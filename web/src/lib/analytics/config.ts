@@ -24,15 +24,17 @@ const POSTHOG_HOSTS = ["https://us.i.posthog.com", "https://eu.i.posthog.com"];
 /** A malformed value counts as unset, so a typo in Vercel cannot inject anything into the page. */
 export function analyticsConfig(env: Record<string, string | undefined> = process.env): AnalyticsConfig {
   const gaId = clean(env.NEXT_PUBLIC_GA_ID);
-  const posthogKey = clean(env.NEXT_PUBLIC_POSTHOG_KEY);
+  // PostHog only runs on the Production deployment, so Preview and local builds never send events.
+  // VERCEL_ENV is read here on the server (root layout) and passed down with the rest of the config.
+  const posthogKey = env.VERCEL_ENV === "production" ? clean(env.NEXT_PUBLIC_POSTHOG_KEY) : undefined;
   const host = clean(env.NEXT_PUBLIC_POSTHOG_HOST)?.replace(/\/$/, "");
   const cf = clean(env.NEXT_PUBLIC_CF_BEACON_TOKEN);
   const metricool = clean(env.NEXT_PUBLIC_METRICOOL_HASH);
   return {
     gaId: gaId && GA_ID.test(gaId) ? gaId : undefined,
     posthogKey: posthogKey && POSTHOG_KEY.test(posthogKey) ? posthogKey : undefined,
-    // Unset or unknown host falls back to the EU cloud, the safer default for EU visitors.
-    posthogHost: host && POSTHOG_HOSTS.includes(host) ? host : POSTHOG_HOSTS[1],
+    // Unset or unknown host falls back to the US cloud, where the Everloot project (684968) lives.
+    posthogHost: host && POSTHOG_HOSTS.includes(host) ? host : POSTHOG_HOSTS[0],
     cfBeaconToken: cf && CF_TOKEN.test(cf) ? cf : undefined,
     metricoolHash: metricool && /^[a-f0-9]{32}$/.test(metricool) ? metricool : undefined,
   };
