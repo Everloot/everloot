@@ -257,8 +257,9 @@ export default async function AddonPage() {
               install and says so once in chat: it counts the race, class, level and faction of characters you see, never a
               name. <code>/everloot census off</code> turns it off and deletes its rows. The players module is off
               until you type <code>/everloot players on</code>; when you turn it on, the addon records the name, realm,
-              race, class, level and guild of your own characters and of players you target, mouse over or group with.
-              Those rows can appear on the site&apos;s player pages, and any character can be hidden without an account.
+              race, class, level and guild of your own characters and of players you target, mouse over or group with,
+              and your own guild&apos;s boss kills (the guild, the boss and the time, no names). Those rows can appear on
+              the site&apos;s player and guild pages, and any character or guild can be hidden without an account.
               Read the{" "}
               <Link href="/privacy" className={link}>Privacy Policy</Link> and the{" "}
               <a className={link} href={`${REPO_URL}/blob/main/docs/DATA_POLICY.md`} rel={EXT}>data policy</a>.

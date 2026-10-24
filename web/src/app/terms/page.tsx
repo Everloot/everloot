@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   ...pageMetadata({ title: "Terms of Use", description, path: "/terms" }),
 };
 
-const UPDATED = "18 October 2026";
+const UPDATED = "24 October 2026";
 const HISTORY_URL = `${REPO_URL}/commits/main/web/src/app/terms/page.tsx`;
 
 const SECTIONS: TocItem[] = [
@@ -82,6 +82,12 @@ export default function TermsPage() {
               <Link href="/players/opt-out">hide form</Link>, which needs no account, or email us; we will remove it and
               it is not recorded again. We may remove any player page at any time, including one that is accurate. Do not
               use the player pages to harass, dox or locate a person.
+            </p>
+            <p>
+              The same holds for the guild pages, where the site has them: a guild&apos;s kills, ranks and the characters
+              seen in it come from players&apos; uploads, are unverified, and say nothing about who belongs to a guild or
+              leads it. Anyone can hide a guild on the <Link href="/guilds/hide">guild hide form</Link>, which needs no
+              account or officer rank. We may remove any guild page at any time.
             </p>
           </Section>
 

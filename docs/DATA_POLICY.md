@@ -52,7 +52,8 @@ installs and check our counts. The facts the site states itself, such as drop ra
 ranges, appear only once at least three installs have reported them. Addon lists are the
 exception to public records: they are never published row by row, only as counts for addons that
 at least three installs report. Guild data is published only through an officer's
-upload, and named records only with that person's sharing choice. Player rows are a second
+upload, and named records only with that person's sharing choice; a guild's boss kills (`guild_kill`, below) are
+the exception, published once two of its members' installs report them. Player rows are a second
 exception, described below: they carry character names, and they are never published as part of
 the public records.
 
@@ -68,6 +69,22 @@ because counting the reporters would mean keeping who reported a row. A row is d
 character was last seen, and a hidden character is deleted at once and never recorded again. The pages are
 unverified information reported by other players, and Everloot makes no statement that a character
 belongs to anyone.
+
+The guild pages are off until the owner turns them on, like the player pages (the guild design,
+`docs/design/specs/2026-10-24-guild-board-design.md`). While the players module is on, the addon also records
+your own guild's boss kills: when `ENCOUNTER_END` reports a kill inside a dungeon or raid and the game shows your
+character in a guild, one `guild_kill` row with the guild's name, the realm, your faction, the encounter's id and
+name, the instance's map id and difficulty, the group size and the time. It holds no character name, no GUID and
+nothing about who else was there; at most 60 are written a UTC day, and `/everloot players off` deletes them with
+the player rows. `guild_kill` is a public kind: it names a guild and a boss, never a person, and it is published
+row by row with the per-install pseudonym like the anonymous records. A kill is the guild's once two installs
+report the same guild and boss, timed at the earliest of their reports; the guild ladder and the open data export's
+`guild-kills.ndjson` and `guilds.ndjson` hold only those. A guild's page lists its agreed kills, its officers'
+publication when they made one, and the characters the addon saw in that guild: these are player rows, each
+already public on its own page, grouped by the guild the game showed, and the page says they are sightings, not
+the game's member list. Anyone can hide a guild with the guild hide form, without an account or proof of office:
+the guild leaves the pages, the ladder, the search and the export at once, and its kill rows are dropped at
+intake from then on. Its characters keep their own pages, which the character hide form governs.
 
 The addon also reads a few game facts about the NPC you target and the quest you accept, as the game
 shows them to you. For an NPC: its creature type (Beast, Undead, Humanoid) and its rank (normal, elite,
