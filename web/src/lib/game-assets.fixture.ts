@@ -37,6 +37,8 @@ export const siteManifest = {
     "night elf": { name: "Night Elf", female: null, male: emblem("raceicon128-nightelf-male") },
   },
   factions: { alliance: emblem("AllianceEmblem"), horde: emblem("HordeEmblem") },
+  // The map legend's icons: a build that has pieces for two categories, none for the rest.
+  poi: { dungeon: { file: "poi/Dungeon.webp", width: 50, height: 50 }, flight: { file: "poi/TaxiNode_Neutral.webp", width: 32, height: 32 } },
   logo: { file: "logo/logo-wow-forever-2x.webp", width: 640, height: 640, element: "logo-wow-forever-2x", fileDataId: 7312237 },
 };
 

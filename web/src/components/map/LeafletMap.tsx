@@ -8,6 +8,7 @@ import { useEffect, useRef } from "react";
 import {
   labelFontPx, placeLabels, zoneArtShown, type ArtImage, type Box, type InitialView, type LabelCandidate, type MapArtLayer, type MapItems, type MapZone,
 } from "@/lib/map-view";
+import { pinIconUrl, pinMarkHtml, type PinKind, type PoiIcons } from "@/lib/map-marks";
 import { reducedMotion } from "@/lib/motion";
 
 /** Where the reader's deep link points: a ring on the spot. */
@@ -26,6 +27,8 @@ export interface LeafletMapProps {
   zones: MapZone[];
   art: MapArtLayer | null;
   showArt: boolean;
+  /** The game's minimap icons by legend category; a pin whose category has none is drawn as a glyph. */
+  icons: PoiIcons;
   selectedId: string | null;
   marker: MapMarker | null;
   /** Where to open: a box to fit, or a centre and a zoom from the address. */
@@ -45,8 +48,19 @@ const ll = (x: number, y: number) => L.latLng(-y, x);
 const bounds = (b: Box) => L.latLngBounds(ll(b.x, b.y + b.height), ll(b.x + b.width, b.y));
 const box = (b: L.LatLngBounds): Box => ({ x: b.getWest(), y: -b.getNorth(), width: b.getEast() - b.getWest(), height: b.getNorth() - b.getSouth() });
 
-function pinIcon(kind: string, selected: boolean) {
-  return L.divIcon({ className: `wm-pin wm-pin-${kind}${selected ? " wm-selected" : ""}`, html: "<span></span>", iconSize: [26, 26], iconAnchor: [13, 13] });
+function pinIcon(kind: PinKind, selected: boolean, icons: PoiIcons) {
+  const image = pinIconUrl(kind, icons) !== null;
+  return L.divIcon({
+    className: `wm-pin wm-pin-${kind}${image ? " wm-pin-img" : ""}${selected ? " wm-selected" : ""}`,
+    html: pinMarkHtml(kind, icons), iconSize: [26, 26], iconAnchor: [13, 13],
+  });
+}
+
+/** The name a pin shows on hover (and on a tap, before its card). Text, never markup: names come from uploads too. */
+function tooltipFor(name: string): HTMLElement {
+  const el = document.createElement("span");
+  el.textContent = name;
+  return el;
 }
 
 function labelIcon(l: LabelCandidate) {
@@ -228,18 +242,19 @@ export default function LeafletMap(props: LeafletMapProps) {
     for (const l of props.items.flightLines) {
       L.polyline(l.points.map(([x, y]) => ll(x, y)), { pane: "flights", weight: 1.5, className: "wm-flight-line", interactive: false, smoothFactor: 0 }).addTo(g.flights);
     }
-    const add = (id: string, x: number, y: number, kind: string) => {
-      const mk = L.marker(ll(x, y), { icon: pinIcon(kind, id === live.current.selectedId), keyboard: false, riseOnHover: true });
+    const add = (id: string, x: number, y: number, kind: PinKind, name: string) => {
+      const mk = L.marker(ll(x, y), { icon: pinIcon(kind, id === live.current.selectedId, props.icons), keyboard: false, riseOnHover: true });
+      mk.bindTooltip(tooltipFor(name), { direction: "top", offset: [0, -12], className: "wm-tooltip", opacity: 1 });
       mk.on("click", () => live.current.onSelect(id));
       mk.addTo(g.pins);
       markers.current.set(id, mk);
     };
-    for (const e of props.items.entrances) add(`e${e.id}`, e.x, e.y, e.raid ? "raid" : "dungeon");
-    for (const f of props.items.flightMasters) add(f.id, f.x, f.y, "flight");
-    for (const p of props.items.pins) add(p.id, p.x, p.y, p.kind);
-    for (const t of props.items.treasures) add(t.id, t.x, t.y, "chest");
+    for (const e of props.items.entrances) add(`e${e.id}`, e.x, e.y, e.raid ? "raid" : "dungeon", e.names.join(", "));
+    for (const f of props.items.flightMasters) add(f.id, f.x, f.y, "flight", f.name);
+    for (const p of props.items.pins) add(p.id, p.x, p.y, p.kind, p.name ?? `NPC ${p.npcId}`);
+    for (const t of props.items.treasures) add(t.id, t.x, t.y, "chest", t.name ?? `Object ${t.objectId}`);
     relabel.current();
-  }, [props.items]);
+  }, [props.items, props.icons]);
 
   // The selected pin is drawn bigger.
   useEffect(() => {

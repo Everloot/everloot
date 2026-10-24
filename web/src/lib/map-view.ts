@@ -217,17 +217,23 @@ export function searchMap(items: MapItems, query: string, limit = RANK_LIMIT): S
 export interface ArtImage { uiMapId: number; name: string; url: string; smallUrl: string | null; x: number; y: number; width: number; height: number }
 export interface MapArtLayer { continent: ArtImage | null; zones: ArtImage[] }
 
-/** From this zoom in, zone pictures are drawn at full size. */
-export const ZONE_ART_ZOOM = 2.5;
+/**
+ * From this zoom in, zone pictures are drawn at full size. The continent picture is one 1002 px painting over
+ * the whole continent, so past this zoom it is stretched; a zone's own picture is the same size over one zone,
+ * several times sharper.
+ */
+export const ZONE_ART_ZOOM = 2;
 
 const intersects = (a: Box, b: Box) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
 /**
  * Which zone pictures to draw, and at which size. Only pictures that reach into the view are drawn.
  * With a continent picture, a zone's own picture is laid over it only once the reader has zoomed in to
- * ZONE_ART_ZOOM, and only for the smallest zone under the middle of the view. Without one, every zone in
- * view shows, largest first so the smaller sit on top, from its small copy until zoomed in. Pure, so the
- * choice is tested without a browser.
+ * ZONE_ART_ZOOM, and only for the smallest zone under the middle of the view: each zone's painting reaches
+ * into its neighbours and paints them differently, so laying every zone in view side by side makes a quilt
+ * of seams. One zone at a time is also how the game's own map behaves. Without a continent picture, every
+ * zone in view shows, largest first so the smaller sit on top, from its small copy until zoomed in. Pure,
+ * so the choice is tested without a browser.
  */
 export function zoneArtShown(art: MapArtLayer, camera: Camera, view: Box): ArtImage[] {
   const bySize = [...art.zones].filter((z) => intersects(view, z)).sort((a, b) => b.width * b.height - a.width * a.height);

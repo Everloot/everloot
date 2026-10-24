@@ -3,6 +3,7 @@ import { z } from "zod";
 import { CLASSES } from "@/design/tokens";
 import type { BuffTable } from "@/data/game-data/raid";
 import { itemTipText, qualityColor } from "@/lib/item-names";
+import { ICON_CATEGORIES, type PoiIcons } from "@/lib/map-marks";
 import { assetPath, assetsBaseUrl, MANIFEST_SCHEMA } from "@/lib/talents/assets";
 import type { ItemRecord } from "../../../kb/src/assets/items";
 import { worldToMap } from "../../../kb/src/world-coords";
@@ -57,6 +58,8 @@ const site = z.object({
   })).default({}),
   races: z.record(z.string(), z.object({ name: z.string(), female: Pic.nullable(), male: Pic.nullable() })).default({}),
   factions: z.record(z.string(), Pic).default({}),
+  // The world map's legend icons by category id ("flight"): the game's own minimap pieces.
+  poi: z.record(z.string(), Pic).default({}),
   logo: Pic.nullable().default(null),
 });
 
@@ -92,6 +95,8 @@ export interface SiteAssets {
   races: Map<string, { name: string; female: string | null; male: string | null }>;
   /** "alliance", "horde" -> emblem URL. */
   factions: Map<string, string>;
+  /** Map legend category id ("flight") -> the game's own minimap icon for it. */
+  poi: Map<string, string>;
   /** The game's own WoW: Forever logo, from its interface files; null when the upload has none. */
   logo: { url: string; width: number; height: number } | null;
 }
@@ -156,6 +161,7 @@ export function parseSiteManifest(json: unknown, base: string): SiteAssets | nul
     })),
     races: new Map(Object.entries(m.races).map(([key, r]) => [key.toLowerCase(), { name: r.name, female: url(r.female), male: url(r.male) }])),
     factions: new Map(Object.entries(m.factions).map(([key, f]) => [key.toLowerCase(), assetUrl(base, f.file)])),
+    poi: new Map(Object.entries(m.poi).map(([key, p]) => [key, assetUrl(base, p.file)])),
     logo: m.logo ? { url: assetUrl(base, m.logo.file), width: m.logo.width, height: m.logo.height } : null,
   };
 }
@@ -524,6 +530,20 @@ export function continentArt(assets: SiteAssets | null, continentId: number, spo
   const zones = here.filter((m) => m.kind === "zone").map(box);
   if (!continent && !zones.length) return null;
   return { continent: continent ? box(continent) : null, zones };
+}
+
+/**
+ * The game's icons for the world map's legend and pins, by category, for the categories the upload has one for.
+ * Empty without an upload: the map then draws its own glyphs.
+ */
+export function poiIcons(assets: SiteAssets | null): PoiIcons {
+  const out: PoiIcons = {};
+  if (!assets) return out;
+  for (const id of ICON_CATEGORIES) {
+    const url = assets.poi.get(id);
+    if (url) out[id] = url;
+  }
+  return out;
 }
 
 /* ---------- Loading screens, emblems and the launch banner ---------- */
