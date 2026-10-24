@@ -50,4 +50,39 @@ test("an unavailable release renders the unavailable copy, not a zero", async ()
   const html = await render(join(tmpdir(), "missing.sqlite"));
   expect(html).toContain("Lore archive unavailable");
   expect(html).not.toContain("0 pages");
+  expect(html).not.toContain("Start here");
+  expect(html).not.toContain('id="zones"');
+});
+
+test("the landing offers a start-here path with each page's opening sentence, and a zone list", async () => {
+  const html = await render(await buildLoreRelease({ landing: true }));
+  expect(html).toContain("Start here");
+  expect(html).toContain('href="/lore/481380-alliance"');
+  expect(html).toContain("The Alliance is one of two major factions.");
+  expect(html).not.toContain("A quote set as a list.");
+  expect(html).toContain('href="/lore/19317-orc"');
+  // Start-here ids the release lacks are skipped, never linked.
+  expect(html).not.toContain('href="/lore/360548');
+  expect(html).toContain('id="zones"');
+  expect(html).toContain('href="/lore/zones"');
+  expect(html.indexOf('href="/lore/201-ashenvale"')).toBeGreaterThan(-1);
+  expect(html.indexOf('href="/lore/201-ashenvale"')).toBeLessThan(html.indexOf('href="/lore/200-durotar"'));
+  // A town has a zone type but not the zone infobox.
+  expect(html).not.toContain("202-razor-hill");
+  // The zone rows the shared fixture has without an infobox stay out.
+  expect(html).not.toContain('href="/lore/100-zone-1"');
+});
+
+test("without the landing rows the new sections are left out, not shown empty", async () => {
+  const html = await render();
+  expect(html).not.toContain("Start here");
+  expect(html).not.toContain('id="zones"');
+});
+
+test("a release without type data keeps Start here and leaves out the zone list", async () => {
+  const html = await render(await buildLoreRelease({ typed: false, landing: true }));
+  expect(html).toContain("Start here");
+  expect(html).toContain('href="/lore/481380-alliance"');
+  expect(html).not.toContain('id="zones"');
+  expect(html).not.toContain('href="/lore/npcs"');
 });

@@ -324,6 +324,62 @@ export function facetValues(type: LoreType): Record<FacetKey, string[]> | Unavai
   return out;
 }
 
+// ---- The landing's way in ---------------------------------------------------------------------
+
+/**
+ * Wiki page ids for the landing's "Start here" list, checked against the 2026-10-24 release: Alliance,
+ * Horde, Human, Orc, Eastern Kingdoms, Kalimdor, Burning Legion, Scourge. An id the release lacks is skipped.
+ */
+export const START_HERE = ["481380", "360548", "353113", "19317", "397389", "144560", "490354", "201569"] as const;
+
+export interface LoreLink { extId: string; name: string; sentence: string }
+
+/** The first sentence of the first paragraph, past hatnotes and quotes set as lists; "" when there is none. */
+export function openingSentence(body: string): string {
+  const first = renderBody(body).find((b) => b.type === "p");
+  return first ? firstSentence(first.text) : "";
+}
+
+const START = new WeakMap<object, LoreLink[]>();
+
+/** The "Start here" pages this release has, in list order, each with its own opening sentence. */
+export function startHere(): LoreLink[] | Unavailable {
+  const release = getRelease();
+  if (!release) return UNAVAILABLE;
+  const known = START.get(release.db);
+  if (known) return known;
+  const out: LoreLink[] = [];
+  for (const extId of START_HERE) {
+    const page = loreByExtId(extId);
+    if (!page || page === UNAVAILABLE || page.body.includes("REDIRECT")) continue;
+    out.push({ extId: page.extId, name: page.name, sentence: openingSentence(page.body) });
+  }
+  START.set(release.db, out);
+  return out;
+}
+
+const ZONES = new WeakMap<object, { extId: string; name: string }[]>();
+
+/**
+ * Zone pages with the wiki's zone infobox (not towns or instances), by name. The data names a continent
+ * for too few of them to group by, so the list is alphabetical. Empty for a release without type data.
+ */
+export function zonePages(): { extId: string; name: string }[] | Unavailable {
+  const release = getRelease();
+  if (!release) return UNAVAILABLE;
+  const known = ZONES.get(release.db);
+  if (known) return known;
+  const rows = release.db
+    .prepare(
+      `SELECT ext_id AS extId, name FROM entities
+       WHERE ${INDEXABLE_SQL} AND json_extract(data, '$.type') = 'zone' AND json_extract(data, '$.infobox.template') = 'infobox zone'
+       ORDER BY name COLLATE NOCASE, id`,
+    )
+    .all(...PUBLISHABLE) as { extId: string; name: string }[];
+  ZONES.set(release.db, rows);
+  return rows;
+}
+
 export interface Coverage {
   types: Record<string, number> | null;
   damaged: number | null;
