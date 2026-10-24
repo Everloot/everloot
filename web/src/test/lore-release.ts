@@ -17,9 +17,12 @@ const EMPTY_FACETS: Record<"expansion" | "profession" | "class" | "race" | "zone
  * out of lore search. `typed: false` builds the same rows with no type data, like the 2026-10-05
  * release; `facets: false` keeps the types but drops the manifest facet totals — an artifact the
  * serving gate refuses, because a typed release without them would serve slow scan paths. `dir` writes
- * into that folder instead of a new temp dir (used by `npm run sample-release`).
+ * into that folder instead of a new temp dir (used by `npm run sample-release`). `landing: true` adds the
+ * landing's rows: two "Start here" pages (Alliance 481380, Orc 19317), two zones with the zone infobox
+ * (Durotar 200, Ashenvale 201), a town (Razor Hill 202) that the zone list leaves out, and two "(Classic)"
+ * zones: Durotar (Classic) 203, dropped beside Durotar, and Silithus (Classic) 204, kept with no twin.
  */
-export async function buildLoreRelease(options: { typed?: boolean; facets?: boolean; dir?: string } = {}): Promise<string> {
+export async function buildLoreRelease(options: { typed?: boolean; facets?: boolean; dir?: string; landing?: boolean } = {}): Promise<string> {
   const typed = options.typed ?? true;
   const withFacets = options.facets ?? true;
   const dir = options.dir ?? mkdtempSync(join(tmpdir(), "everloot-lore-"));
@@ -45,6 +48,15 @@ export async function buildLoreRelease(options: { typed?: boolean; facets?: bool
     ...Array.from({ length: 22 }, (_, i) => wiki(String(100 + i), `Zone ${i + 1}`, `Zone ${i + 1} is where grommash fought. ${"Battles raged here. ".repeat(20)}`, {
       type: "zone", facets: facets({ expansion: [(100 + i) % 2 ? "Legion" : "Battle for Azeroth"] }), damaged: false,
     })),
+    ...(options.landing ? [
+      wiki("481380", "Alliance", `* A quote set as a list.\n\nThe Alliance is one of two major factions. ${"It fights on. ".repeat(30)}`, { type: "other", facets: EMPTY_FACETS, damaged: false }),
+      wiki("19317", "Orc", `The orcs are a race from Draenor. ${"They endure. ".repeat(30)}`, { type: "other", facets: EMPTY_FACETS, damaged: false }),
+      wiki("200", "Durotar", `Durotar is a zone of red earth. ${"Dust blows. ".repeat(30)}`, { type: "zone", facets: EMPTY_FACETS, infobox: { template: "infobox zone", fields: { name: "Durotar" } }, damaged: false }),
+      wiki("201", "Ashenvale", `Ashenvale is a forest zone. ${"Trees stand. ".repeat(30)}`, { type: "zone", facets: EMPTY_FACETS, infobox: { template: "infobox zone", fields: { name: "Ashenvale" } }, damaged: false }),
+      wiki("203", "Durotar (Classic)", `Durotar (Classic) is the zone as it was. ${"Dust blew. ".repeat(30)}`, { type: "zone", facets: EMPTY_FACETS, infobox: { template: "infobox zone", fields: { name: "Durotar" } }, damaged: false }),
+      wiki("204", "Silithus (Classic)", `Silithus (Classic) is a desert zone. ${"Sand shifts. ".repeat(30)}`, { type: "zone", facets: EMPTY_FACETS, infobox: { template: "infobox zone", fields: { name: "Silithus" } }, damaged: false }),
+      wiki("202", "Razor Hill", `Razor Hill is a town. ${"Orcs live here. ".repeat(30)}`, { type: "zone", facets: EMPTY_FACETS, infobox: { template: "infobox town", fields: { name: "Razor Hill" } }, damaged: false }),
+    ] : []),
   ];
   await replaceSourceRows(source, "warcraft-wiki-2023", ["lore_page"], rows);
   await replaceSourceRows(source, "curated", ["lore_page", "item"], [{
