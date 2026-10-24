@@ -22,7 +22,7 @@ import { z } from "zod";
 import type { TableSource } from "./client-extract.js";
 import { readClientMeta, readClientRows, readClientTables } from "./client-snapshot.js";
 import {
-  atlasPieces, blpSize, FACTION_ELEMENTS, LOGO_ELEMENTS, narrowCrop, planLoadingScreens, RACE_ATLAS, RACE_SEXES, raceElement, racesInBuild,
+  atlasPieces, blpSize, FACTION_ELEMENTS, LOGO_ELEMENTS, narrowCrop, planLoadingScreens, POI_ELEMENTS, RACE_ATLAS, RACE_SEXES, raceElement, racesInBuild,
 } from "./assets/banners.js";
 import { buildItemSet, shardRecords, ITEM_SHARD_SIZE } from "./assets/items.js";
 import { planMapArt, stitchPlan } from "./assets/map-art.js";
@@ -157,6 +157,8 @@ export const AssetManifest = z.object({
   races: z.record(z.string(), z.object({ name: z.string(), female: File.nullable(), male: File.nullable() })).default({}),
   /** "alliance" and "horde": the faction emblems. */
   factions: z.record(z.string(), File).default({}),
+  /** By the world map's legend category id ("flight"): the game's own minimap icon for it, and the atlas element it is. */
+  poi: z.record(z.string(), File.extend({ element: z.string() })).default({}),
   /** The game's own WoW: Forever logo from the interface atlas, or null when the build has none. Never marketing art. */
   logo: File.extend({ element: z.string(), fileDataId: z.number().int() }).nullable().default(null),
   // Item tooltip facts are not listed here: they go to the private folder (ItemIndex), never to the public bucket.
@@ -168,6 +170,7 @@ export const AssetManifest = z.object({
     mapsExtracted: z.number().int().default(0), mapsSkipped: z.number().int().default(0),
     loadingScreensExtracted: z.number().int().default(0), loadingScreensSkipped: z.number().int().default(0),
     emblemsExtracted: z.number().int().default(0), logoExtracted: z.number().int().default(0),
+    poiExtracted: z.number().int().default(0),
   }),
   /** Frame elements the build does not have or that could not be read; the site falls back for these. */
   missingFrames: z.array(z.string()),
@@ -339,7 +342,7 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
   mkdirSync(join(dir, "icons"), { recursive: true });
   mkdirSync(join(dir, "frames"), { recursive: true });
   mkdirSync(join(dir, "maps"), { recursive: true });
-  for (const folder of ["loading", "emblems", "logo"]) mkdirSync(join(dir, folder), { recursive: true });
+  for (const folder of ["loading", "emblems", "logo", "poi"]) mkdirSync(join(dir, folder), { recursive: true });
   mkdirSync(work, { recursive: true });
 
   const fetched = new Map<number, Fetched>();
@@ -661,7 +664,7 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
   let emblemsExtracted = 0;
   const raceNames = get("ChrRaces") ? racesInBuild(get) : [];
   const emblemElements = [...raceNames.flatMap((n) => RACE_SEXES.map((s) => raceElement(RACE_ATLAS[n].atlas, s))), ...Object.values(FACTION_ELEMENTS)];
-  const pieces = atlasPieces(get, [...emblemElements, ...LOGO_ELEMENTS]);
+  const pieces = atlasPieces(get, [...emblemElements, ...LOGO_ELEMENTS, ...Object.values(POI_ELEMENTS).flat()]);
   const emblems = new Map<string, z.infer<typeof File>>();
   async function cutPiece(element: string, folder: string, quality?: number): Promise<z.infer<typeof File> | null> {
     const p = pieces.get(element);
@@ -694,17 +697,26 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
     if (made) { logo = { ...made, element, fileDataId: pieces.get(element)!.fileId }; break; }
   }
 
+  // The world map's legend icons: one minimap piece per category that has one, the first listed that the build holds.
+  const poi: AssetManifest["poi"] = {};
+  for (const [category, elements] of Object.entries(POI_ELEMENTS)) {
+    for (const element of elements) {
+      const made = await cutPiece(element, "poi");
+      if (made) { poi[category] = { ...made, element }; break; }
+    }
+  }
+
   rmSync(work, { recursive: true, force: true });
   const manifest = AssetManifest.parse({
     schema: ASSET_SCHEMA, label: LABEL,
     build: { product: build.product, buildId: build.buildId, version: build.version, buildConfig: build.buildConfig, extractedAt: new Date().toISOString() },
-    spells, frames, backgrounds, classes, professions, spellIcons, familyIcons, maps, spellTips, loadingScreens, races, factions, logo,
+    spells, frames, backgrounds, classes, professions, spellIcons, familyIcons, maps, spellTips, loadingScreens, races, factions, poi, logo,
     counts: {
       ...stats, tooltipsResolved: resolved, tooltipsUnresolved: unresolvedCount, tooltipsEmpty: empty,
       itemsRecorded: items?.count ?? 0, itemsWithIcon, mapsExtracted: Object.keys(maps).length, mapsSkipped: skippedMaps.length,
       loadingScreensExtracted: Object.keys(loadingScreens).length,
       loadingScreensSkipped: loadingSkipped,
-      emblemsExtracted, logoExtracted: logo ? 1 : 0,
+      emblemsExtracted, logoExtracted: logo ? 1 : 0, poiExtracted: Object.keys(poi).length,
     },
     missingFrames: missingFrames.sort(),
     skippedMaps,
@@ -724,6 +736,7 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
     `maps: ${c.mapsExtracted} pictures, ${c.mapsSkipped} skipped`,
     `loading screens: ${c.loadingScreensExtracted} maps with a picture (${new Set(Object.values(loadingScreens).map((l) => l.file)).size} files), ${c.loadingScreensSkipped} skipped; buff tooltips: ${Object.keys(spellTips).length}`,
     `emblems: ${c.emblemsExtracted} (races: ${Object.keys(races).length}, factions: ${Object.keys(factions).length})`,
+    `map legend icons: ${c.poiExtracted} of ${Object.keys(POI_ELEMENTS).length} categories (${Object.entries(poi).map(([k, p]) => `${k}: ${p.element}`).join(", ") || "none"})`,
     logo ? `logo: ${logo.element}, atlas file ${logo.fileDataId}, ${logo.width} x ${logo.height}` : "logo: none in this build's files (no stand-in is used)",
   ];
   return { dir, privateDir: items ? privateDir : null, manifest, checksums: sums, items, notes };

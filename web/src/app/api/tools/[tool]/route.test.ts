@@ -62,6 +62,12 @@ test("numbers and booleans are read from their text; strings stay strings", () =
   expect(argumentsFromQuery("item_page", new URLSearchParams("itemId=abc"))).toEqual({ itemId: "abc" });
 });
 
+test("a choice from a fixed list matches without regard to case; anything off the list stays as written", () => {
+  expect(argumentsFromQuery("search_knowledge", new URLSearchParams("query=x&version=Classic"))).toEqual({ query: "x", version: "classic" });
+  expect(argumentsFromQuery("search_knowledge", new URLSearchParams("query=x&version=+FOREVER+"))).toEqual({ query: "x", version: "forever" });
+  expect(argumentsFromQuery("search_knowledge", new URLSearchParams("query=x&version=World+of+Warcraft"))).toEqual({ query: "x", version: "World of Warcraft" });
+});
+
 test("a wrong argument is a 400 that names it, an unknown tool a 404 that lists the tools, a missing release a 503", async () => {
   const bad = await get("item_page", "?itemId=abc");
   expect(bad.status).toBe(400);

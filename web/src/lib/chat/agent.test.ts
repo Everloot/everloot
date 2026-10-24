@@ -1,8 +1,8 @@
 import { describe, expect, test, vi } from "vitest";
 import { MY_BUILDS_LINE, MY_BUILDS_REFUSAL } from "../saved-builds";
 import {
-  ACCOUNT_TOOL, answer, answerOrigin, callTool, CHAT_TOOLS, loadTools, NO_SOURCED_ANSWER, pagesIn, readOpenAiStream, searchOnly, signedIn, sourceLink,
-  sourcesIn, SYSTEM, testKey, TOOL_POLICY, UNSOURCED, type ToolDef,
+  ACCOUNT_TOOL, answer, answerOrigin, callTool, CHAT_TOOLS, loadTools, MODEL_STOPPED, NO_SOURCED_ANSWER, pagesIn, readOpenAiStream, searchOnly, signedIn,
+  SMALL_TALK_REPLY, smallTalk, sourceLink, sourcesIn, SYSTEM, testKey, TOOL_POLICY, UNSOURCED, type ToolDef,
 } from "./agent";
 import { chatProvider } from "./providers";
 
@@ -147,6 +147,45 @@ test("provider errors name the provider and the message, in a body or inside the
   const inStream = vi.fn(async () => sse([{ error: { message: "Rate limit exceeded" } }]));
   await expect(answer({ provider: chatProvider("openrouter")!, model: "m", key: "k", history: [], question: "q", tools: TOOLS, send: inStream as never, site: site([]) }))
     .rejects.toThrow("openrouter.ai: Rate limit exceeded");
+});
+
+test("small talk without a key gets the page's own line and no lookup; a real question still searches", async () => {
+  const calls: string[] = [];
+  for (const q of ["hi", "Hello!", "thank you", "ok cool", "testing"]) {
+    expect(smallTalk(q)).toBe(true);
+    expect((await searchOnly(q, site(calls))).text).toBe(SMALL_TALK_REPLY);
+  }
+  expect(calls).toEqual([]);
+  for (const q of ["hi where is Leeroy", "Linen Cloth", "what drops the hi-tech supergun"]) expect(smallTalk(q)).toBe(false);
+  await searchOnly("Linen Cloth", site(calls));
+  expect(calls).toHaveLength(1);
+});
+
+test("a provider that fails after the tools answered gives what they found, not nothing", async () => {
+  const calls: string[] = [];
+  let turns = 0;
+  const send = vi.fn(async () => turns++ === 0
+    ? sse([{ choices: [{ delta: { tool_calls: [{ index: 0, id: "c1", type: "function", function: { name: "search_knowledge", arguments: "{\"query\":\"Leeroy\"}" } }] } }] }])
+    : new Response(JSON.stringify({ error: { message: "upstream relay failed" } }), { status: 502 }));
+  const r = await answer({ provider: chatProvider("openrouter")!, model: "m", key: "k", history: [], question: "who is leeroy", tools: TOOLS, send: send as never, site: site(calls) });
+  // The 502 was asked once more before it counted, then the tool output came back as the reply.
+  expect(send).toHaveBeenCalledTimes(3);
+  expect(r.model).toBeNull();
+  expect(r.text).toContain(`${MODEL_STOPPED} (openrouter.ai: HTTP 502, upstream relay failed)`);
+  expect(r.text).toContain("Leeroy Jenkins is a valiant human paladin.");
+  expect(r).toMatchObject({ steps: [{ tool: "search_knowledge" }], sources: [expect.stringContaining("Leeroy_Jenkins")] });
+  expect(answerOrigin(r)).toEqual({ everloot: true, model: false });
+});
+
+test("a failure before any lookup is still thrown, and a 5xx is retried once only", async () => {
+  const http = vi.fn(async () => new Response(JSON.stringify({ error: { message: "overloaded" } }), { status: 503 }));
+  await expect(answer({ provider: chatProvider("openrouter")!, model: "m", key: "k", history: [], question: "q", tools: TOOLS, send: http as never, site: site([]) }))
+    .rejects.toThrow("openrouter.ai: HTTP 503, overloaded");
+  expect(http).toHaveBeenCalledTimes(2);
+  const auth = vi.fn(async () => new Response(JSON.stringify({ error: { message: "bad key" } }), { status: 401 }));
+  await expect(answer({ provider: chatProvider("openrouter")!, model: "m", key: "k", history: [], question: "q", tools: TOOLS, send: auth as never, site: site([]) }))
+    .rejects.toThrow("HTTP 401");
+  expect(auth).toHaveBeenCalledTimes(1);
 });
 
 test("an Ollama that cannot be reached says how to let the page in", async () => {

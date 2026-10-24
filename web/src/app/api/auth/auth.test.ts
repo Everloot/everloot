@@ -104,7 +104,19 @@ test("callback does not create a browser session when storage fails", async () =
   const { GET } = await import("./bnet/callback/route");
   const response = await GET(new Request("https://everloot.app/api/auth/bnet/callback?code=code&state=state"));
   expect(response.cookies.get("everloot_session")).toBeUndefined();
-  expect(response.headers.get("location")).toContain("auth_error=callback_failed");
+  expect(response.headers.get("location")).toBe("https://everloot.app/sign-in?error=callback_failed");
+});
+
+test("a failed callback sends the visitor to the sign-in page with the reason and their return path", async () => {
+  vi.stubEnv("BNET_CLIENT_ID", "client");
+  vi.stubEnv("BNET_CLIENT_SECRET", "secret");
+  jar.set("bnet_oauth_state", "state");
+  jar.set("everloot_return_to", "/tools/talents/mage?save=1");
+  vi.stubGlobal("fetch", vi.fn());
+  const { GET } = await import("./bnet/callback/route");
+  const response = await GET(new Request("https://everloot.app/api/auth/bnet/callback?error=access_denied&state=state"));
+  expect(response.headers.get("location")).toBe(`https://everloot.app/sign-in?error=access_denied&returnTo=${encodeURIComponent("/tools/talents/mage?save=1")}`);
+  expect(jar.has("everloot_return_to")).toBe(false);
 });
 
 test("the first sign-in flow carries the return path in a short cookie and lands there", async () => {
@@ -139,6 +151,6 @@ test("callback rejects mismatched state before contacting the provider", async (
   vi.stubGlobal("fetch", fetch);
   const { GET } = await import("./bnet/callback/route");
   const response = await GET(new Request("https://everloot.app/api/auth/bnet/callback?code=code&state=wrong"));
-  expect(response.headers.get("location")).toContain("auth_error=invalid_state");
+  expect(response.headers.get("location")).toBe("https://everloot.app/sign-in?error=invalid_state");
   expect(fetch).not.toHaveBeenCalled();
 });

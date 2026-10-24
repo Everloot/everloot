@@ -17,7 +17,7 @@ import { instanceHref, instanceRows, loadSightings } from "@/lib/instances";
 import { publicZones, zoneHref } from "@/lib/zones";
 import WorldMapView from "@/components/WorldMapView";
 import { LIST_LIMIT } from "@/components/map/MapList";
-import { continentArt, instanceThumbs, loadSiteAssets } from "@/lib/game-assets";
+import { continentArt, instanceThumbs, loadSiteAssets, poiIcons } from "@/lib/game-assets";
 import { SiteCredit } from "@/components/Footer";
 
 export const TITLE = "WoW Forever World Map";
@@ -109,6 +109,8 @@ export async function renderMapScreen(query: MapQuery, pageContinent: number | n
   const lead = pageContinent === null ? DESCRIPTION : continentDescription(continentId);
   // Each dungeon's and raid's loading screen beside its entrance in the list; a later map's only with spoilers on.
   const allThumbs = instanceThumbs(assets, spoilers);
+  // The game's minimap icons for the legend and the pins, where the upload has them.
+  const poi = poiIcons(assets);
   const thumbs = Object.fromEntries(map.entrances.flatMap((p) => p.names).filter((n) => allThumbs[n]).map((n) => [n, allThumbs[n]]));
   const thumbShown = Object.keys(thumbs).length > 0;
 
@@ -184,6 +186,7 @@ export async function renderMapScreen(query: MapQuery, pageContinent: number | n
           spoilerHref={switchHref}
           art={art}
           thumbs={thumbShown ? thumbs : undefined}
+          poi={poi}
           marker={marker}
           zoneId={zoneId}
           view={parseViewState(query)}

@@ -12,7 +12,7 @@ import { dataAgeLabel } from "@/lib/data-age";
 import { classAndProfessionIcons, loadSiteAssets } from "@/lib/game-assets";
 import GameIcon from "@/components/game/GameIcon";
 import { trailFor } from "@/lib/breadcrumbs";
-import { Card, Container, Disclosure, EmptyState, Field, PageHeader, SectionHeading } from "@/components/ui";
+import { Card, Container, Contribute, Disclosure, EmptyState, Field, PageHeader, SectionHeading } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -117,6 +117,12 @@ export default async function ProfessionsPage(
             <Card><pre className="whitespace-pre-wrap text-sm text-fg">{ranges}</pre></Card>
           </section>
         )}
+
+        <Contribute
+          id="prof-contribute"
+          title="Add your recipes"
+          note="Open your profession windows and trainers with the addon on, and scan the auction house for reagent prices. The Desktop App uploads both when you log out; a range shows once 3 installs agree."
+        />
 
         <section aria-labelledby="prof-help">
           <SectionHeading id="prof-help">Questions</SectionHeading>

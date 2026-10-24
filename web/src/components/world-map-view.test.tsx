@@ -352,6 +352,22 @@ test("a pin link to a point past what the page carried opens on it once the pins
   expect($("[data-map-card]").querySelector('a[href="/database/npcs/5"]')).not.toBeNull();
 });
 
+test("the legend's marks are the map's: the game's icon where the upload has one, the glyph elsewhere, and the map gets the same icons", async () => {
+  const poi = { dungeon: "https://assets.example.test/b/poi/Dungeon.webp", flight: "https://assets.example.test/b/poi/TaxiNode_Neutral.webp" };
+  await mount({ poi });
+  const row = (name: string) => [...container.querySelectorAll("label")].find((l) => l.textContent?.includes(name))!;
+  expect(row("Dungeon entrances").querySelector("img[data-swatch-icon]")?.getAttribute("src")).toBe(poi.dungeon);
+  expect(row("Flight masters").querySelector("img[data-swatch-icon]")?.getAttribute("src")).toBe(poi.flight);
+  // Raids have no piece in this upload: the glyph stays, and so does the pin's.
+  expect(row("Raid entrances").querySelector("img")).toBeNull();
+  expect(row("Raid entrances").querySelector("svg")).not.toBeNull();
+  expect(leaflet.props.icons).toEqual(poi);
+  await act(async () => root.unmount());
+  await mount();
+  expect(container.querySelector("img[data-swatch-icon]")).toBeNull();
+  expect(leaflet.props.icons).toEqual({});
+});
+
 test("reduced motion: the sheet slides only when motion is welcome, and the global rule stops the rest", () => {
   const css = readFileSync(source("components/map/world-map.css"), "utf8").replace(/\r\n/g, "\n");
   const motionBlock = css.slice(css.indexOf("@media (max-width: 767.98px) and (prefers-reduced-motion: no-preference)"));

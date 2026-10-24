@@ -9,6 +9,7 @@ import {
   parseDeepLink, parseZoneLink, pinHref, readPinSet, searchMap, spotBox, viewSearch, visibleItems, wayCommand, zoneSearch, zoneSpot,
   type Box, type Candidate, type CategoryId, type CategoryState, type MapArtLayer, type MapItems, type MapPinSet, type MapUrlState, type SearchHit,
 } from "@/lib/map-view";
+import type { PoiIcons } from "@/lib/map-marks";
 import { confirmedLine } from "@/lib/report-labels";
 import MapList, { HELD_LABEL } from "./map/MapList";
 import type { FitRequest, MapMarker, MapViewChange } from "./map/LeafletMap";
@@ -31,7 +32,15 @@ type View = MapUrlState["tab"];
 type Sheet = View | "search";
 
 /** Each category's mark, the same shape the map draws; a category with nothing on the map yet gets an empty ring. */
-function Swatch({ category }: { category: CategoryId }) {
+/**
+ * The mark beside a legend row: the same mark the category's pins carry on the map. The game's own icon where the
+ * upload has one; else the glyph the stylesheet draws on the pins, in the same shape and colour.
+ */
+function Swatch({ category, icon }: { category: CategoryId; icon?: string }) {
+  if (icon) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={icon} alt="" aria-hidden="true" width={18} height={18} data-swatch-icon decoding="async" className="h-[18px] w-[18px] shrink-0 object-contain" />;
+  }
   return (
     <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" className="shrink-0">
       {category === "zone" && <rect x="1.5" y="1.5" width="11" height="11" strokeWidth="1.2" className="fill-fg/10 stroke-edge" />}
@@ -114,6 +123,8 @@ export interface WorldMapViewProps {
   art?: MapArtLayer | null;
   /** Small loading screens by dungeon or raid name, already filtered for spoilers; absent without the asset URL. */
   thumbs?: Record<string, string>;
+  /** The game's minimap icons by legend category, for the legend rows and the pins; absent without the asset URL. */
+  poi?: PoiIcons;
   /** A spot from a deep link: a ring, and the view opens on it. */
   marker: (MapMarker & { mapId: number }) | null;
   /** The zone a link asked for, to open fitted to the view. */
@@ -133,6 +144,7 @@ export interface WorldMapViewProps {
  */
 export default function WorldMapView(props: WorldMapViewProps) {
   const { base, marker, spoilers, art } = props;
+  const icons: PoiIcons = props.poi ?? {};
   const [show, setShow] = useState<CategoryState>(props.url.show);
   const [showArt, setShowArt] = useState(true);
   const [query, setQuery] = useState(props.url.q);
@@ -510,7 +522,7 @@ export default function WorldMapView(props: WorldMapViewProps) {
                               type="checkbox" checked={show[c.id]} disabled={idle} aria-describedby={note ? `map-category-${c.id}` : undefined}
                               onChange={() => setShow((s) => ({ ...s, [c.id]: !s[c.id] }))} className="h-4 w-4 accent-accent"
                             />
-                            <Swatch category={c.id} />
+                            <Swatch category={c.id} icon={icons[c.id]} />
                             <span className={`min-w-0 flex-1 ${idle ? "text-muted" : "text-fg"}`}>{c.label}</span>
                             <span data-count className="tabular-nums text-muted"><span className="sr-only">, </span>{counts[c.id]}</span>
                           </label>
@@ -556,7 +568,7 @@ export default function WorldMapView(props: WorldMapViewProps) {
 
       <div className="relative isolate min-h-0 min-w-0 flex-1 bg-panel">
         <LeafletMap
-          name={props.name} base={base} items={shown} zones={zones} art={art ?? null} showArt={showArt}
+          name={props.name} base={base} items={shown} zones={zones} art={art ?? null} showArt={showArt} icons={icons}
           selectedId={selectedId} marker={marker} initial={initial} request={request}
           onSelect={(id) => { setSelectedId(id); if (id) { setSpot(null); setSheet(null); returnFocus.current = null; } }}
           onZone={goZone}

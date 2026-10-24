@@ -5,6 +5,7 @@ export { default as Banner } from "./Banner";
 export { default as Card, type CardProps } from "./Card";
 export { default as CodeBlock } from "./CodeBlock";
 export { default as Container, type ContainerWidth } from "./Container";
+export { default as Contribute } from "./Contribute";
 export { default as CopyButton, type CopyButtonProps } from "./CopyButton";
 export { default as DataTable, filledColumns, type Column, type DataTableProps, type SortDirection, type SparseColumn } from "./DataTable";
 export { default as DataTitle } from "./DataTitle";

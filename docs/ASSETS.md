@@ -29,7 +29,7 @@ variables (`GAME_DATA_*`), item links stay plain while the other art still shows
 | `/database/items/<class>/<subclass>` | Icon and game file name of each listed item players have reported, and name, quality colour and icon for every item the game files or the Warcraft Wiki name; other rows stay "Item N" |
 | `/tools/professions` | Profession icons as a picker |
 | `/tools/raid` | Class, talent tree and buff icons, each buff's tooltip on hover and keyboard focus, and Molten Core's loading screen as the banner |
-| `/map` | The game's own continent and zone pictures under the zone outlines, with a switch to hide them; the continent's loading screen as the banner; each dungeon's and raid's loading screen, small, beside its entrance |
+| `/map` | The game's own continent and zone pictures under the zone outlines, with a switch to hide them; the continent's loading screen as the banner; each dungeon's and raid's loading screen, small, beside its entrance; the game's minimap icons on the legend rows and the pins they switch, where the upload has them |
 | `/changes` | Kalimdor's loading screen as the banner; a talent or raid buff a post names gets its icon, its tooltip and a link to the page that shows it |
 | `/` | The launch banner: the game's own WoW: Forever logo over Eastern Kingdoms' loading screen, the launch countdown (moved from the hero onto the banner), and "Not affiliated with or endorsed by Blizzard Entertainment" on the banner. Class and profession icons, linking to the talent calculator and the profession hubs |
 | `/wow-forever` | Race and faction emblems beside the race and faction names in the race and class table |
@@ -81,6 +81,7 @@ It writes two folders under `kb/data/assets/` (gitignored, like all of `kb/data/
   loading/<fileDataID>.webp  one loading screen picture, at most 1600 px, whichever maps show it,
   loading/<fileDataID>-small.webp  and a copy at most 640 px for phones and thumbnails
   emblems/<name>.webp      race icons (raceicon128-<race>-<female|male>) and faction emblems, by their atlas name
+  poi/<element>.webp       the minimap icons the world map's legend and pins use (Dungeon, Raid, TaxiNode_Neutral, ...), by their atlas name
   logo/<name>.webp         the game's own WoW: Forever logo (logo-wow-forever-2x, or the 1x piece)
   checksums.json           size and sha256 of every file above; the upload script checks it, it is
                            not uploaded
@@ -126,6 +127,11 @@ How it works, and what it will not do:
   it lines up with the zone outlines. Phased art is left out. A map with a missing, encrypted or
   unreadable tile is skipped and listed in `skippedMaps`, never drawn with a hole. The map page draws
   only the pictures in view, from their small copies until the reader zooms in.
+- **Map legend icons.** The pieces the game's own map and minimap draw (`Dungeon`, `Raid`,
+  `TaxiNode_Neutral`, `Innkeeper`, `Profession`, `QuestNormal`, `VignetteLoot`), cut out of the interface
+  atlas like the emblems and listed in the manifest's `poi` by the map's legend category. The map page puts
+  each on its legend row and on the pins that row switches, so the legend is the map. A category with no piece
+  in the build keeps the site's glyph; vendors and other NPCs have none in the game either.
 - **Loading screens.** `Map.LoadingScreenID` names each map's row in `LoadingScreens`; the widest
   picture the row names is used (`MainImageFileDataID`, else the 16:9, 16:10 and 4:3 files). Only
   continents, and dungeons and raids entered somewhere on a continent (the map layer's rule for

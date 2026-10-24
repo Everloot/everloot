@@ -141,8 +141,24 @@ export async function callTool(name: string, input: Record<string, unknown>, sen
   }
 }
 
-/** No key: the top sourced hits for the question, verbatim. */
+/**
+ * A greeting, thanks or the like: a few words with no game in them. The search would only turn up names that
+ * happen to start with "hi", so without a model the page answers these itself.
+ */
+export function smallTalk(question: string): boolean {
+  const words = question.toLowerCase().replace(/[^a-z' ]+/g, " ").trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0 || words.length > 4) return false;
+  const chat = new Set(["hi", "hello", "hey", "yo", "sup", "hola", "thanks", "thank", "you", "ty", "ok", "okay", "cool", "nice", "good", "morning", "evening", "afternoon", "there", "bye", "test", "testing", "help", "please", "a", "the", "and", "what", "can", "do"]);
+  return words.every((w) => chat.has(w));
+}
+
+/** What the page says to small talk without a model: where to ask, and how to get written answers. */
+export const SMALL_TALK_REPLY =
+  "Hello. Ask about an item, quest, NPC, zone or build in WoW: Forever, for example \"Where does Linen Cloth drop?\". Without a model key, Send shows what Everloot's data has on it; add a key on Account, Chat keys, and a model writes the answer from that data.";
+
+/** No key: the top sourced hits for the question, verbatim. Small talk gets the page's own reply, with no lookup. */
 export async function searchOnly(question: string, send: typeof fetch = fetch): Promise<ChatReply> {
+  if (smallTalk(question)) return { text: SMALL_TALK_REPLY, model: null, sources: [], pages: [], steps: [] };
   const hits = await callTool("search_knowledge", { query: question, limit: 3 }, send);
   const sources = sourcesIn(hits);
   const steps = [{ tool: "search_knowledge", input: question, chars: hits.length }];
@@ -186,8 +202,12 @@ export interface AnswerOptions {
   signal?: AbortSignal;
 }
 
-/** What an answer's tool calls found so far. */
-type Found = Pick<ChatReply, "steps" | "sources" | "pages">;
+/** What an answer's tool calls found so far, with each tool's output kept for the fallback. */
+type Found = Pick<ChatReply, "steps" | "sources" | "pages"> & { outputs: string[] };
+
+const newFound = (): Found => ({ steps: [], sources: [], pages: [], outputs: [] });
+/** How much of each tool's output the fallback shows when the model stops before answering. */
+const FALLBACK_CHARS = 1500;
 
 /** Records a tool call, its sources and its pages, and returns its output cut to what a model needs. */
 async function runTool(o: AnswerOptions, name: string, input: Record<string, unknown>, found: Found): Promise<string> {
@@ -195,6 +215,7 @@ async function runTool(o: AnswerOptions, name: string, input: Record<string, unk
   for (const s of sourcesIn(out)) if (!found.sources.includes(s)) found.sources.push(s);
   for (const p of pagesIn(out)) if (!found.pages.includes(p)) found.pages.push(p);
   found.steps.push({ tool: name, input: JSON.stringify(input).slice(0, 200), chars: out.length });
+  if (!out.startsWith("Tool error:")) found.outputs.push(out.slice(0, FALLBACK_CHARS));
   return out.slice(0, MAX_RESULT);
 }
 
@@ -204,24 +225,53 @@ async function failure(res: Response, label: string): Promise<Error> {
   return new Error(`${label}: HTTP ${res.status}${message ? `, ${message}` : ""}`);
 }
 
-/** The model answers with Everloot's tools: Anthropic's Messages API or any OpenAI-compatible one, streamed. */
+/** A provider's 5xx is asked once more before it counts: cloud relays drop a request now and then. */
+async function sendTwice(send: typeof fetch, url: string, init: RequestInit): Promise<Response> {
+  const first = await send(url, init);
+  if (first.status < 500 || init.signal?.aborted) return first;
+  return send(url, init);
+}
+
+/** The line a fallback answer starts with when the model stopped after Everloot's tools had already answered. */
+export const MODEL_STOPPED = "The model stopped before writing an answer";
+
+/** What the tools found, in place of the answer the model did not write. */
+function foundSoFar(found: Found, reason: string): ChatReply {
+  const text = `${MODEL_STOPPED} (${reason}). What Everloot found:\n\n${found.outputs.join("\n\n").trim()}`;
+  return { text, model: null, steps: found.steps, sources: found.sources, pages: found.pages };
+}
+
+/**
+ * The model answers with Everloot's tools: Anthropic's Messages API or any OpenAI-compatible one, streamed. When
+ * the provider fails after the tools have answered, the reply is what they found rather than nothing; a failure
+ * before any lookup, or a stop by the player, is thrown as before.
+ */
 export async function answer(o: AnswerOptions): Promise<ChatReply> {
-  return o.provider.api === "anthropic" ? anthropicLoop(o) : openAiLoop(o);
+  const found = newFound();
+  try {
+    return await (o.provider.api === "anthropic" ? anthropicLoop(o, found) : openAiLoop(o, found));
+  } catch (err) {
+    if (o.signal?.aborted || found.outputs.length === 0) throw err;
+    return foundSoFar(found, err instanceof Error ? err.message : String(err));
+  }
 }
 
 type AnthropicBlock = { type: "text"; text: string } | { type: "tool_use"; id: string; name: string; input: unknown };
 
-async function anthropicLoop(o: AnswerOptions): Promise<ChatReply> {
+/** A reply with what the tools found, without the kept outputs. */
+const reply = (text: string, model: string | null, found: Found): ChatReply =>
+  ({ text, model, steps: found.steps, sources: found.sources, pages: found.pages });
+
+async function anthropicLoop(o: AnswerOptions, found: Found): Promise<ChatReply> {
   const send = o.send ?? fetch;
   const tools = o.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.inputSchema }));
   const messages: { role: "user" | "assistant"; content: string | unknown[] }[] = [
     ...o.history.slice(-10).map((m) => ({ role: m.role, content: m.text })),
     { role: "user", content: o.question },
   ];
-  const found: Found = { steps: [], sources: [], pages: [] };
   let model = o.model;
   for (let round = 0; round <= MAX_ROUNDS; round++) {
-    const res = await send(`${o.provider.baseUrl}/messages`, {
+    const res = await sendTwice(send, `${o.provider.baseUrl}/messages`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -260,7 +310,7 @@ async function anthropicLoop(o: AnswerOptions): Promise<ChatReply> {
     });
     const uses = content.filter((b): b is Extract<AnthropicBlock, { type: "tool_use" }> => b.type === "tool_use");
     const text = content.filter((b): b is Extract<AnthropicBlock, { type: "text" }> => b.type === "text").map((b) => b.text).join("\n").trim();
-    if (stop !== "tool_use" || uses.length === 0 || round === MAX_ROUNDS) return { text: text || NO_SOURCED_ANSWER, model, ...found };
+    if (stop !== "tool_use" || uses.length === 0 || round === MAX_ROUNDS) return reply(text || NO_SOURCED_ANSWER, model, found);
     messages.push({ role: "assistant", content });
     const results = [];
     for (const use of uses) {
@@ -269,7 +319,7 @@ async function anthropicLoop(o: AnswerOptions): Promise<ChatReply> {
     }
     messages.push({ role: "user", content: results });
   }
-  return { text: NO_SOURCED_ANSWER, model, ...found };
+  return reply(NO_SOURCED_ANSWER, model, found);
 }
 
 interface OaiToolCall { id: string; type: "function"; function: { name: string; arguments: string } }
@@ -298,7 +348,7 @@ export async function readOpenAiStream(stream: ReadableStream<Uint8Array>, onTex
   return { model, message: { role: "assistant", content: text || null, ...(toolCalls.length ? { tool_calls: toolCalls } : {}) } };
 }
 
-async function openAiLoop(o: AnswerOptions): Promise<ChatReply> {
+async function openAiLoop(o: AnswerOptions, found: Found): Promise<ChatReply> {
   const send = o.send ?? fetch;
   const label = new URL(o.provider.baseUrl).host;
   const tools = o.tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.inputSchema } }));
@@ -307,12 +357,11 @@ async function openAiLoop(o: AnswerOptions): Promise<ChatReply> {
     ...o.history.slice(-10).map((m): OaiMessage => ({ role: m.role, content: m.text })),
     { role: "user", content: o.question },
   ];
-  const found: Found = { steps: [], sources: [], pages: [] };
   let model = o.model;
   for (let round = 0; round <= MAX_ROUNDS; round++) {
     let res: Response;
     try {
-      res = await send(`${o.provider.baseUrl}/chat/completions`, {
+      res = await sendTwice(send, `${o.provider.baseUrl}/chat/completions`, {
         method: "POST",
         headers: { "content-type": "application/json", ...(o.key ? { authorization: `Bearer ${o.key}` } : {}), ...o.provider.headers },
         body: JSON.stringify({ model: o.model, max_tokens: 1500, messages, tools, stream: true }),
@@ -322,24 +371,24 @@ async function openAiLoop(o: AnswerOptions): Promise<ChatReply> {
       throw new Error(`${label}: ${err instanceof Error ? err.message : String(err)}${o.provider.kind === "ollama" ? ". Is Ollama running with OLLAMA_ORIGINS=https://everloot.app?" : ""}`);
     }
     if (!res.ok || !res.body) throw await failure(res, label);
-    let reply: OaiMessage;
+    let turn: OaiMessage;
     if ((res.headers.get("content-type") ?? "").includes("text/event-stream")) {
       try {
         const r = await readOpenAiStream(res.body, (text) => o.onProgress?.({ text, tool: null }));
         model = r.model ?? model;
-        reply = r.message;
+        turn = r.message;
       } catch (err) { throw new Error(`${label}: ${err instanceof Error ? err.message : String(err)}`); }
     } else {
       // A server that ignores stream answers with one JSON body.
       const body = (await res.json().catch(() => ({}))) as { model?: string; error?: { message?: string }; choices?: { message?: OaiMessage }[] };
       if (!body.choices && body.error?.message) throw new Error(`${label}: ${body.error.message}`);
       model = body.model ?? model;
-      reply = body.choices?.[0]?.message ?? { role: "assistant", content: null };
+      turn = body.choices?.[0]?.message ?? { role: "assistant", content: null };
     }
-    const calls = reply.tool_calls ?? [];
-    const text = (reply.content ?? "").trim();
-    if (calls.length === 0 || round === MAX_ROUNDS) return { text: text || NO_SOURCED_ANSWER, model, ...found };
-    messages.push({ role: "assistant", content: reply.content ?? null, tool_calls: calls });
+    const calls = turn.tool_calls ?? [];
+    const text = (turn.content ?? "").trim();
+    if (calls.length === 0 || round === MAX_ROUNDS) return reply(text || NO_SOURCED_ANSWER, model, found);
+    messages.push({ role: "assistant", content: turn.content ?? null, tool_calls: calls });
     for (const call of calls) {
       let input: Record<string, unknown>;
       try { input = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>; } catch {
@@ -350,7 +399,7 @@ async function openAiLoop(o: AnswerOptions): Promise<ChatReply> {
       messages.push({ role: "tool", tool_call_id: call.id, content: await runTool(o, call.function.name, input, found) });
     }
   }
-  return { text: NO_SOURCED_ANSWER, model, ...found };
+  return reply(NO_SOURCED_ANSWER, model, found);
 }
 
 /**

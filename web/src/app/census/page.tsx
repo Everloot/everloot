@@ -6,7 +6,9 @@ import { loadCensus } from "@/lib/rollup-compute";
 import { REPO_URL } from "@/lib/source";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import { trailFor } from "@/lib/breadcrumbs";
-import { Card, Container, DataTable, EmptyState, Explainer, LinkTabs, PageHeader, SectionHeading, type Column } from "@/components/ui";
+import { playerPagesOn } from "@/lib/player-pages";
+import { PLAYER_PAGE_SHOWS } from "../players/player-view";
+import { Card, Container, DataTable, EmptyState, Explainer, Input, LinkTabs, PageHeader, SectionHeading, type Column } from "@/components/ui";
 import {
   CENSUS_CLASSES, CENSUS_RACES, FACTIONS, HIDDEN_LABEL, HIDDEN_MEANING, LEVEL_BANDS, type CensusCount, type CensusView, type CensusWindow,
 } from "../../../../kb/src/census";
@@ -94,6 +96,22 @@ function TakePart() {
   );
 }
 
+/** The way into the player pages, shown only while the owner's switch has them on. */
+function LookUpPlayer() {
+  return (
+    <Card as="section" aria-labelledby="look-up" className="space-y-3">
+      <SectionHeading id="look-up">Look up a player</SectionHeading>
+      <form action="/players" method="get" role="search" className="flex max-w-xl flex-col gap-2 sm:flex-row">
+        <label htmlFor="census-player-q" className="sr-only">Character name</label>
+        <Input id="census-player-q" name="q" type="search" maxLength={40} autoComplete="off" placeholder="Start of a character's name" className="flex-1" />
+        <button type="submit" className="btn btn-primary min-h-11">Find</button>
+      </form>
+      <p className="text-sm text-fg-2">{PLAYER_PAGE_SHOWS}</p>
+      <p className="text-sm"><Link href="/players/opt-out" className={link}>Hide your character</Link></p>
+    </Card>
+  );
+}
+
 const WINDOWS = [
   { id: "week", label: "Last 7 days", href: "/census" },
   { id: "launch", label: "Since launch", href: "/census?window=launch" },
@@ -150,6 +168,8 @@ export default async function CensusPage({ searchParams }: { searchParams?: Prom
             {!unreachable && <span>{dataAgeLabel(dataAsOf)}</span>}
           </>}
         />
+
+        {playerPagesOn() && <div className="mb-12"><LookUpPlayer /></div>}
 
         {!ready ? (
           <Card><p className="text-fg-2">{STORAGE_UNREACHABLE}</p></Card>
