@@ -60,7 +60,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return pageMetadata({
     title: `${title}: addon for WoW: Forever`,
     description: `How many Everloot installs run ${title}, where its author publishes it and what its repository shows. Counts appear once three installs report the addon.`,
-    path: `/addons/${encodeURIComponent(found.name)}`,
+    // Polestar has a dedicated guide page at the lowercase address.
+    path: found.name.toLowerCase() === "polestar" ? "/addons/polestar" : `/addons/${encodeURIComponent(found.name)}`,
   });
 }
 
