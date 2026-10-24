@@ -7,7 +7,7 @@ import JsonLd from "@/components/JsonLd";
 import LoreSource from "@/components/LoreSource";
 import { BannerArt } from "@/components/game/PageBanner";
 import { BANNER_MAP, loadingArt, loadSiteAssets } from "@/lib/game-assets";
-import { Card, Container, Explainer, PageHeader, SectionHeading } from "@/components/ui";
+import { Card, Container, Disclosure, Explainer, PageHeader, SectionHeading } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import { loreCollectionJsonLd } from "@/lib/jsonld";
 import { getRelease } from "@/lib/release";
@@ -88,20 +88,22 @@ export default async function LoreLanding() {
               <section aria-labelledby="zones">
                 <SectionHeading
                   id="zones"
-                  note="Pages with the wiki's zone infobox, by name. Most do not record a continent."
                   action={<Link href="/lore/zones" className={link}>All zones and locations</Link>}
                 >
                   Zones
                 </SectionHeading>
-                <Card>
-                  <ul className="gap-x-6 text-sm sm:columns-2 md:columns-3">
+                <p className="mb-4 text-fg-2">
+                  {formatter.format(zones.length)} pages carry the wiki&apos;s zone infobox, which towns and instances do not. Most do not record a continent, so they are listed by name.
+                </p>
+                <Disclosure summary="All zone pages">
+                  <ul className="gap-x-6 text-sm sm:columns-2">
                     {zones.map((zone) => (
                       <li key={zone.extId} className="min-w-0 break-inside-avoid">
                         <Link href={`/lore/${loreSlug(zone)}`} className={`inline-flex min-h-9 items-center [overflow-wrap:anywhere] ${link}`}>{zone.name}</Link>
                       </li>
                     ))}
                   </ul>
-                </Card>
+                </Disclosure>
               </section>
             )}
             <p className="text-sm text-muted">

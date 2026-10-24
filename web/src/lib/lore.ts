@@ -362,7 +362,8 @@ const ZONES = new WeakMap<object, { extId: string; name: string }[]>();
 
 /**
  * Zone pages with the wiki's zone infobox (not towns or instances), by name. The data names a continent
- * for too few of them to group by, so the list is alphabetical. Empty for a release without type data.
+ * for too few of them to group by, so the list is alphabetical. A "<name> (Classic)" page is left out when
+ * "<name>" is in the list too. Empty for a release without type data.
  */
 export function zonePages(): { extId: string; name: string }[] | Unavailable {
   const release = getRelease();
@@ -376,8 +377,10 @@ export function zonePages(): { extId: string; name: string }[] | Unavailable {
        ORDER BY name COLLATE NOCASE, id`,
     )
     .all(...PUBLISHABLE) as { extId: string; name: string }[];
-  ZONES.set(release.db, rows);
-  return rows;
+  const names = new Set(rows.map((r) => r.name));
+  const out = rows.filter((r) => !(r.name.endsWith(" (Classic)") && names.has(r.name.slice(0, -" (Classic)".length))));
+  ZONES.set(release.db, out);
+  return out;
 }
 
 export interface Coverage {

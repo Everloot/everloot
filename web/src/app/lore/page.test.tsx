@@ -69,6 +69,17 @@ test("the landing offers a start-here path with each page's opening sentence, an
   expect(html.indexOf('href="/lore/201-ashenvale"')).toBeLessThan(html.indexOf('href="/lore/200-durotar"'));
   // A town has a zone type but not the zone infobox.
   expect(html).not.toContain("202-razor-hill");
+  // A "(Classic)" page is dropped only when its twin without the suffix is listed.
+  expect(html).not.toContain("203-durotar-classic");
+  expect(html).toContain('href="/lore/204-silithus-classic"');
+  expect(html).toContain("3 pages carry the wiki");
+  // The full list sits in a closed disclosure; the browse link stays outside it.
+  const details = html.slice(html.indexOf("<details"), html.indexOf("</details>"));
+  expect(details).toContain("All zone pages");
+  expect(details).toContain('href="/lore/200-durotar"');
+  expect(details).not.toMatch(/^<details[^>]*\sopen/);
+  expect(details).not.toContain('href="/lore/zones"');
+  expect(html.indexOf('href="/lore/zones"')).toBeLessThan(html.indexOf("<details"));
   // The zone rows the shared fixture has without an infobox stay out.
   expect(html).not.toContain('href="/lore/100-zone-1"');
 });

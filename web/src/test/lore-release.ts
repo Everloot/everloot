@@ -19,7 +19,8 @@ const EMPTY_FACETS: Record<"expansion" | "profession" | "class" | "race" | "zone
  * serving gate refuses, because a typed release without them would serve slow scan paths. `dir` writes
  * into that folder instead of a new temp dir (used by `npm run sample-release`). `landing: true` adds the
  * landing's rows: two "Start here" pages (Alliance 481380, Orc 19317), two zones with the zone infobox
- * (Durotar 200, Ashenvale 201) and a town (Razor Hill 202) that the zone list leaves out.
+ * (Durotar 200, Ashenvale 201), a town (Razor Hill 202) that the zone list leaves out, and two "(Classic)"
+ * zones: Durotar (Classic) 203, dropped beside Durotar, and Silithus (Classic) 204, kept with no twin.
  */
 export async function buildLoreRelease(options: { typed?: boolean; facets?: boolean; dir?: string; landing?: boolean } = {}): Promise<string> {
   const typed = options.typed ?? true;
@@ -52,6 +53,8 @@ export async function buildLoreRelease(options: { typed?: boolean; facets?: bool
       wiki("19317", "Orc", `The orcs are a race from Draenor. ${"They endure. ".repeat(30)}`, { type: "other", facets: EMPTY_FACETS, damaged: false }),
       wiki("200", "Durotar", `Durotar is a zone of red earth. ${"Dust blows. ".repeat(30)}`, { type: "zone", facets: EMPTY_FACETS, infobox: { template: "infobox zone", fields: { name: "Durotar" } }, damaged: false }),
       wiki("201", "Ashenvale", `Ashenvale is a forest zone. ${"Trees stand. ".repeat(30)}`, { type: "zone", facets: EMPTY_FACETS, infobox: { template: "infobox zone", fields: { name: "Ashenvale" } }, damaged: false }),
+      wiki("203", "Durotar (Classic)", `Durotar (Classic) is the zone as it was. ${"Dust blew. ".repeat(30)}`, { type: "zone", facets: EMPTY_FACETS, infobox: { template: "infobox zone", fields: { name: "Durotar" } }, damaged: false }),
+      wiki("204", "Silithus (Classic)", `Silithus (Classic) is a desert zone. ${"Sand shifts. ".repeat(30)}`, { type: "zone", facets: EMPTY_FACETS, infobox: { template: "infobox zone", fields: { name: "Silithus" } }, damaged: false }),
       wiki("202", "Razor Hill", `Razor Hill is a town. ${"Orcs live here. ".repeat(30)}`, { type: "zone", facets: EMPTY_FACETS, infobox: { template: "infobox town", fields: { name: "Razor Hill" } }, damaged: false }),
     ] : []),
   ];
