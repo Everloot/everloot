@@ -4,13 +4,13 @@ import JsonLd from "@/components/JsonLd";
 import { Card, Container, EmptyState, FilterBar, PageHeader, type FilterControl } from "@/components/ui";
 import { dataAgeLabel } from "@/lib/data-age";
 import {
-  COLLECTING_LINE, START_LINE, isFiltered, itemListJsonLd, loadRankingWeeks, rankedCount, rankingDef, rankingHref,
+  COLLECTING_LINE, isFiltered, itemListJsonLd, loadRankingWeeks, rankedCount, rankingDef, rankingHref,
   rankingIndexable, rankingPath, rankingView, type RankingQuery, type RankingView,
 } from "@/lib/rankings";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import { CENSUS_CLASSES, FACTIONS } from "../../../../../kb/src/census";
-import { HowItCounts, OneWeek, RankTable, RankingRail, WeeklyChart, weekLabel } from "../parts";
+import { HowItCounts, OneWeek, RankTable, RankingRail, StartState, WeeklyChart, weekLabel } from "../parts";
 
 export const dynamic = "force-dynamic";
 
@@ -84,7 +84,7 @@ export default async function RankingPage({ params, searchParams }: Props) {
             {unreachable ? (
               <Card><p className="text-fg-2">{STORAGE_UNREACHABLE}</p></Card>
             ) : !week ? (
-              <EmptyState message={START_LINE} />
+              <StartState />
             ) : (
               <>
                 <FilterBar

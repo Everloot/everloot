@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 // The page reads the store's census rows, so these tests feed stored census rows in and check what reaches the HTML.
 // The end-to-end path through the real store is in census-end-to-end.test.tsx.
@@ -45,6 +45,7 @@ const html = async (window?: string) => renderToStaticMarkup(await CensusPage({ 
 const text = (page: string) => page.replace(/<[^>]+>/g, " ").replace(/&#x27;|&apos;/g, "'").replace(/\s+/g, " ");
 
 beforeEach(() => store.loadCensus.mockReset());
+afterEach(() => vi.unstubAllEnvs());
 
 test("at launch, with nothing reported, the page is collecting: no table, no number, how to take part", async () => {
   store.loadCensus.mockResolvedValue(corpus([]));
@@ -134,6 +135,30 @@ test("unreadable storage says so, never a collecting page or a zero", async () =
   expect(page).toContain(STORAGE_UNREACHABLE);
   expect(page).not.toContain("Still collecting");
   expect(page).not.toContain("<table");
+});
+
+test("with player pages on, the census offers the player lookup: a form to /players and the hide link", async () => {
+  vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+  store.loadCensus.mockResolvedValue(corpus(RECORDS));
+  const page = await html();
+  expect(page).toContain("Look up a player");
+  expect(page).toMatch(/<form [^>]*action="\/players"[^>]*method="get"/);
+  expect(page).toMatch(/<form [^>]*role="search"/);
+  expect(page).toMatch(/<input [^>]*maxlength="40"/i);
+  expect(page).toMatch(/<input [^>]*name="q"/);
+  expect(page).toContain('href="/players/opt-out"');
+  expect(text(page)).toContain("Race, class, level, guild and the day the addon last saw them. Nothing else.");
+  // The lookup comes before the window tabs.
+  expect(page.indexOf("Look up a player")).toBeLessThan(page.indexOf('aria-label="Census window"'));
+});
+
+test("with player pages off, the census says nothing about looking up players", async () => {
+  vi.stubEnv("EVERLOOT_PLAYER_PAGES", "");
+  store.loadCensus.mockResolvedValue(corpus(RECORDS));
+  const page = await html();
+  expect(page).not.toContain("Look up a player");
+  expect(page).not.toContain('action="/players"');
+  expect(page).not.toContain('href="/players/opt-out"');
 });
 
 test("the page has its own title, description and canonical", () => {
