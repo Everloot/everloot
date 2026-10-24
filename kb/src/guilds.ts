@@ -318,7 +318,7 @@ const timeOrder = (a: string | null, b: string | null): number => (a === b ? 0 :
 export function guildDirectory(sources: {
   kills: readonly AgreedKill[];
   seen: ReadonlyMap<string, SeenGuild>;
-  boards: readonly OfficerBoard[];
+  boards: readonly Omit<OfficerBoard, "progression">[];
 }): GuildSummary[] {
   const out = new Map<string, GuildSummary>();
   const get = (key: string, guildName: string, realm: string): GuildSummary => {

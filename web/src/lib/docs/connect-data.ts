@@ -32,6 +32,8 @@ const TOOL_TEXT: Record<McpToolName, string> = {
   collection_gap: "What one install is missing from a collection, such as Mounts.",
   completion_progress: "What one install's characters finished in achievements, reputation, titles and quest chains, and what is closest to done.",
   guild_board: "A guild's roster, bosses, loot and attendance, from officer uploads.",
+  guild_search: "Guilds by the start of their name, with realm, members seen and agreed kills. Listed only while the guild pages are on.",
+  guild_rankings: "The guild ladder for one raid or dungeon: bosses killed, then who got there first. Listed only while the guild pages are on.",
   auction_history: "Daily median auction price for one item on one realm.",
   market_value: "Market value, minimum buyout, historical value and units listed for one item on one realm, from full scans players started.",
   gold_ledger: "Peak gold and money events for one character, from that player's own upload.",

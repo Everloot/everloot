@@ -65,7 +65,7 @@ const TOOL_GROUPS: { title: string; icon: DocsIcon; names: McpToolName[] }[] = [
   { title: "Search and lore", icon: "search", names: ["search_knowledge", "get_entity", "get_by_name", "answer_sources", "search", "fetch"] },
   { title: "Database", icon: "database", names: ["item_page", "npc_page", "object_page", "quest_page", "vendor_page", "entity_relations", "item_categories", "world_map_near"] },
   { title: "Planning", icon: "compass", names: ["talent_tree", "talent_plan", "profession_path", "recipe_thresholds"] },
-  { title: "Market and characters", icon: "chart", names: ["market_value", "auction_history", "gold_ledger", "collection_gap", "completion_progress", "guild_board"] },
+  { title: "Market and characters", icon: "chart", names: ["market_value", "auction_history", "gold_ledger", "collection_gap", "completion_progress", "guild_board", "guild_search", "guild_rankings"] },
   { title: "World and project", icon: "home", names: ["coverage", "population", "recent_changes", "ecosystem_projects", "everloot_plan"] },
 ];
 

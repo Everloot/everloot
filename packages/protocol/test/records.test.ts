@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { ALL_RECORD_KINDS, parseRecords, parseUpload, PUBLIC_RECORD_KINDS, validateUpload } from "../src/index.js";
+import { ALL_RECORD_KINDS, parseRecords, parseUpload, PUBLIC_RECORD_KINDS, sharingCategory, validateUpload } from "../src/index.js";
 
 const base = { installId: "test-install-1234", capturedAt: "2026-09-29T12:00:00.000Z", eventId: "evt-1" };
 
@@ -251,6 +251,9 @@ describe("intake contract", () => {
     expect(result.records[2]).not.toHaveProperty("playerName");
     expect(result.records[1]).toMatchObject({ difficulty: 1, size: 5 });
     expect(PUBLIC_RECORD_KINDS).toContain("guild_kill");
+    // No sharing choice or grant: members agreeing is the bar, not an officer's grant.
+    expect(sharingCategory(result.records[0]!)).toBeNull();
+    expect(sharingCategory({ ...base, kind: "raid_lockout", guildName: "Night Watch", realm: "Forever", instance: "Molten Core", difficulty: "40", bossesKilled: [], resetAt: "2026-10-14T00:00:00Z" } as never)).toBe("guild");
   });
 
   test("the envelope may say its rows came from a Polestar Recorder file, and nothing else", () => {

@@ -2,6 +2,9 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MCP_TOOL_NAMES } from "@everloot/protocol";
+
+/** The keyless list with EVERLOOT_GUILDS off: the protocol's tools less the guild ladder's two. */
+const PUBLIC_NAMES = MCP_TOOL_NAMES.filter((name) => name !== "guild_search" && name !== "guild_rankings");
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { MY_BUILDS_REFUSAL } from "@/lib/saved-builds";
 import { openDb } from "../../../../../kb/src/db";
@@ -103,7 +106,7 @@ describe("my_builds, the account tool", () => {
   test("the keyless list is exactly the protocol's tools, and a call is refused in words", async () => {
     const send = database(["read:public", "read:own"]);
     const { POST } = await route(env("1"));
-    expect(await listed(await POST(rpc("tools/list", {})))).toEqual(MCP_TOOL_NAMES);
+    expect(await listed(await POST(rpc("tools/list", {})))).toEqual(PUBLIC_NAMES);
     const called = (await (await POST(rpc("tools/call", { name: "my_builds", arguments: {} }))).json()).result;
     expect(called).toEqual({ content: [{ type: "text", text: MY_BUILDS_REFUSAL }], isError: true });
     expect(send).not.toHaveBeenCalled();
@@ -112,7 +115,7 @@ describe("my_builds, the account tool", () => {
   test("a key without read:own sees the public list and gets the refusal", async () => {
     database(["read:public"]);
     const { POST } = await route(env("1"));
-    expect(await listed(await POST(rpc("tools/list", {}, KEY)))).toEqual(MCP_TOOL_NAMES);
+    expect(await listed(await POST(rpc("tools/list", {}, KEY)))).toEqual(PUBLIC_NAMES);
     const called = (await (await POST(rpc("tools/call", { name: "my_builds", arguments: {} }, KEY))).json()).result;
     expect(called.isError).toBe(true);
     expect(called.content[0].text).toBe(MY_BUILDS_REFUSAL);
@@ -121,13 +124,13 @@ describe("my_builds, the account tool", () => {
   test("with the switch off even a read:own key sees the public list only", async () => {
     database(["read:public", "read:own"]);
     const { POST } = await route(env(""));
-    expect(await listed(await POST(rpc("tools/list", {}, KEY)))).toEqual(MCP_TOOL_NAMES);
+    expect(await listed(await POST(rpc("tools/list", {}, KEY)))).toEqual(PUBLIC_NAMES);
   });
 
   test("a read:own key gets my_builds after the public tools, and it answers", async () => {
     const send = database(["read:public", "read:own"]);
     const { POST } = await route(env("1"));
-    expect(await listed(await POST(rpc("tools/list", {}, KEY)))).toEqual([...MCP_TOOL_NAMES, "my_builds"]);
+    expect(await listed(await POST(rpc("tools/list", {}, KEY)))).toEqual([...PUBLIC_NAMES, "my_builds"]);
     const called = (await (await POST(rpc("tools/call", { name: "my_builds", arguments: {} }, KEY))).json()).result;
     expect(called.isError).not.toBe(true);
     expect(called.content[0].text).toContain("No saved builds yet.");

@@ -10,6 +10,7 @@ import { authorizeRecord, sharingCategory, type PublicationGrant } from "../../.
 import { isPlayerRow, playerDateProblem, playerPagesOn, playerStoreProblem, playerUpsert, PLAYERS_PER_UPLOAD, type PlayerUpsert } from "@/lib/player-pages";
 import { playerStore } from "@/lib/player-store";
 import { isLinkRow } from "@/lib/character-links";
+import { guildKillProblem, guildsOn, hiddenGuildsForIntake, isGuildKillRow } from "@/lib/guilds";
 import { censusDailyCap } from "../../../../../kb/src/census-rows";
 import { isRecorderInstall } from "../../../../../kb/src/recorder-installs";
 import { RECORDER_KINDS, RECORDER_SOURCE, recorderCharacter } from "@/lib/polestar-recorder";
@@ -114,6 +115,9 @@ export async function POST(req: Request) {
   const tallyBuild = settledTallyOn() ? upload.clientBuild ?? (await import("@/lib/coverage-compute")).COVERAGE_BUILD : null;
   const settled = tallyBuild ? await settledForIntake(tallyBuild) : null;
   const tallied: { row: StoredRecord; fact: string }[] = [];
+  // Guild kill rows are kept only with the guild pages on, and never for a hidden guild; the hide list is read once.
+  const guildsCollecting = guildsOn();
+  const hiddenGuilds = guildsCollecting && upload.records.some(isGuildKillRow) ? await hiddenGuildsForIntake() : null;
   for (let i = 0; i < upload.records.length; i++) {
     const row = upload.records[i];
     const recorderProblem = recorder ? (RECORDER_KINDS.includes(row.kind) ? null : "A Polestar Recorder upload carries NPC positions, quests, loot, instance entrances, encounters and object sightings only.")
@@ -143,6 +147,13 @@ export async function POST(req: Request) {
       // A link row carries a GUID and a code: it is redeemed at /api/me/characters/links and never stored here.
       receipt.rejected.push({ index: receipt.accepted[i].index, reason: "Character links are sent from your account, not in uploads." });
       continue;
+    }
+    if (isGuildKillRow(row)) {
+      const problem = guildKillProblem(row, guildsCollecting, hiddenGuilds);
+      if (problem) {
+        receipt.rejected.push({ index: receipt.accepted[i].index, reason: problem });
+        continue;
+      }
     }
     if (isPlayerRow(row)) {
       const now = new Date();

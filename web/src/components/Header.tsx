@@ -7,7 +7,7 @@ import { track } from "@/lib/analytics/track";
 import AccountControls from "./AccountControls";
 import GameVersionLabel from "./GameVersionLabel";
 import { SuggestField } from "./ui/SearchBar";
-import { TOOL_GROUPS } from "@/data/tools";
+import { TOOL_GROUPS, toolGroups } from "@/data/tools";
 
 type NavLink = { label: string; href: string };
 
@@ -23,7 +23,7 @@ export const PRIMARY: NavLink[] = [
 // The Tools menu lives in data/tools.ts so the home page lists the same groups.
 export { TOOL_GROUPS };
 
-const TOOL_HREFS = TOOL_GROUPS.flatMap((g) => g.links.map((l) => l.href));
+const TOOL_HREFS = [...TOOL_GROUPS.flatMap((g) => g.links.map((l) => l.href)), "/guilds"];
 
 const isCurrent = (path: string, href: string) => path === href || path.startsWith(`${href}/`);
 
@@ -43,13 +43,16 @@ function SearchIcon() {
  * The compact bar (docs/design/specs/2026-10-20-account-shell-design.md). From the layout: `savedBuilds` adds Your
  * builds to the avatar menu (EVERLOOT_SAVED_BUILDS); `accountSwitching` is true with Better Auth (EVERLOOT_AUTH_V2),
  * which can hold several accounts on one browser; `profiles` is EVERLOOT_PROFILES, without which the avatar menu
- * never asks for the player's shell. With it, the menu fetches the player from /api/me/shell itself.
+ * never asks for the player's shell. With it, the menu fetches the player from /api/me/shell itself. `guilds` is
+ * EVERLOOT_GUILDS: the Tools menu then offers Guilds in place of the guild board.
  */
-export default function Header({ savedBuilds = false, profiles = false, accountSwitching = false }: {
+export default function Header({ savedBuilds = false, profiles = false, accountSwitching = false, guilds = false }: {
   savedBuilds?: boolean;
   profiles?: boolean;
   accountSwitching?: boolean;
+  guilds?: boolean;
 }) {
+  const groups = toolGroups(guilds);
   const path = usePathname() ?? "/";
   const [open, setOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
@@ -125,7 +128,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
             </button>
             {/* Always in the page, so the tools are in the HTML for crawlers; hidden until opened. */}
             <div id="tools-menu" hidden={!toolsOpen} className={`pop absolute left-0 top-full mt-2 w-[36rem] grid-cols-3 gap-6 rounded-card border border-edge bg-panel p-6 ${toolsOpen ? "grid" : "hidden"}`}>
-              {TOOL_GROUPS.map((group) => (
+              {groups.map((group) => (
                 <div key={group.title}>
                   <p className="mb-2 px-3 font-mono text-xs text-muted">{group.title}</p>
                   <ul>
@@ -211,7 +214,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
                   <li><Link href="/about" onClick={closeAll} className={menuLink}>About</Link></li>
                 </ul>
               </div>
-              {TOOL_GROUPS.map((group) => (
+              {groups.map((group) => (
                 <div key={group.title}>
                   <p className="mb-1 px-3 font-mono text-xs text-muted">{group.title}</p>
                   <ul>
