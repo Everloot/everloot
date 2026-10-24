@@ -146,6 +146,13 @@ test("the canonical link uses the site's spelling of the name and the page is in
   expect(meta.robots).toBeUndefined();
 });
 
+test("Polestar's usage profile names the dedicated guide page as its canonical", async () => {
+  store.loadCorpus.mockResolvedValue(corpus(three("Polestar")));
+  for (const name of ["Polestar", "POLESTAR"]) {
+    expect((await generateMetadata(props(name))).alternates?.canonical).toBe("/addons/polestar");
+  }
+});
+
 test("every external link carries noopener noreferrer nofollow", async () => {
   store.loadCorpus.mockResolvedValue(corpus(three("Polestar")));
   github.addonGithub.mockResolvedValue(okGithub);
