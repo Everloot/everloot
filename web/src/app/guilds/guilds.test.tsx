@@ -189,3 +189,44 @@ test("the hide form posts to the server without JavaScript", async () => {
   expect(html).toContain('type="submit"');
   expect(html).not.toContain("<script");
 });
+
+test("a hide list that cannot be read withholds every guild: the hub, the search and the page show the unavailable state", async () => {
+  on();
+  vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+  vi.spyOn(holder.store!, "hiddenGuilds").mockRejectedValue(new Error("hidden_guilds unavailable"));
+  const html = await hub({ q: "nig" });
+  expect(html).toContain("Storage unreachable");
+  expect(html).not.toContain(">Night Watch</a>");
+  expect(html).not.toContain(">Ember</a>");
+  const page = await guildPage("forever-pioneer", "night-watch");
+  expect(page).toContain("Storage unreachable");
+  expect(page).not.toContain("Thrallina");
+  const { guildReader } = await import("@/lib/guilds");
+  expect(await guildReader.ladder()).toBeNull();
+  expect(await guildReader.search("nig", 10)).toBeNull();
+  expect(await guildReader.page("Night Watch", "Forever Pioneer")).toBeNull();
+});
+
+test("the reader tells a hidden guild from an unknown one", async () => {
+  on();
+  const { guildReader } = await import("@/lib/guilds");
+  await holder.store!.suppressGuild("Forever Pioneer", "Iron Oath");
+  expect(await guildReader.page("Iron Oath", "Forever Pioneer")).toEqual({ page: null, hidden: true, dataAsOf: AS_OF });
+  expect(await guildReader.page("Nobody Here", "Forever Pioneer")).toEqual({ page: null, hidden: false, dataAsOf: AS_OF });
+});
+
+test("the officers' board page withholds a hidden guild's board while the switch is on", async () => {
+  const { default: Board } = await import("../tools/guild-board/page");
+  const render = async () => renderToStaticMarkup(await Board({ searchParams: Promise.resolve({ guild: "Iron Oath", realm: "Forever Pioneer" }) }));
+  await holder.store!.suppressGuild("Forever Pioneer", "Iron Oath");
+  // Off: no hide form, no hide list read; the board answers as it always has.
+  expect(await render()).toContain("Ada");
+  on();
+  const hidden = await render();
+  expect(hidden).toContain("This guild asked to be hidden. Its board is not shown.");
+  expect(hidden).not.toContain("Ada");
+  vi.spyOn(holder.store!, "hiddenGuilds").mockRejectedValue(new Error("down"));
+  const unread = await render();
+  expect(unread).toContain("Storage unreachable");
+  expect(unread).not.toContain("Ada");
+});

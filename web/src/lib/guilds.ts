@@ -19,6 +19,7 @@ import { uploadStore } from "./upload-store";
  * the seen roster from the players table. A guild hidden through the hide form leaves all three.
  */
 
+import { guildsOn } from "./guild-switch";
 export { guildIndexingOn, guildsOn } from "./guild-switch";
 
 /** The cache tag the guild search results carry; recording a hide clears it. */
@@ -88,9 +89,11 @@ export interface GuildData {
   kills: AgreedKill[];
   progress: GuildProgress[];
   boards: Map<string, GuildBoard>;
+  /** The hidden guilds, as `guildHideKey` keys, so a caller can tell a hidden guild from an unknown one. */
+  hidden: ReadonlySet<string>;
 }
 
-const UNREAD: GuildData = { unreachable: true, dataAsOf: null, instances: [], kills: [], progress: [], boards: new Map() };
+const UNREAD: GuildData = { unreachable: true, dataAsOf: null, instances: [], kills: [], progress: [], boards: new Map(), hidden: new Set() };
 
 /** A board worth keeping: something in it was agreed by two officer uploads. */
 const published = (b: GuildBoard) => b.memberCount !== null || b.roster.length > 0 || b.progression.length > 0 || b.loot.length > 0 || b.present.length > 0;
@@ -112,20 +115,13 @@ function rollup(key: string, records: readonly unknown[], asOf: Date): Rollup {
 
 let memo: Rollup | null = null;
 
-async function hiddenGuilds(): Promise<Set<string>> {
-  try {
-    return await playerStore().hiddenGuilds();
-  } catch {
-    return new Set();
-  }
-}
-
 const hiddenKey = (g: { realm: string; guildName: string }) => guildHideKey(g.realm, g.guildName);
 
 /**
  * The ladder's data from the stored uploads: the instances with agreed bosses, every agreed kill and each guild's
  * progression. The rollup is kept per corpus read, as lib/rankings.ts does; the hidden set is read each time, so a
- * hide takes effect at once.
+ * hide takes effect at once. A hide list that cannot be read makes the whole answer unreachable: guilds are withheld,
+ * never shown unfiltered (pages show the unavailable state, the tools answer unavailable, the export skips its files).
  */
 export async function loadGuildData(): Promise<GuildData> {
   const corpus = await uploadStore.loadCorpus();
@@ -134,12 +130,13 @@ export async function loadGuildData(): Promise<GuildData> {
   const asOf = dataAsOf ? new Date(dataAsOf) : new Date();
   const key = `${corpus.uploads}|${dataAsOf ?? ""}|${corpus.records.length}`;
   if (memo === null || memo.key !== key) memo = rollup(key, corpus.records, asOf);
-  const hidden = await hiddenGuilds();
+  const hidden = await hiddenGuildsForIntake();
+  if (hidden === null) return UNREAD;
   const members = agreedKills(memo.rows, asOf).filter((k) => !hidden.has(hiddenKey(k)));
   const officers = memo.officers.filter((k) => !hidden.has(hiddenKey(k)));
   const kills = mergeKills(members, officers);
   const boards = new Map([...memo.boards].filter(([, b]) => !hidden.has(hiddenKey(b))));
-  return { unreachable: false, dataAsOf, instances: memo.instances, kills, progress: guildProgression(kills, memo.instances), boards };
+  return { unreachable: false, dataAsOf, instances: memo.instances, kills, progress: guildProgression(kills, memo.instances), boards, hidden };
 }
 
 const boardSources = (boards: ReadonlyMap<string, GuildBoard>) =>
@@ -155,12 +152,14 @@ const seenFromHits = (hits: readonly GuildHit[]): Seen =>
  */
 export async function loadGuildSearch(prefix: string): Promise<{ results: GuildSummary[]; unreachable: boolean; dataAsOf: string | null }> {
   const data = await loadGuildData();
+  // Without a readable hide list nothing is listed, not even the players table's guilds.
+  if (data.unreachable) return { results: [], unreachable: true, dataAsOf: null };
   let hits: GuildHit[] = [];
   if (playerPagesOn()) {
     try { hits = await playerStore().searchGuilds(prefix); } catch { hits = []; }
   }
   const directory = guildDirectory({ kills: data.kills, seen: seenFromHits(hits), boards: boardSources(data.boards) });
-  return { results: searchGuilds(directory, prefix), unreachable: data.unreachable && hits.length === 0, dataAsOf: data.dataAsOf };
+  return { results: searchGuilds(directory, prefix), unreachable: false, dataAsOf: data.dataAsOf };
 }
 
 export interface LadderQuery { instance?: number; realm?: string; faction?: GuildFaction; page?: number }
@@ -265,10 +264,10 @@ async function fromStore(realm: string, guild: string): Promise<GuildHit | null>
  * Everything a guild page shows, by the realm and guild slugs in its address: null when no source knows the guild
  * (or it is hidden), "unreachable" when the corpus could not be read.
  */
-export async function loadGuildPage(realmSlug: string, guildSlug_: string): Promise<GuildPageData | null | "unreachable"> {
+export async function loadGuildPage(realmSlug: string, guildSlug_: string, loaded?: GuildData): Promise<GuildPageData | null | "unreachable"> {
   const realm = realmSlug.toLowerCase();
   const guild = guildSlug_.toLowerCase();
-  const data = await loadGuildData();
+  const data = loaded ?? (await loadGuildData());
   if (data.unreachable) return "unreachable";
   const known = fromCorpus(data, realm, guild);
   const hit = known ? null : await fromStore(realm, guild);
@@ -308,9 +307,12 @@ export const guildReader: GuildReader = {
     return found.unreachable ? null : { guilds: found.results.slice(0, limit), dataAsOf: found.dataAsOf };
   },
   async page(guildName, realm) {
-    const loaded = await loadGuildPage(guildSlug(realm), guildSlug(guildName));
+    const data = await loadGuildData();
+    if (data.unreachable) return null;
+    if (data.hidden.has(guildHideKey(realm, guildName))) return { page: null, hidden: true, dataAsOf: data.dataAsOf };
+    const loaded = await loadGuildPage(guildSlug(realm), guildSlug(guildName), data);
     if (loaded === "unreachable") return null;
-    return { page: loaded?.page ?? null, dataAsOf: loaded?.dataAsOf ?? null };
+    return { page: loaded?.page ?? null, hidden: false, dataAsOf: loaded?.dataAsOf ?? data.dataAsOf };
   },
 };
 
@@ -330,4 +332,16 @@ export function guildExportRows(data: GuildData): { kills: Record<string, unknow
     kills: g.kills, latestKillAt: g.latestKillAt, lastSeen: null, sources: g.sources,
   }));
   return { kills, guilds };
+}
+
+/**
+ * Whether the officers' board of a guild may be shown on /tools/guild-board: with the guild pages on, a hidden guild's
+ * board is withheld too, and an unreadable hide list withholds every board. With the switch off there is no hide form
+ * and no hide list to read, so the board answers as it always has.
+ */
+export async function officerBoardState(guildName: string, realm: string): Promise<"shown" | "hidden" | "unreachable"> {
+  if (!guildsOn()) return "shown";
+  const hidden = await hiddenGuildsForIntake();
+  if (hidden === null) return "unreachable";
+  return hidden.has(guildHideKey(realm, guildName)) ? "hidden" : "shown";
 }

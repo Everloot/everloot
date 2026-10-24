@@ -38,20 +38,21 @@ const reader: GuildReader = {
   search: async (prefix, limit) => ({ guilds: searchGuilds(directory, prefix, limit), dataAsOf: AS_OF }),
   page: async (guildName, realm) => {
     const summary = directory.find((g) => g.guildName.toLowerCase() === guildName.toLowerCase() && g.realm.toLowerCase() === realm.toLowerCase());
-    if (!summary) return { page: null, dataAsOf: AS_OF };
+    if (guildName.toLowerCase() === "iron oath") return { page: null, hidden: true, dataAsOf: AS_OF };
+    if (!summary) return { page: null, hidden: false, dataAsOf: AS_OF };
     const page: GuildPage = {
       summary: { ...summary, membersSeen: 1 }, progression: progress.filter((p) => p.key === summary.key),
       activity: kills.filter((k) => k.key === summary.key).reverse(), ranks: guildRanks(summary.key, progress),
       seenRoster: [{ name: "Thrallina", realm: "Forever Pioneer", race: "Orc", class: "SHAMAN", level: 25, lastSeen: "2026-10-21" }],
     };
-    return { page, dataAsOf: AS_OF };
+    return { page, hidden: false, dataAsOf: AS_OF };
   },
 };
 
-const officers: unknown[] = ["a", "b"].map((installId) => ({
-  installId, kind: "guild_snapshot", claimToken: "x".repeat(16), guildName: "Night Watch", realm: "Forever Pioneer",
+const officers: unknown[] = ["a", "b"].flatMap((installId) => ["Night Watch", "Iron Oath"].map((guildName) => ({
+  installId, kind: "guild_snapshot", claimToken: "x".repeat(16), guildName, realm: "Forever Pioneer",
   members: [{ name: "Ada", rank: "Officer", level: 60, class: "Mage" }],
-}));
+})));
 
 const databases: DB[] = [];
 afterEach(() => { for (const db of databases.splice(0)) db.close(); });
@@ -132,5 +133,19 @@ test("a reader that fails is unrecorded, not zero", async () => {
   const search = await c.callTool({ name: "guild_search", arguments: { query: "night" } });
   expect(search.structuredContent).toMatchObject({ connected: false });
   const board = await c.callTool({ name: "guild_board", arguments: { guildName: "Night Watch", realm: "Forever Pioneer" } });
-  expect(JSON.stringify(board.content)).toContain("Guild data unavailable");
+  // The officers' board is withheld too: an unreadable hide list cannot vouch that the guild is not hidden.
+  expect(board.structuredContent).toEqual({ connected: false, dataAsOf: null, reason: expect.stringContaining("Guild data unavailable") });
+  expect(JSON.stringify(board.content)).not.toContain("Ada");
+});
+
+test("a hidden guild with officer records answers nothing from guild_board: no roster, loot, attendance or ladder", async () => {
+  const c = await client({ corpus, guilds: reader });
+  const answer = await c.callTool({ name: "guild_board", arguments: { guildName: "Iron Oath", realm: "Forever Pioneer" } });
+  expect(answer.isError).not.toBe(true);
+  const parsed = OUT.guild_board.parse(answer.structuredContent);
+  expect(parsed).toEqual({ connected: true, dataAsOf: AS_OF });
+  expect(JSON.stringify(answer.content)).toBe(JSON.stringify([{ type: "text", text: "This guild asked to be hidden. Nothing about it is shown." }]));
+  // Without a guild reader (the switch off) there is no hide list, and the board answers as before.
+  const off = await client({ corpus });
+  expect(JSON.stringify((await off.callTool({ name: "guild_board", arguments: { guildName: "Iron Oath", realm: "Forever Pioneer" } })).content)).toContain("Ada");
 });

@@ -566,6 +566,7 @@ export function registeredToolNames(options: Pick<ToolOptions, "guilds"> = {}): 
 
 const GUILDS_OFF = "Guild pages are not on for this server.";
 const GUILDS_UNREAD = "Guild data unavailable. It is unrecorded, not zero.";
+const GUILD_HIDDEN = "This guild asked to be hidden. Nothing about it is shown.";
 
 /** A tool's answer: the text every client gets, and the structured content of the tool's output schema. */
 export type ToolAnswer = Answer;
@@ -682,10 +683,14 @@ export function createToolHandlers(db: DB, options: ToolOptions = {}): ToolHandl
     }),
     completion_progress: (args) => completionProgressAnswer(args, options.completion),
     guild_board: async (args) => {
-      // The ladder side (members' kills, sightings, ranks) only when the host lends a guild reader.
+      // The ladder side (members' kills, sightings, ranks) only when the host lends a guild reader. With one, the hide
+      // list is authoritative: a hidden guild answers nothing, the officers' board included, and a reader that cannot
+      // tell (the hide list unreadable) withholds the answer rather than show a guild that may be hidden.
       let ladder: Awaited<ReturnType<GuildReader["page"]>> = null;
       if (options.guilds) {
         try { ladder = await options.guilds.page(args.guildName, args.realm); } catch { ladder = null; }
+        if (!ladder) return notRead(GUILDS_UNREAD);
+        if (ladder.hidden) return { text: GUILD_HIDDEN, structured: { connected: true, dataAsOf: ladder.dataAsOf } };
       }
       const guildPage = ladder?.page ?? null;
       return readPageIn("guild_board", (facts: ReturnType<typeof guildFactsFromRecords>) => {
@@ -693,8 +698,7 @@ export function createToolHandlers(db: DB, options: ToolOptions = {}): ToolHandl
         const published = page.roster.length || page.progression.length || page.loot.length;
         const text = handleGuildBoard(args, facts);
         if (!guildPage) {
-          const unread = options.guilds && !ladder ? `\n${GUILDS_UNREAD}` : "";
-          return { text: text + unread, page, url: published ? guildBoardUrl(page.guildName, page.realm) : undefined };
+          return { text, page, url: published ? guildBoardUrl(page.guildName, page.realm) : undefined };
         }
         return {
           text: `${text}\n\n${formatGuildPage(guildPage)}`,

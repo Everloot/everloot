@@ -463,8 +463,11 @@ export function instanceDefs(facts: InstanceFacts, asOf: Date = new Date()): Ins
 export interface GuildReader {
   ladder(): Promise<{ instances: InstanceDef[]; progress: GuildProgress[]; dataAsOf: string | null } | null>;
   search(prefix: string, limit: number): Promise<{ guilds: GuildSummary[]; dataAsOf: string | null } | null>;
-  /** `page` is null when no source knows the guild, or it is hidden. */
-  page(guildName: string, realm: string): Promise<{ page: GuildPage | null; dataAsOf: string | null } | null>;
+  /**
+   * `page` is null when no source knows the guild or it is hidden; `hidden` says which. A hidden guild is withheld
+   * everywhere, the officers' board included: the hide is authoritative.
+   */
+  page(guildName: string, realm: string): Promise<{ page: GuildPage | null; hidden: boolean; dataAsOf: string | null } | null>;
 }
 
 /** A guild as guild_search's output schema lists it. */
