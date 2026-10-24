@@ -62,8 +62,14 @@ export default async function SettingsPage() {
   return (
     <Container>
       <DataTitle title="Settings" meta={shell.handle ? `@${shell.handle}` : "No handle yet"} />
+      <nav aria-label="Settings sections" className="mb-6 flex flex-wrap gap-x-4 gap-y-1 border-b border-line pb-2 text-meta">
+        <a href="#profile" className="text-fg-2 hover:text-accent">Profile</a>
+        <a href="#status" className="text-fg-2 hover:text-accent">Status</a>
+        <a href="#characters" className="text-fg-2 hover:text-accent">Characters</a>
+        <a href="#more" className="text-fg-2 hover:text-accent">More</a>
+      </nav>
       <div className="space-y-8">
-        <section aria-labelledby="profile" className="space-y-2">
+        <section aria-labelledby="profile" className="scroll-mt-20 space-y-2">
           <h2 id="profile" className={heading}>Profile</h2>
           <ProfileForm profile={profile} accountName={shell.displayName} />
           {profile.publicProfile && profile.handle && (
@@ -71,12 +77,12 @@ export default async function SettingsPage() {
           )}
         </section>
 
-        <section aria-labelledby="status" className="space-y-2">
+        <section aria-labelledby="status" className="scroll-mt-20 space-y-2">
           <h2 id="status" className={heading}>Status</h2>
           <StatusForm status={profile.status} />
         </section>
 
-        <section aria-labelledby="characters" className="space-y-2">
+        <section aria-labelledby="characters" className="scroll-mt-20 space-y-2">
           <h2 id="characters" className={heading}>Characters</h2>
           <DataTable
             dense
@@ -93,9 +99,10 @@ export default async function SettingsPage() {
           </p>
         </section>
 
-        <section aria-labelledby="more" className="space-y-2">
+        <section aria-labelledby="more" className="scroll-mt-20 space-y-2">
           <h2 id="more" className={heading}>More</h2>
           <ul className="space-y-1 text-sm">
+            <li><Link href="/account" className={link}>Your account</Link> <span className="text-fg-2">overview, data and privacy</span></li>
             <li><Link href="/account#keys" className={link}>API keys</Link></li>
             <li><Link href="/account#chat-keys" className={link}>Chat keys</Link></li>
             <li><Link href="/addon" className={link}>Desktop App and addon</Link></li>

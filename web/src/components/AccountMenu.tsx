@@ -5,7 +5,7 @@ import type { AccountShell, AccountStatus, DeviceAccount } from "@/lib/account-s
 import { SHELL_CHANGED_EVENT } from "@/lib/profiles";
 
 // The signed-in side of the header (docs/design/specs/2026-10-20-account-shell-design.md): the "+" menu, the
-// avatar bubble and its menu, and the account switcher. Both menus are disclosures like Tools and the version
+// avatar bubble and its menu (the name there links to the account page), and the account switcher. Both menus are disclosures like Tools and the version
 // label: a button with aria-expanded, Escape closes and returns focus, a click outside closes.
 
 type MenuLink = { label: string; href: string };
@@ -43,19 +43,23 @@ export function currentStatus(status: AccountStatus | null | undefined, now = Da
   return status;
 }
 
-/** The middle sections of the avatar menu. Without a shell (EVERLOOT_PROFILES off), the links there are today. */
+/**
+ * The middle sections of the avatar menu. Every variant links to the account page by name, with API keys as a
+ * second entry into it. Without a shell (EVERLOOT_PROFILES off), the links there are today.
+ */
 export function accountMenuSections(shell: AccountShell | null | undefined, savedBuilds: boolean): MenuLink[][] {
   const builds = savedBuilds ? [{ label: "Your builds", href: "/me" }] : [];
-  const apiKeys = { label: "API keys", href: "/account" };
+  const account = { label: "Your account", href: "/account" };
+  const apiKeys = { label: "API keys", href: "/account#keys" };
   const desktop = { label: "Desktop App and addon", href: "/addon" };
-  if (!shell) return [[...builds, apiKeys, desktop]];
+  if (!shell) return [[...builds, account, apiKeys, desktop]];
   return [
     [
       { label: "Your profile", href: shell.handle ? `/u/${encodeURIComponent(shell.handle)}` : "/settings" },
       ...(savedBuilds ? [{ label: "Your characters", href: "/me" }] : []),
       ...builds,
     ],
-    [apiKeys, desktop, { label: "Settings", href: "/settings" }],
+    [account, apiKeys, desktop, { label: "Settings", href: "/settings" }],
   ];
 }
 
@@ -271,7 +275,7 @@ export function AvatarMenu({ name, initialShell = null, profiles = false, savedB
         <div className="flex items-center gap-3 px-3 py-2">
           <Avatar name={shown} fill={fill} size="md" />
           <div className="min-w-0 flex-1">
-            <p className="truncate font-semibold text-fg">{shown}</p>
+            <a href="/account" className="block truncate font-semibold text-fg hover:underline underline-offset-4">{shown}</a>
             {shell && (shell.handle
               ? <p className="truncate text-sm text-muted">@{shell.handle}</p>
               : <a href="/settings" className="text-sm text-accent hover:underline underline-offset-4">Choose a handle</a>)}

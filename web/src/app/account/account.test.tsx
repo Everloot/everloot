@@ -53,7 +53,7 @@ afterEach(() => { vi.unstubAllEnvs(); });
 
 test("signed out: the page sends the visitor to sign in and reads nothing else", async () => {
   auth.getUser.mockResolvedValue(null);
-  await expect(AccountPage()).rejects.toThrow("NEXT_REDIRECT /sign-in");
+  await expect(AccountPage()).rejects.toThrow("NEXT_REDIRECT /sign-in?returnTo=%2Faccount");
   expect(auth.authQuery).not.toHaveBeenCalled();
 });
 
@@ -67,6 +67,15 @@ test("the sections come in order, each with an anchor in the page's nav", async 
   const at = ids.map((id) => html.indexOf(`<section id="${id}"`));
   expect(at).toEqual([...at].sort((a, b) => a - b));
   expect(html).toMatch(/<nav aria-label="Account sections"[^>]*>(<a href="#[a-z-]+"[^>]*>[^<]+<\/a>){5}<\/nav>/);
+});
+
+test("switches off: Profile has nothing to show, so it and its nav link go and its sentence moves into Overview", async () => {
+  switches(false);
+  const html = await render();
+  expect(html).not.toContain('<section id="profile"');
+  expect(html).not.toContain('href="#profile"');
+  expect(html).toMatch(/<nav aria-label="Account sections"[^>]*>(<a href="#[a-z-]+"[^>]*>[^<]+<\/a>){4}<\/nav>/);
+  expect(html).toMatch(/<section id="overview"[^>]*>(?:(?!<\/section>).)*Only you see your account name\.<\/p><\/section>/);
 });
 
 test("Chat keys keeps its own section, the target of chat's key setup, and says keys stay in the browser", async () => {

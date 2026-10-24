@@ -59,6 +59,12 @@ test("profile, status, characters with the main marked, and the links to keys an
   expect(html).toContain('aria-label="Make Jaina your main"');
   expect(html).toContain('aria-label="Unset Thrall as main"');
   expect(html).toContain('href="/me"');
+  // The section nav lists the four sections in page order.
+  expect(html).toMatch(/<nav aria-label="Settings sections"[^>]*>(<a href="#(profile|status|characters|more)"[^>]*>[^<]+<\/a>){4}<\/nav>/);
+  expect(html.match(/<a href="#(profile|status|characters|more)"/g)).toEqual(['<a href="#profile"', '<a href="#status"', '<a href="#characters"', '<a href="#more"']);
+  // Settings points back at the account overview, which is where data and privacy live.
+  expect(html).toContain('href="/account"');
+  expect(html).toContain("overview, data and privacy");
   expect(html).toContain('href="/account#keys"');
   expect(html).toContain('href="/addon"');
   // Chat keys live on /account; Settings only links there.
