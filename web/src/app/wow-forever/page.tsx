@@ -119,7 +119,7 @@ export default async function WowForeverPage() {
         <section aria-labelledby="latest">
           <SectionHeading id="latest">What is the latest WoW: Forever build?</SectionHeading>
           <div className="space-y-4">
-            <p className="text-fg-2">{latestBuildLine(loadTimeline())}</p>
+            <p className="text-fg-2">{latestBuildLine(await loadTimeline())}</p>
             <p className="text-sm text-muted">
               A build&apos;s date is when Everloot first saw it, not when Blizzard shipped it. Every build and Blizzard post is on{" "}
               <Link href="/changes" className={link}>Patch notes and Blizzard posts</Link>.

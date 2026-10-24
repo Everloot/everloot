@@ -78,7 +78,7 @@ const copiesOf = (e: ChangeEntry) => [e, ...(e.copies ?? [])];
 export default async function ChangesPage({ searchParams }: { searchParams: Promise<Search> }) {
   const q = changesQuery((await searchParams) ?? {});
   if (!q) notFound();
-  const all = loadTimeline();
+  const all = await loadTimeline();
   const scope = filterTimeline(all, "all", q.game === "all" ? undefined : q.game);
   const text = q.q?.toLowerCase();
   const since = q.days ? new Date(Date.now() - q.days * 86_400_000).toISOString() : undefined;

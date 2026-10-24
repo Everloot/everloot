@@ -1,11 +1,7 @@
 name: Refresh changes
-# The blue tracker and build registry behind /changes. Every 30 minutes, no faster: the ingester
-# reads robots.txt, skips sources asked less than 25 minutes ago, makes at most 40 requests a run and
-# stops on 429 or a server error.
-# It never pushes to main. New data goes to one rolling pull request from the branch data/changes. That
-# pull request merges itself only when it touches nothing but kb/changes/blue-posts.json and
-# kb/changes/builds.json and every check on its head commit has passed. Every merge deploys the site, so
-# there is at most one deploy per 30 minutes.
+# The build registry behind /changes. Blue polling now belongs to /api/cron/blue.
+# TODO (docs/design/specs/2026-10-20-blue-tracker-live.md, step 4): add a daily
+# R2 posts copy to git once read access is available to this workflow. No second forum reader.
 on:
   schedule:
     - cron: '7,37 * * * *'
@@ -23,8 +19,7 @@ jobs:
     permissions:
       contents: read
     outputs:
-      failed: ${{ steps.blue.outcome == 'failure' || steps.builds.outcome == 'failure' }}
-      blue: ${{ steps.blue.outcome }}
+      failed: ${{ steps.builds.outcome == 'failure' }}
       builds: ${{ steps.builds.outcome }}
     steps:
       - uses: actions/checkout@v7
@@ -34,7 +29,7 @@ jobs:
       - name: Start from the open data pull request, if there is one
         run: |
           git fetch --depth=1 origin data/changes:refs/remotes/origin/data/changes || exit 0
-          git checkout origin/data/changes -- kb/changes
+          git checkout origin/data/changes -- kb/changes/builds.json
       - uses: actions/setup-node@v7
         with:
           node-version: '22.23.2'
@@ -47,35 +42,15 @@ jobs:
       # The knowledge-base CLI imports a few helpers from web/.
       - run: npm ci
         working-directory: web
-      # The politeness state (last asked, Retry-After, validators, newest seen, the forums' staff lists) lives in the Actions cache,
-      # never in git: a 429 with a long Retry-After must still be honoured by the next run.
-      - name: Restore the fetch state
-        uses: actions/cache/restore@v6
-        with:
-          path: kb/data/blue-fetch-state.json
-          key: blue-fetch-state-${{ github.run_id }}
-          restore-keys: blue-fetch-state-
-      - name: Blue posts (Blizzard staff on the US and EU WoW forums, and the official WoW Bluesky feed)
-        id: blue
-        continue-on-error: true
-        run: npm run kb -- blue-check
-        working-directory: kb
       - name: Builds (Blizzard's public version service)
         id: builds
         continue-on-error: true
         run: npm run kb -- builds-check --registry changes/builds.json
         working-directory: kb
-      - name: Save the fetch state, even if a source failed
-        if: always()
-        uses: actions/cache/save@v6
-        with:
-          path: kb/data/blue-fetch-state.json
-          key: blue-fetch-state-${{ github.run_id }}
       - uses: actions/upload-artifact@v7
         with:
           name: changes
           path: |
-            kb/changes/blue-posts.json
             kb/changes/builds.json
           retention-days: 1
   publish:
@@ -100,10 +75,10 @@ jobs:
       - name: Is there anything new?
         id: news
         run: |
-          # Every run moves the "last asked" and "last seen" times. Only a new or changed post or build
+          # Every run moves the "last asked" and "last seen" times. Only a new or changed build
           # is worth a pull request, against main and against what the open pull request already holds.
           meaningful() { grep -E '^[+-] ' | grep -vE '^[+-]\s+"(at|lastSeen)":' | grep -q .; }
-          git add kb/changes/blue-posts.json kb/changes/builds.json
+          git add kb/changes/builds.json
           news=no
           if git diff --cached -U0 -- kb/changes | meaningful; then news=yes; fi
           if [ "$news" = yes ] && git rev-parse -q --verify origin/data/changes >/dev/null; then
@@ -126,12 +101,12 @@ jobs:
           git config user.name 'everloot-changes[bot]'
           git config user.email 'hello@everloot.app'
           git checkout -q -B data/changes
-          git commit -s -q -m 'Changes: refresh blue posts and builds'
+          git commit -s -q -m 'Changes: refresh builds'
           lease=$(git rev-parse -q --verify origin/data/changes || true)
           git push --force-with-lease="data/changes:${lease}"             "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" data/changes
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           if [ -z "$(gh pr list --repo "$REPO" --head data/changes --state open --json number --jq '.[0].number')" ]; then
-            gh pr create --repo "$REPO" --base main --head data/changes               --title 'data(kb): new blue posts and builds'               --body 'Automatic refresh of kb/changes: new or changed Blizzard posts and game builds. The Refresh changes workflow keeps this one pull request up to date and merges it itself, but only when it touches nothing except kb/changes/blue-posts.json and kb/changes/builds.json and every check on the head commit has passed. Every merge deploys the site, so at most one deploy per 30 minutes.'
+            gh pr create --repo "$REPO" --base main --head data/changes               --title 'data(kb): new game builds'               --body 'Automatic refresh of kb/changes: new or changed game builds. The Refresh changes workflow keeps this one pull request up to date and merges it itself, but only when it touches nothing except kb/changes/blue-posts.json and kb/changes/builds.json and every check on the head commit has passed. Every merge deploys the site, so at most one deploy per 30 minutes.'
           fi
       - name: Merge it, only if it is safe
         if: steps.news.outputs.news == 'yes'
@@ -166,12 +141,11 @@ jobs:
           # Everything again right before the merge; --match-head-commit refuses if the head moved after this.
           head_is_ours || fail "The pull request head moved while the checks ran."
           only_data_files || fail "The pull request touches files outside the data allowlist."
-          gh pr merge "$pr" --repo "$REPO" --squash --match-head-commit "$PUSHED" --delete-branch             --subject 'Changes: refresh blue posts and builds' --body 'Automatic data refresh. Only kb/changes data files; all checks passed.'
+          gh pr merge "$pr" --repo "$REPO" --squash --match-head-commit "$PUSHED" --delete-branch             --subject 'Changes: refresh builds' --body 'Automatic data refresh. Only kb/changes data files; all checks passed.'
       - name: Fail the run if a source failed, so it shows up
         if: needs.collect.outputs.failed == 'true'
         env:
-          BLUE: ${{ needs.collect.outputs.blue }}
           BUILDS: ${{ needs.collect.outputs.builds }}
         run: |
-          echo "::error::A source failed in the collect job (blue posts: $BLUE, builds: $BUILDS). That step's log in collect says why."
+          echo "::error::A source failed in the collect job (builds: $BUILDS). That step's log in collect says why."
           exit 1

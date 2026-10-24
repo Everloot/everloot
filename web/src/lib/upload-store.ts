@@ -146,6 +146,23 @@ export function cloudConfig(env: Record<string, string | undefined> = process.en
   return Object.values(c).every(Boolean) ? (c as CloudConfig) : null;
 }
 
+export type R2Config = Pick<CloudConfig, "r2AccountId" | "r2AccessKeyId" | "r2SecretAccessKey" | "r2Bucket">;
+
+/** R2 readers do not need the upload index's Supabase configuration. */
+export function r2Config(): R2Config | null {
+  const c = {
+    r2AccountId: process.env.R2_ACCOUNT_ID?.trim(),
+    r2AccessKeyId: process.env.R2_ACCESS_KEY_ID?.trim(),
+    r2SecretAccessKey: process.env.R2_SECRET_ACCESS_KEY?.trim(),
+    r2Bucket: process.env.R2_BUCKET?.trim(),
+  };
+  return Object.values(c).every(Boolean) ? c as R2Config : null;
+}
+
+export function r2Client(cloud: R2Config): AwsClient {
+  return new AwsClient({ accessKeyId: cloud.r2AccessKeyId, secretAccessKey: cloud.r2SecretAccessKey, service: "s3", region: "auto" });
+}
+
 const PAGE = 1000; // PostgREST's default row cap on Supabase
 const PARALLEL_READS = 16;
 const SNAPSHOT_KEY = "snapshots/corpus.json";
@@ -197,12 +214,7 @@ export function createUploadStore(opts: {
 
   const cloud = opts.cloud;
   const unavailable = !cloud && process.env.NODE_ENV === "production";
-  const r2 = cloud && new AwsClient({
-    accessKeyId: cloud.r2AccessKeyId,
-    secretAccessKey: cloud.r2SecretAccessKey,
-    service: "s3",
-    region: "auto",
-  });
+  const r2 = cloud && r2Client(cloud);
   const objectUrl = (key: string) => `https://${cloud!.r2AccountId}.r2.cloudflarestorage.com/${cloud!.r2Bucket}/${key}`;
   const rest = (path: string) => `${cloud!.supabaseUrl.replace(/\/$/, "")}/rest/v1/${path}`;
   const restHeaders = (extra: Record<string, string> = {}) => ({

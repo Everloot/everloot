@@ -22,7 +22,7 @@ import WithSpells from "../with-spells";
 
 type Props = { params: Promise<{ post: string }> };
 
-// The posts are bundled with the site, so a page changes with a deploy; it is built on first visit and kept.
+// Blue posts are refreshed by the cron through the blue cache tag.
 export const revalidate = 900;
 export function generateStaticParams() {
   return [];
@@ -40,10 +40,10 @@ const isPost = (e: ChangeEntry) => e.type !== "build" && postPath(e) !== null;
 interface Found { entry: ChangeEntry; all: ChangeEntry[]; path: string; writeup: BlueWriteup | null }
 
 /** The announcement an address names. A regional copy's address finds the announcement, whose page is the one shown. */
-function find(segment: string): Found | null {
+async function find(segment: string): Promise<Found | null> {
   const id = postIdOfSegment(segment);
   if (!id) return null;
-  const all = loadTimeline();
+  const all = await loadTimeline();
   const entry = all.find((e) => e.type !== "build" && (e.id === id || e.copies?.some((c) => c.id === id)));
   if (!entry) return null;
   return { entry, all, path: postPath(entry)!, writeup: writeupFor(entry, loadWriteups()) };
@@ -61,7 +61,7 @@ function describe({ entry, writeup }: Found): string {
 }
 
 export async function generateMetadata(props: Props): Promise<Metadata> {
-  const found = find((await props.params).post);
+  const found = await find((await props.params).post);
   if (!found) return { robots: { index: false, follow: true } };
   return {
     ...pageMetadata({ title: found.entry.title, description: describe(found), path: found.path }),
@@ -101,7 +101,7 @@ function PostList({ id, title, entries, more }: { id: string; title: string; ent
 
 export default async function BluePostPage(props: Props) {
   const segment = (await props.params).post;
-  const found = find(segment);
+  const found = await find(segment);
   if (!found) notFound();
   if (`/changes/${segment}` !== found.path) permanentRedirect(found.path);
   const { entry, all, path, writeup } = found;

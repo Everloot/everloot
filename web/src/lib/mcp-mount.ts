@@ -37,9 +37,9 @@ export function toolLoaders(): ToolOptions {
       const list = await readSettledList(build);
       return { build: list.build, dataAsOf: list.dataAsOf, facts: settledKeys(list).size };
     },
-    // The same timeline the /changes page shows, read from the files bundled with the site. The regional
+    // The same timeline the /changes page shows, including live blue posts. The regional
     // copies stay on the site: the protocol's change entry has no field for them.
-    changes: () => loadTimeline().map(({ copies: _copies, ...e }) => e),
+    changes: async () => (await loadTimeline()).map(({ copies: _copies, ...e }) => e),
     // The registry and GitHub snapshot bundled with the site, joined with the same install counts as /addons/popular.
     ecosystem: () => loadEcosystem(),
     // Same deployment as the store: read the public records in process, no HTTP self-fetch or byte ceiling.
