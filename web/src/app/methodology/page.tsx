@@ -4,6 +4,7 @@ import { WIKI_URL } from "@/components/LoreSource";
 import { CURRENT_VERSION } from "@/lib/game-version";
 import { loadSiteAssets } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";
+import { guildsOn } from "@/lib/guild-switch";
 import { playerPagesOn } from "@/lib/player-pages";
 import { pageMetadata } from "@/lib/seo";
 import { REPO_URL } from "@/lib/source";
@@ -139,7 +140,8 @@ export default async function MethodologyPage() {
           </div>
         </section>
 
-        <section aria-labelledby="guilds">
+        {/* Only while the guild pages are on: it describes pages, a ladder and a hide form that are off otherwise. */}
+        {guildsOn() && <section aria-labelledby="guilds">
           <SectionHeading id="guilds">How guilds are counted</SectionHeading>
           <div className="space-y-4">
             <p className="text-fg-2">
@@ -162,7 +164,7 @@ export default async function MethodologyPage() {
                 A character is hidden on its own <Link href="/players/opt-out" className={link}>hide form</Link>.</li>
             </ul>
           </div>
-        </section>
+        </section>}
 
         {/* The full attribution. Pages carry none of their own; the footer's one line links here (docs/DATA_POLICY.md). */}
         <section aria-labelledby="credits">

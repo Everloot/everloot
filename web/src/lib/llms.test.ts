@@ -1,11 +1,12 @@
 import { MCP_PROMPT_NAMES, MCP_RESOURCE_TEMPLATE_URIS, MCP_RESOURCE_URIS, MCP_TOOL_NAMES } from "@everloot/protocol";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
+import { liveToolNames } from "@/lib/guild-switch";
 import { GET as llmsFull } from "@/app/llms-full.txt/route";
 import { GET as llms } from "@/app/llms.txt/route";
 import { tools, toolHref } from "@/data/tools";
 import { FULL_VERSION, llmsFullTxt, llmsTxt } from "./llms";
 
-const registered = MCP_TOOL_NAMES;
+const registered = liveToolNames();
 
 test("both files list every MCP tool the protocol declares", async () => {
   expect(registered.length).toBeGreaterThan(0);
@@ -13,6 +14,18 @@ test("both files list every MCP tool the protocol declares", async () => {
     expect(llmsTxt()).toContain(name);
     expect(await llmsFullTxt()).toContain(`- ${name}: `);
   }
+});
+
+test("the guild ladder's two tools are listed only while EVERLOOT_GUILDS is on, and the count follows", async () => {
+  expect(llmsTxt()).not.toContain("guild_search");
+  expect(await llmsFullTxt()).not.toContain("guild_rankings");
+  expect(llmsTxt()).toContain(`${MCP_TOOL_NAMES.length - 2} tools:`);
+  vi.stubEnv("EVERLOOT_GUILDS", "1");
+  try {
+    expect(llmsTxt()).toContain("guild_search");
+    expect(llmsTxt()).toContain(`${MCP_TOOL_NAMES.length} tools:`);
+    expect(await llmsFullTxt()).toContain("- guild_rankings: ");
+  } finally { vi.unstubAllEnvs(); }
 });
 
 test("both files list every MCP resource and prompt the protocol declares", async () => {

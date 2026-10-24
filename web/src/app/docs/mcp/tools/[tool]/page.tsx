@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
-import { MCP_TOOL_NAMES, type McpToolName } from "@everloot/protocol";
+import type { McpToolName } from "@everloot/protocol";
+import { liveToolNames } from "@/lib/guild-switch";
 import { C, Callout, H2, P, Params, docLink } from "@/components/docs/blocks";
 import { CodeGroup } from "@/components/docs/DocsClient";
 import DocPage from "@/components/docs/DocPage";
@@ -79,7 +80,7 @@ const TOOL_NOTES: Partial<Record<McpToolName, ReactNode>> = {
 export const dynamicParams = false;
 
 export function generateStaticParams() {
-  return MCP_TOOL_NAMES.map((name) => ({ tool: name.replaceAll("_", "-") }));
+  return liveToolNames().map((name) => ({ tool: name.replaceAll("_", "-") }));
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ tool: string }> }): Promise<Metadata> {

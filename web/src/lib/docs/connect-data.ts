@@ -1,3 +1,4 @@
+import { liveToolNames } from "@/lib/guild-switch";
 import { CREDIT_LINE, LICENCE, LICENCE_URL, MCP_PROMPT_NAMES, MCP_RESOURCE_TEMPLATE_LIST, MCP_RESOURCE_URIS, MCP_TOOL_NAMES, SITE, TERMS_URL, type McpPromptName, type McpResourceUri, type McpToolName } from "@everloot/protocol";
 
 export const MCP_URL = `${SITE}/mcp/public`;
@@ -43,8 +44,14 @@ const TOOL_TEXT: Record<McpToolName, string> = {
   everloot_plan: "What is built, what is next and what is waiting. Read it before assuming a tool exists.",
 };
 
-/** Every tool the MCP server registers, in the protocol's order. */
+/** Every tool in the protocol's table, in its order, each with its sentence. */
 export const MCP_TOOLS: readonly { name: McpToolName; text: string }[] = MCP_TOOL_NAMES.map((name) => ({ name, text: TOOL_TEXT[name] }));
+
+/** The tools the MCP server lists today: the guild ladder's two only while EVERLOOT_GUILDS is on. */
+export function liveMcpTools(): readonly { name: McpToolName; text: string }[] {
+  const live = liveToolNames();
+  return MCP_TOOLS.filter((tool) => live.includes(tool.name));
+}
 
 /** One plain sentence per resource, keyed by URI so a new resource in the protocol fails the type check here. */
 const RESOURCE_TEXT: Record<McpResourceUri, string> = {
