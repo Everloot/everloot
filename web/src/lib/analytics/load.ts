@@ -82,10 +82,10 @@ export function stripSearchQuery(url: unknown): unknown {
 export function scrubEvent<T extends { properties?: Record<string, unknown> } | null>(event: T, origin?: string): T {
   const props = event?.properties;
   if (!props) return event;
-  for (const key of ["$current_url", "$initial_current_url"]) {
+  for (const key of ["$current_url", "$initial_current_url", "$session_entry_url"]) {
     if (key in props) props[key] = stripSearchQuery(props[key]);
   }
-  for (const key of ["$referrer", "$initial_referrer"]) {
+  for (const key of ["$referrer", "$initial_referrer", "$session_entry_referrer"]) {
     const ref = props[key];
     if (typeof ref === "string" && origin) {
       try { if (new URL(ref).origin === origin) props[key] = stripSearchQuery(ref); } catch {}
@@ -106,6 +106,8 @@ async function startPosthog(config: AnalyticsConfig, win: Window): Promise<void>
       api_host: config.posthogHost,
       autocapture: false,
       disable_session_recording: true,
+      capture_performance: false,
+      enable_heatmaps: false,
       capture_pageview: "history_change",
       person_profiles: "identified_only",
       before_send: (event) => scrubEvent(event, win.location.origin),

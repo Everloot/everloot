@@ -170,7 +170,7 @@ describe("PostHog consent gating", () => {
   it("starts after consent", async () => {
     loadConsented(config, window, document);
     await vi.waitFor(() => expect(posthogMock.init).toHaveBeenCalledOnce());
-    expect(posthogMock.init.mock.calls[0][1]).toMatchObject({ autocapture: false, disable_session_recording: true });
+    expect(posthogMock.init.mock.calls[0][1]).toMatchObject({ autocapture: false, disable_session_recording: true, capture_performance: false, enable_heatmaps: false });
   });
 
   it("does not initialise if consent is withdrawn while the import is in flight", async () => {
@@ -200,6 +200,18 @@ describe("search term scrubbing", () => {
     await vi.waitFor(() => expect(posthogMock.init).toHaveBeenCalledOnce());
     const before = posthogMock.init.mock.calls[0][1].before_send;
     expect(before({ properties: { $current_url: `${window.location.origin}/x?q=1` } }).properties.$current_url).toBe(`${window.location.origin}/x`);
+  });
+
+  it("removes search terms from session entry properties on every event", () => {
+    const event = scrubEvent({ properties: {
+      $session_entry_url: "https://everloot.app/search?q=private&page=2",
+      $session_entry_referrer: "https://everloot.app/players?q=private",
+    } }, "https://everloot.app");
+    expect(event.properties).toEqual({
+      $session_entry_url: "https://everloot.app/search?page=2",
+      $session_entry_referrer: "https://everloot.app/players",
+    });
+    expect(scrubEvent({ properties: { $session_entry_referrer: "https://example.com/?q=external" } }, "https://everloot.app").properties.$session_entry_referrer).toBe("https://example.com/?q=external");
   });
 });
 
