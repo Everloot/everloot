@@ -51,22 +51,30 @@
   outline-offset: -2px;
 }
 
-/* Zone outlines: shapes with names. They stay whether or not the game's pictures are under them. */
+/* Zone bounds are hit targets, not geographic borders. Names identify the zones. */
 .wm-map .wm-zone {
-  fill: rgb(var(--fg) / 0.05);
-  stroke: rgb(var(--edge));
+  fill: transparent;
+  stroke: transparent;
   cursor: pointer;
   transition: fill var(--dur-fade) var(--ease-color), stroke var(--dur-fade) var(--ease-color);
-}
-.wm-map .wm-zone:hover {
-  fill: rgb(var(--accent) / 0.18);
-  stroke: rgb(var(--accent));
 }
 /* Dashed is the site's mark for "from the game files, unconfirmed". */
 .wm-map .wm-zone-held {
   fill: rgb(var(--warning) / 0.1);
   stroke: rgb(var(--warning));
   stroke-dasharray: 5 3;
+}
+/* The alpha asset softens mismatched picture edges into the continent art underneath. */
+.wm-map .wm-zone-art {
+  mask-image: url("/map-zone-mask.png");
+  mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+}
+.wm-map .leaflet-map-pane:not(.leaflet-zoom-anim) .wm-zone-art {
+  transition: opacity var(--dur-fade) var(--ease-color);
+}
+@media (prefers-reduced-motion: reduce) {
+  .wm-map .wm-zone-art { transition: none; }
 }
 .wm-map .wm-flight-line {
   stroke: rgb(var(--fg-2));

@@ -10,6 +10,8 @@ import {
 } from "@/lib/map-view";
 import { pinIconUrl, pinMarkHtml, type PinKind, type PoiIcons } from "@/lib/map-marks";
 import { reducedMotion } from "@/lib/motion";
+import { MOTION } from "@/design/tokens";
+import { artHandoff } from "./art-handoff";
 
 /** Where the reader's deep link points: a ring on the spot. */
 export interface MapMarker { x: number; y: number; label: string }
@@ -112,7 +114,7 @@ export default function LeafletMap(props: LeafletMapProps) {
     const p = live.current, pins = markers.current, art = artLayers.current;
     const m = L.map(el, {
       crs: L.CRS.Simple, zoomSnap: 0.25, zoomDelta: 0.5, wheelPxPerZoomLevel: 90, maxZoom: MAX_ZOOM, minZoom: -8,
-      attributionControl: false, zoomControl: false, maxBoundsViscosity: 1, zoomAnimation: !reducedMotion(), markerZoomAnimation: false,
+      attributionControl: false, zoomControl: false, maxBoundsViscosity: 1, zoomAnimation: !reducedMotion(), markerZoomAnimation: !reducedMotion(),
     });
     map.current = m;
     const pad = Math.max(p.base.width, p.base.height) * 0.02;
@@ -171,17 +173,44 @@ export default function LeafletMap(props: LeafletMapProps) {
       for (const l of placeLabels(out, v, px, fontPx)) L.marker(ll(l.x, l.y), { icon: labelIcon(l), interactive: false, keyboard: false }).addTo(g.labels);
     };
 
-    // Which of the game's zone pictures to show at this zoom and place; the continent's own is laid once.
+    let zoneImage: ArtImage | null = null;
+    const zoneArt = artHandoff((key) => {
+      const a = zoneImage!;
+      const layer = L.imageOverlay(key, bounds(a), { pane: "art", interactive: false, alt: "", opacity: 0, className: "wm-zone-art" });
+      const ready = new Promise<void>((resolve, reject) => {
+        layer.once("load", () => {
+          const image = layer.getElement();
+          if (image?.decode) image.decode().then(resolve, resolve);
+          else resolve();
+        });
+        layer.once("error", reject);
+      });
+      layer.addTo(groups.current!.art);
+      return { layer, ready };
+    }, (layer, previous) => {
+      layer.bringToFront();
+      // Commit the hidden state before starting the fade, including a browser-cached image.
+      const image = layer.getElement();
+      if (image) getComputedStyle(image).opacity;
+      layer.setOpacity(1);
+      previous?.setOpacity(0);
+    }, (layer) => { layer.off(); groups.current?.art.removeLayer(layer); }, reducedMotion() ? 0 : MOTION.duration.fade);
+
+    // The continent stays underneath; only its detail image gets softened edges and a load-ready handoff.
     resync.current = () => {
       const g = groups.current, now = live.current;
       if (!g) return;
       const wanted = new Map<string, ArtImage>();
+      zoneImage = null;
       if (now.art && now.showArt) {
         const v = view();
         const camera = { zoom: Math.max(1, now.base.width / v.width), cx: v.x + v.width / 2, cy: v.y + v.height / 2 };
         if (now.art.continent) wanted.set(`c-${now.art.continent.url}`, now.art.continent);
-        for (const z of zoneArtShown(now.art, camera, v)) wanted.set(`${z.uiMapId}-${z.url}`, z);
+        const zones = zoneArtShown(now.art, camera, v);
+        if (now.art.continent) zoneImage = zones[0] ?? null;
+        else for (const z of zones) wanted.set(`${z.uiMapId}-${z.url}`, z);
       }
+      zoneArt.set(zoneImage?.url ?? null);
       for (const [key, layer] of artLayers.current) if (!wanted.has(key)) { g.art.removeLayer(layer); artLayers.current.delete(key); }
       for (const [key, a] of wanted) {
         if (artLayers.current.has(key)) continue;
@@ -198,8 +227,13 @@ export default function LeafletMap(props: LeafletMapProps) {
       live.current.onView({ x: c.lng, y: -c.lat, zoom: m.getZoom() });
     });
     m.on("resize", () => { fitMin(); relabel.current(); resync.current(); });
-    m.on("mousemove", (e: L.LeafletMouseEvent) => live.current.onHover({ x: e.latlng.lng, y: -e.latlng.lat }));
-    m.on("mouseout", () => live.current.onHover(null));
+    let hoverFrame = 0;
+    let hoverPoint: { x: number; y: number } | null = null;
+    m.on("mousemove", (e: L.LeafletMouseEvent) => {
+      hoverPoint = { x: e.latlng.lng, y: -e.latlng.lat };
+      if (!hoverFrame) hoverFrame = requestAnimationFrame(() => { hoverFrame = 0; live.current.onHover(hoverPoint); });
+    });
+    m.on("mouseout", () => { cancelAnimationFrame(hoverFrame); hoverFrame = 0; live.current.onHover(null); });
     m.on("click", (e: L.LeafletMouseEvent) => {
       const now = live.current, x = e.latlng.lng, y = -e.latlng.lat;
       // The smallest zone under the click: zoom to it from afar, drop a point once already close.
@@ -217,6 +251,8 @@ export default function LeafletMap(props: LeafletMapProps) {
     p.onView({ x: c.lng, y: -c.lat, zoom: m.getZoom() });
     return () => {
       observer.disconnect();
+      cancelAnimationFrame(hoverFrame);
+      zoneArt.set(null);
       m.remove();
       map.current = null;
       groups.current = null;

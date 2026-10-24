@@ -89,6 +89,15 @@ const button = (label: string, scope: ParentNode = container) =>
 const click = (el: Element) => act(async () => (el as HTMLElement).click());
 const shell = () => $("[data-map-shell]");
 const panel = () => $("#map-panel");
+test("pointer coordinates update without rendering the surrounding map view", async () => {
+  await mount();
+  const before = leaflet.props;
+  await act(async () => before.onHover({ x: 250, y: 400 }));
+  expect($("[data-coordinates]").textContent).toContain("Durotar 25, 40");
+  expect(leaflet.props).toBe(before);
+  await act(async () => before.onHover(null));
+  expect($("[data-coordinates]").textContent).toContain("Move over the map");
+});
 const listRows = (id: string) => Array.from(container.querySelectorAll(`[aria-labelledby="${id}"] li`)).map((li) => li.textContent ?? "");
 
 test("the desk sidebar collapses to a rail, and this browser remembers it", async () => {

@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Badge, Card, LinkTabs, Segmented } from "@/components/ui";
 import {
   allCategories, candidateCounts, categoryCounts, CATEGORY_GROUPS, CATEGORY_IDS, continentPath, initialView, mapUrlSearch, openPageLink,
@@ -26,6 +26,17 @@ const LeafletMap = dynamic(() => import("./map/LeafletMap"), {
 
 /** Where the desktop sidebar's collapsed state is kept, in this browser only. */
 export const SIDEBAR_KEY = "everloot.map.sidebar";
+const EMPTY_ICONS: PoiIcons = {};
+type HoverPoint = { x: number; y: number } | null;
+type CoordinatesHandle = { setPoint: (point: HoverPoint) => void };
+const Coordinates = forwardRef<CoordinatesHandle, { zones: MapItems["zones"] }>(function Coordinates({ zones }, ref) {
+  const [point, setPoint] = useState<HoverPoint>(null);
+  useImperativeHandle(ref, () => ({ setPoint }), []);
+  const hovered = point ? zoneSpot(zones, point.x, point.y) : null;
+  return <p data-coordinates className="pointer-events-none absolute bottom-2 right-2 z-[1100] hidden rounded-control border border-line bg-panel px-3 py-1 font-mono text-xs text-fg-2 md:block">
+    {hovered ? `${hovered.zone.name} ${hovered.x}, ${hovered.y}` : "Move over the map for coordinates"}
+  </p>;
+});
 
 /** The sidebar's two views on a desk; on a phone, which bottom sheet is open. */
 type View = MapUrlState["tab"];
@@ -144,7 +155,7 @@ export interface WorldMapViewProps {
  */
 export default function WorldMapView(props: WorldMapViewProps) {
   const { base, marker, spoilers, art } = props;
-  const icons: PoiIcons = props.poi ?? {};
+  const icons: PoiIcons = props.poi ?? EMPTY_ICONS;
   const [show, setShow] = useState<CategoryState>(props.url.show);
   const [showArt, setShowArt] = useState(true);
   const [query, setQuery] = useState(props.url.q);
@@ -154,7 +165,8 @@ export default function WorldMapView(props: WorldMapViewProps) {
   const [selectedId, setSelectedId] = useState<string | null>(props.view.pin);
   const [focusZone, setFocusZone] = useState<number | null>(props.marker?.mapId ?? props.zoneId);
   const [spot, setSpot] = useState<{ x: number; y: number } | null>(null);
-  const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
+  const coordinates = useRef<CoordinatesHandle>(null);
+  const onHover = useCallback((point: HoverPoint) => coordinates.current?.setPoint(point), []);
   const [copied, setCopied] = useState("");
   const [request, setRequest] = useState<FitRequest | null>(null);
   const [view, setView] = useState<View>(props.url.tab);
@@ -233,7 +245,6 @@ export default function WorldMapView(props: WorldMapViewProps) {
   const selected = selectedId ? subjects.get(selectedId) ?? null : null;
   const selectedSpot = selected ? zoneSpot(zones, selected.x, selected.y) : null;
   const here = spot ? zoneSpot(zones, spot.x, spot.y) : null;
-  const hovered = hover ? zoneSpot(zones, hover.x, hover.y) : null;
 
   const ask = (to: "search" | "card" | "panel") => setFocusAsk((f) => ({ to, n: (f?.n ?? 0) + 1 }));
   useEffect(() => {
@@ -573,7 +584,7 @@ export default function WorldMapView(props: WorldMapViewProps) {
           onSelect={(id) => { setSelectedId(id); if (id) { setSpot(null); setSheet(null); returnFocus.current = null; } }}
           onZone={goZone}
           onPoint={(x, y) => { setSpot({ x, y }); setSheet(null); returnFocus.current = null; }}
-          onHover={setHover}
+          onHover={onHover}
           onView={onView}
         />
         {props.notice && noticeOpen && (
@@ -583,9 +594,7 @@ export default function WorldMapView(props: WorldMapViewProps) {
           </div>
         )}
         {/* Where the pointer is, on the game's 0 to 100 scale. A phone has no pointer: it reads the card instead. */}
-        <p data-coordinates className="pointer-events-none absolute bottom-2 right-2 z-[1100] hidden rounded-control border border-line bg-panel px-3 py-1 font-mono text-xs text-fg-2 md:block">
-          {hovered ? `${hovered.zone.name} ${hovered.x}, ${hovered.y}` : "Move over the map for coordinates"}
-        </p>
+        <Coordinates ref={coordinates} zones={zones} />
         {/* The card for what was chosen: a sheet along the bottom on a phone, the map's corner on a desk. */}
         {(selected || (spot && here)) && (
           <div
