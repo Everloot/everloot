@@ -10,7 +10,7 @@ type Status = "loading" | "anonymous" | "signed-in" | "unavailable";
 /**
  * The header's account area. Signed out: Sign in and Get the addon. Signed in: the "+" menu and the avatar menu.
  * The account is looked up here; the avatar menu fetches the player's shell itself. `initialShell` seeds it (tests).
- * `place="menu"` is the phone menu's copy: only Sign in (or Retry), which the bar hides below 640 px.
+ * `place="menu"` keeps Sign in (or Retry) and the addon link reachable on narrow phones.
  */
 export default function AccountControls({ savedBuilds = false, initialShell = null, profiles = false, accountSwitching = false, place = "bar" }: {
   savedBuilds?: boolean;
@@ -72,7 +72,7 @@ export default function AccountControls({ savedBuilds = false, initialShell = nu
     : <button type="button" disabled aria-busy="true" className={controlClass}>Account</button>;
 
   if (place === "menu") {
-    return status === "signed-in" ? null : <div className="border-t border-line pt-4 sm:hidden">{signIn}</div>;
+    return status === "signed-in" ? null : <div className="flex flex-wrap gap-2 border-t border-line pt-4 sm:hidden">{signIn}<a href="/addon" className={controlClass}>Get the addon</a></div>;
   }
 
   return (
@@ -85,7 +85,7 @@ export default function AccountControls({ savedBuilds = false, initialShell = nu
       ) : (
         <>
           <span className="hidden sm:inline-flex">{signIn}</span>
-          <a href="/addon" className="btn btn-primary min-h-8 shrink-0 whitespace-nowrap px-4 text-sm">Get the addon</a>
+          <a href="/addon" className="btn btn-primary hidden min-h-8 shrink-0 whitespace-nowrap px-4 text-sm min-[400px]:inline-flex">Get the addon</a>
         </>
       )}
       {alert}
