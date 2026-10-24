@@ -5,7 +5,7 @@
 Everloot = Everloot or {}
 local E = Everloot
 
-E.VERSION = "0.3.10"
+E.VERSION = "0.3.11"
 E.MAX_ROWS_PER_KIND = 2000
 
 -- Same Adler-32 the companion writes into its slot addons; Lua 5.1 arithmetic only.

@@ -16,7 +16,9 @@ from protocol_schema import check_all
 root = Path(__file__).parents[1]
 toc = (root / "Everloot.toc").read_text(encoding="utf-8")
 assert "modules\\itemfacts.lua" in toc, "the item facts module must be in the TOC"
-assert re.search(r"^## Version: 0\.3\.10\s*$", toc, re.M), "the item facts lane leaves ## Version as it is"
+version = re.search(r"^## Version: (\d+\.\d+\.\d+)\s*$", toc, re.M)
+assert version, "the release has a numeric addon version"
+assert f'E.VERSION = "{version.group(1)}"' in (root / "core.lua").read_text(encoding="utf-8"), "core and TOC versions agree"
 
 STUBS = """
 date = function() return '2026-11-04T18:00:00Z' end

@@ -87,6 +87,8 @@ jobs:
       - run: python addon/tests/event_identity.py && python addon/tests/collection_contract.py && python addon/tests/map_positions_contract.py && python addon/tests/loot_types_contract.py && python addon/tests/item_facts_contract.py && python addon/tests/auction_contract.py && python addon/tests/gold_contract.py && python addon/tests/ask_contract.py && python addon/tests/recipes_contract.py && python addon/tests/addons_contract.py && python addon/tests/mapbounds_contract.py && python addon/tests/market_contract.py && python addon/tests/drops_contract.py && python addon/tests/scan_prompt_contract.py && python addon/tests/auction_tab_contract.py && python addon/tests/options_contract.py && python addon/tests/gph_contract.py && python addon/tests/talents_contract.py && python addon/tests/plan_contract.py && python addon/tests/raid_contract.py && python addon/tests/completion_contract.py && python addon/tests/census_contract.py && python addon/tests/players_contract.py && python addon/tests/conveniences_contract.py && python addon/tests/protocol_contract.py && python addon/tests/no_ads_contract.py && python addon/tests/minimap_contract.py
       - name: Website plans import into the addon workspace
         run: python addon/tests/raid_plan_contract.py && python addon/tests/planner_contract.py
+      - name: Alpha releases stay pre-releases
+        run: python scripts/test_alpha_release.py
       # A released version's zip is the published download: rebuild it to prove the source packages, then
       # put the published one back. An unreleased version's zip must match the source byte for byte.
       # release.yml stays strict.

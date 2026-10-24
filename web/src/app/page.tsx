@@ -137,8 +137,8 @@ export default async function Home() {
           </ul>
           {addon && (
             <p className="text-sm text-fg-2 md:max-w-[26ch]">
-              The addon is <span className="tabular-nums text-fg">{addon.version}</span>. It reads the client and
-              sends what you allow.
+              The addon is <span className="tabular-nums text-fg">{addon.version} Alpha</span>. Live-client verification
+              is pending. It reads the client and sends what you allow.
             </p>
           )}
         </Card>
@@ -268,7 +268,7 @@ export default async function Home() {
         </SectionHeading>
         <div className="flex flex-wrap items-center gap-3">
           {addon
-            ? <TrackedDownload href={addon.downloadPath} addon="everloot" to="site" download className="btn btn-primary">Download addon {addon.version}</TrackedDownload>
+            ? <TrackedDownload href={addon.downloadPath} addon="everloot" to="site" download className="btn btn-primary">Download addon {addon.version} Alpha</TrackedDownload>
             : <Link href="/addon" className="btn btn-primary">Get the addon</Link>}
           <Link href="/addon" className="btn">Desktop app</Link>
         </div>

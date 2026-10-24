@@ -147,7 +147,7 @@ test("/upload: the download is the one the site serves, with the licence beside 
   expect(blocks(html).find((b) => b["@type"] === "SoftwareApplication")).toBeUndefined();
   const release = latestAddonRelease()!;
   expect(html).toContain(`href="${release.downloadPath}"`);
-  expect(visible(html)).toContain(`Download beta addon ${release.version}`);
+  expect(visible(html)).toContain(`Download Alpha addon ${release.version}`);
   expect(visible(html)).toContain("Licence: AGPL-3.0");
 });
 

@@ -60,7 +60,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.plan.outputs.sha }}
+          ref: main
+      - name: Main still matches the planned source revision
+        env:
+          PLANNED_SHA: ${{ needs.plan.outputs.sha }}
+        run: test "$(git rev-parse HEAD)" = "${PLANNED_SHA}"
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
@@ -68,6 +72,8 @@ jobs:
       # Tests run on the tree exactly as committed, before the version is stamped.
       - name: Addon tests
         run: python addon/tests/event_identity.py && python addon/tests/collection_contract.py && python addon/tests/map_positions_contract.py && python addon/tests/loot_types_contract.py && python addon/tests/item_facts_contract.py && python addon/tests/auction_contract.py && python addon/tests/gold_contract.py && python addon/tests/ask_contract.py && python addon/tests/recipes_contract.py && python addon/tests/addons_contract.py && python addon/tests/mapbounds_contract.py && python addon/tests/market_contract.py && python addon/tests/drops_contract.py && python addon/tests/scan_prompt_contract.py && python addon/tests/auction_tab_contract.py && python addon/tests/options_contract.py && python addon/tests/gph_contract.py && python addon/tests/talents_contract.py && python addon/tests/plan_contract.py && python addon/tests/raid_contract.py && python addon/tests/completion_contract.py && python addon/tests/census_contract.py && python addon/tests/players_contract.py && python addon/tests/conveniences_contract.py && python addon/tests/protocol_contract.py && python addon/tests/no_ads_contract.py && python addon/tests/minimap_contract.py && python addon/tests/answers_contract.py
+      - name: Connected planner contracts
+        run: python addon/tests/raid_plan_contract.py && python addon/tests/planner_contract.py
       - name: Stamp the nightly version (this runner's copy only, never committed)
         env:
           VERSION: ${{ needs.plan.outputs.version }}
