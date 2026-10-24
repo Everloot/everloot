@@ -5,6 +5,7 @@ import { validPlayerName } from "@everloot/protocol";
 import { pageMetadata } from "@/lib/seo";
 import { optOutPath, playerPagesOn, playerPath, type Player } from "@/lib/player-pages";
 import { playerStore } from "@/lib/player-store";
+import { guildPath, guildsOn } from "@/lib/guilds";
 import { Card, Container, Facts, PageHeader } from "@/components/ui";
 import { className, classText, describePlayer, PLAYER_STORAGE_UNAVAILABLE, playerRobots, raceName } from "../../../player-view";
 
@@ -84,7 +85,8 @@ export default async function PlayerPage(props: { params: Promise<Params> }) {
             { label: "Class", value: <span className={classText(player.class)}>{className(player.class)}</span> },
             { label: "Race", value: raceName(player.race) },
             { label: "Level", value: player.level, numeric: true },
-            { label: "Guild", value: player.guild ?? "None seen" },
+            // With the guild pages on, the guild names its page; the page 404s for a hidden guild.
+            { label: "Guild", value: player.guild ? (guildsOn() ? <Link href={guildPath(player.realm, player.guild)} className={link}>{player.guild}</Link> : player.guild) : "None seen" },
             { label: "Realm", value: player.realm },
             { label: "Last seen", value: player.lastSeen, numeric: true },
           ]}

@@ -263,9 +263,52 @@ export const healthResponse = z.object({
 });
 export type HealthResponse = z.infer<typeof healthResponse>;
 
+/** One boss kill a guild owns: reported by 2 of its members' installs, or published by its officers. Guild and boss, never a person. */
+const guildKillRow = z.object({
+  guildName: z.string(),
+  realm: z.string(),
+  faction: z.enum(["alliance", "horde"]).nullable().describe("Null when only the officers' board, which carries no faction, reports the kill."),
+  encounterId: z.number().int().positive(),
+  name: z.string().describe("The encounter's name as most reports gave it."),
+  instanceMapId: z.number().int().positive(),
+  difficulty: z.number().int().nonnegative().nullable().describe("The difficulty id most reports gave; null when none did or only the officers published the kill."),
+  killedAt: z.string().describe("The earliest agreeing report, ISO; empty when only the officers published the kill."),
+  installs: z.number().int().nonnegative().describe("Distinct member installs that reported it; 0 for an officers' publication."),
+  source: z.enum(["members", "officers"]),
+});
+/** guild-kills.ndjson of the bulk export: the agreed guild kills, oldest first. */
+export const guildKillsResponse = z.object({
+  generatedAt: ISO_TIME,
+  dataAsOf: ISO_TIME.nullable(),
+  kills: z.array(guildKillRow),
+  attribution: attributionSchema,
+});
+export type GuildKillsResponse = z.infer<typeof guildKillsResponse>;
+
+/** One guild the site knows, with the sources that know it named. No member names. */
+const guildDirectoryRow = z.object({
+  guildName: z.string(),
+  realm: z.string(),
+  faction: z.enum(["alliance", "horde"]).nullable(),
+  membersSeen: z.number().int().nonnegative().nullable().describe("Characters the addon saw in the guild; null when the export did not read the player pages, which is not zero."),
+  membersPublished: z.number().int().nonnegative().nullable().describe("The officer roster's size when published."),
+  kills: z.number().int().nonnegative(),
+  latestKillAt: z.string().nullable(),
+  lastSeen: z.string().nullable().describe("The newest day a member was seen, YYYY-MM-DD; null without player rows."),
+  sources: z.array(z.enum(["kills", "seen", "officers"])),
+});
+/** guilds.ndjson of the bulk export: the guild directory, newest kill first. */
+export const guildsResponse = z.object({
+  generatedAt: ISO_TIME,
+  dataAsOf: ISO_TIME.nullable(),
+  guilds: z.array(guildDirectoryRow),
+  attribution: attributionSchema,
+});
+export type GuildsResponse = z.infer<typeof guildsResponse>;
+
 /** The response schemas by name, the names schema/api/<name>.json uses. */
 /** The datasets the bulk export writes, one NDJSON file each; the rows are the same the JSON API serves. */
-export const BULK_DATASETS = ["corpus", "edges", "drops", "items"] as const;
+export const BULK_DATASETS = ["corpus", "edges", "drops", "items", "guilds"] as const;
 export type BulkDataset = (typeof BULK_DATASETS)[number];
 
 /** One file of a bulk export: a newline-delimited JSON file whose rows are the `rowsOf` response's `field` elements. */
@@ -337,6 +380,8 @@ export const API_SCHEMAS = {
   tooltipResponse,
   bulkIndex,
   settledListResponse,
+  guildKillsResponse,
+  guildsResponse,
   intakeRequest,
   intakeReceipt,
   intakeRefused,

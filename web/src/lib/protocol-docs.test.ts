@@ -1,10 +1,11 @@
-import { API_ROUTES, MCP_TOOL_NAMES } from "@everloot/protocol";
+import { API_ROUTES } from "@everloot/protocol";
+import { liveToolNames } from "@/lib/guild-switch";
 import { expect, test } from "vitest";
 import { routeDocs, toolDocs, toolOutput, toolParams, typeLabel } from "./protocol-docs";
 
 test("every tool gets a parameter table in declaration order, with required flags and descriptions", () => {
   const docs = toolDocs();
-  expect(docs.map((d) => d.name)).toEqual(MCP_TOOL_NAMES);
+  expect(docs.map((d) => d.name)).toEqual(liveToolNames());
   const search = docs.find((d) => d.name === "search_knowledge")!;
   expect(search.params.map((p) => p.name)).toEqual(["query", "kind", "version", "limit"]);
   expect(search.params[0]).toMatchObject({ required: true, type: "string, up to 1000 characters" });

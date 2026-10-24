@@ -18,7 +18,7 @@ import { FEED } from "@/lib/seo";
 import { classAndProfessionIcons, launchArt, loadSiteAssets } from "@/lib/game-assets";
 import GameIcon from "@/components/game/GameIcon";
 import { BannerArt } from "@/components/game/PageBanner";
-import { CONNECT_EXAMPLES, MCP_TOOLS } from "@/lib/docs/connect-data";
+import { CONNECT_EXAMPLES, liveMcpTools } from "@/lib/docs/connect-data";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/", types: FEED },
@@ -257,7 +257,7 @@ export default async function Home() {
         </div>
         <div className="min-w-0 space-y-2">
           <CodeBlock title="Claude Code" label="Add Everloot to Claude Code">{CONNECT_EXAMPLES.claudeCode}</CodeBlock>
-          <p className="text-sm text-muted">{MCP_TOOLS.length} read-only tools. Works with Claude, ChatGPT, Grok and any client that takes a URL.</p>
+          <p className="text-sm text-muted">{liveMcpTools().length} read-only tools. Works with Claude, ChatGPT, Grok and any client that takes a URL.</p>
         </div>
       </section>
 

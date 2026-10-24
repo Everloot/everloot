@@ -6,6 +6,7 @@
  * The facts come from the completion rollup (kb/src/completion-rollup.ts).
  */
 import { COMPLETION_AGREEMENT } from "./completion-rollup.js";
+import { slugify } from "./lore-slug.js";
 
 export { COMPLETION_AGREEMENT };
 export const CLOSEST_LIMIT = 5;
@@ -21,7 +22,8 @@ export type OwnedCharacter = {
   characterKey: string;
   class: string;
   level: number;
-  achievements: Map<number, { completed: boolean; earnedByMe?: boolean; criteriaMet: number; criteriaTotal: number; quantity?: number; required?: number }>;
+  /** `earnedOn` is the date the upload carried for a completed achievement, when it carried one. */
+  achievements: Map<number, { completed: boolean; earnedByMe?: boolean; criteriaMet: number; criteriaTotal: number; quantity?: number; required?: number; earnedOn?: string }>;
   factions: Map<number, { reaction: number; standing: number; floor: number; ceiling: number }>;
   titles: Set<number>;
   quests: Set<number>;
@@ -209,4 +211,137 @@ export function handleCompletionProgress(
 ): string {
   if (!args.ownerInstallId.trim()) return "Name the install.";
   return formatCompletionProgress(completionProgress(args.ownerInstallId, args.characterKey, facts));
+}
+
+// The completionist overview and the detail lists behind it. Pure: the page and tests hand facts in.
+
+export type CompletionKind = "achievements" | "reputation" | "titles" | "quests";
+
+export type OverviewCategory = {
+  /** A slug: `achievements-quests`, `reputation`, `reputation-alliance-forces`, `titles`, `quests`. */
+  id: string;
+  label: string;
+  kind: CompletionKind;
+  /** The achievement category or the reputation header this bar breaks down. */
+  group?: string;
+  done: number;
+  total: number;
+  points?: { have: number; of: number };
+};
+
+export type Overview = { total: { done: number; total: number }; categories: OverviewCategory[] };
+
+const byName = <T extends { name: string }>(a: T, b: T) => a.name.localeCompare(b.name);
+
+/** Done on this character, as the game's window counts it: complete, and not earned by another character of the account. */
+const achievementDone = (c: OwnedCharacter | null, id: number) => {
+  const a = c?.achievements.get(id);
+  return Boolean(a && a.completed && a.earnedByMe !== false);
+};
+const factionDone = (c: OwnedCharacter | null, id: number) => c?.factions.get(id)?.reaction === TOP_REACTION;
+const chainHave = (c: OwnedCharacter | null, chain: ChainEntry) => (c ? chain.questIds.filter((id) => c.quests.has(id)).length : 0);
+const chainDone = (c: OwnedCharacter | null, chain: ChainEntry) => !chain.truncated && chainHave(c, chain) === chain.questIds.length;
+
+/**
+ * Every category the agreed lists hold, with one character's count through each. With no character every `done`
+ * is 0 and the totals are still the catalog's, so the overview reads as the game's completionist universe.
+ * `total` adds each kind once: the achievement categories, reputation as a whole, titles and quest chains.
+ * Reputation headers are a breakdown of the reputation bar and are not added again.
+ */
+export function overviewOf(facts: CompletionFacts, character?: OwnedCharacter | null): Overview {
+  const c = character ?? null;
+  const categories: OverviewCategory[] = [];
+  const total = { done: 0, total: 0 };
+  const add = (cat: OverviewCategory, counts: boolean) => {
+    categories.push(cat);
+    if (counts) { total.done += cat.done; total.total += cat.total; }
+  };
+
+  const achievementGroups = new Map<string, AchievementEntry[]>();
+  for (const a of facts.achievements.values()) achievementGroups.set(a.category, [...(achievementGroups.get(a.category) ?? []), a]);
+  for (const [category, entries] of [...achievementGroups].sort(([x], [y]) => x.localeCompare(y))) {
+    const done = entries.filter((a) => achievementDone(c, a.achievementId));
+    add({
+      id: `achievements-${slugify(category) || "other"}`, label: category, kind: "achievements", group: category,
+      done: done.length, total: entries.length,
+      points: { have: done.reduce((sum, a) => sum + a.points, 0), of: entries.reduce((sum, a) => sum + a.points, 0) },
+    }, true);
+  }
+
+  const factions = [...facts.factions.values()].filter((f) => !f.major);
+  add({ id: "reputation", label: "Reputation", kind: "reputation", done: factions.filter((f) => factionDone(c, f.factionId)).length, total: factions.length }, true);
+  const headers = new Map<string, FactionEntry[]>();
+  for (const f of factions) if (f.header) headers.set(f.header, [...(headers.get(f.header) ?? []), f]);
+  for (const [header, entries] of [...headers].sort(([x], [y]) => x.localeCompare(y))) {
+    add({
+      id: `reputation-${slugify(header) || "other"}`, label: header, kind: "reputation", group: header,
+      done: entries.filter((f) => factionDone(c, f.factionId)).length, total: entries.length,
+    }, false);
+  }
+
+  add({ id: "titles", label: "Titles", kind: "titles", done: c ? [...facts.titles.keys()].filter((id) => c.titles.has(id)).length : 0, total: facts.titles.size }, true);
+  const chains = [...facts.chains.values()];
+  add({ id: "quests", label: "Quest chains", kind: "quests", done: chains.filter((chain) => chainDone(c, chain)).length, total: chains.length }, true);
+
+  return { total, categories };
+}
+
+export type AchievementRow = {
+  kind: "achievements"; entry: AchievementEntry; done: boolean; earnedOn?: string;
+  /** Present while the achievement is started and not done: criteria met, or the progress bar's quantity. */
+  progress?: { have: number; of: number; unit: "criteria" | "progress" };
+};
+export type FactionRow = {
+  kind: "reputation"; entry: FactionEntry; done: boolean;
+  /** The standing the character holds and how much reputation the next one needs; absent when the character has no row. */
+  standing?: string; toNext?: number;
+  /** A row whose scale is not the eight standings: the raw value only. */
+  value?: number;
+};
+export type TitleRow = { kind: "titles"; entry: TitleEntry; done: boolean };
+export type ChainRow = { kind: "quests"; entry: ChainEntry; done: boolean; have: number; total: number; truncated: boolean };
+export type CompletionRows = { achievements: AchievementRow; reputation: FactionRow; titles: TitleRow; quests: ChainRow };
+
+/** Every agreed entry of one kind with the character's state against it, by name. Major factions are left out, as in the counts. */
+export function rowsOf<K extends CompletionKind>(facts: CompletionFacts, character: OwnedCharacter | null | undefined, kind: K): CompletionRows[K][] {
+  const c = character ?? null;
+  let rows: AchievementRow[] | FactionRow[] | TitleRow[] | ChainRow[];
+  if (kind === "achievements") {
+    rows = [...facts.achievements.values()].sort(byName).map((entry): AchievementRow => {
+      const a = c?.achievements.get(entry.achievementId);
+      if (achievementDone(c, entry.achievementId)) return { kind: "achievements", entry, done: true, ...(a?.earnedOn ? { earnedOn: a.earnedOn } : {}) };
+      let progress: AchievementRow["progress"];
+      if (a && !a.completed) {
+        if (a.required && a.quantity !== undefined && a.quantity < a.required) progress = { have: a.quantity, of: a.required, unit: "progress" };
+        else if (a.criteriaTotal > 0 && a.criteriaMet > 0 && a.criteriaMet < a.criteriaTotal) progress = { have: a.criteriaMet, of: a.criteriaTotal, unit: "criteria" };
+      }
+      return { kind: "achievements", entry, done: false, ...(progress ? { progress } : {}) };
+    });
+  } else if (kind === "reputation") {
+    rows = [...facts.factions.values()].filter((f) => !f.major).sort(byName).map((entry): FactionRow => {
+      const f = c?.factions.get(entry.factionId);
+      if (!f) return { kind: "reputation", entry, done: false };
+      const scaled = f.reaction >= 1 && f.reaction <= TOP_REACTION;
+      if (!scaled) return { kind: "reputation", entry, done: false, value: f.standing };
+      if (f.reaction === TOP_REACTION) return { kind: "reputation", entry, done: true, standing: STANDING_NAMES[TOP_REACTION - 1] };
+      return { kind: "reputation", entry, done: false, standing: STANDING_NAMES[f.reaction - 1], ...(f.ceiling > f.standing ? { toNext: f.ceiling - f.standing } : {}) };
+    });
+  } else if (kind === "titles") {
+    rows = [...facts.titles.values()].sort(byName).map((entry): TitleRow => ({ kind: "titles", entry, done: Boolean(c?.titles.has(entry.titleId)) }));
+  } else {
+    rows = [...facts.chains.values()].sort(byName).map((entry): ChainRow => ({
+      kind: "quests", entry, done: chainDone(c, entry), have: chainHave(c, entry), total: entry.questIds.length, truncated: entry.truncated,
+    }));
+  }
+  return rows as CompletionRows[K][];
+}
+
+/** The agreed entries this character has not completed, reached, known or finished, by name, with the owned state when partial. */
+export function missingOf<K extends CompletionKind>(facts: CompletionFacts, character: OwnedCharacter | null | undefined, kind: K): CompletionRows[K][] {
+  return rowsOf(facts, character, kind).filter((row) => !row.done);
+}
+
+/** The agreed entries this character has done, by name; an achievement carries `earnedOn` when the upload did. */
+export function doneOf<K extends CompletionKind>(facts: CompletionFacts, character: OwnedCharacter | null | undefined, kind: K): CompletionRows[K][] {
+  return rowsOf(facts, character, kind).filter((row) => row.done);
 }

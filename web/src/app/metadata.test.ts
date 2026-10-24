@@ -104,9 +104,9 @@ test("the map descriptions still fit when the game's map pictures are on", async
 
 test("every MCP tool page has a description that fits", async () => {
   const { generateMetadata } = await import("./docs/mcp/tools/[tool]/page");
-  const { MCP_TOOL_NAMES } = await import("@everloot/protocol");
+  const { liveToolNames } = await import("@/lib/guild-switch");
   const { toolHref } = await import("@/lib/docs/nav");
-  for (const name of MCP_TOOL_NAMES) {
+  for (const name of liveToolNames()) {
     const slug = toolHref(name).split("/").pop()!;
     const m = await generateMetadata({ params: Promise.resolve({ tool: slug }) });
     within(m.description, name);

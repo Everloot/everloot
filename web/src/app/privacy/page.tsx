@@ -34,7 +34,7 @@ function Section({ id, children }: { id: string; children: React.ReactNode }) {
 }
 
 export default function PrivacyPage() {
-  const updated = "20 October 2026";
+  const updated = "24 October 2026";
   return (
     <article>
       <Container width="reading">
@@ -198,6 +198,13 @@ export default function PrivacyPage() {
                 recorded again. If you play a character and do not want a page, hide it. You can also
                 email{" "}
                 <a href="mailto:hello@everloot.app">hello@everloot.app</a>.
+                {" "}The same module also records your own guild&apos;s boss kills: the guild, the realm, your
+                faction, the boss and the time, with no names. If the site has guild pages on, a kill is shown on
+                the guild&apos;s page once two players&apos; uploads report it, and a guild page lists the
+                characters seen in that guild, labelled as sightings, not the game&apos;s member list. Anyone can
+                hide a guild, without an account or an officer rank, on the{" "}
+                <Link href="/guilds/hide">guild hide form</Link>; its kills are then not kept. Its characters
+                keep their own pages, which the character hide form covers.
               </li>
               <li>
                 <strong>Cookies:</strong> an essential login cookie if you sign in (plus a

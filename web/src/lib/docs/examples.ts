@@ -155,6 +155,8 @@ export const TOOL_ARGS: Record<McpToolName, Record<string, string | number>> = {
   collection_gap: { collection: "mounts", ownerInstallId: "your-install-id" },
   completion_progress: { ownerInstallId: "your-install-id" },
   guild_board: { guildName: "Your Guild", realm: "YourRealm" },
+  guild_search: { query: "Your" },
+  guild_rankings: {},
   auction_history: { realm: "YourRealm", itemId: 2589 },
   market_value: { realm: "YourRealm", itemId: 2589 },
   gold_ledger: { character: "YourCharacter", realm: "YourRealm" },

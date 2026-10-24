@@ -20,6 +20,19 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   runs in CI), written in the wiki's syntax so they link database entities and wiki pages the same way. Published
   posts appear at `/news` and `/news/<slug>` with Article structured data, in the `/news/feed.xml` RSS feed, in the
   sitemap and in llms.txt; a draft is built nowhere. Blizzard's own posts stay on `/changes`, which the hub links.
+- Addon: while `/everloot players` is on, a boss kill inside a dungeon or raid with your character in a guild writes
+  a `guild_kill` row (guild, realm, faction, encounter, instance, time; no name), at most 60 a UTC day;
+  `/everloot players off` deletes them with the player rows. Design: `docs/design/specs/2026-10-24-guild-board-design.md`.
+- Site, behind `EVERLOOT_GUILDS` (off): `/guilds`, a ladder per raid from the kills two members' installs agree on
+  (bosses killed, then first to the latest kill; no score), with guild search and realm and faction filters;
+  `/guilds/<realm>/<guild>` with progression per instance, the officers' roster and the characters seen in the guild
+  (labelled as sightings), activity and a hide form that works without an account. MCP `guild_search` and
+  `guild_rankings`, and `guild_board` gains the ladder side; the open data export gains `guild-kills.ndjson` and
+  `guilds.ndjson`. Migration `20261025120000_guilds.sql`, applied by hand before the switch goes on.
+- Site: `/tools/collections` opens on a completionist overview, a "Total complete" bar and one bar per category
+  from the agreed lists, with done, missing and started views and a "remember this character" helper on the browser.
+- Site: `/tools/gold-ledger` reads `Everloot.lua` in the browser, nothing sent: characters, the last 30 days of money
+  in and out, this week, categories, receipts and gold history. The published ledgers stay below.
 
 ### Changed
 - Knowledge base: `entities.name_norm` stores each name's words as the search re-rank reads them, with an index on

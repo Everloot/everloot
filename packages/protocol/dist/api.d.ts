@@ -987,6 +987,22 @@ export declare const intakeRequest: z.ZodObject<{
         }>;
         guid: z.ZodString;
         completionKey: z.ZodString;
+    }, z.core.$strip>, z.ZodObject<{
+        installId: z.ZodString;
+        eventId: z.ZodOptional<z.ZodString>;
+        capturedAt: z.ZodString;
+        kind: z.ZodLiteral<"guild_kill">;
+        guildName: z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>;
+        realm: z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>;
+        faction: z.ZodEnum<{
+            alliance: "alliance";
+            horde: "horde";
+        }>;
+        encounterId: z.ZodNumber;
+        name: z.ZodString;
+        instanceMapId: z.ZodNumber;
+        difficulty: z.ZodOptional<z.ZodNumber>;
+        size: z.ZodOptional<z.ZodNumber>;
     }, z.core.$strip>], "kind">>;
     sharing: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodBoolean>>;
     grantTokens: z.ZodOptional<z.ZodArray<z.ZodString>>;
@@ -1007,9 +1023,71 @@ export declare const healthResponse: z.ZodObject<{
     }, z.core.$strip>;
 }, z.core.$strip>;
 export type HealthResponse = z.infer<typeof healthResponse>;
+/** guild-kills.ndjson of the bulk export: the agreed guild kills, oldest first. */
+export declare const guildKillsResponse: z.ZodObject<{
+    generatedAt: z.ZodString;
+    dataAsOf: z.ZodNullable<z.ZodString>;
+    kills: z.ZodArray<z.ZodObject<{
+        guildName: z.ZodString;
+        realm: z.ZodString;
+        faction: z.ZodNullable<z.ZodEnum<{
+            alliance: "alliance";
+            horde: "horde";
+        }>>;
+        encounterId: z.ZodNumber;
+        name: z.ZodString;
+        instanceMapId: z.ZodNumber;
+        difficulty: z.ZodNullable<z.ZodNumber>;
+        killedAt: z.ZodString;
+        installs: z.ZodNumber;
+        source: z.ZodEnum<{
+            members: "members";
+            officers: "officers";
+        }>;
+    }, z.core.$strip>>;
+    attribution: z.ZodObject<{
+        licence: z.ZodString;
+        licenceUrl: z.ZodString;
+        credit: z.ZodString;
+        source: z.ZodString;
+        terms: z.ZodString;
+    }, z.core.$strip>;
+}, z.core.$strip>;
+export type GuildKillsResponse = z.infer<typeof guildKillsResponse>;
+/** guilds.ndjson of the bulk export: the guild directory, newest kill first. */
+export declare const guildsResponse: z.ZodObject<{
+    generatedAt: z.ZodString;
+    dataAsOf: z.ZodNullable<z.ZodString>;
+    guilds: z.ZodArray<z.ZodObject<{
+        guildName: z.ZodString;
+        realm: z.ZodString;
+        faction: z.ZodNullable<z.ZodEnum<{
+            alliance: "alliance";
+            horde: "horde";
+        }>>;
+        membersSeen: z.ZodNullable<z.ZodNumber>;
+        membersPublished: z.ZodNullable<z.ZodNumber>;
+        kills: z.ZodNumber;
+        latestKillAt: z.ZodNullable<z.ZodString>;
+        lastSeen: z.ZodNullable<z.ZodString>;
+        sources: z.ZodArray<z.ZodEnum<{
+            kills: "kills";
+            officers: "officers";
+            seen: "seen";
+        }>>;
+    }, z.core.$strip>>;
+    attribution: z.ZodObject<{
+        licence: z.ZodString;
+        licenceUrl: z.ZodString;
+        credit: z.ZodString;
+        source: z.ZodString;
+        terms: z.ZodString;
+    }, z.core.$strip>;
+}, z.core.$strip>;
+export type GuildsResponse = z.infer<typeof guildsResponse>;
 /** The response schemas by name, the names schema/api/<name>.json uses. */
 /** The datasets the bulk export writes, one NDJSON file each; the rows are the same the JSON API serves. */
-export declare const BULK_DATASETS: readonly ["corpus", "edges", "drops", "items"];
+export declare const BULK_DATASETS: readonly ["corpus", "edges", "drops", "items", "guilds"];
 export type BulkDataset = (typeof BULK_DATASETS)[number];
 /** One file of a bulk export: a newline-delimited JSON file whose rows are the `rowsOf` response's `field` elements. */
 export declare const bulkFile: z.ZodObject<{
@@ -1018,6 +1096,7 @@ export declare const bulkFile: z.ZodObject<{
         corpus: "corpus";
         drops: "drops";
         edges: "edges";
+        guilds: "guilds";
         items: "items";
     }>;
     format: z.ZodLiteral<"ndjson">;
@@ -1062,6 +1141,7 @@ export declare const bulkIndex: z.ZodObject<{
             corpus: "corpus";
             drops: "drops";
             edges: "edges";
+            guilds: "guilds";
             items: "items";
         }>;
         format: z.ZodLiteral<"ndjson">;
@@ -1412,6 +1492,7 @@ export declare const API_SCHEMAS: {
                 corpus: "corpus";
                 drops: "drops";
                 edges: "edges";
+                guilds: "guilds";
                 items: "items";
             }>;
             format: z.ZodLiteral<"ndjson">;
@@ -1465,6 +1546,64 @@ export declare const API_SCHEMAS: {
         object_sighting: z.ZodObject<{
             ids: z.ZodArray<z.ZodNumber>;
             maps: z.ZodArray<z.ZodArray<z.ZodNumber>>;
+        }, z.core.$strip>;
+    }, z.core.$strip>;
+    readonly guildKillsResponse: z.ZodObject<{
+        generatedAt: z.ZodString;
+        dataAsOf: z.ZodNullable<z.ZodString>;
+        kills: z.ZodArray<z.ZodObject<{
+            guildName: z.ZodString;
+            realm: z.ZodString;
+            faction: z.ZodNullable<z.ZodEnum<{
+                alliance: "alliance";
+                horde: "horde";
+            }>>;
+            encounterId: z.ZodNumber;
+            name: z.ZodString;
+            instanceMapId: z.ZodNumber;
+            difficulty: z.ZodNullable<z.ZodNumber>;
+            killedAt: z.ZodString;
+            installs: z.ZodNumber;
+            source: z.ZodEnum<{
+                members: "members";
+                officers: "officers";
+            }>;
+        }, z.core.$strip>>;
+        attribution: z.ZodObject<{
+            licence: z.ZodString;
+            licenceUrl: z.ZodString;
+            credit: z.ZodString;
+            source: z.ZodString;
+            terms: z.ZodString;
+        }, z.core.$strip>;
+    }, z.core.$strip>;
+    readonly guildsResponse: z.ZodObject<{
+        generatedAt: z.ZodString;
+        dataAsOf: z.ZodNullable<z.ZodString>;
+        guilds: z.ZodArray<z.ZodObject<{
+            guildName: z.ZodString;
+            realm: z.ZodString;
+            faction: z.ZodNullable<z.ZodEnum<{
+                alliance: "alliance";
+                horde: "horde";
+            }>>;
+            membersSeen: z.ZodNullable<z.ZodNumber>;
+            membersPublished: z.ZodNullable<z.ZodNumber>;
+            kills: z.ZodNumber;
+            latestKillAt: z.ZodNullable<z.ZodString>;
+            lastSeen: z.ZodNullable<z.ZodString>;
+            sources: z.ZodArray<z.ZodEnum<{
+                kills: "kills";
+                officers: "officers";
+                seen: "seen";
+            }>>;
+        }, z.core.$strip>>;
+        attribution: z.ZodObject<{
+            licence: z.ZodString;
+            licenceUrl: z.ZodString;
+            credit: z.ZodString;
+            source: z.ZodString;
+            terms: z.ZodString;
         }, z.core.$strip>;
     }, z.core.$strip>;
     readonly intakeRequest: z.ZodObject<{
@@ -2071,6 +2210,22 @@ export declare const API_SCHEMAS: {
             }>;
             guid: z.ZodString;
             completionKey: z.ZodString;
+        }, z.core.$strip>, z.ZodObject<{
+            installId: z.ZodString;
+            eventId: z.ZodOptional<z.ZodString>;
+            capturedAt: z.ZodString;
+            kind: z.ZodLiteral<"guild_kill">;
+            guildName: z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>;
+            realm: z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>;
+            faction: z.ZodEnum<{
+                alliance: "alliance";
+                horde: "horde";
+            }>;
+            encounterId: z.ZodNumber;
+            name: z.ZodString;
+            instanceMapId: z.ZodNumber;
+            difficulty: z.ZodOptional<z.ZodNumber>;
+            size: z.ZodOptional<z.ZodNumber>;
         }, z.core.$strip>], "kind">>;
         sharing: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodBoolean>>;
         grantTokens: z.ZodOptional<z.ZodArray<z.ZodString>>;

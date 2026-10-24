@@ -5,6 +5,7 @@ import { loadCoverage } from "./coverage-compute";
 import { loadCompletion } from "./completion-store";
 import { attributionHeaders } from "./data-guard";
 import { loadEcosystem } from "./ecosystem";
+import { guildReader, guildsOn } from "./guilds";
 import { accountMcpTools } from "./my-builds-tool";
 import { getRelease } from "./release";
 import { RECHECK_SCOPES } from "./recheck-scopes";
@@ -52,6 +53,8 @@ export function toolLoaders(): ToolOptions {
       const loaded = await uploadStore.loadMarket();
       return loaded.state ? { state: loaded.state, dataAsOf: loaded.dataAsOf } : null;
     },
+    // The guild ladder, only while its switch is on: off, guild_search and guild_rankings are not listed.
+    ...(guildsOn() ? { guilds: guildReader } : {}),
     // The same census /census shows: counts only, under its thresholds.
     census: async () => {
       const loaded = await loadCensus();

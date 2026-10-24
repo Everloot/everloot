@@ -169,3 +169,9 @@ export const TOOL_GROUPS: { title: string; links: { label: string; href: string 
     ],
   },
 ];
+
+/** The Tools menu with the guild switch applied: with EVERLOOT_GUILDS on, "Guild board" becomes "Guilds", the ladder hub. */
+export function toolGroups(guilds: boolean): typeof TOOL_GROUPS {
+  if (!guilds) return TOOL_GROUPS;
+  return TOOL_GROUPS.map((g) => ({ ...g, links: g.links.map((l) => (l.href === "/tools/guild-board" ? { label: "Guilds", href: "/guilds" } : l)) }));
+}

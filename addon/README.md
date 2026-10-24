@@ -179,6 +179,11 @@ whether it is on and how many characters it holds; `/everloot players off` stops
 - **What a row holds** (`player_seen`): name (`UnitName`), realm (`GetRealmName`), race and class tokens
   (`UnitRace`, `UnitClass`), level (`UnitLevel`) and the guild name when the game shows one (`GetGuildInfo`).
   The date is the row's `capturedAt`; the site keeps the day, not the time.
+- **A second row** (`guild_kill`): when `ENCOUNTER_END` reports a kill inside a dungeon or raid and the game
+  shows your character in a guild, the guild name, realm, your faction (`UnitFactionGroup`), the encounter, the
+  instance map id and difficulty (`GetInstanceInfo`) and the time. No character name. At most 60 a UTC day; written
+  only while the module is on, and `/everloot players off` deletes these rows with the others. The guild page
+  counts a kill once two installs report it.
 - **Whom it reads**: your own characters at login and at each level-up, and players you target, mouse over or
   group with (`PLAYER_TARGET_CHANGED`, `UPDATE_MOUSEOVER_UNIT`, `GROUP_ROSTER_UPDATE`). Not nameplates, not the
   guild roster, not the who list, not inspection. Players from another realm are skipped.

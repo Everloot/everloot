@@ -1,4 +1,5 @@
-import { API_ROUTES, API_SCHEMAS, LICENCE, LICENCE_URL, MCP_TOOL_NAMES, PROTOCOL_VERSION, SITE, TERMS_URL, type ApiRoute } from "@everloot/protocol";
+import { API_ROUTES, API_SCHEMAS, LICENCE, LICENCE_URL, PROTOCOL_VERSION, SITE, TERMS_URL, type ApiRoute } from "@everloot/protocol";
+import { liveToolNames } from "@/lib/guild-switch";
 import { z } from "zod";
 
 /**
@@ -105,7 +106,7 @@ export function openApiDocument(): Json {
     "x-everloot": {
       protocol: PROTOCOL_VERSION,
       schemas: `${SITE}/schema/index.json`,
-      mcp: { endpoint: `${SITE}/mcp/public`, tools: MCP_TOOL_NAMES, toolSchema: `${SITE}/schema/mcp/{tool}.json` },
+      mcp: { endpoint: `${SITE}/mcp/public`, tools: liveToolNames(), toolSchema: `${SITE}/schema/mcp/{tool}.json` },
       source: "https://github.com/Everloot/everloot",
     },
   };

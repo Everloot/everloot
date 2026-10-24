@@ -1,4 +1,5 @@
-import { API_ROUTES, MCP_TOOL_NAMES, MCP_TOOLS, type ApiRoute, type McpToolName } from "@everloot/protocol";
+import { API_ROUTES, MCP_TOOLS, type ApiRoute, type McpToolName } from "@everloot/protocol";
+import { liveToolNames } from "@/lib/guild-switch";
 
 /**
  * The docs' one table of contents: tabs, their sidebar groups and pages, in reading order. The tab bar,
@@ -44,7 +45,7 @@ export const toolHref = (name: McpToolName): string => `/docs/mcp/tools/${name.r
 
 /** The tool a docs address names, or undefined. */
 export function toolFromSlug(slug: string): McpToolName | undefined {
-  return MCP_TOOL_NAMES.find((name) => name === slug.replaceAll("-", "_"));
+  return liveToolNames().find((name) => name === slug.replaceAll("-", "_"));
 }
 
 /** The endpoint a docs address names, or undefined. */
@@ -65,7 +66,7 @@ const TOOL_GROUPS: { title: string; icon: DocsIcon; names: McpToolName[] }[] = [
   { title: "Search and lore", icon: "search", names: ["search_knowledge", "get_entity", "get_by_name", "answer_sources", "search", "fetch"] },
   { title: "Database", icon: "database", names: ["item_page", "npc_page", "object_page", "quest_page", "vendor_page", "entity_relations", "item_categories", "world_map_near"] },
   { title: "Planning", icon: "compass", names: ["talent_tree", "talent_plan", "profession_path", "recipe_thresholds"] },
-  { title: "Market and characters", icon: "chart", names: ["market_value", "auction_history", "gold_ledger", "collection_gap", "completion_progress", "guild_board"] },
+  { title: "Market and characters", icon: "chart", names: ["market_value", "auction_history", "gold_ledger", "collection_gap", "completion_progress", "guild_board", "guild_search", "guild_rankings"] },
   { title: "World and project", icon: "home", names: ["coverage", "population", "recent_changes", "ecosystem_projects", "everloot_plan"] },
 ];
 
@@ -77,7 +78,8 @@ function endpointPages(paths: string[]): DocsPage[] {
 }
 
 function toolPages(names: McpToolName[]): DocsPage[] {
-  return names.map((name) => ({ href: toolHref(name), title: name, lede: MCP_TOOLS[name].title }));
+  const live = liveToolNames();
+  return names.filter((name) => live.includes(name)).map((name) => ({ href: toolHref(name), title: name, lede: MCP_TOOLS[name].title }));
 }
 
 export const DOCS_TABS: DocsTab[] = [
@@ -213,7 +215,7 @@ const LEGACY_SECTIONS: Record<string, string> = {
 export function legacyAnchorTarget(hash: string): string | undefined {
   const id = decodeURIComponent(hash.replace(/^#/, ""));
   if (LEGACY_SECTIONS[id]) return LEGACY_SECTIONS[id];
-  const tool = id.startsWith("tool-") ? MCP_TOOL_NAMES.find((name) => name === id.slice(5)) : undefined;
+  const tool = id.startsWith("tool-") ? liveToolNames().find((name) => name === id.slice(5)) : undefined;
   if (tool) return toolHref(tool);
   const route = id.startsWith("api-") ? API_ROUTES.find((r) => `api-${r.path.replace(/^\/api\//, "").replace(/\//g, "-")}` === id) : undefined;
   return route ? endpointHref(route) : undefined;
@@ -223,7 +225,7 @@ export function legacyAnchorTarget(hash: string): string | undefined {
 export function legacyAnchors(): Record<string, string> {
   const ids = [
     ...Object.keys(LEGACY_SECTIONS),
-    ...MCP_TOOL_NAMES.map((name) => `tool-${name}`),
+    ...liveToolNames().map((name) => `tool-${name}`),
     ...API_ROUTES.map((r) => `api-${r.path.replace(/^\/api\//, "").replace(/\//g, "-")}`),
   ];
   return Object.fromEntries(ids.map((id) => [id, legacyAnchorTarget(id)!]));

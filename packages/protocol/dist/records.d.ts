@@ -793,6 +793,29 @@ export declare const playerSeen: z.ZodObject<{
 }, z.core.$strip>;
 /** The player-page kind. Never part of the public corpus; intake writes it to the players table, not to the upload. */
 export declare const PLAYER_KINDS: readonly string[];
+/**
+ * The guild kill kind. Stored with the upload, never served raw: it is not on the public corpus allowlist, and
+ * only the guild rollup (2 installs, hidden guilds out, behind the switch) publishes kills.
+ */
+export declare const GUILD_KILL_KINDS: readonly string[];
+/** One boss kill as a member's client saw it, credited to that member's own guild. */
+export declare const guildKill: z.ZodObject<{
+    installId: z.ZodString;
+    eventId: z.ZodOptional<z.ZodString>;
+    capturedAt: z.ZodString;
+    kind: z.ZodLiteral<"guild_kill">;
+    guildName: z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>;
+    realm: z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>;
+    faction: z.ZodEnum<{
+        alliance: "alliance";
+        horde: "horde";
+    }>;
+    encounterId: z.ZodNumber;
+    name: z.ZodString;
+    instanceMapId: z.ZodNumber;
+    difficulty: z.ZodOptional<z.ZodNumber>;
+    size: z.ZodOptional<z.ZodNumber>;
+}, z.core.$strip>;
 /** A link code as the site shows it: EL-, four characters, a hyphen and two more, from Crockford's base 32 alphabet. */
 export declare const LINK_CODE: z.ZodString;
 /** One of your own characters, written when you type `/everloot link <code>` on it. */
@@ -1457,6 +1480,23 @@ export declare const recordSchemas: {
         guid: z.ZodString;
         completionKey: z.ZodString;
     }, z.core.$strip>;
+    readonly guild_kill: z.ZodObject<{
+        installId: z.ZodString;
+        eventId: z.ZodOptional<z.ZodString>;
+        capturedAt: z.ZodString;
+        kind: z.ZodLiteral<"guild_kill">;
+        guildName: z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>;
+        realm: z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>;
+        faction: z.ZodEnum<{
+            alliance: "alliance";
+            horde: "horde";
+        }>;
+        encounterId: z.ZodNumber;
+        name: z.ZodString;
+        instanceMapId: z.ZodNumber;
+        difficulty: z.ZodOptional<z.ZodNumber>;
+        size: z.ZodOptional<z.ZodNumber>;
+    }, z.core.$strip>;
 };
 export type RecordKind = keyof typeof recordSchemas;
 export declare const ALL_RECORD_KINDS: RecordKind[];
@@ -2061,6 +2101,22 @@ export declare const anyRecord: z.ZodDiscriminatedUnion<[z.ZodObject<{
     }>;
     guid: z.ZodString;
     completionKey: z.ZodString;
+}, z.core.$strip>, z.ZodObject<{
+    installId: z.ZodString;
+    eventId: z.ZodOptional<z.ZodString>;
+    capturedAt: z.ZodString;
+    kind: z.ZodLiteral<"guild_kill">;
+    guildName: z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>;
+    realm: z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>;
+    faction: z.ZodEnum<{
+        alliance: "alliance";
+        horde: "horde";
+    }>;
+    encounterId: z.ZodNumber;
+    name: z.ZodString;
+    instanceMapId: z.ZodNumber;
+    difficulty: z.ZodOptional<z.ZodNumber>;
+    size: z.ZodOptional<z.ZodNumber>;
 }, z.core.$strip>], "kind">;
 export type IntakeRecord = z.infer<typeof anyRecord>;
 /**

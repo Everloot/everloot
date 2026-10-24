@@ -3,6 +3,7 @@ import Script from "next/script";
 import "./globals.css";
 import { fontVariables } from "./fonts";
 import Header from "@/components/Header";
+import { guildsOn } from "@/lib/guild-switch";
 import Footer from "@/components/Footer";
 import CookieConsent from "@/components/CookieConsent";
 import Breadcrumbs from "@/components/Breadcrumbs";
@@ -72,7 +73,7 @@ export default function RootLayout({
       <body className="flex flex-col min-h-screen">
         <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-canvas focus:px-4 focus:py-3">Skip to content</a>
         <NavPendingBar />
-        <Header savedBuilds={savedBuildsOn()} profiles={profilesOn()} accountSwitching={authV2Enabled()} />
+        <Header savedBuilds={savedBuildsOn()} profiles={profilesOn()} accountSwitching={authV2Enabled()} guilds={guildsOn()} />
         <main id="main-content" className="flex-1 min-w-0 mx-auto w-full max-w-wide px-4 py-8">
           <Breadcrumbs />
           {children}

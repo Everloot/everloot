@@ -180,6 +180,224 @@
           },
           "attendanceWaiting": {
             "type": "boolean"
+          },
+          "ladderProgression": {
+            "description": "Per instance, newest first: bosses killed out of the instance's bosses, each kill with its date and who reported it. Members' kills and the officers' board together; a boss both report is one line.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "instanceMapId": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "name": {
+                  "type": "string"
+                },
+                "killed": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "bosses": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "list": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "encounterId": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "killed": {
+                        "type": "boolean"
+                      },
+                      "killedAt": {
+                        "description": "The earliest agreeing report, ISO; null for an unkilled boss or one only the officers published.",
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "source": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "members",
+                              "officers"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Who reported the kill; null for an unkilled boss."
+                      }
+                    },
+                    "required": [
+                      "encounterId",
+                      "name",
+                      "killed",
+                      "killedAt",
+                      "source"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "description": "Every boss of the instance in encounter order, killed or not."
+                }
+              },
+              "required": [
+                "instanceMapId",
+                "name",
+                "killed",
+                "bosses",
+                "list"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "activity": {
+            "description": "The agreed kills, newest first.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "encounterId": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "name": {
+                  "type": "string"
+                },
+                "instanceMapId": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "killedAt": {
+                  "type": "string",
+                  "description": "The earliest agreeing report, ISO."
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "members",
+                    "officers"
+                  ]
+                }
+              },
+              "required": [
+                "encounterId",
+                "name",
+                "instanceMapId",
+                "killedAt",
+                "source"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "seenRoster": {
+            "description": "Characters the addon saw in this guild, newest first: sightings, not the game's roster. Null when the player pages are not connected, which is not an empty guild.",
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "count": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "members": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "level": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "class": {
+                          "type": "string"
+                        },
+                        "lastSeen": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "level",
+                        "class",
+                        "lastSeen"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "count",
+                  "members"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ranks": {
+            "description": "Rank on the realm and overall in the newest instance with a kill; null without one.",
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "instanceMapId": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "instanceName": {
+                    "type": "string"
+                  },
+                  "realm": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991,
+                    "description": "Rank among the realm's guilds in that instance."
+                  },
+                  "overall": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991,
+                    "description": "Rank among every guild in that instance."
+                  }
+                },
+                "required": [
+                  "instanceMapId",
+                  "instanceName",
+                  "realm",
+                  "overall"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [

@@ -97,8 +97,9 @@ test("a host's extra tool is listed and answers only for the requests it is give
   };
   const handle = await handler({ extraTools: (req: Request, body: string) => (req.headers.get("x-test") === "yes" && body.includes("tools/") ? [extra] : []) });
   const names = async (headers = {}) => ((await (await handle(request("tools/list", {}, headers))).json()).result.tools as { name: string }[]).map((t) => t.name);
-  expect(await names()).toEqual(MCP_TOOL_NAMES);
-  expect(await names({ "x-test": "yes" })).toEqual([...MCP_TOOL_NAMES, "my_test_tool"]);
+  const listed = MCP_TOOL_NAMES.filter((name) => name !== "guild_search" && name !== "guild_rankings");
+  expect(await names()).toEqual(listed);
+  expect(await names({ "x-test": "yes" })).toEqual([...listed, "my_test_tool"]);
   const called = await (await handle(request("tools/call", { name: "my_test_tool", arguments: { slug: "a" } }, { "x-test": "yes" }))).json();
   expect(called.result.content[0].text).toBe('got {"slug":"a"}');
   const refused = await (await handle(request("tools/call", { name: "my_test_tool", arguments: {} }))).json();

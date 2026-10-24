@@ -243,7 +243,7 @@ SlashCmdList["EVERLOOT"] = function(msg)
   elseif msg == "players on" or msg == "players off" then
     EverlootDB.toggles.players = (msg == "players on")
     if EverlootDB.toggles.players then
-      print("Everloot: players on. It records the name, realm, race, class, level and guild of your characters and of players you target, mouse over or group with, one row per character and the day you saw it. Never where they are, their gear or what they do. It is sent only from the everloot.app upload page, after its preview. If the site has player pages on, these characters can appear there, and anyone can have a character hidden. /reload to apply.")
+      print("Everloot: players on. It records the name, realm, race, class, level and guild of your characters and of players you target, mouse over or group with, one row per character and the day you saw it, and the bosses your guild kills (the guild, the boss and the time, no names). Never where they are, their gear or what they do. It is sent only from the everloot.app upload page, after its preview. If the site has player pages on, these characters can appear there, and anyone can have a character hidden. /reload to apply.")
     else
       -- Turning it off withdraws what it wrote: every player row is deleted from this file.
       if E.Players then E.Players.Withdraw() end
