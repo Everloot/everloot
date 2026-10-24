@@ -3052,6 +3052,95 @@
               "completionKey"
             ],
             "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "installId": {
+                "type": "string",
+                "minLength": 8,
+                "maxLength": 64,
+                "description": "Random install id, no account needed."
+              },
+              "eventId": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 96,
+                "pattern": "^[A-Za-z0-9:_-]+$"
+              },
+              "capturedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "ISO time the event happened in-game."
+              },
+              "kind": {
+                "type": "string",
+                "const": "guild_kill"
+              },
+              "guildName": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 60,
+                "description": "GetGuildInfo for your own character: the guild the kill is credited to."
+              },
+              "realm": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 60,
+                "description": "GetRealmName(): the realm the addon runs on, the guild's realm."
+              },
+              "faction": {
+                "type": "string",
+                "enum": [
+                  "alliance",
+                  "horde"
+                ],
+                "description": "UnitFactionGroup for your own character: the guild's faction."
+              },
+              "encounterId": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991,
+                "description": "The encounter id `ENCOUNTER_END` reports."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120,
+                "description": "The encounter's name in the client's language."
+              },
+              "instanceMapId": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991,
+                "description": "The instance's map id, the 8th return of `GetInstanceInfo`: a map, not a UiMap."
+              },
+              "difficulty": {
+                "description": "The difficulty id `GetInstanceInfo` reports. Absent when the source did not record it.",
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              },
+              "size": {
+                "description": "The group size the encounter reports.",
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 40
+              }
+            },
+            "required": [
+              "installId",
+              "capturedAt",
+              "kind",
+              "guildName",
+              "realm",
+              "faction",
+              "encounterId",
+              "name",
+              "instanceMapId"
+            ],
+            "additionalProperties": false
           }
         ]
       }

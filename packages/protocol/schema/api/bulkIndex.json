@@ -59,7 +59,8 @@
               "corpus",
               "edges",
               "drops",
-              "items"
+              "items",
+              "guilds"
             ]
           },
           "format": {

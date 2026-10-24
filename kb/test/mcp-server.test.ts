@@ -15,7 +15,9 @@ import {
   handleGetByName,
   handleGetEntity,
   handleSearch,
+  registeredToolNames,
 } from "../src/mcp-server.js";
+import type { GuildReader } from "../src/guilds.js";
 import { CREDIT_LINE, MCP_CREDIT } from "@everloot/protocol";
 
 const UNAVAILABLE_TEXT = "Public corpus unavailable. These figures are unrecorded, not zero.";
@@ -219,7 +221,7 @@ test("the stdio server reuses a corpus read for the snapshot interval, then read
   } finally { cachePublicCorpus(0); vi.useRealTimers(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); }
 });
 
-test("tools/list is exactly the protocol's tool table, in order, with its input shapes", async () => {
+test("tools/list is exactly the protocol's tool table, in order, with its input shapes (the guild ladder's two only with a guild reader)", async () => {
   const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
   const { InMemoryTransport } = await import("@modelcontextprotocol/sdk/inMemory.js");
   const { MCP_TOOL_NAMES, MCP_TOOLS } = await import("@everloot/protocol");
@@ -230,7 +232,9 @@ test("tools/list is exactly the protocol's tool table, in order, with its input 
   const client = new Client({ name: "test", version: "0" });
   await client.connect(clientSide);
   const listed = (await client.listTools()).tools;
-  expect(listed.map((t) => t.name)).toEqual(MCP_TOOL_NAMES);
+  expect(listed.map((t) => t.name)).toEqual(MCP_TOOL_NAMES.filter((name) => name !== "guild_search" && name !== "guild_rankings"));
+  expect(registeredToolNames()).toHaveLength(MCP_TOOL_NAMES.length - 2);
+  expect(registeredToolNames({ guilds: {} as GuildReader })).toEqual(MCP_TOOL_NAMES);
   for (const tool of listed) {
     const expected = z.toJSONSchema(z.object(MCP_TOOLS[tool.name as keyof typeof MCP_TOOLS].inputSchema), { io: "input" }) as { properties?: Record<string, unknown>; required?: string[] };
     expect(Object.keys(tool.inputSchema.properties ?? {}).sort()).toEqual(Object.keys(expected.properties ?? {}).sort());

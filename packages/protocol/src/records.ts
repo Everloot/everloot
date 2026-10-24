@@ -643,6 +643,24 @@ export const playerSeen = base.extend({
 /** The player-page kind. Never part of the public corpus; intake writes it to the players table, not to the upload. */
 export const PLAYER_KINDS: readonly string[] = ["player_seen"];
 
+// --- Guild kills: a boss kill credited to the player's own guild (docs/design/specs/2026-10-24-guild-board-design.md) ---
+// Written by the players module on ENCOUNTER_END with success, when the game shows the player a guild. The row
+// names the guild and the boss, never a character. A kill is the guild's once 2 installs report it.
+
+/** One boss kill as a member's client saw it, credited to that member's own guild. */
+export const guildKill = base.extend({
+  kind: z.literal("guild_kill"),
+  guildName: z.string().min(2).max(60).refine(validGuildName, { message: "not a guild name" })
+    .describe("GetGuildInfo for your own character: the guild the kill is credited to."),
+  realm: CENSUS_REALM.describe("GetRealmName(): the realm the addon runs on, the guild's realm."),
+  faction: z.enum(["alliance", "horde"]).describe("UnitFactionGroup for your own character: the guild's faction."),
+  encounterId: z.number().int().positive().describe("The encounter id `ENCOUNTER_END` reports."),
+  name: z.string().min(1).max(120).describe("The encounter's name in the client's language."),
+  instanceMapId: INSTANCE_MAP_ID,
+  difficulty: DIFFICULTY,
+  size: z.number().int().min(1).max(40).optional().describe("The group size the encounter reports."),
+});
+
 // --- Character links: a code typed in game ties one character to an Everloot account ---
 // The site shows a signed-in player a short code; typed in game, it becomes one character_link row, which the
 // player sends to the account's link endpoint. The GUID is in transit only: the server turns it into a keyed hash
@@ -711,6 +729,7 @@ export const recordSchemas = {
   census_seen: censusSeen,
   player_seen: playerSeen,
   character_link: characterLink,
+  guild_kill: guildKill,
 } as const;
 
 export type RecordKind = keyof typeof recordSchemas;
@@ -728,6 +747,8 @@ const PUBLIC_KIND_LIST = [
   "instance_entrance", "encounter", "object_sighting",
   // A tooltip number, anonymous like item_seen: shown on an item page only once 3 installs agree on it.
   "item_fact",
+  // A guild's boss kill: it names a guild and a boss, never a person. Counted once 2 installs report it.
+  "guild_kill",
   // The eight completion kinds are deliberately absent. Catalog rows reflect one character's visible factions
   // and quest lines under a per-install event id, so they are never served raw: pages and MCP show an entry
   // only when 3 installs reported it identically. Owned rows are shown only to a granted owner. Both come
@@ -743,7 +764,7 @@ export const anyRecord = z.discriminatedUnion("kind", [
   guildSnapshot, raidLockout, attendance, lootAward, gearSnapshot,
   collectionCatalog, collectionOwned, achievementCatalog, reputationCatalog, titleCatalog, questChainCatalog,
   achievementOwned, reputationOwned, titleOwned, questOwned, auctionScan, auctionSnapshot, recipeSeen, priceSeen, recipeObserved, trainerSeen,
-  goldSnapshot, moneyEvent, addonSeen, mapBounds, talentSnapshot, censusSelf, censusSeen, playerSeen, characterLink,
+  goldSnapshot, moneyEvent, addonSeen, mapBounds, talentSnapshot, censusSelf, censusSeen, playerSeen, characterLink, guildKill,
 ]);
 
 export type IntakeRecord = z.infer<typeof anyRecord>;
