@@ -10,7 +10,7 @@ sources:
     url: https://everloot.app/database/items
   - title: Database sitemap
     url: https://everloot.app/database-sitemap.xml
-status: draft
+status: published
 ---
 
 Item pages can now show names from the current game's files or the Warcraft Wiki before players have uploaded matching observations. Open {item:2589}, or browse the [item database](/database/items), to see the names alongside the information available for each item.
