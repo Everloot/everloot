@@ -17,7 +17,8 @@ required, or tightening a limit is a major release.
 ### Added
 - 1.19.0 (record protocol 1.10.0), for the guild ladder (`docs/design/specs/2026-10-24-guild-board-design.md`):
   the `guild_kill` record, a boss kill credited to the uploading member's own guild (guild, realm, faction,
-  encounter, name, instance, difficulty, size; no character), public and counted once 2 installs report it.
+  encounter, name, instance, difficulty, size; no character), counted once 2 installs report it. It is not a public
+  corpus kind: kills are published only through the guild rollup, behind the guild switch, with hidden guilds left out.
   Two tools, `guild_search` and `guild_rankings`, with output schemas `guildSearch` and `guildRankings`;
   `guild_board`'s output gains optional `ladderProgression`, `activity`, `seenRoster` and `ranks`, its inputs
   untouched. The public catalogue is 31 tools.

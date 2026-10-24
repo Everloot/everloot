@@ -53,7 +53,7 @@ ranges, appear only once at least three installs have reported them. Addon lists
 exception to public records: they are never published row by row, only as counts for addons that
 at least three installs report. Guild data is published only through an officer's
 upload, and named records only with that person's sharing choice; a guild's boss kills (`guild_kill`, below) are
-the exception, published once two of its members' installs report them. Player rows are a second
+the exception, published through the guild pages once two of its members' installs report them. Player rows are a second
 exception, described below: they carry character names, and they are never published as part of
 the public records.
 
@@ -76,10 +76,10 @@ your own guild's boss kills: when `ENCOUNTER_END` reports a kill inside a dungeo
 character in a guild, one `guild_kill` row with the guild's name, the realm, your faction, the encounter's id and
 name, the instance's map id and difficulty, the group size and the time. It holds no character name, no GUID and
 nothing about who else was there; at most 60 are written a UTC day, and `/everloot players off` deletes them with
-the player rows. `guild_kill` is a public kind: it names a guild and a boss, never a person, and it is published
-row by row with the per-install pseudonym like the anonymous records. A kill is the guild's once two installs
-report the same guild and boss, timed at the earliest of their reports; the guild ladder and the open data export's
-`guild-kills.ndjson` and `guilds.ndjson` hold only those. A guild's page lists its agreed kills, its officers'
+the player rows. `guild_kill` rows are never published row by row: they are not in the public corpus API or in
+`corpus.ndjson`, so one install's report and a hidden guild's rows never leave. A kill is the guild's once two
+installs report the same guild and boss, timed at the earliest of their reports; the guild pages, the guild tools and
+the open data export's `guild-kills.ndjson` and `guilds.ndjson` hold only those, and only while the guild pages are on. A guild's page lists its agreed kills, its officers'
 publication when they made one, and the characters the addon saw in that guild: these are player rows, each
 already public on its own page, grouped by the guild the game showed, and the page says they are sightings, not
 the game's member list. Anyone can hide a guild with the guild hide form, without an account or proof of office:

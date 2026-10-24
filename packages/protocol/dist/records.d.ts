@@ -793,6 +793,11 @@ export declare const playerSeen: z.ZodObject<{
 }, z.core.$strip>;
 /** The player-page kind. Never part of the public corpus; intake writes it to the players table, not to the upload. */
 export declare const PLAYER_KINDS: readonly string[];
+/**
+ * The guild kill kind. Stored with the upload, never served raw: it is not on the public corpus allowlist, and
+ * only the guild rollup (2 installs, hidden guilds out, behind the switch) publishes kills.
+ */
+export declare const GUILD_KILL_KINDS: readonly string[];
 /** One boss kill as a member's client saw it, credited to that member's own guild. */
 export declare const guildKill: z.ZodObject<{
     installId: z.ZodString;

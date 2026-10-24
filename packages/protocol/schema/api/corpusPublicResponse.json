@@ -65,8 +65,7 @@
           "instance_entrance",
           "encounter",
           "object_sighting",
-          "item_fact",
-          "guild_kill"
+          "item_fact"
         ]
       }
     },

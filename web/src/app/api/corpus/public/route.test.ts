@@ -5,7 +5,7 @@ vi.mock("@/lib/upload-store", () => ({ uploadStore: { loadCorpus: store.loadCorp
 vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { api: store.api } }));
 
 import { GET } from "./route";
-import { ALL_RECORD_KINDS, CENSUS_KINDS, COMPLETION_KINDS, LINK_KINDS, PLAYER_KINDS, PUBLIC_RECORD_KINDS } from "@everloot/protocol";
+import { ALL_RECORD_KINDS, CENSUS_KINDS, COMPLETION_KINDS, GUILD_KILL_KINDS, LINK_KINDS, PLAYER_KINDS, PUBLIC_RECORD_KINDS } from "@everloot/protocol";
 import { ANON_PAGE, KEY_PAGE } from "@/lib/data-guard";
 import { newKey } from "@/lib/api-keys";
 import { corpusPublicResponse, parseRecords } from "@everloot/protocol";
@@ -119,11 +119,23 @@ test("census rows never leave row by row, even if one reached the corpus", async
   for (const kind of [...CENSUS_KINDS, ...PLAYER_KINDS]) expect((await GET(req(`?kinds=${kind}`))).status).toBe(400);
 });
 
+test("a guild kill row never leaves row by row: not one install's, not a hidden guild's, not with the switch on", async () => {
+  vi.stubEnv("EVERLOOT_GUILDS", "1");
+  const kill = { ...base, eventId: "guild_kill:1", kind: "guild_kill", guildName: "Night Watch", realm: "Forever", faction: "horde", encounterId: 663, name: "Lucifron", instanceMapId: 409, difficulty: 9 };
+  store.loadCorpus.mockResolvedValue({ uploads: 2, records: [gold, kill, { ...kill, installId: "install-other", eventId: "guild_kill:2" }, scan] });
+  const body = JSON.stringify(await (await GET(req())).json());
+  expect(body).not.toContain("guild_kill");
+  expect(body).not.toContain("Night Watch");
+  expect((await GET(req("?kinds=guild_kill"))).status).toBe(400);
+  vi.unstubAllEnvs();
+});
+
 test("every record kind is either on the allowlist or named private here", () => {
   // The completion kinds are served only through the completion rollup: 3-install agreement and live grants.
   // The census kinds are published only as counts, like addon lists. Player rows go to the player pages, never this feed.
-  // Link rows are redeemed at the account's link endpoint and never stored.
-  const privateKinds = ["addon_seen", "talent_snapshot", "auction_snapshot", ...COMPLETION_KINDS, ...CENSUS_KINDS, ...PLAYER_KINDS, ...LINK_KINDS];
+  // Link rows are redeemed at the account's link endpoint and never stored. Guild kills reach the public only
+  // through the guild rollup (2 installs, hidden guilds out, behind EVERLOOT_GUILDS).
+  const privateKinds = ["addon_seen", "talent_snapshot", "auction_snapshot", ...COMPLETION_KINDS, ...CENSUS_KINDS, ...PLAYER_KINDS, ...LINK_KINDS, ...GUILD_KILL_KINDS];
   expect([...PUBLIC_RECORD_KINDS, ...privateKinds].sort()).toEqual([...ALL_RECORD_KINDS].sort());
 });
 

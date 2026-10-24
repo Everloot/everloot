@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { ALL_RECORD_KINDS, parseRecords, parseUpload, PUBLIC_RECORD_KINDS, sharingCategory, validateUpload } from "../src/index.js";
+import { ALL_RECORD_KINDS, GUILD_KILL_KINDS, parseRecords, parseUpload, PUBLIC_RECORD_KINDS, sharingCategory, validateUpload } from "../src/index.js";
 
 const base = { installId: "test-install-1234", capturedAt: "2026-09-29T12:00:00.000Z", eventId: "evt-1" };
 
@@ -228,7 +228,7 @@ describe("intake contract", () => {
     expect(PUBLIC_RECORD_KINDS).toContain("item_fact");
   });
 
-  test("a guild kill names a guild, a realm, a faction and a boss; a person never survives parsing; the kind is public", () => {
+  test("a guild kill names a guild, a realm, a faction and a boss; a person never survives parsing; the kind is never served raw", () => {
     const kill = { ...base, kind: "guild_kill", guildName: "Night Watch", realm: "Forever", faction: "horde", encounterId: 1144, name: "Edwin VanCleef", instanceMapId: 36 };
     const result = parseRecords([
       kill,
@@ -250,7 +250,9 @@ describe("intake contract", () => {
     expect(result.records[2]).not.toHaveProperty("character");
     expect(result.records[2]).not.toHaveProperty("playerName");
     expect(result.records[1]).toMatchObject({ difficulty: 1, size: 5 });
-    expect(PUBLIC_RECORD_KINDS).toContain("guild_kill");
+    // Not on the public corpus allowlist: single-install and hidden-guild rows must not leave through the raw feed.
+    expect(PUBLIC_RECORD_KINDS).not.toContain("guild_kill");
+    expect(GUILD_KILL_KINDS).toEqual(["guild_kill"]);
     // No sharing choice or grant: members agreeing is the bar, not an officer's grant.
     expect(sharingCategory(result.records[0]!)).toBeNull();
     expect(sharingCategory({ ...base, kind: "raid_lockout", guildName: "Night Watch", realm: "Forever", instance: "Molten Core", difficulty: "40", bossesKilled: [], resetAt: "2026-10-14T00:00:00Z" } as never)).toBe("guild");

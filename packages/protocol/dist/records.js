@@ -569,6 +569,11 @@ export const PLAYER_KINDS = ["player_seen"];
 // --- Guild kills: a boss kill credited to the player's own guild (docs/design/specs/2026-10-24-guild-board-design.md) ---
 // Written by the players module on ENCOUNTER_END with success, when the game shows the player a guild. The row
 // names the guild and the boss, never a character. A kill is the guild's once 2 installs report it.
+/**
+ * The guild kill kind. Stored with the upload, never served raw: it is not on the public corpus allowlist, and
+ * only the guild rollup (2 installs, hidden guilds out, behind the switch) publishes kills.
+ */
+export const GUILD_KILL_KINDS = ["guild_kill"];
 /** One boss kill as a member's client saw it, credited to that member's own guild. */
 export const guildKill = base.extend({
     kind: z.literal("guild_kill"),
@@ -577,6 +582,10 @@ export const guildKill = base.extend({
     realm: CENSUS_REALM.describe("GetRealmName(): the realm the addon runs on, the guild's realm."),
     faction: z.enum(["alliance", "horde"]).describe("UnitFactionGroup for your own character: the guild's faction."),
     encounterId: z.number().int().positive().describe("The encounter id `ENCOUNTER_END` reports."),
+    // TODO(docs/design/specs/2026-10-24-guild-board-design.md, section 5): the name is free text up to 120 characters.
+    // No encounter catalogue is read at intake today (DungeonEncounter is only read by the kb CLI); once one is, check
+    // the name against it there. Until then progression names bosses from the 3-install agreed boss list; the activity
+    // list and the guild export carry the name the agreeing members reported.
     name: z.string().min(1).max(120).describe("The encounter's name in the client's language."),
     instanceMapId: INSTANCE_MAP_ID,
     difficulty: DIFFICULTY,
@@ -662,8 +671,6 @@ const PUBLIC_KIND_LIST = [
     "instance_entrance", "encounter", "object_sighting",
     // A tooltip number, anonymous like item_seen: shown on an item page only once 3 installs agree on it.
     "item_fact",
-    // A guild's boss kill: it names a guild and a boss, never a person. Counted once 2 installs report it.
-    "guild_kill",
     // The eight completion kinds are deliberately absent. Catalog rows reflect one character's visible factions
     // and quest lines under a per-install event id, so they are never served raw: pages and MCP show an entry
     // only when 3 installs reported it identically. Owned rows are shown only to a granted owner. Both come
@@ -671,6 +678,9 @@ const PUBLIC_KIND_LIST = [
     // The census kinds are absent too: like addon lists, they are published only as counts.
     // So is player_seen: named rows reach the player pages, never this corpus.
     // So is character_link: it goes to the account's link endpoint and is never stored as sent.
+    // So is guild_kill (GUILD_KILL_KINDS): one install's row is not yet a fact, and a hidden guild's rows must not
+    // leave. Kills reach the public only through the guild pages, the guild tools and the guild export files, which
+    // count the 2-install bar, leave hidden guilds out and answer only while EVERLOOT_GUILDS is on.
 ];
 export const PUBLIC_RECORD_KINDS = PUBLIC_KIND_LIST;
 export const anyRecord = z.discriminatedUnion("kind", [
