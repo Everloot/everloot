@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { analyticsConfig, needsAnalyticsConsent } from "./config";
-import { loadConsented, loadCookieless, optedOutBySignal, privacySignals, unloadConsented } from "./load";
+import { loadConsented, loadCookieless, optedOutBySignal, privacySignals, scrubEvent, stripSearchQuery, unloadConsented } from "./load";
 
 const posthogMock = vi.hoisted(() => ({ init: vi.fn(), opt_in_capturing: vi.fn(), opt_out_capturing: vi.fn(), __loaded: false }));
 vi.mock("posthog-js", () => ({ default: posthogMock }));
@@ -44,11 +44,22 @@ describe("analyticsConfig", () => {
     expect(c.gaId).toBeUndefined();
     expect(c.posthogKey).toBeUndefined();
     expect(c.cfBeaconToken).toBeUndefined();
-    expect(c.posthogHost).toBe("https://eu.i.posthog.com");
+    expect(c.posthogHost).toBe("https://us.i.posthog.com");
+  });
+
+  it("defaults PostHog to the US cloud and keeps an EU override", () => {
+    expect(analyticsConfig({}).posthogHost).toBe("https://us.i.posthog.com");
+    expect(analyticsConfig({ NEXT_PUBLIC_POSTHOG_HOST: "https://eu.i.posthog.com" }).posthogHost).toBe("https://eu.i.posthog.com");
+  });
+
+  it("turns PostHog on only for the Production deployment", () => {
+    expect(analyticsConfig({ NEXT_PUBLIC_POSTHOG_KEY: PH }).posthogKey).toBeUndefined();
+    expect(analyticsConfig({ NEXT_PUBLIC_POSTHOG_KEY: PH, VERCEL_ENV: "preview" }).posthogKey).toBeUndefined();
+    expect(analyticsConfig({ NEXT_PUBLIC_POSTHOG_KEY: PH, VERCEL_ENV: "production" }).posthogKey).toBe(PH);
   });
 
   it("accepts well-formed values", () => {
-    const c = analyticsConfig({ NEXT_PUBLIC_GA_ID: GA, NEXT_PUBLIC_POSTHOG_KEY: PH, NEXT_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com/", NEXT_PUBLIC_CF_BEACON_TOKEN: CF });
+    const c = analyticsConfig({ NEXT_PUBLIC_GA_ID: GA, NEXT_PUBLIC_POSTHOG_KEY: PH, NEXT_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com/", NEXT_PUBLIC_CF_BEACON_TOKEN: CF, VERCEL_ENV: "production" });
     expect(c).toEqual({ gaId: GA, posthogKey: PH, posthogHost: "https://us.i.posthog.com", cfBeaconToken: CF });
     expect(needsAnalyticsConsent(c)).toBe(true);
   });
@@ -168,6 +179,27 @@ describe("PostHog consent gating", () => {
     await new Promise((r) => setTimeout(r, 10));
     expect(posthogMock.init).not.toHaveBeenCalled();
     expect(window.posthog).toBeUndefined();
+  });
+});
+
+describe("search term scrubbing", () => {
+  it("strips q and keeps other params", () => {
+    expect(stripSearchQuery("https://everloot.app/search?q=thunderfury&page=2")).toBe("https://everloot.app/search?page=2");
+    expect(stripSearchQuery("https://everloot.app/items")).toBe("https://everloot.app/items");
+    expect(stripSearchQuery(undefined)).toBeUndefined();
+  });
+
+  it("scrubs page URLs and same-origin referrers only", () => {
+    const e = scrubEvent({ properties: { $current_url: "https://everloot.app/?q=onyxia", $referrer: "https://everloot.app/s?q=x", $initial_referrer: "https://google.com/?q=everloot" } }, "https://everloot.app");
+    expect(e.properties).toEqual({ $current_url: "https://everloot.app/", $referrer: "https://everloot.app/s", $initial_referrer: "https://google.com/?q=everloot" });
+    expect(scrubEvent(null)).toBeNull();
+  });
+
+  it("wires before_send into init", async () => {
+    loadConsented({ posthogKey: PH, posthogHost: "https://us.i.posthog.com" }, window, document);
+    await vi.waitFor(() => expect(posthogMock.init).toHaveBeenCalledOnce());
+    const before = posthogMock.init.mock.calls[0][1].before_send;
+    expect(before({ properties: { $current_url: `${window.location.origin}/x?q=1` } }).properties.$current_url).toBe(`${window.location.origin}/x`);
   });
 });
 

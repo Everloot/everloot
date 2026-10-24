@@ -65,6 +65,35 @@ export function loadConsented(config: AnalyticsConfig, win: Window, doc: Documen
   }
 }
 
+/** Removes the `q` (search terms) parameter from a URL. Relative or unparsable values are returned unchanged. */
+export function stripSearchQuery(url: unknown): unknown {
+  if (typeof url !== "string") return url;
+  try {
+    const u = new URL(url);
+    if (!u.searchParams.has("q")) return url;
+    u.searchParams.delete("q");
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
+/** posthog-js before_send hook: drops search terms from page URLs, and from the referrer when it is this site. */
+export function scrubEvent<T extends { properties?: Record<string, unknown> } | null>(event: T, origin?: string): T {
+  const props = event?.properties;
+  if (!props) return event;
+  for (const key of ["$current_url", "$initial_current_url"]) {
+    if (key in props) props[key] = stripSearchQuery(props[key]);
+  }
+  for (const key of ["$referrer", "$initial_referrer"]) {
+    const ref = props[key];
+    if (typeof ref === "string" && origin) {
+      try { if (new URL(ref).origin === origin) props[key] = stripSearchQuery(ref); } catch {}
+    }
+  }
+  return event;
+}
+
 // Bumped on every withdrawal, so an import that was already in flight can tell consent was taken back.
 let generation = 0;
 
@@ -79,6 +108,7 @@ async function startPosthog(config: AnalyticsConfig, win: Window): Promise<void>
       disable_session_recording: true,
       capture_pageview: "history_change",
       person_profiles: "identified_only",
+      before_send: (event) => scrubEvent(event, win.location.origin),
     });
   }
   posthog.opt_in_capturing();
