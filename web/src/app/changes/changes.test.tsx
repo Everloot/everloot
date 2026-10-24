@@ -168,7 +168,7 @@ test("empty states: nothing recorded at all, or no match with the filters as rem
 });
 
 test("the RSS feed is Forever only, is RSS, and links each post's page on Everloot with the original kept in the item", async () => {
-  const response = GET();
+  const response = await GET();
   expect(response.headers.get("content-type")).toContain("application/rss+xml");
   const xml = await response.text();
   expect(xml).toContain("<rss version=\"2.0\"");
@@ -254,7 +254,7 @@ test("filters and counts count announcements; the region filter finds one posted
 
 test("the RSS feed has one item per announcement, linking the US copy's page", async () => {
   timeline.entries = [...entries, ...announcement];
-  const xml = await GET().text();
+  const xml = await (await GET()).text();
   expect((xml.match(/<item>/g) ?? []).length).toBe(4 + 2);
   expect(xml.match(/<title>Blue post: World of Warcraft: Forever Raid Overview/g)).toHaveLength(1);
   expect(xml).toContain("<link>https://everloot.app/changes/us-30552118-world-of-warcraft-forever-raid-overview-locations-raid-sizes-and-attunement</link>");

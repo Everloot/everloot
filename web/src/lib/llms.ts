@@ -171,7 +171,8 @@ export function llmsTxt(): string {
   ].join("\n");
 }
 
-export function llmsFullTxt(entries: ChangeEntry[] = loadTimeline()): string {
+export async function llmsFullTxt(entries?: ChangeEntry[]): Promise<string> {
+  entries ??= await loadTimeline();
   return [
     ...head(),
     `Site: ${SITE_URL}`,

@@ -48,7 +48,7 @@ test("the panel links each blue post to its page on Everloot, in blue, never to 
   }
   expect(panel).not.toMatch(/forums\.blizzard\.com|bsky\.app/);
 });
-test("the panel shows a post that arrived from two regions once", () => {
+test("the panel shows a post that arrived from two regions once", async () => {
   const start = html.indexOf('id="whats-new"');
   const panel = html.slice(start, html.indexOf("</section>", start));
   const titles = [...panel.matchAll(/<a [^>]*>([^<]+)<\/a>/g)].map((m) => m[1]).filter((t) => !t.startsWith("Every change"));
@@ -58,7 +58,7 @@ test("the panel shows a post that arrived from two regions once", () => {
   // The fold itself: an announcement that arrived from two regions is one entry, with the other region's
   // copy under it rather than beside it. Which announcement that is changes with the day's posts, so the
   // test finds it in the data instead of naming one.
-  const timeline = loadTimeline();
+  const timeline = await loadTimeline();
   const twoRegions = timeline.find((e) => (e.copies ?? []).some((c) => (c.region ?? "us") !== (e.region ?? "us")));
   expect(twoRegions).toBeDefined();
   for (const copy of twoRegions!.copies ?? []) {

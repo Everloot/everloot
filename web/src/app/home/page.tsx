@@ -60,7 +60,7 @@ export default async function SignedInHome({ searchParams }: { searchParams?: Pr
   const main = shell.characters.find((c) => c.id === shell.mainCharacterId) ?? null;
   const activeBuilds = active ? saved.builds.filter((b) => b.characterId === active.id) : [];
   const facts = await describeBuilds(activeBuilds);
-  const latest = filterTimeline(loadTimeline(), "all", "forever").slice(0, 5);
+  const latest = filterTimeline(await loadTimeline(), "all", "forever").slice(0, 5);
   // Back from "Add another account" through Battle.net as an account that was already here: Battle.net kept the
   // earlier login and signed it in again.
   const sameAccount = (await searchParams)?.added === "bnet"

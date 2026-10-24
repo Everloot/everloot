@@ -29,14 +29,14 @@ vi.mock("@/lib/news", async (importOriginal) => {
 const entries = await sitemap();
 const byPath = new Map(entries.map((e) => [new URL(e.url).pathname, e]));
 
-test("/changes is dated by its newest entry", () => {
-  const newest = loadTimeline()[0];
+test("/changes is dated by its newest entry", async () => {
+  const newest = (await loadTimeline())[0];
   expect(newest).toBeDefined();
   expect(byPath.get("/changes")?.lastModified).toEqual(new Date(newest.at));
 });
 
 test("a blue post's page is listed only once it has a reviewed write-up, dated by the review", async () => {
-  const posts = loadTimeline().filter((e) => e.type !== "build");
+  const posts = (await loadTimeline()).filter((e) => e.type !== "build");
   const listed = (all: typeof entries) => all.map((e) => new URL(e.url).pathname).filter((p) => /^\/changes\/./.test(p) && p !== "/changes/feed.xml");
   expect(listed(entries)).toEqual([]);
   const [first, second] = posts;

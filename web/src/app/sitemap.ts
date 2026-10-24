@@ -56,7 +56,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
   const paths = [...new Set([...staticRoutes, ...rankingRoutes, ...talentRoutes, ...itemRoutes, ...zoneRoutes, ...instanceRoutes, ...catalogRoutes, ...tools.filter((tool) => tool.status !== "coming-soon").map(toolHref), ...allDocsPages().map((page) => page.href)])];
 
-  const timeline = loadTimeline();
+  const timeline = await loadTimeline();
   const newestChange = timeline[0]?.at;
   // A blue post's page only once it carries our reviewed write-up (it says noindex until then), dated by the review.
   const writeups = loadWriteups();
