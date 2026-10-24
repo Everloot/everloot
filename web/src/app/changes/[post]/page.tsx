@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import JsonLd from "@/components/JsonLd";
-import { Container } from "@/components/ui";
+import { Card, Container, SectionHeading } from "@/components/ui";
 import { longDate } from "@/data/wow-forever";
 import { GAME_LABEL, TYPE_LABEL, loadTimeline, loadWriteups, postIdOfSegment, postPath, writeupFor, type BlueWriteup, type ChangeEntry } from "@/lib/changes";
 import { loadSiteAssets } from "@/lib/game-assets";
@@ -18,6 +18,7 @@ import WithSpells from "../with-spells";
  * as Blizzard's words), our own write-up when a maintainer has reviewed one, and the link to the original.
  * The address is `/changes/<page id>-<slug>`; a wrong slug moves to the right one, an unknown id is a 404.
  * Indexed only once it carries our write-up: an excerpt alone is mostly Blizzard's words.
+ * Under the post: the newer and the older post of the same game, then more by the author and the same day.
  */
 
 type Props = { params: Promise<{ post: string }> };
@@ -84,9 +85,9 @@ function Parts({ parts, index }: { parts: Inline[]; index: MentionIndex }) {
 function PostList({ id, title, entries, more }: { id: string; title: string; entries: ChangeEntry[]; more?: { href: string; label: string } }) {
   if (entries.length === 0) return null;
   return (
-    <section aria-labelledby={id} className="min-w-0">
-      <h2 id={id} className="text-h2-sm text-fg sm:text-h2">{title}</h2>
-      <ul className="mt-2 space-y-2">
+    <Card as="section" aria-labelledby={id} className="min-w-0">
+      <SectionHeading id={id} action={more && <Link href={more.href} className={LINK}>{more.label}</Link>}>{title}</SectionHeading>
+      <ul className="space-y-2">
         {entries.map((e) => (
           <li key={e.id} className="text-cell">
             <Link href={postPath(e)!} className={`${BLUE} [overflow-wrap:anywhere]`}>{e.title}</Link>
@@ -94,8 +95,26 @@ function PostList({ id, title, entries, more }: { id: string; title: string; ent
           </li>
         ))}
       </ul>
-      {more && <p className="mt-2 text-meta"><Link href={more.href} className={LINK}>{more.label}</Link></p>}
-    </section>
+    </Card>
+  );
+}
+
+/** The post before and after this one in the same game's timeline, two cards to step through the posts. */
+function Nearby({ newer, older }: { newer: ChangeEntry | null; older: ChangeEntry | null }) {
+  if (!newer && !older) return null;
+  const card = (e: ChangeEntry | null, label: string, align: string) =>
+    e ? (
+      <Card href={postPath(e)!} className={`flex min-w-0 flex-col gap-1 ${align}`}>
+        <span className="text-meta text-muted">{label}</span>
+        <span className="text-cell font-medium text-blue-post [overflow-wrap:anywhere]">{e.title}</span>
+        <time dateTime={e.at} className="text-meta text-muted">{longDate(e.at.slice(0, 10))}</time>
+      </Card>
+    ) : <span aria-hidden="true" />;
+  return (
+    <nav data-nearby aria-label="Nearby posts" className="mt-8 grid gap-4 sm:grid-cols-2">
+      {card(newer, "Newer", "")}
+      {card(older, "Older", "sm:items-end sm:text-right")}
+    </nav>
   );
 }
 
@@ -110,7 +129,12 @@ export default async function BluePostPage(props: Props) {
   const index = mentionIndex(assets, assets ? await siteSpellNames() : []);
   const excerpt = clampExcerpt(entry.excerpt);
   const day = entry.at.slice(0, 10);
-  const others = all.filter((e) => e.id !== entry.id && e.game === entry.game && isPost(e));
+  // Newest first, as the timeline lists them.
+  const posts = all.filter((e) => e.game === entry.game && isPost(e)).sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
+  const at = posts.findIndex((e) => e.id === entry.id);
+  const newer = at > 0 ? posts[at - 1] : null;
+  const older = at >= 0 && at < posts.length - 1 ? posts[at + 1] : null;
+  const others = posts.filter((e) => e.id !== entry.id);
   const byAuthor = entry.author ? others.filter((e) => e.author === entry.author).slice(0, RELATED) : [];
   const sameDay = others.filter((e) => e.at.slice(0, 10) === day).slice(0, RELATED);
   const authorHref = `/changes?${new URLSearchParams([...(entry.game === "classic" ? [["game", "classic"]] : []), ["author", entry.author ?? ""]]).toString()}`;
@@ -137,33 +161,40 @@ export default async function BluePostPage(props: Props) {
         </header>
 
         {excerpt && (
-          <figure data-excerpt className="border-l-2 border-blue-post pl-4">
-            <blockquote cite={entry.url ?? undefined} className="text-blue-post">
-              <p><WithSpells text={excerpt} index={index} /></p>
-            </blockquote>
-            <figcaption className="mt-1 text-meta text-muted">Blizzard&apos;s words, an excerpt.</figcaption>
-          </figure>
+          <Card as="section" aria-label="Blizzard's words">
+            <figure data-excerpt className="border-l-2 border-blue-post pl-4">
+              <blockquote cite={entry.url ?? undefined} className="text-blue-post">
+                <p><WithSpells text={excerpt} index={index} /></p>
+              </blockquote>
+              <figcaption className="mt-1 text-meta text-muted">Blizzard&apos;s words, an excerpt.</figcaption>
+            </figure>
+          </Card>
         )}
 
-        {(writeup || entry.summary) && (
-          <section data-writeup={writeup ? "" : undefined} aria-labelledby="notes" className="mt-8 space-y-3 text-fg">
-            <h2 id="notes" className="text-h2-sm text-fg sm:text-h2">Our notes</h2>
-            {writeup
-              ? writeupBlocks(writeup.body).map((b, i) => b.kind === "p"
-                ? <p key={i}><Parts parts={b.parts} index={index} /></p>
-                : <ul key={i} className="list-disc space-y-1 pl-6">{b.items.map((item, j) => <li key={j}><Parts parts={item} index={index} /></li>)}</ul>)
-              : <p><WithSpells text={entry.summary!} index={index} /></p>}
-            {writeup && <p className="text-meta text-muted">Reviewed <time dateTime={writeup.reviewed.on}>{longDate(writeup.reviewed.on)}</time></p>}
-          </section>
+        {writeup || entry.summary ? (
+          <Card as="section" data-writeup={writeup ? "" : undefined} aria-labelledby="notes" className="mt-4">
+            <SectionHeading id="notes" note={writeup && <>Reviewed <time dateTime={writeup.reviewed.on}>{longDate(writeup.reviewed.on)}</time></>}>Our notes</SectionHeading>
+            <div className="space-y-3 text-fg">
+              {writeup
+                ? writeupBlocks(writeup.body).map((b, i) => b.kind === "p"
+                  ? <p key={i}><Parts parts={b.parts} index={index} /></p>
+                  : <ul key={i} className="list-disc space-y-1 pl-6">{b.items.map((item, j) => <li key={j}><Parts parts={item} index={index} /></li>)}</ul>)
+                : <p><WithSpells text={entry.summary!} index={index} /></p>}
+            </div>
+          </Card>
+        ) : (
+          <Card as="section" data-no-notes aria-labelledby="notes" className="mt-4">
+            <SectionHeading id="notes">Our notes</SectionHeading>
+            <p className="text-sm text-fg-2">None yet. A maintainer writes them after reading the full post; until then the excerpt above is all this page carries.</p>
+          </Card>
         )}
 
-        {entry.url && (
-          <p className="mt-8">
-            <a data-original href={entry.url} rel="noopener" className={`${LINK} font-medium`}>Read the full post {where}</a>
-          </p>
-        )}
+        <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2">
+          {entry.url && <a data-original href={entry.url} rel="noopener" className="btn">Read the full post {where}</a>}
+          <Link href={entry.game === "classic" ? "/changes?game=classic" : "/changes"} className={`${LINK} text-sm`}>All posts</Link>
+        </div>
         {copies.length > 0 && (
-          <p data-also-posted className="mt-2 text-meta text-fg-2">
+          <p data-also-posted className="mt-3 text-meta text-fg-2">
             Also posted{" "}
             {copies.map((c, i) => (
               <span key={c.id}>
@@ -175,7 +206,9 @@ export default async function BluePostPage(props: Props) {
           </p>
         )}
 
-        <div className="mt-12 grid gap-8 border-t border-line pt-6 sm:grid-cols-2">
+        <Nearby newer={newer} older={older} />
+
+        <div className="mt-8 grid gap-4 sm:grid-cols-2">
           <PostList id="more-from" title={`More from ${entry.author}`} entries={byAuthor} more={{ href: authorHref, label: `Every post by ${entry.author}` }} />
           <PostList id="same-day" title="Same day" entries={sameDay} />
         </div>

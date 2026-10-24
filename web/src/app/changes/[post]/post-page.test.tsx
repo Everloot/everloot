@@ -135,6 +135,33 @@ test("More from the author and Same day link to the other posts' pages, never to
   expect(html).not.toContain("1.60.1.70460");
 });
 
+test("newer and older step through the same game's posts, skipping builds and copies; the ends have one card", async () => {
+  const html = await page(CANONICAL);
+  const nearby = html.slice(html.indexOf('data-nearby'), html.indexOf('id="more-from"'));
+  expect(nearby).toContain('aria-label="Nearby posts"');
+  expect(nearby).toContain('href="/changes/bsky-3mydklukhq22f-good-news-everyone"');
+  expect(nearby).toContain(">Newer</span>");
+  expect(nearby).toContain('href="/changes/eu-6400001-eu-realm-maintenance"');
+  expect(nearby).toContain(">Older</span>");
+  expect(nearby).not.toContain("1.60.1.70460");
+  expect(nearby).not.toContain("eu-6443686");
+  // The newest post has no newer neighbour: its card is an empty cell, the older one stays.
+  const newest = await page("bsky-3mydklukhq22f-good-news-everyone");
+  const top = newest.slice(newest.indexOf('data-nearby'), newest.indexOf('id="same-day"'));
+  expect(top).not.toContain(">Newer</span>");
+  expect(top).toContain(`href="/changes/${CANONICAL}"`);
+});
+
+test("without a write-up the notes card says so in our words, and the original is the one button", async () => {
+  const html = await page(CANONICAL);
+  expect(html).toContain('data-no-notes="true"');
+  expect(html).toContain("None yet. A maintainer writes them after reading the full post");
+  expect(html).toMatch(/<a data-original="true" href="[^"]+" rel="noopener" class="btn">/);
+  expect(html).toContain('href="/changes"');
+  data.writeups = new Map([[writeup.postId, writeup]]);
+  expect(await page(CANONICAL)).not.toContain("data-no-notes");
+});
+
 test("a regional copy's address moves (308) to the announcement's page", async () => {
   await expect(page("eu-6443686-claim-your-world-of-warcraft-forever-character-names")).rejects.toThrow(`NEXT_REDIRECT /changes/${CANONICAL}`);
   await expect(page("eu-6443686")).rejects.toThrow(`NEXT_REDIRECT /changes/${CANONICAL}`);
