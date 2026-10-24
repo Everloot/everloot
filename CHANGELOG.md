@@ -20,6 +20,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   runs in CI), written in the wiki's syntax so they link database entities and wiki pages the same way. Published
   posts appear at `/news` and `/news/<slug>` with Article structured data, in the `/news/feed.xml` RSS feed, in the
   sitemap and in llms.txt; a draft is built nowhere. Blizzard's own posts stay on `/changes`, which the hub links.
+- Addon: while `/everloot players` is on, a boss kill inside a dungeon or raid with your character in a guild writes
+  a `guild_kill` row (guild, realm, faction, encounter, instance, time; no name), at most 60 a UTC day;
+  `/everloot players off` deletes them with the player rows. Design: `docs/design/specs/2026-10-24-guild-board-design.md`.
 
 ### Changed
 - Knowledge base: `entities.name_norm` stores each name's words as the search re-rank reads them, with an index on
