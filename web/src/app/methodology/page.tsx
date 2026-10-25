@@ -33,7 +33,7 @@ export default async function MethodologyPage() {
   // The art's build comes from the asset manifest, only when the asset URL is set.
   const assets = await loadSiteAssets();
   return (
-    <ReadingLayout items={SECTIONS}>
+    <ReadingLayout items={SECTIONS.filter((s) => s.id !== "guilds" || guildsOn())}>
       <PageHeader
         title="How we count"
         lede="Every fact on Everloot comes from players running the Everloot addon and choosing to upload what it recorded."

@@ -49,7 +49,8 @@ describe("ReadingLayout", () => {
     expect(html).toContain('href="#a"');
     expect(html).toContain('href="#b"');
     expect(text(html)).toContain("Published today");
-    expect(html.indexOf("<aside")).toBeLessThan(html.indexOf("body"));
+    // The text comes first, so a phone opens on the title and a screen reader reaches the h1 before the rail.
+    expect(html.indexOf("body")).toBeLessThan(html.indexOf("<aside"));
   });
 });
 
@@ -96,8 +97,8 @@ describe("SectionHeading", () => {
   test("one style, h2 by default, h3 on request", () => {
     const h2 = render(<SectionHeading>Used in</SectionHeading>);
     const h3 = render(<SectionHeading as="h3">Used in</SectionHeading>);
-    expect(h2).toMatch(/<h2 class="text-xl font-semibold tracking-tight text-fg">Used in<\/h2>/);
-    expect(h3).toMatch(/<h3 class="text-xl font-semibold tracking-tight text-fg">Used in<\/h3>/);
+    expect(h2).toMatch(/<h2 class="scroll-mt-24 text-xl font-semibold tracking-tight text-fg">Used in<\/h2>/);
+    expect(h3).toMatch(/<h3 class="scroll-mt-24 text-xl font-semibold tracking-tight text-fg">Used in<\/h3>/);
   });
 });
 

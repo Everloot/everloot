@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { LAUNCH, LAUNCH_AT, longDate } from "@/data/wow-forever";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { NPC_CREATURE_TYPES, NPC_RANKS, type NpcRank, type NpcReaction } from "../../../../../kb/src/world-pages";
@@ -148,7 +149,7 @@ export default async function NpcListPage(props: { searchParams?: Promise<Search
         <NoMatches noun="NPCs" chips={chips} clearHref="/database/npcs" />
         {id !== null && <p className="pb-4 text-cell"><Link href={`/database/npcs/${id}`} className={LINK}>Open NPC {id}</Link></p>}
       </>
-    : <NoObservations>NPCs are listed once players report them. The addon starts recording when the game launches on November 4, and an NPC shows here once 3 installs agree on it.</NoObservations>;
+    : <NoObservations>{`NPCs are listed once players report them. ${Date.now() < Date.parse(LAUNCH_AT) ? `The addon starts recording when the game launches on ${longDate(LAUNCH.date)}, and an` : "An"} NPC shows here once 3 installs agree on it.`}</NoObservations>;
 
   return (
     <Container width="data">

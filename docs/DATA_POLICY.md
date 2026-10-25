@@ -323,9 +323,12 @@ The rules:
   names the Warcraft Wiki contributors. A name from the game files alone carries the quiet unconfirmed marker,
   *From the game files, not yet confirmed by players*. A name 3 installs agree on comes first, with the tooltip
   *Name confirmed by players*. No source label is printed beside a name.
-- There is no id range and no placeholder filter: an item from a later version, an unreleased one, or one the
-  files call "Deprecated" or "[PH]" is named as the files name it. The marker and the build stamp say what the
-  name is: found in game files, unconfirmed.
+- There is no id range: an item from a later version, an unreleased one, or one the files call "Deprecated" or
+  "[PH]" is named as the files name it. The marker and the build stamp say what the name is: found in game files,
+  unconfirmed. Items whose name marks them as development leftovers (test, placeholder and retired items, decided
+  by `kb/src/dev-item-names.ts`, added 2026-10-26) are left out of the category lists and their counts unless the
+  reader asks for them, and their pages stay out of search and the sitemap; their pages, names and id lookups stay
+  as before.
 - The tooltip facts follow the name (added 2026-10-20, at Carlos's request that the database show the game file
   data it already holds, as Wowhead does). Until players confirm the item, its page keeps the quiet unconfirmed
   marker on the icon, whose tooltip says so, and prints no source line. The lists sort and filter by item level,

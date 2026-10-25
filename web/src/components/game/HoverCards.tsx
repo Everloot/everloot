@@ -53,7 +53,7 @@ export default function HoverCards() {
 
   useEffect(() => {
     let current: { anchor: HTMLAnchorElement; timer: ReturnType<typeof setTimeout>; ctrl: AbortController; described: string | null; keyboard: boolean } | null = null;
-    let touchedAt = -Infinity;
+    let pressedAt = -Infinity;
 
     const close = () => {
       if (!current) return;
@@ -90,13 +90,13 @@ export default function HoverCards() {
     const onOut = (e: PointerEvent) => {
       if (current && !(e.relatedTarget instanceof Node && current.anchor.contains(e.relatedTarget))) close();
     };
-    const onDown = (e: PointerEvent) => {
-      if (e.pointerType === "touch") touchedAt = Date.now();
+    const onDown = () => {
+      pressedAt = Date.now();
       close();
     };
     const onFocus = (e: FocusEvent) => {
-      // A tap focuses the link on some phones: that is not keyboard focus.
-      if (Date.now() - touchedAt < 1000) return;
+      // A click or a tap focuses the link too: that is not keyboard focus (a hover already shows the card).
+      if (Date.now() - pressedAt < 1000) return;
       const link = linkIn(e.target);
       if (link) start(link, null);
     };

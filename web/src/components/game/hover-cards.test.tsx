@@ -101,6 +101,14 @@ test("keyboard focus shows the card and Escape hides it, with focus left on the 
   expect(document.activeElement).toBe(a);
 });
 
+test("the focus a click gives a link is not keyboard focus: no card opens from it", async () => {
+  const a = link("/database/items/19019");
+  pointer("pointerdown", a);
+  await act(async () => a.focus());
+  await wait(SHOW_DELAY);
+  expect(card()).toBeNull();
+});
+
 test("a pointer that leaves before the delay asks for nothing; touch, other pages and links with their own card get none", async () => {
   pointer("pointerover", link("/database/items/19019"));
   await wait(50);
