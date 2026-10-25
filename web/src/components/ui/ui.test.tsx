@@ -19,6 +19,7 @@ import DataTable, { filledColumns, type Column, type SparseColumn } from "./Data
 import EmptyState from "./EmptyState";
 import { pageWindow } from "./Pager";
 import PageHeader from "./PageHeader";
+import ReadingLayout, { RailFacts } from "./ReadingLayout";
 import SectionHeading from "./SectionHeading";
 import TooltipFrame from "./TooltipFrame";
 import { qualityOf, QUALITY_TEXT } from "./quality";
@@ -30,6 +31,25 @@ describe("Container", () => {
   test("has two widths, wide by default", () => {
     expect(render(<Container>x</Container>)).toContain("max-w-wide");
     expect(render(<Container width="reading">x</Container>)).toContain("max-w-reading");
+  });
+});
+
+describe("ReadingLayout", () => {
+  const items = [{ id: "a", label: "First" }, { id: "b", label: "Second" }];
+
+  test("is a plain reading column without a rail when it has no meta and no contents", () => {
+    const html = render(<ReadingLayout>x</ReadingLayout>);
+    expect(html).toContain("max-w-reading");
+    expect(html).not.toContain("<aside");
+  });
+
+  test("puts the meta and a contents list of anchors in the rail", () => {
+    const html = render(<ReadingLayout items={items} meta={<RailFacts items={[{ label: "Published", value: "today" }]} />}>body</ReadingLayout>);
+    expect(html).toContain("data-reading-layout");
+    expect(html).toContain('href="#a"');
+    expect(html).toContain('href="#b"');
+    expect(text(html)).toContain("Published today");
+    expect(html.indexOf("<aside")).toBeLessThan(html.indexOf("body"));
   });
 });
 

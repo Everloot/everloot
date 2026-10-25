@@ -62,7 +62,7 @@ const columns = (reportingInstalls: number): Column<Row>[] => [
 export default async function PopularAddonsPage() {
   const { addons, reportingInstalls, unreachable, dataAsOf } = await loadPopularAddons();
   return (
-    <Container width="wide">
+    <Container width="data">
       <article>
         <PageHeader
           trail={trailFor("/addons/popular")!}

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import JsonLd from "@/components/JsonLd";
-import { Container, PageHeader, Prose, SectionHeading } from "@/components/ui";
+import { PageHeader, Prose, RailFacts, ReadingLayout, SectionHeading, type TocItem } from "@/components/ui";
 import { longDate } from "@/data/wow-forever";
 import { trailFor } from "@/lib/breadcrumbs";
 import { newsArticleJsonLd } from "@/lib/jsonld";
@@ -51,8 +51,23 @@ export default async function NewsArticle(props: { params: Promise<{ slug: strin
   const trail = [...trailFor("/news")!, { name: post.title, path }];
   const others = publishedPosts(news).filter((p) => p.slug !== post.slug).slice(0, RELATED);
 
+  // Contents from the body's own headings; a post with fewer than two needs none.
+  const headings = post.blocks.flatMap((b, i) => (b.type === "heading" ? [{ i, id: `h-${i}-${b.text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`, label: b.text }] : []));
+  const toc: TocItem[] = headings.length > 1
+    ? [...headings, ...(post.sources.length > 0 ? [{ id: "sources", label: "Sources" }] : []), ...(others.length > 0 ? [{ id: "more-news", label: "More news" }] : [])]
+    : [];
+  const meta = (
+    <RailFacts
+      items={[
+        { label: "Author", value: <span data-author>{post.author}</span> },
+        { label: "Published", value: <time dateTime={post.published}>{longDate(post.published)}</time> },
+        ...(post.updated ? [{ label: "Updated", value: <time dateTime={post.updated}>{longDate(post.updated)}</time> }] : []),
+      ]}
+    />
+  );
+
   return (
-    <Container width="reading">
+    <ReadingLayout items={toc} meta={meta}>
       <JsonLd data={newsArticleJsonLd({ title: post.title, description: postDescription(post), path, published: post.published, modified: lastChanged(post), author: post.author })} />
       <article data-news-post>
         <PageHeader
@@ -61,16 +76,18 @@ export default async function NewsArticle(props: { params: Promise<{ slug: strin
           lede={post.summary}
           meta={
             <>
-              <span data-author>{post.author}</span>
-              <time dateTime={post.published}>{longDate(post.published)}</time>
-              {post.updated && <span>Updated <time dateTime={post.updated}>{longDate(post.updated)}</time></span>}
               {post.tags.map((t) => <span key={t} className="rounded-control border border-line px-2">{t}</span>)}
             </>
           }
         />
 
         <Prose>
-          {post.blocks.map((b, i) => <WikiBlock key={i} block={b} ctx={ctx} />)}
+          {post.blocks.map((b, i) => {
+            const heading = toc.length > 0 ? headings.find((h) => h.i === i) : undefined;
+            return heading
+              ? <h3 key={i} id={heading.id} className="scroll-mt-24 text-base font-semibold text-fg">{heading.label}</h3>
+              : <WikiBlock key={i} block={b} ctx={ctx} />;
+          })}
         </Prose>
 
         {post.sources.length > 0 && (
@@ -100,6 +117,6 @@ export default async function NewsArticle(props: { params: Promise<{ slug: strin
           <Link href="/news" className={LINK}>All news</Link>
         </p>
       </article>
-    </Container>
+    </ReadingLayout>
   );
 }

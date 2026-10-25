@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { FEED, IMAGE, TWITTER_IMAGE } from "@/lib/seo";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { Card, Container, Explainer, Facts, PageHeader, Prose, SectionHeading } from "@/components/ui";
+import { Card, Explainer, Facts, PageHeader, Prose, ReadingLayout, SectionHeading, type TocItem } from "@/components/ui";
 import LoreSource from "@/components/LoreSource";
 import { trailFor } from "@/lib/breadcrumbs";
 import { entityHref } from "@/components/EntityLink";
@@ -81,8 +81,17 @@ export default async function LorePage(props: { params: Promise<{ slug: string }
   const dbKind = wiki && (page.type === "npc" || page.type === "item" || page.type === "quest") ? page.type : null;
   const names = dbKind ? await loadNames() : null;
   const dbId = dbKind && names ? idForName(dbKind === "npc" ? names.npcs : dbKind === "item" ? names.items : names.quests, page.name) : null;
+  // The archive's body has no headings (the dump is plain text), so the contents are the sections this page adds.
+  const sections: TocItem[] = [
+    ...(dbKind && dbId !== null ? [{ id: "in-database", label: "In the database" }] : []),
+    ...(infoboxEntries.length > 0 ? [{ id: "infobox", label: "Wiki infobox" }] : []),
+    ...(typeSlug || page.categories.length > 0 ? [{ id: "categories", label: "Categories" }] : []),
+  ];
+  const source = (
+    <LoreSource className="" href={page.sourceUrl} wiki={wiki} name={wiki ? undefined : page.sourceUrl.replace(/^https?:\/\//, "").split("/")[0]} licence={page.licence.replace("CC-BY-SA-4.0", "CC BY-SA 4.0")} />
+  );
   return (
-    <Container width="reading">
+    <ReadingLayout items={sections.length > 1 ? sections : []} meta={source}>
       <article>
         <PageHeader
           trail={trail}
@@ -159,8 +168,7 @@ export default async function LorePage(props: { params: Promise<{ slug: string }
             <p>{CONVERSION_NOTE}</p>
           </Explainer>
         )}
-        <LoreSource href={page.sourceUrl} wiki={wiki} name={wiki ? undefined : page.sourceUrl.replace(/^https?:\/\//, "").split("/")[0]} licence={page.licence.replace("CC-BY-SA-4.0", "CC BY-SA 4.0")} />
       </article>
-    </Container>
+    </ReadingLayout>
   );
 }

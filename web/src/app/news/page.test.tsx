@@ -57,7 +57,8 @@ test("a post page shows the byline, the body with its links and tokens, the sour
   expect(html).toContain("Test Post");
   expect(html).toMatch(/<span data-author(?:="[^"]*")?>Test Author<\/span>/);
   expect(html).toContain('<time dateTime="2026-10-24">October 24, 2026</time>');
-  expect(html).toContain('Updated <time dateTime="2026-10-25">October 25, 2026</time>');
+  expect(html).toContain('<dt class="font-mono text-xs text-muted">Updated</dt><dd class="text-fg-2 [overflow-wrap:anywhere]"><time dateTime="2026-10-25">October 25, 2026</time>');
+  expect(html).toContain("data-reading-layout");
   expect(html).toContain('href="/database/items"');
   expect(html).toContain('<a href="/database/items/2589">Rough Copper Vest</a>');
   expect(html).toContain('<a href="/wiki/test-dungeon">Test Dungeon</a>');

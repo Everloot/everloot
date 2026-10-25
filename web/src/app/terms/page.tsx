@@ -5,7 +5,7 @@ import { KEYS_PER_ACCOUNT } from "@/lib/api-keys";
 import { CC_BY_SA, CONTACT_EMAIL, NON_AFFILIATION, OPERATOR, TRADEMARK_LINE } from "@/lib/jsonld";
 import { REPO_URL } from "@/lib/source";
 import { trailFor } from "@/lib/breadcrumbs";
-import { Container, PageHeader, Prose, SectionHeading, TocLayout, type TocItem } from "@/components/ui";
+import { Container, PageHeader, Prose, SectionHeading, ReadingLayout, type TocItem } from "@/components/ui";
 
 const description = "The terms for using everloot.app, its API and MCP server, and the Everloot addon: your uploads, free API keys, licences, takedowns and warranty.";
 
@@ -47,7 +47,7 @@ export default function TermsPage() {
       <Container width="reading">
         <PageHeader trail={trailFor("/terms")!} title="Terms of Use" meta={<span>Last updated: {UPDATED}</span>} />
       </Container>
-      <TocLayout items={SECTIONS}>
+      <ReadingLayout items={SECTIONS}>
         <Prose>
           <p>
             These terms cover everloot.app, its APIs and MCP server, the Everloot addon and the companion (together,
@@ -218,7 +218,7 @@ export default function TermsPage() {
             </p>
           </Section>
         </Prose>
-      </TocLayout>
+      </ReadingLayout>
     </article>
   );
 }

@@ -3,7 +3,7 @@ import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import JsonLd from "@/components/JsonLd";
 import { TOOL_LINES, toolGroups } from "@/data/tools";
-import { Container, PageHeader, SectionHeading } from "@/components/ui";
+import { PageHeader, ReadingLayout, SectionHeading } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import { guildsOn } from "@/lib/guild-switch";
 import { aboutPageJsonLd, DISCORD_INVITE, NON_AFFILIATION, OPERATOR, TRADEMARK_LINE } from "@/lib/jsonld";
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 
 export default function AboutPage() {
   return (
-    <Container width="reading">
+    <ReadingLayout items={[{ id: "the-tools", label: "The tools" }, { id: "free", label: "How it stays free" }, { id: "blizzard", label: "Not affiliated with Blizzard" }]}>
       <JsonLd data={aboutPageJsonLd({ name: TITLE, description, path: "/about" })} />
       <PageHeader title={TITLE} lede={description} trail={trailFor("/about")!} />
 
@@ -73,6 +73,6 @@ export default function AboutPage() {
           </p>
         </section>
       </div>
-    </Container>
+    </ReadingLayout>
   );
 }

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import JsonLd from "@/components/JsonLd";
-import { Card, Container, SectionHeading } from "@/components/ui";
+import { Card, RailFacts, ReadingLayout, SectionHeading } from "@/components/ui";
 import { longDate } from "@/data/wow-forever";
 import { GAME_LABEL, TYPE_LABEL, loadTimeline, loadWriteups, postIdOfSegment, postPath, writeupFor, type BlueWriteup, type ChangeEntry } from "@/lib/changes";
 import { loadSiteAssets } from "@/lib/game-assets";
@@ -142,7 +142,7 @@ export default async function BluePostPage(props: Props) {
   const copies = entry.copies ?? [];
 
   return (
-    <Container width="reading">
+    <ReadingLayout meta={<RailFacts items={[{ label: "Source", value: entry.url ? <a href={entry.url} rel="noopener" className={LINK}>{sourceLabel(entry)}, original post</a> : sourceLabel(entry) }, ...(writeup ? [{ label: "Notes reviewed", value: <time dateTime={writeup.reviewed.on}>{longDate(writeup.reviewed.on)}</time> }] : [])]} />}>
       <article data-blue-post>
         <JsonLd data={breadcrumbJsonLd([{ name: "Home", path: "/" }, { name: "Patch notes and Blizzard posts", path: "/changes" }, { name: entry.title, path }])} />
         {writeup && (
@@ -208,6 +208,6 @@ export default async function BluePostPage(props: Props) {
           <PostList id="same-day" title="Same day" entries={sameDay} />
         </div>
       </article>
-    </Container>
+    </ReadingLayout>
   );
 }

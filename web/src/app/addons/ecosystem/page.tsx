@@ -91,7 +91,7 @@ export default async function EcosystemPage() {
   const boards = buildBoards(view, new Date());
   const issueUrl = `${REPO_URL}/issues/new?template=ecosystem-project.yml`;
   return (
-    <Container width="wide">
+    <Container width="data">
       <article>
         <PageHeader
           trail={trailFor("/addons/ecosystem")!}

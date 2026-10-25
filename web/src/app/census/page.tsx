@@ -167,7 +167,7 @@ export default async function CensusPage({ searchParams }: { searchParams?: Prom
   const w = view?.windows[chosen];
   const ready = !unreachable && view && w;
   return (
-    <Container width="wide">
+    <Container width="data">
       <article>
         <PageHeader
           trail={trailFor("/census")!}

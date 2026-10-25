@@ -45,7 +45,7 @@ export default async function GuildFamilyPage(props: { params: Promise<{ slug: s
   const answer = (value: "answers" | "refused") => (value === "answers" ? "Answers" : "Refused");
 
   return (
-    <Container width="wide">
+    <Container width="data">
       <article>
         <PageHeader
           trail={[{ name: "Home", path: "/" }, { name: `${family.name} family`, path: `/guilds/${family.slug}` }]}

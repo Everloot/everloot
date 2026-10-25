@@ -10,7 +10,7 @@ import { pageMetadata } from "@/lib/seo";
 import { REPO_URL } from "@/lib/source";
 import { CREDIT } from "@/lib/talents/assets";
 import { MAP_SOURCE } from "@/lib/world-map";
-import { Container, PageHeader, SectionHeading } from "@/components/ui";
+import { PageHeader, ReadingLayout, SectionHeading, type TocItem } from "@/components/ui";
 
 const description =
   "How Everloot turns addon uploads into WoW Forever facts: three installs must agree, addresses are never published, and names only on the player pages.";
@@ -19,11 +19,21 @@ export const metadata: Metadata = pageMetadata({ title: "How We Count WoW Foreve
 
 const link = "text-accent hover:underline underline-offset-4";
 
+const SECTIONS: TocItem[] = [
+  { id: "three", label: "Three installs have to agree" },
+  { id: "zero", label: "Unrecorded is not zero" },
+  { id: "never", label: "What we never publish" },
+  { id: "files", label: "Game files and play are kept apart" },
+  { id: "population", label: "Population numbers" },
+  { id: "guilds", label: "How guilds are counted" },
+  { id: "credits", label: "Credits" },
+];
+
 export default async function MethodologyPage() {
   // The art's build comes from the asset manifest, only when the asset URL is set.
   const assets = await loadSiteAssets();
   return (
-    <Container width="reading">
+    <ReadingLayout items={SECTIONS}>
       <PageHeader
         title="How we count"
         lede="Every fact on Everloot comes from players running the Everloot addon and choosing to upload what it recorded."
@@ -197,6 +207,6 @@ export default async function MethodologyPage() {
           </ul>
         </section>
       </div>
-    </Container>
+    </ReadingLayout>
   );
 }
