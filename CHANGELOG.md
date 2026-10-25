@@ -20,9 +20,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   runs in CI), written in the wiki's syntax so they link database entities and wiki pages the same way. Published
   posts appear at `/news` and `/news/<slug>` with Article structured data, in the `/news/feed.xml` RSS feed, in the
   sitemap and in llms.txt; a draft is built nowhere. Blizzard's own posts stay on `/changes`, which the hub links.
-- Addon: while `/everloot players` is on, a boss kill inside a dungeon or raid with your character in a guild writes
-  a `guild_kill` row (guild, realm, faction, encounter, instance, time; no name), at most 60 a UTC day;
-  `/everloot players off` deletes them with the player rows. Design: `docs/design/specs/2026-10-24-guild-board-design.md`.
 - Site, behind `EVERLOOT_GUILDS` (off): `/guilds`, a ladder per raid from the kills two members' installs agree on
   (bosses killed, then first to the latest kill; no score), with guild search and realm and faction filters;
   `/guilds/<realm>/<guild>` with progression per instance, the officers' roster and the characters seen in the guild
@@ -129,6 +126,20 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   agree. Fishing (the bobber, or an object installs agree is fished) is never a pin. An upload of an event
   that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
   instead of withdrawing the event as a conflict. The map shows none of this yet.
+
+## [0.3.12] - 2026-10-24
+
+Release channel: Alpha
+
+Live-client verification is pending. This is a pre-release for WoW: Forever 1.60.1, not a verified stable build.
+
+### Added
+- While `/everloot players` is on, a boss kill inside a dungeon or raid with your character in a guild writes a
+  `guild_kill` row: guild, realm, faction, encounter, instance and time, never a character name. At most 60 a UTC
+  day; `/everloot players off` deletes them with the player rows. The players module now also reads
+  `UnitFactionGroup` (the guild's faction) and `GetInstanceInfo` (the instance the kill was in), on your own
+  character only. The site's guild ladder, built from these rows, stays off until its switch is turned on.
+  Design: `docs/design/specs/2026-10-24-guild-board-design.md`.
 
 ## [0.3.11] - 2026-10-24
 
