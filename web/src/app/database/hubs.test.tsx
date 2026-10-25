@@ -43,3 +43,16 @@ test("with storage down the instance index is still counted from the game files,
   const page = renderToStaticMarkup(await DatabasePage());
   expect(row(page, "/database/instances")).toContain(`>${instanceRows().size}<`);
 });
+
+test("before launch the players column says when recording starts; after launch the line is gone", async () => {
+  store.loadCorpus.mockResolvedValue({ uploads: 0, dataAsOf: null, records: [] });
+  vi.useFakeTimers({ toFake: ["Date"] });
+  try {
+    vi.setSystemTime(new Date("2026-10-25T12:00:00Z"));
+    expect(renderToStaticMarkup(await DatabasePage())).toContain("The addon starts recording when the game launches on November 4, 2026.");
+    vi.setSystemTime(new Date("2026-11-10T12:00:00Z"));
+    expect(renderToStaticMarkup(await DatabasePage())).not.toContain("The addon starts recording");
+  } finally {
+    vi.useRealTimers();
+  }
+});
