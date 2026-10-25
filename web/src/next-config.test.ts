@@ -89,8 +89,8 @@ test("the pages that hold chat keys and the account enforce the strict policy; e
     expect(isProtectedPath(path), path).toBe(true);
     const got = await headersFor(path);
     expect(directives(got["Content-Security-Policy"]!)["script-src"], path).toEqual(["'self'", "'unsafe-inline'"]);
-    // Every other header the site sends stays as it is.
-    expect({ ...got, "Content-Security-Policy": "" }, path).toEqual({ ...site, "Content-Security-Policy": "" });
+    // Every other header the site sends stays as it is (Chat's microphone rule is checked below).
+    expect({ ...got, "Content-Security-Policy": "", "Permissions-Policy": "" }, path).toEqual({ ...site, "Content-Security-Policy": "", "Permissions-Policy": "" });
   }
   for (const path of PUBLIC) {
     expect(isProtectedPath(path), path).toBe(false);
@@ -110,4 +110,23 @@ test("the strict policy loads scripts from this site only, and connects only to 
   expect(csp["object-src"]).toEqual(["'none'"]);
   expect(csp["base-uri"]).toEqual(["'self'"]);
   expect(csp["frame-ancestors"]).toEqual(["'self'"]);
+});
+
+/** The features a Permissions-Policy header grants, by name. */
+const features = (policy: string) => Object.fromEntries(policy.split(/,\s*/).map((f) => f.trim().split("=") as [string, string]));
+
+test("Chat may ask for the microphone (dictation); every other page, the account and settings included, may not", async () => {
+  const site = features((await headersFor("/"))["Permissions-Policy"]!);
+  expect(site["microphone"]).toBe("()");
+  for (const path of ["/chat", "/chat/anything", "/beta/chat", "/beta/chat/anything"]) {
+    const got = await headersFor(path);
+    expect(features(got["Permissions-Policy"]!), path).toEqual({ ...site, microphone: "(self)" });
+    // One header, not a second spelling of it.
+    expect(Object.keys(got).filter((k) => k.toLowerCase() === "permissions-policy"), path).toEqual(["Permissions-Policy"]);
+    // The strict policy those pages get is unchanged.
+    expect(got["Content-Security-Policy"], path).toBe((await headersFor("/account"))["Content-Security-Policy"]);
+  }
+  for (const path of ["/", "/account", "/settings", "/beta/account", "/beta/settings", "/ptr/chat", "/chatter", "/beta", "/beta/wiki", "/database/items/2589", "/sign-in"]) {
+    expect(features((await headersFor(path))["Permissions-Policy"]!), path).toEqual(site);
+  }
 });

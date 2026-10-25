@@ -43,13 +43,20 @@ const protectedCsp = [
 ].join("; ");
 const servedPrefix = versions.prefixes[versions.served] ?? "";
 // `/chat/:path*` matches /chat itself too.
-const protectedSources = protectedPaths.flatMap((p) => [`${p}/:path*`, ...(servedPrefix ? [`${servedPrefix}${p}/:path*`] : [])]);
+const servedSources = (p) => [`${p}/:path*`, ...(servedPrefix ? [`${servedPrefix}${p}/:path*`] : [])];
+const protectedSources = protectedPaths.flatMap(servedSources);
+
+const permissionsPolicy = (microphone) => `camera=(), microphone=${microphone}, geolocation=(), payment=(), usb=(), browsing-topics=()`;
+// Chat's dictation (components/chat/Dictation.tsx) uses the browser's speech recognition, which needs the
+// microphone. This lets Chat's own document ask the player; it grants nothing by itself. Every other page,
+// /account and /settings included, keeps it blocked.
+const microphoneSources = servedSources("/chat");
 
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()" },
+  { key: "Permissions-Policy", value: permissionsPolicy("()") },
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
   { key: "Content-Security-Policy", value: enforcedCsp },
   { key: "Content-Security-Policy-Report-Only", value: reportOnlyCsp },
@@ -141,6 +148,8 @@ const nextConfig = {
       { source: "/:path*", headers: securityHeaders },
       // After the rule above: the later rule's value for the same header is the one sent.
       ...protectedSources.map((source) => ({ source, headers: [{ key: "Content-Security-Policy", value: protectedCsp }] })),
+      // The same key's spelling, so it replaces the site's value rather than adding a second header.
+      ...microphoneSources.map((source) => ({ source, headers: [{ key: "Permissions-Policy", value: permissionsPolicy("(self)") }] })),
       // These pages read no cookies, so the CDN can serve them. Next overwrites Cache-Control on
       // dynamic pages, so the CDN-specific headers are used.
       { source: "/database/items", headers: databaseItemsCdnHeaders },
