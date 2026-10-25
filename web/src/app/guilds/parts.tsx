@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import type { GuildFaction } from "../../../../kb/src/guilds";
 import { factionLabel, guildIndexingOn } from "@/lib/guilds";
 
-export const link = "text-accent hover:underline underline-offset-4";
+export const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 export const number = (n: number) => n.toLocaleString("en-US");
 /** The day of an ISO time, the only part a guild page shows. */
 export const day = (iso: string | null) => (iso ? iso.slice(0, 10) : "");

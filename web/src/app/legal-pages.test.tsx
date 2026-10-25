@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test, vi } from "vitest";
 import { REPO_URL } from "@/lib/source";
-import { toolHref, tools } from "@/data/tools";
+import { TOOL_GROUPS } from "@/data/tools";
 
 vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a>,
@@ -77,8 +77,8 @@ test("/.well-known/security.txt follows RFC 9116 and has not expired", () => {
 test("/about links every tool at the address it lives at, not a slug that redirects or 404s", async () => {
   const { default: About } = await import("./about/page");
   const html = renderToStaticMarkup(<About />);
-  for (const t of tools) expect(html, t.slug).toContain(`href="${toolHref(t)}"`);
-  expect(html).not.toContain('href="/tools/upload"');
+  for (const l of TOOL_GROUPS.flatMap((g) => g.links)) expect(html, l.href).toContain(`href="${l.href}"`);
+  for (const slug of ["upload", "completionist", "guild-tracker"]) expect(html).not.toContain(`href="/tools/${slug}"`);
 });
 
 test("/accessibility says what is in place, what was checked and when, what was not, and how to report", async () => {

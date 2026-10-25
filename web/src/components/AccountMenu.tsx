@@ -278,7 +278,7 @@ export function AvatarMenu({ name, initialShell = null, profiles = false, savedB
             <a href="/account" className="block truncate font-semibold text-fg hover:underline underline-offset-4">{shown}</a>
             {shell && (shell.handle
               ? <p className="truncate text-sm text-muted">@{shell.handle}</p>
-              : <a href="/settings" className="text-sm text-accent hover:underline underline-offset-4">Choose a handle</a>)}
+              : <a href="/settings" className="text-sm text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Choose a handle</a>)}
           </div>
           {shell && (
             <button

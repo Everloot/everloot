@@ -9,9 +9,9 @@ export default function ServerError() {
       <h1 className="text-3xl font-bold text-fg">Lore archive unavailable</h1>
       <p className="text-fg-2">The lore archive couldn&apos;t load right now. Try again in a few minutes.</p>
       <p className="text-sm">
-        <a href="" className="text-accent hover:underline underline-offset-4">Try again</a>
+        <a href="" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Try again</a>
         {" · "}
-        <Link href="/lore" className="text-accent hover:underline underline-offset-4">Lore archive</Link>
+        <Link href="/lore" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Lore archive</Link>
       </p>
     </article>
   );

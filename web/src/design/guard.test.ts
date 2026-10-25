@@ -138,6 +138,14 @@ const RULES: Rule[] = [
     spares: ["text-muted", "bg-canvas/60"],
   },
   {
+    // The accent is a lime close to the uncommon item green (#1EFF00), so a lime link reads as an uncommon
+    // item name. Links are `text-fg` with an underline; the accent stays on fills, focus rings and counts.
+    name: "accent text link",
+    pattern: new RegExp(`^(?=.*${START}underline${END}).*(?:^|[\\s"'\\x60])text-accent${END}`),
+    bites: ['className="text-accent hover:underline underline-offset-4"', "text-accent underline", 'className="underline text-accent"'],
+    spares: ["text-fg underline decoration-edge underline-offset-4 hover:decoration-fg", 'className="text-accent font-semibold"', "underline hover:text-accent"],
+  },
+  {
     // Opacity that dims content; disabled states and fully shown or hidden are fine.
     name: "dimmed with opacity",
     pattern: new RegExp(`(?:^|[\\s"'\\x60])(?!(?:[a-z0-9-]+:)*(?:aria-|group-|peer-)?disabled:)(?:[a-z0-9-]+:)*!?opacity-(?:[1-9]\\d?|\\[[^\\]]*\\])${END}`),

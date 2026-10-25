@@ -33,7 +33,7 @@ export function Entry({ title, href, as: Tag = "h2", meta, actions, children }: 
     <li data-entry className="min-w-0 space-y-2 p-4 sm:p-6">
       {meta && <p className="font-mono text-xs text-muted">{meta}</p>}
       <Tag className="text-lg font-semibold leading-snug text-fg [overflow-wrap:anywhere]">
-        {href ? <Link href={href} className="text-accent hover:underline underline-offset-4">{title}</Link> : title}
+        {href ? <Link href={href} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{title}</Link> : title}
       </Tag>
       {children && <div className="space-y-2 text-sm text-fg-2">{children}</div>}
       {actions && <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">{actions}</div>}

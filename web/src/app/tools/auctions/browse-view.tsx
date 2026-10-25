@@ -201,7 +201,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
     const empty = (
       <div className="flex flex-wrap items-center gap-2 py-4 text-cell text-fg-2">
         <span>No items match these filters.</span>
-        <Link href={clearHref} className="text-accent hover:underline underline-offset-4">Clear filters</Link>
+        <Link href={clearHref} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Clear filters</Link>
       </div>
     );
     body = (

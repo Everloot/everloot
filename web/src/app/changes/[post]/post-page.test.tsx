@@ -152,14 +152,17 @@ test("newer and older step through the same game's posts, skipping builds and co
   expect(top).toContain(`href="/changes/${CANONICAL}"`);
 });
 
-test("without a write-up the notes card says so in our words, and the original is the one button", async () => {
+test("without a write-up there is no notes card at all, and the original is the one button", async () => {
   const html = await page(CANONICAL);
-  expect(html).toContain('data-no-notes="true"');
-  expect(html).toContain("None yet. A maintainer writes them after reading the full post");
+  expect(html).not.toContain("data-no-notes");
+  expect(html).not.toContain("Our notes");
+  expect(html).not.toContain("None yet");
   expect(html).toMatch(/<a data-original="true" href="[^"]+" rel="noopener" class="btn">/);
   expect(html).toContain('href="/changes"');
   data.writeups = new Map([[writeup.postId, writeup]]);
-  expect(await page(CANONICAL)).not.toContain("data-no-notes");
+  const written = await page(CANONICAL);
+  expect(written).toContain("data-writeup");
+  expect(written).toContain("Our notes");
 });
 
 test("a regional copy's address moves (308) to the announcement's page", async () => {

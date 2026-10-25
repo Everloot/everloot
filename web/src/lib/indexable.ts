@@ -1,3 +1,4 @@
+import { isDevelopmentItemName } from "../../../kb/src/dev-item-names";
 import { itemHasFacts, npcHasFacts, objectHasFacts, questHasFacts, vendorHasFacts } from "../../../kb/src/page-urls";
 import type { ItemPage } from "../../../kb/src/item-page";
 import type { ObjectPage } from "../../../kb/src/object-page";
@@ -10,9 +11,12 @@ import type { ShownItemName } from "./items";
  * reach a page has no player facts to show, so only an item named under the item name rule stays indexed.
  */
 
-/** Players reported the item (an agreed name, a public drop or a pin), or a source names it in the current build. */
+/**
+ * Players reported the item (an agreed name, a public drop or a pin), or a source names it in the current build.
+ * Never a development leftover: its page stays reachable by id, but search has no use for it.
+ */
 export const itemIndexable = (page: ItemPage, unreachable: boolean, name: ShownItemName | null): boolean =>
-  (!unreachable && itemHasFacts(page)) || name?.source === "wiki" || name?.source === "files";
+  !isDevelopmentItemName(name?.name) && ((!unreachable && itemHasFacts(page)) || name?.source === "wiki" || name?.source === "files");
 
 export const npcIndexable = (page: NpcPage, unreachable: boolean): boolean => !unreachable && npcHasFacts(page);
 

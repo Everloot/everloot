@@ -45,7 +45,7 @@ export default async function CharacterPage({ params }: Params) {
       <DataTitle
         title={<span className={CLASS_TEXT[character.classSlug] ?? "text-fg"}>{character.name}</span>}
         meta={[className(character.classSlug), character.realm, character.note].filter(Boolean).join(" · ")}
-        aside={<Link href="/me" className="text-meta text-accent hover:underline underline-offset-4">All my builds</Link>}
+        aside={<Link href="/me" className="text-meta text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">All my builds</Link>}
       />
       {builds.length === 0 ? (
         <EmptyState
