@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import AdSlot from "@/components/AdSlot";
 import JsonLd from "@/components/JsonLd";
 import { PageHeader, Prose, ReadingLayout, type TocItem } from "@/components/ui";
 import { longDate } from "@/data/wow-forever";
@@ -30,6 +31,9 @@ export function generateStaticParams() {
 
 const LINK = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 const RELATED = 3;
+/** The in-article ad goes after this many paragraphs, and only in a post with at least one more after it. */
+const AD_AFTER_PARAGRAPH = 3;
+const AD_MIN_PARAGRAPHS = 4;
 /** Article type: 17 px body at a 1.75 line height, brighter text, larger title and section headings. */
 const ARTICLE = "text-[17px] leading-[1.75] [&_[data-prose]]:max-w-none [&_[data-prose]]:text-fg [&_[data-prose]>*+*]:mt-5 [&_h1]:text-[28px] [&_h1]:leading-tight sm:[&_h1]:text-[36px]";
 
@@ -61,6 +65,9 @@ export default async function NewsArticle(props: { params: Promise<{ slug: strin
   const related = relatedPosts(news, post, body.relatedSlugs, RELATED);
   const sources = sourceNames(post);
   const minutes = readingMinutes(post.blocks);
+  // Index of the block after which the in-article ad sits; -1 for a short post, which gets none.
+  const paragraphs = body.blocks.flatMap((b, i) => (b.type === "paragraph" ? [i] : []));
+  const adAfter = paragraphs.length >= AD_MIN_PARAGRAPHS ? paragraphs[AD_AFTER_PARAGRAPH - 1] : -1;
 
   // Contents from the body's own headings; a post with fewer than two needs none. Sources and Related appear once each.
   const headings = body.blocks.flatMap((b, i) => (b.type === "heading" ? [{ i, id: anchor(i, b.text), label: b.text }] : []));
@@ -86,7 +93,7 @@ export default async function NewsArticle(props: { params: Promise<{ slug: strin
 
   return (
     <div data-news-article className={`mx-auto w-full max-w-[66rem] ${ARTICLE}`}>
-      <ReadingLayout items={toc}>
+      <ReadingLayout items={toc} rail={<AdSlot slot="sidebar" />}>
         <JsonLd data={newsArticleJsonLd({ title: post.title, description: postDescription(post), path, published: post.published, modified: lastChanged(post), author: post.author, ...(post.hero ? { image: post.hero.share ?? post.hero.src } : {}) })} />
         <article data-news-post>
           <PageHeader trail={trail} title={post.title} lede={<span className="text-base leading-relaxed">{post.summary}</span>} />
@@ -106,9 +113,10 @@ export default async function NewsArticle(props: { params: Promise<{ slug: strin
             <Prose>
               {body.blocks.map((b, i) => {
                 const heading = headings.find((h) => h.i === i);
-                return heading
+                const el = heading
                   ? <h2 key={i} id={heading.id} className="scroll-mt-24 !mt-10 text-[22px] font-semibold leading-snug text-fg sm:text-[24px]">{heading.label}</h2>
                   : <WikiBlock key={i} block={b} ctx={ctx} />;
+                return i === adAfter ? [el, <div key="ad-in-article" data-ad-in-article><AdSlot slot="inContent" /></div>] : el;
               })}
             </Prose>
           </div>
@@ -121,6 +129,8 @@ export default async function NewsArticle(props: { params: Promise<{ slug: strin
               </ul>
             </section>
           )}
+
+          <div data-ad-end-of-article><AdSlot slot="inContent" /></div>
 
           {related.length > 0 && (
             <section aria-labelledby="related" className="mt-12 border-t border-line pt-8">

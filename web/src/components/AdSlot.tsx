@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 export const AD_SLOTS = {
   /** Below the facts on database pages, the patch notes and the home page. */
   inContent: "6833061644",
-  /** Reserved for a desktop sidebar; no page has one yet. */
+  /** The desktop-only sidebar on news posts (ReadingLayout rail, hidden below lg). */
   sidebar: "7165243291",
   /** Directly below a tool (talents, raid planner, gold calculator, professions). */
   belowTool: "9300452042",

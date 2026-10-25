@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import AdSlot from "@/components/AdSlot";
 import { Container, PageHeader, SectionHeading } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import { hubIndexable, loadNews, publishedPosts } from "@/lib/news";
@@ -11,6 +12,8 @@ export const revalidate = 3600;
 
 const DESCRIPTION = "What is new on Everloot and what it means for WoW: Forever players: site updates, data milestones and launch notes, in Everloot's own words.";
 const LEDE = "What is new on Everloot and what it means for players, newest first.";
+/** The in-feed ad follows this many cards in the grid (the featured post not counted). */
+const FEED_AD_AFTER = 6;
 const LINK = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -34,9 +37,13 @@ export default function NewsHub() {
             <div data-news-post><FeaturedNewsCard post={posts[0]} /></div>
             {posts.length > 1 && (
               <ol className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {posts.slice(1).map((p) => (
-                  <li key={p.slug} data-news-post><NewsCard post={p} /></li>
-                ))}
+                {posts.slice(1).flatMap((p, i) => {
+                  const card = <li key={p.slug} data-news-post><NewsCard post={p} /></li>;
+                  // Only between cards: a grid with no card after the sixth gets no ad.
+                  return i === FEED_AD_AFTER - 1 && posts.length > FEED_AD_AFTER + 1
+                    ? [card, <li key="ad-in-feed" data-ad-in-feed className="col-span-full empty:hidden"><AdSlot slot="inContent" /></li>]
+                    : [card];
+                })}
               </ol>
             )}
           </>

@@ -135,3 +135,26 @@ test("posts with a hero get card thumbnails, a featured card and the share image
   const fallback = await generateMetadata({ params: Promise.resolve({ slug: "mid-one" }) });
   expect(fallback.openGraph?.images).toEqual([{ url: "/news/heroes/mid-one/clean.webp", width: 1600, height: 900, alt: "The mid art" }]);
 });
+
+test("news ad units: sidebar on posts, in-article only after the third paragraph of a long post, one before related", async () => {
+  fixtures();
+  vi.stubEnv("NEXT_PUBLIC_ADSENSE_CLIENT", "ca-pub-test");
+  const { default: NewsArticle } = await import("./[slug]/page");
+  const { AD_SLOTS } = await import("@/components/AdSlot");
+  const html = renderToStaticMarkup(await NewsArticle({ params: Promise.resolve({ slug: "test-post" }) }));
+  expect(html).toContain("data-reading-rail");
+  expect(html).toContain(`data-ad-slot="${AD_SLOTS.sidebar}"`);
+  expect(html).toContain("data-ad-end-of-article");
+  const end = html.indexOf("data-ad-end-of-article");
+  const related = html.indexOf('id="related"');
+  if (related >= 0) expect(end).toBeLessThan(related);
+  const paragraphs = (html.split("data-ad-in-article")[0].match(/<p[ >]/g) ?? []).length;
+  if (html.includes("data-ad-in-article")) expect(paragraphs).toBeGreaterThanOrEqual(3);
+});
+
+test("no ad markup at all without an AdSense client", async () => {
+  fixtures();
+  const { default: NewsArticle } = await import("./[slug]/page");
+  const html = renderToStaticMarkup(await NewsArticle({ params: Promise.resolve({ slug: "test-post" }) }));
+  expect(html).not.toContain("adsbygoogle");
+});
