@@ -46,6 +46,9 @@ async function drop(text: string, name = "Everloot.lua") {
   await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
 }
 
+const TWO = LUA.replace(`["money_event"] = {`, `["money_event"] = {
+      { ["capturedAt"] = "${today}T00:00:04Z", ["character"] = "Jaina", ["realm"] = "Moon Guard", ["category"] = "auction", ["copper"] = 777 },`);
+
 const remember = () => [...container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')][0]!;
 
 test("without a file it says where the file is and that it stays here", async () => {
@@ -95,4 +98,29 @@ test("Remember keeps the summary, not the file, and Forget clears it", async () 
   await act(async () => { forget.click(); });
   expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
   expect(container.textContent).not.toContain("123g 45s 67c");
+});
+
+test("choosing a character narrows the week, categories and receipts to them and names them", async () => {
+  await act(async () => root.render(<LocalLedger />));
+  await drop(TWO);
+  const select = container.querySelector<HTMLSelectElement>("select")!;
+  expect(select.labels?.[0]?.textContent).toBe("Character");
+  expect([...select.options].map((o) => o.textContent)).toEqual(["All characters", "Thrall (Moon Guard)", "Jaina (Moon Guard)"]);
+  const notes = () => container.textContent!;
+  const receipts = () => [...container.querySelectorAll('[aria-labelledby="ledger-receipts"] tbody tr')].map((tr) => tr.textContent);
+  expect(notes()).toContain("The last 7 days, all characters.");
+  expect(receipts()).toHaveLength(3);
+
+  await act(async () => {
+    select.value = "Thrall-Moon Guard";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  expect(notes()).toContain("The last 7 days, Thrall (Moon Guard).");
+  expect(notes()).toContain("Every money event in the file, Thrall (Moon Guard).");
+  expect(notes()).not.toContain("all characters");
+  expect(receipts()).toHaveLength(2);
+  expect(receipts().join(" ")).not.toContain("Jaina");
+  expect(notes()).not.toContain("7s 77c");
+  // The Characters table stays whole.
+  expect(container.querySelector('[aria-labelledby="ledger-roster"]')!.textContent).toContain("Jaina");
 });

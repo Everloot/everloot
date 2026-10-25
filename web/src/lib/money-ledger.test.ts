@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { parseEverlootLua } from "./sv-parse";
-import { HISTORY_POINTS, RIVER_DAYS, categoryLabel, directionOf, isMoneyLedger, summarizeMoney, thin } from "./money-ledger";
+import { HISTORY_POINTS, RIVER_DAYS, categoryLabel, characterKey, directionOf, isMoneyLedger, narrowLedger, summarizeMoney, thin } from "./money-ledger";
 
 const NOW = Date.parse("2026-10-24T12:00:00Z");
 const gold = (character: string, capturedAt: string, currentCopper: number, peakCopper = currentCopper) =>
@@ -90,6 +90,35 @@ describe("summarizeMoney", () => {
     expect(back).toEqual(ledger);
     expect(isMoneyLedger({ roster: [] })).toBe(false);
     expect(isMoneyLedger(null)).toBe(false);
+  });
+});
+
+describe("narrowLedger", () => {
+  const ledger = summarizeMoney(RECORDS, NOW);
+  const thrall = narrowLedger(ledger, characterKey({ character: "Thrall", realm: "Moon Guard" }));
+
+  test("week, river, categories, receipts and history hold only that character", () => {
+    expect(thrall.week).toEqual({ in: 11_800, out: 0, net: 11_800 });
+    expect(thrall.river.reduce((s, d) => s + d.in + d.out, 0)).toBe(11_800);
+    expect(thrall.categories.map((c) => [c.category, c.copper, c.events])).toEqual([["quest", 10_000, 1], ["loot", 1_500, 1], ["vendor", 300, 1]]);
+    expect(thrall.eventCount).toBe(3);
+    expect(thrall.receipts.map((r) => r.character)).toEqual(["Thrall", "Thrall", "Thrall"]);
+    expect(thrall.history.map((s) => [s.character, s.points.map((p) => p.copper)])).toEqual([["Thrall", [50_000, 90_000, 125_000]]]);
+  });
+
+  test("the roster stays whole", () => {
+    expect(thrall.roster).toEqual(ledger.roster);
+  });
+
+  test("the characters' parts add up to the whole", () => {
+    const parts = ledger.roster.map((r) => narrowLedger(ledger, characterKey(r)));
+    expect(parts.reduce((s, p) => s + p.eventCount, 0)).toBe(ledger.eventCount);
+    expect(parts.reduce((s, p) => s + p.week.net, 0)).toBe(ledger.week.net);
+  });
+
+  test("null or an unknown character gives the whole ledger back", () => {
+    expect(narrowLedger(ledger, null)).toBe(ledger);
+    expect(narrowLedger(ledger, "Arthas-Moon Guard")).toBe(ledger);
   });
 });
 

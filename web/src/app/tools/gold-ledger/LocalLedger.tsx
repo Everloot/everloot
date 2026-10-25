@@ -1,9 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Card, DataTable, SectionHeading, type Column } from "@/components/ui";
 import { parseEverlootLua } from "@/lib/sv-parse";
 import {
-  RIVER_DAYS, categoryLabel, isMoneyLedger, summarizeMoney,
+  RIVER_DAYS, categoryLabel, characterKey, isMoneyLedger, narrowLedger, summarizeMoney,
   type CategoryTotal, type GoldSeries, type MoneyLedger, type Receipt, type RiverDay, type RosterRow,
 } from "@/lib/money-ledger";
 import { formatCopper } from "../../../../../kb/src/gold-ledger";
@@ -97,20 +97,36 @@ export default function LocalLedger() {
 }
 
 function LedgerView({ ledger }: { ledger: MoneyLedger }) {
+  const [key, setKey] = useState<string | null>(null);
+  const selectId = useId();
+  const chosen = ledger.roster.find((r) => characterKey(r) === key);
+  const shown = narrowLedger(ledger, key);
+  // "Thrall (Moon Guard)" when one character is chosen, else "all characters".
+  const who = chosen ? `${chosen.character} (${chosen.realm})` : "all characters";
   return (
     <div className="space-y-8">
       <p className="text-sm text-muted">Read {when(ledger.madeAt)}. A missing line means the addon did not record it, not zero.</p>
-      <WeekCard week={ledger.week} />
+      {ledger.roster.length > 1 && (
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <label htmlFor={selectId} className="text-muted">Character</label>
+          <select id={selectId} value={chosen ? characterKey(chosen) : ""} onChange={(e) => setKey(e.target.value || null)}
+            className="min-h-11 rounded-control border border-edge bg-canvas px-3 text-base text-fg">
+            <option value="">All characters</option>
+            {ledger.roster.map((r) => <option key={characterKey(r)} value={characterKey(r)}>{r.character} ({r.realm})</option>)}
+          </select>
+        </div>
+      )}
+      <WeekCard week={shown.week} who={who} />
       <Roster rows={ledger.roster} />
-      <River days={ledger.river} />
-      <Categories rows={ledger.categories} />
-      <Receipts rows={ledger.receipts} total={ledger.eventCount} />
-      <History series={ledger.history} />
+      <River days={shown.river} who={who} />
+      <Categories rows={shown.categories} who={who} />
+      <Receipts rows={shown.receipts} total={shown.eventCount} />
+      <History series={shown.history} />
     </div>
   );
 }
 
-function WeekCard({ week }: { week: MoneyLedger["week"] }) {
+function WeekCard({ week, who }: { week: MoneyLedger["week"]; who: string }) {
   const facts = [
     { label: "Money in", value: formatCopper(week.in) },
     { label: "Money out", value: formatCopper(week.out) },
@@ -118,7 +134,7 @@ function WeekCard({ week }: { week: MoneyLedger["week"] }) {
   ];
   return (
     <Card as="section" aria-labelledby="ledger-week">
-      <SectionHeading id="ledger-week" note="The last 7 days, all characters.">This week</SectionHeading>
+      <SectionHeading id="ledger-week" note={`The last 7 days, ${who}.`}>This week</SectionHeading>
       <dl className="grid grid-cols-3 gap-x-6">
         {facts.map((f) => (
           <div key={f.label} className="min-w-0">
@@ -149,13 +165,13 @@ function Roster({ rows }: { rows: RosterRow[] }) {
   );
 }
 
-function River({ days }: { days: RiverDay[] }) {
+function River({ days, who }: { days: RiverDay[]; who: string }) {
   const high = Math.max(1, ...days.map((d) => Math.max(d.in, d.out)));
   const any = days.some((d) => d.in || d.out);
   const height = (copper: number) => (copper ? `${Math.max(2, Math.round((copper / high) * 64))}px` : "0px");
   return (
     <Card as="section" aria-labelledby="ledger-river">
-      <SectionHeading id="ledger-river" note={`Money in and out per day, the last ${RIVER_DAYS} days (UTC).`}>Money river</SectionHeading>
+      <SectionHeading id="ledger-river" note={`Money in and out per day, the last ${RIVER_DAYS} days (UTC), ${who}.`}>Money river</SectionHeading>
       {!any ? <p className="text-sm text-fg-2">No money events in the last {RIVER_DAYS} days.</p> : (
         <>
           <ol data-river className="flex items-stretch gap-px">
@@ -181,7 +197,7 @@ function River({ days }: { days: RiverDay[] }) {
   );
 }
 
-function Categories({ rows }: { rows: CategoryTotal[] }) {
+function Categories({ rows, who }: { rows: CategoryTotal[]; who: string }) {
   const columns: Column<CategoryTotal>[] = [
     { key: "category", header: "Category", nowrap: true, cell: (r) => categoryLabel(r.category) },
     { key: "direction", header: "In or out", cell: (r) => r.direction },
@@ -190,7 +206,7 @@ function Categories({ rows }: { rows: CategoryTotal[] }) {
   ];
   return (
     <section aria-labelledby="ledger-categories">
-      <SectionHeading id="ledger-categories" note="Every money event in the file, all characters.">Categories</SectionHeading>
+      <SectionHeading id="ledger-categories" note={`Every money event in the file, ${who}.`}>Categories</SectionHeading>
       <DataTable caption="Money per category" columns={columns} rows={rows} rowKey={(r) => r.category}
         empty={<p className="px-4 py-6 text-sm text-fg-2">This file has no money events yet.</p>} />
     </section>
