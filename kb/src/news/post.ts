@@ -26,6 +26,15 @@ export const PostFrontMatter = z.strictObject({
   tags: z.array(slug).max(6).default([]),
   /** Blizzard posts and other evidence, for review and the page's "Sources" list. */
   sources: z.array(z.strictObject({ title: z.string().trim().min(1), url: httpsUrl })).default([]),
+  /**
+   * The post's top image, optional: a site path (`/news/heroes/<slug>.webp`, under web/public) or an https URL,
+   * 16:9, and its alt text. Shown above the body and used as the share image; without it the page keeps the
+   * site's default share image and no top image.
+   */
+  hero: z.strictObject({
+    src: z.string().trim().regex(/^(\/[^\s]*|https:\/\/[^\s]+)$/, "a site path starting with / or an https URL"),
+    alt: z.string().trim().min(1).max(200),
+  }).optional(),
   /** A draft is read but never built, previews included. */
   status: z.enum(["draft", "published"]),
 });

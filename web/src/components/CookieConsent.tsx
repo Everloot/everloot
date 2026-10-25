@@ -36,6 +36,7 @@ export default function CookieConsent({ adsenseClient, analytics = {} }: { adsen
   const heading = useRef<HTMLHeadingElement>(null);
   const trigger = useRef<HTMLElement | null>(null);
   const loaded = useRef<Choices>(NONE);
+  const panel = useRef<HTMLElement>(null);
 
   const apply = (next: Choices) => {
     syncOptionalScripts(next.advertising, adsenseClient, document);
@@ -71,6 +72,18 @@ export default function CookieConsent({ adsenseClient, analytics = {} }: { adsen
     return () => window.removeEventListener(OPEN_PREFERENCES, reopen);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adsenseClient, categoryKey, analytics.gaId, analytics.posthogKey, analytics.posthogHost, analytics.cfBeaconToken, analytics.metricoolHash]);
+
+  // While the banner is open the page gains bottom room of the banner's height, so it never covers the footer.
+  useEffect(() => {
+    const el = panel.current;
+    if (!visible || !el) return;
+    const body = document.body;
+    const pad = () => { body.style.paddingBottom = `${el.getBoundingClientRect().height + 32}px`; };
+    pad();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(pad);
+    observer?.observe(el);
+    return () => { observer?.disconnect(); body.style.paddingBottom = ""; };
+  }, [visible]);
 
   useEffect(() => {
     if (visible && trigger.current) heading.current?.focus();
@@ -110,7 +123,7 @@ export default function CookieConsent({ adsenseClient, analytics = {} }: { adsen
   if (!visible) return null;
   const allRejected = categories.length > 0 && categories.every((c) => choices[c] === "rejected");
   return (
-    <section aria-labelledby="cookie-heading" className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[min(92%,640px)] z-50 rounded-xl border border-line bg-canvas p-4" onKeyDown={(event) => { if (event.key === "Escape" && categories.every((c) => choices[c])) close(); }}>
+    <section ref={panel} data-cookie-banner aria-labelledby="cookie-heading" className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[min(92%,640px)] z-50 rounded-xl border border-line bg-canvas p-4" onKeyDown={(event) => { if (event.key === "Escape" && categories.every((c) => choices[c])) close(); }}>
       <h2 ref={heading} tabIndex={-1} id="cookie-heading" className="font-semibold text-fg">Cookie preferences</h2>
       {categories.length === 0 ? (
         <p className="mt-1 text-sm text-fg">No optional cookies are in use on this site right now.</p>

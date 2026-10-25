@@ -103,3 +103,55 @@ export function renderNewsFeed(posts: NewsPost[], site: { baseUrl: string; now: 
     "",
   ].join("\n");
 }
+
+/** Reading time in whole minutes (at least one), at 220 words a minute over the post's prose. */
+export const readingMinutes = (blocks: Block[]): number => Math.max(1, Math.round(postText(blocks).split(/\s+/).filter(Boolean).length / 220));
+
+/** The publishers a post cites, from its sources' titles ("Blizzard: …" → "Blizzard"), in order, once each. */
+export function sourceNames(post: Pick<NewsPost, "sources">): string[] {
+  const names = post.sources.map((s) => (s.title.includes(":") ? s.title.slice(0, s.title.indexOf(":")) : new URL(s.url).hostname.replace(/^www\./, "")).trim());
+  return [...new Set(names.filter(Boolean))];
+}
+
+const TRAILING = /^(sources|related|related posts|related news|more news|read more)$/i;
+
+/**
+ * The body without the closing link lists the page draws itself: a "Sources" section (when the front matter
+ * has sources, the page lists them once) and any "Related" or "More news" section (the page shows one related
+ * list). A section runs from its heading to the next heading of the same or a higher level. Also returns the
+ * /news/<slug> links those related sections named, so the page can list them first.
+ */
+export function bodyForPage(post: Pick<NewsPost, "blocks" | "sources">): { blocks: Block[]; relatedSlugs: string[] } {
+  const blocks: Block[] = [];
+  const relatedSlugs: string[] = [];
+  let skipping: { level: number; related: boolean } | null = null;
+  for (const b of post.blocks) {
+    if (b.type === "heading") {
+      if (skipping && b.level <= skipping.level) skipping = null;
+      const name = b.text.trim().replace(/:$/, "");
+      if (!skipping && TRAILING.test(name) && (!/^sources$/i.test(name) || post.sources.length > 0)) {
+        skipping = { level: b.level, related: !/^sources$/i.test(name) };
+        continue;
+      }
+    }
+    if (!skipping) { blocks.push(b); continue; }
+    if (skipping.related) {
+      // A related section's link list goes; a call to action under it (a paragraph) stays in the body.
+      if (b.type !== "list") { blocks.push(b); continue; }
+      const runs = b.items.flat();
+      for (const r of runs) if (r.kind === "text") for (const m of r.text.matchAll(/\]\(\/news\/([a-z0-9]+(?:-[a-z0-9]+)*)\)/g)) relatedSlugs.push(m[1]);
+    }
+  }
+  return { blocks, relatedSlugs: [...new Set(relatedSlugs)] };
+}
+
+/** Up to `count` other published posts: the ones the post itself named first, then the newest. */
+export function relatedPosts(news: Map<string, NewsPost>, post: Pick<NewsPost, "slug">, named: string[], count = 3): NewsPost[] {
+  const picked: NewsPost[] = [];
+  for (const slug of named) {
+    const p = publishedPost(news, slug);
+    if (p && p.slug !== post.slug && !picked.includes(p)) picked.push(p);
+  }
+  for (const p of publishedPosts(news)) if (p.slug !== post.slug && !picked.includes(p)) picked.push(p);
+  return picked.slice(0, count);
+}

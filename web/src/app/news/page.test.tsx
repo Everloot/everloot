@@ -55,10 +55,16 @@ test("a post page shows the byline, the body with its links and tokens, the sour
   const html = renderToStaticMarkup(await NewsArticle({ params: Promise.resolve({ slug: "test-post" }) }));
   expect(html).toContain("<h1");
   expect(html).toContain("Test Post");
-  expect(html).toMatch(/<span data-author(?:="[^"]*")?>Test Author<\/span>/);
+  expect(html).toMatch(/<span data-author(?:="[^"]*")?(?: class="[^"]*")?>Test Author<\/span>/);
+  expect(html).toContain("data-reading-time");
+  expect(html).toContain("Source: worldofwarcraft.blizzard.com");
+  // One Sources list and one related list, no "More news".
+  expect(html.match(/id="sources"/g)).toHaveLength(1);
+  expect(html).toContain('id="related"');
+  expect(html).not.toContain("More news");
   expect(html).toContain('<time dateTime="2026-10-24">October 24, 2026</time>');
-  expect(html).toContain('<dt class="font-mono text-xs text-muted">Updated</dt><dd class="text-fg-2 [overflow-wrap:anywhere]"><time dateTime="2026-10-25">October 25, 2026</time>');
-  expect(html).toContain("data-reading-layout");
+  expect(html).toContain('<span>Updated <time dateTime="2026-10-25">October 25, 2026</time></span>');
+  expect(html).toContain("data-news-article");
   expect(html).toContain('href="/database/items"');
   expect(html).toContain('<a href="/database/items/2589">Rough Copper Vest</a>');
   expect(html).toContain('<a href="/wiki/test-dungeon">Test Dungeon</a>');

@@ -39,3 +39,29 @@ test("the feed escapes what it prints and dates the channel by the newest change
   expect(xml).toContain(`<lastBuildDate>${new Date("2026-10-25").toUTCString()}</lastBuildDate>`);
   expect(renderNewsFeed([], { baseUrl: "https://everloot.app", now: new Date("2026-10-26") })).toContain(`<lastBuildDate>${new Date("2026-10-26").toUTCString()}</lastBuildDate>`);
 });
+
+test("the page body drops its own Sources and Related lists and keeps the call to action under them", async () => {
+  const { bodyForPage, relatedPosts, sourceNames, readingMinutes } = await import("./news");
+  const { parsePage } = await import("../../../kb/src/wiki/page");
+  const blocks = parsePage(["---", "slug: x", "---", "Intro.", "## Facts", "- one", "## Related", "- [A](/news/older-post)", "- [Changes](/changes)", "", "**Try:** the [calculator](/tools/talents).", "## Sources", "- [Blizzard: B](https://example.com)"].join("\n")).blocks;
+  const sources = [{ title: "Blizzard: B", url: "https://example.com" }, { title: "Wowhead: C", url: "https://www.wowhead.com/x" }];
+  const body = bodyForPage({ blocks, sources });
+  expect(body.blocks.filter((b) => b.type === "heading").map((b) => (b.type === "heading" ? b.text : ""))).toEqual(["Facts"]);
+  expect(body.blocks.some((b) => b.type === "paragraph" && JSON.stringify(b).includes("calculator"))).toBe(true);
+  expect(body.relatedSlugs).toEqual(["older-post"]);
+  // Without front-matter sources the body's own Sources section stays.
+  expect(bodyForPage({ blocks, sources: [] }).blocks.some((b) => b.type === "heading" && b.text === "Sources")).toBe(true);
+  expect(sourceNames({ sources })).toEqual(["Blizzard", "Wowhead"]);
+  expect(readingMinutes(blocks)).toBe(1);
+  const news = loadNews(FIXTURES);
+  expect(relatedPosts(news, { slug: "test-post" }, ["older-post", "test-draft"], 3).map((p) => p.slug)).toEqual(["older-post"]);
+});
+
+test("a hero is optional and checked", async () => {
+  const { PostFrontMatter } = await import("../../../kb/src/news/post");
+  const base = { slug: "x", title: "T", summary: "S", author: "A", published: "2026-10-25", status: "published" };
+  expect(PostFrontMatter.safeParse(base).success).toBe(true);
+  expect(PostFrontMatter.safeParse({ ...base, hero: { src: "/news/heroes/x.webp", alt: "A hero" } }).success).toBe(true);
+  expect(PostFrontMatter.safeParse({ ...base, hero: { src: "http://x.test/a.png", alt: "A" } }).success).toBe(false);
+  expect(PostFrontMatter.safeParse({ ...base, hero: { src: "/a.png" } }).success).toBe(false);
+});
