@@ -118,6 +118,9 @@ test("nothing uploaded yet: the empty meter, one sentence and a plain addon link
   expect(page).toContain("data-empty-state");
   expect(page).toContain('href="/addon"');
   expect(page).not.toContain("btn");
+  // Nothing to filter yet, so no filter bar; the line says what will appear and when.
+  expect(page).not.toContain("NPC filters");
+  expect(page).toContain("The addon starts recording when the game launches on November 4");
 });
 
 test("the plain lists are indexed, each page under its own URL; any filter, sort or search is noindex with the plain list as canonical", async () => {
