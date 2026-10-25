@@ -100,9 +100,11 @@ describe("Card", () => {
 });
 
 describe("Badge", () => {
-  test("the files badge is a quiet dashed marker, not a pill: a tooltip and a screen-reader label", () => {
+  test("the files badge is a quiet hollow diamond, not a pill or a dotted ring: a tooltip and a screen-reader label", () => {
     const html = render(<Badge tone="files" />);
-    expect(html).toContain("border-dashed");
+    expect(html).toContain("rotate-45");
+    expect(html).not.toContain("border-dashed");
+    expect(html).not.toContain("rounded-full");
     expect(html).not.toContain("rounded-full border px-2.5");
     expect(html).toContain('title="From the game files, not yet confirmed by players"');
     expect(html).toMatch(/<span class="sr-only">unconfirmed<\/span>/);
