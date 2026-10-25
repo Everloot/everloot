@@ -3,6 +3,7 @@
 import { cloneElement, isValidElement, useEffect, useId, useState, type ReactElement } from "react";
 import type { ItemTip as Tip } from "@/lib/game-assets";
 import { CardPopup, GameCard } from "./GameCard";
+import { splitWhy } from "@/lib/placeholder";
 import GameIcon from "./GameIcon";
 
 // An item link with the item's icon in front and the game's tooltip on hover and keyboard focus
@@ -28,7 +29,8 @@ function Tipped({ tip, size, children }: { tip: Tip; size: number; children: Rea
     return () => document.removeEventListener("keydown", close);
   }, [open]);
   const link = isValidElement<{ "aria-describedby"?: string }>(children) ? cloneElement(children, { "aria-describedby": descId }) : children;
-  const lines = [...tip.lines, ...tip.why];
+  const { reasons, evidence } = splitWhy(tip.why);
+  const lines = [...tip.lines, ...evidence];
   return (
     <span
       id={anchorId}
@@ -43,8 +45,8 @@ function Tipped({ tip, size, children }: { tip: Tip; size: number; children: Rea
       {link}
       <span id={descId} hidden>{[`${tip.name}, ${tip.quality}`, ...tip.lines, tip.label].join(". ")}</span>
       {open && (
-        <CardPopup anchor={open.anchor} x={open.x} id={`${anchorId}-tip`} icon={Boolean(tip.icon)}>
-          <GameCard card={{ title: tip.name, color: tip.color, icon: tip.icon, lines, foot: tip.label }} />
+        <CardPopup anchor={open.anchor} x={open.x} id={`${anchorId}-tip`}>
+          <GameCard card={{ title: tip.name, color: tip.color, icon: tip.icon, lines, notes: reasons, foot: tip.label }} />
         </CardPopup>
       )}
     </span>

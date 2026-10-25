@@ -52,7 +52,7 @@ export default function HoverCards() {
   const [open, setOpen] = useState<{ anchor: HTMLAnchorElement; x: number | null; card: SiteCard } | null>(null);
 
   useEffect(() => {
-    let current: { anchor: HTMLAnchorElement; timer: ReturnType<typeof setTimeout>; ctrl: AbortController; described: string | null } | null = null;
+    let current: { anchor: HTMLAnchorElement; timer: ReturnType<typeof setTimeout>; ctrl: AbortController; described: string | null; keyboard: boolean } | null = null;
     let touchedAt = -Infinity;
 
     const close = () => {
@@ -79,7 +79,7 @@ export default function HoverCards() {
         anchor.setAttribute("aria-describedby", described ? `${described} ${CARD_ID}` : CARD_ID);
         setOpen({ anchor, x, card });
       }, SHOW_DELAY);
-      current = { anchor, timer, ctrl, described };
+      current = { anchor, timer, ctrl, described, keyboard: x === null };
     };
 
     const onOver = (e: PointerEvent) => {
@@ -104,13 +104,20 @@ export default function HoverCards() {
     // Escape closes the card wherever focus is; Enter follows the link, so the card goes with the page.
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" || e.key === "Enter") close(); };
 
+    // Scrolling closes a card opened by the pointer, which is no longer over its link. Focus scrolls the link into
+    // view, so a scroll then is how the card was reached: it stays and follows the link.
+    const onScroll = () => {
+      if (current?.keyboard) setOpen((o) => (o ? { ...o } : o));
+      else close();
+    };
+
     document.addEventListener("pointerover", onOver);
     document.addEventListener("pointerout", onOut);
     document.addEventListener("pointerdown", onDown, true);
     document.addEventListener("focusin", onFocus);
     document.addEventListener("focusout", onBlur);
     document.addEventListener("keydown", onKey, true);
-    window.addEventListener("scroll", close, { capture: true, passive: true });
+    window.addEventListener("scroll", onScroll, { capture: true, passive: true });
     window.addEventListener("popstate", close);
     return () => {
       close();
@@ -120,14 +127,14 @@ export default function HoverCards() {
       document.removeEventListener("focusin", onFocus);
       document.removeEventListener("focusout", onBlur);
       document.removeEventListener("keydown", onKey, true);
-      window.removeEventListener("scroll", close, { capture: true });
+      window.removeEventListener("scroll", onScroll, { capture: true });
       window.removeEventListener("popstate", close);
     };
   }, []);
 
   if (!open) return null;
   return (
-    <CardPopup anchor={open.anchor} x={open.x} id={CARD_ID} icon={Boolean(open.card.icon)}>
+    <CardPopup anchor={open.anchor} x={open.x} id={CARD_ID}>
       <GameCard card={open.card} />
     </CardPopup>
   );
