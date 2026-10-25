@@ -10,6 +10,11 @@ sources:
     url: https://news.blizzard.com/en-us/article/24302070/updated-10-22-choose-your-ruleset-in-world-of-warcraft-forever
   - title: "Blizzard forums: Thank You For Testing the WoW Forever Beta"
     url: https://us.forums.blizzard.com/en/wow/t/thank-you-for-testing-the-wow-forever-beta/2390465
+hero:
+  src: /news/heroes/wow-forever-rulesets-explained-pvp-rp-pvp-hardcore/wow-forever-rulesets-explained-pvp-rp-pvp-hardcore-clean.webp
+  alt: "Everloot illustration: a signpost pointing to the WoW: Forever rulesets Normal, PvP, RP, RP-PvP and Hardcore, with the WoW: Forever logo"
+  thumb: /news/heroes/wow-forever-rulesets-explained-pvp-rp-pvp-hardcore/wow-forever-rulesets-explained-pvp-rp-pvp-hardcore-card.webp
+  share: /news/heroes/wow-forever-rulesets-explained-pvp-rp-pvp-hardcore/wow-forever-rulesets-explained-pvp-rp-pvp-hardcore-share.png
 status: published
 ---
 
