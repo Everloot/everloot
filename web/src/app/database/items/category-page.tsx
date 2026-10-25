@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { describe, filterItems, QUALITIES, resolveClass, resolveLegacyClass, resolveSubclass, slotOf, type ItemClass, type ItemRow, type ItemSubclass } from "../../../../../kb/src/item-taxonomy";
 import {
-  activeFilters, BINDINGS, CLIENT_TAXONOMY as T, categoryNamedEnough, categoryQuery, itemFacets, ITEM_LEVEL_BRACKETS, ITEMS_PER_PAGE, itemsHref,
+  activeFilters, BINDINGS, CLIENT_TAXONOMY as T, categoryNamedEnough, categoryQuery, developmentLeftovers, itemFacets, ITEM_LEVEL_BRACKETS, ITEMS_PER_PAGE, itemsHref,
   listItems, NAME_FROM, SOURCES, shownItemName, subclassLabel, toggled, UNRECORDED, type CategoryQuery, type NameSource,
 } from "@/lib/items";
 import { loadItemSeen } from "@/lib/item-seen";
@@ -47,7 +47,7 @@ export const NAME_TITLE: Record<NameSource, string> = { ...NAME_FROM, files: UNC
  * The plain list, on any page, is its own canonical; a filter, a sort or a name search is noindex and points
  * its canonical at page 1 of the plain list.
  */
-const isPlain = (q: CategoryQuery) => activeFilters(q) === 0 && !q.sort;
+const isPlain = (q: CategoryQuery) => activeFilters(q) === 0 && !q.sort && !q.dev;
 
 export const ALL_ITEMS = {
   title: "WoW Forever Items by Category",
@@ -63,23 +63,26 @@ export async function categoryMetadata(classSlug: string | undefined, subclassKe
   const page = plain ? r.q.page : 1;
   // A later page of the plain list is indexed like page 1: once half the rows it shows have a name. The plain
   // list shows named rows first, so its first pages fill with them; until then a page is a list of "Item N".
-  const named = plain ? (await loadShownNames()).named : null;
+  const shown = plain ? await loadShownNames() : null;
+  const named = shown?.named ?? null;
+  // The plain list leaves the development leftovers out, so its pages, count and indexing do too.
+  const hidden = shown ? developmentLeftovers(T.items, (id) => shown.agreed.get(id) ?? shown.matched?.names.get(id)?.name) : undefined;
   if (!r.cls) {
-    const index = plain && (page === 1 || categoryNamedEnough(undefined, undefined, named!, page));
+    const index = plain && (page === 1 || categoryNamedEnough(undefined, undefined, named!, page, hidden));
     return {
       ...pageMetadata({ title: `${ALL_ITEMS.title}${pageSuffix(page)}`, description: ALL_ITEMS.description, path: itemsHref(undefined, undefined, { page }) }),
       ...(index ? {} : { robots: { index: false, follow: true } }),
     };
   }
   const name = r.sub ? `${subclassLabel(r.sub).label} (${r.cls.label})` : r.cls.label;
-  const count = (r.sub ? r.sub.items : r.cls.items).toLocaleString("en-US");
+  const count = ((r.sub ? r.sub.items : r.cls.items) - (hidden ? filterItems(T, { classId: r.cls.id, subclassId: r.sub?.id }).filter((row) => hidden.has(row[0])).length : 0)).toLocaleString("en-US");
   return {
     ...pageMetadata({
       title: `${r.sub ? `WoW Forever ${name}: ${count} Items` : `WoW Forever ${name}: All ${count} Items`}${pageSuffix(page)}`,
       description: `All ${count} ${name} items in WoW: Forever, with filters for slot, quality, item level, required level, binding and where players found them.`,
       path: itemsHref(r.cls.slug, r.sub?.slug, { page }),
     }),
-    robots: { index: named !== null && categoryNamedEnough(r.cls.id, r.sub?.id, named, page), follow: true },
+    robots: { index: named !== null && categoryNamedEnough(r.cls.id, r.sub?.id, named, page, hidden), follow: true },
   };
 }
 
@@ -104,7 +107,14 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   // A level or binding filter or sort reads the facts of every row that may show them; otherwise only this page's.
   const wide = Boolean(q.ilvl || q.req || q.bind) || q.sort?.key === "ilvl" || q.sort?.key === "req";
   const every = wide ? await tipsFor(base.map((row) => row[0]).filter(showsTip)) : null;
-  const rows = listItems(base, q, { name: nameOf, seen: seen.seen, sources: (id) => seen.from.get(id), tip: (id) => every?.get(id) });
+  const ctx = { name: nameOf, seen: seen.seen, sources: (id: number) => seen.from.get(id), tip: (id: number) => every?.get(id) };
+  const rows = listItems(base, q, ctx);
+  // The development leftovers (test, placeholder and retired items) are out of the list unless asked for; the
+  // menus count what the list can show, and the line above the table says how many are held back.
+  const leftovers = developmentLeftovers(T.items, nameOf);
+  const pool = q.dev ? base : base.filter((row) => !leftovers.has(row[0]));
+  const held = q.dev ? rows.filter((row) => leftovers.has(row[0])).length : listItems(base, { ...q, dev: true }, ctx).length - rows.length;
+  const hiddenIn = (classId: number, subclassId?: number) => (q.dev ? 0 : T.items.reduce((n, row) => n + Number(row[1] === classId && (subclassId === undefined || row[2] === subclassId) && leftovers.has(row[0])), 0));
   const pages = Math.max(1, Math.ceil(rows.length / ITEMS_PER_PAGE));
   if (q.page > pages) notFound();
   const shown = rows.slice((q.page - 1) * ITEMS_PER_PAGE, q.page * ITEMS_PER_PAGE);
@@ -160,18 +170,18 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   ];
 
   // Choices with their counts in this category, so a menu never offers an empty list.
-  const counted = <K,>(key: (row: ItemRow) => K) => { const m = new Map<K, number>(); for (const row of base) m.set(key(row), (m.get(key(row)) ?? 0) + 1); return m; };
+  const counted = <K,>(key: (row: ItemRow) => K) => { const m = new Map<K, number>(); for (const row of pool) m.set(key(row), (m.get(key(row)) ?? 0) + 1); return m; };
   const slots = counted((row) => slotOf(row[3])?.slug ?? null);
   const qualities = counted((row) => (row[4] === null ? UNRECORDED : QUALITIES[row[4]]?.slug ?? UNRECORDED));
   const sourceOptions = SOURCES.map((x) => ({
     label: x.menu, href: itemsHref(cls?.slug, sub?.slug, toggled(q, "src", x.slug)), on: Boolean(q.src?.includes(x.slug)),
-    count: base.reduce((n, row) => n + Number(seen.from.get(row[0])?.includes(x.slug) ?? false), 0),
+    count: pool.reduce((n, row) => n + Number(seen.from.get(row[0])?.includes(x.slug) ?? false), 0),
   }))
     .filter((o) => o.count > 0 || o.on);
   const facets = itemFacets();
-  const inBase = (set: Set<number>) => base.reduce((n, row) => n + Number(set.has(row[0])), 0);
+  const inBase = (set: Set<number>) => pool.reduce((n, row) => n + Number(set.has(row[0])), 0);
   const skills = facets.professions.map((p) => ({ ...p, count: inBase(facets.bySkill.get(p.id)!) })).filter((p) => p.count > 0);
-  const slotNames = new Map(base.map((row) => slotOf(row[3])).filter((s) => s !== null).map((s) => [s!.slug, s!.name]));
+  const slotNames = new Map(pool.map((row) => slotOf(row[3])).filter((s) => s !== null).map((s) => [s!.slug, s!.name]));
   const toggle = (key: "crafted" | "reagent" | "set" | "seen", label: string, count: number): FilterControl[] =>
     count > 0 || q[key] ? [{ type: "toggle", key, label, href: here({ [key]: q[key] ? undefined : true }), on: Boolean(q[key]) }] : [];
 
@@ -179,15 +189,15 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
     {
       type: "menu", key: "class", label: "Class",
       options: [
-        { label: "All classes", href: itemsHref(undefined, undefined, { ...q, page: 1 }), on: !cls, reset: true, count: T.items.length },
-        ...T.classes.filter((c) => c.items > 0).map((c) => ({ label: c.label, href: itemsHref(c.slug, undefined, { ...q, page: 1 }), on: c.id === cls?.id, count: c.items })),
+        { label: "All classes", href: itemsHref(undefined, undefined, { ...q, page: 1 }), on: !cls, reset: true, count: T.items.length - (q.dev ? 0 : leftovers.size) },
+        ...T.classes.filter((c) => c.items > 0).map((c) => ({ label: c.label, href: itemsHref(c.slug, undefined, { ...q, page: 1 }), on: c.id === cls?.id, count: c.items - hiddenIn(c.id) })),
       ],
     },
     ...(cls ? [{
       type: "menu" as const, key: "type", label: "Type",
       options: [
-        { label: `All ${cls.label.toLowerCase()}`, href: itemsHref(cls.slug, undefined, { ...q, page: 1 }), on: !sub, reset: true, count: cls.items },
-        ...T.subclasses.filter((s) => s.classId === cls.id && s.items > 0).map((s) => ({ label: subclassLabel(s).label, href: itemsHref(cls.slug, s.slug, { ...q, page: 1 }), on: s.id === sub?.id, count: s.items })),
+        { label: `All ${cls.label.toLowerCase()}`, href: itemsHref(cls.slug, undefined, { ...q, page: 1 }), on: !sub, reset: true, count: cls.items - hiddenIn(cls.id) },
+        ...T.subclasses.filter((s) => s.classId === cls.id && s.items > 0).map((s) => ({ label: subclassLabel(s).label, href: itemsHref(cls.slug, s.slug, { ...q, page: 1 }), on: s.id === sub?.id, count: s.items - hiddenIn(cls.id, s.id) })),
       ],
     }] : []),
     {
@@ -278,6 +288,15 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
           active={active}
           clearHref={itemsHref(cls?.slug, sub?.slug)}
         />
+        {held > 0 && (
+          <p className="mt-2 text-cell-2 text-muted">
+            <Link href={here({ dev: q.dev ? undefined : true })} className="text-accent hover:underline underline-offset-4">
+              {q.dev ? "Hide" : "Show"} {held.toLocaleString("en-US")} development {held === 1 ? "leftover" : "leftovers"}
+            </Link>
+            {" "}
+            {q.dev ? "Test, placeholder and retired items the game files still list are in the list." : "Test, placeholder and retired items the game files still list stay out of it."}
+          </p>
+        )}
         <div className="mt-2">
           <DataTable
             dense

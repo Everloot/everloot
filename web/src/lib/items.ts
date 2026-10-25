@@ -1,4 +1,5 @@
 import { CLIENT_EDGES, CLIENT_LAYER, CLIENT_SKILLS, CLIENT_TAXONOMY } from "../../../kb/src/client-layer-file";
+import { isDevelopmentItemName } from "../../../kb/src/dev-item-names";
 import { describe, filterItems, QUALITIES, slotOf, slugify, type ItemRow } from "../../../kb/src/item-taxonomy";
 
 export { CLIENT_LAYER, CLIENT_TAXONOMY };
@@ -52,13 +53,19 @@ export function subclassLabel(s: { name: string | null }): { label: string; reti
   return { label, retired: label !== s.name };
 }
 
+/** The ids among `rows` whose shown name is a development leftover: the rows a list hides by default. */
+export function developmentLeftovers(rows: readonly ItemRow[], name: (id: number) => string | undefined): Set<number> {
+  return new Set(rows.filter((row) => isDevelopmentItemName(name(row[0]))).map((row) => row[0]));
+}
+
 /**
  * Whether a page of a category's plain list has enough names to be indexed. It reads the plain list's own
  * order (sortItems with no sort: named rows first, each part by id), so page `page` holds the named rows left
- * after the earlier pages, then unnamed ones. No row gets a name it does not have.
+ * after the earlier pages, then unnamed ones. No row gets a name it does not have. `hidden` rows (the
+ * development leftovers) are not in the plain list, so they are not counted.
  */
-export function categoryNamedEnough(classId: number | undefined, subclassId: number | undefined, named: { has(id: number): boolean }, page = 1): boolean {
-  const rows = sortItems(filterItems(CLIENT_TAXONOMY, { classId, subclassId }), undefined, { name: (id) => (named.has(id) ? "" : undefined) });
+export function categoryNamedEnough(classId: number | undefined, subclassId: number | undefined, named: { has(id: number): boolean }, page = 1, hidden?: { has(id: number): boolean }): boolean {
+  const rows = sortItems(filterItems(CLIENT_TAXONOMY, { classId, subclassId }).filter((row) => !hidden?.has(row[0])), undefined, { name: (id) => (named.has(id) ? "" : undefined) });
   const shown = rows.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
   return shown.length > 0 && shown.filter((row) => named.has(row[0])).length / shown.length >= MIN_NAMED_SHARE;
 }
@@ -144,6 +151,8 @@ export interface CategoryQuery {
   ilvl?: { min: number; max: number };
   req?: { min: number; max: number };
   bind?: string;
+  /** Include the development leftovers (isDevelopmentItemName), which a list hides unless asked. A view, not a filter: no count, no chip. */
+  dev?: boolean;
   /** Absent: named items first, each part by id (sortItems). */
   sort?: { key: ItemSort; desc: boolean };
   page: number;
@@ -179,10 +188,10 @@ export function categoryQuery(search: Record<string, string | string[] | undefin
   const slot = list(one("slot"), SLOT_SLUGS);
   const quality = list(one("quality"), [...QUALITY_SLUGS, UNRECORDED]);
   const src = list(one("src"), SOURCE_SLUGS) as SourceSlug[] | undefined | null;
-  const crafted = flag("crafted"), reagent = flag("reagent"), set = flag("set"), seen = flag("seen");
+  const crafted = flag("crafted"), reagent = flag("reagent"), set = flag("set"), seen = flag("seen"), dev = flag("dev");
   const skill = one("skill"), sort = one("sort"), page = one("page");
   const ilvl = levels(one("ilvl")), req = levels(one("req")), bind = one("bind");
-  if (slot === null || quality === null || src === null || crafted === null || reagent === null || set === null || seen === null || ilvl === null || req === null) return null;
+  if (slot === null || quality === null || src === null || crafted === null || reagent === null || set === null || seen === null || dev === null || ilvl === null || req === null) return null;
   if (skill !== undefined && !itemFacets().professions.some((p) => p.slug === skill)) return null;
   if (bind !== undefined && !BINDING_SLUGS.includes(bind)) return null;
   const sorted = sort === undefined ? undefined : /^(-?)([a-z]+)$/.exec(sort);
@@ -192,7 +201,7 @@ export function categoryQuery(search: Record<string, string | string[] | undefin
   return {
     ...(text ? { q: text } : {}),
     ...(slot ? { slot } : {}), ...(quality ? { quality } : {}), ...(src ? { src } : {}),
-    ...(crafted ? { crafted } : {}), ...(reagent ? { reagent } : {}), ...(set ? { set } : {}), ...(seen ? { seen } : {}),
+    ...(crafted ? { crafted } : {}), ...(reagent ? { reagent } : {}), ...(set ? { set } : {}), ...(seen ? { seen } : {}), ...(dev ? { dev } : {}),
     ...(skill ? { skill } : {}),
     ...(ilvl ? { ilvl } : {}), ...(req ? { req } : {}), ...(bind ? { bind } : {}),
     ...(sorted ? { sort: { key: sorted[2] as ItemSort, desc: sorted[1] === "-" } } : {}),
@@ -216,6 +225,7 @@ export function itemsHref(classSlug?: string, subclassSlug?: string, q: Partial<
   if (q.ilvl) params.set("ilvl", levelsParam(q.ilvl)!);
   if (q.req) params.set("req", levelsParam(q.req)!);
   if (q.bind) params.set("bind", q.bind);
+  if (q.dev) params.set("dev", "1");
   if (q.sort) params.set("sort", `${q.sort.desc ? "-" : ""}${q.sort.key}`);
   if (q.page && q.page > 1) params.set("page", String(q.page));
   // Commas read better in a shared link than %2C, and are safe in a query string.
@@ -269,6 +279,8 @@ export function listItems(base: readonly ItemRow[], q: CategoryQuery, ctx: ItemL
   const id = text && /^#?\d+$/.test(text) ? Number(text.replace("#", "")) : null;
   const rows = base.filter(([itemId, , , inv, quality]) => {
     if (text && !(id !== null ? itemId === id : ctx.name?.(itemId)?.toLowerCase().includes(text))) return false;
+    // A development leftover stays out unless asked for, or looked up by its id.
+    if (!q.dev && id === null && isDevelopmentItemName(ctx.name?.(itemId))) return false;
     if (q.slot?.length && !q.slot.includes(slotOf(inv)?.slug ?? "")) return false;
     if (q.quality?.length && !q.quality.includes(quality === null ? UNRECORDED : QUALITIES[quality]?.slug ?? UNRECORDED)) return false;
     if (q.seen && !ctx.seen?.has(itemId)) return false;

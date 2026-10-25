@@ -195,3 +195,46 @@ test("the Source column and filter: reported items show where they come from, th
     facts.rates = [];
   }
 });
+
+test("development leftovers are out of a list by default, counted honestly, and one click or an id brings them back", async () => {
+  const cloth = CLIENT_TAXONOMY.items.filter((r) => r[1] === 4 && r[2] === 1).map((r) => r[0]);
+  const [dev, real] = cloth;
+  const total = cloth.length;
+  const name = (itemId: number, label: string) => ["a", "b", "c"].map((installId) => ({ installId, itemId, name: label }));
+  facts.names = [...name(dev, "Deprecated Cloth Cap"), ...name(real, "Linen Cap")];
+  try {
+    const list = await html(SubclassPage(sub("armor", "cloth")));
+    expect(list).toContain("Linen Cap");
+    expect(list).not.toContain("Deprecated Cloth Cap");
+    // The total, the title and the control all say one item is held back.
+    expect(list).toContain(`>${(total - 1).toLocaleString("en-US")}</span> items`);
+    expect(list).toContain("Show 1 development leftover");
+    expect(list).toContain('href="/database/items/armor/cloth?dev=1"');
+    expect(String((await subclassMetadata(sub("armor", "cloth"))).title)).toContain(`${(total - 1).toLocaleString("en-US")} Items`);
+    // Asked for, the leftover is listed and the control turns around; the view is its own URL and stays out of search.
+    const all = await html(SubclassPage(sub("armor", "cloth", { dev: "1" })));
+    expect(all).toContain("Deprecated Cloth Cap");
+    expect(all).toContain(`>${total.toLocaleString("en-US")}</span> items`);
+    expect(all).toContain("Hide 1 development leftover");
+    expect(all).toContain('href="/database/items/armor/cloth"');
+    expect(all).toContain("dev=1&amp;sort=");
+    const m = await subclassMetadata(sub("armor", "cloth", { dev: "1" }));
+    expect(m.robots).toMatchObject({ index: false });
+    expect(m.alternates?.canonical).toBe("/database/items/armor/cloth");
+    // Its id finds it without the switch; its name does not.
+    expect(await html(SubclassPage(sub("armor", "cloth", { q: String(dev) })))).toContain("Deprecated Cloth Cap");
+    expect(await html(SubclassPage(sub("armor", "cloth", { q: "cloth cap" })))).not.toContain("Deprecated Cloth Cap");
+    expect(await html(SubclassPage(sub("armor", "cloth", { q: "cloth cap", dev: "1" })))).toContain("Deprecated Cloth Cap");
+    // Its own page says what it is, and stays out of search.
+    const page = await html(ItemPage(props(String(dev))));
+    expect(page).toContain("The game files mark this as a development item");
+    expect((await generateMetadata(props(String(dev)))).robots).toMatchObject({ index: false });
+    expect(await html(ItemPage(props(String(real))))).not.toContain("development item");
+  } finally {
+    facts.names = [];
+  }
+});
+
+test("with no development names the list shows no control", async () => {
+  expect(await html(SubclassPage(sub("armor", "cloth")))).not.toContain("development leftover");
+});
