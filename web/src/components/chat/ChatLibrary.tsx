@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   clip, deleteConversation, deleteWorkspace, exportWorkspace, listConversations, type Scoped,
 } from "@/lib/chat/workspace-api";
@@ -41,22 +41,43 @@ export default function ChatLibrary({ projects, local, opts, failed, busy, onBac
   const [clearing, setClearing] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const listing = useRef(0);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     const o = opts();
     if (!o) return;
+    const request = ++listing.current;
+    const current = () => request === listing.current && !o.signal.aborted;
     setRows(null);
+    setCursor(null);
+    setLoadingMore(false);
     listConversations({ query: search.query, projectId: search.projectId || null }, o).then(
-      (r) => { if (!o.signal.aborted) { setRows(r.items); setCursor(r.nextCursor); setError(""); } },
-      (e) => { if (!o.signal.aborted) { setRows([]); setError(failed(e)); } },
+      (r) => { if (current()) { setRows(r.items); setCursor(r.nextCursor); setError(""); } },
+      (e) => { if (current()) { setRows([]); setError(failed(e)); } },
     );
+    return () => { listing.current = request + 1; };
   }, [search, opts, failed]);
 
   async function act(work: (o: Scoped) => Promise<void>) {
     const o = opts();
-    if (!o) return;
+    if (!o) return false;
     setError("");
-    try { await work(o); } catch (e) { if (!o.signal.aborted) setError(failed(e)); }
+    try { await work(o); return !o.signal.aborted; } catch (e) { if (!o.signal.aborted) setError(failed(e)); return false; }
+  }
+
+  async function loadMore() {
+    const o = opts();
+    if (!o || loadingMore || !cursor) return;
+    const request = listing.current;
+    const current = () => request === listing.current && !o.signal.aborted;
+    setLoadingMore(true);
+    setError("");
+    try {
+      const r = await listConversations({ ...search, projectId: search.projectId || null, cursor }, o);
+      if (current()) { setRows((list) => [...(list ?? []), ...r.items]); setCursor(r.nextCursor); }
+    } catch (e) { if (current()) setError(failed(e)); }
+    finally { if (current()) setLoadingMore(false); }
   }
 
   /**
@@ -115,7 +136,7 @@ export default function ChatLibrary({ projects, local, opts, failed, busy, onBac
             {rows.map((s) => (
               <li key={s.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
                 {renaming?.id === s.id ? (
-                  <form className="flex flex-1 gap-2" onSubmit={(e) => { e.preventDefault(); const t = clip(renaming.title, WORKSPACE_LIMITS.title); if (t) void patch(s, { title: t }).then(() => setRenaming(null)); }}>
+                  <form className="flex flex-1 gap-2" onSubmit={(e) => { e.preventDefault(); const t = clip(renaming.title, WORKSPACE_LIMITS.title); if (t) void patch(s, { title: t }).then((saved) => { if (saved) setRenaming(null); }); }}>
                     <input aria-label="New title" autoFocus maxLength={WORKSPACE_LIMITS.title} className={`${field} flex-1`} value={renaming.title} onChange={(e) => setRenaming({ id: s.id, title: e.target.value })} />
                     <button type="submit" className="btn min-h-9 px-3 text-sm">Save title</button>
                     <button type="button" className="btn min-h-9 px-3 text-sm" onClick={() => setRenaming(null)}>Cancel</button>
@@ -150,9 +171,8 @@ export default function ChatLibrary({ projects, local, opts, failed, busy, onBac
           </ul>
         )}
         {cursor && (
-          <button type="button" className="btn min-h-9 px-3 text-sm"
-            onClick={() => void act(async (o) => { const r = await listConversations({ ...search, projectId: search.projectId || null, cursor }, o); setRows((list) => [...(list ?? []), ...r.items]); setCursor(r.nextCursor); })}>
-            Load more
+          <button type="button" className="btn min-h-9 px-3 text-sm" disabled={loadingMore} onClick={() => void loadMore()}>
+            {loadingMore ? "Loading…" : "Load more"}
           </button>
         )}
       </section>

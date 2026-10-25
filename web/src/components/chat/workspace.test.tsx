@@ -712,6 +712,16 @@ test("Download my chat data reads every section for this account and hands over 
   expect(button("Download my chat data")).toBeDefined();
 });
 
+test("the phone conversation drawer has a close button that returns focus to Chats", async () => {
+  vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+  await render();
+  await click("Chats");
+  expect(container.querySelector('nav[aria-label="Conversations"]')).not.toBeNull();
+  await click("Close conversations");
+  expect(container.querySelector('nav[aria-label="Conversations"]')).toBeNull();
+  expect(document.activeElement).toBe(button("Chats"));
+});
+
 test("a failed export downloads nothing and says so", async () => {
   seedChat(ME, "Fury talents");
   exportFails = true;
