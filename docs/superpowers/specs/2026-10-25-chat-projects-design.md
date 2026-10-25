@@ -1,6 +1,6 @@
 # Private projects and the Chat library
 
-Status: proposed design, 2026-10-25. Implementation has not started.
+Status: approved by Carlos for implementation, 2026-10-25.
 
 ## Decisions Carlos made
 

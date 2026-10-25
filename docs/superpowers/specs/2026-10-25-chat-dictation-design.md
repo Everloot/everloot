@@ -1,6 +1,6 @@
 # Reviewed speech-to-text drafts in Chat
 
-Status: proposed design, 2026-10-25. Carlos selected speech-to-text with review before sending; full spoken conversation is excluded.
+Status: approved by Carlos for implementation, 2026-10-25. Carlos selected speech-to-text with review before sending; full spoken conversation is excluded.
 
 ## Approach and experience
 
