@@ -141,6 +141,17 @@ export default function PrivacyPage() {
                 search engines index it only while it is public. Turning it off hides it at once.
                 Deleting your account deletes your profile with it.
               </li>
+              <li id="chat-projects">
+                <strong>Chat projects (optional):</strong> while signed in, Chat can keep your
+                conversations, projects, notes and saved entries in your account so they follow
+                you to other devices. Only you can see them. A saved build or page is kept as a link
+                to it and the label you type, not a copy of the build or the page. Notes are sent to
+                your model only when you attach one to a question. You can choose to keep a chat in
+                this browser instead, and older browser chats are copied to your account only when
+                you choose Import. Chat keys, unsent drafts and audio are never stored in your
+                account. In Chat&apos;s All chats view you can download all of it or delete all of
+                it; deleting your account deletes it too.
+              </li>
               <li>
                 <strong>Uploads:</strong> files you send on the upload page
                 (addon records plus a random install id — no account, no character
@@ -325,6 +336,10 @@ export default function PrivacyPage() {
                 <strong>Your profile</strong> is changed, cleared or made private again on Settings.
               </li>
               <li>
+                <strong>Chat projects and account chats</strong> are downloaded or deleted in
+                Chat&apos;s All chats view.
+              </li>
+              <li>
                 <strong>Uploads</strong> you ask us to remove are deleted, and the
                 next rollup rebuild removes anything derived from them.
               </li>
@@ -339,6 +354,7 @@ export default function PrivacyPage() {
               <li><strong>Account email, name and password hash:</strong> until you ask us to delete your account. Unused confirmation and reset links expire after one hour.</li>
               <li><strong>API key usage counts:</strong> {USAGE_KEPT_DAYS} days. A revoked key and its counts: {REVOKED_KEPT_DAYS} days after revocation, or at once when you delete it.</li>
               <li><strong>Saved builds and characters:</strong> until you delete them or your account.</li>
+              <li><strong>Chat projects, account chats, notes and saved entries:</strong> until you delete them, clear them in Chat or delete your account.</li>
               <li><strong>Handle, display name, status and profile choices:</strong> until you change them or delete your account. A status with a clear-after time stops showing at that time.</li>
               <li><strong>Rate-limit hashes:</strong> a short time, long enough to enforce the limit, then discarded.</li>
               <li><strong>Uploads:</strong> until you ask us to remove them. They are the public database.</li>

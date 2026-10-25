@@ -53,7 +53,7 @@ function sample(d: Drop): string {
     : `${count(d.drops)} of ${count(d.kills)} observed loot windows (${(d.rate * 100).toFixed(1)}%), ${reporters}`;
 }
 
-function ItemCard({ id }: { id: number }) {
+function ItemCard({ id, onSave }: { id: number; onSave?: (id: number) => void }) {
   const [card, setCard] = useState<Card>({ state: "loading" });
   const [drops, setDrops] = useState<Drops>({ state: "loading" });
 
@@ -104,7 +104,12 @@ function ItemCard({ id }: { id: number }) {
         )}
       </div>
 
-      <a href={page} className={`${link} text-xs`}>Open in the database</a>
+      {onSave ? (
+        <div className="flex flex-wrap gap-x-3 text-xs">
+          <a href={page} className={link}>Open in the database</a>
+          <button type="button" className={`min-h-9 ${link}`} onClick={() => onSave(id)}>Save item to a project</button>
+        </div>
+      ) : <a href={page} className={`${link} text-xs`}>Open in the database</a>}
     </section>
   );
 }
@@ -138,7 +143,7 @@ function Choices({ query, onChoose }: { query: string; onChoose: (id: number) =>
   );
 }
 
-/** An answer's item: its card and drops, or the items its name could mean. */
-export default function ItemResult({ item, onChoose }: { item: ItemRef; onChoose: (id: number) => void }) {
-  return "id" in item ? <ItemCard id={item.id} /> : <Choices query={item.query} onChoose={onChoose} />;
+/** An answer's item: its card and drops, or the items its name could mean. `onSave` keeps the item's page in a project. */
+export default function ItemResult({ item, onChoose, onSave }: { item: ItemRef; onChoose: (id: number) => void; onSave?: (id: number) => void }) {
+  return "id" in item ? <ItemCard id={item.id} onSave={onSave} /> : <Choices query={item.query} onChoose={onChoose} />;
 }

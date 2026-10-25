@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { answerOrigin, NO_SOURCED_ANSWER, sourceLink } from "@/lib/chat/agent";
 import type { ChatMessage } from "@/lib/chat/store";
 import ItemResult from "./ItemResult";
@@ -22,8 +23,16 @@ export function UserMessage({ m }: { m: ChatMessage }) {
   );
 }
 
-/** An answer, its item, its origin (From Everloot with the pages, From the model), the model and a copy button. */
-export function AssistantMessage({ m, copied, onCopy, onChoose = () => {} }: { m: ChatMessage; copied: boolean; onCopy: () => void; onChoose?: (id: number) => void }) {
+/**
+ * An answer, its item, its origin (From Everloot with the pages, From the model), the model and a copy button. With
+ * the workspace on, `onSave` gets the text selected inside the answer (or all of it) and `onSaveItem` its item.
+ */
+export function AssistantMessage({ m, copied, onCopy, onChoose = () => {}, onSave, onSaveItem }: {
+  m: ChatMessage; copied: boolean; onCopy: () => void; onChoose?: (id: number) => void;
+  onSave?: (text: string) => void; onSaveItem?: (id: number) => void;
+}) {
+  const body = useRef<HTMLDivElement>(null);
+  const picked = useRef("");
   const origin = answerOrigin(m);
   // Without a model an item answer is the database's card alone.
   const everloot = origin.everloot || (!m.model && m.item !== undefined && "id" in m.item);
@@ -34,8 +43,8 @@ export function AssistantMessage({ m, copied, onCopy, onChoose = () => {} }: { m
   });
   return (
     <div className="space-y-2">
-      <div className="whitespace-pre-wrap break-words leading-7 text-fg">{shownText(m)}</div>
-      {m.item && <ItemResult item={m.item} onChoose={onChoose} />}
+      <div ref={body} className="whitespace-pre-wrap break-words leading-7 text-fg">{shownText(m)}</div>
+      {m.item && <ItemResult item={m.item} onChoose={onChoose} onSave={onSaveItem} />}
       {everloot && (
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs text-fg-2">
           <span className="rounded-full border border-accent px-2 text-accent">From Everloot</span>
@@ -61,6 +70,14 @@ export function AssistantMessage({ m, copied, onCopy, onChoose = () => {} }: { m
         {m.steps.length > 0 && <span>{m.steps.length} lookup{m.steps.length === 1 ? "" : "s"}</span>}
         {m.text !== NO_SOURCED_ANSWER && (
           <button type="button" className="min-h-9 underline underline-offset-4 hover:text-accent" onClick={onCopy}>{copied ? "Copied" : "Copy"}</button>
+        )}
+        {onSave && m.text !== NO_SOURCED_ANSWER && (
+          // The selection is read as the pointer goes down, before the click can move it.
+          <button type="button" className="min-h-9 underline underline-offset-4 hover:text-accent"
+            onPointerDown={() => { const s = window.getSelection(); picked.current = s && !s.isCollapsed && body.current?.contains(s.anchorNode) && body.current.contains(s.focusNode) ? s.toString().trim() : ""; }}
+            onClick={() => { onSave(picked.current || shownText(m)); picked.current = ""; }}>
+            Save to project
+          </button>
         )}
       </div>
     </div>

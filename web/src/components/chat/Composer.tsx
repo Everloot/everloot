@@ -2,6 +2,7 @@ import { useLayoutEffect, type RefObject } from "react";
 import type { ShellCharacter } from "@/lib/account-shell-types";
 import type { SavedProvider } from "@/lib/chat/store";
 import { modelOptions } from "./ChatKeys";
+import DictationButton from "./Dictation";
 
 const MAX_HEIGHT = 240;
 const chip = "inline-flex min-h-8 items-center gap-1 rounded-full border border-line px-3 text-xs text-fg-2";
@@ -29,6 +30,11 @@ export default function Composer(p: {
   characters: ShellCharacter[];
   context: ShellCharacter | null;
   onContext: (c: ShellCharacter | null) => void;
+  /** With the workspace on: the chat or project the draft belongs to. Dictation shows and stops when it changes. */
+  sessionKey?: string;
+  /** A project note the player attached to the next question. */
+  note?: { title: string } | null;
+  onRemoveNote?: () => void;
 }) {
   const ready = p.providers.length > 0;
   const active = p.providers[0] ?? null;
@@ -74,6 +80,20 @@ export default function Composer(p: {
               <option value="manage">Manage keys…</option>
             </select>
           )}
+          {/* With the workspace on the model menu shows without a key too: Everloot search now, a model after setup. */}
+          {!ready && p.sessionKey !== undefined && (
+            <select aria-label="Model" className={menu} disabled={p.busy} value="search"
+              onChange={(e) => { if (e.target.value === "setup") window.location.assign(p.keysHref); }}>
+              <option value="search">Everloot search</option>
+              <option value="setup">Set up a model…</option>
+            </select>
+          )}
+          {p.note && (
+            <span className={chip}>
+              Note: {p.note.title}
+              <button type="button" className="min-h-6 px-1 text-muted hover:text-fg" aria-label={`Remove note ${p.note.title} from the question`} onClick={p.onRemoveNote}>×</button>
+            </span>
+          )}
           {p.context ? (
             <span className={chip}>
               {p.context.name} · {className(p.context.classSlug)}
@@ -89,6 +109,7 @@ export default function Composer(p: {
           {p.signed !== null && (
             <span className="text-xs text-muted">{p.signed ? "Game data through your Everloot account" : "Signed out: lookups use the public limits"}</span>
           )}
+          {p.sessionKey !== undefined && <DictationButton value={p.value} onChange={p.onValue} disabled={p.busy} sessionKey={p.sessionKey} />}
           {p.busy
             ? <button type="button" className="btn ml-auto min-h-9 px-4 text-sm" aria-keyshortcuts="Escape" onClick={p.onStop}>Stop</button>
             : <button type="submit" className="btn btn-primary ml-auto min-h-9 px-4 text-sm" disabled={!p.value.trim()}>Send</button>}
