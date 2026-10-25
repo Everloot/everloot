@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { completionProgress, handleCompletionProgress } from "../src/completion.js";
+import { completionProgress, doneOf, handleCompletionProgress } from "../src/completion.js";
 import {
   agreedCatalog, authorizedOwners, COMPLETION_LIMITS, completionFactsFromRecords, completionFactsOf, emptyCompletion, foldCompletion,
   trimCompletion,
@@ -46,6 +46,14 @@ const progress = [
 ];
 
 const facts = () => completionFactsFromRecords([...catalog, ...progress]);
+
+test("the day an achievement was earned survives the rollup and reaches the character's rows", () => {
+  const [c] = facts().owned;
+  expect(c.achievements.get(1)?.earnedOn).toBe("2026-09-30");
+  expect(c.achievements.get(2)?.earnedOn).toBeUndefined();
+  const done = doneOf(facts(), c, "achievements");
+  expect(done.map((r) => [r.entry.achievementId, r.earnedOn])).toEqual([[1, "2026-09-30"]]);
+});
 
 test("what is done and what is closest to done, per character", () => {
   const result = completionProgress(OWNER, undefined, facts());
