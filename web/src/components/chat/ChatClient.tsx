@@ -355,7 +355,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
     if (!o || latest.current.busy) return;
     const id = latest.current.currentId;
     const token = ++opening.current;
-    const here = () => !o.signal.aborted && token === opening.current && id === latest.current.currentId;
+    const here = () => !o.signal.aborted && token === opening.current && id === latest.current.currentId && !latest.current.busy;
     try {
       const c = await api.getConversation(id, o);
       if (!here()) return;
@@ -379,6 +379,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
   }
 
   function showAccountChat(c: WorkspaceConversation, owner: string) {
+    if (latest.current.busy) return;
     revisions.current.set(c.id, c.revision);
     setMeta({ store: "account", accountId: owner, projectId: c.projectId, pinned: c.pinned, revision: c.revision, title: c.title });
     open(c.id, c.messages);
@@ -408,7 +409,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
     setError("");
     try {
       const c = await api.getConversation(s.id, o);
-      if (o.signal.aborted || token !== opening.current) return;
+      if (o.signal.aborted || token !== opening.current || latest.current.busy) return;
       if (view) setView(null);
       showAccountChat(c, o.accountId);
     } catch (err) {

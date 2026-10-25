@@ -80,7 +80,7 @@ export default function WorkspaceRail(p: {
               ))}
             </ul>
             {naming === null
-              ? <button type="button" className="min-h-9 px-2 text-sm text-accent underline underline-offset-4" disabled={p.busy} onClick={() => { setNaming(""); setProblem(""); }}>New project</button>
+              ? <button type="button" className="min-h-9 px-2 text-sm text-fg underline decoration-edge underline-offset-4 hover:decoration-fg" disabled={p.busy} onClick={() => { setNaming(""); setProblem(""); }}>New project</button>
               : (
                 <form className="space-y-2 px-2 py-2" onSubmit={(e) => { e.preventDefault(); void create(); }}>
                   <input aria-label="Project name" autoFocus maxLength={100} value={naming} onChange={(e) => setNaming(e.target.value)}
@@ -107,7 +107,7 @@ export default function WorkspaceRail(p: {
           </>
         ) : p.account === null && (
           <p className="px-2 pt-1 text-sm text-muted">
-            <a href={signInPath("/chat")} className="text-accent underline underline-offset-4">Sign in</a> to keep chats and projects in your account.
+            <a href={signInPath("/chat")} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Sign in</a> to keep chats and projects in your account.
           </p>
         )}
 
@@ -128,7 +128,7 @@ export default function WorkspaceRail(p: {
             </ul>
           )}
         {p.account && p.importable > 0 && (
-          <button type="button" className="min-h-9 px-2 text-left text-sm text-accent underline underline-offset-4" disabled={p.busy} onClick={p.onImport}>
+          <button type="button" className="min-h-9 px-2 text-left text-sm text-fg underline decoration-edge underline-offset-4 hover:decoration-fg" disabled={p.busy} onClick={p.onImport}>
             Import {p.importable} browser chat{p.importable === 1 ? "" : "s"}
           </button>
         )}

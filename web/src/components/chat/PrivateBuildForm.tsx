@@ -94,7 +94,7 @@ function Form({ accountId, build, onSaved, onCancel }: Props) {
           {state.busy ? "Saving…" : state.retry ? "Try again" : "Save build"}
         </button>
         <button type="button" className="btn min-h-9 px-4 text-sm" onClick={onCancel}>Cancel</button>
-        {build && <a href={editPath(build)} className="text-accent underline">Open in the calculator</a>}
+        {build && <a href={editPath(build)} className="text-fg underline decoration-edge hover:decoration-fg">Open in the calculator</a>}
       </div>
     </form>
   );

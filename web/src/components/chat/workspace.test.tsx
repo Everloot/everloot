@@ -43,6 +43,7 @@ function server() {
     const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : null;
     calls.push({ url: `${url.pathname}${url.search}`, method, body });
     const path = url.pathname;
+    if (hold && path === hold.path) { const h = hold; hold = null; await h.done; }
     if (path === "/api/auth/me") {
       if (meFails > 0) { meFails--; return Response.json({ error: "down" }, { status: 503 }); }
       return Response.json({ user: who });
@@ -58,7 +59,6 @@ function server() {
     if (path === "/api/me/builds") return Response.json({ characters: [], builds: builds() });
     if (!path.startsWith("/api/me/chat")) throw new Error(`Unexpected request ${path}`);
 
-    if (hold && path === hold.path) { const h = hold; hold = null; await h.done; }
     if (!who) return Response.json({ error: "Sign in" }, { status: 401 });
     const owner = who.id;
     const s = accounts[owner] ??= store();
@@ -582,6 +582,38 @@ test("Load the newer version asks first, and a load the account switch overtook 
   expect(text()).not.toContain("Not saved");
   expect(text()).not.toContain("no longer in your account");
   expect(text()).not.toContain("And at level 50?");
+});
+
+test("a newer-version read cannot clear a conflict after another question starts", async () => {
+  const c = seedChat(ME, "Fury talents");
+  await render(); await click("Fury talents");
+  c.revision = 5;
+  await ask("And at level 50?");
+  await click("Load the newer version");
+  const releaseRead = holdNext(`/api/me/chat/conversations/${c.id}`);
+  await click("Replace mine");
+  const releaseAnswer = holdNext("/api/tools/search_knowledge");
+  await ask("Keep this new question");
+  await releaseRead();
+  expect(text()).toContain("changed on another device");
+  await releaseAnswer();
+  expect(c.revision).toBe(5);
+  expect(c.messages).toHaveLength(2);
+  expect(text()).toContain("Keep this new question");
+});
+
+test("a delayed sidebar chat read cannot change the chat being answered", async () => {
+  const c = seedChat(ME, "Fury talents");
+  const other = seedChat(ME, "Other plan", { pinned: true });
+  await render(); await click("Fury talents");
+  const releaseRead = holdNext(`/api/me/chat/conversations/${other.id}`);
+  await click("Other plan");
+  const releaseAnswer = holdNext("/api/tools/search_knowledge");
+  await ask("Keep this new question");
+  await releaseRead(); await releaseAnswer();
+  expect(mine().conversations.get(c.id)).toMatchObject({ title: "Fury talents", pinned: false });
+  expect(mine().conversations.get(c.id)!.messages).toHaveLength(4);
+  expect(other.messages).toHaveLength(2);
 });
 
 test("an attached note goes to the model with its own question only, never again in later turns' history", async () => {
