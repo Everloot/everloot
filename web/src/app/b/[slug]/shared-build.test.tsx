@@ -69,10 +69,10 @@ test("the page shows the name and notes over the calculator, read-only, with a w
 
 test("a signed-in visitor can save a copy, and the owner's name shows only when they chose it", async () => {
   auth.getUser.mockResolvedValue({ id: "11111111-2222-4333-8444-555555555555", name: "Thrall#1" });
-  auth.authQuery.mockResolvedValue(shared({ owner_name: "Thrall#1", game_build: "1.0.0.1" }));
+  auth.authQuery.mockResolvedValue(shared({ owner_name: "Email owner", game_build: "1.0.0.1" }));
   const html = renderToStaticMarkup(await SharedBuildPage(params()));
   expect(html).toContain("Save a copy");
-  expect(html).toContain("Shared by Thrall#1");
+  expect(html).toContain("Shared by Email owner");
   expect(html).toContain('data-badge="files"');
 });
 

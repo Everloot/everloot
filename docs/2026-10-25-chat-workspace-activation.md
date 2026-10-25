@@ -20,6 +20,13 @@ build tables exist shows a builds-unavailable message. Keep `EVERLOOT_SAVED_BUIL
 session-only `/api/me/chat/builds` route creates builds with `shared`, `showName` and `active` false, and edits
 preserve their stored sharing values. It does not expose builds to API keys or enable the older public save form.
 
+The original saved-build file read `users.name`, a column added by `20261020120000_accounts.sql`. The compatibility
+fix removes that dependency; do not apply accounts v2 to activate this workspace. Shared builds return no owner
+name for Battle.net accounts, including after accounts v2 or a BattleTag rename. An email-only account's
+sign-up name is returned only when the build is shared and `show_name` is on; linking Battle.net hides it.
+Public profile display names are a separate feature. No function recreation is needed after adding `users.name`.
+Regression: `web/scripts/saved-builds-legacy.integration.mjs`.
+
 Before applying the older saved-build migration, check the catalog rather than replaying all migrations.
 Its expected prerequisites are the four-argument `create_api_key`, no five-argument version or `link_codes`,
 quota columns in `bucket,count,reset_at` order, scopes allowing `read:own`, and the usage surfaces
