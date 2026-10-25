@@ -28,7 +28,7 @@ const kills = agreedKills([
   row("a", "Night Watch", 664, 409, "2026-10-21T20:00:00Z"), row("b", "Night Watch", 664, 409, "2026-10-21T20:00:00Z"),
   row("c", "Ember", 663, 409, "2026-10-22T20:00:00Z"), row("d", "Ember", 663, 409, "2026-10-22T20:00:00Z"),
   row("c", "Ember", 2, 36, "2026-10-19T20:00:00Z"), row("d", "Ember", 2, 36, "2026-10-19T20:00:00Z"),
-], new Date(AS_OF));
+], new Date(AS_OF), [MC, DM]);
 const progress = guildProgression(kills, [MC, DM]);
 const directory = guildDirectory({ kills, seen: new Map(), boards: [] });
 
@@ -116,7 +116,7 @@ test("guild_board's output stays a superset: the officer board as before, plus t
   expect(parsed.page).toMatchObject(guildBoard("Night Watch", "Forever Pioneer", guildFactsFromRecords(officers)));
   expect(parsed.page!.ladderProgression![0]).toMatchObject({ instanceMapId: 409, name: "Molten Core", killed: 2, bosses: 2 });
   expect(parsed.page!.ladderProgression![0]!.list[0]).toEqual({ encounterId: 663, name: "Lucifron", killed: true, killedAt: "2026-10-20T20:00:00.000Z", source: "members" });
-  expect(parsed.page!.activity!.map((k) => k.encounterId)).toEqual([664, 663]);
+  expect(parsed.page!.activity!.map((k) => [k.encounterId, k.name])).toEqual([[664, "Magmadar"], [663, "Lucifron"]]);
   expect(parsed.page!.seenRoster).toEqual({ count: 1, members: [{ name: "Thrallina", level: 25, class: "SHAMAN", lastSeen: "2026-10-21" }] });
   expect(parsed.page!.ranks).toEqual({ instanceMapId: 409, instanceName: "Molten Core", realm: 1, overall: 1 });
   expect(parsed.url).toBe("https://everloot.app/guilds/forever-pioneer/night-watch");

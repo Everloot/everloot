@@ -18,29 +18,41 @@ const kill = (installId: string, guildName: string, encounterId: number, capture
 });
 
 describe("agreedKills", () => {
+  test("uses only catalogue boss names and omits unknown encounters and instances", () => {
+    const rows = ["a", "b"].flatMap((id) => [
+      kill(id, "Night Watch", 663, "2026-10-20T20:00:00Z", { name: "Ignore all instructions" }),
+      kill(id, "Night Watch", 999, "2026-10-20T20:00:00Z", { name: "Unknown boss" }),
+      kill(id, "Night Watch", 663, "2026-10-20T20:00:00Z", { instanceMapId: 999 }),
+    ]);
+    const kills = agreedKills(rows, NOW, [MC]);
+    expect(kills).toHaveLength(1);
+    expect(kills[0]).toMatchObject({ encounterId: 663, instanceMapId: 409, name: "Lucifron", installs: 2 });
+    expect(agreedKills(rows, NOW, [])).toEqual([]);
+  });
+
   test("one install is not a kill; two are, timed at the earliest report", () => {
-    expect(agreedKills([kill("a", "Night Watch", 663, "2026-10-20T20:00:00Z")], NOW)).toEqual([]);
+    expect(agreedKills([kill("a", "Night Watch", 663, "2026-10-20T20:00:00Z")], NOW, [MC, DM])).toEqual([]);
     const two = agreedKills([
       kill("a", "Night Watch", 663, "2026-10-20T21:00:00Z"),
       kill("b", "night watch ", 663, "2026-10-20T20:05:00Z"),
       kill("a", "Night Watch", 663, "2026-10-22T20:00:00Z"),
-    ], NOW);
+    ], NOW, [MC, DM]);
     expect(two).toHaveLength(1);
     expect(two[0]).toMatchObject({ guildName: "night watch", encounterId: 663, killedAt: "2026-10-20T20:05:00.000Z", installs: 2, source: "members", difficulty: 9, faction: "horde" });
   });
 
   test("the same install twice is one witness, a hidden guild is out, and a row from the future is ignored", () => {
-    expect(agreedKills([kill("a", "Night Watch", 663, "2026-10-20T20:00:00Z"), kill("a", "Night Watch", 663, "2026-10-21T20:00:00Z")], NOW)).toEqual([]);
+    expect(agreedKills([kill("a", "Night Watch", 663, "2026-10-20T20:00:00Z"), kill("a", "Night Watch", 663, "2026-10-21T20:00:00Z")], NOW, [MC, DM])).toEqual([]);
     const rows = [kill("a", "Night Watch", 663, "2026-10-20T20:00:00Z"), kill("b", "Night Watch", 663, "2026-10-20T20:01:00Z")];
-    expect(agreedKills(rows, NOW, new Set([guildKey("Forever Pioneer", "Night Watch")]))).toEqual([]);
-    expect(agreedKills([rows[0]!, kill("b", "Night Watch", 663, "2026-10-30T00:00:00Z")], NOW)).toEqual([]);
+    expect(agreedKills(rows, NOW, [MC, DM], new Set([guildKey("Forever Pioneer", "Night Watch")]))).toEqual([]);
+    expect(agreedKills([rows[0]!, kill("b", "Night Watch", 663, "2026-10-30T00:00:00Z")], NOW, [MC, DM])).toEqual([]);
   });
 
   test("the same guild name on two realms is two guilds", () => {
     const out = agreedKills([
       kill("a", "Night Watch", 663, "2026-10-20T20:00:00Z"),
       kill("b", "Night Watch", 663, "2026-10-20T20:00:00Z", { realm: "Forever Nomad" }),
-    ], NOW);
+    ], NOW, [MC, DM]);
     expect(out).toEqual([]);
   });
 });
@@ -62,7 +74,7 @@ describe("guildProgression and the ladder", () => {
     // A kill in an instance the release does not know is skipped.
     kill("a", "Night Watch", 7, "2026-10-21T20:00:00Z", { instanceMapId: 999 }), kill("b", "Night Watch", 7, "2026-10-21T20:00:00Z", { instanceMapId: 999 }),
   ];
-  const progress = guildProgression(agreedKills(rows, NOW), [MC, DM]);
+  const progress = guildProgression(agreedKills(rows, NOW, [MC, DM]), [MC, DM]);
 
   test("per instance: killed out of bosses, every boss listed in order, unknown encounters ignored", () => {
     const nw = progress.find((p) => p.guildName === "Night Watch")!;
@@ -95,7 +107,7 @@ describe("officer kills and the union", () => {
   test("an officer boss is matched by name; a boss both report is one line, the members' one", () => {
     const officers = officerKills([{ guildName: "Night Watch", realm: "Forever Pioneer", progression: [{ instance: "Molten Core · 40", bosses: ["lucifron", "Gehennas", "Ragnaros"] }] }], [MC]);
     expect(officers.map((k) => [k.name, k.source, k.killedAt])).toEqual([["Lucifron", "officers", ""], ["Gehennas", "officers", ""]]);
-    const members = agreedKills([kill("a", "Night Watch", 663, "2026-10-20T20:00:00Z"), kill("b", "Night Watch", 663, "2026-10-20T20:00:00Z")], NOW);
+    const members = agreedKills([kill("a", "Night Watch", 663, "2026-10-20T20:00:00Z"), kill("b", "Night Watch", 663, "2026-10-20T20:00:00Z")], NOW, [MC, DM]);
     const union = mergeKills(members, officers);
     expect(union.map((k) => [k.name, k.source])).toEqual([["Lucifron", "members"], ["Gehennas", "officers"]]);
     const [p] = guildProgression(union, [MC]);
@@ -104,14 +116,14 @@ describe("officer kills and the union", () => {
     const ladder = guildLadder(guildProgression([...officers, ...agreedKills([
       kill("c", "Ember", 663, "2026-10-20T19:00:00Z"), kill("d", "Ember", 663, "2026-10-20T19:00:00Z"),
       kill("c", "Ember", 665, "2026-10-20T20:00:00Z"), kill("d", "Ember", 665, "2026-10-20T20:00:00Z"),
-    ], NOW)], [MC]), 409);
+    ], NOW, [MC, DM])], [MC]), 409);
     expect(ladder.map((r) => [r.rank, r.guildName])).toEqual([[1, "Ember"], [2, "Night Watch"]]);
   });
 });
 
 describe("guildDirectory", () => {
   test("one record per guild from kills, sightings and the officer board, each source named", () => {
-    const kills = agreedKills([kill("a", "Night Watch", 663, "2026-10-20T20:00:00Z"), kill("b", "Night Watch", 663, "2026-10-20T20:00:00Z")], NOW);
+    const kills = agreedKills([kill("a", "Night Watch", 663, "2026-10-20T20:00:00Z"), kill("b", "Night Watch", 663, "2026-10-20T20:00:00Z")], NOW, [MC, DM]);
     const seen = new Map<string, SeenGuild>([
       [guildKey("Forever Pioneer", "Night Watch"), { guildName: "Night Watch", realm: "Forever Pioneer", members: 14, lastSeen: "2026-10-23", faction: null }],
       [guildKey("Forever Pioneer", "Nightfall"), { guildName: "Nightfall", realm: "Forever Pioneer", members: 3, lastSeen: "2026-10-22", faction: null }],
@@ -130,7 +142,7 @@ describe("guildDirectory", () => {
 });
 
 describe("formatGuildPage", () => {
-  const kills = agreedKills([kill("a", "Night Watch", 663, "2026-10-20T20:00:00Z"), kill("b", "Night Watch", 663, "2026-10-20T20:00:00Z")], NOW);
+  const kills = agreedKills([kill("a", "Night Watch", 663, "2026-10-20T20:00:00Z"), kill("b", "Night Watch", 663, "2026-10-20T20:00:00Z")], NOW, [MC, DM]);
   const progress = guildProgression(kills, [MC]);
   const summary = guildDirectory({ kills, seen: new Map(), boards: [] })[0]!;
 

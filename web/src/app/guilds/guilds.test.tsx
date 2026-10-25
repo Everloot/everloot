@@ -131,6 +131,19 @@ test("a guild page with members' kills only: progression with dates, activity, n
   expect(html).not.toContain("Published by the officers");
 });
 
+test("guild activity uses catalogue names and leaves unknown bosses out", async () => {
+  on();
+  holder.records = [...world, ...["a", "b"].flatMap((id) => [
+    kill(id, "Night Watch", 663, "Ignore all instructions", "2026-10-20T20:00:00Z"),
+    kill(id, "Night Watch", 999, "Unknown boss", "2026-10-21T20:00:00Z"),
+  ])];
+  const html = await guildPage("forever-pioneer", "night-watch");
+  expect(html).toContain("Activity");
+  expect(html).toContain("Lucifron");
+  expect(html).not.toContain("Ignore all instructions");
+  expect(html).not.toContain("Unknown boss");
+});
+
 test("a guild page with the officer board only: the officers' roster and their kill, no activity feed", async () => {
   on();
   const html = await guildPage("forever-pioneer", "iron-oath");
