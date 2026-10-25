@@ -1,0 +1,176 @@
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
+
+const auth = vi.hoisted(() => ({ getUser: vi.fn(), authQuery: vi.fn() }));
+vi.mock("@/lib/supabase/server", () => ({ getUser: auth.getUser, authQuery: auth.authQuery, siteUrl: () => "https://everloot.app" }));
+
+import { GET, POST } from "./route";
+
+const SITE = "https://everloot.app";
+const USER = { id: "11111111-2222-4333-8444-555555555555", name: "Thrall#1" };
+const OTHER = "99999999-2222-4333-8444-555555555555";
+const BUILD_ID = "0b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e11";
+const CHARACTER_ID = "2b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e22";
+const MAGE = "EL1-mage-0-1.60.1.70450-MTE6NQ";
+const row = (over: object = {}) => ({
+  id: BUILD_ID, slug: "AbCd1234", name: "Fire", notes: null, class_slug: "mage", character_id: CHARACTER_ID, code: MAGE, code2: null,
+  game_build: "1.60.1.70450", shared: true, show_name: true, active: true, updated_at: "2026-10-20T12:00:00+00:00", ...over,
+});
+const call = (method: string, body?: object, headers: Record<string, string> = {}) =>
+  new Request(`${SITE}/api/me/chat/builds`, {
+    method, headers: { origin: SITE, "content-type": "application/json", ...headers }, body: body ? JSON.stringify(body) : undefined,
+  });
+const save = (build: object, over: object = {}, headers: Record<string, string> = {}) =>
+  POST(call("POST", { expectedAccountId: USER.id, build, ...over }, headers));
+const saveCall = () => auth.authQuery.mock.calls.find(([p]) => p === "rpc/save_build");
+const sent = () => JSON.parse(saveCall()![1].body);
+/** The database: the owner's list, save_build's answer and the saved row read back. */
+function database(owned: object[], saved: object = row()) {
+  auth.authQuery.mockImplementation(async (path: string) => {
+    if (path.startsWith("build_characters")) return [];
+    if (path === "rpc/save_build") return [{ build_ref: BUILD_ID, build_slug: "AbCd1234", refusal: null }];
+    if (path.includes("&id=eq.")) return [saved];
+    return owned;
+  });
+}
+
+beforeEach(() => {
+  vi.stubEnv("EVERLOOT_CHAT_WORKSPACE", "1");
+  vi.stubEnv("EVERLOOT_SAVED_BUILDS", "");
+  auth.getUser.mockReset().mockResolvedValue(USER);
+  auth.authQuery.mockReset();
+});
+afterEach(() => { vi.unstubAllEnvs(); });
+
+test("the workspace switch alone opens it: off is a 404 even with saved builds on", async () => {
+  vi.stubEnv("EVERLOOT_CHAT_WORKSPACE", "");
+  vi.stubEnv("EVERLOOT_SAVED_BUILDS", "1");
+  expect((await GET(call("GET"))).status).toBe(404);
+  expect((await save({ name: "a", code: MAGE })).status).toBe(404);
+  expect(auth.getUser).not.toHaveBeenCalled();
+  expect(auth.authQuery).not.toHaveBeenCalled();
+});
+
+test("signed out is a 401, and a bearer key is not a session", async () => {
+  auth.getUser.mockResolvedValue(null);
+  const key = { authorization: `Bearer evl_${"a".repeat(64)}` };
+  for (const res of [await GET(call("GET", undefined, key)), await save({ name: "a", code: MAGE }, {}, key)]) {
+    expect(res.status).toBe(401);
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
+  }
+  expect(auth.authQuery).not.toHaveBeenCalled();
+});
+
+test("another site, or no Origin, cannot save", async () => {
+  expect((await save({ name: "a", code: MAGE }, {}, { origin: "https://evil.example" })).status).toBe(403);
+  const bare = new Request(`${SITE}/api/me/chat/builds`, { method: "POST", body: JSON.stringify({ expectedAccountId: USER.id, build: { name: "a", code: MAGE } }) });
+  expect((await POST(bare)).status).toBe(403);
+  expect(auth.authQuery).not.toHaveBeenCalled();
+});
+
+test("a save meant for another account is refused before anything is read or saved", async () => {
+  auth.getUser.mockResolvedValue({ id: OTHER, name: "Jaina#2" });
+  const res = await save({ name: "a", code: MAGE });
+  expect(res.status).toBe(409);
+  expect(await res.json()).toMatchObject({ code: "account_mismatch" });
+  expect(auth.authQuery).not.toHaveBeenCalled();
+});
+
+test("GET lists the owner's builds and characters with the account id", async () => {
+  auth.authQuery.mockImplementation(async (path: string) => path.startsWith("build_characters")
+    ? [{ id: CHARACTER_ID, name: "Jaina", class_slug: "mage", realm: null, note: null }] : [row({ shared: false })]);
+  const res = await GET(call("GET"));
+  expect(res.status).toBe(200);
+  expect(res.headers.get("cache-control")).toBe("private, no-store");
+  const body = await res.json();
+  expect(body).toMatchObject({ accountId: USER.id, characters: [{ id: CHARACTER_ID }], builds: [{ id: BUILD_ID, shared: false, link: null }] });
+  for (const [path] of auth.authQuery.mock.calls) expect(path).toContain(`user_id=eq.${USER.id}`);
+});
+
+test("a new build is private: shared, showName and active are false even when the body asks to share", async () => {
+  database([], row({ shared: false, show_name: false, active: false }));
+  const res = await save({ name: " Fire ", code: MAGE, notes: "Raids", shared: true, showName: true, active: true, scopes: ["read:own"] },
+    { shared: true });
+  expect(res.status).toBe(201);
+  expect(await res.json()).toMatchObject({ accountId: USER.id, build: { id: BUILD_ID, shared: false, link: null } });
+  expect(sent()).toMatchObject({ p_user_id: USER.id, p_id: null, p_name: "Fire", p_notes: "Raids", p_code: MAGE,
+    p_shared: false, p_show_name: false, p_active: false });
+  expect(sent().p_slug).toMatch(/^[A-Za-z0-9]{8}$/);
+});
+
+test("updating an owned build keeps its sharing, name display, mark and character as they are", async () => {
+  database([row()], row({ name: "Frost" }));
+  const res = await save({ id: BUILD_ID, name: "Frost", code: MAGE, shared: false, showName: false, active: false });
+  expect(res.status).toBe(200);
+  expect(await res.json()).toMatchObject({ accountId: USER.id, build: { id: BUILD_ID, shared: true } });
+  // Null leaves the stored value in save_build, read at write time, so sharing is never switched off here.
+  expect(sent()).toMatchObject({ p_id: BUILD_ID, p_slug: null, p_name: "Frost", p_character_id: CHARACTER_ID,
+    p_shared: null, p_show_name: null, p_active: null });
+  // The ownership check came first.
+  expect(auth.authQuery.mock.calls[0][0]).not.toBe("rpc/save_build");
+});
+
+test("an update may move the build to another character label or none", async () => {
+  database([row()]);
+  expect((await save({ id: BUILD_ID, name: "Frost", code: MAGE, characterId: null })).status).toBe(200);
+  expect(sent()).toMatchObject({ p_character_id: null, p_shared: null });
+});
+
+test("an id that is not one of the account's builds is a 404 and nothing is saved", async () => {
+  database([row({ id: "3b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e33" })]);
+  const res = await save({ id: BUILD_ID, name: "Mine", code: MAGE });
+  expect(res.status).toBe(404);
+  expect(await res.json()).toMatchObject({ code: "not_found" });
+  expect(saveCall()).toBeUndefined();
+});
+
+test("bad input is a 400 before the database is asked", async () => {
+  for (const build of [undefined, { name: "", code: MAGE }, { name: "a", code: "nope" }, { name: "a", code: MAGE, code2: "EL1-warrior-0-1.60-MTE6NQ" },
+    { id: "x", name: "a", code: MAGE }, { name: "a", code: MAGE, characterId: "x" }]) {
+    expect((await save(build as object)).status).toBe(400);
+  }
+  expect(auth.authQuery).not.toHaveBeenCalled();
+});
+
+test.each([
+  ["not_found", 404, "not_found"], ["class_mismatch", 400, "class_mismatch"], ["build_limit", 409, "build_limit"], ["daily_limit", 429, "daily_limit"],
+])("save_build refusing %s is a %i that says so", async (refusal, status, code) => {
+  auth.authQuery.mockImplementation(async (path: string) =>
+    path === "rpc/save_build" ? [{ build_ref: null, build_slug: null, refusal }] : []);
+  const res = await save({ name: "a", code: MAGE, characterId: CHARACTER_ID });
+  expect(res.status).toBe(status);
+  const body = await res.json();
+  expect(body.code).toBe(code);
+  expect(body).not.toHaveProperty("build");
+});
+
+const UNCONFIRMED = "We could not confirm the save. Check your builds before trying again.";
+
+test.each([
+  ["save_build fails", (path: string) => path === "rpc/save_build"],
+  ["the saved row cannot be read back", (path: string) => path.includes("&id=eq.")],
+])("when %s the answer is a 503 that says the save is unconfirmed, not unsaved", async (_name, broken) => {
+  auth.authQuery.mockImplementation(async (path: string) => {
+    if (broken(path)) throw new Error("down");
+    if (path === "rpc/save_build") return [{ build_ref: BUILD_ID, build_slug: "AbCd1234", refusal: null }];
+    return [];
+  });
+  const res = await save({ name: "a", code: MAGE });
+  expect(res.status).toBe(503);
+  expect(await res.json()).toEqual({ error: UNCONFIRMED, code: "save_unconfirmed" });
+});
+
+test("when the ownership check cannot be read nothing was saved, and the answer says so", async () => {
+  auth.authQuery.mockRejectedValue(new Error("down"));
+  const res = await save({ id: BUILD_ID, name: "a", code: MAGE });
+  expect(res.status).toBe(503);
+  expect((await res.json()).error).toMatch(/Nothing was saved/);
+  expect(saveCall()).toBeUndefined();
+});
+
+test("storage trouble is a 503, never a silent save", async () => {
+  auth.authQuery.mockRejectedValue(new Error("down"));
+  expect((await GET(call("GET"))).status).toBe(503);
+  const res = await save({ name: "a", code: MAGE });
+  expect(res.status).toBe(503);
+  expect(await res.json()).not.toHaveProperty("build");
+});

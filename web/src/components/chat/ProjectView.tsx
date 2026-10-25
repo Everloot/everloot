@@ -5,11 +5,12 @@ import { sourceLink } from "@/lib/chat/agent";
 import { newConversationId } from "@/lib/chat/store";
 import {
   clip, deleteEntry, deleteProject, listConversations, listEntries, sameSitePath, saveEntry, saveProject,
-  type EntryInput, type Scoped,
+  WorkspaceError, type EntryInput, type Scoped,
 } from "@/lib/chat/workspace-api";
 import { WORKSPACE_LIMITS, type WorkspaceConversationSummary, type WorkspaceEntry, type WorkspaceProject } from "@/lib/chat/workspace-types";
-import type { AccountBuilds, SavedBuild } from "@/lib/saved-builds";
+import { editPath, type AccountBuilds, type SavedBuild } from "@/lib/saved-builds";
 import ItemResult from "./ItemResult";
+import PrivateBuildForm from "./PrivateBuildForm";
 
 const link = "underline underline-offset-4 hover:text-accent";
 const field = "min-h-9 w-full rounded-control border border-line bg-panel px-2 text-sm text-fg focus:border-accent focus:outline-none";
@@ -20,22 +21,22 @@ const ITEM_PAGE = /^\/database\/items\/([1-9]\d{0,9})$/;
 /** A note the player chose to send with their next question, shown as a removable chip. */
 export interface AttachedNote { title: string; text: string }
 
-function SavedEntry({ e, builds, onDelete, onAttach }: {
-  e: WorkspaceEntry; builds: SavedBuild[] | null; onDelete: () => void; onAttach: () => void;
+function SavedEntry({ e, builds, onDelete, onAttach, onEditBuild }: {
+  e: WorkspaceEntry; builds: SavedBuild[] | null; onDelete: () => void; onAttach: () => void; onEditBuild: (b: SavedBuild) => void;
 }) {
   const [card, setCard] = useState(false);
   const item = e.href ? ITEM_PAGE.exec(e.href) : null;
-  // A build is kept by its id; its name and link are read live from My builds, so its edits and sharing show here.
+  // A build is kept by its id; the account's current code, name and sharing are read live.
   const build = e.kind === "build" ? builds?.find((b) => b.id === e.buildId) ?? null : null;
   return (
     <li className="space-y-1 rounded-card border border-line p-3 text-sm">
       <div className="flex flex-wrap items-baseline gap-x-3">
         {e.kind === "page" && e.href && <a href={e.href} className={`${link} text-fg`}>{e.title}</a>}
         {e.kind === "build" && (build
-          ? <a href={build.link ?? "/me"} className={`${link} text-fg`}>{build.name}</a>
+          ? <a href={build.link ?? editPath(build)} className={`${link} text-fg`}>{build.name}</a>
           : (
             <span className="text-muted">
-              {builds ? "This build is no longer in My builds." : `${e.title}: My builds is not available right now, so this build cannot be opened here.`}
+              {builds ? "This build is no longer in your account." : `${e.title}: builds are unavailable right now.`}
             </span>
           ))}
         {(e.kind === "answer" || e.kind === "note") && <span className="font-semibold text-fg">{e.title}</span>}
@@ -54,6 +55,7 @@ function SavedEntry({ e, builds, onDelete, onAttach }: {
       {card && item && <ItemResult item={{ id: Number(item[1]) }} onChoose={() => {}} />}
       <div className="flex flex-wrap gap-x-3 text-xs">
         {item && <button type="button" className={`min-h-9 ${link}`} aria-expanded={card} onClick={() => setCard(!card)}>{card ? "Hide card" : "Show card"}</button>}
+        {build && <button type="button" className={`min-h-9 ${link}`} onClick={() => onEditBuild(build)}>Edit build</button>}
         {(e.kind === "note" || e.kind === "answer") && <button type="button" className={`min-h-9 ${link}`} onClick={onAttach}>Use in question</button>}
         <button type="button" className={`min-h-9 ${link} hover:text-danger`} aria-label={`Delete ${e.title}`} onClick={onDelete}>Delete</button>
       </div>
@@ -65,7 +67,7 @@ function SavedEntry({ e, builds, onDelete, onAttach }: {
  * A project's overview under /chat?project=<id>: its Saved pages, builds and answers, its Chats and its Notes, with
  * New chat, rename and remove. Removing a project moves its chats and entries to Unfiled; builds and pages stay.
  */
-export default function ProjectView({ project, opts, failed, savedBuilds, busy, onBack, onNewChat, onOpenChat, onProject, onRemoved, onAttach }: {
+export default function ProjectView({ project, opts, failed, busy, onBack, onNewChat, onOpenChat, onProject, onRemoved, onAttach }: {
   project: WorkspaceProject;
   opts: () => Scoped | null;
   failed: (err: unknown) => string;
@@ -82,6 +84,7 @@ export default function ProjectView({ project, opts, failed, savedBuilds, busy, 
   const [entries, setEntries] = useState<WorkspaceEntry[] | null>(null);
   const [more, setMore] = useState<string | null>(null);
   const [builds, setBuilds] = useState<SavedBuild[] | null>(null);
+  const [buildForm, setBuildForm] = useState<SavedBuild | "new" | null>(null);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<{ name: string; description: string } | null>(null);
   const [removing, setRemoving] = useState(false);
@@ -89,17 +92,27 @@ export default function ProjectView({ project, opts, failed, savedBuilds, busy, 
   const [page, setPage] = useState({ href: "", label: "" });
 
   useEffect(() => {
-    const o = opts();
-    if (!o) return;
+    const account = opts();
+    if (!account) return;
+    const ctl = new AbortController();
+    const abort = () => ctl.abort();
+    account.signal.addEventListener("abort", abort, { once: true });
+    if (account.signal.aborted) ctl.abort();
+    const o = { ...account, signal: ctl.signal };
     setChats(null); setEntries(null);
+    setBuilds(null); setBuildForm(null);
     listConversations({ projectId: project.id }, o).then((r) => { if (!o.signal.aborted) setChats(r.items); }, (e) => { if (!o.signal.aborted) setError(failed(e)); });
     listEntries({ projectId: project.id }, o).then((r) => { if (!o.signal.aborted) { setEntries(r.items); setMore(r.nextCursor); } }, (e) => { if (!o.signal.aborted) setError(failed(e)); });
-    if (savedBuilds) {
-      fetch("/api/me/builds", { cache: "no-store", signal: o.signal })
-        .then(async (res) => { if (!o.signal.aborted) setBuilds(res.ok ? ((await res.json()) as AccountBuilds).builds : null); })
-        .catch(() => { /* builds unavailable: their entries show their own labels */ });
-    }
-  }, [project.id, opts, failed, savedBuilds]);
+    fetch("/api/me/chat/builds", { cache: "no-store", signal: o.signal })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Your builds could not be loaded. Try opening this project again.");
+        const body = await res.json() as AccountBuilds & { accountId: string };
+        if (o.signal.aborted) return;
+        if (body.accountId !== o.accountId) throw new WorkspaceError("account_changed", "Your account changed. Reload Chat.");
+        setBuilds(body.builds);
+      }).catch((e) => { if (!o.signal.aborted) setError(failed(e)); });
+    return () => { ctl.abort(); account.signal.removeEventListener("abort", abort); };
+  }, [project.id, opts, failed]);
 
   async function run<T>(work: (o: Scoped) => Promise<T>): Promise<T | null> {
     const o = opts();
@@ -142,7 +155,16 @@ export default function ProjectView({ project, opts, failed, savedBuilds, busy, 
   }
 
   async function addBuild(b: SavedBuild) {
-    await add({ kind: "build", title: clip(b.name, WORKSPACE_LIMITS.title), buildId: b.id, href: null, text: null, sources: [] });
+    return add({ kind: "build", title: clip(b.name, WORKSPACE_LIMITS.title), buildId: b.id, href: null, text: null, sources: [] });
+  }
+
+  async function buildSaved(b: SavedBuild) {
+    const created = buildForm === "new";
+    setBuilds((list) => [b, ...(list ?? []).filter((x) => x.id !== b.id)]);
+    setBuildForm(null);
+    if (created && !await addBuild(b)) {
+      setError((message) => `The build was saved privately, but its project reference was not confirmed. Choose it from Add a build to try again. ${message}`);
+    }
   }
 
   async function removeEntry(e: WorkspaceEntry) {
@@ -153,7 +175,7 @@ export default function ProjectView({ project, opts, failed, savedBuilds, busy, 
   const notes = entries?.filter((e) => e.kind === "note") ?? [];
   const entry = (e: WorkspaceEntry) => (
     <SavedEntry key={e.id} e={e} builds={builds} onDelete={() => void removeEntry(e)}
-      onAttach={() => onAttach({ title: e.title, text: e.text ?? "" })} />
+      onAttach={() => onAttach({ title: e.title, text: e.text ?? "" })} onEditBuild={setBuildForm} />
   );
 
   return (
@@ -199,10 +221,12 @@ export default function ProjectView({ project, opts, failed, savedBuilds, busy, 
           <input aria-label="Label (optional)" maxLength={WORKSPACE_LIMITS.title} className={`${field} flex-1`} value={page.label} onChange={(e) => setPage({ ...page, label: e.target.value })} />
           <button type="submit" className="btn min-h-9 px-3 text-sm" disabled={!page.href.trim()}>Save page</button>
         </form>
-        {!savedBuilds && <p className="text-xs text-muted">Builds can be added here once My builds is available.</p>}
-        {savedBuilds && builds && builds.length > 0 && (
+        <button type="button" className="btn min-h-9 px-3 text-sm" disabled={busy} onClick={() => setBuildForm("new")}>New private build</button>
+        {buildForm && opts() && <PrivateBuildForm accountId={opts()!.accountId} build={buildForm === "new" ? undefined : buildForm}
+          onSaved={(b) => void buildSaved(b)} onCancel={() => setBuildForm(null)} />}
+        {builds && builds.length > 0 && (
           <select aria-label="Add a build" className={field} value="" onChange={(e) => { const b = builds.find((x) => x.id === e.target.value); if (b) void addBuild(b); }}>
-            <option value="">Add a build from My builds</option>
+            <option value="">Add a build from your account</option>
             {builds.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         )}
