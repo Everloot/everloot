@@ -325,6 +325,7 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
     return {
       effects: eff, durationMs: durationIndex && durations.has(durationIndex) ? durations.get(durationIndex)! : null,
       procChance: num(a?.ProcChance) > 0 && num(a?.ProcChance) <= 100 ? num(a?.ProcChance) : null, procCharges: num(a?.ProcCharges) || null, name: names.get(id) ?? null,
+      description: text(spellRows.get(id)?.Description_lang),
     };
   };
 

@@ -16,7 +16,7 @@ export default function EntityLink({ kind, id, name, icon, ...aria }: { kind: En
   return (
     <span className="inline-flex items-center gap-2">
       {icon ? <GameIcon src={icon} size={18} /> : null}
-      <Link href={entityHref(kind, id)} {...aria} className="text-accent hover:underline underline-offset-4">{name || `${WORD[kind]} ${id}`}</Link>
+      <Link href={entityHref(kind, id)} {...aria} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{name || `${WORD[kind]} ${id}`}</Link>
     </span>
   );
 }

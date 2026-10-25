@@ -60,7 +60,7 @@ export function RelationTarget({ edge, rel, client, spellIcon, nameOf, gameName 
     <>
       {icon ? <><GameIcon src={icon} size={18} />{" "}</> : null}
       {/* A link's hover card says where its name comes from; a name without a page keeps the plain tooltip. */}
-      {href ? <Link href={href} className="text-accent hover:underline underline-offset-4">{text}</Link> : title ? <span title={title}>{text}</span> : text}
+      {href ? <Link href={href} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{text}</Link> : title ? <span title={title}>{text}</span> : text}
       {fromFiles?.source === "wiki" ? <span className="sr-only"> ({GAME_NAME_TITLE.wiki.toLowerCase()})</span> : null}
       {/* A name only the game files give carries the quiet unconfirmed marker, as on the item lists. */}
       {fromFiles?.source === "files" ? <>{" "}<Badge tone="files" /></> : null}
@@ -109,15 +109,38 @@ export function EntityRelations({ kind, id, observed, client, skip = [], spellIc
   );
 }
 
-export function SameIcon({ edge, self, client }: { edge: Edge; self: number; client: readonly Edge[] }) {
+/**
+ * Items that share an icon file. An item with a name to show is a link, with its icon when the page has one; the
+ * rest are not listed by id, only counted in one muted line.
+ */
+export function SameIcon({ edge, self, client, itemName, itemIcon }: {
+  edge: Edge; self: number; client: readonly Edge[]; itemName?: (id: number) => string | undefined; itemIcon?: (id: number) => string | undefined;
+}) {
   const others = client.filter((o) => o.rel === "same_icon" && o.toId === edge.toId && o.fromId !== self).map((o) => o.fromId);
+  const named = others.filter((id) => itemName?.(id));
+  const shown = named.slice(0, SAME_ICON_SHOWN);
+  const nameless = others.length - named.length;
   return (
     <>
-      {`Icon file ${edge.toId}, shared with `}
-      {others.slice(0, SAME_ICON_SHOWN).map((item, i) => (
-        <span key={item}>{i > 0 ? ", " : ""}<Link href={`/database/items/${item}`} className="text-accent hover:underline underline-offset-4">item {item}</Link></span>
-      ))}
-      {others.length > SAME_ICON_SHOWN ? ` and ${others.length - SAME_ICON_SHOWN} more` : ""}
+      {`Icon file ${edge.toId}`}
+      {shown.length > 0 && ", shared with "}
+      {shown.map((item, i) => {
+        const icon = itemIcon?.(item);
+        return (
+          <span key={item}>
+            {i > 0 ? ", " : ""}
+            {icon ? <><GameIcon src={icon} size={18} />{" "}</> : null}
+            <Link href={`/database/items/${item}`} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{itemName!(item)}</Link>
+          </span>
+        );
+      })}
+      {named.length > shown.length && ` and ${named.length - shown.length} more`}
+      {nameless > 0 && (
+        <span className="text-muted">
+          {shown.length > 0 ? "; " : ", shared with "}
+          {nameless} {nameless === 1 ? "item" : "items"} with no name yet
+        </span>
+      )}
     </>
   );
 }

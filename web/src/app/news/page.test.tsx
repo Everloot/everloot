@@ -57,7 +57,8 @@ test("a post page shows the byline, the body with its links and tokens, the sour
   expect(html).toContain("Test Post");
   expect(html).toMatch(/<span data-author(?:="[^"]*")?>Test Author<\/span>/);
   expect(html).toContain('<time dateTime="2026-10-24">October 24, 2026</time>');
-  expect(html).toContain('Updated <time dateTime="2026-10-25">October 25, 2026</time>');
+  expect(html).toContain('<dt class="font-mono text-xs text-muted">Updated</dt><dd class="text-fg-2 [overflow-wrap:anywhere]"><time dateTime="2026-10-25">October 25, 2026</time>');
+  expect(html).toContain("data-reading-layout");
   expect(html).toContain('href="/database/items"');
   expect(html).toContain('<a href="/database/items/2589">Rough Copper Vest</a>');
   expect(html).toContain('<a href="/wiki/test-dungeon">Test Dungeon</a>');
@@ -66,7 +67,12 @@ test("a post page shows the byline, the body with its links and tokens, the sour
   expect(html).toContain("<blockquote");
   expect(html).toContain('href="https://worldofwarcraft.blizzard.com/en-us/news/example"');
   expect(html).toContain('href="/news/older-post"');
-  expect(html).toContain('"@type":"Article"');
+  expect(html).toContain('"@type":"NewsArticle"');
+  expect(html).not.toContain('"@type":"Article"');
+  expect(html).toContain('"author":{"@type":"Organization","name":"Everloot Team"}');
+  expect(html).toContain('"headline":"Test Post"');
+  expect(html).toContain('"mainEntityOfPage":');
+  expect(html).toContain('"publisher":');
   expect(html).toContain('"datePublished":"2026-10-24"');
   expect(html).toContain('"dateModified":"2026-10-25"');
   expect(html).not.toContain('"Person"');

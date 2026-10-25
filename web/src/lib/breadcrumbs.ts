@@ -2,11 +2,12 @@ import type { Crumb } from "./jsonld";
 import { CLASSES } from "@/design/tokens";
 
 /**
- * Where a page sits, for the visible breadcrumb and its BreadcrumbList. /tools is not a page (it 404s), so a
- * tool's trail goes from Home straight to the tool. Pages without an entry have no breadcrumb.
+ * Where a page sits, for the visible breadcrumb and its BreadcrumbList. /tools is the index of the menu, but a
+ * tool's trail still goes from Home straight to the tool. Pages without an entry have no breadcrumb.
  */
 const NAMES: Record<string, string> = {
   "/about": "About",
+  "/tools": "Tools",
   "/privacy": "Privacy",
   "/terms": "Terms of use",
   "/security": "Security",

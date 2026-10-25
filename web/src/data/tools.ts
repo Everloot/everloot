@@ -170,6 +170,24 @@ export const TOOL_GROUPS: { title: string; links: { label: string; href: string 
   },
 ];
 
+/** One plain line per Tools menu link, for /tools and /about. Keyed by the menu's href (tools.test.ts). */
+export const TOOL_LINES: Record<string, string> = {
+  "/tools/talents": "Plan a talent build for any class and share it with its game build attached.",
+  "/tools/raid": "Fill a 10, 20 or 40 player raid and see which buffs and debuffs it covers.",
+  "/tools/professions": "Skill-up paths and recipe ranges for each profession, from recipes and prices players uploaded.",
+  "/tools/farming-routes": "Farming areas by what you farm, filled in from what players upload.",
+  "/chat": "Ask a question in plain words. Your own AI model looks it up in Everloot's data and names the sources.",
+  "/tools/auctions": "Auction House prices by realm, from player scans. A price shows once 3 reporters agree.",
+  "/census": "Races, classes and levels, counted from players who turned the census on.",
+  "/rankings": "WoW: Forever week by week, from players who turned the census on.",
+  "/addons": "Addons made for WoW: Forever, ranked by GitHub stars.",
+  "/tools/guild-board": "Roster, progression, loot and item level for a guild, from officer uploads.",
+  "/guilds": "Guilds by progression, from their members' uploads.",
+  "/tools/collections": "Owned and missing in a collection, and what a character has done in achievements, reputation, titles and quest chains.",
+  "/tools/gold-ledger": "Your gold, income and spending across characters, read from your own addon file in your browser.",
+  "/upload": "Upload what the Everloot addon recorded. You preview everything before it is sent.",
+};
+
 /** The Tools menu with the guild switch applied: with EVERLOOT_GUILDS on, "Guild board" becomes "Guilds", the ladder hub. */
 export function toolGroups(guilds: boolean): typeof TOOL_GROUPS {
   if (!guilds) return TOOL_GROUPS;

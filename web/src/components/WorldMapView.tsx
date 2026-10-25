@@ -476,7 +476,7 @@ export default function WorldMapView(props: WorldMapViewProps) {
           {focus && (
             <div data-map-zone className="flex items-center justify-between gap-3 text-sm">
               <p className="min-w-0 font-medium text-fg [overflow-wrap:anywhere]">{focus.name}{focus.heldBack ? " *" : ""}</p>
-              <button type="button" onClick={goHome} className="inline-flex min-h-11 shrink-0 items-center text-accent hover:underline underline-offset-4 md:min-h-8">All of {props.name}</button>
+              <button type="button" onClick={goHome} className="inline-flex min-h-11 shrink-0 items-center text-fg underline decoration-edge underline-offset-4 hover:decoration-fg md:min-h-8">All of {props.name}</button>
             </div>
           )}
 
@@ -519,7 +519,7 @@ export default function WorldMapView(props: WorldMapViewProps) {
                 return (
                   <fieldset key={group.id} data-category-group={group.id}>
                     <legend className="mb-0.5 text-sm font-medium text-fg">{group.label}</legend>
-                    {empty.length > 0 && <p className="text-xs text-muted">Filled by uploads from the <Link href="/addon" className="text-accent hover:underline underline-offset-4">addon</Link> once 3 installs agree on a place.</p>}
+                    {empty.length > 0 && <p className="text-xs text-muted">Filled by uploads from the <Link href="/addon" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">addon</Link> once 3 installs agree on a place.</p>}
                     {group.categories.map((c) => {
                       const idle = c.status === "waiting" && counts[c.id] === 0;
                       const near = candidates[c.id] ?? 0;
@@ -557,7 +557,7 @@ export default function WorldMapView(props: WorldMapViewProps) {
                     Game map art
                   </label>
                 )}
-                <Link href={props.spoilerHref} className="inline-flex min-h-11 items-center text-accent hover:underline underline-offset-4 md:min-h-9">
+                <Link href={props.spoilerHref} className="inline-flex min-h-11 items-center text-fg underline decoration-edge underline-offset-4 hover:decoration-fg md:min-h-9">
                   {spoilers ? "Hide spoilers" : "Show spoilers"}
                 </Link>
               </div>

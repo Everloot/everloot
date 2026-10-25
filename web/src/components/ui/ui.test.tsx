@@ -19,6 +19,7 @@ import DataTable, { filledColumns, type Column, type SparseColumn } from "./Data
 import EmptyState from "./EmptyState";
 import { pageWindow } from "./Pager";
 import PageHeader from "./PageHeader";
+import ReadingLayout, { RailFacts } from "./ReadingLayout";
 import SectionHeading from "./SectionHeading";
 import TooltipFrame from "./TooltipFrame";
 import { qualityOf, QUALITY_TEXT } from "./quality";
@@ -30,6 +31,26 @@ describe("Container", () => {
   test("has two widths, wide by default", () => {
     expect(render(<Container>x</Container>)).toContain("max-w-wide");
     expect(render(<Container width="reading">x</Container>)).toContain("max-w-reading");
+  });
+});
+
+describe("ReadingLayout", () => {
+  const items = [{ id: "a", label: "First" }, { id: "b", label: "Second" }];
+
+  test("is a plain reading column without a rail when it has no meta and no contents", () => {
+    const html = render(<ReadingLayout>x</ReadingLayout>);
+    expect(html).toContain("max-w-reading");
+    expect(html).not.toContain("<aside");
+  });
+
+  test("puts the meta and a contents list of anchors in the rail", () => {
+    const html = render(<ReadingLayout items={items} meta={<RailFacts items={[{ label: "Published", value: "today" }]} />}>body</ReadingLayout>);
+    expect(html).toContain("data-reading-layout");
+    expect(html).toContain('href="#a"');
+    expect(html).toContain('href="#b"');
+    expect(text(html)).toContain("Published today");
+    // The text comes first, so a phone opens on the title and a screen reader reaches the h1 before the rail.
+    expect(html.indexOf("body")).toBeLessThan(html.indexOf("<aside"));
   });
 });
 
@@ -76,8 +97,8 @@ describe("SectionHeading", () => {
   test("one style, h2 by default, h3 on request", () => {
     const h2 = render(<SectionHeading>Used in</SectionHeading>);
     const h3 = render(<SectionHeading as="h3">Used in</SectionHeading>);
-    expect(h2).toMatch(/<h2 class="text-xl font-semibold tracking-tight text-fg">Used in<\/h2>/);
-    expect(h3).toMatch(/<h3 class="text-xl font-semibold tracking-tight text-fg">Used in<\/h3>/);
+    expect(h2).toMatch(/<h2 class="scroll-mt-24 text-xl font-semibold tracking-tight text-fg">Used in<\/h2>/);
+    expect(h3).toMatch(/<h3 class="scroll-mt-24 text-xl font-semibold tracking-tight text-fg">Used in<\/h3>/);
   });
 });
 
@@ -100,9 +121,11 @@ describe("Card", () => {
 });
 
 describe("Badge", () => {
-  test("the files badge is a quiet dashed marker, not a pill: a tooltip and a screen-reader label", () => {
+  test("the files badge is a quiet hollow diamond, not a pill or a dotted ring: a tooltip and a screen-reader label", () => {
     const html = render(<Badge tone="files" />);
-    expect(html).toContain("border-dashed");
+    expect(html).toContain("rotate-45");
+    expect(html).not.toContain("border-dashed");
+    expect(html).not.toContain("rounded-full");
     expect(html).not.toContain("rounded-full border px-2.5");
     expect(html).toContain('title="From the game files, not yet confirmed by players"');
     expect(html).toMatch(/<span class="sr-only">unconfirmed<\/span>/);

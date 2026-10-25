@@ -20,7 +20,7 @@ const description =
 export const metadata: Metadata = pageMetadata({ title: "WoW Forever Census: Races, Classes and Levels", description, path: "/census" });
 export const dynamic = "force-dynamic";
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 const CLASS_NAME = new Map<string, string>(CENSUS_CLASSES.map((c) => [c.token, c.name]));
 const RACE_NAME = new Map<string, string>(CENSUS_RACES.map((r) => [r.token, r.name]));
 const day = (iso: string) => iso.slice(0, 10);
@@ -167,7 +167,7 @@ export default async function CensusPage({ searchParams }: { searchParams?: Prom
   const w = view?.windows[chosen];
   const ready = !unreachable && view && w;
   return (
-    <Container width="wide">
+    <Container width="data">
       <article>
         <PageHeader
           trail={trailFor("/census")!}

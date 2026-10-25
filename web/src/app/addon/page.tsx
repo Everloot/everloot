@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 // The Desktop App release is read from GitHub, so the page is rebuilt at most once an hour.
 export const revalidate = 3600;
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 const EXT = "noopener noreferrer";
 
 /** The Desktop App files the page offers, in this order, matched by the end of the artifact name. */

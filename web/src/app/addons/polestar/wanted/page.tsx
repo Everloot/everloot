@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   ...pageMetadata({ title: "Polestar Pack Ideas for WoW Forever", description: "Guide packs nobody has built yet for Polestar, the WoW: Forever leveling addon: why each one is still open, and how Polestar itself needs help.", path: "/addons/polestar/wanted" }),
 };
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 export default function WantedPage() {
   return (

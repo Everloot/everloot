@@ -46,9 +46,13 @@
 }
 
 .wm-map {
-  background: rgb(var(--panel));
   font: inherit;
   outline-offset: -2px;
+}
+
+/* Leaflet's stylesheet loads after this one and sets #ddd on .leaflet-container; the second class wins over it. */
+.wm-map.leaflet-container {
+  background: rgb(var(--panel));
 }
 
 /* Zone bounds are hit targets, not geographic borders. Names identify the zones. */

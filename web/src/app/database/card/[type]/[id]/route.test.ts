@@ -42,7 +42,9 @@ test("an item the name rule shows gets its page's box: the game's lines, its qua
   const { card } = await res.json();
   // No quality in the client layer for this one: the name keeps its own colour.
   expect(card).toMatchObject({ type: "item", id: 647, title: "Destiny", quality: null, color: "#a335ee", icon: TIP.icon });
-  expect(card.lines).toEqual(["Two-Hand", "+[?] Strength", "[?] stat amounts: reason."]);
+  // The reason for the placeholder is a note for the card to draw under it, not a line in the box.
+  expect(card.lines).toEqual(["Two-Hand", "+[?] Strength"]);
+  expect(card.notes).toEqual(["[?] stat amounts: reason."]);
   expect(card.foot).toBe("Name from the Warcraft Wiki · Found in game files, unconfirmed · build 70450");
   expect(mocks.tips).toHaveBeenCalledWith(expect.anything(), [647]);
 });
@@ -52,7 +54,8 @@ test("a number 3 installs' tooltips agree on fills its placeholder, with the ins
     shown: [{ fact: "strength", value: 7, reporters: 4, build: "1.60.1.70450", lastSeen: "2026-11-05T12:00:00.000Z" }], contested: [], unreachable: false,
   });
   const { card } = await (await call("item", "647")).json();
-  expect(card.lines).toEqual(["Two-Hand", "+7 Strength", "[?] stat amounts: reason.", "+7 Strength: reported by 4 installs, last seen 2026-11-05, build 1.60.1.70450."]);
+  expect(card.notes).toEqual(["[?] stat amounts: reason."]);
+  expect(card.lines).toEqual(["Two-Hand", "+7 Strength", "+7 Strength: reported by 4 installs, last seen 2026-11-05, build 1.60.1.70450."]);
   expect(mocks.reported).toHaveBeenCalledWith(647);
 });
 

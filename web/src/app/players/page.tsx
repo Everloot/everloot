@@ -22,7 +22,7 @@ export async function generateMetadata(props: { searchParams: Promise<{ q?: stri
 /** One search per prefix is kept five minutes, so a repeated search never reaches the database again. */
 const search = unstable_cache((prefix: string) => playerStore().search(prefix), ["player-search"], { revalidate: 300, tags: [PLAYER_SEARCH_TAG] });
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 // The hide link sits with the name, the one column a phone shows.

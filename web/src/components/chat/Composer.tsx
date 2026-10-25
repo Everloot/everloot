@@ -53,7 +53,7 @@ export default function Composer(p: {
       <div className="rounded-card border border-edge bg-panel focus-within:border-accent">
         {!ready && (
           <p className="border-b border-line px-4 py-2 text-sm text-fg-2">
-            <a href={p.keysHref} className="text-accent underline underline-offset-4">Finish your key setup</a>{p.signed === false ? " (sign in first)" : ""} to answer with a model. Until then, Send shows Everloot&apos;s search results.
+            <a href={p.keysHref} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Finish your key setup</a>{p.signed === false ? " (sign in first)" : ""} to answer with a model. Until then, Send shows Everloot&apos;s search results.
           </p>
         )}
         <textarea ref={p.box} rows={1} value={p.value} aria-label="Your question" aria-keyshortcuts="Enter Shift+Enter"

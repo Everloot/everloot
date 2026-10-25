@@ -4,7 +4,7 @@ import { pageMetadata } from "@/lib/seo";
 import { REVOKED_KEPT_DAYS, USAGE_KEPT_DAYS } from "@/lib/api-keys";
 import { OPERATOR } from "@/lib/jsonld";
 import { trailFor } from "@/lib/breadcrumbs";
-import { Container, PageHeader, Prose, SectionHeading, TocLayout, type TocItem } from "@/components/ui";
+import { Container, PageHeader, Prose, SectionHeading, ReadingLayout, type TocItem } from "@/components/ui";
 
 export const metadata: Metadata = {
   ...pageMetadata({ title: "Privacy Policy", description: "How Everloot handles your data, cookies and usage statistics, and what happens to the addon files you upload to the WoW: Forever database.", path: "/privacy" }),
@@ -40,7 +40,7 @@ export default function PrivacyPage() {
       <Container width="reading">
         <PageHeader trail={trailFor("/privacy")!} title="Privacy Policy" meta={<span>Last updated: {updated}</span>} />
       </Container>
-      <TocLayout items={SECTIONS}>
+      <ReadingLayout items={SECTIONS}>
         <Prose>
           <Section id="overview">
             <p>
@@ -383,7 +383,7 @@ export default function PrivacyPage() {
             </p>
           </Section>
         </Prose>
-      </TocLayout>
+      </ReadingLayout>
     </article>
   );
 }

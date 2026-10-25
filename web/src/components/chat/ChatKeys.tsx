@@ -159,7 +159,7 @@ function ProviderCard({ preset, saved, isDefault, busy, onSave, onTest, onRemove
       )}
 
       <p className="text-xs text-muted">
-        <a href={preset.getKey.href} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline underline-offset-4">
+        <a href={preset.getKey.href} target="_blank" rel="noopener noreferrer" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">
           {preset.getKey.text}<span className="sr-only"> (opens in a new tab)</span>
         </a>
         {" · "}{preset.dataNote}

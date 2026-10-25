@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   ...pageMetadata({ title: "Polestar Guide Packs for WoW Forever", description: "An independent list of guide packs for Polestar, the WoW: Forever leveling addon: who made each, what it covers, its licence and where to get it.", path: "/addons/polestar/packs" }),
 };
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 export default function PacksPage() {
   return (

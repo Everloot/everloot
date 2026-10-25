@@ -8,7 +8,7 @@ export const LIST_LIMIT = 100;
 export const HELD_LABEL = "found in game files, unconfirmed";
 
 const heading = "mb-2 text-h2-sm text-fg";
-const showClass = "inline-flex min-h-11 items-center text-accent hover:underline underline-offset-4 md:min-h-8";
+const showClass = "inline-flex min-h-11 items-center text-fg underline decoration-edge underline-offset-4 hover:decoration-fg md:min-h-8";
 
 /**
  * The List tab: every place the map shows, as headed lists, for a keyboard, a screen reader or anyone who would
@@ -41,7 +41,7 @@ export default function MapList({ zones, shown, show, pinTotal, spoilers, thumbs
             <li key={z.mapId} className="min-w-0">
               <Link
                 href={zoneHref(z.mapId, spoilers)} onClick={(e) => { e.preventDefault(); onZone(z.mapId); }}
-                className="inline-flex min-h-11 items-center gap-1.5 text-accent hover:underline underline-offset-4 md:min-h-8"
+                className="inline-flex min-h-11 items-center gap-1.5 text-fg underline decoration-edge underline-offset-4 hover:decoration-fg md:min-h-8"
               >
                 {z.name}{z.heldBack && <> *<Badge tone="files">{HELD_LABEL}</Badge></>}
               </Link>
@@ -100,7 +100,7 @@ export default function MapList({ zones, shown, show, pinTotal, spoilers, thumbs
             <ul className="space-y-2 text-fg-2">
               {shown.pins.slice(0, LIST_LIMIT).map((p) => (
                 <li key={p.id}>
-                  <Link href={`/database/npcs/${p.npcId}`} className="text-accent hover:underline underline-offset-4">{p.name ?? `NPC ${p.npcId}`}</Link>
+                  <Link href={`/database/npcs/${p.npcId}`} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{p.name ?? `NPC ${p.npcId}`}</Link>
                   {" · "}{p.kind}{" · "}{p.zoneName}{" "}
                   <Link href={mapHref({ mapId: p.mapId, x: p.zoneX, y: p.zoneY })} className="font-mono text-xs text-muted hover:underline underline-offset-4">{p.zoneX}, {p.zoneY}</Link>
                   {" · "}{p.reporters} reporters
@@ -122,7 +122,7 @@ export default function MapList({ zones, shown, show, pinTotal, spoilers, thumbs
             <ul className="space-y-2 text-fg-2">
               {shown.treasures.map((t) => (
                 <li key={t.id}>
-                  <Link href={`/database/objects/${t.objectId}`} className="text-accent hover:underline underline-offset-4">{t.name ?? `Object ${t.objectId}`}</Link>
+                  <Link href={`/database/objects/${t.objectId}`} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{t.name ?? `Object ${t.objectId}`}</Link>
                   {" · "}{t.zoneName}{" "}
                   <Link href={mapHref({ mapId: t.mapId, x: t.zoneX, y: t.zoneY })} className="font-mono text-xs text-muted hover:underline underline-offset-4">{t.zoneX}, {t.zoneY}</Link>
                   {" · "}{confirmedLine(t.reporters, t.lastSeen ?? null)}

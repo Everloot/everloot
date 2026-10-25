@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 const heading = "text-cell font-semibold text-fg";
 
 /** The player's profile, status and characters, with links to their keys and the Desktop App. */

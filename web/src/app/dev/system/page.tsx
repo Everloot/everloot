@@ -140,7 +140,7 @@ export default function DesignSystemPage() {
             <a href="/addon" className="btn btn-primary min-h-10 px-4 text-sm">Small primary</a>
             <button type="button" className="btn btn-primary" disabled>Disabled primary</button>
             <button type="button" className="btn" disabled>Disabled</button>
-            <a href="/database" className="text-accent underline underline-offset-4">A text link</a>
+            <a href="/database" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">A text link</a>
           </div>
         </Specimen>
 
@@ -171,7 +171,7 @@ export default function DesignSystemPage() {
 
         <Specimen id="section-heading" title="SectionHeading" note="One style. An action at the right, at most one line under it.">
           <Card>
-            <SectionHeading as="h3" action={<a href="#section-heading" className="text-accent">All recipes →</a>}>Used in</SectionHeading>
+            <SectionHeading as="h3" action={<a href="#section-heading" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">All recipes →</a>}>Used in</SectionHeading>
             <SectionHeading as="h3" note="Read from the game files.">Where it comes from</SectionHeading>
           </Card>
         </Specimen>
@@ -222,7 +222,7 @@ export default function DesignSystemPage() {
             rowKey={(r) => String(r.id)}
             sort={{ key: "seen", direction: "desc" }}
             sortHref={(key, dir) => `/dev/system?sort=${key}&dir=${dir}#table`}
-            footer={<><span>7 of 31,849 items</span><a href="/database" className="text-accent">Open the database →</a></>}
+            footer={<><span>7 of 31,849 items</span><a href="/database" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Open the database →</a></>}
           />
           <DataTable
             caption="Drops of Linen Cloth"

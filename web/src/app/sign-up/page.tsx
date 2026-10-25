@@ -24,7 +24,7 @@ export default async function SignUpPage({ searchParams }: { searchParams?: Prom
       <h1 className="text-3xl font-bold text-fg">Make an account</h1>
       {methods.battlenet && (
         <p className="text-fg-2">
-          Play on Battle.net? <a href={returnTo ? `/api/auth/bnet?returnTo=${encodeURIComponent(returnTo)}` : "/api/auth/bnet"} className="text-accent hover:underline underline-offset-4">Sign in with Battle.net</a>; your
+          Play on Battle.net? <a href={returnTo ? `/api/auth/bnet?returnTo=${encodeURIComponent(returnTo)}` : "/api/auth/bnet"} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Sign in with Battle.net</a>; your
           first sign-in makes the account.
         </p>
       )}
@@ -32,9 +32,9 @@ export default async function SignUpPage({ searchParams }: { searchParams?: Prom
         ? <EmailAuthForm mode="sign-up" returnTo={returnTo ?? undefined} />
         : <p className="text-fg-2">Email sign-up is not open yet.</p>}
       <p className="text-sm text-fg-2">
-        Already have one? <Link href={returnTo ? `/sign-in?returnTo=${encodeURIComponent(returnTo)}` : "/sign-in"} className="text-accent hover:underline underline-offset-4">Sign in</Link>.
-        {" "}By making an account you agree to the <Link href="/terms" className="text-accent hover:underline underline-offset-4">Terms</Link> and
-        the <Link href="/privacy" className="text-accent hover:underline underline-offset-4">Privacy Policy</Link>.
+        Already have one? <Link href={returnTo ? `/sign-in?returnTo=${encodeURIComponent(returnTo)}` : "/sign-in"} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Sign in</Link>.
+        {" "}By making an account you agree to the <Link href="/terms" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Terms</Link> and
+        the <Link href="/privacy" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Privacy Policy</Link>.
       </p>
     </article>
   );

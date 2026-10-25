@@ -24,7 +24,7 @@ const CREDIT = "Warcraft Wiki contributors, CC BY-SA 4.0";
 export const metadata: Metadata = pageMetadata({ title: "Lore archive", description: DESCRIPTION, path: "/lore" });
 
 const formatter = new Intl.NumberFormat("en-US");
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 export default async function LoreLanding() {
   const release = getRelease();
@@ -108,7 +108,7 @@ export default async function LoreLanding() {
             )}
             <p className="text-sm text-muted">
               This archive predates WoW: Forever. For collected gameplay facts see the{" "}
-              <Link href="/database" className="text-accent">Forever database</Link>.
+              <Link href="/database" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Forever database</Link>.
             </p>
           </div>
         ) : (

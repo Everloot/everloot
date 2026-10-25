@@ -21,7 +21,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: The tag matches the desktop version
         shell: bash
         run: |
@@ -37,7 +37,7 @@ jobs:
         shell: bash
         run: |
           grep -q "^## \[${GITHUB_REF_NAME}\]" CHANGELOG.md || { echo "CHANGELOG.md has no section for ${GITHUB_REF_NAME}"; exit 1; }
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22.23.2'
           cache: npm
@@ -67,7 +67,7 @@ jobs:
           mkdir -p out
           find desktop/release -maxdepth 1 -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' \) -exec cp {} out/ \;
           ls -l out
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: desktop-${{ matrix.os }}
           path: out/*
@@ -80,7 +80,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: The changelog has a section for this version
         run: |
           version="${GITHUB_REF_NAME#desktop-v}"
@@ -89,7 +89,7 @@ jobs:
             on { print }
           ' CHANGELOG.md > release-notes.md
           test -s release-notes.md || { echo "CHANGELOG.md has no section for desktop-v${version}"; exit 1; }
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: desktop-*
           merge-multiple: true

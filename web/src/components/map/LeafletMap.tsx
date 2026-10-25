@@ -118,7 +118,10 @@ export default function LeafletMap(props: LeafletMapProps) {
     });
     map.current = m;
     const pad = Math.max(p.base.width, p.base.height) * 0.02;
-    const limit = bounds({ x: p.base.x - pad, y: p.base.y - pad, width: p.base.width + 2 * pad, height: p.base.height + 2 * pad });
+    // With the continent's picture the frame is bounded by the picture, which is larger than the zones' box, and is
+    // always filled by it. Without one, the whole zones' box fits and the panel colour shows around it.
+    const picture = p.art?.continent ?? null;
+    const limit = picture ? bounds(picture) : bounds({ x: p.base.x - pad, y: p.base.y - pad, width: p.base.width + 2 * pad, height: p.base.height + 2 * pad });
     m.setMaxBounds(limit);
     zoomButtons(m).addTo(m);
     m.getContainer().setAttribute("role", "group");
@@ -140,7 +143,7 @@ export default function LeafletMap(props: LeafletMapProps) {
       const { x, y } = m.getSize();
       // A box with no size yet (hidden, or mid-resize) has no zoom that fits.
       if (!x || !y) return m.getMinZoom();
-      const min = m.getBoundsZoom(limit, false);
+      const min = m.getBoundsZoom(limit, Boolean(picture));
       if (Number.isFinite(min)) m.setMinZoom(min);
       return m.getMinZoom();
     };
