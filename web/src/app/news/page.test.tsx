@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -109,4 +109,29 @@ test("the feed lists the published posts newest first with their pages as links"
   expect(body).toContain("<category>site</category>");
   expect(body).not.toContain("Test Draft");
   expect(body).toContain(`<pubDate>${new Date("2026-10-24").toUTCString()}</pubDate>`);
+});
+
+test("posts with a hero get card thumbnails, a featured card and the share image; one without gets the placeholder", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "news-hero-"));
+  const post = (slug: string, published: string, hero: string[]) => writeFileSync(join(dir, `${slug}.md`), ["---", `slug: ${slug}`, `title: ${slug}`, "summary: A summary long enough to read as one.", "author: Everloot Team", `published: ${published}`, "tags: [news-recap, forever]", ...hero, "status: published", "---", "", "Body."].join("\n"));
+  post("new-one", "2026-10-25", ["hero:", "  src: /news/heroes/new-one/clean.webp", "  alt: The new art", "  thumb: /news/heroes/new-one/card.webp", "  share: /news/heroes/new-one/share.png"]);
+  post("mid-one", "2026-10-24", ["hero:", "  src: /news/heroes/mid-one/clean.webp", "  alt: The mid art", "  thumb: /news/heroes/mid-one/card.webp"]);
+  post("old-one", "2026-10-23", []);
+  vi.stubEnv("NEWS_DIR", dir); vi.stubEnv("WIKI_DIR", WIKI);
+  const { default: NewsHub } = await import("./page");
+  const hub = renderToStaticMarkup(NewsHub());
+  expect(hub.indexOf("data-news-featured")).toBeLessThan(hub.indexOf('href="/news/mid-one"'));
+  expect(hub).toMatch(/<img data-news-thumb[^>]*src="\/news\/heroes\/new-one\/card.webp"[^>]*loading="eager"/);
+  expect(hub).toMatch(/<img data-news-thumb[^>]*src="\/news\/heroes\/mid-one\/card.webp"[^>]*width="800" height="450"[^>]*loading="lazy"/);
+  expect(hub.match(/data-news-thumb-placeholder/g)).toHaveLength(1);
+  expect(hub).toContain(">Forever</span>");
+  const { default: NewsArticle, generateMetadata } = await import("./[slug]/page");
+  const page = renderToStaticMarkup(await NewsArticle({ params: Promise.resolve({ slug: "new-one" }) }));
+  expect(page).toMatch(/<img data-news-hero[^>]*src="\/news\/heroes\/new-one\/clean.webp" alt="The new art" width="1600" height="900"/);
+  expect(page).toContain('"image":["https://everloot.app/news/heroes/new-one/share.png"]');
+  expect(page).toMatch(/data-related-card[^]*src="\/news\/heroes\/mid-one\/card.webp"/);
+  const meta = await generateMetadata({ params: Promise.resolve({ slug: "new-one" }) });
+  expect(meta.openGraph?.images).toEqual([{ url: "/news/heroes/new-one/share.png", width: 1200, height: 675, alt: "The new art" }]);
+  const fallback = await generateMetadata({ params: Promise.resolve({ slug: "mid-one" }) });
+  expect(fallback.openGraph?.images).toEqual([{ url: "/news/heroes/mid-one/clean.webp", width: 1600, height: 900, alt: "The mid art" }]);
 });

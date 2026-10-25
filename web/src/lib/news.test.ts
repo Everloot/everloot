@@ -63,5 +63,7 @@ test("a hero is optional and checked", async () => {
   expect(PostFrontMatter.safeParse(base).success).toBe(true);
   expect(PostFrontMatter.safeParse({ ...base, hero: { src: "/news/heroes/x.webp", alt: "A hero" } }).success).toBe(true);
   expect(PostFrontMatter.safeParse({ ...base, hero: { src: "http://x.test/a.png", alt: "A" } }).success).toBe(false);
+  expect(PostFrontMatter.safeParse({ ...base, hero: { src: "/a.webp", alt: "A", thumb: "/a-card.webp", share: "/a-share.png" } }).success).toBe(true);
+  expect(PostFrontMatter.safeParse({ ...base, hero: { src: "/a.webp", alt: "A", share: "not a path" } }).success).toBe(false);
   expect(PostFrontMatter.safeParse({ ...base, hero: { src: "/a.png" } }).success).toBe(false);
 });

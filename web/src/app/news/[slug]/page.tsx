@@ -8,6 +8,7 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { newsArticleJsonLd } from "@/lib/jsonld";
 import { bodyForPage, lastChanged, loadNews, newsHref, postDescription, publishedPost, publishedPosts, readingMinutes, relatedPosts, sourceNames } from "@/lib/news";
 import { pageMetadata } from "@/lib/seo";
+import { NewsCard } from "../news-card";
 import { loadWiki, publishedPage } from "@/lib/wiki";
 import { resolveTokens } from "@/lib/wiki-names";
 import { WikiBlock, type TextContext } from "../../wiki/wiki-text";
@@ -36,7 +37,7 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
   const { slug } = await props.params;
   const post = publishedPost(loadNews(), slug);
   if (!post) return { robots: { index: false, follow: true } };
-  const base = pageMetadata({ title: post.title, description: postDescription(post), path: newsHref(post.slug), ...(post.hero ? { image: post.hero.src, alt: post.hero.alt } : {}) });
+  const base = pageMetadata({ title: post.title, description: postDescription(post), path: newsHref(post.slug), ...(post.hero ? { image: post.hero.share ?? post.hero.src, alt: post.hero.alt, imageWidth: post.hero.share ? 1200 : 1600, imageHeight: post.hero.share ? 675 : 900 } : {}) });
   return {
     ...base,
     openGraph: { ...base.openGraph, type: "article", publishedTime: post.published, ...(post.updated ? { modifiedTime: post.updated } : {}), authors: [post.author] },
@@ -86,7 +87,7 @@ export default async function NewsArticle(props: { params: Promise<{ slug: strin
   return (
     <div data-news-article className={`mx-auto w-full max-w-[66rem] ${ARTICLE}`}>
       <ReadingLayout items={toc}>
-        <JsonLd data={newsArticleJsonLd({ title: post.title, description: postDescription(post), path, published: post.published, modified: lastChanged(post), author: post.author })} />
+        <JsonLd data={newsArticleJsonLd({ title: post.title, description: postDescription(post), path, published: post.published, modified: lastChanged(post), author: post.author, ...(post.hero ? { image: post.hero.share ?? post.hero.src } : {}) })} />
         <article data-news-post>
           <PageHeader trail={trail} title={post.title} lede={<span className="text-base leading-relaxed">{post.summary}</span>} />
           {byline}
@@ -98,7 +99,7 @@ export default async function NewsArticle(props: { params: Promise<{ slug: strin
 
           {post.hero && (
             // eslint-disable-next-line @next/next/no-img-element -- a fixed 16:9 frame; the file is pre-sized for it.
-            <img data-news-hero src={post.hero.src} alt={post.hero.alt} width={1600} height={900} className="mt-6 aspect-video w-full rounded-card border border-line object-cover" fetchPriority="high" />
+            <img data-news-hero src={post.hero.src} alt={post.hero.alt} width={1600} height={900} sizes="(min-width: 1024px) 760px, 100vw" decoding="async" className="mt-6 aspect-video w-full rounded-card border border-line object-cover" fetchPriority="high" />
           )}
 
           <div className="mt-8">
@@ -126,13 +127,7 @@ export default async function NewsArticle(props: { params: Promise<{ slug: strin
               <h2 id="related" className="scroll-mt-24 text-[22px] font-semibold text-fg">Related</h2>
               <ul className="mt-4 grid gap-4 sm:grid-cols-3">
                 {related.map((p) => (
-                  <li key={p.slug}>
-                    <Link href={newsHref(p.slug)} data-related-card className="flex h-full flex-col rounded-card border border-line bg-panel p-4 transition-colors hover:border-edge">
-                      <span className="text-[15px] font-semibold leading-snug text-fg">{p.title}</span>
-                      <span className="mt-2 line-clamp-3 text-sm leading-relaxed text-fg-2">{p.summary}</span>
-                      <time dateTime={p.published} className="mt-auto pt-3 text-meta text-muted">{longDate(p.published)}</time>
-                    </Link>
-                  </li>
+                  <li key={p.slug} data-related-card><NewsCard post={p} heading="h3" /></li>
                 ))}
               </ul>
             </section>
