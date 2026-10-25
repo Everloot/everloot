@@ -66,7 +66,12 @@ test("a post page shows the byline, the body with its links and tokens, the sour
   expect(html).toContain("<blockquote");
   expect(html).toContain('href="https://worldofwarcraft.blizzard.com/en-us/news/example"');
   expect(html).toContain('href="/news/older-post"');
-  expect(html).toContain('"@type":"Article"');
+  expect(html).toContain('"@type":"NewsArticle"');
+  expect(html).not.toContain('"@type":"Article"');
+  expect(html).toContain('"author":{"@type":"Organization","name":"Everloot Team"}');
+  expect(html).toContain('"headline":"Test Post"');
+  expect(html).toContain('"mainEntityOfPage":');
+  expect(html).toContain('"publisher":');
   expect(html).toContain('"datePublished":"2026-10-24"');
   expect(html).toContain('"dateModified":"2026-10-25"');
   expect(html).not.toContain('"Person"');

@@ -287,7 +287,7 @@ export function wikiArticleJsonLd(page: { title: string; summary: string; path: 
 export function newsArticleJsonLd(page: { title: string; description: string; path: string; published: string; modified: string; author: string }): JsonLd {
   return {
     "@context": CONTEXT,
-    "@type": "Article",
+    "@type": "NewsArticle",
     headline: page.title,
     description: page.description,
     url: absoluteUrl(page.path),
@@ -295,7 +295,7 @@ export function newsArticleJsonLd(page: { title: string; description: string; pa
     isPartOf: { "@id": WEBSITE_ID },
     datePublished: page.published,
     dateModified: page.modified,
-    author: publisher,
+    author: { "@type": "Organization", name: "Everloot Team" },
     publisher,
     license: CC_BY_SA.url,
   };
