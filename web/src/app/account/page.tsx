@@ -135,7 +135,7 @@ export default async function AccountPage() {
         <section id="data" aria-labelledby="data-heading" className={section}>
           <h2 id="data-heading" className={heading}>Data and privacy</h2>
           <p className="text-sm text-fg-2">
-            Everloot keeps {listed(kept)}. Chat keys stay in this browser. The{" "}
+            Everloot keeps {listed(kept)}. Chat keys stay in this tab until it closes. The{" "}
             <Link href="/privacy" className={link}>Privacy Policy</Link> says what each one holds and how long it is kept.
           </p>
           <ul className="space-y-1 text-sm text-fg-2">

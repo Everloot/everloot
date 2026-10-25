@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
+import { isProtectedPath } from "@/lib/document-boundary";
 import { readConsent, writeConsent, syncOptionalScripts, rejectionFragment, rejectionSessionKey, type ConsentCategory, type ConsentChoice } from "./consent";
 import { needsAnalyticsConsent, type AnalyticsConfig } from "@/lib/analytics/config";
 import { loadConsented, loadCookieless, privacySignals, unloadConsented } from "@/lib/analytics/load";
@@ -10,6 +12,8 @@ type Choices = Record<ConsentCategory, ConsentChoice | null>;
 const NONE: Choices = { advertising: null, analytics: null };
 
 export function CookiePreferencesButton() {
+  const pathname = usePathname();
+  if (pathname && isProtectedPath(pathname)) return <a href="/privacy#choices" className="inline-flex items-center min-h-11 text-sm text-fg-2 hover:text-accent transition-colors">Cookie preferences</a>;
   return (
     <button type="button" className="inline-flex items-center min-h-11 text-sm text-fg-2 hover:text-accent transition-colors" onClick={() => window.dispatchEvent(new Event(OPEN_PREFERENCES))}>
       Cookie preferences

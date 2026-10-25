@@ -2,7 +2,7 @@ import { CATALOGUE, type CatalogueKind, type CatalogueModel, type CatalogueProvi
 
 /**
  * The providers the /chat page offers, from the shared catalogue (./catalogue.ts). The player brings their own key;
- * it is kept in this browser (localStorage) and sent from the page straight to that provider, never to Everloot.
+ * it is kept in this tab (sessionStorage) and sent from the page straight to that provider, never to Everloot.
  * Only providers whose APIs answered a browser's CORS check from everloot.app are listed (`browser` in the
  * catalogue); a local Ollama does once it allows the site's origin. The rest stay in the Desktop App only.
  */

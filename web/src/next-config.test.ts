@@ -3,6 +3,8 @@ import { getPathMatch } from "next/dist/shared/lib/router/utils/path-match";
 import { matchHas } from "next/dist/shared/lib/router/utils/prepare-destination";
 import { expect, test } from "vitest";
 import nextConfig from "../next.config.js";
+import { CHAT_PROVIDERS } from "./lib/chat/providers";
+import { isProtectedPath } from "./lib/document-boundary";
 
 test("the internal browse route redirects to its public address, and the rewrite serves that address", async () => {
   expect(await nextConfig.redirects!()).toContainEqual({ source: "/lore/browse/:type(npcs|items|quests|zones|spells)", destination: "/lore/:type", permanent: true });
@@ -63,4 +65,49 @@ test("the build cache checks the protocol package's files, and trusts every othe
   expect(managed("/vercel/path0/web/node_modules/@everloot/protocol/dist/index.js")).toBe(false);
   expect(managed("C:\\work\\web\\node_modules\\@everloot\\protocol\\dist\\index.js")).toBe(false);
   expect(config.snapshot.immutablePaths).toEqual([]);
+});
+
+/** The headers a request for `path` gets: Next applies every matching entry in order, and a later entry's key wins. */
+async function headersFor(path: string): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  for (const entry of await nextConfig.headers!()) {
+    if (getPathMatch(entry.source)(path) === false) continue;
+    for (const { key, value } of entry.headers) out[key] = value;
+  }
+  return out;
+}
+
+const directives = (csp: string) => Object.fromEntries(csp.split(/;\s*/).map((d) => { const [name, ...values] = d.trim().split(/\s+/); return [name, values]; }));
+
+const PROTECTED = ["/chat", "/account", "/settings", "/chat/anything", "/beta/chat", "/beta/account", "/beta/settings"];
+const PUBLIC = ["/", "/database/items/2589", "/chatter", "/accounts", "/settings-help", "/beta", "/beta/wiki", "/ptr/chat", "/sign-in"];
+
+test("the pages that hold chat keys and the account enforce the strict policy; every other page keeps the public one", async () => {
+  const site = await headersFor("/");
+  expect(site["Content-Security-Policy"]).toBe("object-src 'none'; base-uri 'self'; frame-ancestors 'self'");
+  for (const path of PROTECTED) {
+    expect(isProtectedPath(path), path).toBe(true);
+    const got = await headersFor(path);
+    expect(directives(got["Content-Security-Policy"]!)["script-src"], path).toEqual(["'self'", "'unsafe-inline'"]);
+    // Every other header the site sends stays as it is.
+    expect({ ...got, "Content-Security-Policy": "" }, path).toEqual({ ...site, "Content-Security-Policy": "" });
+  }
+  for (const path of PUBLIC) {
+    expect(isProtectedPath(path), path).toBe(false);
+    expect((await headersFor(path))["Content-Security-Policy"], path).toBe(site["Content-Security-Policy"]);
+  }
+});
+
+test("the strict policy loads scripts from this site only, and connects only to it, its assets and the chat providers", async () => {
+  const csp = directives((await headersFor("/chat"))["Content-Security-Policy"]!);
+  expect(csp["default-src"]).toEqual(["'self'"]);
+  expect(csp["script-src"]).toEqual(["'self'", "'unsafe-inline'"]);
+  const providers = CHAT_PROVIDERS.map((p) => new URL(p.baseUrl).origin);
+  expect(providers).toContain("http://localhost:11434");
+  expect([...csp["connect-src"]!].sort()).toEqual([...new Set(["'self'", "https://assets.everloot.app", ...providers])].sort());
+  expect(csp["img-src"]).toEqual(["'self'", "data:", "blob:", "https://assets.everloot.app"]);
+  expect(csp["frame-src"]).toEqual(["'none'"]);
+  expect(csp["object-src"]).toEqual(["'none'"]);
+  expect(csp["base-uri"]).toEqual(["'self'"]);
+  expect(csp["frame-ancestors"]).toEqual(["'self'"]);
 });

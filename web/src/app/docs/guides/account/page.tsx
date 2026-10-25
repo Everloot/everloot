@@ -67,7 +67,7 @@ export default function Page() {
         <li><strong>API keys.</strong> Your keys, described below.</li>
         <li>
           <strong>Chat keys.</strong> One card per provider Chat supports, with its key, its model and a Test button, and the
-          provider Chat uses by default. The keys stay in that browser and never reach Everloot.
+          provider Chat uses by default. The keys stay in that tab until it closes and never reach Everloot.
         </li>
         <li><strong>Data and privacy.</strong> What we keep, where you delete each part, and how to delete your account.</li>
       </List>

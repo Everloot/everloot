@@ -5,7 +5,7 @@ import { savedBuildsOn } from "@/lib/saved-builds";
 import { pageMetadata } from "@/lib/seo";
 
 const TITLE = "Ask Everloot";
-const description = "Ask about WoW: Forever in plain words. Your own AI model looks it up in Everloot's data and names the sources. Your key stays in your browser.";
+const description = "Ask about WoW: Forever in plain words. Your own AI model looks it up in Everloot's data and names the sources. Your key lasts only in this tab.";
 
 export const metadata: Metadata = pageMetadata({ title: TITLE, description, path: "/chat" });
 

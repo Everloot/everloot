@@ -6,6 +6,8 @@ import Header from "@/components/Header";
 import { guildsOn } from "@/lib/guild-switch";
 import Footer from "@/components/Footer";
 import CookieConsent from "@/components/CookieConsent";
+import DocumentBoundary from "@/components/DocumentBoundary";
+import OptionalScripts from "@/components/OptionalScripts";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { NavPendingBar } from "@/components/NavPending";
 import HoverCards from "@/components/game/HoverCards";
@@ -76,22 +78,25 @@ export default function RootLayout({
         <Header savedBuilds={savedBuildsOn()} profiles={profilesOn()} accountSwitching={authV2Enabled()} guilds={guildsOn()} />
         <main id="main-content" className="flex-1 min-w-0 mx-auto w-full max-w-wide px-4 py-8">
           <Breadcrumbs />
-          {children}
+          <DocumentBoundary>{children}</DocumentBoundary>
         </main>
         <Footer />
-        {/* AdSense loads on every page so Google's certified consent message can run where the law requires
+        {/* AdSense loads on every public page so Google's certified consent message can run where the law requires
             it (EEA, UK, Switzerland, US states). Ads themselves appear only where a page places an AdSlot.
-            It loads once the page has, so it neither competes with the page's own files nor runs before its first paint. */}
-        {adsenseClient && (
-          <Script
-            id="adsense"
-            async
-            strategy="lazyOnload"
-            crossOrigin="anonymous"
-            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(adsenseClient)}`}
-          />
-        )}
-        <CookieConsent analytics={analyticsConfig()} />
+            It loads once the page has, so it neither competes with the page's own files nor runs before its first paint.
+            The pages that hold chat keys or the account load neither it nor the analytics (OptionalScripts). */}
+        <OptionalScripts>
+          {adsenseClient && (
+            <Script
+              id="adsense"
+              async
+              strategy="lazyOnload"
+              crossOrigin="anonymous"
+              src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(adsenseClient)}`}
+            />
+          )}
+          <CookieConsent analytics={analyticsConfig()} />
+        </OptionalScripts>
         {/* The in-game card on every link to an item, NPC, quest or object page. */}
         <HoverCards />
       </body>

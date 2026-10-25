@@ -2,8 +2,8 @@ import type { ChatStep } from "./agent";
 import { chatProvider, MODEL_ID, type ChatProviderKind } from "./providers";
 
 /**
- * What /chat and the Chat keys section of /settings keep in this browser's localStorage, and nowhere
- * else: the providers the player saved (their keys included) and the conversations. Nothing here is
+ * What /chat and the Chat keys section of /settings keep in this tab's sessionStorage (providers and keys)
+ * and this browser's localStorage (conversations). Nothing here is
  * sent to Everloot; a key goes only to its own provider. Clearing the site's data removes all of it.
  */
 
@@ -25,7 +25,7 @@ export interface ChatMessage {
 }
 export interface Conversation { id: string; title: string; updatedAt: string; messages: ChatMessage[] }
 
-/** The localStorage name of the saved providers; the chat listens for changes to it from other tabs. */
+/** The sessionStorage name of saved providers; provider-session.ts migrates the old localStorage entry. */
 export const PROVIDERS = "everloot.chat.providers.v1";
 /** The single transcript kept before conversations; read once, moved into a conversation and removed. */
 const THREAD = "everloot.chat.thread.v1";
