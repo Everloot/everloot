@@ -278,3 +278,10 @@ test("items no source names are one line above the list, sort last when shown, a
 test("with no development names the list shows no control", async () => {
   expect(await html(SubclassPage(sub("armor", "cloth")))).not.toContain("development leftover");
 });
+
+test("the profession menu leaves out a development profession unless the leftovers are asked for", async () => {
+  const plain = await html(ItemPage(props("trade-goods")));
+  expect(plain).toContain("?skill=tailoring");
+  expect(plain).not.toContain("Test Profession [DNT]");
+  expect(await html(ItemPage(props("trade-goods", { dev: "1" })))).toContain("Test Profession [DNT]");
+});
