@@ -107,10 +107,20 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
   const index = mentionIndex(assets, assets ? await siteSpellNames() : []);
 
   const dash = <span className="text-muted">—</span>;
+  const titleLink = (e: ChangeEntry) => {
+    const page = postPath(e);
+    return page
+      ? <Link href={page} className={`${BLUE} font-medium`}>{e.title}</Link>
+      : <span className="font-medium">{e.title}</span>;
+  };
   const columns: Column<ChangeEntry>[] = [
     {
+      // On a phone this is the only column shown, so it carries the title and the muted line holds the date.
       key: "date", header: "Date", sortable: true, nowrap: true, cell: (e) => (
-        <time dateTime={e.at} title={e.type === "build" ? `${stamp(e.at)}, when Everloot first saw it` : stamp(e.at)} className="font-mono tabular-nums text-fg-2">{e.at.slice(0, 10)}</time>
+        <>
+          <time dateTime={e.at} title={e.type === "build" ? `${stamp(e.at)}, when Everloot first saw it` : stamp(e.at)} className="hidden font-mono tabular-nums text-fg-2 sm:inline">{e.at.slice(0, 10)}</time>
+          <div data-phone-title className="whitespace-normal py-1 sm:hidden">{titleLink(e)}</div>
+        </>
       ),
     },
     { key: "type", header: "Type", sortable: true, nowrap: true, cell: (e) => <Badge tone="neutral">{TYPE_LABEL[e.type]}</Badge> },
@@ -119,12 +129,9 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
         const line = e.type === "build"
           ? <>First seen by Everloot. {e.diffUrl ? <a href={e.diffUrl} className={LINK}>See what changed</a> : "What changed: not published yet."}</>
           : (e.summary ?? e.excerpt) && <WithSpells text={(e.summary ?? e.excerpt)!} index={index} />;
-        const page = postPath(e);
         return (
-          <div data-change-row data-blue-post={page ? "" : undefined} className="min-w-0 py-1">
-            {page
-              ? <Link href={page} className={`${BLUE} font-medium`}>{e.title}</Link>
-              : <span className="font-medium">{e.title}</span>}
+          <div data-change-row data-blue-post={postPath(e) ? "" : undefined} className="min-w-0 py-1">
+            {titleLink(e)}
             {q.game === "all" && <span className="ml-2 text-cell-2 text-muted">{GAME_LABEL[e.game]}</span>}
             {line && <p className="line-clamp-2 text-cell-2 text-muted">{line}</p>}
           </div>

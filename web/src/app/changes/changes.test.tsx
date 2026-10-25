@@ -72,6 +72,19 @@ test("dense rows: date, type badge, title linked to the post's page on Everloot,
   expect(html).not.toContain("Classic realm move");
 });
 
+test("on a phone the first column carries the title once, and the date sits in the muted line, not as the heading", async () => {
+  const html = await page();
+  const phone = [...html.matchAll(/<div data-phone-title[^>]*>(.*?)<\/div>(<div class="[^"]*sm:hidden">.*?<\/div>)/g)];
+  expect(phone).toHaveLength(4);
+  expect(phone[0][1]).toContain("WoW: Forever build 1.60.1.70460");
+  expect(phone[0][2]).toContain("2026-10-17 · Build");
+  expect(phone[1][1]).toContain('href="/changes/us-1-synthetic-beta-notice-b"');
+  expect(phone[1][1]).toContain("Synthetic beta notice &lt;b&gt;");
+  expect(phone[1][1]).not.toContain("2026-10-16");
+  // The date is a table-cell time hidden on phones, so only the muted line shows it there.
+  expect(html).toMatch(/<time dateTime="2026-10-16T22:00:00.000Z"[^>]*class="hidden [^"]*sm:inline"/);
+});
+
 test("markup in a title is escaped, not rendered", async () => {
   const html = await page();
   expect(html).toContain("Synthetic beta notice &lt;b&gt;");
