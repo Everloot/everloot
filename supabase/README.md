@@ -34,7 +34,8 @@ disposable local Postgres named `intake_quota_test`, set in `QUOTA_TEST_DATABASE
 any other host or database name. The accounts script drops and recreates the `public` schema first.
 `web/scripts/api-key-expiry.integration.mjs` does the same, applies every migration, and checks that keys
 made before `20261022120000_api_key_expiry.sql` keep working, that an expired key is refused, and that a
-rolled key keeps its settings.
+rolled key keeps its settings. `web/scripts/chat-workspace.integration.mjs` does the same for the private Chat
+workspace (`docs/2026-10-25-chat-workspace-activation.md`).
 
 ## Where things live
 

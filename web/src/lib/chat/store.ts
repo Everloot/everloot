@@ -150,7 +150,7 @@ export function titleFor(messages: ChatMessage[]): string {
 }
 
 export function newConversationId(): string {
-  return globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+  return globalThis.crypto.randomUUID();
 }
 
 /** The saved conversations, newest first. The old single transcript becomes the first conversation. */
