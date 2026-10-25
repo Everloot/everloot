@@ -436,6 +436,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
   async function ask(question: string, character: ShellCharacter | null = latest.current.context) {
     const q = question.trim().slice(0, 2000);
     if (!q || latest.current.busy || !latest.current.known) return;
+    opening.current++;
     const { providers: saved, own: mine, currentId: id, note: attached } = latest.current;
     const prior = messagesRef.current;
     if (workspace && metaRef.current.store === "account" && prior.length + 2 > WORKSPACE_LIMITS.messagesPerConversation) {

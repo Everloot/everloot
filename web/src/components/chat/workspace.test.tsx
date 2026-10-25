@@ -616,6 +616,21 @@ test("a delayed sidebar chat read cannot change the chat being answered", async 
   expect(other.messages).toHaveLength(2);
 });
 
+test("a newer-version read that finishes after the answer cannot discard the new turns", async () => {
+  const c = seedChat(ME, "Fury talents");
+  await render(); await click("Fury talents");
+  c.revision = 5;
+  await ask("And at level 50?"); await click("Load the newer version");
+  const releaseRead = holdNext(`/api/me/chat/conversations/${c.id}`);
+  await click("Replace mine");
+  const releaseAnswer = holdNext("/api/tools/search_knowledge");
+  await ask("Keep this new question");
+  await releaseAnswer(); await releaseRead();
+  expect(text()).toContain("Keep this new question");
+  expect(text()).toContain("changed on another device");
+  expect(c.revision).toBe(5);
+});
+
 test("an attached note goes to the model with its own question only, never again in later turns' history", async () => {
   sessionStorage.setItem("everloot.chat.providers.v1", JSON.stringify([{ kind: "openrouter", model: "deepseek/deepseek-v4.1-flash", key: "sk-or-v1-secretsecretsecretsecret1234" }]));
   const project = { id: crypto.randomUUID(), name: "Raid prep", description: null, revision: 1, updatedAt: now() };
