@@ -14,6 +14,7 @@ import GameIcon from "@/components/game/GameIcon";
 import Badge, { UNCONFIRMED_TITLE } from "@/components/ui/Badge";
 import { Container, DataTable, DataTitle, FilterBar, filledColumns, QUALITY_TEXT, ResultStrip, qualityOf, type FilterControl, type SparseColumn } from "@/components/ui";
 import type { Crumb } from "@/lib/jsonld";
+import { LAUNCH, LAUNCH_AT, longDate } from "@/data/wow-forever";
 import { LEVEL_BRACKETS } from "../list-parts";
 
 type Search = Record<string, string | string[] | undefined>;
@@ -47,7 +48,7 @@ export const NAME_TITLE: Record<NameSource, string> = { ...NAME_FROM, files: UNC
  * The plain list, on any page, is its own canonical; a filter, a sort or a name search is noindex and points
  * its canonical at page 1 of the plain list.
  */
-const isPlain = (q: CategoryQuery) => activeFilters(q) === 0 && !q.sort && !q.dev;
+const isPlain = (q: CategoryQuery) => activeFilters(q) === 0 && !q.sort && !q.dev && !q.unnamed;
 
 export const ALL_ITEMS = {
   title: "WoW Forever Items by Category",
@@ -86,6 +87,8 @@ export async function categoryMetadata(classSlug: string | undefined, subclassKe
   };
 }
 
+/** Why a row has no name, and when that changes: names come from the addon once players see the items. */
+const namesArrive = () => (Date.now() < Date.parse(LAUNCH_AT) ? `Their names arrive from the addon after launch on ${longDate(LAUNCH.date)}.` : "Their names arrive from the addon as players see them.");
 const plural = (n: number) => `${n.toLocaleString("en-US")} item${n === 1 ? "" : "s"}`;
 /** A level range as a menu writes it: "11–20", "81+" for the open top bracket. */
 const bracket = (r: { min: number; max: number }) => (r.max >= 999 ? `${r.min}+` : r.min === r.max ? String(r.min) : `${r.min}–${r.max}`);
@@ -108,19 +111,29 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   const wide = Boolean(q.ilvl || q.req || q.bind) || q.sort?.key === "ilvl" || q.sort?.key === "req";
   const every = wide ? await tipsFor(base.map((row) => row[0]).filter(showsTip)) : null;
   const ctx = { name: nameOf, seen: seen.seen, sources: (id: number) => seen.from.get(id), tip: (id: number) => every?.get(id) };
-  const rows = listItems(base, q, ctx);
+  const listed = listItems(base, q, ctx);
+  // The items no source names ("Item N") are one line above the table unless asked for, in the unrecorded quality
+  // view (which lists them by design) or by id; not when nothing in the list has a name (names out of reach),
+  // where the line would hide the whole list. They sort last either way.
+  const isNamed = (id: number) => showsTip(id);
+  const idLookup = Boolean(q.q && /^#?\d+$/.test(q.q));
+  const folded = !q.unnamed && !q.quality?.includes(UNRECORDED) && !idLookup && listed.some((row) => isNamed(row[0]));
+  const unnamed = new Set(folded ? T.items.filter((row) => !isNamed(row[0])).map((row) => row[0]) : []);
+  const rows = listed.filter((row) => !unnamed.has(row[0]));
+  const unnamedCount = folded ? listed.length - rows.length : rows.filter((row) => !isNamed(row[0])).length;
   // The development leftovers (test, placeholder and retired items) are out of the list unless asked for; the
   // menus count what the list can show, and the line above the table says how many are held back.
   const leftovers = developmentLeftovers(T.items, nameOf);
-  const pool = q.dev ? base : base.filter((row) => !leftovers.has(row[0]));
-  const held = q.dev ? rows.filter((row) => leftovers.has(row[0])).length : listItems(base, { ...q, dev: true }, ctx).length - rows.length;
-  const hiddenIn = (classId: number, subclassId?: number) => (q.dev ? 0 : T.items.reduce((n, row) => n + Number(row[1] === classId && (subclassId === undefined || row[2] === subclassId) && leftovers.has(row[0])), 0));
+  const gone = (id: number) => unnamed.has(id) || (!q.dev && leftovers.has(id));
+  const pool = base.filter((row) => !gone(row[0]));
+  const held = q.dev ? rows.filter((row) => leftovers.has(row[0])).length : listItems(base, { ...q, dev: true }, ctx).filter((row) => !unnamed.has(row[0])).length - rows.length;
+  const hiddenIn = (classId?: number, subclassId?: number) => T.items.reduce((n, row) => n + Number((classId === undefined || (row[1] === classId && (subclassId === undefined || row[2] === subclassId))) && gone(row[0])), 0);
   const pages = Math.max(1, Math.ceil(rows.length / ITEMS_PER_PAGE));
   if (q.page > pages) notFound();
   const shown = rows.slice((q.page - 1) * ITEMS_PER_PAGE, q.page * ITEMS_PER_PAGE);
   const tips = every ?? await tipsFor(shown.map((row) => row[0]).filter(showsTip));
   const names = new Map(shown.map((row) => [row[0], shownItemName(row[0], agreed, matched?.names, tips.get(row[0]))]));
-  const icons = shown.some((row) => tips.get(row[0])?.icon);
+  const icons = shown.some((row) => tips.get(row[0])?.icon || !names.get(row[0]));
   const here = (over: Partial<CategoryQuery>) => itemsHref(cls?.slug, sub?.slug, { ...q, page: 1, ...over });
   const title = sub ? subclassLabel(sub).label : cls ? cls.label : "Items";
 
@@ -147,7 +160,10 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
           <span className="flex min-w-0 items-center gap-2">
             {icons && (tip?.icon
               ? <GameIcon src={tip.icon} size={24} />
-              : <span aria-hidden="true" className="h-6 w-6 shrink-0 rounded-sm border border-line" />)}
+              : name
+                ? <span aria-hidden="true" className="h-6 w-6 shrink-0 rounded-sm border border-line" />
+                // No name from any source: the same empty tile with a question mark, so a run of ids reads as unknown, not broken.
+                : <span aria-hidden="true" className="grid h-6 w-6 shrink-0 place-items-center rounded-sm border border-line bg-panel text-cell-2 text-muted">?</span>)}
             {/* Where the name comes from is in the link's hover card (and words for a screen reader, after the link so the
                 link's text is the name alone), never a printed label; a name only the game files give carries the
                 quiet unconfirmed marker. */}
@@ -189,7 +205,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
     {
       type: "menu", key: "class", label: "Class",
       options: [
-        { label: "All classes", href: itemsHref(undefined, undefined, { ...q, page: 1 }), on: !cls, reset: true, count: T.items.length - (q.dev ? 0 : leftovers.size) },
+        { label: "All classes", href: itemsHref(undefined, undefined, { ...q, page: 1 }), on: !cls, reset: true, count: T.items.length - hiddenIn() },
         ...T.classes.filter((c) => c.items > 0).map((c) => ({ label: c.label, href: itemsHref(c.slug, undefined, { ...q, page: 1 }), on: c.id === cls?.id, count: c.items - hiddenIn(c.id) })),
       ],
     },
@@ -295,6 +311,15 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
             </Link>
             {" "}
             {q.dev ? "Test, placeholder and retired items the game files still list are in the list." : "Test, placeholder and retired items the game files still list stay out of it."}
+          </p>
+        )}
+        {unnamedCount > 0 && (folded || q.unnamed) && (
+          <p className="mt-2 text-cell-2 text-muted">
+            {folded ? `${unnamedCount.toLocaleString("en-US")} ${unnamedCount === 1 ? "item" : "items"} the game files do not name yet. ` : ""}
+            {namesArrive()}{" "}
+            <Link href={here({ unnamed: q.unnamed ? undefined : true })} className="text-accent hover:underline underline-offset-4">
+              {q.unnamed ? `Hide the ${unnamedCount.toLocaleString("en-US")} unnamed ${unnamedCount === 1 ? "item" : "items"}` : "Show them"}
+            </Link>
           </p>
         )}
         <div className="mt-2">

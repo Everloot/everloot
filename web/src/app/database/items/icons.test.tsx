@@ -104,13 +104,15 @@ test("a category row shows a name the game files and the wiki agree on, in its q
   expect(page).toContain(`Agreed ${ids[1]}`);
   expect(page).not.toContain(`title="${NAME_TITLE.players}"`);
   expect(page).toContain(`>Agreed ${ids[1]}</a><span class="sr-only"> (name confirmed by players)</span>`);
-  expect(page).toContain(`>Item ${ids[2]}<`);
+  expect(page).not.toContain(`>Item ${ids[2]}<`);
+  expect(page).toContain("do not name yet");
   // No source line, no wiki link and no credit line on the list (density spec, 2026-10-20).
   expect(page).not.toContain(NAME_SOURCE.wiki);
   expect(page).not.toContain(NAME_SOURCE.players);
   expect(page).not.toContain("warcraft.wiki.gg/wiki/");
   // Tooltip facts are asked for the matched item and the reported one only.
   expect(state.tipCalls).toEqual([[ids[0], ids[1]]]);
+  expect(await html(SubclassPage({ params: Promise.resolve({ id: "armor", subclass: "cloth" }), searchParams: Promise.resolve({ unnamed: "1" }) }))).toContain(`>Item ${ids[2]}<`);
 });
 
 test("a name from the game files alone shows with the unconfirmed marker", async () => {
@@ -225,10 +227,10 @@ test("sorting by item level or required level puts known values first, low to hi
   const ids = clothIds();
   state.matched = matchedNames(ids.slice(0, 3));
   state.levels = new Map([[ids[0], { level: 15, required: 10, binding: 2 }], [ids[1], { level: 25, required: 0, binding: 1 }], [ids[2], { level: 15, required: 5, binding: 0 }]]);
-  expect((await clothRows({ sort: "-ilvl" })).rows.slice(0, 4)).toEqual([ids[1], ids[0], ids[2], ids[3]]);
-  expect((await clothRows({ sort: "ilvl" })).rows.slice(0, 4)).toEqual([ids[0], ids[2], ids[1], ids[3]]);
+  expect((await clothRows({ sort: "-ilvl", unnamed: "1" })).rows.slice(0, 4)).toEqual([ids[1], ids[0], ids[2], ids[3]]);
+  expect((await clothRows({ sort: "ilvl", unnamed: "1" })).rows.slice(0, 4)).toEqual([ids[0], ids[2], ids[1], ids[3]]);
   // Item 1's "no required level" sorts with the unknown rows, by id.
-  expect((await clothRows({ sort: "req" })).rows.slice(0, 3)).toEqual([ids[2], ids[0], ids[1]]);
+  expect((await clothRows({ sort: "req", unnamed: "1" })).rows.slice(0, 3)).toEqual([ids[2], ids[0], ids[1]]);
 });
 
 test("the pager and the other filters' links keep the level and binding filters", async () => {
