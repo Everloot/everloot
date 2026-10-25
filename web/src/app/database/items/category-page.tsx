@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { isDevelopmentItemName } from "../../../../../kb/src/dev-item-names";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { describe, filterItems, QUALITIES, resolveClass, resolveLegacyClass, resolveSubclass, slotOf, type ItemClass, type ItemRow, type ItemSubclass } from "../../../../../kb/src/item-taxonomy";
@@ -196,7 +197,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
     .filter((o) => o.count > 0 || o.on);
   const facets = itemFacets();
   const inBase = (set: Set<number>) => pool.reduce((n, row) => n + Number(set.has(row[0])), 0);
-  const skills = facets.professions.map((p) => ({ ...p, count: inBase(facets.bySkill.get(p.id)!) })).filter((p) => p.count > 0);
+  const skills = facets.professions.map((p) => ({ ...p, count: inBase(facets.bySkill.get(p.id)!) })).filter((p) => p.count > 0 && (q.dev || !isDevelopmentItemName(p.name)));
   const slotNames = new Map(pool.map((row) => slotOf(row[3])).filter((s) => s !== null).map((s) => [s!.slug, s!.name]));
   const toggle = (key: "crafted" | "reagent" | "set" | "seen", label: string, count: number): FilterControl[] =>
     count > 0 || q[key] ? [{ type: "toggle", key, label, href: here({ [key]: q[key] ? undefined : true }), on: Boolean(q[key]) }] : [];
