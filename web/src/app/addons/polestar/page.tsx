@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   ...pageMetadata({ title: "Polestar: WoW Forever Leveling Guide Addon", description: "What Polestar is, how to install it, its commands and licence, where it needs help, and its guide packs for WoW: Forever leveling.", path: "/addons/polestar" }),
 };
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 const button = "btn min-h-11";
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;

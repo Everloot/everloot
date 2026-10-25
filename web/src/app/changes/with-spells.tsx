@@ -8,7 +8,7 @@ export default function WithSpells({ text, index }: { text: string; index: Menti
     <>
       {splitMentions(text, index).map((p, i) => (typeof p === "string" ? p : (
         <SpellTip key={i} tip={p.mention.tip}>
-          <Link href={p.mention.href} className="text-accent hover:underline underline-offset-4">{p.text}</Link>
+          <Link href={p.mention.href} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{p.text}</Link>
         </SpellTip>
       )))}
     </>

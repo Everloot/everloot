@@ -11,7 +11,7 @@ export const revalidate = 3600;
 
 const DESCRIPTION = "What is new on Everloot and what it means for WoW: Forever players: site updates, data milestones and launch notes, in Everloot's own words.";
 const LEDE = "What is new on Everloot and what it means for players, newest first.";
-const LINK = "text-accent hover:underline underline-offset-4";
+const LINK = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 export async function generateMetadata(): Promise<Metadata> {
   return {

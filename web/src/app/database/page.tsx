@@ -125,7 +125,7 @@ export default async function DatabasePage() {
             ))}
           </dl>
           <p className="mt-3 text-sm text-fg-2">
-            The method behind every count is on the <Link href="/methodology" className="text-accent hover:underline underline-offset-4">methodology page</Link>.
+            The method behind every count is on the <Link href="/methodology" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">methodology page</Link>.
           </p>
         </section>
       </article>

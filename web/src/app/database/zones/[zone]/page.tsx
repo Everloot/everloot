@@ -27,7 +27,7 @@ export const dynamic = "force-dynamic";
 
 type Props = { params: Promise<{ zone: string }> };
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 /** Resolves the segment to a released zone, or null; a held-back zone is the same as one that does not exist. */
 function find(segment: string) {

@@ -29,7 +29,7 @@ export function generateStaticParams() {
   return [];
 }
 
-const LINK = "text-accent hover:underline underline-offset-4";
+const LINK = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 const BLUE = "text-blue-post hover:underline underline-offset-4";
 const RELATED = 5;
 

@@ -289,7 +289,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
           {c.label}<span aria-hidden="true">×</span><span className="sr-only">(remove)</span>
         </Link>
       ))}
-      <Link href={itemsHref(cls?.slug, sub?.slug)} className="text-accent hover:underline underline-offset-4">Clear filters</Link>
+      <Link href={itemsHref(cls?.slug, sub?.slug)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Clear filters</Link>
     </div>
   ) : <p className="py-4 text-cell text-fg-2">No items in this category.</p>;
 

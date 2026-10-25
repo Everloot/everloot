@@ -33,7 +33,7 @@ function sourceHost(url: string): string {
 /** Next hands a repeated parameter over as an array; the first value is the one we answer. */
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 type Params = { q?: string | string[]; page?: string | string[]; type?: string | string[]; in?: string | string[] };
 

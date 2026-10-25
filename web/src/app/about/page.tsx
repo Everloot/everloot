@@ -11,7 +11,7 @@ import { aboutPageJsonLd, DISCORD_INVITE, NON_AFFILIATION, OPERATOR, TRADEMARK_L
 const TITLE = "About Everloot";
 const description = `Everloot offers free WoW: Forever tools and a database built from player addon uploads. It is run by ${OPERATOR} and not affiliated with Blizzard.`;
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 export const metadata: Metadata = {
   // The layout adds "· Everloot", so the tab reads "About · Everloot" rather than naming Everloot twice.

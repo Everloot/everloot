@@ -15,7 +15,7 @@ export default function LoreSection({ match }: { match: LoreMatch | null | Unava
         <p className="text-fg leading-relaxed">{match.intro}</p>
         <p className="mt-3 text-sm text-muted">
           From the Warcraft Wiki archive of 2023, which predates WoW: Forever.{" "}
-          <Link href={`/lore/${loreSlug(match)}`} className="text-accent hover:underline underline-offset-4">Read {match.name} in the lore archive</Link>
+          <Link href={`/lore/${loreSlug(match)}`} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Read {match.name} in the lore archive</Link>
         </p>
       </Card>
     </section>

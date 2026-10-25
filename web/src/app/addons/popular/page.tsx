@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 };
 export const dynamic = "force-dynamic";
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const percent = (share: number) => `${Number((share * 100).toFixed(1))}%`;

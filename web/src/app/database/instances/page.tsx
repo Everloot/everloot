@@ -16,7 +16,7 @@ export const metadata: Metadata = pageMetadata({
   path: "/database/instances",
 });
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 /** One row per instance: the entrance's zone, its confirmation, and the bosses players report. */
 export default async function InstancesPage() {

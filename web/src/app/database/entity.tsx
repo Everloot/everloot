@@ -103,4 +103,4 @@ export const percent = (rate: number) => `${(rate * 100).toFixed(1)}%`;
 export const FREQUENCY = <span title="A loot window is a recorded loot, not a verified kill, so a frequency is not a drop chance.">Observed frequency</span>;
 
 /** The shared link style for a name in a table. */
-export const LINK = "text-accent hover:underline underline-offset-4";
+export const LINK = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";

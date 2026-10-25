@@ -36,7 +36,7 @@ function BarRow({ cat, q, measured, sub }: { cat: OverviewCategory; q: ViewQuery
   return (
     <li className={`space-y-1.5 ${sub ? "pl-4" : ""}`}>
       <div className="flex items-baseline justify-between gap-3">
-        <Link href={viewHref({ ...q, view: cat.id, show: undefined })} className={`min-w-0 text-sm hover:text-accent hover:underline underline-offset-4 ${sub ? "text-fg-2" : "text-fg"}`}>
+        <Link href={viewHref({ ...q, view: cat.id, show: undefined })} className={`min-w-0 text-sm hover:text-fg underline decoration-edge underline-offset-4 hover:decoration-fg ${sub ? "text-fg-2" : "text-fg"}`}>
           {cat.label}
         </Link>
         <Counts done={cat.done} total={cat.total} measured={measured} />
@@ -97,7 +97,7 @@ function status(row: CategoryRow): string {
 function columnsFor(cat: OverviewCategory, measured: boolean): Column<CategoryRow>[] {
   const name: Column<CategoryRow> = {
     key: "name", header: "Name",
-    cell: (row) => <Link href={nameHref(row)} className="text-fg hover:text-accent hover:underline underline-offset-4">{row.entry.name}</Link>,
+    cell: (row) => <Link href={nameHref(row)} className="text-fg hover:text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{row.entry.name}</Link>,
   };
   const cols: Column<CategoryRow>[] = [name];
   if (cat.kind === "achievements") {
@@ -186,7 +186,7 @@ export function CategoryDetail({ facts, character, cat, q, show, categories }: {
           empty={
             <div className="flex flex-wrap items-center gap-2 py-4 text-cell text-fg-2">
               <span>{active === "all" ? "Nothing listed here yet." : `Nothing ${SHOW_LABEL[active].toLowerCase()} here.`}</span>
-              <Link href={viewHref({ ...q, view: cat.id, show: undefined })} className="text-accent hover:underline underline-offset-4">Show all</Link>
+              <Link href={viewHref({ ...q, view: cat.id, show: undefined })} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Show all</Link>
             </div>
           }
         />

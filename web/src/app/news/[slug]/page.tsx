@@ -24,7 +24,7 @@ export function generateStaticParams() {
   return publishedPosts(loadNews()).map((p) => ({ slug: p.slug }));
 }
 
-const LINK = "text-accent hover:underline underline-offset-4";
+const LINK = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 const RELATED = 5;
 
 export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {

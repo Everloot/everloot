@@ -253,7 +253,7 @@ export default function ApiKeys() {
   if (state.status === "off") return <p className="text-sm text-muted">Keys are not switched on yet. Until they are, every endpoint works without one.</p>;
   if (state.status === "error") return <p role="alert" className="text-sm text-fg">{state.message}</p>;
   if (state.status === "signed-out") {
-    return <p className="text-fg-2"><a href="/sign-in" className="text-accent hover:underline underline-offset-4">Sign in</a> to make a key.</p>;
+    return <p className="text-fg-2"><a href="/sign-in" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Sign in</a> to make a key.</p>;
   }
   const now = Date.now();
   const live = state.keys.filter((k) => !k.revoked_at && !keyExpired(k, now)).length;

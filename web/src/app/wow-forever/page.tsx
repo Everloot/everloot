@@ -18,7 +18,7 @@ const title = "What Is WoW Forever? Launch Date and Latest Build";
 
 export const metadata: Metadata = pageMetadata({ title, description, path: "/wow-forever" });
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 const isNew = (race: string, cls: string) => NEW_COMBOS.some(([r, c]) => r === race && c === cls);
 
 type RaceRow = { race: string; classes: readonly string[] };

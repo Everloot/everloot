@@ -129,14 +129,14 @@ export default async function WikiArticle(props: { params: Promise<{ slug: strin
           <div className="mt-12">
             <Disclosure summary={`Linked from (${inbound.length})`} as="h2" id="linked-from">
               <ul className="space-y-1 text-sm">
-                {inbound.map((p) => <li key={p.slug}><Link href={wikiHref(p.slug)} className="text-accent hover:underline underline-offset-4">{p.title}</Link></li>)}
+                {inbound.map((p) => <li key={p.slug}><Link href={wikiHref(p.slug)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{p.title}</Link></li>)}
               </ul>
             </Disclosure>
           </div>
         )}
 
         <p className="mt-12 text-sm text-fg-2">
-          <Link href="/wiki" className="text-accent hover:underline underline-offset-4">All wiki pages</Link>
+          <Link href="/wiki" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">All wiki pages</Link>
         </p>
 
         {page.origin === "adapted" && page.adaptedFrom.length > 0 && (

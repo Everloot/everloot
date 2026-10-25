@@ -17,7 +17,7 @@ export function pageWindow(page: number, pages: number): (number | null)[] {
 export default function Pager(props: Steps | Numbered) {
   if ("pages" in props) return <NumberedPager {...props} />;
   const { label, page, prevHref, nextHref } = props;
-  const step = "inline-flex min-h-11 items-center text-accent hover:underline underline-offset-4";
+  const step = "inline-flex min-h-11 items-center text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
   return (
     <nav aria-label={label} className="mt-4 flex items-center gap-4 text-sm">
       {prevHref && <Link href={prevHref} className={step}>Previous</Link>}

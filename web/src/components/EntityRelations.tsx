@@ -60,7 +60,7 @@ export function RelationTarget({ edge, rel, client, spellIcon, nameOf, gameName 
     <>
       {icon ? <><GameIcon src={icon} size={18} />{" "}</> : null}
       {/* A link's hover card says where its name comes from; a name without a page keeps the plain tooltip. */}
-      {href ? <Link href={href} className="text-accent hover:underline underline-offset-4">{text}</Link> : title ? <span title={title}>{text}</span> : text}
+      {href ? <Link href={href} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{text}</Link> : title ? <span title={title}>{text}</span> : text}
       {fromFiles?.source === "wiki" ? <span className="sr-only"> ({GAME_NAME_TITLE.wiki.toLowerCase()})</span> : null}
       {/* A name only the game files give carries the quiet unconfirmed marker, as on the item lists. */}
       {fromFiles?.source === "files" ? <>{" "}<Badge tone="files" /></> : null}
@@ -130,7 +130,7 @@ export function SameIcon({ edge, self, client, itemName, itemIcon }: {
           <span key={item}>
             {i > 0 ? ", " : ""}
             {icon ? <><GameIcon src={icon} size={18} />{" "}</> : null}
-            <Link href={`/database/items/${item}`} className="text-accent hover:underline underline-offset-4">{itemName!(item)}</Link>
+            <Link href={`/database/items/${item}`} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{itemName!(item)}</Link>
           </span>
         );
       })}

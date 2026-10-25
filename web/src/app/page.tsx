@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/", types: FEED },
 };
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 /** What each tool in the grouped list is for, in a few words. The groups themselves are the header's Tools menu. */
 const TOOL_NOTES: Record<string, string> = {
