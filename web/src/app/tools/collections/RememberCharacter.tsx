@@ -43,7 +43,7 @@ export default function RememberCharacter({ install, character }: { install: str
     if (!saved) return null;
     return (
       <p data-remember className="text-sm text-fg-2">
-        <Link href={viewHref({ install: saved.install, character: saved.character })} className="text-accent hover:underline underline-offset-4">
+        <Link href={viewHref({ install: saved.install, character: saved.character })} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">
           Open the character you remembered
         </Link>
         <span className="font-mono text-xs text-muted"> {saved.character || "all characters"}</span>
@@ -55,7 +55,7 @@ export default function RememberCharacter({ install, character }: { install: str
       {isSaved ? (
         <>
           <span role="status">Remembered on this browser.</span>
-          <button type="button" onClick={forget} className="text-accent hover:underline underline-offset-4">Forget</button>
+          <button type="button" onClick={forget} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Forget</button>
         </>
       ) : (
         <button type="button" onClick={remember} className="btn text-sm">Remember this character on this browser</button>

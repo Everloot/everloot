@@ -75,7 +75,7 @@ export default async function SignedInHome({ searchParams }: { searchParams?: Pr
             <p className="truncate font-semibold text-fg">{shell.displayName}</p>
             {shell.handle
               ? <p className="truncate text-meta text-muted">@{shell.handle}</p>
-              : <Link href="/settings" className="text-meta text-accent hover:underline underline-offset-4">Choose a handle</Link>}
+              : <Link href="/settings" className="text-meta text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Choose a handle</Link>}
             {shell.status && <p className="truncate text-meta text-fg-2">{shell.status.emoji} {shell.status.text}</p>}
           </div>
         </div>
@@ -84,7 +84,7 @@ export default async function SignedInHome({ searchParams }: { searchParams?: Pr
             <span className="block text-meta text-muted">Playing</span>
             {active
               ? <span className={`block truncate font-semibold ${CLASS_TEXT[active.classSlug] ?? "text-fg"}`}>{active.name}</span>
-              : <Link href="/me" className="text-accent hover:underline underline-offset-4">Add a character</Link>}
+              : <Link href="/me" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Add a character</Link>}
           </p>
           <CharacterSwitch characters={shell.characters} activeId={active?.id ?? null} />
         </div>
@@ -95,7 +95,7 @@ export default async function SignedInHome({ searchParams }: { searchParams?: Pr
         <section aria-labelledby="your-characters" className="space-y-1">
           <h2 id="your-characters" className={rail}>Your characters</h2>
           {shell.characters.length === 0
-            ? <p className="text-cell text-muted">None yet. <Link href="/me" className="text-accent hover:underline underline-offset-4">Add one</Link></p>
+            ? <p className="text-cell text-muted">None yet. <Link href="/me" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Add one</Link></p>
             : (
               <ul>
                 {shell.characters.map((c) => (
@@ -112,7 +112,7 @@ export default async function SignedInHome({ searchParams }: { searchParams?: Pr
         <section aria-labelledby="recent-builds" className="space-y-1">
           <h2 id="recent-builds" className={rail}>Recent builds</h2>
           {saved.builds.length === 0
-            ? <p className="text-cell text-muted">None yet. <Link href="/tools/talents" className="text-accent hover:underline underline-offset-4">Plan one</Link></p>
+            ? <p className="text-cell text-muted">None yet. <Link href="/tools/talents" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Plan one</Link></p>
             : (
               <ul>
                 {saved.builds.slice(0, 5).map((b) => (
@@ -146,11 +146,11 @@ export default async function SignedInHome({ searchParams }: { searchParams?: Pr
             {active ? <>Builds for <span className={CLASS_TEXT[active.classSlug] ?? ""}>{active.name}</span></> : "Your builds"}
           </h2>
           {!active ? (
-            <p className="text-cell text-muted">Add a character on <Link href="/me" className="text-accent hover:underline underline-offset-4">My builds</Link> to see its builds here.</p>
+            <p className="text-cell text-muted">Add a character on <Link href="/me" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">My builds</Link> to see its builds here.</p>
           ) : activeBuilds.length === 0 ? (
             <p className="text-cell text-muted">
               No builds for this {className(active.classSlug).toLowerCase()} yet.{" "}
-              <Link href={`/tools/talents/${active.classSlug}`} className="text-accent hover:underline underline-offset-4">Plan one</Link>
+              <Link href={`/tools/talents/${active.classSlug}`} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Plan one</Link>
             </p>
           ) : (
             <BuildsTable builds={activeBuilds} facts={facts} caption={`Builds for ${active.name}`} onCharacterPage />
@@ -171,7 +171,7 @@ export default async function SignedInHome({ searchParams }: { searchParams?: Pr
               </li>
             ))}
           </ol>
-          <Link href="/changes" className="text-meta text-accent hover:underline underline-offset-4">All changes</Link>
+          <Link href="/changes" className="text-meta text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">All changes</Link>
         </section>
         <LaunchCountdown />
       </aside>

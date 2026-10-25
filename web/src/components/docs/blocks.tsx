@@ -5,7 +5,7 @@ import DocsIcon from "./DocsIcon";
 
 /** The building blocks of a docs page. Server components; the interactive ones are in DocsClient. */
 
-export const docLink = "text-accent underline decoration-accent/40 underline-offset-4 hover:decoration-accent";
+export const docLink = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 function Anchor({ id }: { id: string }) {
   return <a href={`#${id}`} aria-label="Link to this section" data-md-skip className="ml-2 text-muted opacity-0 transition-opacity hover:text-accent focus:opacity-100 group-hover:opacity-100">#</a>;

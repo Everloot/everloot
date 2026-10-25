@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 
 type Props = { params: Promise<{ instance: string }> };
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 /** The instance's row, with what players reported when storage answers; null for an id the site does not show. */
 async function find(segment: string): Promise<{ row: InstanceRow; unreachable: boolean } | null> {

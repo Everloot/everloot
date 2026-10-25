@@ -170,7 +170,7 @@ How it works, and what it will not do:
 ## Game versions: Live, PTR and Beta
 
 The site knows its game versions in one list, `web/src/lib/game-version.ts`. The header label next to the
-search ("Beta · 1.60.1") and the build line on `/methodology` read from it. Today only Beta exists; Live
+search ("Build 1.60.1") and the build line on `/methodology` read from it. Today only Beta exists; Live
 arrives at launch on 2026-11-04, and Blizzard runs no PTR for Forever. The Beta build is not typed in: it
 comes from the `build` in `web/src/data/game-data/client-layer.json`. `game-version.test.ts` fails if any
 committed game-data layer (client layer, map, talents, digests, spell values, raid file) names a different

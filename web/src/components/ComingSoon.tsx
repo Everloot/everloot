@@ -42,7 +42,7 @@ export default function ComingSoon({
               {s.href && (
                 <Link
                   href={s.href}
-                  className="mt-3 inline-block text-sm text-accent hover:underline underline-offset-4"
+                  className="mt-3 inline-block text-sm text-fg underline decoration-edge underline-offset-4 hover:decoration-fg"
                 >
                   {s.hrefLabel ?? "Open"}
                 </Link>
@@ -57,7 +57,7 @@ export default function ComingSoon({
           In the meantime, check live prices in the{" "}
           <Link
             href="/tools/auctions"
-            className="text-accent hover:text-accent underline-offset-4 hover:underline"
+            className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg"
           >
             Auction House
           </Link>.

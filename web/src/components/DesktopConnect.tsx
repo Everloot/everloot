@@ -44,10 +44,10 @@ export default function DesktopConnect({ request, name }: { request: ConnectRequ
       <ul className="list-disc pl-5 space-y-1 text-sm text-fg-2">
         <li>Chat and the in-game <code>/ask</code> count against your account, with a higher limit.</li>
         <li>Your saved talent builds sync into the game.</li>
-        <li>It gets a key named <b>Everloot Desktop App</b>. You can revoke it any time on <Link href="/account" className="text-accent hover:underline underline-offset-4">your account</Link>. Uploads never carry it, and the app never sees your Battle.net password.</li>
+        <li>It gets a key named <b>Everloot Desktop App</b>. You can revoke it any time on <Link href="/account" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">your account</Link>. Uploads never carry it, and the app never sees your Battle.net password.</li>
       </ul>
       {done === "connected" ? (
-        <p role="status" className="text-fg">Connected. Go back to the Desktop App; you can close this tab. If the app does not show you signed in (it stops waiting after five minutes), press Sign in there again and revoke the unused key on <Link href="/account" className="text-accent hover:underline underline-offset-4">your account</Link>.</p>
+        <p role="status" className="text-fg">Connected. Go back to the Desktop App; you can close this tab. If the app does not show you signed in (it stops waiting after five minutes), press Sign in there again and revoke the unused key on <Link href="/account" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">your account</Link>.</p>
       ) : done === "cancelled" ? (
         <p role="status" className="text-fg-2">Cancelled. Nothing was made. You can close this tab.</p>
       ) : (
@@ -56,7 +56,7 @@ export default function DesktopConnect({ request, name }: { request: ConnectRequ
           <button type="button" className={secondary} onClick={cancel} disabled={busy}>Cancel</button>
         </div>
       )}
-      {error && <p role="alert" className="text-sm text-fg">{error} {/keys/.test(error) && <Link href="/account" className="text-accent hover:underline underline-offset-4">Manage your keys</Link>}</p>}
+      {error && <p role="alert" className="text-sm text-fg">{error} {/keys/.test(error) && <Link href="/account" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Manage your keys</Link>}</p>}
     </article>
   );
 }

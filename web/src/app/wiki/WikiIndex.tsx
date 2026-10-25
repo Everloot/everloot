@@ -37,7 +37,7 @@ export default function WikiIndex({ groups }: { groups: WikiGroup[] }) {
             <h2 id={`type-${g.type}`} className="mb-3 text-xl font-semibold tracking-tight text-fg">{g.label}</h2>
             <ul className="grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
               {g.pages.map((p) => (
-                <li key={p.slug}><Link href={`/wiki/${p.slug}`} className="text-accent hover:underline underline-offset-4">{p.title}</Link></li>
+                <li key={p.slug}><Link href={`/wiki/${p.slug}`} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{p.title}</Link></li>
               ))}
             </ul>
           </section>

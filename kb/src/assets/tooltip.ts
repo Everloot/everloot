@@ -23,6 +23,8 @@ export interface SpellFacts {
   procChance?: number | null;
   procCharges?: number | null;
   name?: string | null;
+  /** The spell's own description text, as stored, for `$@spelldesc<id>` in another spell's text. */
+  description?: string | null;
 }
 
 export type SpellLookup = (spellId: number) => SpellFacts | undefined;
@@ -181,7 +183,10 @@ function stripEscapes(text: string): string {
     .replace(/\|r/gi, "");
 }
 
-export function resolveTooltip(source: string, self: SpellFacts, others: SpellLookup = () => undefined): Resolved {
+/** How many `$@spelldesc` hops one description follows; a loop between two spells stops here. */
+const MAX_DESCRIPTION_DEPTH = 3;
+
+export function resolveTooltip(source: string, self: SpellFacts, others: SpellLookup = () => undefined, depth = 0): Resolved {
   const unresolved: string[] = [];
   const text = stripEscapes(source);
   let out = "";
@@ -253,6 +258,16 @@ export function resolveTooltip(source: string, self: SpellFacts, others: SpellLo
     } else if ((m = /^\$@spellname(\d+)/.exec(rest))) {
       const name = others(Number(m[1]))?.name;
       if (name) out += name; else miss(m[0]);
+      i += m[0].length;
+    } else if ((m = /^\$@spelldesc(\d+)/.exec(rest))) {
+      // Another spell's description, resolved with that spell's own numbers. Anything it cannot resolve stays a placeholder.
+      const other = others(Number(m[1]));
+      const raw = other?.description?.trim();
+      if (other && raw && depth < MAX_DESCRIPTION_DEPTH) {
+        const inner = resolveTooltip(raw, other, others, depth + 1);
+        out += inner.text;
+        unresolved.push(...inner.unresolved);
+      } else miss(m[0]);
       i += m[0].length;
     } else if ((m = /^\$@[a-z]+\d*/i.exec(rest)) || (m = /^\$<[^>]*>/.exec(rest)) || (m = /^\$[a-zA-Z]{2,}\d*/.exec(rest))) {
       // Another spell's text or icon, a named variable ($<mult>, $proccooldown, $pl): not in the tables.

@@ -21,12 +21,13 @@ import {
   type ZoneEntrance, type ZoneNpc, type ZoneQuest, type ZoneTreasure,
 } from "@/lib/zones";
 import { zoneLore } from "@/lib/zone-lore";
+import { EmptyTab } from "../../entity";
 
 export const dynamic = "force-dynamic";
 
 type Props = { params: Promise<{ zone: string }> };
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 /** Resolves the segment to a released zone, or null; a held-back zone is the same as one that does not exist. */
 function find(segment: string) {
@@ -77,7 +78,8 @@ export default async function ZonePage(props: Props) {
   const entrances = here?.entrances ?? [];
   const treasures = here?.treasures ?? [];
   const nameOf = (n: ZoneNpc) => n.name ?? `NPC ${n.npcId}`;
-  const empty = (message: string) => <EmptyState message={message} framed={false} />;
+  // An empty list is one muted line. The addon call is made once, in the notice above the tabs.
+  const empty = (message: string) => <div className="px-4 sm:px-6"><EmptyTab message={message} players={false} action={null} /></div>;
 
   const npcColumns = (kind: "npcs" | "vendors"): Column<ZoneNpc>[] => [
     { key: "name", header: "Name", cell: (n) => <Link href={`/database/${kind}/${n.npcId}`} className={link}>{nameOf(n)}</Link> },
@@ -125,7 +127,7 @@ export default async function ZonePage(props: Props) {
     { id: "npcs", label: "NPCs", count: npcs.length, panel: <DataTable dense caption={`NPCs players placed in ${zone.name}`} columns={npcColumns("npcs")} rows={npcs} rowKey={(n) => String(n.npcId)} empty={empty("No NPC has a confirmed position here yet. A pin needs 3 installs on the same map.")} /> },
     { id: "vendors", label: "Vendors", count: vendors.length, panel: <DataTable dense caption={`Vendors players placed in ${zone.name}`} columns={npcColumns("vendors")} rows={vendors} rowKey={(n) => String(n.npcId)} empty={empty("No vendor here has prices 3 installs agree on yet.")} /> },
     { id: "quests", label: "Quests", count: quests.length, panel: <DataTable dense caption={`Quests given or turned in at confirmed NPCs in ${zone.name}`} columns={questColumns} rows={quests} rowKey={(q) => String(q.questId)} empty={empty("No quest has a confirmed giver or turn-in here yet.")} /> },
-    { id: "dungeons", label: "Dungeons and raids", count: entrances.length, panel: <DataTable dense caption={`Dungeon and raid entrances in ${zone.name}`} columns={entranceColumns} rows={entrances} rowKey={(e) => `${e.names.join("|")}-${e.x}-${e.y}`} empty={<p className="px-4 py-8 text-fg-2 sm:px-6">No dungeon or raid is entered from this zone.</p>} /> },
+    { id: "dungeons", label: "Dungeons and raids", count: entrances.length, panel: <DataTable dense caption={`Dungeon and raid entrances in ${zone.name}`} columns={entranceColumns} rows={entrances} rowKey={(e) => `${e.names.join("|")}-${e.x}-${e.y}`} empty={empty("No dungeon or raid is entered from this zone.")} /> },
     { id: "objects", label: "Objects", count: treasures.length, panel: <DataTable dense caption={`Treasures players saw on the minimap in ${zone.name}`} columns={treasureColumns} rows={treasures} rowKey={(t) => `${t.objectId}-${t.x}-${t.y}`} empty={empty("No treasure has a confirmed position here yet. A pin needs 3 installs at the same spot.")} /> },
   ];
   // Storage down: an empty list would read as "nobody has seen anything", so only the game-file list stays.

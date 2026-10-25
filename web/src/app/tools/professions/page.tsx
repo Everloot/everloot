@@ -149,7 +149,7 @@ export default async function ProfessionsPage(
               windows and trainers (addon 0.2.5) builds route steps: only the ranks where a recipe is known
               orange, once 3 installs agree. Ranks past that stay gaps. Material drops it records already
               reach the drop pages. Upload on the{" "}
-              <Link href="/upload" className="text-accent hover:underline underline-offset-4">upload page</Link>.
+              <Link href="/upload" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">upload page</Link>.
             </p>
           </Disclosure>
           <Disclosure summary="Does the hub plan farming routes?">

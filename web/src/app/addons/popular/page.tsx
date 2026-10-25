@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 };
 export const dynamic = "force-dynamic";
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const percent = (share: number) => `${Number((share * 100).toFixed(1))}%`;
@@ -62,7 +62,7 @@ const columns = (reportingInstalls: number): Column<Row>[] => [
 export default async function PopularAddonsPage() {
   const { addons, reportingInstalls, unreachable, dataAsOf } = await loadPopularAddons();
   return (
-    <Container width="wide">
+    <Container width="data">
       <article>
         <PageHeader
           trail={trailFor("/addons/popular")!}

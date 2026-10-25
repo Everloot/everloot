@@ -24,8 +24,8 @@ const button = () => container.querySelector("button")!;
 const menu = () => container.querySelector<HTMLElement>("#game-version-menu")!;
 
 test("the button names the version and the menu starts closed", () => {
-  expect(button().textContent).toBe("Beta · 1.60.1");
-  expect(button().getAttribute("aria-label")).toBe("Game version: Beta · 1.60.1");
+  expect(button().textContent).toBe("Build 1.60.1");
+  expect(button().getAttribute("aria-label")).toBe("Game version: Build 1.60.1");
   expect(button().getAttribute("aria-expanded")).toBe("false");
   expect(menu().hidden).toBe(true);
 });

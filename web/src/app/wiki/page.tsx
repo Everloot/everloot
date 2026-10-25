@@ -44,7 +44,7 @@ export default function WikiHub() {
               <ul className="space-y-1 text-sm">
                 {recent.map((p) => (
                   <li key={p.slug} className="flex flex-wrap items-baseline gap-x-3">
-                    <Link href={wikiHref(p.slug)} className="text-accent hover:underline underline-offset-4">{p.title}</Link>
+                    <Link href={wikiHref(p.slug)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{p.title}</Link>
                     <span className="text-meta text-muted">{TYPE_LABEL[p.type].word}{p.reviewed && <> · <span className="font-mono tabular-nums">{p.reviewed.on}</span></>}</span>
                   </li>
                 ))}
@@ -57,7 +57,7 @@ export default function WikiHub() {
           <SectionHeading id="archive">Lore archive, 2023</SectionHeading>
           <p className="text-sm text-fg-2">
             Lore and history as the Warcraft Wiki stood in November 2023, before WoW: Forever.{" "}
-            <Link href="/lore" className="text-accent hover:underline underline-offset-4">Open the lore archive</Link>
+            <Link href="/lore" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Open the lore archive</Link>
           </p>
         </section>
       </div>

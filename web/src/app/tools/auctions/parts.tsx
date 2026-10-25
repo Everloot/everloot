@@ -27,7 +27,7 @@ export function ItemLink({ id, href, tip, names }: { id: number; href: string; t
   const q = itemQuality(id, tip, names.has(id));
   return (
     <ItemTip tip={tip}>
-      <Link href={href} className={`underline-offset-4 hover:underline ${q ? QUALITY_TEXT[q] : "text-accent"}`}>{itemLabel(id, names)}</Link>
+      <Link href={href} className={`underline-offset-4 hover:underline ${q ? QUALITY_TEXT[q] : "text-fg"}`}>{itemLabel(id, names)}</Link>
     </ItemTip>
   );
 }
@@ -128,7 +128,7 @@ export function RealmPrices({ rows, caption, empty }: { rows: MarketRow[]; capti
   const columns: Column<MarketRow>[] = [
     {
       key: "realm", header: "Realm", nowrap: true,
-      cell: (r) => <Link href={itemHref(r.realm, r.value.itemId)} className="text-accent underline-offset-4 hover:underline">{r.realm.name}</Link>,
+      cell: (r) => <Link href={itemHref(r.realm, r.value.itemId)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{r.realm.name}</Link>,
     },
     { key: "market", header: "Market value", numeric: true, cell: (r) => <span className={r.value.market === null ? "text-muted" : undefined}>{money(r.value.market)}</span> },
     { key: "min", header: "Min buyout", numeric: true, cell: (r) => formatCopper(r.value.min) },

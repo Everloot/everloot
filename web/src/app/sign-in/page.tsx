@@ -75,9 +75,9 @@ export default async function SignInPage({ searchParams }: { searchParams?: Prom
           {methods.battlenet && <p className="text-sm text-muted">Or with your email:</p>}
           <EmailAuthForm mode="sign-in" returnTo={returnTo ?? undefined} />
           <p className="text-sm text-fg-2">
-            New here? <Link href={returnTo ? `/sign-up?returnTo=${encodeURIComponent(returnTo)}` : "/sign-up"} className="text-accent hover:underline underline-offset-4">Make an account</Link>
+            New here? <Link href={returnTo ? `/sign-up?returnTo=${encodeURIComponent(returnTo)}` : "/sign-up"} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Make an account</Link>
             {" · "}
-            <Link href="/reset-password" className="text-accent hover:underline underline-offset-4">Forgot your password?</Link>
+            <Link href="/reset-password" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Forgot your password?</Link>
           </p>
         </>
       ) : !methods.battlenet && <p className="text-fg-2">Sign-in is not available right now.</p>}

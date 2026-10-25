@@ -33,7 +33,7 @@ function sourceHost(url: string): string {
 /** Next hands a repeated parameter over as an array; the first value is the one we answer. */
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 type Params = { q?: string | string[]; page?: string | string[]; type?: string | string[]; in?: string | string[] };
 
@@ -97,8 +97,9 @@ function ResultTable({ group, q, scoped, icons }: { group: SearchGroup; q: strin
   const all = isScope(group.type) ? `/search?q=${encodeURIComponent(q)}&in=${group.type}` : group.type === "lore" ? `/search?q=${encodeURIComponent(q)}&in=lore` : null;
   const list = more && scoped && group.type in DATABASE_LIST ? `/database/${DATABASE_LIST[group.type as keyof typeof DATABASE_LIST]}?q=${encodeURIComponent(q)}` : null;
   const name = (r: SearchResult) => {
-    const colour = group.type === "item" && typeof r.quality === "number" && r.quality <= 5 ? QUALITY_TEXT[qualityOf(r.quality)] : "text-accent";
-    const link = <Link href={r.href} className={`${colour} hover:underline underline-offset-4`}>{r.label}</Link>;
+    // An item name takes its quality colour; any other hit is a plain link, never the accent an uncommon item resembles.
+    const style = group.type === "item" && typeof r.quality === "number" && r.quality <= 5 ? `${QUALITY_TEXT[qualityOf(r.quality)]} hover:underline underline-offset-4` : "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
+    const link = <Link href={r.href} className={style}>{r.label}</Link>;
     // Item hits carry the game icon as the item lists do, and an empty box where an item has none.
     if (group.type !== "item" || icons.size === 0) return link;
     const icon = r.id === undefined ? undefined : icons.get(r.id);

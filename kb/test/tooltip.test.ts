@@ -54,6 +54,19 @@ test("another spell's numbers and name", () => {
   expect(resolveTooltip("$98s1", self, others).unresolved).toEqual(["$98s1"]);
 });
 
+test("another spell's description is resolved with that spell's own numbers", () => {
+  const others = (id: number): SpellFacts | undefined => id === 99
+    ? { effects: [eff(0, 40)], durationMs: 6000, description: "Restores $s1 health over $d." }
+    : id === 98 ? { effects: [], durationMs: null, description: "Gives $s3 and $@spelldesc98." }
+    : id === 97 ? { effects: [], durationMs: null } : undefined;
+  expect(resolveTooltip("Eat. $@spelldesc99", self, others)).toEqual({ text: "Eat. Restores 40 health over 6 sec.", unresolved: [] });
+  // What the other description cannot resolve stays open, and is reported.
+  expect(resolveTooltip("$@spelldesc98", self, others).unresolved).toContain("$s3");
+  // No description, an unknown spell, or a loop between descriptions: one placeholder, never a guess.
+  expect(resolveTooltip("$@spelldesc97 $@spelldesc96", self, others)).toEqual({ text: `${PLACEHOLDER} ${PLACEHOLDER}`, unresolved: ["$@spelldesc97", "$@spelldesc96"] });
+  expect(resolveTooltip("$@spelldesc98", self, others).text).toContain(PLACEHOLDER);
+});
+
 test("a sentence prints the size of a reduction, an expression keeps the stored sign", () => {
   const cut: SpellFacts = { effects: [eff(0, -1500)], durationMs: null };
   expect(resolveTooltip("Reduces by $s1 and by ${$s1/-1000}.1 sec.", cut).text).toBe("Reduces by 1500 and by 1.5 sec.");

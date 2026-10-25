@@ -101,6 +101,14 @@ test("keyboard focus shows the card and Escape hides it, with focus left on the 
   expect(document.activeElement).toBe(a);
 });
 
+test("the focus a click gives a link is not keyboard focus: no card opens from it", async () => {
+  const a = link("/database/items/19019");
+  pointer("pointerdown", a);
+  await act(async () => a.focus());
+  await wait(SHOW_DELAY);
+  expect(card()).toBeNull();
+});
+
 test("a pointer that leaves before the delay asks for nothing; touch, other pages and links with their own card get none", async () => {
   pointer("pointerover", link("/database/items/19019"));
   await wait(50);
@@ -121,4 +129,49 @@ test("a pointer that leaves before the delay asks for nothing; touch, other page
   await wait(SHOW_DELAY);
   expect(fetcher).not.toHaveBeenCalled();
   expect(card()).toBeNull();
+});
+
+test("the scroll that focus causes does not close the card; it still closes a card the pointer opened", async () => {
+  const a = link("/database/items/19019");
+  await act(async () => a.focus());
+  window.dispatchEvent(new Event("scroll"));
+  await wait(SHOW_DELAY);
+  expect(card()).not.toBeNull();
+  expect(a.getAttribute("aria-describedby")).toBe(CARD_ID);
+  window.dispatchEvent(new Event("scroll"));
+  await wait(0);
+  expect(card()).not.toBeNull();
+  await act(async () => a.blur());
+  await wait(0);
+  expect(card()).toBeNull();
+  expect(a.hasAttribute("aria-describedby")).toBe(false);
+
+  pointer("pointerover", a);
+  await wait(SHOW_DELAY);
+  expect(card()).not.toBeNull();
+  window.dispatchEvent(new Event("scroll"));
+  await wait(0);
+  expect(card()).toBeNull();
+});
+
+test("the icon sits inside the frame beside the name, and the footnote shows only while a line holds [?]", async () => {
+  const NOTE = "[?] in a Use, Equip or Chance on hit line: a value the spell tables we read do not give.";
+  const open = async (c: object) => {
+    forgetCards();
+    fetcher.mockImplementation(async () => new Response(JSON.stringify({ ok: true, card: c }), { status: 200 }));
+    await act(async () => link("/database/items/19019").focus());
+    await wait(SHOW_DELAY);
+    return card()!;
+  };
+  const shown = await open({ ...THUNDERFURY, notes: [NOTE] });
+  const frame = shown.querySelector("[data-tooltip-frame]")!;
+  expect(frame.contains(shown.querySelector("img"))).toBe(true);
+  expect(shown.querySelector("img")!.getAttribute("width")).toBe("48");
+  const notes = shown.querySelector("[data-card-notes]")!;
+  expect(notes.textContent).toBe(NOTE);
+  expect(frame.contains(notes)).toBe(false);
+
+  await act(async () => link("/database/items/19019").blur());
+  const clean = await open({ ...THUNDERFURY, lines: ["Binds when picked up"], notes: [NOTE] });
+  expect(clean.querySelector("[data-card-notes]")).toBeNull();
 });

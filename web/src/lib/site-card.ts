@@ -1,7 +1,8 @@
 import type { TooltipType } from "@everloot/protocol";
 import { categoryOf } from "../../../kb/src/item-taxonomy";
 import { loadItemTips, loadQuestNames, loadSiteAssets } from "./game-assets";
-import { tipLines, withReported } from "./item-names";
+import { withReported } from "./item-names";
+import { splitWhy } from "./placeholder";
 import { loadReportedItemFacts } from "./rollup-compute";
 import { CLIENT_LAYER, CLIENT_TAXONOMY, NAME_FROM, shownItemName } from "./items";
 import { loadShownNames } from "./shown-item-names";
@@ -24,6 +25,8 @@ export interface SiteCard {
   color: string | null;
   icon: string | null;
   lines: string[];
+  /** Why the lines hold `[?]`, apart from the lines so the card can draw them as a footnote; absent without any. */
+  notes?: string[];
   /** Where the name and the game file lines come from, one short line; null when there is nothing to say. */
   foot: string | null;
 }
@@ -60,15 +63,16 @@ async function itemCard(id: number): Promise<SiteCardResult> {
   const name = shownItemName(id, shown.agreed, shown.matched?.names, tip);
   const category = categoryOf(CLIENT_TAXONOMY, id);
   // As the item page's box: the game's lines, else the type and slot from the client layer.
+  const { reasons, evidence } = splitWhy(tip?.why ?? []);
   const lines = tip
-    ? tipLines(tip)
+    ? [...tip.lines, ...evidence]
     : [category?.subclass?.name ?? category?.class?.label, category?.slot?.name].filter((l): l is string => Boolean(l));
   // The quality colour only where a name is shown, as on the item page; "Item N" stays plain.
   const quality = name && category?.quality && category.quality.id <= 5 ? category.quality.id : null;
   return {
     status: 200,
     body: {
-      type: "item", id, title: name?.name ?? `Item ${id}`, quality, color: name && quality === null ? name.color : null, icon: tip?.icon ?? null, lines,
+      type: "item", id, title: name?.name ?? `Item ${id}`, quality, color: name && quality === null ? name.color : null, icon: tip?.icon ?? null, lines, ...(reasons.length ? { notes: reasons } : {}),
       foot: join([name && name.source !== "files" ? NAME_FROM[name.source] : null, tip?.label]),
     },
   };

@@ -86,7 +86,7 @@ export function NoObservations({ children }: { children: string }) {
     <div data-empty-state className="flex flex-wrap items-center gap-3 py-4 text-cell text-fg-2">
       <AgreementMeter count={0} />
       <span>{children}</span>
-      <Link href="/addon" className="text-accent hover:underline underline-offset-4">Get the addon</Link>
+      <Link href="/addon" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Get the addon</Link>
     </div>
   );
 }
@@ -101,7 +101,7 @@ export function NoMatches({ noun, chips, clearHref }: { noun: string; chips: { l
           {c.label}<span aria-hidden="true">×</span><span className="sr-only">(remove)</span>
         </Link>
       ))}
-      <Link href={clearHref} className="text-accent hover:underline underline-offset-4">Clear filters</Link>
+      <Link href={clearHref} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Clear filters</Link>
     </div>
   );
 }

@@ -7,7 +7,7 @@ import {
   COLLECTING_LINE, HUB_ROWS, RAIL_GROUPS, START_LINE, rankingPath, type Change, type ChartSeries, type RankRow, type RankingView, type RankingWeek,
 } from "@/lib/rankings";
 
-export const link = "text-accent hover:underline underline-offset-4";
+export const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 const number = (n: number) => n.toLocaleString("en-US");
 /** A share of the shown total, both rounded already; a whole percent claims no more than the counts do. */
 export const percent = (share: number) => `${Math.round(share * 100)}%`;

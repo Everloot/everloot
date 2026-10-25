@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   ...pageMetadata({ title: "Contact", description: "Contact the Everloot team by email at hello@everloot.app for corrections, privacy requests, bug reports and partnership questions about the WoW: Forever tools.", path: "/contact" }),
 };
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 export default function ContactPage() {
   return (

@@ -54,7 +54,7 @@ export async function generateMetadata(props: { params: Promise<Params> }): Prom
   };
 }
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 export default async function PlayerPage(props: { params: Promise<Params> }) {
   if (!playerPagesOn()) notFound();

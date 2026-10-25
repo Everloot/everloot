@@ -89,7 +89,7 @@ function Controls({ search, controls, active, clearHref, phone }: FilterBarProps
         : <Link key={c.key} href={c.href} aria-current={c.on ? "true" : undefined} className={`${control} ${c.on ? lit : idle}`}>
             <span aria-hidden="true" className={`h-3 w-3 shrink-0 rounded-[3px] border ${c.on ? "border-accent bg-accent" : "border-edge"}`} />{c.label}
           </Link>)}
-      {active > 0 && <Link href={clearHref} className="ctl inline-flex items-center px-2 text-accent hover:underline underline-offset-4">Clear filters</Link>}
+      {active > 0 && <Link href={clearHref} className="ctl inline-flex items-center px-2 text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Clear filters</Link>}
     </>
   );
 }

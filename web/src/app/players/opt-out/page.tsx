@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 const field = "w-full min-h-11 rounded-lg border border-edge bg-canvas px-3 text-fg placeholder:text-muted";
 

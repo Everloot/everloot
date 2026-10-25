@@ -166,7 +166,7 @@ export default function SaveBuild({ classSlug, codes, defaultName, onMessage }: 
             {mine.map((b) => (
               <li key={b.id}><a href={editPath(b)} className="block truncate rounded-control px-3 py-2 text-sm text-fg-2 hover:bg-canvas hover:text-accent">{b.name}</a></li>
             ))}
-            <li><a href="/me" className="block rounded-control px-3 py-2 text-sm text-accent hover:bg-canvas">All my builds</a></li>
+            <li><a href="/me" className="block rounded-control px-3 py-2 text-sm text-fg hover:bg-canvas">All my builds</a></li>
           </ul>
         </details>
       )}
@@ -176,7 +176,7 @@ export default function SaveBuild({ classSlug, codes, defaultName, onMessage }: 
         <section aria-label="Sign in to save builds" className="order-last basis-full rounded-control border border-line bg-canvas p-3 text-sm text-fg-2">
           <p>
             Sign in to save builds to your account. You come back to this build after.{" "}
-            <a href={signInPath(`/tools/talents/${classSlug}?save=1`)} onClick={rememberBuild} className="text-accent hover:underline underline-offset-4">Sign in</a>
+            <a href={signInPath(`/tools/talents/${classSlug}?save=1`)} onClick={rememberBuild} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Sign in</a>
           </p>
         </section>
       )}
