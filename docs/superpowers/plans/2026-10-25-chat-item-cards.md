@@ -34,12 +34,14 @@ Files: new `web/src/components/chat/ItemResult.tsx` and its test; existing `Mess
 
 ## Task 3: Verification and release
 
-- [ ] Run types, lint and production build plus relevant tests. Inspect the full diff independently and fix substantive findings.
-- [ ] Verify actual desktop and narrow-screen Chat, no-key Linen Cloth, unavailable-data behavior, database links and retained protected-page behavior.
+- [x] Run types, lint and production build plus relevant tests. Inspect the full diff independently and fix substantive findings.
+- [x] Verify actual desktop and narrow-screen Chat, no-key Linen Cloth, unavailable-data behavior, database links and retained protected-page behavior.
 - [ ] Open and link a PR with evidence; use required CI and existing deployment serialization before merge. Verify production before reporting deployed.
 
 Execution: Carlos explicitly approved implementation. Continue in this thread without another plan approval round. Use a focused implementation delegate and an independent whole-branch review; root owns integration and release verification.
 
 Review record: the final review approved the feature after regression fixes for install-count wording, pending evidence, neutral result text, choosing an item, real names beginning with articles, and common drop-rate question forms. Focused checks: 123 tests, typecheck and scoped lint passed. Release verification remains tracked in Task 3.
+
+Final local verification: production build succeeds with `/chat` still static; settled full web suite 2,446 passed and 3 skipped; production dependency audit found zero vulnerabilities. Chrome verified desktop and 390px layout with no horizontal overflow, real Linen Cloth icon/tooltip/provenance and the missing-drop state. Both the suggestion and the drop-rate question resolve to item 2589. The local browser test forwards existing item read routes to production because the local checkout has no private knowledge release; no synthetic drop facts were used. Outage, pending and provider cases are verified by focused tests.
 
 Ruling: retain the existing lore/model fallback for questions the bounded item patterns do not recognize. Arbitrary natural-language entity extraction and article-prefixed partial-name improvements are outside this change; exact names are never silently replaced.
