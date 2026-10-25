@@ -250,13 +250,15 @@ revoke all on function public.delete_build_character(uuid, uuid) from public, an
 grant execute on function public.delete_build_character(uuid, uuid) to service_role;
 
 -- 5. The public read behind /b/<slug>: a shared build, or no row. The owner's name only when they chose to show it.
+-- users.name arrives with the accounts migration, which may not be applied yet: read it through the row, so the
+-- function compiles without it, and fall back to the battletag.
 create or replace function public.shared_build(p_slug text)
 returns table (name text, notes text, class_slug text, code text, code2 text, game_build text,
   character_name text, character_class text, owner_name text, updated_at timestamptz)
 language sql stable security definer set search_path = '' set lock_timeout = '3s'
 as $$
   select b.name, b.notes, b.class_slug, b.code, b.code2, b.game_build, c.name, c.class_slug,
-    case when b.show_name then u.name end, b.updated_at
+    case when b.show_name then coalesce(to_jsonb(u) ->> 'name', to_jsonb(u) ->> 'battletag') end, b.updated_at
   from public.saved_builds b
   join public.users u on u.id = b.user_id
   left join public.build_characters c on c.id = b.character_id
