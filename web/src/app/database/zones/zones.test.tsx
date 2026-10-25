@@ -113,6 +113,15 @@ test("a zone with nothing confirmed says so once, above the lists, and a zone wi
   expect(await html(ZonePage(props("1436-westfall")))).not.toContain("Players have not confirmed anything");
 });
 
+test("an empty zone page makes one addon call; its empty lists are single muted lines with none", async () => {
+  store.loadCorpus.mockResolvedValue(corpus([]));
+  const page = await html(ZonePage(props("1429-elwynn-forest")));
+  expect(page.match(/href="\/addon"/g)).toHaveLength(1);
+  // The notice, then one line for each of the five lists.
+  expect(page.match(/data-empty-state/g)).toHaveLength(6);
+  expect(page).toContain("No NPC has a confirmed position here yet.");
+});
+
 test("the zone index says a dash is unrecorded, not none, and says so plainly when no zone has anything", async () => {
   store.loadCorpus.mockResolvedValue(corpus(three(100, "Guard Orin", 1436, 40, 50)));
   const some = await html(ZonesPage());
