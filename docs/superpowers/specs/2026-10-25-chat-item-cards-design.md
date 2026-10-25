@@ -1,6 +1,6 @@
 # Item details inside Chat
 
-Status: proposed for design approval, 2026-10-25.
+Status: approved by Carlos for implementation, 2026-10-25.
 
 ## Intent
 
