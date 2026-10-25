@@ -1,5 +1,6 @@
 const path = require("node:path");
 const versions = require("./src/data/build-versions.json");
+const protectedPaths = require("./src/data/protected-paths.json");
 
 const reportOnlyCsp = [
   "default-src 'self'",
@@ -17,6 +18,32 @@ const reportOnlyCsp = [
 // Enforced: only directives that block nothing the site or AdSense uses. AdSense supports a nonce-based
 // CSP only (support.google.com/adsense/answer/16283098), so script, connect and frame sources stay report-only.
 const enforcedCsp = ["object-src 'none'", "base-uri 'self'", "frame-ancestors 'self'"].join("; ");
+
+// Enforced on the pages that hold chat keys or the account (data/protected-paths.json, also under the served
+// version's prefix, whose rewrite shows the same pages). They load no ads or analytics (OptionalScripts), so
+// scripts come from this site alone and connections go only to it, its assets and the chat providers the browser
+// calls (lib/chat/catalogue.ts, held to this list by next-config.test.ts). 'unsafe-inline' stays in script-src:
+// Next's inline bootstrap scripts need it without a nonce, and a nonce would make every page dynamic. So an
+// injected inline script is not blocked here; the policy only keeps out other hosts' scripts and connections.
+// This is document protection, not storage isolation: same-origin scripts can still read tab keys after a
+// visit to a public page in that tab. Session storage narrows lifetime and cross-tab access, not script trust.
+// `next dev` runs its scripts through eval. A CSP lasts as long as its document, so DocumentBoundary reloads on
+// any move between these pages and the rest of the site.
+const protectedCsp = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""}`,
+  "connect-src 'self' https://assets.everloot.app https://openrouter.ai https://api.anthropic.com http://localhost:11434 https://api.deepseek.com https://api.moonshot.ai https://dashscope-intl.aliyuncs.com https://api.minimax.io https://api.siliconflow.com https://qianfan.baidubce.com https://api.xiaomimimo.com https://api.groq.com https://generativelanguage.googleapis.com https://api.mistral.ai",
+  "img-src 'self' data: blob: https://assets.everloot.app",
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self' data:",
+  "frame-src 'none'",
+  "frame-ancestors 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+].join("; ");
+const servedPrefix = versions.prefixes[versions.served] ?? "";
+// `/chat/:path*` matches /chat itself too.
+const protectedSources = protectedPaths.flatMap((p) => [`${p}/:path*`, ...(servedPrefix ? [`${servedPrefix}${p}/:path*`] : [])]);
 
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -112,6 +139,8 @@ const nextConfig = {
     ];
     return [
       { source: "/:path*", headers: securityHeaders },
+      // After the rule above: the later rule's value for the same header is the one sent.
+      ...protectedSources.map((source) => ({ source, headers: [{ key: "Content-Security-Policy", value: protectedCsp }] })),
       // These pages read no cookies, so the CDN can serve them. Next overwrites Cache-Control on
       // dynamic pages, so the CDN-specific headers are used.
       { source: "/database/items", headers: databaseItemsCdnHeaders },

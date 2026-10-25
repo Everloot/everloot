@@ -5,10 +5,12 @@ import type { AccountShell, ShellCharacter } from "@/lib/account-shell-types";
 import { signInPath } from "@/lib/auth/return-to";
 import { answer, loadTools, searchOnly, signedIn, type ChatProgress, type ToolDef } from "@/lib/chat/agent";
 import { chatProvider } from "@/lib/chat/providers";
+import { providerStorage } from "@/lib/chat/provider-session";
 import {
-  deleteConversation, keyReady, loadConversations, loadProviders, newConversationId, pickModel, PROVIDERS, saveConversation,
+  deleteConversation, keyReady, loadConversations, loadProviders, newConversationId, pickModel, saveConversation,
   type ChatMessage, type Conversation, type SavedProvider,
 } from "@/lib/chat/store";
+import { crossesDocumentBoundary } from "@/lib/document-boundary";
 import { askPrefill, validCharacterId } from "@/lib/profiles";
 import type { AccountBuilds, SavedBuild } from "@/lib/saved-builds";
 import Composer from "./Composer";
@@ -75,16 +77,15 @@ export default function ChatClient({ savedBuilds = false, profiles = false }: { 
   latest.current = { providers, signed, context, own, busy, currentId };
 
   // localStorage only exists in the browser; read it after the first render. A new chat opens each visit.
+  // Not in a document that came with a public page's policy: DocumentBoundary reloads it first.
   useEffect(() => {
-    setProviders(loadProviders(localStorage));
+    if (crossesDocumentBoundary(window.location.pathname)) return;
+    try { setProviders(loadProviders(providerStorage())); }
+    catch { setError("Chat keys could not move to this tab. Allow browser storage and reload before saving a key."); }
     setConversations(loadConversations(localStorage));
     setCurrentId(newConversationId());
     setRailOpen(typeof window.matchMedia === "function" && window.matchMedia("(min-width: 1024px)").matches);
     setReady(true);
-    // Keys saved on /account in another tab apply here at once.
-    const onStorage = (e: StorageEvent) => { if (e.key === PROVIDERS || e.key === null) setProviders(loadProviders(localStorage)); };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
   useEffect(() => {
@@ -228,6 +229,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false }: { 
           {!railOpen && <button type="button" className="btn min-h-9 px-3 text-sm" disabled={busy} aria-keyshortcuts="Control+Shift+O" onClick={newChat}>New chat</button>}
         </div>
 
+        {providers.length > 0 && <p className="px-4 text-xs text-muted">Keys last only in this tab. Closing it forgets them.</p>}
         <div ref={thread} className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
           onScroll={(e) => { const t = e.currentTarget; stick.current = t.scrollHeight - t.scrollTop - t.clientHeight < 80; }}>
           <div className="mx-auto w-full max-w-reading px-4 py-6">
@@ -258,7 +260,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false }: { 
         </div>
 
         <Composer box={box} value={draft} onValue={setDraft} onSend={() => void ask(draft)} onStop={() => stop.current?.abort()} busy={busy}
-          providers={providers} onPickModel={(kind, model) => { try { setProviders(pickModel(localStorage, kind, model)); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } }}
+          providers={providers} onPickModel={(kind, model) => { try { setProviders(pickModel(providerStorage(), kind, model)); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } }}
           keysHref={keysHref} signed={signed}
           characters={own.characters} context={context} onContext={(c) => { setContext(c); box.current?.focus(); }} />
       </div>

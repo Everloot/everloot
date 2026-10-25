@@ -72,6 +72,7 @@ let root: Root;
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   localStorage.clear();
+  sessionStorage.clear();
   window.history.replaceState(null, "", "/chat");
   container = document.createElement("div");
   document.body.append(container);
@@ -98,6 +99,14 @@ function setValue(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
 }
 
 describe("the chat page", () => {
+  test("moves old browser-wide credentials into this tab before using them", async () => {
+    api();
+    saveKey();
+    await render(<ChatClient />);
+    expect(localStorage.getItem(PROVIDERS)).toBeNull();
+    expect(sessionStorage.getItem(PROVIDERS)).toContain(KEY);
+    expect(text()).toContain("Keys last only in this tab. Closing it forgets them.");
+  });
   test("no key, signed in: one composer that asks to finish key setup on /account, the account label and four suggestions", async () => {
     api();
     await render(<ChatClient profiles />);
@@ -221,7 +230,7 @@ describe("the Chat keys section", () => {
   const card = (name: string) => Array.from(container.querySelectorAll("section")).find((s) => s.querySelector("h3")?.textContent?.startsWith(name))!;
   const inCard = (name: string, label: string) =>
     Array.from(card(name).querySelectorAll("button")).find((b) => b.textContent === label || b.getAttribute("aria-label") === label);
-  const saved = () => JSON.parse(localStorage.getItem(PROVIDERS) ?? "null");
+  const saved = () => JSON.parse(sessionStorage.getItem(PROVIDERS) ?? "null");
 
   test("one card per provider Chat supports, each with its status, a link to get a key, and no dropdown of providers", async () => {
     api();
@@ -239,7 +248,7 @@ describe("the Chat keys section", () => {
     expect(container.querySelectorAll("select")).toHaveLength(0);
   });
 
-  test("a key is added in its card, kept in this browser only, shown masked, tested with its provider alone and removable", async () => {
+  test("a key is added in its card, kept in this tab only, shown masked, tested with its provider alone and removable", async () => {
     api();
     await render(<ChatKeys />);
     await click(inCard("OpenRouter", "Add OpenRouter key"));
@@ -257,7 +266,7 @@ describe("the Chat keys section", () => {
     expect(container.innerHTML).not.toContain(KEY);
     expect(card("OpenRouter").textContent).toContain("Set, ending ••••1234");
     expect(card("OpenRouter").textContent).toContain("Default");
-    expect(text()).toContain("OpenRouter saved in this browser.");
+    expect(text()).toContain("OpenRouter saved in this tab.");
 
     await click(inCard("OpenRouter", "Test OpenRouter"));
     expect(beyondList().map((c) => c.url)).toEqual(["https://openrouter.ai/api/v1/key"]);
