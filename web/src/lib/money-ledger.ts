@@ -5,8 +5,8 @@
  *
  * Ported from the Desktop App's summariser (desktop/src/main/characters.ts); the two should become one later.
  * Categories are the ones the records carry; nothing is added or renamed. In and out follow the server ledger
- * (kb/src/gold-ledger.ts): `vendor` is money in, since the addon writes it only for gold gained at a merchant.
- * The Desktop App counts `vendor` as spending.
+ * (kb/src/gold-ledger.ts): `vendor` is money in, since the addon writes it only for gold gained at a merchant;
+ * the Desktop App reads the same list.
  */
 import { SPENDING_CATEGORIES } from "../../../kb/src/gold-ledger";
 

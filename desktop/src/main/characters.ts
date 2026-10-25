@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { parseEverlootLua } from "../../../web/src/lib/sv-parse";
+import { SPENDING_CATEGORIES } from "../../../kb/src/gold-ledger";
 import type { CharacterRow, CharactersInfo, ProgressRow } from "../shared/types";
 
 /**
@@ -12,7 +13,9 @@ const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v)
 const str = (v: unknown): string => (typeof v === "string" ? v : "");
 
 export const HISTORY_POINTS = 60;
-const SPENT = ["vendor", "flight", "postage", "barber", "respec", "auction_spend"];
+// In and out follow the server ledger (kb/src/gold-ledger.ts): `vendor` is money in, since the addon writes it only
+// for gold gained at a merchant (addon/modules/gold.lua). The website ledger reads the same list.
+const SPENT: readonly string[] = SPENDING_CATEGORIES;
 const WEEK_MS = 7 * 24 * 3600 * 1000;
 const DAY_MS = 24 * 3600 * 1000;
 const MONEY_DAYS = 30;
