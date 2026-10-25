@@ -31,7 +31,7 @@ type Sort = (typeof SORTS)[number];
 const DEFAULT_SORT = { key: "date" as Sort, desc: true };
 
 const TYPE_FILTER_LABEL: Record<ChangeFilter, string> = { all: "Any type", posts: "Blue posts", hotfixes: "Hotfixes", builds: "Builds" };
-const GAMES = { forever: "WoW: Forever", classic: "WoW Classic", all: "Both games" } as const;
+const GAMES = { forever: "WoW: Forever", classic: "WoW Classic", retail: "WoW (retail)", all: "All games" } as const;
 type Game = keyof typeof GAMES;
 const REGIONS = { us: "US forum", eu: "EU forum" } as const;
 type Region = keyof typeof REGIONS;
@@ -43,7 +43,7 @@ interface ChangesQuery extends ListQuery<Sort> { show: ChangeFilter; game: Game;
 const one = (search: Search, k: string) => (typeof search[k] === "string" ? (search[k] as string) : undefined);
 
 /**
- * The filters from the URL: `q`, `show=posts|hotfixes|builds`, `game=classic|all` (Forever when absent),
+ * The filters from the URL: `q`, `show=posts|hotfixes|builds`, `game=classic|retail|all` (Forever when absent),
  * `region=us|eu`, `author=`, `days=7|30|90|365`, `sort`, `page`. An unknown filter value is ignored, as the old
  * links did; a malformed sort or page is a 404, as on the database lists.
  */
@@ -55,7 +55,7 @@ function changesQuery(search: Search): ChangesQuery | null {
   return {
     ...base,
     show: parseFilter(one(search, "show")),
-    game: game === "classic" || game === "all" ? game : "forever",
+    game: game === "classic" || game === "retail" || game === "all" ? game : "forever",
     ...(region === "us" || region === "eu" ? { region } : {}),
     ...(author ? { author } : {}),
     ...(days in DAYS ? { days: days as Days } : {}),
@@ -70,7 +70,7 @@ const href = (q: Partial<ChangesQuery>) => listHref("/changes", [
 const active = (q: ChangesQuery) => [q.q, q.show !== "all", q.game !== "forever", q.region, q.author, q.days].filter(Boolean).length;
 
 /** Every forum an announcement was posted on: "US forum", or "US · EU forum" for one posted on both. */
-const SOURCE_LABEL = (e: ChangeEntry) => e.type === "build" ? "" : e.source === "bluesky" ? "Bluesky"
+const SOURCE_LABEL = (e: ChangeEntry) => e.type === "build" ? "" : e.source === "bluesky" ? "Bluesky" : e.source === "manual" ? e.category || "Everloot"
   : `${forumRegions(e).map((r) => r.toUpperCase()).join(" · ")} forum`;
 /** The announcement and its regional copies, for the filters that look inside them. */
 const copiesOf = (e: ChangeEntry) => [e, ...(e.copies ?? [])];

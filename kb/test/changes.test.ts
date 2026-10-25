@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "vitest";
 import { emptyStore, loadStore, mergePosts, parseBlueskyFeed, type BluePost } from "../src/blue-posts.js";
-import { blueThreads, buildTimeline, filterTimeline, forumRegions, groupAnnouncements, handleRecentChanges, parseFilter, renderFeed, sameAnnouncement, type BuildLike } from "../src/changes.js";
+import { blueThreads, buildTimeline, filterTimeline, forumRegions, groupAnnouncements, handleRecentChanges, manualEntries, parseFilter, renderFeed, sameAnnouncement, type BuildLike } from "../src/changes.js";
 import { clampExcerpt, safeHttpUrl } from "../src/text-safety.js";
 
 const fixture = (name: string) => JSON.parse(readFileSync(new URL(`./fixtures/blue/${name}`, import.meta.url), "utf8"));
@@ -274,4 +274,15 @@ test("the RSS feed of the grouped timeline has one item per announcement", () =>
   expect((xml.match(/<item>/g) ?? []).length).toBe(5);
   expect(xml).not.toContain("eu-6443510");
   expect(xml.match(/Raid Overview/g)).toHaveLength(2);
+});
+test("hand-written entries carry a manual source and id, may be retail, and are kept out of the Forever filter", () => {
+  const manual = manualEntries({ entries: [
+    { id: "retail-hotfix", type: "hotfix", game: "retail", at: "2026-10-23T00:00:00Z", title: "Retail hotfixes", summary: "Fixes.", url: "https://example.com/x" },
+    { id: "Bad Id", game: "retail", at: "2026-10-23T00:00:00Z", title: "Skipped" },
+    { id: "no-game", at: "2026-10-23T00:00:00Z", title: "Skipped" },
+  ] });
+  expect(manual).toEqual([expect.objectContaining({ id: "manual:retail-hotfix", source: "manual", type: "hotfix", game: "retail", url: "https://example.com/x" })]);
+  expect(filterTimeline([...timeline, ...manual], "all", "forever").some((e) => e.source === "manual")).toBe(false);
+  expect(groupAnnouncements([...timeline, ...manual]).some((e) => e.id === "manual:retail-hotfix")).toBe(true);
+  expect(manualEntries(null)).toEqual([]);
 });

@@ -24,10 +24,13 @@ export interface BuildLike {
   diffUrl?: string | null;
 }
 
+/** Blue posts and builds are Forever or Classic; a hand-written entry (kb/curated/manual-changes.json) may be retail. */
+export type ChangeGame = BlueGame | "retail";
+
 export interface ChangeEntry {
   id: string;
   type: ChangeType;
-  game: BlueGame;
+  game: ChangeGame;
   /** Posts: when Blizzard posted. Builds: when Everloot first saw the build, not when Blizzard shipped it. */
   at: string;
   title: string;
@@ -98,7 +101,31 @@ const PRODUCT_GAME: Record<string, BlueGame> = {
   wow_classic: "classic",
 };
 
-export const GAME_LABEL: Record<BlueGame, string> = { forever: "WoW: Forever", classic: "WoW Classic" };
+export const GAME_LABEL: Record<ChangeGame, string> = { forever: "WoW: Forever", classic: "WoW Classic", retail: "WoW (retail)" };
+
+/**
+ * Hand-written entries from kb/curated/manual-changes.json: a change Everloot reports itself, never dressed up
+ * as a Blizzard forum record. Source "manual", an id under `manual:`, a post or hotfix, and the same limits
+ * as stored posts. An entry missing an id, title, date or game is skipped.
+ */
+export function manualEntries(file: unknown): ChangeEntry[] {
+  const list = isRecord(file) && Array.isArray(file.entries) ? file.entries : [];
+  const out: ChangeEntry[] = [];
+  for (const raw of list) {
+    if (!isRecord(raw)) continue;
+    const slug = typeof raw.id === "string" && /^[a-z0-9-]{1,100}$/.test(raw.id) ? raw.id : null;
+    const title = clampText(raw.title, 200);
+    const at = isoTime(raw.at);
+    const game = raw.game === "forever" || raw.game === "classic" || raw.game === "retail" ? raw.game : null;
+    if (!slug || !title || !at || !game) continue;
+    const summary = clampText(raw.summary, 280);
+    out.push({
+      id: `manual:${slug}`, type: raw.type === "hotfix" ? "hotfix" : "post", game, at, title, url: safeHttpUrl(raw.url),
+      source: "manual", category: clampText(raw.category, 100), ...(summary ? { summary } : {}),
+    });
+  }
+  return out;
+}
 
 /** Entries with a bad date, no title or an unknown game are skipped rather than failing the whole list. */
 export function buildTimeline(posts: unknown[], builds: unknown[]): ChangeEntry[] {
@@ -187,7 +214,7 @@ const FILTER_TYPES: Record<Exclude<ChangeFilter, "all">, ChangeType[]> = {
   builds: ["build"],
 };
 
-export function filterTimeline(entries: ChangeEntry[], filter: ChangeFilter, game?: BlueGame): ChangeEntry[] {
+export function filterTimeline(entries: ChangeEntry[], filter: ChangeFilter, game?: ChangeGame): ChangeEntry[] {
   return entries.filter((e) => (filter === "all" || FILTER_TYPES[filter].includes(e.type)) && (!game || e.game === game));
 }
 
@@ -203,7 +230,7 @@ export interface BlueThread {
   topicId: number;
   topicSlug: string | null;
   title: string;
-  game: BlueGame;
+  game: ChangeGame;
   category: string;
   /** The thread's first post when its slug is known, else the earliest blue post's link. */
   url: string | null;
@@ -255,6 +282,7 @@ export function entryDescription(e: ChangeEntry): string {
   }
   const by = [e.author, e.role].filter(Boolean).join(", ");
   const lead = e.summary ? `${e.summary} ` : "";
+  if (e.source === "manual") return `${lead}Written by Everloot${e.category ? `, from ${e.category}` : ""}.`.trim();
   return `${lead}${e.excerpt ? `"${e.excerpt}" ` : ""}From ${by || "Blizzard"} on ${e.category || e.source}. Read the original post for the full text.`.trim();
 }
 

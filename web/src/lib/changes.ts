@@ -1,14 +1,15 @@
 import postsFile from "../../../kb/changes/blue-posts.json";
 import buildsFile from "../../../kb/changes/builds.json";
+import manualFile from "../../../kb/curated/manual-changes.json";
 import writeupsFile from "../../../kb/curated/blue-writeups.json";
 import type { BlueStore } from "../../../kb/src/blue-posts";
 import { writeupsById, type BlueWriteup } from "../../../kb/src/blue-writeups";
-import { buildTimeline, groupAnnouncements, type BuildLike, type ChangeEntry } from "../../../kb/src/changes";
+import { buildTimeline, groupAnnouncements, manualEntries, type BuildLike, type ChangeEntry } from "../../../kb/src/changes";
 import { BLUE_POSTS_KEY, bluePosts, blueStorage } from "./blue-store";
 
 export {
-  CHANGE_FILTERS, GAME_LABEL, TYPE_LABEL, blueThreads, buildTimeline, filterTimeline, forumRegions, groupAnnouncements, parseFilter, postIdOfSegment,
-  postPath, renderFeed, type BlueThread, type ChangeEntry, type ChangeFilter,
+  CHANGE_FILTERS, GAME_LABEL, TYPE_LABEL, blueThreads, buildTimeline, filterTimeline, forumRegions, groupAnnouncements, manualEntries, parseFilter, postIdOfSegment,
+  postPath, renderFeed, type BlueThread, type ChangeEntry, type ChangeGame, type ChangeFilter,
 } from "../../../kb/src/changes";
 export type { BlueWriteup } from "../../../kb/src/blue-writeups";
 
@@ -29,7 +30,7 @@ export async function loadTimeline(): Promise<ChangeEntry[]> {
       posts = bluePosts(await response.json());
     }
   } catch { /* The bundled posts remain available during a storage outage. */ }
-  return groupAnnouncements(buildTimeline(posts, builds));
+  return groupAnnouncements([...buildTimeline(posts, builds), ...manualEntries(manualFile)]);
 }
 
 /** Our reviewed write-ups of blue posts (kb/curated/blue-writeups), by post id; bundled like the posts. */
