@@ -391,3 +391,12 @@ test("reduced motion: the sheet slides only when motion is welcome, and the glob
   expect(leafletSource).toContain("zoomAnimation: !reducedMotion()");
   expect(leafletSource).toContain("animate: !reducedMotion()");
 });
+
+test("the frame never shows Leaflet's grey: the panel colour beats it, and the continent's picture bounds a zoom that fills the frame", () => {
+  const css = readFileSync(source("components/map/world-map.css"), "utf8");
+  // Leaflet's stylesheet loads later with the same one-class weight, so the panel colour needs the second class.
+  expect(css).toMatch(/\.wm-map\.leaflet-container \{\s*background: rgb\(var\(--panel\)\);/);
+  const leafletSource = readFileSync(source("components/map/LeafletMap.tsx"), "utf8");
+  expect(leafletSource).toContain("p.art?.continent");
+  expect(leafletSource).toContain("m.getBoundsZoom(limit, Boolean(picture))");
+});
