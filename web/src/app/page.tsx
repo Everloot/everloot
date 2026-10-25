@@ -228,7 +228,7 @@ export default async function Home() {
           note="The addon records what you see. No fact goes public on one person's word."
           action={<Link href="/methodology" className={link}>How we count →</Link>}
         >
-          Three players agree. Then it&apos;s a fact.
+          Three installs agree. Then it&apos;s a fact.
         </SectionHeading>
         <ol className="grid gap-x-6 gap-y-4 border-t border-line pt-6 sm:grid-cols-2 lg:grid-cols-4">
           {AGREEMENT_STEPS.map((step) => (

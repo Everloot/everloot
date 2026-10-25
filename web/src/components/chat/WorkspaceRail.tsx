@@ -63,8 +63,9 @@ export default function WorkspaceRail(p: {
     <nav id="chat-rail" aria-label="Conversations"
       className="absolute inset-y-0 left-0 z-10 flex w-72 flex-col border-r border-line bg-canvas lg:static lg:w-64 lg:shrink-0"
       onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); p.onClose(); } }}>
-      <div className="p-3">
-        <button type="button" className="btn min-h-9 w-full px-3 text-sm" disabled={p.busy} onClick={p.onNew}>New chat</button>
+      <div className="flex gap-2 p-3">
+        <button type="button" className="btn min-h-9 min-w-0 flex-1 px-3 text-sm" disabled={p.busy} onClick={p.onNew}>New chat</button>
+        <button type="button" aria-label="Close conversations" className="btn min-h-9 px-3 text-sm lg:hidden" onClick={p.onClose}>Close</button>
       </div>
       <div className="flex-1 overflow-y-auto overscroll-contain px-2 pb-3">
         {p.account ? (
