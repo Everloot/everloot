@@ -175,9 +175,11 @@ function parseTime(value: string): number | null {
 
 /**
  * The kills enough installs agree on: one per guild and encounter, timed at the earliest report, with the
- * difficulty most reports name. A hidden guild (by key) is left out. Rows dated after `now` are ignored.
+ * difficulty most reports name. Boss names come only from the catalogue; unknown encounters are left out.
+ * A hidden guild (by key) is left out. Rows dated after `now` are ignored.
  */
-export function agreedKills(rows: readonly GuildKillRow[], now: Date, hidden: ReadonlySet<string> = new Set()): AgreedKill[] {
+export function agreedKills(rows: readonly GuildKillRow[], now: Date, instances: readonly InstanceDef[], hidden: ReadonlySet<string> = new Set()): AgreedKill[] {
+  const byInstance = new Map(instances.map((i) => [i.instanceMapId, new Map(i.bosses.map((b) => [b.encounterId, b.name]))]));
   const groups = new Map<string, { rows: GuildKillRow[]; installs: Set<string> }>();
   for (const r of rows) {
     const installId = r.installId.trim();
@@ -195,11 +197,13 @@ export function agreedKills(rows: readonly GuildKillRow[], now: Date, hidden: Re
   for (const { rows: list, installs } of groups.values()) {
     if (installs.size < GUILD_KILL_AGREEMENT) continue;
     const first = [...list].sort((a, b) => parseTime(a.capturedAt)! - parseTime(b.capturedAt)!)[0]!;
+    const name = byInstance.get(first.instanceMapId)?.get(first.encounterId);
+    if (!name) continue;
     const difficulty = mode(list.map((r) => r.difficulty).filter((d): d is number => d !== null)) ?? null;
     const faction = mode(list.map((r) => r.faction)) ?? null;
     out.push({
       key: guildKey(first.realm, first.guildName), guildName: first.guildName.trim(), realm: first.realm.trim(), faction,
-      encounterId: first.encounterId, name: mode(list.map((r) => r.name.trim()).filter(Boolean)) ?? first.name.trim(),
+      encounterId: first.encounterId, name,
       instanceMapId: first.instanceMapId, difficulty, killedAt: new Date(parseTime(first.capturedAt)!).toISOString(),
       installs: installs.size, source: "members",
     });

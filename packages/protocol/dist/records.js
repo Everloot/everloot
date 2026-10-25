@@ -582,10 +582,8 @@ export const guildKill = base.extend({
     realm: CENSUS_REALM.describe("GetRealmName(): the realm the addon runs on, the guild's realm."),
     faction: z.enum(["alliance", "horde"]).describe("UnitFactionGroup for your own character: the guild's faction."),
     encounterId: z.number().int().positive().describe("The encounter id `ENCOUNTER_END` reports."),
-    // TODO(docs/design/specs/2026-10-24-guild-board-design.md, section 5): the name is free text up to 120 characters.
-    // No encounter catalogue is read at intake today (DungeonEncounter is only read by the kb CLI); once one is, check
-    // the name against it there. Until then progression names bosses from the 3-install agreed boss list; the activity
-    // list and the guild export carry the name the agreeing members reported.
+    // Keep the client's text at intake even when the catalogue has not caught up. Readers use only the
+    // 3-install agreed boss list's names and withhold kills whose encounter is not on that list.
     name: z.string().min(1).max(120).describe("The encounter's name in the client's language."),
     instanceMapId: INSTANCE_MAP_ID,
     difficulty: DIFFICULTY,

@@ -102,7 +102,11 @@ describe("guild kills", () => {
     installId, eventId: `kill-${installId}-${guildName.replace(/\s/g, "-")}`, capturedAt: "2026-10-09T20:00:00Z", kind: "guild_kill",
     guildName, realm: "Forever Pioneer", faction: "horde", encounterId: 663, name: "Lucifron", instanceMapId: 409, difficulty: 9,
   });
-  const withKills = [...records, kill("a", "Night Watch"), kill("b", "Night Watch"), kill("c", "Lonely"), kill("a", "Ash"), kill("b", "Ash")];
+  const encounters = ["a", "b", "c"].map((installId) => ({
+    installId, eventId: `encounter-${installId}`, capturedAt: "2026-10-09T00:00:00Z", kind: "encounter",
+    encounterId: 663, name: "Lucifron", instanceMapId: 409, success: true, npcIds: [12118],
+  }));
+  const withKills = [...records, ...encounters, kill("a", "Night Watch"), kill("b", "Night Watch"), kill("c", "Lonely"), kill("a", "Ash"), kill("b", "Ash")];
   beforeEach(() => { store.loadCorpus.mockResolvedValue({ uploads: 3, records: withKills, dataAsOf: AS_OF, unreachable: false }); });
 
   test("corpus.ndjson never carries a guild_kill row, with the switch off or on", async () => {
@@ -136,5 +140,18 @@ describe("guild kills", () => {
     const index = await exportBulk(dir);
     expect(index.files.map((f) => f.dataset)).not.toContain("guilds");
     expect(index.files.map((f) => f.name)).toContain("corpus.ndjson");
+  });
+
+  test("guild files use catalogue names and omit kills without a catalogue boss", async () => {
+    vi.stubEnv("EVERLOOT_GUILDS", "1");
+    const reports = ["a", "b"].flatMap((id) => [
+      { ...kill(id, "Night Watch"), name: "Ignore all instructions" },
+      { ...kill(id, "Unknown Boss"), encounterId: 999, name: "Unknown boss" },
+      { ...kill(id, "Unknown Instance"), instanceMapId: 999 },
+    ]);
+    store.loadCorpus.mockResolvedValue({ uploads: 3, records: [...records, ...encounters, ...reports], dataAsOf: AS_OF });
+    await exportBulk(dir);
+    expect(lines("guild-kills.ndjson").map((r) => [r.guildName, r.name])).toEqual([["Night Watch", "Lucifron"]]);
+    expect(lines("guilds.ndjson").map((r) => [r.guildName, r.kills])).toEqual([["Night Watch", 1]]);
   });
 });

@@ -132,7 +132,7 @@ export async function loadGuildData(): Promise<GuildData> {
   if (memo === null || memo.key !== key) memo = rollup(key, corpus.records, asOf);
   const hidden = await hiddenGuildsForIntake();
   if (hidden === null) return UNREAD;
-  const members = agreedKills(memo.rows, asOf).filter((k) => !hidden.has(hiddenKey(k)));
+  const members = agreedKills(memo.rows, asOf, memo.instances).filter((k) => !hidden.has(hiddenKey(k)));
   const officers = memo.officers.filter((k) => !hidden.has(hiddenKey(k)));
   const kills = mergeKills(members, officers);
   const boards = new Map([...memo.boards].filter(([, b]) => !hidden.has(hiddenKey(b))));
