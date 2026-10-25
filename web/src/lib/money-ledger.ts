@@ -78,7 +78,15 @@ export interface MoneyLedger {
   eventCount: number;
   /** Gold over time per character, oldest first, thinned to HISTORY_POINTS. */
   history: GoldSeries[];
+  /** The same money summaries for each character alone, keyed by characterKey. */
+  byCharacter: Record<string, CharacterMoney>;
 }
+
+/** The parts of a ledger that change when it is narrowed to one character; the roster does not. */
+export type CharacterMoney = Pick<MoneyLedger, "river" | "week" | "categories" | "receipts" | "eventCount" | "history">;
+
+/** One character's key in byCharacter: name and realm. */
+export const characterKey = (r: { character: string; realm: string }) => `${r.character}-${r.realm}`;
 
 export function directionOf(category: string): Direction {
   return (SPENDING_CATEGORIES as readonly string[]).includes(category) ? "out" : "in";
@@ -93,49 +101,17 @@ export function thin<T>(points: T[], max = HISTORY_POINTS): T[] {
 
 const dayOf = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
-/** The ledger for the parsed records of one Everloot.lua (parseEverlootLua(text).records). */
-export function summarizeMoney(records: ReadonlyArray<Record<string, unknown>>, now = Date.now()): MoneyLedger {
-  const roster = new Map<string, RosterRow>();
-  const series = new Map<string, GoldSeries>();
-  const events: (Receipt & { ms: number })[] = [];
+type MoneyEvent = Omit<Receipt, "at"> & { at: string; ms: number | null };
+
+/** River, week, categories, receipts and history for the given money events and gold series. */
+function summarizeFlows(money: MoneyEvent[], series: GoldSeries[], now: number): CharacterMoney {
   const totals = new Map<string, CategoryTotal>();
-
-  const rosterRow = (r: Record<string, unknown>): RosterRow | null => {
-    const character = str(r.character), realm = str(r.realm);
-    if (!character || !realm) return null;
-    const id = `${character}-${realm}`;
-    let row = roster.get(id);
-    if (!row) { row = { character, realm, copper: null, peakCopper: null, at: null }; roster.set(id, row); }
-    return row;
-  };
-
-  for (const r of records) {
-    if (r.kind === "gold_snapshot") {
-      const row = rosterRow(r);
-      if (!row) continue;
-      const at = str(r.capturedAt), ms = Date.parse(at);
-      const dated = Number.isFinite(ms);
-      // The newest snapshot is the current gold; one without a time counts only when nothing dated is known.
-      if (row.copper === null || (dated && (!row.at || ms >= Date.parse(row.at)))) { row.copper = num(r.currentCopper); if (dated) row.at = at; }
-      row.peakCopper = Math.max(row.peakCopper ?? 0, num(r.peakCopper), num(r.currentCopper));
-      if (dated) {
-        const id = `${row.character}-${row.realm}`;
-        const s = series.get(id) ?? { character: row.character, realm: row.realm, points: [] };
-        s.points.push({ at, copper: num(r.currentCopper) });
-        series.set(id, s);
-      }
-    } else if (r.kind === "money_event") {
-      const row = rosterRow(r);
-      const category = str(r.category), copper = num(r.copper);
-      if (!row || !category || copper <= 0) continue;
-      const direction = directionOf(category);
-      const t = totals.get(category) ?? { category, direction, copper: 0, events: 0 };
-      t.copper += copper; t.events += 1;
-      totals.set(category, t);
-      const at = str(r.capturedAt), ms = Date.parse(at);
-      if (Number.isFinite(ms)) events.push({ at, ms, character: row.character, realm: row.realm, category, direction, copper });
-    }
+  for (const e of money) {
+    const t = totals.get(e.category) ?? { category: e.category, direction: e.direction, copper: 0, events: 0 };
+    t.copper += e.copper; t.events += 1;
+    totals.set(e.category, t);
   }
+  const events = money.filter((e): e is MoneyEvent & { ms: number } => e.ms !== null);
 
   const today = new Date(now);
   const end = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
@@ -154,17 +130,77 @@ export function summarizeMoney(records: ReadonlyArray<Record<string, unknown>>, 
 
   events.sort((a, b) => b.ms - a.ms);
   return {
-    madeAt: new Date(now).toISOString(),
-    roster: [...roster.values()].sort((a, b) => (b.copper ?? -1) - (a.copper ?? -1) || a.character.localeCompare(b.character)),
     river,
     week,
     categories: [...totals.values()].sort((a, b) => b.copper - a.copper || a.category.localeCompare(b.category)),
     receipts: events.slice(0, RECEIPTS_SHOWN).map(({ ms: _ms, ...e }) => e),
     eventCount: events.length,
-    history: [...series.values()]
-      .map((s) => ({ ...s, points: thin(s.points.sort((a, b) => Date.parse(a.at) - Date.parse(b.at))) }))
+    history: series
+      .map((s) => ({ ...s, points: thin([...s.points].sort((a, b) => Date.parse(a.at) - Date.parse(b.at))) }))
       .sort((a, b) => a.character.localeCompare(b.character)),
   };
+}
+
+/** The ledger for the parsed records of one Everloot.lua (parseEverlootLua(text).records). */
+export function summarizeMoney(records: ReadonlyArray<Record<string, unknown>>, now = Date.now()): MoneyLedger {
+  const roster = new Map<string, RosterRow>();
+  const series = new Map<string, GoldSeries>();
+  const money: MoneyEvent[] = [];
+
+  const rosterRow = (r: Record<string, unknown>): RosterRow | null => {
+    const character = str(r.character), realm = str(r.realm);
+    if (!character || !realm) return null;
+    const id = characterKey({ character, realm });
+    let row = roster.get(id);
+    if (!row) { row = { character, realm, copper: null, peakCopper: null, at: null }; roster.set(id, row); }
+    return row;
+  };
+
+  for (const r of records) {
+    if (r.kind === "gold_snapshot") {
+      const row = rosterRow(r);
+      if (!row) continue;
+      const at = str(r.capturedAt), ms = Date.parse(at);
+      const dated = Number.isFinite(ms);
+      // The newest snapshot is the current gold; one without a time counts only when nothing dated is known.
+      if (row.copper === null || (dated && (!row.at || ms >= Date.parse(row.at)))) { row.copper = num(r.currentCopper); if (dated) row.at = at; }
+      row.peakCopper = Math.max(row.peakCopper ?? 0, num(r.peakCopper), num(r.currentCopper));
+      if (dated) {
+        const id = characterKey(row);
+        const s = series.get(id) ?? { character: row.character, realm: row.realm, points: [] };
+        s.points.push({ at, copper: num(r.currentCopper) });
+        series.set(id, s);
+      }
+    } else if (r.kind === "money_event") {
+      const row = rosterRow(r);
+      const category = str(r.category), copper = num(r.copper);
+      if (!row || !category || copper <= 0) continue;
+      const at = str(r.capturedAt), ms = Date.parse(at);
+      // Undated events count in the category totals only.
+      money.push({ at, ms: Number.isFinite(ms) ? ms : null, character: row.character, realm: row.realm, category, direction: directionOf(category), copper });
+    }
+  }
+
+  const byCharacter: Record<string, CharacterMoney> = {};
+  for (const [id, row] of roster) {
+    const own = series.get(id);
+    byCharacter[id] = summarizeFlows(money.filter((e) => e.character === row.character && e.realm === row.realm), own ? [own] : [], now);
+  }
+  return {
+    madeAt: new Date(now).toISOString(),
+    roster: [...roster.values()].sort((a, b) => (b.copper ?? -1) - (a.copper ?? -1) || a.character.localeCompare(b.character)),
+    ...summarizeFlows(money, [...series.values()], now),
+    byCharacter,
+  };
+}
+
+/**
+ * The ledger as one character sees it: river, week, categories, receipts and history for that character alone.
+ * The roster stays whole. An unknown key, or null, gives the ledger back unchanged.
+ */
+export function narrowLedger(ledger: MoneyLedger, key: string | null): MoneyLedger {
+  const own = key === null ? undefined : ledger.byCharacter[key];
+  return own ? { ...ledger, ...own } : ledger;
 }
 
 /** A category as the page shows it: the record's own name, underscores as spaces ("auction_spend" → "auction spend"). */
@@ -176,5 +212,5 @@ export function isMoneyLedger(value: unknown): value is MoneyLedger {
   const v = value as Record<string, unknown>;
   return typeof v.madeAt === "string" && Array.isArray(v.roster) && Array.isArray(v.river) && Array.isArray(v.categories)
     && Array.isArray(v.receipts) && Array.isArray(v.history) && typeof v.eventCount === "number"
-    && typeof v.week === "object" && v.week !== null;
+    && typeof v.week === "object" && v.week !== null && typeof v.byCharacter === "object" && v.byCharacter !== null;
 }
