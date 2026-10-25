@@ -24,8 +24,16 @@ let calls: { url: string; method: string; body: Record<string, unknown> | null }
 let failNext: { path: string; status: number; body?: unknown; times?: number } | null;
 let hold: { path: string; release: () => void; done: Promise<void> } | null;
 let buildName: string;
+let meFails: number;
+let exportFails: boolean;
+
+function sse(events: unknown[]): Response {
+  const raw = events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join("") + "data: [DONE]\n\n";
+  return new Response(new TextEncoder().encode(raw), { status: 200, headers: { "content-type": "text/event-stream" } });
+}
 
 const now = () => new Date().toISOString();
+const builds = () => [{ id: BUILD, slug: "abcdefgh", name: buildName, notes: null, classSlug: "warrior", characterId: null, code: "x", code2: null, gameBuild: "1", shared: false, active: false, link: null, updatedAt: now(), showName: false }];
 const summary = ({ messages: _m, ...s }: WorkspaceConversation) => s;
 
 function server() {
@@ -35,11 +43,19 @@ function server() {
     const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : null;
     calls.push({ url: `${url.pathname}${url.search}`, method, body });
     const path = url.pathname;
-    if (path === "/api/auth/me") return Response.json({ user: who });
+    if (path === "/api/auth/me") {
+      if (meFails > 0) { meFails--; return Response.json({ error: "down" }, { status: 503 }); }
+      return Response.json({ user: who });
+    }
+    if (url.host === "openrouter.ai") {
+      if (path.endsWith("/chat/completions")) return sse([{ model: "m", choices: [{ delta: { content: "Bring potions." } }] }]);
+      return Response.json({ data: [] });
+    }
+    if (path.startsWith("/schema/mcp/")) return Response.json({ title: "T", inputSchema: { type: "object", properties: {} } });
     if (path.startsWith("/api/tools/item_page")) return Response.json({ answer: { connected: true, dataAsOf: null, page: { drops: [] } } });
     if (path.startsWith("/api/tools/")) return Response.json({ text: HIT });
     if (path === "/database/card/item/2589") return Response.json({ ok: true, card: CARD });
-    if (path === "/api/me/builds") return Response.json({ characters: [], builds: [{ id: BUILD, slug: "abcdefgh", name: buildName, notes: null, classSlug: "warrior", characterId: null, code: "x", code2: null, gameBuild: "1", shared: false, active: false, link: null, updatedAt: now(), showName: false }] });
+    if (path === "/api/me/builds") return Response.json({ characters: [], builds: builds() });
     if (!path.startsWith("/api/me/chat")) throw new Error(`Unexpected request ${path}`);
 
     if (hold && path === hold.path) { const h = hold; hold = null; await h.done; }
@@ -53,6 +69,19 @@ function server() {
     const rev = body?.expectedRevision as number;
     const [, , , , kind, id] = path.split("/");
 
+    // The account's private builds for a project's picker (ProjectView), read live: Jaina has one.
+    if (kind === "builds" && method === "GET") return ok({ characters: [], builds: owner === ME ? builds() : [] });
+    // The export, one section a request, each list in a single page here.
+    if (kind === "export") {
+      const section = url.searchParams.get("section");
+      if (exportFails && section === "conversations") return Response.json({ error: "down" }, { status: 503 });
+      if (section === "projects") return ok({ projects: [...s.projects.values()] });
+      if (section === "conversations") return ok({ conversations: [...s.conversations.values()], nextCursor: null });
+      if (section === "entries") return ok({ entries: [...s.entries.values()], nextCursor: null });
+      if (section === "builds") return ok({ builds: [] });
+      return Response.json({ error: "Say which section." }, { status: 400 });
+    }
+
     if (kind === "projects") {
       if (method === "GET") return ok({ projects: [...s.projects.values()] });
       if (method === "DELETE") {
@@ -60,8 +89,9 @@ function server() {
         if (!p) return Response.json({ error: "missing" }, { status: 404 });
         if (p.revision !== rev) return conflict();
         s.projects.delete(id);
-        for (const c of s.conversations.values()) if (c.projectId === id) c.projectId = null;
-        for (const e of s.entries.values()) if (e.projectId === id) e.projectId = null;
+        // As chat_delete_project does: what moves to Unfiled gets a new revision.
+        for (const c of s.conversations.values()) if (c.projectId === id) { c.projectId = null; c.revision++; }
+        for (const e of s.entries.values()) if (e.projectId === id) { e.projectId = null; e.revision++; }
         return ok({ ok: true });
       }
       const input = body!.project as WorkspaceProject;
@@ -130,6 +160,8 @@ beforeEach(() => {
   failNext = null;
   hold = null;
   buildName = "Fury leveling";
+  meFails = 0;
+  exportFails = false;
   server();
   container = document.createElement("div");
   document.body.append(container);
@@ -286,20 +318,24 @@ test("notes, pages and live build references are saved in a project; a note reac
   expect(text()).toContain("Note: Consumables");
   await ask("What should I bring?");
   const sent = posts("/api/me/chat/conversations")[0].conversation as { messages: ChatMessage[] };
-  expect(sent.messages[0]).toMatchObject({ text: "What should I bring?", context: 'My note "Consumables":\nBring 20 Major Healing Potions.' });
+  // The project keeps the note; the chat's history does not carry a copy of it.
+  expect(sent.messages[0]).toMatchObject({ text: "What should I bring?" });
+  expect(sent.messages[0].context).toBeUndefined();
   expect(text()).not.toContain("Note: Consumables");
   await ask("And for the next boss?");
-  expect((posts("/api/me/chat/conversations").at(-1)!.conversation as { messages: ChatMessage[] }).messages[2].context).toBeUndefined();
+  expect(JSON.stringify(posts("/api/me/chat/conversations"))).not.toContain("Major Healing Potions");
 });
 
-test("builds explain that My builds is unavailable while its switch is off", async () => {
+test("a project's builds are read from Chat's private builds even with the My builds switch off", async () => {
   const project = { id: crypto.randomUUID(), name: "Raid prep", description: null, revision: 1, updatedAt: now() };
   (accounts[ME] = store()).projects.set(project.id, project);
   mine().entries.set("e1", { id: "e1", projectId: project.id, kind: "build", title: "Fury leveling", buildId: BUILD, href: null, text: null, sources: [], revision: 1, updatedAt: now() });
+  mine().entries.set("e2", { id: "e2", projectId: project.id, kind: "build", title: "Gone build", buildId: crypto.randomUUID(), href: null, text: null, sources: [], revision: 1, updatedAt: now() });
   window.history.replaceState(null, "", `/chat?project=${project.id}`);
   await render();
-  expect(text()).toContain("Fury leveling: My builds is not available right now");
-  expect(text()).toContain("Builds can be added here once My builds is available.");
+  expect(container.querySelector<HTMLAnchorElement>('[aria-labelledby="project-saved"] a')?.textContent).toBe("Fury leveling");
+  expect(text()).toContain("This build is no longer in your account.");
+  expect(calls.some((c) => c.url === "/api/me/chat/builds")).toBe(true);
   expect(calls.some((c) => c.url === "/api/me/builds")).toBe(false);
 });
 
@@ -449,10 +485,196 @@ test("export and clear live inside the workspace and clear only Chat's records",
   seedChat(ME, "Fury talents");
   await render();
   await click("View all chats");
-  expect(container.querySelector<HTMLAnchorElement>('a[download]')?.getAttribute("href")).toBe("/api/me/chat/export");
+  expect(button("Download my chat data")).toBeDefined();
   await click("Delete my chat workspace");
   expect(text()).toContain("Your login, builds and characters stay.");
   await click("Yes, delete everything in Chat");
   expect(calls.find((c) => c.method === "DELETE")).toMatchObject({ url: "/api/me/chat/workspace", body: { expectedAccountId: ME } });
   expect(mine().conversations.size).toBe(0);
+});
+
+/** Holds the next request to `path` until the returned function is called. */
+function holdNext(path: string) {
+  let release!: () => void;
+  hold = { path, release: () => release(), done: new Promise<void>((r) => { release = r; }) };
+  return async () => { await act(async () => release()); await settle(); };
+}
+
+test("a finished answer is saved even when the player starts a new chat while an earlier save is still running", async () => {
+  await render();
+  const release = holdNext("/api/me/chat/conversations");
+  await ask("Plan a level 40 Fury warrior");
+  await act(async () => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "O", ctrlKey: true, shiftKey: true, bubbles: true })); });
+  await settle();
+  expect(container.querySelector('[role="log"]')).toBeNull();
+  await release();
+  const [saved] = mine().conversations.values();
+  expect(saved.messages).toHaveLength(2);
+  expect(saved.revision).toBe(2);
+  expect(posts("/api/me/chat/conversations").map((b) => b.expectedRevision)).toEqual([0, 1]);
+});
+
+test("a chat whose save failed stays recoverable after leaving it, and Retry saves it from there", async () => {
+  await render();
+  failNext = { path: "/api/me/chat/conversations", status: 503, times: 2 };
+  await ask("Plan a level 40 Fury warrior");
+  expect(text()).toContain("Not saved.");
+  await click("New chat");
+  expect(text()).toContain("Not saved: Plan a level 40 Fury warrior");
+  await click("Open unsaved chat Plan a level 40 Fury warrior");
+  expect(text()).toContain("Plan a level 40 Fury warrior");
+  expect(text()).toContain("Not saved.");
+  await click("Retry");
+  expect(text()).toContain("In your account · Saved");
+  expect([...mine().conversations.values()][0].messages).toHaveLength(2);
+  expect(text()).not.toContain("Not saved: Plan");
+});
+
+test("removing the open chat's project takes the chat's new revision, so the next turn saves without a conflict", async () => {
+  const project = { id: crypto.randomUUID(), name: "Warrior leveling", description: null, revision: 1, updatedAt: now() };
+  (accounts[ME] = store()).projects.set(project.id, project);
+  const c = seedChat(ME, "Fury talents", { projectId: project.id });
+  await render();
+  await click("Fury talents");
+  await click("Warrior leveling");
+  await click("Remove project");
+  await click("Yes, remove");
+  expect(mine().conversations.get(c.id)).toMatchObject({ projectId: null, revision: 2 });
+  await click("Back to chat");
+  await ask("And at level 50?");
+  expect(text()).not.toContain("changed on another device");
+  expect(mine().conversations.get(c.id)).toMatchObject({ projectId: null });
+  expect(mine().conversations.get(c.id)!.messages).toHaveLength(4);
+  expect(text()).toContain("In your account · Saved");
+});
+
+test("pinning the open chat while its turn is still saving waits for that save instead of racing it", async () => {
+  const c = seedChat(ME, "Fury talents");
+  await render();
+  await click("Fury talents");
+  const release = holdNext("/api/me/chat/conversations");
+  await ask("And at level 50?");
+  await click("View all chats");
+  await click("Pin Fury talents");
+  await release();
+  expect(text()).not.toContain("changed on another device");
+  expect(mine().conversations.get(c.id)).toMatchObject({ pinned: true, revision: 4 });
+  expect(mine().conversations.get(c.id)!.messages).toHaveLength(4);
+  expect(posts("/api/me/chat/conversations").map((b) => b.expectedRevision)).toEqual([1, 2, 3]);
+});
+
+test("Load the newer version asks first, and a load the account switch overtook writes nothing for the next account", async () => {
+  const c = seedChat(ME, "Fury talents");
+  seedChat(OTHER, "Thrall's route");
+  await render();
+  await click("Fury talents");
+  c.revision = 5;
+  await ask("And at level 50?");
+  await click("Load the newer version");
+  expect(text()).toContain("not saved here will be gone");
+  const release = holdNext(`/api/me/chat/conversations/${c.id}`);
+  await click("Replace mine");
+  who = { id: OTHER, name: "Thrall#1" };
+  await act(async () => { window.dispatchEvent(new Event("focus")); });
+  await settle();
+  await release();
+  expect(text()).toContain("Thrall's route");
+  expect(text()).not.toContain("Not saved");
+  expect(text()).not.toContain("no longer in your account");
+  expect(text()).not.toContain("And at level 50?");
+});
+
+test("an attached note goes to the model with its own question only, never again in later turns' history", async () => {
+  sessionStorage.setItem("everloot.chat.providers.v1", JSON.stringify([{ kind: "openrouter", model: "deepseek/deepseek-v4.1-flash", key: "sk-or-v1-secretsecretsecretsecret1234" }]));
+  const project = { id: crypto.randomUUID(), name: "Raid prep", description: null, revision: 1, updatedAt: now() };
+  (accounts[ME] = store()).projects.set(project.id, project);
+  mine().entries.set("n1", { id: "n1", projectId: project.id, kind: "note", title: "Consumables", buildId: null, href: null, text: "Bring 20 Major Healing Potions.", sources: [], revision: 1, updatedAt: now() });
+  window.history.replaceState(null, "", `/chat?project=${project.id}`);
+  await render();
+  await click("Use in question");
+  await ask("What should I bring?");
+  await ask("And for the next boss?");
+  const turns = calls.filter((c) => c.url === "/api/v1/chat/completions");
+  expect(turns.length).toBeGreaterThanOrEqual(2);
+  expect(turns.filter((t) => JSON.stringify(t.body).includes("Major Healing Potions"))).toHaveLength(1);
+  expect(JSON.stringify(turns[0].body)).toContain("Major Healing Potions");
+  expect(JSON.stringify(mine().conversations)).not.toContain("Major Healing Potions");
+});
+
+test("when the first sign-in check fails, Chat waits and writes nothing to the browser's shared list until it knows", async () => {
+  meFails = 1;
+  await render();
+  expect(button("Send")).toBeUndefined();
+  expect(text()).toContain("Could not check whether you are signed in.");
+  expect(localStorage.getItem("everloot.chat.conversations.v1")).toBeNull();
+  await click("Try again");
+  await ask("Plan a level 40 Fury warrior");
+  expect(localStorage.getItem("everloot.chat.conversations.v1")).toBeNull();
+  expect([...mine().conversations.values()][0].messages).toHaveLength(2);
+});
+
+test("a chat at the 200-message limit says so before asking, instead of failing to save", async () => {
+  const many = Array.from({ length: 200 }, (_, i) => msg(i % 2 ? "assistant" : "user", `Turn ${i}`));
+  seedChat(ME, "Long one", { messages: many });
+  await render();
+  await click("Long one");
+  await ask("One more?");
+  expect(posts("/api/me/chat/conversations")).toEqual([]);
+  expect(text()).toContain("This chat is full");
+  expect(button("Start a new chat")).toBeDefined();
+});
+
+test("deleting a chat in View all asks first", async () => {
+  const c = seedChat(ME, "Fury talents");
+  await render();
+  await click("View all chats");
+  await click("Delete Fury talents");
+  expect(mine().conversations.has(c.id)).toBe(true);
+  await click("Yes, delete");
+  expect(mine().conversations.has(c.id)).toBe(false);
+});
+
+/** Watches the download: the file's blob, its name, and the link let go. */
+function watchDownload() {
+  const blobs: Blob[] = [];
+  const names: string[] = [];
+  const revoked: string[] = [];
+  vi.stubGlobal("URL", Object.assign(URL, {
+    createObjectURL: (b: Blob) => { blobs.push(b); return "blob:everloot/1"; },
+    revokeObjectURL: (u: string) => { revoked.push(u); },
+  }));
+  const spy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) { names.push(this.download); });
+  return { blobs, names, revoked, restore: () => spy.mockRestore() };
+}
+
+test("Download my chat data reads every section for this account and hands over one dated JSON file", async () => {
+  seedChat(ME, "Fury talents");
+  await render();
+  await click("View all chats");
+  const d = watchDownload();
+  await click("Download my chat data");
+  d.restore();
+  expect(calls.filter((c) => c.url.startsWith("/api/me/chat/export")).map((c) => c.url)).toEqual(expect.arrayContaining([
+    "/api/me/chat/export?section=projects", "/api/me/chat/export?section=conversations", "/api/me/chat/export?section=entries",
+  ]));
+  expect(d.names).toEqual([expect.stringMatching(/^everloot-chat-\d{4}-\d{2}-\d{2}\.json$/)]);
+  const data = JSON.parse(await d.blobs[0].text()) as { accountId: string; conversations: { title: string }[] };
+  expect(data.accountId).toBe(ME);
+  expect(data.conversations.map((c) => c.title)).toEqual(["Fury talents"]);
+  expect(d.revoked).toEqual(["blob:everloot/1"]);
+  expect(button("Download my chat data")).toBeDefined();
+});
+
+test("a failed export downloads nothing and says so", async () => {
+  seedChat(ME, "Fury talents");
+  exportFails = true;
+  await render();
+  await click("View all chats");
+  const d = watchDownload();
+  await click("Download my chat data");
+  d.restore();
+  expect(d.blobs).toEqual([]);
+  expect(d.names).toEqual([]);
+  expect(text()).toContain("Nothing was downloaded.");
+  expect(button("Download my chat data")).toBeDefined();
 });

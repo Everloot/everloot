@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
-  clip, deleteConversation, deleteWorkspace, EXPORT_PATH, listConversations, type Scoped,
+  clip, deleteConversation, deleteWorkspace, exportWorkspace, listConversations, type Scoped,
 } from "@/lib/chat/workspace-api";
 import { WORKSPACE_LIMITS, type WorkspaceConversationSummary, type WorkspaceProject } from "@/lib/chat/workspace-types";
 import type { LocalChat } from "./WorkspaceRail";
@@ -39,6 +39,8 @@ export default function ChatLibrary({ projects, local, opts, failed, busy, onBac
   const [error, setError] = useState("");
   const [renaming, setRenaming] = useState<{ id: string; title: string } | null>(null);
   const [clearing, setClearing] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     const o = opts();
@@ -55,6 +57,33 @@ export default function ChatLibrary({ projects, local, opts, failed, busy, onBac
     if (!o) return;
     setError("");
     try { await work(o); } catch (e) { if (!o.signal.aborted) setError(failed(e)); }
+  }
+
+  /**
+   * Reads every page of the account's Chat data and hands the browser one file. Nothing is written to disk
+   * unless every page arrived for this account; the file's link is let go as soon as the download starts.
+   */
+  async function download() {
+    const o = opts();
+    if (!o || exporting) return;
+    setExporting(true);
+    setError("");
+    try {
+      const blob = await exportWorkspace(o);
+      if (o.signal.aborted) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `everloot-chat-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch (e) {
+      if (!o.signal.aborted) setError(`Nothing was downloaded. ${failed(e)}`);
+    } finally {
+      if (!o.signal.aborted) setExporting(false);
+    }
   }
 
   const replace = (s: WorkspaceConversationSummary) => setRows((list) => (list ?? []).map((r) => (r.id === s.id ? s : r)));
@@ -103,10 +132,19 @@ export default function ChatLibrary({ projects, local, opts, failed, busy, onBac
                   <option value={UNFILED}>Unfiled</option>
                   {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
-                <button type="button" className={`min-h-9 text-xs ${link} hover:text-danger`} aria-label={`Delete ${s.title}`}
-                  onClick={() => void act(async (o) => { await deleteConversation(s.id, s.revision, o); setRows((list) => (list ?? []).filter((r) => r.id !== s.id)); onDeleted(s.id); })}>
+                <button type="button" disabled={busy} className={`min-h-9 text-xs ${link} hover:text-danger`} aria-label={`Delete ${s.title}`} onClick={() => setDeleting(s.id)}>
                   Delete
                 </button>
+                {deleting === s.id && (
+                  <div role="alertdialog" aria-label={`Delete ${s.title}?`} className="flex w-full flex-wrap items-center gap-2 text-xs">
+                    <span className="text-fg">Delete this chat from your account? This cannot be undone.</span>
+                    <button type="button" disabled={busy} className="btn btn-primary min-h-9 px-3 text-xs"
+                      onClick={() => void act(async (o) => { await deleteConversation(s.id, s.revision, o); setDeleting(null); setRows((list) => (list ?? []).filter((r) => r.id !== s.id)); onDeleted(s.id); })}>
+                      Yes, delete
+                    </button>
+                    <button type="button" className="btn min-h-9 px-3 text-xs" onClick={() => setDeleting(null)}>Cancel</button>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
@@ -136,7 +174,9 @@ export default function ChatLibrary({ projects, local, opts, failed, busy, onBac
         <h3 id="library-data" className="font-semibold text-fg-2">Your chat data</h3>
         <p className="text-fg-2">Projects, chats, notes and saved entries in your account. Chat keys are never part of it.</p>
         <div className="flex flex-wrap gap-3">
-          <a href={EXPORT_PATH} download className="btn min-h-9 px-3 text-sm">Download my chat data</a>
+          <button type="button" className="btn min-h-9 px-3 text-sm" disabled={exporting} onClick={() => void download()}>
+            {exporting ? "Preparing download…" : "Download my chat data"}
+          </button>
           <button type="button" className="btn min-h-9 px-3 text-sm" onClick={() => setClearing(true)}>Delete my chat workspace</button>
         </div>
         {clearing && (

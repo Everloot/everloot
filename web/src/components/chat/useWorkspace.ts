@@ -5,7 +5,7 @@ import { listConversations, listProjects, whoAmI, WorkspaceError, type Identity,
 import type { WorkspaceConversationSummary, WorkspaceProject } from "@/lib/chat/workspace-types";
 
 export interface Workspace {
-  /** The session's account as /api/auth/me says; null signed out, undefined not known yet. */
+  /** The session's account as /api/auth/me says; null signed out, undefined not known yet (or the read failed). */
   account: Identity | null | undefined;
   projects: WorkspaceProject[];
   /** The first page of the account's chats, newest first: the sidebar's Pinned and Recent. */
@@ -20,6 +20,8 @@ export interface Workspace {
   setProjects: (update: (list: WorkspaceProject[]) => WorkspaceProject[]) => void;
   /** A failed call's words for the screen; a sign-out or another account reads the session again. */
   failed: (err: unknown) => string;
+  /** Reads the session's account again now, e.g. after the first read failed. */
+  recheck: () => void;
 }
 
 /**
@@ -38,13 +40,22 @@ export function useWorkspace(enabled: boolean, onAccountChange: () => void): Wor
   const changed = useRef(onAccountChange);
   changed.current = onAccountChange;
 
+  const retry = useRef<{ timer: ReturnType<typeof setTimeout> | undefined; wait: number }>({ timer: undefined, wait: 2000 });
+
   const check = useCallback(async () => {
     let who: Identity | null;
     try { who = await whoAmI(); } catch {
-      // Unknown: keep what is shown; on the first read, act as signed out so the browser's chats still work.
+      // Unknown: keep what is shown. Before the first answer the account stays unknown (nothing is sent or kept
+      // until it is), and the read is tried again, waiting longer each time up to 30 seconds.
       if (current.current !== undefined) return;
-      who = null;
+      setError("Could not check whether you are signed in. Chat waits until it can, so your chats go to the right place.");
+      clearTimeout(retry.current.timer);
+      retry.current.timer = setTimeout(() => void check(), retry.current.wait);
+      retry.current.wait = Math.min(retry.current.wait * 2, 30_000);
+      return;
     }
+    clearTimeout(retry.current.timer);
+    retry.current.wait = 2000;
     const before = current.current;
     if (before !== undefined && (before?.id ?? null) === (who?.id ?? null)) return;
     ctl.current.abort();
@@ -57,6 +68,7 @@ export function useWorkspace(enabled: boolean, onAccountChange: () => void): Wor
 
   useEffect(() => {
     if (!enabled) return;
+    const pending = retry.current;
     void check();
     const onVisible = () => { if (document.visibilityState !== "hidden") void check(); };
     window.addEventListener("focus", onVisible);
@@ -64,6 +76,7 @@ export function useWorkspace(enabled: boolean, onAccountChange: () => void): Wor
     return () => {
       window.removeEventListener("focus", onVisible);
       document.removeEventListener("visibilitychange", onVisible);
+      clearTimeout(pending.timer);
       ctl.current.abort();
     };
   }, [enabled, check]);
@@ -91,5 +104,7 @@ export function useWorkspace(enabled: boolean, onAccountChange: () => void): Wor
   }, []);
   const remove = useCallback((id: string) => setRecent((list) => list.filter((c) => c.id !== id)), []);
 
-  return { account, projects, recent, loaded, error, opts, reload, upsert, remove, setProjects: setProjectList, failed };
+  const recheck = useCallback(() => void check(), [check]);
+
+  return { account, projects, recent, loaded, error, opts, reload, upsert, remove, setProjects: setProjectList, failed, recheck };
 }

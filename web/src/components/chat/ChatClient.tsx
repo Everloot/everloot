@@ -53,7 +53,10 @@ const reducedMotion = () => typeof window.matchMedia === "function" && window.ma
 
 /** Where the open chat is kept: the account, this account's browser list, or the browser's old shared list. */
 interface Meta { store: "account" | "browser" | "shared"; accountId: string | null; projectId: string | null; pinned: boolean; revision: number; title: string }
-type SaveState = { state: "idle" | "saving" | "saved" | "conflict" } | { state: "failed"; message: string };
+/** `full`: the chat is over a limit, so Retry would fail the same way. */
+type SaveState = { state: "idle" | "saving" | "saved" | "conflict" } | { state: "failed"; message: string; full?: boolean };
+/** An account chat's save that has not landed: what was sent, held in this tab's memory only, until it lands or the account changes. */
+interface Unsaved { input: api.ConversationInput; state: SaveState; seq: number }
 /** The workspace screen in the URL: /chat?view=all or /chat?project=<id>; the conversation otherwise. */
 type View = { kind: "all" } | { kind: "project"; id: string } | null;
 type Pending = { kind: "import" } | { kind: "backups" } | null;
@@ -98,6 +101,8 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
   const [local, setLocal] = useState<{ mine: Conversation[]; unbound: Conversation[]; backups: Conversation[] }>({ mine: [], unbound: [], backups: [] });
   const [pending, setPending] = useState<Pending>(null);
   const [notice, setNotice] = useState("");
+  const [drafts, setDrafts] = useState<Unsaved[]>([]);
+  const [full, setFull] = useState(false);
 
   const tools = useRef<ToolDef[] | null>(null);
   const stop = useRef<AbortController | null>(null);
@@ -110,20 +115,30 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
   const charactersOnce = useRef<Promise<Characters> | null>(null);
   const metaRef = useRef<Meta>(meta);
   const saveRef = useRef<SaveState>(save);
-  const saves = useRef<Promise<void>>(Promise.resolve());
+  const saves = useRef<Promise<unknown>>(Promise.resolve());
   const opening = useRef(0);
+  // Account chats' saves: the last revision each record was read or saved at, and those not landed yet.
+  const revisions = useRef(new Map<string, number>());
+  const unsaved = useRef(new Map<string, Unsaved>());
+  const seq = useRef(0);
+  const generation = useRef(0);
   // What ask() and the shortcuts read, current at every render even from an older closure.
-  const latest = useRef({ providers, signed, context, own, busy, currentId, note });
-  latest.current = { providers, signed, context, own, busy, currentId, note };
+  const latest = useRef({ providers, signed, context, own, busy, currentId, note, known: !workspace });
+  latest.current = { providers, signed, context, own, busy, currentId, note, known: latest.current.known };
 
   const setMeta = (m: Meta) => { metaRef.current = m; setMetaState(m); };
   const setSave = (s: SaveState) => { saveRef.current = s; setSaveState(s); };
+  const syncDrafts = () => setDrafts([...unsaved.current.values()].filter((u) => u.state.state === "failed" || u.state.state === "conflict"));
 
   /** Everything the departing account loaded or started goes before the next account's records are read. */
   function forgetAccount() {
     stop.current?.abort();
     opening.current++;
+    generation.current++;
     saves.current = Promise.resolve();
+    revisions.current.clear();
+    unsaved.current.clear();
+    setDrafts([]); setFull(false);
     const id = newConversationId();
     latest.current.currentId = id;
     setCurrentId(id);
@@ -140,6 +155,15 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
 
   const ws = useWorkspace(workspace, forgetAccount);
   const accountId = workspace ? ws.account?.id ?? null : null;
+  // Until the session's account is known nothing is sent or kept: a chat could land in the wrong place.
+  latest.current.known = !workspace || ws.account !== undefined;
+
+  // Unsaved account chats live only in this tab; leaving the page asks first.
+  useEffect(() => {
+    const onLeave = (e: BeforeUnloadEvent) => { if (unsaved.current.size) e.preventDefault(); };
+    window.addEventListener("beforeunload", onLeave);
+    return () => window.removeEventListener("beforeunload", onLeave);
+  }, []);
 
   // localStorage only exists in the browser; read it after the first render. A new chat opens each visit.
   // Not in a document that came with a public page's policy: DocumentBoundary reloads it first.
@@ -185,7 +209,8 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
     setViewState(next);
     const q = next?.kind === "all" ? "?view=all" : next?.kind === "project" ? `?project=${next.id}` : "";
     window.history.pushState(window.history.state, "", `${window.location.pathname}${q}`);
-    if (narrow()) setRailOpen(false);
+    // On a phone the sidebar closes over the new screen; focus goes back to the button that opens it.
+    if (narrow()) { setRailOpen(false); railToggle.current?.focus(); }
   }
 
   const characters = () => (charactersOnce.current ??= fetchCharacters(savedBuilds, profiles));
@@ -256,51 +281,94 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
     if (m.store === "shared") { saveConversation(localStorage, { id, title: "", updatedAt: at, messages: next }); refreshLocal(); return; }
     if (m.accountId !== accountIdNow()) return;
     if (m.store === "browser") { saveConversation(scoped(localStorage, m.accountId!), { id, title: "", updatedAt: at, messages: next }); refreshLocal(); return; }
-    // A chat in conflict keeps its text here until the player picks what to do.
+    // A chat in conflict keeps its text here, and in its unsaved copy, until the player picks what to do.
     if (saveRef.current.state !== "conflict") persist();
+    else { const u = unsaved.current.get(id); if (u) u.input = { ...u.input, messages: next }; }
+  }
+
+  /** Saves run one at a time, in the order they were asked for, whichever chat is open by then. */
+  function queue<T>(work: () => Promise<T>): Promise<T> {
+    const run = saves.current.then(work);
+    saves.current = run.catch(() => undefined);
+    return run;
   }
 
   /**
-   * Saves the open account chat with the revision it was read at; saves run one at a time, so each names the
-   * revision the last one returned. A conflict or failure keeps the text here and says so; nothing retries alone.
+   * Saves one account chat as it was when asked (its messages, title, project and pin), naming the revision the
+   * record was last read or saved at when its turn in the queue comes. Until it lands, the chat stays in
+   * `unsaved`: a failure or conflict keeps it there to reopen, even after the player moved on; nothing retries alone.
    */
-  function persist() {
-    const id = latest.current.currentId;
-    if (metaRef.current.store !== "account") return;
-    setSave({ state: "saving" });
-    saves.current = saves.current.then(async () => {
+  function send(input: api.ConversationInput, owner: string): Promise<WorkspaceConversation> {
+    const gen = generation.current;
+    const n = ++seq.current;
+    unsaved.current.set(input.id, { input, state: { state: "saving" }, seq: n });
+    if (input.id === latest.current.currentId) setSave({ state: "saving" });
+    const mine = () => unsaved.current.get(input.id)?.seq === n;
+    return queue(async () => {
       const o = ws.opts();
-      const m = metaRef.current;
-      const list = messagesRef.current;
-      if (!o || o.accountId !== m.accountId || latest.current.currentId !== id || !list.length) return;
-      const input = { id, title: m.title || api.clip(titleFor(list), WORKSPACE_LIMITS.title), projectId: m.projectId, pinned: m.pinned, messages: list };
+      if (gen !== generation.current || !o || o.accountId !== owner) throw new api.WorkspaceError("account_changed", "You are signed in as someone else now.");
       try {
-        const saved = await api.saveConversation(input, m.revision, o);
-        if (o.signal.aborted || latest.current.currentId !== id) return;
-        setMeta({ ...metaRef.current, revision: saved.revision, title: saved.title });
+        const saved = await api.saveConversation(input, revisions.current.get(input.id) ?? 0, o);
+        if (o.signal.aborted || gen !== generation.current) throw new api.WorkspaceError("account_changed", "You are signed in as someone else now.");
+        revisions.current.set(saved.id, saved.revision);
+        const last = mine();
+        if (last) unsaved.current.delete(saved.id);
         ws.upsert(saved);
-        setSave({ state: "saved" });
+        if (saved.id === latest.current.currentId && metaRef.current.store === "account") {
+          setMeta({ ...metaRef.current, revision: saved.revision, title: metaRef.current.title || saved.title });
+          if (last) setSave({ state: "saved" });
+        }
+        syncDrafts();
+        return saved;
       } catch (err) {
-        if (o.signal.aborted || latest.current.currentId !== id) return;
+        if (o.signal.aborted || gen !== generation.current) throw err;
         const message = ws.failed(err);
-        setSave(err instanceof api.WorkspaceError && err.code === "conflict" ? { state: "conflict" } : { state: "failed", message });
+        const code = err instanceof api.WorkspaceError ? err.code : null;
+        const state: SaveState = code === "conflict" ? { state: "conflict" } : { state: "failed", message, full: code === "too_large" };
+        if (mine()) {
+          unsaved.current.get(input.id)!.state = state;
+          if (input.id === latest.current.currentId) setSave(state);
+        }
+        syncDrafts();
+        throw err;
       }
     });
+  }
+
+  /** The open account chat as shown, for a save. */
+  function shown(): api.ConversationInput {
+    const m = metaRef.current;
+    const list = messagesRef.current;
+    return { id: latest.current.currentId, title: m.title || api.clip(titleFor(list), WORKSPACE_LIMITS.title), projectId: m.projectId, pinned: m.pinned, messages: list };
+  }
+
+  function persist() {
+    const m = metaRef.current;
+    if (m.store !== "account" || !m.accountId) return;
+    if (!messagesRef.current.length) { setSave({ state: "idle" }); return; }
+    void send(shown(), m.accountId).catch(() => { /* said on the save line, or kept in Not saved */ });
   }
 
   /** The chat as saved elsewhere replaces what is shown here; offered only after a conflict, by choice. */
   async function loadNewer() {
     const o = ws.opts();
-    if (!o) return;
+    if (!o || latest.current.busy) return;
+    const id = latest.current.currentId;
+    const token = ++opening.current;
+    const here = () => !o.signal.aborted && token === opening.current && id === latest.current.currentId;
     try {
-      const c = await api.getConversation(latest.current.currentId, o);
-      if (o.signal.aborted || c.id !== latest.current.currentId) return;
+      const c = await api.getConversation(id, o);
+      if (!here()) return;
+      unsaved.current.delete(id);
+      syncDrafts();
       showAccountChat(c, o.accountId);
-    } catch (err) { setSave({ state: "failed", message: ws.failed(err) }); }
+    } catch (err) { if (here()) setSave({ state: "failed", message: ws.failed(err) }); }
   }
 
   /** What is shown here becomes a new chat of its own, leaving the other device's version as it is. */
   function saveCopy() {
+    unsaved.current.delete(latest.current.currentId);
+    syncDrafts();
     const id = newConversationId();
     latest.current.currentId = id;
     setCurrentId(id);
@@ -311,15 +379,31 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
   }
 
   function showAccountChat(c: WorkspaceConversation, owner: string) {
+    revisions.current.set(c.id, c.revision);
     setMeta({ store: "account", accountId: owner, projectId: c.projectId, pinned: c.pinned, revision: c.revision, title: c.title });
     open(c.id, c.messages);
     setSave({ state: "saved" });
+  }
+
+  /** An account chat whose save has not landed, as this tab last had it. */
+  function openUnsaved(u: Unsaved) {
+    const owner = accountIdNow();
+    if (latest.current.busy || !owner) return;
+    opening.current++;
+    const { input } = u;
+    setMeta({ store: "account", accountId: owner, projectId: input.projectId, pinned: input.pinned, revision: revisions.current.get(input.id) ?? 0, title: input.title });
+    if (view) setView(null);
+    open(input.id, input.messages);
+    setSave(u.state);
   }
 
   async function openAccountChat(s: WorkspaceConversationSummary) {
     if (latest.current.busy) return;
     const o = ws.opts();
     if (!o) return;
+    // This tab's copy is newer than the account's until its save lands.
+    const u = unsaved.current.get(s.id);
+    if (u) { openUnsaved(u); return; }
     const token = ++opening.current;
     setError("");
     try {
@@ -350,14 +434,19 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
 
   async function ask(question: string, character: ShellCharacter | null = latest.current.context) {
     const q = question.trim().slice(0, 2000);
-    if (!q || latest.current.busy) return;
+    if (!q || latest.current.busy || !latest.current.known) return;
     const { providers: saved, own: mine, currentId: id, note: attached } = latest.current;
-    const builds = character ? mine.builds.filter((b) => b.characterId === character.id) : [];
-    const contextLine = [
-      character ? askPrefill("", character, builds) : "",
-      attached ? `My note "${attached.title}":\n${attached.text.slice(0, MAX_NOTE)}` : "",
-    ].filter(Boolean).join("\n\n");
     const prior = messagesRef.current;
+    if (workspace && metaRef.current.store === "account" && prior.length + 2 > WORKSPACE_LIMITS.messagesPerConversation) {
+      setError(`This chat is full: it holds ${WORKSPACE_LIMITS.messagesPerConversation} messages. Start a new chat to go on; this one stays as it is.`);
+      setFull(true);
+      return;
+    }
+    const builds = character ? mine.builds.filter((b) => b.characterId === character.id) : [];
+    // The character stays with the turn, so later turns still know it. The note goes with this question only:
+    // the project keeps it, and the chat's history never carries a copy.
+    const contextLine = character ? askPrefill("", character, builds) : "";
+    const noteLine = attached ? `My note "${attached.title}":\n${attached.text.slice(0, MAX_NOTE)}` : "";
     const history = prior.map((m) => ({ role: m.role, text: m.context ? `${m.text}\n\n${m.context}` : m.text }));
     const asked: ChatMessage[] = [...prior, { role: "user", text: q, ...(contextLine ? { context: contextLine } : {}), at: new Date().toISOString(), model: null, sources: [], pages: [], steps: [] }];
     commit(id, asked);
@@ -382,7 +471,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
         tools.current ??= await loadTools(fetch, savedBuilds && latest.current.signed === true);
         r = await answer({
           provider: chatProvider(active.kind)!, model: active.model, key: active.key, history,
-          question: contextLine ? `${q}\n\n${contextLine}` : q, tools: tools.current, onProgress: setLive, signal: ctl.signal,
+          question: [q, contextLine, noteLine].filter(Boolean).join("\n\n"), tools: tools.current, onProgress: setLive, signal: ctl.signal,
         });
         item = await lookup;
       }
@@ -416,7 +505,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
     setCurrentId(id);
     messagesRef.current = list;
     setMessages(list);
-    setError(""); setDraft("");
+    setError(""); setDraft(""); setFull(false);
     stick.current = true;
     if (narrow()) setRailOpen(false);
     box.current?.focus();
@@ -456,21 +545,57 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
 
   const putProject = (p: WorkspaceProject) => ws.setProjects((list) => (list.some((x) => x.id === p.id) ? list.map((x) => (x.id === p.id ? p : x)) : [...list, p]));
 
-  /** Renames, pins or moves an account chat. The open one is saved from here, with what is shown. */
+  /**
+   * Renames, pins or moves an account chat, in the same queue as its turns' saves. The open one, and one this tab
+   * still holds unsaved, are saved with what this tab has; any other is read and saved back with the change.
+   */
   async function patchChat(s: WorkspaceConversationSummary, patch: ConversationPatch): Promise<WorkspaceConversationSummary> {
     const o = ws.opts();
     if (!o) throw new api.WorkspaceError("signed_out", "Sign in again to change your chats.");
+    const summary = ({ messages: _m, ...rest }: WorkspaceConversation) => rest;
     if (s.id === latest.current.currentId && metaRef.current.store === "account") {
-      const m = metaRef.current;
-      const saved = await api.saveConversation({ id: s.id, title: patch.title ?? m.title, projectId: patch.projectId !== undefined ? patch.projectId : m.projectId, pinned: patch.pinned ?? m.pinned, messages: messagesRef.current }, m.revision, o);
-      if (s.id === latest.current.currentId) setMeta({ ...metaRef.current, revision: saved.revision, title: saved.title, projectId: saved.projectId, pinned: saved.pinned });
-      ws.upsert(saved);
-      return saved;
+      setMeta({ ...metaRef.current, ...patch });
+      return summary(await send(shown(), o.accountId));
     }
-    const c = await api.getConversation(s.id, o);
-    const saved = await api.saveConversation({ id: c.id, title: c.title, projectId: c.projectId, pinned: c.pinned, messages: c.messages, ...patch }, c.revision, o);
-    ws.upsert(saved);
-    return saved;
+    const u = unsaved.current.get(s.id);
+    if (u) return summary(await send({ ...u.input, ...patch }, o.accountId));
+    return queue(async () => {
+      const c = await api.getConversation(s.id, o);
+      const saved = await api.saveConversation({ id: c.id, title: c.title, projectId: c.projectId, pinned: c.pinned, messages: c.messages, ...patch }, c.revision, o);
+      if (o.signal.aborted) throw new api.WorkspaceError("account_changed", "You are signed in as someone else now.");
+      revisions.current.set(saved.id, saved.revision);
+      ws.upsert(saved);
+      return summary(saved);
+    });
+  }
+
+  /**
+   * A removed project's chats come back Unfiled with a new revision. The open chat, and any this tab holds unsaved,
+   * take that revision when nothing else changed on the account's side, so their next save is not a false conflict.
+   */
+  function projectRemoved(projectId: string) {
+    const o = ws.opts();
+    const ids = new Set<string>();
+    if (metaRef.current.store === "account" && metaRef.current.projectId === projectId) {
+      setMeta({ ...metaRef.current, projectId: null });
+      ids.add(latest.current.currentId);
+    }
+    for (const u of unsaved.current.values()) if (u.input.projectId === projectId) { u.input = { ...u.input, projectId: null }; ids.add(u.input.id); }
+    if (!o) return;
+    for (const id of ids) {
+      if (!revisions.current.has(id)) continue; // never saved: nothing on the account's side moved
+      void queue(async () => {
+        const c = await api.getConversation(id, o);
+        if (o.signal.aborted) return;
+        const here = id === latest.current.currentId ? messagesRef.current : unsaved.current.get(id)?.input.messages ?? [];
+        const same = c.projectId === null && c.messages.length <= here.length
+          && c.messages.every((m, i) => m.role === here[i].role && m.text === here[i].text && m.at === here[i].at);
+        // Anything else changed it: the next save meets a conflict and offers the usual ways out.
+        if (!same) return;
+        revisions.current.set(id, c.revision);
+        if (id === latest.current.currentId && metaRef.current.store === "account") setMeta({ ...metaRef.current, revision: c.revision });
+      }).catch(() => { /* the next save says what went wrong */ });
+    }
   }
 
   async function runImport() {
@@ -522,6 +647,8 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
   ];
   const closeRail = () => { if (narrow()) { setRailOpen(false); railToggle.current?.focus(); } };
   const projectName = meta.projectId ? ws.projects.find((p) => p.id === meta.projectId)?.name ?? "a project" : null;
+  const others = drafts.filter((u) => u.input.id !== currentId);
+  const unknown = workspace && ws.account === undefined;
 
   const rail = !workspace
     ? (
@@ -548,8 +675,21 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
             Chats
           </button>
           {!railOpen && <button type="button" className="btn min-h-9 px-3 text-sm" disabled={busy} aria-keyshortcuts="Control+Shift+O" onClick={() => newChat()}>New chat</button>}
-          {workspace && !view && <SaveLine meta={meta} save={save} empty={messages.length === 0} projectName={projectName} onRetry={persist} onNewer={() => void loadNewer()} onCopy={saveCopy} />}
+          {workspace && !view && <SaveLine key={currentId} meta={meta} save={save} empty={messages.length === 0} projectName={projectName} busy={busy}
+            onRetry={persist} onNewer={() => void loadNewer()} onCopy={saveCopy} onNew={() => newChat()} />}
         </div>
+
+        {workspace && others.length > 0 && (
+          <ul aria-label="Chats not saved" className="mx-auto w-full max-w-reading space-y-1 px-4 text-sm">
+            {others.map((u) => (
+              <li key={u.input.id} className="flex flex-wrap items-center gap-x-3 text-danger">
+                <span className="min-w-0 truncate">Not saved: {u.input.title}</span>
+                <button type="button" className="min-h-9 text-fg-2 underline underline-offset-4 hover:text-accent" disabled={busy}
+                  aria-label={`Open unsaved chat ${u.input.title}`} onClick={() => openUnsaved(u)}>Open</button>
+              </li>
+            ))}
+          </ul>
+        )}
 
         {workspace && (pending || notice) && (
           <div className="mx-auto w-full max-w-reading px-4">
@@ -579,7 +719,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             <ChatLibrary key={accountId} projects={ws.projects} local={localChats} opts={ws.opts} failed={ws.failed} busy={busy}
               onBack={() => setView(null)} onOpen={(s) => void openAccountChat(s)} onOpenLocal={openLocal} onPatch={patchChat}
-              onDeleted={(id) => { ws.remove(id); if (id === currentId) newChat(); }}
+              onDeleted={(id) => { ws.remove(id); revisions.current.delete(id); unsaved.current.delete(id); syncDrafts(); if (id === currentId) newChat(); }}
               onCleared={() => { ws.reload(); if (metaRef.current.store === "account") newChat(); }} />
           </div>
         ) : workspace && view?.kind === "project" ? (
@@ -588,7 +728,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
               ? <ProjectView key={`${accountId}:${project.id}`} project={project} opts={ws.opts} failed={ws.failed} savedBuilds={savedBuilds} busy={busy}
                   onBack={() => setView(null)} onNewChat={() => newChat(project.id)} onOpenChat={(s) => void openAccountChat(s)}
                   onProject={putProject}
-                  onRemoved={() => { ws.setProjects((list) => list.filter((p) => p.id !== project.id)); ws.reload(); if (metaRef.current.projectId === project.id) setMeta({ ...metaRef.current, projectId: null }); setView({ kind: "all" }); }}
+                  onRemoved={() => { ws.setProjects((list) => list.filter((p) => p.id !== project.id)); ws.reload(); projectRemoved(project.id); setView({ kind: "all" }); }}
                   onAttach={(n) => { setNote(n); setView(null); box.current?.focus(); }} />
               : <p className="mx-auto max-w-reading px-4 py-6 text-sm text-muted">{ws.account === null ? "Sign in to open your projects." : ws.loaded ? "That project is not in your account." : "Loading the project…"}</p>}
           </div>
@@ -602,7 +742,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
                   <div className="flex min-h-[50vh] flex-col items-center justify-center gap-6 text-center">
                     <h2 className="text-2xl font-semibold text-fg">What do you want to know about WoW: Forever?</h2>
                     <ul aria-label="Suggestions" className="flex max-w-xl flex-wrap justify-center gap-2">
-                      {SUGGESTIONS.map((s) => <li key={s}><button type="button" className="btn min-h-9 px-3 text-sm" onClick={() => void ask(s)}>{s}</button></li>)}
+                      {SUGGESTIONS.map((s) => <li key={s}><button type="button" className="btn min-h-9 px-3 text-sm" disabled={unknown} onClick={() => void ask(s)}>{s}</button></li>)}
                     </ul>
                     {inAccount && !meta.projectId && meta.revision === 0 && (
                       <div role="radiogroup" aria-label="Keep this chat in" className="flex flex-wrap items-center justify-center gap-3 text-sm text-fg-2">
@@ -636,6 +776,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
                 <p role="status" className="sr-only">{busy ? (live?.tool ? `Looking up ${live.tool}` : "Answering") : ""}</p>
                 {busy && live?.tool && <p className="mt-2 text-xs text-muted">Looking up {live.tool}…</p>}
                 {error && <p role="alert" className="mt-4 text-sm text-danger">{error}</p>}
+                {full && <button type="button" className="btn mt-2 min-h-9 px-3 text-sm" disabled={busy} onClick={() => newChat()}>Start a new chat</button>}
               </div>
             </div>
 
@@ -645,11 +786,17 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
                   opts={ws.opts} failed={ws.failed} onProject={putProject} onClose={() => { setSaving(null); box.current?.focus(); }} />
               </div>
             )}
-            <Composer box={box} value={draft} onValue={setDraft} onSend={() => void ask(draft)} onStop={() => stop.current?.abort()} busy={busy}
+            {unknown ? (
+              <div role="status" className="mx-auto w-full max-w-reading px-4 pb-3 text-sm text-fg-2">
+                {ws.error
+                  ? <>{ws.error} <button type="button" className="min-h-9 underline underline-offset-4 hover:text-accent" onClick={ws.recheck}>Try again</button></>
+                  : "Checking whether you are signed in…"}
+              </div>
+            ) : <Composer box={box} value={draft} onValue={setDraft} onSend={() => void ask(draft)} onStop={() => stop.current?.abort()} busy={busy}
               providers={providers} onPickModel={(kind, model) => { try { setProviders(pickModel(providerStorage(), kind, model)); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } }}
               keysHref={keysHref} signed={signed}
               characters={own.characters} context={context} onContext={(c) => { setContext(c); box.current?.focus(); }}
-              {...(workspace ? { sessionKey: `${currentId}:${meta.projectId ?? ""}`, note, onRemoveNote: () => { setNote(null); box.current?.focus(); } } : {})} />
+              {...(workspace ? { sessionKey: `${currentId}:${meta.projectId ?? ""}`, note, onRemoveNote: () => { setNote(null); box.current?.focus(); } } : {})} />}
           </>
         )}
       </div>
@@ -657,24 +804,37 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
   );
 }
 
-/** Where the open chat is kept and whether its last save landed, with the ways out of a failed or conflicting one. */
-function SaveLine({ meta, save, empty, projectName, onRetry, onNewer, onCopy }: {
-  meta: Meta; save: SaveState; empty: boolean; projectName: string | null; onRetry: () => void; onNewer: () => void; onCopy: () => void;
+/**
+ * Where the open chat is kept and whether its last save landed, with the ways out of a failed or conflicting one.
+ * Loading the newer version replaces what is shown, so it asks first; a chat over a limit offers a new chat, not Retry.
+ */
+function SaveLine({ meta, save, empty, projectName, busy, onRetry, onNewer, onCopy, onNew }: {
+  meta: Meta; save: SaveState; empty: boolean; projectName: string | null; busy: boolean;
+  onRetry: () => void; onNewer: () => void; onCopy: () => void; onNew: () => void;
 }) {
+  const [replacing, setReplacing] = useState(false);
   const link = "min-h-9 underline underline-offset-4 hover:text-accent";
   const where = meta.store === "account" ? (projectName ? `In ${projectName}` : "In your account") : meta.store === "browser" ? "In this browser only" : "In this browser";
   return (
     <div role="status" className="flex min-w-0 flex-wrap items-center gap-x-3 text-xs text-fg-2">
-      {save.state === "conflict" ? (
+      {save.state === "conflict" && replacing ? (
+        <>
+          <span className="text-danger">Replace this with the newer version? Turns not saved here will be gone.</span>
+          <button type="button" className={link} disabled={busy} onClick={() => { setReplacing(false); onNewer(); }}>Replace mine</button>
+          <button type="button" className={link} onClick={() => setReplacing(false)}>Keep mine</button>
+        </>
+      ) : save.state === "conflict" ? (
         <>
           <span className="text-danger">This chat changed on another device. Nothing here was lost.</span>
-          <button type="button" className={link} onClick={onNewer}>Load the newer version</button>
-          <button type="button" className={link} onClick={onCopy}>Save mine as a copy</button>
+          <button type="button" className={link} disabled={busy} onClick={() => setReplacing(true)}>Load the newer version</button>
+          <button type="button" className={link} disabled={busy} onClick={onCopy}>Save mine as a copy</button>
         </>
       ) : save.state === "failed" ? (
         <>
           <span className="text-danger">Not saved. {save.message}</span>
-          <button type="button" className={link} onClick={onRetry}>Retry</button>
+          {save.full
+            ? <button type="button" className={link} disabled={busy} onClick={onNew}>Start a new chat</button>
+            : <button type="button" className={link} disabled={busy} onClick={onRetry}>Retry</button>}
         </>
       ) : (
         <span>{where}{meta.store === "account" && !empty ? (save.state === "saving" ? " · Saving…" : save.state === "saved" ? " · Saved" : "") : ""}</span>
