@@ -10,7 +10,7 @@ const description = "Everloot's tools for WoW: Forever: plan a build or a raid, 
 
 export const metadata: Metadata = pageMetadata({ title: "WoW Forever Tools", description, path: "/tools" });
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 /** The index of the Tools menu: the same groups and names as the header, one line each. */
 export default function ToolsPage() {

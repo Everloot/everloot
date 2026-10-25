@@ -306,7 +306,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
         />
         {held > 0 && (
           <p className="mt-2 text-cell-2 text-muted">
-            <Link href={here({ dev: q.dev ? undefined : true })} className="text-accent hover:underline underline-offset-4">
+            <Link href={here({ dev: q.dev ? undefined : true })} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">
               {q.dev ? "Hide" : "Show"} {held.toLocaleString("en-US")} development {held === 1 ? "leftover" : "leftovers"}
             </Link>
             {" "}
@@ -317,7 +317,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
           <p className="mt-2 text-cell-2 text-muted">
             {folded ? `${unnamedCount.toLocaleString("en-US")} ${unnamedCount === 1 ? "item" : "items"} the game files do not name yet. ` : ""}
             {namesArrive()}{" "}
-            <Link href={here({ unnamed: q.unnamed ? undefined : true })} className="text-accent hover:underline underline-offset-4">
+            <Link href={here({ unnamed: q.unnamed ? undefined : true })} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">
               {q.unnamed ? `Hide the ${unnamedCount.toLocaleString("en-US")} unnamed ${unnamedCount === 1 ? "item" : "items"}` : "Show them"}
             </Link>
           </p>
