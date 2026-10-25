@@ -20,17 +20,17 @@ Similar names must not replace exact matches. Ambiguity must offer choices. Temp
 
 Files: new `web/src/lib/chat/items.ts` and its test; existing `agent.ts`, `store.ts`, `ChatClient.tsx` and corresponding tests.
 
-- [ ] Write and run failing tests: Linen Cloth wins over Red Linen Robe; ordinary non-item questions retain existing behavior; ambiguous names return choices; lookup failure falls back safely; saved messages retain only item references.
-- [ ] Implement a small browser-side resolver for supported item questions. Validate returned IDs and canonical links, never guess a candidate. Expose typed item references to rendering and attach them to assistant messages in both no-key and provider flows. Keep references and page facts separate from model input.
-- [ ] Verify cancellation and old-message compatibility in focused tests, then commit the tested change.
+- [x] Write and run failing tests: Linen Cloth wins over Red Linen Robe; ordinary non-item questions retain existing behavior; ambiguous names return choices; lookup failure falls back safely; saved messages retain only item references.
+- [x] Implement a small browser-side resolver for supported item questions. Validate returned IDs and canonical links, never guess a candidate. Expose typed item references to rendering and attach them to assistant messages in both no-key and provider flows. Keep references and page facts separate from model input.
+- [x] Verify cancellation and old-message compatibility in focused tests.
 
 ## Task 2: Live item card and drop evidence
 
 Files: new `web/src/components/chat/ItemResult.tsx` and its test; existing `Message.tsx` and Chat integration tests.
 
-- [ ] Write and run failing tests for game card display, published drop counts, pending reports, empty results, unavailable data, item choices and canonical links.
-- [ ] Implement the live component with existing `GameCard`; fetch the existing page-side card and player-data item tool, abort on unmount, and show evidence and freshness where available. Render ambiguous choices as accessible controls that open the selected item in Chat.
-- [ ] Verify page-only card facts are never persisted or passed to provider requests; run lookup, Chat and publishing guard tests; commit.
+- [x] Write and run failing tests for game card display, published drop counts, pending reports, empty results, unavailable data, item choices and canonical links.
+- [x] Implement the live component with existing `GameCard`; fetch the existing page-side card and player-data item tool, abort on unmount, and show evidence and freshness where available. Render ambiguous choices as accessible controls that open the selected item in Chat.
+- [x] Verify page-only card facts are never persisted or passed to provider requests; run lookup, Chat and publishing guard tests.
 
 ## Task 3: Verification and release
 
@@ -39,3 +39,7 @@ Files: new `web/src/components/chat/ItemResult.tsx` and its test; existing `Mess
 - [ ] Open and link a PR with evidence; use required CI and existing deployment serialization before merge. Verify production before reporting deployed.
 
 Execution: Carlos explicitly approved implementation. Continue in this thread without another plan approval round. Use a focused implementation delegate and an independent whole-branch review; root owns integration and release verification.
+
+Review record: the final review approved the feature after regression fixes for install-count wording, pending evidence, neutral result text, choosing an item, real names beginning with articles, and common drop-rate question forms. Focused checks: 123 tests, typecheck and scoped lint passed. Release verification remains tracked in Task 3.
+
+Ruling: retain the existing lore/model fallback for questions the bounded item patterns do not recognize. Arbitrary natural-language entity extraction and article-prefixed partial-name improvements are outside this change; exact names are never silently replaced.

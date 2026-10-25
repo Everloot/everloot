@@ -104,3 +104,24 @@ test("a Test's result is kept with the key, and forgotten when the key changes",
   s.setItem("everloot.chat.providers.v1", JSON.stringify([{ kind: "openrouter", model: "m", key: OR, check: { ok: "yes" } }]));
   expect(loadProviders(s)[0]).toEqual({ kind: "openrouter", model: "m", key: OR });
 });
+
+test("an answer keeps its item as a reference only; older answers without one read as before", () => {
+  const s = memory();
+  const at = "2026-10-25T00:00:00.000Z";
+  const base = { role: "assistant" as const, text: "a", at, model: null, sources: [], steps: [] };
+  saveConversation(s, { id: "c", title: "", updatedAt: at, messages: [
+    { role: "user", text: "Where does Linen Cloth drop?", at, model: null, sources: [], steps: [] },
+    { ...base, item: { id: 2589, label: "Linen Cloth", lines: ["Sell Price 13c"] } as never },
+    { ...base, item: { query: "Linen" } },
+    { ...base, item: { id: "x" } as never },
+    base,
+  ] });
+  const stored = s.m.get("everloot.chat.conversations.v1")!;
+  expect(stored).not.toContain("Sell Price");
+  expect(stored).not.toContain("\"label\"");
+  const [, exact, choices, broken, old] = loadConversations(s)[0].messages;
+  expect(exact.item).toEqual({ id: 2589 });
+  expect(choices.item).toEqual({ query: "Linen" });
+  expect(broken).not.toHaveProperty("item");
+  expect(old).not.toHaveProperty("item");
+});

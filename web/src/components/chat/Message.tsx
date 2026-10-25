@@ -1,5 +1,6 @@
 import { answerOrigin, NO_SOURCED_ANSWER, sourceLink } from "@/lib/chat/agent";
 import type { ChatMessage } from "@/lib/chat/store";
+import ItemResult from "./ItemResult";
 
 const link = "underline underline-offset-4 hover:text-accent break-all";
 
@@ -21,9 +22,11 @@ export function UserMessage({ m }: { m: ChatMessage }) {
   );
 }
 
-/** An answer, its origin (From Everloot with the pages, From the model), the model and a copy button. */
-export function AssistantMessage({ m, copied, onCopy }: { m: ChatMessage; copied: boolean; onCopy: () => void }) {
+/** An answer, its item, its origin (From Everloot with the pages, From the model), the model and a copy button. */
+export function AssistantMessage({ m, copied, onCopy, onChoose = () => {} }: { m: ChatMessage; copied: boolean; onCopy: () => void; onChoose?: (id: number) => void }) {
   const origin = answerOrigin(m);
+  // Without a model an item answer is the database's card alone.
+  const everloot = origin.everloot || (!m.model && m.item !== undefined && "id" in m.item);
   const pages = m.pages ?? [];
   const cited = m.sources.flatMap((s) => {
     const l = sourceLink(s);
@@ -32,7 +35,8 @@ export function AssistantMessage({ m, copied, onCopy }: { m: ChatMessage; copied
   return (
     <div className="space-y-2">
       <div className="whitespace-pre-wrap break-words leading-7 text-fg">{shownText(m)}</div>
-      {origin.everloot && (
+      {m.item && <ItemResult item={m.item} onChoose={onChoose} />}
+      {everloot && (
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs text-fg-2">
           <span className="rounded-full border border-accent px-2 text-accent">From Everloot</span>
           {pages.map((p) => <a key={p} href={p} className={link}>{pagePath(p)}</a>)}

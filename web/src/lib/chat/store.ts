@@ -1,4 +1,5 @@
 import type { ChatStep } from "./agent";
+import { itemRef, type ItemRef } from "./items";
 import { chatProvider, MODEL_ID, type ChatProviderKind } from "./providers";
 
 /**
@@ -22,6 +23,8 @@ export interface ChatMessage {
   steps: ChatStep[];
   /** A user message's attached context ("I'm playing Jaina, a Mage."), sent to the model after the question. */
   context?: string;
+  /** An answer's item, as a reference only: its card and drops are fetched fresh each time it is shown. */
+  item?: ItemRef;
 }
 export interface Conversation { id: string; title: string; updatedAt: string; messages: ChatMessage[] }
 
@@ -129,8 +132,15 @@ function messagesIn(list: unknown): ChatMessage[] {
   if (!Array.isArray(list)) return [];
   return (list as ChatMessage[])
     .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.text === "string")
-    .map((m) => ({ ...m, sources: Array.isArray(m.sources) ? m.sources : [], steps: Array.isArray(m.steps) ? m.steps : [], model: m.model ?? null }))
+    .map((m) => withItem({ ...m, sources: Array.isArray(m.sources) ? m.sources : [], steps: Array.isArray(m.steps) ? m.steps : [], model: m.model ?? null }))
     .slice(-MAX_MESSAGES);
+}
+
+/** A message with its item reference reduced to what is kept (lib/chat/items.ts), or without one. */
+function withItem(m: ChatMessage): ChatMessage {
+  const { item, ...rest } = m;
+  const ref = itemRef(item);
+  return ref ? { ...rest, item: ref } : rest;
 }
 
 /** A conversation's title: its first question, cut to fit the list. */
@@ -163,7 +173,7 @@ export function loadConversations(storage: Storage): Conversation[] {
 /** Saves a conversation at the top of the list; one with no messages is removed instead. */
 export function saveConversation(storage: Storage, conversation: Conversation): Conversation[] {
   const others = loadConversations(storage).filter((c) => c.id !== conversation.id);
-  const messages = conversation.messages.slice(-MAX_MESSAGES);
+  const messages = conversation.messages.slice(-MAX_MESSAGES).map(withItem);
   const next = messages.length ? [{ ...conversation, title: titleFor(messages), messages }, ...others].slice(0, MAX_CONVERSATIONS) : others;
   if (next.length) storage.setItem(CONVERSATIONS, JSON.stringify(next)); else storage.removeItem(CONVERSATIONS);
   return next;

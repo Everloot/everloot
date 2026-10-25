@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { AccountShell, ShellCharacter } from "@/lib/account-shell-types";
 import { signInPath } from "@/lib/auth/return-to";
 import { answer, loadTools, searchOnly, signedIn, type ChatProgress, type ToolDef } from "@/lib/chat/agent";
+import { ITEM_FOUND, itemQuery, resolveItem, type ItemRef } from "@/lib/chat/items";
 import { chatProvider } from "@/lib/chat/providers";
 import { providerStorage } from "@/lib/chat/provider-session";
 import {
@@ -155,16 +156,24 @@ export default function ChatClient({ savedBuilds = false, profiles = false }: { 
     stop.current = ctl;
     try {
       const active = saved[0];
+      // An item question also finds its item, for the card under the answer; the model is never told of it.
+      const name = itemQuery(q);
       let r;
-      if (!active) r = await searchOnly(q);
-      else {
+      let item: ItemRef | null = null;
+      if (!active) {
+        item = name ? await resolveItem(name, ctl.signal) : null;
+        r = item && "id" in item ? { text: ITEM_FOUND, model: null, sources: [], pages: [], steps: [] } : await searchOnly(q);
+      } else {
+        const lookup = name ? resolveItem(name, ctl.signal).catch(() => null) : Promise.resolve(null);
         tools.current ??= await loadTools(fetch, savedBuilds && latest.current.signed === true);
         r = await answer({
           provider: chatProvider(active.kind)!, model: active.model, key: active.key, history,
           question: contextLine ? `${q}\n\n${contextLine}` : q, tools: tools.current, onProgress: setLive, signal: ctl.signal,
         });
+        item = await lookup;
       }
-      commit(id, [...asked, { role: "assistant", text: r.text, at: new Date().toISOString(), model: r.model, sources: r.sources, pages: r.pages, steps: r.steps }]);
+      ctl.signal.throwIfAborted();
+      commit(id, [...asked, { role: "assistant", text: r.text, at: new Date().toISOString(), model: r.model, sources: r.sources, pages: r.pages, steps: r.steps, ...(item ? { item } : {}) }]);
     } catch (err) {
       setError(ctl.signal.aborted ? "Stopped." : err instanceof Error ? err.message : String(err));
     } finally {
@@ -172,6 +181,17 @@ export default function ChatClient({ savedBuilds = false, profiles = false }: { 
       latest.current.busy = false;
       box.current?.focus();
     }
+  }
+
+  // An answer the player leaves behind is stopped, so it writes nothing after the page is gone.
+  useEffect(() => () => stop.current?.abort(), []);
+
+  /** The item picked from an answer's choices replaces them, kept by id like any other. */
+  function choose(i: number, item: number) {
+    if (latest.current.busy) return;
+    commit(latest.current.currentId, messagesRef.current.map((m, j) => (j === i
+      ? { ...m, ...(!m.model ? { text: ITEM_FOUND, sources: [], pages: [], steps: [] } : {}), item: { id: item } }
+      : m)));
   }
 
   const narrow = () => typeof window.matchMedia === "function" && !window.matchMedia("(min-width: 1024px)").matches;
@@ -244,7 +264,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false }: { 
               <div role="log" aria-label="Conversation" aria-relevant="additions" className="space-y-6">
                 {messages.map((m, i) => m.role === "user"
                   ? <UserMessage key={i} m={m} />
-                  : <AssistantMessage key={i} m={m} copied={copied === i} onCopy={() => void copy(i, m.text)} />)}
+                  : <AssistantMessage key={i} m={m} copied={copied === i} onCopy={() => void copy(i, m.text)} onChoose={(item) => choose(i, item)} />)}
                 {busy && (
                   <div aria-busy="true" className="whitespace-pre-wrap break-words leading-7 text-fg">
                     {live?.text}
