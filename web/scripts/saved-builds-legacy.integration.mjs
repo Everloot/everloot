@@ -67,12 +67,16 @@ try {
   assert.equal(open.refusal, null);
   assert.equal(await ownerName("Shared01"), null, "no name unless the owner chose to show it");
   await save(owner, { id: open.build_ref, showName: true });
-  assert.equal(await ownerName("Shared01"), "Thrall#1", "the battletag stands in for the name");
+  assert.equal(await ownerName("Shared01"), null, "a legacy BattleTag must never be published as the owner name");
 
-  // Once the accounts migration adds users.name, the name wins.
+  // Account names remain private for Battle.net users, even after a rename.
   await pool.query("alter table public.users add column name text");
+  await pool.query("update public.users set name = battletag where id = $1", [owner]);
+  assert.equal(await ownerName("Shared01"), null, "the accounts migration's BattleTag-derived default must stay private");
+  await pool.query("update public.users set battletag = 'Thrall#2' where id = $1", [owner]);
+  assert.equal(await ownerName("Shared01"), null, "a stale BattleTag in name must stay private after a rename");
   await pool.query("update public.users set name = 'Thrall' where id = $1", [owner]);
-  assert.equal(await ownerName("Shared01"), "Thrall");
+  assert.equal(await ownerName("Shared01"), null, "Battle.net account names are not public profile display names");
   await save(owner, { id: open.build_ref, showName: false });
   assert.equal(await ownerName("Shared01"), null);
   console.log("saved builds legacy users integration: ok");
