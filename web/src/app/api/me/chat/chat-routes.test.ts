@@ -215,16 +215,13 @@ test("import is idempotent per account, browser and local id", async () => {
     body: { p_user_id: USER.id, p_source_id: PROJECT, p_legacy_id: "k3x9", p_title: "Old", p_messages: [msg] } });
 });
 
-test("export is the owner's workspace as a private download; clearing takes only the workspace", async () => {
-  auth.authQuery.mockResolvedValueOnce({ projects: [projectRow()], conversations: [{ ...chatRow(), messages: [msg] }], entries: [] });
-  const res = await exportRoute.GET(req("GET", "/export"));
+test("export is the owner's workspace in private pages; clearing takes only the workspace", async () => {
+  auth.authQuery.mockResolvedValueOnce([projectRow()]);
+  const res = await exportRoute.GET(req("GET", "/export?section=projects"));
   expect(res.status).toBe(200);
   expect(res.headers.get("cache-control")).toBe("private, no-store");
-  expect(res.headers.get("content-disposition")).toMatch(/^attachment; filename="everloot-chat-\d{4}-\d\d-\d\d\.json"$/);
-  const body = await res.json();
-  expect(body).toMatchObject({ accountId: USER.id, projects: [{ id: PROJECT, updatedAt: "2026-10-25T12:00:00.123Z" }], entries: [] });
-  expect(Object.keys(body).sort()).toEqual(["accountId", "conversations", "entries", "exportedAt", "projects"]);
-  expect(rpc()).toEqual({ path: "rpc/chat_export", body: { p_user_id: USER.id } });
+  expect(await res.json()).toEqual({ accountId: USER.id, projects: [{ ...projectRow(), updatedAt: "2026-10-25T12:00:00.123Z" }], nextCursor: null });
+  expect(rpc()).toEqual({ path: "rpc/chat_list_projects", body: { p_user_id: USER.id } });
 
   auth.authQuery.mockResolvedValueOnce(true);
   const cleared = await workspace.DELETE(req("DELETE", "/workspace", { expectedAccountId: USER.id }));

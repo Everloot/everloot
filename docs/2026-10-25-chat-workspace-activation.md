@@ -15,7 +15,17 @@ belongs to `public.users(id)` and goes when that user is deleted. Nothing existi
 Prerequisites: `public.users` only. Saved-build entries also need `public.saved_builds`
 (`20261021150000_saved_builds.sql`). Without it the migration still applies and a build entry is refused as
 `build_not_found` (404). Production had no `saved_builds` at the 2026-10-25 preflight, so apply that migration first
-if build entries should work on day one.
+before activating the approved workspace, which includes private build creation. Opening projects before the
+build tables exist shows a builds-unavailable message. Keep `EVERLOOT_SAVED_BUILDS` off: the workspace's
+session-only `/api/me/chat/builds` route creates builds with `shared`, `showName` and `active` false, and edits
+preserve their stored sharing values. It does not expose builds to API keys or enable the older public save form.
+
+Before applying the older saved-build migration, check the catalog rather than replaying all migrations.
+Its expected prerequisites are the four-argument `create_api_key`, no five-argument version or `link_codes`,
+quota columns in `bucket,count,reset_at` order, scopes allowing `read:own`, and the usage surfaces
+`corpus,drops,market,mcp`. The 2026-10-25 metadata-only production check matched these conditions, with no
+build tables present. Recheck immediately before application; replay after character links can replace newer
+API-key behavior. Use a bounded lock timeout for the transaction that replaces the usage-surface constraint.
 
 ## Limits
 
@@ -37,6 +47,20 @@ if build entries should work on day one.
 The database holds these under a lock on the user row, so concurrent saves cannot pass them. Nothing saved is
 pruned to make room: an excess save is refused (413 `quota_exceeded` or `size_exceeded`, 429 `daily_limit`).
 
+## Export
+
+An account holds up to 10 MiB and a Vercel function answers at most 4.5 MB, so the export is read in pages and
+joined in the browser (`exportWorkspace` in `web/src/lib/chat/workspace-api.ts`), never sent as one response.
+`GET /api/me/chat/export?section=` takes `projects` (one page), `conversations` (one whole chat per page, at most
+1 MiB), `entries` (up to 50 and under 3 MiB per page) or `builds&ids=` (up to 50 of the owner's builds named by
+build entries: name, notes, class, codes and game build; no short link, sharing or character). Pages after the
+first take `&cursor=` from the last `nextCursor`. Every page is `private, no-store` and names its account; a page
+for another account, a failed page or a cancel stops the download with no file. The file is
+`{ version: 1, accountId, exportedAt, projects, conversations, entries, builds }`. Each page is read as it stands
+then, not as one snapshot: a chat or entry saved from another tab during the download moves to the top of its
+list, so the file may hold its older copy or miss it. Downloading again afterwards picks it up. The app no longer calls
+`chat_export`; it stays in the migration for a by-hand export.
+
 ## Test locally
 
 Against a disposable local Postgres only (the script drops the `public` schema and refuses any other host or
@@ -53,6 +77,11 @@ npx vitest run src/lib/chat/workspace.test.ts src/app/api/me/chat
 The integration script applies the migration on `users` alone first, then every migration in order, plus this one twice.
 It checks role isolation, two-account CRUD and references, revisions, project unfiling, pages, concurrent
 quotas, idempotent concurrent import, export, workspace clear and account deletion.
+
+`scripts/chat-workspace.rest.integration.mjs` additionally checks real PostgREST response shapes, owner
+isolation and private build flags against a disposable local PostgREST instance connected to that database.
+It requires `LOCAL_REST_URL` and `LOCAL_REST_JWT_SECRET` for local fixtures, rejects remote hosts, and removes
+only the fixture users it created. It does not exercise the paginated HTTP export route; the route tests do.
 
 ## Apply (root only, after review)
 
@@ -79,7 +108,8 @@ select not has_table_privilege('anon', 'public.chat_conversations', 'select'),
    - A saves the chat from two tabs with the same revision: the second gets 409 `revision_conflict`.
    - A imports one browser chat twice: one conversation, `created` true then false.
    - A removes the project: the chat and note show as Unfiled.
-   - A downloads `/api/me/chat/export` and clears the workspace with `DELETE /api/me/chat/workspace`.
+   - A downloads the export from Chat (see Export below), the file holds A's projects, chats, entries and the
+     builds they name, and A clears the workspace with `DELETE /api/me/chat/workspace`.
 4. Confirm the test rows are gone (counts only, no content):
 
 ```sql

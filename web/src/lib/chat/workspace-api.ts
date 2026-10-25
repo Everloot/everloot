@@ -131,6 +131,47 @@ export const deleteWorkspace = (o: CallOptions) => call<{ ok: true }>("/api/me/c
 
 export const EXPORT_PATH = "/api/me/chat/export";
 
+/** A build an export entry names, as its owner made it. */
+export interface ExportedBuild { id: string; name: string; notes: string | null; classSlug: string; code: string; code2: string | null; gameBuild: string; updatedAt: string }
+
+/** Every page of one export section, in order. A record read twice (it moved while paging) is kept once, as last read. */
+async function exportSection<T extends { id: string }>(section: "conversations" | "entries", o: CallOptions): Promise<T[]> {
+  const records = new Map<string, T>();
+  let cursor: string | null = null;
+  for (let pages = 0; pages <= 2 * WORKSPACE_LIMITS.entries; pages++) {
+    const page: Record<string, unknown> = await call(`${EXPORT_PATH}${query({ section, cursor })}`, o);
+    o.signal?.throwIfAborted();
+    for (const record of page[section] as T[]) records.set(record.id, record);
+    const next = typeof page.nextCursor === "string" ? page.nextCursor : null;
+    if (!next) return [...records.values()];
+    if (next === cursor) break;
+    cursor = next;
+  }
+  throw new WorkspaceError("unavailable", MESSAGES.unavailable);
+}
+
+/**
+ * The account's whole workspace as one JSON file, read page by page (no answer may pass 4.5 MB, and an account
+ * holds up to 10 MiB). Each page must name this account; a failed page, an account switch or the signal aborting
+ * rejects with nothing returned. Records are as they were when each page was read, not one frozen moment.
+ */
+export async function exportWorkspace(o: CallOptions): Promise<Blob> {
+  const exportedAt = new Date().toISOString();
+  const { projects } = await call<{ projects: WorkspaceProject[] }>(`${EXPORT_PATH}?section=projects`, o);
+  o.signal?.throwIfAborted();
+  const conversations = await exportSection<WorkspaceConversation>("conversations", o);
+  const entries = await exportSection<WorkspaceEntry>("entries", o);
+  const ids = [...new Set(entries.flatMap((e) => (e.kind === "build" && e.buildId ? [e.buildId] : [])))];
+  const builds: ExportedBuild[] = [];
+  for (let i = 0; i < ids.length; i += WORKSPACE_LIMITS.page) {
+    const page = await call<{ builds: ExportedBuild[] }>(`${EXPORT_PATH}?section=builds&ids=${ids.slice(i, i + WORKSPACE_LIMITS.page).join(",")}`, o);
+    o.signal?.throwIfAborted();
+    builds.push(...page.builds);
+  }
+  const data = { version: 1, accountId: o.accountId, exportedAt, projects, conversations, entries, builds };
+  return new Blob([JSON.stringify(data)], { type: "application/json" });
+}
+
 const SITE = /^https:\/\/(?:www\.)?everloot\.app(?=[/?#]|$)/;
 
 /** An everloot.app page as its path, or null for anything else: another site, a scheme, a protocol-relative URL. */

@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { listConversations, saveConversation, saveEntry, sameSitePath, whoAmI, WorkspaceError, deleteProject, importConversation } from "./workspace-api";
+import { listConversations, saveConversation, saveEntry, sameSitePath, whoAmI, WorkspaceError, deleteProject, importConversation, exportWorkspace } from "./workspace-api";
 
 const ME = "11111111-2222-4333-8444-555555555555";
 const OTHER = "99999999-2222-4333-8444-555555555555";
@@ -71,4 +71,59 @@ test("only this site's pages can be saved, kept as their path", () => {
   expect(sameSitePath("https://evil.example/database")).toBeNull();
   expect(sameSitePath("javascript:alert(1)")).toBeNull();
   expect(sameSitePath(`/${"a".repeat(2048)}`)).toBeNull();
+});
+
+/** Export pages by section, answered in order; a page may be a status with a body instead. */
+function exportSender(pages: Record<string, Array<object | [number, object]>>) {
+  return vi.fn<typeof fetch>(async (url, init) => {
+    if (init?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    const section = new URL(String(url), "https://everloot.app").searchParams.get("section")!;
+    const next = pages[section].shift()!;
+    return Array.isArray(next) ? Response.json(next[1], { status: next[0] }) : Response.json({ accountId: ME, ...next });
+  });
+}
+
+test("the export reads every page and assembles one JSON file, asking only for builds the entries name", async () => {
+  const send = exportSender({
+    projects: [{ projects: [{ id: ID }], nextCursor: null }],
+    conversations: [{ conversations: [{ id: "c1" }], nextCursor: "n1" }, { conversations: [{ id: "c2" }], nextCursor: null }],
+    entries: [{ entries: [{ id: "e1", kind: "build", buildId: OTHER }, { id: "e2", kind: "note", buildId: null }], nextCursor: null }],
+    builds: [{ builds: [{ id: OTHER, code: "EL1-mage-1-0.1-x" }], nextCursor: null }],
+  });
+  const data = JSON.parse(await (await exportWorkspace({ accountId: ME, send })).text());
+  expect(send.mock.calls.map(([u]) => u)).toEqual([
+    "/api/me/chat/export?section=projects", "/api/me/chat/export?section=conversations", "/api/me/chat/export?section=conversations&cursor=n1",
+    "/api/me/chat/export?section=entries", `/api/me/chat/export?section=builds&ids=${OTHER}`,
+  ]);
+  expect(data).toMatchObject({ version: 1, accountId: ME, conversations: [{ id: "c1" }, { id: "c2" }], builds: [{ id: OTHER }] });
+  expect(Date.parse(data.exportedAt)).not.toBeNaN();
+});
+
+test("a failed page fails the whole export instead of saving part of it", async () => {
+  const send = exportSender({
+    projects: [{ projects: [], nextCursor: null }],
+    conversations: [{ conversations: [{ id: "c1" }], nextCursor: "n1" }, [503, { error: "down" }]],
+  });
+  await expect(exportWorkspace({ accountId: ME, send })).rejects.toMatchObject({ code: "unavailable" });
+  const signedOut = exportSender({ projects: [[401, { error: "x" }]] });
+  await expect(exportWorkspace({ accountId: ME, send: signedOut })).rejects.toMatchObject({ code: "signed_out" });
+});
+
+test("a cursor that does not move is refused rather than read forever", async () => {
+  const send = exportSender({
+    projects: [{ projects: [], nextCursor: null }],
+    conversations: [{ conversations: [], nextCursor: "same" }, { conversations: [], nextCursor: "same" }],
+  });
+  await expect(exportWorkspace({ accountId: ME, send })).rejects.toMatchObject({ code: "unavailable" });
+});
+
+test("cancelling between pages stops the export", async () => {
+  const stop = new AbortController();
+  const send = exportSender({
+    projects: [{ projects: [], nextCursor: null }],
+    conversations: [{ conversations: [{ id: "c1" }], nextCursor: "n1" }, { conversations: [], nextCursor: null }],
+  });
+  send.mockImplementationOnce(async () => { stop.abort(); return Response.json({ accountId: ME, projects: [], nextCursor: null }); });
+  await expect(exportWorkspace({ accountId: ME, send, signal: stop.signal })).rejects.toMatchObject({ name: "AbortError" });
+  expect(send).toHaveBeenCalledTimes(1);
 });

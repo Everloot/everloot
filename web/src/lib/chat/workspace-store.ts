@@ -172,17 +172,6 @@ export const importConversation = (userId: string, input: ImportSave) => save<Wo
   p_title: input.conversation.title, p_messages: input.conversation.messages,
 }, "conversation");
 
-/** The account's whole workspace, for its own download. */
-export async function exportWorkspace(userId: string) {
-  const raw = await rpc<{ projects?: unknown; conversations?: unknown; entries?: unknown } | null>("chat_export", { p_user_id: userId });
-  if (!raw || typeof raw !== "object") throw new Error("Invalid workspace export");
-  return {
-    projects: records<WorkspaceProject>(raw.projects),
-    conversations: records<WorkspaceConversation>(raw.conversations),
-    entries: records<WorkspaceEntry>(raw.entries),
-  };
-}
-
 export async function clearWorkspace(userId: string): Promise<void> {
   if ((await rpc<unknown>("chat_clear_workspace", { p_user_id: userId })) !== true) throw new Error("Workspace was not cleared");
 }
