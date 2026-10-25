@@ -7,12 +7,13 @@ platform's page on the day you submit, these portals change.
 
 ## What every listing says
 
-**Next submission, prepared only (wave 5):** the public catalogue remains **29 tools**.
-`item_page` now describes agreed player-reported item numbers with installs, build and last seen;
-`coverage` now describes scoped field totals and the separately dated whole-fact settled-list size.
-Use their exact descriptions from `packages/protocol/src/mcp.ts` when the next listing is due.
-ChatGPT 1.0.1 and Claude are In review with the older descriptions: this lane submits nothing and
-does not change those reviews. Inputs are unchanged; the optional item output is protocol 1.17.0.
+**Next submission, prepared only (wave 6, 2026-10-25):** the public catalogue becomes **31 tools** once
+`EVERLOOT_GUILDS` is on (PR #427): `guild_search` ("Find a guild by the start of its name") and `guild_rankings`
+("Guild ladder for one raid or dungeon") join the list, and `guild_board` gains the ladder side. With the switch
+off the live endpoint still serves 29, so submit only after the switch is on and `/api/tools/guild_search`
+answers 200. Use the exact titles and descriptions from `packages/protocol/src/mcp.ts` (protocol 1.19.0), and
+change the tool count in the long description below to 31. Wave 5 (`item_page`, `coverage` wording) is folded
+into this one. ChatGPT 1.0.1 and Claude are In review with the older descriptions: this lane submits nothing.
 
 Use the same words everywhere, so the listings match the site and each other.
 
