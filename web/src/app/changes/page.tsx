@@ -127,7 +127,7 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
     {
       key: "title", header: "Title", sortable: true, cell: (e) => {
         const line = e.type === "build"
-          ? <>First seen by Everloot. {e.diffUrl ? <a href={e.diffUrl} className={LINK}>See what changed</a> : "What changed: not published yet."}</>
+          ? <>First seen by Everloot.{e.diffUrl && <> <a href={e.diffUrl} className={LINK}>See what changed</a></>}</>
           : (e.summary ?? e.excerpt) && <WithSpells text={(e.summary ?? e.excerpt)!} index={index} />;
         return (
           <div data-change-row data-blue-post={postPath(e) ? "" : undefined} className="min-w-0 py-1">

@@ -91,11 +91,12 @@ test("markup in a title is escaped, not rendered", async () => {
   expect(html).not.toContain("<b>");
 });
 
-test("builds say they were first seen by Everloot, and link the diff when there is one", async () => {
+test("builds say they were first seen by Everloot, link the diff when there is one, and print no empty field when there is not", async () => {
   const html = await page({ show: "builds" });
   expect(rows(html)).toBe(2);
   expect(html).toContain("First seen by Everloot.");
-  expect(html).toContain("What changed: not published yet.");
+  expect(html).not.toContain("not published yet");
+  expect(html).toMatch(/70460<\/span><p[^>]*>First seen by Everloot\.<\/p>/);
   expect(html).toContain('href="https://everloot.app/changes/diff/70450"');
   expect(html).not.toContain("Synthetic beta notice");
 });

@@ -182,12 +182,7 @@ export default async function BluePostPage(props: Props) {
                 : <p><WithSpells text={entry.summary!} index={index} /></p>}
             </div>
           </Card>
-        ) : (
-          <Card as="section" data-no-notes aria-labelledby="notes" className="mt-4">
-            <SectionHeading id="notes">Our notes</SectionHeading>
-            <p className="text-sm text-fg-2">None yet. A maintainer writes them after reading the full post; until then the excerpt above is all this page carries.</p>
-          </Card>
-        )}
+        ) : null}
 
         <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2">
           {entry.url && <a data-original href={entry.url} rel="noopener" className="btn">Read the full post {where}</a>}
