@@ -4,7 +4,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { AgreementMeter, Badge, Card, Container, DataTable, DataTitle, EmptyState, SectionHeading, type Column } from "@/components/ui";
 import type { InstanceBoss } from "../../../../../../kb/src/instances";
 import {
-  difficultyLabel, instanceDescription, instanceHref, instanceRows, instanceTitle, loadSightings, parseInstanceSegment,
+  difficultyLabel, instanceDescription, instanceHref, instanceRows, instanceTitle, levelLabel, loadSightings, parseInstanceSegment,
   type InstancePlace, type InstanceRow,
 } from "@/lib/instances";
 import { dayLabel } from "@/lib/report-labels";
@@ -102,12 +102,13 @@ export default async function InstancePage(props: Props) {
 
         <div className="space-y-6">
           <section aria-labelledby="facts">
-            <SectionHeading id="facts" note="The type is from the game files where they place the entrance, else as 3 installs agree. The difficulty is the id 3 installs agree on.">
+            <SectionHeading id="facts" note="The type is from the game files where they place the entrance, else as 3 installs agree. The level is from the game files, which give one level for most instances rather than a range. The difficulty is the id 3 installs agree on.">
               Facts
             </SectionHeading>
             <Card as="div">
               <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm">
                 <dt className="text-muted">Type</dt><dd className="text-fg">{kindLabel(row.raid)}</dd>
+                <dt className="text-muted">Level</dt><dd className="text-fg">{levelLabel(row.level) ?? <span className="text-muted">–</span>}</dd>
                 <dt className="text-muted">Difficulty</dt><dd className="text-fg">{row.difficulty === null ? PLACEHOLDER : difficultyLabel(row.difficulty)}</dd>
                 <dt className="text-muted">Bosses reported</dt><dd className="text-fg">{unreachable ? PLACEHOLDER : row.bosses.length}</dd>
               </dl>

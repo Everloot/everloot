@@ -217,3 +217,23 @@ test("on the server it is still plain markup: the same bar, native <details> men
   expect(html.match(/<details name="filters-phone" /g)).toHaveLength(2);
   expect(html).not.toContain("open=");
 });
+
+test("a choice that matches nothing is left out unless selected, and a menu with nothing left to pick is not drawn", () => {
+  const side = (on: string | null) => ({
+    type: "menu" as const, key: "side", label: "Side", options: [
+      { label: "Any side", href: "/q", on: on === null, reset: true },
+      { label: "Alliance", href: "/q?side=alliance", on: on === "alliance", count: 0 },
+      { label: "Horde", href: "/q?side=horde", on: on === "horde", count: 3 },
+    ],
+  });
+  const html = (controls: FilterBarProps["controls"]) => renderToStaticMarkup(<FilterBar {...props} controls={controls} />);
+  const some = html([side(null)]);
+  expect(some).toContain('data-filter="side"');
+  expect(some).toContain("Horde");
+  expect(some).not.toContain("Alliance");
+  // Selected, an empty choice stays, so the reader can see and undo it.
+  expect(html([side("alliance")])).toContain("Alliance");
+  // Every choice empty: no menu at all, rather than a list of zeros.
+  const empty = { ...side(null), options: side(null).options.map((o) => (o.reset ? o : { ...o, count: 0 })) };
+  expect(html([empty])).not.toContain('data-filter="side"');
+});

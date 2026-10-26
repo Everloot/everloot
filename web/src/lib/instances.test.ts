@@ -5,7 +5,7 @@ import type { EncounterRow, InstanceEntranceRow } from "../../../kb/src/instance
 // The loaders read storage; these tests hand the readers their facts directly.
 vi.mock("./rollup-compute", () => ({ loadInstanceFacts: vi.fn(), loadItemFacts: vi.fn() }));
 
-import { bossLine, difficultyLabel, entranceLinks, instanceHref, instanceRows, parseInstanceSegment } from "./instances";
+import { bossLine, compareInstances, difficultyLabel, entranceLinks, instanceHref, instanceRows, levelLabel, parseInstanceSegment } from "./instances";
 import { continentPinSet, continentTreasureCandidates } from "./world-map";
 import { zoneContents, type ZoneSightings } from "./zones";
 
@@ -25,7 +25,7 @@ const data: WorldMapData = {
     { uiMapId: 2482, name: "Synthetic Peak", continentId: 1, bounds: { top: 6000, bottom: 4000, left: -900, right: -4400 } },
   ],
   entrances: [
-    { mapId: 34, name: "Synthetic Stockade", raid: false, continentId: 0, worldX: -8762.4, worldY: 848 },
+    { mapId: 34, name: "Synthetic Stockade", raid: false, continentId: 0, worldX: -8762.4, worldY: 848, minLevel: 17, maxLevel: 24 },
     { mapId: 389, name: "Synthetic Chasm", raid: false, continentId: 1, worldX: 1500, worldY: -4423.4 },
     { mapId: 99, name: "Synthetic Spire", raid: true, continentId: 1, worldX: 5000, worldY: -2000 },
   ],
@@ -59,7 +59,7 @@ describe("instance rows", () => {
     const rows = instanceRows(seen, data);
     const stockade = rows.get(34)!;
     expect(stockade).toEqual({
-      instanceMapId: 34, name: "Synthetic Stockade", raid: false, difficulty: 1,
+      instanceMapId: 34, name: "Synthetic Stockade", raid: false, difficulty: 1, level: { min: 17, max: 24 },
       files: [{ mapId: 1429, zoneName: "Synthetic Forest", x: 19.8, y: 35.5 }],
       confirmed: [{ mapId: 1429, zoneName: "Synthetic Forest", x: 20, y: 36, installs: 3, lastSeen: "2026-10-19T10:00:00.000Z" }],
       reported: 0,
@@ -94,6 +94,22 @@ describe("instance rows", () => {
     expect(row).toMatchObject({ names: ["Synthetic Stockade"], instanceMapIds: [34], confirmed: 3, lastSeen: "2026-10-19T10:00:00.000Z" });
     expect(row.bosses).toEqual(instanceRows(seen, data).get(34)!.bosses);
     expect(entranceLinks(row, data)).toEqual([{ name: "Synthetic Stockade", id: 34 }]);
+  });
+
+  test("the level comes from the files' range; an instance with no range in the files has none, never a guess", () => {
+    const rows = instanceRows(seen, data);
+    expect(rows.get(34)!.level).toEqual({ min: 17, max: 24 });
+    expect(rows.get(389)!.level).toBeNull();
+    expect(levelLabel(rows.get(34)!.level)).toBe("17–24");
+    expect(levelLabel({ min: 60, max: 60 })).toBe("60");
+    expect(levelLabel(rows.get(389)!.level)).toBeNull();
+  });
+
+  test("the list runs from the lowest level up, instances with no level last, then by name", () => {
+    const base = instanceRows(seen, data).get(34)!;
+    const mk = (id: number, name: string, level: { min: number; max: number } | null) => ({ ...base, instanceMapId: id, name, level });
+    const sorted = [mk(1, "Zed", null), mk(2, "Raid", { min: 60, max: 60 }), mk(3, "Beta", { min: 17, max: 24 }), mk(4, "Alpha", null), mk(5, "Early", { min: 13, max: 13 })].sort(compareInstances);
+    expect(sorted.map((r) => r.name)).toEqual(["Early", "Beta", "Raid", "Alpha", "Zed"]);
   });
 
   test("a difficulty id prints by the game's name for it, and an id the list lacks as its number", () => {

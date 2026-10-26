@@ -278,6 +278,11 @@ interface files, is a different thing and is covered by the second extension. Th
   icons (`CreatureFamily.IconFileID`) in the manifest. Item icons and names on these pages follow the
   item tooltip rule above: only for items 3 installs reported, never in bulk and never for every id,
   except where the item name rule below allows them.
+- **Dungeon and raid levels** (*proposed 2026-10-25, in the pull request that adds them (the maintainer review)*): the level
+  range the files give each instance, read like the entrance points beside it from the unencrypted tables
+  `MapDifficulty`, `ContentTuning` and `LFGDungeons`, published in the map layer's file and shown on `/database/instances`
+  and each instance's page as a fact from the game files. The files give one level for most instances, not a range, and
+  none for some; an instance they give none for shows a dash. Nothing is filled in from memory or another site.
 
 **Second extension: loading screens, race and faction emblems, spell tooltips and the game's logo.**
 Decided 2026-10-18. Carlos: "Approved next: (1) loading-screen art as page banners (zones, dungeons,

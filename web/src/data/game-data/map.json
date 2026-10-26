@@ -9,8 +9,8 @@
     "buildId": 70532,
     "version": "1.60.1.70532",
     "buildConfig": "ad1802f4455e427ed8b7769aab25b0c0",
-    "definitions": "326704dc5066",
-    "extractedAt": "2026-10-23T01:16:52.238Z",
+    "definitions": "12ce70d5fef1",
+    "extractedAt": "2026-10-25T23:52:06.422Z",
     "tables": [
       {
         "table": "Map",
@@ -46,6 +46,21 @@
         "table": "AreaTable",
         "rows": 1375,
         "encryptedBlocks": 3
+      },
+      {
+        "table": "MapDifficulty",
+        "rows": 142,
+        "encryptedBlocks": 1
+      },
+      {
+        "table": "ContentTuning",
+        "rows": 100,
+        "encryptedBlocks": 0
+      },
+      {
+        "table": "LFGDungeons",
+        "rows": 71,
+        "encryptedBlocks": 1
       },
       {
         "table": "TerrainArea",
@@ -627,7 +642,9 @@
       "continentId": 0,
       "worldX": -231,
       "worldY": 1571.6,
-      "uiMapId": 1421
+      "uiMapId": 1421,
+      "minLevel": 18,
+      "maxLevel": 18
     },
     {
       "mapId": 34,
@@ -636,7 +653,9 @@
       "continentId": 0,
       "worldX": -8762.4,
       "worldY": 848,
-      "uiMapId": 1453
+      "uiMapId": 1453,
+      "minLevel": 23,
+      "maxLevel": 23
     },
     {
       "mapId": 36,
@@ -645,7 +664,9 @@
       "continentId": 0,
       "worldX": -11207.8,
       "worldY": 1681.2,
-      "uiMapId": 1436
+      "uiMapId": 1436,
+      "minLevel": 16,
+      "maxLevel": 16
     },
     {
       "mapId": 43,
@@ -654,7 +675,9 @@
       "continentId": 1,
       "worldX": -751.1,
       "worldY": -2209.2,
-      "uiMapId": 1413
+      "uiMapId": 1413,
+      "minLevel": 17,
+      "maxLevel": 17
     },
     {
       "mapId": 47,
@@ -663,7 +686,9 @@
       "continentId": 1,
       "worldX": -4459.4,
       "worldY": -1660.2,
-      "uiMapId": 1413
+      "uiMapId": 1413,
+      "minLevel": 24,
+      "maxLevel": 24
     },
     {
       "mapId": 48,
@@ -672,7 +697,9 @@
       "continentId": 1,
       "worldX": 4249.1,
       "worldY": 748.4,
-      "uiMapId": 1440
+      "uiMapId": 1440,
+      "minLevel": 22,
+      "maxLevel": 22
     },
     {
       "mapId": 70,
@@ -681,7 +708,9 @@
       "continentId": 0,
       "worldX": -6060.2,
       "worldY": -2955,
-      "uiMapId": 1418
+      "uiMapId": 1418,
+      "minLevel": 35,
+      "maxLevel": 35
     },
     {
       "mapId": 90,
@@ -690,7 +719,9 @@
       "continentId": 0,
       "worldX": -5162.7,
       "worldY": 931.6,
-      "uiMapId": 1426
+      "uiMapId": 1426,
+      "minLevel": 25,
+      "maxLevel": 25
     },
     {
       "mapId": 109,
@@ -699,7 +730,9 @@
       "continentId": 0,
       "worldX": -10170.1,
       "worldY": -3996,
-      "uiMapId": 1435
+      "uiMapId": 1435,
+      "minLevel": 45,
+      "maxLevel": 45
     },
     {
       "mapId": 129,
@@ -708,7 +741,9 @@
       "continentId": 1,
       "worldX": -4662.9,
       "worldY": -2535.9,
-      "uiMapId": 1413
+      "uiMapId": 1413,
+      "minLevel": 34,
+      "maxLevel": 34
     },
     {
       "mapId": 189,
@@ -717,7 +752,9 @@
       "continentId": 0,
       "worldX": 2892.2,
       "worldY": -811.3,
-      "uiMapId": 1420
+      "uiMapId": 1420,
+      "minLevel": 30,
+      "maxLevel": 30
     },
     {
       "mapId": 209,
@@ -726,7 +763,9 @@
       "continentId": 1,
       "worldX": -6790.6,
       "worldY": -2891.3,
-      "uiMapId": 1446
+      "uiMapId": 1446,
+      "minLevel": 42,
+      "maxLevel": 42
     },
     {
       "mapId": 229,
@@ -735,7 +774,9 @@
       "continentId": 0,
       "worldX": -7522.5,
       "worldY": -1233,
-      "uiMapId": 1428
+      "uiMapId": 1428,
+      "minLevel": 53,
+      "maxLevel": 53
     },
     {
       "mapId": 230,
@@ -744,7 +785,9 @@
       "continentId": 0,
       "worldX": -7178.1,
       "worldY": -928.6,
-      "uiMapId": 1427
+      "uiMapId": 1427,
+      "minLevel": 48,
+      "maxLevel": 48
     },
     {
       "mapId": 249,
@@ -762,7 +805,9 @@
       "continentId": 0,
       "worldX": 1274.8,
       "worldY": -2552.6,
-      "uiMapId": 1422
+      "uiMapId": 1422,
+      "minLevel": 57,
+      "maxLevel": 57
     },
     {
       "mapId": 309,
@@ -771,7 +816,9 @@
       "continentId": 0,
       "worldX": -11916.1,
       "worldY": -1224.6,
-      "uiMapId": 1434
+      "uiMapId": 1434,
+      "minLevel": 60,
+      "maxLevel": 60
     },
     {
       "mapId": 329,
@@ -780,7 +827,9 @@
       "continentId": 0,
       "worldX": 3392.3,
       "worldY": -3378.5,
-      "uiMapId": 1423
+      "uiMapId": 1423,
+      "minLevel": 55,
+      "maxLevel": 55
     },
     {
       "mapId": 349,
@@ -789,7 +838,9 @@
       "continentId": 1,
       "worldX": -1432.7,
       "worldY": 2925,
-      "uiMapId": 1443
+      "uiMapId": 1443,
+      "minLevel": 42,
+      "maxLevel": 42
     },
     {
       "mapId": 389,
@@ -798,7 +849,9 @@
       "continentId": 1,
       "worldX": 1816.8,
       "worldY": -4423.4,
-      "uiMapId": 1454
+      "uiMapId": 1454,
+      "minLevel": 13,
+      "maxLevel": 13
     },
     {
       "mapId": 409,
@@ -807,7 +860,9 @@
       "continentId": 0,
       "worldX": -7510.6,
       "worldY": -1036.7,
-      "uiMapId": 1428
+      "uiMapId": 1428,
+      "minLevel": 60,
+      "maxLevel": 60
     },
     {
       "mapId": 429,
@@ -816,7 +871,9 @@
       "continentId": 1,
       "worldX": -3908,
       "worldY": 1130,
-      "uiMapId": 1444
+      "uiMapId": 1444,
+      "minLevel": 54,
+      "maxLevel": 54
     },
     {
       "mapId": 469,
@@ -825,7 +882,9 @@
       "continentId": 0,
       "worldX": -7663.4,
       "worldY": -1218.7,
-      "uiMapId": 1428
+      "uiMapId": 1428,
+      "minLevel": 60,
+      "maxLevel": 60
     },
     {
       "mapId": 509,

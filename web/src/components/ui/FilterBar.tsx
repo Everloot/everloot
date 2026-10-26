@@ -37,8 +37,11 @@ function Chevron() {
   return <svg aria-hidden="true" width="10" height="10" viewBox="0 0 10 10" className="text-muted [[open]>summary>&]:rotate-180"><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>;
 }
 
-function Menu({ c, phone }: { c: Extract<FilterControl, { type: "menu" }>; phone: boolean }) {
-  if (c.options.length === 0) return null;
+function Menu({ c: given, phone }: { c: Extract<FilterControl, { type: "menu" }>; phone: boolean }) {
+  // A choice that matches nothing is noise ("Alliance 0" before launch): it stays only while selected, and a menu
+  // left with nothing to pick is not drawn.
+  const c = { ...given, options: given.options.filter((o) => o.reset || o.on || o.count !== 0) };
+  if (!c.options.some((o) => !o.reset)) return null;
   const on = c.options.filter((o) => o.on && !o.reset);
   const summary = on.length === 0 ? c.label : on.length === 1 ? <>{c.label}: <span className="text-fg">{on[0].label}</span></> : <>{c.label} ({on.length})</>;
   return (

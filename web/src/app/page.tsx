@@ -150,10 +150,11 @@ export default async function Home() {
         <Card unconfirmed className="grid gap-8 md:grid-cols-[auto_minmax(0,1fr)] md:items-center">
           <div>
             <p className="text-5xl font-bold tabular-nums tracking-tight text-fg">{CLIENT_TAXONOMY.items.length.toLocaleString("en-US")}</p>
-            <p className="mt-2 max-w-[28ch] text-sm text-fg-2">items in the game files. Players turn them into facts.</p>
+            <p className="mt-2 max-w-[28ch] text-sm text-fg-2">items in the game files. Players turn them into facts. Lists show named items; the rest wait for a name.</p>
           </div>
           <div className="min-w-0">
-            <ul aria-label="Items by category" className="grid gap-x-8 sm:grid-cols-2 lg:grid-cols-3">
+            <p className="mb-2 font-mono text-xs text-muted">The largest categories</p>
+            <ul aria-label="The largest item categories" className="grid gap-x-8 sm:grid-cols-2 lg:grid-cols-3">
               {categories.map((c) => (
                 <li key={c.id} className="border-b border-line">
                   <Link href={itemsHref(c.slug)} className="flex min-h-11 items-center justify-between gap-4 text-fg hover:text-accent">
