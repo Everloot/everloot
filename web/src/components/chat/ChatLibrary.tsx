@@ -43,6 +43,7 @@ export default function ChatLibrary({ projects, local, opts, failed, busy, onBac
   const [exporting, setExporting] = useState(false);
   const listing = useRef(0);
   const [loadingMore, setLoadingMore] = useState(false);
+  const pagePending = useRef(false);
 
   useEffect(() => {
     const o = opts();
@@ -52,6 +53,7 @@ export default function ChatLibrary({ projects, local, opts, failed, busy, onBac
     setRows(null);
     setCursor(null);
     setLoadingMore(false);
+    pagePending.current = false;
     listConversations({ query: search.query, projectId: search.projectId || null }, o).then(
       (r) => { if (current()) { setRows(r.items); setCursor(r.nextCursor); setError(""); } },
       (e) => { if (current()) { setRows([]); setError(failed(e)); } },
@@ -68,7 +70,8 @@ export default function ChatLibrary({ projects, local, opts, failed, busy, onBac
 
   async function loadMore() {
     const o = opts();
-    if (!o || loadingMore || !cursor) return;
+    if (!o || pagePending.current || !cursor) return;
+    pagePending.current = true;
     const request = listing.current;
     const current = () => request === listing.current && !o.signal.aborted;
     setLoadingMore(true);
@@ -77,7 +80,7 @@ export default function ChatLibrary({ projects, local, opts, failed, busy, onBac
       const r = await listConversations({ ...search, projectId: search.projectId || null, cursor }, o);
       if (current()) { setRows((list) => [...(list ?? []), ...r.items]); setCursor(r.nextCursor); }
     } catch (e) { if (current()) setError(failed(e)); }
-    finally { if (current()) setLoadingMore(false); }
+    finally { if (current()) { pagePending.current = false; setLoadingMore(false); } }
   }
 
   /**
@@ -136,7 +139,7 @@ export default function ChatLibrary({ projects, local, opts, failed, busy, onBac
             {rows.map((s) => (
               <li key={s.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
                 {renaming?.id === s.id ? (
-                  <form className="flex flex-1 gap-2" onSubmit={(e) => { e.preventDefault(); const t = clip(renaming.title, WORKSPACE_LIMITS.title); if (t) void patch(s, { title: t }).then((saved) => { if (saved) setRenaming(null); }); }}>
+                  <form className="flex flex-1 gap-2" onSubmit={(e) => { e.preventDefault(); const edit = renaming; const t = clip(edit.title, WORKSPACE_LIMITS.title); if (t) void patch(s, { title: t }).then((saved) => { if (saved) setRenaming((current) => current === edit ? null : current); }); }}>
                     <input aria-label="New title" autoFocus maxLength={WORKSPACE_LIMITS.title} className={`${field} flex-1`} value={renaming.title} onChange={(e) => setRenaming({ id: s.id, title: e.target.value })} />
                     <button type="submit" className="btn min-h-9 px-3 text-sm">Save title</button>
                     <button type="button" className="btn min-h-9 px-3 text-sm" onClick={() => setRenaming(null)}>Cancel</button>

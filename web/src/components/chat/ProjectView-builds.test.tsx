@@ -133,3 +133,31 @@ test("a project switch cancels a pending page and late results cannot enter the 
   expect(button("Wrong project")).toBeUndefined();
   expect(button("Load more chats")).toBeUndefined();
 });
+
+
+test("saved-entry pages ignore duplicate clicks and discard a late reply after a project switch", async () => {
+  const original = globalThis.fetch;
+  let release!: (r: Response) => void;
+  let pendingSignal: AbortSignal | null | undefined;
+  let pageReads = 0;
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(input), "https://everloot.app");
+    if (url.pathname === "/api/me/chat/entries") {
+      if (url.searchParams.has("cursor")) {
+        pageReads++; pendingSignal = init?.signal;
+        return new Promise<Response>((resolve) => { release = resolve; });
+      }
+      return Response.json({ accountId: ACCOUNT, entries: [], nextCursor: url.searchParams.get("projectId") === PROJECT ? "next" : null });
+    }
+    return original(input, init);
+  }));
+  await render();
+  await act(async () => { const b = button("Load more saved items"); b.click(); b.click(); });
+  expect(pageReads).toBe(1);
+  await render("another-project");
+  expect(pendingSignal?.aborted).toBe(true);
+  await act(async () => release(Response.json({ accountId: ACCOUNT, entries: [{ id: "stale", kind: "note", title: "Wrong project note", text: "stale", sources: [] }], nextCursor: "stale" })));
+  await settle();
+  expect(host.textContent).not.toContain("Wrong project note");
+  expect(button("Load more saved items")).toBeUndefined();
+});

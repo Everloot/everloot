@@ -2,7 +2,7 @@ import type { Conversation } from "@/lib/chat/store";
 
 /**
  * The saved conversations, kept in this browser. A column on desktop; over the chat on a phone, where Escape
- * or picking a conversation closes it.
+ * or picking a conversation closes it. A Close control is also available on phones.
  */
 export default function ConversationRail({ conversations, currentId, busy, onNew, onOpen, onDelete, onClose }: {
   conversations: Conversation[];
@@ -17,8 +17,9 @@ export default function ConversationRail({ conversations, currentId, busy, onNew
     <nav id="chat-rail" aria-label="Conversations"
       className="absolute inset-y-0 left-0 z-10 flex w-72 flex-col border-r border-line bg-canvas lg:static lg:w-64 lg:shrink-0"
       onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); onClose(); } }}>
-      <div className="p-3">
-        <button type="button" className="btn min-h-9 w-full px-3 text-sm" disabled={busy} onClick={onNew}>New chat</button>
+      <div className="flex gap-2 p-3">
+        <button type="button" className="btn min-h-9 min-w-0 flex-1 px-3 text-sm" disabled={busy} onClick={onNew}>New chat</button>
+        <button type="button" aria-label="Close conversations" className="btn min-h-9 px-3 text-sm lg:hidden" onClick={onClose}>Close</button>
       </div>
       {conversations.length === 0
         ? <p className="px-4 text-sm text-muted">Your chats stay in this browser.</p>

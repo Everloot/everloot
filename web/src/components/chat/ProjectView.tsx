@@ -87,6 +87,8 @@ export default function ProjectView({ project, opts, failed, busy, onBack, onNew
   const projectRequest = useRef<Scoped | null>(null);
   const [entries, setEntries] = useState<WorkspaceEntry[] | null>(null);
   const [more, setMore] = useState<string | null>(null);
+  const [loadingEntries, setLoadingEntries] = useState(false);
+  const entryPagePending = useRef(false);
   const [builds, setBuilds] = useState<SavedBuild[] | null>(null);
   const [buildForm, setBuildForm] = useState<SavedBuild | "new" | null>(null);
   const [error, setError] = useState("");
@@ -105,6 +107,8 @@ export default function ProjectView({ project, opts, failed, busy, onBack, onNew
     const o = { ...account, signal: ctl.signal };
     projectRequest.current = o;
     chatPagePending.current = false;
+    entryPagePending.current = false;
+    setLoadingEntries(false); setMore(null);
     setLoadingChats(false); setChatCursor(null); setError("");
     setChats(null); setEntries(null);
     setBuilds(null); setBuildForm(null);
@@ -135,8 +139,20 @@ export default function ProjectView({ project, opts, failed, busy, onBack, onNew
   }
 
   async function loadMore() {
-    const r = await run((o) => listEntries({ projectId: project.id, cursor: more }, o));
-    if (r) { setEntries((list) => [...(list ?? []), ...r.items]); setMore(r.nextCursor); }
+    const o = projectRequest.current;
+    if (!o || o.signal.aborted || !more || entryPagePending.current) return;
+    entryPagePending.current = true;
+    setLoadingEntries(true); setError("");
+    try {
+      const r = await listEntries({ projectId: project.id, cursor: more }, o);
+      if (o.signal.aborted) return;
+      setEntries((list) => [...(list ?? []), ...r.items.filter((e) => !list?.some((old) => old.id === e.id))]);
+      setMore(r.nextCursor);
+    } catch (e) {
+      if (!o.signal.aborted) setError(failed(e));
+    } finally {
+      if (!o.signal.aborted) { entryPagePending.current = false; setLoadingEntries(false); }
+    }
   }
 
   async function loadMoreChats() {
@@ -278,7 +294,7 @@ export default function ProjectView({ project, opts, failed, busy, onBack, onNew
           <button type="submit" className="btn min-h-9 px-3 text-sm" disabled={!note.text.trim()}>Add note</button>
         </form>
       </section>
-      {more && <button type="button" className="btn min-h-9 px-3 text-sm" onClick={() => void loadMore()}>Load more saved items</button>}
+      {more && <button type="button" className="btn min-h-9 px-3 text-sm" disabled={loadingEntries} onClick={() => void loadMore()}>{loadingEntries ? "Loading saved items..." : "Load more saved items"}</button>}
     </div>
   );
 }
