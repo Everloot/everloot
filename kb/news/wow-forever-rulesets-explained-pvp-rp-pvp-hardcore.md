@@ -4,12 +4,17 @@ title: "WoW: Forever Rulesets Explained - PvP, RP-PvP, Hardcore and More"
 summary: "WoW: Forever drops realm selection for rulesets. Here is what Normal, PvP, Roleplaying, RP-PvP and Hardcore mean before name reservations open Oct 27."
 author: Everloot Team
 published: 2026-10-25
+updated: 2026-10-26
 tags: [guide, wow-forever, rulesets, name-reservations]
 sources:
   - title: "Blizzard: Choose Your Ruleset in World of Warcraft: Forever (updated Oct 22)"
     url: https://news.blizzard.com/en-us/article/24302070/updated-10-22-choose-your-ruleset-in-world-of-warcraft-forever
   - title: "Blizzard forums: Thank You For Testing the WoW Forever Beta"
     url: https://us.forums.blizzard.com/en/wow/t/thank-you-for-testing-the-wow-forever-beta/2390465
+  - title: "Blizzard forums: The Roleplay-PvP Ruleset is Coming to WoW Forever"
+    url: https://us.forums.blizzard.com/en/wow/t/the-roleplay-pvp-ruleset-is-coming-to-wow-forever/2389502
+  - title: "Massively OP: World of Warcraft Forever is getting RP-PvP as a ruleset after all"
+    url: https://massivelyop.com/2026/10/23/world-of-warcraft-forever-is-getting-rp-pvp-as-a-ruleset-after-all/
 status: published
 ---
 
@@ -24,6 +29,13 @@ Per [Blizzard's ruleset article](https://news.blizzard.com/en-us/article/2430207
 - **Roleplaying:** for players who want to stay in character.
 - **RP-PvP:** added in Blizzard's October 22 update. It arrives at launch on November 4, and Blizzard plans to offer it during name reservations.
 - **Hardcore:** comes sometime after launch. Death is permanent, but a dead Hardcore character can move to another ruleset.
+
+## Update, Oct 26: RP-PvP confirmed, one question open
+Blizzard's Josh "Aggrend" Greenfield [confirmed on the forums](https://us.forums.blizzard.com/en/wow/t/the-roleplay-pvp-ruleset-is-coming-to-wow-forever/2389502) that Blizzard reversed course after player feedback:
+
+> "We will add a Roleplay-PVP Ruleset for launch on November 4." (Blizzard)
+
+Blizzard is also "working hard" to let you pick RP-PvP and reserve names there starting Oct 27. The top open question from players: will one faction per account apply across both PvP and RP-PvP, so RP-PvP doesn't become a home for off-faction alts? Blizzard has not answered yet. We'll update this post when it does.
 
 ## What this means before October 27
 - You can't hop between rulesets. Playing on another one means a new character.
