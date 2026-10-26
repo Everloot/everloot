@@ -121,6 +121,6 @@ test("Glint perches on the footer's edge as a labelled button, his drawing hidde
 test("says when the beta ends and when the game launches", () => {
   const t = text();
   // The beta's last day has passed, so the sentence is in the past; the launch is still ahead.
-  expect(t).toContain("The beta ran until October 21, 2026");
+  expect(t).toContain("The beta ran until October 23, 2026");
   expect(t).toContain("the game launches November 4, 2026");
 });

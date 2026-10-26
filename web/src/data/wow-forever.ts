@@ -18,14 +18,13 @@ export const LAUNCH = {
 export const LAUNCH_AT = "2026-11-04T23:00:00Z";
 
 /**
- * When the beta closes. The client's own beta notice carries the date, and the site's player-pages
- * design spec (2026-10-20) works to the same day. It moves when the client says so, not when a
- * page is edited, so it is one dated fact here.
+ * Blizzard extended the beta past the client's original October 21 notice. The October 20
+ * stress-test post gives the final closing date; the October 23 thank-you post confirms it closed.
  */
 export const BETA = {
-  endsOn: "2026-10-21",
-  source: "the beta client's own notice",
-  checkedOn: "2026-10-20",
+  endsOn: "2026-10-23",
+  source: "https://us.forums.blizzard.com/en/wow/t/heads-up-wow-forever-stress-test-on-october-21/2387920",
+  checkedOn: "2026-10-26",
 } as const;
 
 export const CLASSES = ["Druid", "Hunter", "Mage", "Paladin", "Priest", "Rogue", "Shaman", "Warlock", "Warrior"] as const;
