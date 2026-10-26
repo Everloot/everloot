@@ -91,7 +91,7 @@ async function objectById(id: number | null, names: Map<number, string>): Promis
  * lore comes from the archive, tools from the tool list. A group with an exact id or name match comes first; an
  * empty group is left out. `only` keeps one database type; `limit` is the rows per group.
  */
-export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, names: given }: { only?: Scope; limit?: number; names?: Names } = {}): Promise<SearchGroup[]> {
+export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, names: given }: { only?: Scope; limit?: number; names?: Names | Promise<Names> } = {}): Promise<SearchGroup[]> {
   const text = raw.trim().slice(0, MAX_QUERY);
   const q = text.toLowerCase();
   if (!q) return [];
@@ -99,13 +99,13 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, names
   const found = new Map<SearchType, { results: SearchResult[]; total: number }>();
   const want = (t: SearchType) => !only || only === t;
 
-  const names = given ?? await loadNames();
+  // Neither read depends on the other. Scoped searches do not need the completion catalogue.
+  const [names, catalog] = await Promise.all([given ?? loadNames(), only ? null : loadCatalog()]);
   for (const kind of ["item", "npc", "quest"] as const) if (want(kind)) found.set(kind, agreed(kind, names[`${kind}s`], q, id));
   if (want("object")) { const objects = await objectById(id, names.objects); found.set("object", { results: objects, total: objects.length }); }
 
   if (!only) {
     // Achievements, factions, titles and quest chains three players reported, by name or id; none when the rollup cannot be read.
-    const catalog = await loadCatalog();
     if (catalog) {
       const hit = (label: string, href: string, n: number, exact: boolean): SearchResult => ({ label, href, note: `id ${n}`, exact, id: n });
       const achievements = byName(catalog.achievements, q).map(({ entry, exact }) => hit(entry.name, achievementHref(entry.achievementId, entry.name), entry.achievementId, exact));

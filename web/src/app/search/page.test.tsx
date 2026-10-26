@@ -13,11 +13,12 @@ vi.mock("next/link", () => ({
 
 let release = "";
 beforeAll(async () => { release = await buildLoreRelease(); });
-afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); vi.restoreAllMocks(); });
+afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); vi.restoreAllMocks(); namesRead.pending = null; siteSearch.names = undefined; });
 
-const siteSearch = vi.hoisted(() => ({ groups: [] as unknown[] }));
-vi.mock("@/lib/site-search", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/site-search")>()), siteSearch: async () => siteSearch.groups }));
-vi.mock("@/lib/shown-search-names", () => ({ loadShownSearchNames: async () => ({ items: new Map(), npcs: new Map(), quests: new Map() }) }));
+const siteSearch = vi.hoisted(() => ({ groups: [] as unknown[], names: undefined as unknown }));
+const namesRead = vi.hoisted(() => ({ pending: null as Promise<unknown> | null }));
+vi.mock("@/lib/site-search", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/site-search")>()), siteSearch: async (_q: string, options: { names?: unknown }) => { siteSearch.names = options.names; await options.names; return siteSearch.groups; } }));
+vi.mock("@/lib/shown-search-names", () => ({ loadShownSearchNames: () => namesRead.pending ?? Promise.resolve({ items: new Map(), npcs: new Map(), quests: new Map() }) }));
 const icons = vi.hoisted(() => ({ asked: [] as number[][], map: new Map<number, string>() }));
 vi.mock("@/lib/item-icons", () => ({ shownItemIcons: async (ids: number[]) => { icons.asked.push(ids); return icons.map; } }));
 
@@ -29,6 +30,18 @@ async function render(query: Record<string, string>, path = release) {
 
 /** The full lore list, which `in=lore` opens from the overview's lore group. */
 const renderLore = (query: Record<string, string>, path = release) => render({ in: "lore", ...query }, path);
+
+test("the page starts search without waiting for its independent name loader", async () => {
+  let finish!: (value: unknown) => void;
+  namesRead.pending = new Promise((resolve) => { finish = resolve; });
+  const { default: SearchPage } = await import("./page");
+  const answer = SearchPage({ searchParams: Promise.resolve({ q: "Linen Cloth" }) });
+  await Promise.resolve();
+  const passedPendingNames = siteSearch.names === namesRead.pending;
+  finish({ items: new Map(), npcs: new Map(), quests: new Map(), objects: new Map() });
+  await answer;
+  expect(passedPendingNames).toBe(true);
+});
 
 test("without a query it shows the form and no results", async () => {
   const html = await render({});

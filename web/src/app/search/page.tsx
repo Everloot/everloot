@@ -52,7 +52,7 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
   const scope = isScope(first(params.in)) ? (first(params.in) as Scope) : undefined;
 
   // Matched on the names the database pages show, so a name a list prints is found here too.
-  const groups = q ? await siteSearch(q, { ...(scope ? { only: scope, limit: SCOPED_LIMIT } : {}), names: await loadShownSearchNames() }) : null;
+  const groups = q ? await siteSearch(q, { ...(scope ? { only: scope, limit: SCOPED_LIMIT } : {}), names: loadShownSearchNames() }) : null;
   // The game icon beside each item hit, where its page shows one.
   const icons = await shownItemIcons(groups?.find((g) => g.type === "item")?.results.flatMap((r) => (r.id === undefined ? [] : [r.id])) ?? []);
   const base = `/search?q=${encodeURIComponent(q)}`;
