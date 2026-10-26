@@ -81,8 +81,9 @@ export default async function LorePage(props: { params: Promise<{ slug: string }
   const dbKind = wiki && (page.type === "npc" || page.type === "item" || page.type === "quest") ? page.type : null;
   const names = dbKind ? await loadNames() : null;
   const dbId = dbKind && names ? idForName(dbKind === "npc" ? names.npcs : dbKind === "item" ? names.items : names.quests, page.name) : null;
-  // The archive's body has no headings (the dump is plain text), so the contents are the sections this page adds.
+  // The archive has no source headings; link to its text and the metadata sections without inventing story sections.
   const sections: TocItem[] = [
+    { id: "lore-text", label: "Article text" },
     ...(dbKind && dbId !== null ? [{ id: "in-database", label: "In the database" }] : []),
     ...(infoboxEntries.length > 0 ? [{ id: "infobox", label: "Wiki infobox" }] : []),
     ...(typeSlug || page.categories.length > 0 ? [{ id: "categories", label: "Categories" }] : []),
@@ -104,17 +105,30 @@ export default async function LorePage(props: { params: Promise<{ slug: string }
           }
         />
 
-        <Prose>
-          {blocks.map((block, i) =>
-            block.type === "p" ? (
-              <p key={i}>{block.text}</p>
-            ) : (
-              <ul key={i}>
-                {block.items.map((item, j) => <li key={j}>{item}</li>)}
+        {sections.length > 1 && (
+          <details className="mb-6 rounded-card border border-line p-3 lg:hidden">
+            <summary className="min-h-9 cursor-pointer text-sm text-fg-2">On this page</summary>
+            <nav aria-label="Article sections">
+              <ul className="mt-2 space-y-1">
+                {sections.map((item) => <li key={item.id}><a href={`#${item.id}`} className={`inline-flex min-h-9 items-center text-sm ${link}`}>{item.label}</a></li>)}
               </ul>
-            ),
-          )}
-        </Prose>
+            </nav>
+          </details>
+        )}
+
+        <section id="lore-text" aria-label="Article text" tabIndex={-1} className="scroll-mt-24">
+          <Prose>
+            {blocks.map((block, i) =>
+              block.type === "p" ? (
+                <p key={i}>{block.text}</p>
+              ) : (
+                <ul key={i}>
+                  {block.items.map((item, j) => <li key={j}>{item}</li>)}
+                </ul>
+              ),
+            )}
+          </Prose>
+        </section>
 
         {dbKind && dbId !== null && (
           <Card as="section" aria-labelledby="in-database" className="mt-12">

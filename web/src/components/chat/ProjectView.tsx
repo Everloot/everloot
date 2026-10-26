@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { sourceLink } from "@/lib/chat/agent";
 import { newConversationId } from "@/lib/chat/store";
 import {
@@ -81,6 +81,10 @@ export default function ProjectView({ project, opts, failed, busy, onBack, onNew
   onAttach: (note: AttachedNote) => void;
 }) {
   const [chats, setChats] = useState<WorkspaceConversationSummary[] | null>(null);
+  const [chatCursor, setChatCursor] = useState<string | null>(null);
+  const [loadingChats, setLoadingChats] = useState(false);
+  const chatPagePending = useRef(false);
+  const projectRequest = useRef<Scoped | null>(null);
   const [entries, setEntries] = useState<WorkspaceEntry[] | null>(null);
   const [more, setMore] = useState<string | null>(null);
   const [builds, setBuilds] = useState<SavedBuild[] | null>(null);
@@ -99,9 +103,12 @@ export default function ProjectView({ project, opts, failed, busy, onBack, onNew
     account.signal.addEventListener("abort", abort, { once: true });
     if (account.signal.aborted) ctl.abort();
     const o = { ...account, signal: ctl.signal };
+    projectRequest.current = o;
+    chatPagePending.current = false;
+    setLoadingChats(false); setChatCursor(null); setError("");
     setChats(null); setEntries(null);
     setBuilds(null); setBuildForm(null);
-    listConversations({ projectId: project.id }, o).then((r) => { if (!o.signal.aborted) setChats(r.items); }, (e) => { if (!o.signal.aborted) setError(failed(e)); });
+    listConversations({ projectId: project.id }, o).then((r) => { if (!o.signal.aborted) { setChats(r.items); setChatCursor(r.nextCursor); } }, (e) => { if (!o.signal.aborted) setError(failed(e)); });
     listEntries({ projectId: project.id }, o).then((r) => { if (!o.signal.aborted) { setEntries(r.items); setMore(r.nextCursor); } }, (e) => { if (!o.signal.aborted) setError(failed(e)); });
     fetch("/api/me/chat/builds", { cache: "no-store", signal: o.signal })
       .then(async (res) => {
@@ -130,6 +137,23 @@ export default function ProjectView({ project, opts, failed, busy, onBack, onNew
   async function loadMore() {
     const r = await run((o) => listEntries({ projectId: project.id, cursor: more }, o));
     if (r) { setEntries((list) => [...(list ?? []), ...r.items]); setMore(r.nextCursor); }
+  }
+
+  async function loadMoreChats() {
+    const o = projectRequest.current;
+    if (!o || o.signal.aborted || !chatCursor || chatPagePending.current) return;
+    chatPagePending.current = true;
+    setLoadingChats(true); setError("");
+    try {
+      const r = await listConversations({ projectId: project.id, cursor: chatCursor }, o);
+      if (o.signal.aborted) return;
+      setChats((list) => [...(list ?? []), ...r.items.filter((c) => !list?.some((old) => old.id === c.id))]);
+      setChatCursor(r.nextCursor);
+    } catch (e) {
+      if (!o.signal.aborted) setError(failed(e));
+    } finally {
+      if (!o.signal.aborted) { chatPagePending.current = false; setLoadingChats(false); }
+    }
   }
 
   async function rename() {
@@ -241,6 +265,7 @@ export default function ProjectView({ project, opts, failed, busy, onBack, onNew
               {chats.map((c) => <li key={c.id}><button type="button" disabled={busy} className={`min-h-9 text-left text-sm text-fg ${link}`} onClick={() => onOpenChat(c)}>{c.title}</button></li>)}
             </ul>
           )}
+        {chatCursor && <button type="button" className="btn min-h-9 px-3 text-sm" disabled={loadingChats || busy} onClick={() => void loadMoreChats()}>{loadingChats ? "Loading chats..." : "Load more chats"}</button>}
       </section>
 
       <section aria-labelledby="project-notes" className={section}>
