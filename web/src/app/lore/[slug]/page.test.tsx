@@ -115,3 +115,19 @@ test("an untyped page carries no type links and no infobox section", async () =>
   expect(html).not.toContain('href="/lore/npcs"');
   expect(html).not.toContain("Details from the wiki infobox");
 });
+
+
+test("article navigation is available before the archived text and every jump has a target", async () => {
+  const { default: LorePage } = await page();
+  const html = renderToStaticMarkup(await LorePage(params("1-thrall")));
+  expect(html).toContain('aria-label="Article sections"');
+  expect(html.indexOf('aria-label="Article sections"')).toBeLessThan(html.indexOf("Thrall is the former Warchief"));
+  for (const id of ["lore-text", "infobox", "categories"]) {
+    expect(html).toContain(`href="#${id}"`);
+    expect(html).toContain(`id="${id}"`);
+  }
+  expect(html).toContain('tabindex="-1"');
+  expect(html).toContain("Article text");
+  // The plain-text archive has no source headings: navigation must not fabricate story sections.
+  expect(html).not.toMatch(/>History<|>Biography</);
+});
