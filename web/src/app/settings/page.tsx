@@ -11,6 +11,7 @@ import type { AccountShell, ShellCharacter } from "@/lib/account-shell-types";
 import { loadAccountShell, readProfile, toSettings, type ProfileSettings } from "@/lib/account-shell";
 import { signInPath } from "@/lib/auth/return-to";
 import { profilesOn } from "@/lib/profiles";
+import { savedBuildsOn } from "@/lib/saved-builds";
 
 export const dynamic = "force-dynamic";
 
@@ -40,13 +41,16 @@ export default async function SettingsPage() {
   }
   if (!loaded) redirect(signInPath("/settings"));
   const { shell, profile } = loaded;
+  const buildsEnabled = savedBuildsOn();
 
   const columns: Column<ShellCharacter>[] = [
     {
       key: "name", header: "Name",
       cell: (c) => (
         <span className="inline-flex min-w-0 items-center gap-2">
-          <Link href={`/me/characters/${c.id}`} className={`min-w-0 hover:underline ${CLASS_TEXT[c.classSlug] ?? "text-fg"}`}>{c.name}</Link>
+          {buildsEnabled
+            ? <Link href={`/me/characters/${c.id}`} className={`min-w-0 hover:underline ${CLASS_TEXT[c.classSlug] ?? "text-fg"}`}>{c.name}</Link>
+            : <span className={`min-w-0 ${CLASS_TEXT[c.classSlug] ?? "text-fg"}`}>{c.name}</span>}
           {c.id === shell.mainCharacterId && <Badge tone="neutral">Main</Badge>}
         </span>
       ),
@@ -94,8 +98,8 @@ export default async function SettingsPage() {
             empty={<p className="px-3 py-4 text-cell text-muted">No characters yet.</p>}
           />
           <p className="text-sm text-fg-2">
-            Your main character colours your avatar and is who you play unless you switch. Add, rename or delete characters on{" "}
-            <Link href="/me" className={link}>My builds</Link>.
+            Your main character colours your avatar and is who you play unless you switch.
+            {buildsEnabled && <> Add, rename or delete characters on <Link href="/me" className={link}>My builds</Link>.</>}
           </p>
         </section>
 
