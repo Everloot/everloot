@@ -132,6 +132,11 @@ installs reported it, from which build and when it was last seen. A line install
 it stays `[?]`, and the tooltip says the installs disagree. The game files' tooltip carries these numbers only
 where it is already shown (the item tooltip rule below).
 
+Item pages may show how many distinct installs reported each tooltip line in its newest reported build
+when fewer than three have reported it (for example, "1 of 3 installs reported"). These progress counts
+are omitted for a line already agreed or contested in any build, include no reported value or install
+identity, and do not lower the confirmation threshold.
+
 Full auction scans are not public records either. They feed market values only, and a value is
 published when three distinct reporters scanned the item. For that count, an upload containing a scan
 is stored with a keyed hash of the address it came from (never the address itself). The hash stays in
