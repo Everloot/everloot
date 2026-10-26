@@ -261,7 +261,7 @@ export default async function WowForeverPage() {
           <SectionHeading id="tools">What can you do with it on Everloot?</SectionHeading>
           <ul className="list-disc space-y-1 pl-6 text-fg-2">
             <li><Link href="/tools/talents" className={link}>Talent calculator</Link> for all nine classes, from the game files.</li>
-            <li><Link href="/tools/raid" className={link}>Raid buff planner</Link> for 10, 20 and 40 player raids.</li>
+            <li><Link href="/tools/raid" className={link}>Raid builder</Link> for 10, 20 and 40 player raids.</li>
             <li><Link href="/map" className={link}>World map</Link> of zones and dungeon and raid entrances.</li>
             <li><Link href="/addons" className={link}>Addons</Link> and the Everloot addon that collects what players see.</li>
           </ul>
