@@ -223,8 +223,9 @@ test("/wow-forever shows Blizzard's race and class tables with the new combinati
   expect(visible(html)).toContain("Which races and classes can you play?");
   expect(html).toContain(`href="${RACES.sourceUrl}"`);
   expect(visible(html)).toContain("published September 22, 2026");
-  expect(html.match(/<table/g)).toHaveLength(2);
-  const tables = html.match(/<table[\s\S]*?<\/table>/g)!.join("");
+  const races = html.slice(html.indexOf('aria-labelledby="races"'), html.indexOf('aria-labelledby="latest"'));
+  expect(races.match(/<table/g)).toHaveLength(2);
+  const tables = races.match(/<table[\s\S]*?<\/table>/g)!.join("");
   expect(tables.match(/>New</g)).toHaveLength(NEW_COMBOS.length);
 });
 
