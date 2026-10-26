@@ -110,6 +110,44 @@ describe("map data from client tables", () => {
   });
 });
 
+describe("instance levels from MapDifficulty, ContentTuning and LFGDungeons", () => {
+  const tuning = (ID: number, MinLevelSquish: number, MaxLevelSquish: number): Row => ({ ID, MinLevelSquish, MaxLevelSquish });
+  const withLevels: typeof tables = {
+    ...tables,
+    ContentTuning: rows([tuning(1, 24, 24), tuning(2, 60, 60), tuning(3, 17, 24), tuning(4, 0, 0), tuning(5, 10, 12)]),
+    // Stockade by MapID (two difficulty rows naming the same tuning), Scarlet Monastery has two different ones, Ragefire's tuning row is empty.
+    MapDifficulty: rows([
+      { ID: 1, MapID: 34, ContentTuningID: 3 }, { ID: 2, MapID: 34, ContentTuningID: 3 },
+      { ID: 3, MapID: 189, ContentTuningID: 3 }, { ID: 4, MapID: 189, ContentTuningID: 5 },
+      { ID: 5, MapID: 389, ContentTuningID: 4 }, { ID: 6, MapID: 409, ContentTuningID: 0 },
+    ]),
+    // No MapID in this build's LFGDungeons: Molten Core is found by its exact name; "Naxxramas" has no row at all.
+    LFGDungeons: rows([{ ID: 1, Name_lang: "Molten Core", ContentTuningID: 2 }, { ID: 2, Name_lang: "Ragefire", ContentTuningID: 1 }]),
+  };
+  const d = buildWorldMapData((t) => withLevels[t], source);
+  const level = (name: string) => { const e = d.entrances.find((x) => x.name === name)!; return [e.minLevel, e.maxLevel]; };
+
+  test("a dungeon takes its range from the tuning row MapDifficulty names", () => {
+    expect(level("Stormwind Stockade")).toEqual([17, 24]);
+  });
+
+  test("a raid with no tuning in MapDifficulty takes the LFGDungeons row with exactly its name", () => {
+    expect(level("Molten Core")).toEqual([60, 60]);
+  });
+
+  test("an instance with no usable row, an empty range or two different ranges has no level, not a guess", () => {
+    expect(level("Ragefire Chasm")).toEqual([undefined, undefined]);
+    expect(level("Scarlet Monastery")).toEqual([undefined, undefined]);
+    expect(d.entrances.find((e) => e.name === "Ragefire Chasm")).not.toHaveProperty("minLevel");
+  });
+
+  test("a snapshot without ContentTuning gives no levels and still builds", () => {
+    const { ContentTuning: _t, ...rest } = withLevels;
+    const none = buildWorldMapData((t) => rest[t], source);
+    expect(none.entrances.every((e) => e.minLevel === undefined && e.maxLevel === undefined)).toBe(true);
+  });
+});
+
 describe("the zone each entrance is in, from the ground under it", () => {
   // Each zone's whole-map assignment names the area it shows; the terrain chunk under a spot names its area.
   const ground = (continentId: number, worldX: number, worldY: number, AreaID: number): Row => {
@@ -248,7 +286,15 @@ describe("the committed map data", () => {
     expect(committed.schema).toBe(WORLD_MAP_SCHEMA);
     expect(committed.source).toMatchObject({ product: "wow_classic_beta", status: "found in game files, unconfirmed", licence: "Blizzard game data, not under our licence" });
     expect(committed.source.buildId).toBeGreaterThan(70000);
-    expect(committed.source.tables.map((t) => t.table).sort()).toEqual(["AreaTable", "Map", "TaxiNodes", "TaxiPath", "TaxiPathNode", "TerrainArea", "UiMap", "UiMapAssignment"]);
+    expect(committed.source.tables.map((t) => t.table).sort()).toEqual(["AreaTable", "ContentTuning", "LFGDungeons", "Map", "MapDifficulty", "TaxiNodes", "TaxiPath", "TaxiPathNode", "TerrainArea", "UiMap", "UiMapAssignment"]);
+  });
+
+  test("an entrance's level is both ends or neither, within the game's 1 to 60, and most instances have one", () => {
+    for (const e of committed.entrances) {
+      expect(e.minLevel === undefined, e.name).toBe(e.maxLevel === undefined);
+      if (e.minLevel !== undefined) expect(e.minLevel >= 1 && e.minLevel <= e.maxLevel! && e.maxLevel! <= 60, e.name).toBe(true);
+    }
+    expect(committed.entrances.filter((e) => e.minLevel !== undefined).length).toBeGreaterThan(committed.entrances.length / 2);
   });
 
   test("every entrance and flight master has the zone its ground belongs to, and the zone is on its continent", () => {

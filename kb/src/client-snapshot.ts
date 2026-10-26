@@ -41,6 +41,8 @@ export const CLIENT_TABLES = {
   // Maps: zone rectangles in world coordinates (UiMap names the maps, UiMapAssignment places them on a
   // continent) and, in Map, the continents and the instances with their entrance position.
   Map: 1349477, UiMap: 1957206, UiMapAssignment: 1957219,
+  // ContentTuning gives the level range of an instance: MapDifficulty names its tuning row (the dungeon and raid list).
+  ContentTuning: 1962930,
   // Map art: which tile files make up each map's picture (UiMapXMapArt names the art of a UiMap, UiMapArtTile
   // lists its tiles by row and column, UiMapArtStyleLayer gives the tile and layer sizes).
   UiMapArt: 1957202, UiMapArtTile: 1957210, UiMapArtStyleLayer: 1957208, UiMapXMapArt: 1957217,

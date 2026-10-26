@@ -24,6 +24,8 @@ export interface InstanceRow {
   raid: boolean | null;
   /** The difficulty id 3 installs agree on, or null. */
   difficulty: number | null;
+  /** The level range the game files give it (ContentTuning), or null: never worked out another way. */
+  level: { min: number; max: number } | null;
   files: InstancePlace[];
   confirmed: (InstancePlace & { installs: number; lastSeen: string | null })[];
   reported: number;
@@ -42,6 +44,15 @@ const DIFFICULTY_NAMES: Readonly<Record<number, string>> = {
 
 export const difficultyLabel = (id: number): string => DIFFICULTY_NAMES[id] ?? `Difficulty ${id}`;
 export const instanceTitle = (row: Pick<InstanceRow, "instanceMapId" | "name">): string => row.name ?? `Instance ${row.instanceMapId}`;
+
+/** "17–24" for a range, "60" for one level, null when the game files give none. */
+export const levelLabel = (level: InstanceRow["level"]): string | null =>
+  level === null ? null : level.min === level.max ? String(level.min) : `${level.min}–${level.max}`;
+
+/** The list's order: lowest level first, instances with no level last, then by name and id. */
+export const compareInstances = (a: InstanceRow, b: InstanceRow): number =>
+  (a.level?.min ?? Infinity) - (b.level?.min ?? Infinity) || (a.level?.max ?? Infinity) - (b.level?.max ?? Infinity)
+  || instanceTitle(a).localeCompare(instanceTitle(b)) || a.instanceMapId - b.instanceMapId;
 
 /**
  * The instance page's meta description: what the page shows, in its order. No zone, because a files entrance is
@@ -92,7 +103,9 @@ export function instanceRows(seen: ZoneSightings = {}, data: Pick<WorldMapData, 
   const difficulty = agreedDifficulties(facts);
   const out = new Map<number, InstanceRow>();
   const row = (id: number): InstanceRow => {
-    const r = out.get(id) ?? { instanceMapId: id, name: null, raid: null, difficulty: difficulty.get(id) ?? null, files: [], confirmed: [], reported: 0, bosses: [] };
+    const lv = data.entrances.find((f) => f.mapId === id);
+    const level = lv?.minLevel !== undefined && lv.maxLevel !== undefined ? { min: lv.minLevel, max: lv.maxLevel } : null;
+    const r = out.get(id) ?? { instanceMapId: id, name: null, raid: null, difficulty: difficulty.get(id) ?? null, level, files: [], confirmed: [], reported: 0, bosses: [] };
     out.set(id, r);
     return r;
   };

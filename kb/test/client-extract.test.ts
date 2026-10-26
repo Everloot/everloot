@@ -89,6 +89,11 @@ test("the coverage tables are read by the file data ids the WoWDBDefs manifest l
   });
 });
 
+test("the instance level range table is read by the file data id the WoWDBDefs manifest lists for it", () => {
+  // manifest.json at WoWDBDefs b9a63096cdd9, field db2FileDataID.
+  expect(CLIENT_TABLES).toMatchObject({ ContentTuning: 1962930 });
+});
+
 test("the W0 tables are read by the file data ids the WoWDBDefs manifest lists for them", () => {
   // manifest.json at WoWDBDefs b9a63096cdd9, field db2FileDataID.
   expect(CLIENT_TABLES).toMatchObject({
