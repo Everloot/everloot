@@ -146,3 +146,30 @@ test("Alts on this device loads no ads, analytics or consent banner, and a move 
   expect(mounted).toHaveBeenCalledTimes(1);
   expect(reload).toHaveBeenCalledTimes(2);
 });
+
+test("writing a guide loads no ads, analytics or consent banner beside the drafts, and a move to or from the guides reloads first", async () => {
+  for (const path of ["/guides/write", "/beta/guides/write"]) {
+    at(path, path);
+    const host = await mount(<OptionalScripts><span>scripts</span></OptionalScripts>);
+    expect(host.textContent, path).toBe("");
+    act(() => root?.unmount());
+  }
+  // From the guides to the writer, and from a draft's preview to a published guide: neither mounts in the other's document.
+  for (const [loadedAt, now] of [["/guides", "/guides/write"], ["/guides/write", "/guides/frost-leveling"]] as const) {
+    at(loadedAt, now);
+    await mount(<DocumentBoundary><Page /></DocumentBoundary>);
+    act(() => root?.unmount());
+  }
+  expect(mounted).not.toHaveBeenCalled();
+  expect(reload).toHaveBeenCalledTimes(2);
+  // The scripts stay out of the writer's document on its way to a guide, too.
+  at("/guides/write", "/guides/frost-leveling");
+  const host = await mount(<OptionalScripts><span>scripts</span></OptionalScripts>);
+  expect(host.textContent).toBe("");
+  act(() => root?.unmount());
+  // Settings, where a handle is chosen, is on the same side.
+  at("/settings", "/guides/write");
+  await mount(<DocumentBoundary><Page /></DocumentBoundary>);
+  expect(mounted).toHaveBeenCalledTimes(1);
+  expect(reload).toHaveBeenCalledTimes(2);
+});

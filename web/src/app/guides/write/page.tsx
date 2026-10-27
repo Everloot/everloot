@@ -16,8 +16,9 @@ import { WikiBlock, type TextContext } from "../../wiki/wiki-text";
 
 // A player's own community guides: the list, the editor, and a preview of the saved draft drawn by the guides' own
 // renderer, with what must change before it can be submitted. Private to the signed-in account, never indexed, and a 404
-// with EVERLOOT_GUIDE_SUBMISSIONS off. Nothing here is published: the public guides are still the reviewed files in
-// kb/guides.
+// with EVERLOOT_GUIDE_SUBMISSIONS off. It is one of the protected pages (data/protected-paths.json): no ads or analytics
+// load beside the drafts, the strict Content-Security-Policy applies, and a move to or from a public page reloads the
+// document first. Nothing here is published: the public guides are still the reviewed files in kb/guides.
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
