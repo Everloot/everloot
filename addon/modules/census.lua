@@ -13,8 +13,9 @@
 -- anything is stored (docs/design/specs/2026-10-18-census-design.md, section 5).
 --
 -- One row per guid per UTC day and kind. A row keeps the first way you saw the player that day; only a
--- new level changes it (level and capturedAt), because the upload page sends the file again and the
--- server keys the row by character and day. At most 2,000 rows per kind; the oldest days go first.
+-- new level changes it (level, capturedAt and a new event id, so the upload sends the row again and the
+-- server, which keys a row by character and day, takes the new level). At most 2,000 rows per kind; the
+-- oldest days go first.
 -- Mouseover fires constantly, so a player already recorded today at the same level costs a few table
 -- reads and no new strings or tables.
 
@@ -120,7 +121,7 @@ local function seen(unit, via)
   local on = currentDay()
   local row = today.census_seen[guid]
   if row then
-    if row.level ~= level then row.level = level; row.capturedAt = stamp() end
+    if row.level ~= level then row.level = level; row.capturedAt = stamp(); row.eventId = eventId("census_seen", on) end
     return
   end
   if type(guid) ~= "string" or not guid:find(GUID) then return end
@@ -157,7 +158,9 @@ local function recordSelf(newLevel)
   local on = currentDay()
   local row = today.census_self[guid]
   if row then
-    if row.level ~= math.floor(level) then row.level = math.floor(level); row.capturedAt = stamp() end
+    if row.level ~= math.floor(level) then
+      row.level = math.floor(level); row.capturedAt = stamp(); row.eventId = eventId("census_self", on)
+    end
     return
   end
   append("census_self", {

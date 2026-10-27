@@ -176,3 +176,48 @@ test("a failed upload is tried again a few times, then waits for the next write"
   await vi.advanceTimersByTimeAsync(60_000);
   expect(deps.upload).toHaveBeenCalledTimes(7);
 });
+
+test("stopping during an upload leaves jobs off and does not upload the next account", async () => {
+  const { deps, settings, engine, flush } = harness();
+  let release!: () => void;
+  deps.upload.mockImplementationOnce(() => new Promise<string>((resolve) => { release = () => resolve("old upload"); }));
+  engine.start(settings);
+  await flush();
+  engine.stop();
+  release();
+  await flush();
+  expect(deps.upload).toHaveBeenCalledTimes(1);
+  expect(deps.prices).not.toHaveBeenCalled();
+  expect(engine.snapshot().jobs.upload.state).toBe("off");
+  expect(engine.snapshot().log.some((line) => line.text.includes("old upload"))).toBe(false);
+});
+
+test("restarting with the same settings waits for the old upload then runs the new session", async () => {
+  const { deps, settings, engine, flush } = harness(["A/Everloot.lua"]);
+  let release!: () => void;
+  deps.upload.mockImplementationOnce(() => new Promise<string>((resolve) => { release = () => resolve("old upload"); }));
+  engine.start(settings);
+  await flush();
+  engine.start(settings);
+  release();
+  await flush();
+  expect(deps.upload).toHaveBeenCalledTimes(2);
+  expect(deps.prices).toHaveBeenCalledTimes(1);
+  expect(engine.snapshot().jobs.upload).toMatchObject({ state: "ok", message: "sent 3 from A/Everloot.lua" });
+  expect(engine.snapshot().log.some((line) => line.text.includes("old upload"))).toBe(false);
+});
+
+test("an old failed upload cannot replace the new session's disabled status or schedule retries", async () => {
+  const { deps, settings, engine, flush } = harness(["A/Everloot.lua"]);
+  let reject!: (error: Error) => void;
+  deps.upload.mockImplementationOnce(() => new Promise<string>((_resolve, fail) => { reject = fail; }));
+  engine.start(settings);
+  await flush();
+  engine.start({ ...settings, upload: false, prices: false });
+  reject(new Error("old failure"));
+  await flush();
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(deps.upload).toHaveBeenCalledTimes(1);
+  expect(engine.snapshot().jobs.upload.state).toBe("off");
+  expect(engine.snapshot().log.some((line) => line.text.includes("old failure"))).toBe(false);
+});

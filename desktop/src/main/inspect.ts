@@ -3,6 +3,7 @@ import { parseEverlootLua } from "../../../web/src/lib/sv-parse";
 import { readAsks } from "../../../companion/src/bridge/asks";
 import { parseEverlootTable } from "../../../web/src/lib/sv-parse";
 import { readRealms } from "../../../companion/src/prices";
+import { receiptKeyForSite } from "../../../companion/src/sent-state";
 import type { FileSummary, ScanAge } from "../shared/types";
 
 /** When the player last ran a full scan on each realm (`EverlootDB.lastScans`), newest first. */
@@ -42,17 +43,17 @@ export function summarizeSavedVariables(text: string, confirmedFor: (installId: 
 }
 
 /** Confirmed event counts per install from the companion's sent.json; an unreadable file counts nothing. */
-export function confirmedCounts(sentPath: string): (installId: string) => number {
+export function confirmedCounts(sentPath: string, endpoint = "https://everloot.app"): (installId: string) => number {
   let sent: Record<string, string[]> = {};
   try { if (existsSync(sentPath)) sent = JSON.parse(readFileSync(sentPath, "utf8")) as Record<string, string[]>; } catch { sent = {}; }
-  return (installId) => (Array.isArray(sent[installId]) ? sent[installId].length : 0);
+  return (installId) => { const ids = sent?.[receiptKeyForSite(installId, endpoint)]; return Array.isArray(ids) ? ids.length : 0; };
 }
 
 /** One parse per file write: the summary is remembered by size and mtime, only the confirmed count is live. */
 const memo = new Map<string, { key: string; summary: Omit<FileSummary, "file" | "writtenAt" | "bytes" | "confirmed">; installId: string | null }>();
 
-export function summarizeFiles(files: string[], sentPath: string): FileSummary[] {
-  const confirmedFor = confirmedCounts(sentPath);
+export function summarizeFiles(files: string[], sentPath: string, endpoint = "https://everloot.app"): FileSummary[] {
+  const confirmedFor = confirmedCounts(sentPath, endpoint);
   return files.map((file) => {
     let st: ReturnType<typeof statSync>;
     try { st = statSync(file); }

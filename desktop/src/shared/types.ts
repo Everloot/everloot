@@ -152,6 +152,8 @@ export interface ChatInfo {
   /** The MCP endpoint in use and whether a token is set (the public one is rate limited per IP). */
   mcpUrl: string;
   withToken: boolean;
+  /** The public MCP target is actually using the account key for its checked origin. */
+  withAccountKey: boolean;
   /** The provider saved from the Chat page, if config.json still names it; null when none or hand-written only. */
   provider: ProviderInUse | null;
   /** Every provider saved from the Chat page, with a key where it needs one; the model menu lists their models. */

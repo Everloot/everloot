@@ -3,12 +3,39 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
 import { emptySettledList, encodeIds } from "../../kb/src/settled-list";
+import * as bridge from "../../companion/src/bridge/engine";
+import { ACCOUNT_KEY_FILE, writeKeyOrigin } from "../src/main/account";
 import { companionJobs } from "../src/main/jobs";
 import { defaultSettings } from "../src/main/settings";
 
 const dirs: string[] = [];
 const dir = () => { const d = mkdtempSync(join(tmpdir(), "everloot-desktop-")); dirs.push(d); return d; };
 afterEach(() => { for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true }); });
+
+test.each(["https://other.test", "http://everloot.app", "https://everloot.app"])("the ask job scopes the account key to its checked site: %s", async (endpoint) => {
+  const d = dir();
+  const key = `evl_${"ab".repeat(32)}`;
+  writeFileSync(join(d, ACCOUNT_KEY_FILE), key);
+  writeKeyOrigin(d, "https://everloot.app");
+  const file = join(d, "Everloot.lua");
+  writeFileSync(file, "EverlootDB = {}\n");
+  const engine = vi.spyOn(bridge, "mcpEngine").mockReturnValue({ answer: async () => ({ answer: "ok", source: "test" }) });
+  try {
+    await companionJobs(d, () => ({ ...defaultSettings(), endpoint })).deps.ask(file);
+    expect(engine.mock.calls[0][0].token).toBe(endpoint === "https://everloot.app" ? key : null);
+  } finally { engine.mockRestore(); }
+});
+
+test("startup recovery exposes warnings for both damaged state files", () => {
+  const d = dir();
+  writeFileSync(join(d, "sent.json"), "");
+  writeFileSync(join(d, "answers.json"), "{");
+  const jobs = companionJobs(d, defaultSettings);
+  expect(jobs.notices).toHaveLength(2);
+  expect(jobs.notices.join("\n")).toContain("sent.json.corrupt-");
+  expect(jobs.notices.join("\n")).toContain("answers.json.corrupt-");
+  expect(jobs.answerStore.list()).toEqual([]);
+});
 
 const until = (check: () => boolean, ms = 3000) => new Promise<void>((res, rej) => {
   const start = Date.now();

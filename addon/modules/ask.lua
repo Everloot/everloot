@@ -16,13 +16,18 @@ function E:Ask(text)
     return
   end
   EverlootDB.asks = EverlootDB.asks or {}
+  -- A waiting question is only removed by its answer, so a full queue turns the new question away: dropping
+  -- the oldest would lose a question whose answer the companion may be about to write.
+  if #EverlootDB.asks >= MAX_PENDING then
+    print(string.format("Everloot: %d questions are already waiting for answers, so this one was not added. Keep the companion running and /reload to read the answers, then ask again.", MAX_PENDING))
+    return
+  end
   EverlootDB.askCounter = (EverlootDB.askCounter or 0) + 1
   table.insert(EverlootDB.asks, {
     id = "ask:" .. EverlootDB.installId .. ":" .. EverlootDB.askCounter,
     question = question,
     askedAt = date("!%Y-%m-%dT%H:%M:%SZ"),
   })
-  while #EverlootDB.asks > MAX_PENDING do table.remove(EverlootDB.asks, 1) end
   print("Everloot: question saved. Keep the companion running, then /reload to read the answer.")
 end
 

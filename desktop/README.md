@@ -10,8 +10,10 @@ and, if you turn it on, answers `/ask` questions. Design:
 
 It follows the same rules ([`docs/DATA_POLICY.md`](../docs/DATA_POLICY.md)). It sends anonymous
 open-world events, and census rows if you allowed the census on its setup screen (the box starts ticked)
-or later in Settings; the command-line uploader never sends census rows. It never sends named data
-(guild, gear, gold, collection), player rows or the installed addon list: those stay on your computer.
+or later in Settings; the command-line uploader never sends census rows. The automatic uploader keeps guild, gear, gold, collection and installed-addon rows on your computer.
+Player sightings are sent only if you enable player pages in Settings. Chat is separate: a configured
+model provider receives your questions, conversation history and any local character details the model
+uses to answer, including names, gold, gear and progress.
 Nothing touches the game client. The window never shows an ad.
 
 ## Install
@@ -41,8 +43,8 @@ The window is a sidebar with one page per thing to manage:
 | Page | What it shows and does |
 |---|---|
 | Overview | The four states at a glance (upload, prices, `/ask`, addon), recent activity, the latest Blizzard changes |
-| Chat | Ask anything about the game, or about your own characters. With a provider the model works Everloot's own MCP tools itself and names the sources; three local tools read your characters' gold, gear and progress, each realm's last scan, and the app's own status (what is on, what failed and why, the addon and app versions) from this computer, never uploaded, sourced as "this computer". When the tools have nothing it answers from its own knowledge and says so. The answer shows as the model writes it, with the tool it is running, and each answer has a Copy button. An empty thread offers a few questions to start with; a failed job on the Overview or Log page has an "ask why" link that puts the failure to the chat, the Characters page has an "Ask the assistant" chip, and the tray menu an "Ask Everloot" item. Providers are your own account, and the model menu under the question box switches between the models of every provider you saved (for Chat and the in-game `/ask`), with entries to add a key or remove one: an Anthropic key, an OpenRouter key (cheap or free models), an OpenCode Zen key (its zero-retention free models), an Ollama on this computer, or any OpenAI-compatible server. The key goes into a file in the data folder and `config.json` names it, so the in-game `/ask` uses the same pick. With no provider you get the sourced search hits as they are. Claude.ai and ChatGPT subscriptions cannot be used: both companies allow API keys in other apps, not their consumer sign-ins. The transcript stays in your data folder |
-| Characters | Your own characters from the save file: gold with a line of every snapshot the addon kept and the last seven days as earned, spent and net, peak, item level, and the completion tracker's progress per character key. Never uploaded from here |
+| Chat | Ask anything about the game, or about your own characters. With a provider the model works Everloot's own MCP tools itself and names the sources; three local tools read your characters' gold, gear and progress, each realm's last scan, and the app's own status (what is on, what failed and why, the addon and app versions) from this computer, sourced as "this computer". Local tool results used for an answer are sent to the selected model provider. When the tools have nothing it answers from its own knowledge and says so. The answer shows as the model writes it, with the tool it is running, and each answer has a Copy button. An empty thread offers a few questions to start with; a failed job on the Overview or Log page has an "ask why" link that puts the failure to the chat, the Characters page has an "Ask the assistant" chip, and the tray menu an "Ask Everloot" item. Providers are your own account, and the model menu under the question box switches between the models of every provider you saved (for Chat and the in-game `/ask`), with entries to add a key or remove one: an Anthropic key, an OpenRouter key (cheap or free models), an OpenCode Zen key (its zero-retention free models), an Ollama on this computer, or any OpenAI-compatible server. The key goes into a file in the data folder and `config.json` names it, so the in-game `/ask` uses the same pick. With no provider you get the sourced search hits as they are. Claude.ai and ChatGPT subscriptions cannot be used: both companies allow API keys in other apps, not their consumer sign-ins. The transcript stays in your data folder |
+| Characters | Your own characters from the save file: gold with a line of every snapshot the addon kept and the last seven days as earned, spent and net, peak, item level, and the completion tracker's progress per character key. Stored locally; asking the assistant may send these details to the selected model provider |
 | Upload | Each account file: when it was written, addon and client build, records per kind, how many the site confirmed. Run now |
 | Market | Realm picks: your scanned realms are always carried; tick more from the realms the site has public values for (TSM-style realm picks, on Everloot's own scan data). When you last scanned each realm, with a reminder past a day. What the last refresh wrote |
 | Ask | MCP server and token file, which provider answers (`config.json`), questions pending in game, recent answers |
@@ -61,7 +63,7 @@ after that.
 The app shares its data folder with the command line (`%APPDATA%\Everloot`,
 `~/Library/Application Support/Everloot`, `~/.config/everloot`): `sent.json` for confirmed events,
 `answers.json`, `settings.json`, `chat.json`, a `backups/` folder with the newest ten copies of each
-account's `Everloot.lua` as uploaded (the Upload page lists them and can restore one while you are
+account's `Everloot.lua` before upload attempts, including while offline (the Upload page lists them and can restore one while you are
 logged out; the file it replaces is backed up first), and the optional `config.json` for `/ask` model providers (same
 format and same rules as the [companion README](../companion/README.md#providers-design-sections-6465):
 keys come from a file named by `apiKeyFile`, never from the config itself).
@@ -69,7 +71,7 @@ keys come from a file named by `apiKeyFile`, never from the config itself).
 ## Run it from source
 
 ```
-cd web && npm install && cd ../companion && npm install && cd ../desktop
+cd web && npm ci && cd ../kb && npm ci --ignore-scripts && cd ../companion && npm ci && cd ../desktop
 npm install
 npm start
 ```

@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { explainKeyError, readAccountKey } from "./account";
+import { accountKeyForSite, explainKeyError } from "./account";
 import { readJsonFile } from "./json-file";
 import type { ChatInfo, ChatMessage, ChatProgress, Settings } from "../shared/types";
 import { answer, readProviderEntries } from "./agent";
@@ -39,7 +39,7 @@ export function createChat(dataFolder: string, current: () => Settings, local: L
   const target = () => {
     const s = current();
     const t = token();
-    return t ? { url: s.ask.mcpUrl, token: t } : { url: `${s.endpoint}/mcp/public`, token: readAccountKey(dataFolder) };
+    return t ? { url: s.ask.mcpUrl, token: t } : { url: `${s.endpoint}/mcp/public`, token: accountKeyForSite(dataFolder, s.endpoint) };
   };
   const mode = (): string => {
     try {
@@ -50,7 +50,8 @@ export function createChat(dataFolder: string, current: () => Settings, local: L
   };
   const info = (): ChatInfo => {
     const t = target();
-    return { messages: [...messages], mode: mode(), mcpUrl: t.url, withToken: token() !== null, provider: ownProvider(dataFolder), providers: ownProviders(dataFolder), busy, error };
+    const withToken = token() !== null;
+    return { messages: [...messages], mode: mode(), mcpUrl: t.url, withToken, withAccountKey: !withToken && t.token !== null, provider: ownProvider(dataFolder), providers: ownProviders(dataFolder), busy, error };
   };
 
   return {

@@ -168,28 +168,39 @@ local function guarded(fn)
   end
 end
 
-local retryIncomplete = guarded(function()
-  if not scan then return end
-  for _, i in ipairs(scan.retry) do
-    if readRow(i) ~= "ok" then scan.incomplete = scan.incomplete + 1 end
-  end
-  finish()
-end)
+--- The second read of rows whose item data had not loaded, one chunk a frame like the first pass, so a large
+--- house with slow item data does not read thousands of rows at once. `from` is the next index into the
+--- retry list. A step belongs to the scan that scheduled it: if that scan stopped or another began, it reads nothing.
+local function retryFrom(s, from)
+  return guarded(function()
+    if scan ~= s then return end
+    local last = math.min(#s.retry, from + E.SCAN_CHUNK - 1)
+    for k = from, last do
+      if readRow(s.retry[k]) ~= "ok" then s.incomplete = s.incomplete + 1 end
+    end
+    if last < #s.retry then C_Timer.After(0, retryFrom(s, last + 1)) else finish() end
+  end)
+end
 
-local safeStep
-safeStep = guarded(function()
-  if not scan then return end
-  local last = math.min(scan.total, scan.next + E.SCAN_CHUNK - 1)
-  for i = scan.next, last do
-    local result = readRow(i)
-    if result == "incomplete" then scan.retry[#scan.retry + 1] = i
-    elseif result == "skip" then scan.skipped = scan.skipped + 1 end
-  end
-  scan.next = last + 1
-  if scan.next <= scan.total then C_Timer.After(0, safeStep)
-  elseif #scan.retry > 0 then C_Timer.After(RETRY_SECONDS, retryIncomplete)
-  else finish() end
-end)
+--- One chunk of the first pass. Like the retry, a step belongs to the scan that scheduled it: if that scan
+--- stopped or another began, it reads and schedules nothing.
+local function stepFrom(s)
+  local step
+  step = guarded(function()
+    if scan ~= s then return end
+    local last = math.min(s.total, s.next + E.SCAN_CHUNK - 1)
+    for i = s.next, last do
+      local result = readRow(i)
+      if result == "incomplete" then s.retry[#s.retry + 1] = i
+      elseif result == "skip" then s.skipped = s.skipped + 1 end
+    end
+    s.next = last + 1
+    if s.next <= s.total then C_Timer.After(0, step)
+    elseif #s.retry > 0 then C_Timer.After(RETRY_SECONDS, retryFrom(s, 1))
+    else finish() end
+  end)
+  return step
+end
 
 function E:StartScan()
   if not (C_AuctionHouse and C_AuctionHouse.ReplicateItems and C_Timer) then return say("full scans need the auction house API.") end
@@ -302,7 +313,7 @@ local function onFullScanEvent(event, arg1)
   elseif event == "REPLICATE_ITEM_LIST_UPDATE" and scan and scan.waiting then
     scan.waiting = false
     scan.total = C_AuctionHouse.GetNumReplicateItems() or 0
-    safeStep()
+    stepFrom(scan)()
   end
 end
 

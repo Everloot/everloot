@@ -40,7 +40,7 @@ export interface AppStatus {
   errors: LogLine[];
 }
 
-export const LOCAL_SOURCE = "this computer (your Everloot.lua, not uploaded)";
+export const LOCAL_SOURCE = "this computer (your Everloot.lua; shared with your selected model provider for this answer)";
 export const STATUS_SOURCE = "this computer (the Everloot Desktop App's own status)";
 
 const NO_ARGS = { type: "object", properties: {}, additionalProperties: false };
