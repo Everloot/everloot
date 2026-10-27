@@ -74,12 +74,17 @@ Run the bank, or a sample of it, through the chat's own planner (`web/src/lib/ch
 provider or a cheap model, and score whether the answer cites the evidence and names the page. This is what the
 "cite" column would mean. It costs tokens per run, so it runs on demand, never on every push.
 
-## Phase 3 (design only, needs a data-policy decision): the question ledger
+## Phase 3 (the question ledger)
 
-Record, per `/chat` and in-game `/ask` question, only its shape: which tools ran, whether evidence came back, and
-which named subject was not found. No question text and no account id by default. The ledger feeds the bank with
-real phrasings and the aliases players actually use. It needs a line in docs/DATA_POLICY.md and the privacy page
-before it is built.
+**3a, built (same day, Carlos's go):** for each lookup the chat makes through `/api/tools`, one daily usage
+counter, `ledger.<tool>.hit` or `ledger.<tool>.miss`, for `search_knowledge`, `get_by_name`, `get_entity`,
+`search` and `answer_sources` (`web/src/lib/question-ledger.ts`). The tool's name and found-or-not, nothing else:
+no question text, no looked-up name, no account. docs/DATA_POLICY.md, "The question ledger", and the privacy
+page say so. Lookups over the MCP mounts (the Desktop App, in-game `/ask`, the public MCP) are counted by call
+today, not by hit or miss: counting those the same way is the next step on this phase.
+
+**3b, design only, needs its own data-policy line:** which named subjects fail to resolve, kept as game names
+without the question. That is what would feed the bank with the aliases players actually use.
 
 ## Tests
 
