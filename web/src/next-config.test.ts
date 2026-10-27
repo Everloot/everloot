@@ -139,11 +139,13 @@ test("Chat may ask for the microphone (dictation); every other page, the account
   }
 });
 
-test("the sitemaps are cached at the CDN for an hour and served stale for a day", async () => {
-  for (const path of ["/sitemap.xml", "/database-sitemap.xml", "/database-sitemap/3.xml", "/auctions-sitemap.xml", "/auctions-sitemap/0.xml"]) {
-    const got = await headersFor(path);
-    expect(got["Vercel-CDN-Cache-Control"], path).toBe("max-age=3600, stale-while-revalidate=86400");
-    expect(got["CDN-Cache-Control"], path).toBe("max-age=3600, stale-while-revalidate=86400");
+test("only /sitemap.xml gets its CDN cache from next.config; the database and auctions sitemaps set their own", async () => {
+  const got = await headersFor("/sitemap.xml");
+  expect(got["Vercel-CDN-Cache-Control"]).toBe("max-age=3600, stale-while-revalidate=86400");
+  expect(got["CDN-Cache-Control"]).toBe("max-age=3600, stale-while-revalidate=86400");
+  for (const path of ["/", "/database-sitemap.xml", "/database-sitemap/3.xml", "/auctions-sitemap.xml", "/auctions-sitemap/0.xml"]) {
+    const h = await headersFor(path);
+    expect(h["Vercel-CDN-Cache-Control"], path).toBeUndefined();
+    expect(h["CDN-Cache-Control"], path).toBeUndefined();
   }
-  expect((await headersFor("/"))["CDN-Cache-Control"]).toBeUndefined();
 });

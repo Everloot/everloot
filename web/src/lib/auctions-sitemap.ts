@@ -18,4 +18,7 @@ export function auctionsUnavailable(): Response {
 export const AUCTIONS_SITEMAP_HEADERS = {
   "Content-Type": "application/xml; charset=utf-8",
   "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+  // Next overwrites Cache-Control on dynamic routes, so the CDN reads these instead.
+  "Vercel-CDN-Cache-Control": "max-age=3600, stale-while-revalidate=86400",
+  "CDN-Cache-Control": "max-age=3600, stale-while-revalidate=86400",
 };
