@@ -36,6 +36,8 @@ afterEach(async () => {
 
 const button = (label: string) => Array.from(container.querySelectorAll("button")).find((b) => b.textContent === label)!;
 const scripts = () => Array.from(document.head.querySelectorAll("script"));
+// The Google tag is told apart by the exact host of its address, not a substring of it.
+const googleTagLoaded = () => scripts().some((s) => new URL(s.src).hostname === "www.googletagmanager.com");
 const checkboxes = () => Array.from(container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'));
 const reopen = () => act(async () => window.dispatchEvent(new Event("everloot:cookie-preferences")));
 const remount = async (element: ReactElement) => {
@@ -99,7 +101,7 @@ describe("compact consent", () => {
     await act(async () => checkboxes()[0].click());
     await act(async () => button("Save my choices").click());
     expect(localStorage.getItem("everloot-analytics-consent-v1")).toBe("accepted");
-    expect(scripts().some((s) => s.src.includes("googletagmanager.com"))).toBe(true);
+    expect(googleTagLoaded()).toBe(true);
   });
 
   it("reopens from the footer with the categories open and focus on the heading; Escape closes and gives focus back", async () => {
@@ -147,7 +149,7 @@ describe("compact consent", () => {
     await reopen();
     expect(checkboxes().map((c) => c.checked)).toEqual([true]);
     expect(localStorage.getItem("everloot-analytics-consent-v1")).toBe("accepted");
-    expect(scripts().some((s) => s.src.includes("googletagmanager.com"))).toBe(true);
+    expect(googleTagLoaded()).toBe(true);
   });
 
   it("shows an earlier one-action acceptance as ticked when reopened, so saving keeps it", async () => {
@@ -157,13 +159,13 @@ describe("compact consent", () => {
     expect(checkboxes().map((c) => c.checked)).toEqual([true]);
     await act(async () => button("Save my choices").click());
     expect(localStorage.getItem("everloot-analytics-consent-v1")).toBe("accepted");
-    expect(scripts().some((s) => s.src.includes("googletagmanager.com"))).toBe(true);
+    expect(googleTagLoaded()).toBe(true);
   });
 
   it("unloads analytics when an acceptance is withdrawn", async () => {
     await act(async () => root.render(<CookieConsent analytics={{ gaId: GA }} />));
     await act(async () => button("Accept optional cookies").click());
-    expect(scripts().some((s) => s.src.includes("googletagmanager.com"))).toBe(true);
+    expect(googleTagLoaded()).toBe(true);
     await reopen();
     // The withdrawal also reloads the page; jsdom prints that it cannot ("Not implemented: navigation").
     await act(async () => button("Reject optional cookies").click());
@@ -212,7 +214,7 @@ describe("compact consent", () => {
     expect(scripts()).toHaveLength(0);
     await act(async () => button("Accept optional cookies").click());
     expect(window.location.hash).toBe("#plan=EL1abc");
-    expect(scripts().some((s) => s.src.includes("googletagmanager.com"))).toBe(true);
+    expect(googleTagLoaded()).toBe(true);
   });
 
   it("keeps the cookieless beacon off under GPC, before and after a rejection", async () => {
