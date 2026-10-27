@@ -120,7 +120,8 @@ function type(field: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
 }
 const panel = () => container.querySelector<HTMLFormElement>('form[aria-label="Save build"]');
 const prompt = () => container.querySelector<HTMLElement>('section[aria-label="Sign in to save builds"]');
-const menu = () => container.querySelector<HTMLDetailsElement>("details");
+/** My builds, in the build bar: the calculator has other <details> further down. */
+const menu = () => container.querySelector<HTMLDetailsElement>('section[aria-label="Build"] details');
 /** The build bar's Save: the first in the page, ahead of the panel's own submit button. */
 const saveButton = () => button(/^Save$/)!;
 /** Sign out in this tab's header: the session is gone, and the header says so with ACCOUNT_CHANGED_EVENT. */
@@ -356,10 +357,9 @@ test("back from sign-in with no build to restore, the panel says to spend a poin
 test("My builds lists this class's saved builds", async () => {
   api("in", [saved(), saved({ id: "5b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e55", name: "Warrior thing", classSlug: "warrior" })]);
   await render();
-  const menu = container.querySelector("details")!;
-  expect(menu.textContent).toContain("Fire");
-  expect(menu.textContent).not.toContain("Warrior thing");
-  expect(menu.querySelector("a")!.getAttribute("href")).toBe(`/tools/talents/mage?saved=${ID}#plan=${CODE}`);
+  expect(menu()!.textContent).toContain("Fire");
+  expect(menu()!.textContent).not.toContain("Warrior thing");
+  expect(menu()!.querySelector("a")!.getAttribute("href")).toBe(`/tools/talents/mage?saved=${ID}#plan=${CODE}`);
 });
 
 test("Save moves the focus to the build's name; Escape closes the panel and gives the focus back to Save", async () => {
