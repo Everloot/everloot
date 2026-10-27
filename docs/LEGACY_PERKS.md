@@ -57,17 +57,18 @@ LegacyPerkCatalog {
   trees: Tree[]                     by id
   emptyTreeIds: number[]            trees of the system with no nodes
   withdrawn: Withdrawn[]            ids an earlier catalog listed that the files no longer hold
-  tables: { table, rows, hash }[]   every table read, with the row count and hash client-digests.json uses
+  tables: { table, rows, hash, encryptedBlocks }[]   every table read: the row count and hash client-digests.json
+                                    uses, and the encrypted blocks the extraction skipped in it
   warnings: string[]
 }
 Reading { value | null, confidence: "stored" | "inferred" | "unknown", from }
 Tree { id, currencyId | null, cost: Reading & { traitCostId | null, currencyId | null }, nodes: Node[], gates: Gate[] }
 Node {
-  id, x, y                          x, y as stored
+  id, x | null, y | null            x, y as stored
   kind: "single" | "tiered" | "choice" | null
-  flags                             TraitNode.Flags as stored
+  flags | null                      TraitNode.Flags as stored
   ranks: Reading
-  entries: { id, definitionId, spellId, name | null, maxRanks }[]    in buy order
+  entries: { id, definitionId, spellId, name | null, maxRanks | null }[]    in buy order
   prereqs: { nodeId, rule: "any" | "all" | null, confidence }[]
 }
 Gate { condId, amount, currencyId, guardedGroupId, guards[], countedGroupId | null, counted[], confidence, from }
@@ -104,11 +105,15 @@ How the rest is read:
 - **Trees.** The trees of trait system 45 that hold nodes, by id. Trees of the system with no nodes are listed in
   `emptyTreeIds`. No table we read names a Legacy tree, so a tree has no name.
 - **Names.** The definition's `OverrideName_lang`, else the `SpellName` of `VisibleSpellID`, else of `SpellID`, as in
-  the talent catalog. A name in an encrypted block is `null`.
-- **Kind.** `TraitNode.Type` 0 single, 1 tiered, 2 choice. A type WoWDBDefs does not name leaves `kind` `null` and
-  the ranks unknown, with a warning.
-- **Edges.** Type 0 is drawn and asks nothing. Types 1 and 5 (deprecated in WoWDBDefs), type 4 (mutually exclusive, not
-  modelled) and unnamed types are left out with a warning, as are edges that leave the Legacy trees.
+  the talent catalog. With no name row the name is `null`, and the warning says when `SpellName` has encrypted blocks
+  the name may sit in. A definition without a `VisibleSpellID` column has a `null` name too: which spell it shows is
+  not known.
+- **Kind.** `TraitNode.Type` 0 single, 1 tiered, 2 choice. An absent type, or one WoWDBDefs does not name, leaves
+  `kind` `null` and the ranks unknown, with a warning.
+- **Edges.** Type 0 is drawn and asks nothing. Types 1 and 5 (deprecated in WoWDBDefs) and type 4 (mutually exclusive,
+  not modelled) are left out with a warning, as are edges that leave the Legacy trees. An edge between two Legacy nodes
+  with no type, or a type WoWDBDefs does not name, stays as a prerequisite whose `rule` is `null` and whose confidence
+  is `unknown`, with a warning: the link is there, and what it asks is not.
 - **Gates.** Only a condition of type 0 that asks for points spent and nothing else becomes a gate. Any other condition
   on a Legacy group, node or entry (a level, a quest, an achievement, condition flags) is a warning, so the nodes it
   guards are known to carry a rule the catalog does not show.
@@ -116,7 +121,26 @@ How the rest is read:
   follows a curve has an unknown cost.
   So does a tree that `TraitNodeXTraitCost`, `TraitNodeGroupXTraitCost` or `TraitNodeEntryXTraitCost` overrides for any
   of its nodes, groups or entries: the tree cost is never applied in their place.
-- **Cap.** A `SourcedMax` of 0, or no currency row, gives an unknown cap.
+- **Cap.** A `SourcedMax` of 0 gives an unknown cap.
+
+## Absent columns and missing rows
+
+A column a row lacks is never read as 0, and a row another row names is never left out quietly:
+
+- **Refused**, so no catalog is written: a row without a column that ties it to a tree, node, entry, group, condition or
+  cost (checked on every row of the link tables, since which rows are Legacy rows is worked out over all of them); an
+  entry without `TraitDefinitionID`, a definition without `SpellID`; a condition on a Legacy group, node or entry
+  without any column a gate is read by; and a row a Legacy row names that its table lacks: an entry, a definition, a
+  condition, a cost or a currency.
+- **Unknown, with no value**: an entry without `MaxRanks` (`maxRanks` is `null`, and its node's ranks are unknown
+  rather than summed without it), a node without `Type`, an edge between Legacy nodes without `Type`, a cost row
+  without `Amount`, `CurveID` or `TraitCurrencyID`, and a currency without `SourcedMax`.
+- **Empty**: a node without `PosX`, `PosY` or `Flags` keeps that field `null`, with a warning.
+
+Encrypted blocks are read the same way. The extraction skips them and the manifest beside the snapshot counts them per
+table. Their rows could be any perk or rule, so a block in any table but `SpellName` refuses the build. In `SpellName`
+a block can only hide a name, which is then `null`, as above. The generator also refuses a snapshot with no manifest:
+without it, neither which tables were read nor how many blocks were skipped is known.
 
 ## What the files leave open
 
@@ -147,10 +171,12 @@ A saved plan names perks by id, so an id never silently disappears:
 - A tree still in the trait system, even with no nodes left, is not withdrawn; its nodes are.
 
 The generator refuses, writing nothing and leaving the committed file as it is, when a table it reads is missing from
-the snapshot or one of the six core tables is empty, when trait system 45 holds no tree with nodes, and when the
-previous catalog comes from a newer build. Those mean an extraction problem or a change a maintainer must look at, not
-perks that left the game, so none of them can withdraw an id. If Blizzard asks for the data to be taken down, a
-maintainer deletes the file, as [DATA_POLICY](DATA_POLICY.md) says.
+the snapshot or one of the six core tables is empty, when the snapshot has no manifest or a table other than
+`SpellName` has encrypted blocks, when a row is refused as above, when trait system 45 holds no tree with nodes, and
+when the previous catalog comes from a newer build or does not read as this schema. Those mean an extraction problem,
+an incomplete inventory or a change a maintainer must look at, not perks that left the game, so none of them can
+withdraw an id: an id is withdrawn only when a complete inventory lacks it. If Blizzard asks for the data to be taken
+down, a maintainer deletes the file, as [DATA_POLICY](DATA_POLICY.md) says.
 
 ## Build 1.60.1.70634
 
@@ -164,9 +190,11 @@ The two warnings are the six "Unknown" nodes' flags and their shared spell.
 `kb/test/legacy-perks.test.ts`, on made-up tables and on the committed file:
 
 - trees, nodes, entries, ranks, names and prerequisites as above, and a class tree never appears;
-- cost, cap and gate counting are never `stored`, overrides and missing rows make them unknown, and the schema refuses a
-  value on an unknown reading;
-- conditions it does not model, unknown edge types, differing flags and shared spells are warnings;
+- cost, cap and gate counting are never `stored`, overrides make the cost unknown, and the schema refuses a value on an
+  unknown reading, counted nodes on an unknown counting scope and a rule on an unresolved prerequisite;
+- each absent column is refused, unknown or empty as listed above, and each missing row and encrypted table refuses the
+  build, in the builder and in the writer;
+- conditions it does not model, deprecated edge types, differing flags and shared spells are warnings;
 - withdrawn ids are kept, carried forward and released when they come back, and the refusals above hold;
 - the same rows give the same bytes in any order, and the committed file is exactly what the generator writes;
 - the committed file holds no text, descriptions or icons, and its tables' row counts and hashes match

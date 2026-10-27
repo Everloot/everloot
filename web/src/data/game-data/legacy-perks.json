@@ -886,97 +886,116 @@
     {
       "table": "SpellName",
       "rows": 31948,
-      "hash": "755d96b020cb"
+      "hash": "755d96b020cb",
+      "encryptedBlocks": 14
     },
     {
       "table": "TraitCond",
       "rows": 172,
-      "hash": "4c6d3b4f7a63"
+      "hash": "4c6d3b4f7a63",
+      "encryptedBlocks": 0
     },
     {
       "table": "TraitCost",
       "rows": 11,
-      "hash": "d0ea4bfcb7d6"
+      "hash": "d0ea4bfcb7d6",
+      "encryptedBlocks": 0
     },
     {
       "table": "TraitCurrency",
       "rows": 2,
-      "hash": "2f2b620a5d9f"
+      "hash": "2f2b620a5d9f",
+      "encryptedBlocks": 0
     },
     {
       "table": "TraitDefinition",
       "rows": 659,
-      "hash": "3cd3b8bd49e5"
+      "hash": "3cd3b8bd49e5",
+      "encryptedBlocks": 0
     },
     {
       "table": "TraitEdge",
       "rows": 99,
-      "hash": "7ae86fb7976a"
+      "hash": "7ae86fb7976a",
+      "encryptedBlocks": 0
     },
     {
       "table": "TraitNode",
       "rows": 557,
-      "hash": "ef2669c38e78"
+      "hash": "ef2669c38e78",
+      "encryptedBlocks": 0
     },
     {
       "table": "TraitNodeEntry",
       "rows": 659,
-      "hash": "420826e3f973"
+      "hash": "420826e3f973",
+      "encryptedBlocks": 0
     },
     {
       "table": "TraitNodeEntryXTraitCond",
       "rows": 0,
-      "hash": "e3b0c44298fc"
+      "hash": "e3b0c44298fc",
+      "encryptedBlocks": 0
     },
     {
       "table": "TraitNodeEntryXTraitCost",
       "rows": 0,
-      "hash": "e3b0c44298fc"
+      "hash": "e3b0c44298fc",
+      "encryptedBlocks": 0
     },
     {
       "table": "TraitNodeGroupXTraitCond",
       "rows": 171,
-      "hash": "6eeb4ced0b04"
+      "hash": "6eeb4ced0b04",
+      "encryptedBlocks": 0
     },
     {
       "table": "TraitNodeGroupXTraitCost",
       "rows": 0,
-      "hash": "e3b0c44298fc"
+      "hash": "e3b0c44298fc",
+      "encryptedBlocks": 0
     },
     {
       "table": "TraitNodeGroupXTraitNode",
       "rows": 2152,
-      "hash": "bfe5ff002423"
+      "hash": "bfe5ff002423",
+      "encryptedBlocks": 0
     },
     {
       "table": "TraitNodeXTraitCond",
       "rows": 1,
-      "hash": "392ac8a057b6"
+      "hash": "392ac8a057b6",
+      "encryptedBlocks": 0
     },
     {
       "table": "TraitNodeXTraitCost",
       "rows": 0,
-      "hash": "e3b0c44298fc"
+      "hash": "e3b0c44298fc",
+      "encryptedBlocks": 0
     },
     {
       "table": "TraitNodeXTraitNodeEntry",
       "rows": 560,
-      "hash": "0a040d1eb7eb"
+      "hash": "0a040d1eb7eb",
+      "encryptedBlocks": 0
     },
     {
       "table": "TraitTree",
       "rows": 17,
-      "hash": "992163bec5ab"
+      "hash": "992163bec5ab",
+      "encryptedBlocks": 0
     },
     {
       "table": "TraitTreeXTraitCost",
       "rows": 13,
-      "hash": "cba55014ebf6"
+      "hash": "cba55014ebf6",
+      "encryptedBlocks": 0
     },
     {
       "table": "TraitTreeXTraitCurrency",
       "rows": 13,
-      "hash": "38257cc75b38"
+      "hash": "38257cc75b38",
+      "encryptedBlocks": 0
     }
   ],
   "warnings": [

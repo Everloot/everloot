@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
@@ -111,7 +111,8 @@ function rows(): Record<string, Row[]> {
     ],
     TraitTreeXTraitCost: [{ ID: 1, TraitTreeID: 700, TraitCostID: 600 }, { ID: 2, TraitTreeID: 701, TraitCostID: 601 }, { ID: 3, TraitTreeID: 900, TraitCostID: 650 }],
     TraitCost: [
-      { ID: 600, Amount: 1, TraitCurrencyID: 5000 }, { ID: 601, Amount: 2, TraitCurrencyID: 5000 }, { ID: 650, Amount: 1, TraitCurrencyID: 3000 },
+      { ID: 600, Amount: 1, TraitCurrencyID: 5000, CurveID: 0 }, { ID: 601, Amount: 2, TraitCurrencyID: 5000, CurveID: 0 },
+      { ID: 650, Amount: 1, TraitCurrencyID: 3000, CurveID: 0 },
     ],
     TraitNodeXTraitCost: [],
     TraitNodeGroupXTraitCost: [],
@@ -129,9 +130,28 @@ const edit = (change: (t: Record<string, Row[] | undefined>) => void): Record<st
   return t;
 };
 const drop = (t: Record<string, Row[] | undefined>, table: string, keep: (r: Row) => boolean) => { t[table] = t[table]!.filter(keep); };
+/** The fixture with one column taken out of one row: the column is absent, which is not a stored 0. */
+const without = (table: string, id: number, column: string) => edit((t) => { delete t[table]!.find((r) => r.ID === id)![column]; });
 
-const run = (tables: Record<string, Row[] | undefined> = rows(), build = stamp(70634), previous?: LegacyPerkCatalog) =>
-  buildLegacyPerkCatalog({ get: reader(tables), build, previous });
+/** Builds from the fixture; `encrypted` gives a table's encrypted blocks, which the manifest beside a snapshot records. */
+const run = (tables: Record<string, Row[] | undefined> = rows(), build = stamp(70634), previous?: LegacyPerkCatalog, encrypted: Record<string, number> = {}) =>
+  buildLegacyPerkCatalog({
+    get: reader(tables), build, previous,
+    encryptedBlocks: new Map(Object.keys(tables).filter((t) => tables[t]).map((t) => [t, encrypted[t] ?? 0])),
+  });
+
+/** The fixture written as a snapshot with its manifest, as client-extract writes one, in a folder removed afterwards. */
+function withSnapshot(check: (snapshot: string, dir: string) => void, tables = rows()) {
+  const dir = mkdtempSync(join(tmpdir(), "legacy-perks-"));
+  try {
+    const snapshot = join(dir, "wowf-70634-cccccccc.sqlite");
+    const meta = { ...stamp(70634), library: "test", definitions: "abc1234" };
+    writeClientSnapshot(snapshot, meta, Object.entries(tables).map(([table, list]) => ({ table, fileDataID: 1, cKey: null, encryptedBlocks: 0, rows: toRows(list) })));
+    check(snapshot, dir);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
 const tree = (c: LegacyPerkCatalog, id: number) => c.trees.find((t) => t.id === id)!;
 const node = (c: LegacyPerkCatalog, id: number) => c.trees.flatMap((t) => t.nodes).find((n) => n.id === id)!;
 /** Whether the schema still accepts a built catalog after a change to a copy of it. */
@@ -227,12 +247,10 @@ describe("cost and cap", () => {
     expect(tree(two, 701).cost).toMatchObject({ value: null, confidence: "unknown" });
   });
 
-  test("the cap is the currency's SourcedMax, an inferred reading; a SourcedMax of 0 or no currency row gives no cap at all", () => {
+  test("the cap is the currency's SourcedMax, an inferred reading; a SourcedMax of 0 gives no cap at all", () => {
     expect(run().currencies).toEqual([{ id: 5000, cap: { value: 16, confidence: "inferred", from: "TraitCurrency.SourcedMax" } }]);
     const zero = run(edit((t) => { t.TraitCurrency!.find((r) => r.ID === 5000)!.SourcedMax = 0; }));
     expect(zero.currencies[0].cap).toMatchObject({ value: null, confidence: "unknown" });
-    const missing = run(edit((t) => drop(t, "TraitCurrency", (r) => r.ID !== 5000)));
-    expect(missing.currencies[0].cap).toMatchObject({ value: null, confidence: "unknown" });
   });
 
   test("a tree that lists two currencies gets neither, rather than the first one picked", () => {
@@ -272,6 +290,113 @@ describe("spend gates", () => {
     }));
     expect(tree(c, 701).gates.map((g) => g.condId)).toEqual([73]);
     expect(c.warnings).toEqual(expect.arrayContaining([expect.stringMatching(/condition 74 .*not modelled/), expect.stringMatching(/condition 76 .*not modelled/)]));
+  });
+});
+
+describe("absent columns", () => {
+  test("an entry without MaxRanks has no rank count, and its node's ranks are unknown rather than summed without it", () => {
+    const c = run(without("TraitNodeEntry", 21, "MaxRanks"));
+    expect(node(c, 2).entries[0]).toMatchObject({ id: 21, maxRanks: null });
+    expect(node(c, 2).ranks).toEqual({ value: null, confidence: "unknown", from: "TraitNodeEntry 21 has no MaxRanks" });
+  });
+
+  test("a node without a Type has no kind and unknown ranks, not those of a single node", () => {
+    const c = run(without("TraitNode", 1, "Type"));
+    expect(node(c, 1)).toMatchObject({ kind: null, ranks: { value: null, confidence: "unknown" } });
+    expect(c.warnings.join("\n")).toMatch(/node 1 has no TraitNode\.Type/);
+  });
+
+  test("a node without a position or flags keeps them empty", () => {
+    const c = run(edit((t) => { const r = t.TraitNode!.find((x) => x.ID === 1)!; delete r.PosX; delete r.Flags; }));
+    expect(node(c, 1)).toMatchObject({ x: null, y: 1000, flags: null });
+    expect(c.warnings.join("\n")).toMatch(/node 1 has no TraitNode\.Flags/);
+  });
+
+  test("an edge between Legacy nodes with no Type, or a type WoWDBDefs does not name, is a prerequisite whose rule is unresolved", () => {
+    const absent = run(without("TraitEdge", 1, "Type"));
+    expect(node(absent, 2).prereqs).toEqual([{ nodeId: 1, rule: null, confidence: "unknown" }]);
+    expect(absent.warnings.join("\n")).toMatch(/edge 1 \(node 1 to 2\) has no TraitEdge\.Type/);
+    const unnamed = run(edit((t) => { t.TraitEdge!.find((r) => r.ID === 1)!.Type = 9; }));
+    expect(node(unnamed, 2).prereqs).toEqual([{ nodeId: 1, rule: null, confidence: "unknown" }]);
+    expect(unnamed.warnings.join("\n")).toMatch(/edge 1 \(node 1 to 2\) has TraitEdge type 9/);
+  });
+
+  test("a definition without VisibleSpellID has no name, rather than its own spell's", () => {
+    const c = run(without("TraitDefinition", 131, "VisibleSpellID"));
+    expect(node(c, 3).entries[0]).toMatchObject({ spellId: 2003, name: null });
+    expect(c.warnings.join("\n")).toMatch(/definition 131 has no VisibleSpellID/);
+  });
+
+  test("a cost or cap whose column is absent is unknown", () => {
+    for (const column of ["Amount", "CurveID", "TraitCurrencyID"]) {
+      expect(tree(run(without("TraitCost", 600, column)), 700).cost, column).toMatchObject({ value: null, confidence: "unknown", from: `TraitCost 600 has no ${column}` });
+    }
+    expect(run(without("TraitCurrency", 5000, "SourcedMax")).currencies[0].cap).toEqual({ value: null, confidence: "unknown", from: "TraitCurrency 5000 has no SourcedMax" });
+  });
+
+  test("a condition on a Legacy group without a column it is read by refuses the build, never reading it as 0", () => {
+    for (const column of ["CondType", "TraitNodeGroupID", "TraitCurrencyID", "SpentAmountRequired", "RequiredLevel", "AchievementID", "Flags"]) {
+      expect(() => run(without("TraitCond", 71, column)), column).toThrow(new RegExp(`TraitCond 71 has no ${column}`));
+    }
+    expect(run(without("TraitCond", 75, "RequiredLevel")).trees).toHaveLength(2);
+  });
+
+  test("a row without a column that ties it to a tree, node, entry, group, condition or cost refuses the build", () => {
+    for (const [table, id, column] of [
+      ["TraitTree", 900, "TraitSystemID"], ["TraitNode", 9, "TraitTreeID"], ["TraitNodeXTraitNodeEntry", 5, "TraitNodeEntryID"],
+      ["TraitNodeXTraitNodeEntry", 3, "Index"], ["TraitNodeEntry", 31, "TraitDefinitionID"], ["TraitDefinition", 111, "SpellID"],
+      ["TraitEdge", 5, "RightTraitNodeID"], ["TraitNodeGroupXTraitNode", 7, "TraitNodeID"], ["TraitNodeGroupXTraitCond", 4, "TraitCondID"],
+      ["TraitCond", 75, "TraitTreeID"], ["TraitTreeXTraitCurrency", 3, "TraitCurrencyID"], ["TraitTreeXTraitCost", 1, "TraitCostID"],
+    ] as const) {
+      expect(() => run(without(table, id, column)), `${table} ${column}`).toThrow(new RegExp(`${table} ${id} has no ${column}`));
+    }
+    expect(() => run(edit((t) => { t.TraitNodeXTraitCost = [{ ID: 1, TraitCostID: 600 }]; }))).toThrow(/TraitNodeXTraitCost 1 has no TraitNodeID/);
+  });
+});
+
+describe("incomplete inventories", () => {
+  test("an entry its node lists but TraitNodeEntry lacks refuses the build, so it is never withdrawn", () => {
+    const partial = edit((t) => drop(t, "TraitNodeEntry", (r) => r.ID !== 21));
+    expect(() => run(partial)).toThrow(/node 2 lists entry 21, which is not in TraitNodeEntry/);
+    expect(() => run(partial, stamp(70700), run())).toThrow(/node 2 lists entry 21, which is not in TraitNodeEntry/);
+  });
+
+  test("a definition, condition, cost or currency a Legacy row names but its table lacks refuses the build", () => {
+    expect(() => run(edit((t) => drop(t, "TraitDefinition", (r) => r.ID !== 131)))).toThrow(/entry 31 names definition 131, which is not in TraitDefinition/);
+    expect(() => run(edit((t) => drop(t, "TraitCond", (r) => r.ID !== 71)))).toThrow(/group 801 names condition 71, which is not in TraitCond/);
+    expect(() => run(edit((t) => drop(t, "TraitCost", (r) => r.ID !== 600)))).toThrow(/tree 700 names cost 600, which is not in TraitCost/);
+    expect(() => run(edit((t) => drop(t, "TraitCurrency", (r) => r.ID !== 5000)))).toThrow(/tree 700 names currency 5000, which is not in TraitCurrency/);
+  });
+
+  test("an encrypted block in any table but SpellName refuses the build, with or without a previous catalog", () => {
+    for (const table of ["TraitNodeEntry", "TraitNode", "TraitNodeXTraitNodeEntry", "TraitEdge", "TraitCond", "TraitCost", "TraitCurrency"]) {
+      expect(() => run(rows(), stamp(70634), undefined, { [table]: 1 }), table).toThrow(new RegExp(`${table} has 1 encrypted block;`));
+      expect(() => run(rows(), stamp(70700), run(), { [table]: 2 }), table).toThrow(new RegExp(`${table} has 2 encrypted blocks;`));
+    }
+  });
+
+  test("encrypted blocks in SpellName leave unknown only a name that may sit in one, and are recorded", () => {
+    const c = run(edit((t) => drop(t, "SpellName", (r) => r.ID !== 2001)), stamp(70634), undefined, { SpellName: 3 });
+    expect(node(c, 1).entries[0]).toMatchObject({ spellId: 2001, name: null });
+    expect(node(c, 1).ranks).toMatchObject({ value: 5, confidence: "stored" });
+    expect(c.warnings.join("\n")).toMatch(/spell 2001 .*SpellName has 3 encrypted blocks/);
+    expect(c.tables.find((t) => t.table === "SpellName")).toMatchObject({ encryptedBlocks: 3 });
+  });
+
+  test("the writer refuses a snapshot whose manifest records an encrypted block, or that has no manifest, and leaves the file as it was", () => {
+    withSnapshot((snapshot, dir) => {
+      const out = join(dir, "legacy-perks.json");
+      writeLegacyPerkCatalog(snapshot, out);
+      const before = readFileSync(out, "utf8");
+      const manifestPath = `${snapshot}.manifest.json`;
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as { tables: { table: string; encryptedBlocks: number }[] };
+      manifest.tables.find((t) => t.table === "TraitNodeEntry")!.encryptedBlocks = 1;
+      writeFileSync(manifestPath, JSON.stringify(manifest));
+      expect(() => writeLegacyPerkCatalog(snapshot, out)).toThrow(/TraitNodeEntry has 1 encrypted block;/);
+      rmSync(manifestPath);
+      expect(() => writeLegacyPerkCatalog(snapshot, out)).toThrow(/no manifest/);
+      expect(readFileSync(out, "utf8")).toBe(before);
+    });
   });
 });
 
@@ -328,7 +453,7 @@ describe("provenance", () => {
     const c = run(tables);
     expect(c).toMatchObject({ schema: LEGACY_PERKS_SCHEMA, label: "found in game files, unconfirmed", credit: GAME_DATA_CREDIT, build: stamp(70634) });
     expect(c.tables.map((t) => t.table)).toEqual(Object.keys(tables).sort());
-    expect(c.tables.find((t) => t.table === "TraitNode")).toEqual({ table: "TraitNode", rows: 7, hash: tableHash(toRows(tables.TraitNode)) });
+    expect(c.tables.find((t) => t.table === "TraitNode")).toEqual({ table: "TraitNode", rows: 7, hash: tableHash(toRows(tables.TraitNode)), encryptedBlocks: 0 });
   });
 
   test("a missing table refuses the build rather than turning into missing perks", () => {
@@ -382,6 +507,14 @@ describe("withdrawal", () => {
     expect(node(c, 3).id).toBe(3);
   });
 
+  test("a previous catalog that does not read as this schema refuses the build, rather than drop what it withdrew", () => {
+    withSnapshot((snapshot, dir) => {
+      const out = join(dir, "legacy-perks.json");
+      writeFileSync(out, JSON.stringify({ schema: "everloot.legacy-perks/0", withdrawn: [{ kind: "node", id: 3 }] }));
+      expect(() => writeLegacyPerkCatalog(snapshot, out)).toThrow(/does not read as everloot\.legacy-perks\/1/);
+    });
+  });
+
   test("the same build twice withdraws nothing, and a previous catalog from a newer build is refused", () => {
     expect(run(rows(), stamp(70634), run()).withdrawn).toEqual([]);
     expect(() => run(rows(), stamp(70600), run())).toThrow(/newer/);
@@ -398,21 +531,14 @@ describe("determinism", () => {
   });
 
   test("the writer reads a snapshot file and writes the builder's bytes, the same on a second run over its own output", () => {
-    const dir = mkdtempSync(join(tmpdir(), "legacy-perks-"));
-    try {
-      const snapshot = join(dir, "wowf-70634-cccccccc.sqlite");
-      const meta = { ...stamp(70634), library: "test", definitions: "abc1234" };
-      const tables = rows();
-      writeClientSnapshot(snapshot, meta, Object.entries(tables).map(([table, list]) => ({ table, fileDataID: 1, cKey: null, encryptedBlocks: 0, rows: toRows(list) })));
+    withSnapshot((snapshot, dir) => {
       const out = join(dir, "legacy-perks.json");
       writeLegacyPerkCatalog(snapshot, out);
       const first = readFileSync(out, "utf8");
-      expect(first).toBe(serializeLegacyPerkCatalog(run(tables)));
+      expect(first).toBe(serializeLegacyPerkCatalog(run()));
       writeLegacyPerkCatalog(snapshot, out);
       expect(readFileSync(out, "utf8")).toBe(first);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
+    });
   });
 });
 

@@ -73,9 +73,13 @@ export const Entry = z.object({
   id: z.number().int(),
   definitionId: z.number().int(),
   spellId: z.number().int(),
-  /** The definition's override name, else the shown spell's name; null when it sits in an encrypted block we skip. */
+  /**
+   * The definition's override name, else the shown spell's name; null when there is no name row (it may sit in an
+   * encrypted block we skip) or when the definition has no VisibleSpellID column to say which spell is shown.
+   */
   name: z.string().nullable(),
-  maxRanks: z.number().int(),
+  /** TraitNodeEntry.MaxRanks; null when the row has no such column, never 0 in its place. */
+  maxRanks: z.number().int().nullable(),
 });
 export type Entry = z.infer<typeof Entry>;
 
@@ -92,13 +96,13 @@ export const Prereq = z.object({
 export const Node = z.object({
   /** TraitNode.ID, stable across builds; a saved plan names nodes by it. */
   id: z.number().int(),
-  /** Position as the client stores it. */
-  x: z.number().int(),
-  y: z.number().int(),
-  /** TraitNode.Type 0 single, 1 tiered (entries bought in order), 2 choice; null for a type WoWDBDefs does not name. */
+  /** Position as the client stores it; null when the row has no such column. */
+  x: z.number().int().nullable(),
+  y: z.number().int().nullable(),
+  /** TraitNode.Type 0 single, 1 tiered (entries bought in order), 2 choice; null when it is absent or a type WoWDBDefs does not name. */
   kind: z.enum(["single", "tiered", "choice"]).nullable(),
-  /** TraitNode.Flags as stored. WoWDBDefs names only bit 1 (ShowMultipleIcons); the other bits are not interpreted. */
-  flags: z.number().int(),
+  /** TraitNode.Flags as stored, null when absent. WoWDBDefs names only bit 1 (ShowMultipleIcons); the other bits are not interpreted. */
+  flags: z.number().int().nullable(),
   ranks: Ranks,
   /** In buy order (TraitNodeXTraitNodeEntry.Index). */
   entries: z.array(Entry),
@@ -169,8 +173,11 @@ export const LegacyPerkCatalog = z.object({
   emptyTreeIds: z.array(z.number().int()),
   /** Trees, then nodes, then entries, each by id. */
   withdrawn: z.array(Withdrawn),
-  /** Every table read, by name, with its row count and content hash by the rule of client-digests.json. */
-  tables: z.array(z.object({ table: z.string(), rows: z.number().int(), hash: z.string() })),
+  /**
+   * Every table read, by name, with its row count and content hash by the rule of client-digests.json, and the
+   * encrypted blocks the extraction skipped in it. Only SpellName may have any: elsewhere they refuse the build.
+   */
+  tables: z.array(z.object({ table: z.string(), rows: z.number().int(), hash: z.string(), encryptedBlocks: z.number().int() })),
   /** What the extraction could not resolve, or noticed and did not interpret. */
   warnings: z.array(z.string()),
 });
