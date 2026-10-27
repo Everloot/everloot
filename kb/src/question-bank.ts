@@ -57,15 +57,15 @@ export const TEMPLATES: readonly Template[] = [
 ];
 
 /**
- * How players shorten instance names. Each alias expects to resolve to the instance named beside it: today
- * nothing maps the short form, which is what the eval should show.
+ * How players shorten instance names. Each alias expects to resolve to the instance named beside it, by the
+ * title the knowledge release carries (`name-aliases.ts` maps the short forms).
  */
 export const INSTANCE_ALIASES: readonly { alias: string; name: string }[] = [
   { alias: "where is MC", name: "Molten Core" },
   { alias: "BRD entrance", name: "Blackrock Depths" },
   { alias: "how do I get to BWL", name: "Blackwing Lair" },
   { alias: "ZG bosses", name: "Zul'Gurub" },
-  { alias: "AQ40 attunement", name: "Ahn'Qiraj Temple" },
+  { alias: "AQ40 attunement", name: "Temple of Ahn'Qiraj" },
   { alias: "AQ20 entrance", name: "Ruins of Ahn'Qiraj" },
   { alias: "where is SM", name: "Scarlet Monastery" },
   { alias: "DM east", name: "Dire Maul" },
@@ -73,7 +73,7 @@ export const INSTANCE_ALIASES: readonly { alias: string; name: string }[] = [
   { alias: "WC entrance", name: "Wailing Caverns" },
   { alias: "RFC level", name: "Ragefire Chasm" },
   { alias: "SFK bosses", name: "Shadowfang Keep" },
-  { alias: "ST entrance", name: "Sunken Temple" },
+  { alias: "ST entrance", name: "Temple of Atal'Hakkar" },
   { alias: "UBRS key", name: "Blackrock Spire" },
   { alias: "Strat live", name: "Stratholme" },
   { alias: "Scholo bosses", name: "Scholomance" },

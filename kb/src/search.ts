@@ -1,6 +1,7 @@
 import type { DB } from "./db.js";
 import type { GameVersion, Kind } from "./entities.js";
 import type { LoreType } from "./importers/wiki-classify.js";
+import { expandAliases, NAME_ALIASES, withoutArticle } from "./name-aliases.js";
 
 export interface SearchHit {
   id: number;
@@ -152,7 +153,8 @@ function pushOptionFilters(conds: string[], params: unknown[], opts: SearchOptio
 }
 
 export function search(db: DB, query: string, limit = 10, opts: SearchOptions = {}): SearchHit[] {
-  const raw = query.trim();
+  // "where is MC" asks about Molten Core: the short forms players type become the names the pages carry.
+  const { text: raw, expanded } = expandAliases(query.trim());
   if (!raw) return [];
   const q = contentTerms(raw)
     .map((t) => `"${t}"`)
@@ -194,7 +196,11 @@ export function search(db: DB, query: string, limit = 10, opts: SearchOptions = 
           .all(...exactParams) as SearchHit[];
       })();
   const seen = new Set(pool.map((h) => h.id));
-  const merged = [...exact.filter((h) => !seen.has(h.id) && [wanted, asked].includes(allTerms(h.name))), ...pool];
+  // A short form names its page outright: "BRD entrance" is about Blackrock Depths before any page that
+  // mentions the words. The expanded names' own pages lead, whatever the body text ranks.
+  const named = expanded.length ? pagesNamed(db, expanded, opts) : [];
+  for (const h of named) seen.add(h.id);
+  const merged = [...named, ...exact.filter((h) => !seen.has(h.id) && [wanted, asked].includes(allTerms(h.name))), ...pool.filter((h) => !named.some((n) => n.id === h.id))];
   const rank = (hit: SearchHit) => (allTerms(hit.name) === wanted ? 0 : contentTerms(hit.name).join(" ") === wanted ? 1 : 2);
   // At the same rank, Everloot's own curated entries come before the copied Warcraft Wiki pages.
   const own = (hit: SearchHit) => (hit.sourceId === "curated" ? 0 : 1);
@@ -202,6 +208,18 @@ export function search(db: DB, query: string, limit = 10, opts: SearchOptions = 
   // different limits stay a stable prefix of one ordering. Rows after them keep the SQL order.
   const head = merged.slice(0, RERANK).sort((a, b) => rank(a) - rank(b) || own(a) - own(b));
   return [...head, ...merged.slice(RERANK)].slice(0, limit);
+}
+
+/** The pages whose title is one of `names` (by normalized name), in the names' order; at most 2 per name. */
+function pagesNamed(db: DB, names: readonly string[], opts: SearchOptions): SearchHit[] {
+  const out: SearchHit[] = [];
+  for (const name of names) {
+    const conds = [`${nameNormSql(db)} = ?`];
+    const params: unknown[] = [allTerms(name)];
+    pushOptionFilters(conds, params, opts);
+    out.push(...(db.prepare(`SELECT ${ROW_EXACT} FROM entities e WHERE ${conds.join(" AND ")} ORDER BY e.id LIMIT 2`).all(...params) as SearchHit[]));
+  }
+  return out;
 }
 
 /** The line an answer starts with when its pages hold only some of the asked words. */
@@ -213,7 +231,7 @@ export const SOME_WORDS = "No page has every word you asked for. Pages with some
  * word is every word, so `search` has already said all there is. Pick words ("best") are left out.
  */
 export function searchSomeWords(db: DB, query: string, limit = 10, opts: SearchOptions = {}): SearchHit[] {
-  const asked = [...new Set(contentTerms(query.trim()))];
+  const asked = [...new Set(contentTerms(expandAliases(query.trim()).text))];
   const terms = asked.filter((t) => !PICK_WORDS.has(t));
   // One word is a new search only when a pick word was dropped from beside it ("best gnome").
   if (terms.length === 0 || (terms.length === 1 && asked.length === 1)) return [];
@@ -288,9 +306,20 @@ export function getDocument(db: DB, id: number): (SearchHit & { body: string }) 
 /** Exact full-name match (case-insensitive), optionally narrowed to one kind. */
 export function getByName(db: DB, name: string, kind?: Kind): SearchHit[] {
   const cond = kind ? "AND kind = ?" : "";
-  const params = kind ? [name, kind] : [name];
-  const rows = db
-    .prepare(`SELECT ${ROW_BY_ID} FROM entities WHERE name = ? COLLATE NOCASE ${cond} ORDER BY id`)
-    .all(...params) as EntityRow[];
-  return rows.map(toHit);
+  const exact = (n: string) => {
+    const params = kind ? [n, kind] : [n];
+    const rows = db
+      .prepare(`SELECT ${ROW_BY_ID} FROM entities WHERE name = ? COLLATE NOCASE ${cond} ORDER BY id`)
+      .all(...params) as EntityRow[];
+    return rows.map(toHit);
+  };
+  const asked = name.trim();
+  const hits = exact(asked);
+  if (hits.length || !asked) return hits;
+  // The name as players shorten it ("MC"), then with its article the other way round ("The Barrens" / "Barrens").
+  const alias = NAME_ALIASES[asked.toLowerCase()];
+  if (alias) { const found = exact(alias); if (found.length) return found; }
+  const bare = withoutArticle(asked);
+  for (const variant of bare === asked ? [`The ${asked}`] : [bare]) { const found = exact(variant); if (found.length) return found; }
+  return [];
 }
