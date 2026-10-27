@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { buildClientAchievements, criteriaOf, serializeClientAchievements, writeClientAchievements } from "../src/client-achievements.js";
+import { buildClientAchievements, criteriaOf, serializeClientAchievements, writeClientAchievements, type TreeRow } from "../src/client-achievements.js";
 import { writeClientSnapshot, type ClientBuildMeta, type ExtractedTable } from "../src/client-snapshot.js";
 
 const meta: ClientBuildMeta = {
@@ -25,7 +25,7 @@ const tree: [number, Record<string, unknown>][] = [
 ];
 
 test("criteriaOf: text nodes in order index first; amounts only over 1; headings with children are not criteria", () => {
-  const t = new Map(tree.map(([id, r]) => [id, r]));
+  const t = new Map(tree.map(([id, r]) => [id, r as unknown as TreeRow]));
   expect(criteriaOf(100, t)).toEqual([
     { text: "Win battles" },
     { text: "Kill 5 foes", amount: 5 },
@@ -35,7 +35,7 @@ test("criteriaOf: text nodes in order index first; amounts only over 1; headings
 
 const tree2: [number, Record<string, unknown>][] = [[200, { ID: 200, Parent: 0, OrderIndex: 0, Description_lang: "Defeat 3 foes", Amount: 3 }]];
 test("criteriaOf: a root that is itself the only leaf is one criterion; an unknown root is none", () => {
-  const t = new Map(tree2.map(([id, r]) => [id, r]));
+  const t = new Map(tree2.map(([id, r]) => [id, r as unknown as TreeRow]));
   expect(criteriaOf(200, t)).toEqual([{ text: "Defeat 3 foes", amount: 3 }]);
   expect(criteriaOf(999, t)).toEqual([]);
 });

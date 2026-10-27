@@ -54,7 +54,7 @@ export function serializeClientAchievements(table: ClientAchievements): string {
   return `${top},\n "achievements": {\n${ids.map((id) => rows([id, achievements[id] as ClientAchievement])).join(",\n")}\n }\n}\n`;
 }
 
-interface TreeRow { ID: number; Parent: number; OrderIndex: number; Description_lang: string | null; Amount: number }
+export interface TreeRow { ID: number; Parent: number; OrderIndex: number; Description_lang: string | null; Amount: number }
 
 /** DFS under the achievement's root tree, order index first; text nodes are criteria, group nodes are not. */
 export function criteriaOf(rootId: number, tree: Map<number, TreeRow>): ClientCriterion[] {
