@@ -20,8 +20,12 @@ const PROOF: Record<string, string> = {
   "talent name": "a talent has the same name",
 };
 
-/** The raid planner page body. The page renders it as is; a raid link (/tools/raid/r/<code>) renders it with the raid to open. */
-export default async function RaidView({ initialCode }: { initialCode?: string } = {}) {
+/**
+ * The raid planner page body. The page renders it with a class hub's context chip under the title (`classContext`,
+ * drawn by the planner, which holds the raid its links keep); a raid link (/tools/raid/r/<code>) renders it with the
+ * raid to open.
+ */
+export default async function RaidView({ initialCode, classContext }: { initialCode?: string; classContext?: boolean } = {}) {
   const facts = raidTalentFacts(TABLES[CURRENT_BUILD]);
   // Class, tree and buff icons and a raid's loading screen, only when the asset URL is set and the upload has them.
   const assets = await loadSiteAssets();
@@ -37,7 +41,7 @@ export default async function RaidView({ initialCode }: { initialCode?: string }
         banner={banner && assets ? { image: <BannerArt art={banner} eager /> } : undefined}
       />
 
-      <RaidBuilder art={art} initialCode={initialCode} />
+      <RaidBuilder art={art} initialCode={initialCode} classContext={classContext} />
       <AdSlot slot="belowTool" />
 
       {/* The explanations stay on the page for readers and search engines, closed until asked for. */}

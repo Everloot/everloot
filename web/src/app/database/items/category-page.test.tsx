@@ -286,3 +286,78 @@ test("the profession menu leaves out a development profession unless the leftove
   expect(plain).not.toContain("Test Profession [DNT]");
   expect(await html(ItemPage(props("trade-goods", { dev: "1" })))).toContain("Test Profession [DNT]");
 });
+
+/* ---------- A class context (class hubs) ---------- */
+
+const rows = (page: string) => page.slice(page.indexOf("<tbody"), page.indexOf("</tbody>"));
+
+test("a class context is a chip, never an item filter: the rows are the same for every class and role, and nothing is called best", async () => {
+  const plain = await html(SubclassPage(sub("armor", "cloth")));
+  const mage = await html(SubclassPage(sub("armor", "cloth", { class: "mage", level: "25", role: "damage" })));
+  const warrior = await html(SubclassPage(sub("armor", "cloth", { class: "warrior", role: "tank" })));
+  expect(rows(plain).match(/<tr /g)?.length).toBeGreaterThan(0);
+  expect(rows(mage)).toBe(rows(plain));
+  expect(rows(warrior)).toBe(rows(plain));
+  expect(mage).toContain('href="/classes/mage?level=25&amp;role=damage"');
+  // Which items a class can use is not proven by any source we read, so the list says it is not narrowed.
+  expect(mage).toContain("The list is the same for every class and role: which items a class can use is not in our data yet.");
+  expect(await html(SubclassPage(sub("armor", "cloth", { class: "mage" })))).toContain("The list is the same for every class: which items a class can use is not in our data yet.");
+  for (const page of [mage, warrior]) expect(page).not.toMatch(/best in slot|\bBiS\b|best for|recommended/i);
+  expect(plain).not.toContain("data-class-context");
+});
+
+test("a level offers the required-level filter, on the levels items show; the context never sets it by itself", async () => {
+  const page = await html(items({ class: "mage", level: "25" }));
+  expect(page).toContain('href="/database/items?req=1-25&amp;class=mage&amp;level=25"');
+  expect(page).toContain("Filter to required level 25 or lower");
+  expect(page).toContain(`>${CLIENT_TAXONOMY.items.length.toLocaleString("en-US")}</span> items`);
+  // A required level already chosen is kept, and none is offered over it.
+  const chosen = await html(items({ req: "11-20", class: "mage", level: "25" }));
+  expect(chosen).not.toContain("Filter to required level");
+  expect(chosen).toContain('href="/database/items?req=11-20"');
+  // Without a level there is nothing to offer.
+  expect(await html(items({ class: "mage" }))).not.toContain("Filter to required level");
+});
+
+test("a required level the menu does not list shows as its own choice, so the filter the level offers is visible", async () => {
+  const page = await html(items({ req: "1-25", class: "mage", level: "25" }));
+  expect(page).toMatch(/Req\. level: <span class="text-fg">1–25<\/span>/);
+  expect(page).toContain('href="/database/items?class=mage&amp;level=25"');
+});
+
+test("taking the context off keeps every filter; the list's own links, menus and name box keep the context", async () => {
+  const page = await html(SubclassPage(sub("armor", "cloth", { quality: "rare,epic", sort: "-id", class: "mage", level: "25", role: "damage" })));
+  // The chip's cross: the same view without the context.
+  expect(page).toContain('href="/database/items/armor/cloth?quality=rare,epic&amp;sort=-id"');
+  // A quality choice, the type menu and Clear filters keep the context; Clear filters keeps nothing else.
+  expect(page).toContain('href="/database/items/armor/cloth?quality=epic&amp;sort=-id&amp;class=mage&amp;level=25&amp;role=damage"');
+  expect(page).toContain('href="/database/items/armor?quality=rare,epic&amp;sort=-id&amp;class=mage&amp;level=25&amp;role=damage"');
+  expect(page).toContain('href="/database/items/armor/cloth?class=mage&amp;level=25&amp;role=damage"');
+  expect(page).toMatch(/<input[^>]*name="role"[^>]*value="damage"/);
+});
+
+test("an old singular category address moves to the plural one with its class context, when the context reads", async () => {
+  await expect(html(ItemPage(props("weapon", { quality: "rare", class: "mage", level: "25" })))).rejects.toThrow(/^NEXT_REDIRECT \/database\/items\/weapons\?quality=rare&class=mage&level=25$/);
+  await expect(html(SubclassPage(sub("weapon", "one-handed-swords", { class: "warrior", role: "tank" })))).rejects.toThrow(/^NEXT_REDIRECT \/database\/items\/weapons\/one-handed-swords\?class=warrior&role=tank$/);
+  // A context the page cannot read is not carried on.
+  await expect(html(ItemPage(props("weapon", { quality: "rare", class: "deathknight" })))).rejects.toThrow(/^NEXT_REDIRECT \/database\/items\/weapons\?quality=rare$/);
+});
+
+test("a class context the page cannot read is named and left out, and the page is not a 404", async () => {
+  const page = await html(items({ class: "deathknight", sort: "name" }));
+  expect(page).toContain("&quot;deathknight&quot; is not one of the nine classes. This page leaves the class out.");
+  expect(page).toContain('href="/database/items?sort=name"');
+  expect(page).not.toContain("class=deathknight");
+});
+
+test("an address with a class context is noindex, with the plain category as its canonical", async () => {
+  for (const search of [{ class: "mage" }, { class: "mage", level: "25", role: "damage" }, { class: "deathknight" }, { class: "mage", page: "2" }] as Record<string, string>[]) {
+    const m = await subclassMetadata(sub("armor", "cloth", search));
+    expect(m.robots, JSON.stringify(search)).toMatchObject({ index: false, follow: true });
+    expect(m.alternates?.canonical, JSON.stringify(search)).toBe("/database/items/armor/cloth");
+  }
+  const { generateMetadata: allMetadata } = await import("./page");
+  const all = await allMetadata({ searchParams: Promise.resolve({ class: "mage", level: "25" }) });
+  expect(all.robots).toMatchObject({ index: false, follow: true });
+  expect(all.alternates?.canonical).toBe("/database/items");
+});

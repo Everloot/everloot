@@ -170,15 +170,27 @@ describe("class hubs", () => {
     }
   });
 
-  test("the hub links the calculator, the database and dungeon preparation, through pages that exist", async () => {
+  test("the hub links the calculator, the database and dungeon preparation, through pages that exist, with its class", async () => {
     const page = section(await hub("mage"), "plan");
     const links = contextLinks({ classSlug: "mage" }).filter((l) => l.key !== "hub");
     for (const link of links) expect(page, link.key).toContain(`href="${link.href}"`);
+    expect(page).toContain('href="/database/spells?class=mage"');
     expect(page).not.toContain("/tools/talents/warrior");
-    // The page is built once, so its links cannot carry a level or role from the address. They need not: none of
-    // their pages reads one yet. Once contextLinks carries one to a page, this fails, and the hub has to draw that
-    // link from the address on the client.
-    expect(contextLinks({ classSlug: "mage", level: 25, role: "damage" }).filter((l) => l.key !== "hub")).toEqual(links);
+    // The spell link opens a subset, and the hub names it as exactly that.
+    expect(visible(page)).toContain("Spells in the Mage talent catalog");
+  });
+
+  test("the hub's links carry the level and role of its address, added in the browser since the page is built once", async () => {
+    const hrefs = () => [...container!.querySelectorAll('[aria-labelledby="plan"] a')].map((a) => a.getAttribute("href"));
+    const destinations = (context: Parameters<typeof contextLinks>[0]) => contextLinks(context).filter((l) => l.key !== "hub").map((l) => l.href);
+    address.search = "level=25&role=damage";
+    await mount(await ClassPage({ params: Promise.resolve({ class: "mage" }) }));
+    expect(hrefs()).toEqual(destinations({ classSlug: "mage", level: 25, role: "damage" }));
+    expect(hrefs()).toContain("/database/items?class=mage&level=25&role=damage");
+    // An address the hub cannot read leaves its links with the class alone.
+    address.search = "level=99&role=damage";
+    await mount(await ClassPage({ params: Promise.resolve({ class: "mage" }) }));
+    expect(hrefs()).toEqual(destinations({ classSlug: "mage" }));
   });
 
   test("who can be the class comes from Blizzard's race table, with the new combinations marked", async () => {

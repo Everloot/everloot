@@ -11,6 +11,7 @@ import {
   type ClassName, type DragSource, type DropTarget, type FamilyCoverage, type Size, type Slot, type Slots, type State,
 } from "@/lib/raid";
 import type { RaidArt } from "@/lib/game-assets";
+import { ClassContextChipFromAddress } from "@/components/classes/ClassContextChip";
 import GameIcon from "@/components/game/GameIcon";
 import SpellTip from "@/components/game/SpellTip";
 import { Badge, Card, CopyButton, DataTable, Input, SectionHeading, Segmented, type Column } from "@/components/ui";
@@ -81,8 +82,11 @@ interface Drag { source: DragSource; over: DropTarget | null }
  * without the asset URL. The icons sit beside the names, which stay; without them the builder is the
  * text it always was.
  */
-/** `initialCode` is the raid from a raid link (/tools/raid/r/<code>), opened when the address has no #raid=. */
-export default function RaidBuilder({ art = null, initialCode }: { art?: RaidArt | null; initialCode?: string } = {}) {
+/**
+ * `initialCode` is the raid from a raid link (/tools/raid/r/<code>), opened when the address has no #raid=.
+ * `classContext` shows a class hub's context chip on top (the planner's own page), with the raid as it is now.
+ */
+export default function RaidBuilder({ art = null, initialCode, classContext = false }: { art?: RaidArt | null; initialCode?: string; classContext?: boolean } = {}) {
   const classIcon = (c: ClassName, size = 20, gap = "mr-2") => {
     const src = art?.classes[c];
     return src ? <GameIcon src={src} size={size} className={gap} /> : null;
@@ -175,12 +179,13 @@ export default function RaidBuilder({ art = null, initialCode }: { art?: RaidArt
   const empty = slots.every((s) => !s);
   // The link handed out is the raid link: same raid, and its preview in a chat names the roster.
   const link = typeof window === "undefined" ? "" : `${location.origin}/tools/raid/r/${code}`;
+  // The raid in the address, as it is now: written there below and handed to the class context chip, whose links keep it.
+  const fragment = empty ? "" : `#raid=${code}`;
 
   useEffect(() => {
     if (!ready) return;
-    const hash = empty ? "" : `#raid=${code}`;
-    history.replaceState(null, "", `${location.pathname}${location.search}${hash}`);
-  }, [ready, code, empty]);
+    history.replaceState(null, "", `${location.pathname}${location.search}${fragment}`);
+  }, [ready, fragment]);
 
   useEffect(() => {
     if (selected !== null) pickerRef.current?.focus();
@@ -425,6 +430,7 @@ export default function RaidBuilder({ art = null, initialCode }: { art?: RaidArt
 
   return (
     <div className="space-y-8">
+      {classContext && <ClassContextChipFromAddress className="-mt-2" fragment={fragment} />}
       {linkBuild && (
         <p role="status" className="text-sm text-warning">
           This link was made for build <span className="font-mono">{linkBuild}</span>. This page has rules for build{" "}

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Fragment } from "react";
+import { ClassContextLink } from "@/components/classes/ClassContextChip";
 import UseClassButton from "@/components/classes/UseClassButton";
 import { CLASS_TEXT } from "@/components/talents/TalentTreeView";
 import { Container, PageHeader, SectionHeading } from "@/components/ui";
@@ -14,8 +15,9 @@ import type { GuideActivity, GuideRole } from "../../../../../kb/src/guides/guid
 
 // Built once per deploy, one page per class; `dynamic = "error"` fails the build if the page ever reads the request.
 // The guides are read from kb/guides while the site builds: the function bundles do not carry that folder, so a page
-// rendered for a request could not read it. A link's level and role are read in the browser (UseClassButton), so
-// every address of one class gets the same page, canonical to the plain one.
+// rendered for a request could not read it. A link's level and role are read in the browser (UseClassButton, and
+// ClassContextLink for the links that carry them on), so every address of one class gets the same page, canonical to
+// the plain one.
 export const dynamic = "error";
 export const dynamicParams = false;
 
@@ -34,7 +36,7 @@ type Destination = Exclude<ContextDestination, "hub">;
 /** What each linked page holds, and that it is the whole list where it is not narrowed to the class. */
 const NOTES: Record<Destination, (name: string) => string> = {
   talents: (name) => `${name} talent trees with the game's point rules, two talent sets and a share link.`,
-  spells: () => "The spell list from the game files, every class together.",
+  spells: (name) => `Spells in the ${name} talent catalog, from the game files.`,
   items: () => "Every item, with filters for slot, quality, item level and required level.",
   raid: () => "Fill a 10, 20 or 40 player raid with classes and talent trees to see which buffs each group gets.",
   professions: () => "Profession paths and recipe skill ranges, estimated from the recipes and prices players uploaded.",
@@ -108,7 +110,7 @@ export default async function ClassHubPage({ params }: Params) {
           <ul className="space-y-2 text-sm">
             {links.map((l) => (
               <li key={l.key}>
-                <Link href={l.href} className={LINK}>{l.label}</Link>
+                <ClassContextLink classSlug={slug} to={l.key} className={LINK}>{l.label}</ClassContextLink>
                 <span className="text-fg-2">{` ${NOTES[l.key](name)}`}</span>
               </li>
             ))}

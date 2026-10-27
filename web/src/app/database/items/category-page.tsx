@@ -11,6 +11,8 @@ import { loadItemSeen } from "@/lib/item-seen";
 import { pageMetadata } from "@/lib/seo";
 import { loadShownNames } from "@/lib/shown-item-names";
 import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
+import { hasClassContext, parseClassContext, withClassContext, withoutClassContext } from "@/lib/class-context";
+import ClassContextChip from "@/components/classes/ClassContextChip";
 import GameIcon from "@/components/game/GameIcon";
 import Badge, { UNCONFIRMED_TITLE } from "@/components/ui/Badge";
 import { Container, DataTable, DataTitle, FilterBar, filledColumns, QUALITY_TEXT, ResultStrip, qualityOf, type FilterControl, type SparseColumn } from "@/components/ui";
@@ -20,14 +22,18 @@ import { LEVEL_BRACKETS } from "../list-parts";
 
 type Search = Record<string, string | string[] | undefined>;
 
-/** The first category URLs used the client's singular names (/database/items/weapon); they move to the plural ones for good. */
+/**
+ * The first category URLs used the client's singular names (/database/items/weapon); they move to the plural ones
+ * for good, with their filters and a class context the page can read.
+ */
 function legacyHref(classSlug: string, subclassKey: string | undefined, search: Search): string | null {
   const cls = resolveLegacyClass(T, classSlug);
   if (!cls) return null;
   const sub = subclassKey === undefined ? null : resolveSubclass(T, cls.id, subclassKey);
   if (subclassKey !== undefined && !sub) return null;
   const q = categoryQuery(search);
-  return q ? itemsHref(cls.slug, sub?.slug, q) : null;
+  const read = parseClassContext(search);
+  return q ? withClassContext(itemsHref(cls.slug, sub?.slug, q), read.ok ? read.context : null) : null;
 }
 
 /** The class and subclass a path names (none for /database/items), and the filters; null when any part is unknown. */
@@ -46,10 +52,10 @@ const subName = (s: ItemSubclass) => s.name ?? `Subclass ${s.id}`;
 export const NAME_TITLE: Record<NameSource, string> = { ...NAME_FROM, files: UNCONFIRMED_TITLE };
 
 /**
- * The plain list, on any page, is its own canonical; a filter, a sort or a name search is noindex and points
- * its canonical at page 1 of the plain list.
+ * The plain list, on any page, is its own canonical; a filter, a sort, a name search or a class context is noindex
+ * and points its canonical at page 1 of the plain list.
  */
-const isPlain = (q: CategoryQuery) => activeFilters(q) === 0 && !q.sort && !q.dev && !q.unnamed;
+const isPlain = (q: CategoryQuery, search: Search) => activeFilters(q) === 0 && !q.sort && !q.dev && !q.unnamed && !hasClassContext(search);
 
 export const ALL_ITEMS = {
   title: "WoW Forever Items by Category",
@@ -61,7 +67,7 @@ const pageSuffix = (page: number) => (page > 1 ? ` – Page ${page}` : "");
 export async function categoryMetadata(classSlug: string | undefined, subclassKey: string | undefined, search: Search): Promise<Metadata> {
   const r = resolve(classSlug, subclassKey, search);
   if (!r) return { robots: { index: false, follow: true } };
-  const plain = isPlain(r.q);
+  const plain = isPlain(r.q, search);
   const page = plain ? r.q.page : 1;
   // A later page of the plain list is indexed like page 1: once half the rows it shows have a name. The plain
   // list shows named rows first, so its first pages fill with them; until then a page is a list of "Item N".
@@ -102,6 +108,11 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
     notFound();
   }
   const { cls, sub, q } = r;
+  // A class context from a class hub rides on every link of the list, never on its breadcrumb or canonical. It narrows
+  // nothing: which items a class can use is not in any source we read (docs/sources, class proficiency).
+  const read = parseClassContext(search);
+  const context = read.ok ? read.context : null;
+  const link = (classSlug?: string, subclassSlug?: string, query?: Partial<CategoryQuery>) => withClassContext(itemsHref(classSlug, subclassSlug, query), context);
   const base = cls ? filterItems(T, { classId: cls.id, subclassId: sub?.id }) : T.items;
   const [{ agreed, matched, showsTip }, seen] = await Promise.all([loadShownNames(), loadItemSeen()]);
   const nameOf = (id: number) => agreed.get(id) ?? matched?.names.get(id)?.name;
@@ -135,7 +146,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   const tips = every ?? await tipsFor(shown.map((row) => row[0]).filter(showsTip));
   const names = new Map(shown.map((row) => [row[0], shownItemName(row[0], agreed, matched?.names, tips.get(row[0]))]));
   const icons = shown.some((row) => tips.get(row[0])?.icon || !names.get(row[0]));
-  const here = (over: Partial<CategoryQuery>) => itemsHref(cls?.slug, sub?.slug, { ...q, page: 1, ...over });
+  const here = (over: Partial<CategoryQuery>) => link(cls?.slug, sub?.slug, { ...q, page: 1, ...over });
   const title = sub ? subclassLabel(sub).label : cls ? cls.label : "Items";
 
   const trail: Crumb[] = [
@@ -191,7 +202,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   const slots = counted((row) => slotOf(row[3])?.slug ?? null);
   const qualities = counted((row) => (row[4] === null ? UNRECORDED : QUALITIES[row[4]]?.slug ?? UNRECORDED));
   const sourceOptions = SOURCES.map((x) => ({
-    label: x.menu, href: itemsHref(cls?.slug, sub?.slug, toggled(q, "src", x.slug)), on: Boolean(q.src?.includes(x.slug)),
+    label: x.menu, href: link(cls?.slug, sub?.slug, toggled(q, "src", x.slug)), on: Boolean(q.src?.includes(x.slug)),
     count: pool.reduce((n, row) => n + Number(seen.from.get(row[0])?.includes(x.slug) ?? false), 0),
   }))
     .filter((o) => o.count > 0 || o.on);
@@ -206,28 +217,28 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
     {
       type: "menu", key: "class", label: "Class",
       options: [
-        { label: "All classes", href: itemsHref(undefined, undefined, { ...q, page: 1 }), on: !cls, reset: true, count: T.items.length - hiddenIn() },
-        ...T.classes.filter((c) => c.items > 0).map((c) => ({ label: c.label, href: itemsHref(c.slug, undefined, { ...q, page: 1 }), on: c.id === cls?.id, count: c.items - hiddenIn(c.id) })),
+        { label: "All classes", href: link(undefined, undefined, { ...q, page: 1 }), on: !cls, reset: true, count: T.items.length - hiddenIn() },
+        ...T.classes.filter((c) => c.items > 0).map((c) => ({ label: c.label, href: link(c.slug, undefined, { ...q, page: 1 }), on: c.id === cls?.id, count: c.items - hiddenIn(c.id) })),
       ],
     },
     ...(cls ? [{
       type: "menu" as const, key: "type", label: "Type",
       options: [
-        { label: `All ${cls.label.toLowerCase()}`, href: itemsHref(cls.slug, undefined, { ...q, page: 1 }), on: !sub, reset: true, count: cls.items - hiddenIn(cls.id) },
-        ...T.subclasses.filter((s) => s.classId === cls.id && s.items > 0).map((s) => ({ label: subclassLabel(s).label, href: itemsHref(cls.slug, s.slug, { ...q, page: 1 }), on: s.id === sub?.id, count: s.items - hiddenIn(cls.id, s.id) })),
+        { label: `All ${cls.label.toLowerCase()}`, href: link(cls.slug, undefined, { ...q, page: 1 }), on: !sub, reset: true, count: cls.items - hiddenIn(cls.id) },
+        ...T.subclasses.filter((s) => s.classId === cls.id && s.items > 0).map((s) => ({ label: subclassLabel(s).label, href: link(cls.slug, s.slug, { ...q, page: 1 }), on: s.id === sub?.id, count: s.items - hiddenIn(cls.id, s.id) })),
       ],
     }] : []),
     {
       type: "menu", key: "slot", label: "Slot", multi: true,
-      options: [...slotNames].map(([slug, name]) => ({ label: name, href: itemsHref(cls?.slug, sub?.slug, toggled(q, "slot", slug)), on: Boolean(q.slot?.includes(slug)), count: slots.get(slug) ?? 0 })),
+      options: [...slotNames].map(([slug, name]) => ({ label: name, href: link(cls?.slug, sub?.slug, toggled(q, "slot", slug)), on: Boolean(q.slot?.includes(slug)), count: slots.get(slug) ?? 0 })),
     },
     {
       type: "menu", key: "quality", label: "Quality", multi: true,
       options: [...QUALITIES.filter((x) => qualities.has(x.slug)).map((x) => ({
         label: x.name, className: x.id <= 5 ? QUALITY_TEXT[qualityOf(x.id)] : undefined,
-        href: itemsHref(cls?.slug, sub?.slug, toggled(q, "quality", x.slug)), on: Boolean(q.quality?.includes(x.slug)), count: qualities.get(x.slug) ?? 0,
+        href: link(cls?.slug, sub?.slug, toggled(q, "quality", x.slug)), on: Boolean(q.quality?.includes(x.slug)), count: qualities.get(x.slug) ?? 0,
       })), ...(qualities.has(UNRECORDED) ? [{
-        label: "Unrecorded", href: itemsHref(cls?.slug, sub?.slug, toggled(q, "quality", UNRECORDED)), on: Boolean(q.quality?.includes(UNRECORDED)), count: qualities.get(UNRECORDED) ?? 0,
+        label: "Unrecorded", href: link(cls?.slug, sub?.slug, toggled(q, "quality", UNRECORDED)), on: Boolean(q.quality?.includes(UNRECORDED)), count: qualities.get(UNRECORDED) ?? 0,
       }] : [])],
     },
     ...(sourceOptions.length ? [{ type: "menu" as const, key: "src", label: "Source", multi: true, options: sourceOptions }] : []),
@@ -241,7 +252,9 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
       type: "menu", key: "req", label: "Req. level",
       options: [{ label: "Any required level", href: here({ req: undefined }), on: !q.req, reset: true }, ...LEVEL_BRACKETS.map((b) => ({
         label: bracket(b), href: here({ req: b }), on: q.req?.min === b.min && q.req?.max === b.max,
-      }))],
+      })),
+      // A range no bracket covers (a class context's "required level 25 or lower", or one typed in) is its own choice.
+      ...(q.req && !LEVEL_BRACKETS.some((b) => b.min === q.req!.min && b.max === q.req!.max) ? [{ label: bracket(q.req), href: here({}), on: true }] : [])],
     },
     {
       type: "menu", key: "bind", label: "Binding",
@@ -263,16 +276,16 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
     ...toggle("seen", "Seen by players", seen.seen.size),
   ];
   // The name box keeps every other filter (not the page) as hidden fields.
-  const keep = Object.fromEntries(new URLSearchParams(itemsHref(undefined, undefined, { ...q, q: undefined, page: 1 }).split("?")[1] ?? ""));
-  const pageHref = (page: number) => itemsHref(cls?.slug, sub?.slug, { ...q, page });
+  const keep = Object.fromEntries(new URLSearchParams(link(undefined, undefined, { ...q, q: undefined, page: 1 }).split("?")[1] ?? ""));
+  const pageHref = (page: number) => link(cls?.slug, sub?.slug, { ...q, page });
   const strip = <ResultStrip total={rows.length} noun={rows.length === 1 ? "item" : "items"} page={q.page} perPage={ITEMS_PER_PAGE} href={pageHref} label="Item pages" />;
   const active = activeFilters(q);
 
   const chips = [
     ...(q.q ? [{ label: `Name: ${q.q}`, href: here({ q: undefined }) }] : []),
-    ...(q.slot ?? []).map((s) => ({ label: slotNames.get(s) ?? s, href: itemsHref(cls?.slug, sub?.slug, toggled(q, "slot", s)) })),
-    ...(q.quality ?? []).map((s) => ({ label: QUALITIES.find((x) => x.slug === s)?.name ?? "Unrecorded", href: itemsHref(cls?.slug, sub?.slug, toggled(q, "quality", s)) })),
-    ...(q.src ?? []).map((s) => ({ label: SOURCES.find((x) => x.slug === s)!.menu, href: itemsHref(cls?.slug, sub?.slug, toggled(q, "src", s)) })),
+    ...(q.slot ?? []).map((s) => ({ label: slotNames.get(s) ?? s, href: link(cls?.slug, sub?.slug, toggled(q, "slot", s)) })),
+    ...(q.quality ?? []).map((s) => ({ label: QUALITIES.find((x) => x.slug === s)?.name ?? "Unrecorded", href: link(cls?.slug, sub?.slug, toggled(q, "quality", s)) })),
+    ...(q.src ?? []).map((s) => ({ label: SOURCES.find((x) => x.slug === s)!.menu, href: link(cls?.slug, sub?.slug, toggled(q, "src", s)) })),
     ...(q.ilvl ? [{ label: `Item level ${bracket(q.ilvl)}`, href: here({ ilvl: undefined }) }] : []),
     ...(q.req ? [{ label: `Req. level ${bracket(q.req)}`, href: here({ req: undefined }) }] : []),
     ...(q.bind ? [{ label: BINDINGS.find((b) => b.slug === q.bind)?.label ?? q.bind, href: here({ bind: undefined }) }] : []),
@@ -290,7 +303,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
           {c.label}<span aria-hidden="true">×</span><span className="sr-only">(remove)</span>
         </Link>
       ))}
-      <Link href={itemsHref(cls?.slug, sub?.slug)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Clear filters</Link>
+      <Link href={link(cls?.slug, sub?.slug)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Clear filters</Link>
     </div>
   ) : <p className="py-4 text-cell text-fg-2">No items in this category.</p>;
 
@@ -303,8 +316,23 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
           search={{ action: itemsHref(cls?.slug, sub?.slug), value: q.q, placeholder: "Name or id", label: "Filter by name or id", keep }}
           controls={controls}
           active={active}
-          clearHref={itemsHref(cls?.slug, sub?.slug)}
+          clearHref={link(cls?.slug, sub?.slug)}
         />
+        <ClassContextChip read={read} here={withoutClassContext(itemsHref(cls?.slug, sub?.slug), search)}>
+          {context && (
+            <span>
+              {`The list is the same for every class${context.role ? " and role" : ""}: which items a class can use is not in our data yet.`}
+              {context.level !== undefined && !q.req && (
+                <>
+                  {" "}
+                  <Link href={here({ req: { min: 1, max: context.level } })} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">
+                    {`Filter to required level ${context.level} or lower`}
+                  </Link>
+                </>
+              )}
+            </span>
+          )}
+        </ClassContextChip>
         {held > 0 && (
           <p className="mt-2 text-cell-2 text-muted">
             <Link href={here({ dev: q.dev ? undefined : true })} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">
