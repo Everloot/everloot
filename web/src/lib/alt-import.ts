@@ -19,6 +19,7 @@ export const ADDON_FILE_LIMIT = 20 * 1024 * 1024;
 export const ADDON_FILE_TOO_LARGE = "That file is over 20 MiB, larger than an Everloot.lua should be, so it was not read. Nothing was changed.";
 const NOT_EVERLOOT = "That is not an Everloot.lua: it holds no Everloot addon data. Nothing was changed.";
 const DAMAGED = "That file is cut off or damaged, so nothing in it was read. If the game was running, log out fully so it finishes writing the file, then choose it again. Nothing was changed.";
+const EXTRA = "That file has text the addon never writes before or after its data, so nothing in it was read. Choose the Everloot.lua the game wrote. Nothing was changed.";
 const CHANGED = "The alts on this device changed since the preview. Choose the file again to see what it would do now.";
 
 /** One of the player's own characters as their file names it. Details its records do not give are null. */
@@ -68,7 +69,8 @@ export function readAddonFile(text: string): AddonFile {
     // The parser throws for anything outside the addon's Lua, a file cut off part way included; a table nested past
     // what it can follow throws too.
     const foreign = error instanceof LuaParseError && error.message.startsWith("not ");
-    return { ok: false, error: foreign ? "not-everloot" : "damaged", message: foreign ? NOT_EVERLOOT : DAMAGED };
+    const extra = error instanceof LuaParseError && error.message.startsWith("extra text");
+    return { ok: false, error: foreign ? "not-everloot" : "damaged", message: foreign ? NOT_EVERLOOT : extra ? EXTRA : DAMAGED };
   }
   const found = new Map<string, { character: FileCharacter; linkAt: number }>();
   const skipped = { noRealm: 0, unreadable: 0 };

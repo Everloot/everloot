@@ -24,12 +24,34 @@ class Parser {
     // EverlootDB = { ... } (or the root given) — find the assignment, parse the table.
     const m = new RegExp(`${this.root}\\s*=\\s*`).exec(this.s);
     if (!m) throw new LuaParseError(`not ${this.what} (${this.root} = {...} not found)`);
+    this.start = m.index;
     this.i = m.index + m[0].length;
     const v = this.value();
     if (typeof v !== "object" || v === null || !("array" in v)) {
       throw new LuaParseError(`${this.root} is not a table`);
     }
     return v as LuaTable;
+  }
+
+  /** Where the assignment parse found begins. */
+  private start = 0;
+
+  /**
+   * As parse, for a file that is that one assignment and nothing else, as the game writes it: whitespace and comments
+   * around it and at most a semicolon after it. A file holding anything more is not read at all.
+   */
+  parseWhole(): LuaTable {
+    const table = this.parse();
+    const end = this.i;
+    // Only whitespace and comments before the assignment, ending where it begins (not one inside a comment).
+    this.i = 0;
+    this.ws();
+    if (this.i !== this.start) throw new LuaParseError(`extra text before ${this.root}`);
+    this.i = end;
+    this.ws();
+    if (this.s[this.i] === ";") { this.i++; this.ws(); }
+    if (this.i < this.s.length) throw new LuaParseError(`extra text after ${this.root} at offset ${this.i}`);
+    return table;
   }
 
   private ws(): void {
@@ -167,9 +189,10 @@ export function parsePolestarTable(text: string): Record<string, unknown> {
   return Array.isArray(plain) ? {} : (plain as Record<string, unknown>);
 }
 
-/** Parse Everloot.lua text into an intake-ready payload. Throws LuaParseError. */
+/** Parse Everloot.lua text into an intake-ready payload. Throws LuaParseError, for a file holding anything besides
+ *  the EverlootDB assignment too: its only saved variable (addon/Everloot.toc), so a game-written file holds no more. */
 export function parseEverlootLua(text: string): EverlootFile {
-  const root = new Parser(text).parse();
+  const root = new Parser(text).parseWhole();
   const get = (k: string): LuaValue | undefined => root.map.get(k);
   const version = get("version");
   const installId = get("installId");

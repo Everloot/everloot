@@ -158,6 +158,16 @@ describe("reading the file", () => {
     expect(file.skipped).toEqual({ noRealm: 2, unreadable: 4 });
   });
 
+  test("a file with text after its data, or before it, is not previewed as a complete export (reported case)", () => {
+    const one = `EverlootDB = { version="0.3.12", installId="fixture", records={ ["gold_snapshot"]={ { character="Thrall", realm="Forever", capturedAt="2026-10-27T00:00:00Z" } } } }`;
+    expect(readAddonFile(one).ok).toBe(true);
+    for (const text of [`${one}\nthis is not valid Lua !!!`, `this is not valid Lua !!!\n${one}`]) {
+      const result = readAddonFile(text);
+      expect(result).toMatchObject({ ok: false, error: "damaged" });
+      expect(!result.ok && result.message).toContain("text the addon never writes");
+    }
+  });
+
   test("a sighting cannot declare itself to be an own money row (reported case)", () => {
     const result = readAddonFile(`EverlootDB = { version="0.3.12", installId="fixture", records={ ["census_seen"]={ { kind="gold_snapshot", character="Arthas", realm="Forever", capturedAt="2026-10-27T00:00:00Z" } } } }`);
     expect(result.ok).toBe(true);

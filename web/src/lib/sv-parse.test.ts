@@ -74,6 +74,15 @@ describe("SavedVariables parser", () => {
     ]);
   });
 
+  test("the file is the export and nothing else: whitespace, comments and a semicolon around it, never other text", () => {
+    expect(parseEverlootLua(`${SV}\n-- written by the game\n\n`).records).toHaveLength(3);
+    expect(parseEverlootLua(`\n\n${SV.replace("};", "}")}`).records).toHaveLength(3);
+    const commentedOut = `-- EverlootDB = { version = "0.1.0", installId = "abcd-1234", records = {} }\n`;
+    for (const text of [`${SV}\nthis is not valid Lua !!!`, `${SV}\nEverlootOther = {}`, `garbage\n${SV}`, `x${SV.replace("-- Everloot export\n", "")}`, `${SV};`, commentedOut]) {
+      expect(() => parseEverlootLua(text), JSON.stringify(text.slice(-30))).toThrow(LuaParseError);
+    }
+  });
+
   test("rejects non-exports and malformed tables", () => {
     expect(() => parseEverlootLua("x = 1")).toThrow(LuaParseError);
     expect(() => parseEverlootLua("EverlootDB = { version = ")).toThrow(LuaParseError);
