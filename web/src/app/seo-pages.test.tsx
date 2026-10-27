@@ -40,13 +40,14 @@ test("the home page carries Organization and WebSite, and shows the lore search 
   expect(html).toContain('action="/search"');
 });
 
-test("the footer shows the email, the blurb and the non-affiliation line the Organization repeats", async () => {
+test("the footer shows the email and the blurb the Organization repeats", async () => {
   const { default: Footer } = await import("@/components/Footer");
-  const { organizationJsonLd } = await import("@/lib/jsonld");
+  const { organizationJsonLd, SITE_BLURB } = await import("@/lib/jsonld");
   const text = visible(renderToStaticMarkup(<Footer />));
   const org = organizationJsonLd() as { email: string; description: string };
   expect(text).toContain(org.email);
-  for (const sentence of org.description.split(/(?<=\.) /)) expect(text).toContain(sentence);
+  expect(org.description).toContain(SITE_BLURB);
+  expect(text).toContain(SITE_BLURB);
 });
 
 test("a class page: name matches the H1, description and facts are visible, the hub is its parent, and the breadcrumb is real links", async () => {

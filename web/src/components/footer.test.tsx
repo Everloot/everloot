@@ -10,7 +10,7 @@ vi.mock("next/link", () => ({
 vi.mock("./CookieConsent", () => ({ CookiePreferencesButton: () => <button type="button">Cookie preferences</button> }));
 
 import Footer from "./Footer";
-import { TRADEMARK_LINE } from "@/lib/jsonld";
+import { NON_AFFILIATION, TRADEMARK_LINE } from "@/lib/jsonld";
 
 afterEach(() => { vi.unstubAllEnvs(); });
 
@@ -61,9 +61,11 @@ test("one site-wide credit line, linked to the full credits on /methodology", ()
   expect(html()).toMatch(/<p data-site-credit[^>]*>[\s\S]*href="\/methodology#credits"[\s\S]*<\/p>/);
 });
 
-test("carries the full Blizzard trademark sentence", () => {
-  expect(text()).toContain(TRADEMARK_LINE);
-  expect(TRADEMARK_LINE).toContain("registered trademarks of Blizzard Entertainment, Inc.");
+test("links the full trademark notice and credits instead of repeating them on every page", () => {
+  expect(html()).toContain('href="/terms#trademarks"');
+  expect(html()).toContain('href="/methodology#credits"');
+  expect(text()).not.toContain(TRADEMARK_LINE);
+  expect(text()).not.toContain(NON_AFFILIATION);
 });
 
 test("links How we count and the Discord invite", () => {

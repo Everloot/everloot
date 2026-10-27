@@ -6,10 +6,10 @@ import { TOOL_LINES, toolGroups } from "@/data/tools";
 import { PageHeader, ReadingLayout, SectionHeading } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import { guildsOn } from "@/lib/guild-switch";
-import { aboutPageJsonLd, DISCORD_INVITE, NON_AFFILIATION, OPERATOR, TRADEMARK_LINE } from "@/lib/jsonld";
+import { aboutPageJsonLd, DISCORD_INVITE, OPERATOR } from "@/lib/jsonld";
 
 const TITLE = "About Everloot";
-const description = `Everloot offers free WoW: Forever tools and a database built from player addon uploads. It is run by ${OPERATOR} and not affiliated with Blizzard.`;
+const description = `Everloot offers free WoW: Forever tools and a database built from player addon uploads. It is an independent project run by ${OPERATOR}.`;
 
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 
 export default function AboutPage() {
   return (
-    <ReadingLayout items={[{ id: "the-tools", label: "The tools" }, { id: "free", label: "How it stays free" }, { id: "blizzard", label: "Not affiliated with Blizzard" }]}>
+    <ReadingLayout items={[{ id: "the-tools", label: "The tools" }, { id: "free", label: "How it stays free" }, { id: "independent", label: "An independent project" }]}>
       <JsonLd data={aboutPageJsonLd({ name: TITLE, description, path: "/about" })} />
       <PageHeader title={TITLE} lede={description} trail={trailFor("/about")!} />
 
@@ -66,10 +66,13 @@ export default function AboutPage() {
           </p>
         </section>
 
-        <section aria-labelledby="blizzard">
-          <SectionHeading id="blizzard">Not affiliated with Blizzard</SectionHeading>
+        <section aria-labelledby="independent">
+          <SectionHeading id="independent">An independent project</SectionHeading>
           <p className="text-fg-2">
-            Everloot is an independent fan project. {NON_AFFILIATION} {TRADEMARK_LINE}
+            Everloot is an independent fan project, built and run by {OPERATOR}.
+            The game, its data and its art belong to Blizzard Entertainment; the
+            full credits are on <Link href="/methodology#credits" className={link}>How we count</Link>, and
+            the trademark notice is in the <Link href="/terms#trademarks" className={link}>Terms of Use</Link>.
           </p>
         </section>
       </div>

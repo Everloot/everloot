@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { SOCIAL_PROFILES } from "@/lib/social";
-import { CONTACT_EMAIL, DISCORD_INVITE, NON_AFFILIATION, OPERATOR, SITE_BLURB, TRADEMARK_LINE } from "@/lib/jsonld";
+import { CONTACT_EMAIL, DISCORD_INVITE, OPERATOR, SITE_BLURB } from "@/lib/jsonld";
 import { deployedSha, REPO_URL, sourceUrl } from "@/lib/source";
 import { BETA, LAUNCH, longDate } from "@/data/wow-forever";
 import { CookiePreferencesButton } from "./CookieConsent";
@@ -74,7 +74,7 @@ function FooterLink({ item, className = itemClass }: { item: Item; className?: s
  * The site footer: two slim rows. The first has the wordmark (Glint perched on the footer's edge above it), the
  * tagline, the link groups and the Discord and GitHub icons; on a phone each group folds into a small disclosure.
  * The second, small and muted, has the legal links, the cookie choices, the one site-wide credit line, the operator,
- * licence and build, and the trademark notice.
+ * licence and build. The full trademark notice and credits are a link away, on /terms#trademarks and /methodology#credits.
  */
 export default function Footer() {
   const now = new Date();
@@ -146,7 +146,6 @@ export default function Footer() {
             &copy; {year} {OPERATOR}. Code AGPL-3.0.
             {sha && <> Build <a href={sourceUrl()} rel="noopener" className="font-mono hover:text-accent transition-colors">{sha.slice(0, 7)}</a>.</>}
             {" "}Contact: <a href={`mailto:${CONTACT_EMAIL}`} className="hover:text-accent transition-colors">{CONTACT_EMAIL}</a>
-            {" "}· {NON_AFFILIATION} {TRADEMARK_LINE}
           </p>
         </div>
       </div>

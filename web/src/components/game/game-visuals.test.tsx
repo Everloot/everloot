@@ -198,7 +198,7 @@ test("raid builder: a raid's loading screen above the title, and a buff's toolti
   expect(html).not.toMatch(/data-game-credit|data-source-line/);
 });
 
-test("home: the hero shows the game's own logo, the name and the disclaimer as text, with no credit line on the page", async () => {
+test("home: the hero shows the game's own logo and its name as text, on a phone too, with no credit line on the page", async () => {
   vi.stubEnv("NEXT_PUBLIC_GAME_ASSETS_URL", BASE);
   vi.stubGlobal("fetch", bucket());
   const html = await render(() => Home());
@@ -207,7 +207,8 @@ test("home: the hero shows the game's own logo, the name and the disclaimer as t
   expect(banner).toMatch(/<img[^>]*src="[^"]*logo\/logo-wow-forever-2x\.webp"[^>]*alt=""[^>]*aria-hidden="true"/);
   expect(banner).toMatch(/<img[^>]*src="[^"]*loading\/9249\.webp"[^>]*alt=""[^>]*aria-hidden="true"/);
   expect(banner).toContain(">World of Warcraft: Forever</p>");
-  expect(banner).toContain("Not affiliated with or endorsed by Blizzard Entertainment.");
+  expect(banner).not.toMatch(/class="[^"]*hidden[^"]*">World of Warcraft: Forever/);
+  expect(banner).not.toContain("endorsed by Blizzard");
   // The countdown sits on the banner, in Glint's speech bubble, and only there.
   expect(banner).toMatch(/data-glint-hero[\s\S]*Forever launches <a href="\/wow-forever"[^>]*><time/);
   expect(html.match(/Forever launches/g)).toHaveLength(1);

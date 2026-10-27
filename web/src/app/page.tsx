@@ -82,8 +82,8 @@ export default async function Home() {
           hero
           image={launch?.background && <BannerArt art={launch.background} eager position={HERO_ART_POSITION} sizes={HERO_ART_SIZES} />}
           aside={launch && (
-            // The game's name and the disclaimer stay real text under its logo; the logo is decorative. On a
-            // phone only the disclaimer shows, under the buttons, to keep the hero short.
+            // The game's name stays real text under its logo; the logo is decorative. On a phone only the name
+            // shows, under the buttons, to keep the hero short.
             <div className="lg:text-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -95,8 +95,7 @@ export default async function Home() {
                 decoding="async"
                 className="mx-auto mb-3 hidden h-28 w-28 object-contain lg:block"
               />
-              <p className="hidden font-semibold text-fg lg:block">World of Warcraft: Forever</p>
-              <p className="text-xs text-fg-2 lg:mt-1 lg:text-sm">Not affiliated with or endorsed by Blizzard Entertainment.</p>
+              <p className="text-sm font-semibold text-fg lg:text-base">World of Warcraft: Forever</p>
             </div>
           )}
         >
