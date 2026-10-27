@@ -118,6 +118,38 @@ describe("compact consent", () => {
     footerButton.remove();
   });
 
+  const dismiss = (how: "Escape" | "Close") => act(async () => {
+    if (how === "Close") button("Close").click();
+    else checkboxes()[0].dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  });
+
+  it.each(["Escape", "Close"] as const)("forgets a tick dismissed with %s: reopened, the box shows the saved rejection and Save keeps it", async (how) => {
+    localStorage.setItem("everloot-analytics-consent-v1", "rejected");
+    await act(async () => root.render(<CookieConsent analytics={{ gaId: GA }} />));
+    await reopen();
+    await act(async () => checkboxes()[0].click());
+    await dismiss(how);
+    expect(container.querySelector("section")).toBeNull();
+    expect(localStorage.getItem("everloot-analytics-consent-v1")).toBe("rejected");
+    await reopen();
+    expect(checkboxes().map((c) => c.checked)).toEqual([false]);
+    await act(async () => button("Save my choices").click());
+    expect(localStorage.getItem("everloot-analytics-consent-v1")).toBe("rejected");
+    expect(scripts()).toHaveLength(0);
+  });
+
+  it.each(["Escape", "Close"] as const)("keeps a saved acceptance when an untick is dismissed with %s", async (how) => {
+    localStorage.setItem("everloot-analytics-consent-v1", "accepted");
+    await act(async () => root.render(<CookieConsent analytics={{ gaId: GA }} />));
+    await reopen();
+    await act(async () => checkboxes()[0].click());
+    await dismiss(how);
+    await reopen();
+    expect(checkboxes().map((c) => c.checked)).toEqual([true]);
+    expect(localStorage.getItem("everloot-analytics-consent-v1")).toBe("accepted");
+    expect(scripts().some((s) => s.src.includes("googletagmanager.com"))).toBe(true);
+  });
+
   it("shows an earlier one-action acceptance as ticked when reopened, so saving keeps it", async () => {
     await act(async () => root.render(<CookieConsent analytics={{ gaId: GA }} />));
     await act(async () => button("Accept optional cookies").click());
@@ -198,28 +230,36 @@ describe("compact consent", () => {
   it("keeps a focused control scrolled clear of the banner while it is open, then gives the page its padding back", async () => {
     document.documentElement.style.scrollPaddingBottom = "12px";
     document.body.style.paddingBottom = "4px";
-    await act(async () => root.render(<CookieConsent analytics={{ gaId: GA }} />));
-    const banner = container.querySelector("section")!;
-    banner.getBoundingClientRect = () => ({ top: window.innerHeight - 130 }) as DOMRect;
-    resized!();
-    expect(document.documentElement.style.scrollPaddingBottom).toBe("138px");
-    // The last controls on the page need room below them to scroll clear of it too.
-    expect(document.body.style.paddingBottom).toBe("138px");
-    banner.getBoundingClientRect = () => ({ top: window.innerHeight - 300 }) as DOMRect;
-    resized!();
-    expect(document.documentElement.style.scrollPaddingBottom).toBe("308px");
-    expect(document.body.style.paddingBottom).toBe("308px");
-    await act(async () => button("Reject optional cookies").click());
-    expect(document.documentElement.style.scrollPaddingBottom).toBe("12px");
-    expect(document.body.style.paddingBottom).toBe("4px");
-    document.body.style.paddingBottom = "";
+    // A desktop scrollbar along the bottom makes the visible page shorter than innerHeight.
+    const visible = window.innerHeight - 15;
+    Object.defineProperty(document.documentElement, "clientHeight", { configurable: true, value: visible });
+    try {
+      await act(async () => root.render(<CookieConsent analytics={{ gaId: GA }} />));
+      const banner = container.querySelector("section")!;
+      banner.getBoundingClientRect = () => ({ top: visible - 130 }) as DOMRect;
+      resized!();
+      expect(document.documentElement.style.scrollPaddingBottom).toBe("138px");
+      // The last controls on the page need room below them to scroll clear of it too.
+      expect(document.body.style.paddingBottom).toBe("138px");
+      banner.getBoundingClientRect = () => ({ top: visible - 300 }) as DOMRect;
+      resized!();
+      expect(document.documentElement.style.scrollPaddingBottom).toBe("308px");
+      expect(document.body.style.paddingBottom).toBe("308px");
+      await act(async () => button("Reject optional cookies").click());
+      expect(document.documentElement.style.scrollPaddingBottom).toBe("12px");
+      expect(document.body.style.paddingBottom).toBe("4px");
+    } finally {
+      delete (document.documentElement as unknown as { clientHeight?: number }).clientHeight;
+      document.body.style.paddingBottom = "";
+    }
   });
 
-  it("caps the banner at the window and lets it scroll when zoomed text outgrows it", async () => {
+  it("stops a banner grown by zoom 5rem short of the window top, so a focused control fits above it, and scrolls inside", async () => {
     await act(async () => root.render(<CookieConsent analytics={{ gaId: GA }} />));
     const banner = container.querySelector("section")!;
     expect(banner.className).toContain("overflow-y-auto");
-    expect(banner.className).toMatch(/max-h-\[calc\(100dvh-/);
+    // With bottom-4 that leaves 5rem above it: a 2.75rem control, its focus ring and a desktop scrollbar.
+    expect(banner.className).toContain("max-h-[calc(100dvh-6rem)]");
   });
 });
 

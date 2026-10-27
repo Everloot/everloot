@@ -23,10 +23,20 @@ describe("a rejection carried in the address when storage is blocked", () => {
     const withMark = withRejectionFragment("#plan=EL1abc&plan2=EL1def", "analytics", true);
     expect(withMark).toBe("#plan=EL1abc&plan2=EL1def&everloot-analytics-rejected");
     expect(withRejectionFragment(withMark, "analytics", true)).toBe(withMark);
-    expect(readPlanHash(withMark)).toEqual({ first: "EL1abc", second: "EL1def" });
+    expect(readPlanHash(withMark)).toMatchObject({ first: "EL1abc", second: "EL1def" });
     expect(withRejectionFragment(withMark, "analytics", false)).toBe("#plan=EL1abc&plan2=EL1def");
     expect(withRejectionFragment("", "analytics", true)).toBe("#everloot-analytics-rejected");
     expect(withRejectionFragment("#everloot-analytics-rejected", "analytics", false)).toBe("");
+  });
+
+  it("leaves spend-order parts exactly as they were, wherever the rejection sits", () => {
+    const plan = "#plan=EL1abc&plan2=EL1def&order=O1p-AB_c-9&order2=O1g-BAz";
+    const withMark = withRejectionFragment(plan, "analytics", true);
+    expect(withMark).toBe(`${plan}&everloot-analytics-rejected`);
+    expect(withRejectionFragment(withMark, "analytics", false)).toBe(plan);
+    // A page that appends its own parts after the rejection keeps them when the rejection comes out.
+    expect(withRejectionFragment("#plan=EL1abc&everloot-analytics-rejected&order=O1p-AB_c-9", "analytics", false)).toBe("#plan=EL1abc&order=O1p-AB_c-9");
+    expect(hasRejectionFragment(plan, "analytics")).toBe(false);
   });
 
   it("keeps a raid link readable", () => {

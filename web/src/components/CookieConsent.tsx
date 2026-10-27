@@ -70,6 +70,8 @@ export default function CookieConsent({ adsenseClient, analytics = {} }: { adsen
     loadCookieless(analytics, privacySignals(navigator, window), document);
     const reopen = () => {
       trigger.current = document.activeElement as HTMLElement;
+      // Ticks left unsaved by Escape or Close are not a choice: show the one in force.
+      setDraft(ticked(loaded.current));
       setExpanded(true);
       setVisible(true);
     };
@@ -85,14 +87,15 @@ export default function CookieConsent({ adsenseClient, analytics = {} }: { adsen
   // The banner sits over the foot of the window. While it is open, scroll padding of its height makes the
   // browser bring a control that takes focus (a calculator's, say) into view above it rather than under it,
   // and as much padding under the page gives the last controls on it the room to get there. The 8 px spare
-  // keeps the focus ring in sight too.
+  // keeps the focus ring in sight too. It is measured from the visible page (clientHeight), which a desktop
+  // scrollbar along the bottom makes shorter than innerHeight.
   useEffect(() => {
     const banner = panel.current;
     if (!visible || !banner) return;
     const root = document.documentElement;
     const before = [root.style.scrollPaddingBottom, document.body.style.paddingBottom];
     const fit = () => {
-      const covered = `${window.innerHeight - banner.getBoundingClientRect().top + 8}px`;
+      const covered = `${root.clientHeight - banner.getBoundingClientRect().top + 8}px`;
       root.style.scrollPaddingBottom = covered;
       document.body.style.paddingBottom = covered;
     };
@@ -139,9 +142,9 @@ export default function CookieConsent({ adsenseClient, analytics = {} }: { adsen
   if (!visible) return null;
   const allRejected = categories.length > 0 && categories.every((c) => choices[c] === "rejected");
   return (
-    // At 390 px the first view is under 140 px tall. Zoomed text can make it taller than the window, so it
-    // stops at the window's height and scrolls inside.
-    <section ref={panel} aria-labelledby="cookie-heading" className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[min(92%,640px)] max-h-[calc(100dvh-2rem)] overflow-y-auto z-50 rounded-xl border border-line bg-canvas p-3" onKeyDown={(event) => { if (event.key === "Escape" && categories.every((c) => choices[c])) close(); }}>
+    // At 390 px the first view is under 140 px tall. Zoom can make it taller than the window, so it stops 5rem
+    // short of the top, room for a focused 44 px control and its ring above it, and scrolls inside.
+    <section ref={panel} aria-labelledby="cookie-heading" className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[min(92%,640px)] max-h-[calc(100dvh-6rem)] overflow-y-auto z-50 rounded-xl border border-line bg-canvas p-3" onKeyDown={(event) => { if (event.key === "Escape" && categories.every((c) => choices[c])) close(); }}>
       <h2 ref={heading} tabIndex={-1} id="cookie-heading" className="text-sm font-semibold text-fg">Cookie preferences</h2>
       {categories.length === 0 ? (
         <p className="text-sm text-fg">No optional cookies are in use on this site right now.</p>
