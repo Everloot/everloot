@@ -8,6 +8,7 @@
  *   web/src/data/game-data/client-layer.json      npm run kb -- client-layer (relation edges for the database pages)
  *   web/src/data/game-data/client-achievements.json  npm run kb -- client-achievements (achievements and criteria)
  *   web/src/data/game-data/client-encounters.json  npm run kb -- client-encounters (each instance's bosses)
+ *   web/src/data/game-data/client-mounts.json      npm run kb -- client-mounts (the mount list)
  *   web/src/data/game-data/spell-values.json      the build watch (numbers of the spells talents show)
  *   web/src/data/game-data/changes/<id>.json      the build watch (one changelog entry per build)
  *
@@ -171,6 +172,6 @@ export function differingFiles(generated: string, committed: string, files: stri
 export function generatedFiles(root: string): string[] {
   const dir = dataDir(root);
   const talents = existsSync(join(dir, "talents")) ? readdirSync(join(dir, "talents")).filter((f) => f.endsWith(".json")).sort().map((f) => `${GAME_DATA_DIR}/talents/${f}`) : [];
-  const top = ["map.json", "client-layer.json", "client-achievements.json", "client-encounters.json", "spell-values.json", "client-digests.json", ...raidFiles(root)].filter((f) => existsSync(join(dir, f))).map((f) => `${GAME_DATA_DIR}/${f}`);
+  const top = ["map.json", "client-layer.json", "client-achievements.json", "client-encounters.json", "client-mounts.json", "spell-values.json", "client-digests.json", ...raidFiles(root)].filter((f) => existsSync(join(dir, f))).map((f) => `${GAME_DATA_DIR}/${f}`);
   return [...talents, ...top, ...(existsSync(join(root, RAID_LUA)) ? [RAID_LUA] : [])];
 }
