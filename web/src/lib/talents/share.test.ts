@@ -227,8 +227,8 @@ describe("importCode with a spend order", () => {
   });
 
   test("an order that matches the code loads with the talents and says who made it", () => {
-    const result = importCode(fixture, code, encodeOrder(ranks, order, "player"));
-    expect(result).toEqual({ ...plain, order: { known: true, origin: "player", order } });
+    const result = importCode(fixture, code, encodeOrder(ranks, order, "planned"));
+    expect(result).toEqual({ ...plain, order: { known: true, origin: "planned", order } });
     expect(result.ok && result.report.problems).toEqual([]);
   });
 
@@ -254,7 +254,7 @@ describe("importCode with a spend order", () => {
 
   test("an order for points that did not all place on this tree is unknown, after the talents' own problems", () => {
     const more: Ranks = { ...ranks, 777: { rank: 1 } };
-    const result = importCode(fixture, encodeBuild({ ...shared, ranks: more }), encodeOrder(more, [...order, 777], "player"));
+    const result = importCode(fixture, encodeBuild({ ...shared, ranks: more }), encodeOrder(more, [...order, 777], "planned"));
     if (!result.ok) throw new Error("expected ok");
     expect(result.ranks).toEqual(ranks);
     expect(result.order).toEqual({ known: false, reason: "not-placed" });
@@ -265,11 +265,11 @@ describe("importCode with a spend order", () => {
   });
 
   test("who made the order comes from the token, never from how it arrived", () => {
-    const generated = encodeOrder(ranks, order, "generated")!;
+    const generated = encodeOrder(ranks, order, "provisional")!;
     const link = `https://everloot.app/tools/talents/mage${planHash(code, null, generated)}`;
     const fromLink = importCode(fixture, link, readPlanHash(link).firstOrder);
     const pasted = importCode(fixture, code, ` ${generated} `);
-    expect(fromLink.ok && fromLink.order).toEqual({ known: true, origin: "generated", order });
-    expect(pasted.ok && pasted.order).toEqual({ known: true, origin: "generated", order });
+    expect(fromLink.ok && fromLink.order).toEqual({ known: true, origin: "provisional", order });
+    expect(pasted.ok && pasted.order).toEqual({ known: true, origin: "provisional", order });
   });
 });

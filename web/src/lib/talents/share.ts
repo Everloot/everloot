@@ -176,9 +176,9 @@ export const ORDER_VERSION = 1;
 export const ORDER_LIMIT = 64;
 const ORDER_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
-export type OrderOrigin = "player" | "generated";
-const MODE: Record<OrderOrigin, string> = { player: "p", generated: "g" };
-const ORIGIN: Record<string, OrderOrigin | undefined> = { p: "player", g: "generated" };
+export type OrderOrigin = "planned" | "provisional";
+const MODE: Record<OrderOrigin, string> = { planned: "p", provisional: "g" };
+const ORIGIN: Record<string, OrderOrigin | undefined> = { p: "planned", g: "provisional" };
 
 export type OrderError = "malformed" | "newer-version" | "unsupported-mode" | "over-limit" | "extra-points" | "missing-points";
 

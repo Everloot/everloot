@@ -51,8 +51,8 @@ code, never part of it, so every EL1 code, link and addon example stays byte for
   included. `O2` and later are newer than a version 1 reader; `O0` and `O01` are damaged.
 - `mode`: who made the order. It is read from the token only, never from how the plan arrived (a
   link, a paste, a saved build or the addon).
-  - `p`: the player planned it.
-  - `g`: a tool generated it; provisional.
+  - `p`, planned: the player planned it.
+  - `g`, provisional: a tool generated it.
 
   Version 1 has only these two. Any other letter is an unsupported mode.
 - `sequence`: one character per point, in spend order. Each character is a node's index among the

@@ -113,7 +113,7 @@ test("talent_plan refuses what it cannot read, in the calculator's words", () =>
 test("talent_plan answers a link that carries spend orders exactly as it answers the same link without them", () => {
   const code = legalCode();
   const node = firstNode();
-  const order = encodeOrder({ [node.id]: { rank: node.maxRanks } }, Array<number>(node.maxRanks).fill(node.id), "player");
+  const order = encodeOrder({ [node.id]: { rank: node.maxRanks } }, Array<number>(node.maxRanks).fill(node.id), "planned");
   expect(order).toMatch(/^O1p-A+$/);
   const old = `https://everloot.app/tools/talents/mage#plan=${code}&plan2=${code}`;
   expect(handleTalentPlan({ code: `${old}&order=${order}&order2=O1g-A` })).toEqual(handleTalentPlan({ code: old }));

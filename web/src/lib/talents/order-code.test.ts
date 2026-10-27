@@ -13,39 +13,39 @@ const upTo = (n: number) => Array.from({ length: n }, (_, i) => i + 1);
 
 describe("spend order token", () => {
   test("a player-planned order is O1p- and one character per point, and reads back the same", () => {
-    const token = encodeOrder(ranks, order, "player");
+    const token = encodeOrder(ranks, order, "planned");
     expect(token).toBe(`O1p-${sequence}`);
-    expect(decodeOrder(token!, ranks)).toEqual({ ok: true, origin: "player", order });
+    expect(decodeOrder(token!, ranks)).toEqual({ ok: true, origin: "planned", order });
   });
 
-  test("a generated order is O1g- and reads back as generated: the maker is the token's own letter", () => {
-    const token = encodeOrder(ranks, order, "generated");
+  test("a generated order is O1g- and reads back as provisional: the maker is the token's own letter", () => {
+    const token = encodeOrder(ranks, order, "provisional");
     expect(token).toBe(`O1g-${sequence}`);
-    expect(decodeOrder(token!, ranks)).toEqual({ ok: true, origin: "generated", order });
-    expect(decodeOrder(`O1p-${sequence}`, ranks)).toEqual({ ok: true, origin: "player", order });
+    expect(decodeOrder(token!, ranks)).toEqual({ ok: true, origin: "provisional", order });
+    expect(decodeOrder(`O1p-${sequence}`, ranks)).toEqual({ ok: true, origin: "planned", order });
   });
 
   test("indexes follow ascending node ids, whatever order the ranks were made in, and zero ranks are not nodes", () => {
     const reversed = Object.fromEntries(Object.entries(ranks).reverse()) as Ranks;
-    expect(encodeOrder(reversed, order, "player")).toBe(`O1p-${sequence}`);
-    expect(encodeOrder({ ...ranks, 5: { rank: 0 } }, order, "player")).toBe(`O1p-${sequence}`);
-    expect(decodeOrder(`O1p-${sequence}`, { ...reversed, 5: { rank: 0 } })).toEqual({ ok: true, origin: "player", order });
+    expect(encodeOrder(reversed, order, "planned")).toBe(`O1p-${sequence}`);
+    expect(encodeOrder({ ...ranks, 5: { rank: 0 } }, order, "planned")).toBe(`O1p-${sequence}`);
+    expect(decodeOrder(`O1p-${sequence}`, { ...reversed, 5: { rank: 0 } })).toEqual({ ok: true, origin: "planned", order });
   });
 
   test("the sequence is the standard base64url alphabet: 64 nodes run from A to _", () => {
-    const token = encodeOrder(flat(64), upTo(64), "player");
+    const token = encodeOrder(flat(64), upTo(64), "planned");
     expect(token).toBe("O1p-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_");
-    expect(decodeOrder(token!, flat(64))).toEqual({ ok: true, origin: "player", order: upTo(64) });
+    expect(decodeOrder(token!, flat(64))).toEqual({ ok: true, origin: "planned", order: upTo(64) });
   });
 
   test("64 points is the most a token carries: a bigger build gets no token and a longer token is refused", () => {
     const most: Ranks = { 1: { rank: 50 }, 2: { rank: 14 } };
     const mostOrder = [...Array<number>(50).fill(1), ...Array<number>(14).fill(2)];
-    expect(encodeOrder(most, mostOrder, "player")).toBe(`O1p-${"A".repeat(50)}${"B".repeat(14)}`);
+    expect(encodeOrder(most, mostOrder, "planned")).toBe(`O1p-${"A".repeat(50)}${"B".repeat(14)}`);
     expect(ORDER_LIMIT).toBe(64);
     const over: Ranks = { 1: { rank: 50 }, 2: { rank: 15 } };
-    expect(encodeOrder(over, [...mostOrder, 2], "player")).toBeNull();
-    expect(encodeOrder(flat(65), upTo(65), "player")).toBeNull();
+    expect(encodeOrder(over, [...mostOrder, 2], "planned")).toBeNull();
+    expect(encodeOrder(flat(65), upTo(65), "planned")).toBeNull();
     expect(decodeOrder(`O1p-${"A".repeat(50)}${"B".repeat(15)}`, over)).toEqual({ ok: false, error: "over-limit" });
     expect(decodeOrder("O1p-A", over)).toEqual({ ok: false, error: "over-limit" });
     expect(decodeOrder(`O1p-${"A".repeat(65)}`, ranks)).toEqual({ ok: false, error: "over-limit" });
@@ -57,15 +57,15 @@ describe("spend order token", () => {
     expect(decodeOrder("O1p-ABABABABABCDD", ranks)).toEqual({ ok: false, error: "extra-points" });
     expect(decodeOrder("O1p-ABABABABABCCE", ranks)).toEqual({ ok: false, error: "extra-points" });
     expect(decodeOrder("O1p-A", {})).toEqual({ ok: false, error: "extra-points" });
-    expect(encodeOrder(ranks, [...order, 32], "player")).toBeNull();
-    expect(encodeOrder(ranks, [...order.slice(0, -1), 99], "player")).toBeNull();
+    expect(encodeOrder(ranks, [...order, 32], "planned")).toBeNull();
+    expect(encodeOrder(ranks, [...order.slice(0, -1), 99], "planned")).toBeNull();
   });
 
   test("a missing count fails: a node named less often than its rank, or not at all", () => {
     expect(decodeOrder("O1p-ABABABABABCD", ranks)).toEqual({ ok: false, error: "missing-points" });
     expect(decodeOrder("O1p-ABABABABABCC", ranks)).toEqual({ ok: false, error: "missing-points" });
-    expect(encodeOrder(ranks, order.slice(0, -1), "player")).toBeNull();
-    expect(encodeOrder(ranks, [], "player")).toBeNull();
+    expect(encodeOrder(ranks, order.slice(0, -1), "planned")).toBeNull();
+    expect(encodeOrder(ranks, [], "planned")).toBeNull();
   });
 
   test("a bad version fails clearly: O0 and O01 are damaged, O2 and later are newer than this reader", () => {
@@ -90,7 +90,7 @@ describe("spend order token", () => {
   });
 
   test("an empty build has no order to carry", () => {
-    expect(encodeOrder({}, [], "player")).toBeNull();
-    expect(encodeOrder({ 11: { rank: 0 } }, [], "generated")).toBeNull();
+    expect(encodeOrder({}, [], "planned")).toBeNull();
+    expect(encodeOrder({ 11: { rank: 0 } }, [], "provisional")).toBeNull();
   });
 });
