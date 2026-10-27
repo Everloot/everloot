@@ -7,7 +7,7 @@ import { Card, Field, SectionHeading } from "@/components/ui";
 import { detailValue, listOf } from "@/lib/alt-workspace";
 import {
   ANONYMOUS, WORKSPACE_LIMITS, bindTransferred, boundElsewhere, bucketKey, deviceStorage, emptyWorkspace, orderState, planGroups,
-  readWorkspace, settleTransferred, transferRoom, transferStanding,
+  readWorkspace, settleTransferred, transferRoom, transferStanding, withWorkspaceLock,
   type Failure, type LocalAlt, type LocalPlan, type Owner, type PlayerWorkspace, type Standing,
 } from "@/lib/player-workspace";
 import {
@@ -387,12 +387,12 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
           if (!answer.ok) return refusal(answer, plan.name);
           // The account has it: bound to that account on this device at once, whoever is signed in here when it lands.
           saved.push(plan.name);
-          const bound = bindTransferred(deviceStorage(), { owner, planIds: [plan.id] }, { ok: true, userId: owner.userId, planIds: [plan.id] });
+          const bound = await withWorkspaceLock(() => bindTransferred(deviceStorage(), { owner, planIds: [plan.id] }, { ok: true, userId: owner.userId, planIds: [plan.id] }));
           tell();
           if (!bound.ok) return unrecorded(bound);
         }
         if (!live.current) return null;
-        const settled = settleTransferred(deviceStorage(), owner, group.map((r) => r.plan.id));
+        const settled = await withWorkspaceLock(() => settleTransferred(deviceStorage(), owner, group.map((r) => r.plan.id)));
         tell();
         if (!settled.ok) return unrecorded(settled);
       }

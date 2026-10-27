@@ -238,7 +238,7 @@ export function validateWorkspace(value: unknown): Validation {
 export type ReadError = "unavailable" | "corrupt" | "newer-version";
 export type WriteError =
   | ReadError | "full" | "over-limit" | "invalid" | "missing" | "referenced" | "changed" | "other-owner"
-  | "not-transferred" | "incomplete" | "left-signed-out" | "format-room";
+  | "not-transferred" | "incomplete" | "left-signed-out" | "format-room" | "conflict";
 export type Failure = { ok: false; error: WriteError; message: string };
 export type ReadResult = { ok: true; workspace: PlayerWorkspace; raw: string | null } | (Failure & { error: ReadError; raw: string | null });
 export type WriteResult = { ok: true; workspace: PlayerWorkspace } | Failure;
@@ -257,6 +257,7 @@ const MESSAGES: Record<WriteError, string> = {
   "not-transferred": "The transfer did not finish, so nothing on this device changed.",
   incomplete: "The transfer did not confirm every plan it was sent, so none were moved. Nothing on this device changed.",
   "left-signed-out": "The plans were saved to the account, but this browser could not take them out of its signed-out plans, so they show in both.",
+  conflict: "The plans on this device changed in another tab while this was being saved, so nothing was saved. Try again.",
   "format-room": "The plans and alts on this device are saved in an older format. Alt details need the newer one, which takes more room for the same alts, and here that would come to more than the 1 MiB this device keeps. Nothing was changed. Download a backup first (it keeps the older format), then delete a plan or an alt, or shorten some notes, to make room.",
 };
 
@@ -330,11 +331,14 @@ function storable(workspace: PlayerWorkspace): { ok: true; doc: ReturnType<typeo
   return failure(checked.error === "over-limit" ? "over-limit" : "invalid");
 }
 
-function store(storage: DeviceStorage | null, workspace: PlayerWorkspace): WriteResult {
+/** Stores one bucket whole. `expected` is the bucket's stored text as the change read it (null for none yet): when the
+ *  bucket holds anything else now, another tab changed it in between, and nothing is written over that. */
+function store(storage: DeviceStorage | null, workspace: PlayerWorkspace, expected?: string | null): WriteResult {
   const checked = storable(workspace);
   if (!checked.ok) return checked;
   try {
     if (!storage) throw new Error("No storage");
+    if (expected !== undefined && storage.getItem(bucketKey(workspace.owner)) !== expected) return failure("conflict");
     storage.setItem(bucketKey(workspace.owner), JSON.stringify(checked.doc));
     return { ok: true, workspace: { ...workspace, version: checked.doc.version } };
   } catch (error) {
@@ -342,13 +346,28 @@ function store(storage: DeviceStorage | null, workspace: PlayerWorkspace): Write
   }
 }
 
-/** The owner's bucket as stored now, `change` made to it, then stored. Nothing is stored unless every step works.
- *  The alt planner (lib/alt-workspace.ts, lib/alt-import.ts) changes alts through it too. */
+/** The owner's bucket as stored now, `change` made to it, then stored, unless another tab stored something else in
+ *  between. Nothing is stored unless every step works. The alt planner (lib/alt-workspace.ts, lib/alt-import.ts) changes
+ *  alts through it too. */
 export function update(storage: DeviceStorage | null, owner: Owner, change: (workspace: PlayerWorkspace) => PlayerWorkspace | Failure): WriteResult {
   const read = readWorkspace(storage, owner);
   if (!read.ok) return failure(read.error);
   const next = change(read.workspace);
-  return "error" in next ? next : store(storage, next);
+  return "error" in next ? next : store(storage, next, read.raw);
+}
+
+/** The lock every tab takes to change these buckets: Plans on this device's writes and a transfer's, one at a time. */
+export const WORKSPACE_LOCK = "everloot:player-workspace";
+
+/**
+ * Runs `task` holding the workspace lock (the Web Locks API), so no other tab's change to these buckets runs in between,
+ * or at once in a browser without it. Either way each write still checks that its bucket is as the change read it
+ * (store), and writes nothing over another tab's change.
+ */
+export async function withWorkspaceLock<T>(task: () => T | Promise<T>): Promise<T> {
+  const locks = typeof navigator === "undefined" ? undefined : (navigator as { locks?: LockManager }).locks;
+  if (!locks) return task();
+  return locks.request(WORKSPACE_LOCK, () => task()) as Promise<T>;
 }
 
 const replace = (workspace: PlayerWorkspace, plan: LocalPlan): PlayerWorkspace =>
@@ -524,25 +543,27 @@ function withBound(account: PlayerWorkspace, plans: LocalPlan[], boundTo: Bindin
 }
 
 /**
- * What moves out of the signed-out bucket into the account's: of the groups holding any of `ids`, each whose plans the
- * account's bucket all holds as saved (transferStanding), with the alts that use them, every detail kept, and the
- * watches on them. The account's copy of a plan, alt or watch it holds already is kept, and a group with an alt
- * changed here after the account's copy stays.
+ * Of the signed-out groups holding any of `ids`, those the account's bucket holds whole: each plan saved there
+ * (transferStanding), and once `taken`, each alt and each watch on their plans there as well, as the account's bucket
+ * took them, with no alt changed here since. What the account's bucket takes of them (an alt or watch it holds already
+ * keeps the account's copy), and the signed-out bucket without them.
  */
-function settle(signedOut: PlayerWorkspace, account: PlayerWorkspace, ids: Set<string>) {
+function settle(signedOut: PlayerWorkspace, account: PlayerWorkspace, ids: Set<string>, taken = false) {
   const plans = new Map(signedOut.plans.map((p) => [p.id, p]));
   const alts = new Map(signedOut.alts.map((a) => [a.id, a]));
   const theirAlts = new Map(account.alts.map((a) => [a.id, a]));
-  const altKept = (alt: LocalAlt) => {
+  const watched = new Set(account.watches.map((w) => w.planId));
+  const altGoes = (alt: LocalAlt) => {
     const theirs = theirAlts.get(alt.id);
-    return !theirs || whole(theirs) === whole(alt) || Date.parse(alt.updatedAt) <= Date.parse(theirs.updatedAt);
+    if (!theirs) return !taken;
+    return whole(theirs) === whole(alt) || Date.parse(alt.updatedAt) <= Date.parse(theirs.updatedAt);
   };
   const going = planGroups(signedOut).filter((g) => g.planIds.some((id) => ids.has(id))
     && g.planIds.every((id) => transferStanding(plans.get(id)!, account, new Set()).kind === "saved")
-    && g.altIds.every((id) => altKept(alts.get(id)!)));
+    && g.altIds.every((id) => altGoes(alts.get(id)!))
+    && (!taken || signedOut.watches.every((w) => !g.planIds.includes(w.planId) || watched.has(w.planId))));
   const planIds = new Set(going.flatMap((g) => g.planIds));
   const altIds = new Set(going.flatMap((g) => g.altIds));
-  const watched = new Set(account.watches.map((w) => w.planId));
   return {
     moved: planIds.size,
     account: {
@@ -559,13 +580,28 @@ function settle(signedOut: PlayerWorkspace, account: PlayerWorkspace, ids: Set<s
   };
 }
 
-/** Stores the account's bucket, then the signed-out one when anything left it: if the second write fails, a plan is in
- *  both buckets, never in neither. */
-function commit(storage: DeviceStorage | null, next: ReturnType<typeof settle>): { ok: true; moved: number } | Failure {
-  const first = store(storage, next.account);
+/**
+ * Moves out of the signed-out bucket the groups holding any of `ids` that the account's bucket holds whole (settle).
+ * The account's bucket takes their alts and watches first. Then the signed-out bucket, read again as it is stored at that
+ * moment, lets go of only what the account's bucket now holds, so anything another tab added in between stays. Each
+ * write is made to its bucket as stored, never from an earlier snapshot. If the second fails, a plan is in both
+ * buckets, never in neither.
+ */
+function moveSaved(storage: DeviceStorage | null, owner: Owner, ids: Set<string>): { ok: true; moved: number } | Failure {
+  const signedOut = readWorkspace(storage, ANONYMOUS);
+  if (!signedOut.ok) return failure(signedOut.error);
+  const account = readWorkspace(storage, owner);
+  if (!account.ok) return failure(account.error);
+  if (settle(signedOut.workspace, account.workspace, ids).moved === 0) return { ok: true, moved: 0 };
+  const first = update(storage, owner, (mine) => settle(signedOut.workspace, mine, ids).account);
   if (!first.ok) return first;
-  if (next.moved === 0) return { ok: true, moved: 0 };
-  return store(storage, next.signedOut).ok ? { ok: true, moved: next.moved } : failure("left-signed-out");
+  let moved = 0;
+  const second = update(storage, ANONYMOUS, (theirs) => {
+    const next = settle(theirs, first.workspace, ids, true);
+    moved = next.moved;
+    return next.signedOut;
+  });
+  return second.ok ? { ok: true, moved } : failure("left-signed-out");
 }
 
 /** A transfer of device plans to an account, as it was sent: the account, and which plans. */
@@ -577,7 +613,7 @@ export type TransferResult = { ok: true; userId: string; planIds: string[] } | {
 /**
  * Once a transfer reports that it saved every plan it was sent, those plans are the account's: its bucket keeps them,
  * bound to it (a plan it holds bound already keeps the account's copy), and they move out of the signed-out bucket
- * with the alts and watches that go with them (settle). A plan an alt uses stays signed out as well until every plan
+ * with the alts and watches that go with them (moveSaved). A plan an alt uses stays signed out as well until every plan
  * of that alt is the account's, so the alt never names a plan its bucket lacks, and a transfer that stops part way has
  * a record of what the account has. Anything less binds nothing: a failed result, one that confirms only some of the
  * plans or others than were sent, or an answer for another account than the transfer was sent for. `bound` counts the
@@ -593,25 +629,19 @@ export function bindTransferred(storage: DeviceStorage | null, sent: TransferReq
   if (confirmed.size !== ids.size || [...ids].some((id) => !confirmed.has(id))) return failure("incomplete");
   const signedOut = readWorkspace(storage, ANONYMOUS);
   if (!signedOut.ok) return failure(signedOut.error);
-  const account = readWorkspace(storage, owner);
-  if (!account.ok) return failure(account.error);
   const sending = signedOut.workspace.plans.filter((p) => ids.has(p.id));
   if (sending.length === 0) return { ok: true, bound: 0 };
-  const into = withBound(account.workspace, sending, { userId: result.userId, at: now.toISOString() });
-  const done = commit(storage, settle(signedOut.workspace, into, ids));
-  return done.ok ? { ok: true, bound: sending.length } : done;
+  const into = update(storage, owner, (account) => withBound(account, sending, { userId: result.userId, at: now.toISOString() }));
+  if (!into.ok) return into;
+  const moved = moveSaved(storage, owner, ids);
+  return moved.ok ? { ok: true, bound: sending.length } : moved;
 }
 
 /** For plans a transfer has nothing to send for, as the account's bucket holds them already: moves them out of the
  *  signed-out bucket with what goes with them, as bindTransferred does once a plan is saved. */
 export function settleTransferred(storage: DeviceStorage | null, owner: Owner, planIds: string[]): { ok: true; moved: number } | Failure {
   if (owner.kind !== "account") return failure("other-owner");
-  const signedOut = readWorkspace(storage, ANONYMOUS);
-  if (!signedOut.ok) return failure(signedOut.error);
-  const account = readWorkspace(storage, owner);
-  if (!account.ok) return failure(account.error);
-  const next = settle(signedOut.workspace, account.workspace, new Set(planIds));
-  return next.moved === 0 ? { ok: true, moved: 0 } : commit(storage, next);
+  return moveSaved(storage, owner, new Set(planIds));
 }
 
 /** Why the account's bucket could not take these signed-out plans and what goes with them once the account has them,
@@ -746,7 +776,7 @@ export function applyImport(storage: DeviceStorage | null, owner: Owner, preview
   const read = readWorkspace(storage, owner);
   if (!read.ok) return failure(read.error);
   if (JSON.stringify(read.workspace) !== preview.base) return failure("changed");
-  return store(storage, preview.result);
+  return store(storage, preview.result, read.raw);
 }
 
 /** The bucket as a backup file: its stored text, binding and all. Only this bucket, never another owner's. */

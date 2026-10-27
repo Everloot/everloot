@@ -662,3 +662,87 @@ describe("binding a transfer on this device", () => {
     expect(boundElsewhere(null, A, [FROST.id])).toEqual(new Set());
   });
 });
+
+describe("writes from more than one tab", () => {
+  /** A Web Locks stand-in: one holder at a time per name, in turn, with every request and any overlap recorded. */
+  function fakeLocks() {
+    const names: string[] = [];
+    let held = 0;
+    let overlapped = false;
+    let queue: Promise<unknown> = Promise.resolve();
+    const request = (name: string, callback: () => unknown) => {
+      names.push(name);
+      const run = queue.then(async () => {
+        held++;
+        if (held > 1) overlapped = true;
+        try { return await callback(); } finally { held--; }
+      });
+      queue = run.catch(() => undefined);
+      return run;
+    };
+    Object.defineProperty(navigator, "locks", { value: { request }, configurable: true });
+    return { names, overlapped: () => overlapped };
+  }
+  afterEach(() => { delete (navigator as { locks?: unknown }).locks; });
+
+  test("a plan another tab saves between the two binding writes is kept", () => {
+    seed(ANON, [FROST]);
+    const nativeSet = Storage.prototype.setItem;
+    let addBetweenWrites = true;
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (this: Storage, key: string, value: string) {
+      nativeSet.call(this, key, value);
+      if (key === bucketKey(A) && addBetweenWrites) {
+        addBetweenWrites = false;
+        nativeSet.call(this, bucketKey(ANON), JSON.stringify(doc(ANON, [FROST, FIRE])));
+      }
+    });
+    const result = bindTransferred(localStorage, { owner: A, planIds: [FROST.id] }, { ok: true, userId: A_ID, planIds: [FROST.id] });
+    expect(result.ok).toBe(true);
+    expect(names(ANON)).toEqual(["Fire"]);
+    expect(stored(A)!.plans).toEqual([bound(FROST)]);
+  });
+
+  test("a write whose bucket another tab changed after it was read writes nothing over that change, and says so", async () => {
+    const { savePlan } = await import("@/lib/player-workspace");
+    seed(ANON, [FROST]);
+    const theirs = JSON.stringify(doc(ANON, [FROST, FIRE]));
+    let first = true;
+    // Another tab saves Fire just after this write has read the bucket.
+    const storage = {
+      getItem: (key: string) => {
+        const value = localStorage.getItem(key);
+        if (key === bucketKey(ANON) && first) { first = false; localStorage.setItem(key, theirs); }
+        return value;
+      },
+      setItem: (key: string, value: string) => localStorage.setItem(key, value),
+      removeItem: (key: string) => localStorage.removeItem(key),
+    };
+    const result = savePlan(storage, ANON, { name: "Arcane", notes: "", classSlug: "mage", codes: [MAGE, null], orders: [PLANNED, null] });
+    expect(result).toMatchObject({ ok: false, error: "conflict", message: "The plans on this device changed in another tab while this was being saved, so nothing was saved. Try again." });
+    expect(localStorage.getItem(bucketKey(ANON))).toBe(theirs);
+  });
+
+  test("every write on Plans on this device, and every binding a transfer makes, holds the one workspace lock, one at a time", async () => {
+    const lock = fakeLocks();
+    seed(ANON, [FROST, FIRE]);
+    who = null;
+    const { default: DevicePlans } = await import("@/components/workspace/DevicePlans");
+    await act(async () => root.render(<DevicePlans />));
+    await settle();
+    const item = [...container.querySelectorAll("li")].find((li) => li.querySelector("h3")?.textContent === "Fire")!;
+    await click([...item.querySelectorAll("button")].find((b) => b.textContent === "Make a copy"));
+    expect(names(ANON)).toEqual(["Frost", "Fire", "Fire (copy)"]);
+    expect(lock.names).toEqual(["everloot:player-workspace"]);
+    await act(async () => root.unmount());
+    root = createRoot(container);
+    who = A_ID;
+    await render();
+    await open();
+    await choose("Save Frost to your account", { Frost: "private" });
+    await click(saveButton());
+    expect(posts.map((p) => p.body.name)).toEqual(["Frost"]);
+    expect(lock.names.length).toBeGreaterThan(1);
+    expect(new Set(lock.names)).toEqual(new Set(["everloot:player-workspace"]));
+    expect(lock.overlapped()).toBe(false);
+  });
+});

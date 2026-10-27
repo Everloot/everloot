@@ -6,7 +6,7 @@ import { Card, CopyButton, Field, SectionHeading } from "@/components/ui";
 import { restoreLines } from "@/lib/alt-workspace";
 import {
   BACKUP_TOO_LARGE, WORKSPACE_LIMITS, applyImport, bucketKey, copyPlan, deletePlan, deviceStorage, editPlan, exportBackup, storedCounts,
-  orderState, previewImport, readPlanText, readWorkspace, sameOwner, savePlan,
+  orderState, previewImport, readPlanText, readWorkspace, sameOwner, savePlan, withWorkspaceLock,
   type Failure, type ImportPreview, type LocalPlan, type Owner, type PlanText, type ReadResult,
 } from "@/lib/player-workspace";
 import { planHash, replacePlanHash } from "@/lib/talents/import";
@@ -15,7 +15,8 @@ import { useWorkspaceOwner } from "./LocalPlanSave";
 // /tools/builds: the plans kept in this browser (lib/player-workspace.ts) for whoever is signed in now, or for
 // the browser signed out. Named, opened, edited, copied, deleted, backed up and restored here, with nothing sent:
 // the page asks the network only who is signed in. The calculator's Save on this device opens it with the plan in
-// the address fragment, to be named and saved here.
+// the address fragment, to be named and saved here. Every change is made holding the workspace lock
+// (withWorkspaceLock), one tab at a time, as a transfer's are.
 
 const action = "inline-flex min-h-8 items-center px-1.5 text-cell text-fg-2 hover:text-accent disabled:opacity-60";
 const textarea = "w-full rounded-control border border-edge bg-canvas px-3 py-2 text-base text-fg";
@@ -126,7 +127,6 @@ function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | nu
     setMessage(result.ok ? { text: done, alert: false } : { text: result.message, alert: true, inUse: result.error === "referenced" });
     return result.ok;
   };
-  const storage = deviceStorage();
   const plans = [...read.workspace.plans].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
   return (
@@ -159,15 +159,15 @@ function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | nu
               <PlanItem
                 key={plan.id}
                 plan={plan}
-                onEdit={(edit) => {
-                  const result = editPlan(storage, owner, plan.id, edit);
+                onEdit={async (edit) => {
+                  const result = await withWorkspaceLock(() => editPlan(deviceStorage(), owner, plan.id, edit));
                   if (result.ok) { after(result, `Saved "${result.plan.name}".`); return null; }
                   // A plan deleted in another tab leaves the list, and its form with it: say so above the list.
                   if (result.error === "missing") { after(result, ""); return null; }
                   return result.message;
                 }}
-                onCopy={() => { const result = copyPlan(storage, owner, plan.id); after(result, result.ok ? `Made "${result.plan.name}".` : ""); }}
-                onDelete={() => after(deletePlan(storage, owner, plan.id), `Deleted "${plan.name}" from this device.`)}
+                onCopy={async () => { const result = await withWorkspaceLock(() => copyPlan(deviceStorage(), owner, plan.id)); after(result, result.ok ? `Made "${result.plan.name}".` : ""); }}
+                onDelete={async () => after(await withWorkspaceLock(() => deletePlan(deviceStorage(), owner, plan.id)), `Deleted "${plan.name}" from this device.`)}
                 onCopied={(ok) => setMessage(ok
                   ? { text: "Link copied. It opens the plan in the talent calculator.", alert: false }
                   : { text: "Copy failed. Use Open, then copy the address.", alert: true })}
@@ -184,7 +184,7 @@ function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | nu
 function PlanItem({ plan, onEdit, onCopy, onDelete, onCopied }: {
   plan: LocalPlan;
   /** Null when it saved, else why not. */
-  onEdit: (edit: { name: string; notes: string }) => string | null;
+  onEdit: (edit: { name: string; notes: string }) => Promise<string | null>;
   onCopy: () => void;
   onDelete: () => void;
   onCopied: (ok: boolean) => void;
@@ -210,16 +210,16 @@ function PlanItem({ plan, onEdit, onCopy, onDelete, onCopied }: {
           <button type="button" className={action} onClick={() => setConfirming(true)}>Delete</button>
         )}
       </div>
-      {editing && <EditForm plan={plan} onSave={(edit) => { const error = onEdit(edit); if (!error) setEditing(false); return error; }} onCancel={() => setEditing(false)} />}
+      {editing && <EditForm plan={plan} onSave={async (edit) => { const error = await onEdit(edit); if (!error) setEditing(false); return error; }} onCancel={() => setEditing(false)} />}
     </li>
   );
 }
 
-function EditForm({ plan, onSave, onCancel }: { plan: LocalPlan; onSave: (edit: { name: string; notes: string }) => string | null; onCancel: () => void }) {
+function EditForm({ plan, onSave, onCancel }: { plan: LocalPlan; onSave: (edit: { name: string; notes: string }) => Promise<string | null>; onCancel: () => void }) {
   const [form, setForm] = useState({ name: plan.name, notes: plan.notes });
   const [error, setError] = useState<string | null>(null);
   return (
-    <form aria-label={`Edit ${plan.name}`} onSubmit={(e) => { e.preventDefault(); setError(onSave(form)); }}
+    <form aria-label={`Edit ${plan.name}`} onSubmit={async (e) => { e.preventDefault(); setError(await onSave(form)); }}
       className="grid gap-3 rounded-control border border-line bg-canvas p-3 sm:grid-cols-2">
       <Field label="Name" required maxLength={WORKSPACE_LIMITS.name} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
       <label className="block space-y-1 text-sm sm:col-span-2">
@@ -250,10 +250,11 @@ function SaveFromLink({ owner, onSaved }: { owner: Owner; onSaved: (text: string
     if (result.ok) setForm({ name: `${className(result.classSlug)} plan`, notes: "" });
   }
 
-  function save(event: FormEvent<HTMLFormElement>) {
+  async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!found) return;
-    const result = savePlan(deviceStorage(), owner, { ...form, classSlug: found.classSlug, codes: found.codes, orders: found.orders });
+    const input = { ...form, classSlug: found.classSlug, codes: found.codes, orders: found.orders };
+    const result = await withWorkspaceLock(() => savePlan(deviceStorage(), owner, input));
     if (!result.ok) { setError(result.message); return; }
     setFound(null);
     setText("");
@@ -306,9 +307,10 @@ function SaveSent({ found, plans, owner, onDone }: {
     setForm({ target: plan?.id ?? "", name: plan?.name ?? fresh, notes: plan?.notes ?? "" });
   }
 
-  function save(event: FormEvent<HTMLFormElement>) {
+  async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const result = savePlan(deviceStorage(), owner, { id: form.target || null, name: form.name, notes: form.notes, classSlug: found.classSlug, codes: found.codes, orders: found.orders });
+    const input = { id: form.target || null, name: form.name, notes: form.notes, classSlug: found.classSlug, codes: found.codes, orders: found.orders };
+    const result = await withWorkspaceLock(() => savePlan(deviceStorage(), owner, input));
     if (!result.ok) { setError(result.message); return; }
     onDone(`${form.target ? "Updated" : "Saved"} "${result.plan.name}" on this device.`);
   }
@@ -407,11 +409,12 @@ function Backup({ owner, onRestored }: { owner: Owner; onRestored: (result: { ok
     setAltLines(restoreLines(now.workspace, result.preview));
   }
 
-  function restore() {
+  async function restore() {
     if (!preview) return;
-    const result = applyImport(deviceStorage(), owner, preview);
+    const shown = preview;
     setPreview(null);
-    onRestored(result, `Restored the backup: ${plural(preview.added, "plan")} added and ${preview.updated.toLocaleString("en-US")} updated.`);
+    const result = await withWorkspaceLock(() => applyImport(deviceStorage(), owner, shown));
+    onRestored(result, `Restored the backup: ${plural(shown.added, "plan")} added and ${shown.updated.toLocaleString("en-US")} updated.`);
   }
 
   const changes = preview ? preview.added + preview.updated + preview.others : 0;
@@ -452,8 +455,10 @@ function Backup({ owner, onRestored }: { owner: Owner; onRestored: (result: { ok
 function StoredProblem({ read, owner, onCleared }: { read: Extract<ReadResult, { ok: false }>; owner: Owner; onCleared: () => void }) {
   const [confirming, setConfirming] = useState(false);
   const raw = read.raw;
-  function clear() {
-    try { deviceStorage()?.removeItem(bucketKey(owner)); } catch { /* the read that follows says what is still there */ }
+  async function clear() {
+    await withWorkspaceLock(() => {
+      try { deviceStorage()?.removeItem(bucketKey(owner)); } catch { /* the read that follows says what is still there */ }
+    });
     onCleared();
   }
   const download = (text: string) => saveFile(text, `everloot-plans-stored-${new Date().toISOString().slice(0, 10)}.txt`);
