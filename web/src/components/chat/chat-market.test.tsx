@@ -167,3 +167,28 @@ test("stopping during the price lookup writes no answer", async () => {
   expect(text()).toContain("Stopped.");
   expect(stored()).not.toContain("\"role\":\"assistant\"");
 });
+
+test("asking again a question left unanswered replaces it, so the chat holds it once; a different question keeps it", async () => {
+  // Found live 10/27: a turn that failed, sent again, showed the question twice above one answer.
+  const base = globalThis.fetch;
+  let hang = true;
+  vi.stubGlobal("fetch", vi.fn((input: string, init?: RequestInit) => hang && String(input).startsWith("/api/tools/market_value")
+    ? new Promise((_, reject) => init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError"))))
+    : base(input, init)));
+  await render(<ChatClient />);
+  await say("price 2589 on Forever");
+  await act(async () => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })); });
+  await settle();
+  hang = false;
+  await say("price 2589 on Forever");
+  const questions = () => (JSON.parse(stored()) as { messages: { role: string; text: string }[] }[])[0].messages.filter((m) => m.role === "user").map((m) => m.text);
+  expect(questions()).toEqual(["price 2589 on Forever"]);
+  expect(text()).toContain("Item 2589 on Forever, all houses: market 3s 10c");
+  hang = true;
+  await say("price 2996 on Forever");
+  await act(async () => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })); });
+  await settle();
+  hang = false;
+  await say("Who is Leeroy Jenkins?");
+  expect(questions()).toEqual(["price 2589 on Forever", "price 2996 on Forever", "Who is Leeroy Jenkins?"]);
+});

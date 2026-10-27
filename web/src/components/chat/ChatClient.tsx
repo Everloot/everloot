@@ -438,7 +438,9 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
     if (!q || latest.current.busy || !latest.current.known) return;
     opening.current++;
     const { providers: saved, own: mine, currentId: id, note: attached } = latest.current;
-    const prior = messagesRef.current;
+    // The same question again, after a turn that failed or was stopped left it unanswered, takes its place: one copy.
+    const last = messagesRef.current.at(-1);
+    const prior = last?.role === "user" && last.text === q ? messagesRef.current.slice(0, -1) : messagesRef.current;
     if (workspace && metaRef.current.store === "account" && prior.length + 2 > WORKSPACE_LIMITS.messagesPerConversation) {
       setError(`This chat is full: it holds ${WORKSPACE_LIMITS.messagesPerConversation} messages. Start a new chat to go on; this one stays as it is.`);
       setFull(true);
