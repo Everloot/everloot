@@ -134,7 +134,7 @@ describe("signed in without a shell (EVERLOOT_PROFILES off)", () => {
 
 describe("signed in with a shell", () => {
   it("fetches the shell once and shows name, handle, status and the menu in GitHub's order", async () => {
-    const fetch = withShell(shell(), { "/api/me/accounts": () => Response.json([{ userId: ME, displayName: "Jaina Proudmoore", handle: "jaina", current: true }]) });
+    const fetch = withShell(shell({ publicProfile: true }), { "/api/me/accounts": () => Response.json([{ userId: ME, displayName: "Jaina Proudmoore", handle: "jaina", current: true }]) });
     await act(async () => root.render(<Header profiles savedBuilds accountSwitching />));
     expect(fetch.mock.calls.filter(([url]) => url === "/api/me/shell")).toHaveLength(1);
     // The accounts on this browser are asked for only once the menu opens.
@@ -171,6 +171,13 @@ describe("signed in with a shell", () => {
     expect(links[2]).toEqual(["Set status", "/settings#status"]);
     expect(links[3]).toEqual(["Your profile", "/settings"]);
     expect(avatarButton().querySelector("span")!.className).toContain("bg-accent");
+  });
+
+  it("a private profile's Your profile opens Settings, not the 404 everyone else gets at /u/<handle>", async () => {
+    withShell(shell());
+    await act(async () => root.render(<Header profiles />));
+    expect(menuLinks()).toContainEqual(["Your profile", "/settings"]);
+    expect(menuLinks().some(([, href]) => href?.startsWith("/u/"))).toBe(false);
   });
 
   it("hides Add another account at 5 accounts on this browser, and until the list is known", async () => {
@@ -303,6 +310,15 @@ describe("helpers", () => {
     expect(currentStatus({ emoji: null, text: "Busy", clearsAt: "2026-10-20T11:00:00Z" }, now)).toBeNull();
     expect(currentStatus({ emoji: null, text: "Busy", clearsAt: "2026-10-20T13:00:00Z" }, now)?.text).toBe("Busy");
     expect(currentStatus({ emoji: null, text: "", clearsAt: null }, now)).toBeNull();
+  });
+
+  it("Your profile opens /u/<handle> only for a public profile with a handle; otherwise Settings", () => {
+    const profileLink = (over: Partial<AccountShell>) => accountMenuSections(shell(over), true)[0][0];
+    expect(profileLink({ publicProfile: true })).toEqual({ label: "Your profile", href: "/u/jaina" });
+    expect(profileLink({ handle: "jaina?x", publicProfile: true }).href).toBe("/u/jaina%3Fx");
+    for (const over of [{ publicProfile: false }, { handle: null, publicProfile: false }, { handle: null, publicProfile: true }, { handle: "", publicProfile: true }]) {
+      expect(profileLink(over), JSON.stringify(over)).toEqual({ label: "Your profile", href: "/settings" });
+    }
   });
 
   it("without saved builds the shell menu keeps profile, account and settings only", () => {

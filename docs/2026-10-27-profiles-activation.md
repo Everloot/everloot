@@ -32,8 +32,9 @@ the columns in another order the migration still applies and the first handle ch
 checks the order. The saved-builds file is already applied in production: never run it again.
 
 Supabase stops granting new tables to `anon`, `authenticated` and `service_role` by default on 2026-10-30
-(https://supabase.com/changelog/45329-breaking-change-tables-not-exposed-to-data-and-graphql-api-automatically).
-The migration grants the service role exactly what the site uses, so it works the same before and after that date.
+(https://supabase.com/changelog/45329-breaking-change-tables-not-exposed-to-data-and-graphql-api-automatically);
+tables that already exist keep their grants. The migration grants the service role exactly what the site uses, so
+it works the same before and after that date.
 
 ## What a public profile shows
 
@@ -41,8 +42,9 @@ Only what its owner ticked: characters (name, class, realm, which one is the mai
 date, short link) while saved builds are on, and a status that has not cleared. Never the BattleTag, the email, the
 account or character ids, a character's note or a build that is not shared. A private profile and a handle nobody
 has are the same 404 with `noindex`, and the page is rendered on every request, so turning a profile off takes it
-down at once. A public profile is indexable with the canonical `/u/<handle>` and is not in the sitemap; this
-rollout does not change that.
+down at once. Your profile in the avatar menu opens `/u/<handle>` only while the profile is public, and Settings
+otherwise. A public profile is indexable with the canonical `/u/<handle>` and is not in the sitemap; this rollout
+does not change that.
 
 The signed-in home that `/` becomes is rendered per request with `noindex`, and the middleware adds no caching of
 its own. The header check in the preview step confirms that the response for a session cookie is `private, no-store`,
@@ -189,25 +191,45 @@ select check_name, ok from (values
 ) as checks(check_name, ok);
 ```
 
-## Preview, then production
+## Preview checks (no sign-in)
+
+A preview deployment cannot sign anyone in at its own address. `siteUrl()` is `NEXT_PUBLIC_SITE_URL` or
+`https://everloot.app` (`web/src/lib/supabase/server.ts`); Battle.net returns to that site's callback
+(`BNET_REDIRECT_URI` or `<siteUrl>/api/auth/bnet/callback`), which sets the session there; and every profile write
+needs `Origin` to equal `siteUrl()` (`profileAccount` in `web/src/lib/account-shell.ts`). Do not change the site URL,
+the redirect or the origin check, copy a session cookie, or make a session to get past this. With only
+`EVERLOOT_PROFILES=1` on one preview deployment, check what needs no account:
+
+- `/` without cookies is the landing page. With an `everloot_session` cookie of 64 made-up hex characters, which
+  matches no session (as a stale cookie would), it is still the landing page, answers
+  `cache-control: private, no-cache, no-store, max-age=0, must-revalidate` and never `x-vercel-cache: HIT`; a request
+  without cookies afterwards still gets the landing page.
+- `/home` without a session redirects to `/`, and `/settings` to `/sign-in?returnTo=%2Fsettings`.
+- `/u/<a handle nobody has>` is a 404 with `noindex, nofollow`.
+- `GET /api/me/shell` answers 401. `POST /api/me/profile` with the preview's own `Origin` is refused with 403
+  `Invalid origin` before any sign-in check or database call.
+
+## Production acceptance (signed in)
 
 Change only `EVERLOOT_PROFILES`. Keep `EVERLOOT_SAVED_BUILDS` and `EVERLOOT_AUTH_V2` as they are, along with every
 other switch.
 
-1. Set `EVERLOOT_PROFILES=1` for one preview deployment. Sign in with a test Battle.net account, never a real
-   player's, and do not make anyone else's profile public or pick a handle for them:
-   - Signed in, `/` is the home; in a private window it is the landing page.
+1. After the preflight, apply and postflight, set `EVERLOOT_PROFILES=1` in Production and redeploy main. Unsetting it
+   and redeploying undoes this step.
+2. On `https://everloot.app`, sign in with a disposable Battle.net test account, never a real player's or the
+   owner's, and do not make anyone else's profile public or pick a handle for them. Without such an account the
+   signed-in acceptance has not happened: record it as open, not passed.
+   - Signed in, `/` is the home, and with that session it answers
+     `cache-control: private, no-cache, no-store, max-age=0, must-revalidate`, never `x-vercel-cache: HIT`. In a
+     private window `/` is the landing page.
    - In `/settings`, save a handle that is plainly a test, a display name and a status that clears in 30 minutes.
      Each saves and shows again after a reload. Without saved builds no character can be added, so the main
      character stays none unless the account already has character labels.
-   - With the profile private, `/u/<handle>` is a 404 with `noindex, nofollow`, like `/u/<a handle nobody has>`.
+   - With the profile private, `/u/<handle>` is a 404 with `noindex, nofollow`, like `/u/<a handle nobody has>`, and
+     Your profile in the avatar menu opens Settings.
    - Make it public with only Status ticked: the page shows the display name, `@handle` and the status, with no
      characters or builds. Its source holds no BattleTag, email or account id. Turn it private: 404 at once.
-   - Headers, through the deployment's protection: `/` without cookies is the landing page; with any
-     `everloot_session` cookie it answers `cache-control: private, no-cache, no-store, max-age=0, must-revalidate`
-     and never `x-vercel-cache: HIT`; a request without cookies afterwards still gets the landing page.
    - Clear the status and save an empty handle, so the test leaves nothing public.
-2. Set `EVERLOOT_PROFILES=1` in Production, redeploy main and repeat step 1 there with the same test account.
 3. Run the postflight again, then check the test account only (counts and flags, no other player's data):
 
 ```sql

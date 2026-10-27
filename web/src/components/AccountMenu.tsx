@@ -55,7 +55,8 @@ export function accountMenuSections(shell: AccountShell | null | undefined, save
   if (!shell) return [[...builds, account, apiKeys, desktop]];
   return [
     [
-      { label: "Your profile", href: shell.handle ? `/u/${encodeURIComponent(shell.handle)}` : "/settings" },
+      // A private profile's page is a 404 for its owner too, so Settings is where it lives until made public.
+      { label: "Your profile", href: shell.handle && shell.publicProfile ? `/u/${encodeURIComponent(shell.handle)}` : "/settings" },
       ...(savedBuilds ? [{ label: "Your characters", href: "/me" }] : []),
       ...builds,
     ],
