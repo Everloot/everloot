@@ -3,7 +3,8 @@ import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import AccountControls, { ACCOUNT_CHANGED_EVENT } from "@/components/AccountControls";
-import { bucketKey, type LocalPlan, type Owner, type PlayerWorkspace } from "@/lib/player-workspace";
+import { NEWEST_VERSION, bucketKey, type LocalPlan, type Owner, type PlayerWorkspace } from "@/lib/player-workspace";
+import { FIXTURE_PLAN_ID, V2_ALT_TEXT, V2_BUCKET_TEXT } from "@/lib/player-workspace.fixture";
 import DevicePlans from "./DevicePlans";
 import LocalPlanSave from "./LocalPlanSave";
 
@@ -459,8 +460,19 @@ test("damaged stored plans are kept: their text can be downloaded, nothing is sa
   expect(field("Talent link or share code")).not.toBeNull();
 });
 
+test("a version 2 bucket's plans show and can be edited, and its alts are kept as they were", async () => {
+  localStorage.setItem(bucketKey(ANON), V2_BUCKET_TEXT);
+  await render();
+  await click(button(/^Edit$/, item("Frost")!));
+  await type(field("Notes", item("Frost")!), "Raid notes");
+  await click(button(/^Save$/, item("Frost")!));
+  const text = localStorage.getItem(bucketKey(ANON))!;
+  expect(JSON.parse(text)).toMatchObject({ version: 2, plans: [{ id: FIXTURE_PLAN_ID, notes: "Raid notes" }] });
+  expect(text).toContain(`"alts":[${V2_ALT_TEXT}]`);
+});
+
 test("plans saved by a newer version are left alone, and the page says to reload", async () => {
-  const newer = JSON.stringify({ format: "everloot.player-workspace", version: 2, owner: ANON });
+  const newer = JSON.stringify({ format: "everloot.player-workspace", version: NEWEST_VERSION + 1, owner: ANON });
   localStorage.setItem(bucketKey(ANON), newer);
   await render();
   expect(alerts()).toContain("saved by a newer version of Everloot. Reload the page");

@@ -1,10 +1,11 @@
 import { describe, expect, test } from "vitest";
 import { encodeBuild } from "./talents/share";
 import {
-  WORKSPACE_LIMITS, applyImport, bindTransferred, bucketKey, copyPlan, deletePlan, editPlan, emptyWorkspace, exportBackup,
+  NEWEST_VERSION, WORKSPACE_LIMITS, applyImport, bindTransferred, bucketKey, copyPlan, deletePlan, editPlan, emptyWorkspace, exportBackup,
   lookupOwner, orderState, previewImport, readPlanText, readWorkspace, savePlan, validateWorkspace,
   type LocalPlan, type Owner, type PlanInput, type PlayerWorkspace,
 } from "./player-workspace";
+import { FIXTURE_ALT_ID, FIXTURE_PLAN_ID, V2_ALT_TEXT, V2_BUCKET_TEXT, V2_PLAN_TEXT } from "./player-workspace.fixture";
 
 // Codes and tokens from docs/2026-10-17-talent-share-code.md: MAGE is 90001:2, 90002:1:1, 90004:2, so its
 // nodes index as A, B and C, and O1p-AABCC is a player's order for its five points.
@@ -157,12 +158,96 @@ describe("storage that fails", () => {
 
   test("plans saved by a newer version are never overwritten", () => {
     const storage = memory();
-    const newer = JSON.stringify({ format: "everloot.player-workspace", version: 2, owner: ANON, shelves: [] });
+    const newer = JSON.stringify({ format: "everloot.player-workspace", version: NEWEST_VERSION + 1, owner: ANON, shelves: [] });
     storage.items.set(bucketKey(ANON), newer);
     expect(readWorkspace(storage, ANON)).toMatchObject({ ok: false, error: "newer-version", raw: newer });
     expect(savePlan(storage, ANON, input(), NOW)).toMatchObject({ ok: false, error: "newer-version" });
     expect(deletePlan(storage, ANON, idOf(1))).toMatchObject({ ok: false, error: "newer-version" });
     expect(storage.items.get(bucketKey(ANON))).toBe(newer);
+  });
+});
+
+describe("version 2, written by the alt planner, is read and kept", () => {
+  /** The bucket's stored alts, as text. */
+  const altsText = (text: string) => /"alts":(\[.*\]),"watches"/.exec(text)?.[1];
+
+  test("this build writes version 1: a new bucket, and a version 1 bucket after a change", () => {
+    const storage = memory();
+    saved(storage, ANON);
+    expect(NEWEST_VERSION).toBe(2);
+    expect(JSON.parse(storage.items.get(bucketKey(ANON))!).version).toBe(1);
+  });
+
+  test("a plan edit on a version 2 bucket keeps it version 2, with every alt field it does not use kept byte for byte", () => {
+    const storage = memory();
+    storage.items.set(bucketKey(ANON), V2_BUCKET_TEXT);
+    const read = readWorkspace(storage, ANON);
+    expect(read).toMatchObject({ ok: true, workspace: { version: 2 } });
+    expect(editPlan(storage, ANON, FIXTURE_PLAN_ID, { name: "Frost raid", notes: "Raid" }, LATER)).toMatchObject({ ok: true });
+    const text = storage.items.get(bucketKey(ANON))!;
+    expect(JSON.parse(text)).toMatchObject({ version: 2, plans: [{ id: FIXTURE_PLAN_ID, name: "Frost raid", notes: "Raid" }] });
+    expect(altsText(text)).toBe(`[${V2_ALT_TEXT}]`);
+    // So does every other change: a new plan, a copy, a delete.
+    const extra = saved(storage, ANON, { name: "Second" });
+    copyPlan(storage, ANON, extra.id, LATER);
+    deletePlan(storage, ANON, extra.id);
+    expect(altsText(storage.items.get(bucketKey(ANON))!)).toBe(`[${V2_ALT_TEXT}]`);
+  });
+
+  test("a version 2 alt still guards the plans it uses", () => {
+    const storage = memory();
+    storage.items.set(bucketKey(ANON), V2_BUCKET_TEXT);
+    expect(deletePlan(storage, ANON, FIXTURE_PLAN_ID)).toMatchObject({ ok: false, error: "referenced" });
+    expect(storage.items.get(bucketKey(ANON))).toBe(V2_BUCKET_TEXT);
+  });
+
+  test("a version 2 alt is checked by the fields this build uses; its own other fields are left to it", () => {
+    const doc = (alt: object) => ({ ...JSON.parse(V2_BUCKET_TEXT), alts: [alt] });
+    const alt = JSON.parse(V2_ALT_TEXT);
+    expect(validateWorkspace(doc(alt)).ok).toBe(true);
+    const { planIds: _planIds, ...noPlans } = alt;
+    expect(validateWorkspace(doc(noPlans))).toMatchObject({ ok: false, error: "malformed" });
+    expect(validateWorkspace(doc({ ...alt, notes: "n".repeat(1001) }))).toMatchObject({ ok: false, error: "malformed" });
+    expect(validateWorkspace(doc({ ...alt, planIds: [idOf(99)] }))).toMatchObject({ ok: false, error: "bad-reference" });
+    // Version 1 is never extended in place: its alts have exactly version 1's fields.
+    const one = { format: "everloot.player-workspace", version: 1, owner: ANON, plans: [JSON.parse(V2_PLAN_TEXT)], watches: [] };
+    expect(validateWorkspace({ ...one, alts: [alt] })).toMatchObject({ ok: false, error: "malformed" });
+    expect(validateWorkspace({ ...one, alts: [{ id: FIXTURE_ALT_ID, name: "Thrall", planIds: [], notes: "", updatedAt: "2026-10-20T12:00:00.000Z" }] }).ok).toBe(true);
+  });
+
+  test("a version 2 backup restores into a signed-out device that has no alts, which becomes version 2 with the alts as they were", () => {
+    const storage = memory();
+    saved(storage, ANON, { name: "Here" });
+    const read = readWorkspace(storage, ANON);
+    const preview = read.ok ? previewImport(V2_BUCKET_TEXT, read.workspace) : null;
+    if (!preview?.ok) throw new Error("no preview");
+    expect(preview.preview).toMatchObject({ added: 1, others: 1, result: { version: 2 } });
+    expect(applyImport(storage, ANON, preview.preview)).toMatchObject({ ok: true });
+    const text = storage.items.get(bucketKey(ANON))!;
+    expect(JSON.parse(text).version).toBe(2);
+    expect(altsText(text)).toBe(`[${V2_ALT_TEXT}]`);
+    expect(names(storage, ANON)).toEqual(["Frost", "Here"]);
+  });
+
+  test("a backup that would put version 1 alts with version 2 alts is refused, and nothing changes", () => {
+    const storage = memory();
+    const one = { format: "everloot.player-workspace", version: 1, owner: ANON, plans: [], watches: [],
+      alts: [{ id: idOf(501), name: "Jaina", planIds: [], notes: "", updatedAt: "2026-10-20T12:00:00.000Z" }] };
+    storage.items.set(bucketKey(ANON), JSON.stringify(one));
+    const read = readWorkspace(storage, ANON);
+    expect(read.ok).toBe(true);
+    expect(read.ok && previewImport(V2_BUCKET_TEXT, read.workspace)).toMatchObject({ ok: false, error: "mixed-versions" });
+    expect(previewImport(JSON.stringify(one), JSON.parse(V2_BUCKET_TEXT))).toMatchObject({ ok: false, error: "mixed-versions" });
+  });
+
+  test("a backup of a version 2 bucket is its own text, and restoring it again changes nothing", () => {
+    const storage = memory();
+    storage.items.set(bucketKey(ANON), V2_BUCKET_TEXT);
+    const read = readWorkspace(storage, ANON);
+    const backup = read.ok ? exportBackup(read.workspace, NOW) : null;
+    expect(backup).toMatchObject({ ok: true, text: V2_BUCKET_TEXT });
+    const again = read.ok ? previewImport(V2_BUCKET_TEXT, read.workspace) : null;
+    expect(again).toMatchObject({ ok: true, preview: { added: 0, updated: 0, unchanged: 1, others: 0 } });
   });
 });
 
@@ -443,7 +528,7 @@ describe("backup and restore", () => {
     const current = emptyWorkspace(ANON);
     expect(previewImport("{not json", current)).toMatchObject({ ok: false, error: "malformed" });
     expect(previewImport(JSON.stringify({ plans: [] }), current)).toMatchObject({ ok: false, error: "malformed" });
-    expect(previewImport(JSON.stringify({ format: "everloot.player-workspace", version: 2, owner: ANON }), current)).toMatchObject({ ok: false, error: "newer-version" });
+    expect(previewImport(JSON.stringify({ format: "everloot.player-workspace", version: NEWEST_VERSION + 1, owner: ANON }), current)).toMatchObject({ ok: false, error: "newer-version" });
   });
 
   test("a backup restores only into the bucket it came from: never across accounts or between signed out and signed in", () => {
