@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import DevicePlans from "@/components/workspace/DevicePlans";
+import TransferPlans from "@/components/workspace/TransferPlans";
 import { Container, PageHeader } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
+import { savedBuildsOn } from "@/lib/saved-builds";
 import { pageMetadata } from "@/lib/seo";
 
 const TITLE = "Plans on this device";
@@ -16,13 +18,16 @@ export const metadata: Metadata = {
 };
 
 export default function DevicePlansPage() {
+  // With saved builds on, a signed-in player can save the plans kept signed out to the account, when they ask.
+  const transfer = savedBuildsOn();
   return (
     <Container>
       <PageHeader
         title={TITLE}
-        lede="Talent plans kept by name in this browser. No account needed, and nothing is uploaded."
+        lede={`Talent plans kept by name in this browser. No account needed, and nothing is uploaded${transfer ? " unless you save plans to your account" : ""}.`}
         trail={trailFor("/tools/builds")!}
       />
+      {transfer && <TransferPlans />}
       <DevicePlans />
     </Container>
   );

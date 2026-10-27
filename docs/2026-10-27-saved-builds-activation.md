@@ -30,6 +30,8 @@ saved build and character label, including the builds Chat entries point to, and
   its owner's shared builds when they tick builds in settings.
 - Builds made in Chat while the switch was off belong to their owners like any other: they show in My builds and on
   `/me`, still private.
+- On `/tools/builds`, signed in: "Plans saved here while signed out", which saves the plans a browser keeps signed
+  out to the account, when the player asks. See [Plans kept on a device](#plans-kept-on-a-device).
 
 Save shows one account's builds: the one this tab last confirmed through `/api/auth/me`, asked again whenever the tab
 comes back. Each save sends that account's id in `x-everloot-expected-owner`, and the site answers a private 409
@@ -316,12 +318,50 @@ select (select count(*) from public.saved_builds where user_id = '<test user id>
   (select count(*) from public.build_characters where user_id = '<test user id>') as labels;
 ```
 
+## Plans kept on a device
+
+The switch also shows, on `/tools/builds` signed in, "Plans saved here while signed out": the plans a browser keeps
+signed out, which the player can save to the account signed in now. The account is asked nothing until the panel is
+opened, and nothing is sent until Save. Each plan goes through `POST /api/me/builds` with `x-everloot-expected-owner`,
+both spend orders, the sharing the player chose, and a `transferKey` the browser stores before sending (`transfer_key`
+under [Spend orders](#spend-orders)). Sent again after a lost answer, a reload or from another tab, the same save is
+answered 200 with the build it made, not a 201 with a second one; the panel reads that 200 as the build it sent before.
+Until the spend-order migration is in, the route refuses such a save with the code `orders_unavailable`, and the panel
+says so and keeps every plan on the device as it was. The panel needs the browser's Web Locks API, which every current
+browser has; without it, it says "This browser can't move plans safely; try a current browser." and sends nothing.
+
+A plan can go under a new character made from one of the player's alts. The panel looks for that character on the
+account before it asks `POST /api/me/characters` for one, and records the request first. When a request gets no answer
+within 20 seconds, or the connection drops, the panel cannot tell whether the character was made. For two minutes after
+that request it asks for no other character for that alt: a retry in that time finds the character if it was made, and
+otherwise says "The last attempt may still finish; try again in a couple of minutes." After two minutes a retry reads
+the account's characters again and asks for the character only if it is still not there. The risk that remains is a
+request the site carries out more than two minutes after it was sent, for example one held up behind a stalled
+connection: the account can then hold two characters made from the same alt, one with no builds. A player can delete
+the spare one on `/me`.
+
+Add these to the signed-in acceptance, with the same disposable test account and the window 390 px wide:
+
+1. Signed out, save two test plans on `/tools/builds`. Sign in: the panel offers them, and the network tab shows no
+   request to `/api/me/builds` until "Choose plans to save to your account". Open it: it names the test account. Choose
+   one plan, private, and Save: "Saved 1 plan to your account." It is on `/me`, private, with its spend order, and on
+   `/tools/builds` it shows under the account, not signed out.
+2. A failure: with the spend-order migration not in yet, save a plan from the panel: "Saving spend orders isn't
+   available yet, so no plans were saved to your account. They stay on this device as they were, spend orders
+   included." The plan is still offered, unchanged, and `/me` has nothing new.
+3. An account switch: open the panel and choose a plan, then sign in as a second disposable account in another tab,
+   come back and press Save: "The account signed in here changed, so nothing was sent." Neither account gains a build.
+   Without a second account, record this step as not done.
+
+Delete the test builds on `/me` afterwards, as in step 12 above.
+
 ## Rollback
 
 Unset `EVERLOOT_SAVED_BUILDS` (anything but exactly `1` is off) and redeploy. Save, My builds, `/me`, `/b/<slug>`
 and the `/api/me/builds` and `/api/me/characters` routes answer 404 at once, public profiles stop listing builds, and
 `my_builds` leaves the MCP list for every key. Stored builds and labels stay, and Chat keeps its private builds. No SQL
-is part of the rollback: never run the file's commented rollback (see the top of this document).
+is part of the rollback: never run the file's commented rollback (see the top of this document). The panel on
+`/tools/builds` goes with the switch; plans it moved stay with their account on the device.
 
 ## Spend orders
 

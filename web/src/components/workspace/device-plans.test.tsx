@@ -3,7 +3,7 @@ import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import AccountControls, { ACCOUNT_CHANGED_EVENT } from "@/components/AccountControls";
-import { NEWEST_VERSION, WORKSPACE_VERSION, bucketKey, type LocalPlan, type Owner, type PlayerWorkspace } from "@/lib/player-workspace";
+import { NEWEST_VERSION, WORKSPACE_VERSION, bucketKey, withWorkspaceLock, type LocalPlan, type Owner, type PlayerWorkspace } from "@/lib/player-workspace";
 import { FIXTURE_PLAN_ID, V2_ALT_TEXT, V2_BUCKET_TEXT } from "@/lib/player-workspace.fixture";
 import DevicePlans from "./DevicePlans";
 import LocalPlanSave from "./LocalPlanSave";
@@ -573,6 +573,56 @@ test("clearing stored plans says it also deletes alts and their notes (reported 
   await click(button(/^Clear for good$/));
   expect(localStorage.getItem(bucketKey(ANON))).toBeNull();
   expect(copyBeforeClear).toMatch(/alts/i);
+});
+
+test("a clear that waited for the lock clears only the text confirmed: a bucket another tab repaired meanwhile stays, and the focus goes to why", async () => {
+  // Web Locks as a browser gives them: one holder at a time, in the order asked.
+  let queue: Promise<unknown> = Promise.resolve();
+  Object.defineProperty(navigator, "locks", { configurable: true, value: { request: (_: string, task: () => unknown) => {
+    const next = queue.then(task);
+    queue = next.catch(() => undefined);
+    return next;
+  } } });
+  try {
+    localStorage.setItem(bucketKey(ANON), "{not json");
+    await render();
+    await click(button(/^Clear stored plans$/));
+    // Another tab holds the lock, and repairs the bucket before it lets go.
+    let release = () => {};
+    const repaired = withWorkspaceLock(async () => { await new Promise<void>((r) => { release = r; }); seed(ANON, [plan()]); });
+    button(/^Clear for good$/)!.focus();
+    await click(button(/^Clear for good$/));
+    expect(localStorage.getItem(bucketKey(ANON))).toBe("{not json");
+    release();
+    await act(async () => { await repaired; });
+    await settle();
+    expect(stored(ANON)?.plans).toEqual([plan()]);
+    expect(alerts()).toContain("What is stored here changed in another tab, so nothing was cleared.");
+    expect(item("Frost")).toBeDefined();
+    // The control pressed is gone with the damaged text: the focus is on what says why nothing was cleared.
+    expect(document.activeElement?.getAttribute("role")).toBe("alert");
+    expect(document.activeElement?.textContent).toContain("nothing was cleared");
+  } finally {
+    delete (navigator as { locks?: unknown }).locks;
+  }
+});
+
+test("damaged text that changed after its clear was confirmed is not cleared: the new text needs confirming of its own, from where the focus is left", async () => {
+  localStorage.setItem(bucketKey(ANON), "{not json");
+  await render();
+  await click(button(/^Clear stored plans$/));
+  // Another tab stores other damaged text while this one asks.
+  localStorage.setItem(bucketKey(ANON), "{other damage");
+  button(/^Clear for good$/)!.focus();
+  await click(button(/^Clear for good$/));
+  expect(localStorage.getItem(bucketKey(ANON))).toBe("{other damage");
+  expect(alerts()).toContain("What is stored here changed in another tab, so nothing was cleared.");
+  expect(clearGroup()).toBeNull();
+  expect(document.activeElement).toBe(button(/^Clear stored plans$/));
+  await click(button(/^Clear stored plans$/));
+  await click(button(/^Clear for good$/));
+  expect(localStorage.getItem(bucketKey(ANON))).toBeNull();
+  expect(alerts()).not.toContain("nothing was cleared");
 });
 
 test("a version 2 bucket's plans show and can be edited, and its alts are kept as they were", async () => {
