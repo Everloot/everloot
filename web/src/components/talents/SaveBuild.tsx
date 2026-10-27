@@ -150,7 +150,8 @@ export default function SaveBuild({ classSlug, codes, defaultName, onMessage }: 
         setEditing(saved);
         if (params.get("save") === "1") { rewriteSearch(saved?.id ?? null); openSave(saved); }
       } catch {
-        if (era.current === ask) setAccount({ status: "error" });
+        // No answer at all: without a confirmed account Save stays off with its reason, as when the check failed.
+        if (era.current === ask) setAccount({ status: validId(ownerKey) ? "error" : "unchecked" });
       }
     })();
     // Read again when the class or the account changes; the message and opening the panel only use setters.

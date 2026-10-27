@@ -707,6 +707,32 @@ test("a list read while the session was briefly B is not kept once the tab is A 
   expect(container.textContent).not.toContain("Their frost");
 });
 
+test("with no network at all from the start, Save stays off and says why", async () => {
+  api("in");
+  offline = true;
+  await render();
+  await click(node(11));
+  expect(menu()).toBeNull();
+  expect(saveButton().disabled).toBe(true);
+  expect(bar().textContent).toContain(UNCHECKED);
+});
+
+test("losing the network after a good load turns Save off with its reason, not back on", async () => {
+  api("in");
+  await render();
+  await click(node(11));
+  expect(menu()!.textContent).toContain("Fire");
+  offline = true;
+  await comeBack();
+  expect(menu()).toBeNull();
+  expect(saveButton().disabled).toBe(true);
+  expect(bar().textContent).toContain(UNCHECKED);
+  offline = false;
+  await comeBack();
+  expect(menu()!.textContent).toContain("Fire");
+  expect(saveButton().disabled).toBe(false);
+});
+
 test("a failed check after a good one drops the account's builds and the open panel, and Save stays off until a check works", async () => {
   api("in");
   window.history.replaceState(null, "", `/tools/talents/mage?saved=${ID}#plan=${CODE}`);
