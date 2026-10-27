@@ -1,4 +1,4 @@
-import { extractCode, importPlan, readPlanHash, type ImportReport } from "./import";
+import { importPlan, type ImportReport } from "./import";
 import { prefixRanks } from "./order";
 import { nodeMap, pointsAtLevel, pointsSpent, rankOf } from "./rules";
 import { decodeBuild } from "./share";
@@ -93,20 +93,41 @@ const LETTER: Record<Side, string> = { a: "A", b: "B" };
 const titleCase = (slug: string) => slug[0].toUpperCase() + slug.slice(1);
 const plural = (n: number, one: string) => `${n} ${n === 1 ? one : `${one}s`}`;
 
+/** A fragment's named parts, each value whole up to the next "&" and unescaped where it can be. A damaged value stays
+ *  damaged: it is never cut down to the part of it that reads. The first part of a name wins. */
+function fragmentValues(fragment: string): Map<string, string> {
+  const values = new Map<string, string>();
+  for (const part of fragment.replace(/^#/, "").split("&")) {
+    const at = part.indexOf("=");
+    const key = part.slice(0, at);
+    if (at > 0 && !values.has(key)) values.set(key, unescaped(part.slice(at + 1)));
+  }
+  return values;
+}
+
+const unescaped = (value: string) => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+};
+
 /** The share code and order token a pasted text names. A calculator link gives its first set's pair, or its second
- *  set's when it has only that one (Copy for addon's set two); any other text is a code without an order. */
+ *  set's when it has only that one (Copy for addon's set two), each read whole; any other text is a code without an order. */
 export function planRef(text: string): PlanRef {
-  if (!/[#&]plan2?=/.test(text)) return { code: text.trim(), order: null };
-  const hash = readPlanHash(text);
-  if (hash.first) return { code: hash.first, order: hash.firstOrder ?? null };
-  return { code: hash.second ?? text.trim(), order: hash.secondOrder ?? null };
+  const trimmed = text.trim();
+  const at = trimmed.indexOf("#");
+  const values = at < 0 ? new Map<string, string>() : fragmentValues(trimmed.slice(at));
+  const set = values.get("plan") ? ["plan", "order"] : values.get("plan2") ? ["plan2", "order2"] : null;
+  return set ? { code: values.get(set[0])!, order: values.get(set[1]) || null } : { code: trimmed, order: null };
 }
 
 /** A talent as the calculator names it: a choice node by both its entries. */
 const talentName = (node: TalentNode) => (node.kind === "choice" ? node.entries.map((e) => e.name).join(" or ") : node.entries[0].name);
 
 function load(catalog: TalentCatalog, side: Side, input: PlanInput): ComparedPlan | { side: Side; message: string } {
-  const { code, order } = input.order === undefined ? planRef(input.code) : { code: extractCode(input.code), order: input.order || null };
+  const { code, order } = input.order === undefined ? planRef(input.code) : { code: planRef(input.code).code, order: input.order || null };
   const plan = `Plan ${LETTER[side]}`;
   if (!code) return { side, message: `${plan} is empty. Paste a share code or a calculator link.` };
   const decoded = decodeBuild(code);
@@ -198,26 +219,25 @@ export function comparePlans(catalog: TalentCatalog, a: PlanInput, b: PlanInput)
 // ---- the address ------------------------------------------------------------------------------
 //
 // A comparison is shared as /tools/talents/<class>/compare#a=<code>&ao=<order>&b=<code>&bo=<order>. Like a plan link,
-// it lives in the fragment, which never reaches the server; an order rides after its own code.
+// it lives in the fragment, which never reaches the server; an order rides after its own code. Each value goes in as it
+// came and is read back whole, so a damaged code or order reads as damaged, never as the valid part in front of it.
 
-const SAFE = /^[A-Za-z0-9_.-]+$/;
 const COMPARE_PART = /^(?:a|ao|b|bo)=/;
 
 /** The two plans a page address carries; a side without a code is null. */
 export function readCompareHash(hash: string): { a: PlanRef | null; b: PlanRef | null } {
-  const part = (key: string) => new RegExp(`[#&]${key}=([A-Za-z0-9_.-]+)`).exec(hash)?.[1] ?? null;
-  const side = (code: string | null, order: string | null) => (code ? { code, order } : null);
-  return { a: side(part("a"), part("ao")), b: side(part("b"), part("bo")) };
+  const values = fragmentValues(hash);
+  const side = (key: Side) => {
+    const code = values.get(key);
+    return code ? { code, order: values.get(`${key}o`) || null } : null;
+  };
+  return { a: side("a"), b: side("b") };
 }
 
-/** The fragment for two plans; empty when neither has a code. Text that is not a code or a token stays out. */
+/** The fragment for two plans; empty when neither has a code. Each value is escaped where a fragment needs it. */
 export function compareHash(a: PlanRef | null, b: PlanRef | null): string {
-  const safe = (value: string | null | undefined) => (value && SAFE.test(value) ? value : null);
-  const parts = ([["a", a], ["b", b]] as const).flatMap(([key, ref]) => {
-    const code = safe(ref?.code);
-    const order = code && safe(ref?.order);
-    return code ? [`${key}=${code}`, ...(order ? [`${key}o=${order}`] : [])] : [];
-  });
+  const parts = ([["a", a], ["b", b]] as const).flatMap(([key, ref]) =>
+    ref?.code ? [`${key}=${encodeURIComponent(ref.code)}`, ...(ref.order ? [`${key}o=${encodeURIComponent(ref.order)}`] : [])] : []);
   return parts.length ? `#${parts.join("&")}` : "";
 }
 

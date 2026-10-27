@@ -197,6 +197,38 @@ test("an unknown spend order shows no levels and says which plan has none", asyn
   expect(items(plan("b"), '[aria-label="What loaded"] li')).toEqual(["The plan's spend order leaves out points the code has, so the order is unknown. The talents still loaded."]);
 });
 
+const NOT_A_CODE = "These plans cannot be compared. Plan A: That is not a share code. Codes start with EL1 and use letters, digits, - and _ only.";
+const DAMAGED_ORDER = "The plan's spend order is damaged, so the order is unknown. The talents still loaded.";
+
+test("a damaged code in the address fails with its side named; a damaged order keeps the talents, with no levels, and says why", async () => {
+  await open(`#a=${code(P)}!damaged&b=${code(P)}`);
+  expect(status()).toBe(NOT_A_CODE);
+  expect(container.querySelector("[data-comparison]")).toBeNull();
+  expect(field("a").value).toBe(`${code(P)}!damaged`);
+
+  await act(async () => { window.location.hash = `#a=${code(P)}&ao=${t(P, leftFirst)}!damaged&b=${code(P)}&bo=${t(P, rightFirst)}`; });
+  expect(plan("a").textContent).toContain("Spend order unknown.");
+  expect(items(plan("a"), '[aria-label="What loaded"] li')).toEqual([DAMAGED_ORDER]);
+  expect(container.querySelector("[data-milestones]")).toBeNull();
+  expect(container.querySelector("[data-level-order]")!.textContent).toBe("Level by level needs both plans' spend orders, and plan A has none this page can use.");
+});
+
+test("a pasted calculator link is read whole: a damaged order compares the talents without levels and stays in the address as it came", async () => {
+  await open("");
+  const damaged = `${t(P, leftFirst)}!damaged`;
+  await type("a", `https://everloot.app/tools/talents/mage#plan=${code(P)}&order=${damaged}`);
+  await type("b", code(P));
+  await compare();
+  expect(plan("a").textContent).toContain("Spend order unknown.");
+  expect(items(plan("a"), '[aria-label="What loaded"] li')).toEqual([DAMAGED_ORDER]);
+  expect(container.querySelector("[data-milestones]")).toBeNull();
+  expect(window.location.hash).toBe(`#a=${code(P)}&ao=${damaged}&b=${code(P)}`);
+
+  await type("a", `https://everloot.app/tools/talents/mage#plan=${code(P)}!damaged&order=${t(P, leftFirst)}`);
+  await compare();
+  expect(status()).toBe(NOT_A_CODE);
+});
+
 test("a plan from an older game build keeps its code, and says what the game files changed in its talents since", async () => {
   const writes = [vi.spyOn(window.history, "replaceState"), vi.spyOn(window.history, "pushState"), vi.spyOn(Storage.prototype, "setItem")];
   const fetch = vi.fn();

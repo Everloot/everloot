@@ -239,13 +239,58 @@ describe("the comparison's address", () => {
     expect(readCompareHash(`#plan=${a}&plan2=${b}&order=${t}`)).toEqual({ a: null, b: null });
   });
 
-  test("text that is not a code stays out of the address", () => {
-    expect(compareHash({ code: "not a code", order: null }, { code: b, order: "O1p-%%" })).toBe(`#b=${b}`);
+  test("the address holds each plan's text as it came, escaped where a fragment needs it, and reads it back the same", () => {
+    const hash = compareHash({ code: "not a code", order: null }, { code: b, order: "O1p-%%&x" });
+    expect(hash).toBe(`#a=not%20a%20code&b=${b}&bo=O1p-%25%25%26x`);
+    expect(readCompareHash(hash)).toEqual({ a: { code: "not a code", order: null }, b: { code: b, order: "O1p-%%&x" } });
+    // A stray % that is not an escape is kept as it is.
+    expect(readCompareHash("#a=EL1-50%off").a).toEqual({ code: "EL1-50%off", order: null });
   });
 
   test("replacing the comparison keeps the address's other parts, such as a cookie choice", () => {
     expect(replaceCompareHash(`#a=OLD&everloot-cookie-rejected&bo=OLD`, `#a=${a}&b=${b}`)).toBe(`#a=${a}&b=${b}&everloot-cookie-rejected`);
     expect(replaceCompareHash("#everloot-cookie-rejected", "")).toBe("#everloot-cookie-rejected");
     expect(replaceCompareHash(`#a=${a}`, "")).toBe("");
+  });
+});
+
+describe("a damaged code or order", () => {
+  const [p, t] = [code(P), token(P, leftFirst)];
+  const link = (fragment: string) => `https://everloot.app/tools/talents/mage#${fragment}`;
+  const notACode = "Plan A: That is not a share code. Codes start with EL1 and use letters, digits, - and _ only.";
+  const damagedOrder = "The plan's spend order is damaged, so the order is unknown. The talents still loaded.";
+
+  test("the comparison's address is read a whole value at a time: damage after a valid start is not cut away", () => {
+    expect(readCompareHash(`#a=${p}!damaged&ao=${t}&b=${p}&bo=${t}!damaged`)).toEqual({
+      a: { code: `${p}!damaged`, order: t },
+      b: { code: p, order: `${t}!damaged` },
+    });
+  });
+
+  test("from the address, a damaged code fails with its side named; a damaged order keeps the talents, unknown, with no milestones", () => {
+    const badCode = readCompareHash(`#a=${p}!damaged&b=${p}&bo=${t}`);
+    expect(errors(comparePlans(fixture, badCode.a!, badCode.b!))).toEqual([{ side: "a", message: notACode }]);
+    const badOrder = readCompareHash(`#a=${p}&ao=${t}!damaged&b=${p}&bo=${t}`);
+    const c = compared(comparePlans(fixture, badOrder.a!, badOrder.b!));
+    expect(c.a.set).toEqual({ ranks: P, order: null, orderOrigin: null });
+    expect(c.a.report.problems).toEqual([damagedOrder]);
+    expect(c.milestones).toBeNull();
+  });
+
+  test("a pasted calculator link is read whole too: its damaged code fails, its damaged order is unknown", () => {
+    expect(planRef(link(`plan=${p}!damaged&order=${t}`))).toEqual({ code: `${p}!damaged`, order: t });
+    expect(planRef(link(`plan=${p}&order=${t}!damaged`))).toEqual({ code: p, order: `${t}!damaged` });
+    expect(planRef(link(`plan2=${p}&order2=${t}!damaged`))).toEqual({ code: p, order: `${t}!damaged` });
+    expect(errors(comparePlans(fixture, { code: link(`plan=${p}!damaged&order=${t}`) }, { code: p }))).toEqual([{ side: "a", message: notACode }]);
+    // An order given apart from the link does not change how the link's code is read.
+    expect(errors(comparePlans(fixture, { code: link(`plan=${p}!damaged`), order: t }, { code: p }))).toEqual([{ side: "a", message: notACode }]);
+    const c = compared(comparePlans(fixture, { code: link(`plan=${p}&order=${t}!damaged`) }, { code: p, order: t }));
+    expect(c.a.set.order).toBeNull();
+    expect(c.a.report.problems).toEqual([damagedOrder]);
+    expect(c.milestones).toBeNull();
+  });
+
+  test("a link copied with spaces or a line break around it still reads", () => {
+    expect(planRef(`  ${link(`plan=${p}&order=${t}`)}\n`)).toEqual({ code: p, order: t });
   });
 });
