@@ -1,5 +1,5 @@
 import { SOURCES } from "../../../kb/src/sources";
-import { search, type SearchHit } from "../../../kb/src/search";
+import { search, searchSomeWords, type SearchHit } from "../../../kb/src/search";
 import type { Facets, LoreType } from "../../../kb/src/importers/wiki-classify";
 import type { Infobox } from "../../../kb/src/importers/wiki-infobox";
 import { getRelease } from "./release";
@@ -228,6 +228,13 @@ export function searchLore(q: string, page: number, type?: LoreType): { hits: Se
   const types = type ? [type] : undefined;
   const results = search(release.db, q.slice(0, MAX_QUERY), p * PAGE_SIZE + 1, { kinds: ["lore_page"], types });
   return { hits: results.slice((p - 1) * PAGE_SIZE, p * PAGE_SIZE), hasNext: results.length > p * PAGE_SIZE };
+}
+
+/** For a question no lore page answers in full: the pages with the most of its words, best first. */
+export function searchLoreSomeWords(q: string, limit: number): SearchHit[] | Unavailable {
+  const release = getRelease();
+  if (!release) return UNAVAILABLE;
+  return searchSomeWords(release.db, q.slice(0, MAX_QUERY), limit, { kinds: ["lore_page"] });
 }
 
 /** The count scans every body (seconds on the real file); a read-only release cannot change, so count once per open. */

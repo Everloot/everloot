@@ -2,10 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { AgreementMeter, Badge, Card, Container, DataTable, DataTitle, EmptyState, SectionHeading, type Column } from "@/components/ui";
-import type { InstanceBoss } from "../../../../../../kb/src/instances";
 import {
-  difficultyLabel, instanceDescription, instanceHref, instanceRows, instanceTitle, levelLabel, loadSightings, parseInstanceSegment,
-  type InstancePlace, type InstanceRow,
+  bossRows, difficultyLabel, instanceDescription, instanceHref, instanceRows, instanceTitle, levelLabel, loadSightings, parseInstanceSegment,
+  type BossRow, type InstancePlace, type InstanceRow,
 } from "@/lib/instances";
 import { dayLabel } from "@/lib/report-labels";
 import { PLACEHOLDER } from "@/lib/item-names";
@@ -70,13 +69,18 @@ export default async function InstancePage(props: Props) {
     { key: "installs", header: "Installs", cell: (p) => <AgreementMeter count={p.installs} /> },
     { key: "seen", header: "Last seen", numeric: true, cell: (p) => dayLabel(p.lastSeen) },
   ];
-  const bossColumns: Column<InstanceBoss>[] = [
-    { key: "name", header: "Boss", cell: (b) => b.name ?? `Encounter ${b.encounterId}` },
-    { key: "kills", header: "Kills", numeric: true, cell: (b) => b.kills.toLocaleString("en-US") },
-    { key: "installs", header: "Installs", cell: (b) => <AgreementMeter count={b.reporters} /> },
-    { key: "seen", header: "Last seen", numeric: true, cell: (b) => dayLabel(b.lastSeen) },
-    { key: "npcs", header: "Creatures", cell: (b) => (b.npcIds.length
-      ? b.npcIds.map((id, i) => <span key={id}>{i > 0 && ", "}<Link href={`/database/npcs/${id}`} className={link}>NPC {id}</Link></span>)
+  // Player-first: the bosses 3 installs report, then the encounters the files list that no report has confirmed.
+  // When storage is down the files' list stands alone, every row marked unconfirmed.
+  const bosses = bossRows(unreachable ? { bosses: [], encounters: row.encounters } : row);
+  const bossColumns: Column<BossRow>[] = [
+    { key: "name", header: "Boss", cell: (b) => (b.filesName
+      ? <span className="inline-flex items-baseline gap-1.5"><Badge tone="files" />{b.name}</span>
+      : b.name ?? `Encounter ${b.encounterId}`) },
+    { key: "kills", header: "Kills", numeric: true, cell: (b) => (b.boss ? b.boss.kills.toLocaleString("en-US") : PLACEHOLDER) },
+    { key: "installs", header: "Installs", cell: (b) => (b.boss ? <AgreementMeter count={b.boss.reporters} /> : PLACEHOLDER) },
+    { key: "seen", header: "Last seen", numeric: true, cell: (b) => (b.boss ? dayLabel(b.boss.lastSeen) : PLACEHOLDER) },
+    { key: "npcs", header: "Creatures", cell: (b) => (b.boss?.npcIds.length
+      ? b.boss.npcIds.map((id, i) => <span key={id}>{i > 0 && ", "}<Link href={`/database/npcs/${id}`} className={link}>NPC {id}</Link></span>)
       : PLACEHOLDER) },
   ];
 
@@ -102,15 +106,27 @@ export default async function InstancePage(props: Props) {
 
         <div className="space-y-6">
           <section aria-labelledby="facts">
-            <SectionHeading id="facts" note="The type is from the game files where they place the entrance, else as 3 installs agree. The level is from the game files, which give one level for most instances rather than a range. The difficulty is the id 3 installs agree on.">
+            <SectionHeading id="facts" note="The type is from the game files where they place the entrance, else as 3 installs agree. The level is from the game files, which give one level for most instances rather than a range. The difficulty is the id 3 installs agree on; the game files' own list of the instance's difficulties shows beside it when they give one.">
               Facts
             </SectionHeading>
             <Card as="div">
               <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm">
                 <dt className="text-muted">Type</dt><dd className="text-fg">{kindLabel(row.raid)}</dd>
                 <dt className="text-muted">Level</dt><dd className="text-fg">{levelLabel(row.level) ?? <span className="text-muted">–</span>}</dd>
-                <dt className="text-muted">Difficulty</dt><dd className="text-fg">{row.difficulty === null ? PLACEHOLDER : difficultyLabel(row.difficulty)}</dd>
-                <dt className="text-muted">Bosses reported</dt><dd className="text-fg">{unreachable ? PLACEHOLDER : row.bosses.length}</dd>
+                <dt className="text-muted">Difficulty</dt>
+                <dd className="text-fg">
+                  {row.difficulty !== null ? difficultyLabel(row.difficulty) : PLACEHOLDER}
+                  {row.difficulties.length > 0 && (
+                    <span className="ml-2 inline-flex items-baseline gap-1.5 text-meta text-muted"><Badge tone="files" />in the files, {row.difficulties.map(difficultyLabel).join(", ")}</span>
+                  )}
+                </dd>
+                <dt className="text-muted">Bosses reported</dt>
+                <dd className="text-fg">
+                  {unreachable ? PLACEHOLDER : row.bosses.length}
+                  {row.encounters.length > 0 && (
+                    <span className="ml-2 inline-flex items-baseline gap-1.5 text-meta text-muted"><Badge tone="files" />in the files, {row.encounters.length}</span>
+                  )}
+                </dd>
               </dl>
             </Card>
           </section>
@@ -135,15 +151,13 @@ export default async function InstancePage(props: Props) {
           </section>
 
           <section aria-labelledby="bosses">
-            <SectionHeading id="bosses" note="A boss is listed once 3 installs report its encounter ending here. Kills count every install's kills together; wipes are not kills.">
+            <SectionHeading id="bosses" note="A boss is listed once 3 installs report its encounter ending here. Kills count every install's kills together; wipes are not kills. The encounters the game files list for this instance follow, marked unconfirmed until 3 installs report them.">
               Bosses
             </SectionHeading>
-            {!unreachable && (
-              <DataTable
-                dense caption={`Bosses players reported in ${title}`} columns={bossColumns} rows={row.bosses} rowKey={(b) => String(b.encounterId)}
-                empty={empty("No boss has 3 installs reporting it here yet.")}
-              />
-            )}
+            <DataTable
+              dense caption={`Bosses players reported in ${title}, and the ones the game files list`} columns={bossColumns} rows={bosses} rowKey={(b) => String(b.encounterId)}
+              empty={empty("No boss has 3 installs reporting it here yet, and the game files list none.")}
+            />
           </section>
         </div>
       </article>
