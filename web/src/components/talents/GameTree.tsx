@@ -12,8 +12,10 @@ const NODE = 50;
 const PITCH = 60;
 const LABEL = 24;
 const GOLD = "#ffd100";
+/** The preview's mark on its node: a ring 7 px out, clear of the frame and of the gold focus ring 2 to 4 px out. */
+const MARK = "pointer-events-none absolute -inset-[7px] border-2 border-accent";
 
-export default function GameTree({ catalog, tree, ranks, available, spent, selected, roving, assets, onAdd, onSelect, onTip }: Props & { assets: GameAssets }) {
+export default function GameTree({ catalog, tree, ranks, available, spent, selected, roving, highlighted = null, assets, onAdd, onSelect, onTip }: Props & { assets: GameAssets }) {
   const frames = assets.frames;
   const nodes = catalog.nodes.filter((n) => n.treeId === tree.id);
   const rows = Math.max(...nodes.map((n) => n.row));
@@ -28,7 +30,7 @@ export default function GameTree({ catalog, tree, ranks, available, spent, selec
   const bgUrl = bg ? frames.get(bg.element)?.url : undefined;
 
   return (
-    <div role="group" aria-label={`${tree.name} talents, ${spent} ${spent === 1 ? "point" : "points"}`} className="overflow-x-auto rounded-lg border border-[#3d3a2e]" data-game-look>
+    <div role="group" aria-label={`${tree.name} talents, ${spent} ${spent === 1 ? "point" : "points"}`} className="overflow-x-auto rounded-lg border border-[#3d3a2e]" data-game-look data-tree-scroll>
       <div
         className="relative p-3"
         style={{ backgroundColor: "#07070d", backgroundImage: bgUrl ? `url(${bgUrl})` : undefined, backgroundSize: "cover", backgroundPosition: "center" }}
@@ -78,10 +80,11 @@ export default function GameTree({ catalog, tree, ranks, available, spent, selec
             const pos = { left: x(node.col), top: y(node.row), width: NODE, height: NODE };
             const counter = state === "yellow" ? GOLD : state === "green" ? "#4cff4c" : "#9a9a9a";
             const focusRing = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ffd100]";
+            const marked = highlighted === node.id;
 
             if (node.kind === "choice") {
               return (
-                <div key={node.id} role="group" aria-label={nodeLabel(catalog, node, ranks, available)} className="absolute flex items-center justify-center gap-0.5" style={pos}>
+                <div key={node.id} role="group" aria-label={nodeLabel(catalog, node, ranks, available)} data-highlighted={marked || undefined} className="absolute flex items-center justify-center gap-0.5" style={pos}>
                   {node.entries.map((entry, i) => {
                     const picked = rank > 0 && ranks[node.id]?.choice === i;
                     const icon = assetOf(assets, entry)?.icon;
@@ -92,6 +95,7 @@ export default function GameTree({ catalog, tree, ranks, available, spent, selec
                         id={`talent-${node.id}-${i}`}
                         aria-label={`${entry.name}${picked ? ", chosen" : ""}`}
                         aria-pressed={picked}
+                        aria-current={marked && picked ? "step" : undefined}
                         aria-describedby={`talent-desc-${node.id}`}
                         tabIndex={tabIndex}
                         {...common}
@@ -102,6 +106,7 @@ export default function GameTree({ catalog, tree, ranks, available, spent, selec
                     );
                   })}
                   <span id={`talent-desc-${node.id}`} className="sr-only">{describeNode(assets, node, rank)}</span>
+                  {marked && <span aria-hidden="true" className={`${MARK} rounded-md`} />}
                 </div>
               );
             }
@@ -121,6 +126,8 @@ export default function GameTree({ catalog, tree, ranks, available, spent, selec
                 data-state={state}
                 data-shape={square ? "square" : "circle"}
                 data-selected={selected === node.id || undefined}
+                data-highlighted={marked || undefined}
+                aria-current={marked ? "step" : undefined}
                 style={pos}
                 onClick={() => onAdd(node.id)}
                 className={`absolute select-none [-webkit-touch-callout:none] touch-manipulation ${square ? "rounded-md" : "rounded-full"} ${focusRing}`}
@@ -137,6 +144,7 @@ export default function GameTree({ catalog, tree, ranks, available, spent, selec
                   </span>
                 )}
                 <span id={`talent-desc-${node.id}`} className="sr-only">{describeNode(assets, node, rank)}</span>
+                {marked && <span aria-hidden="true" className={`${MARK} ${square ? "rounded-lg" : "rounded-full"}`} />}
               </button>
             );
           })}

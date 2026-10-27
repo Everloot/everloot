@@ -44,6 +44,8 @@ export interface Props extends TreeHandlers {
   available: number;
   spent: number;
   selected: number | null;
+  /** The node the spend order's preview stops at, marked as the current step. Absent without a preview. */
+  highlighted?: number | null;
   /** The asset files, when the page has them; null shows the text tiles. */
   assets: GameAssets | null;
 }
@@ -72,7 +74,10 @@ export function nodeLabel(catalog: TalentCatalog, node: TalentNode, ranks: Ranks
   return `${name}, rank ${rank} of ${node.maxRanks}, row ${node.row}, ${state}`;
 }
 
-export default function TalentTreeView({ catalog, tree, ranks, available, spent, selected, roving, assets, onAdd, onSelect, onTip }: Props) {
+/** The preview's mark on its node: a ring inside the tile's own border, so it never covers the focus ring outside it. */
+const MARK = "pointer-events-none absolute inset-0 rounded-md border-2 border-accent";
+
+export default function TalentTreeView({ catalog, tree, ranks, available, spent, selected, roving, highlighted = null, assets, onAdd, onSelect, onTip }: Props) {
   const nodes = catalog.nodes.filter((n) => n.treeId === tree.id);
   const rows = Math.max(...nodes.map((n) => n.row));
   const cols = Math.max(...nodes.map((n) => n.col));
@@ -85,7 +90,7 @@ export default function TalentTreeView({ catalog, tree, ranks, available, spent,
   const gateOfRow = (row: number) => Math.min(...nodes.filter((n) => n.row === row).map((n) => n.unlock?.pointsInTree ?? 0));
 
   return (
-    <div role="group" aria-label={`${tree.name} talents, ${spent} ${spent === 1 ? "point" : "points"}`} className="overflow-x-auto">
+    <div role="group" aria-label={`${tree.name} talents, ${spent} ${spent === 1 ? "point" : "points"}`} className="overflow-x-auto" data-tree-scroll>
       <div className="relative mx-auto" style={{ width: LABEL + GAP + width, height }}>
         {Array.from({ length: rows }, (_, i) => i + 1).map((row) => (
           <span key={row} aria-hidden="true" className="absolute font-mono text-xs text-muted text-right" style={{ left: 0, top: top(row) + H / 2 - 8, width: LABEL }}>
@@ -118,10 +123,11 @@ export default function TalentTreeView({ catalog, tree, ranks, available, spent,
           const style = { left: left(node.col), top: top(node.row), width: W, height: H };
           const tabIndex = roving === node.id ? 0 : -1;
           const common = { "data-node": node.id, "data-row": node.row, "data-col": node.col, "data-tree": tree.id };
+          const marked = highlighted === node.id;
 
           if (node.kind === "choice") {
             return (
-              <div key={node.id} role="group" aria-label={nodeLabel(catalog, node, ranks, available)} className={`absolute flex flex-col overflow-hidden ${base}`} style={style}>
+              <div key={node.id} role="group" aria-label={nodeLabel(catalog, node, ranks, available)} data-highlighted={marked || undefined} className={`absolute flex flex-col overflow-hidden ${base}`} style={style}>
                 {node.entries.map((entry, i) => {
                   const picked = rank > 0 && ranks[node.id]?.choice === i;
                   return (
@@ -130,6 +136,7 @@ export default function TalentTreeView({ catalog, tree, ranks, available, spent,
                       type="button"
                       id={`talent-${node.id}-${i}`}
                       aria-pressed={picked}
+                      aria-current={marked && picked ? "step" : undefined}
                       tabIndex={tabIndex}
                       {...common}
                       onFocus={() => onSelect(node.id)}
@@ -140,6 +147,7 @@ export default function TalentTreeView({ catalog, tree, ranks, available, spent,
                     </button>
                   );
                 })}
+                {marked && <span aria-hidden="true" className={MARK} />}
               </div>
             );
           }
@@ -154,6 +162,8 @@ export default function TalentTreeView({ catalog, tree, ranks, available, spent,
               tabIndex={tabIndex}
               {...common}
               data-selected={selected === node.id || undefined}
+              data-highlighted={marked || undefined}
+              aria-current={marked ? "step" : undefined}
               style={style}
               aria-describedby={assets ? `talent-desc-${node.id}` : undefined}
               onFocus={() => { onSelect(node.id); onTip(node.id, "focus"); }}
@@ -168,6 +178,7 @@ export default function TalentTreeView({ catalog, tree, ranks, available, spent,
                 {rank}/{node.maxRanks}{full ? " full" : ""}
               </span>
               {assets && <span id={`talent-desc-${node.id}`} className="sr-only">{describeNode(assets, node, rank)}</span>}
+              {marked && <span aria-hidden="true" className={MARK} />}
             </button>
           );
         })}
