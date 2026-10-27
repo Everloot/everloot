@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { AccountShell, ShellCharacter } from "@/lib/account-shell-types";
 import { signInPath } from "@/lib/auth/return-to";
-import { answer, loadTools, marketReply, searchOnly, signedIn, type ChatProgress, type ToolDef } from "@/lib/chat/agent";
+import { answer, answerFree, FREE_TOOLS, loadTools, marketReply, searchOnly, signedIn, type ChatProgress, type ToolDef } from "@/lib/chat/agent";
 import { ITEM_FOUND, itemQuery, resolveItem, type ItemRef } from "@/lib/chat/items";
 import { chatProvider } from "@/lib/chat/providers";
 import { providerStorage } from "@/lib/chat/provider-session";
@@ -76,8 +76,13 @@ function viewIn(search: string): View {
  * `savedBuilds` (EVERLOOT_SAVED_BUILDS) offers my_builds to a signed-in visitor's model; `profiles`
  * (EVERLOOT_PROFILES) offers the account's characters as context. Keys are set up on /account#chat-keys.
  * `workspace` (EVERLOOT_CHAT_WORKSPACE) adds private account projects and chats; without it chats stay in the browser.
+ * `freeChat` (EVERLOOT_FREE_CHAT_KEY, EVERLOOT_FREE_CHAT_CF_*) names the providers of Everloot (free), the built-in
+ * model a visitor without a key of their own gets by default; empty while it is off. A key the player added always comes first.
  */
-export default function ChatClient({ savedBuilds = false, profiles = false, workspace = false }: { savedBuilds?: boolean; profiles?: boolean; workspace?: boolean }) {
+export default function ChatClient({ savedBuilds = false, profiles = false, workspace = false, freeChat = [] }: {
+  savedBuilds?: boolean; profiles?: boolean; workspace?: boolean; freeChat?: string[];
+}) {
+  const freeOn = freeChat.length > 0;
   const [providers, setProviders] = useState<SavedProvider[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentId, setCurrentId] = useState("");
@@ -103,8 +108,11 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
   const [notice, setNotice] = useState("");
   const [drafts, setDrafts] = useState<Unsaved[]>([]);
   const [full, setFull] = useState(false);
+  // Without a key: the free model when it is on, or Everloot search.
+  const [mode, setMode] = useState<"free" | "search">(freeOn ? "free" : "search");
 
   const tools = useRef<ToolDef[] | null>(null);
+  const freeTools = useRef<ToolDef[] | null>(null);
   const stop = useRef<AbortController | null>(null);
   const thread = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
@@ -123,8 +131,8 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
   const seq = useRef(0);
   const generation = useRef(0);
   // What ask() and the shortcuts read, current at every render even from an older closure.
-  const latest = useRef({ providers, signed, context, own, busy, currentId, note, known: !workspace });
-  latest.current = { providers, signed, context, own, busy, currentId, note, known: latest.current.known };
+  const latest = useRef({ providers, signed, context, own, busy, currentId, note, mode, known: !workspace });
+  latest.current = { providers, signed, context, own, busy, currentId, note, mode, known: latest.current.known };
 
   const setMeta = (m: Meta) => { metaRef.current = m; setMetaState(m); };
   const setSave = (s: SaveState) => { saveRef.current = s; setSaveState(s); };
@@ -223,7 +231,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
   }, [signed, savedBuilds, profiles, accountId]);
 
   // From the home's Ask box: /chat?q=<question>&character=<id>. The character becomes the context chip. With a key
-  // ready the question is sent at once; without one it waits in the box. The URL drops both so a reload does not resend.
+  // ready, or the free model on, the question is sent at once; otherwise it waits in the box. The URL drops both so a reload does not resend.
   useEffect(() => {
     if (!ready || signed === null || prefilled.current) return;
     const params = new URLSearchParams(window.location.search);
@@ -238,7 +246,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
         character = (await characters()).characters.find((c) => c.id === characterId) ?? null;
         setContext(character);
       }
-      if (q && keyReady(latest.current.providers)) void ask(q, character);
+      if (q && (keyReady(latest.current.providers) || freeOn)) void ask(q, character);
       else { setDraft(q); box.current?.focus(); }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, when storage and the session are known
@@ -471,9 +479,17 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
       let item: ItemRef | null = null;
       if (priced) {
         r = priced;
-      } else if (!active) {
+      } else if (!active && !(freeOn && latest.current.mode === "free")) {
         item = name ? await resolveItem(name, ctl.signal) : null;
         r = item && "id" in item ? { text: ITEM_FOUND, model: null, sources: [], pages: [], steps: [] } : await searchOnly(q);
+      } else if (!active) {
+        // Everloot (free): the same loop through this site's proxy. It never gets my_builds, which reads the account.
+        const lookup = name ? resolveItem(name, ctl.signal).catch(() => null) : Promise.resolve(null);
+        freeTools.current ??= await loadTools(fetch, false, FREE_TOOLS);
+        r = await answerFree({
+          history, question: [q, contextLine, noteLine].filter(Boolean).join("\n\n"), tools: freeTools.current, onProgress: setLive, signal: ctl.signal,
+        }, q);
+        item = await lookup;
       } else {
         const lookup = name ? resolveItem(name, ctl.signal).catch(() => null) : Promise.resolve(null);
         tools.current ??= await loadTools(fetch, savedBuilds && latest.current.signed === true);
@@ -802,7 +818,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
               </div>
             ) : <Composer box={box} value={draft} onValue={setDraft} onSend={() => void ask(draft)} onStop={() => stop.current?.abort()} busy={busy}
               providers={providers} onPickModel={(kind, model) => { try { setProviders(pickModel(providerStorage(), kind, model)); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } }}
-              keysHref={keysHref} signed={signed}
+              keysHref={keysHref} signed={signed} free={freeChat} mode={mode} onMode={(m) => { setMode(m); box.current?.focus(); }}
               characters={own.characters} context={context} onContext={(c) => { setContext(c); box.current?.focus(); }}
               {...(workspace ? { sessionKey: `${currentId}:${meta.projectId ?? ""}`, note, onRemoveNote: () => { setNote(null); box.current?.focus(); } } : {})} />}
           </>

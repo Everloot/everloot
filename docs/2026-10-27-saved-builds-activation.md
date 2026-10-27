@@ -24,7 +24,7 @@ saved build and character label, including the builds Chat entries point to, and
 - `/me` and `/me/characters/<id>`, `/b/<slug>`, and the routes under `/api/me/builds` and `/api/me/characters`. With
   the switch off they all answer 404.
 - `my_builds` in the MCP tool list and at `/api/tools/my_builds`, only for a key made with "Read my saved builds".
-  The keyless list stays the protocol's tools: 31, with guilds on. MCP directories copied that list, and it does not
+  The keyless list stays the protocol's tools: 32, with guilds on. MCP directories copied that list, and it does not
   change.
 - With profiles on, the home, settings and public profiles add builds and character labels. A public profile lists
   its owner's shared builds when they tick builds in settings.
@@ -223,7 +223,7 @@ Then, from any machine, keep the public MCP tool list as it is now, with the swi
 ```
 curl -s https://everloot.app/mcp/public -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' > tools-before.json
-jq '.result.tools | length' tools-before.json                  # 31
+jq '.result.tools | length' tools-before.json                  # 32
 jq '[.result.tools[].name] | index("my_builds")' tools-before.json  # null
 curl -s -o /dev/null -w '%{http_code}\n' https://everloot.app/api/me/builds   # 404 while the switch is off
 ```
@@ -248,7 +248,7 @@ Then, without signing in:
   any sign-in check or database call.
 - `/b/AAAAAAAA` is a 404 with `noindex, nofollow`, and `/me` redirects to `/sign-in?returnTo=%2Fme`.
 - The MCP list has not moved: fetch it again into `tools-after.json` with the same `curl` and
-  `cmp tools-before.json tools-after.json` prints nothing. Still 31 tools, still no `my_builds`.
+  `cmp tools-before.json tools-after.json` prints nothing. Still 32 tools, still no `my_builds`.
 
 If any of these fails, unset the switch and redeploy (see Rollback).
 

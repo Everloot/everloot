@@ -5,6 +5,7 @@ import { CLASSES, LAUNCH, longDate, NEW_COMBOS, RACES } from "@/data/wow-forever
 import { DATES, POSTS, RULESETS, RULESETS_POST, hasLaunched, windowAt, type BluePostRef } from "@/data/wow-forever-launch";
 import { latestBuildLine } from "@/lib/changes-facts";
 import { loadTimeline, postPath } from "@/lib/changes";
+import { RACE_TABLE, traitsFor, type RaceTrait } from "@/lib/race-traits";
 import { pageMetadata } from "@/lib/seo";
 import JsonLd from "@/components/JsonLd";
 import { videoGamePageJsonLd } from "@/lib/jsonld";
@@ -101,6 +102,13 @@ function RaceTable({ faction, rows, icons }: { faction: string; rows: Record<str
       ),
     })),
   ];
+  const traitNames = (race: string, kind: RaceTrait["kind"]) => traitsFor(faction, race).filter((t) => t.kind === kind).map((t) => t.name).join(", ");
+  const traitColumns: Column<RaceRow>[] = [
+    { key: "race", header: "Race", nowrap: true, cell: (r) => <span className="font-medium">{r.race}</span> },
+    { key: "active", header: "Active traits", cell: (r) => traitNames(r.race, "active") },
+    { key: "passive", header: "Passive traits", cell: (r) => traitNames(r.race, "passive") },
+  ];
+  const tableRows = Object.entries(rows).map(([race, classes]) => ({ race, classes }));
   return (
     <div>
       <SectionHeading as="h3">
@@ -109,9 +117,12 @@ function RaceTable({ faction, rows, icons }: { faction: string; rows: Record<str
       <DataTable
         caption={`${faction}: races and the classes each can play`}
         columns={columns}
-        rows={Object.entries(rows).map(([race, classes]) => ({ race, classes }))}
+        rows={tableRows}
         rowKey={(r) => r.race}
       />
+      <div className="mt-4">
+        <DataTable caption={`${faction}: racial traits`} columns={traitColumns} rows={tableRows} rowKey={(r) => r.race} />
+      </div>
     </div>
   );
 }
@@ -240,7 +251,8 @@ export default async function WowForeverPage() {
               <span className="font-semibold text-accent">New</span> marks the combinations Blizzard names as new in WoW: Forever.
               Source: <a href={RACES.sourceUrl} rel="noopener" className={link}>{RACES.sourceName}, {RACES.sourceTitle}</a>, published{" "}
               <time dateTime={RACES.published}>{longDate(RACES.published)}</time>. Checked on{" "}
-              <time dateTime={RACES.checkedOn}>{longDate(RACES.checkedOn)}</time>. How many characters play each
+              <time dateTime={RACES.checkedOn}>{longDate(RACES.checkedOn)}</time>. Racial traits found in game files,
+              unconfirmed, build {RACE_TABLE.build.version}. How many characters play each
               combination: the <Link href="/census" className={link}>census</Link>.
             </p>
           </div>

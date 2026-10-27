@@ -1,4 +1,6 @@
 import { agreedDifficulties, bossLabel, confirmedEntrances, instanceBosses, type InstanceBoss } from "../../../kb/src/instances";
+import type { ClientEncounter } from "../../../kb/src/client-encounters";
+import { CLIENT_ENCOUNTERS } from "@/data/game-data/client-encounters";
 import { dayLabel } from "./report-labels";
 import type { WorldMapData } from "../../../kb/src/world-map-data";
 import { slugify } from "../../../kb/src/lore-slug";
@@ -26,15 +28,46 @@ export interface InstanceRow {
   difficulty: number | null;
   /** The level range the game files give it (ContentTuning), or null: never worked out another way. */
   level: { min: number; max: number } | null;
+  /** The difficulty id / names the game files give it (MapDifficulty), ids in file order; empty when they give none. */
+  difficulties: number[];
   files: InstancePlace[];
   confirmed: (InstancePlace & { installs: number; lastSeen: string | null })[];
   reported: number;
   bosses: InstanceBoss[];
+  /** The encounters the game files list for it (DungeonEncounter), in the files' order; empty when they list none. */
+  encounters: ClientEncounter[];
+}
+
+/**
+ * One line of an instance's boss table, player-first: every boss 3 installs report, in the reports' order, then the
+ * encounters the files list that no report has confirmed. A reported boss the installs have not named borrows the
+ * files' name (`filesName`); a files-only encounter has no `boss`.
+ */
+export interface BossRow {
+  encounterId: number;
+  name: string | null;
+  /** True when the name shown is the files', not one 3 installs agreed on. */
+  filesName: boolean;
+  boss: InstanceBoss | null;
+}
+
+export function bossRows(row: Pick<InstanceRow, "bosses" | "encounters">): BossRow[] {
+  const files = new Map(row.encounters.map((e) => [e.id, e.name]));
+  const out: BossRow[] = row.bosses.map((b) => ({
+    encounterId: b.encounterId,
+    name: b.name ?? files.get(b.encounterId) ?? null,
+    filesName: b.name === null && files.has(b.encounterId),
+    boss: b,
+  }));
+  const reported = new Set(row.bosses.map((b) => b.encounterId));
+  for (const e of row.encounters) if (!reported.has(e.id)) out.push({ encounterId: e.id, name: e.name, filesName: true, boss: null });
+  return out;
 }
 
 /**
  * The difficulty ids a classic client reports, by the names the game gives them (the Classic DifficultyID list on
- * warcraft.wiki.gg). Any other id is printed as a number.
+ * warcraft.wiki.gg). Kept as the fallback for ids the committed map.json does not carry yet; the build's own
+ * Difficulty names take over as the build watch merges them into map.json.
  */
 const DIFFICULTY_NAMES: Readonly<Record<number, string>> = {
   1: "Normal", 2: "Heroic", 3: "10 Player", 4: "25 Player", 5: "10 Player (Heroic)", 6: "25 Player (Heroic)",
@@ -42,7 +75,13 @@ const DIFFICULTY_NAMES: Readonly<Record<number, string>> = {
   173: "Normal", 174: "Heroic", 175: "10 Player", 176: "25 Player", 193: "10 Player (Heroic)", 194: "25 Player (Heroic)",
 };
 
-export const difficultyLabel = (id: number): string => DIFFICULTY_NAMES[id] ?? `Difficulty ${id}`;
+/** A name that prefers the files' Difficulty row, keeps the wiki fallback for ids map.json does not carry yet. */
+export const difficultyLabelIn =
+  (data: Pick<WorldMapData, "difficulties">) =>
+  (id: number): string =>
+    data.difficulties?.[id]?.name ?? DIFFICULTY_NAMES[id] ?? `Difficulty ${id}`;
+/** The site's name for a difficulty id, from the build's own files when map.json carries them. */
+export const difficultyLabel = (id: number): string => difficultyLabelIn(WORLD_MAP)(id);
 export const instanceTitle = (row: Pick<InstanceRow, "instanceMapId" | "name">): string => row.name ?? `Instance ${row.instanceMapId}`;
 
 /** "17–24" for a range, "60" for one level, null when the game files give none. */
@@ -92,10 +131,15 @@ export function parseInstanceSegment(segment: string): number | null {
 /**
  * Every instance the site shows, by id. An instance is listed when the files place its entrance in a released zone,
  * when 3 installs confirm an entrance in one, or when 3 installs report a boss in it: an instance known only from an
- * entrance in a held-back zone has no row, as on the map without spoilers. Entrances come from `placedEntrances`, the
+ * entrance in a held-back zone has no row, as on the map without spoilers, and the files' encounter list never adds
+ * a row by itself. Entrances come from `placedEntrances`, the
  * list the zone pages and the map read, so the three never disagree.
  */
-export function instanceRows(seen: ZoneSightings = {}, data: Pick<WorldMapData, "zones" | "continents" | "entrances"> = WORLD_MAP): Map<number, InstanceRow> {
+export function instanceRows(
+  seen: ZoneSightings = {},
+  data: Pick<WorldMapData, "zones" | "continents" | "entrances"> = WORLD_MAP,
+  encounters: Readonly<Record<string, ClientEncounter[]>> = CLIENT_ENCOUNTERS.instances,
+): Map<number, InstanceRow> {
   const zoneName = new Map(publicZones(data).map((z) => [z.mapId, z.name]));
   const place = (mapId: number, x: number, y: number): InstancePlace | null => (zoneName.has(mapId) ? { mapId, zoneName: zoneName.get(mapId)!, x, y } : null);
   const asOf = seen.asOf ?? new Date();
@@ -105,7 +149,7 @@ export function instanceRows(seen: ZoneSightings = {}, data: Pick<WorldMapData, 
   const row = (id: number): InstanceRow => {
     const lv = data.entrances.find((f) => f.mapId === id);
     const level = lv?.minLevel !== undefined && lv.maxLevel !== undefined ? { min: lv.minLevel, max: lv.maxLevel } : null;
-    const r = out.get(id) ?? { instanceMapId: id, name: null, raid: null, difficulty: difficulty.get(id) ?? null, level, files: [], confirmed: [], reported: 0, bosses: [] };
+    const r = out.get(id) ?? { instanceMapId: id, name: null, raid: null, difficulty: difficulty.get(id) ?? null, level, difficulties: lv?.difficultyIds ?? [], files: [], confirmed: [], reported: 0, bosses: [], encounters: encounters[String(id)] ?? [] };
     out.set(id, r);
     return r;
   };

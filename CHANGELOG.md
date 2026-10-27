@@ -15,6 +15,10 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site and MCP: racial traits from the game files (build-stamped `races.json`, found in game files, unconfirmed).
+  Each class page lists, under "Who can be a {Class}", every race's traits with active or passive and the short
+  text; `/wow-forever` adds a trait table per faction. New MCP tool `class_races` (protocol 1.20.0): the races that
+  can be a class per faction, with trait names and no game text; the chat uses it for builds questions.
 - Site: **Copy for addon** on both planners, exporting the selected talent set or planned raid code.
 - Site: a news section. Posts are Markdown files under `kb/news/` with front matter (`npm run kb -- news-check`
   runs in CI), written in the wiki's syntax so they link database entities and wiki pages the same way. Published

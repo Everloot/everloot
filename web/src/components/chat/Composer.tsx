@@ -13,7 +13,8 @@ const className = (slug: string) => slug.charAt(0).toUpperCase() + slug.slice(1)
 /**
  * The one question box, pinned under the conversation: it grows with the text, Enter sends and Shift+Enter
  * starts a new line, and Stop replaces Send while an answer streams. The model menu, the character attached
- * as context and whose limits the lookups use sit inside it. Without a key it says search is ready and that an AI model is optional.
+ * as context and whose limits the lookups use sit inside it. Without a key it says search is ready and that an AI model is optional;
+ * with the free model on, the menu offers it first and the box says what it is and which provider sees the question.
  */
 export default function Composer(p: {
   box: RefObject<HTMLTextAreaElement | null>;
@@ -27,6 +28,10 @@ export default function Composer(p: {
   /** Where to set keys up: /account#chat-keys, through sign-in when signed out. */
   keysHref: string;
   signed: boolean | null;
+  /** The free model's providers, in the order they are tried; empty while it is off. `mode` is what Send uses without a key. */
+  free?: string[];
+  mode?: "free" | "search";
+  onMode?: (mode: "free" | "search") => void;
   characters: ShellCharacter[];
   context: ShellCharacter | null;
   onContext: (c: ShellCharacter | null) => void;
@@ -38,6 +43,12 @@ export default function Composer(p: {
 }) {
   const ready = p.providers.length > 0;
   const active = p.providers[0] ?? null;
+  const names = !ready ? p.free ?? [] : [];
+  const free = names.length > 0 ? names.join(" or ") : null;
+  const mode = free ? p.mode ?? "free" : "search";
+  const setup = (
+    <><a href={p.keysHref} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Assistant setup</a>{p.signed === false ? " (sign in first)" : ""}</>
+  );
 
   // Grow with the text up to MAX_HEIGHT, then scroll inside.
   useLayoutEffect(() => {
@@ -51,11 +62,15 @@ export default function Composer(p: {
     <form className="mx-auto w-full max-w-reading px-4 pb-3" aria-label="Ask Everloot"
       onSubmit={(e) => { e.preventDefault(); p.onSend(); }}>
       <div className="rounded-card border border-edge bg-panel focus-within:border-accent">
-        {!ready && (
+        {!ready && (mode === "free" ? (
           <p className="border-b border-line px-4 py-2 text-sm text-fg-2">
-            Everloot search is ready: Send shows its results. <a href={p.keysHref} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Assistant setup</a>{p.signed === false ? " (sign in first)" : ""} adds an optional AI model, which uses your own provider account.
+            Everloot (free) answers with a free AI model on {free}, from Everloot&apos;s data, a limited number a day. Your question and this chat go to {names.length > 1 ? `whichever of ${free} answers` : free}, and each answer names it; no key, and no account details unless you attach a character or note. At the limit, Send shows Everloot search. {setup} adds your own model.
           </p>
-        )}
+        ) : (
+          <p className="border-b border-line px-4 py-2 text-sm text-fg-2">
+            Everloot search is ready: Send shows its results. {setup} adds an optional AI model, which uses your own provider account.
+          </p>
+        ))}
         <textarea ref={p.box} rows={1} value={p.value} aria-label="Your question" aria-keyshortcuts="Enter Shift+Enter"
           placeholder="Ask about WoW: Forever" maxLength={2000}
           className="block max-h-60 w-full resize-none border-0 bg-transparent px-4 pt-3 text-base text-fg placeholder:text-muted focus:outline-none"
@@ -80,10 +95,15 @@ export default function Composer(p: {
               <option value="manage">Assistant setup…</option>
             </select>
           )}
-          {/* With the workspace on the model menu shows without a key too: Everloot search now, a model after setup. */}
-          {!ready && p.sessionKey !== undefined && (
-            <select aria-label="Model" className={menu} disabled={p.busy} value="search"
-              onChange={(e) => { if (e.target.value === "setup") window.location.assign(p.keysHref); }}>
+          {/* With the workspace or the free model on, the model menu shows without a key too: the free model when it is
+              on, Everloot search, and a model of your own after setup. */}
+          {!ready && (free || p.sessionKey !== undefined) && (
+            <select aria-label="Model" className={menu} disabled={p.busy} value={mode}
+              onChange={(e) => {
+                if (e.target.value === "setup") window.location.assign(p.keysHref);
+                else p.onMode?.(e.target.value as "free" | "search");
+              }}>
+              {free && <option value="free">Everloot (free)</option>}
               <option value="search">Everloot search</option>
               <option value="setup">Assistant setup…</option>
             </select>
