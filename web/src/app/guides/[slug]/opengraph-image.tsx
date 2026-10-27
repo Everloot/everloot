@@ -17,9 +17,11 @@ export default async function Image({ params }: { params: Promise<{ slug: string
   const { slug } = await params;
   const guide = publishedGuide(loadGuides(), slug);
   if (!guide) notFound();
+  // A guide's title may run to 90 characters, so the card bounds it to the lines it has.
   return renderCard({
     label: "Everloot guide",
     title: guide.title,
     subtitle: `${classLabel(guide.classSlug)} · ${ACTIVITY_LABEL[guide.activity]} · Levels ${guide.levels.from}–${guide.levels.to}`,
+    fit: true,
   });
 }

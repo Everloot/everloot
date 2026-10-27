@@ -2,6 +2,7 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { inflateSync } from "node:zlib";
 import type { Metadata } from "next";
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -34,8 +35,10 @@ import GuidesIndex, * as indexRoute from "./page";
 import GuidePage, * as guideRoute from "./[slug]/page";
 import GuideImage, * as imageRoute from "./[slug]/opengraph-image";
 import GuidePlan, { guideAddonLink, guideCalculatorHref } from "@/components/guides/GuidePlan";
+import { tokens } from "@/design/tokens";
 import { guideFreshness } from "@/lib/guide-freshness";
 import { loadGuides, publishedGuide } from "@/lib/guides";
+import { fittedTitle } from "@/lib/og-card";
 import { loadCatalog } from "@/lib/talents/catalogs";
 import { classTalentChanges } from "@/lib/talents/freshness-records";
 import { fixture } from "@/lib/talents/fixture";
@@ -374,6 +377,29 @@ describe("a guide's page", () => {
     ]);
   });
 
+  test("a long title keeps to its lines on the guide's card, so it never runs into the line under it", async () => {
+    // 90 characters, the longest title a guide may have, with spaces where a title has them.
+    const long = "Practical Mage leveling talents with two sets and a detailed order for the whole long journey".slice(0, 90);
+    // Wide letters, so three lines cannot hold it and it ends in an ellipsis.
+    const wide = "WWW MMMM WWWWW MMMM WWW MMMMM WWWW MMMM WWWWW MMM WWWW MMMMM WWW MMMM WWWWW MMMM WWW MMMMMW".slice(0, 90);
+    for (const [slug, title] of [["long-title", long], ["wide-title", wide]]) {
+      expect(title, slug).toHaveLength(90);
+      stubGuides([{ slug, title }]);
+      const card = decodePng(new Uint8Array(await (await GuideImage(params(slug))).arrayBuffer()));
+      expect([card.width, card.height], slug).toEqual([1200, 630]);
+      // The title is drawn in the card's text colour and the line under it in the second one: every row of title ends
+      // above the first row of that line.
+      const drawn = rowsIn(card, tokens.dark.fg);
+      const under = rowsIn(card, tokens.dark["fg-2"]);
+      expect(drawn.length, slug).toBeGreaterThan(0);
+      expect(under.length, slug).toBeGreaterThan(0);
+      expect(Math.max(...drawn), slug).toBeLessThan(Math.min(...under));
+    }
+    // Over three lines at a smaller size, ending in an ellipsis past them; a short title keeps the card's full size.
+    expect(fittedTitle(long)).toEqual({ fontSize: 64, lines: 3 });
+    expect(fittedTitle("Frost leveling")).toEqual({ fontSize: 84, lines: 2 });
+  });
+
   test("its title, description and social card are complete, and the card is the guide's own", async () => {
     stubGuides(SOME);
     const m = await metadata("frost-leveling");
@@ -460,6 +486,58 @@ describe("the guide index", () => {
     expect(trail.itemListElement.map((i: { name: string }) => i.name)).toEqual(["Home", "Guides"]);
   });
 });
+
+/* ---------- The card's pixels ---------- */
+
+/** A PNG's pixels, for the 8-bit RGBA files the card renderer writes. */
+function decodePng(bytes: Uint8Array): { width: number; height: number; rgba: Uint8Array } {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const idat: Uint8Array[] = [];
+  let width = 0;
+  let height = 0;
+  for (let at = 8; at < bytes.length;) {
+    const length = view.getUint32(at);
+    const type = String.fromCharCode(...bytes.subarray(at + 4, at + 8));
+    if (type === "IHDR") {
+      width = view.getUint32(at + 8);
+      height = view.getUint32(at + 12);
+      expect([bytes[at + 16], bytes[at + 17], bytes[at + 20]], "8-bit RGBA, not interlaced").toEqual([8, 6, 0]);
+    } else if (type === "IDAT") idat.push(bytes.subarray(at + 8, at + 8 + length));
+    at += 12 + length;
+  }
+  const raw = inflateSync(Buffer.concat(idat));
+  const stride = width * 4;
+  const rgba = new Uint8Array(height * stride);
+  for (let y = 0; y < height; y++) {
+    const filter = raw[y * (stride + 1)];
+    for (let x = 0; x < stride; x++) {
+      const left = x >= 4 ? rgba[y * stride + x - 4] : 0;
+      const up = y > 0 ? rgba[(y - 1) * stride + x] : 0;
+      const corner = x >= 4 && y > 0 ? rgba[(y - 1) * stride + x - 4] : 0;
+      const p = left + up - corner;
+      const paeth = Math.abs(p - left) <= Math.abs(p - up) && Math.abs(p - left) <= Math.abs(p - corner) ? left : Math.abs(p - up) <= Math.abs(p - corner) ? up : corner;
+      const predicted = [0, left, up, (left + up) >> 1, paeth][filter];
+      rgba[y * stride + x] = (raw[y * (stride + 1) + 1 + x] + predicted) & 0xff;
+    }
+  }
+  return { width, height, rgba };
+}
+
+/** The rows holding a pixel of exactly this colour: the inside of a glyph drawn in it, not its blended edge. */
+function rowsIn(png: { width: number; height: number; rgba: Uint8Array }, hex: string): number[] {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const rows: number[] = [];
+  for (let y = 0; y < png.height; y++) {
+    for (let x = 0; x < png.width; x++) {
+      const i = (y * png.width + x) * 4;
+      if (png.rgba[i] === r && png.rgba[i + 1] === g && png.rgba[i + 2] === b) {
+        rows.push(y);
+        break;
+      }
+    }
+  }
+  return rows;
+}
 
 /* ---------- In the browser ---------- */
 
