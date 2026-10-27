@@ -346,6 +346,28 @@ test("an order beside another code in the address is never sent with this one", 
   expect(posts[0].body).toMatchObject({ order: null, order2: null });
 });
 
+test("a point spent while a new character is being made does not cost the plan Save was pressed on its order", async () => {
+  api("in", []);
+  await render();
+  await click(node(11));
+  await click(node(11));
+  await click(saveButton());
+  await type(panel()!.querySelector("select")!, "new");
+  await type(panel()!.querySelectorAll<HTMLInputElement>("input")[1], "Jaina");
+  const pressed = readPlanHash(window.location.hash);
+  expect(pressed.firstOrder).toBe("O1p-AA");
+  const release = hold("POST /api/me/characters");
+  await click(button(/^Save build$/)!);
+  // The character is still being made when another point goes in, and the address moves on to that plan.
+  await click(node(12));
+  expect(readPlanHash(window.location.hash).first).not.toBe(pressed.first);
+  await act(async () => release());
+  await settle();
+  expect(posts.map((p) => p.url)).toEqual(["/api/me/characters", "/api/me/builds"]);
+  // The build sent is the one on screen when Save was pressed: its codes, and the order that went with them.
+  expect(posts[1].body).toMatchObject({ code: pressed.first, code2: null, order: "O1p-AA", order2: null });
+});
+
 test("reopened from My builds, the plan comes back with both sets' orders, and saving it again keeps them", async () => {
   api("in", [saved({ code2: CODE2, order: "O1p-AA", order2: "O1g-A" })]);
   await render();

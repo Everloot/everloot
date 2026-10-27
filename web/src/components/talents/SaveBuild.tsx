@@ -264,6 +264,10 @@ export default function SaveBuild({ classSlug, codes, defaultName, onMessage }: 
     if (account.status !== "ready" || !codes[0] || !validId(ownerKey)) return;
     const ask = era.current;
     const owner = ownerKey;
+    // The plan on screen as Save is pressed, codes and orders together, before anything is awaited: points spent while
+    // a new character is made change the address, and the build sent must still be this one.
+    const [code, code2] = codes;
+    const [order, order2] = ordersFor(codes);
     setBusy(true);
     setError(null);
     try {
@@ -280,11 +284,10 @@ export default function SaveBuild({ classSlug, codes, defaultName, onMessage }: 
         setForm((f) => ({ ...f, characterId: character.id, newName: "", newRealm: "" }));
       }
       const update = editing && !asNew;
-      // The codes and their orders in the one write, an unknown order as null: the saved build is the plan on screen.
-      const [order, order2] = ordersFor(codes);
+      // The codes and their orders in the one write, an unknown order as null.
       const answer = await post<{ build: SavedBuild }>("/api/me/builds", {
         ...(update ? { id: editing.id } : {}),
-        name: form.name, notes: form.notes, characterId, code: codes[0], code2: codes[1], shared: form.shared, showName: form.showName,
+        name: form.name, notes: form.notes, characterId, code, code2, shared: form.shared, showName: form.showName,
         order, order2,
       }, ask, owner);
       if (!answer) return;
