@@ -14,6 +14,9 @@ import { buildTimeline } from "./changes.js";
 import { checkBuilds, loadRegistry, recordBuilds, saveRegistry, versionsUrl } from "./builds.js";
 import { clientCoverage, formatCoverage } from "./client-coverage.js";
 import { formatScanReport, loadManifest, scanBuild } from "./client-scan.js";
+import { writeClientAchievements } from "./client-achievements.js";
+import { writeClientEncounters } from "./client-encounters.js";
+import { writeClientMounts } from "./client-mounts.js";
 import { writeClientLayer } from "./client-layer.js";
 import { diffSnapshots } from "./client-diff.js";
 import { parseRegistry } from "./ecosystem.js";
@@ -152,6 +155,15 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
   client-layer <snapshot.sqlite> [--out ../web/src/data/game-data/client-layer.json]
     (relation edges derived from the game files, one build-stamped file for the database pages. Game file data,
     labelled found in game files, unconfirmed. See docs/DATA_POLICY.md)
+  client-achievements <snapshot.sqlite> [--out ../web/src/data/game-data/client-achievements.json]
+    (every achievement the game files carry with its criteria walked from CriteriaTree, one build-stamped file the
+    achievement pages merge with player reports player-first. Pages only: the API, MCP and bulk exports stay clean. See docs/DATA_POLICY.md)
+  client-encounters <snapshot.sqlite> [--out ../web/src/data/game-data/client-encounters.json]
+    (every boss encounter the game files list per instance, from DungeonEncounter, one build-stamped file the
+    instance pages merge with player reports player-first. Pages only, as above)
+  client-mounts <snapshot.sqlite> [--out ../web/src/data/game-data/client-mounts.json]
+    (every mount the game files list with its spell and riding skill, one build-stamped file the collections tool
+    shows beside player uploads player-first. Pages only, as above)
   item-names <snapshot.sqlite> --wiki <knowledge base or release .sqlite> [--ledger data/item-names/ledger.json] [--out data/assets]
     (adds the snapshot's item names and the Warcraft Wiki dump's item names to the name ledger, which only
     grows, and writes the name the site shows for every item a source names (the game files' first, with the wiki
@@ -534,6 +546,31 @@ async function main(): Promise<number> {
       const layer = writeClientLayer(args[0], path);
       for (const [rel, n] of Object.entries(layer.counts)) console.log(`${rel}: ${n} edges`);
       console.log(`-> ${path}`);
+      return 0;
+    }
+    case "client-achievements": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-achievements.json";
+      const table = writeClientAchievements(args[0], path);
+      const listed = Object.keys(table.achievements).length;
+      const withCriteria = Object.values(table.achievements).filter((a) => a.criteria.length > 0).length;
+      console.log(`${table.build.product} ${table.build.version}: ${listed} achievements, ${withCriteria} with criteria -> ${path}`);
+      return 0;
+    }
+    case "client-encounters": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-encounters.json";
+      const table = writeClientEncounters(args[0], path);
+      const instances = Object.keys(table.instances).length;
+      const encounters = Object.values(table.instances).reduce((n, list) => n + list.length, 0);
+      console.log(`${table.build.product} ${table.build.version}: ${encounters} encounters in ${instances} instances -> ${path}`);
+      return 0;
+    }
+    case "client-mounts": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-mounts.json";
+      const table = writeClientMounts(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${Object.keys(table.mounts).length} mounts -> ${path}`);
       return 0;
     }
     case "client-diff": {

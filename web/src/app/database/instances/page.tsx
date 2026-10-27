@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Container, DataTable, DataTitle, type Column } from "@/components/ui";
+import { Badge, Container, DataTable, DataTitle, type Column } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import { compareInstances, instanceHref, instanceRows, instanceTitle, levelLabel, loadSightings, type InstanceRow } from "@/lib/instances";
 import { PLACEHOLDER } from "@/lib/item-names";
@@ -32,7 +32,10 @@ export default async function InstancesPage() {
       return at ? <Link href={zoneHref(at.mapId, at.zoneName)} className={link}>{at.zoneName}</Link> : dash;
     } },
     { key: "confirmed", header: "Entrance confirmed", numeric: true, cell: (r) => (seen.unreachable ? PLACEHOLDER : r.confirmed.length ? `${Math.max(...r.confirmed.map((p) => p.installs))} installs` : dash) },
-    { key: "bosses", header: "Bosses", numeric: true, cell: (r) => (seen.unreachable ? PLACEHOLDER : r.bosses.length || dash) },
+    // Player-first: the reported count, else the files' count marked unconfirmed, else a dash.
+    { key: "bosses", header: "Bosses", numeric: true, cell: (r) => (!seen.unreachable && r.bosses.length
+      ? r.bosses.length
+      : r.encounters.length ? <span className="inline-flex items-baseline gap-1.5"><Badge tone="files" />{r.encounters.length}</span> : dash) },
   ];
 
   return (
@@ -42,7 +45,7 @@ export default async function InstancesPage() {
         {seen.unreachable && <p className="mb-3 text-meta text-warning">{STORAGE_UNREACHABLE} The entrances below are from the game files.</p>}
         {!seen.unreachable && (
           <p className="mb-3 max-w-reading text-meta text-fg-2">
-            Sorted by level, lowest first. The level is read from the game files, which give one level for most instances rather than a range; a dash there means the files give none. Entrances are read from the game files and confirmed once 3 installs zone in from the same place. A boss is counted once 3 installs report it. A dash in the other columns means nobody has yet, not that there is none.
+            Sorted by level, lowest first. The level is read from the game files, which give one level for most instances rather than a range; a dash there means the files give none. Entrances are read from the game files and confirmed once 3 installs zone in from the same place. A boss is counted once 3 installs report it; until then the count is the game files' own list, marked unconfirmed. A dash in the other columns means nobody has yet, not that there is none.
           </p>
         )}
         <DataTable dense caption="Dungeons and raids" columns={columns} rows={rows} rowKey={(r) => String(r.instanceMapId)} />
