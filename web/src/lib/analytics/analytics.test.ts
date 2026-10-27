@@ -233,4 +233,49 @@ describe("withdrawal cleanup", () => {
     expect((window as Window & { dataLayer?: unknown }).dataLayer).toBeUndefined();
     expect(posthogMock.opt_out_capturing).toHaveBeenCalled();
   });
+
+  it("keeps the cookieless beacon, the consent record and the tab's veto", () => {
+    loadCookieless({ cfBeaconToken: CF }, {}, document);
+    loadConsented({ gaId: GA, metricoolHash: METRICOOL }, window, document);
+    localStorage.setItem("everloot-analytics-consent-v1", "rejected");
+    sessionStorage.setItem("everloot-analytics-rejection", "rejected");
+    try {
+      unloadConsented(document, window);
+      expect(Array.from(document.head.querySelectorAll("script"), (s) => s.id)).toEqual(["everloot-cf-beacon"]);
+      expect(localStorage.getItem("everloot-analytics-consent-v1")).toBe("rejected");
+      expect(sessionStorage.getItem("everloot-analytics-rejection")).toBe("rejected");
+    } finally {
+      sessionStorage.clear();
+    }
+  });
+
+  it("still unloads when the browser refuses storage outright, as Chrome does with cookies blocked", () => {
+    loadConsented({ gaId: GA, metricoolHash: METRICOOL }, window, document);
+    const own = (["localStorage", "sessionStorage"] as const).map((name) => [name, Object.getOwnPropertyDescriptor(window, name)] as const);
+    for (const [name] of own) {
+      Object.defineProperty(window, name, { configurable: true, get() { throw new DOMException("Access is denied for this document.", "SecurityError"); } });
+    }
+    try {
+      expect(() => unloadConsented(document, window)).not.toThrow();
+      expect(document.head.querySelectorAll("script")).toHaveLength(0);
+    } finally {
+      for (const [name, descriptor] of own) {
+        if (descriptor) Object.defineProperty(window, name, descriptor);
+        else delete (window as unknown as Record<string, unknown>)[name];
+      }
+    }
+  });
+
+  it("still removes the tags when browser storage refuses the cleanup", () => {
+    loadConsented({ gaId: GA, metricoolHash: METRICOOL }, window, document);
+    localStorage.setItem("ph_phc_key_posthog", "{}");
+    const removeItem = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => { throw new DOMException("blocked", "SecurityError"); });
+    try {
+      expect(() => unloadConsented(document, window)).not.toThrow();
+      expect(document.head.querySelectorAll("script")).toHaveLength(0);
+      expect(window.gtag).toBeUndefined();
+    } finally {
+      removeItem.mockRestore();
+    }
+  });
 });

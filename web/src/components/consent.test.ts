@@ -1,5 +1,47 @@
 import { describe, expect, it, vi } from "vitest";
-import { readConsent, saveConsent, writeConsent, syncOptionalScripts } from "./consent";
+import { findCode } from "@/lib/raid";
+import { readPlanHash } from "@/lib/talents/import";
+import { hasRejectionFragment, readConsent, saveConsent, withRejectionFragment, writeConsent, syncOptionalScripts } from "./consent";
+
+describe("a rejection carried in the address when storage is blocked", () => {
+  const blocked = { getItem: () => { throw new Error("blocked"); } };
+
+  it("is read beside a #plan= share code, and the old lone fragment still counts", () => {
+    expect(readConsent(blocked, blocked, "#plan=EL1abc&plan2=EL1def&everloot-analytics-rejected", "analytics")).toBe("rejected");
+    expect(readConsent(blocked, blocked, "#everloot-analytics-rejected", "analytics")).toBe("rejected");
+    expect(readConsent(blocked, blocked, "#plan=EL1abc", "analytics")).toBeNull();
+  });
+
+  it("counts only a whole part, never a lookalike inside another one", () => {
+    for (const hash of ["#plan=everloot-analytics-rejected", "#everloot-analytics-rejected-x", "#xeverloot-analytics-rejected"]) {
+      expect(hasRejectionFragment(hash, "analytics"), hash).toBe(false);
+    }
+    expect(hasRejectionFragment("#plan=EL1abc&everloot-analytics-rejected", "advertising")).toBe(false);
+  });
+
+  it("is added after the share code and taken out again without touching it", () => {
+    const withMark = withRejectionFragment("#plan=EL1abc&plan2=EL1def", "analytics", true);
+    expect(withMark).toBe("#plan=EL1abc&plan2=EL1def&everloot-analytics-rejected");
+    expect(withRejectionFragment(withMark, "analytics", true)).toBe(withMark);
+    expect(readPlanHash(withMark)).toEqual({ first: "EL1abc", second: "EL1def" });
+    expect(withRejectionFragment(withMark, "analytics", false)).toBe("#plan=EL1abc&plan2=EL1def");
+    expect(withRejectionFragment("", "analytics", true)).toBe("#everloot-analytics-rejected");
+    expect(withRejectionFragment("#everloot-analytics-rejected", "analytics", false)).toBe("");
+  });
+
+  it("keeps a raid link readable", () => {
+    const raid = "#raid=ELR1-25-1.15.8-abc_DEF";
+    expect(findCode(withRejectionFragment(raid, "analytics", true).slice("#raid=".length))).toBe("ELR1-25-1.15.8-abc_DEF");
+  });
+
+  it("carries both categories at once, and drops one without the other", () => {
+    const both = withRejectionFragment(withRejectionFragment("#plan=EL1abc", "analytics", true), "advertising", true);
+    expect(hasRejectionFragment(both, "analytics")).toBe(true);
+    expect(hasRejectionFragment(both, "advertising")).toBe(true);
+    const one = withRejectionFragment(both, "advertising", false);
+    expect(one).toBe("#plan=EL1abc&everloot-analytics-rejected");
+  });
+});
 
 describe("optional tracking consent", () => {
   it("keeps withdrawal rejected after reload when local writes fail but reads still return accepted", () => {
