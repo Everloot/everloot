@@ -357,6 +357,23 @@ test("the list and Remove access revoking one key at the same time send one requ
   expect(row().textContent).toContain("Revoked 2026-10-27");
 });
 
+test("Remove access asks with the card's pill buttons, and the list's question keeps the list's own buttons", async () => {
+  api(ready());
+  await act(async () => root.render(both));
+  await click("Revoke bot");
+  await click("Remove access for bot");
+  const classes = (b: HTMLButtonElement) => b.className.split(" ");
+  const [listRevoke, cardRevoke] = buttonsNamed("Revoke key");
+  const [listCancel, cardCancel] = buttonsNamed("Cancel");
+  expect(classes(cardRevoke)).toEqual(expect.arrayContaining(["btn", "btn-primary"]));
+  expect(classes(cardCancel)).toContain("btn");
+  expect(classes(cardCancel)).not.toContain("btn-primary");
+  for (const b of [listRevoke, listCancel]) {
+    expect(classes(b)).toContain("rounded-lg");
+    expect(classes(b)).not.toContain("btn");
+  }
+});
+
 test("revoking a key that is already revoked (404) reads the keys again instead of asking to retry", async () => {
   let reads = 0;
   vi.stubGlobal("fetch", async (_url: string, init?: RequestInit) => {

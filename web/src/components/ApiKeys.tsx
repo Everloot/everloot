@@ -13,6 +13,9 @@ interface Fresh { token: string; name: string; expiresAt: string | null; rolled:
 
 const button = "inline-flex items-center justify-center min-h-11 px-3 rounded-lg border border-line text-sm text-fg hover:text-accent disabled:opacity-60";
 const primary = "inline-flex items-center justify-center min-h-11 px-4 rounded-lg bg-accent text-bg text-sm font-semibold hover:bg-accent/90 disabled:opacity-60";
+/** The design system's pill buttons, for the Integrations cards; the list keeps `button` and `primary`. */
+const pill = "btn min-h-11 px-3 text-sm";
+const pillPrimary = "btn btn-primary min-h-11 px-3 text-sm";
 const input = "min-h-11 w-full rounded-lg border border-line bg-canvas px-3 text-sm text-fg aria-[invalid=true]:border-accent";
 const DAY_MS = 86_400_000;
 const EXPIRY_LABEL: Record<number, string> = { 7: "7 days", 30: "30 days", 90: "90 days", 365: "1 year" };
@@ -78,10 +81,13 @@ const offers = (k: KeyRow | undefined, action: "revoke" | "roll", records: boole
 const rowIn = (list: HTMLElement | null, id: string) =>
   Array.from(list?.children ?? []).find((li) => (li as HTMLElement).dataset.key === id) as HTMLElement | undefined;
 
-/** The question before a key is revoked or rolled: what stops working, then the action or Cancel. */
-function Confirm({ action, name, hint, busy, confirmRef, onConfirm, onCancel }: {
+/**
+ * The question before a key is revoked or rolled: what stops working, then the action or Cancel. `pills` gives it the
+ * pill buttons of the card it sits in; without it, it has the list's own buttons.
+ */
+function Confirm({ action, name, hint, busy, confirmRef, onConfirm, onCancel, pills = false }: {
   action: "revoke" | "roll"; name: string; hint: string; busy: boolean;
-  confirmRef: Ref<HTMLButtonElement>; onConfirm: () => void; onCancel: () => void;
+  confirmRef: Ref<HTMLButtonElement>; onConfirm: () => void; onCancel: () => void; pills?: boolean;
 }) {
   return (
     <div role="group" aria-label={`Confirm ${action} ${name}`} className="space-y-2 rounded-lg border border-line bg-panel p-3">
@@ -91,10 +97,10 @@ function Confirm({ action, name, hint, busy, confirmRef, onConfirm, onCancel }: 
           : `Roll ${name}? You get a new secret with the same name, permissions and lifetime. evl_…${hint} stops working at once.`}
       </p>
       <div className="flex flex-wrap gap-2">
-        <button ref={confirmRef} type="button" className={primary} disabled={busy} onClick={onConfirm}>
+        <button ref={confirmRef} type="button" className={pills ? pillPrimary : primary} disabled={busy} onClick={onConfirm}>
           {action === "revoke" ? "Revoke key" : "Roll key"}
         </button>
-        <button type="button" className={button} onClick={onCancel}>Cancel</button>
+        <button type="button" className={pills ? pill : button} onClick={onCancel}>Cancel</button>
       </div>
     </div>
   );
@@ -449,9 +455,9 @@ export function RemoveAccess({ id, name, hint, focusAfter }: { id: string; name:
   return (
     <div ref={box} className="space-y-2">
       {asking ? (
-        <Confirm action="revoke" name={name} hint={hint} busy={busy} confirmRef={confirmButton} onConfirm={() => void revoke()} onCancel={() => setAsking(false)} />
+        <Confirm action="revoke" name={name} hint={hint} busy={busy} confirmRef={confirmButton} onConfirm={() => void revoke()} onCancel={() => setAsking(false)} pills />
       ) : (
-        <button ref={opener} type="button" className="btn min-h-11 px-3 text-sm" aria-label={`Remove access for ${name}`} onClick={() => setAsking(true)}>Remove access</button>
+        <button ref={opener} type="button" className={pill} aria-label={`Remove access for ${name}`} onClick={() => setAsking(true)}>Remove access</button>
       )}
       {error && <p role="alert" className="text-sm text-fg">{error}</p>}
     </div>
