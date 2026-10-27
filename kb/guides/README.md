@@ -95,3 +95,33 @@ request's base.
 
 Every guide is reviewed like code: the check passes, and the person named in `reviewed` has read it before it merges
 as published.
+
+## The class chooser's files
+
+Two YAML files in this folder feed the class chooser at `/classes/choose`. They are not guides, and the guide reader
+skips them. Like the guides they are content under CC BY-SA 4.0, and the game facts they name stay Blizzard's.
+
+- `class-roles.yaml` holds facts only: the roles Blizzard's race and class article gives each class, each with what it
+  says in our words, and the races that can be each class. A role is listed only where that source says the class
+  does it, never worked out from a talent tree. The races are the site's copy of the same article's tables, and a test
+  holds them equal.
+- `class-chooser.yaml` holds Everloot's editorial choices: the questions, their answers and the weight each answer
+  gives a class (1, 2 or 3), with why. An answer that names a role weighs the classes `class-roles.yaml` gives that
+  role. A weight leans toward a class; it never measures one or names a best class.
+
+Each file carries its own review:
+
+```yaml
+status: draft      # draft, or reviewed once someone has reviewed this version
+version: 1
+reviewer: ""       # who reviewed this version; empty while the file is a draft
+reviewedOn: null   # the day they did, YYYY-MM-DD; null while the file is a draft
+```
+
+The check refuses a file marked reviewed that names no reviewer or no date, a draft that names either, and a review
+dated after today. Only the person who reviewed a version is named there. A change to a reviewed file is a new
+version: raise `version` and set it back to draft until it is reviewed again. While either file is a draft, the page
+says so first and stays out of search, and no other page on the site links to it.
+
+From `kb/`, `npx vitest run test/class-chooser.test.ts` checks the committed files, and `npm run kb -- guide-check`
+checks them with the guides.

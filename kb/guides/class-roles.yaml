@@ -1,0 +1,73 @@
+# The facts the class chooser (/classes/choose) reads: the roles Blizzard's race and class article gives each class,
+# and the races that can be each class. Facts only. The chooser's questions and weights, which are Everloot's own
+# editorial choices, are in class-chooser.yaml. Rules and the review: README.md in this folder.
+#
+# A role is listed only where the article says the class does it, with what it says in our words. The article names
+# three roles (healing allies, dealing damage and protecting your group) but does not say which classes protect a
+# group, and it describes Hunters, Shaman and Druids without naming a role, so they list none. A class that lists no
+# role may still fill one; the article just does not say so.
+#
+# The races are the site's copy of the article's two tables (web/src/data/wow-forever.ts, read from the article on
+# 2026-10-18), and a test holds them equal to it. Every class can be played on both sides.
+status: draft
+version: 1
+reviewer: ""
+reviewedOn: null
+source:
+  title: "Create the Hero You Want to Be in World of Warcraft: Forever"
+  url: https://news.blizzard.com/en-us/article/24304075/create-the-hero-you-want-to-be-in-world-of-warcraft-forever
+  checkedOn: 2026-10-27
+classes:
+  warrior:
+    roles:
+      - { role: damage, basis: "Blizzard's article says warriors strive for perfection in armed combat." }
+    races:
+      Alliance: [Dwarf, Gnome, Human, Night Elf, Skyborne]
+      Horde: [Orc, Tauren, Troll, Undead, Skyborne]
+  paladin:
+    roles:
+      - { role: healer, basis: "Blizzard's article says paladins call upon the Light to heal wounds." }
+      - { role: damage, basis: "Blizzard's article says paladins call upon the Light to incinerate evil creatures." }
+    races:
+      Alliance: [Dwarf, Human]
+      Horde: [Undead]
+  hunter:
+    roles: []
+    races:
+      Alliance: [Dwarf, Human, Night Elf, Skyborne]
+      Horde: [Orc, Tauren, Troll, Skyborne]
+  rogue:
+    roles:
+      - { role: damage, basis: "Blizzard's article says rogues are hired to eliminate designated targets." }
+    races:
+      Alliance: [Dwarf, Gnome, Human, Night Elf, Skyborne]
+      Horde: [Orc, Troll, Undead, Skyborne]
+  priest:
+    roles:
+      - { role: healer, basis: "Blizzard's article says priests can heal or harm." }
+      - { role: damage, basis: "Blizzard's article says priests can heal or harm." }
+    races:
+      Alliance: [Dwarf, Gnome, Human, Night Elf]
+      Horde: [Troll, Undead]
+  shaman:
+    roles: []
+    races:
+      Alliance: [Dwarf]
+      Horde: [Orc, Tauren, Troll, Skyborne]
+  mage:
+    roles:
+      - { role: damage, basis: "Blizzard's article says mages attack from a distance with bolts of frost and flame." }
+    races:
+      Alliance: [Gnome, Human, Skyborne]
+      Horde: [Orc, Troll, Undead]
+  warlock:
+    roles:
+      - { role: damage, basis: "Blizzard's article says warlocks inflict great torment upon their foes." }
+    races:
+      Alliance: [Gnome, Human]
+      Horde: [Orc, Troll, Undead]
+  druid:
+    roles: []
+    races:
+      Alliance: [Night Elf, Skyborne]
+      Horde: [Tauren, Skyborne]
