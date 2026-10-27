@@ -62,6 +62,21 @@ test("editing another player's label is a 404; the limits and a locked class say
   expect((await POST(call({ name: "Alt", classSlug: "mage" }))).status).toBe(429);
 });
 
+test("a label meant for another account than the session's is a private 409 and nothing is written; the session's own is saved", async () => {
+  const sent = (owner: string) => new Request("https://everloot.app/api/me/characters", {
+    method: "POST", headers: { origin: "https://everloot.app", "content-type": "application/json", "x-everloot-expected-owner": owner },
+    body: JSON.stringify({ name: "Jaina", classSlug: "mage" }),
+  });
+  const refused = await POST(sent("99999999-2222-4333-8444-555555555555"));
+  expect(refused.status).toBe(409);
+  expect(refused.headers.get("cache-control")).toBe("private, no-store");
+  expect((await refused.json()).code).toBe("account_mismatch");
+  expect(auth.authQuery).not.toHaveBeenCalled();
+  auth.authQuery.mockResolvedValueOnce([{ character_ref: CHARACTER_ID, refusal: null }]);
+  expect((await POST(sent(USER.id))).status).toBe(201);
+  expect(JSON.parse(auth.authQuery.mock.calls[0][1].body).p_user_id).toBe(USER.id);
+});
+
 test("bad labels are a 400 before the database is asked", async () => {
   for (const body of [{ name: "", classSlug: "mage" }, { name: "Jaina", classSlug: "monk" }, { name: "x".repeat(25), classSlug: "mage" }]) {
     expect((await POST(call(body))).status).toBe(400);
