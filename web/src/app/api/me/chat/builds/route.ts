@@ -1,4 +1,4 @@
-import { BUILDS_PER_ACCOUNT, ORDERS_UNAVAILABLE, SAVES_PER_DAY } from "@/lib/saved-builds";
+import { BUILDS_PER_ACCOUNT, ORDERS_UNAVAILABLE, ORDERS_UNAVAILABLE_CODE, SAVES_PER_DAY } from "@/lib/saved-builds";
 import { listOwn } from "@/lib/saved-builds-store";
 import { parseWorkspaceBuild, SaveUnconfirmed, saveWorkspaceBuild } from "@/lib/chat/workspace-builds";
 import { answer, fail, workspaceRead, workspaceWrite } from "@/lib/chat/workspace-store";
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
         case "build_limit": return fail(409, `You have ${BUILDS_PER_ACCOUNT} saved builds. Delete one to save another.`, "build_limit");
         case "daily_limit": return fail(429, `You saved ${SAVES_PER_DAY} times in the last day. Try again tomorrow.`, "daily_limit");
         // Known not saved, so a 409 and not a 5xx, which Chat reads as a save it could not confirm.
-        case "orders_unavailable": return fail(409, ORDERS_UNAVAILABLE, "orders_unavailable");
+        case "orders_unavailable": return fail(409, ORDERS_UNAVAILABLE, ORDERS_UNAVAILABLE_CODE);
       }
     }
     return answer(user.id, { build: saved.build }, saved.created ? 201 : 200);

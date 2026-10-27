@@ -177,7 +177,7 @@ describe.skipIf(!databaseUrl || !restUrl || !secret)("saved builds through Postg
       await account({ id: chatBuild, name: "Test order", code: MAGE, order: ORDER }),
     ]) {
       expect(res.status).toBe(409);
-      expect((await res.json()).error).toBe(UNAVAILABLE);
+      expect(await res.json()).toEqual({ error: UNAVAILABLE, code: "orders_unavailable" });
     }
     expect(await state(owner)).toEqual(before);
   });

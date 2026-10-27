@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { presentedKey } from "@/lib/api-keys";
-import { BUILDS_PER_ACCOUNT, ORDERS_UNAVAILABLE, parseBuildInput, savedBuildsOn, SAVES_PER_DAY } from "@/lib/saved-builds";
+import { BUILDS_PER_ACCOUNT, ORDERS_UNAVAILABLE, ORDERS_UNAVAILABLE_CODE, parseBuildInput, savedBuildsOn, SAVES_PER_DAY } from "@/lib/saved-builds";
 import { fail, limitedText, listOwn, meAccount, NO_STORE, ownBuildsForKey, saveBuild, unavailable } from "@/lib/saved-builds-store";
 
 /**
@@ -53,7 +53,8 @@ export async function POST(req: Request) {
         case "class_mismatch": return fail(400, "That character is another class. Pick a character of the build's class.");
         case "build_limit": return fail(409, `You have ${BUILDS_PER_ACCOUNT} saved builds. Delete one to save another.`);
         case "daily_limit": return fail(429, `You saved ${SAVES_PER_DAY} times in the last day. Try again tomorrow.`);
-        case "orders_unavailable": return fail(409, ORDERS_UNAVAILABLE);
+        case "orders_unavailable":
+          return NextResponse.json({ error: ORDERS_UNAVAILABLE, code: ORDERS_UNAVAILABLE_CODE }, { status: 409, headers: NO_STORE });
       }
     }
     return NextResponse.json({ build: saved.build }, { status: saved.created ? 201 : 200, headers: NO_STORE });

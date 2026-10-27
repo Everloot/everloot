@@ -363,7 +363,8 @@ test("before the migration a save that names an order, an unknown one too, is re
     const res = await POST(call("POST", body));
     expect(res.status).toBe(409);
     expect(res.headers.get("cache-control")).toBe("private, no-store");
-    expect(await res.json()).toEqual({ error: ORDERS_UNAVAILABLE });
+    // The words for people, and a code for clients that tell this refusal from the others.
+    expect(await res.json()).toEqual({ error: ORDERS_UNAVAILABLE, code: "orders_unavailable" });
   }
   expect(writes()).toEqual(["rpc/save_build_plan"]);
 });
