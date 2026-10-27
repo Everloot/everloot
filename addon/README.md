@@ -205,17 +205,24 @@ Right-click the minimap button, or use `/everloot options`, for collection setti
 `/everloot status` still prints the collector status.
 
 1. Make a build on everloot.app's talent calculator or raid planner and choose **Copy for addon**.
-2. Open the matching tab in the addon, paste the code, and click **Import** (or press Enter).
-3. Talents shows your progress and next planned point. Raid compares class counts per group and
-   checks buffs on the current roster. Apply points and arrange players yourself.
+2. Open the matching tab in the addon, paste the code or link, and click **Import** (or press Enter).
+   Website links go here; `/everloot plan` takes a share code only.
+3. Talents shows your progress. With the plan's point order it names the next point of that order;
+   without one it lists the points you can spend now, in no order (see "Point order" below). Raid
+   compares class counts per group and checks buffs on the current roster. Apply points and arrange
+   players yourself.
 
 Talent export copies the selected set only. Talent links with two sets import the first; a second-set-only
-link imports that set. For saved short links, open the website and use **Copy for addon** to choose the set.
+link imports that set. A set's point order comes only from its own key, `order` with `plan` and `order2`
+with `plan2`, so an order the link carries for the other set is not used. For saved short links, open the
+website and use **Copy for addon** to choose the set.
 Raid codes preserve planned talent trees for the website. The addon cannot verify another player's talent
 choices or identify players from a class-only code.
 Differences in game build remain visible. Imports stay in your local SavedVariables file; roster names
-are never saved by this workspace. **Copy plan link** returns an imported plan to the website;
-**Copy current raid** opens your actual roster there. Use Ctrl+C in the selected field.
+are never saved by this workspace. **Copy plan link** returns an imported plan to the website under its
+own set's keys (`#plan=` and `&order=`, or `#plan2=` and `&order2=`), with its point order when the addon
+read one; an order it could not read is left out. **Copy current raid** opens your actual roster there.
+Use Ctrl+C in the selected field.
 
 The window is created when opened, refreshes on relevant character/group changes while visible, and
 uses no polling loop. Escape closes it. This workspace still needs a live-client layout and behavior
@@ -235,10 +242,12 @@ Drag its header beside the game's talent window to keep the next-point highlight
   Run it once with the talent window closed and once open. It also prints your race token (`INFO player
   race`), the value the census stores.
 - **Plan panel (display only).** `/everloot plan <share code>` loads an Everloot talent plan and shows,
-  beside the talent window, the next point to spend and where your build differs. `/everloot plan` reopens
-  it (it also has a paste box), `plan hide` closes it, `plan clear` forgets it. When the talent window is
-  open it also puts a green overlay on the next talent and red ones on mismatches. It never spends a
-  point, clicks, imports a loadout or acts for you. The plan is kept in your SavedVariables file.
+  beside the talent window, your progress and where your build differs. A share code alone has no point
+  order, so the panel lists the points you can spend now; a website link pasted into the Talents tab's
+  Import brings the plan's order. `/everloot plan` reopens it (it also has a paste box), `plan hide` closes
+  it, `plan clear` forgets it. When the talent window is open it also puts a green overlay on the next
+  talent of an ordered plan and red ones on mismatches. It never spends a point, clicks, imports a loadout
+  or acts for you. The plan and its order are kept in your SavedVariables file.
 - **Saved builds.** When the Desktop App has synced your everloot.app builds into the `EverlootBuilds`
   slot addon, `/everloot plan` also lists them in chat, this character's first (the label's name, and its realm when it has one), then the rest of your class,
   and `/everloot plan <number>` loads one as if you pasted its code (`/everloot plan <number> 2` loads its second talent set, marked `[2 sets]` in the list). Nothing is saved or uploaded for it.
@@ -258,10 +267,31 @@ same format (see `docs/2026-10-17-talent-share-code.md`):
 | `build` | Client build the plan was made on, e.g. `1.60.1.70450`. A different build shows a warning because node ids can move. |
 | `payload` | base64url (RFC 4648 section 5, no `=` padding) of the ASCII text `node:rank,node:rank:choice,...`. |
 
-Payload items are in spend order: `node` is the client's trait node id, `rank` is the target rank (1 to
-50), and an optional third number is the zero-based entry of a choice node. A node absent from the list is
-planned at zero. Example: `EL1-mage-1482-1.60.1.70450-OTAwMDE6Miw5MDAwMjoxOjEsOTAwMDQ6Mg` carries
-`90001:2,90002:1:1,90004:2`.
+`node` is the client's trait node id, `rank` is the target rank (1 to 50), and an optional third number is
+the zero-based entry of a choice node. A node absent from the list is planned at zero. The site writes the
+items in ascending node id order and the addon reads any order; item order is not a spend order. Example:
+`EL1-mage-1482-1.60.1.70450-OTAwMDE6Miw5MDAwMjoxOjEsOTAwMDQ6Mg` carries `90001:2,90002:1:1,90004:2`.
+
+### Point order
+
+A plan can carry the order its points are spent in, as a token of its own next to the code: `O1p-...`
+when it was planned in the talent calculator, `O1g-...` when a tool made a provisional one (see "Spend
+order" in `docs/2026-10-17-talent-share-code.md`). The addon reads it from a pasted link, checks it
+against the code and keeps it with the plan.
+
+- With an order, the panel says who made it and names the next point of that order as point N of M. A
+  next point the game does not offer yet stays next, marked not available; the panel never skips to a point
+  the order spends later. Points spent ahead of the order are counted. A provisional order is labelled as
+  one until the plan is replaced or cleared.
+- Without one (a share code alone, a link made before orders, a saved build), the panel says the point
+  order is unavailable and lists the points the game shows as open now, by name and unranked. Item order
+  and node ids are never taken for a leveling order.
+- A token that is damaged, newer, of a kind the addon does not read, over 64 points, or not matching the
+  code's points leaves the order unknown: the talents still load, and the panel says why.
+
+Addon 0.3.12 and earlier read the talents from these links and ignore the order: their next point follows
+the code's item order, which is not a spend order. The point order reader has passed its Lua contract
+tests only; it has not run in the Forever client yet.
 
 ## Test it
 
@@ -319,7 +349,7 @@ addon/
 │   ├── census.lua      race, class, level and faction of your characters and players you see; on in a new install
 │   ├── players.lua     name, realm, race, class, level and guild of your characters and players you see; off until enabled
 │   ├── selftest.lua    /everloot selftest and /everloot talents
-│   ├── plan.lua        share code reader and the display-only plan panel
+│   ├── plan.lua        share code and point order reader, plan links, the display-only plan panel
 │   ├── raid_data.lua   raid buff list generated from web/src/data/game-data/raid-*.json
 │   ├── raid.lua        /everloot raid: buffs missing per group, and a raid share code; display only
 │   ├── prices.lua      item tooltips: your latest scan and the companion's community prices

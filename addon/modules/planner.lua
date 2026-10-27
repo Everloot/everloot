@@ -76,16 +76,22 @@ function W.Import()
     notice("Talent import is unavailable: this client's trait API is missing."); return
   elseif W.tab == "talents" then
     if #input > 16000 then notice("That talent code is too long."); return end
-    local first = input:match("^https?://[^/]+/tools/talents/%a+[^#]*#plan=([^&]+)")
-      or input:match("^https?://[^/]+/tools/talents/%a+/b/([^/?#]+)")
-    local second = input:match("^https?://[^/]+/tools/talents/%a+[^#]*#plan2=([^&]+)")
-      or input:match("^https?://[^/]+/tools/talents/%a+/b/%-/([^/?#]+)")
-    if first == "-" then first = nil end
-    if first or second then input = first or second end
-    if not input:match("^EL%d+%-") and isLink then
+    local code, order, set = input, nil, nil
+    local page = "^https?://[^/]+/tools/talents/%a+"
+    if input:match(page) then
+      -- One set loads, with the order under that set's own key only: order with plan, order2 with plan2.
+      -- A build link's /b/ path carries codes and no order.
+      local link = E.Plan.ReadLink(input)
+      local first = link.first or input:match(page .. "/b/([^/?#]+)")
+      local second = link.second or input:match(page .. "/b/%-/([^/?#]+)")
+      if first == "-" then first = nil end
+      if first then code, order = first, link.first and link.firstOrder
+      elseif second then code, order, set = second, link.second and link.secondOrder, 2 end
+    end
+    if not code:match("^EL%d+%-") and isLink then
       notice("Open this link on the website and use Copy for addon for the set you want."); return
     end
-    ok, reason = E.Plan.Load(input, true)
+    ok, reason = E.Plan.Load(code, true, order, set)
   elseif E.Raid then
     ok, reason = E.Raid.Load(input)
   end
@@ -93,8 +99,10 @@ function W.Import()
     f.box:SetText("")
     f.box:ClearFocus()
     if W.tab == "raid" then notice("Plan loaded. Compare class counts by group below; arrange players yourself.")
-    elseif isLink then notice("Plan loaded. Talent links use the first available set; Copy for addon selects the set you want.")
-    else notice("Plan loaded. Compare your build and next planned point below.") end
+    else
+      notice("Plan loaded. " .. E.Plan.OrderLine()
+        .. (isLink and " Talent links use the first available set; Copy for addon selects the set you want." or ""))
+    end
     W.Refresh()
     f.scroll:SetVerticalScroll(0)
   else
@@ -124,8 +132,7 @@ end
 
 local function exportPlan()
   if W.tab == "talents" then
-    local plan = E.Plan and E.Plan.Decode(EverlootDB.plan)
-    copy(plan and ("https://everloot.app/tools/talents/" .. plan.class:lower() .. "#plan=" .. EverlootDB.plan))
+    copy(E.Plan and E.Plan.Link())
   else
     local plan = E.Raid and E.Raid.Decode(EverlootDB.raidPlan)
     copy(plan and ("https://everloot.app/tools/raid#raid=" .. EverlootDB.raidPlan))
@@ -233,7 +240,7 @@ function W.Open(tab)
   local raid = W.tab == "raid"
   f.heading:SetText(raid and "Bring your raid plan" or "Follow your talent plan")
   f.hint:SetText(raid and "Website > Copy for addon > Import here. Compare class counts, then arrange your raid."
-    or "Website > Copy for addon > Import here. Compare your build and follow the next point.")
+    or "Website > Copy for addon > Import here. Compare your build; a plan with its point order names the next point.")
   for key, b in pairs(f.tabs) do
     b.text:SetTextColor(unpack(key == W.tab and COLORS.accent or COLORS.muted))
     if key == W.tab then b.selected:Show() else b.selected:Hide() end

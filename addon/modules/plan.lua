@@ -1,5 +1,6 @@
 -- Everloot talent plan: loads an Everloot share code and shows it next to the talent window.
--- DISPLAY ONLY. It names the next point to spend and lists where your build differs from the plan.
+-- DISPLAY ONLY. With the plan's point order it names the next point of that order; without one it lists
+-- the points the game shows as open, unranked. It also lists where your build differs from the plan.
 -- It never spends a point, clicks a talent, imports a loadout or acts for the player.
 --
 -- Share code (documented in addon/README.md and docs/2026-10-17-talent-share-code.md):
@@ -7,7 +8,13 @@
 --   class    lowercase class token, e.g. mage
 --   spec     client spec id, or 0 when unknown
 --   build    client build the plan was made on, e.g. 1.60.1.70450
---   payload  base64url (no padding) of the text "node:rank,node:rank:choice,..." in spend order
+--   payload  base64url (no padding) of the text "node:rank,node:rank:choice,...", the nodes in any
+--            order (the site writes ascending ids). The order of the items is not a spend order.
+-- Point order, a token of its own next to the code (same doc, "Spend order"):
+--   O1<mode>-<sequence>
+--   mode     p: planned in the talent calculator; g: provisional, made by a tool
+--   sequence one base64url character per point, in spend order, each the index of a node among the
+--            code's nodes with points, by ascending node id
 
 local E = Everloot
 local T = E.Talents
@@ -16,10 +23,42 @@ E.Plan = P
 
 local VERSION = 1
 local MAX_ENTRIES = 600
+local ORDER_VERSION = 1
+local ORDER_LIMIT = 64
+local ORIGIN = { p = "planned", g = "provisional" }
 
 local B64URL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 local B64URL_VALUE = {}
 for i = 1, #B64URL do B64URL_VALUE[B64URL:sub(i, i)] = i - 1 end
+
+-- Whitespace around an order token: exactly the code points ECMAScript's String.prototype.trim removes, as
+-- the share-code doc lists them, matched as UTF-8 bytes. Lua's %s knows only the ASCII ones.
+local SPACES = { "\t", "\n", "\v", "\f", "\r", " ", "\194\160", "\225\154\128", "\226\128\168", "\226\128\169",
+  "\226\128\175", "\226\129\159", "\227\128\128", "\239\187\191" }
+for byte = 128, 138 do SPACES[#SPACES + 1] = "\226\128" .. string.char(byte) end -- U+2000 to U+200A
+
+--- The byte length of the whitespace that starts at first (or, from the back, ends at last), if any.
+local function spaceAt(text, first, last, back)
+  for _, space in ipairs(SPACES) do
+    local from = back and last - #space + 1 or first
+    if from >= first and from + #space - 1 <= last and text:sub(from, from + #space - 1) == space then return #space end
+  end
+end
+
+local function trim(text)
+  local first, last = 1, #text
+  while first <= last do
+    local width = spaceAt(text, first, last, false)
+    if not width then break end
+    first = first + width
+  end
+  while first <= last do
+    local width = spaceAt(text, first, last, true)
+    if not width then break end
+    last = last - width
+  end
+  return text:sub(first, last)
+end
 
 local function encode64(text)
   local out = {}
@@ -91,14 +130,74 @@ function P.Decode(code)
   return { version = VERSION, class = class:upper(), spec = tonumber(spec), build = build, entries = entries }
 end
 
---- Compare a plan with the client's current state (T.State). Pure: no game calls.
---- Returns { total, done, next = { entry, blocked }, mismatches = { { kind, nodeId, have, want } } }.
-function P.Evaluate(plan, state)
+--- Read a point order token against the plan it came with. Returns { origin, order }, order being node ids
+--- one per point in spend order, or nil and the error the share-code doc names, the first that applies of
+--- newer-version, malformed, unsupported-mode, over-limit, extra-points and missing-points. A known order
+--- only means its points are the plan's; whether each could be spent at its place is not checked here.
+function P.DecodeOrder(token, plan)
+  if type(token) ~= "string" then return nil, "malformed" end
+  token = trim(token)
+  local version = token:match("^O([1-9]%d*)")
+  if not version then return nil, "malformed" end
+  -- A newer token may change everything after its version: say so rather than guess.
+  if tonumber(version) > ORDER_VERSION then return nil, "newer-version" end
+  local mode, sequence = token:sub(#version + 2):match("^([a-z])%-([A-Za-z0-9_%-]+)$")
+  if not mode then return nil, "malformed" end
+  local origin = ORIGIN[mode]
+  if not origin then return nil, "unsupported-mode" end
+  local nodes, left, total = {}, {}, 0
+  for _, entry in ipairs(plan and plan.entries or {}) do
+    if entry.rank > 0 then
+      nodes[#nodes + 1] = entry.nodeId
+      left[entry.nodeId] = entry.rank
+      total = total + entry.rank
+    end
+  end
+  if #sequence > ORDER_LIMIT or total > ORDER_LIMIT then return nil, "over-limit" end
+  table.sort(nodes)
+  local order = {}
+  for i = 1, #sequence do
+    local nodeId = nodes[B64URL_VALUE[sequence:sub(i, i)] + 1]
+    if not nodeId or left[nodeId] == 0 then return nil, "extra-points" end
+    left[nodeId] = left[nodeId] - 1
+    order[i] = nodeId
+  end
+  if #order < total then return nil, "missing-points" end
+  return { origin = origin, order = order }
+end
+
+--- The codes and orders a link's #fragment carries, read as the site reads them: each value is the run of
+--- letters, digits, _ . and - after its key, and a key that is missing is nil. An order belongs only with
+--- its own set's code (order with plan, order2 with plan2); a link may carry one whose set has no code.
+function P.ReadLink(text)
+  local fragment = type(text) == "string" and text:match("#.*$") or ""
+  local function value(key) return fragment:match("[#&]" .. key .. "=([A-Za-z0-9_%.%-]+)") end
+  return { first = value("plan"), second = value("plan2"), firstOrder = value("order"), secondOrder = value("order2") }
+end
+
+--- The #fragment for these codes and orders, as the site writes it: the codes first, so a reader that stops
+--- at & still finds them, then the order of each set that has a code. Empty without a code.
+function P.Fragment(first, second, firstOrder, secondOrder)
+  local parts = {}
+  if first then parts[#parts + 1] = "plan=" .. first end
+  if second then parts[#parts + 1] = "plan2=" .. second end
+  if first and firstOrder then parts[#parts + 1] = "order=" .. firstOrder end
+  if second and secondOrder then parts[#parts + 1] = "order2=" .. secondOrder end
+  return #parts > 0 and "#" .. table.concat(parts, "&") or ""
+end
+
+--- Compare a plan with the client's current state (T.State). Pure: no game calls. order is what
+--- P.DecodeOrder read for this plan, or nil: only an order names a next point, and never skips past it.
+--- Returns { total, done, mismatches = { { kind, nodeId, have, want } } } and, with an order, origin, steps,
+--- next = { entry, step, blocked, unsure, missing } until the order is done, and ahead, the points spent
+--- that the order places after next; without one, open, the plan's entries the game shows as buyable now
+--- (unranked), and waiting, how many more are short of their rank.
+function P.Evaluate(plan, state, order)
   local result = { total = 0, done = 0, mismatches = {} }
   local planned = {}
   local deficits = {}
   for _, entry in ipairs(plan.entries) do
-    planned[entry.nodeId] = true
+    planned[entry.nodeId] = entry
     result.total = result.total + entry.rank
     local node = state.nodes[entry.nodeId]
     if not node then
@@ -120,10 +219,28 @@ function P.Evaluate(plan, state)
       result.mismatches[#result.mismatches + 1] = { kind = "extra", nodeId = nodeId, have = node.ranks, want = 0 }
     end
   end
-  for _, d in ipairs(deficits) do
-    if d.node.canBuy ~= false then result.next = { entry = d.entry, blocked = false }; break end
+  if order then
+    result.origin, result.steps, result.ahead = order.origin, #order.order, 0
+    local used = {}
+    for step, nodeId in ipairs(order.order) do
+      local node = state.nodes[nodeId]
+      local spent = used[nodeId] or 0
+      if node and spent < node.ranks then
+        used[nodeId] = spent + 1
+      else
+        result.next = { entry = planned[nodeId], step = step, missing = node == nil,
+          blocked = node == nil or node.canBuy == false, unsure = node ~= nil and node.canBuy == nil }
+        -- Every point before this step is spent, so any other spent point of the plan is ahead of the order.
+        result.ahead = result.done - (step - 1)
+        break
+      end
+    end
+  else
+    result.open, result.waiting = {}, 0
+    for _, d in ipairs(deficits) do
+      if d.node.canBuy == true then result.open[#result.open + 1] = d.entry else result.waiting = result.waiting + 1 end
+    end
   end
-  if not result.next and deficits[1] then result.next = { entry = deficits[1].entry, blocked = true } end
   return result
 end
 
@@ -233,7 +350,28 @@ function P.ListSaved()
 end
 
 local current       -- the loaded plan
+local currentOrder  -- what P.DecodeOrder read for it, or nil
+local orderProblem  -- why the order that came with it is unknown, or nil
 local last          -- { configID, state, result } from the latest refresh
+
+local ORDER_PROBLEMS = {
+  malformed = "the order is damaged",
+  ["newer-version"] = "a newer version of Everloot made it",
+  ["unsupported-mode"] = "it is a kind of order this addon does not read",
+  ["over-limit"] = "it is for more than " .. ORDER_LIMIT .. " points, the most an order carries",
+  ["extra-points"] = "it lists points the plan does not have",
+  ["missing-points"] = "it leaves out points the plan has",
+}
+
+--- One line on the loaded plan's point order: who made it, or why there is none to follow.
+function P.OrderLine()
+  if currentOrder then
+    return currentOrder.origin == "planned" and "Point order: planned in the talent calculator, not recorded play."
+      or "Point order: provisional, made by a tool, not a recommendation or recorded play."
+  end
+  if orderProblem then return "Point order unknown: " .. ORDER_PROBLEMS[orderProblem] .. ", so no next point is ranked." end
+  return "Point order unavailable: none came with this plan, so no next point is ranked."
+end
 
 --- The text lines shown in the panel and printed to chat.
 local function lines()
@@ -248,18 +386,40 @@ local function lines()
   if here and here ~= current.build then
     out[#out + 1] = "You are on build " .. here .. ": node ids may have moved since this plan was made."
   end
+  out[#out + 1] = P.OrderLine()
   if not last then
     out[#out + 1] = "Open the talent window, or wait: your talents have not been read yet."
     return out
   end
   local r, state, configID = last.result, last.state, last.configID
   out[#out + 1] = string.format("%d of %d planned points match.", r.done, r.total)
+  local function point(entry)
+    local node = state.nodes[entry.nodeId]
+    return string.format("%s (rank %d of %d)", spellName(configID, entry.nodeId, state, entry.choice), (node and node.ranks or 0) + 1, entry.rank)
+  end
   if r.next then
-    local want = r.next.entry
-    local have = state.nodes[want.nodeId] and state.nodes[want.nodeId].ranks or 0
-    out[#out + 1] = string.format("Next point: %s (rank %d of %d)%s", spellName(configID, want.nodeId, state, want.choice), have + 1, want.rank,
-      r.next.blocked and " - not available yet (a gate or no point to spend)" or "")
-  elseif r.total > 0 and #r.mismatches == 0 then
+    out[#out + 1] = string.format("Next point: %s, point %d of %d in the %s order%s", point(r.next.entry), r.next.step, r.steps, r.origin,
+      r.next.missing and " - not in your talent tree (plan from another build?)"
+        or r.next.blocked and " - not available yet (a gate or no point to spend)"
+        or r.next.unsure and " - the game does not say whether it is available yet" or "")
+    if r.ahead > 0 then
+      out[#out + 1] = string.format("Your build is off this order: you have %d %s it spends later.", r.ahead, r.ahead == 1 and "point" or "points")
+    end
+  elseif r.open and #r.open > 0 then
+    -- Sorted by name, so the list cannot read as a sequence.
+    local open = {}
+    for i, entry in ipairs(r.open) do open[i] = point(entry) end
+    table.sort(open)
+    if #open > 8 then
+      local more = #open - 8
+      for i = #open, 9, -1 do open[i] = nil end
+      open[9] = "and " .. more .. " more"
+    end
+    out[#out + 1] = "Points you can spend now, in no order: " .. table.concat(open, ", ")
+  elseif r.open and r.waiting > 0 then
+    out[#out + 1] = "The game shows none of the plan's remaining points as available now."
+  end
+  if r.total > 0 and r.done == r.total and #r.mismatches == 0 then
     out[#out + 1] = "Your build matches the plan."
   end
   if #r.mismatches > 0 then
@@ -407,7 +567,7 @@ function P.Refresh()
     if entry.active then active = entry end
   end
   local state = active and T.State(active.configID)
-  last = state and { configID = active.configID, state = state, result = P.Evaluate(current, state) } or nil
+  last = state and { configID = active.configID, state = state, result = P.Evaluate(current, state, currentOrder) } or nil
   if panel and panel:IsShown() then
     panel.body:SetText(table.concat(lines(), "\n"))
   end
@@ -438,8 +598,21 @@ function P.Show()
   pcall(mark)
 end
 
---- Load a share code. Returns true, or false and the reason (also printed).
-function P.Load(code, embedded)
+--- Forget the loaded plan and everything kept with it.
+local function forget()
+  current, currentOrder, orderProblem, last = nil, nil, nil, nil
+  EverlootDB.plan, EverlootDB.planOrder, EverlootDB.planOrderProblem, EverlootDB.planSet = nil, nil, nil, nil
+end
+
+--- Load a share code with the point order token that came with it, if any; set is 2 for a plan's second
+--- talent set. Only a token that fits the code is kept: with any other the talents load, the order is
+--- unknown and the reason is kept. Returns true, or false and the reason (also printed).
+function P.Load(code, embedded, order, set)
+  if type(code) == "string" and code:find("^%s*https?://") then
+    local reason = "/everloot plan takes a share code; paste a website link into /everloot > Talents > Import"
+    print("Everloot: " .. reason)
+    return false, reason
+  end
   local plan, reason = P.Decode(code)
   if not plan then print("Everloot: " .. reason); return false, reason end
   local class = T.Player()
@@ -453,8 +626,13 @@ function P.Load(code, embedded)
   if plan.spec and plan.spec > 0 and spec and spec ~= plan.spec then
     print("Everloot: this plan was made for spec id " .. plan.spec .. " and the client reports " .. spec .. ". Check it is the right plan.")
   end
-  current = plan
+  local decoded, problem
+  if order ~= nil then decoded, problem = P.DecodeOrder(order, plan) end
+  current, currentOrder, orderProblem = plan, decoded, problem
   EverlootDB.plan = P.Encode(plan)
+  EverlootDB.planOrder = decoded and trim(order) or nil
+  EverlootDB.planOrderProblem = problem
+  EverlootDB.planSet = set == 2 and 2 or nil
   if embedded then
     P.UseWorkspace()
     P.Refresh()
@@ -465,10 +643,21 @@ function P.Load(code, embedded)
 end
 
 function P.Clear()
-  current, last = nil, nil
-  EverlootDB.plan = nil
+  forget()
   clearMarks()
   if panel then panel.body:SetText(table.concat(lines(), "\n")) end
+end
+
+--- The website link for the loaded plan: its code and, when known, its point order, under its own set's
+--- keys (plan and order for a first set, plan2 and order2 for a second). Nil without a plan.
+function P.Link()
+  local plan = EverlootDB and P.Decode(EverlootDB.plan)
+  if not plan then return nil end
+  local code, token = EverlootDB.plan, EverlootDB.planOrder
+  -- Only an order that fits the code is written; an unknown one is left out, never made up.
+  token = token and P.DecodeOrder(token, plan) and trim(token) or nil
+  local fragment = EverlootDB.planSet == 2 and P.Fragment(nil, code, nil, token) or P.Fragment(code, nil, token, nil)
+  return "https://everloot.app/tools/talents/" .. plan.class:lower() .. fragment
 end
 
 --- Load saved build number n from the list /everloot plan prints, exactly like a pasted code.
@@ -492,7 +681,7 @@ function P.LoadSaved(n, set)
     return false
   end
   print("Everloot: loading saved build " .. n .. (set == 2 and " (second set)" or "") .. ", " .. plain(build.name) .. ".")
-  return P.Load(code)
+  return P.Load(code, nil, nil, set)
 end
 
 --- /everloot plan [code | number | show | hide | clear]
@@ -538,7 +727,17 @@ E:RegisterModule("plan", function()
   userHidden = EverlootDB.planView == "workspace"
   if EverlootDB.plan then
     local plan = P.Decode(EverlootDB.plan)
-    if plan then current = plan else EverlootDB.plan = nil end
+    if plan then
+      current, currentOrder, orderProblem = plan, nil, nil
+      if EverlootDB.planOrder then
+        currentOrder, orderProblem = P.DecodeOrder(EverlootDB.planOrder, plan)
+        -- A saved order that no longer fits its code is dropped, never repaired.
+        if not currentOrder then EverlootDB.planOrder, EverlootDB.planOrderProblem = nil, orderProblem end
+      else
+        orderProblem = ORDER_PROBLEMS[EverlootDB.planOrderProblem] and EverlootDB.planOrderProblem or nil
+        EverlootDB.planOrderProblem = orderProblem
+      end
+    else forget() end
   end
   local f = E.frame
   for _, name in ipairs({ "ADDON_LOADED", "PLAYER_ENTERING_WORLD", "TRAIT_CONFIG_UPDATED", "TRAIT_NODE_CHANGED",
