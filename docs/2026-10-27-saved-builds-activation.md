@@ -327,7 +327,8 @@ both spend orders, the sharing the player chose, and a `transferKey` the browser
 under [Spend orders](#spend-orders)). Sent again after a lost answer, a reload or from another tab, the same save is
 answered 200 with the build it made, not a 201 with a second one; the panel reads that 200 as the build it sent before.
 Until the spend-order migration is in, the route refuses such a save with the code `orders_unavailable`, and the panel
-says so and keeps every plan on the device as it was.
+says so and keeps every plan on the device as it was. The panel needs the browser's Web Locks API, which every current
+browser has; without it, it says "This browser can't move plans safely; try a current browser." and sends nothing.
 
 Add these to the signed-in acceptance, with the same disposable test account and the window 390 px wide:
 
