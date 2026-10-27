@@ -1142,14 +1142,36 @@ describe("one lock for every writer", () => {
   /** The modules that are the writing itself: they run inside the lock their callers take. */
   const LAYER = ["lib/player-workspace.ts", "lib/alt-workspace.ts", "lib/alt-import.ts"];
 
+  /** The site's source files, tests aside, each with its code alone (codeOnly). */
+  function sources() {
+    const src = resolve(import.meta.dirname, "../..");
+    return (readdirSync(src, { recursive: true }) as string[])
+      .map((entry) => ({ entry, file: relative(src, join(src, entry)).replace(/\\/g, "/") }))
+      .filter(({ file }) => /\.tsx?$/.test(file) && !/\.test\.tsx?$/.test(file))
+      .map(({ entry, file }) => {
+        const source = readFileSync(join(src, entry), "utf8");
+        return { file, source, code: codeOnly(source) };
+      });
+  }
+
+  /** Each withWorkspaceLock(…) call in this code, from its name to its closing parenthesis. */
+  function lockSpans(code: string): Array<[number, number]> {
+    const spans: Array<[number, number]> = [];
+    for (const m of code.matchAll(/\bwithWorkspaceLock\s*\(/g)) {
+      let depth = 0;
+      for (let k = m.index! + m[0].length - 1; k < code.length; k++) {
+        if (code[k] === "(") depth++;
+        else if (code[k] === ")" && --depth === 0) { spans.push([m.index!, k]); break; }
+      }
+    }
+    return spans;
+  }
+
   /** Every call of a writer in the site's source outside the writing layer, and those not inside withWorkspaceLock(…). */
   function scan() {
-    const src = resolve(import.meta.dirname, "../..");
     const calls: Array<{ file: string; name: string; locked: boolean }> = [];
-    for (const entry of readdirSync(src, { recursive: true }) as string[]) {
-      const file = relative(src, join(src, entry)).replace(/\\/g, "/");
-      if (!/\.tsx?$/.test(file) || /\.test\.tsx?$/.test(file) || LAYER.includes(file)) continue;
-      const source = readFileSync(join(src, entry), "utf8");
+    for (const { file, source, code } of sources()) {
+      if (LAYER.includes(file)) continue;
       const names = new Set<string>();
       for (const m of source.matchAll(/import\s*\{([^}]*)\}\s*from\s*"([^"]+)"/g)) {
         const writers = WRITERS[m[2]];
@@ -1159,15 +1181,7 @@ describe("one lock for every writer", () => {
           if (writers.includes(name)) names.add(name);
         }
       }
-      const code = codeOnly(source);
-      const spans: Array<[number, number]> = [];
-      for (const m of code.matchAll(/\bwithWorkspaceLock\s*\(/g)) {
-        let depth = 0;
-        for (let k = m.index! + m[0].length - 1; k < code.length; k++) {
-          if (code[k] === "(") depth++;
-          else if (code[k] === ")" && --depth === 0) { spans.push([m.index!, k]); break; }
-        }
-      }
+      const spans = lockSpans(code);
       const inside = (at: number) => spans.some(([from, to]) => from < at && at < to);
       for (const name of names) {
         for (const m of code.matchAll(new RegExp(`(?<![\\w.])${name}\\s*\\(`, "g"))) calls.push({ file, name, locked: inside(m.index!) });
@@ -1176,6 +1190,51 @@ describe("one lock for every writer", () => {
       for (const m of code.matchAll(/\.removeItem\s*\(\s*bucketKey\s*\(/g)) calls.push({ file, name: "removeItem(bucketKey(…))", locked: inside(m.index!) });
     }
     return calls;
+  }
+
+  /** Where the declaration at `from` ends: at its first `;` outside brackets, at the end of the line its block closes
+   *  on, or where the block around it closes. */
+  function declarationEnd(code: string, from: number): number {
+    let depth = 0;
+    let closed = false;
+    for (let k = from; k < code.length; k++) {
+      const c = code[k];
+      if (c === "(" || c === "[" || c === "{") { depth++; closed = false; continue; }
+      if (c === ")" || c === "]" || c === "}") {
+        if (--depth < 0) return k;
+        closed = depth === 0 && c === "}";
+        continue;
+      }
+      if (depth === 0 && (c === ";" || (c === "\n" && closed))) return k;
+      if (c !== " " && c !== "\t" && c !== "\r") closed = false;
+    }
+    return code.length;
+  }
+
+  /**
+   * In each file that takes the lock: what takes it (withWorkspaceLock, and each function or value declared there whose
+   * declaration does), and each call of one of them made inside a lock already held, which would wait on itself.
+   */
+  function nesting() {
+    const takers: Record<string, string[]> = {};
+    const nested: Array<{ file: string; name: string }> = [];
+    for (const { file, code } of sources()) {
+      const spans = lockSpans(code);
+      if (spans.length === 0) continue;
+      const names = new Set(["withWorkspaceLock"]);
+      for (const m of code.matchAll(/\b(?:const|let|function)\s+([A-Za-z_]\w*)/g)) {
+        const end = declarationEnd(code, m.index!);
+        if (spans.some(([from]) => from > m.index! && from < end)) names.add(m[1]);
+      }
+      takers[file] = [...names].sort();
+      for (const [from, to] of spans) {
+        for (const name of names) {
+          const calls = code.slice(from + 1, to).match(new RegExp(`(?<![\\w.])${name}\\s*\\(`, "g")) ?? [];
+          nested.push(...calls.map(() => ({ file, name })));
+        }
+      }
+    }
+    return { takers, nested };
   }
 
   test("without Web Locks a transfer is refused before anything is allocated or sent", async () => {
@@ -1221,6 +1280,26 @@ describe("one lock for every writer", () => {
     expect(stored(ANON)!.alts.map((a) => a.name)).toEqual(["Thrall"]);
     expect(lock.names).toEqual(["everloot:player-workspace", "everloot:player-workspace"]);
     expect(lock.overlapped()).toBe(false);
+  });
+
+  test("a task holding the lock that asks for it again fails at once rather than wait on itself, and the lock is free after", async () => {
+    const { withWorkspaceLock } = await import("@/lib/player-workspace");
+    // Web Locks are not re-entrant: in a browser, and with the stand-in here, this call would wait for good.
+    await expect(withWorkspaceLock(() => withWorkspaceLock(() => "inside"))).rejects.toThrow("already holds it");
+    await expect(withWorkspaceLock(async () => withWorkspaceLock(() => "inside"))).rejects.toThrow("already holds it");
+    await expect(withWorkspaceLock(() => "next")).resolves.toBe("next");
+    // Without Web Locks nothing would wait, so nothing would hide the mistake: it fails the same way.
+    delete (navigator as { locks?: unknown }).locks;
+    await expect(withWorkspaceLock(() => withWorkspaceLock(() => "inside"))).rejects.toThrow("already holds it");
+  });
+
+  test("no task holding the lock asks for it again: nothing in the site takes it inside a lock, and the library never takes it", () => {
+    const { takers, nested } = nesting();
+    expect(nested).toEqual([]);
+    // The scan knows the transfer's helpers that take the lock, so a call of one inside a lock would be found.
+    expect(takers["components/workspace/TransferPlans.tsx"]).toEqual(expect.arrayContaining(["characterFor", "step", "withWorkspaceLock"]));
+    const layer = sources().filter((s) => LAYER.includes(s.file)).map((s) => [s.file, lockSpans(s.code).length]);
+    expect(layer.sort()).toEqual([...LAYER].sort().map((file) => [file, 0]));
   });
 });
 

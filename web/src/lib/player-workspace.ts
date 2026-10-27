@@ -356,7 +356,7 @@ export function update(storage: DeviceStorage | null, owner: Owner, change: (wor
   return "error" in next ? next : store(storage, next, read.raw);
 }
 
-/** The lock every tab takes to change these buckets: Plans on this device's writes and a transfer's, one at a time. */
+/** The lock every tab takes to change these buckets or the record of sends, one change at a time. */
 export const WORKSPACE_LOCK = "everloot:player-workspace";
 
 const lockManager = () => (typeof navigator === "undefined" ? undefined : (navigator as { locks?: LockManager }).locks);
@@ -365,16 +365,28 @@ const lockManager = () => (typeof navigator === "undefined" ? undefined : (navig
  *  another tab's. A plain change to a bucket still goes ahead, checked as `store` checks it. */
 export const locksAvailable = () => lockManager() !== undefined;
 
+/** Tasks holding the lock that are running now, until each first waits. */
+let holding = 0;
+
 /**
  * Runs `task` holding the workspace lock (the Web Locks API), so no other tab's change to these buckets or to the record
  * of sends runs in between: every writer takes it (Plans on this device, Save on this device, the alt planner, the
  * Everloot.lua import and the transfer). Without the API the task runs at once. Either way each write still checks that
  * its bucket is as the change read it (store), and writes nothing over another tab's change.
+ *
+ * Web Locks are not re-entrant: a task that holds the lock and asks for it again waits on itself for good. Such a call,
+ * made before the task first waits, fails at once instead. One made after cannot be told from another writer on this
+ * page, which rightly waits its turn, so none is made anywhere in the site, and a test checks that.
  */
 export async function withWorkspaceLock<T>(task: () => T | Promise<T>): Promise<T> {
+  if (holding > 0) throw new Error("The workspace lock was asked for by a task that already holds it: Web Locks are not re-entrant, so it would wait on itself for good.");
+  const run = () => {
+    holding++;
+    try { return task(); } finally { holding--; }
+  };
   const locks = lockManager();
-  if (!locks) return task();
-  return locks.request(WORKSPACE_LOCK, () => task()) as Promise<T>;
+  if (!locks) return run();
+  return locks.request(WORKSPACE_LOCK, run) as Promise<T>;
 }
 
 const replace = (workspace: PlayerWorkspace, plan: LocalPlan): PlayerWorkspace =>
