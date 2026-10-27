@@ -1,5 +1,5 @@
 import { GAME_DATA_CREDIT, SITE, TALENT_CLASSES, type McpToolArgs, type TalentClass, type TalentNodeOut } from "@everloot/protocol";
-import { extractCode, importCode } from "../../web/src/lib/talents/import";
+import { DECODE_MESSAGES, extractCode, importCode } from "../../web/src/lib/talents/import";
 import { decodeBuild } from "../../web/src/lib/talents/share";
 import { nodeMap, pointsByTree } from "../../web/src/lib/talents/rules";
 import type { TalentCatalog, TalentNode } from "../../web/src/lib/talents/types";
@@ -76,12 +76,14 @@ const LABEL = "found in game files, unconfirmed";
 export function handleTalentPlan(args: McpToolArgs<"talent_plan">): Answer {
   const fail = (message: string): Answer => ({ text: `${message}\n${GAME_DATA_CREDIT}`, structured: { ok: false, message, label: LABEL, credit: GAME_DATA_CREDIT } });
   const code = extractCode(args.code);
+  // The value must read as a code whole, in the calculator's words when it does not. importCode reads links too, and
+  // would find a code inside a value that is not one.
   const decoded = decodeBuild(code);
-  if (decoded.ok && !isTalentClass(decoded.build.classSlug)) {
+  if (!decoded.ok) return fail(DECODE_MESSAGES[decoded.error]);
+  if (!isTalentClass(decoded.build.classSlug)) {
     return fail(`The code names a class without a talent catalog: ${decoded.build.classSlug}. Classes: ${TALENT_CLASSES.join(", ")}.`);
   }
-  // A code that does not decode gets the calculator's own message; the class is read only to pick the trees.
-  const catalog = siteCatalog(decoded.ok ? (decoded.build.classSlug as TalentClass) : TALENT_CLASSES[0]);
+  const catalog = siteCatalog(decoded.build.classSlug as TalentClass);
   const result = importCode(catalog, code);
   if (!result.ok) return fail(result.message);
   const nodes = nodeMap(catalog);

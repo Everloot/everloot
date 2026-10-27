@@ -110,6 +110,20 @@ test("talent_plan refuses what it cannot read, in the calculator's words", () =>
   expect(handleTalentPlan({ code: "   " }).text).toContain("Paste a share code");
 });
 
+test("talent_plan refuses a link's value that is not a whole code, escaped or raw, even with a code inside it", () => {
+  // A warrior code: a value that did not decode fell back to the first class's trees, which loaded the code inside it.
+  const warrior = siteCatalog("warrior");
+  const node = warrior.nodes.find((n) => !n.unlock && n.prereqs.length === 0 && !n.anyOf)!;
+  const code = encodeBuild({ classSlug: "warrior", specId: warrior.specId, build: warrior.build, ranks: { [node.id]: { rank: 1 } } });
+  expect(planOut.parse(handleTalentPlan({ code }).structured)).toMatchObject({ ok: true, pointsSpent: 1 });
+  for (const link of [`https://everloot.app/tools/talents/warrior#plan=junk%23plan%3D${code}`, `https://everloot.app/tools/talents/warrior#plan=junk#plan=${code}`]) {
+    const { text, structured } = handleTalentPlan({ code: link });
+    expect(planOut.parse(structured), link).toMatchObject({ ok: false, message: "That share code is damaged or cut short." });
+    expect(structured, link).not.toHaveProperty("url");
+    expect(text, link).toBe(`That share code is damaged or cut short.\n${GAME_DATA_CREDIT}`);
+  }
+});
+
 test("talent_plan answers a link that carries spend orders exactly as it answers the same link without them", () => {
   const code = legalCode();
   const node = firstNode();

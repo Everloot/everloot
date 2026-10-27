@@ -25,3 +25,19 @@ test("a build link's path carries one or two sets; a bad code is dropped, none l
   expect(readPathCodes(fixture, [a, "EL1-nonsense"])).toMatchObject({ first: a, second: null });
   expect(readPathCodes(fixture, ["junk"])).toBeNull();
 });
+
+test("a path segment that does not unescape is a bad code too, and reading it never throws", () => {
+  const a = code({ 11: { rank: 2 } });
+  for (const segment of ["%E0%A4%A", "%E0"]) {
+    expect(readPathCodes(fixture, [segment]), segment).toBeNull();
+    expect(readPathCodes(fixture, [a, segment]), segment).toMatchObject({ first: a, second: null });
+  }
+});
+
+test("a path segment must read as a code whole, as the calculator reads it: a link's code inside one is not read", () => {
+  const a = code({ 11: { rank: 2 } });
+  for (const segment of [`junk%23plan=${a}`, `junk#plan=${a}`]) {
+    expect(readPathCodes(fixture, [segment]), segment).toBeNull();
+    expect(readPathCodes(fixture, [a, segment]), segment).toMatchObject({ first: a, second: null });
+  }
+});

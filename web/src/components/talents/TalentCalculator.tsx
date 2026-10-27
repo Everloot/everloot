@@ -350,7 +350,7 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
     // The link handed out is the build link: same build, and its preview in a chat names it. Its codes are in the
     // path, so their orders ride in its fragment, which the class page reads when the link opens.
     const preview = previewPath(catalog.classSlug, first, second);
-    const sequence = [first && orders[0] && `order=${orders[0]}`, second && orders[1] && `order2=${orders[1]}`].filter(Boolean).join("&");
+    const sequence = [first && orders[0] && `order=${encodeURIComponent(orders[0])}`, second && orders[1] && `order2=${encodeURIComponent(orders[1])}`].filter(Boolean).join("&");
     setLink(preview ? `${origin}${preview}${sequence ? `#${sequence}` : ""}` : "");
   }, [codes, orders, catalog, readOnly]);
 

@@ -610,6 +610,94 @@ test("with the game's art the switch's line and the talents' clearance work the 
   }
 });
 
+// Links are read a whole value at a time; lib/talents/plan-links.test.ts has the reader's own cases.
+
+const NOT_A_CODE = "That is not a share code. Codes start with EL1 and use letters, digits, - and _ only.";
+const DAMAGED_ORDER = "The plan's spend order is damaged, so the order is unknown. The talents still loaded.";
+const loadedList = () => [...container.querySelectorAll('[aria-label="What loaded"] li')].map((li) => li.textContent);
+const spendOrder = () => container.querySelector("#spend-order")!.closest("section")!;
+async function paste(text: string) {
+  const box = container.querySelector<HTMLInputElement>("#talent-paste")!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(box, text);
+    box.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await click(button(/^Load into set/));
+}
+
+test("an address whose code is damaged after a valid start is refused, on opening and in an open tab, and loads nothing", async () => {
+  const code = encodeBuild({ classSlug: "mage", specId: 1482, build: "1.0.0.1", ranks: { 11: { rank: 3 } } });
+  window.location.hash = `#plan=${code}!damaged`;
+  await render();
+  expect(status()).toBe(NOT_A_CODE);
+  expect(node(11).textContent).toContain("0/5");
+  // In an open tab, a value with a valid code inside it changes nothing either.
+  await click(node(12));
+  await act(async () => {
+    window.location.hash = `#plan=${code}!damaged?plan=${code}!tail`;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  });
+  expect(status()).toBe(NOT_A_CODE);
+  expect([node(11).textContent, node(12).textContent]).toEqual([expect.stringContaining("0/5"), expect.stringContaining("1/5")]);
+});
+
+test("a damaged order in the address keeps the talents with the order unknown, and stays as it came in the address and the build link", async () => {
+  const code = encodeBuild({ classSlug: "mage", specId: 1482, build: "1.0.0.1", ranks: { 11: { rank: 3 } } });
+  window.location.hash = `#plan=${code}&order=O1p-AAA!damaged`;
+  await render();
+  expect(node(11).textContent).toContain("3/5");
+  expect(status()).toBe("Loaded from the link with changes. The list below says what.");
+  expect(loadedList()).toEqual([DAMAGED_ORDER]);
+  expect(spendOrder().textContent).toContain("Spend order unknown.");
+  // So a reload, or the link handed out, says the same.
+  const link = () => container.querySelector<HTMLInputElement>("#talent-link")!.value;
+  expect(window.location.hash).toBe(`#plan=${code}&order=O1p-AAA!damaged`);
+  expect(link()).toBe(`${window.location.origin}/tools/talents/mage/b/${code}#order=O1p-AAA!damaged`);
+  // An order that would end its part early goes back in escaped.
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  window.location.hash = `#plan=${code}&order=O1p-AA%26A`;
+  await render();
+  expect(loadedList()).toEqual([DAMAGED_ORDER]);
+  expect(window.location.hash).toBe(`#plan=${code}&order=O1p-AA%26A`);
+  expect(link()).toBe(`${window.location.origin}/tools/talents/mage/b/${code}#order=O1p-AA%26A`);
+});
+
+test("the import box refuses a damaged link as a whole, and still reads one copied with spaces around it", async () => {
+  const code = encodeBuild({ classSlug: "mage", specId: 1482, build: "1.0.0.1", ranks: { 11: { rank: 3 } } });
+  await render();
+  for (const text of [`https://everloot.app/tools/talents/mage#plan=${code}!damaged&order=O1p-AAA`, `${code}!damaged?plan=${code}!tail`]) {
+    await paste(text);
+    expect(status(), text).toBe(NOT_A_CODE);
+    expect(node(11).textContent, text).toContain("0/5");
+  }
+  await paste(`  https://everloot.app/tools/talents/mage#plan=${code}&order=O1p-AAA `);
+  expect(status()).toBe("Build loaded.");
+  expect(node(11).textContent).toContain("3/5");
+  expect(spendOrder().textContent).toContain("Planned order.");
+});
+
+test("the import box loads the calculator's own build link with its order, and refuses another class's and a saved build's", async () => {
+  await render();
+  await click(node(11));
+  await click(node(11));
+  await click(node(12));
+  const handedOut = container.querySelector<HTMLInputElement>("#talent-link")!.value;
+  expect(handedOut).toMatch(/\/tools\/talents\/mage\/b\/EL1-[^#]+#order=O1p-AAB$/);
+  await click(button(/Reset set 1$/));
+  expect(node(11).textContent).toContain("0/5");
+  await paste(handedOut);
+  expect(status()).toBe("Build loaded.");
+  expect([node(11).textContent, node(12).textContent]).toEqual([expect.stringContaining("2/5"), expect.stringContaining("1/5")]);
+  expect(spendOrder().textContent).toContain("Planned order.");
+  const druid = encodeBuild({ classSlug: "druid", specId: 0, build: "1.0.0.1", ranks: { 11: { rank: 1 } } });
+  await paste(`https://everloot.app/tools/talents/druid/b/${druid}`);
+  expect(status()).toBe("That code is for a different class. Open this class's calculator to load it.");
+  await paste("https://everloot.app/b/abcd1234");
+  expect(status()).toBe("That link names a saved build, not its talents, so it cannot load here. Open the link, then choose Open in the calculator.");
+  expect(node(11).textContent).toContain("2/5");
+});
+
 test("the class page keeps its lede in the page but drops it below the phone breakpoint (class proxy)", async () => {
   const page = new DOMParser().parseFromString(renderToStaticMarkup(await TalentClassView({ slug: "mage" })), "text/html");
   const lede = page.querySelector("[data-page-header] p")!;
