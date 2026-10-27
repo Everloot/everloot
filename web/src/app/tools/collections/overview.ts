@@ -4,6 +4,7 @@ import { rowsOf, type CompletionFacts, type CompletionRows, type OverviewCategor
 
 export const PATH = "/tools/collections";
 export const GAP_VIEW = "gap";
+export const MOUNTS_VIEW = "mounts";
 
 export const SHOWS = ["all", "done", "missing", "started"] as const;
 export type Show = (typeof SHOWS)[number];

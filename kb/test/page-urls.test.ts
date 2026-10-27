@@ -6,7 +6,7 @@ import { z } from "zod";
 import { openDb, type DB } from "../src/db.js";
 import { replaceSourceRows, type EntityInput } from "../src/entities.js";
 import { emptyMarket, foldMarket } from "../src/market.js";
-import { createKnowledgeServer, type ToolOptions } from "../src/mcp-server.js";
+import { createKnowledgeServer, SOME_WORDS, type ToolOptions } from "../src/mcp-server.js";
 import { changesUrl, collectionsUrl, marketItemUrl, withMore } from "../src/page-urls.js";
 import { WORLD_MAP_DATA } from "../src/world-map-file.js";
 
@@ -191,6 +191,11 @@ test("the structured answers carry the same page as url, and no url where the te
   const evidence = (await structured("answer_sources", { question: "Who is Thrall?" })).evidence as { source: { title: string }; url?: string }[];
   expect(evidence.find((e) => e.source.title === "Thrall")).toMatchObject({ url: THRALL });
   expect(evidence.find((e) => e.source.title === "Thrall stub")).not.toHaveProperty("url");
+  // A fallback answer says so in its text; the structured answer keeps its published shape.
+  const partial = (await c.callTool({ name: "answer_sources", arguments: { question: "best warchief for horde mains" } })).structuredContent as Record<string, unknown>;
+  expect(partial).not.toHaveProperty("someWords");
+  expect(partial.evidence).toEqual(expect.arrayContaining([expect.objectContaining({ url: THRALL })]));
+  expect(await call(c, "answer_sources", { question: "best warchief for horde mains" })).toContain(SOME_WORDS);
   expect(await structured("item_categories", {})).toMatchObject({ url: "https://everloot.app/database/items" });
   expect(await structured("item_categories", { class: "no-such-class" })).not.toHaveProperty("url");
   expect(await structured("item_page", { itemId: 1234 })).toMatchObject({ url: "https://everloot.app/database/items/1234" });

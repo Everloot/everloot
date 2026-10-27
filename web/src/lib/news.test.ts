@@ -39,3 +39,48 @@ test("the feed escapes what it prints and dates the channel by the newest change
   expect(xml).toContain(`<lastBuildDate>${new Date("2026-10-25").toUTCString()}</lastBuildDate>`);
   expect(renderNewsFeed([], { baseUrl: "https://everloot.app", now: new Date("2026-10-26") })).toContain(`<lastBuildDate>${new Date("2026-10-26").toUTCString()}</lastBuildDate>`);
 });
+
+test("the page body drops its own Sources and Related lists and keeps the call to action under them", async () => {
+  const { bodyForPage, relatedPosts, sourceNames, readingMinutes } = await import("./news");
+  const { parsePage } = await import("../../../kb/src/wiki/page");
+  const blocks = parsePage(["---", "slug: x", "---", "Intro.", "## Facts", "- one", "## Related", "- [A](/news/older-post)", "- [Changes](/changes)", "", "**Try:** the [calculator](/tools/talents).", "## Sources", "- [Blizzard: B](https://example.com)"].join("\n")).blocks;
+  const sources = [{ title: "Blizzard: B", url: "https://example.com" }, { title: "Wowhead: C", url: "https://www.wowhead.com/x" }];
+  const body = bodyForPage({ blocks, sources });
+  expect(body.blocks.filter((b) => b.type === "heading").map((b) => (b.type === "heading" ? b.text : ""))).toEqual(["Facts"]);
+  expect(body.blocks.some((b) => b.type === "paragraph" && JSON.stringify(b).includes("calculator"))).toBe(true);
+  expect(body.relatedSlugs).toEqual(["older-post"]);
+  expect(JSON.stringify(body.relatedBlocks)).toContain("[Changes](/changes)");
+  // Without front-matter sources the body's own Sources section stays.
+  expect(bodyForPage({ blocks, sources: [] }).blocks.some((b) => b.type === "heading" && b.text === "Sources")).toBe(true);
+  expect(sourceNames({ sources })).toEqual(["Blizzard", "Wowhead"]);
+  expect(readingMinutes(blocks)).toBe(1);
+  const news = loadNews(FIXTURES);
+  expect(relatedPosts(news, { slug: "test-post" }, ["older-post", "test-draft"], 3).map((p) => p.slug)).toEqual(["older-post"]);
+  const expanded = new Map(news);
+  for (const slug of ["alpha", "bravo", "charlie", "delta"]) expanded.set(slug, { ...news.get("test-post")!, slug });
+  expect(relatedPosts(expanded, { slug: "test-post" }, ["delta", "delta", "test-post", "test-draft", "unknown", "older-post"]).map((p) => p.slug)).toEqual(["delta", "older-post", "alpha"]);
+});
+
+test("Related retains mixed items and non-news destinations while pure news links become card candidates", async () => {
+  const { bodyForPage, relatedPosts } = await import("./news");
+  const { parsePage } = await import("../../../kb/src/wiki/page");
+  const blocks = parsePage("---\nslug: x\n---\n## Related\n- [Older](/news/older-post)\n- [Older](/news/older-post) and [Changes](/changes), then {zone:12}.\n- [Draft](/news/test-draft)\n- [Unknown](/news/missing)\n- [Self](/news/test-post)\n\n**Try:** [calculator](/tools/talents).\n").blocks;
+  const body = bodyForPage({ blocks, sources: [] });
+  expect(body.relatedSlugs).toEqual(["older-post", "test-draft", "missing", "test-post"]);
+  expect(body.relatedBlocks).toMatchObject([{
+    type: "list", items: [(blocks.find((b) => b.type === "list") as Extract<typeof blocks[number], { type: "list" }>).items[1]],
+  }]);
+  expect(JSON.stringify(body.blocks)).toContain("calculator");
+  expect(relatedPosts(loadNews(FIXTURES), { slug: "test-post" }, body.relatedSlugs).map((p) => p.slug)).toEqual(["older-post"]);
+});
+
+test("a hero is optional and checked", async () => {
+  const { PostFrontMatter } = await import("../../../kb/src/news/post");
+  const base = { slug: "x", title: "T", summary: "S", author: "A", published: "2026-10-25", status: "published" };
+  expect(PostFrontMatter.safeParse(base).success).toBe(true);
+  expect(PostFrontMatter.safeParse({ ...base, hero: { src: "/news/heroes/x.webp", alt: "A hero" } }).success).toBe(true);
+  expect(PostFrontMatter.safeParse({ ...base, hero: { src: "http://x.test/a.png", alt: "A" } }).success).toBe(false);
+  expect(PostFrontMatter.safeParse({ ...base, hero: { src: "/a.webp", alt: "A", thumb: "/a-card.webp", share: "/a-share.png" } }).success).toBe(true);
+  expect(PostFrontMatter.safeParse({ ...base, hero: { src: "/a.webp", alt: "A", share: "not a path" } }).success).toBe(false);
+  expect(PostFrontMatter.safeParse({ ...base, hero: { src: "/a.png" } }).success).toBe(false);
+});

@@ -3,7 +3,7 @@ import JsonLd from "@/components/JsonLd";
 import { webApplicationJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
-import { collectionFactsFromRecords, handleCollectionGap } from "../../../../../kb/src/collection-gap";
+import { agreedCollectionItems, collectionFactsFromRecords, handleCollectionGap } from "../../../../../kb/src/collection-gap";
 import {
   ANOTHER_CHARACTER_NOTE, COMPLETION_AGREEMENT, completionEmptyState, completionProgress, droppedCharactersNote, overviewOf,
 } from "../../../../../kb/src/completion";
@@ -12,8 +12,9 @@ import { STORAGE_UNREACHABLE, uploadStore } from "@/lib/upload-store";
 import { dataAgeLabel } from "@/lib/data-age";
 import CompletionView, { CharacterClosest } from "./CompletionView";
 import { CategoryDetail, OverviewBars, TotalBar } from "./OverviewView";
+import MountsView from "./MountsView";
 import RememberCharacter from "./RememberCharacter";
-import { GAP_VIEW, showOf, viewHref, type ViewQuery } from "./overview";
+import { GAP_VIEW, MOUNTS_VIEW, showOf, viewHref, type ViewQuery } from "./overview";
 import { trailFor } from "@/lib/breadcrumbs";
 import { Card, Container, DataTitle, Disclosure, EmptyState, Field, LinkTabs, SectionHeading } from "@/components/ui";
 
@@ -57,6 +58,18 @@ async function gapView({ collection, install }: { collection: string; install: s
           ? <EmptyState message="No collection list yet: an item joins a list once 3 installs agree on it and its source." />
           : <Card><pre className="whitespace-pre-wrap text-sm text-fg">{answer}</pre></Card>}
       </section>
+    </>
+  );
+}
+
+/** The files' mount list, player-first: the mounts 3 installs list under the "Mounts" collection lead. */
+async function mountsView() {
+  const corpus = await uploadStore.loadCorpus();
+  const agreed = corpus.unreachable ? new Set<number>() : agreedCollectionItems("Mounts", collectionFactsFromRecords(corpus.records));
+  return (
+    <>
+      <p className="text-meta text-muted">{corpus.unreachable ? "Storage unreachable" : dataAgeLabel(corpus.dataAsOf)}</p>
+      <MountsView agreedSpellIds={agreed} unreachable={corpus.unreachable === true} />
     </>
   );
 }
@@ -149,6 +162,7 @@ export default async function CollectionsPage(
   // A link that names a collection (the old form) opens the gap view.
   const view = one(searchParams.view) || (collection.trim() ? GAP_VIEW : "");
   const gap = view === GAP_VIEW;
+  const mounts = view === MOUNTS_VIEW;
 
   return (
     <Container width="data">
@@ -163,14 +177,17 @@ export default async function CollectionsPage(
         <LinkTabs
           label="View"
           tabs={[
-            { href: viewHref({ install, character }), label: "Completion", current: !gap },
+            { href: viewHref({ install, character }), label: "Completion", current: !gap && !mounts },
             { href: viewHref({ view: GAP_VIEW, install, collection }), label: "Collection gap", current: gap },
+            { href: viewHref({ view: MOUNTS_VIEW }), label: "Mounts", current: mounts },
           ]}
         />
         <div className="mt-4 space-y-6">
           {gap
             ? await gapView({ collection, install })
-            : await completionOverview({ install, character, view, show: one(searchParams.show) })}
+            : mounts
+              ? await mountsView()
+              : await completionOverview({ install, character, view, show: one(searchParams.show) })}
         </div>
         <div className="mt-8">
           <Disclosure summary="Where do done and missing come from?">

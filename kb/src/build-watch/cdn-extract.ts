@@ -12,6 +12,9 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { writeClientAchievements } from "../client-achievements.js";
+import { writeClientEncounters } from "../client-encounters.js";
+import { writeClientMounts } from "../client-mounts.js";
 import { writeCatalogs } from "../client-catalog.js";
 import { writeClientLayer } from "../client-layer.js";
 import { writeRaceTable } from "../client-races.js";
@@ -69,6 +72,9 @@ export async function extractFromCdn(product: string, region: string, curatedPat
         writeFileSync(join(root, GAME_DATA_DIR, "map.json"), `${JSON.stringify(writeWorldMapData(snapshot), null, 2)}\n`);
         writeClientLayer(snapshot, join(root, GAME_DATA_DIR, "client-layer.json"));
         writeRaceTable(snapshot, join(root, GAME_DATA_DIR, "races.json"));
+        writeClientAchievements(snapshot, join(root, GAME_DATA_DIR, "client-achievements.json"));
+        writeClientEncounters(snapshot, join(root, GAME_DATA_DIR, "client-encounters.json"));
+        writeClientMounts(snapshot, join(root, GAME_DATA_DIR, "client-mounts.json"));
       },
       dispose: () => rmSync(work, { recursive: true, force: true }),
       encryptedTables: manifest.tables.map((t) => ({ table: t.table, blocks: t.encryptedBlocks })),

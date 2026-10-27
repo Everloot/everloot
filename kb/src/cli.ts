@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { auditSources } from "./audit-sources.js";
 import { compareBaseline, readBaseline, writeBaselineReport } from "./baseline-report.js";
@@ -14,8 +14,13 @@ import { buildTimeline } from "./changes.js";
 import { checkBuilds, loadRegistry, recordBuilds, saveRegistry, versionsUrl } from "./builds.js";
 import { clientCoverage, formatCoverage } from "./client-coverage.js";
 import { formatScanReport, loadManifest, scanBuild } from "./client-scan.js";
+import { writeClientAchievements } from "./client-achievements.js";
+import { writeClientEncounters } from "./client-encounters.js";
+import { writeClientMounts } from "./client-mounts.js";
 import { writeClientLayer } from "./client-layer.js";
 import { writeRaceTable } from "./client-races.js";
+import { buildQuestionBank, gameDataSubjects, parseQuestionBank, serializeQuestionBank, wikiSubjects } from "./question-bank.js";
+import { evaluateBank, formatEvalReport } from "./question-eval.js";
 import { diffSnapshots } from "./client-diff.js";
 import { parseRegistry } from "./ecosystem.js";
 import { loadSnapshotFile, refreshSnapshot, saveSnapshotFile } from "./ecosystem-fetch.js";
@@ -51,6 +56,7 @@ import { importWikiDump } from "./importers/wiki-dump.js";
 import { lootWindowsFromRecords, rollupDrops } from "./drop-rollup.js";
 import { startHttpBridge } from "./mcp-http.js";
 import { readCorpusRecords, serveStdio } from "./mcp-server.js";
+import { answerSourcesFactsFromRecords } from "./answer-sources.js";
 import { objectSpawnRowsFromRecords } from "./object-spawns.js";
 import { openPublicSnapshot } from "./public-snapshot.js";
 import { search } from "./search.js";
@@ -150,6 +156,13 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
     build, which the knowledge base already reads and which candidates remain, grouped by site domain.
     Root-listing lookups only, no file content and no keys. Writes <out>/<product>-<build>-<config>-scan.json
     and -scan.md; the report feeds the coverage backlog in docs/2026-10-18-database-taxonomy-research.md)
+  question-bank --db <public release> [--game-data ../web/src/data/game-data] [--per-kind 60] [--out data/question-bank/bank.jsonl]
+    (the questions players are likely to ask, generated from the game-data files, the release's page titles and a
+    hand-written long tail; one JSON line each. Nothing is fetched. See docs/design/specs/2026-10-27-question-bank-design.md)
+  question-eval <bank.jsonl> --db <public release> [--out docs/evals/question-eval-<date>.md] [--json <path>]
+    (runs every question through get_by_name, search and answer_sources with no model, and writes the markdown report:
+    what resolves, what has evidence, and the gap lists. Player observations join when EVERLOOT_PUBLIC_CORPUS_URL or
+    EVERLOOT_UPLOADS is set, else the observed layer reads as unrecorded)
   client-layer <snapshot.sqlite> [--out ../web/src/data/game-data/client-layer.json]
     (relation edges derived from the game files, one build-stamped file for the database pages. Game file data,
     labelled found in game files, unconfirmed. See docs/DATA_POLICY.md)
@@ -157,6 +170,15 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
     (each playable race with its faction, the classes it can be and its racial traits, one build-stamped file
     for the class pages and the class_races tool. Game file data, labelled found in game files, unconfirmed;
     trait descriptions are for pages only. See docs/DATA_POLICY.md)
+  client-achievements <snapshot.sqlite> [--out ../web/src/data/game-data/client-achievements.json]
+    (every achievement the game files carry with its criteria walked from CriteriaTree, one build-stamped file the
+    achievement pages merge with player reports player-first. Pages only: the API, MCP and bulk exports stay clean. See docs/DATA_POLICY.md)
+  client-encounters <snapshot.sqlite> [--out ../web/src/data/game-data/client-encounters.json]
+    (every boss encounter the game files list per instance, from DungeonEncounter, one build-stamped file the
+    instance pages merge with player reports player-first. Pages only, as above)
+  client-mounts <snapshot.sqlite> [--out ../web/src/data/game-data/client-mounts.json]
+    (every mount the game files list with its spell and riding skill, one build-stamped file the collections tool
+    shows beside player uploads player-first. Pages only, as above)
   item-names <snapshot.sqlite> --wiki <knowledge base or release .sqlite> [--ledger data/item-names/ledger.json] [--out data/assets]
     (adds the snapshot's item names and the Warcraft Wiki dump's item names to the name ledger, which only
     grows, and writes the name the site shows for every item a source names (the game files' first, with the wiki
@@ -533,6 +555,38 @@ async function main(): Promise<number> {
       console.log(`${report.totals.present}/${report.totals.known} tables in build, ${report.candidates.length} unread candidates, ${report.totals.neverListed} never-list; -> ${outDir}`);
       return 0;
     }
+    case "question-bank": {
+      const release = openExistingReadOnlyDb(requireExistingDbPath(flags, "question-bank"));
+      const gameData = flags.get("game-data") || "../web/src/data/game-data";
+      const perKind = Number(flags.get("per-kind") || 60);
+      const out = flags.get("out") || "data/question-bank/bank.jsonl";
+      const subjects = [...gameDataSubjects(gameData), ...wikiSubjects(release, perKind)];
+      const bank = buildQuestionBank(subjects);
+      mkdirSync(dirname(out), { recursive: true });
+      writeFileSync(out, serializeQuestionBank(bank));
+      const kinds = new Map<string, number>();
+      for (const s of subjects) kinds.set(s.kind, (kinds.get(s.kind) ?? 0) + 1);
+      console.log(`${subjects.length} subjects (${[...kinds].map(([k, n]) => `${k} ${n}`).join(", ")}) -> ${bank.length} questions -> ${out}`);
+      return 0;
+    }
+    case "question-eval": {
+      if (!args[0]) break;
+      const releasePath = requireExistingDbPath(flags, "question-eval");
+      const release = openExistingReadOnlyDb(releasePath);
+      const bank = parseQuestionBank(readFileSync(args[0], "utf8"));
+      const corpus = await readCorpusRecords(["item_seen", "item_fact", "loot", "npc_sighting", "vendor", "quest", "object_sighting", "instance_entrance", "encounter"]);
+      const facts = corpus ? answerSourcesFactsFromRecords(corpus.records) : null;
+      const ranAt = new Date().toISOString();
+      const report = evaluateBank(release, bank, facts, { release: basename(releasePath), dataAsOf: corpus?.dataAsOf ?? null, ranAt });
+      const out = flags.get("out") || `../docs/evals/question-eval-${ranAt.slice(0, 10)}.md`;
+      mkdirSync(dirname(out), { recursive: true });
+      writeFileSync(out, formatEvalReport(report));
+      const json = flags.get("json");
+      if (json) { mkdirSync(dirname(json), { recursive: true }); writeFileSync(json, `${JSON.stringify(report, null, 1)}\n`); }
+      const t = report.totals;
+      console.log(`${t.questions} questions: ${t.exact} exact, ${t.search} by search, ${t.none} unresolved; ${t.withEvidence} with evidence, ${t.withObserved} with observed facts, ${t.withPage} with a page -> ${out}`);
+      return 0;
+    }
     case "client-layer": {
       if (!args[0]) break;
       const path = flags.get("out") || "../web/src/data/game-data/client-layer.json";
@@ -547,6 +601,31 @@ async function main(): Promise<number> {
       const table = writeRaceTable(args[0], path);
       for (const r of table.races) console.log(`${r.faction} ${r.name}: ${r.classes.length} classes, ${r.traits.length} traits`);
       console.log(`-> ${path}`);
+      return 0;
+    }
+    case "client-achievements": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-achievements.json";
+      const table = writeClientAchievements(args[0], path);
+      const listed = Object.keys(table.achievements).length;
+      const withCriteria = Object.values(table.achievements).filter((a) => a.criteria.length > 0).length;
+      console.log(`${table.build.product} ${table.build.version}: ${listed} achievements, ${withCriteria} with criteria -> ${path}`);
+      return 0;
+    }
+    case "client-encounters": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-encounters.json";
+      const table = writeClientEncounters(args[0], path);
+      const instances = Object.keys(table.instances).length;
+      const encounters = Object.values(table.instances).reduce((n, list) => n + list.length, 0);
+      console.log(`${table.build.product} ${table.build.version}: ${encounters} encounters in ${instances} instances -> ${path}`);
+      return 0;
+    }
+    case "client-mounts": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-mounts.json";
+      const table = writeClientMounts(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${Object.keys(table.mounts).length} mounts -> ${path}`);
       return 0;
     }
     case "client-diff": {

@@ -279,6 +279,42 @@ describe("flight masters and flight lines from the taxi tables", () => {
   });
 });
 
+describe("difficulty names and the difficulties an instance has, from Difficulty and MapDifficulty", () => {
+  const diff = (ID: number, Name_lang: string, MinPlayers?: number, MaxPlayers?: number): Row => ({ ID, Name_lang, MinPlayers, MaxPlayers });
+  const withDifficulties: typeof tables = {
+    ...tables,
+    Difficulty: rows([diff(1, "Normal", 5, 5), diff(2, "Heroic", 5, 5), diff(3, "10 Player", 10, 10), diff(4, "  ", 0, 0), diff(5, "Blanks")]),
+    // Stockade has Normal and Heroic; the Monastery lists Heroic twice; no row at all for Ragefire.
+    MapDifficulty: rows([
+      { ID: 1, MapID: 34, DifficultyID: 2 }, { ID: 2, MapID: 34, DifficultyID: 1 }, { ID: 3, MapID: 34, DifficultyID: 2 },
+      { ID: 4, MapID: 189, DifficultyID: 2 }, { ID: 5, MapID: 189, DifficultyID: 2 },
+    ]),
+  };
+  const d = buildWorldMapData((t) => withDifficulties[t], source);
+
+  test("the Difficulty table names each difficulty by id, with its group size when given", () => {
+    expect(d.difficulties).toEqual({
+      1: { name: "Normal", minPlayers: 5, maxPlayers: 5 },
+      2: { name: "Heroic", minPlayers: 5, maxPlayers: 5 },
+      3: { name: "10 Player", minPlayers: 10, maxPlayers: 10 },
+      5: { name: "Blanks" },
+    });
+  });
+
+  test("an instance's difficulties are the distinct ids of its MapDifficulty rows, in order; none when it has no rows", () => {
+    const stockade = d.entrances.find((e) => e.name === "Stormwind Stockade")!;
+    expect(stockade.difficultyIds).toEqual([1, 2]);
+    const monastery = d.entrances.find((e) => e.name === "Scarlet Monastery")!;
+    expect(monastery.difficultyIds).toEqual([2]);
+    expect(d.entrances.find((e) => e.name === "Ragefire Chasm")).not.toHaveProperty("difficultyIds");
+  });
+
+  test("a snapshot without the Difficulty tables still builds", () => {
+    expect(data.difficulties).toEqual({});
+    expect(data.entrances.every((e) => !("difficultyIds" in e))).toBe(true);
+  });
+});
+
 describe("the committed map data", () => {
   const committed = WorldMapData.parse(JSON.parse(readFileSync(join(import.meta.dirname, "..", "..", "web", "src", "data", "game-data", "map.json"), "utf8")));
 
@@ -286,7 +322,12 @@ describe("the committed map data", () => {
     expect(committed.schema).toBe(WORLD_MAP_SCHEMA);
     expect(committed.source).toMatchObject({ product: "wowf", status: "found in game files, unconfirmed", licence: "Blizzard game data, not under our licence" });
     expect(committed.source.buildId).toBeGreaterThan(70000);
-    expect(committed.source.tables.map((t) => t.table).sort()).toEqual(["AreaTable", "ContentTuning", "LFGDungeons", "Map", "MapDifficulty", "TaxiNodes", "TaxiPath", "TaxiPathNode", "TerrainArea", "UiMap", "UiMapAssignment"]);
+    // The known tables must all be there; the Difficulty names join in when the build watch regenerates. No
+    // table outside the set the pages read.
+    const known = ["AreaTable", "ContentTuning", "LFGDungeons", "Map", "MapDifficulty", "TaxiNodes", "TaxiPath", "TaxiPathNode", "TerrainArea", "UiMap", "UiMapAssignment"];
+    const read = committed.source.tables.map((t) => t.table).sort();
+    expect(read.filter((t) => !known.includes(t))).toEqual([]);
+    for (const t of known) expect(read).toContain(t);
   });
 
   test("an entrance's level is both ends or neither, within the game's 1 to 60, and most instances have one", () => {

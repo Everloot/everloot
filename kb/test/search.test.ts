@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { fillNameNorm, openDb } from "../src/db.js";
 import { replaceSourceRows, type EntityInput } from "../src/entities.js";
-import { allTerms, getByName, getEntity, search } from "../src/search.js";
+import { allTerms, getByName, getEntity, search, searchSomeWords } from "../src/search.js";
 
 const row = (extId: string, name: string, body = "", extra: Partial<EntityInput> = {}): EntityInput => ({
   kind: "lore_page",
@@ -249,4 +249,34 @@ test("a buried punctuated name with stopwords is rescued when asked with all its
   const db = await buriedUnder("Rise of the Lich-King", "rise lich king");
   expect(search(db, "rise of the lich king", 1)[0].name).toBe("Rise of the Lich-King");
   expect(search(db, "Rise of the Lich King?", 10)[0].name).toBe("Rise of the Lich-King");
+});
+
+test("when no page has every word, pages with more of the asked words come first", async () => {
+  const db = openDb(":memory:");
+  await replaceSourceRows(db, "curated", ["lore_page"], [
+    row("1", "Horde", "Horde Horde Horde Horde Horde, the faction."),
+    row("2", "Warlock trainers", "Horde warlock trainers teach each racial warlock."),
+    row("3", "Gnome", "A small race."),
+    // Found on the real release: "Saving the Best for Last (Horde)" led because "best" counted as a topic word.
+    row("4", "Best Warlock Horde", "Best best warlock horde."),
+  ]);
+  expect(search(db, "best racial warlock for horde")).toEqual([]);
+  const names = searchSomeWords(db, "best racial warlock for horde").map((h) => h.name);
+  expect(names[0]).toBe("Warlock trainers");
+  expect(names).toContain("Horde");
+  expect(names).not.toContain("Gnome");
+  expect(searchSomeWords(db, "best racial warlock for horde", 1)).toHaveLength(1);
+  expect(searchSomeWords(db, "warlock horde", 10, { kinds: ["item"] })).toEqual([]);
+  expect(searchSomeWords(db, "best gnome").map((h) => h.name)).toEqual(["Gnome"]);
+  expect(searchSomeWords(db, "best top")).toEqual([]);
+});
+
+test("a question typed without its apostrophe still finds the page", async () => {
+  for (const q of ["whats Thunderfury", "wheres Thunderfury", "whos Thunderfury"]) expect(search(await seed(), q)[0].name).toBe("Thunderfury");
+});
+
+test("a one-word query has no fallback: any word is every word", async () => {
+  const db = await seed();
+  expect(searchSomeWords(db, "Thunderfury")).toEqual([]);
+  expect(searchSomeWords(db, "where is xyznothinghere")).toEqual([]);
 });

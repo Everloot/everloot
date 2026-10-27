@@ -11,6 +11,11 @@ sources:
     url: https://www.pcgamer.com/games/world-of-warcraft/now-its-over-wow-forevers-beta-has-left-me-with-just-one-fear-its-endgame
   - title: "Wowhead: Blizzard Teases Raid Philosophy and Encounters for WoW: Forever (comments)"
     url: https://www.wowhead.com/forever/news/383546
+hero:
+  src: /news/heroes/wow-forever-beta-over-endgame-question/wow-forever-beta-over-endgame-question-clean.webp
+  alt: "Everloot illustration: green roads branching into the distance, asking where WoW: Forever's endgame goes, with the WoW: Forever logo"
+  thumb: /news/heroes/wow-forever-beta-over-endgame-question/wow-forever-beta-over-endgame-question-card.webp
+  share: /news/heroes/wow-forever-beta-over-endgame-question/wow-forever-beta-over-endgame-question-share.png
 status: published
 ---
 

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { collectionFactsFromRecords, handleCollectionGap, type CatalogSighting, type OwnedSighting } from "../src/collection-gap.js";
+import { agreedCollectionItems, collectionFactsFromRecords, handleCollectionGap, type CatalogSighting, type OwnedSighting } from "../src/collection-gap.js";
 
 function catalog(installId: string, itemId: number, source = "Vendor"): CatalogSighting {
   return { installId, collection: "Mounts", source, itemId };
@@ -50,4 +50,19 @@ test("an install that never uploaded the collection has an unrecorded owned set,
   expect(text).not.toContain("Owned: none");
   expect(text).not.toContain("Missing: 1");
   expect(text).toContain("Listed: 1");
+});
+
+test("agreedCollectionItems: an item 3 installs list under the collection, whatever the source; 2 installs do not", () => {
+  const facts = {
+    catalog: [
+      ...["a", "b", "c"].map((installId) => ({ installId, collection: "mounts", source: "Vendor", itemId: 458 })),
+      ...["a", "b"].map((installId) => ({ installId, collection: "Mounts", source: "Drop", itemId: 459 })),
+      { installId: "c", collection: "Mounts", source: "Quest", itemId: 459 },
+      ...["a", "b"].map((installId) => ({ installId, collection: "Mounts", source: "Drop", itemId: 460 })),
+      ...["a", "b", "c"].map((installId) => ({ installId, collection: "Pets", source: "Drop", itemId: 461 })),
+    ],
+    owned: [],
+  };
+  expect([...agreedCollectionItems("Mounts", facts)].sort()).toEqual([458, 459]);
+  expect(agreedCollectionItems("Toys", facts).size).toBe(0);
 });
