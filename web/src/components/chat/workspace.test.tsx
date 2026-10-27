@@ -477,7 +477,7 @@ test("an account switch hides the departing account's chats and drops its late r
 test("signed in without a key, the model menu shows Everloot search and the way to set a model up; dictation sits in the composer", async () => {
   await render();
   const menu = field("Model") as HTMLSelectElement;
-  expect(Array.from(menu.options).map((o) => o.textContent)).toEqual(["Everloot search", "Set up a model…"]);
+  expect(Array.from(menu.options).map((o) => o.textContent)).toEqual(["Everloot search", "Assistant setup…"]);
   expect(container.querySelector('form[aria-label="Ask Everloot"]')?.textContent).toMatch(/Dictat|Speak|microphone/i);
 });
 

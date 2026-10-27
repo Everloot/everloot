@@ -64,6 +64,12 @@ export default function AboutPage() {
             sell data, we don&apos;t gate tools behind signups, and we don&apos;t show
             popups or interstitials.
           </p>
+          <p className="mt-4 text-fg-2">
+            Everloot search is free. If you add an optional AI model to{" "}
+            <Link href="/chat" className={link}>Chat</Link>, it runs on your own provider account,
+            so that provider&apos;s pricing and limits apply; some models have a limited free tier.
+            A ChatGPT or Claude subscription is not an API key.
+          </p>
         </section>
 
         <section aria-labelledby="independent">

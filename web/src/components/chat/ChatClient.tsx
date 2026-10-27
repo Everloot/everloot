@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { AccountShell, ShellCharacter } from "@/lib/account-shell-types";
 import { signInPath } from "@/lib/auth/return-to";
-import { answer, loadTools, searchOnly, signedIn, type ChatProgress, type ToolDef } from "@/lib/chat/agent";
+import { answer, loadTools, marketReply, searchOnly, signedIn, type ChatProgress, type ToolDef } from "@/lib/chat/agent";
 import { ITEM_FOUND, itemQuery, resolveItem, type ItemRef } from "@/lib/chat/items";
 import { chatProvider } from "@/lib/chat/providers";
 import { providerStorage } from "@/lib/chat/provider-session";
@@ -461,11 +461,15 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
     stop.current = ctl;
     try {
       const active = saved[0];
+      // A price question is answered from the recorded market before anything else, with or without a key.
+      const priced = await marketReply(q, { signal: ctl.signal });
       // An item question also finds its item, for the card under the answer; the model is never told of it.
-      const name = itemQuery(q);
+      const name = priced ? null : itemQuery(q);
       let r;
       let item: ItemRef | null = null;
-      if (!active) {
+      if (priced) {
+        r = priced;
+      } else if (!active) {
         item = name ? await resolveItem(name, ctl.signal) : null;
         r = item && "id" in item ? { text: ITEM_FOUND, model: null, sources: [], pages: [], steps: [] } : await searchOnly(q);
       } else {

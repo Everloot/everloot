@@ -5,6 +5,16 @@
 local E = Everloot
 local MAX_QUESTION, MAX_PENDING = 500, 20
 
+--- The realm the player is on, sent with the question so a price question needs no realm in its words. Only a
+--- plain name goes: anything else is left out and the companion asks which realm.
+local function currentRealm()
+  local realm = GetRealmName and GetRealmName()
+  if type(realm) ~= "string" then return nil end
+  realm = realm:gsub("^%s+", ""):gsub("%s+$", "")
+  if #realm < 2 or #realm > 40 or realm:find("[%c|]") then return nil end
+  return realm
+end
+
 function E:Ask(text)
   local question = type(text) == "string" and (text:gsub("^%s+", ""):gsub("%s+$", "")) or ""
   if question == "" then
@@ -27,6 +37,7 @@ function E:Ask(text)
     id = "ask:" .. EverlootDB.installId .. ":" .. EverlootDB.askCounter,
     question = question,
     askedAt = date("!%Y-%m-%dT%H:%M:%SZ"),
+    realm = currentRealm(),
   })
   print("Everloot: question saved. Keep the companion running, then /reload to read the answer.")
 end

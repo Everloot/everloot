@@ -1,6 +1,7 @@
 import { expect, test, vi } from "vitest";
 import { checkForUpdates, compareVersions, downloadFor, newestDesktopRelease, releaseNotes, updateFrom } from "../src/main/updates";
 import { allowedExternal } from "../src/main/external";
+import { PROVIDER_PRESETS } from "../src/shared/providers";
 
 test("versions compare by number, and a dev build is older than any release", () => {
   expect(compareVersions("0.2.0", "0.1.9")).toBeGreaterThan(0);
@@ -45,6 +46,29 @@ test("the page may open a browser only to https on the project's own hosts", () 
   expect(allowedExternal("https://evil.example/everloot.app")).toBe(false);
   expect(allowedExternal("file:///C:/Windows")).toBe(false);
   expect(allowedExternal("not a url")).toBe(false);
+});
+
+test("a provider's own get-key page opens, exactly as the catalogue gives it and nothing else on that host", () => {
+  const links = PROVIDER_PRESETS.flatMap((p) => (p.getKey ? [p.getKey.href] : []));
+  expect(links.length).toBeGreaterThan(15);
+  for (const href of links) {
+    expect(allowedExternal(href)).toBe(true);
+    const u = new URL(href);
+    expect(allowedExternal(href.replace("https:", "http:"))).toBe(false);
+    expect(allowedExternal(`https://user:pw@${u.host}${u.pathname}${u.search}`)).toBe(false);
+    expect(allowedExternal(`${href.replace(/\/$/, "")}/extra`)).toBe(false);
+    expect(allowedExternal(`${href}${u.search ? "&" : "?"}next=https://evil.example`)).toBe(false);
+    expect(allowedExternal(`${href}#frag`)).toBe(false);
+    expect(allowedExternal(`https://${u.hostname}.evil.example${u.pathname}`)).toBe(false);
+    expect(allowedExternal(`https://evil-${u.hostname}${u.pathname}`)).toBe(false);
+  }
+  // Another path on a provider's host is not granted, nor is a custom server's address.
+  expect(allowedExternal("https://openrouter.ai/")).toBe(false);
+  expect(allowedExternal("https://platform.deepseek.com/")).toBe(false);
+  expect(allowedExternal("https://llm.example.test/v1")).toBe(false);
+  expect(allowedExternal("https://openrouter.ai:8443/keys")).toBe(false);
+  // The project's own hosts keep working.
+  expect(allowedExternal("https://everloot.app/upload")).toBe(true);
 });
 
 test("a release's changes are read from the changelog section or GitHub's generated list", () => {

@@ -13,7 +13,7 @@ const className = (slug: string) => slug.charAt(0).toUpperCase() + slug.slice(1)
 /**
  * The one question box, pinned under the conversation: it grows with the text, Enter sends and Shift+Enter
  * starts a new line, and Stop replaces Send while an answer streams. The model menu, the character attached
- * as context and whose limits the lookups use sit inside it. Without a key it says how to finish setup.
+ * as context and whose limits the lookups use sit inside it. Without a key it says search is ready and that an AI model is optional.
  */
 export default function Composer(p: {
   box: RefObject<HTMLTextAreaElement | null>;
@@ -53,7 +53,7 @@ export default function Composer(p: {
       <div className="rounded-card border border-edge bg-panel focus-within:border-accent">
         {!ready && (
           <p className="border-b border-line px-4 py-2 text-sm text-fg-2">
-            <a href={p.keysHref} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Finish your key setup</a>{p.signed === false ? " (sign in first)" : ""} to answer with a model. Until then, Send shows Everloot&apos;s search results.
+            Everloot search is ready: Send shows its results. <a href={p.keysHref} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Assistant setup</a>{p.signed === false ? " (sign in first)" : ""} adds an optional AI model, which uses your own provider account.
           </p>
         )}
         <textarea ref={p.box} rows={1} value={p.value} aria-label="Your question" aria-keyshortcuts="Enter Shift+Enter"
@@ -77,7 +77,7 @@ export default function Composer(p: {
                   {g.models.map((m) => <option key={m.id} value={`${g.kind}|${m.id}`}>{m.label}</option>)}
                 </optgroup>
               ))}
-              <option value="manage">Manage keys…</option>
+              <option value="manage">Assistant setup…</option>
             </select>
           )}
           {/* With the workspace on the model menu shows without a key too: Everloot search now, a model after setup. */}
@@ -85,7 +85,7 @@ export default function Composer(p: {
             <select aria-label="Model" className={menu} disabled={p.busy} value="search"
               onChange={(e) => { if (e.target.value === "setup") window.location.assign(p.keysHref); }}>
               <option value="search">Everloot search</option>
-              <option value="setup">Set up a model…</option>
+              <option value="setup">Assistant setup…</option>
             </select>
           )}
           {p.note && (

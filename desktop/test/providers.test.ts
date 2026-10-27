@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
 import { loadProviders } from "../../companion/src/providers/config";
 import { modelsFor, ownProvider, ownProviders, removeProvider, setProvider, useModel } from "../src/main/providers";
-import { PROVIDER_PRESETS } from "../src/shared/providers";
+import { CATALOGUE } from "../../web/src/lib/chat/catalogue";
+import { PROVIDER_PRESETS, assistantSource, keptModelPick, manualModelShown, presetFor, removalNotice } from "../src/shared/providers";
 
 const dirs: string[] = [];
 const dir = () => { const d = mkdtempSync(join(tmpdir(), "everloot-providers-")); dirs.push(d); return d; };
@@ -154,4 +155,43 @@ test("every catalogue provider the website lists is here too, and the Chinese fa
   const kinds = PROVIDER_PRESETS.map((p) => p.kind);
   for (const k of ["deepseek", "moonshot", "qwen", "minimax", "siliconflow", "baidu", "xiaomi", "zai", "tencent", "byteplus", "stepfun", "internlm"]) expect(kinds).toContain(k);
   for (const p of PROVIDER_PRESETS) if (p.kind !== "anthropic" && p.kind !== "custom") expect(p.baseUrl).toMatch(/^https?:\/\//);
+});
+
+test("every preset carries its catalogue get-key link; a custom server has none to invent", () => {
+  for (const c of CATALOGUE) expect(presetFor(c.kind)?.getKey).toEqual(c.getKey);
+  expect(presetFor("custom")?.getKey).toBeNull();
+  expect(presetFor("ollama")?.getKey?.href).toBe("https://ollama.com/download");
+  expect(presetFor("ollama")?.keyFile).toBeNull();
+});
+
+test("the manual model box shows only for Another model id or a provider with no list, and a late list keeps that choice", () => {
+  const models = [{ id: "a", label: "A", note: "" }, { id: "b", label: "B", note: "" }];
+  expect(manualModelShown(models, "a")).toBe(false);
+  expect(manualModelShown(models, undefined)).toBe(false);
+  expect(manualModelShown(models, "")).toBe(true);
+  expect(manualModelShown([], undefined)).toBe(true);
+  expect(manualModelShown([], "")).toBe(true);
+  expect(keptModelPick(models, "b")).toBe("b");
+  expect(keptModelPick(models, "")).toBe("");
+  expect(keptModelPick(models, "gone")).toBe("a");
+  expect(keptModelPick(models, undefined)).toBe("a");
+  expect(keptModelPick([], undefined)).toBe("");
+});
+
+test("what answers is read from the actual mode and whether the app wrote the first entry, not from how many providers are saved", () => {
+  const own = { kind: "anthropic" as const, model: "claude-sonnet-5-5", baseUrl: null };
+  expect(assistantSource({ mode: "plain search", provider: null })).toBe("search");
+  expect(assistantSource({ mode: "anthropic:claude-sonnet-5-5 with tools", provider: own })).toBe("app");
+  // A hand-written first entry is in use even though the app has saved a provider behind it.
+  expect(assistantSource({ mode: "llm.example.test:m with tools", provider: null })).toBe("config");
+  expect(assistantSource({ mode: "llm.example.test:m with tools", provider: null })).toBe("config");
+});
+
+test("removal says what is actually answering afterwards", () => {
+  const own = { kind: "openrouter" as const, model: "qwen/qwen3.7-flash", baseUrl: "https://openrouter.ai/api/v1" };
+  expect(removalNotice({ mode: "plain search", provider: null })).toMatch(/search only/);
+  expect(removalNotice({ mode: "openrouter.ai:qwen/qwen3.7-flash with tools", provider: own })).toMatch(/Chat now runs openrouter\.ai:qwen\/qwen3\.7-flash.*\/ask/);
+  const next = removalNotice({ mode: "llm.example.test:m with tools", provider: null });
+  expect(next).toMatch(/config\.json/);
+  expect(next).not.toMatch(/search only/);
 });

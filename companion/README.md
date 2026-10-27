@@ -56,6 +56,14 @@ The addon stores `/ask` questions in SavedVariables (written at logout or `/relo
 answers new ones from the Everloot MCP server's `search_knowledge` and writes them into the
 `EverlootAnswers` slot addon under `Interface/AddOns`; they show after the next `/reload`.
 
+Explicit item-price questions use `market_value` before search or a model, so they need no AI provider.
+For example, `/ask price 2589 on Nightslayer` asks for that realm's recorded all-house values.
+New addon questions carry the player's realm when none is named; older questions must name one.
+The answer reports observation age and insufficient or unavailable data rather than inventing a price.
+Write a queued question with `/reload` or logout, let the bridge process it, then `/reload` again to read it.
+For an immediate offline answer from the current game files, use `/everloot price` with an item link or id.
+The Desktop App's public-search setup needs no token file; the command above is the CLI's private-server setup.
+
 - Every string is a Lua-escaped literal (`src/bridge/lua.ts`); `addon/tests/answers_contract.py`
   loads the golden file in real Lua 5.1 and proves hostile text stays data.
 - Each answer carries an Adler-32 `sum` the addon can verify with Lua 5.1 arithmetic.
