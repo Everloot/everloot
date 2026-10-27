@@ -710,6 +710,30 @@ data, not game data and not an observation.
 - **Deletion.** The player changes or clears any of it, or turns the public profile off, on
   /settings at any time. Deleting the account (write to hello@everloot.app) deletes the profile.
 
+## Chat
+
+/chat answers questions about the game from Everloot's data. Everloot search needs no model and sends
+the question nowhere but this site. A player may add a model with their own key; that key stays in their
+browser tab and the page talks to their provider directly.
+
+- **Everloot (free).** When the site offers it, a visitor with no key of their own gets a built-in model on
+  providers' free tiers: Groq first, then Cloudflare Workers AI when Groq is busy or at its limit, before
+  any of the answer has been sent. The question, the earlier turns of that chat and what Everloot's tools
+  returned go through this site's server to the provider, which writes the answer; each answer names the
+  provider that wrote it. A character or note goes only if the visitor attaches it. No account data, no
+  key, no cookie and no address goes to the provider. Each provider's key stays on the server, and a
+  provider is never sent another's key.
+- **What we keep.** Not the questions or the answers. To enforce the limits the server keeps a keyed hash
+  of the address, never the address, for a day. The providers' own terms cover their side: Groq's say it
+  does not train models on what it is sent and keeps it at most 30 days, for reliability and abuse checks;
+  Cloudflare's say it does not use Workers AI content to train models and does not keep it once the
+  request is answered.
+- **Limits.** A visitor gets 6 model calls a minute and 45 a day, whichever provider answers; one answer
+  is usually 2 or 3 calls. The site makes at most 900 calls a day to Groq and 55 to Cloudflare, each under
+  its free tier. Past a limit, or when the free tiers are used up, the answer is Everloot search, with a
+  line saying so.
+- **Free means free.** The model runs on the provider's free tier only; Everloot pays for no model.
+
 ## The question ledger
 
 What people ask Everloot is the signal that decides which data comes next (docs/design/specs/2026-10-27-question-bank-design.md).
