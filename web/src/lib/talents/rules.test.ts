@@ -1,10 +1,10 @@
 import { describe, expect, test } from "vitest";
 import {
   add, canAdd, canRemove, commit, entryAtRank, levelFor, pointsAtLevel, pointsByTree, pointsSpent, redo, refusalText,
-  remove, startHistory, undo,
+  remove, startHistory, undo, withRank,
 } from "./rules";
 import { fixture } from "./fixture";
-import type { Ranks } from "./types";
+import type { PlanSet, Ranks } from "./types";
 
 const ALL = 99;
 
@@ -158,6 +158,15 @@ describe("choice nodes", () => {
     const r = take(open(), 32, 1, ALL, 1);
     expect(remove(fixture, r, 32)[32]).toBeUndefined();
   });
+
+  test("setting a rank keeps the choice it is given, and rank 0 leaves the node out", () => {
+    const ranks: Ranks = { 11: { rank: 2 }, 32: { rank: 1, choice: 1 } };
+    expect(withRank(ranks, 11, 3)).toEqual({ 11: { rank: 3 }, 32: { rank: 1, choice: 1 } });
+    expect(withRank(ranks, 32, 1, 0)).toEqual({ 11: { rank: 2 }, 32: { rank: 1, choice: 0 } });
+    expect(withRank(ranks, 11, 0)).toEqual({ 32: { rank: 1, choice: 1 } });
+    // A new object each time: the ranks it was given stay as they were.
+    expect(ranks).toEqual({ 11: { rank: 2 }, 32: { rank: 1, choice: 1 } });
+  });
 });
 
 describe("tiered nodes, any-of prerequisites and rank gates", () => {
@@ -216,6 +225,16 @@ describe("points and levels", () => {
     for (const p of [1, 7, 31, 51]) expect(pointsAtLevel(fixture, levelFor(fixture, p))).toBe(p);
   });
 
+  test("the point table's last point is the most a build holds: one more arrives at no level", () => {
+    const table = { ...fixture, rules: { ...fixture.rules, pointLevels: [10, 12, 12, 20] } };
+    expect([pointsAtLevel(fixture, 60), pointsAtLevel(table, 60)]).toEqual([51, 4]);
+    for (const c of [fixture, table]) {
+      const most = pointsAtLevel(c, c.rules.maxLevel);
+      expect(pointsAtLevel(c, levelFor(c, most))).toBe(most);
+      expect(pointsAtLevel(c, levelFor(c, most + 1))).toBe(most);
+    }
+  });
+
   test("points are counted per tree", () => {
     const r = take(take({}, 11, 3), 51, 2);
     expect([...pointsByTree(fixture, r)]).toEqual([[1, 3], [2, 2]]);
@@ -257,5 +276,23 @@ describe("undo and redo", () => {
     h = commit(h, {});
     expect(h.present).toEqual({});
     expect(pointsSpent(undo(h).present)).toBe(3);
+  });
+
+  test("two plan sets come back as the very pair that was there: talents, order and label together", () => {
+    const one: PlanSet = { ranks: { 11: { rank: 2 } }, order: [11, 11], orderOrigin: "planned" };
+    const two: PlanSet = { ranks: { 51: { rank: 1 } }, order: null, orderOrigin: null };
+    const states: [PlanSet, PlanSet][] = [
+      [one, two],
+      [{ ranks: { 11: { rank: 2 }, 12: { rank: 1 } }, order: [11, 11, 12], orderOrigin: "planned" }, two],
+      [one, { ranks: { 51: { rank: 1 } }, order: [51], orderOrigin: "provisional" }],
+    ];
+    const copies = structuredClone(states);
+    let h = commit(commit(startHistory(states[0]), states[1]), states[2]);
+    h = undo(h);
+    expect(h.present).toBe(states[1]);
+    h = undo(h);
+    expect(h.present).toBe(states[0]);
+    expect(redo(redo(h)).present).toBe(states[2]);
+    expect(states).toEqual(copies);
   });
 });

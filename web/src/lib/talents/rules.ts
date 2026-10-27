@@ -122,7 +122,8 @@ export function canRemove(catalog: TalentCatalog, ranks: Ranks, id: number): Ver
   return isLegal(catalog, withRank(ranks, id, rankOf(ranks, id) - 1, ranks[id]?.choice)) ? OK : no("dependents");
 }
 
-function withRank(ranks: Ranks, id: number, rank: number, choice?: number): Ranks {
+/** The ranks with one node set to `rank` and, for a choice node, `choice`; at 0 the node is left out. */
+export function withRank(ranks: Ranks, id: number, rank: number, choice?: number): Ranks {
   const next = { ...ranks };
   if (rank <= 0) delete next[id];
   else next[id] = choice === undefined ? { rank } : { rank, choice };

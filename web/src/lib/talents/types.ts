@@ -77,3 +77,13 @@ export interface TalentCatalog {
 
 /** Ranks spent per node id. `choice` is the chosen entry index, for choice nodes. */
 export type Ranks = Record<number, { rank: number; choice?: number }>;
+
+/** One talent set of a plan: its ranks, and the order its points are spent in, one node id per point.
+ *  An unknown order (an old link, an order that could not be read) is null, and so is its label.
+ *  "planned": the player chose the order in the calculator; it is not a record of play. "provisional":
+ *  the tool generated it when asked. order.ts keeps every known order legal. */
+export interface PlanSet {
+  ranks: Ranks;
+  order: number[] | null;
+  orderOrigin: "planned" | "provisional" | null;
+}
