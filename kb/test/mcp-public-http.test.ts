@@ -1,9 +1,11 @@
 import { MCP_TOOL_NAMES, MCP_TOOLS } from "@everloot/protocol";
 import { afterEach, expect, test } from "vitest";
 import { z } from "zod";
+import { encodeBuild } from "../../web/src/lib/talents/share";
 import { openDb, type DB } from "../src/db.js";
 import { replaceSourceRows } from "../src/entities.js";
 import { createMcpHttpHandler } from "../src/mcp-http-server.js";
+import { siteCatalog } from "../src/talents/site-catalogs.js";
 
 const databases: DB[] = [];
 afterEach(() => { for (const db of databases.splice(0)) db.close(); });
@@ -50,6 +52,19 @@ test("independent clients initialize and receive sourced knowledge plus the trac
   expect(answer.result.content[0].text).toContain("CC-BY-SA-4.0");
   const plan = await handle(request("tools/call", { name: "everloot_plan", arguments: {} }));
   expect((await plan.json()).result.isError).not.toBe(true);
+});
+
+test("talent_plan refuses a link's value that is not a whole code, escaped or raw, even with a code inside it", async () => {
+  const handle = await handler();
+  const warrior = siteCatalog("warrior");
+  const node = warrior.nodes.find((n) => !n.unlock && n.prereqs.length === 0 && !n.anyOf)!;
+  const code = encodeBuild({ classSlug: "warrior", specId: warrior.specId, build: warrior.build, ranks: { [node.id]: { rank: 1 } } });
+  for (const link of [`https://everloot.app/tools/talents/warrior#plan=junk%23plan%3D${code}`, `https://everloot.app/tools/talents/warrior#plan=junk#plan=${code}`]) {
+    const answer = await (await handle(request("tools/call", { name: "talent_plan", arguments: { code: link } }))).json();
+    expect(answer.result.isError, link).not.toBe(true);
+    expect(z.object(MCP_TOOLS.talent_plan.outputSchema).parse(answer.result.structuredContent), link)
+      .toMatchObject({ ok: false, message: "That share code is damaged or cut short." });
+  }
 });
 
 test("rejects an untrusted Origin even with valid authorization", async () => {
