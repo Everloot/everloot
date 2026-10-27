@@ -12,6 +12,9 @@ export type PageType = (typeof PAGE_TYPES)[number];
 /** The heading that holds what is specific to WoW: Forever. An indexable page needs one with text under it. */
 export const FOREVER_SECTION = "In WoW: Forever";
 
+/** The heading of a dungeon or raid page's advice for a group about to go in: Everloot's own words, never game data. */
+export const PREP_SECTION = "Before you go";
+
 /**
  * The written sections of each type, in order, as `##` headings. Infoboxes and data blocks are placed by type,
  * not written, so they are not here. `optional` sections may follow the required ones, in that order.
@@ -23,8 +26,8 @@ export interface SectionRule { required: readonly string[]; optional: readonly s
 const STANDARD = (required: string[], optional: string[] = []): SectionRule => ({ required, optional, forever: FOREVER_SECTION });
 
 export const SECTIONS: Record<PageType, SectionRule> = {
-  dungeon: STANDARD(["Overview", "Getting there", "History", FOREVER_SECTION]),
-  raid: STANDARD(["Overview", "Getting there", "History", FOREVER_SECTION]),
+  dungeon: STANDARD(["Overview", "Getting there", "History", FOREVER_SECTION], [PREP_SECTION]),
+  raid: STANDARD(["Overview", "Getting there", "History", FOREVER_SECTION], [PREP_SECTION]),
   zone: STANDARD(["Overview", "History", FOREVER_SECTION]),
   npc: STANDARD(["Who they are", "Where to find them", FOREVER_SECTION]),
   faction: STANDARD(["Overview", "History", "How players gain standing"], [FOREVER_SECTION]),
@@ -134,6 +137,29 @@ export function badTokensIn(text: string): string[] {
 /** The plain text of inline content, with each token standing in as one word. */
 export function inlineText(inline: Inline[], tokenWord = "X"): string {
   return inline.map((i) => (i.kind === "text" ? i.text : tokenWord)).join("");
+}
+
+/** A Markdown link in a text run that the site draws: `[text](https://…)` or `[text](/path)`. Other forms stay text. */
+export const MARKDOWN_LINK = /\[([^\]\n]+)\]\((https:\/\/[^)\s]+|\/[^)\s]*)\)/g;
+
+/** The site's own origins, as URL gives them: the host in lower case and the default port left out. */
+const SITE_ORIGINS: ReadonlySet<string> = new Set(["https://everloot.app", "https://www.everloot.app"]);
+
+/**
+ * The wiki page a link's address points at: "deadmines" for `/wiki/deadmines`, also with a trailing slash, a query or a
+ * fragment, or written out in full on the site. The address is read as a browser reads it on the site, so the host's
+ * case, a default port, a dot segment or a backslash changes nothing. Null for any other address, the hub included;
+ * another port or host is another site. The page part is kept as the URL gives it, so any other spelling names no page.
+ */
+export function wikiLinkTarget(href: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(href, "https://everloot.app");
+  } catch {
+    return null;
+  }
+  if (!SITE_ORIGINS.has(url.origin) || !url.pathname.startsWith("/wiki/")) return null;
+  return url.pathname.slice("/wiki/".length).replace(/\/+$/, "") || null;
 }
 
 const LIST_ITEM = /^\s*(?:[-*+]|\d+\.)\s+/;

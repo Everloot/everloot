@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { badTokensIn, inlineText, parseInline, parsePage } from "../src/wiki/page.js";
+import { badTokensIn, inlineText, parseInline, parsePage, wikiLinkTarget } from "../src/wiki/page.js";
 
 describe("parseInline", () => {
   test("splits text, entity tokens and wiki links", () => {
@@ -36,6 +36,40 @@ describe("badTokensIn", () => {
 
   test("plain prose has none", () => {
     expect(badTokensIn("The Deadmines lie under Westfall.")).toEqual([]);
+  });
+});
+
+describe("wikiLinkTarget", () => {
+  test("names the page a link into the wiki points at, with a trailing slash, query or fragment, or written out in full", () => {
+    for (const href of ["/wiki/deadmines", "/wiki/deadmines/", "/wiki/deadmines?from=westfall", "/wiki/deadmines#history", "/wiki/deadmines/#history",
+      "https://everloot.app/wiki/deadmines", "https://www.everloot.app/wiki/deadmines?from=westfall", "//everloot.app/wiki/deadmines"]) {
+      expect(wikiLinkTarget(href)).toBe("deadmines");
+    }
+  });
+
+  test("knows the site's own address as a browser does: the host in any case, the default port written or not", () => {
+    for (const href of ["https://EVERLOOT.APP/wiki/deadmines#history", "https://everloot.app:443/wiki/deadmines?from=westfall", "https://EVERLOOT.APP:443/wiki/deadmines/",
+      "https://WWW.Everloot.App:443/wiki/deadmines#history", "//EVERLOOT.APP:443/wiki/deadmines"]) {
+      expect(wikiLinkTarget(href)).toBe("deadmines");
+    }
+  });
+
+  test("reads the path as a browser does, so a dot segment or a backslash cannot hide the page", () => {
+    for (const href of ["/wiki/x/../deadmines", "/wiki\\deadmines", "https://EVERLOOT.APP/wiki/./deadmines"]) expect(wikiLinkTarget(href)).toBe("deadmines");
+  });
+
+  test("keeps any other page part as written, so it names no page", () => {
+    expect(wikiLinkTarget("/wiki/Deadmines")).toBe("Deadmines");
+    expect(wikiLinkTarget("/wiki/deadmines/extra")).toBe("deadmines/extra");
+    expect(wikiLinkTarget("/wiki/dead%2Dmines")).toBe("dead%2Dmines");
+  });
+
+  test("is null for the hub, other paths on the site and other sites", () => {
+    for (const href of ["/wiki", "/wiki/", "/wiki?q=dead", "/wiki#recent", "/wikis/deadmines", "/database/zones/1436-westfall",
+      "https://warcraft.wiki.gg/wiki/Deadmines", "https://worldofwarcraft.blizzard.com/en-us/news/1", "https://everloot.app.example.com/wiki/deadmines",
+      "https://everloot.app:8443/wiki/deadmines", "https://everloot-git-feat.vercel.app/wiki/deadmines"]) {
+      expect(wikiLinkTarget(href)).toBeNull();
+    }
   });
 });
 

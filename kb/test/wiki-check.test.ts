@@ -67,8 +67,8 @@ function file(over: Record<string, unknown> = {}, body = DUNGEON_BODY): WikiFile
   return { path: `wiki/${String(fm.slug)}.md`, source: `---\n${stringify(fm)}---\n${body}` };
 }
 
-const westfall = (over: Record<string, unknown> = {}) =>
-  file({ id: 2, slug: "westfall", title: "Westfall", type: "zone", binds: { zone: 1436 }, summary: "A zone in the Eastern Kingdoms.", categories: ["zones"], ...over }, ZONE_BODY);
+const westfall = (over: Record<string, unknown> = {}, body = ZONE_BODY) =>
+  file({ id: 2, slug: "westfall", title: "Westfall", type: "zone", binds: { zone: 1436 }, summary: "A zone in the Eastern Kingdoms.", categories: ["zones"], ...over }, body);
 
 /** The problems of a dungeon page checked beside a good Westfall page. */
 function problemsOf(over: Record<string, unknown> = {}, body = DUNGEON_BODY): string[] {
@@ -187,6 +187,40 @@ describe("links", () => {
     const drafts = checkWiki([file({ status: "draft", reviewed: null }), westfall({ status: "draft", reviewed: null })], ctx);
     expect(drafts.problems).toEqual([]);
   });
+
+  describe("a Markdown link into the wiki follows the same rules", () => {
+    const via = (href: string) => withSection("History", `See [the zone](${href}).`);
+    const FORMS = ["/wiki/westfall", "/wiki/westfall/", "/wiki/westfall#history", "/wiki/westfall?from=deadmines", "https://everloot.app/wiki/westfall",
+      "https://EVERLOOT.APP/wiki/westfall#history", "https://everloot.app:443/wiki/westfall?from=deadmines", "https://EVERLOOT.APP:443/wiki/westfall/"];
+
+    test("to a published page it passes, in every written form", () => {
+      for (const href of FORMS) expect(problemsOf({}, via(href))).toEqual([]);
+    });
+
+    test("from a published page to a draft it fails, in every written form", () => {
+      for (const href of FORMS) {
+        const toDraft = checkWiki([file({}, via(href)), westfall({ status: "draft", reviewed: null })], ctx).problems.map((p) => p.message);
+        // The first is the [[westfall]] in Getting there.
+        expect(toDraft).toEqual(["[[westfall]] links to a draft; a published page links only to published pages", `[the zone](${href}) links to a draft; a published page links only to published pages`]);
+      }
+    });
+
+    test("to a page that does not exist it fails, from a draft too and inside a quote", () => {
+      for (const href of ["/wiki/nowhere", "/wiki/Westfall", "/wiki/westfall/extra", "https://everloot.app/wiki/nowhere?from=deadmines", "https://EVERLOOT.APP/wiki/nowhere#top", "https://EVERLOOT.APP:443/wiki/nowhere"]) {
+        expect(problemsOf({}, via(href))).toEqual([`[the zone](${href}) links to a page that does not exist`]);
+        expect(problemsOf({ status: "draft", reviewed: null }, via(href))).toEqual([`[the zone](${href}) links to a page that does not exist`]);
+      }
+      expect(problemsOf({}, withSection("History", "> Blizzard said to read [this](/wiki/nowhere)."))).toEqual(["[this](/wiki/nowhere) links to a page that does not exist"]);
+    });
+
+    test("the hub, other paths on the site and other sites are not wiki pages", () => {
+      // Another port or a preview host is another site, even pointing at a page that does not exist.
+      for (const href of ["/wiki", "/wiki/", "/database/zones/1436-westfall", "https://warcraft.wiki.gg/wiki/Westfall", "https://worldofwarcraft.blizzard.com/en-us/news/1",
+        "https://everloot.app:8443/wiki/nowhere", "https://everloot-git-feat.vercel.app/wiki/nowhere"]) {
+        expect(problemsOf({}, via(href))).toEqual([]);
+      }
+    });
+  });
 });
 
 describe("hand-typed gameplay numbers", () => {
@@ -216,7 +250,7 @@ describe("hand-typed gameplay numbers", () => {
 describe("sections", () => {
   test("headings must follow the type's order", () => {
     const swapped = DUNGEON_BODY.replace("## Getting there", "## TEMP").replace("## History", "## Getting there").replace("## TEMP", "## History");
-    expect(problemsOf({}, swapped)).toEqual([expect.stringMatching(/^sections must be, in order: Overview, Getting there, History, In WoW: Forever; found: Overview, History, Getting there/)]);
+    expect(problemsOf({}, swapped)).toEqual([expect.stringMatching(/^sections must be, in order: Overview, Getting there, History, In WoW: Forever \(then optionally Before you go\); found: Overview, History, Getting there/)]);
     expect(problemsOf({}, `${DUNGEON_BODY}\n## Trivia\n\nMore.\n`)).toEqual([expect.stringMatching(/^sections must be/)]);
   });
 
@@ -237,6 +271,47 @@ describe("sections", () => {
   test("text before the first section and a # heading fail", () => {
     expect(problemsOf({}, `Intro text.\n${DUNGEON_BODY}`)).toEqual([expect.stringMatching(/^text before the first ## section/)]);
     expect(problemsOf({}, `# Deadmines\n${DUNGEON_BODY}`)).toEqual([expect.stringMatching(/^no # heading in the body/)]);
+  });
+});
+
+describe("Before you go", () => {
+  const advised = (text: string) => `${DUNGEON_BODY}\n## Before you go\n\n${text}\n`;
+  const ADVICE = "Go with a full group and someone who can heal. The tunnels are narrow, so pull one pack at a time.";
+
+  test("a dungeon or raid page may end with advice for a group about to go in", () => {
+    expect(problemsOf({}, advised(ADVICE))).toEqual([]);
+    expect(problemsOf({ type: "raid", binds: { entrance: "molten-core" } }, advised(ADVICE))).toEqual([]);
+  });
+
+  test("it comes after the Forever section, and no other type has it", () => {
+    const early = DUNGEON_BODY.replace("## History", `## Before you go\n\n${ADVICE}\n\n## History`);
+    expect(problemsOf({}, early)).toEqual([
+      "sections must be, in order: Overview, Getting there, History, In WoW: Forever (then optionally Before you go); found: Overview, Getting there, Before you go, History, In WoW: Forever",
+    ]);
+    const zone = checkWiki([file(), westfall({}, `${ZONE_BODY}\n## Before you go\n\n${ADVICE}\n`)], ctx).problems.map((p) => p.message);
+    expect(zone).toEqual(["sections must be, in order: Overview, History, In WoW: Forever; found: Overview, History, In WoW: Forever, Before you go"]);
+  });
+
+  test("it is original advice: an adapted page has none", () => {
+    const adapted = { origin: "adapted", status: "draft", reviewed: null, adaptedFrom: [{ title: "Deadmines", url: "https://warcraft.wiki.gg/wiki/Deadmines", extId: "12345", revision: 678 }] };
+    expect(problemsOf(adapted, advised(ADVICE))).toEqual(['a "Before you go" section is original advice; an adapted page has none']);
+  });
+
+  test("on a published page it needs words of its own, not only a quote or a subheading; a draft may keep the bare heading", () => {
+    const refused = ["a published page's \"Before you go\" section needs advice in our own words, not only quotes; leave the heading out until there is some"];
+    const empty = `${DUNGEON_BODY}\n## Before you go\n`;
+    expect(problemsOf({}, empty)).toEqual(refused);
+    expect(problemsOf({}, advised("> Blizzard said to bring a healer."))).toEqual(refused);
+    expect(problemsOf({}, advised("### Healers"))).toEqual(refused);
+    expect(problemsOf({}, advised(`> Blizzard said to bring a healer.\n\n${ADVICE}`))).toEqual([]);
+    expect(problemsOf({ status: "draft", reviewed: null }, empty)).toEqual([]);
+  });
+
+  test("the advice follows the page's number and link rules", () => {
+    expect(problemsOf({}, advised("Go in at level 18 or higher."))).toEqual(['hand-typed gameplay number ("level 18") outside a quote; numbers come from the infobox and data blocks']);
+    // One from Getting there, one from the advice: a link to a draft is refused wherever it is written.
+    const toDraft = checkWiki([file({}, advised("Read [[westfall]] before you set out.")), westfall({ status: "draft", reviewed: null })], ctx).problems.map((p) => p.message);
+    expect(toDraft).toEqual(Array(2).fill("[[westfall]] links to a draft; a published page links only to published pages"));
   });
 });
 

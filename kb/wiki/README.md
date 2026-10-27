@@ -47,7 +47,7 @@ editor cannot drop or reorder them.
 
 | Type | Binds | Sections, in order |
 |---|---|---|
-| `dungeon`, `raid` | `entrance` (slug of the entrance name), optional `zone`, `lfgDungeon` | Overview, Getting there, History, In WoW: Forever |
+| `dungeon`, `raid` | `entrance` (slug of the entrance name), optional `zone`, `lfgDungeon` | Overview, Getting there, History, In WoW: Forever, then optionally Before you go |
 | `zone` | `zone` (UiMap id) | Overview, History, In WoW: Forever |
 | `npc` | `npc` | Who they are, Where to find them, In WoW: Forever |
 | `faction` | `faction` | Overview, History, How players gain standing, then optionally In WoW: Forever |
@@ -66,13 +66,19 @@ editor cannot drop or reorder them.
 - **Announced but not in the files yet.** A `dungeon` or `raid` page may leave out `entrance`, and a `race` page
   `race`, only when its `sources` list a Blizzard post (worldofwarcraft.blizzard.com or the US or EU forums).
   The binding is added once the game files have it.
+- **Before you go is advice.** A `dungeon` or `raid` page may end with what a group should know before going in,
+  in our own words. An adapted page has none. On a published page the section needs words of its own, not only a
+  quote; leave the heading out until there are some. The page shows the level, the entrance and the bosses in its
+  facts, and the number rule above applies to the advice as to every section.
 - **Original pages only for now.** An original page is written in our own words from the game files,
   Blizzard's posts and Everloot's data. An adapted page reuses Warcraft Wiki text; it needs `adaptedFrom` for
   its credit line and cannot be published until the overlap check against the wiki dump exists.
 - **Published pages meet the index bar:** at least 150 words of our own prose, at least one binding so the
   page shows live data, an "In WoW: Forever" section (for `change` pages, "What changed") with something in
   it, and a maintainer's review recorded in `reviewed`.
-- **Links:** every `[[slug]]` names an existing page; a published page links only to published pages.
+- **Links:** every `[[slug]]` names an existing page, and so does every Markdown link into the wiki
+  (`[text](/wiki/slug)`, also with a trailing slash, a query or a fragment, or written out on everloot.app). A
+  published page links only to published pages; the site draws a link to any other page as plain words.
 - No private paths, internal names or AI tool credits.
 
 ## Check a page

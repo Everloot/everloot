@@ -3,7 +3,7 @@
  * caller passes the files, the category list and what the game files know, so tests can use small fixtures.
  * The overlap check against the Warcraft Wiki dump is not here; it needs the dump, which CI does not have.
  */
-import { BINDS, BLIZZARD_SOURCED, FrontMatter, inlineText, parsePage, SECTIONS, type Block, type Inline, type ParsedPage } from "./page.js";
+import { BINDS, BLIZZARD_SOURCED, FrontMatter, inlineText, MARKDOWN_LINK, parsePage, PREP_SECTION, SECTIONS, wikiLinkTarget, type Block, type Inline, type ParsedPage } from "./page.js";
 
 /** Ids the committed game data knows. Kinds with no committed list (NPCs, quests, factions) are checked for shape and range only. */
 export interface KnownData {
@@ -165,7 +165,12 @@ function checkPage(p: CheckedPage, ctx: CheckContext, bySlug: ReadonlyMap<string
     for (const c of Array.isArray(b.changes) ? (b.changes as string[]) : []) if (!known.changes.has(c)) report(`binds.changes "${c}" is not an entry on /changes`);
   }
 
-  // Tokens and links in the body.
+  // Tokens and links in the body. A Markdown link into the wiki answers to the same rules as a [[slug]].
+  const linkTo = (slug: string, written: string, line: number) => {
+    const target = bySlug.get(slug);
+    if (!target) report(`${written} links to a page that does not exist`, line);
+    else if (published && target.fm.status !== "published") report(`${written} links to a draft; a published page links only to published pages`, line);
+  };
   for (const block of page.blocks) {
     for (const run of inlines(block)) {
       for (const t of run) {
@@ -173,9 +178,12 @@ function checkPage(p: CheckedPage, ctx: CheckContext, bySlug: ReadonlyMap<string
           const why = tokenProblem(t.entity, t.id, known);
           if (why) report(`{${t.entity}:${t.id}} ${why}`, block.line);
         } else if (t.kind === "link") {
-          const target = bySlug.get(t.slug);
-          if (!target) report(`[[${t.slug}]] links to a page that does not exist`, block.line);
-          else if (published && target.fm.status !== "published") report(`[[${t.slug}]] links to a draft; a published page links only to published pages`, block.line);
+          linkTo(t.slug, `[[${t.slug}]]`, block.line);
+        } else {
+          for (const m of t.text.matchAll(MARKDOWN_LINK)) {
+            const slug = wikiLinkTarget(m[2]!);
+            if (slug !== null) linkTo(slug, m[0], block.line);
+          }
         }
       }
     }
@@ -208,6 +216,14 @@ function checkPage(p: CheckedPage, ctx: CheckContext, bySlug: ReadonlyMap<string
     const allowed = [...rule.required, ...rule.optional];
     const fits = headings.length >= rule.required.length && headings.length <= allowed.length && headings.every((h, i) => h === allowed[i]);
     if (!fits) report(`sections must be, in order: ${rule.required.join(", ")}${rule.optional.length ? ` (then optionally ${rule.optional.join(", ")})` : ""}; found: ${headings.join(", ") || "none"}`);
+  }
+
+  // Advice for a group about to go in: Everloot's own words only, so a built page never shows a bare heading or only
+  // a quote under the advice label. Quotes do not count as words of the page's own, as for the index bar.
+  const prep = rule.optional.includes(PREP_SECTION) ? sections.find((s) => s.heading === PREP_SECTION) : undefined;
+  if (prep && fm.origin === "adapted") report(`a "${PREP_SECTION}" section is original advice; an adapted page has none`, prep.line);
+  if (prep && published && proseWords(prep.blocks) === 0) {
+    report(`a published page's "${PREP_SECTION}" section needs advice in our own words, not only quotes; leave the heading out until there is some`, prep.line);
   }
 
   // Origin and credit.

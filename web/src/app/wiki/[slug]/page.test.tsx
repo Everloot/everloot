@@ -15,19 +15,26 @@ vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NOT_FOUND
 const agree = <T,>(row: (installId: string) => T) => ["a", "b", "c"].map(row);
 const facts = vi.hoisted(() => ({ rates: [] as unknown[], names: [] as unknown[], npcs: [] as unknown[], unreachable: false }));
 const world = vi.hoisted(() => ({ npcs: [] as unknown[], quests: [] as unknown[], vendors: [] as unknown[], unreachable: false }));
-vi.mock("@/lib/rollup-compute", () => ({ loadItemFacts: async () => facts, loadWorldFacts: async () => world, loadInstanceFacts: async () => ({ entrances: [], encounters: [], sightings: [], unreachable: false, dataAsOf: null }) }));
+// Nobody has zoned into a dungeon or reported a boss unless a test says so.
+const instances = vi.hoisted(() => ({ entrances: [] as unknown[], encounters: [] as unknown[], sightings: [] as unknown[], unreachable: false, dataAsOf: null as string | null }));
+vi.mock("@/lib/rollup-compute", () => ({ loadItemFacts: async () => facts, loadWorldFacts: async () => world, loadInstanceFacts: async () => instances }));
 facts.names = agree((installId) => ({ installId, itemId: 2589, name: "Linen Cloth" }));
 world.npcs = agree((installId) => ({ installId, npcId: 639, name: "Edwin VanCleef", mapId: 1436, x: 40, y: 70, positionKind: "npc" }));
 
 const FIXTURES = fileURLToPath(new URL("../../../test/wiki", import.meta.url));
 beforeEach(() => { vi.stubEnv("WIKI_DIR", FIXTURES); });
-afterEach(() => { vi.unstubAllEnvs(); });
+afterEach(() => {
+  vi.unstubAllEnvs();
+  Object.assign(instances, { entrances: [], encounters: [], unreachable: false, dataAsOf: null });
+});
 
 const params = (slug: string) => ({ params: Promise.resolve({ slug }) });
 const render = async (slug: string) => {
   const { default: WikiArticle } = await import("./page");
   return renderToStaticMarkup(await WikiArticle(params(slug)));
 };
+/** The markup of one `<section>`, by the id of its heading. */
+const section = (html: string, id: string) => new RegExp(`<section[^>]*aria-labelledby="${id}"[^>]*>[\\s\\S]*?</section>`).exec(html)?.[0] ?? "";
 
 test("a published page that meets the bar is indexed, with a self canonical and a title under 60 characters", async () => {
   const { generateMetadata } = await import("./page");
@@ -52,7 +59,7 @@ test("a published page is in sitemap.xml, dated by its review; adapted pages and
 test("only published pages are built, and a draft answers 404 in production", async () => {
   vi.stubEnv("NODE_ENV", "production");
   const { default: WikiArticle, generateMetadata, generateStaticParams } = await import("./page");
-  expect(generateStaticParams().map((p) => p.slug).sort()).toEqual(["test-dungeon", "test-new-dungeon", "test-zone"]);
+  expect(generateStaticParams().map((p) => p.slug).sort()).toEqual(["test-dungeon", "test-lost-raid", "test-new-dungeon", "test-raid", "test-zone"]);
   await expect(WikiArticle(params("test-draft"))).rejects.toThrow("NOT_FOUND");
   await expect(WikiArticle(params("no-such-page"))).rejects.toThrow("NOT_FOUND");
   expect((await generateMetadata(params("test-draft"))).robots).toEqual({ index: false, follow: true });
@@ -84,12 +91,27 @@ test("tokens link to their database pages under the name rules, and [[links]] to
   expect(html).toContain("&quot;a short quote stays a quote&quot;");
 });
 
-test("the page shows title, summary, sections in type order, categories, Linked from and placeholders, with no visible breadcrumb", async () => {
+test("a Markdown link into the wiki is drawn only to a published page; to a draft or a missing page it stays words, in every written form", async () => {
+  const html = await render("test-dungeon");
+  expect(html).toContain('<a href="/wiki/test-zone#history">the zone page</a> is published');
+  expect(html).toContain("while the draft, the draft in full and a page never written stay words.");
+  expect(html).not.toMatch(/href="[^"]*(?:test-draft|no-such-page)/i);
+  // The site's own address, in any case and with its default port, is still the site.
+  for (const [href, words] of [["https://everloot.app/wiki/test-zone#history", "the zone in full"], ["https://EVERLOOT.APP/wiki/test-zone?from=here", "in capitals"], ["https://everloot.app:443/wiki/test-zone/", "on the default port"]]) {
+    expect(html).toContain(`<a href="${href}" rel="noopener">${words}</a>`);
+  }
+  expect(html).toContain("while the draft in capitals, the draft on the default port, a lost page in full, a lost page in capitals and a lost page on the default port stay words.");
+  // Links that are not wiki pages are drawn as before.
+  expect(html).toContain('<a href="https://worldofwarcraft.blizzard.com/en-us/news/1" rel="noopener">Blizzard&#x27;s post</a>');
+  expect(html).toContain('<a href="/database/zones/1436-westfall">the zone&#x27;s database page</a>');
+});
+
+test("the page shows title, summary, sections in type order, categories and Linked from, with no visible breadcrumb", async () => {
   const html = await render("test-dungeon");
   expect(html).toContain("<h1");
   expect(html).toContain("Test Dungeon");
   expect(html).toContain("A fixture dungeon page, published and written in Everloot&#x27;s own words, for the page tests.");
-  const order = ["Overview", "Getting there", "History", "In WoW: Forever"].map((h) => html.indexOf(`>${h}</h2>`));
+  const order = ["Overview", "Getting there", "History", "In WoW: Forever", "Before you go"].map((h) => html.indexOf(`>${h}</h2>`));
   expect(order.every((i) => i > 0)).toBe(true);
   expect([...order].sort((a, b) => a - b)).toEqual(order);
   expect(html).toContain("Dungeons · Eastern Kingdoms · Westfall");
@@ -98,9 +120,6 @@ test("the page shows title, summary, sections in type order, categories, Linked 
   expect(html).toContain("Linked from (1)");
   expect(html).toMatch(/<a href="\/wiki\/test-zone"[^>]*>Test Zone<\/a><\/li>/);
   expect(html).not.toContain("Test Draft");
-  // Infobox and data blocks are marked placeholders: no numbers in them.
-  expect(html).toContain('data-wiki-placeholder="infobox"');
-  expect(html).toMatch(/data-wiki-placeholder="blocks"[\s\S]*Bosses[\s\S]*Loot by boss/);
   // No visible trail: the BreadcrumbList is structured data only, beside the Article.
   expect(html).not.toMatch(/<nav[^>]*breadcrumb/i);
   expect(html).not.toMatch(/>Home</);
@@ -126,6 +145,97 @@ test("a dungeon known only from a Blizzard post, with no entrance bound, renders
   expect((await generateMetadata(params("test-new-dungeon"))).robots).toEqual({ index: false, follow: true });
   const { default: sitemap } = await import("../../sitemap");
   expect((await sitemap()).map((e) => new URL(e.url).pathname)).not.toContain("/wiki/test-new-dungeon");
+});
+
+test("a published dungeon page shows the game files' level and entrance marked unconfirmed, prints one level as one number and links the instance in the database", async () => {
+  const html = await render("test-dungeon");
+  const glance = section(html, "at-a-glance");
+  // The committed build gives the Deadmines one level; it is printed as given, never widened into a range.
+  expect(glance).toMatch(/<dt[^>]*>Level<\/dt><dd[^>]*>16 <span data-badge="files"/);
+  expect(glance).not.toMatch(/16\s*[–-]/);
+  expect(glance).toMatch(/<dt[^>]*>Entrance<\/dt><dd[^>]*>[\s\S]*href="\/database\/zones\/1436-westfall"[^>]*>Westfall<\/a>[\s\S]*href="\/map\?zone=1436&amp;x=38.2&amp;y=77.5"[^>]*>38.2, 77.5<\/a>[\s\S]*data-badge="files"/);
+  expect(glance.match(/data-badge="files"/g)).toHaveLength(2);
+  expect(glance).toContain('<a href="/database/instances/36-deadmines"');
+  // The facts link the database and the map, never another wiki page, so no draft can surface through them.
+  expect(glance).not.toContain('href="/wiki/');
+});
+
+test("players' reports keep their evidence: the entrance and each boss 3 installs report, with how many and when last; fewer than 3 installs list nothing", async () => {
+  Object.assign(instances, {
+    dataAsOf: "2026-10-22T00:00:00Z",
+    entrances: ["a", "b", "c"].map((installId, n) => ({ installId, instanceMapId: 36, name: "Deadmines", instanceType: "party", mapId: 1436, x: 38, y: 77, capturedAt: `2026-10-${17 + n}T10:00:00Z` })),
+    encounters: [
+      ...["a", "b", "c", "a"].map((installId, n) => ({ installId, encounterId: 1, name: "Edwin VanCleef", instanceMapId: 36, success: true, npcIds: [639], capturedAt: `2026-10-${18 + n}T11:00:00Z` })),
+      ...["a", "b"].map((installId) => ({ installId, encounterId: 2, name: "Rhahk'Zor", instanceMapId: 36, success: true, npcIds: [644], capturedAt: "2026-10-20T11:00:00Z" })),
+    ],
+  });
+  const html = await render("test-dungeon");
+  expect(section(html, "at-a-glance")).toMatch(/<dt[^>]*>Confirmed entrance<\/dt><dd[^>]*>[\s\S]*>Westfall<\/a>[\s\S]*>38, 77<\/a>[\s\S]*from 3 installs, last seen 2026-10-19/);
+  const bosses = section(html, "bosses");
+  expect(bosses).toContain(">Bosses</h2>");
+  expect(bosses).toContain("Edwin VanCleef (4 kills) from 3 installs, last seen 2026-10-21");
+  expect(html).not.toContain("Rhahk");
+});
+
+test("relations nobody has reported are left out: no boss section, no quest or loot list, no zero and no later-update placeholder", async () => {
+  const html = await render("test-dungeon");
+  expect(html).not.toContain('aria-labelledby="bosses"');
+  expect(html).not.toContain("Confirmed entrance");
+  expect(html).not.toMatch(/Quests that send you here|Loot by boss|From the database/);
+  expect(html).not.toMatch(/\b0 (?:bosses|installs|kills)\b/);
+  expect(html).not.toContain("data-wiki-placeholder");
+  expect(html).not.toContain("in a later update");
+});
+
+test("with storage down, the game files' facts stay and the page says players' reports are unknown, not none", async () => {
+  instances.unreachable = true;
+  const html = await render("test-dungeon");
+  const glance = section(html, "at-a-glance");
+  expect(glance).toContain("Storage unreachable. These figures are unrecorded, not zero. Players&#x27; reports cannot be shown until it is back; what is here is from the game files.");
+  expect(glance).toMatch(/>Level<\/dt><dd[^>]*>16 /);
+  expect(glance).toContain(">Westfall</a>");
+  expect(html).not.toContain('aria-labelledby="bosses"');
+  expect(html).not.toContain("data-wiki-placeholder");
+});
+
+test("Before you go is labelled as advice, not data, and a link in it to a draft stays plain text", async () => {
+  const html = await render("test-dungeon");
+  const advice = section(html, "before-you-go");
+  expect(advice).toContain(">Before you go</h2>");
+  expect(advice).toContain("Advice in Everloot&#x27;s own words, not data from the game files or from players.");
+  expect(advice).toContain("pull one pack at a time, and read <span>test draft</span> before you set out.");
+  expect(advice).not.toContain('href="/wiki/');
+  expect(html.match(/Advice in Everloot/g)).toHaveLength(1);
+});
+
+test("a raid page shows the same facts, and a level the game files do not give has no row, not a dash or a zero", async () => {
+  // The committed build places Onyxia's Lair in Dustwallow Marsh but gives it no level.
+  const html = await render("test-raid");
+  const glance = section(html, "at-a-glance");
+  expect(glance).not.toContain(">Level</dt>");
+  expect(glance).toMatch(/<dt[^>]*>Entrance<\/dt><dd[^>]*>[\s\S]*>Dustwallow Marsh<\/a>/);
+  expect(glance.match(/data-badge="files"/g)).toHaveLength(1);
+  expect(glance).toContain('<a href="/database/instances/249-onyxia-s-lair"');
+  expect(html).not.toContain("data-wiki-placeholder");
+});
+
+test("a raid page whose entrance the game files no longer have shows neither facts nor placeholders", async () => {
+  const html = await render("test-lost-raid");
+  expect(html).toContain("Test Lost Raid");
+  expect(html).not.toContain("At a glance");
+  expect(html).not.toContain("data-wiki-placeholder");
+  expect(html).not.toContain("/database/instances/");
+  expect(html).not.toContain('aria-labelledby="bosses"');
+});
+
+test("other wiki types are unchanged: a zone page keeps its placeholders and shows no dungeon facts or advice note", async () => {
+  const html = await render("test-zone");
+  expect(html).toContain('data-wiki-placeholder="infobox"');
+  expect(html).toContain("Facts from the database appear here in a later update.");
+  expect(html).toMatch(/data-wiki-placeholder="blocks"[\s\S]*NPCs[\s\S]*Quests[\s\S]*Vendors/);
+  expect(html).not.toContain("data-wiki-facts");
+  expect(html).not.toContain("/database/instances/");
+  expect(html).not.toContain("Advice in Everloot");
 });
 
 test("no private path or internal name reaches the output", async () => {
