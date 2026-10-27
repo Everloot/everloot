@@ -129,6 +129,9 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
     setPreview(null);
     setRefused(null);
   }, [set]);
+  /** The preview as the page last showed it, for a long press's timer, which runs from the render the press began in. */
+  const previewNow = useRef<number | null>(null);
+  useEffect(() => { previewNow.current = previewing; }, [previewing]);
 
   function setSets(next: Sets) {
     if (readOnly) return;
@@ -295,8 +298,10 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
     setRefused({ set, at: from, text });
   }
 
-  // The preview changes only what the trees show, never the set. A phone shows the tree its point went to.
+  // The preview changes only what the trees show, never the set. A phone shows the tree its point went to. A long press
+  // under way is cancelled, so it cannot take a point back once the preview is on.
   function showPreview(points: number | null) {
+    endPress();
     setPreview(points === null ? null : { set, points });
     const tree = points === null ? undefined : nodes.get(set.order?.[points - 1] ?? -1)?.treeId;
     if (tree !== undefined) setView(catalog.trees.findIndex((t) => t.id === tree));
@@ -375,7 +380,9 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
     press.current = setTimeout(() => {
       suppressClick.current = true;
       if (assets) onTip(id, "press");
-      else doRemove(id);
+      // This runs half a second after the press, from the render it began in: only the ref knows whether the preview
+      // has come on since.
+      else if (previewNow.current === null) doRemove(id);
     }, LONG_PRESS_MS);
   }
   // Touch browsers also send a context menu event on a long press. Whichever arrives first takes

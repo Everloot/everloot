@@ -35,6 +35,7 @@ beforeEach(() => {
   root = createRoot(container);
 });
 afterEach(async () => {
+  vi.useRealTimers();
   await act(async () => root.unmount());
   container.remove();
   document.documentElement.style.scrollPaddingBottom = "";
@@ -255,6 +256,45 @@ test("nothing changes the plan while the preview is on: talents, take-backs, key
   expect([shown(11), shown(12)]).toEqual(["2/5", "1/5"]);
   await click(button(/^Redo$/));
   expect(shown(12)).toBe("2/5");
+});
+
+/** A finger, not a mouse, pressing a talent: the start of a long press, which takes a point back after half a second. */
+const touchDown = (el: Element) => act(async () => {
+  const event = new MouseEvent("pointerdown", { bubbles: true, cancelable: true });
+  Object.defineProperty(event, "pointerType", { value: "touch" });
+  el.dispatchEvent(event);
+});
+
+test("a long press begun before the preview turned on takes nothing back once it is on", async () => {
+  await render();
+  await spend(11, 11);
+  const plan = hash();
+  vi.useFakeTimers();
+  await touchDown(node(11));
+  await click(previewSwitch());
+  await act(async () => { vi.advanceTimersByTime(600); });
+  expect(hash()).toBe(plan);
+  expect(panel()).not.toBeNull();
+  expect(status()).toBe("Preview on. Point 1 of 2, level 10: Talent 11, rank 1.");
+  await click(previewSwitch());
+  expect(shown(11)).toBe("2/5");
+  // And the press left no undo step: Undo takes back the second point spent.
+  await click(button(/^Undo$/));
+  expect(shown(11)).toBe("1/5");
+});
+
+test("turning the preview on or off cancels a long press under way", async () => {
+  await render();
+  await spend(11, 11);
+  vi.useFakeTimers();
+  await touchDown(node(11));
+  expect(vi.getTimerCount()).toBe(1);
+  await click(previewSwitch());
+  expect(vi.getTimerCount()).toBe(0);
+  await touchDown(node(11));
+  expect(vi.getTimerCount()).toBe(1);
+  await click(previewSwitch());
+  expect(vi.getTimerCount()).toBe(0);
 });
 
 test("a preview ends when the set on screen changes, and does not come back with it", async () => {
