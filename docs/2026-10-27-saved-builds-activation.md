@@ -344,9 +344,12 @@ migration holds them, `supabase/migrations/20261027120000_saved_build_point_orde
   same new build twice, such as the device transfer, gives it a key (`transferKey`). If the account already has a build
   with that key, `save_build_plan` answers with that build as its create did, plus `"replayed": true`; nothing is
   written and no save is counted, and the route answers 200 rather than 201 with the same body. Two saves racing with
-  one key make one build: the index refuses the second its key, and it is answered as the first one's replay with all it
-  did undone. Another account's same key is a key of its own. A key is for a new build only; an update that sends one
-  is refused.
+  one key make one build. One that finds no build with its key looks again once it holds the account's row, the lock
+  `save_build` takes first, which a save with the same key still under way holds until it commits: the second finds the
+  first one's build and is answered as its replay, at the day's last save and the account's last build too, never
+  refused for the place the first one took. The index stays the backstop for any other writer: a save it refuses the
+  key is answered as the replay of the build that has it, with all it did undone. Another account's same key is a key
+  of its own. A key is for a new build only; an update that sends one is refused.
 - The trigger `saved_builds_order_follows_code`, with its function `saved_build_order_follows_code()`: an update that
   changes a code drops that set's order. That keeps the orders right for every caller of `save_build`, the site from
   before this migration included.
@@ -396,10 +399,12 @@ off the public read, orders and all; the browser roles reach neither the columns
 and Chat's saves and reopens keep both orders and their makers; another account changes nothing; the limits hold; a
 key's read is unchanged. A new build's transfer key: the same save again is answered with the build it made, as its
 create was plus `replayed`, with nothing written and no save counted, even at the day's limit; another account's same
-key makes its own build; two saves racing with one key make one build, both when one waits for the other's account and
-when they are sent together; a key of another shape or on an update is refused. Applying twice keeps every order and
-key, the rollback keeps the columns, the orders and keys, the index and the trigger, and applying again brings the
-function back, with every other function, grant and table as it was throughout.
+key makes its own build; two saves racing with one key make one build, when one waits for the other's account, at the
+day's last save and the account's last build too, and when they are sent together; a key another session gives a build
+while a save is under way answers that save with that build, its own row and count undone; a key of another shape or on
+an update is refused. Applying twice keeps every order and key, the rollback keeps the columns, the orders and keys,
+the index and the trigger, and applying again brings the function back, with every other function, grant and table as
+it was throughout.
 
 `src/lib/saved-build-point-order.rest.test.ts` runs the site's own saved-builds code, the Chat and calculator routes
 with a made-up session, through a real PostgREST on the same legacy schema: first without the migration, then in the
@@ -422,11 +427,12 @@ test checks those answers. Then it checks that Chat lists and saves, that a save
 refused with nothing written, and that the explicit sharing and the owner checks hold on the older path. After the
 apply, the process goes on without the migration for the rest of its minute, then saves orders through
 `save_build_plan`. Through the calculator's route, a new build with a transfer key is a 201, the same save again a 200
-with the same body and nothing written, another account's same key its own build, and two sent together one build. A
-fault made on purpose, `save_build_plan` calling a helper the database does not have, gets a 503 with nothing written,
-and once the file is applied again the very next save with orders goes through `save_build_plan`. A drop that PostgREST
-is not told about counts as the function missing, through 42883 from its stale cache. After the rollback the orders
-stay, and a save without one goes through `save_build` again.
+with the same body and nothing written, another account's same key its own build, two sent together one build, and two
+that both wait for the account at the day's last save a 201 and a 200 with that build, not a 429. A fault made on
+purpose, `save_build_plan` calling a helper the database does not have, gets a 503 with nothing written, and once the
+file is applied again the very next save with orders goes through `save_build_plan`. A drop that PostgREST is not told
+about counts as the function missing, through 42883 from its stale cache. After the rollback the orders stay, and a
+save without one goes through `save_build` again.
 
 ### Preflight (read-only)
 
@@ -517,7 +523,7 @@ select check_name, ok from (values
   ('their bodies are the file''s, word for word',
     (select md5(string_agg(proname || ':' || regexp_replace(prosrc, '\s+', ' ', 'g'), '|' order by proname)) from pg_proc
       where pronamespace = 'public'::regnamespace and proname in ('save_build_plan', 'saved_build_order_follows_code'))
-      = '5d5076f1049d691143e4d97e6a4e4c1a'),
+      = '37561800ec163ecfbef6f352479bc2f9'),
   ('only service_role may call save_build_plan',
     coalesce(has_function_privilege('service_role', to_regprocedure('public.save_build_plan(uuid, jsonb)'), 'execute')
       and not has_function_privilege('anon', to_regprocedure('public.save_build_plan(uuid, jsonb)'), 'execute')

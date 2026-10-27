@@ -457,6 +457,28 @@ async function waitForLock() {
   throw new Error("The second save never waited for the first");
 }
 
+/** Two saves of one new build with one key: the first is held open until the late one waits for it, then committed. */
+async function heldRace(owner, key) {
+  const first = await pool.connect();
+  const late = await pool.connect();
+  try {
+    await first.query("BEGIN");
+    await first.query("SET LOCAL ROLE service_role");
+    const won = (await first.query("select public.save_build_plan(p_user_id => $1, p_payload => $2) as saved",
+      [owner, JSON.stringify(fresh({ name: "Test race", transferKey: key }))])).rows[0].saved;
+    const pending = savePlan(owner, fresh({ name: "Test race late", transferKey: key }), late);
+    await waitForLock();
+    await first.query("COMMIT");
+    return { won, lost: await pending };
+  } catch (error) {
+    await first.query("ROLLBACK").catch(() => {});
+    throw error;
+  } finally {
+    first.release();
+    late.release();
+  }
+}
+
 /** A new build's transfer key: the same save sent again is answered with the build it made, and nothing is written. */
 async function transferKeys() {
   const owner = await user("bnet-87030", "Rexxar#3003");
@@ -510,39 +532,56 @@ async function transferKeys() {
     /duplicate key value violates unique constraint "saved_builds_transfer_key"/);
 
   // Two saves racing with one new key make one build. The late one looked for the key before the first was in, then
-  // waited for the account inside save_build: the unique index refuses it the key, and it is answered as the first one's
-  // replay, with its own row and its count undone.
-  const RACE = "device-plan-race-000001";
+  // waited for the account; once the first is in, it looks again under the account's lock and is answered as the first
+  // one's replay, without reaching save_build.
   const counted = await totals(owner);
-  const first = await pool.connect();
-  const late = await pool.connect();
-  let won;
-  let lost;
-  try {
-    await first.query("BEGIN");
-    await first.query("SET LOCAL ROLE service_role");
-    won = (await first.query("select public.save_build_plan(p_user_id => $1, p_payload => $2) as saved",
-      [owner, JSON.stringify(fresh({ name: "Test race", transferKey: RACE }))])).rows[0].saved;
-    const pending = savePlan(owner, fresh({ name: "Test race late", transferKey: RACE }), late);
-    await waitForLock();
-    await first.query("COMMIT");
-    lost = await pending;
-  } finally {
-    first.release();
-    late.release();
-  }
-  assert.equal(won.refusal, null);
-  assert.deepEqual(lost, { ...won, replayed: true });
+  const rowsWith = async (u, key) => (await pool.query("select count(*)::int as n from public.saved_builds where user_id = $1 and transfer_key = $2", [u, key])).rows[0].n;
+  const race = await heldRace(owner, "device-plan-race-000001");
+  assert.equal(race.won.refusal, null);
+  assert.deepEqual(race.lost, { ...race.won, replayed: true });
   assert.deepEqual(await totals(owner), [counted[0] + 1, counted[1] + 1]);
-  const rowsWith = async (key) => (await pool.query("select count(*)::int as n from public.saved_builds where user_id = $1 and transfer_key = $2", [owner, key])).rows[0].n;
-  assert.equal(await rowsWith(RACE), 1);
+  assert.equal(await rowsWith(owner, "device-plan-race-000001"), 1);
+  // The same at the day's last save, and at the account's last build: the first one takes it, and the late one is
+  // answered with the build it made, never refused for the place the first one used.
+  const bucket = `builds:${owner}`;
+  const [{ count: day }] = (await pool.query("select count from public.intake_quota_buckets where bucket = $1", [bucket])).rows;
+  await pool.query("update public.intake_quota_buckets set count = 299 where bucket = $1", [bucket]);
+  const daily = await heldRace(owner, "device-plan-race-daily-01");
+  assert.equal(daily.won.refusal, null);
+  assert.deepEqual(daily.lost, { ...daily.won, replayed: true });
+  assert.deepEqual([await saves(owner), await rowsWith(owner, "device-plan-race-daily-01")], [300, 1]);
+  await pool.query("update public.intake_quota_buckets set count = $2 where bucket = $1", [bucket, day + 1]);
+  const full = await user("bnet-87032", "Thrall#3005");
+  await pool.query("insert into public.saved_builds (user_id, slug, name, class_slug, code, game_build) "
+    + "select $1, 'K' || lpad(i::text, 7, '0'), 'Test limit', 'mage', $2, '1.60.1.70450' from generate_series(1, 199) i", [full, MAGE]);
+  const last = await heldRace(full, "device-plan-race-builds-1");
+  assert.equal(last.won.refusal, null);
+  assert.deepEqual(last.lost, { ...last.won, replayed: true });
+  assert.deepEqual([await count(full), await saves(full), await rowsWith(full, "device-plan-race-builds-1")], [200, 1, 1]);
+  // The unique index stays the backstop for a writer that never takes the account's lock: another session sets the key
+  // on one of the owner's builds while the save is under way. The save's own row and count are undone, and it is
+  // answered with that build.
+  const target = await savePlan(owner, fresh({ name: "Test backstop" }));
+  const counting = await totals(owner);
+  const writer = await pool.connect();
+  try {
+    await writer.query("BEGIN");
+    await writer.query("update public.saved_builds set transfer_key = 'device-plan-backstop-01' where id = $1", [target.build_ref]);
+    const pending = savePlan(owner, fresh({ name: "Test backstop late", transferKey: "device-plan-backstop-01" }));
+    await waitForLock();
+    await writer.query("COMMIT");
+    assert.deepEqual(await pending, { ...target, replayed: true });
+  } finally {
+    writer.release();
+  }
+  assert.deepEqual(await totals(owner), counting);
   // Sent at the same moment, the same: one build and one save counted; one answer is the other's replay.
   const SAME = "device-plan-race-000002";
   const both = await Promise.all([savePlan(owner, fresh({ transferKey: SAME })), savePlan(owner, fresh({ transferKey: SAME }))]);
   assert.equal(both[0].build_ref, both[1].build_ref);
   assert.deepEqual(both.map((b) => b.replayed === true).sort(), [false, true]);
-  assert.equal(await rowsWith(SAME), 1);
-  assert.deepEqual(await totals(owner), [counted[0] + 2, counted[1] + 2]);
+  assert.equal(await rowsWith(owner, SAME), 1);
+  assert.deepEqual(await totals(owner), [counting[0] + 1, counting[1] + 1]);
   return { owner, made };
 }
 

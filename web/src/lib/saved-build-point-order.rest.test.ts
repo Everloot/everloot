@@ -264,6 +264,39 @@ describe.skipIf(!databaseUrl || !restUrl || !secret)("saved builds through Postg
     expect(await state(owner, true)).toEqual(counted);
   });
 
+  test("at the day's last save, two at once with one key are a 201 and a 200 with its build, not a 429", async () => {
+    const body = { name: "Test last save", code: MAGE, shared: false, showName: false, transferKey: "Test-transfer-key-0003" };
+    const bucket = `builds:${owner}`;
+    const { saves } = await state(owner);
+    await pool.query("update public.intake_quota_buckets set count = 299 where bucket = $1", [bucket]);
+    // The account's row held, so both have looked for the key and found nothing by the time it is let go.
+    const holder = await pool.connect();
+    let raced: Response[];
+    try {
+      await holder.query("begin");
+      await holder.query("select 1 from public.users where id = $1 for update", [owner]);
+      const pending = Promise.all([account(body), account(body)]);
+      await until(async () => (await pool.query(
+        "select count(*)::int as n from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock'")).rows[0].n >= 2,
+      "send both saves");
+      await holder.query("commit");
+      raced = await pending;
+    } catch (error) {
+      await holder.query("rollback").catch(() => {});
+      throw error;
+    } finally {
+      holder.release();
+    }
+    const counted = [(await state(owner)).saves,
+      (await pool.query("select count(*)::int as n from public.saved_builds where user_id = $1 and transfer_key = $2", [owner, body.transferKey])).rows[0].n];
+    // Put back before anything is checked, so the tests after this one keep their saves.
+    await pool.query("update public.intake_quota_buckets set count = $2 where bucket = $1", [bucket, saves + 1]);
+    expect(raced.map((r) => r.status).sort()).toEqual([200, 201]);
+    const [one, two] = await Promise.all(raced.map((r) => r.json()));
+    expect(one).toEqual(two);
+    expect(counted).toEqual([300, 1]);
+  });
+
   test("a function save_build_plan needs, missing, is a failure with nothing written, not the function missing", async () => {
     // A fault made on purpose: save_build_plan calls a helper the database does not have. PostgREST names that helper.
     await pool.query(`create or replace function public.save_build_plan(p_user_id uuid, p_payload jsonb) returns jsonb

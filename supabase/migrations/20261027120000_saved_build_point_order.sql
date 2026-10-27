@@ -61,8 +61,9 @@ create trigger saved_builds_order_follows_code
 -- stays only while its code stays the same (the trigger above).
 -- transferKey is for a new build only, and an update that sends one raises. A new build whose owner already has a build
 -- with that key is answered as that build's create was, plus "replayed": true; nothing is written and no save is
--- counted. Two saves racing with one key make one build: the unique index refuses the second its key, and it is
--- answered as the first one's replay, with everything it did undone.
+-- counted. Two saves racing with one key make one build: one that finds no build with the key looks again holding the
+-- account's row, which the other holds until it commits, so the second finds the first one's build and is answered as its
+-- replay, at the daily and build limits too. The unique index gives a key to one build whatever writes it.
 -- Returns {build_ref, build_slug, refusal} with save_build's refusals: not_found, class_mismatch, build_limit,
 -- daily_limit, slug_taken; a replay adds replayed. A payload of any other shape raises.
 create or replace function public.save_build_plan(p_user_id uuid, p_payload jsonb)
@@ -107,9 +108,16 @@ begin
   end if;
 
   -- The same new build sent again with its key, its first answer lost on the way: the build the key made, answered as its
-  -- create was. Nothing is written and no save is counted. Only this owner's builds are looked at.
+  -- create was. Nothing is written and no save is counted. Only this owner's builds are looked at. Not found, the key is
+  -- looked for again once this save holds the account's row, the lock save_build takes first: a save with the same key
+  -- still under way holds that row until it commits, so its build is found here, before save_build could refuse this one
+  -- at the daily or build limit the first one reached.
   if v_transfer_key is not null then
     select b.id, b.slug into v_made from public.saved_builds b where b.user_id = p_user_id and b.transfer_key = v_transfer_key;
+    if not found then
+      perform 1 from public.users where id = p_user_id for update;
+      select b.id, b.slug into v_made from public.saved_builds b where b.user_id = p_user_id and b.transfer_key = v_transfer_key;
+    end if;
     if found then
       return jsonb_build_object('build_ref', v_made.id, 'build_slug', v_made.slug, 'refusal', null, 'replayed', true);
     end if;
@@ -130,7 +138,8 @@ begin
         where b.id = v_saved.build_ref and b.user_id = p_user_id;
     end if;
   exception when unique_violation then
-    -- Another save with the same key got in after this one looked: the index gives the key to one build. All this save
+    -- The key went to another build after this save last looked. The account's lock keeps two saves of this function from
+    -- both getting here, so this is the backstop for any other writer: the index gives the key to one build. All this save
     -- did in this block is undone, its count against the daily saves included, and it is answered as that build's replay.
     get stacked diagnostics v_index = constraint_name;
     if v_index is distinct from 'saved_builds_transfer_key' then raise; end if;
