@@ -7,6 +7,7 @@ import GuidePlan from "@/components/guides/GuidePlan";
 import GuideSources from "@/components/guides/GuideSources";
 import { CLASS_TEXT } from "@/components/talents/TalentTreeView";
 import { PageHeader, Prose, RailFacts, ReadingLayout, SectionHeading, type TocItem } from "@/components/ui";
+import { withoutVersionPrefix } from "@/lib/build-versions";
 import { classLabel } from "@/lib/class-context";
 import { GUIDE_STATE_LABEL, guideFreshness, guideIndexable, type GuideFreshness, type GuideState } from "@/lib/guide-freshness";
 import { ACTIVITY_LABEL, ROLE_LABEL, guideHref, loadGuides, publishedGuide, publishedGuides, type Guide } from "@/lib/guides";
@@ -17,7 +18,7 @@ import { PUBLISHED_CHANGES, classTalentChanges } from "@/lib/talents/freshness-r
 import type { TalentCatalog } from "@/lib/talents/types";
 import { loadWiki, publishedPage, type Block } from "@/lib/wiki";
 import { resolveTokens } from "@/lib/wiki-names";
-import { guideLinkTarget } from "../../../../../kb/src/guides/guide";
+import { guideLinkTarget, sitePath } from "../../../../../kb/src/guides/guide";
 import { slugify } from "../../../../../kb/src/lore-slug";
 import { WikiBlock, type TextContext } from "../../wiki/wiki-text";
 
@@ -117,9 +118,11 @@ export default async function GuidePage({ params }: Params) {
   const ctx: TextContext = {
     tokens: await resolveTokens(guide),
     pages: (s) => publishedPage(wiki, s),
-    // A link to another guide is drawn only while that guide is published, whatever reached main.
+    // A link to another guide is drawn only while that guide is published, whatever reached main, and through a version's
+    // prefix as well (/beta/guides/x shows the same page). Links off the site are not this page's to judge.
     linkable: (href) => {
-      const target = guideLinkTarget(href);
+      const path = sitePath(href);
+      const target = path === null ? null : guideLinkTarget(withoutVersionPrefix(path));
       return target === null || publishedGuide(guides, target) !== null;
     },
   };

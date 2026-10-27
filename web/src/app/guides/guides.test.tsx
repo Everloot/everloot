@@ -389,6 +389,34 @@ describe("a guide's page", () => {
     expect([...dom(html).querySelectorAll("a")].map((a) => a.textContent)).not.toContain("the fire draft");
   });
 
+  test("a link through a version's prefix is held to the same rule: a draft's is drawn as its words, a published guide's stays, and other sites' links are untouched", async () => {
+    const links = [
+      "[the draft in beta](/beta/guides/fire-draft)",
+      "[the draft in beta by its address](https://everloot.app/beta/guides/fire-draft/)",
+      "[the draft in beta with a query](/beta/guides/fire-draft/?x=1)",
+      "[the draft in beta with a fragment](https://www.everloot.app/beta/guides/fire-draft#how-to-play-it)",
+      "[the draft in another version](/ptr/guides/fire-draft)",
+      "[warrior tanking in beta](/beta/guides/warrior-tanking)",
+      "[the beta](/beta)",
+      "[a page on another site](https://example.com/beta/guides/fire-draft)",
+    ];
+    stubGuides([
+      { slug: "frost-leveling", links: `See ${links.join(", ")}.` },
+      { slug: "fire-draft", title: "Fire draft", status: "draft", reviewed: false },
+      { slug: "warrior-tanking", title: "Warrior tanking", classSlug: "warrior" },
+    ]);
+    const html = await page("frost-leveling");
+    const hrefs = [...dom(html).querySelectorAll("article a")].map((a) => a.getAttribute("href") ?? "");
+    // The only address naming the draft is the other site's.
+    expect(hrefs.filter((h) => h.includes("fire-draft"))).toEqual(["https://example.com/beta/guides/fire-draft"]);
+    expect(hrefs).toContain("/beta/guides/warrior-tanking");
+    expect(hrefs).toContain("/beta");
+    const text = visible(html);
+    for (const words of ["the draft in beta", "the draft in beta by its address", "the draft in beta with a query", "the draft in beta with a fragment", "the draft in another version"]) {
+      expect(text, words).toContain(words);
+    }
+  });
+
   test("a guide that cites no Blizzard post says what it rests on instead", async () => {
     stubGuides(SOME);
     const html = await page("warrior-tanking");
