@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { className } from "@/components/builds/describe";
 import { Card, CopyButton, Field, SectionHeading } from "@/components/ui";
+import { restoreLines } from "@/lib/alt-workspace";
 import {
-  BACKUP_TOO_LARGE, WORKSPACE_LIMITS, applyImport, bucketKey, copyPlan, deletePlan, deviceStorage, editPlan, exportBackup,
+  BACKUP_TOO_LARGE, WORKSPACE_LIMITS, applyImport, bucketKey, copyPlan, deletePlan, deviceStorage, editPlan, exportBackup, storedCounts,
   orderState, previewImport, readPlanText, readWorkspace, sameOwner, savePlan,
   type Failure, type ImportPreview, type LocalPlan, type Owner, type PlanText, type ReadResult,
 } from "@/lib/player-workspace";
@@ -99,7 +100,7 @@ export default function DevicePlans() {
 
 function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | null; onSentDone: () => void }) {
   const [read, setRead] = useState<ReadResult | null>(null);
-  const [message, setMessage] = useState<{ text: string; alert: boolean } | null>(null);
+  const [message, setMessage] = useState<{ text: string; alert: boolean; inUse?: boolean } | null>(null);
   const reload = useCallback(() => setRead(readWorkspace(deviceStorage(), owner)), [owner]);
   useEffect(() => {
     reload();
@@ -122,7 +123,7 @@ function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | nu
   /** Shows what a change did; the list is read back from storage, so it never shows a save that did not happen. */
   const after = (result: { ok: true } | Failure, done: string) => {
     reload();
-    setMessage(result.ok ? { text: done, alert: false } : { text: result.message, alert: true });
+    setMessage(result.ok ? { text: done, alert: false } : { text: result.message, alert: true, inUse: result.error === "referenced" });
     return result.ok;
   };
   const storage = deviceStorage();
@@ -138,7 +139,12 @@ function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | nu
       <section aria-labelledby="device-plans">
         <SectionHeading id="device-plans" note={`${plans.length} of ${WORKSPACE_LIMITS.plans}, newest first. ${UNCHECKED}`}>Your plans</SectionHeading>
         <p role="status" className="mb-3 text-sm text-fg-2 empty:hidden">{message && !message.alert ? message.text : ""}</p>
-        {message?.alert && <p role="alert" className="mb-3 text-sm text-danger">{message.text}</p>}
+        {message?.alert && (
+          <p role="alert" className="mb-3 text-sm text-danger">
+            {message.text}
+            {message.inUse && <> See <a href="/tools/alts" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Alts on this device</a> to let go of it there first.</>}
+          </p>
+        )}
         {plans.length === 0 ? (
           // EmptyState's meter counts agreeing installs, which a device's own plans have nothing to do with.
           <Card>
@@ -361,6 +367,8 @@ function previewLine(p: ImportPreview): string {
 /** Download a backup of this bucket, or restore one after seeing what it would do. */
 function Backup({ owner, onRestored }: { owner: Owner; onRestored: (result: { ok: true } | Failure, done: string) => void }) {
   const [preview, setPreview] = useState<ImportPreview | null>(null);
+  // Alt by alt, what the restore adds or replaces, as Alts on this device shows it: a backup holds the alts too.
+  const [altLines, setAltLines] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
   // Gone with its bucket: a file still being read when the account changes is not previewed for the next one.
@@ -396,6 +404,7 @@ function Backup({ owner, onRestored }: { owner: Owner; onRestored: (result: { ok
     const result = previewImport(text, now.workspace);
     if (!result.ok) { setError(result.message); return; }
     setPreview(result.preview);
+    setAltLines(restoreLines(now.workspace, result.preview));
   }
 
   function restore() {
@@ -411,7 +420,8 @@ function Backup({ owner, onRestored }: { owner: Owner; onRestored: (result: { ok
       <SectionHeading id="device-plans-backup" note="A backup holds the plans this page shows. It restores only here, never into another account's plans or the signed-out ones.">Back up and restore</SectionHeading>
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" className="btn text-sm" onClick={download}>Download backup</button>
-        <label className="btn cursor-pointer text-sm">Restore from a backup
+        {/* The input inside is hidden, so the label shows the site's focus ring while it has focus. */}
+        <label className="btn cursor-pointer text-sm focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent">Restore from a backup
           <input aria-label="Choose a backup file" type="file" accept=".json,application/json" className="sr-only" disabled={reading}
             onChange={(e) => { const f = e.target.files?.[0]; if (f) void choose(f); e.target.value = ""; }} />
         </label>
@@ -421,6 +431,8 @@ function Backup({ owner, onRestored }: { owner: Owner; onRestored: (result: { ok
       {preview && (
         <div role="group" aria-label="What the restore would do" className="mt-4 space-y-3 rounded-control border border-line bg-canvas p-3">
           <p className="text-sm text-fg">{previewLine(preview)}</p>
+          {/* Two alts of one name read alike here, so a line is known by its place. */}
+          {altLines.map((line, i) => <p key={i} className="text-sm text-fg">{line}</p>)}
           {preview.warnings.length > 0 && (
             <ul className="list-disc space-y-1 pl-5 text-sm text-fg-2">{preview.warnings.map((w) => <li key={w}>{w}</li>)}</ul>
           )}
@@ -435,7 +447,8 @@ function Backup({ owner, onRestored }: { owner: Owner; onRestored: (result: { ok
 }
 
 /** Stored plans that do not read: kept as they are, with their text to download. Damaged ones can be cleared,
- *  after asking; a newer version's are left for that version to open. */
+ *  after saying everything that deletes and offering the download again; a newer version's are left for that
+ *  version to open. */
 function StoredProblem({ read, owner, onCleared }: { read: Extract<ReadResult, { ok: false }>; owner: Owner; onCleared: () => void }) {
   const [confirming, setConfirming] = useState(false);
   const raw = read.raw;
@@ -443,18 +456,38 @@ function StoredProblem({ read, owner, onCleared }: { read: Extract<ReadResult, {
     try { deviceStorage()?.removeItem(bucketKey(owner)); } catch { /* the read that follows says what is still there */ }
     onCleared();
   }
+  const download = (text: string) => saveFile(text, `everloot-plans-stored-${new Date().toISOString().slice(0, 10)}.txt`);
   return (
     <Card>
       <p role="alert" className="text-fg">{read.message}</p>
-      {raw !== null && (
+      {raw !== null && !confirming && (
         <div className="mt-4 flex flex-wrap gap-2">
-          <button type="button" className="btn text-sm" onClick={() => saveFile(raw, `everloot-plans-stored-${new Date().toISOString().slice(0, 10)}.txt`)}>Download what is stored</button>
-          {read.error === "corrupt" && (confirming
-            ? <button type="button" className="btn text-sm" onClick={clear}>Clear for good</button>
-            : <button type="button" className="btn text-sm" onClick={() => setConfirming(true)}>Clear stored plans</button>)}
+          <button type="button" className="btn text-sm" onClick={() => download(raw)}>Download what is stored</button>
+          {read.error === "corrupt" && <button type="button" className="btn text-sm" onClick={() => setConfirming(true)}>Clear stored plans</button>}
         </div>
       )}
-      {read.error === "corrupt" && <p className="mt-3 text-sm text-muted">Clearing removes them from this browser for good. Download them first to keep a copy.</p>}
+      {raw !== null && read.error === "corrupt" && confirming && (
+        <div role="group" aria-label="Clear what is stored" className="mt-4 space-y-3 rounded-control border border-line bg-canvas p-3">
+          <p className="text-sm text-fg">{clearingLine(raw, owner)}</p>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn text-sm" onClick={() => download(raw)}>Download what is stored</button>
+            <button type="button" className="btn text-sm" onClick={clear}>Clear for good</button>
+            <button type="button" className="btn text-sm" onClick={() => setConfirming(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {read.error === "corrupt" && !confirming && <p className="mt-3 text-sm text-muted">Clearing removes it from this browser for good. Download it first to keep a copy.</p>}
     </Card>
   );
+}
+
+/** Everything clearing a damaged bucket deletes, counted where the stored text allows: the bucket holds alts and
+ *  watches as well as plans, so all of them are named. */
+function clearingLine(raw: string, owner: Owner): string {
+  const whose = owner.kind === "account" ? "this account" : "this browser while signed out";
+  const counts = storedCounts(raw);
+  const held = counts
+    ? `Here that is ${plural(counts.plans, "plan")}, ${plural(counts.alts, "alt")} and ${plural(counts.watches, "watch", "watches")}${counts.notes > 0 ? `, with notes on ${counts.notes.toLocaleString("en-US")} of them` : ""}.`
+    : "It could not be read, so they cannot be counted.";
+  return `Clearing deletes everything stored on this device for ${whose}: its plans, alts and watches, and their notes. ${held} This cannot be undone, so download it first to keep a copy.`;
 }

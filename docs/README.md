@@ -25,6 +25,7 @@ architecture map.
 | [`DATA_POLICY.md`](DATA_POLICY.md) | What we publish, what we refuse, and why |
 | [`LEGACY_DATA_POLICY.md`](LEGACY_DATA_POLICY.md) | How older uploads are handled |
 | [`TALENT_CATALOG.md`](TALENT_CATALOG.md) | The talent catalog read from the game files |
+| [`GUIDES.md`](GUIDES.md) | The contract every guide meets: review, versions and history, plans, sources |
 
 ## Architecture
 

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { hashKey, KEY_PATTERN } from "./api-keys";
 import { signInPath } from "./auth/return-to";
 import {
-  BUILD_COLUMNS, CHARACTER_COLUMNS, savedBuildsOn, SLUG_PATTERN, toBuild, toCharacters,
+  ACCOUNT_MISMATCH, BUILD_COLUMNS, CHARACTER_COLUMNS, EXPECTED_OWNER_HEADER, savedBuildsOn, SLUG_PATTERN, toBuild, toCharacters,
   type AccountBuilds, type BuildCharacter, type BuildInput, type BuildRow, type CharacterInput, type CharacterRow, type SavedBuild,
 } from "./saved-builds";
 import { authQuery, getUser, siteUrl, type AccountUser } from "./supabase/server";
@@ -144,11 +144,20 @@ export const fail = (status: number, error: string, extra: Record<string, string
   NextResponse.json({ error }, { status, headers: { ...NO_STORE, ...extra } });
 export const unavailable = () => fail(503, "Saved builds are unavailable right now. Try again in a minute.");
 
-/** 404 with the switch off, 403 for a write not from this site (a missing Origin too), 401 with where to sign in, else the user. */
+/**
+ * 404 with the switch off, 403 for a write not from this site (a missing Origin too), 401 with where to sign in, 409
+ * when the request names another account than the session's (EXPECTED_OWNER_HEADER), else the user.
+ */
 export async function meAccount(req: Request, write: boolean): Promise<AccountUser | Response> {
   if (!savedBuildsOn()) return fail(404, "Not found");
   if (write && req.headers.get("origin") !== siteUrl()) return fail(403, "Invalid origin");
   const user = await getUser();
   if (!user) return NextResponse.json({ error: "Sign in to save builds.", signIn: signInPath("/me") }, { status: 401, headers: NO_STORE });
+  // Before anything is read or written: a page that names the account it shows never writes into another one.
+  const expected = req.headers.get(EXPECTED_OWNER_HEADER);
+  if (expected !== null && expected !== user.id) {
+    return NextResponse.json({ error: "This was meant for another account than the one signed in now. Nothing was saved.", code: ACCOUNT_MISMATCH },
+      { status: 409, headers: NO_STORE });
+  }
   return user;
 }

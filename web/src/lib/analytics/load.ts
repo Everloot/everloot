@@ -42,6 +42,8 @@ export function loadConsented(config: AnalyticsConfig, win: Window, doc: Documen
     const gtag = function (..._args: unknown[]) { w.dataLayer!.push(arguments); };
     win.gtag = gtag as unknown as Window["gtag"];
     gtag("js", new Date());
+    // No page location is set here: one set at load would hold for every page after it. The tag measures each event at
+    // the address as it is then, and leaves the fragment out itself (the calculator's #plan=…).
     gtag("config", config.gaId);
     const script = doc.createElement("script");
     script.id = GA_ID;
@@ -58,11 +60,22 @@ export function loadConsented(config: AnalyticsConfig, win: Window, doc: Documen
     script.src = "https://tracker.metricool.com/resources/be.js";
     script.onload = () => {
       if (started === generation && doc.getElementById(METRICOOL_ID) === script) {
-        win.beTracker?.t({ hash: config.metricoolHash! });
+        // The tracker sets the visit's `u` from the address bar and its `ref` from the referrer itself. Given values it
+        // cannot change, it sends the page's URL without the fragment or search terms, and a referrer on this site
+        // without search terms, instead; a tracker that refuses that sends nothing.
+        const visit = { hash: config.metricoolHash! };
+        Object.defineProperty(visit, "u", { value: stripSearchQuery(stripFragment(win.location.href)), enumerable: true });
+        if (sameSite(doc.referrer, win.location.origin)) Object.defineProperty(visit, "ref", { value: stripSearchQuery(doc.referrer), enumerable: true });
+        try { win.beTracker?.t(visit); } catch {}
       }
     };
     doc.head.appendChild(script);
   }
+}
+
+/** Whether a URL is on this site's origin. */
+function sameSite(url: string, origin: string): boolean {
+  try { return url !== "" && new URL(url).origin === origin; } catch { return false; }
 }
 
 /** Removes the `q` (search terms) parameter from a URL. Relative or unparsable values are returned unchanged. */
@@ -78,17 +91,48 @@ export function stripSearchQuery(url: unknown): unknown {
   }
 }
 
-/** posthog-js before_send hook: drops search terms from page URLs, and from the referrer when it is this site. */
-export function scrubEvent<T extends { properties?: Record<string, unknown> } | null>(event: T, origin?: string): T {
-  const props = event?.properties;
-  if (!props) return event;
-  for (const key of ["$current_url", "$initial_current_url", "$session_entry_url"]) {
-    if (key in props) props[key] = stripSearchQuery(props[key]);
+/**
+ * A URL without its fragment. The calculator keeps a plan there (#plan=…&order=…), and no analytics tool needs a
+ * fragment, so none gets one. Relative or unparsable values are returned unchanged.
+ */
+export function stripFragment(url: unknown): unknown {
+  if (typeof url !== "string" || !url.includes("#") || !/^https?:\/\//i.test(url)) return url;
+  try {
+    const u = new URL(url);
+    u.hash = "";
+    return u.toString();
+  } catch {
+    return url;
   }
-  for (const key of ["$referrer", "$initial_referrer", "$session_entry_referrer"]) {
-    const ref = props[key];
-    if (typeof ref === "string" && origin) {
-      try { if (new URL(ref).origin === origin) props[key] = stripSearchQuery(ref); } catch {}
+}
+
+/** Every URL among an event's values, nested ones included, without its fragment. Changes them in place. */
+function dropFragments(value: unknown): unknown {
+  if (typeof value === "string") return stripFragment(value);
+  if (typeof value === "object" && value !== null) {
+    const values = value as Record<string, unknown>;
+    for (const key of Object.keys(values)) values[key] = dropFragments(values[key]);
+  }
+  return value;
+}
+
+/**
+ * posthog-js before_send hook: drops the fragment from every URL an event carries, in its properties and in the
+ * person properties it sets, and search terms from page URLs and from the referrer when it is this site.
+ */
+export function scrubEvent<T extends { properties?: Record<string, unknown>; $set?: Record<string, unknown>; $set_once?: Record<string, unknown> } | null>(event: T, origin?: string): T {
+  if (!event) return event;
+  for (const props of [event.properties, event.$set, event.$set_once]) {
+    if (!props) continue;
+    dropFragments(props);
+    for (const key of ["$current_url", "$initial_current_url", "$session_entry_url"]) {
+      if (key in props) props[key] = stripSearchQuery(props[key]);
+    }
+    for (const key of ["$referrer", "$initial_referrer", "$session_entry_referrer"]) {
+      const ref = props[key];
+      if (typeof ref === "string" && origin) {
+        try { if (new URL(ref).origin === origin) props[key] = stripSearchQuery(ref); } catch {}
+      }
     }
   }
   return event;

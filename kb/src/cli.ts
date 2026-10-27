@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -55,6 +55,8 @@ import { openPublicSnapshot } from "./public-snapshot.js";
 import { search } from "./search.js";
 import { snapshot } from "./snapshot.js";
 import { validate } from "./validate.js";
+import { checkGuides } from "./guides/check.js";
+import { GUIDES_DIR, loadGuideCheckContext, readGuideFiles } from "./guides/data.js";
 import { checkNews } from "./news/check.js";
 import { NEWS_DIR, publishedWikiSlugs, readNewsPosts } from "./news/data.js";
 import { checkWiki } from "./wiki/check.js";
@@ -211,6 +213,11 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
   news-check [--dir <kb>/news]
     (the news posts' check: front matter, slugs, dates, [[links]] against the published wiki pages, tokens, the
     prose bar for published posts, private paths and AI credits. Exits 1 on any problem. See news/README.md)
+  guide-check [--dir <kb>/guides] [--previous <folder>]
+    (the guides' check: front matter, review and history, codes and spend orders against the site's talent
+    trees, sections, sources, links and tokens. --previous is a copy of kb/guides from before the change, such
+    as a pull request's base: published versions are then held to it. A --previous that is not a folder fails;
+    an empty one means there were no guides. Exits 1 on any problem. See ../docs/GUIDES.md)
 
   A source database and a public release are different artifacts. The serve commands accept only a
   release: an existing file plus its <release>.manifest.json, opened read-only and checked against
@@ -790,6 +797,21 @@ async function main(): Promise<number> {
       for (const p of result.problems) console.error(`${p.file}${p.line ? `:${p.line}` : ""}: ${p.message}`);
       const published = result.posts.filter((p) => p.fm.status === "published").length;
       console.log(`${result.posts.length} posts (${published} published, ${result.posts.length - published} draft), ${result.problems.length} problems`);
+      return result.problems.length ? 1 : 0;
+    }
+    case "guide-check": {
+      const dir = flags.get("dir") || GUIDES_DIR;
+      const previousDir = flags.get("previous");
+      // Comparing with a folder that is not there would let any change to a published guide through.
+      if (previousDir !== undefined && !(previousDir && statSync(previousDir, { throwIfNoEntry: false })?.isDirectory())) {
+        throw new Error(`guide-check: --previous ${previousDir ? `${previousDir} is not a folder` : "needs a folder"}; nothing was checked`);
+      }
+      const previous = previousDir === undefined ? undefined : readGuideFiles(previousDir);
+      const result = checkGuides(readGuideFiles(dir), { ...loadGuideCheckContext(), ...(previous ? { previous } : {}) });
+      for (const p of result.problems) console.error(`${p.file}${p.line ? `:${p.line}` : ""}: ${p.message}`);
+      const published = result.guides.filter((g) => g.fm.status === "published").length;
+      console.log(`${result.guides.length} guides (${published} published, ${result.guides.length - published} draft), ${result.problems.length} problems`);
+      console.log(previous ? `compared with ${previous.length} guides from before the change` : "not compared with the guides from before the change; pass --previous for that");
       return result.problems.length ? 1 : 0;
     }
     case "snapshot":

@@ -3,7 +3,7 @@ import buildsFile from "../../../kb/changes/builds.json";
 import writeupsFile from "../../../kb/curated/blue-writeups.json";
 import type { BlueStore } from "../../../kb/src/blue-posts";
 import { writeupsById, type BlueWriteup } from "../../../kb/src/blue-writeups";
-import { buildTimeline, groupAnnouncements, type BuildLike, type ChangeEntry } from "../../../kb/src/changes";
+import { buildTimeline, groupAnnouncements, postPath, type BuildLike, type ChangeEntry } from "../../../kb/src/changes";
 import { BLUE_POSTS_KEY, bluePosts, blueStorage } from "./blue-store";
 
 export {
@@ -40,4 +40,13 @@ export function loadWriteups(): Map<string, BlueWriteup> {
 /** An announcement's write-up, whichever of its copies it was written for. */
 export function writeupFor(entry: ChangeEntry, writeups: Map<string, BlueWriteup>): BlueWriteup | null {
   return [entry, ...(entry.copies ?? [])].map((c) => writeups.get(c.id)).find(Boolean) ?? null;
+}
+
+const sameAddress = (url: string) => url.trim().replace(/[?#].*$/, "").replace(/\/+$/, "").toLowerCase();
+
+/** The Everloot page of the Blizzard post a link points at (the announcement or one of its copies), or null. */
+export function postPathForUrl(url: string, timeline: ChangeEntry[]): string | null {
+  const address = sameAddress(url);
+  const entry = timeline.find((e) => e.type !== "build" && [e, ...(e.copies ?? [])].some((c) => c.url !== null && sameAddress(c.url) === address));
+  return entry ? postPath(entry) : null;
 }

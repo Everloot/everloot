@@ -97,5 +97,8 @@ test("/accessibility says what is in place, what was checked and when, what was 
 
 test("/contact points copyright and takedown requests at the terms", async () => {
   const { default: Contact } = await import("./contact/page");
-  expect(renderToStaticMarkup(<Contact />)).toContain('href="/terms#takedown"');
+  const html = renderToStaticMarkup(<Contact />);
+  expect(html).toContain('href="/terms#takedown"');
+  expect(html).toContain('href="https://support.blizzard.com/"');
+  expect(visible(html)).not.toContain("can't see or change your Blizzard account");
 });

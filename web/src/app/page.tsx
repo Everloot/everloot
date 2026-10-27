@@ -75,28 +75,16 @@ export default async function Home() {
       <JsonLd data={organizationJsonLd()} />
       <JsonLd data={websiteJsonLd()} />
 
-      {/* The hero: the section banner at full height, over the game's own loading screen, with its logo.
+      {/* The hero: the section banner at full height, over the game's own loading screen.
           The scripts above it would give it the list's top margin; the banner meets the site header instead. */}
       <section aria-labelledby="hero-title" data-launch-banner={launch ? "" : undefined} className="!mt-0">
         <Banner
           hero
           image={launch?.background && <BannerArt art={launch.background} eager position={HERO_ART_POSITION} sizes={HERO_ART_SIZES} />}
           aside={launch && (
-            // The game's name and the disclaimer stay real text under its logo; the logo is decorative. On a
-            // phone only the disclaimer shows, under the buttons, to keep the hero short.
+            // Keep the game name as text on every screen; the hero uses Everloot's branding.
             <div className="lg:text-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={launch.logo.url}
-                alt=""
-                aria-hidden="true"
-                width={launch.logo.width}
-                height={launch.logo.height}
-                decoding="async"
-                className="mx-auto mb-3 hidden h-28 w-28 object-contain lg:block"
-              />
-              <p className="hidden font-semibold text-fg lg:block">World of Warcraft: Forever</p>
-              <p className="text-xs text-fg-2 lg:mt-1 lg:text-sm">Not affiliated with or endorsed by Blizzard Entertainment.</p>
+              <p className="text-sm font-semibold text-fg lg:text-base">World of Warcraft: Forever</p>
             </div>
           )}
         >

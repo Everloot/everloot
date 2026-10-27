@@ -284,7 +284,7 @@ describe("the committed map data", () => {
 
   test("is stamped with a build and labelled as game file data, not our licence", () => {
     expect(committed.schema).toBe(WORLD_MAP_SCHEMA);
-    expect(committed.source).toMatchObject({ product: "wow_classic_beta", status: "found in game files, unconfirmed", licence: "Blizzard game data, not under our licence" });
+    expect(committed.source).toMatchObject({ product: "wowf", status: "found in game files, unconfirmed", licence: "Blizzard game data, not under our licence" });
     expect(committed.source.buildId).toBeGreaterThan(70000);
     expect(committed.source.tables.map((t) => t.table).sort()).toEqual(["AreaTable", "ContentTuning", "LFGDungeons", "Map", "MapDifficulty", "TaxiNodes", "TaxiPath", "TaxiPathNode", "TerrainArea", "UiMap", "UiMapAssignment"]);
   });

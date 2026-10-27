@@ -5,12 +5,12 @@
     "status": "found in game files, unconfirmed",
     "licence": "Blizzard game data, not under our licence",
     "licenceUrl": "https://github.com/Everloot/everloot/blob/main/docs/DATA_POLICY.md",
-    "product": "wow_classic_beta",
-    "buildId": 70532,
-    "version": "1.60.1.70532",
-    "buildConfig": "ad1802f4455e427ed8b7769aab25b0c0",
-    "definitions": "12ce70d5fef1",
-    "extractedAt": "2026-10-25T23:52:06.422Z",
+    "product": "wowf",
+    "buildId": 70630,
+    "version": "1.60.1.70630",
+    "buildConfig": "644ffedb0d59bb0da2af9011b36f44db",
+    "definitions": "05e242b6acdc",
+    "extractedAt": "2026-10-27T06:57:32.302Z",
     "tables": [
       {
         "table": "Map",
@@ -29,17 +29,17 @@
       },
       {
         "table": "TaxiNodes",
-        "rows": 100,
+        "rows": 101,
         "encryptedBlocks": 0
       },
       {
         "table": "TaxiPath",
-        "rows": 328,
+        "rows": 329,
         "encryptedBlocks": 0
       },
       {
         "table": "TaxiPathNode",
-        "rows": 10778,
+        "rows": 10782,
         "encryptedBlocks": 0
       },
       {
@@ -64,7 +64,7 @@
       },
       {
         "table": "TerrainArea",
-        "rows": 25600,
+        "rows": 25856,
         "encryptedBlocks": 0
       }
     ]

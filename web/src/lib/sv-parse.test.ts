@@ -65,6 +65,24 @@ describe("SavedVariables parser", () => {
     expect(parseEverlootLua(SV)).not.toHaveProperty("clientBuild");
   });
 
+  test("a row's kind is the table it is in: a field of the row cannot change it", () => {
+    const text = `EverlootDB = { version = "0.3.12", installId = "abcd-1234", records = {
+      census_seen = { { kind = "gold_snapshot", character = "Arthas", realm = "Forever", capturedAt = "2026-10-27T00:00:00Z" } },
+    } }`;
+    expect(parseEverlootLua(text).records).toEqual([
+      { kind: "census_seen", installId: "abcd-1234", character: "Arthas", realm: "Forever", capturedAt: "2026-10-27T00:00:00Z" },
+    ]);
+  });
+
+  test("the file is the export and nothing else: whitespace, comments and a semicolon around it, never other text", () => {
+    expect(parseEverlootLua(`${SV}\n-- written by the game\n\n`).records).toHaveLength(3);
+    expect(parseEverlootLua(`\n\n${SV.replace("};", "}")}`).records).toHaveLength(3);
+    const commentedOut = `-- EverlootDB = { version = "0.1.0", installId = "abcd-1234", records = {} }\n`;
+    for (const text of [`${SV}\nthis is not valid Lua !!!`, `${SV}\nEverlootOther = {}`, `garbage\n${SV}`, `x${SV.replace("-- Everloot export\n", "")}`, `${SV};`, commentedOut]) {
+      expect(() => parseEverlootLua(text), JSON.stringify(text.slice(-30))).toThrow(LuaParseError);
+    }
+  });
+
   test("rejects non-exports and malformed tables", () => {
     expect(() => parseEverlootLua("x = 1")).toThrow(LuaParseError);
     expect(() => parseEverlootLua("EverlootDB = { version = ")).toThrow(LuaParseError);

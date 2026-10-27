@@ -1,0 +1,327 @@
+// @vitest-environment jsdom
+import { act, useLayoutEffect, type ReactNode } from "react";
+import { createRoot, hydrateRoot, type Root } from "react-dom/client";
+import { renderToStaticMarkup, renderToString } from "react-dom/server";
+import { afterEach, expect, test, vi } from "vitest";
+import { loadCatalog } from "@/lib/talents/catalogs";
+import { fixture } from "@/lib/talents/fixture";
+import { encodeBuild } from "@/lib/talents/share";
+import type { Ranks, TalentCatalog } from "@/lib/talents/types";
+import FreshnessNote from "./FreshnessNote";
+import TalentClassView from "./TalentClassView";
+
+vi.mock("@/lib/analytics/track", () => ({ track: vi.fn() }));
+vi.mock("next/link", () => ({
+  default: (props: { href: string; children: ReactNode; className?: string; "aria-current"?: "page" }) => <a {...props} />,
+}));
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
+// Change records in the build watch's shape (kb/src/build-watch/changes.ts), on the made-up test tree.
+const EMPTY = { classesAdded: [], classesRemoved: [], added: [], removed: [], moved: [], ranks: [], gates: [], prereqs: [], replaced: [], spellValues: [], pointLevels: [] };
+const ref = (version: string) => ({ version, buildId: Number(version.split(".").at(-1)), buildConfig: `config-${version}` });
+const record = (build: string, previous: string, talents: Record<string, unknown[]> = {}, spoiler = false) => ({
+  schema: "everloot.game-changes/2", label: "found in game files, unconfirmed", id: `test-${ref(build).buildId}`, product: "test",
+  live: !spoiler, spoiler, detectedAt: "2026-10-01T00:00:00.000Z", build: ref(build), previous: ref(previous), initial: false,
+  encryptedBlocks: { total: 0, tables: [] }, source: { definitions: null, library: "test", extractedAt: "2026-10-01T00:00:00.000Z" },
+  catalog: { classes: 9, nodes: 12 }, talents: { ...EMPTY, ...talents }, raidBuffs: null, mapChanges: null, readSet: null, warnings: [],
+});
+const at = (nodeId: number, extra: Record<string, unknown> = {}) => ({ classId: 8, className: "Mage", tree: "Left", nodeId, name: `Talent ${nodeId}`, spoiler: false, ...extra });
+
+const tree: TalentCatalog = { ...fixture, build: "1.0.0.5" };
+const records = (spoiler = false) => [
+  record("1.0.0.5", "1.0.0.3", { ranks: [at(11, { before: 5, after: 3, spoiler })] }, spoiler),
+  record("1.0.0.3", "1.0.0.1", { removed: [at(21, { maxRanks: 5, spoiler })] }, spoiler),
+];
+const code = (build: string, ranks: Ranks = { 11: { rank: 5 }, 21: { rank: 2 } }, classSlug = "mage") => encodeBuild({ classSlug, specId: 1482, build, ranks });
+const page = (html: string) => new DOMParser().parseFromString(html, "text/html");
+const NOTE = 'section[aria-label="Game build changes"]';
+
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === "object") {
+    for (const v of Object.values(value)) deepFreeze(v);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+// The tests of what the note says read it as a saved build's page renders it, at once (followsAddress={false}). A build
+// link's note waits for the browser to read the address; the tests further down cover that.
+
+test("says nothing without a plan from an older build: no codes, codes made on this tree's build, damaged codes or another class's", () => {
+  const html = (codes?: (string | null)[]) => renderToStaticMarkup(<FreshnessNote catalog={tree} codes={codes} entries={records()} followsAddress={false} />);
+  expect(html()).toBe("");
+  expect(html([null, null])).toBe("");
+  expect(html([code("1.0.0.5"), null])).toBe("");
+  // The calculator's own report says why these did not load.
+  expect(html(["not a code", "EL1-mage-1482-1.0.0.1-%%%"])).toBe("");
+  expect(html([code("1.0.0.1", { 11: { rank: 5 } }, "druid")])).toBe("");
+});
+
+test("lists what changed for each set that was made on an older build, labelled as game file data", () => {
+  const doc = page(renderToStaticMarkup(<FreshnessNote catalog={tree} codes={[code("1.0.0.1"), code("1.0.0.3", { 11: { rank: 4 } })]} entries={records()} followsAddress={false} />));
+  const note = doc.querySelector(NOTE)!;
+  const sets = [...note.querySelectorAll(":scope > div")];
+  expect(sets.map((s) => s.querySelector("p")!.textContent)).toEqual([
+    "Set 1: Made on game build 1.0.0.1; this tree is build 1.0.0.5.",
+    "Set 2: Made on game build 1.0.0.3; this tree is build 1.0.0.5.",
+  ]);
+  expect([...sets[0].querySelectorAll("li")].map((li) => li.textContent)).toEqual([
+    "Talent 21: removed in build 1.0.0.3 (this plan spends 2 points in it).",
+    "Talent 11: its maximum rank went from 5 to 3 in build 1.0.0.5 (this plan spends 5 points in it).",
+    "Check these talents before you follow the plan.",
+  ]);
+  expect([...sets[1].querySelectorAll("li")].map((li) => li.textContent)).toEqual([
+    "Talent 11: its maximum rank went from 5 to 3 in build 1.0.0.5 (this plan spends 4 points in it).",
+    "Check these talents before you follow the plan.",
+  ]);
+  expect(note.textContent).toContain("found in game files, unconfirmed");
+
+  // One set: no set label.
+  const one = page(renderToStaticMarkup(<FreshnessNote catalog={tree} codes={[code("1.0.0.3", { 11: { rank: 4 } }), null]} entries={records()} followsAddress={false} />));
+  expect(one.querySelector(`${NOTE} p`)!.textContent).toBe("Made on game build 1.0.0.3; this tree is build 1.0.0.5.");
+});
+
+test("a spoiler build's changes are counted but not shown, unless the reader turned spoilers on", () => {
+  const hidden = page(renderToStaticMarkup(<FreshnessNote catalog={tree} codes={[code("1.0.0.1")]} entries={records(true)} followsAddress={false} />)).querySelector(NOTE)!;
+  expect(hidden.textContent).toContain("2 of this plan's talents changed in builds players cannot play yet (1.0.0.3, 1.0.0.5). Spoilers are not shown here.");
+  expect(hidden.textContent).not.toMatch(/Talent 11|Talent 21|maximum rank|removed/);
+  const shown = page(renderToStaticMarkup(<FreshnessNote catalog={tree} codes={[code("1.0.0.1")]} entries={records(true)} spoilers followsAddress={false} />)).querySelector(NOTE)!;
+  expect(shown.textContent).toContain("Talent 21: removed in build 1.0.0.3");
+});
+
+test("with spoilers off, a talent a spoiler build renamed keeps the name its public change has", () => {
+  const mixed = [
+    record("1.0.0.5", "1.0.0.3", { ranks: [at(11, { name: "Hidden Name", before: 4, after: 3 })] }, true),
+    record("1.0.0.3", "1.0.0.1", { ranks: [at(11, { before: 5, after: 4 })] }),
+  ];
+  const html = renderToStaticMarkup(<FreshnessNote catalog={tree} codes={[code("1.0.0.1", { 11: { rank: 5 } })]} entries={mixed} followsAddress={false} />);
+  expect(html).not.toContain("Hidden Name");
+  expect([...page(html).querySelectorAll(`${NOTE} li`)].map((li) => li.textContent)).toEqual([
+    "Talent 11: its maximum rank went from 5 to 4 in build 1.0.0.3 (this plan spends 5 points in it).",
+    "1 of this plan's talents changed in a build players cannot play yet (1.0.0.5). Spoilers are not shown here.",
+    "Check each talent before you follow the plan.",
+  ]);
+});
+
+// The address the calculator reads. Waits for the change event, so each step is one hashchange.
+async function setHash(hash: string) {
+  if (window.location.hash === hash) return;
+  await new Promise((resolve) => {
+    window.addEventListener("hashchange", resolve, { once: true });
+    window.location.hash = hash;
+  });
+}
+
+async function mounted(codes: (string | null)[], run: (shown: () => boolean, go: (hash: string) => Promise<void>) => Promise<void>) {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const writes = [vi.spyOn(window.history, "replaceState"), vi.spyOn(window.history, "pushState"), vi.spyOn(Storage.prototype, "setItem")];
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  try {
+    await act(async () => root.render(<FreshnessNote catalog={tree} codes={codes} entries={records()} />));
+    await run(() => container.querySelector(NOTE) !== null, (hash) => act(() => setHash(hash)));
+    // Following the address never writes it, or anything else.
+    for (const write of writes) expect(write).not.toHaveBeenCalled();
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    await setHash("");
+  }
+}
+
+/** Says, at the first commit and before any passive effect has run, whether the note is in the document. */
+function FirstCommit({ seen }: { seen: (present: boolean) => void }) {
+  useLayoutEffect(() => {
+    seen(document.querySelector(NOTE) !== null);
+  }, [seen]);
+  return null;
+}
+
+test("the note waits for the address check: not in the server HTML or the first commit, then shown when the address holds no other plan", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const errors = vi.spyOn(console, "error");
+  const opened = code("1.0.0.1");
+  // A saved build's page does not follow the address, so its note is in the server HTML.
+  expect(renderToString(<FreshnessNote catalog={tree} codes={[opened, null]} entries={records()} followsAddress={false} />)).toContain("Game build changes");
+  for (const [hash, shown] of [["", true], [`#plan=${opened}`, true], [`#plan=${code("1.0.0.3", { 11: { rank: 4 } })}`, false]] as const) {
+    await setHash(hash);
+    const note = <FreshnessNote catalog={tree} codes={[opened, null]} entries={records()} />;
+    const html = renderToString(<div>{note}</div>);
+    expect(html, hash).not.toContain("Game build changes");
+    const container = document.createElement("div");
+    container.innerHTML = html;
+    document.body.append(container);
+    const firstCommit: boolean[] = [];
+    let root: Root | undefined;
+    try {
+      await act(async () => { root = hydrateRoot(container, <div>{note}<FirstCommit seen={(present) => firstCommit.push(present)} /></div>); });
+      expect(firstCommit, hash).toEqual([false]);
+      expect(container.querySelector(NOTE) !== null, hash).toBe(shown);
+    } finally {
+      await act(async () => root?.unmount());
+      container.remove();
+    }
+  }
+  await setHash("");
+  // The server HTML and the first client render agree: no hydration error.
+  expect(errors).not.toHaveBeenCalled();
+});
+
+test("a different plan already in the address when the page opens hides the note: the calculator shows that plan", async () => {
+  const opened = code("1.0.0.1");
+  await setHash(`#plan=${code("1.0.0.3", { 11: { rank: 4 } })}`);
+  await mounted([opened, null], async (shown, go) => {
+    expect(shown()).toBe(false);
+    // The link's own codes, as the calculator writes them into the address; an order rides along and does not count.
+    await go(`#plan=${opened}&order=O1p-AAAAAB`);
+    expect(shown()).toBe(true);
+  });
+});
+
+test("a plan pasted into the address after the page opens hides the note; an anchor on the page leaves it as it is", async () => {
+  const opened = code("1.0.0.1");
+  const other = code("1.0.0.3", { 11: { rank: 4 } });
+  await mounted([opened, null], async (shown, go) => {
+    // No plan in the address: the page shows the codes it opened with.
+    expect(shown()).toBe(true);
+    await go("#how-it-works");
+    expect(shown()).toBe(true);
+    await go(`#plan=${other}`);
+    expect(shown()).toBe(false);
+    await go("#how-it-works");
+    expect(shown()).toBe(false);
+    // A second set the note was not made for.
+    await go(`#plan=${opened}&plan2=${other}`);
+    expect(shown()).toBe(false);
+    await go(`#plan=${opened}`);
+    expect(shown()).toBe(true);
+  });
+});
+
+// The real page at an address: the class view, its calculator and the note, with the published records. The tree status
+// says which plan the calculator shows: one point in a first-row talent, or two.
+async function onPage(url: string, props: Omit<Parameters<typeof TalentClassView>[0], "slug">, check: (shown: boolean, status: string, container: HTMLElement) => void) {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.spyOn(window, "scrollBy").mockImplementation(() => {});
+  window.history.replaceState(null, "", url);
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  try {
+    const view = await TalentClassView({ slug: "mage", ...props });
+    await act(async () => root.render(view));
+    check(container.querySelector(NOTE) !== null, container.querySelector("[data-tree-status]")!.textContent!, container);
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    window.history.replaceState(null, "", "/");
+  }
+}
+
+async function mageCodes() {
+  const catalog = await loadCatalog("mage");
+  const node = catalog.nodes.find((n) => n.row === 1 && n.maxRanks >= 2)!;
+  const made = (build: string, rank: number) => encodeBuild({ classSlug: "mage", specId: catalog.specId, build, ranks: { [node.id]: { rank } } });
+  return { one: made("1.60.1.70450", 1), two: made("1.60.1.70532", 2) };
+}
+
+test("with the calculator: a build link opened with another fragment loads its own codes, and the note stays", async () => {
+  const { one } = await mageCodes();
+  for (const fragment of ["how-it-works", "order=O1p-A"]) {
+    await onPage(`/tools/talents/mage/b/${one}#${fragment}`, { initialCodes: [one, null] }, (shown, status) => {
+      // The calculator loads the link's codes, keeps the rest of the fragment, and then writes the plan it shows into
+      // the address as its own code, on this tree's build. It writes without a hashchange, so the note stays.
+      expect(window.location.pathname).toBe("/tools/talents/mage");
+      expect(window.location.hash).toMatch(/plan=EL1-mage-/);
+      expect(window.location.hash).toContain(fragment);
+      expect(status).toBe("50 left · Set 1");
+      expect(shown).toBe(true);
+    });
+  }
+});
+
+test("with the calculator: a build link opened with another plan in its address shows that plan, and not the link's note", async () => {
+  const { one, two } = await mageCodes();
+  await onPage(`/tools/talents/mage/b/${one}#plan=${two}`, { initialCodes: [one, null] }, (shown, status) => {
+    expect(status).toBe("49 left · Set 1");
+    expect(shown).toBe(false);
+  });
+});
+
+test("with the calculator: a saved build's page shows its own plan whatever the address holds, so its note stays", async () => {
+  const { one, two } = await mageCodes();
+  await onPage(`/b/saved-plan#plan=${two}`, { initialCodes: [one, null], saved: { name: "Saved plan", notes: null, meta: null, actions: null } }, (shown, status) => {
+    expect(status).toBe("50 left · Set 1");
+    expect(shown).toBe(true);
+  });
+});
+
+test("missing records make the change history unknown, never unchanged", () => {
+  const note = page(renderToStaticMarkup(<FreshnessNote catalog={tree} codes={[code("1.0.0.1")]} entries={[records()[0]]} followsAddress={false} />)).querySelector(NOTE)!;
+  expect([...note.querySelectorAll("li")].map((li) => li.textContent)).toEqual([
+    "Talent 11: its maximum rank went from 5 to 3 in build 1.0.0.5 (this plan spends 5 points in it).",
+    "There is no change record for game build 1.0.0.3, so changes between 1.0.0.1 and 1.0.0.3 are unknown.",
+    "Check each talent before you follow the plan.",
+  ]);
+  const none = page(renderToStaticMarkup(<FreshnessNote catalog={tree} codes={[code("1.0.0.1")]} entries={[]} followsAddress={false} />)).querySelector(NOTE)!;
+  expect(none.textContent).toContain("There is no change record for game build 1.0.0.5, so changes between 1.0.0.1 and 1.0.0.5 are unknown.");
+  expect(none.textContent).not.toMatch(/changed none/);
+});
+
+test("rendering the warning never saves or restamps the plan: no storage, no network, no new code or link, its inputs as given", () => {
+  const setItem = vi.spyOn(Storage.prototype, "setItem");
+  const removeItem = vi.spyOn(Storage.prototype, "removeItem");
+  const fetch = vi.fn();
+  vi.stubGlobal("fetch", fetch);
+  const original = code("1.0.0.1");
+  const codes = Object.freeze([original, null]);
+  const entries = deepFreeze(records());
+  const before = JSON.stringify(entries);
+  const html = renderToStaticMarkup(<FreshnessNote catalog={deepFreeze({ ...tree })} codes={codes} entries={entries} followsAddress={false} />);
+  expect(html).toContain("Made on game build 1.0.0.1; this tree is build 1.0.0.5.");
+  expect(setItem).not.toHaveBeenCalled();
+  expect(removeItem).not.toHaveBeenCalled();
+  expect(fetch).not.toHaveBeenCalled();
+  expect(codes).toEqual([original, null]);
+  expect(JSON.stringify(entries)).toBe(before);
+  // Nothing in the note could carry the plan to this tree's build: no share code, no link, no button.
+  expect(html).not.toMatch(/EL1-|#plan=|href=|<button|<form/);
+});
+
+test("a build link made on an older game build gets the note under the calculator; the class page and a link on this tree's build get none", async () => {
+  const catalog = await loadCatalog("mage");
+  const node = catalog.nodes.find((n) => n.row === 1)!;
+  const made = (build: string) => encodeBuild({ classSlug: "mage", specId: catalog.specId, build, ranks: { [node.id]: { rank: 1 } } });
+  const older = made("1.60.1.1");
+  const html = async (initialCodes?: (string | null)[], saved?: boolean) => page(renderToStaticMarkup(await TalentClassView({
+    slug: "mage", initialCodes, ...(saved ? { saved: { name: "Saved plan", notes: null, meta: null, actions: null } } : {}),
+  })));
+
+  expect((await html()).querySelector(NOTE)).toBeNull();
+  expect((await html([made(catalog.build), null])).querySelector(NOTE)).toBeNull();
+  // A build link's note waits for the browser to read the address; a saved build's page shows it at once.
+  expect((await html([older, null])).querySelector(NOTE)).toBeNull();
+  const saved = await html([older, null], true);
+
+  const expectNote = (doc: ParentNode) => {
+    const note = doc.querySelector(NOTE)!;
+    expect(note.querySelector("p")!.textContent).toBe(`Made on game build 1.60.1.1; this tree is build ${catalog.build}.`);
+    // No record reaches back to 1.60.1.1, so the note cannot say the plan is unchanged.
+    expect(note.textContent).toMatch(/so changes between 1\.60\.1\.1 and [\d.]+ are unknown\./);
+    expect(note.textContent).not.toMatch(/changed none/);
+    // Under the calculator, not above it: the tree keeps its place on a phone.
+    const calculator = doc.querySelector("[data-calculator]")!;
+    expect(calculator.contains(note)).toBe(false);
+    expect(calculator.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  };
+  expectNote(saved);
+  await onPage(`/tools/talents/mage/b/${older}`, { initialCodes: [older, null] }, (shown, _status, container) => {
+    expect(shown).toBe(true);
+    expectNote(container);
+  });
+});

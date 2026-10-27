@@ -33,6 +33,11 @@ describe("isProtectedPath", () => {
       expect(isProtectedPath(path), path).toBe(false);
     }
   });
+
+  test("Alts on this device is protected too, under the served prefix; look-alikes are not", () => {
+    for (const path of ["/tools/alts", "/tools/alts/x", "/beta/tools/alts"]) expect(isProtectedPath(path), path).toBe(true);
+    for (const path of ["/tools/altsx", "/tools/alt", "/ptr/tools/alts"]) expect(isProtectedPath(path), path).toBe(false);
+  });
 });
 
 describe("documentPathname", () => {
@@ -75,6 +80,12 @@ describe("crossesDocumentBoundary", () => {
     expect(crossesDocumentBoundary("/tools/talents/mage", fakeWindow("/tools/talents/mage", "https://everloot.app/tools/builds"))).toBe(true);
     expect(crossesDocumentBoundary("/tools/builds", fakeWindow("/tools/builds", "https://everloot.app/settings"))).toBe(false);
   });
+
+  test("going from a public page to Alts on this device crosses it, and so does opening a plan from an alt; the plans page does not", () => {
+    expect(crossesDocumentBoundary("/tools/alts", fakeWindow("/tools/alts", "https://everloot.app/tools"))).toBe(true);
+    expect(crossesDocumentBoundary("/tools/talents/mage", fakeWindow("/tools/talents/mage", "https://everloot.app/tools/alts"))).toBe(true);
+    expect(crossesDocumentBoundary("/tools/alts", fakeWindow("/tools/alts", "https://everloot.app/tools/builds"))).toBe(false);
+  });
 });
 
 /** The headers a request for `path` gets: Next applies every matching entry in order, and a later entry's key wins. */
@@ -91,7 +102,8 @@ describe("Plans on this device's document", () => {
   test("gets the protected pages' policy: scripts from this site only, no frames, and no ad or analytics host to connect to", async () => {
     const strict = (await headersFor("/chat"))["Content-Security-Policy"]!;
     const site = await headersFor("/");
-    for (const path of ["/tools/builds", "/beta/tools/builds"]) {
+    // Alts on this device holds the same workspace, with the alts' notes, and gets the same policy.
+    for (const path of ["/tools/builds", "/beta/tools/builds", "/tools/alts", "/beta/tools/alts"]) {
       const got = await headersFor(path);
       expect(got["Content-Security-Policy"], path).toBe(strict);
       // The microphone stays Chat's alone.
