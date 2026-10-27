@@ -30,6 +30,8 @@ let who: string | null;
 let off: boolean;
 /** /api/auth/me fails while set. */
 let authDown: boolean;
+/** No network at all while set: every request rejects, as fetch does when the connection is gone. */
+let offline: boolean;
 /** Each account's characters and builds, as GET /api/me/builds lists them. */
 let accounts: Record<string, { characters: object[]; builds: Build[] }>;
 /** Every POST that reached the site: the account it was sent as, and the one the page said it was for. */
@@ -81,9 +83,11 @@ function api(state: "in" | "out" | "off", builds = [saved()]) {
   held = new Map();
   off = state === "off";
   authDown = false;
+  offline = false;
   who = state === "out" ? null : A;
   accounts = { [A]: { characters: [jaina], builds } };
   vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+    if (offline) throw new TypeError("Failed to fetch");
     const response = answer(url, init);
     const request = `${init?.method ?? "GET"} ${url}`;
     const wait = held.get(request);
@@ -665,6 +669,42 @@ test("when this tab cannot tell which account is signed in, it shows no builds a
   expect(menu()!.textContent).toContain("Fire");
   expect(saveButton().disabled).toBe(false);
   expect(bar().textContent).not.toContain(UNCHECKED);
+});
+
+test("the list read for A after another tab switched to B is refused: B's builds never show as A's, and the tab asks again", async () => {
+  api("in");
+  accounts[B] = { characters: [], builds: [saved({ id: NEW_ID, name: "Their frost", slug: "TheirOne" })] };
+  // This tab learns it is A, and before its list is read another tab signs in as B.
+  const firstCheck = hold("GET /api/auth/me");
+  await render();
+  who = B;
+  const secondCheck = hold("GET /api/auth/me");
+  await act(async () => firstCheck());
+  await settle();
+  // The list was refused for A: nothing is shown while the tab asks again who is signed in.
+  expect(menu()).toBeNull();
+  expect(container.textContent).not.toContain("Their frost");
+  expect(saveButton().disabled).toBe(true);
+  await act(async () => secondCheck());
+  await settle();
+  // Now the tab knows it is B, and B's builds are B's.
+  expect(menu()!.textContent).toContain("Their frost");
+  expect(menu()!.textContent).not.toContain("Fire");
+});
+
+test("a list read while the session was briefly B is not kept once the tab is A again", async () => {
+  api("in");
+  accounts[B] = { characters: [], builds: [saved({ id: NEW_ID, name: "Their frost", slug: "TheirOne" })] };
+  const firstCheck = hold("GET /api/auth/me");
+  await render();
+  who = B;
+  await act(async () => firstCheck());
+  await settle();
+  // The other tab switches back to A, and this one comes back to the front.
+  who = A;
+  await comeBack();
+  expect(menu()!.textContent).toContain("Fire");
+  expect(container.textContent).not.toContain("Their frost");
 });
 
 test("a failed check after a good one drops the account's builds and the open panel, and Save stays off until a check works", async () => {

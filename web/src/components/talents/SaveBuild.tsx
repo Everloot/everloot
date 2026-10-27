@@ -77,7 +77,7 @@ export default function SaveBuild({ classSlug, codes, defaultName, onMessage }: 
   onMessage: (text: string) => void;
 }) {
   // Strict: a check that fails gives up the account it had, as the session may have changed since.
-  const [owner] = useWorkspaceOwner({ strict: true });
+  const [owner, recheck] = useWorkspaceOwner({ strict: true });
   // Whose builds may show: an account's id, "signed-out", or "checking" and "unavailable" while none is known.
   const ownerKey = owner.status === "ready" ? (owner.owner.kind === "account" ? owner.owner.userId : "signed-out") : owner.status;
   const [account, setAccount] = useState<Account>({ status: "loading" });
@@ -129,10 +129,16 @@ export default function SaveBuild({ classSlug, codes, defaultName, onMessage }: 
     if (ownerKey === "checking") return;
     (async () => {
       try {
-        const response = await fetch("/api/me/builds", { cache: "no-store" });
+        // The list names the account it is for, as every save does: the site refuses it if the session is another one.
+        const response = await fetch("/api/me/builds", { cache: "no-store", headers: validId(ownerKey) ? { [EXPECTED_OWNER_HEADER]: ownerKey } : {} });
         if (era.current !== ask) return;
         if (response.status === 404) { setAccount({ status: "off" }); return; }
         if (response.status === 401) { setAccount({ status: "signed-out" }); return; }
+        // Another account than the one this tab confirmed is signed in now: take no list, and ask again who it is.
+        if (response.status === 409 && (await response.json().catch(() => ({}))).code === ACCOUNT_MISMATCH) {
+          if (era.current === ask) recheck();
+          return;
+        }
         // Builds show only for an account this tab knows by its id, never for a guess.
         if (!validId(ownerKey)) { setAccount({ status: "unchecked" }); return; }
         if (!response.ok) throw new Error("unavailable");

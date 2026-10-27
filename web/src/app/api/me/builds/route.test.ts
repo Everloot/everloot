@@ -69,6 +69,16 @@ test("a save or delete meant for another account than the session's is a private
   expect(auth.authQuery).not.toHaveBeenCalled();
 });
 
+test("a list asked for another account than the session's is a private 409, and nothing is read", async () => {
+  const res = await GET(call("GET", undefined, { "x-everloot-expected-owner": "99999999-2222-4333-8444-555555555555" }));
+  expect(res.status).toBe(409);
+  expect(res.headers.get("cache-control")).toBe("private, no-store");
+  expect((await res.json()).code).toBe("account_mismatch");
+  expect(auth.authQuery).not.toHaveBeenCalled();
+  auth.authQuery.mockResolvedValue([]);
+  expect((await GET(call("GET", undefined, { "x-everloot-expected-owner": USER.id }))).status).toBe(200);
+});
+
 test("naming the session's own account saves as before, and so does a save that names none", async () => {
   auth.authQuery.mockImplementation(async (path: string) => path === "rpc/save_build"
     ? [{ build_ref: BUILD_ID, build_slug: "AbCd1234", refusal: null }] : [row()]);
