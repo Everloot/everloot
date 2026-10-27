@@ -22,7 +22,7 @@ export interface ToolDef { name: string; description: string; inputSchema: Recor
 export const CHAT_TOOLS = [
   "search_knowledge", "get_by_name", "get_entity", "answer_sources",
   "item_page", "npc_page", "quest_page", "vendor_page", "object_page", "entity_relations", "item_categories",
-  "profession_path", "recipe_thresholds", "talent_tree",
+  "profession_path", "recipe_thresholds", "talent_tree", "class_races",
   "market_value", "auction_history", "population", "recent_changes", "world_map_near",
 ] as const;
 
@@ -45,7 +45,7 @@ export const TOOL_POLICY: { label: string; tools: string[] }[] = [
   { label: "the database", tools: ["get_by_name", "item_page", "npc_page", "quest_page", "vendor_page", "object_page", "entity_relations", "item_categories", "profession_path", "recipe_thresholds", "world_map_near", "recent_changes"] },
   { label: "the wiki and lore archive", tools: ["search_knowledge", "answer_sources", "get_entity"] },
   { label: "the market", tools: ["market_value", "auction_history", "population"] },
-  { label: "builds and talents", tools: ["talent_tree", MY_BUILDS] },
+  { label: "builds and talents", tools: ["talent_tree", "class_races", MY_BUILDS] },
 ];
 
 export const SYSTEM = [

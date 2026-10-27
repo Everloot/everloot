@@ -163,7 +163,7 @@ jobs:
             done
             git add -A -- web/src/data/game-data addon/modules/raid_data.lua kb/curated/recheck.json
             # Only the files the generators write may change, and the recheck scopes the watch adds.
-            allowed='^(web/src/data/game-data/(talents/[a-z]+\.json|raid-[0-9.]+\.json|raid\.ts|map\.json|client-layer\.json|client-achievements\.json|client-encounters\.json|client-mounts\.json|spell-values\.json|client-digests\.json|changes/[a-z0-9_]+-[0-9]+\.json)|addon/modules/raid_data\.lua|kb/curated/recheck\.json)$'
+            allowed='^(web/src/data/game-data/(talents/[a-z]+\.json|raid-[0-9.]+\.json|raid\.ts|map\.json|client-layer\.json|races\.json|client-achievements\.json|client-encounters\.json|client-mounts\.json|spell-values\.json|client-digests\.json|changes/[a-z0-9_]+-[0-9]+\.json)|addon/modules/raid_data\.lua|kb/curated/recheck\.json)$'
             unexpected=$(git diff --cached --name-only | grep -Ev "$allowed" || true)
             [ -z "$unexpected" ] || { echo "unexpected files in the change:"; echo "$unexpected"; exit 1; }
             # raid.ts may change its import line and nothing else.

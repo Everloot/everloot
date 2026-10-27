@@ -186,8 +186,8 @@ test("sign-in can bring the visitor back to the saved build they were editing, w
 });
 
 // What the MCP directories copied when they listed Everloot is the keyless tools/list of /mcp/public: with the guild
-// ladder on, as in production, the protocol's 31 tools. Saved builds must not move it; my_builds is listed only for a
-// key that reads its owner's builds, after those 31.
+// ladder on, as in production, the protocol's 32 tools. Saved builds must not move it; my_builds is listed only for a
+// key that reads its owner's builds, after those 32.
 let release = "";
 beforeAll(async () => {
   const dir = mkdtempSync(join(tmpdir(), "everloot-saved-builds-mcp-"));
@@ -224,15 +224,15 @@ async function publicTools(savedBuilds: string, key?: string) {
   return (await response.json()).result.tools as Array<{ name: string }>;
 }
 
-test("saved builds leave the public MCP catalogue as the directories copied it: the same 31 tools, my_builds only for a key", async () => {
+test("saved builds leave the public MCP catalogue as the directories copied it: the same 32 tools, my_builds only for a key", async () => {
   const before = await publicTools("");
   const after = await publicTools("1");
   expect(after.map((tool) => tool.name)).toEqual(MCP_TOOL_NAMES);
-  expect(after).toHaveLength(31);
+  expect(after).toHaveLength(32);
   // Names, titles, descriptions, schemas and annotations: everything a directory keeps a copy of.
   expect(after).toEqual(before);
   expect(MCP_TOOL_NAMES).not.toContain(MY_BUILDS);
   const keyed = await publicTools("1", `evl_${"a".repeat(64)}`);
-  expect(keyed.slice(0, 31)).toEqual(after);
-  expect(keyed.slice(31).map((tool) => tool.name)).toEqual([MY_BUILDS]);
+  expect(keyed.slice(0, 32)).toEqual(after);
+  expect(keyed.slice(32).map((tool) => tool.name)).toEqual([MY_BUILDS]);
 });
