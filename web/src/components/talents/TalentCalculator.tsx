@@ -1,30 +1,41 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
-import { importCode, planHash, readPlanHash, type ImportReport, type ImportResult } from "@/lib/talents/import";
+import { importPlan, planHash, readPlanHash, replacePlanHash, type ImportReport, type PlanImport } from "@/lib/talents/import";
+import { addPoint, emptySet, movedLater, removePoint, resetTree, type MovedPoint } from "@/lib/talents/order";
 import {
-  add, canAdd, canRemove, commit, entryAtRank, isLegal, nodeMap, pointsAtLevel, pointsByTree, pointsSpent, redo, refusalText,
-  remove, startHistory, undo, levelFor, type History,
+  canAdd, canRemove, commit, entryAtRank, isLegal, nodeMap, pointsAtLevel, pointsByTree, pointsSpent, redo, refusalText,
+  startHistory, undo, levelFor, type History,
 } from "@/lib/talents/rules";
 import { hasNodeFrames, loadGameAssets, type GameAssets } from "@/lib/talents/assets";
 import { HOW_IT_WORKS_ID } from "@/lib/talents/facts";
-import { encodeBuild } from "@/lib/talents/share";
+import { encodeBuild, encodeOrder } from "@/lib/talents/share";
 import { track } from "@/lib/analytics/track";
+import { absoluteUrl } from "@/lib/seo";
 import { DATA_SIZE } from "@/design/tokens";
 import { buildTitle, previewPath, summarizeBuild } from "@/lib/talents/summary";
-import type { Ranks, TalentCatalog } from "@/lib/talents/types";
+import type { PlanSet, Ranks, TalentCatalog } from "@/lib/talents/types";
 import GameIcon from "@/components/game/GameIcon";
 import { Card, CopyButton, Input, Segmented } from "@/components/ui";
 import GameTree from "./GameTree";
+import LevelingOrder from "./LevelingOrder";
 import SaveBuild, { restorePendingSave } from "./SaveBuild";
 import TalentTooltip, { type TipContent } from "./TalentTooltip";
 import TalentTreeView, { assetOf, CLASS_TEXT, type TipMode } from "./TalentTreeView";
 
-// Client side of the calculator: the point rules live in lib/talents/rules.ts, this file only holds
-// state and wires clicks, long presses and keys to them.
+// Client side of the calculator: the point rules live in lib/talents/rules.ts and the spend order's in
+// lib/talents/order.ts; this file only holds state and wires clicks, long presses and keys to them.
 
-type Sets = [Ranks, Ranks];
+type Sets = [PlanSet, PlanSet];
 const LONG_PRESS_MS = 500;
+
+/** Every node at the same rank in both: the code's points all placed as it asked (a corrected choice aside). */
+const samePoints = (a: Ranks, b: Ranks) =>
+  Object.keys(a).length === Object.keys(b).length && Object.entries(a).every(([id, r]) => b[Number(id)]?.rank === r.rank);
+
+/** " 3 points changed places …" after a take-back or tree reset that reordered points; nothing when none moved. */
+const movedNote = (moved: MovedPoint[]) =>
+  moved.length === 0 ? "" : ` ${moved.length} ${moved.length === 1 ? "point" : "points"} changed places to keep the spend order legal: Spend order below says where each went.`;
 
 /**
  * `treeIcons` are the trees' icons in the catalog's tree order, from the site's asset folder; absent without one.
@@ -37,7 +48,13 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
   catalog: TalentCatalog; treeIcons?: (string | null)[]; classIcon?: string | null; initialCodes?: (string | null)[]; savedBuilds?: boolean; readOnly?: boolean;
 }) {
   const { rules } = catalog;
-  const [history, setHistory] = useState<History<Sets>>(() => startHistory<Sets>([{}, {}]));
+  const [history, setHistory] = useState<History<Sets>>(() => startHistory<Sets>([emptySet(), emptySet()]));
+  // A set opened with an order token this page cannot use (a newer version's, say), its points placed as the code
+  // asked, keeps the token as it came in the address and the links until the set changes: an edit makes a new set,
+  // and undo brings this one back with its token.
+  const [came] = useState(() => new WeakMap<PlanSet, string>());
+  /** The points the last take-back or tree reset moved, shown while that set is on screen as it left it. */
+  const [moves, setMoves] = useState<{ after: PlanSet; points: MovedPoint[] } | null>(null);
   const [active, setActive] = useState<0 | 1>(0);
   const [level, setLevel] = useState(rules.maxLevel);
   const [planAhead, setPlanAhead] = useState(false);
@@ -70,7 +87,8 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
     setTip((cur) => (id === null ? (cur?.mode === mode ? null : cur) : { id, mode }));
   }
 
-  const ranks = history.present[active];
+  const set = history.present[active];
+  const { ranks } = set;
   const available = pointsAtLevel(catalog, level);
   const spent = pointsSpent(ranks);
   const perTree = pointsByTree(catalog, ranks);
@@ -86,21 +104,28 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
     setHistory((h) => commit(h, next));
   }
   const READ_ONLY = "This is a saved build. Open it in the calculator to change it.";
-  function setActiveRanks(next: Ranks) {
+  function setActiveSet(next: PlanSet) {
     const sets: Sets = [...history.present];
     sets[active] = next;
     setSets(sets);
   }
 
+  /** The set an import made, and the order token it came with when this page could not use it but it still fits. */
+  function opened(result: Extract<PlanImport, { ok: true }>): PlanSet {
+    if (!result.set.order && result.token && samePoints(result.requested, result.set.ranks)) came.set(result.set, result.token);
+    return result.set;
+  }
+
+  // A failed import changes nothing: the sets, their orders and the undo steps stay as they were.
   function load(text: string) {
-    const result = importCode(catalog, text);
+    const result = importPlan(catalog, text);
     if (!result.ok) {
       setReport(null);
       setMessage(result.message);
       return;
     }
     const sets: Sets = [...history.present];
-    sets[active] = result.ranks;
+    sets[active] = opened(result);
     setHistory((h) => commit(h, sets));
     setLevel((current) => Math.min(rules.maxLevel, Math.max(current, result.minLevel)));
     setReport({ ...result.report, loaded: true });
@@ -112,15 +137,18 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
   // link into a tab that is already open loads it.
   useEffect(() => {
     function fromHash(opening: boolean, codes = readPlanHash(window.location.hash)) {
-      // The first set rides after #plan= (the code the addon reads), the second after &plan2=.
+      // The first set rides after #plan= (the code the addon reads), the second after &plan2=, and each set's
+      // spend order after &order= and &order2=. A link from before orders opens with the orders unknown.
       if (!codes.first && !codes.second) return;
-      const results = [codes.first, codes.second].map((c) => (c ? importCode(catalog, c) : null));
+      const results = ([[codes.first, codes.firstOrder], [codes.second, codes.secondOrder]] as const)
+        .map(([c, token]) => (c ? importPlan(catalog, c, token ?? null) : null));
       for (const r of results) if (r && !r.ok) { setMessage(r.message); return; }
-      const [one, two] = results as (Extract<ImportResult, { ok: true }> | null)[];
+      const [one, two] = results as (Extract<PlanImport, { ok: true }> | null)[];
       const loaded = [one, two].filter((r) => r !== null);
+      const sets = [one && opened(one), two && opened(two)];
       setHistory((h) => (opening
-        ? startHistory<Sets>([one?.ranks ?? {}, two?.ranks ?? {}])
-        : commit(h, [one?.ranks ?? h.present[0], two?.ranks ?? h.present[1]])));
+        ? startHistory<Sets>([sets[0] ?? emptySet(), sets[1] ?? emptySet()])
+        : commit(h, [sets[0] ?? h.present[0], sets[1] ?? h.present[1]])));
       setActive(one ? 0 : 1);
       const minLevel = Math.max(...loaded.map((r) => r.minLevel), two ? rules.dualSpecLevel : 0);
       setLevel((current) => Math.min(rules.maxLevel, Math.max(opening ? rules.maxLevel : current, minLevel)));
@@ -135,10 +163,13 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
     }
     // Back from signing in to save: the build waited in session storage while the visitor was away.
     if (savedBuilds) restorePendingSave();
-    // A build link carries its codes in the path; move them into the class page's #plan= address, which is
-    // what the page keeps up to date from here on, and read them from there.
-    if (!window.location.hash && initialCodes?.some(Boolean)) {
-      window.history.replaceState(window.history.state, "", `/tools/talents/${catalog.classSlug}${planHash(initialCodes[0] ?? null, initialCodes[1] ?? null)}`);
+    // A build link carries its codes in the path, and their spend orders after #order= and &order2=; move them into
+    // the class page's #plan= address, which is what the page keeps up to date from here on, and read them from
+    // there. Anything else in the fragment, such as a cookie choice, comes along.
+    const sent = readPlanHash(window.location.hash);
+    if (!sent.first && !sent.second && initialCodes?.some(Boolean)) {
+      const plan = planHash(initialCodes[0] ?? null, initialCodes[1] ?? null, sent.firstOrder, sent.secondOrder);
+      window.history.replaceState(window.history.state, "", `/tools/talents/${catalog.classSlug}${replacePlanHash(window.location.hash, plan)}`);
     }
     fromHash(true);
     // The page rewrites its own address as points are spent; only a hash it did not write is a new link.
@@ -155,7 +186,7 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
     if (readOnly) return;
     const next = step(history);
     if (next === history) return;
-    const needed = Math.max(...next.present.map((r) => levelFor(catalog, pointsSpent(r))));
+    const needed = Math.max(...next.present.map((s) => levelFor(catalog, pointsSpent(s.ranks))));
     setHistory(next);
     if (needed > level) {
       setLevel(needed);
@@ -166,36 +197,44 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
   function doAdd(id: number, choice?: number) {
     if (readOnly) { setMessage(READ_ONLY); return; }
     const node = nodes.get(id)!;
-    const next = add(catalog, ranks, id, available, choice);
-    if (next === ranks) {
+    // The point joins the end of the set's order.
+    const next = addPoint(catalog, set, id, available, choice);
+    if (next === set) {
       const verdict = canAdd(catalog, ranks, id, available);
       setMessage(verdict.ok ? "" : refusalText(verdict.reason!, node, catalog, ranks));
       return;
     }
-    setActiveRanks(next);
+    setActiveSet(next);
     if (!countedBuild.current) {
       countedBuild.current = true;
       track("talent_build_made", { class: catalog.classSlug });
     }
-    const now = next[id]?.rank ?? 0;
+    const now = next.ranks[id]?.rank ?? 0;
     setMessage(`${nameOf(id)}: rank ${now} of ${node.maxRanks}.`);
   }
 
+  // A point taken back leaves the order; a later one that could no longer be taken where it stands waits for the
+  // points it needs, and the page says where each moved point went. When what stays could not be spent in any
+  // legal order, the point stays and the page says why.
   function doRemove(id: number) {
     if (readOnly) { setMessage(READ_ONLY); return; }
     const node = nodes.get(id)!;
-    const next = remove(catalog, ranks, id);
-    if (next === ranks) {
+    const next = removePoint(catalog, set, id);
+    if (next === set) {
       const verdict = canRemove(catalog, ranks, id);
-      setMessage(refusalText(verdict.reason!, node, catalog, ranks));
+      setMessage(verdict.ok
+        ? `${nameOf(id)} stays: the points after it could not be spent in a legal order without it. Take back a later point first.`
+        : refusalText(verdict.reason!, node, catalog, ranks));
       return;
     }
-    setActiveRanks(next);
-    setMessage(`${nameOf(id)}: rank ${next[id]?.rank ?? 0} of ${node.maxRanks}.`);
+    setActiveSet(next);
+    const moved = movedLater(catalog, set, next);
+    setMoves({ after: next, points: moved });
+    setMessage(`${nameOf(id)}: rank ${next.ranks[id]?.rank ?? 0} of ${node.maxRanks}.${movedNote(moved)}`);
   }
 
   function setLevelClamped(value: number) {
-    const needed = Math.max(...history.present.map((r) => levelFor(catalog, pointsSpent(r))));
+    const needed = Math.max(...history.present.map((s) => levelFor(catalog, pointsSpent(s.ranks))));
     const next = Math.max(rules.firstPointLevel, Math.min(rules.maxLevel, value));
     if (next < needed) {
       setLevel(needed);
@@ -212,25 +251,38 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
   }
 
   // The page address is the build, as old talent calculators did it: every point spent rewrites the
-  // fragment, so copying the address bar shares both sets. Skipped on the first run, where the
-  // build from an opened link has not loaded yet and would be wiped.
+  // fragment, so copying the address bar shares both sets and their orders. Skipped on the first run,
+  // where the build from an opened link has not loaded yet and would be wiped. Only the plan's own parts
+  // are rewritten; anything else there (a cookie choice) stays.
   const linkReady = useRef(false);
   const codes = useMemo<[string | null, string | null]>(() => {
     const codeOf = (r: Ranks) => (pointsSpent(r) > 0 ? encodeBuild({ classSlug: catalog.classSlug, specId: catalog.specId, build: catalog.build, ranks: r }) : null);
-    return [codeOf(history.present[0]), codeOf(history.present[1])];
+    return [codeOf(history.present[0].ranks), codeOf(history.present[1].ranks)];
   }, [history.present, catalog]);
+  // Each set's spend order token: its own known order, or the token it came with, unchanged; null when unknown.
+  const orders = useMemo<[string | null, string | null]>(() => {
+    const tokenOf = (s: PlanSet) => (s.order && s.orderOrigin ? encodeOrder(s.ranks, s.order, s.orderOrigin) : came.get(s) ?? null);
+    return [tokenOf(history.present[0]), tokenOf(history.present[1])];
+  }, [history.present, came]);
   useEffect(() => {
     if (readOnly) return;
     if (!linkReady.current) { linkReady.current = true; return; }
     const [first, second] = codes;
-    const hash = planHash(first, second);
+    const hash = replacePlanHash(window.location.hash, planHash(first, second, orders[0], orders[1]));
     const { pathname, search, origin } = window.location;
     written.current = hash;
     if (window.location.hash !== hash) window.history.replaceState(window.history.state, "", `${pathname}${search}${hash}`);
-    // The link handed out is the build link: same build, and its preview in a chat names it.
+    // The link handed out is the build link: same build, and its preview in a chat names it. Its codes are in the
+    // path, so their orders ride in its fragment, which the class page reads when the link opens.
     const preview = previewPath(catalog.classSlug, first, second);
-    setLink(preview ? `${origin}${preview}` : "");
-  }, [codes, catalog, readOnly]);
+    const sequence = [first && orders[0] && `order=${orders[0]}`, second && orders[1] && `order2=${orders[1]}`].filter(Boolean).join("&");
+    setLink(preview ? `${origin}${preview}${sequence ? `#${sequence}` : ""}` : "");
+  }, [codes, orders, catalog, readOnly]);
+
+  // Copy for addon: one set, as the full class page link with that set's own pair, set 2's under plan2= and order2=.
+  const addonLink = codes[active]
+    ? absoluteUrl(`/tools/talents/${catalog.classSlug}${active === 0 ? planHash(codes[0], null, orders[0]) : planHash(null, codes[1], null, orders[1])}`)
+    : "";
 
   const onCopied = (ok: boolean) => {
     setMessage(ok ? "Link copied. It opens both sets as they are now." : "Copy failed. Select the link and copy it.");
@@ -369,16 +421,22 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
   const setName = active === 0 ? "set 1" : "set 2";
   const left = Math.max(0, available - spent);
 
-  // Take every point out of one tree. Refused when another tree's talents need those points.
-  function resetTree(treeId: number, name: string) {
-    const next: Ranks = {};
-    for (const [id, r] of Object.entries(ranks)) if (nodes.get(Number(id))?.treeId !== treeId) next[Number(id)] = r;
-    if (!isLegal(catalog, next)) {
-      setMessage(`Talents in another tree need the points in ${name}. Take those back first.`);
+  // Take every point out of one tree. Refused when another tree's talents need those points, or when the points left
+  // could not be spent in any legal order; either way the page says which.
+  function onResetTree(treeId: number, name: string) {
+    const next = resetTree(catalog, set, treeId);
+    if (next === set) {
+      const left: Ranks = {};
+      for (const [id, r] of Object.entries(ranks)) if (nodes.get(Number(id))?.treeId !== treeId) left[Number(id)] = r;
+      setMessage(isLegal(catalog, left)
+        ? `${name} was not reset: the points in the other trees could not be spent in a legal order without its points. Take back some of those first.`
+        : `Talents in another tree need the points in ${name}. Take those back first.`);
       return;
     }
-    setActiveRanks(next);
-    setMessage(`${name} was reset. Undo brings it back.`);
+    setActiveSet(next);
+    const moved = movedLater(catalog, set, next);
+    setMoves({ after: next, points: moved });
+    setMessage(`${name} was reset. Undo brings it back.${movedNote(moved)}`);
   }
 
   // The explanations live in the page's closed "How it works" section; "?" opens it and goes there.
@@ -467,7 +525,7 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
           {!readOnly && <CopyButton className="btn btn-primary text-sm lg:ml-auto" text={link} label="Copy link" onResult={onCopied} disabled={!link} />}
           {/* Save, My builds and the save panel, which takes its own row under the bar. */}
           {savedBuilds && !readOnly && (
-            <SaveBuild classSlug={catalog.classSlug} codes={codes} defaultName={buildTitle(catalog, summarizeBuild(catalog, history.present[0]))} onMessage={setMessage} />
+            <SaveBuild classSlug={catalog.classSlug} codes={codes} defaultName={buildTitle(catalog, summarizeBuild(catalog, history.present[0].ranks))} onMessage={setMessage} />
           )}
         </section>
 
@@ -482,7 +540,7 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
             <>
               <button type="button" className="btn px-3 text-sm sm:px-5" onClick={() => travel(undo)} disabled={history.past.length === 0}>Undo</button>
               <button type="button" className="btn px-3 text-sm sm:px-5" onClick={() => travel(redo)} disabled={history.future.length === 0}>Redo</button>
-              <button type="button" className="btn px-3 text-sm sm:px-5" onClick={() => { setActiveRanks({}); setMessage("This set was reset. Undo brings it back."); }} disabled={spent === 0}><span className="sm:hidden">Reset</span><span className="hidden sm:inline">Reset {setName}</span></button>
+              <button type="button" className="btn px-3 text-sm sm:px-5" onClick={() => { setActiveSet(emptySet()); setMessage("This set was reset. Undo brings it back."); }} disabled={spent === 0}><span className="sm:hidden">Reset</span><span className="hidden sm:inline">Reset {setName}</span></button>
               <button type="button" className="btn px-3 text-sm sm:px-5" aria-pressed={removeMode} onClick={() => setRemoveMode(!removeMode)}>
                 <span className="sm:hidden">Take back: {removeMode ? "on" : "off"}</span><span className="hidden sm:inline">Take points back: {removeMode ? "on" : "off"}</span>
               </button>
@@ -523,7 +581,7 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
                       {treeIcons?.[i] && <GameIcon src={treeIcons[i]!} size={24} className="max-md:hidden" />}
                       <h2 className={`min-w-0 truncate text-base font-semibold max-md:sr-only ${classText}`}>{tree.name}</h2>
                       <span className={`ml-auto font-mono text-xl tabular-nums max-md:hidden ${points === 0 ? "text-muted" : "text-fg"}`}>{points}</span>
-                      {!readOnly && <button type="button" className="min-h-11 px-1 text-sm text-muted hover:text-fg disabled:opacity-50 max-md:hidden" disabled={points === 0} aria-label={`Reset ${tree.name}`} onClick={() => resetTree(tree.id, tree.name)}>Reset</button>}
+                      {!readOnly && <button type="button" className="min-h-11 px-1 text-sm text-muted hover:text-fg disabled:opacity-50 max-md:hidden" disabled={points === 0} aria-label={`Reset ${tree.name}`} onClick={() => onResetTree(tree.id, tree.name)}>Reset</button>}
                     </div>
                     <div className="h-1 overflow-hidden rounded-full bg-canvas max-md:hidden" aria-hidden="true">
                       <div className={`h-full rounded-full bg-current ${classText}`} style={{ width: `${available ? Math.min(100, (points / available) * 100) : 0}%` }} />
@@ -536,7 +594,7 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
                     };
                     return game ? <GameTree {...props} assets={assets} /> : <TalentTreeView {...props} assets={assets} />;
                   })()}
-                  {!readOnly && <button type="button" data-tree-reset className="mt-2 min-h-11 px-1 text-sm text-muted hover:text-fg disabled:opacity-50 md:hidden" disabled={points === 0} aria-label={`Reset ${tree.name}`} onClick={() => resetTree(tree.id, tree.name)}>Reset {tree.name}</button>}
+                  {!readOnly && <button type="button" data-tree-reset className="mt-2 min-h-11 px-1 text-sm text-muted hover:text-fg disabled:opacity-50 md:hidden" disabled={points === 0} aria-label={`Reset ${tree.name}`} onClick={() => onResetTree(tree.id, tree.name)}>Reset {tree.name}</button>}
                 </section>
               );
             })}
@@ -561,11 +619,34 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
           </section>
         )}
 
+        {/* The set's spend order, after the trees and outside the phone's sticky switch. */}
+        {!readOnly && (
+          <LevelingOrder catalog={catalog} set={set} setName={setName} moved={moves?.after === set ? moves.points : []}
+            onEdit={(next, text) => { setActiveSet(next); setMessage(text); }} onMessage={setMessage} />
+        )}
+
         {!readOnly && <section aria-label="Share" className="grid gap-3 border-t border-line p-4 md:grid-cols-2">
           <div className="flex flex-wrap items-center gap-3 md:col-span-2">
-            <CopyButton className="btn text-sm" text={codes[active] ?? ""} label="Copy for addon" disabled={!codes[active]}
-              onResult={(ok) => setMessage(ok ? `${setName} copied. Open /everloot, choose the Talents tab, then Import.` : "Copy failed. Select and copy the share link instead.")} />
-            <p className="text-sm text-fg-2">Copies {setName} only. In the addon: <code>/everloot</code> → Talents tab → paste → Import. Spend each point yourself.</p>
+            <CopyButton className="btn text-sm" text={addonLink} label="Copy for addon" disabled={!codes[active]}
+              onResult={(ok) => setMessage(ok
+                ? `Copied ${setName} as a link. In the game: /everloot, the Talents tab, paste, then Import. Addon 0.3.12 loads its talents, not its spend order.`
+                : "Copy failed. Select and copy the share link instead.")} />
+            <p className="text-sm text-fg-2">
+              Copies {setName} only, as a link. In the addon: <code>/everloot</code> → Talents tab → paste → Import. Addon 0.3.12 loads the
+              talents from it but not the spend order, so spend each point yourself.
+            </p>
+          </div>
+          {/* The plan goes to Plans on this device in the address fragment, which never reaches the server; it is named
+              and kept there. This page reads no saved plan. */}
+          <div className="flex flex-wrap items-center gap-3 md:col-span-2">
+            {codes[0]
+              ? <a className="btn text-sm" href={`/tools/builds${planHash(codes[0], codes[1], orders[0], orders[1])}`}>Save on this device</a>
+              : <button type="button" className="btn text-sm" disabled>Save on this device</button>}
+            <p className="text-sm text-fg-2">
+              {codes[0]
+                ? "Opens Plans on this device with this plan, to name it there. Kept in this browser only; nothing is uploaded."
+                : "Spend a point in set 1 to save this plan on this device."}
+            </p>
           </div>
           <div className="min-w-0 space-y-1">
             <label className="block text-sm text-fg-2" htmlFor="talent-link">Link to this build, both sets (game build {catalog.build})</label>

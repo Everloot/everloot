@@ -561,6 +561,20 @@ describe("the account and pasted links", () => {
     expect(readPlanText(`  ${MAGE}  `)).toEqual({ ok: true, classSlug: "mage", codes: [MAGE, null], orders: [null, null] });
   });
 
+  test("readPlanText keeps a build link's orders from its fragment, each with its own set, as they came", () => {
+    const build = `https://everloot.app/tools/talents/mage/b/${MAGE}/${MAGE_SMALL}`;
+    expect(readPlanText(`${build}#order=${PLANNED}&order2=O1g-A`))
+      .toEqual({ ok: true, classSlug: "mage", codes: [MAGE, MAGE_SMALL], orders: [PLANNED, "O1g-A"] });
+    expect(readPlanText(`${build}#order2=O1g-A`))
+      .toEqual({ ok: true, classSlug: "mage", codes: [MAGE, MAGE_SMALL], orders: [null, "O1g-A"] });
+    expect(readPlanText(`${build}#order=O2p-AABCC&order2=not-an-order`))
+      .toEqual({ ok: true, classSlug: "mage", codes: [MAGE, MAGE_SMALL], orders: ["O2p-AABCC", "not-an-order"] });
+    expect(readPlanText(`https://everloot.app/tools/talents/mage/b/${MAGE}#consent=rejected&order=${PLANNED}&order2=O1g-A`))
+      .toEqual({ ok: true, classSlug: "mage", codes: [MAGE, null], orders: [PLANNED, null] });
+    expect(readPlanText(`https://everloot.app/tools/talents/mage/b/${MAGE}?ref=x&order=O1g-A`))
+      .toEqual({ ok: true, classSlug: "mage", codes: [MAGE, null], orders: [null, null] });
+  });
+
   test("readPlanText refuses empty text, other links, a link without a first set and sets of two classes", () => {
     expect(readPlanText("   ")).toMatchObject({ ok: false });
     expect(readPlanText("https://everloot.app/b/AbCd1234")).toMatchObject({ ok: false });
