@@ -80,8 +80,14 @@ const SOME: FixtureGuide[] = [
 
 /* ---------- Rendering ---------- */
 
-const visible = (html: string) =>
-  html.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/\s+/g, " ");
+const visible = (html: string) => {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  doc.querySelectorAll("script").forEach((s) => s.remove());
+  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+  const parts: string[] = [];
+  while (walker.nextNode()) parts.push(walker.currentNode.nodeValue ?? "");
+  return ` ${parts.join(" ")} `.replace(/\s+/g, " ");
+};
 const hub = async (slug: string) => renderToStaticMarkup(await ClassPage({ params: Promise.resolve({ class: slug }) }));
 const hubMetadata = (slug: string) => hubRoute.generateMetadata({ params: Promise.resolve({ class: slug }) });
 const index = async () => renderToStaticMarkup(await ClassesPage());
