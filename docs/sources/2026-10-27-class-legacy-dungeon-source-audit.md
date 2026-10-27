@@ -16,7 +16,7 @@ policy, and anything taken from the game files stays labelled *found in game fil
 |---|---|---|
 | Legacy tree and node ids, ranks, prerequisites | ready | Three trees of 9 nodes in the unencrypted trait tables; enough for a catalog on their own |
 | Legacy spend gates | partial | Amounts (5 and 10), the nodes they guard and the group each condition names are in the files; that the named group is where points are counted is a column-name reading, so no planner enforces the gates yet |
-| Legacy cost and cap | display only | Each tree names a cost of 1 and the currency a maximum of 16; shown as unconfirmed readings, enforced by no planner until confirmed |
+| Legacy cost and cap | ready, display only | Each tree names a cost of 1 and the currency a maximum of 16; shown as unconfirmed readings, enforced by no planner until confirmed |
 | How Legacy points are earned | partial | 131 achievements give points; what each achievement asks for is in tables we do not read |
 | Legacy names | partial | Every perk has a spell name; the three trees have no name in any table we read |
 | Talented, the documented exception | ready from the game files | Every part of the stated fact matches unencrypted rows of builds 70450 and 70532, read from column names; the exception stays as written |
@@ -41,20 +41,21 @@ The required coverage this leaves for the class and dungeon work is in [Required
   committed [`client-digests.json`](../../web/src/data/game-data/client-digests.json) records for 70532.
 - **The earlier build.** The same checks run on the 70450 snapshot of 2026-10-18 (library 2.16.15, WoWDBDefs
   `b9a63096cdd9`, sha256 `6c8c1e4715e4…`, matching its manifest) return the same Legacy, Talented and zone results.
-- **`ContentTuning`.** It joined the read set on 2026-10-25, after both snapshots, so this audit read that one table
-  of build 70532 with a short script outside the repository that calls the extractor's own `openCdn`,
-  `pinDefinitions` and table reader: 100 rows, no encrypted blocks, content key `f4b8d521e141…`, row hash
-  `2499b589186c`. The fields used are `MinLevelSquish`, `MaxLevelSquish`, `LfgMinLevel` and `LfgMaxLevel`. A
-  `client-extract` run from 2026-10-25 on reads the table too, for whatever build the CDN serves at the time.
+- **`ContentTuning`.** It joined the read set with #454 (`c0e0518`, 2026-10-26 00:15 UTC), after both snapshots, so
+  this audit read that one table of build 70532 with a short script outside the repository that calls the
+  extractor's own `openCdn`, `pinDefinitions` and table reader: 100 rows, no encrypted blocks, content key
+  `f4b8d521e141…`, row hash `2499b589186c`. The fields used are `MinLevelSquish`, `MaxLevelSquish`, `LfgMinLevel` and
+  `LfgMaxLevel`. A `client-extract` run after #454 reads the table too, for whatever build the CDN serves at the time.
 - **The live product.** Blizzard's version service also lists product `wowf` (WoW: Forever) at 1.60.1.70630,
   build config `644ffedb`, newer than the beta build above; an installed client's `.build.info` names the same
   product at 1.60.1.70532. A `client-scan` of `wowf` finds the same 1,159 tables and the same 613 candidates. The 37
   tables behind the queries below were read from both products under one WoWDBDefs commit, by the same kind of
   script and written with the repository's snapshot writer (sha256 `80a4e45a3eba…` for the beta file, `ffcb371ec005…`
   for `wowf`). 29 are identical, and every query below gives the same result on `wowf`, except the `ContentTuning`
-  reference count, which needs item, spell and creature tables read from 70532 only. The other tables the verdicts
-  rest on were read from 70532 only: `SpellLevels`, `Spell`, `SpellMisc`, `FileStatus`, `ItemSubClass`, `QuestLine`,
-  `QuestLineXQuest`, the three Journal tables, `TraitSubTree`, `Item`, `ItemSparse` and `CreatureDifficulty`.
+  reference count, whose item, spell and creature tables are not among the 37, so it was counted on 70532 only (see
+  [Reproduce](#reproduce)). The other tables the verdicts rest on were read from 70532 only: `SpellLevels`, `Spell`,
+  `SpellMisc`, `FileStatus`, `ItemSubClass`, `QuestLine`, `QuestLineXQuest`, the three Journal tables, `TraitSubTree`,
+  `Item`, `ItemSparse` and `CreatureDifficulty`.
 - **What `wowf` changes.** Of the 8 tables that differ, four are the talent tables. In the Mage trait tree, Frost
   node 105773 is gone; node 113627, a one-rank talent the published catalog does not list, joins the Arcane display
   group, the group behind Arcane's 15-point gate and two groups that 25- and 20-point conditions name; four Frost
@@ -113,10 +114,12 @@ What the files do not settle, so a catalog must carry these as unknowns, never a
   the points spent in that group, inside its own tree, so points spent in the other two trees would not count. The
   class trees point the same way: every one of their 163 spend conditions names a group, and in 130 of the 131 row
   gates where the catalog finds a companion group, the named group is that companion (build 70532; see
-  [TALENT_CATALOG](../TALENT_CATALOG.md)). Unlike the class trees, though, the Legacy group also holds the nodes its
-  gates guard. This is a reading of a column name backed by an analogy, not observed play. One check in the game
-  tests it: with 5 points spent in one tree only, does another tree's second column open? The tree-local reading
-  says it does not.
+  [TALENT_CATALOG](../TALENT_CATALOG.md)). In all 131 of those gates the named group holds none of the nodes the
+  gate guards, while the Legacy group holds them. The class trees do have that pattern among their 31 gates with no
+  companion: each of the 27 30-point gates names its own talent tree's whole display group, and one 10-point Priest
+  gate names a group holding one of its four nodes; the other three name groups that hold none. This is a reading of
+  a column name backed by an analogy, not observed play. One check in the game tests it: with 5 points spent in one
+  tree only, does another tree's second column open? The tree-local reading says it does not.
 - **Per rank and cap.** That a cost of 1 applies to each rank, and that `SourcedMax` is what a character can hold,
   are readings of the column names. The class currency's 51 supports the cap reading; the coincidence with the beta
   grant and the 146 points the sources add up to are reasons for caution. Neither 16 nor 146 becomes a spend default.
@@ -227,9 +230,9 @@ for a wave that reads `SpellEquippedItems`.
   original world, the outdoor area named after Blackrock Spire, and two areas on maps outside the listed instances.
 - Of the 100 `ContentTuning` rows, 51 have `MinLevelSquish` below `MaxLevelSquish`. Of the eight read tables with a
   `ContentTuningID` column (areas, zone maps, instance difficulties, LFG rows, creatures, spells and the two item
-  tables), only one row points at any of those 51: an area on a map outside the listed instances. `LfgMinLevel` and
-  `LfgMaxLevel` are set on 2 rows, each a single level. `AreaTable.ExplorationLevel` is a single number on 6 zone
-  areas, not a range.
+  tables), only one readable row points at any of those 51: an area on a map outside the listed instances.
+  `LfgMinLevel` and `LfgMaxLevel` are set on 2 rows, each a single level. `AreaTable.ExplorationLevel` is a single
+  number on 6 zone areas, not a range.
 - **Verdict.** Blocked. In `wowf` 70630 the zone maps, the `ContentTuning` rows and every area's tuning id, parent
   and exploration level are the same (the two area rows that change there change a faction mask and a name). The
   site's current position, no zone level ranges, stands. No range is worked out from instance levels, creature
@@ -246,7 +249,8 @@ talents ready (unconfirmed), proficiency partial, trainer spells partial or bloc
 blocked as current content**: the live product's newer build adds, removes, moves and re-ranks Mage talents (see
 [Build and evidence](#build-and-evidence)), so no Mage talent content is presented as current until the build watch
 follows the chosen live product and the catalog is regenerated or shown to match. Priest's change there is to two
-gate groups; the same refresh checks it before Priest talent content claims to be current.
+groups that 15- and 10-point conditions name; the same refresh checks it before Priest talent content claims to be
+current.
 
 **Dungeons required now (19).** The original-world dungeons the site lists today, each with a game-file entrance in a
 released zone (the rule in `web/src/lib/instances.ts`) and a single game-file level:
@@ -345,9 +349,9 @@ are the only record of these results, identified by sha256: the 70532 snapshot `
 
 The snapshot is SQLite with one row per table row in `client_rows(tbl, id, raw)`, `raw` being JSON. Any SQLite with
 JSON functions runs the checks. The results are those of build 70532; every query also gives the same result on
-`wowf` 70630, except the `ContentTuning` reference count (70532 only), and those marked give it on 70450 too. The
-`ContentTuning` queries need a snapshot made from 2026-10-25 on. `tableHash` in
-`kb/src/build-watch/client-digests.ts` gives the hash to compare with `client-digests.json`.
+`wowf` 70630, except the `ContentTuning` reference count (70532 only, see the note after the queries), and those
+marked give it on 70450 too. The `ContentTuning` queries need a snapshot made after #454 added that table to the
+read set. `tableHash` in `kb/src/build-watch/client-digests.ts` gives the hash to compare with `client-digests.json`.
 
 ```sql
 -- Legacy trees and currency: (1187,4225) (1188,4225) (1189,4225)
@@ -449,5 +453,9 @@ SELECT count(*) FROM client_rows d JOIN client_rows c ON c.tbl='Creature'
 SELECT json_extract(raw,'$.MapID'), count(*) FROM client_rows WHERE tbl='QuestPOIBlob' GROUP BY 1;
 ```
 
-`ContentTuning` (the zone and LFG level findings) is in a snapshot made by `client-extract` from 2026-10-25 on. The
-2026-10-25 snapshot above predates it; this audit's `ContentTuning` results come from the separate read of build 70532.
+`ContentTuning` (the zone and LFG level findings) is in every snapshot `client-extract` makes after #454
+(2026-10-26 00:15 UTC). The 2026-10-25 snapshot above predates it, so this audit's `ContentTuning` results come from
+the separate read of build 70532. The reference count joins that read's rows with the 2026-10-25 snapshot's other
+tables, both build 70532; no retained file holds both. On a 37-table file alone the same query returns the same row
+but covers only 4 of its 8 tables (areas, zone maps, instance difficulties and LFG rows), so there it is not a check
+of all eight. A snapshot made after #454 holds all nine tables in one file.
