@@ -1207,6 +1207,13 @@ describe("one lock for every writer", () => {
   /** The modules that are the writing itself: they run inside the lock their callers take. */
   const LAYER = ["lib/player-workspace.ts", "lib/alt-workspace.ts", "lib/alt-import.ts"];
 
+  // What these scans read is the source as written, by name, so some forms pass them unseen. That is accepted: they
+  // guard against a plain unlocked write or nested lock, and prove nothing about these forms:
+  // - a writer imported under another name (`import { savePlan as keep }`) or through `import * as`;
+  // - a writer reached through a dynamic import (`await import(...)`);
+  // - a writer, or a function that takes the lock, passed around and called through a variable or a property;
+  // - a function that takes the lock declared in one module and called inside a lock in another.
+
   /** The site's source files, tests aside, each with its code alone (codeOnly). */
   function sources() {
     const src = resolve(import.meta.dirname, "../..");
