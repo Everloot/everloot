@@ -156,10 +156,11 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
     return result.set;
   }
 
-  // A failed import changes nothing: the sets, their orders and the undo steps stay as they were.
+  // A failed import changes nothing: the sets, their orders and the undo steps stay as they were. A broken order's line
+  // names the levels of the set it goes into.
   function load(text: string) {
     if (previewOnly()) return;
-    const result = importPlan(catalog, text);
+    const result = importPlan(catalog, text, undefined, schedule);
     if (!result.ok) {
       setReport(null);
       setMessage(result.message);
@@ -181,8 +182,8 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
       // The first set rides after #plan= (the code the addon reads), the second after &plan2=, and each set's
       // spend order after &order= and &order2=. A link from before orders opens with the orders unknown.
       if (!codes.first && !codes.second) return;
-      const results = ([[codes.first, codes.firstOrder], [codes.second, codes.secondOrder]] as const)
-        .map(([c, token]) => (c ? importPlan(catalog, c, token ?? null) : null));
+      const results = ([[codes.first, codes.firstOrder, 0], [codes.second, codes.secondOrder, 1]] as const)
+        .map(([c, token, slot]) => (c ? importPlan(catalog, c, token ?? null, forSet(catalog, slot)) : null));
       for (const r of results) if (r && !r.ok) { setMessage(r.message); return; }
       const [one, two] = results as (Extract<PlanImport, { ok: true }> | null)[];
       const loaded = [one, two].filter((r) => r !== null);

@@ -190,6 +190,27 @@ test("the build bar's Level needed is the level the set's last point comes at, s
   expect(stat("Level needed")).toBe("14");
 });
 
+test("an opened order that breaks the tree's rules says where at the level that set's point comes at", async () => {
+  // 21 (B) comes first, before the 5 points its row needs: point 1 is level 10 in set 1, and level 40 in set 2.
+  const c = code({ 11: { rank: 5 }, 21: { rank: 1 } });
+  const broken = (level: number) =>
+    `The plan's spend order breaks this tree's rules, so the order is unknown. Talent 21 at level ${level}: Needs 5 points spent in Left on rows above. The talents still loaded.`;
+  const loaded = () => [...container.querySelectorAll('[aria-label="What loaded"] li')].map((li) => li.textContent);
+  await open(`#plan=${c}&plan2=${c}&order=O1p-BAAAAA&order2=O1p-BAAAAA`);
+  expect(loaded()).toEqual([broken(10), broken(40)]);
+  // Pasted into set 2, a link's own pair names set 2's level too.
+  await remount();
+  await render();
+  await click(button(/^Set 2$/));
+  const paste = container.querySelector<HTMLInputElement>("#talent-paste")!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(paste, `https://everloot.app/tools/talents/mage#plan=${c}&order=O1p-BAAAAA`);
+    paste.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await click(button(/^Load into set 2$/));
+  expect(loaded()).toEqual([broken(40)]);
+});
+
 test("a take-back in set 2 that reorders points gives the levels set 2's points come at", async () => {
   await render();
   await click(button(/^Set 2$/));

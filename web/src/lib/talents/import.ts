@@ -145,8 +145,10 @@ export type PlanImport =
 /** `text` is a share code, or a link whose fragment carries one set's code and order: the first set's after
  *  #plan= and &order=, or the second's after #plan2= and &order2= when the link has only that one (Copy for
  *  addon's set two). With `orderToken` given, even as null, `text` is a code and that is its order. Like
- *  importCode, an order that cannot be used never stops the talents loading: the set's order is unknown. */
-export function importPlan(catalog: TalentCatalog, text: string, orderToken?: string | null): PlanImport {
+ *  importCode, an order that cannot be used never stops the talents loading: the set's order is unknown.
+ *  `levels` is the catalog whose point table gives the levels a broken order's line names: the set the plan goes
+ *  into, since the second set's points wait for the level it opens at. The order is checked against `catalog`. */
+export function importPlan(catalog: TalentCatalog, text: string, orderToken?: string | null, levels: TalentCatalog = catalog): PlanImport {
   const [code, token] = orderToken === undefined ? linkPair(text) : [text, orderToken];
   const result = importCode(catalog, code, token);
   if (!result.ok) return result;
@@ -157,7 +159,7 @@ export function importPlan(catalog: TalentCatalog, text: string, orderToken?: st
   const problems = [...result.report.problems];
   if (known && !set.order) {
     const verdict = validateOrder(catalog, result.ranks, known.order);
-    const where = verdict.ok ? "" : ` ${orderRefusalText(catalog, result.ranks, known.order, verdict)}`;
+    const where = verdict.ok ? "" : ` ${orderRefusalText(levels, result.ranks, known.order, verdict)}`;
     problems.push(`The plan's spend order breaks this tree's rules, so the order is unknown.${where} The talents still loaded.`);
   }
   return { ok: true, set, requested, token, minLevel: result.minLevel, report: { ...result.report, problems } };
