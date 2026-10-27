@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
 import { answer, readProviderEntries, sourcesIn } from "../src/main/agent";
+import { FIXTURE_ANSWER, FIXTURE_STRUCTURED, FIXTURE_URL } from "../../web/src/lib/chat/market-fixture";
 
 const dirs: string[] = [];
 const dir = () => { const d = mkdtempSync(join(tmpdir(), "everloot-agent-")); dirs.push(d); return d; };
@@ -254,4 +255,58 @@ test("an empty stopped answer in the history is not sent to the model", async ()
   const history = [{ role: "user" as const, text: "first", at: "", model: null, sources: [], steps: [] }, { role: "assistant" as const, text: "", at: "", model: null, sources: [], steps: [], stopped: true }];
   await answer({ mcp: { url: "u", token: null }, entries: [entry], history, question: "again", session: fakeSession([]), send: send as never });
   expect(bodies[0].messages.map((m) => m.content)).toEqual([expect.any(String), "first", "again"]);
+});
+
+/** An MCP stand-in that answers market_value with its structured result and records every call. */
+const marketSession = (calls: { name: string; args: unknown }[], structured: unknown = FIXTURE_STRUCTURED) =>
+  (async (_t: unknown, run: (c: unknown) => Promise<unknown>) => run({
+    callTool: async (c: { name: string; arguments: unknown }) => { calls.push({ name: c.name, args: c.arguments }); return { content: [{ type: "text", text: "long tool text" }], structuredContent: structured }; },
+    listTools: async () => ({ tools: [] }),
+  })) as never;
+const LINEN = [{ type: "item", id: 2589, label: "Linen Cloth", href: "/database/items/2589", quality: 1 }];
+const site = (urls: string[]) => vi.fn(async (url: string) => { urls.push(url); return Response.json({ results: LINEN }); }) as never;
+
+test("a price question is answered from market_value with no provider and no knowledge search", async () => {
+  const calls: { name: string; args: unknown }[] = [];
+  const urls: string[] = [];
+  const r = await answer({ mcp: { url: "https://everloot.app/mcp/public", token: null }, entries: [], history: [], question: "What is the price of Linen Cloth on Forever?", session: marketSession(calls), send: site(urls), site: "https://everloot.app" });
+  expect(r).toEqual({ text: FIXTURE_ANSWER, model: null, sources: [FIXTURE_URL], steps: [{ tool: "market_value", input: JSON.stringify({ realm: "Forever", itemId: 2589 }), chars: FIXTURE_ANSWER.length }] });
+  expect(calls).toEqual([{ name: "market_value", args: { realm: "Forever", itemId: 2589 } }]);
+  expect(urls).toEqual(["https://everloot.app/search/suggest?q=Linen+Cloth&in=item"]);
+});
+
+test("with a provider the price is still the market's: no model request, no my_ tool, no tool list", async () => {
+  const calls: { name: string; args: unknown }[] = [];
+  const send = vi.fn(async () => new Response("{}", { status: 500 }));
+  const mine = { name: "my_characters", description: "d", inputSchema: {}, run: vi.fn(() => "gold") };
+  const entry = { type: "openai-compatible", baseUrl: "https://openrouter.ai/api/v1", model: "m" };
+  const r = await answer({ mcp: { url: "u", token: null }, entries: [entry], history: [], question: "price 2589 on Forever", session: marketSession(calls), send: send as never, local: [mine] });
+  expect(r.text.startsWith("Item 2589 on Forever, all houses: market 3s 10c")).toBe(true);
+  expect(r.model).toBeNull();
+  expect(send).not.toHaveBeenCalled();
+  expect(mine.run).not.toHaveBeenCalled();
+  expect(calls.map((c) => c.name)).toEqual(["market_value"]);
+});
+
+test("without a realm it asks, listing the followed realms but choosing none, and opens no connection", async () => {
+  const session = vi.fn(async () => { throw new Error("no connection should open"); });
+  const r = await answer({ mcp: { url: "u", token: null }, entries: [], history: [], question: "price 2589", session: session as never, realms: ["Forever", "Nightslayer"] });
+  expect(r.text).toMatch(/^Which realm\?/);
+  expect(r.text).toContain("Realms you follow: Forever, Nightslayer.");
+  expect(r.sources).toEqual([]);
+  expect(r.steps).toEqual([]);
+  expect(session).not.toHaveBeenCalled();
+});
+
+test("an unreadable market is said, not searched around or guessed", async () => {
+  const calls: { name: string; args: unknown }[] = [];
+  const r = await answer({ mcp: { url: "u", token: null }, entries: [], history: [], question: "price 2589 on Forever", session: marketSession(calls, { connected: false, dataAsOf: null, reason: "x" }) });
+  expect(r.text).toMatch(/unrecorded, not zero/);
+  expect(calls.map((c) => c.name)).toEqual(["market_value"]);
+});
+
+test("a stop during the price lookup ends the answer", async () => {
+  const stop = new AbortController();
+  stop.abort();
+  await expect(answer({ mcp: { url: "u", token: null }, entries: [], history: [], question: "price 2589 on Forever", session: marketSession([]), signal: stop.signal })).rejects.toThrow();
 });

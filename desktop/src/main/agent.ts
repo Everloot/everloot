@@ -2,6 +2,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { existsSync } from "node:fs";
+import { marketValueFrom, siteItemSearch } from "../../../companion/src/bridge/engine";
+import { answerMarketQuestion } from "../../../web/src/lib/chat/market-question";
 import { readJsonFile } from "./json-file";
 import type { LocalTool } from "./local-tools";
 import { DEFAULT_MODEL, readKey } from "./providers";
@@ -87,6 +89,10 @@ export interface AgentOptions {
   onProgress?: (progress: ChatProgress) => void;
   /** The Stop button: ends the provider's request and the tool loop; the reply keeps what was written so far. */
   signal?: AbortSignal;
+  /** The site whose item search turns an item name in a price question into an id (its `send` carries the request). */
+  site?: string;
+  /** Realms the player follows: suggested when a price question names none, never chosen for them. */
+  realms?: string[];
 }
 
 interface ToolDef { name: string; description: string; inputSchema: unknown }
@@ -100,8 +106,30 @@ async function listTools(mcp: Client, local: LocalTool[]): Promise<ToolDef[]> {
 
 export interface AgentReply { text: string; model: string | null; sources: string[]; steps: ChatStep[]; stopped?: boolean }
 
-/** The first provider in config.json answers; none means plain search. */
+/**
+ * A price question, answered from the market tool's recorded values with no provider and no personal tool; null
+ * when the question is not one. Item names resolve through the site's own item search.
+ */
+async function priceAnswer(o: AgentOptions): Promise<AgentReply | null> {
+  const reply = await answerMarketQuestion(o.question, {
+    resolveItem: siteItemSearch(o.site ?? "https://everloot.app", o.send),
+    lookup: (realm, itemId, signal) => (o.session ?? withMcp)(o.mcp, async (mcp) =>
+      marketValueFrom(await mcp.callTool({ name: "market_value", arguments: { realm, itemId } }, undefined, { signal }))),
+    realmChoices: o.realms,
+  }, { signal: o.signal });
+  if (!reply) return null;
+  const looked = reply.kind !== "clarify" && reply.itemId !== null;
+  return {
+    text: reply.text, model: null,
+    sources: looked && reply.source ? [reply.source] : [],
+    steps: looked ? [{ tool: "market_value", input: JSON.stringify({ realm: reply.realm, itemId: reply.itemId }), chars: reply.text.length }] : [],
+  };
+}
+
+/** A price question is the market's to answer; otherwise the first provider in config.json answers, and none means plain search. */
 export async function answer(options: AgentOptions): Promise<AgentReply> {
+  const priced = await priceAnswer(options);
+  if (priced) return priced;
   const entry = options.entries[0];
   if (!entry) return plain(options);
   if (entry.type === "anthropic") return anthropicLoop(options, entry);

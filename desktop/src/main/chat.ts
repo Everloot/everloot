@@ -72,7 +72,8 @@ export function createChat(dataFolder: string, current: () => Settings, local: L
       messages.push({ role: "user", text: question, at: new Date().toISOString(), model: null, sources: [], steps: [] });
       try {
         const entries = readProviderEntries(join(dataFolder, "config.json"));
-        const r = await answer({ mcp: target(), entries, history, question, local, onProgress, signal: stopper.signal });
+        const s = current();
+        const r = await answer({ mcp: target(), entries, history, question, local, onProgress, signal: stopper.signal, site: s.endpoint, realms: s.market.realms });
         messages.push({ role: "assistant", text: r.text, at: new Date().toISOString(), model: r.model, sources: r.sources, steps: r.steps, ...(r.stopped ? { stopped: true } : {}) });
       } catch (err) {
         // Stopped before the provider wrote anything (plain search, or still connecting): not an error.

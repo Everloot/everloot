@@ -105,4 +105,27 @@ SLASH_ASK('question 21')
 assert(#EverlootDB.asks == 20 and EverlootDB.asks[20].question == 'question 21' and EverlootDB.asks[1].id == ids[2], 'the freed slot takes the new question')
 assert(string.find(table.concat(printed, '\\n'), 'question saved', 1, true), 'and it is saved')
 """)
-print("Lua 5.1 ask: /ask stores bounded questions, a full queue refuses a new one and keeps every waiting question, verified answers show once, bad checksums are refused")
+# A price question needs a realm. The ask carries the one the player is on, so "price 2589" can be answered;
+# an ask made where the game gives no usable realm name stays as it was, and the companion asks which realm.
+lua.execute("""
+EverlootDB.asks = {}
+EverlootAnswersDB = {}
+SLASH_ASK('before the realm is known')
+assert(EverlootDB.asks[1].realm == nil, 'no GetRealmName: the ask has no realm')
+GetRealmName = function() return 'Forever' end
+SLASH_ASK('price 2589')
+assert(EverlootDB.asks[2].realm == 'Forever', 'the ask carries the realm the player is on; got ' .. tostring(EverlootDB.asks[2].realm))
+GetRealmName = function() return "  Dawn's Reach  " end
+SLASH_ASK('price 2589 again')
+assert(EverlootDB.asks[3].realm == "Dawn's Reach", 'the realm is trimmed; got ' .. tostring(EverlootDB.asks[3].realm))
+for i, bad in ipairs({ '', 'X', string.rep('a', 41), 'Fore\\nver', 'a|cffff0000b' }) do
+  GetRealmName = function() return bad end
+  SLASH_ASK('bad realm ' .. i)
+  assert(EverlootDB.asks[3 + i].realm == nil and EverlootDB.asks[3 + i].question == 'bad realm ' .. i, 'an unusable realm name is left out, the question is kept: ' .. bad)
+end
+GetRealmName = function() return 42 end
+SLASH_ASK('a number is not a realm')
+assert(EverlootDB.asks[9].realm == nil, 'only a string is a realm')
+assert(EverlootDB.asks[2].id ~= nil and EverlootDB.asks[2].askedAt ~= nil and EverlootDB.asks[2].question == 'price 2589', 'the realm adds a field and changes none')
+""")
+print("Lua 5.1 ask: /ask stores bounded questions with the player's realm when it is a realm name, a full queue refuses a new one and keeps every waiting question, verified answers show once, bad checksums are refused")

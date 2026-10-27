@@ -13,7 +13,7 @@ import { homedir } from "node:os";
 import { dirname, join, posix, win32 } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createAnswerStore, answerPending } from "./bridge/run";
-import { mcpEngine, mcpSearch } from "./bridge/engine";
+import { mcpEngine, mcpMarketValue, mcpSearch, siteItemSearch, withMarket } from "./bridge/engine";
 import { llmEngine } from "./bridge/llm-engine";
 import { loadProviders } from "./providers/config";
 import { findEverlootFiles } from "./savedvariables";
@@ -80,10 +80,13 @@ async function main(argv: string[]): Promise<void> {
     const mcp = { url: args.mcp!, token: readFileSync(args.tokenFile!, "utf8").trim() };
     // Providers the user enabled in config.json beside the state file; none means plain search answers.
     const providers = loadProviders(join(dirname(statePath), "config.json"));
-    const engine = providers.length
-      ? llmEngine({ search: (q) => mcpSearch(mcp, q, 3), providers })
-      : mcpEngine(mcp);
+    // A price question is answered from the recorded market first, with no model; the rest follows the providers.
+    const engine = withMarket(
+      providers.length ? llmEngine({ search: (q) => mcpSearch(mcp, q, 3), providers }) : mcpEngine(mcp),
+      { lookup: (realm, id, signal) => mcpMarketValue(mcp, realm, id, signal), resolveItem: siteItemSearch(args.endpoint) },
+    );
     console.log(providers.length ? `Answering with ${providers.map((p) => p.name).join(" > ")}.` : "Answering with plain search (no providers in config.json).");
+    console.log("Price questions are answered from the recorded market, without a model.");
     const store = createAnswerStore(join(dirname(statePath), "answers.json"));
     const addonsDir = join(args.game!, "Interface", "AddOns");
     const answer = async (file: string) => {

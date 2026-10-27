@@ -40,7 +40,7 @@ export async function answerPending(options: {
   let answered = 0;
   for (const ask of pending) {
     try {
-      const { answer, source } = await options.engine.answer(ask.question);
+      const { answer, source } = await options.engine.answer(ask.question, ask.realm ? { realm: ask.realm } : undefined);
       options.store.add({ id: ask.id, answer: answer.slice(0, MAX_ANSWER), source, answeredAt: now().toISOString() });
       answered++;
     } catch (err) {

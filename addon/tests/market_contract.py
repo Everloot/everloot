@@ -231,7 +231,8 @@ local stale = tooltipFor(2589)
 assert(stale:find('STALE') and stale:find('2026%-10%-20'), 'prices ten days old are marked stale: ' .. stale)
 date = function() return '2026-10-21T10:00:00Z' end
 local fresh = tooltipFor(2589)
-assert(fresh:find('prices fetched 2026%-10%-20') and not fresh:find('STALE'), 'prices from yesterday are not stale: ' .. fresh)
+assert(fresh:find('price file built 2026%-10%-20') and not fresh:find('STALE'), 'prices from yesterday are not stale: ' .. fresh)
+assert(not fresh:find('fetched'), 'the file date is when the file was built, not when it was fetched: ' .. fresh)
 date = function() return '2026-10-20T10:00:00Z' end
 assert(Everloot.DayNumber('1970-01-01') == 0 and Everloot.DayNumber('2000-03-01') == 11017 and Everloot.DayNumber('2026-10-20') - Everloot.DayNumber('2026-10-19') == 1)
 assert(Everloot.DayNumber('nope') == nil)
@@ -253,7 +254,8 @@ assert(frames == math.ceil(#data / 20000) - 1, 'one slice per frame: ' .. frames
 local ready = tooltipFor(7)
 assert(ready:find('Everloot market 5s 0c') and ready:find('50 up'), ready)
 local absent = tooltipFor(3001)
-assert(not absent:find('Everloot market') and absent:find('no price on Bigrealm yet'), 'an id that is not in the file has no price, and 7 does not match 70 or 17: ' .. absent)
+assert(not absent:find('Everloot market') and absent:find('not in the local price file'), 'an id that is not in a full file is not in the file, and 7 does not match 70 or 17: ' .. absent)
+assert(not absent:find('no price on'), 'a full file cannot say the item has no public price: ' .. absent)
 local thin = tooltipFor(2)
 assert(thin:find('unrecorded %(thin%)'), thin)
 
@@ -266,6 +268,40 @@ local refused = tooltipFor(7)
 assert(said('checksum') and not refused:find('Everloot market') and refused:find('community prices failed their checksum'), 'a large file with a bad checksum is refused, and says so: ' .. refused)
 GetRealmName = function() return 'Forever' end
 Everloot:ResetPrices()
+-- A file below the cap that lacks the item has no public price for it: the usual short line.
+assert(tooltipFor(424242):find('no price on Forever yet'), 'a small file that lacks the item has no price for it')
+""")
+
+# The file's build time and the item's own newest day are different facts: a freshly built file can hold an
+# old item, and an old file a current one. Each is judged on its own, against today's UTC date.
+lua.execute("""
+local function priceFile(asOf, day)
+  local data = '2589,205,200,190,40,' .. day .. ',3'
+  EverlootPricesDB = { realms = { forever = { dataAsOf = asOf, data = data, sum = Everloot.Adler32(data) } } }
+  Everloot:ResetPrices()
+  return tooltipFor(2589)
+end
+date = function() return '2026-10-30T10:00:00Z' end
+local oldItem = priceFile('2026-10-30T09:50:00.000Z', '2026-10-20')
+assert(oldItem:find('STALE') and oldItem:find('2026%-10%-20') and oldItem:find('10 days'), 'a new file does not freshen an old item: ' .. oldItem)
+assert(oldItem:find('price file built 2026%-10%-30') and not oldItem:find('OLD FILE'), 'the file itself is new: ' .. oldItem)
+assert(oldItem:find('Everloot market 2s 5c'), 'a stale item keeps its numbers: ' .. oldItem)
+local oldFile = priceFile('2026-10-20T06:30:00.000Z', '2026-10-30')
+assert(oldFile:find('OLD FILE') and oldFile:find('2026%-10%-20'), 'an old file is called old: ' .. oldFile)
+assert(not oldFile:find('STALE'), 'a current item day is not stale because the file is old: ' .. oldFile)
+assert(not priceFile('2026-10-30T09:50:00.000Z', '2026-10-28'):find('STALE'), 'two days is not stale')
+assert(priceFile('2026-10-30T09:50:00.000Z', '2026-10-27'):find('STALE'), 'three days is stale')
+assert(not priceFile('2026-10-30T09:50:00.000Z', '2026-10-31'):find('STALE'), 'a day ahead is client drift, not stale')
+assert(priceFile('garbage', '2026-10-30'):find('price file age unknown'), 'an unreadable build time is unknown, not fresh')
+date = function() return '2026-10-31T00:00:01Z' end
+local midnight = priceFile('2026-10-30T23:50:00.000Z', '2026-10-30')
+assert(not midnight:find('STALE') and not midnight:find('OLD FILE'), 'across UTC midnight yesterday is current: ' .. midnight)
+date = function() return '2026-10-20T10:00:00Z' end
+""")
+lua.execute((Path(__file__).parent / "fixtures" / "EverlootPrices.lua").read_text(encoding="utf-8"))
+lua.execute("""
+Everloot:ResetPrices()
+GetRealmName = function() return 'Forever' end
 """)
 
 # /everloot price <item>: the tooltip's lines in chat, anywhere, from the files already in the game.
@@ -291,7 +327,26 @@ assert(ask('424242'):find('No price for this item on this realm yet'), 'an item 
 
 GetRealmName = function() return 'Nowhere' end
 Everloot:ResetPrices()
-assert(ask('2589'):find('No community prices in the game for this realm yet'), 'a realm with no file says where prices come from')
+local noRealm = ask('2589')
+assert(noRealm:find('has no data for Nowhere') and noRealm:find('/reload'), 'a file without this realm says so: ' .. noRealm)
+assert(not noRealm:find('failed') and not noRealm:find('No price for this item'), noRealm)
+local savedPrices = EverlootPricesDB
+EverlootPricesDB = nil
+Everloot:ResetPrices()
+local noFile = ask('2589')
+assert(noFile:find('No Everloot price file in the game') and noFile:find('Desktop App') and noFile:find('/reload'), 'no file says where prices come from: ' .. noFile)
+EverlootPricesDB = savedPrices
+
+-- A failed checksum is said so, and is not a missing price.
+GetRealmName = function() return 'Forever' end
+EverlootPricesDB.realms.forever.sum = 1
+Everloot:ResetPrices()
+printed = {}
+local refused = ask('2589')
+assert(refused:find('failed their checksum') and refused:find('not used'), 'a command says the checksum failed: ' .. refused)
+assert(not refused:find('No price for this item'), 'a failed file is not a missing price: ' .. refused)
+EverlootPricesDB.realms.forever.sum = 1634601863
+Everloot:ResetPrices()
 
 -- A large file still being checked: the answer waits for the checksum, then prints.
 local big = {}
@@ -305,6 +360,15 @@ SlashCmdList.EVERLOOT('price 7')
 assert(not said('Everloot price'), 'nothing is printed before the checksum has passed')
 drain()
 assert(said('Everloot market 5s 0c'), 'once checked, the price prints')
+
+-- The file keeps only the 2,000 items with the most units listed: an item it lacks may still be public.
+printed = {}
+SlashCmdList.EVERLOOT('price 3001')
+drain()
+local capped = table.concat(printed, '\\n')
+assert(capped:find('keeps only the 2,000 items') and capped:find('website'), 'a full file says it is capped: ' .. capped)
+assert(not capped:find('no public day') and not capped:find('No price for this item'), 'a full file cannot say nothing is public: ' .. capped)
+assert(capped:find('everloot.app/tools/auctions%?realm=Bigrealm&item=3001'), 'and links the page that can tell: ' .. capped)
 GetRealmName = function() return 'Forever' end
 Everloot:ResetPrices()
 """)

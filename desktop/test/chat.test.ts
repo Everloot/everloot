@@ -38,6 +38,12 @@ test("Chat sends the account key to the site it was checked against", async () =
   expect(createChat(d, () => settings()).info().withAccountKey).toBe(true);
 });
 
+test("Chat gives the agent the site for item names and the followed realms to suggest, nothing it could choose from", async () => {
+  mockAnswer.mockResolvedValueOnce(reply("ok"));
+  await createChat(dir(), () => settings({ market: { realms: ["Forever", "Nightslayer"] } })).send("price 2589");
+  expect(mockAnswer.mock.calls[0][0]).toMatchObject({ site: "https://example.test", realms: ["Forever", "Nightslayer"] });
+});
+
 test("a question and its answer land in chat.json and come back on the next start", async () => {
   const d = dir();
   mockAnswer.mockResolvedValueOnce(reply("Thunderfury drops in Molten Core."));

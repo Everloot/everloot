@@ -1,4 +1,6 @@
 import { MY_BUILDS, MY_BUILDS_LINE, SLUG_PATTERN } from "../saved-builds";
+import { resolveItem } from "./items";
+import { answerMarketQuestion } from "./market-question";
 import type { ChatProviderPreset } from "./providers";
 
 /**
@@ -163,6 +165,33 @@ export async function searchOnly(question: string, send: typeof fetch = fetch): 
   const sources = sourcesIn(hits);
   const steps = [{ tool: "search_knowledge", input: question, chars: hits.length }];
   return sources.length ? { text: hits.trim(), model: null, sources, pages: pagesIn(hits), steps } : { text: NO_SOURCED_ANSWER, model: null, sources: [], pages: [], steps };
+}
+
+/** market_value for one realm and item through this site's tool API, as its structured answer. Anything but a 200 is thrown. */
+export async function marketValue(realm: string, itemId: number, signal?: AbortSignal, send: typeof fetch = fetch): Promise<unknown> {
+  const query = new URLSearchParams({ realm, itemId: String(itemId) });
+  const res = await send(`/api/tools/market_value?${query}`, { headers: { accept: "application/json" }, credentials: "same-origin", signal });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return ((await res.json()) as { answer?: unknown }).answer;
+}
+
+/**
+ * A price question answered from the recorded market, with no key and no knowledge search; null when the question
+ * is not one. The item comes from the site's item search, the values from market_value, never from a model.
+ */
+export async function marketReply(question: string, options: { signal?: AbortSignal; send?: typeof fetch } = {}): Promise<ChatReply | null> {
+  const send = options.send ?? fetch;
+  const reply = await answerMarketQuestion(question, {
+    resolveItem: (name, signal) => resolveItem(name, signal, send),
+    lookup: (realm, itemId, signal) => marketValue(realm, itemId, signal, send),
+  }, { signal: options.signal });
+  if (!reply) return null;
+  const looked = reply.kind !== "clarify" && reply.itemId !== null;
+  return {
+    text: reply.text, model: null, sources: [],
+    pages: looked && reply.source ? [reply.source] : [],
+    steps: looked ? [{ tool: "market_value", input: JSON.stringify({ realm: reply.realm, itemId: reply.itemId }), chars: reply.text.length }] : [],
+  };
 }
 
 /** The data lines of a server-sent event stream, parsed as JSON; comments, keep-alives and [DONE] are skipped. */
