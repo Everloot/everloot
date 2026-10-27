@@ -17,12 +17,13 @@ export type OwnerState = { status: "checking" } | { status: "ready"; owner: Owne
  * Whose plans this browser shows, from /api/auth/me: asked when the page opens, again each time the tab comes back
  * (another tab may have signed in, out or into another account), and at once after Sign out in this tab
  * (ACCOUNT_CHANGED_EVENT). Only the latest answer counts. A failed check after a good one keeps the owner it had,
- * but a sign-out is certain, so it starts over as `retry` does: no one's plans until the next answer.
+ * but a sign-out is certain: it drops every answer already asked for, at once, and starts over as `retry` does,
+ * with no one's plans until the next answer.
  */
 export function useWorkspaceOwner(): [OwnerState, () => void] {
   const [state, setState] = useState<OwnerState>({ status: "checking" });
   const [attempt, setAttempt] = useState(0);
-  // Show no one's plans, let every answer already asked for go, and ask again.
+  // Show no one's plans and ask again; the answers asked for before are dropped when the check restarts.
   const retry = useCallback(() => { setState({ status: "checking" }); setAttempt((n) => n + 1); }, []);
   useEffect(() => {
     let active = true;
@@ -39,16 +40,19 @@ export function useWorkspaceOwner(): [OwnerState, () => void] {
     void check();
     const onShow = () => void check();
     const onVisible = () => { if (document.visibilityState === "visible") void check(); };
+    // A sign-out drops the answers already asked for now, not when the check restarts: one landing before then
+    // would bring the old account back.
+    const onChanged = () => { active = false; retry(); };
     window.addEventListener("focus", onShow);
     window.addEventListener("pageshow", onShow);
     document.addEventListener("visibilitychange", onVisible);
-    window.addEventListener(ACCOUNT_CHANGED_EVENT, retry);
+    window.addEventListener(ACCOUNT_CHANGED_EVENT, onChanged);
     return () => {
       active = false;
       window.removeEventListener("focus", onShow);
       window.removeEventListener("pageshow", onShow);
       document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener(ACCOUNT_CHANGED_EVENT, retry);
+      window.removeEventListener(ACCOUNT_CHANGED_EVENT, onChanged);
     };
   }, [attempt, retry]);
   return [state, retry];

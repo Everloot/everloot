@@ -250,6 +250,52 @@ test("after a sign-out, an answer for the old account that was asked before it i
   expect(text()).not.toContain("A's plan");
 });
 
+/** Signed in as A with a re-check for A on its way (the tab came back), then signed out. Returns that answer's release. */
+async function signedOutWithOldCheckPending(ui: ReactElement = <DevicePlans />) {
+  who = { id: A_ID, name: "Thrall#1234" };
+  await render(ui);
+  let release = () => {};
+  gate = new Promise<void>((r) => { release = r; });
+  await comeBack();
+  who = null;
+  return release;
+}
+
+/** The sign-out, with the old answer landing right after it, before React has run the owner check again. */
+const signOutThenOldAnswer = (releaseOld: () => void) => act(async () => {
+  window.dispatchEvent(new Event(ACCOUNT_CHANGED_EVENT));
+  releaseOld();
+  await new Promise((r) => setTimeout(r, 0));
+});
+
+test("an old answer that lands after the sign-out but before the check restarts is ignored, and a failed check then shows no plans", async () => {
+  seed(A, [plan({ id: id(2), name: "A's plan", notes: "A's notes" })]);
+  seed(ANON, [plan({ name: "Signed out plan" })]);
+  const releaseOld = await signedOutWithOldCheckPending();
+  meFails = 1;
+  await signOutThenOldAnswer(releaseOld);
+  await settle();
+  expect(alerts()).toContain("could not be checked");
+  expect(text()).not.toContain("A's plan");
+  expect(text()).not.toContain("A's notes");
+  expect(button(/^Download backup$/)).toBeUndefined();
+});
+
+test("in that same order, no one's plans show while the check after the sign-out is still out", async () => {
+  seed(A, [plan({ id: id(2), name: "A's plan" })]);
+  seed(ANON, [plan({ name: "Signed out plan" })]);
+  const releaseOld = await signedOutWithOldCheckPending();
+  let releaseNew = () => {};
+  gate = new Promise<void>((r) => { releaseNew = r; });
+  await signOutThenOldAnswer(releaseOld);
+  expect(text()).toContain("Checking who is signed in");
+  expect(text()).not.toContain("A's plan");
+  await act(async () => releaseNew());
+  await settle();
+  expect(item("Signed out plan")).toBeDefined();
+  expect(text()).not.toContain("A's plan");
+});
+
 test("a failed check right after a sign-out shows no plans, never the old account's", async () => {
   seed(A, [plan({ id: id(2), name: "A's plan" })]);
   seed(ANON, [plan({ name: "Signed out plan" })]);
@@ -520,6 +566,29 @@ test("LocalPlanSave: a sign-out while the panel is open closes it at once and sa
   await click(button(/^Save plan$/, panel()!));
   expect(stored(ANON)?.plans).toHaveLength(1);
   expect(stored(A)?.plans.map((p) => p.name)).toEqual(["A's plan"]);
+});
+
+test("LocalPlanSave: an old answer landing between the sign-out and the next check keeps the panel closed and saves nothing", async () => {
+  onMessage.mockClear();
+  seed(A, [plan({ id: id(2), name: "A's plan" })]);
+  who = { id: A_ID, name: "Thrall#1234" };
+  await render(widget([MAGE, null], [PLANNED, null]));
+  await click(button(/^Save on this device$/));
+  expect(panel()).not.toBeNull();
+  let releaseOld = () => {};
+  gate = new Promise<void>((r) => { releaseOld = r; });
+  await comeBack();
+  who = null;
+  meFails = 1;
+  await signOutThenOldAnswer(releaseOld);
+  await settle();
+  expect(panel()).toBeNull();
+  // Nobody is known now, so Save on this device says so instead of opening for the old account.
+  await click(button(/^Save on this device$/));
+  expect(panel()).toBeNull();
+  expect(onMessage).toHaveBeenLastCalledWith(expect.stringContaining("could not be checked"));
+  expect(stored(A)?.plans.map((p) => p.name)).toEqual(["A's plan"]);
+  expect(stored(ANON)).toBeNull();
 });
 
 test("LocalPlanSave: a full storage keeps the panel and its text, says so, and never says saved", async () => {
