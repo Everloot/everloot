@@ -198,12 +198,14 @@ export function buildLegacyPerkCatalog({ get, build, previous }: LegacyCatalogIn
     }
     const cost = costs.get(traitCostId);
     const amount = num(cost?.Amount);
-    if (!cost || amount <= 0 || num(cost.CurveID)) {
-      const why = !cost ? `TraitCost ${traitCostId} is not in TraitCost` : num(cost.CurveID) ? `TraitCost ${traitCostId} follows curve ${num(cost.CurveID)}, which is not read` : `TraitCost ${traitCostId} has Amount ${amount}`;
+    if (!cost || amount <= 0 || num(cost.CurveID) || !num(cost.TraitCurrencyID)) {
+      const why = !cost ? `TraitCost ${traitCostId} is not in TraitCost`
+        : num(cost.CurveID) ? `TraitCost ${traitCostId} follows curve ${num(cost.CurveID)}, which is not read`
+          : amount <= 0 ? `TraitCost ${traitCostId} has Amount ${amount}` : `TraitCost ${traitCostId} names no currency`;
       warnings.push(`tree ${treeId}: ${why}; its cost is unknown`);
       return { value: null, confidence: "unknown", from: why, traitCostId, currencyId: null };
     }
-    return { value: amount, confidence: "inferred", from: "TraitTreeXTraitCost, TraitCost.Amount", traitCostId, currencyId: num(cost.TraitCurrencyID) || null };
+    return { value: amount, confidence: "inferred", from: "TraitTreeXTraitCost, TraitCost.Amount", traitCostId, currencyId: num(cost.TraitCurrencyID) };
   };
 
   const currencyLinks = group(list(get("TraitTreeXTraitCurrency")), (r) => num(r.TraitTreeID));
@@ -222,7 +224,7 @@ export function buildLegacyPerkCatalog({ get, build, previous }: LegacyCatalogIn
       if (!kind) warnings.push(`node ${id} has TraitNode type ${num(r.Type)}, which WoWDBDefs does not name; its kind and ranks are left unknown`);
       return {
         id, x: num(r.PosX), y: num(r.PosY), kind, flags: num(r.Flags), ranks: ranksOf(kind, entries), entries,
-        prereqs: [...(prereqs.get(id) ?? [])].sort((a, b) => a.nodeId - b.nodeId || a.rule.localeCompare(b.rule)),
+        prereqs: [...(prereqs.get(id) ?? [])].sort((a, b) => a.nodeId - b.nodeId || (a.rule ?? "").localeCompare(b.rule ?? "")),
       };
     });
     return { id: treeId, currencyId: currencyOf(treeId), cost: costOf(treeId), nodes, gates: [...(gates.get(treeId) ?? [])].sort((a, b) => a.condId - b.condId) };

@@ -26,6 +26,10 @@ export const LEGACY_TRAIT_SYSTEM_ID = 45;
  */
 export const Confidence = z.enum(["stored", "inferred", "unknown"]);
 export type Confidence = z.infer<typeof Confidence>;
+/** Ranks and prerequisites are read as the files store them, or not at all. */
+const StoredOrUnknown = Confidence.exclude(["inferred"]);
+/** The cost, the cap and where a gate counts are column-name readings until confirmed: never stored. */
+const InferredOrUnknown = Confidence.exclude(["stored"]);
 
 /** A reading is unknown exactly when it has no value. */
 const settled = (r: { value: unknown; confidence: Confidence }) => (r.confidence === "unknown") === (r.value === null);
@@ -34,7 +38,7 @@ const SETTLED = { message: "a reading has a value unless it is unknown, and an u
 export const Cap = z.object({
   /** TraitCurrency.SourcedMax, which WoWDBDefs describes as capping the summed TraitCurrencySource amounts. */
   value: z.number().int().positive().nullable(),
-  confidence: Confidence,
+  confidence: InferredOrUnknown,
   /** The table and column it was read from, or what was missing. */
   from: z.string(),
 }).refine(settled, SETTLED);
@@ -48,18 +52,19 @@ export const Currency = z.object({
 export const Cost = z.object({
   /** Points per rank: the tree's TraitCost.Amount. That it is charged per rank is read from the column name. */
   value: z.number().int().positive().nullable(),
-  confidence: Confidence,
+  confidence: InferredOrUnknown,
   from: z.string(),
   /** TraitTreeXTraitCost.TraitCostID; null when the tree has no single cost row. */
   traitCostId: z.number().int().nullable(),
-  /** TraitCost.TraitCurrencyID; null when the cost is unknown. */
+  /** TraitCost.TraitCurrencyID; null exactly when the cost is unknown. */
   currencyId: z.number().int().nullable(),
-}).refine(settled, SETTLED);
+}).refine(settled, SETTLED)
+  .refine((c) => (c.value === null) === (c.currencyId === null), { message: "a known cost names its currency, and an unknown one names none" });
 
 export const Ranks = z.object({
   /** Most ranks the node can hold: single, its entry's MaxRanks; tiered, the sum of its entries'; choice, the largest. */
   value: z.number().int().positive().nullable(),
-  confidence: Confidence,
+  confidence: StoredOrUnknown,
   from: z.string(),
 }).refine(settled, SETTLED);
 
@@ -76,10 +81,13 @@ export type Entry = z.infer<typeof Entry>;
 
 export const Prereq = z.object({
   nodeId: z.number().int(),
-  /** "any": buying that node is enough (TraitEdge type 2). "all": it must be bought, as must every other "all" node (type 3). */
-  rule: z.enum(["any", "all"]),
-  confidence: Confidence,
-});
+  /**
+   * "any": buying that node is enough (TraitEdge type 2). "all": it must be bought, as must every other "all" node
+   * (type 3). null: the edge is there but its rule is not resolved, so its confidence is "unknown".
+   */
+  rule: z.enum(["any", "all"]).nullable(),
+  confidence: StoredOrUnknown,
+}).refine((p) => (p.confidence === "unknown") === (p.rule === null), { message: "a prerequisite has a rule unless it is unresolved, and an unresolved one has none" });
 
 export const Node = z.object({
   /** TraitNode.ID, stable across builds; a saved plan names nodes by it. */
@@ -109,13 +117,14 @@ export const Gate = z.object({
   guards: z.array(z.number().int()),
   /**
    * Where the points are counted: the group TraitCond.TraitNodeGroupID names, and its nodes. That the column means
-   * this is read from its name ("inferred"); with no group named, it is "unknown" and no group is filled in.
+   * this is read from its name ("inferred"); with no group named, it is "unknown" and no group or node is filled in.
    */
   countedGroupId: z.number().int().nullable(),
   counted: z.array(z.number().int()),
-  confidence: Confidence,
+  confidence: InferredOrUnknown,
   from: z.string(),
-}).refine((g) => (g.confidence === "unknown") === (g.countedGroupId === null), { message: "a gate counts in a named group unless where it counts is unknown" });
+}).refine((g) => (g.confidence === "unknown") === (g.countedGroupId === null), { message: "a gate counts in a named group unless where it counts is unknown" })
+  .refine((g) => g.countedGroupId !== null || !g.counted.length, { message: "a gate that counts somewhere unknown names no counted nodes" });
 export type Gate = z.infer<typeof Gate>;
 
 export const Tree = z.object({

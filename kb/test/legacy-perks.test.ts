@@ -134,6 +134,14 @@ const run = (tables: Record<string, Row[] | undefined> = rows(), build = stamp(7
   buildLegacyPerkCatalog({ get: reader(tables), build, previous });
 const tree = (c: LegacyPerkCatalog, id: number) => c.trees.find((t) => t.id === id)!;
 const node = (c: LegacyPerkCatalog, id: number) => c.trees.flatMap((t) => t.nodes).find((n) => n.id === id)!;
+/** Whether the schema still accepts a built catalog after a change to a copy of it. */
+const accepts = (c: LegacyPerkCatalog, change: (x: LegacyPerkCatalog) => void) => {
+  const x = structuredClone(c);
+  change(x);
+  return LegacyPerkCatalog.safeParse(x).success;
+};
+/** A reading with its types widened, so a test can write a value the schema should refuse. */
+const loosen = (reading: object) => reading as { confidence: string; rule?: string | null };
 
 describe("the Legacy trees", () => {
   test("are the trees of trait system 45 that hold nodes, in id order; an empty one is listed, a class tree never appears", () => {
@@ -279,12 +287,38 @@ describe("what the files leave open", () => {
 
   test("the schema refuses a value on an unknown reading and an unknown value on a known one, so no default can slip in", () => {
     const c = run();
-    const mutate = (change: (x: LegacyPerkCatalog) => void) => { const x = structuredClone(c); change(x); return LegacyPerkCatalog.safeParse(x).success; };
+    const mutate = (change: (x: LegacyPerkCatalog) => void) => accepts(c, change);
     expect(mutate(() => {})).toBe(true);
     expect(mutate((x) => { x.currencies[0].cap.confidence = "unknown"; })).toBe(false);
     expect(mutate((x) => { x.trees[0].cost.value = null; })).toBe(false);
     expect(mutate((x) => { x.trees[0].nodes[0].ranks.confidence = "unknown"; })).toBe(false);
     expect(mutate((x) => { x.trees[1].gates[0].confidence = "inferred"; })).toBe(false);
+  });
+
+  test("an unknown counting scope holds no group and no nodes, and a known one names its group", () => {
+    const c = run();
+    expect(accepts(c, (x) => { tree(x, 701).gates[0].counted = [6]; })).toBe(false);
+    expect(accepts(c, (x) => { tree(x, 700).gates[0].countedGroupId = null; })).toBe(false);
+    expect(accepts(c, (x) => { Object.assign(tree(x, 700).gates[0], { countedGroupId: null, counted: [], confidence: "unknown" }); })).toBe(true);
+  });
+
+  test("a prerequisite with a rule is stored, and one whose rule is unresolved carries none", () => {
+    const c = run();
+    const first = (x: LegacyPerkCatalog) => loosen(node(x, 2).prereqs[0]);
+    expect(accepts(c, (x) => { first(x).confidence = "unknown"; })).toBe(false);
+    expect(accepts(c, (x) => { first(x).rule = null; })).toBe(false);
+    expect(accepts(c, (x) => { first(x).confidence = "inferred"; })).toBe(false);
+    expect(accepts(c, (x) => { Object.assign(first(x), { rule: null, confidence: "unknown" }); })).toBe(true);
+  });
+
+  test("cost, cap and gate counting cannot be marked stored, ranks cannot be inferred, and an unknown cost names no currency", () => {
+    const c = run();
+    expect(accepts(c, (x) => { loosen(x.currencies[0].cap).confidence = "stored"; })).toBe(false);
+    expect(accepts(c, (x) => { loosen(tree(x, 700).cost).confidence = "stored"; })).toBe(false);
+    expect(accepts(c, (x) => { loosen(tree(x, 700).gates[0]).confidence = "stored"; })).toBe(false);
+    expect(accepts(c, (x) => { loosen(node(x, 1).ranks).confidence = "inferred"; })).toBe(false);
+    expect(accepts(c, (x) => { Object.assign(tree(x, 700).cost, { value: null, confidence: "unknown" }); })).toBe(false);
+    expect(accepts(c, (x) => { Object.assign(tree(x, 700).cost, { value: null, confidence: "unknown", currencyId: null }); })).toBe(true);
   });
 });
 

@@ -68,7 +68,7 @@ Node {
   flags                             TraitNode.Flags as stored
   ranks: Reading
   entries: { id, definitionId, spellId, name | null, maxRanks }[]    in buy order
-  prereqs: { nodeId, rule: "any" | "all", confidence }[]
+  prereqs: { nodeId, rule: "any" | "all" | null, confidence }[]
 }
 Gate { condId, amount, currencyId, guardedGroupId, guards[], countedGroupId | null, counted[], confidence, from }
 Withdrawn { kind: "tree" | "node" | "entry", id, treeId, nodeId?, name | null, lastSeen, withdrawnIn }
@@ -83,7 +83,11 @@ Every value is found in game files and unconfirmed. `confidence` says how much r
 - **unknown**: the tables do not settle it. The value is `null`, and no default takes its place.
 
 A reading is `unknown` exactly when its value is `null`; the schema refuses anything else, so a guessed value cannot
-slip in. `from` names the table and column a value came from, or what was missing.
+slip in. `from` names the table and column a value came from, or what was missing. The schema also holds the rest of
+the contract: ranks and prerequisites are `stored` or `unknown`; the cost, the cap and where a gate counts are
+`inferred` or `unknown`, never `stored`, so confirming one in game is a change to the schema. An unknown cost names no
+currency, a gate that counts somewhere unknown names no group and no nodes, and a prerequisite is `unknown` exactly
+when its rule is `null`.
 
 | Rule | Read from | Confidence |
 |---|---|---|
@@ -108,7 +112,8 @@ How the rest is read:
 - **Gates.** Only a condition of type 0 that asks for points spent and nothing else becomes a gate. Any other condition
   on a Legacy group, node or entry (a level, a quest, an achievement, condition flags) is a warning, so the nodes it
   guards are known to carry a rule the catalog does not show.
-- **Cost.** A tree with no cost row, more than one, an amount of 0 or a cost that follows a curve has an unknown cost.
+- **Cost.** A tree with no cost row, more than one, an amount of 0, a cost that names no currency or a cost that
+  follows a curve has an unknown cost.
   So does a tree that `TraitNodeXTraitCost`, `TraitNodeGroupXTraitCost` or `TraitNodeEntryXTraitCost` overrides for any
   of its nodes, groups or entries: the tree cost is never applied in their place.
 - **Cap.** A `SourcedMax` of 0, or no currency row, gives an unknown cap.
