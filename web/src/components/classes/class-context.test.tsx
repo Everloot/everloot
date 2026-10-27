@@ -195,6 +195,27 @@ describe("on the raid planner, a page built once", () => {
     expect(title.getAttribute("tabindex")).toBe("-1");
   });
 
+  test("an activation while focus is outside the chip leaves focus where it is; focus inside the chip goes to the title", async () => {
+    const native = history.pushState.bind(history);
+    vi.spyOn(history, "pushState").mockImplementation((...args: Parameters<History["pushState"]>) => { native(...args); window.dispatchEvent(new PopStateEvent("popstate")); });
+    const page = <><h1>WoW Forever Raid Buff Planner</h1><ClassContextChipFromAddress fragment="#raid=ELR1-abc" /><button type="button">Add</button></>;
+    history.replaceState(null, "", "/tools/raid?class=mage#raid=ELR1-abc");
+    await mount(page);
+    const add = container!.querySelector("button")!;
+    add.focus();
+    await act(async () => anchor("Remove Mage")!.click());
+    // The context still comes off, and the control that had focus keeps it.
+    expect(container!.querySelector("[data-class-context]")).toBeNull();
+    expect(document.activeElement).toBe(add);
+    expect(container!.querySelector("h1")!.hasAttribute("tabindex")).toBe(false);
+    // Focus on the chip's other link goes away with the chip, so it moves to the title.
+    history.replaceState(null, "", "/tools/raid?class=mage#raid=ELR1-abc");
+    await mount(page);
+    anchor("Mage")!.focus();
+    await act(async () => anchor("Remove Mage")!.click());
+    expect(document.activeElement).toBe(container!.querySelector("h1"));
+  });
+
   test("the chip's links hold the raid the planner hands it, never the address's, and a modified or middle click is the browser's", async () => {
     history.replaceState(null, "", "/tools/raid?class=mage&level=25#raid=ELR1-old");
     const push = vi.spyOn(history, "pushState");

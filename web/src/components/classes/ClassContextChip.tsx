@@ -48,9 +48,10 @@ export default function ClassContextChip({ read, here, inPlace, className = "mt-
       onClick: (e: MouseEvent) => {
         if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
         e.preventDefault();
-        // The link goes with the old address: focus moves to the page's title rather than falling to the page's end.
+        // The link goes with the old address. When focus is on it or elsewhere in the chip, it moves to the page's title
+        // rather than falling to the page's end; focus anywhere else stays where it is.
         const title = document.querySelector<HTMLElement>("h1");
-        if (title) {
+        if (title && e.currentTarget.closest("[data-class-context]")?.contains(document.activeElement)) {
           if (!title.hasAttribute("tabindex")) title.tabIndex = -1;
           title.focus();
         }
