@@ -31,4 +31,3 @@ test("only a link on the forums or Bluesky could be a stored Blizzard post", () 
     expect(couldBeBluePost(url), url).toBe(false);
   }
 });
-

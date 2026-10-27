@@ -62,4 +62,3 @@ export function couldBeBluePost(url: string): boolean {
     return false;
   }
 }
-
