@@ -36,6 +36,8 @@ it. Delete this checklist once the four are published or dropped.
 
 The plan was built one point at a time with the calculator's own rules, each point within the budget its level gives,
 and places exactly on the 70634 Mage tree: no unknown, cut or refused talent, 51 of 51 points, the last at level 60.
+The source audit's block on current Mage talent content is cleared: the catalog follows the live product, rebuilt on
+70630 and then 70634. Where Ice Barrier's gate counts its points stays unconfirmed, and the guide says so.
 
 - `code`: `EL1-mage-1482-1.60.1.70634-MTA1NzYyOjEsMTA1NzY0OjIsMTA1NzY2OjEsMTA1NzY3OjEsMTA1NzY4OjMsMTA1NzY5OjEsMTA1NzcyOjMsMTA1Nzc0OjMsMTA1Nzc1OjIsMTA1Nzc2OjMsMTA1Nzc3OjUsMTA1Nzc4OjMsMTA1Nzc5OjUsMTA1Nzg1OjMsMTA1Nzk0OjUsMTA1Nzk1OjUsMTA1Nzk2OjMsMTA1Nzk3OjI`
 - `order`: `O1g-MMMMMHHHKKKKKDGGGEEEFCBBLLLJJJAPPPPPQQQOOOOORRNNNII`, legal point by point. It is **provisional on purpose**:
@@ -60,19 +62,21 @@ and places exactly on the 70634 Mage tree: no unknown, cut or refused talent, 51
 |---|---|
 | The first point arrives at level 10, then one a level to 60, 51 in all; the plan spends all of them | Catalog `rules.pointLevels` (game files, unconfirmed); the plan |
 | Talents start at level 10 | Deep dive |
-| Frostfire Bolt is learned at level 40, counts as Fire and Frost, and is meant for builds with both | Deep dive |
+| Frostfire Bolt is learned at level 40, counts as Fire and as Frost, and is meant to give a Mage who mixes the two schools' talents one spell that gains from both | Deep dive |
 | Improved Fireball also shortens Frostfire Bolt; Incineration raises Ice Lance's critical strike chance; Master of Elements refunds mana on Fire and Frost critical strikes | Talent texts, unchanged in 70634 |
-| Cone of Cold's duration was cut against kiting by farmers and boosters; Improved Blizzard's slow was weakened to rein in Frost area damage | Deep dive |
+| Cone of Cold's duration was cut so farmers and boosters cannot kite as many enemies; Improved Blizzard's slow was weakened so Frost Mages cannot farm instances with area spells as easily | Deep dive |
 | Talents, ranks and texts are from the game files and unconfirmed | Catalog `label` |
 | Where Ice Barrier's gate counts is not settled; the calculator reads it as points in Frost | Catalog node 105762, `unlock.scope: unconfirmed`, and `rules.note` |
-| Abilities and talents may keep changing through the beta | Deep dive |
+| The beta could still change Mage spells and talents | Deep dive |
 | The game files have changed since the deep dive | Build 70630 changed Mage talents ([audit](sources/2026-10-27-class-legacy-dungeon-source-audit.md#build-and-evidence)); the catalog on main has them |
 | A later build that changes a planned talent shows on the guide's page | [Guide freshness](GUIDES.md#guide-pages) |
 | The second set opens at level 40; the deep dive gives 40 for Dual Specialization | Catalog `rules.dualSpecLevel` (from the beta notes); deep dive |
 | Ragefire Chasm 13, the Deadmines 16, Wailing Caverns 17, and their pages | Map layer; `/database/instances/389-ragefire-chasm`, `/36-deadmines`, `/43-wailing-caverns` |
 | Inside proposals: Improved Frostbolt speeds up Frostbolt; Frostbite gives chill effects a chance to freeze; Ice Lance hits frozen targets harder; Shatter raises critical strike chance against them; Fingers of Frost treats the target as frozen; Cold Snap finishes the other Frost cooldowns | Talent texts, unchanged in 70634 |
 | Inside proposals: Improved Fire Blast opens Fire's fourth row | Catalog: Master of Elements needs 15 Fire points above it; 5 + 3 + 5 + 2 |
-| Inside a proposal: Frost Nova freezes its target | **Not checked against the current files** (a baseline spell); confirm or cut |
+
+No claim rests on Frost Nova itself, which has no entry in the committed layers. The guide names it only in
+Improved Frost Nova, a talent the catalog carries and whose text hash matches 70634.
 
 ### Proposed, awaiting you
 
@@ -82,7 +86,7 @@ and places exactly on the 70634 Mage tree: no unknown, cut or refused talent, 51
 4. Why: levels 41 to 58 in Fire (Improved Fireball, Incineration, Ignite, Master of Elements, and Improved Fire Blast to
    open the fourth row); the last two points on Improved Frost Nova.
 5. Why: no points in Improved Blizzard or Improved Cone of Cold; level on one or two enemies at a time.
-6. How: lead with Frostbolt; on a frozen target (Frostbite or Frost Nova), Ice Lance.
+6. How: lead with Frostbolt; when Frostbite freezes the target, Ice Lance.
 7. How: spend Fingers of Frost on Ice Lance.
 8. How: keep Ice Block and Cold Snap for a fight that goes wrong.
 9. How: from 40, Frostfire Bolt in place of Frostbolt on enemies that live long enough.

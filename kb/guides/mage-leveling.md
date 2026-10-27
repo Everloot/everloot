@@ -31,14 +31,15 @@ reads one point a level from the game files, 51 in all, and this plan spends eve
 
 ## Why this plan
 
-[Blizzard's deep dive](https://worldofwarcraft.blizzard.com/en-us/news/24302097) adds Frostfire Bolt, a spell learned
-at level 40 that counts as both Fire and Frost, and says it is meant for builds that take both Fire and Frost talents.
-In the game files, three Fire talents also reach Frost spells: Improved Fireball shortens the cast of Frostfire Bolt
+[Blizzard's deep dive](https://worldofwarcraft.blizzard.com/en-us/news/24302097) adds Frostfire Bolt, which Mages learn
+at level 40. It counts as Fire and as Frost, and Blizzard says the point is to give a Mage who mixes Fire and Frost
+talents one spell that gains from both. In the game files, three Fire talents also reach Frost spells: Improved
+Fireball shortens the cast of Frostfire Bolt
 as well as Fireball, Incineration raises the critical strike chance of Ice Lance among other spells, and Master of
 Elements returns mana on Fire and Frost critical strikes. The calculator shows each talent's own text.
 
 The same deep dive cut the duration of Cone of Cold, so that farmers and boosters cannot kite as many enemies, and
-weakened the slow of Improved Blizzard, to rein in the area damage of Frost Mages.
+weakened the slow from Improved Blizzard, so that Frost Mages cannot farm instances with area spells as easily.
 
 ### Editor to confirm
 
@@ -58,8 +59,8 @@ stores it.
 
 ### Editor to confirm
 
-- Proposed: lead with Frostbolt. When a target is frozen, by Frostbite or Frost Nova, follow with Ice Lance: it deals
-  more damage to frozen targets, and Shatter raises the critical strike chance of every spell against them.
+- Proposed: lead with Frostbolt. When Frostbite freezes the target, follow with Ice Lance: it deals more damage to
+  frozen targets, and Shatter raises the critical strike chance of every spell against them.
 - Proposed: when Fingers of Frost triggers, spend it on Ice Lance, since it lets the next spells treat the target as
   frozen.
 - Proposed: keep Ice Block and Cold Snap for a fight that goes wrong. Cold Snap finishes the cooldowns of your other
@@ -76,9 +77,9 @@ The talents, their ranks and their texts come from the game files and have not b
 calculator labels them found in game files, unconfirmed. Where Ice Barrier's gate counts its points is not settled in
 the files either, and the calculator reads it as points spent in Frost.
 
-[Blizzard's deep dive](https://worldofwarcraft.blizzard.com/en-us/news/24302097) says abilities and talents may keep
-changing through the beta, and the game files have changed since it was posted. If a later build changes a talent
-this plan uses, this page says so.
+[Blizzard's deep dive](https://worldofwarcraft.blizzard.com/en-us/news/24302097) warns that the beta could still
+change Mage spells and talents, and the game files have changed since it was posted. If a later build changes a
+talent this plan uses, this page says so.
 
 The second talent set opens at level 40 in the calculator, the level the deep dive gives for Dual Specialization. This
 guide plans one set. How the plan plays is not recorded here: its order is a plan, not a record of play.
