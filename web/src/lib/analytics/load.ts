@@ -157,8 +157,10 @@ function clearAnalyticsStorage(doc: Document, win: Window): void {
       }
     }
   }
-  for (const store of [win.localStorage, win.sessionStorage]) {
+  // A browser that refuses storage (Chrome with cookies blocked) throws on reading the property itself.
+  for (const name of ["localStorage", "sessionStorage"] as const) {
     try {
+      const store = win[name];
       for (const key of Object.keys(store)) if (key.startsWith("ph_")) store.removeItem(key);
     } catch {}
   }

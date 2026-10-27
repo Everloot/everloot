@@ -11,9 +11,25 @@ export const REJECTION_FRAGMENT = KEYS.advertising.fragment;
 export const rejectionFragment = (category: ConsentCategory) => KEYS[category].fragment;
 export const rejectionSessionKey = (category: ConsentCategory) => KEYS[category].session;
 
+// The address fragment can hold other parts joined by "&" (a talent #plan=, a #raid=), so a rejection is
+// one part among them: it is added at the end and removed on its own, and the readers of those parts still
+// find their codes.
+const fragmentParts = (hash: string) => (hash.length > 1 ? hash.slice(1).split("&") : []);
+
+export function hasRejectionFragment(hash: string, category: ConsentCategory = "advertising"): boolean {
+  return fragmentParts(hash).includes(KEYS[category].fragment.slice(1));
+}
+
+export function withRejectionFragment(hash: string, category: ConsentCategory, rejected: boolean): string {
+  const part = KEYS[category].fragment.slice(1);
+  const parts = fragmentParts(hash).filter((p) => p !== part);
+  if (rejected) parts.push(part);
+  return parts.length ? `#${parts.join("&")}` : "";
+}
+
 export function readConsent(storage: Pick<Storage, "getItem">, session?: Pick<Storage, "getItem">, hash = "", category: ConsentCategory = "advertising"): ConsentChoice | null {
   const keys = KEYS[category];
-  if (hash === keys.fragment) return "rejected";
+  if (hasRejectionFragment(hash, category)) return "rejected";
   try {
     if (session?.getItem(keys.session) === "rejected") return "rejected";
   } catch { return null; }
