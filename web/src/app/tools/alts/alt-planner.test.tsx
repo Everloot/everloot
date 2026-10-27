@@ -3,6 +3,7 @@ import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import AccountControls from "@/components/AccountControls";
+import { isProtectedPath } from "@/lib/document-boundary";
 import { bucketKey, type LocalAlt, type LocalPlan, type Owner, type PlayerWorkspace } from "@/lib/player-workspace";
 import AltPlanner from "./AltPlanner";
 
@@ -412,7 +413,8 @@ test("a backup restores every alt detail after a preview that names the alts", a
   expect(stored(ANON)?.plans).toEqual([plan()]);
 });
 
-test("the page is left out of search, as Plans on this device is", async () => {
+test("the page is left out of search and is a protected page, so no ads or analytics load beside the alts", async () => {
   const { metadata } = await import("./page");
   expect(metadata.robots).toEqual({ index: false, follow: false });
+  expect(isProtectedPath("/tools/alts")).toBe(true);
 });
