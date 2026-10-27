@@ -204,6 +204,22 @@ describe("guideFreshness", () => {
     expect(f.reasons).toEqual(["The spend order is provisional, made by the calculator when asked; a published guide carries only an order a player planned."]);
   });
 
+  test("a second set that opens after the guide's levels end is broken, with the level it opens at; the first set is not", () => {
+    // The review's case: two sets, levels 10 to 30, and the tree opens the second set at level 40.
+    expect(fixture.rules.dualSpecLevel).toBe(40);
+    const two = guide({ levels: { from: 10, to: 30 }, code2: code(RANKS2), order2: token(RANKS2, ORDER2) });
+    const f = guideFreshness(two, tree("1.0.0.1"), changes([]), TODAY);
+    expect(f.state).toBe("broken");
+    expect(f.sets[0].problems).toEqual([]);
+    expect(f.sets[1].problems).toEqual(["The second set opens at level 40, after this guide's levels end."]);
+    expect(f.reasons).toEqual(["Set 2: The second set opens at level 40, after this guide's levels end."]);
+    // Its last level one short of 40 is still too early; reaching 40 is enough.
+    expect(guideFreshness({ ...two, levels: { from: 10, to: 39 } }, tree("1.0.0.1"), changes([]), TODAY).state).toBe("broken");
+    expect(guideFreshness({ ...two, levels: { from: 10, to: 40 } }, tree("1.0.0.1"), changes([]), TODAY)).toMatchObject({ state: "current", reasons: [] });
+    // A guide with one set has no second set to open.
+    expect(guideFreshness(guide({ levels: { from: 10, to: 30 } }), tree("1.0.0.1"), changes([]), TODAY)).toMatchObject({ state: "current", reasons: [] });
+  });
+
   test("a plan the tree's points or the guide's levels cannot hold is broken", () => {
     const short = guideFreshness(guide(), tree("1.0.0.1", (n) => n, { maxLevel: 19 }), changes([]), TODAY);
     expect(short.state).toBe("broken");

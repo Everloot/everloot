@@ -85,6 +85,9 @@ function readSet(set: 1 | 2, code: string, order: string | null, guide: GuidePla
   const needs = levelFor(catalog, asked);
   if (asked > most) problems.push(`It spends ${asked} points, and this tree gives ${most} by level ${catalog.rules.maxLevel}.`);
   else if (needs > guide.levels.to) problems.push(`It needs level ${needs}, above level ${guide.levels.to}, the last this guide covers.`);
+  // The second set opens at the level the tree's rules set; a guide that ends before it cannot use the set.
+  const opens = catalog.rules.dualSpecLevel;
+  if (set === 2 && opens > guide.levels.to) problems.push(`The second set opens at level ${opens}, after this guide's levels end.`);
   const f = codeFreshness(catalog, changes, code);
   const since = f && afterReview(f, guide.reviewed?.build ?? null);
   const stale = since !== null && (since.touched.length > 0 || since.pointLevels.length > 0);

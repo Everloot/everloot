@@ -293,6 +293,21 @@ describe("a guide's page", () => {
     expect(guideCalculatorHref("mage", refused.sets)).toContain(`order=${PROVISIONAL}`);
   });
 
+  test("a second set that opens after the guide's levels end is broken: no Copy for addon for it, the calculator link stays, and the guide stays out of search", async () => {
+    stubGuides([{ slug: "frost-leveling", second: true, levels: "{ from: 10, to: 30 }" }]);
+    const html = await page("frost-leveling");
+    const note = dom(html).querySelector('[data-guide-state="broken"]')!;
+    expect(note.querySelector("h2")?.textContent).toBe("Broken");
+    expect([...note.querySelectorAll("li")].map((li) => li.textContent)).toEqual(["Set 2: The second set opens at level 40, after this guide's levels end."]);
+    expect(copyLabels(html)).toEqual(["Copy set 1 for addon"]);
+    expect(visible(html)).toContain("Copy for addon is off for set 2 until the guide is reviewed again; the note above says why.");
+    // Both sets still open in the calculator as the guide stores them.
+    const stored = publishedGuide(loadGuides(), "frost-leveling")!;
+    const open = [...dom(html).querySelectorAll("a")].find((a) => a.textContent === "Open in the calculator")!.getAttribute("href")!;
+    expect(readPlanHash(`#${open.split("#")[1]}`)).toEqual({ first: stored.code, second: stored.code2, firstOrder: stored.order, secondOrder: stored.order2 });
+    expect((await metadata("frost-leveling")).robots).toEqual({ index: false, follow: true });
+  });
+
   test("a guide whose plan no longer fits the tree says what, offers no Copy for addon for that set, and stays out of search", async () => {
     stubGuides(SOME);
     trees.without = [53];
