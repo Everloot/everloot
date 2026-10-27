@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState, type MouseEvent, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useState, type MouseEvent, type ReactNode } from "react";
 import {
   classHubHref, contextLabel, contextLinks, parseClassContext, readClassContext, sameContext, switchClassContext, withoutClassContext,
   type ClassContext, type ClassSlug, type ContextDestination, type ContextRead,
@@ -22,6 +22,22 @@ function useRemembered(): ClassContext | null {
 }
 
 /**
+ * The address's #fragment, on a page that changes its address in place (the raid planner keeps its raid there): read
+ * after mount, on hashchange, and as a link is about to be used, since the planner rewrites it without an event.
+ */
+function useFragment(on: boolean): [string, () => void] {
+  const [fragment, setFragment] = useState("");
+  const sync = useCallback(() => setFragment(window.location.hash), []);
+  useEffect(() => {
+    if (!on) return;
+    sync();
+    window.addEventListener("hashchange", sync);
+    return () => window.removeEventListener("hashchange", sync);
+  }, [on, sync]);
+  return [fragment, sync];
+}
+
+/**
  * On a page a class context leads to: the context its address carries, in a chip that opens the class's hub, with a
  * cross that takes the context off the address and keeps everything else (`here`). A context the page could not read
  * is named with its reason and left out. `children` say what the context does on the page, shown only with one. A
@@ -33,24 +49,34 @@ function useRemembered(): ClassContext | null {
  */
 export default function ClassContextChip({ read, here, inPlace = false, className = "mt-2", children }: { read: ContextRead; here: string; inPlace?: boolean; className?: string; children?: ReactNode }) {
   const remembered = useRemembered();
+  const [fragment, sync] = useFragment(inPlace);
   const context = read.ok ? read.context : null;
   const offer = remembered && !(context && sameContext(remembered, context)) ? remembered : null;
   if (read.ok && !context && !offer) return null;
 
-  const open = (href: string) => inPlace
-    ? (e: MouseEvent) => { e.preventDefault(); window.history.pushState(null, "", `${href}${window.location.hash}`); }
-    : undefined;
+  // In place, the real href keeps the #fragment, so a new tab or a copied link opens the same raid. Only a plain left
+  // click changes this tab's address; a modified or middle click is the browser's.
+  const to = (href: string) => inPlace ? {
+    href: `${href}${fragment}`,
+    onPointerDown: sync,
+    onFocus: sync,
+    onClick: (e: MouseEvent) => {
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      window.history.pushState(null, "", `${href}${window.location.hash}`);
+    },
+  } : { href };
 
   return (
     <div data-class-context className={`${className} flex flex-wrap items-center gap-x-3 gap-y-1 text-cell-2 text-fg-2`}>
       {!read.ok && (
-        <span>{read.error} This page leaves the class out. <Link href={here} onClick={open(here)} className={LINK}>Remove it</Link></span>
+        <span>{read.error} This page leaves the class out. <Link {...to(here)} className={LINK}>Remove it</Link></span>
       )}
       {context && (
         <span className="inline-flex h-6 items-center rounded-full border border-edge pl-2">
           <Link href={classHubHref(context)} className="text-fg hover:underline underline-offset-4">{contextLabel(context)}</Link>
           {/* A 24 px target for the cross, the whole height of the chip. */}
-          <Link href={here} onClick={open(here)} className="inline-flex h-6 w-6 items-center justify-center rounded-full text-muted hover:text-fg">
+          <Link {...to(here)} className="inline-flex h-6 w-6 items-center justify-center rounded-full text-muted hover:text-fg">
             <span aria-hidden="true">×</span><span className="sr-only">Remove {contextLabel(context)}</span>
           </Link>
         </span>
@@ -59,7 +85,7 @@ export default function ClassContextChip({ read, here, inPlace = false, classNam
       {offer && (
         <span>
           This browser remembers {contextLabel(offer)}.{" "}
-          <Link href={switchClassContext(here, offer)} onClick={open(switchClassContext(here, offer))} className={LINK}>Use it</Link>
+          <Link {...to(switchClassContext(here, offer))} className={LINK}>Use it</Link>
         </span>
       )}
     </div>

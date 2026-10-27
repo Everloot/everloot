@@ -161,13 +161,39 @@ describe("on the raid planner, a page built once", () => {
     await mount(<ClassContextChipFromAddress />);
     expect(anchor("Mage, level 25")?.getAttribute("href")).toBe("/classes/mage?level=25");
     const remove = anchor("Remove Mage, level 25")!;
-    expect(remove.getAttribute("href")).toBe("/tools/raid");
+    // The real href holds the raid too, so a new tab or a copied link opens the same raid.
+    expect(remove.getAttribute("href")).toBe("/tools/raid#raid=ELR1-abc");
     await act(async () => remove.click());
     // The page is the same for every address, so nothing loads: the address changes, the raid's #fragment kept.
     expect(push).toHaveBeenCalledTimes(1);
     expect(`${location.pathname}${location.search}${location.hash}`).toBe("/tools/raid#raid=ELR1-abc");
     await mount(<ClassContextChipFromAddress />);
     expect(container!.innerHTML).toBe("");
+  });
+
+  test("the chip's links follow the raid's #fragment as it changes, and a modified or middle click is left to the browser", async () => {
+    history.replaceState(null, "", "/tools/raid?class=mage&level=25#raid=ELR1-abc");
+    const push = vi.spyOn(history, "pushState");
+    await mount(<ClassContextChipFromAddress />);
+    const remove = anchor("Remove Mage, level 25")!;
+    // The planner rewrites the fragment without an event; the link catches up before it can be used.
+    history.replaceState(null, "", "/tools/raid?class=mage&level=25#raid=ELR1-xyz");
+    await act(async () => { remove.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true })); });
+    expect(remove.getAttribute("href")).toBe("/tools/raid#raid=ELR1-xyz");
+    history.replaceState(null, "", "/tools/raid?class=mage&level=25#raid=ELR1-new");
+    await act(async () => { window.dispatchEvent(new HashChangeEvent("hashchange")); });
+    expect(remove.getAttribute("href")).toBe("/tools/raid#raid=ELR1-new");
+    // A new tab, a new window, a download or a middle click: the browser opens the real href, and this tab stays.
+    const before = location.href;
+    for (const init of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { altKey: true }, { button: 1 }]) {
+      let prevented: boolean | null = null;
+      // After the page's own handlers; jsdom cannot open a tab, so the test stops it there.
+      window.addEventListener("click", (e) => { prevented = e.defaultPrevented; e.preventDefault(); }, { once: true });
+      await act(async () => { remove.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, ...init })); });
+      expect(prevented, JSON.stringify(init)).toBe(false);
+    }
+    expect(push).not.toHaveBeenCalled();
+    expect(location.href).toBe(before);
   });
 
   test("the planner shows the chip under its title, and no chip for an address without a class", async () => {
