@@ -303,8 +303,8 @@ export function newsArticleJsonLd(page: { title: string; description: string; pa
 
 /**
  * A guide: Everloot's own reviewed advice, so its CC BY-SA licence may be stated. Dated as its version history shows
- * it: published on the first version's day, modified on the review of the version shown. The author is named on the
- * page only; here the organization stands as author and publisher (no Person), and there is no rating.
+ * it: published on the first version's day, modified on the review of the version shown. The page names its author, a
+ * person, and no Person goes in structured data, so there is no author here; Everloot is the publisher. No rating.
  */
 export function guideArticleJsonLd(page: { title: string; summary: string; path: string; published: string; modified: string }): JsonLd {
   return {
@@ -317,7 +317,6 @@ export function guideArticleJsonLd(page: { title: string; summary: string; path:
     isPartOf: { "@id": WEBSITE_ID },
     datePublished: page.published,
     dateModified: page.modified,
-    author: publisher,
     publisher,
     license: CC_BY_SA.url,
   };

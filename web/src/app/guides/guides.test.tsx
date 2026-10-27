@@ -339,6 +339,9 @@ describe("a guide's page", () => {
       license: "https://creativecommons.org/licenses/by-sa/4.0/",
     });
     expect(article.headline).toBe(dom(html).querySelector("h1")?.textContent);
+    // The page names its author, a person; the data names no Person, so it names no author at all. Everloot publishes.
+    expect(article).not.toHaveProperty("author");
+    expect(article.publisher).toEqual({ "@id": "https://everloot.app/#organization" });
     expect(visible(html)).toContain(article.description);
     for (const shown of [article.datePublished, article.dateModified]) expect(visible(html)).toContain(shown);
     expect(JSON.stringify(blocks)).not.toMatch(/Rating|review"|ratingValue|"Person"/);
