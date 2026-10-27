@@ -4,11 +4,11 @@
  "credit": "Game data © Blizzard Entertainment, Inc., read from the public client; not under Everloot's licence. Column names from WoWDBDefs (https://github.com/wowdev/WoWDBDefs), CC BY-SA 4.0.",
  "build": {
   "product": "wowf",
-  "buildId": 70630,
-  "version": "1.60.1.70630",
-  "buildConfig": "644ffedb0d59bb0da2af9011b36f44db",
-  "definitions": "05e242b6acdc",
-  "extractedAt": "2026-10-27T08:35:27.196Z"
+  "buildId": 70634,
+  "version": "1.60.1.70634",
+  "buildConfig": "7d8ae4cd9c1f639a3ea04fd47e21c746",
+  "definitions": "50ce5d272897",
+  "extractedAt": "2026-10-27T21:56:28.341Z"
  },
  "note": "names and spell ids are the game files'; who owns what comes from player uploads",
  "mounts": {
