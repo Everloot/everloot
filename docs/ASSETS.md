@@ -60,7 +60,7 @@ Spoilers follow the same rule as everywhere else:
 
 ```
 cd kb
-npm run kb -- client-extract --product wow_classic_beta --refresh   # once per build, adds the item, spell, atlas and map art tables
+npm run kb -- client-extract --product wowf --refresh   # once per build, adds the item, spell, atlas and map art tables
 npm run kb -- client-assets data/client/<product>-<build>-<config>.sqlite
 ```
 
@@ -179,7 +179,7 @@ build, so a build bump cannot leave one layer behind.
 **Adding a product or build** (Live at launch, or a PTR):
 
 1. Let the build watch see the product (`kb/src/builds.ts`, `kb/changes/builds.json`) and add it to the
-   ecosystem products in `kb/src/ecosystem.ts` (`FOREVER_PRODUCT` is the Beta product today).
+   ecosystem products in `kb/src/ecosystem.ts` (`FOREVER_PRODUCTS` holds `wowf` and the beta today).
 2. Extract and upload it as above. It gets its own `<product>-<build>-<config>/` asset folder, so the
    older version keeps working.
 3. In `game-version.ts`, fill in `product` and `build` for its entry and set `available: true`. The
