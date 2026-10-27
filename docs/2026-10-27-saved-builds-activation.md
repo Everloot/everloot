@@ -341,15 +341,18 @@ migration holds them, `supabase/migrations/20261027120000_saved_build_point_orde
   The server reads every token against its own set's code before calling it.
 - `transfer_key` on `saved_builds`, nullable text after the orders, checked to `^[A-Za-z0-9_-]{16,64}$`, with the
   unique index `saved_builds_transfer_key` on `(user_id, transfer_key)` where a key is set. A client that may send the
-  same new build twice, such as the device transfer, gives it a key (`transferKey`). If the account already has a build
-  with that key, `save_build_plan` answers with that build as its create did, plus `"replayed": true`; nothing is
-  written and no save is counted, and the route answers 200 rather than 201 with the same body. Two saves racing with
-  one key make one build. One that finds no build with its key looks again once it holds the account's row, the lock
-  `save_build` takes first, which a save with the same key still under way holds until it commits: the second finds the
-  first one's build and is answered as its replay, at the day's last save and the account's last build too, never
-  refused for the place the first one took. The index stays the backstop for any other writer: a save it refuses the
-  key is answered as the replay of the build that has it, with all it did undone. Another account's same key is a key
-  of its own. A key is for a new build only; an update that sends one is refused.
+  same new build twice, such as the device transfer, gives it a key (`transferKey`). The first save with a key that
+  succeeds makes the build, and the key answers with that build from then on. If the account already has a build with
+  that key, `save_build_plan` answers with it as its create did, plus `"replayed": true`: nothing is written and no save
+  is counted, and the rest of the save, its name, codes and orders included, is ignored. The route answers 200 rather
+  than 201, in the body a create has, with the build as it is now. A change to the build after its create is an update
+  by `id`, not another save with the key. Two saves racing with one key make one build. One that finds no build with
+  its key looks again once it holds the account's row, the lock `save_build` takes first, which a save with the same
+  key still under way holds until it commits: the second finds the first one's build and is answered as its replay, at
+  the day's last save and the account's last build too, never refused for the place the first one took. The index
+  stays the backstop for any other writer: a save it refuses the key is answered as the replay of the build that has
+  it, with all it did undone. Another account's same key is a key of its own. A key is for a new build only; an update
+  that sends one is refused.
 - The trigger `saved_builds_order_follows_code`, with its function `saved_build_order_follows_code()`: an update that
   changes a code drops that set's order. That keeps the orders right for every caller of `save_build`, the site from
   before this migration included.
@@ -427,12 +430,13 @@ test checks those answers. Then it checks that Chat lists and saves, that a save
 refused with nothing written, and that the explicit sharing and the owner checks hold on the older path. After the
 apply, the process goes on without the migration for the rest of its minute, then saves orders through
 `save_build_plan`. Through the calculator's route, a new build with a transfer key is a 201, the same save again a 200
-with the same body and nothing written, another account's same key its own build, two sent together one build, and two
-that both wait for the account at the day's last save a 201 and a 200 with that build, not a 429. A fault made on
-purpose, `save_build_plan` calling a helper the database does not have, gets a 503 with nothing written, and once the
-file is applied again the very next save with orders goes through `save_build_plan`. A drop that PostgREST is not told
-about counts as the function missing, through 42883 from its stale cache. After the rollback the orders stay, and a
-save without one goes through `save_build` again.
+with the same body and nothing written, and once the build is updated by `id`, a 200 with the build as it is now;
+another account's same key is its own build, two sent together one build, and two that both wait for the account at
+the day's last save a 201 and a 200 with that build, not a 429. A fault made on purpose, `save_build_plan` calling a
+helper the database does not have, gets a 503 with nothing written, and once the file is applied again the very next
+save with orders goes through `save_build_plan`. A drop that PostgREST is not told about counts as the function
+missing, through 42883 from its stale cache. After the rollback the orders stay, and a save without one goes through
+`save_build` again.
 
 ### Preflight (read-only)
 

@@ -11,8 +11,9 @@ import { fail, limitedText, listOwn, meAccount, NO_STORE, ownBuildsForKey, saveB
  * POST saves one: without an id it makes a new build, with one it updates that build in place. Each set's spend order
  * (order, order2) is saved with its code in the same write. A new build says whether it is shared and shows its owner's
  * name; nothing here picks for it, so a page that forgets cannot publish a link by default. A new build may carry a
- * transfer key (transferKey): sent again with the same key, the save is answered 200 with the build it made, the same
- * body as its 201, and nothing is written.
+ * transfer key (transferKey): sent again with the same key, the save is answered 200 with the build it made, as it is
+ * now, in the body its 201 had; nothing is written and the rest of the save is ignored. A later change is an update by
+ * id.
  */
 export const dynamic = "force-dynamic";
 

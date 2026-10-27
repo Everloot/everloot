@@ -245,6 +245,12 @@ describe.skipIf(!databaseUrl || !restUrl || !secret)("saved builds through Postg
     expect(again.status).toBe(200);
     expect(await again.json()).toEqual(made);
     expect(await state(owner, true)).toEqual(after);
+    // The first create wins: a change after it is an update by id, and the key then answers with the build as it is now.
+    const changed = await account({ id: made.build.id, name: "Test transferred 2", code: MAGE, code2: MAGE2, order: ORDER, order2: ORDER2 });
+    expect(changed.status).toBe(200);
+    const late = await account({ ...body, name: "Test renamed again" });
+    expect(late.status).toBe(200);
+    expect(await late.json()).toEqual(await changed.json());
     // Another account's same key is its own.
     session.user = { id: other, name: "Jaina#2002" };
     const theirs = await account(body);
