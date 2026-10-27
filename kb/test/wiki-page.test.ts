@@ -47,6 +47,15 @@ describe("wikiLinkTarget", () => {
     }
   });
 
+  test("names the same page through a game version's prefix, which shows the page the unprefixed address does", () => {
+    for (const href of ["/beta/wiki/deadmines", "/beta/wiki/deadmines/", "/beta/wiki/deadmines?from=westfall", "/beta/wiki/deadmines#history", "/ptr/wiki/deadmines",
+      "https://everloot.app/beta/wiki/deadmines", "https://www.everloot.app/ptr/wiki/deadmines?from=westfall#history"]) {
+      expect(wikiLinkTarget(href), href).toBe("deadmines");
+    }
+    // A path that only starts with a prefix's letters is no prefix, and a prefix on another site is that site's.
+    for (const href of ["/betamax/wiki/deadmines", "/beta", "/beta/wiki", "https://warcraft.wiki.gg/beta/wiki/deadmines"]) expect(wikiLinkTarget(href), href).toBeNull();
+  });
+
   test("knows the site's own address as a browser does: the host in any case, the default port written or not", () => {
     for (const href of ["https://EVERLOOT.APP/wiki/deadmines#history", "https://everloot.app:443/wiki/deadmines?from=westfall", "https://EVERLOOT.APP:443/wiki/deadmines/",
       "https://WWW.Everloot.App:443/wiki/deadmines#history", "//EVERLOOT.APP:443/wiki/deadmines"]) {

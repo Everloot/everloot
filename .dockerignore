@@ -17,6 +17,7 @@
 !web
 !web/src
 !web/src/data
+!web/src/data/build-versions.json
 !web/src/data/game-data
 !web/src/data/game-data/map.json
 !web/src/data/game-data/client-layer.json
