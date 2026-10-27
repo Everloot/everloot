@@ -15,6 +15,7 @@ import { checkBuilds, loadRegistry, recordBuilds, saveRegistry, versionsUrl } fr
 import { clientCoverage, formatCoverage } from "./client-coverage.js";
 import { formatScanReport, loadManifest, scanBuild } from "./client-scan.js";
 import { writeClientLayer } from "./client-layer.js";
+import { writeRaceTable } from "./client-races.js";
 import { diffSnapshots } from "./client-diff.js";
 import { parseRegistry } from "./ecosystem.js";
 import { loadSnapshotFile, refreshSnapshot, saveSnapshotFile } from "./ecosystem-fetch.js";
@@ -152,6 +153,10 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
   client-layer <snapshot.sqlite> [--out ../web/src/data/game-data/client-layer.json]
     (relation edges derived from the game files, one build-stamped file for the database pages. Game file data,
     labelled found in game files, unconfirmed. See docs/DATA_POLICY.md)
+  client-races <snapshot.sqlite> [--out ../web/src/data/game-data/races.json]
+    (each playable race with its faction, the classes it can be and its racial traits, one build-stamped file
+    for the class pages and the class_races tool. Game file data, labelled found in game files, unconfirmed;
+    trait descriptions are for pages only. See docs/DATA_POLICY.md)
   item-names <snapshot.sqlite> --wiki <knowledge base or release .sqlite> [--ledger data/item-names/ledger.json] [--out data/assets]
     (adds the snapshot's item names and the Warcraft Wiki dump's item names to the name ledger, which only
     grows, and writes the name the site shows for every item a source names (the game files' first, with the wiki
@@ -533,6 +538,14 @@ async function main(): Promise<number> {
       const path = flags.get("out") || "../web/src/data/game-data/client-layer.json";
       const layer = writeClientLayer(args[0], path);
       for (const [rel, n] of Object.entries(layer.counts)) console.log(`${rel}: ${n} edges`);
+      console.log(`-> ${path}`);
+      return 0;
+    }
+    case "client-races": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/races.json";
+      const table = writeRaceTable(args[0], path);
+      for (const r of table.races) console.log(`${r.faction} ${r.name}: ${r.classes.length} classes, ${r.traits.length} traits`);
       console.log(`-> ${path}`);
       return 0;
     }

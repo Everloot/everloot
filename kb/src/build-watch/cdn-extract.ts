@@ -5,7 +5,8 @@
  *
  * `generate(root)` then runs the same generators a maintainer runs by hand, writing into `root`:
  * `client-catalog` and `web/scripts/trim-talent-catalog.mjs` (talents), `web/scripts/build-raid-game-data.ts`
- * (raid file and addon/modules/raid_data.lua), `client-map` (map.json) and `client-layer` (client-layer.json).
+ * (raid file and addon/modules/raid_data.lua), `client-map` (map.json), `client-layer` (client-layer.json) and
+ * `client-races` (races.json).
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -13,6 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { writeCatalogs } from "../client-catalog.js";
 import { writeClientLayer } from "../client-layer.js";
+import { writeRaceTable } from "../client-races.js";
 import { CASC_LIBRARY, extractTables, iconIds, NOT_IN_BUILD, openCdn, pinDefinitions, probeFiles } from "../client-extract.js";
 import { CLIENT_TABLES, clientSnapshotName, readClientMeta, writeClientSnapshot } from "../client-snapshot.js";
 import { readTerrainAreas } from "../terrain-area.js";
@@ -66,6 +68,7 @@ export async function extractFromCdn(product: string, region: string, curatedPat
         web("build-raid-game-data.ts", run.dir, snapshot, root);
         writeFileSync(join(root, GAME_DATA_DIR, "map.json"), `${JSON.stringify(writeWorldMapData(snapshot), null, 2)}\n`);
         writeClientLayer(snapshot, join(root, GAME_DATA_DIR, "client-layer.json"));
+        writeRaceTable(snapshot, join(root, GAME_DATA_DIR, "races.json"));
       },
       dispose: () => rmSync(work, { recursive: true, force: true }),
       encryptedTables: manifest.tables.map((t) => ({ table: t.table, blocks: t.encryptedBlocks })),
