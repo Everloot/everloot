@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import type { ReactNode } from "react";
+import { act, type ReactNode } from "react";
+import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, expect, test, vi } from "vitest";
 import { loadCatalog } from "@/lib/talents/catalogs";
@@ -87,6 +88,78 @@ test("a spoiler build's changes are counted but not shown, unless the reader tur
   expect(hidden.textContent).not.toMatch(/Talent 11|Talent 21|maximum rank|removed/);
   const shown = page(renderToStaticMarkup(<FreshnessNote catalog={tree} codes={[code("1.0.0.1")]} entries={records(true)} spoilers />)).querySelector(NOTE)!;
   expect(shown.textContent).toContain("Talent 21: removed in build 1.0.0.3");
+});
+
+test("with spoilers off, a talent a spoiler build renamed keeps the name its public change has", () => {
+  const mixed = [
+    record("1.0.0.5", "1.0.0.3", { ranks: [at(11, { name: "Hidden Name", before: 4, after: 3 })] }, true),
+    record("1.0.0.3", "1.0.0.1", { ranks: [at(11, { before: 5, after: 4 })] }),
+  ];
+  const html = renderToStaticMarkup(<FreshnessNote catalog={tree} codes={[code("1.0.0.1", { 11: { rank: 5 } })]} entries={mixed} />);
+  expect(html).not.toContain("Hidden Name");
+  expect([...page(html).querySelectorAll(`${NOTE} li`)].map((li) => li.textContent)).toEqual([
+    "Talent 11: its maximum rank went from 5 to 4 in build 1.0.0.3 (this plan spends 5 points in it).",
+    "1 of this plan's talents changed in a build players cannot play yet (1.0.0.5). Spoilers are not shown here.",
+    "Check each talent before you follow the plan.",
+  ]);
+});
+
+// The address the calculator reads. Waits for the change event, so each step is one hashchange.
+async function setHash(hash: string) {
+  if (window.location.hash === hash) return;
+  await new Promise((resolve) => {
+    window.addEventListener("hashchange", resolve, { once: true });
+    window.location.hash = hash;
+  });
+}
+
+async function mounted(codes: (string | null)[], run: (shown: () => boolean, go: (hash: string) => Promise<void>) => Promise<void>) {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const writes = [vi.spyOn(window.history, "replaceState"), vi.spyOn(window.history, "pushState"), vi.spyOn(Storage.prototype, "setItem")];
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  try {
+    await act(async () => root.render(<FreshnessNote catalog={tree} codes={codes} entries={records()} />));
+    await run(() => container.querySelector(NOTE) !== null, (hash) => act(() => setHash(hash)));
+    // Following the address never writes it, or anything else.
+    for (const write of writes) expect(write).not.toHaveBeenCalled();
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    await setHash("");
+  }
+}
+
+test("a different plan already in the address when the page opens hides the note: the calculator shows that plan", async () => {
+  const opened = code("1.0.0.1");
+  await setHash(`#plan=${code("1.0.0.3", { 11: { rank: 4 } })}`);
+  await mounted([opened, null], async (shown, go) => {
+    expect(shown()).toBe(false);
+    // The link's own codes, as the calculator writes them into the address; an order rides along and does not count.
+    await go(`#plan=${opened}&order=O1p-AAAAAB`);
+    expect(shown()).toBe(true);
+  });
+});
+
+test("a plan pasted into the address after the page opens hides the note; an anchor on the page leaves it as it is", async () => {
+  const opened = code("1.0.0.1");
+  const other = code("1.0.0.3", { 11: { rank: 4 } });
+  await mounted([opened, null], async (shown, go) => {
+    // No plan in the address: the page shows the codes it opened with.
+    expect(shown()).toBe(true);
+    await go("#how-it-works");
+    expect(shown()).toBe(true);
+    await go(`#plan=${other}`);
+    expect(shown()).toBe(false);
+    await go("#how-it-works");
+    expect(shown()).toBe(false);
+    // A second set the note was not made for.
+    await go(`#plan=${opened}&plan2=${other}`);
+    expect(shown()).toBe(false);
+    await go(`#plan=${opened}`);
+    expect(shown()).toBe(true);
+  });
 });
 
 test("missing records make the change history unknown, never unchanged", () => {

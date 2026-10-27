@@ -6,9 +6,9 @@ import type { Ranks, TalentCatalog } from "./types";
 // What the game files changed in a plan's talents between the build it was made on and the tree on screen,
 // read from the build watch's change records (web/src/data/game-data/changes/, shape in
 // kb/src/build-watch/changes.ts). The one change engine for plans, guides and watches. It reports evidence
-// only: a change a record shows, or why the records cannot say. Missing records never read as "nothing
-// changed". Whether a guide is due for review, and since when, is the content's call: nothing here reads a
-// date, and nothing here writes, so a plan keeps the build it was made on.
+// only: a change a record shows, or why the records cannot say. A missing record, or one that says it could not
+// make a comparison, never reads as "nothing changed". Whether a guide is due for review, and since when, is the
+// content's call: nothing here reads a date, and nothing here writes, so a plan keeps the build it was made on.
 
 /** The build watch's published records, bundled with the pages that read them. A new build's pull request adds
  *  its record to the folder; list it here in the same pull request (freshness.test.ts fails until it is). */
@@ -52,6 +52,10 @@ export type TalentChange = { build: string; nodeId: number; name: string; spoile
   | { kind: "spellValues"; fields: string[] }
 );
 
+/** A comparison a record says it could not make: the spell numbers of talents, or one a warning names that this
+ *  site does not know, read as missing. */
+export type Limit = "spellValues" | "unknown";
+
 /** One record, read for one class. */
 export interface BuildStep {
   build: string;
@@ -67,6 +71,20 @@ export interface BuildStep {
   talents: TalentChange[];
   /** The levels talent points arrive at, where the build changed them. */
   pointLevels: { before: number[]; after: number[]; spoiler: boolean }[];
+  /** Comparisons the record could not make, from its warnings: what it lists may not be everything. */
+  limits: Limit[];
+}
+
+// The warnings the build watch writes (kb/src/build-watch/diff.ts and client-digests.ts). Three leave the talent
+// comparison whole: differing table layouts say where a listed change may come from, and the client digests and
+// tables are the read set. One says the spell numbers were not compared. Any other warning is read as a comparison
+// that may be missing, so a new one can never let a record say nothing changed.
+const WHOLE = [/^table definitions differ \(/, /^no committed client digests to compare with\b/, /^client table \S+ was read before and is absent from this build\b/];
+const NO_SPELL_VALUES = /^no committed spell values to compare with\b/;
+
+function limitsOf(warnings: string[]): Limit[] {
+  const limits = warnings.map((w): Limit | null => (NO_SPELL_VALUES.test(w) ? "spellValues" : WHOLE.some((p) => p.test(w)) ? null : "unknown"));
+  return (["spellValues", "unknown"] as const).filter((l) => limits.includes(l));
 }
 
 export interface ClassTalentChanges {
@@ -83,8 +101,9 @@ function stepOf(entry: ChangeEntry, classId: number): BuildStep {
   const build = entry.build.version;
   const t = entry.talents;
   const mine = <T extends { classId: number }>(list: T[]) => list.filter((x) => x.classId === classId);
-  // A record from a build players cannot play yet makes every item in it a spoiler.
-  const where = (x: { nodeId: number; name: string; spoiler: boolean }) => ({ build, nodeId: x.nodeId, name: x.name, spoiler: entry.spoiler || x.spoiler });
+  // A record from a build players cannot play yet makes every item in it a spoiler, whatever its flags say.
+  const spoiler = entry.spoiler || !entry.live;
+  const where = (x: { nodeId: number; name: string; spoiler: boolean }) => ({ build, nodeId: x.nodeId, name: x.name, spoiler: spoiler || x.spoiler });
   const talents: TalentChange[] = t ? [
     ...mine(t.added).map((x) => ({ ...where(x), kind: "added" as const })),
     ...mine(t.removed).map((x) => ({ ...where(x), kind: "removed" as const })),
@@ -100,10 +119,11 @@ function stepOf(entry: ChangeEntry, classId: number): BuildStep {
     previous: entry.previous?.version ?? null,
     readable: true,
     baseline: entry.initial || t === null || entry.previous === null,
-    spoiler: entry.spoiler,
+    spoiler,
     classChanged: t !== null && [...t.classesAdded, ...t.classesRemoved].some((c) => c.classId === classId),
     talents,
-    pointLevels: t ? mine(t.pointLevels).map((p) => ({ before: p.before, after: p.after, spoiler: entry.spoiler || p.spoiler })) : [],
+    pointLevels: t ? mine(t.pointLevels).map((p) => ({ before: p.before, after: p.after, spoiler: spoiler || p.spoiler })) : [],
+    limits: limitsOf(entry.warnings),
   };
 }
 
@@ -121,25 +141,28 @@ export function classTalentChanges(entries: readonly unknown[], classId: number)
     }
     const build = (raw as { build?: { version?: unknown } } | null)?.build?.version;
     if (typeof build === "string" && compareGameBuilds(build, build) === 0) {
-      steps.push({ build, previous: null, readable: false, baseline: false, spoiler: false, classChanged: false, talents: [], pointLevels: [] });
+      steps.push({ build, previous: null, readable: false, baseline: false, spoiler: false, classChanged: false, talents: [], pointLevels: [], limits: [] });
     } else unplaced++;
   }
   steps.sort((a, b) => compareGameBuilds(a.build, b.build) ?? 0);
   return { classId, steps, unplaced };
 }
 
-/** Why the records cannot say everything that changed between the plan's build and the tree's. `build` is where
- *  the history stops: changes between the plan's build and it are unknown. */
+/** Why the records cannot say everything that changed between the plan's build and the tree's. */
 export type HistoryGap =
+  /** `build` is where the history stops: changes between the plan's build and it are unknown. */
   | { kind: "missing" | "baseline" | "unreadable" | "conflict" | "class"; build: string }
-  /** The plan's build has no record of its own (skipped or withdrawn): one record compares `from` with `to` across it. */
+  /** The plan's build falls inside one record's comparison, after `from` and before `to`, so that record's changes
+   *  may predate the plan. A build a record compares with needs no record of its own: it is that record's `from`. */
   | { kind: "unrecorded"; build: string; from: string; to: string }
+  /** The record for `build`, between the plan's build and the tree's, could not make this comparison. */
+  | { kind: "limited"; build: string; comparison: Limit }
   | { kind: "unplaced"; count: number };
 
-/** One of the plan's talents that a later build changed, with each change, oldest first. */
+/** One of the plan's talents that a later build changed, with each change, oldest first. A talent is named only on
+ *  its changes, each beside its spoiler flag, so a spoiler build's name for it never stands for a public change. */
 export interface TouchedTalent {
   nodeId: number;
-  name: string;
   /** Points the plan spends in it. */
   points: number;
   changes: TalentChange[];
@@ -170,7 +193,7 @@ export interface PlanFreshness {
   /** Other talents of the class the covered records changed. */
   others: number;
   /** True when a record shows a change to the plan's talents or point levels; false only when the records cover
-   *  every build in between and show none; null when they cannot say. */
+   *  every build in between, made every comparison, and show none; null when they cannot say. */
   changed: boolean | null;
 }
 
@@ -223,6 +246,7 @@ export function planFreshness(catalog: TalentCatalog, changes: ClassTalentChange
     if (reach === 0) break;
     build = step.previous!;
   }
+  for (const step of covered) for (const comparison of step.limits) gaps.push({ kind: "limited", build: step.build, comparison });
   if (changes.unplaced > 0) gaps.push({ kind: "unplaced", count: changes.unplaced });
 
   const asked = askedPoints(askedRanks);
@@ -233,7 +257,7 @@ export function planFreshness(catalog: TalentCatalog, changes: ClassTalentChange
     if (asked.has(change.nodeId)) byNode.set(change.nodeId, [...(byNode.get(change.nodeId) ?? []), change]);
     else others.add(change.nodeId);
   }
-  const touched = [...byNode].map(([nodeId, list]) => ({ nodeId, name: list[list.length - 1].name, points: asked.get(nodeId)!, changes: list }))
+  const touched = [...byNode].map(([nodeId, list]) => ({ nodeId, points: asked.get(nodeId)!, changes: list }))
     .sort((a, b) => (compareGameBuilds(a.changes[0].build, b.changes[0].build) ?? 0) || a.nodeId - b.nodeId);
   const level = (schedule: number[]) => (points > 0 ? schedule[points - 1] ?? null : null);
   const pointLevels = covered.flatMap((s) => s.pointLevels.map((p) => ({
@@ -309,6 +333,9 @@ function gapLine(gap: HistoryGap, madeOn: string): string {
     case "conflict": return `More than one change record describes game build ${gap.build}, ${unknown(gap.build)}.`;
     case "class": return `Game build ${gap.build} added or removed this class's talent trees, so changes between ${madeOn} and ${gap.build} cannot be compared.`;
     case "unrecorded": return `Game build ${gap.build} has no change record of its own: the record for build ${gap.to} compares ${gap.from} with ${gap.to}, so which of its changes came after this plan is unknown.`;
+    case "limited": return gap.comparison === "spellValues"
+      ? `The change record for game build ${gap.build} had no spell numbers to compare with, so changes to spell numbers in that build are unknown.`
+      : `The change record for game build ${gap.build} warns that part of its comparison may be missing, so changes in that build may not all be listed.`;
     case "unplaced": return `${plural(gap.count, "change record")} ${gap.count === 1 ? "does" : "do"} not say which game build ${gap.count === 1 ? "it is" : "they are"} for, so changes may be missing.`;
   }
 }
@@ -338,7 +365,8 @@ export function freshnessLines(f: PlanFreshness, { spoilers = false }: { spoiler
     for (const c of t.changes) if (!shown(c)) hiddenBuilds.add(c.build);
     if (visible.length > 0) {
       shownTalents++;
-      lines.push(`${t.name}: ${visible.map((c) => describe(c, t.points)).join("; ")}.`);
+      // Named as the latest change shown has it: a spoiler build's name for the talent stays hidden with its change.
+      lines.push(`${visible[visible.length - 1].name}: ${visible.map((c) => describe(c, t.points)).join("; ")}.`);
     }
   }
   for (const p of f.pointLevels) {

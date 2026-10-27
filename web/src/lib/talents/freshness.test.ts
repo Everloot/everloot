@@ -77,7 +77,35 @@ describe("compareGameBuilds", () => {
 describe("classTalentChanges", () => {
   test("reads the published record of build 1.60.1.70532: compared with 70450, a spoiler, no Mage talent changed", () => {
     const step = classTalentChanges(PUBLISHED_CHANGES, 8).steps.find((s) => s.build === "1.60.1.70532");
-    expect(step).toEqual({ build: "1.60.1.70532", previous: "1.60.1.70450", readable: true, baseline: false, spoiler: true, classChanged: false, talents: [], pointLevels: [] });
+    // Its one warning, that the table layouts differ, is about where a listed change may come from: nothing is missing.
+    expect(step).toEqual({ build: "1.60.1.70532", previous: "1.60.1.70450", readable: true, baseline: false, spoiler: true, classChanged: false, talents: [], pointLevels: [], limits: [] });
+  });
+
+  test("every warning the build watch writes is read: a missing spell number comparison limits the evidence, and so does a warning it does not know", () => {
+    const root = join(src, "../..");
+    const producer = ["kb/src/build-watch/diff.ts", "kb/src/build-watch/client-digests.ts"].map((f) => readFileSync(join(root, f), "utf8")).join("\n");
+    const written = [...producer.matchAll(/warnings\.push\((`[^`]*`|"[^"]*")\)/g)].map((m) => m[1].slice(1, -1).replace(/\$\{[^}]*\}/g, "x"));
+    const limits = (warning: string) => classTalentChanges([record("1.0.0.5", "1.0.0.1", {}, { warnings: [warning] })], 8).steps[0].limits;
+    expect(written.map((w) => [w, limits(w)])).toEqual([
+      ["table definitions differ (WoWDBDefs x vs x): a change may come from the layouts, not the game", []],
+      ["no committed spell values to compare with, so spell number changes are not listed", ["spellValues"]],
+      ["no committed client digests to compare with, so client table changes are not listed", []],
+      ["client table x was read before and is absent from this build (x), so it is not counted as removed", []],
+    ]);
+    expect(limits("Mage: 3 nodes have no entries")).toEqual(["unknown"]);
+  });
+
+  test("a record from a build that is not live is a spoiler, whatever its own spoiler flags say", () => {
+    const read = classTalentChanges([record("1.0.0.5", "1.0.0.1", {
+      ranks: [at(11, { before: 5, after: 3 })],
+      pointLevels: [{ classId: 8, className: "Mage", before: [10, 11, 12], after: [10, 12, 14], spoiler: false }],
+    }, { live: false, spoiler: false })], 8);
+    expect(read.steps[0]).toMatchObject({ spoiler: true, talents: [{ spoiler: true }], pointLevels: [{ spoiler: true }] });
+    expect(freshnessLines(planFreshness(tree, read, "1.0.0.1", { 11: { rank: 3 } }))).toEqual([
+      "Made on game build 1.0.0.1; this tree is build 1.0.0.5.",
+      "1 of this plan's talents and the levels talent points arrive at changed in a build players cannot play yet (1.0.0.5). Spoilers are not shown here.",
+      "Check each talent before you follow the plan.",
+    ]);
   });
 
   test("keeps one class's talent changes and orders the records by build number, oldest first", () => {
@@ -182,7 +210,48 @@ describe("planFreshness", () => {
     ]);
   });
 
+  test("a record that could not compare spell numbers leaves the history incomplete, and what the records do show is still listed", () => {
+    const noSpells = { warnings: ["no committed spell values to compare with, so spell number changes are not listed"] };
+    const quiet = planFreshness(tree, classTalentChanges([record("1.0.0.5", "1.0.0.1", {}, noSpells)], 8), "1.0.0.1", plan);
+    expect(quiet).toMatchObject({ relation: "older", touched: [], changed: null, gaps: [{ kind: "limited", build: "1.0.0.5", comparison: "spellValues" }] });
+    expect(freshnessLines(quiet)).toEqual([
+      "Made on game build 1.0.0.1; this tree is build 1.0.0.5.",
+      "The change record for game build 1.0.0.5 had no spell numbers to compare with, so changes to spell numbers in that build are unknown.",
+      "Check each talent before you follow the plan.",
+    ]);
+    const shown = planFreshness(tree, classTalentChanges([record("1.0.0.5", "1.0.0.3", { ranks: [at(11, { before: 5, after: 3 })] }), record("1.0.0.3", "1.0.0.1", {}, noSpells)], 8), "1.0.0.1", plan);
+    expect(shown).toMatchObject({ changed: true, gaps: [{ kind: "limited", build: "1.0.0.3", comparison: "spellValues" }] });
+    expect(shown.touched.map((t) => t.nodeId)).toEqual([11]);
+    expect(freshnessLines(shown).at(-1)).toBe("Check each talent before you follow the plan.");
+    // A warning the site does not know is read as a comparison that may be missing.
+    const odd = planFreshness(tree, classTalentChanges([record("1.0.0.5", "1.0.0.1", {}, { warnings: ["Mage: 3 nodes have no entries"] })], 8), "1.0.0.1", plan);
+    expect(odd).toMatchObject({ changed: null, gaps: [{ kind: "limited", build: "1.0.0.5", comparison: "unknown" }] });
+    expect(freshnessLines(odd)[1]).toBe("The change record for game build 1.0.0.5 warns that part of its comparison may be missing, so changes in that build may not all be listed.");
+    // Only the records between the plan's build and the tree's count.
+    expect(planFreshness(tree, classTalentChanges([record("1.0.0.5", "1.0.0.3"), record("1.0.0.3", "1.0.0.1", {}, noSpells)], 8), "1.0.0.3", plan)).toMatchObject({ changed: false, gaps: [] });
+  });
+
+  test("a talent a public build changed and a spoiler build renamed keeps its public name while spoilers are off", () => {
+    const records = [
+      record("1.0.0.5", "1.0.0.3", { ranks: [at(11, { name: "Hidden Name", before: 5, after: 3 })] }, { live: false, spoiler: true }),
+      record("1.0.0.3", "1.0.0.1", { moved: [at(11, { from: pos(0, 0), to: pos(1, 0) })] }),
+    ];
+    const f = planFreshness(tree, classTalentChanges(records, 8), "1.0.0.1", { 11: { rank: 5 } });
+    expect(freshnessLines(f)).toEqual([
+      "Made on game build 1.0.0.1; this tree is build 1.0.0.5.",
+      "Talent 11: moved from row 1, column 1 to row 2, column 1 in build 1.0.0.3.",
+      "1 of this plan's talents changed in a build players cannot play yet (1.0.0.5). Spoilers are not shown here.",
+      "Check each talent before you follow the plan.",
+    ]);
+    // The result names a talent only on each change, beside that change's spoiler flag.
+    expect(f.touched[0]).not.toHaveProperty("name");
+    expect(f.touched[0].changes.map((c) => [c.name, c.spoiler])).toEqual([["Talent 11", false], ["Hidden Name", true]]);
+    expect(freshnessLines(f, { spoilers: true })[1]).toBe("Hidden Name: moved from row 1, column 1 to row 2, column 1 in build 1.0.0.3; its maximum rank went from 5 to 3 in build 1.0.0.5 (this plan spends 5 points in it).");
+  });
+
   test("a plan made on a build with no record of its own, skipped or withdrawn, claims nothing from the record that spans it", () => {
+    // A build that a record compares with needs no record of its own: 1.0.0.1 is 1.0.0.3's previous build.
+    expect(planFreshness(tree, classTalentChanges(changedRecords(), 8), "1.0.0.1", plan).gaps).toEqual([]);
     const f = planFreshness(tree, classTalentChanges(changedRecords(), 8), "1.0.0.2", plan);
     // 1.0.0.3's record compares 1.0.0.1 with 1.0.0.3: its changes may predate the plan, so none is claimed.
     expect(f.touched.map((t) => [t.nodeId, t.changes.map((c) => c.build)])).toEqual([[11, ["1.0.0.5"]], [12, ["1.0.0.5"]], [32, ["1.0.0.5"]]]);
@@ -303,8 +372,12 @@ test("every change record the build watch publishes is read, and reads", () => {
 });
 
 test("the engine and the note only read: nothing in them can save a plan, restamp its code or run in the browser", () => {
+  const writes = /\bencode(?:Build|Order)\b|\b(?:replace)?[pP]lanHash\b|localStorage|sessionStorage|\bfetch\(|player-workspace|saved-builds|SaveBuild|(?:replace|push)State|location\.(?:hash|href)\s*=(?!=)|location\.(?:assign|replace)\(/;
   for (const file of ["lib/talents/freshness.ts", "components/talents/FreshnessNote.tsx"]) {
     const text = readFileSync(join(src, file), "utf8");
-    expect(text, file).not.toMatch(/\bencode(?:Build|Order)\b|\bplanHash\b|localStorage|sessionStorage|\bfetch\(|player-workspace|saved-builds|SaveBuild|"use client"|\buse(?:Effect|State)\b/);
+    expect(text, file).not.toMatch(writes);
+    expect(text, file).not.toMatch(/"use client"|\buse(?:Effect|State)\b/);
   }
+  // The one part that runs in the browser reads the address and never writes it.
+  expect(readFileSync(join(src, "components/talents/WhilePlanShown.tsx"), "utf8")).not.toMatch(writes);
 });

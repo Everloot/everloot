@@ -1,11 +1,13 @@
 import { LABEL } from "../../../../kb/src/talents/catalog";
 import { PUBLISHED_CHANGES, classTalentChanges, codeFreshness, freshnessLines } from "@/lib/talents/freshness";
 import type { TalentCatalog } from "@/lib/talents/types";
+import WhilePlanShown from "./WhilePlanShown";
 
 // Under a build link's calculator: what the game files changed in each set's talents since the build the set
 // was made on, from the build watch's change records. It only reads. The link's codes keep the build they
 // carry, and the note holds no link, code or button that could save or re-stamp the plan. A set made on the
 // tree's own build gets no note, and neither does a code that does not load: the calculator's report says why.
+// In the browser the note stays only while the address shows the plan it describes (WhilePlanShown).
 
 export default function FreshnessNote({ catalog, codes, entries = PUBLISHED_CHANGES, spoilers = false, className = "" }: {
   catalog: TalentCatalog;
@@ -29,18 +31,21 @@ export default function FreshnessNote({ catalog, codes, entries = PUBLISHED_CHAN
   if (notes.length === 0) return null;
 
   return (
-    <section aria-label="Game build changes" className={`space-y-3 rounded-control border border-line bg-canvas p-4 text-sm text-fg-2 ${className}`.trim()}>
-      {notes.map(({ set, lines: [lead, ...rest] }) => (
-        <div key={set} className="space-y-1">
-          <p className="font-semibold text-fg">{sets.length > 1 && `Set ${set}: `}{lead}</p>
-          {rest.length > 0 && (
-            <ul className="list-disc space-y-1 pl-5">
-              {rest.map((line, i) => <li key={i}>{line}</li>)}
-            </ul>
-          )}
-        </div>
-      ))}
-      <p className="font-mono text-xs text-muted">From the game build change records · {LABEL}</p>
-    </section>
+    <WhilePlanShown codes={codes ?? []}>
+      <section aria-label="Game build changes" className={`space-y-3 rounded-control border border-line bg-canvas p-4 text-sm text-fg-2 ${className}`.trim()}>
+        {notes.map(({ set, lines: [lead, ...rest] }) => (
+          <div key={set} className="space-y-1">
+            <p className="font-semibold text-fg">{sets.length > 1 && `Set ${set}: `}{lead}</p>
+            {rest.length > 0 && (
+              <ul className="list-disc space-y-1 pl-5">
+                {rest.map((line, i) => <li key={i}>{line}</li>)}
+              </ul>
+            )}
+          </div>
+        ))}
+        {/* Points spent after the page opens rewrite the address without an event; the note stays about the opened plan. */}
+        <p className="font-mono text-xs text-muted">On the plan this page opened with · from the game build change records · {LABEL}</p>
+      </section>
+    </WhilePlanShown>
   );
 }
