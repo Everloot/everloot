@@ -2,9 +2,14 @@
 import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import AccountControls, { ACCOUNT_CHANGED_EVENT } from "@/components/AccountControls";
 import { bucketKey, type LocalPlan, type Owner, type PlayerWorkspace } from "@/lib/player-workspace";
 import DevicePlans from "./DevicePlans";
 import LocalPlanSave from "./LocalPlanSave";
+
+// The header's sign-out refreshes the route; here that refresh does nothing, as it changes no client state either.
+const { refresh } = vi.hoisted(() => ({ refresh: vi.fn() }));
+vi.mock("next/navigation", async (actual) => ({ ...(await actual<object>()), useRouter: () => ({ refresh }) }));
 
 // The device's plans as a player meets them: this browser's localStorage, and /api/auth/me as the only thing the
 // page asks the network. Codes are the share-code doc's (docs/2026-10-17-talent-share-code.md).
@@ -39,6 +44,8 @@ beforeEach(() => {
   gate = null;
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     requests.push(`${init?.method ?? "GET"} ${String(input)}`);
+    // The header's Sign out, as the server answers it with no other account signed in on this browser.
+    if (String(input) === "/api/auth/logout" && init?.method === "POST") { who = null; return Response.json({ ok: true, next: false }); }
     if (String(input) !== "/api/auth/me") throw new Error(`Unexpected request ${String(input)}`);
     if (meFails > 0) { meFails--; return Response.json({ error: "Authentication is temporarily unavailable" }, { status: 503 }); }
     const answer = who;
@@ -199,6 +206,64 @@ test("a restore begun under one account is dropped when the account changes befo
   expect(text()).not.toContain("From A's backup");
   expect(stored(A)?.plans.map((p) => p.name)).toEqual(["A's plan"]);
   expect(stored(B)).toBeNull();
+});
+
+test("Sign out in the header hides the account's plans, notes and restore at once, then shows the signed-out plans", async () => {
+  seed(A, [plan({ id: id(2), name: "A's plan", notes: "A's notes" })]);
+  seed(ANON, [plan({ name: "Signed out plan" })]);
+  who = { id: A_ID, name: "Thrall#1234" };
+  await render(<><AccountControls /><DevicePlans /></>);
+  expect(item("A's plan")).toBeDefined();
+  await choose(backupFile(doc(A, [plan({ id: id(4), name: "From A's backup" })])));
+  expect(button(/^Restore$/)).toBeDefined();
+  let release = () => {};
+  gate = new Promise<void>((r) => { release = r; });
+  await click(button(/^Sign out$/));
+  expect(requests).toContain("POST /api/auth/logout");
+  // Until this tab knows who is signed in now, it shows no one's plans.
+  expect(text()).toContain("Checking who is signed in");
+  expect(text()).not.toContain("A's plan");
+  expect(text()).not.toContain("A's notes");
+  expect(button(/^Restore$/)).toBeUndefined();
+  await act(async () => release());
+  await settle();
+  expect(item("Signed out plan")).toBeDefined();
+  expect(text()).not.toContain("A's plan");
+  expect(stored(A)?.plans.map((p) => p.name)).toEqual(["A's plan"]);
+});
+
+test("after a sign-out, an answer for the old account that was asked before it is ignored", async () => {
+  seed(A, [plan({ id: id(2), name: "A's plan" })]);
+  seed(ANON, [plan({ name: "Signed out plan" })]);
+  who = { id: A_ID, name: "Thrall#1234" };
+  await render();
+  let release = () => {};
+  gate = new Promise<void>((r) => { release = r; });
+  await comeBack();
+  who = null;
+  await act(async () => { window.dispatchEvent(new Event(ACCOUNT_CHANGED_EVENT)); });
+  await settle();
+  expect(item("Signed out plan")).toBeDefined();
+  await act(async () => release());
+  await settle();
+  expect(item("Signed out plan")).toBeDefined();
+  expect(text()).not.toContain("A's plan");
+});
+
+test("a failed check right after a sign-out shows no plans, never the old account's", async () => {
+  seed(A, [plan({ id: id(2), name: "A's plan" })]);
+  seed(ANON, [plan({ name: "Signed out plan" })]);
+  who = { id: A_ID, name: "Thrall#1234" };
+  await render();
+  who = null;
+  meFails = 1;
+  await act(async () => { window.dispatchEvent(new Event(ACCOUNT_CHANGED_EVENT)); });
+  await settle();
+  expect(alerts()).toContain("could not be checked");
+  expect(text()).not.toContain("A's plan");
+  expect(text()).not.toContain("Signed out plan");
+  await click(button(/^Try again$/));
+  expect(item("Signed out plan")).toBeDefined();
 });
 
 test("a pasted talent link is saved by name with both sets and both orders, and listed", async () => {
@@ -432,6 +497,29 @@ test("LocalPlanSave: an account switch while the panel is open closes it and sav
   await click(button(/^Save plan$/, panel()!));
   expect(stored(B)?.plans).toHaveLength(1);
   expect(stored(A)).toBeNull();
+});
+
+test("LocalPlanSave: a sign-out while the panel is open closes it at once and saves nothing", async () => {
+  onMessage.mockClear();
+  seed(A, [plan({ id: id(2), name: "A's plan", notes: "A's notes" })]);
+  who = { id: A_ID, name: "Thrall#1234" };
+  await render(widget([MAGE, null], [PLANNED, null]));
+  await click(button(/^Save on this device$/));
+  expect(panel()?.textContent).toContain("Replace A's plan");
+  let release = () => {};
+  gate = new Promise<void>((r) => { release = r; });
+  who = null;
+  await act(async () => { window.dispatchEvent(new Event(ACCOUNT_CHANGED_EVENT)); });
+  expect(panel()).toBeNull();
+  expect(text()).not.toContain("A's plan");
+  expect(onMessage).toHaveBeenLastCalledWith(expect.stringContaining("changed, so nothing was saved"));
+  await act(async () => release());
+  await settle();
+  await click(button(/^Save on this device$/));
+  expect(panel()?.textContent).not.toContain("A's plan");
+  await click(button(/^Save plan$/, panel()!));
+  expect(stored(ANON)?.plans).toHaveLength(1);
+  expect(stored(A)?.plans.map((p) => p.name)).toEqual(["A's plan"]);
 });
 
 test("LocalPlanSave: a full storage keeps the panel and its text, says so, and never says saved", async () => {

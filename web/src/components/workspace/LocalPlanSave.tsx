@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { ACCOUNT_CHANGED_EVENT } from "@/components/AccountControls";
 import { Input } from "@/components/ui";
 import {
   WORKSPACE_LIMITS, deviceStorage, lookupOwner, orderState, readWorkspace, sameOwner, savePlan, type LocalPlan, type Owner,
@@ -13,13 +14,16 @@ import {
 export type OwnerState = { status: "checking" } | { status: "ready"; owner: Owner } | { status: "unavailable" };
 
 /**
- * Whose plans this browser shows, from /api/auth/me: asked when the page opens and again each time the tab comes
- * back, since another tab may have signed in, out or into another account. Only the latest answer counts, and a
- * failed check after a good one keeps the owner it had. `retry` asks again.
+ * Whose plans this browser shows, from /api/auth/me: asked when the page opens, again each time the tab comes back
+ * (another tab may have signed in, out or into another account), and at once after Sign out in this tab
+ * (ACCOUNT_CHANGED_EVENT). Only the latest answer counts. A failed check after a good one keeps the owner it had,
+ * but a sign-out is certain, so it starts over as `retry` does: no one's plans until the next answer.
  */
 export function useWorkspaceOwner(): [OwnerState, () => void] {
   const [state, setState] = useState<OwnerState>({ status: "checking" });
   const [attempt, setAttempt] = useState(0);
+  // Show no one's plans, let every answer already asked for go, and ask again.
+  const retry = useCallback(() => { setState({ status: "checking" }); setAttempt((n) => n + 1); }, []);
   useEffect(() => {
     let active = true;
     let asked = 0;
@@ -38,14 +42,15 @@ export function useWorkspaceOwner(): [OwnerState, () => void] {
     window.addEventListener("focus", onShow);
     window.addEventListener("pageshow", onShow);
     document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener(ACCOUNT_CHANGED_EVENT, retry);
     return () => {
       active = false;
       window.removeEventListener("focus", onShow);
       window.removeEventListener("pageshow", onShow);
       document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener(ACCOUNT_CHANGED_EVENT, retry);
     };
-  }, [attempt]);
-  const retry = useCallback(() => { setState({ status: "checking" }); setAttempt((n) => n + 1); }, []);
+  }, [attempt, retry]);
   return [state, retry];
 }
 
@@ -80,12 +85,15 @@ export default function LocalPlanSave({ classSlug, codes, orders, defaultName, o
   const nameNow = useRef(defaultName);
   nameNow.current = defaultName;
 
-  // What was typed for one account is never saved into another: a switch closes the panel.
+  // What was typed for one account is never saved into another: a switch closes the panel, and so does a sign-out,
+  // which leaves no owner until the next answer.
   useEffect(() => {
-    if (!openFor || !owner || sameOwner(openFor, owner)) return;
+    if (!openFor || (owner && sameOwner(openFor, owner))) return;
     setOpenFor(null);
     setLastSaved(null);
-    onMessage("You are signed in to a different account now, so nothing was saved. Press Save on this device again to save it under this one.");
+    onMessage(owner
+      ? "You are signed in to a different account now, so nothing was saved. Press Save on this device again to save it under this one."
+      : "The account signed in here changed, so nothing was saved. Press Save on this device again.");
   }, [owner, openFor, onMessage]);
 
   function pick(target: string, from: LocalPlan[] = plans) {

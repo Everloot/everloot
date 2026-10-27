@@ -7,6 +7,11 @@ import { AvatarMenu, CreateMenu } from "./AccountMenu";
 
 type Status = "loading" | "anonymous" | "signed-in" | "unavailable";
 
+/** Dispatched on window when Sign out leaves no account signed in on this tab. The route refresh after it keeps
+ *  client state, so a page that holds the account's data in the browser (Plans on this device) listens for it,
+ *  hides that data and asks who is signed in now. A sign-out that hands over to another account reloads instead. */
+export const ACCOUNT_CHANGED_EVENT = "everloot:account-changed";
+
 /**
  * The header's account area. Signed out: Sign in and Get the addon. Signed in: the "+" menu and the avatar menu.
  * The account is looked up here; the avatar menu fetches the player's shell itself. `initialShell` seeds it (tests).
@@ -58,6 +63,7 @@ export default function AccountControls({ savedBuilds = false, initialShell = nu
       // Another account signed in on this browser is now the current one.
       if (result.next === true) { window.location.reload(); return; }
       setStatus("anonymous");
+      window.dispatchEvent(new Event(ACCOUNT_CHANGED_EVENT));
       router.refresh();
     } catch {
       setError("Sign out failed. Try again.");
