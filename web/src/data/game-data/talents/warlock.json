@@ -2,12 +2,12 @@
  "schema": "everloot.talent-catalog/2",
  "label": "found in game files, unconfirmed",
  "build": {
-  "product": "wow_classic_beta",
-  "buildId": 70532,
-  "version": "1.60.1.70532",
-  "buildConfig": "ad1802f4455e427ed8b7769aab25b0c0",
-  "definitions": "d8b2f0bdd362",
-  "extractedAt": "2026-10-22T22:42:27.998Z"
+  "product": "wowf",
+  "buildId": 70630,
+  "version": "1.60.1.70630",
+  "buildConfig": "644ffedb0d59bb0da2af9011b36f44db",
+  "definitions": "05e242b6acdc",
+  "extractedAt": "2026-10-27T06:57:32.302Z"
  },
  "classId": 9,
  "className": "Warlock",
