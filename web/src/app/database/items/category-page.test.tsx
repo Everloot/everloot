@@ -336,6 +336,13 @@ test("taking the context off keeps every filter; the list's own links, menus and
   expect(page).toMatch(/<input[^>]*name="role"[^>]*value="damage"/);
 });
 
+test("an old singular category address moves to the plural one with its class context, when the context reads", async () => {
+  await expect(html(ItemPage(props("weapon", { quality: "rare", class: "mage", level: "25" })))).rejects.toThrow(/^NEXT_REDIRECT \/database\/items\/weapons\?quality=rare&class=mage&level=25$/);
+  await expect(html(SubclassPage(sub("weapon", "one-handed-swords", { class: "warrior", role: "tank" })))).rejects.toThrow(/^NEXT_REDIRECT \/database\/items\/weapons\/one-handed-swords\?class=warrior&role=tank$/);
+  // A context the page cannot read is not carried on.
+  await expect(html(ItemPage(props("weapon", { quality: "rare", class: "deathknight" })))).rejects.toThrow(/^NEXT_REDIRECT \/database\/items\/weapons\?quality=rare$/);
+});
+
 test("a class context the page cannot read is named and left out, and the page is not a 404", async () => {
   const page = await html(items({ class: "deathknight", sort: "name" }));
   expect(page).toContain("&quot;deathknight&quot; is not one of the nine classes. This page leaves the class out.");

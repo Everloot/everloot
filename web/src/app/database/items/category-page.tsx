@@ -22,14 +22,18 @@ import { LEVEL_BRACKETS } from "../list-parts";
 
 type Search = Record<string, string | string[] | undefined>;
 
-/** The first category URLs used the client's singular names (/database/items/weapon); they move to the plural ones for good. */
+/**
+ * The first category URLs used the client's singular names (/database/items/weapon); they move to the plural ones
+ * for good, with their filters and a class context the page can read.
+ */
 function legacyHref(classSlug: string, subclassKey: string | undefined, search: Search): string | null {
   const cls = resolveLegacyClass(T, classSlug);
   if (!cls) return null;
   const sub = subclassKey === undefined ? null : resolveSubclass(T, cls.id, subclassKey);
   if (subclassKey !== undefined && !sub) return null;
   const q = categoryQuery(search);
-  return q ? itemsHref(cls.slug, sub?.slug, q) : null;
+  const read = parseClassContext(search);
+  return q ? withClassContext(itemsHref(cls.slug, sub?.slug, q), read.ok ? read.context : null) : null;
 }
 
 /** The class and subclass a path names (none for /database/items), and the filters; null when any part is unknown. */
