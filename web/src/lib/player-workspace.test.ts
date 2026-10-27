@@ -235,43 +235,31 @@ describe("format version 2: alts with their details, and version 1 still read", 
   const upgraded = altOf({ id: idOf(500), name: "Thrall", planIds: [idOf(1)], notes: "Bank alt" });
   const one = () => plan({ id: idOf(1) });
 
-  test("a save stores version 2", () => {
+  test("a new bucket is stored as version 2", () => {
     const storage = memory();
     saved(storage, ANON);
     expect(WORKSPACE_VERSION).toBe(2);
     expect(JSON.parse(storage.items.get(bucketKey(ANON))!).version).toBe(2);
   });
 
-  test("a version 1 bucket reads as version 2 with every plan, alt and watch, and reading writes nothing", () => {
+  test("a version 1 bucket reads with its alts' version 2 details unknown, stays version 1, and reading writes nothing", () => {
     const storage = memory();
     const text = JSON.stringify(versionOne(ANON, [one()], [oldAlt], [watch]));
     storage.items.set(bucketKey(ANON), text);
     const read = readWorkspace(storage, ANON);
     expect(read).toMatchObject({ ok: true, raw: text });
-    expect(read.ok && read.workspace).toEqual(workspace(ANON, [one()], { alts: [upgraded], watches: [watch] }));
+    expect(read.ok && read.workspace).toEqual(workspace(ANON, [one()], { version: 1, alts: [upgraded], watches: [watch] }));
     expect(storage.items.get(bucketKey(ANON))).toBe(text);
   });
 
-  test("the first change to a version 1 bucket stores it as version 2, with everything it held", () => {
+  test("a change to a version 1 bucket stores version 1, alts and all, while no alt holds a version 2 detail", () => {
     const storage = memory();
     storage.items.set(bucketKey(ANON), JSON.stringify(versionOne(ANON, [one()], [oldAlt], [watch])));
     const added = saved(storage, ANON, { name: "New" });
-    expect(JSON.parse(storage.items.get(bucketKey(ANON))!)).toEqual(workspace(ANON, [one(), added], { alts: [upgraded], watches: [watch] }));
+    expect(storage.items.get(bucketKey(ANON))).toBe(JSON.stringify(versionOne(ANON, [one(), added], [oldAlt], [watch])));
   });
 
-  test("a version 1 backup restores into a version 2 device, its alts' new details unknown", () => {
-    const preview = previewImport(JSON.stringify(versionOne(ANON, [one()], [oldAlt])), emptyWorkspace(ANON));
-    expect(preview).toMatchObject({ ok: true, preview: { added: 1, others: 1 } });
-    expect(preview.ok && preview.preview.result).toEqual(workspace(ANON, [one()], { alts: [upgraded] }));
-  });
-
-  test("version 1 is never extended in place: version 2's fields on a version 1 alt, or a version 2 alt without them, are refused", () => {
-    expect(validateWorkspace(versionOne(ANON, [one()], [{ ...oldAlt, realm: "Moon Guard" }]))).toMatchObject({ ok: false, error: "malformed" });
-    expect(validateWorkspace(versionOne(ANON, [one()], [upgraded]))).toMatchObject({ ok: false, error: "malformed" });
-    expect(validateWorkspace(workspace(ANON, [one()], { alts: [oldAlt as unknown as LocalAlt] }))).toMatchObject({ ok: false, error: "malformed" });
-  });
-
-  test("a version 1 bucket within 1 MiB stays readable when its upgrade passes 1 MiB; a change then says so and stores nothing", () => {
+  test("a version 1 bucket near 1 MiB keeps working: its backup is its own stored text, and a plan change is stored as version 1", () => {
     const letters = (n: number) => "\u{1D538}".repeat(n);
     const alts = Array.from({ length: 60 }, (_, i) => ({ ...oldAlt, id: idOf(500 + i), name: letters(60), planIds: [], notes: letters(1000) }));
     const plans: LocalPlan[] = [];
@@ -284,10 +272,49 @@ describe("format version 2: alts with their details, and version 1 still read", 
     const text = JSON.stringify(versionOne(ANON, plans, alts));
     storage.items.set(bucketKey(ANON), text);
     const read = readWorkspace(storage, ANON);
+    if (!read.ok) throw new Error(read.error);
+    // Spelled out in version 2, the same alts would take more than a device keeps.
+    expect(bytes(JSON.stringify({ ...read.workspace, version: 2 }))).toBeGreaterThan(WORKSPACE_LIMITS.bytes);
+    expect(exportBackup(read.workspace, NOW)).toMatchObject({ ok: true, text });
+    expect(editPlan(storage, ANON, idOf(0), { name: "P", notes: "" }, LATER)).toMatchObject({ ok: true });
+    const after = JSON.parse(storage.items.get(bucketKey(ANON))!);
+    expect([after.version, after.plans[0].name, after.alts[0]]).toEqual([1, "P", alts[0]]);
+  });
+
+  test("a version 1 bucket near the limit stays exportable after it is read (reported case)", () => {
+    const code = plan().code;
+    const plans = Array.from({ length: 200 }, (_, i) => plan({ id: idOf(i + 1), name: `Plan ${i + 1}`, code2: code, order: `O9p-${"A".repeat(396)}`, order2: `O9p-${"A".repeat(396)}` }));
+    const alts = Array.from({ length: 60 }, (_, i) => ({ id: idOf(500 + i), name: `Alt ${i}`, planIds: [], notes: "", updatedAt: "2026-10-20T12:00:00.000Z" }));
+    const v1 = { ...emptyWorkspace(ANON), version: 1, plans, alts };
+    for (const entry of [...plans, ...alts]) {
+      const room = WORKSPACE_LIMITS.bytes - bytes(JSON.stringify(v1));
+      if (room > 0) entry.notes = "\u{1f600}".repeat(Math.min(Math.floor(room / 4), 1000));
+    }
+    expect(validateWorkspace(v1).ok).toBe(true);
+    const storage = memory();
+    storage.items.set(bucketKey(ANON), JSON.stringify(v1));
+    const read = readWorkspace(storage, ANON);
     expect(read.ok).toBe(true);
-    expect(bytes(JSON.stringify(read.ok ? read.workspace : null))).toBeGreaterThan(WORKSPACE_LIMITS.bytes);
-    expect(savePlan(storage, ANON, input({ name: "One more" }), NOW)).toMatchObject({ ok: false, error: "over-limit" });
-    expect(storage.items.get(bucketKey(ANON))).toBe(text);
+    expect(read.ok && exportBackup(read.workspace).ok).toBe(true);
+  });
+
+  test("every limit at once can pass 1 MiB, and such a bucket is refused rather than stored (reported case)", () => {
+    const plans = Array.from({ length: 200 }, (_, i) => plan({ id: idOf(i + 1), name: `Plan ${i + 1}`, notes: "\u{1f600}".repeat(1000) }));
+    const alts = Array.from({ length: 60 }, (_, i) => altOf({ id: idOf(500 + i), name: `Alt ${i}`, notes: "\u{1f600}".repeat(1000), planIds: plans.slice(0, 10).map((p) => p.id) }));
+    expect(validateWorkspace(workspace(ANON, plans.map((p) => ({ ...p, notes: "" })), { alts })).ok).toBe(true);
+    expect(validateWorkspace(workspace(ANON, plans, { alts }))).toEqual({ ok: false, error: "over-limit" });
+  });
+
+  test("a version 1 backup restores into a version 2 device, its alts' new details unknown", () => {
+    const preview = previewImport(JSON.stringify(versionOne(ANON, [one()], [oldAlt])), emptyWorkspace(ANON));
+    expect(preview).toMatchObject({ ok: true, preview: { added: 1, others: 1 } });
+    expect(preview.ok && preview.preview.result).toEqual(workspace(ANON, [one()], { alts: [upgraded] }));
+  });
+
+  test("version 1 is never extended in place: version 2's fields on a version 1 alt, or a version 2 alt without them, are refused", () => {
+    expect(validateWorkspace(versionOne(ANON, [one()], [{ ...oldAlt, realm: "Moon Guard" }]))).toMatchObject({ ok: false, error: "malformed" });
+    expect(validateWorkspace(versionOne(ANON, [one()], [upgraded]))).toMatchObject({ ok: false, error: "malformed" });
+    expect(validateWorkspace(workspace(ANON, [one()], { alts: [oldAlt as unknown as LocalAlt] }))).toMatchObject({ ok: false, error: "malformed" });
   });
 
   test("a version 2 alt's details are checked: realm, class, faction, level, professions and where they came from", () => {

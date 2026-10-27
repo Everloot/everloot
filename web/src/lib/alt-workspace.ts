@@ -28,7 +28,8 @@ const MESSAGES: Partial<Record<WriteError, string>> = {
 /** A failure as the alt pages say it. */
 export const altFailure = (error: WriteError, message = MESSAGES[error] ?? MESSAGES.invalid!): Failure => ({ ok: false, error, message });
 
-/** The workspace's update, with its failures said in the alt pages' words; a change's own failure keeps its words. */
+/** The workspace's update, with its failures said in the alt pages' words; a change's own failure keeps its words, and
+ *  so does one these pages have no words of their own for. */
 export function changeAlts(storage: DeviceStorage | null, owner: Owner, change: (workspace: PlayerWorkspace) => PlayerWorkspace | Failure): WriteResult {
   let own: Failure | null = null;
   const result = update(storage, owner, (workspace) => {
@@ -36,7 +37,7 @@ export function changeAlts(storage: DeviceStorage | null, owner: Owner, change: 
     if ("error" in next) own = next;
     return next;
   });
-  return result.ok ? result : own ?? altFailure(result.error);
+  return result.ok ? result : own ?? (MESSAGES[result.error] ? altFailure(result.error) : result);
 }
 
 /** A character's name in any case. */

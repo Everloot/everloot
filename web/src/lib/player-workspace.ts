@@ -5,8 +5,9 @@ import { decodeBuild, decodeOrder, type OrderError, type OrderOrigin } from "./t
 
 // The plans, alts and watches a player keeps in this browser, with no account and nothing uploaded: the
 // PlayerWorkspace, format version 2. Version 2 gave alts their details (realm, class, level and the rest). Version 1
-// is still read, as version 2 with those details unknown, and is stored as version 2 at the next change; a shape
-// change takes a new version number, so an older page reads newer data as newer and leaves it alone.
+// is still read, its alts with those details unknown, and a version 1 bucket stays version 1 until an alt holds one of
+// them (storedForm): pages that read only version 1 keep reading it, and its size and backup stay as they were. A
+// shape change takes a new version number, so an older page reads newer data as newer and leaves it alone.
 //
 // One bucket per owner, each under its own localStorage key: the browser signed out, and each account by its
 // stable user id, never its name. A plan saved in one bucket is shown in no other, so signing in, out or into
@@ -21,7 +22,7 @@ import { decodeBuild, decodeOrder, type OrderError, type OrderOrigin } from "./t
 // account's bucket (bindTransferred).
 
 export const WORKSPACE_FORMAT = "everloot.player-workspace";
-/** The version a new bucket is stored in, and any bucket after a change. */
+/** The version a new bucket is stored in, and a version 1 bucket once an alt has version 2's details. */
 export const WORKSPACE_VERSION = 2;
 /** The newest version this version reads. A bucket in a newer one is left alone. */
 export const NEWEST_VERSION = 2;
@@ -225,10 +226,9 @@ export function validateWorkspace(value: unknown): Validation {
   const named = (id: string) => planIds.has(id);
   if (!altList.every((a) => unique(a.planIds) && a.planIds.every(named))) return refuse("bad-reference");
   if (!watches.every((w) => named(w.planId)) || !unique(watches.map((w) => w.planId))) return refuse("bad-reference");
-  // Measured as written, so version 1 within the limit stays readable after its upgrade adds a few bytes an alt;
-  // the next change is measured as version 2.
   if (bytes(JSON.stringify(value)) > WORKSPACE_LIMITS.bytes) return refuse("over-limit");
-  const workspace = version === 1 ? { ...value, version: WORKSPACE_VERSION, alts: altList.map(upgradeAlt) } : value;
+  // A version 1 bucket stays version 1 (see storedForm): only its alts are read as version 2's, their new details unknown.
+  const workspace = version === 1 ? { ...value, alts: altList.map(upgradeAlt) } : value;
   return { ok: true, workspace: workspace as unknown as PlayerWorkspace };
 }
 
@@ -237,7 +237,7 @@ export function validateWorkspace(value: unknown): Validation {
 export type ReadError = "unavailable" | "corrupt" | "newer-version";
 export type WriteError =
   | ReadError | "full" | "over-limit" | "invalid" | "missing" | "referenced" | "changed" | "other-owner"
-  | "not-transferred" | "incomplete" | "left-signed-out";
+  | "not-transferred" | "incomplete" | "left-signed-out" | "format-room";
 export type Failure = { ok: false; error: WriteError; message: string };
 export type ReadResult = { ok: true; workspace: PlayerWorkspace; raw: string | null } | (Failure & { error: ReadError; raw: string | null });
 export type WriteResult = { ok: true; workspace: PlayerWorkspace } | Failure;
@@ -256,6 +256,7 @@ const MESSAGES: Record<WriteError, string> = {
   "not-transferred": "The transfer did not finish, so nothing on this device changed.",
   incomplete: "The transfer did not confirm every plan it was sent, so none were moved. Nothing on this device changed.",
   "left-signed-out": "The plans were saved to the account, but this browser could not take them out of its signed-out plans, so they show in both.",
+  "format-room": "The plans and alts on this device are saved in an older format. Alt details need the newer one, which takes more room for the same alts, and here that would come to more than the 1 MiB this device keeps. Nothing was changed. Download a backup first (it keeps the older format), then delete a plan or an alt, or shorten some notes, to make room.",
 };
 
 const failure = (error: WriteError, message = MESSAGES[error]): Failure => ({ ok: false, error, message });
@@ -294,13 +295,40 @@ const isQuota = (error: unknown) => error instanceof DOMException
   && (error.name === "QuotaExceededError" || error.name === "NS_ERROR_DOM_QUOTA_REACHED" || error.code === 22);
 
 /** Check one bucket and store the whole of it in one write. */
+/** Whether an alt has nothing version 1 cannot hold: no version 2 detail, and typed here. */
+const plainAlt = (a: LocalAlt) => a.realm === null && a.classSlug === null && a.faction === null && a.level === null
+  && a.professions.length === 0 && a.provenance.source === "manual" && a.provenance.fileRecordAt === null && a.provenance.fileDetails.length === 0;
+
+/**
+ * A bucket as it is stored. One stored in version 1 stays version 1 while every alt is plain, its alts written back
+ * with version 1's fields, so its stored text and its backup keep their size and older pages can still read it. It
+ * moves to version 2 once an alt holds a version 2 detail, and a version 2 bucket stays version 2.
+ */
+export function storedForm(workspace: PlayerWorkspace): PlayerWorkspace | (Omit<PlayerWorkspace, "alts"> & { alts: V1Alt[] }) {
+  if (workspace.version === 1 && workspace.alts.every(plainAlt)) {
+    return { ...workspace, alts: workspace.alts.map(({ id, name, planIds, notes, updatedAt }) => ({ id, name, planIds, notes, updatedAt })) };
+  }
+  return { ...workspace, version: 2 };
+}
+
+/** How many bytes a version 1 bucket would take once an alt needs version 2, when that is more than a device keeps;
+ *  null when it is stored in version 2 or would fit. Version 2 spells out each alt's details, so the same alts take
+ *  more room. */
+export function newFormatOverflow(workspace: PlayerWorkspace): number | null {
+  if (workspace.version !== 1) return null;
+  const size = bytes(JSON.stringify({ ...workspace, version: 2 }));
+  return size > WORKSPACE_LIMITS.bytes ? size : null;
+}
+
 function store(storage: DeviceStorage | null, workspace: PlayerWorkspace): WriteResult {
-  const checked = validateWorkspace(workspace);
+  const doc = storedForm(workspace);
+  const checked = validateWorkspace(doc);
+  if (!checked.ok && checked.error === "over-limit" && workspace.version === 1 && doc.version === 2) return failure("format-room");
   if (!checked.ok) return failure(checked.error === "over-limit" ? "over-limit" : "invalid");
   try {
     if (!storage) throw new Error("No storage");
-    storage.setItem(bucketKey(workspace.owner), JSON.stringify(workspace));
-    return { ok: true, workspace };
+    storage.setItem(bucketKey(workspace.owner), JSON.stringify(doc));
+    return { ok: true, workspace: { ...workspace, version: doc.version } };
   } catch (error) {
     return failure(isQuota(error) ? "full" : "unavailable");
   }
@@ -575,7 +603,7 @@ export function applyImport(storage: DeviceStorage | null, owner: Owner, preview
 
 /** The bucket as a backup file: its stored text, binding and all. Only this bucket, never another owner's. */
 export function exportBackup(workspace: PlayerWorkspace, now = new Date()): { ok: true; text: string; fileName: string } | Failure {
-  const text = JSON.stringify(workspace);
+  const text = JSON.stringify(storedForm(workspace));
   if (bytes(text) > WORKSPACE_LIMITS.bytes) return failure("over-limit");
   return { ok: true, text, fileName: `everloot-plans-${now.toISOString().slice(0, 10)}.json` };
 }

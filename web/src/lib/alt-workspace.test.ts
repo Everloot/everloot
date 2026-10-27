@@ -1,5 +1,7 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
+import { applyAltImport, defaultChoices, previewAltImport, readAddonFile } from "./alt-import";
 import { altKey, deleteAlt, restoreLines, saveAlt, type AltInput } from "./alt-workspace";
+import { FIXTURE_ALT_ID, FIXTURE_PLAN_ID, V2_BUCKET_TEXT } from "./player-workspace.fixture";
 import { PROFESSIONS } from "./game-assets";
 import {
   ALT_PROFESSIONS, applyImport, bucketKey, deletePlan, emptyWorkspace, exportBackup, previewImport, readWorkspace, savePlan,
@@ -229,6 +231,63 @@ describe("adding and editing by hand", () => {
     expect(result).toMatchObject({ ok: false, error: "over-limit" });
     expect(!result.ok && result.message).toContain("60 alts");
     expect(storage.items.get(bucketKey(ANON))).toBe(before);
+  });
+});
+
+describe("which version a bucket is stored in", () => {
+  test("the version 2 bucket a reader-only build is tested with is byte for byte what this version writes", () => {
+    const storage = memory();
+    const uuid = vi.spyOn(crypto, "randomUUID");
+    uuid.mockReturnValueOnce(FIXTURE_PLAN_ID as ReturnType<typeof crypto.randomUUID>);
+    savePlan(storage, ANON, { name: "Frost", notes: "", classSlug: "mage", codes: [MAGE, null], orders: ["O1p-AABCC", null] }, new Date("2026-10-20T12:00:00.000Z"));
+    uuid.mockReturnValueOnce(FIXTURE_ALT_ID as ReturnType<typeof crypto.randomUUID>);
+    const file = readAddonFile(`EverlootDB = { ["version"] = "0.3.12", ["installId"] = "x", ["records"] = { ["character_link"] = { { ["capturedAt"] = "2026-10-21T18:00:00Z", ["name"] = "Thrall", ["realm"] = "Moon Guard", ["class"] = "SHAMAN", ["level"] = 24, ["faction"] = "Horde" } } } }`);
+    if (!file.ok) throw new Error(file.message);
+    const preview = previewAltImport(file, stored(storage, ANON));
+    expect(applyAltImport(storage, ANON, preview, defaultChoices(preview), new Date("2026-10-21T18:00:00.000Z"))).toMatchObject({ ok: true, added: 1 });
+    added(storage, ANON, {
+      id: FIXTURE_ALT_ID, name: "Thrall", realm: "Moon Guard", classSlug: "shaman", faction: "horde", level: 24,
+      professions: ["First Aid", "Alchemy"], notes: "Bank alt.\nTuesdays.", planIds: [FIXTURE_PLAN_ID],
+    }, new Date("2026-10-22T09:30:00.000Z"));
+    uuid.mockRestore();
+    expect(storage.items.get(bucketKey(ANON))).toBe(V2_BUCKET_TEXT);
+  });
+
+
+  const versionOne = (alts: object[]) => JSON.stringify({ format: "everloot.player-workspace", version: 1, owner: ANON, plans: [], alts, watches: [] });
+  /** The signed-out bucket's stored text, parsed as it is: not read as this version reads it. */
+  const storedText = (storage: Memory) => JSON.parse(storage.items.get(bucketKey(ANON))!);
+
+  test("an alt with only a name keeps a version 1 bucket version 1; its first version 2 detail moves the bucket to version 2", () => {
+    const storage = memory();
+    storage.items.set(bucketKey(ANON), versionOne([]));
+    const thrall = added(storage, ANON, { name: "Thrall", notes: "Bank alt" });
+    expect(storedText(storage)).toEqual({ format: "everloot.player-workspace", version: 1, owner: ANON, plans: [], watches: [],
+      alts: [{ id: thrall.id, name: "Thrall", planIds: [], notes: "Bank alt", updatedAt: NOW.toISOString() }] });
+    added(storage, ANON, { id: thrall.id, name: "Thrall", notes: "Bank alt", realm: "Moon Guard" }, LATER);
+    expect(storedText(storage)).toMatchObject({ version: 2, alts: [{ id: thrall.id, realm: "Moon Guard", notes: "Bank alt", provenance: { source: "manual" } }] });
+  });
+
+  test("an alt detail that would take a version 1 bucket past 1 MiB says the newer format needs the room, and stores nothing", () => {
+    const letters = (n: number) => "\u{1D538}".repeat(n);
+    const size = (s: string) => new TextEncoder().encode(s).length;
+    const alts = Array.from({ length: 60 }, (_, i) => ({ id: idOf(500 + i), name: letters(60), planIds: [], notes: letters(1000), updatedAt: "2026-10-20T12:00:00.000Z" }));
+    // Plans with long notes until the next would pass 1 MiB as version 1. In version 2 the same alts take more.
+    const plans: object[] = [];
+    const doc = () => JSON.stringify({ format: "everloot.player-workspace", version: 1, owner: ANON, plans, alts, watches: [] });
+    for (let i = 0; ; i++) {
+      plans.push({ id: idOf(i), name: `Plan ${i}`, classSlug: "mage", code: MAGE, code2: null, order: null, order2: null,
+        notes: letters(1000), updatedAt: "2026-10-20T12:00:00.000Z", boundTo: null });
+      if (size(doc()) > 1024 * 1024) { plans.pop(); break; }
+    }
+    const text = doc();
+    const storage = memory();
+    storage.items.set(bucketKey(ANON), text);
+    const result = saveAlt(storage, ANON, input({ id: idOf(500), name: letters(60), notes: letters(1000), realm: "Moon Guard" }), LATER);
+    expect(result).toMatchObject({ ok: false, error: "format-room" });
+    expect(!result.ok && result.message).toContain("takes more room");
+    expect(!result.ok && result.message).toContain("Download a backup");
+    expect(storage.items.get(bucketKey(ANON))).toBe(text);
   });
 });
 

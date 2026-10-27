@@ -389,7 +389,7 @@ test("damaged stored data is left as it is, with its text to download, and nothi
   expect(localStorage.getItem(bucketKey(ANON))).toBe("{not json");
 });
 
-test("a version 1 bucket's plans and alts show, and the first change keeps them", async () => {
+test("a version 1 bucket's plans and alts show; it stays version 1 until an alt gets a version 2 detail, and keeps everything", async () => {
   localStorage.setItem(bucketKey(ANON), JSON.stringify({ format: "everloot.player-workspace", version: 1, owner: ANON, plans: [plan()],
     alts: [{ id: id(500), name: "Old alt", planIds: [id(1)], notes: "From before", updatedAt: "2026-10-20T12:00:00.000Z" }], watches: [] }));
   await render();
@@ -397,8 +397,31 @@ test("a version 1 bucket's plans and alts show, and the first change keeps them"
   expect(item("Old alt")?.textContent).toContain("From before");
   await type(field("Name", addForm()!), "Jaina");
   await click(button(/^Add alt$/, addForm()!));
-  expect(stored(ANON)).toMatchObject({ version: 2, plans: [plan()] });
+  expect(stored(ANON)).toMatchObject({ version: 1, plans: [plan()] });
   expect(stored(ANON)?.alts.map((a) => [a.name, a.notes, a.planIds])).toEqual([["Old alt", "From before", [id(1)]], ["Jaina", "", []]]);
+  await type(field("Name", addForm()!), "Thrall");
+  await type(field("Realm", addForm()!), "Moon Guard");
+  await click(button(/^Add alt$/, addForm()!));
+  expect(stored(ANON)).toMatchObject({ version: 2, plans: [plan()] });
+  expect(stored(ANON)?.alts.map((a) => [a.name, a.realm, a.notes])).toEqual([["Old alt", null, "From before"], ["Jaina", null, ""], ["Thrall", "Moon Guard", ""]]);
+});
+
+test("a version 1 bucket too full for the newer format says so up front, and why, before anything is added", async () => {
+  const letters = (n: number) => "\u{1D538}".repeat(n);
+  const size = (s: string) => new TextEncoder().encode(s).length;
+  const alts = Array.from({ length: 60 }, (_, i) => ({ id: id(500 + i), name: letters(60), planIds: [], notes: letters(1000), updatedAt: "2026-10-20T12:00:00.000Z" }));
+  const plans: LocalPlan[] = [];
+  const doc = () => JSON.stringify({ format: "everloot.player-workspace", version: 1, owner: ANON, plans, alts, watches: [] });
+  for (let i = 0; ; i++) {
+    plans.push(plan({ id: id(i + 1), name: `Plan ${i}`, notes: letters(1000) }));
+    if (size(doc()) > 1024 * 1024) { plans.pop(); break; }
+  }
+  localStorage.setItem(bucketKey(ANON), doc());
+  await render();
+  const notice = [...container.querySelectorAll('[role="note"]')].map((n) => n.textContent).join(" ");
+  expect(notice).toContain("saved in an older format");
+  expect(notice).toContain("more than the 1 MiB this device keeps");
+  expect(notice).toContain("Download a backup");
 });
 
 test("signed in, the page shows only that account's alts; another account or a sign-out shows that owner's instead", async () => {

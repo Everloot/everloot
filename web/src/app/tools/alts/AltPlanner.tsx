@@ -7,8 +7,8 @@ import {
   DETAIL_WORDS, FIELD_WORDS, altFailure, deleteAlt, detailsLine, listOf, restoreLines, saveAlt, type AltField, type AltInput,
 } from "@/lib/alt-workspace";
 import {
-  ALT_PROFESSIONS, BACKUP_TOO_LARGE, WORKSPACE_LIMITS, applyImport, bucketKey, deviceStorage, exportBackup, previewImport, readWorkspace,
-  type Failure, type ImportPreview, type LocalAlt, type LocalPlan, type Owner, type ReadResult,
+  ALT_PROFESSIONS, BACKUP_TOO_LARGE, WORKSPACE_LIMITS, applyImport, bucketKey, deviceStorage, exportBackup, newFormatOverflow, previewImport,
+  readWorkspace, type Failure, type ImportPreview, type LocalAlt, type LocalPlan, type Owner, type ReadResult,
 } from "@/lib/player-workspace";
 import { TALENT_CLASSES } from "@/lib/talents/catalogs";
 import { planHash } from "@/lib/talents/import";
@@ -101,10 +101,20 @@ function Bucket({ owner }: { owner: Owner }) {
   };
   const storage = deviceStorage();
   const { plans, alts } = read.workspace;
+  // Said before anything is tried: in the newer format the same alts take more room than this device has left.
+  const overflow = newFormatOverflow(read.workspace);
 
   return (
     <div className="space-y-8">
       {intro}
+      {overflow !== null && (
+        <p role="note" className="rounded-control border border-line bg-canvas p-3 text-sm text-fg">
+          Your plans and alts here are saved in an older format. Alt details (realm, class, faction, level and professions, and
+          those read from your Everloot.lua) need the newer one, which takes more room for the same alts: {overflow.toLocaleString("en-US")} bytes
+          here, more than the 1 MiB this device keeps. A name, notes and plans still save as they are. Download a backup first
+          (it keeps the older format), then delete a plan or an alt, or shorten some notes, to make room for details.
+        </p>
+      )}
       <Card as="section" aria-labelledby="alts-add">
         <SectionHeading id="alts-add" note="A name is all an alt needs. Leave out what you do not know: nothing is filled in for you.">Add an alt</SectionHeading>
         <AltForm label="Add an alt" alt={null} plans={plans} submit="Add alt" onSave={(input) => {
