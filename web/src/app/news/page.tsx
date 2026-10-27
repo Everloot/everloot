@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import AdSlot from "@/components/AdSlot";
-import { Container, PageHeader, SectionHeading } from "@/components/ui";
+import { Card, Container, PageHeader, SectionHeading } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
+import { filterTimeline, loadTimeline } from "@/lib/changes";
 import { hubIndexable, loadNews, publishedPosts } from "@/lib/news";
 import { pageMetadata } from "@/lib/seo";
+import ChangeList from "../changes/change-list";
 import { FeaturedNewsCard, NewsCard } from "./news-card";
 
 // The posts change only with a deploy; an hour matches the pages themselves.
@@ -15,6 +17,8 @@ const LEDE = "What is new on Everloot and what it means for players, newest firs
 /** The in-feed ad follows this many cards in the grid (the featured post not counted). */
 const FEED_AD_AFTER = 6;
 const LINK = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
+/** How many of Blizzard's newest entries the section under the cards lists. */
+const FROM_BLIZZARD = 6;
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
@@ -24,14 +28,19 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function NewsHub() {
+/** The news hub: the newest post as a featured card, the rest as a card grid, then Blizzard's newest posts, hotfixes and builds. */
+export default async function NewsHub() {
   const posts = publishedPosts(loadNews());
+  const blizzard = filterTimeline(await loadTimeline(), "all", "forever").slice(0, FROM_BLIZZARD);
   return (
     <Container width="wide">
       <PageHeader trail={trailFor("/news")!} title="News" lede={LEDE} meta={<a href="/news/feed.xml" className={LINK}>RSS</a>} />
       <div className="space-y-12">
         {posts.length === 0 ? (
-          <p data-empty-state className="text-sm text-muted">No posts yet. The first one appears here when it is published.</p>
+          <p data-empty-state className="text-sm text-fg-2">
+            No posts yet. The first one appears here and in the <a href="/news/feed.xml" className={LINK}>news feed</a> when it is
+            published. Blizzard&apos;s own posts are on the <Link href="/changes" className={LINK}>changes timeline</Link>.
+          </p>
         ) : (
           <>
             <div data-news-post><FeaturedNewsCard post={posts[0]} /></div>
@@ -49,11 +58,15 @@ export default function NewsHub() {
           </>
         )}
         <section aria-labelledby="blizzard">
-          <SectionHeading id="blizzard">Blizzard&apos;s own posts</SectionHeading>
-          <p className="text-sm text-fg-2">
-            New builds, hotfixes and blue posts are on their own page.{" "}
-            <Link href="/changes" className={LINK}>Open the changes timeline</Link>
-          </p>
+          <SectionHeading id="blizzard" action={<Link href="/changes" className={LINK}>Every change →</Link>}>From Blizzard</SectionHeading>
+          {blizzard.length > 0 ? (
+            <Card><ChangeList entries={blizzard} types columns /></Card>
+          ) : (
+            <p className="text-sm text-fg-2">
+              New builds, hotfixes and blue posts are on their own page.{" "}
+              <Link href="/changes" className={LINK}>Open the changes timeline</Link>
+            </p>
+          )}
         </section>
       </div>
     </Container>

@@ -6,6 +6,7 @@ import JsonLd from "@/components/JsonLd";
 import { PageHeader, Prose, ReadingLayout, type TocItem } from "@/components/ui";
 import { longDate } from "@/data/wow-forever";
 import { trailFor } from "@/lib/breadcrumbs";
+import { loadTimeline, postPathForUrl } from "@/lib/changes";
 import { newsArticleJsonLd } from "@/lib/jsonld";
 import { bodyForPage, lastChanged, loadNews, newsHref, postDescription, publishedPost, publishedPosts, readingMinutes, relatedPosts, sourceNames } from "@/lib/news";
 import { pageMetadata } from "@/lib/seo";
@@ -36,6 +37,11 @@ const AD_AFTER_PARAGRAPH = 3;
 const AD_MIN_PARAGRAPHS = 4;
 /** Article type: 17 px body at a 1.75 line height, brighter text, larger title and section headings. */
 const ARTICLE = "text-[17px] leading-[1.75] [&_[data-prose]]:max-w-none [&_[data-prose]]:text-fg [&_[data-prose]>*+*]:mt-5 [&_h1]:text-[28px] [&_h1]:leading-tight sm:[&_h1]:text-[36px]";
+/**
+ * The body's measure, on its text only: 48ch of Geist runs about 70 letters a line at 17 px (its "0", which sets
+ * the ch, is wider than its average letter). Headings and the in-article ad keep the column's full width.
+ */
+const MEASURE = "[&_[data-prose]>:is(p,ul,ol,blockquote)]:max-w-[48ch]";
 
 export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await props.params;
@@ -64,6 +70,8 @@ export default async function NewsArticle(props: { params: Promise<{ slug: strin
   const body = bodyForPage(post);
   const related = relatedPosts(news, post, body.relatedSlugs, RELATED);
   const sources = sourceNames(post);
+  // A source that is a Blizzard post Everloot keeps a page for links that page too.
+  const timeline = post.sources.length > 0 ? await loadTimeline() : [];
   const minutes = readingMinutes(post.blocks);
   // Index of the block after which the in-article ad sits; -1 for a short post, which gets none.
   const paragraphs = body.blocks.flatMap((b, i) => (b.type === "paragraph" ? [i] : []));
@@ -109,7 +117,7 @@ export default async function NewsArticle(props: { params: Promise<{ slug: strin
             <img data-news-hero src={post.hero.src} alt={post.hero.alt} width={1600} height={900} sizes="(min-width: 1024px) 760px, 100vw" decoding="async" className="mt-6 aspect-video w-full rounded-card border border-line object-cover" fetchPriority="high" />
           )}
 
-          <div className="mt-8">
+          <div data-news-body className={`mt-8 ${MEASURE}`}>
             <Prose>
               {body.blocks.map((b, i) => {
                 const heading = headings.find((h) => h.i === i);
@@ -125,7 +133,15 @@ export default async function NewsArticle(props: { params: Promise<{ slug: strin
             <section aria-labelledby="sources" className="mt-12 rounded-card border border-line bg-panel p-5">
               <h2 id="sources" className="scroll-mt-24 text-base font-semibold text-fg">Sources</h2>
               <ul className="mt-2 space-y-1.5 text-[15px]">
-                {post.sources.map((s) => <li key={s.url}><a href={s.url} rel="noopener" className={LINK}>{s.title}</a></li>)}
+                {post.sources.map((s) => {
+                  const page = postPathForUrl(s.url, timeline);
+                  return (
+                    <li key={s.url}>
+                      <a href={s.url} rel="noopener" className={LINK}>{s.title}</a>
+                      {page && <> · <Link href={page} className={LINK}>On Everloot</Link></>}
+                    </li>
+                  );
+                })}
               </ul>
             </section>
           )}

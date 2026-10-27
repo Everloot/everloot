@@ -5,7 +5,13 @@ import { fileURLToPath } from "node:url";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, expect, test, vi } from "vitest";
+import type { ChangeEntry } from "@/lib/changes";
 
+const timeline = vi.hoisted((): { entries: ChangeEntry[] } => ({ entries: [] }));
+vi.mock("@/lib/changes", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/changes")>();
+  return { ...real, loadTimeline: async () => real.groupAnnouncements(timeline.entries) };
+});
 vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a>,
 }));
@@ -18,14 +24,27 @@ vi.mock("@/lib/wiki-names", async (importOriginal) => ({
 
 const FIXTURES = fileURLToPath(new URL("../../test/news", import.meta.url));
 const WIKI = fileURLToPath(new URL("../../test/wiki", import.meta.url));
-afterEach(() => { vi.unstubAllEnvs(); });
+
+// Blizzard's side of the timeline: a forum post the fixture post cites, a hotfix, a build and a Classic post.
+const cited: ChangeEntry = {
+  id: "forum:777", type: "post", game: "forever", at: "2026-10-23T18:00:00.000Z", title: "A Blizzard post", url: "https://worldofwarcraft.blizzard.com/en-us/news/example/",
+  author: "Kaivax", role: "Community Manager", category: "WoW: Forever General Discussion", source: "forum", region: "us", excerpt: "Words.",
+};
+const ENTRIES: ChangeEntry[] = [
+  { ...cited, id: "forum:778", type: "hotfix", at: "2026-10-24T18:00:00.000Z", title: "WoW: Forever Hotfixes", url: "https://us.forums.blizzard.com/en/wow/t/hotfixes/9" },
+  cited,
+  { id: "build:b", type: "build", game: "forever", at: "2026-10-22T06:00:00.000Z", title: "WoW: Forever build 1.60.1.70532", url: null, version: "1.60.1.70532", diffUrl: null },
+  { ...cited, id: "forum:779", game: "classic", title: "A Classic notice", url: "https://us.forums.blizzard.com/en/wow/t/classic/10" },
+];
+timeline.entries = ENTRIES;
+afterEach(() => { vi.unstubAllEnvs(); timeline.entries = ENTRIES; });
 
 const fixtures = () => { vi.stubEnv("NEWS_DIR", FIXTURES); vi.stubEnv("WIKI_DIR", WIKI); };
 
 test("the hub lists published posts newest first, with the feed and the changes timeline apart", async () => {
   fixtures();
   const { default: NewsHub, generateMetadata } = await import("./page");
-  const html = renderToStaticMarkup(NewsHub());
+  const html = renderToStaticMarkup(await NewsHub());
   expect(html.indexOf("Test Post")).toBeLessThan(html.indexOf("Older Post"));
   expect(html).toContain('href="/news/test-post"');
   expect(html).toContain('href="/news/older-post"');
@@ -41,10 +60,38 @@ test("the hub lists published posts newest first, with the feed and the changes 
   expect(String(meta.description).length).toBeLessThanOrEqual(160);
 });
 
-test("with no published post the hub says so and stays out of search", async () => {
+test("under the cards, the newest Forever entries from the changes timeline, each linked to its page", async () => {
+  fixtures();
+  const { default: NewsHub } = await import("./page");
+  const html = renderToStaticMarkup(await NewsHub());
+  // The cards come first; Blizzard's entries follow them.
+  expect(html.indexOf("data-news-featured")).toBeLessThan(html.indexOf('id="blizzard"'));
+  const section = html.slice(html.indexOf('id="blizzard"'));
+  expect(section).toContain(">From Blizzard</h2>");
+  expect(section).toContain("Every change →");
+  expect(section).toContain('href="/changes"');
+  expect(section.indexOf("WoW: Forever Hotfixes")).toBeLessThan(section.indexOf("A Blizzard post"));
+  expect(section).toContain('href="/changes/us-778-wow-forever-hotfixes"');
+  expect(section).toContain('href="/changes/us-777-a-blizzard-post"');
+  expect(section).toContain('<time dateTime="2026-10-23T18:00:00.000Z" class="whitespace-nowrap">October 23, 2026</time>');
+  expect(section).toMatch(/>Hotfix · <\/span>/);
+  // A build has no page: its title stays plain. Classic stays on /changes.
+  expect(section).toContain('<span class="text-fg [overflow-wrap:anywhere]">WoW: Forever build 1.60.1.70532</span>');
+  expect(section).not.toContain("A Classic notice");
+  expect(section).not.toContain("Open the changes timeline");
+  // With nothing on the timeline the section still points to the changes page.
+  timeline.entries = [];
+  expect(renderToStaticMarkup(await NewsHub())).toContain("Open the changes timeline");
+});
+
+test("with no published post the hub says so, points to the changes and the feed, and stays out of search", async () => {
   vi.stubEnv("NEWS_DIR", mkdtempSync(join(tmpdir(), "news-")));
   const { default: NewsHub, generateMetadata } = await import("./page");
-  expect(renderToStaticMarkup(NewsHub())).toContain("No posts yet.");
+  const html = renderToStaticMarkup(await NewsHub());
+  const empty = html.slice(html.indexOf("data-empty-state"), html.indexOf('id="blizzard"'));
+  expect(empty).toContain("No posts yet.");
+  expect(empty).toContain('href="/news/feed.xml"');
+  expect(empty).toContain('href="/changes"');
   expect((await generateMetadata()).robots).toEqual({ index: false, follow: true });
 });
 
@@ -72,6 +119,10 @@ test("a post page shows the byline, the body with its links and tokens, the sour
   expect(html).toContain("<span>test draft</span>");
   expect(html).toContain("<blockquote");
   expect(html).toContain('href="https://worldofwarcraft.blizzard.com/en-us/news/example"');
+  // The source is a Blizzard post Everloot keeps a page for: that page is linked too.
+  expect(html).toMatch(/>A Blizzard post<\/a> · <a href="\/changes\/us-777-a-blizzard-post"[^>]*>On Everloot<\/a>/);
+  // The body's text runs at reading measure; the column, its headings and an in-article ad keep their width.
+  expect(html).toContain('<div data-news-body="true" class="mt-8 [&amp;_[data-prose]&gt;:is(p,ul,ol,blockquote)]:max-w-[48ch]">');
   expect(html).toContain('href="/news/older-post"');
   expect(html).toContain('"@type":"NewsArticle"');
   expect(html).not.toContain('"@type":"Article"');
@@ -119,7 +170,7 @@ test("posts with a hero get card thumbnails, a featured card and the share image
   post("old-one", "2026-10-23", []);
   vi.stubEnv("NEWS_DIR", dir); vi.stubEnv("WIKI_DIR", WIKI);
   const { default: NewsHub } = await import("./page");
-  const hub = renderToStaticMarkup(NewsHub());
+  const hub = renderToStaticMarkup(await NewsHub());
   expect(hub.indexOf("data-news-featured")).toBeLessThan(hub.indexOf('href="/news/mid-one"'));
   expect(hub).toMatch(/<img data-news-thumb[^>]*src="\/news\/heroes\/new-one\/card.webp"[^>]*loading="eager"/);
   expect(hub).toMatch(/<img data-news-thumb[^>]*src="\/news\/heroes\/mid-one\/card.webp"[^>]*width="800" height="450"[^>]*loading="lazy"/);
@@ -134,6 +185,26 @@ test("posts with a hero get card thumbnails, a featured card and the share image
   expect(meta.openGraph?.images).toEqual([{ url: "/news/heroes/new-one/share.png", width: 1200, height: 675, alt: "The new art" }]);
   const fallback = await generateMetadata({ params: Promise.resolve({ slug: "mid-one" }) });
   expect(fallback.openGraph?.images).toEqual([{ url: "/news/heroes/mid-one/clean.webp", width: 1600, height: 900, alt: "The mid art" }]);
+});
+
+test("cards name the publishers a post cites, mark an unconfirmed post with the dashed edge, and keep WoW's casing", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "news-cards-"));
+  const post = (slug: string, published: string, extra: string[]) => writeFileSync(join(dir, `${slug}.md`), ["---", `slug: ${slug}`, `title: ${slug}`, "summary: A summary long enough to read as one.", "author: Everloot Team", `published: ${published}`, ...extra, "status: published", "---", "", "Body."].join("\n"));
+  post("lead", "2026-10-26", ["tags: [datamine, unconfirmed]", "sources:", '  - title: "Wowhead: a story"', "    url: https://www.wowhead.com/news/1"]);
+  post("cited", "2026-10-25", ["tags: [wow-forever]", "sources:", '  - title: "Blizzard: an article"', "    url: https://news.blizzard.com/a", '  - title: "Blizzard forums: a thread"', "    url: https://us.forums.blizzard.com/en/wow/t/x/1"]);
+  post("plain", "2026-10-24", ["tags: [site]"]);
+  vi.stubEnv("NEWS_DIR", dir); vi.stubEnv("WIKI_DIR", WIKI);
+  const { default: NewsHub } = await import("./page");
+  const hub = renderToStaticMarkup(await NewsHub());
+  const card = (slug: string) => hub.slice(hub.indexOf(`href="/news/${slug}"`), hub.indexOf("</a>", hub.indexOf(`href="/news/${slug}"`)));
+  // The same names the post's byline badge gives (#449's sourceNames), on the featured card and the grid's.
+  expect(card("lead")).toContain('<p data-news-sources="true" class="text-meta text-muted">Source: Wowhead</p>');
+  expect(card("cited")).toContain('<p data-news-sources="true" class="text-meta text-muted mt-auto pt-1">Source: Blizzard, Blizzard forums</p>');
+  expect(card("plain")).not.toContain("data-news-sources");
+  // Dashed means unconfirmed; the chip says so to a screen reader too.
+  expect(card("lead")).toMatch(/<span data-news-chip="true" title="Unconfirmed" class="[^"]*border-dashed border-edge">Datamine<span class="sr-only">, unconfirmed<\/span><\/span>/);
+  expect(card("cited")).toMatch(/<span data-news-chip="true" class="[^"]*border-line">WoW forever<\/span>/);
+  expect(hub).not.toContain(">Wow forever<");
 });
 
 test("news ad units: sidebar on posts, in-article only after the third paragraph of a long post, one before related", async () => {

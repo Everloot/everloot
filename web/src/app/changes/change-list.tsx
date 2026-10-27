@@ -5,11 +5,12 @@ import { TYPE_LABEL, postPath, type ChangeEntry } from "@/lib/changes";
 /**
  * A short list of timeline entries: the title in a blue post's blue, linked to its page on Everloot (a build
  * has none, so its title stays plain), then its long date, kept on one line. `types` puts the type before the
- * date, for a list that mixes posts, hotfixes and builds.
+ * date, for a list that mixes posts, hotfixes and builds; `columns` sets the entries side by side on a wide
+ * screen, under a grid of cards.
  */
-export default function ChangeList({ entries, types = false }: { entries: ChangeEntry[]; types?: boolean }) {
+export default function ChangeList({ entries, types = false, columns = false }: { entries: ChangeEntry[]; types?: boolean; columns?: boolean }) {
   return (
-    <ul className="space-y-3">
+    <ul className={columns ? "grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3" : "space-y-3"}>
       {entries.map((e) => {
         const page = postPath(e);
         return (

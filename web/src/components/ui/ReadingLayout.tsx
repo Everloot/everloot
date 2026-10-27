@@ -44,7 +44,8 @@ export default function ReadingLayout({ items = [], meta, rail, children }: { it
             <ol className="mt-2 grid grid-cols-2 gap-x-4 lg:grid-cols-1 lg:border-l lg:border-line">
               {items.map((item) => (
                 <li key={item.id} className="min-w-0">
-                  <a href={`#${item.id}`} className="inline-flex min-h-9 items-center text-fg-2 hover:text-accent lg:-ml-px lg:border-l lg:border-transparent lg:pl-3 lg:hover:border-accent">
+                  {/* The padding keeps two wrapped entries from reading as one. */}
+                  <a href={`#${item.id}`} className="inline-flex min-h-9 items-center py-1 text-fg-2 hover:text-accent lg:-ml-px lg:border-l lg:border-transparent lg:pl-3 lg:hover:border-accent">
                     {item.label}
                   </a>
                 </li>
