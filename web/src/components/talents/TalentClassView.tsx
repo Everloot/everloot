@@ -10,13 +10,15 @@ import { loadCatalog, type TalentClassSlug } from "@/lib/talents/catalogs";
 import { HOW_IT_WORKS_ID, classAnswers, classFacts, classLede } from "@/lib/talents/facts";
 import ClassPicker from "./ClassPicker";
 import { classChoices } from "./class-choices";
+import FreshnessNote from "./FreshnessNote";
 import TalentCalculator from "./TalentCalculator";
 import { CLASS_TEXT } from "./TalentTreeView";
 
 // One class's calculator page body: the header, the class strip, the calculator, then the questions,
 // closed. The class page renders it as is; a build link (/b/<code>) renders it with the build to open.
 // A saved build's short link (/b/<slug>) passes `saved`: its name and notes head the page, the calculator only
-// shows the build, and the questions are left to the class page.
+// shows the build, and the questions are left to the class page. Under a link's calculator, a note says what
+// the game files changed since a set's game build.
 
 export const pageTitle = (className: string) => `WoW Forever ${className} Talent Calculator`;
 
@@ -40,6 +42,7 @@ export default async function TalentClassView({ slug, initialCodes, saved }: {
         <PageHeader title={<span className={CLASS_TEXT[slug]}>{saved.name}</span>} meta={saved.meta} actions={saved.actions} />
         {saved.notes && <p className="-mt-2 mb-4 max-w-[75ch] whitespace-pre-line text-cell text-fg-2 [overflow-wrap:anywhere]">{saved.notes}</p>}
         <TalentCalculator catalog={catalog} treeIcons={treeIcons} classIcon={classIcon} initialCodes={initialCodes} readOnly />
+        <FreshnessNote catalog={catalog} codes={initialCodes} className="mt-4" />
         <AdSlot slot="belowTool" />
       </Container>
     );
@@ -54,6 +57,7 @@ export default async function TalentClassView({ slug, initialCodes, saved }: {
       <div className="space-y-3 sm:space-y-4">
         <ClassPicker variant="strip" classes={classes} current={slug} />
         <TalentCalculator catalog={catalog} treeIcons={treeIcons} classIcon={classIcon} initialCodes={initialCodes} savedBuilds={savedBuildsOn()} />
+        <FreshnessNote catalog={catalog} codes={initialCodes} />
       </div>
       <AdSlot slot="belowTool" />
 
