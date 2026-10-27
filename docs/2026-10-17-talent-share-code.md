@@ -84,11 +84,17 @@ A reader checks the token against the code it came with:
 | a node more often than its rank, or an index past the code's nodes | `extra-points` |
 | a node less often than its rank | `missing-points` |
 
-Spaces, tabs and line breaks before or after the token are ignored. A token with more than one of
-these problems gets one error, the first that applies in this order: a version above 1 is
-`newer-version` whatever follows it; then a damaged shape is `malformed`, even with an unsupported
-mode or over the limit; then `unsupported-mode`, even over the limit; then `over-limit`; then
-`extra-points` before `missing-points`.
+Whitespace before or after the token is ignored, and whitespace inside it makes the token
+`malformed`. Whitespace means exactly the code points that ECMAScript's `String.prototype.trim`
+removes (ECMA-262's WhiteSpace and LineTerminator, with the space separators of Unicode 18.0):
+U+0009 to U+000D, U+0020, U+00A0, U+1680, U+2000 to U+200A, U+2028, U+2029, U+202F, U+205F, U+3000
+and U+FEFF. A reader in another language trims this set rather than its own default, matching the
+UTF-8 forms if it reads bytes.
+
+A token with more than one of the problems in the table gets one error, the first that applies in
+this order: a version above 1 is `newer-version` whatever follows it; then a damaged shape is
+`malformed`, even with an unsupported mode or over the limit; then `unsupported-mode`, even over the
+limit; then `over-limit`; then `extra-points` before `missing-points`.
 
 Whatever the error, the talents load exactly as they would without the order, and the order is
 unknown. The web importer (`importCode`) also calls the order unknown when not every point of the

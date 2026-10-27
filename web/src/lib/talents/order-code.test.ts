@@ -94,11 +94,20 @@ describe("spend order token", () => {
     expect(encodeOrder({ 11: { rank: 0 } }, [], "provisional")).toBeNull();
   });
 
-  test("spaces, tabs and line breaks around a token are ignored, and inside it they damage it", () => {
+  test("whitespace around a token is ignored, each code point String.prototype.trim removes, and inside it damages the token", () => {
+    // ECMA-262 WhiteSpace and LineTerminator, the white space of TrimString, with Unicode's Space_Separator.
+    const trimmed = [
+      0x0009, 0x000a, 0x000b, 0x000c, 0x000d, 0x0020, 0x00a0, 0x1680, 0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006,
+      0x2007, 0x2008, 0x2009, 0x200a, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000, 0xfeff,
+    ];
+    for (const cp of trimmed) {
+      const s = String.fromCodePoint(cp);
+      expect(decodeOrder(`${s}O1p-${sequence}${s}`, ranks), `U+${cp.toString(16)}`).toEqual({ ok: true, origin: "planned", order });
+    }
     expect(decodeOrder(` O1g-${sequence} `, ranks)).toEqual({ ok: true, origin: "provisional", order });
-    expect(decodeOrder(`O1p-${sequence}\n`, ranks)).toEqual({ ok: true, origin: "planned", order });
     expect(decodeOrder(`\tO1p-${sequence}\r\n`, ranks)).toEqual({ ok: true, origin: "planned", order });
     expect(decodeOrder(" O1p-ABABA BABABCCD ", ranks)).toEqual({ ok: false, error: "malformed" });
+    expect(decodeOrder("O1p-ABABA BABABCCD", ranks)).toEqual({ ok: false, error: "malformed" });
   });
 
   test("a token with more than one problem gets the first error in the documented order", () => {

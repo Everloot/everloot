@@ -258,6 +258,13 @@ describe("taking a point back", () => {
     ]);
   });
 
+  test("a point that waits one place can keep its level, and is disclosed with the point that went ahead of it", () => {
+    const set = planned(...times(11, 5), 21, 12);
+    const after = removePoint(fixture, set, 11);
+    expect(after.order).toEqual([...times(11, 4), 12, 21]);
+    expect(movedLater(fixture, set, after)).toEqual([{ id: 21, rank: 1, from: 15, to: 15 }, { id: 12, rank: 1, from: 16, to: 14 }]);
+  });
+
   test("a point that keeps its place number but now sits between other points is disclosed too", () => {
     // Talent 3 needs 1 or 4 at full rank, and 4 opens once two other points are spent. With 1 gone,
     // 3 waits for 4 and 4 waits for 5; 4 stays the third point but now comes after 5 and before 3.

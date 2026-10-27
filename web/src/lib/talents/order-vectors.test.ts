@@ -15,7 +15,8 @@ interface Vectors {
   links: { read: ({ name: string; link: string } & Sets)[]; write: ({ name: string; fragment: string } & Sets)[] };
 }
 
-const vectors = JSON.parse(readFileSync(new URL("../../../../docs/fixtures/talent-order-v1.json", import.meta.url), "utf8")) as Vectors;
+const file = readFileSync(new URL("../../../../docs/fixtures/talent-order-v1.json", import.meta.url), "utf8");
+const vectors = JSON.parse(file) as Vectors;
 
 const toRanks = (list: RankList): Ranks =>
   Object.fromEntries(list.map(([id, rank, choice]) => [id, choice === undefined ? { rank } : { rank, choice }]));
@@ -36,6 +37,10 @@ describe("shared spend order vectors", () => {
 
   test.each(vectors.links.write)("write a link: $name", (v) => {
     expect(planHash(v.first, v.second, v.firstOrder, v.secondOrder)).toBe(v.fragment);
+  });
+
+  test("the file is plain ASCII, every other character an escape, so any JSON reader gets the same code points", () => {
+    expect(file).toMatch(/^[\r\n\x20-\x7e]*$/);
   });
 
   test("they cover both makers and every way a token is refused", () => {
