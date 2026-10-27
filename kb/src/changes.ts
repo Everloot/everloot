@@ -24,10 +24,13 @@ export interface BuildLike {
   diffUrl?: string | null;
 }
 
+/** Blue posts and builds are Forever or Classic; a hand-written entry (kb/curated/manual-changes.json) may be retail. */
+export type ChangeGame = BlueGame | "retail";
+
 export interface ChangeEntry {
   id: string;
   type: ChangeType;
-  game: BlueGame;
+  game: ChangeGame;
   /** Posts: when Blizzard posted. Builds: when Everloot first saw the build, not when Blizzard shipped it. */
   at: string;
   title: string;
@@ -99,7 +102,40 @@ const PRODUCT_GAME: Record<string, BlueGame> = {
   wow_classic: "classic",
 };
 
-export const GAME_LABEL: Record<BlueGame, string> = { forever: "WoW: Forever", classic: "WoW Classic" };
+export const GAME_LABEL: Record<ChangeGame, string> = { forever: "WoW: Forever", classic: "WoW Classic", retail: "WoW (retail)" };
+
+/**
+ * Hand-written entries from kb/curated/manual-changes.json: a change Everloot reports itself, never dressed up
+ * as a Blizzard forum record. Source "manual", an id under `manual:`, a post or hotfix, and the same limits
+ * as stored posts. Unknown fields, invalid types or sources and every copy of a duplicate id are withheld.
+ */
+export function manualEntries(file: unknown): ChangeEntry[] {
+  if (!isRecord(file) || Object.keys(file).some((key) => key !== "entries") || !Array.isArray(file.entries)) return [];
+  const list = file.entries;
+  const out: ChangeEntry[] = [];
+  const keys = new Set(["id", "type", "game", "at", "title", "summary", "category", "url"]);
+  const counts = new Map<unknown, number>();
+  for (const raw of list) if (isRecord(raw)) counts.set(raw.id, (counts.get(raw.id) ?? 0) + 1);
+  for (const raw of list) {
+    if (!isRecord(raw) || Object.keys(raw).some((key) => !keys.has(key)) || counts.get(raw.id) !== 1) continue;
+    if (raw.type !== "post" && raw.type !== "hotfix") continue;
+    if (["id", "game", "at", "title", "url"].some((key) => typeof raw[key] !== "string")) continue;
+    if (["summary", "category"].some((key) => key in raw && typeof raw[key] !== "string")) continue;
+    const slug = typeof raw.id === "string" && /^[a-z0-9-]{1,100}$/.test(raw.id) ? raw.id : null;
+    const title = clampText(raw.title, 200);
+    const at = isoTime(raw.at);
+    const game = raw.game === "forever" || raw.game === "classic" || raw.game === "retail" ? raw.game : null;
+    const url = safeHttpUrl(raw.url);
+    if (!slug || !title || !at || !game || !url) continue;
+    if (new URL(url).username || new URL(url).password) continue;
+    const summary = clampText(raw.summary, 280);
+    out.push({
+      id: `manual:${slug}`, type: raw.type, game, at, title, url,
+      source: "manual", category: clampText(raw.category, 100), ...(summary ? { summary } : {}),
+    });
+  }
+  return out;
+}
 
 /** Entries with a bad date, no title or an unknown game are skipped rather than failing the whole list. */
 export function buildTimeline(posts: unknown[], builds: unknown[]): ChangeEntry[] {
@@ -188,7 +224,7 @@ const FILTER_TYPES: Record<Exclude<ChangeFilter, "all">, ChangeType[]> = {
   builds: ["build"],
 };
 
-export function filterTimeline(entries: ChangeEntry[], filter: ChangeFilter, game?: BlueGame): ChangeEntry[] {
+export function filterTimeline(entries: ChangeEntry[], filter: ChangeFilter, game?: ChangeGame): ChangeEntry[] {
   return entries.filter((e) => (filter === "all" || FILTER_TYPES[filter].includes(e.type)) && (!game || e.game === game));
 }
 
@@ -204,7 +240,7 @@ export interface BlueThread {
   topicId: number;
   topicSlug: string | null;
   title: string;
-  game: BlueGame;
+  game: ChangeGame;
   category: string;
   /** The thread's first post when its slug is known, else the earliest blue post's link. */
   url: string | null;
@@ -256,6 +292,7 @@ export function entryDescription(e: ChangeEntry): string {
   }
   const by = [e.author, e.role].filter(Boolean).join(", ");
   const lead = e.summary ? `${e.summary} ` : "";
+  if (e.source === "manual") return `${lead}Written by Everloot${e.category ? `, from ${e.category}` : ""}.`.trim();
   return `${lead}${e.excerpt ? `"${e.excerpt}" ` : ""}From ${by || "Blizzard"} on ${e.category || e.source}. Read the original post for the full text.`.trim();
 }
 

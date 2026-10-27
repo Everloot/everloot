@@ -17,6 +17,7 @@ vi.mock("next/link", () => ({
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
 
 import ChangesPage from "./page";
+import ChangeList from "./change-list";
 import { GET } from "./feed.xml/route";
 
 const entries: ChangeEntry[] = [
@@ -34,6 +35,42 @@ timeline.entries = entries;
 const page = async (params: Record<string, string> = {}) =>
   renderToStaticMarkup(await ChangesPage({ searchParams: Promise.resolve(params) }));
 const rows = (html: string) => (html.match(/data-change-row/g) ?? []).length;
+
+const manualRow: ChangeEntry = { id: "manual:fixture", source: "manual", type: "post", game: "retail", at: "2026-10-23T00:00:00.000Z", title: "Retail source fixture", summary: "Everloot summary fixture.", url: "https://us.forums.blizzard.com/en/wow/t/example/123/4" };
+test("compact ChangeList manual rows show Everloot summary and clickable original with a plain Post label", () => {
+  const html = renderToStaticMarkup(<ChangeList entries={[manualRow]} types />);
+  expect(html).toContain("Summary by Everloot");
+  expect(html).toContain(manualRow.summary);
+  expect(html).toContain(`href="${manualRow.url}"`);
+  expect(html).toContain("Original source");
+  expect(html).not.toContain("Blue post");
+  expect(html).not.toContain("/changes/manual");
+  expect(html).toContain('dateTime="2026-10-23"');
+});
+test("manual retail rows expose original source and authorship on mobile and desktop with day precision", async () => {
+  timeline.entries = [...entries, manualRow];
+  const html = await page({ game: "retail" });
+  const phone = /<div data-phone-title[^>]*>(.*?)<\/div>/.exec(html)![1];
+  for (const content of [phone, html]) {
+    expect(content).toContain(`href="${manualRow.url}"`);
+    expect(content).toContain("Summary by Everloot");
+    expect(content).toContain("Original source");
+    expect(content).toContain("Everloot summary fixture.");
+  }
+  expect(html).toContain("Everloot summary fixture.");
+  expect(html).toContain('dateTime="2026-10-23"');
+  expect(html).toContain('"datePublished":"2026-10-23"');
+  expect(html).not.toContain("2026-10-23T00:00");
+  expect(html).not.toContain(">Blue post</span>");
+  expect(html).not.toContain("/changes/manual");
+});
+test("retail/all include manual rows while default and Forever RSS stay isolated", async () => {
+  timeline.entries = [...entries, manualRow];
+  expect(await page()).not.toContain(manualRow.title);
+  expect(await page({ game: "all" })).toContain(manualRow.title);
+  expect(await page({ game: "retail" })).toContain(manualRow.title);
+  expect(await (await GET()).text()).not.toContain(manualRow.title);
+});
 
 afterEach(() => {
   timeline.entries = entries;
