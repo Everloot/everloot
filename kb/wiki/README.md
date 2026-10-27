@@ -47,7 +47,7 @@ editor cannot drop or reorder them.
 
 | Type | Binds | Sections, in order |
 |---|---|---|
-| `dungeon`, `raid` | `entrance` (slug of the entrance name), optional `zone`, `lfgDungeon` | Overview, Getting there, History, In WoW: Forever |
+| `dungeon`, `raid` | `entrance` (slug of the entrance name), optional `zone`, `lfgDungeon` | Overview, Getting there, History, In WoW: Forever, then optionally Before you go |
 | `zone` | `zone` (UiMap id) | Overview, History, In WoW: Forever |
 | `npc` | `npc` | Who they are, Where to find them, In WoW: Forever |
 | `faction` | `faction` | Overview, History, How players gain standing, then optionally In WoW: Forever |
@@ -66,6 +66,9 @@ editor cannot drop or reorder them.
 - **Announced but not in the files yet.** A `dungeon` or `raid` page may leave out `entrance`, and a `race` page
   `race`, only when its `sources` list a Blizzard post (worldofwarcraft.blizzard.com or the US or EU forums).
   The binding is added once the game files have it.
+- **Before you go is advice.** A `dungeon` or `raid` page may end with what a group should know before going in,
+  in our own words. An adapted page has none, and a published page leaves the heading out until there is advice
+  under it. The page shows the level, the entrance and the bosses itself; the advice never types them.
 - **Original pages only for now.** An original page is written in our own words from the game files,
   Blizzard's posts and Everloot's data. An adapted page reuses Warcraft Wiki text; it needs `adaptedFrom` for
   its credit line and cannot be published until the overlap check against the wiki dump exists.

@@ -67,8 +67,8 @@ function file(over: Record<string, unknown> = {}, body = DUNGEON_BODY): WikiFile
   return { path: `wiki/${String(fm.slug)}.md`, source: `---\n${stringify(fm)}---\n${body}` };
 }
 
-const westfall = (over: Record<string, unknown> = {}) =>
-  file({ id: 2, slug: "westfall", title: "Westfall", type: "zone", binds: { zone: 1436 }, summary: "A zone in the Eastern Kingdoms.", categories: ["zones"], ...over }, ZONE_BODY);
+const westfall = (over: Record<string, unknown> = {}, body = ZONE_BODY) =>
+  file({ id: 2, slug: "westfall", title: "Westfall", type: "zone", binds: { zone: 1436 }, summary: "A zone in the Eastern Kingdoms.", categories: ["zones"], ...over }, body);
 
 /** The problems of a dungeon page checked beside a good Westfall page. */
 function problemsOf(over: Record<string, unknown> = {}, body = DUNGEON_BODY): string[] {
@@ -216,7 +216,7 @@ describe("hand-typed gameplay numbers", () => {
 describe("sections", () => {
   test("headings must follow the type's order", () => {
     const swapped = DUNGEON_BODY.replace("## Getting there", "## TEMP").replace("## History", "## Getting there").replace("## TEMP", "## History");
-    expect(problemsOf({}, swapped)).toEqual([expect.stringMatching(/^sections must be, in order: Overview, Getting there, History, In WoW: Forever; found: Overview, History, Getting there/)]);
+    expect(problemsOf({}, swapped)).toEqual([expect.stringMatching(/^sections must be, in order: Overview, Getting there, History, In WoW: Forever \(then optionally Before you go\); found: Overview, History, Getting there/)]);
     expect(problemsOf({}, `${DUNGEON_BODY}\n## Trivia\n\nMore.\n`)).toEqual([expect.stringMatching(/^sections must be/)]);
   });
 
@@ -237,6 +237,43 @@ describe("sections", () => {
   test("text before the first section and a # heading fail", () => {
     expect(problemsOf({}, `Intro text.\n${DUNGEON_BODY}`)).toEqual([expect.stringMatching(/^text before the first ## section/)]);
     expect(problemsOf({}, `# Deadmines\n${DUNGEON_BODY}`)).toEqual([expect.stringMatching(/^no # heading in the body/)]);
+  });
+});
+
+describe("Before you go", () => {
+  const advised = (text: string) => `${DUNGEON_BODY}\n## Before you go\n\n${text}\n`;
+  const ADVICE = "Go with a full group and someone who can heal. The tunnels are narrow, so pull one pack at a time.";
+
+  test("a dungeon or raid page may end with advice for a group about to go in", () => {
+    expect(problemsOf({}, advised(ADVICE))).toEqual([]);
+    expect(problemsOf({ type: "raid", binds: { entrance: "molten-core" } }, advised(ADVICE))).toEqual([]);
+  });
+
+  test("it comes after the Forever section, and no other type has it", () => {
+    const early = DUNGEON_BODY.replace("## History", `## Before you go\n\n${ADVICE}\n\n## History`);
+    expect(problemsOf({}, early)).toEqual([
+      "sections must be, in order: Overview, Getting there, History, In WoW: Forever (then optionally Before you go); found: Overview, Getting there, Before you go, History, In WoW: Forever",
+    ]);
+    const zone = checkWiki([file(), westfall({}, `${ZONE_BODY}\n## Before you go\n\n${ADVICE}\n`)], ctx).problems.map((p) => p.message);
+    expect(zone).toEqual(["sections must be, in order: Overview, History, In WoW: Forever; found: Overview, History, In WoW: Forever, Before you go"]);
+  });
+
+  test("it is original advice: an adapted page has none", () => {
+    const adapted = { origin: "adapted", status: "draft", reviewed: null, adaptedFrom: [{ title: "Deadmines", url: "https://warcraft.wiki.gg/wiki/Deadmines", extId: "12345", revision: 678 }] };
+    expect(problemsOf(adapted, advised(ADVICE))).toEqual(['a "Before you go" section is original advice; an adapted page has none']);
+  });
+
+  test("a published page has no empty one; a draft may keep the bare heading", () => {
+    const empty = `${DUNGEON_BODY}\n## Before you go\n`;
+    expect(problemsOf({}, empty)).toEqual(["a published page's \"Before you go\" section needs advice in it; leave the heading out until there is some"]);
+    expect(problemsOf({ status: "draft", reviewed: null }, empty)).toEqual([]);
+  });
+
+  test("the advice follows the page's number and link rules", () => {
+    expect(problemsOf({}, advised("Go in at level 18 or higher."))).toEqual(['hand-typed gameplay number ("level 18") outside a quote; numbers come from the infobox and data blocks']);
+    // One from Getting there, one from the advice: a link to a draft is refused wherever it is written.
+    const toDraft = checkWiki([file({}, advised("Read [[westfall]] before you set out.")), westfall({ status: "draft", reviewed: null })], ctx).problems.map((p) => p.message);
+    expect(toDraft).toEqual(Array(2).fill("[[westfall]] links to a draft; a published page links only to published pages"));
   });
 });
 

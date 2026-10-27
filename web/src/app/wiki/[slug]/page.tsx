@@ -7,10 +7,13 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { CC_BY_SA, wikiArticleJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
 import { isBound, linkedFrom, loadWiki, publishedPage, publishedPages, sectionsInOrder, TYPE_LABEL, wikiHref, wikiIndexable, wikiTitle, type PageType, type WikiPage } from "@/lib/wiki";
+import { isDungeonType, loadDungeonFacts } from "@/lib/wiki-dungeon";
 import { resolveTokens } from "@/lib/wiki-names";
 import { WORLD_MAP } from "@/lib/world-map";
 import { zoneByMapId, zoneHref } from "@/lib/zones";
 import { slugify } from "../../../../../kb/src/lore-slug";
+import { PREP_SECTION } from "../../../../../kb/src/wiki/page";
+import { ADVICE_NOTE, DungeonBosses, DungeonGlance } from "../dungeon-facts";
 import { WikiBlock, type TextContext } from "../wiki-text";
 
 // Pages change only with a deploy, but their data blocks will draw on player uploads, so each page is
@@ -22,8 +25,9 @@ export function generateStaticParams() {
 
 /** The data blocks each type will show; placeholders until the database fills them in. */
 const DATA_BLOCKS: Record<PageType, string[]> = {
-  dungeon: ["Bosses", "Loot by boss", "Quests that send you here"],
-  raid: ["Bosses", "Loot by boss", "Quests that send you here"],
+  // A dungeon or raid page shows what is known of its instance instead (dungeon-facts.tsx), never a placeholder.
+  dungeon: [],
+  raid: [],
   zone: ["NPCs", "Quests", "Vendors"],
   npc: ["Quests given and ended", "Drops"],
   faction: ["Reputation rewards"],
@@ -74,8 +78,11 @@ export default async function WikiArticle(props: { params: Promise<{ slug: strin
   const inbound = linkedFrom(wiki, page.slug);
   const categories = page.categories.map((c) => wiki.categories.get(c) ?? c);
   // A page that binds nothing yet (written from a Blizzard post before the game files have it) has no
-  // infobox or data blocks to fill, so it shows neither.
+  // infobox or data blocks to fill, so it shows neither. A dungeon or raid page shows its instance's facts
+  // in their place, and nothing where none are known.
   const bound = isBound(page);
+  const dungeon = isDungeonType(page.type);
+  const facts = dungeon ? await loadDungeonFacts(page) : null;
   const blocks = bound ? DATA_BLOCKS[page.type] : [];
   const path = wikiHref(page.slug);
   const trail = [...trailFor("/wiki")!, { name: page.title, path }];
@@ -91,7 +98,8 @@ export default async function WikiArticle(props: { params: Promise<{ slug: strin
           meta={<span>{TYPE_LABEL[page.type].word.replace(/^./, (c) => c.toUpperCase())}</span>}
         />
 
-        {bound && (
+        {facts && <DungeonGlance facts={facts} />}
+        {bound && !dungeon && (
           <Card as="section" aria-labelledby="at-a-glance" className="mb-8">
             <div data-wiki-placeholder="infobox">
               <h2 id="at-a-glance" className="text-sm font-semibold text-fg">At a glance</h2>
@@ -103,11 +111,13 @@ export default async function WikiArticle(props: { params: Promise<{ slug: strin
         <Prose>
           {sections.map((s) => (
             <section key={s.heading} aria-labelledby={anchor(s.heading)}>
-              <SectionHeading id={anchor(s.heading)}>{s.heading}</SectionHeading>
+              <SectionHeading id={anchor(s.heading)} note={dungeon && s.heading === PREP_SECTION ? ADVICE_NOTE : undefined}>{s.heading}</SectionHeading>
               {s.blocks.map((b, i) => <WikiBlock key={i} block={b} ctx={ctx} />)}
             </section>
           ))}
         </Prose>
+
+        {facts && <DungeonBosses facts={facts} />}
 
         {blocks.length > 0 && (
           <section aria-labelledby="database-blocks" data-wiki-placeholder="blocks" className="mt-12">

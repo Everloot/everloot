@@ -3,7 +3,7 @@
  * caller passes the files, the category list and what the game files know, so tests can use small fixtures.
  * The overlap check against the Warcraft Wiki dump is not here; it needs the dump, which CI does not have.
  */
-import { BINDS, BLIZZARD_SOURCED, FrontMatter, inlineText, parsePage, SECTIONS, type Block, type Inline, type ParsedPage } from "./page.js";
+import { BINDS, BLIZZARD_SOURCED, FrontMatter, inlineText, parsePage, PREP_SECTION, SECTIONS, type Block, type Inline, type ParsedPage } from "./page.js";
 
 /** Ids the committed game data knows. Kinds with no committed list (NPCs, quests, factions) are checked for shape and range only. */
 export interface KnownData {
@@ -208,6 +208,13 @@ function checkPage(p: CheckedPage, ctx: CheckContext, bySlug: ReadonlyMap<string
     const allowed = [...rule.required, ...rule.optional];
     const fits = headings.length >= rule.required.length && headings.length <= allowed.length && headings.every((h, i) => h === allowed[i]);
     if (!fits) report(`sections must be, in order: ${rule.required.join(", ")}${rule.optional.length ? ` (then optionally ${rule.optional.join(", ")})` : ""}; found: ${headings.join(", ") || "none"}`);
+  }
+
+  // Advice for a group about to go in: Everloot's own words only, and never a bare heading on a built page.
+  const prep = rule.optional.includes(PREP_SECTION) ? sections.find((s) => s.heading === PREP_SECTION) : undefined;
+  if (prep && fm.origin === "adapted") report(`a "${PREP_SECTION}" section is original advice; an adapted page has none`, prep.line);
+  if (prep && published && !prep.blocks.some((x) => x.type !== "heading")) {
+    report(`a published page's "${PREP_SECTION}" section needs advice in it; leave the heading out until there is some`, prep.line);
   }
 
   // Origin and credit.

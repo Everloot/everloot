@@ -32,6 +32,11 @@ The entrance lies in {zone:1436}, under the hills south of the main road. See [[
 itself, and [[test-draft]] is a draft, so it never becomes a link. Players reach it by road from the town
 in the middle of the zone, and the way down is easy to miss the first time.
 
+## Before you go
+
+Go with a full group and someone who can heal. The tunnels are narrow, so pull one pack at a time, and
+read [[test-draft]] before you set out.
+
 ## History
 
 The mines were dug long before the brotherhood took them over. When the workers who built the city were

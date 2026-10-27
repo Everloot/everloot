@@ -12,6 +12,9 @@ export type PageType = (typeof PAGE_TYPES)[number];
 /** The heading that holds what is specific to WoW: Forever. An indexable page needs one with text under it. */
 export const FOREVER_SECTION = "In WoW: Forever";
 
+/** The heading of a dungeon or raid page's advice for a group about to go in: Everloot's own words, never game data. */
+export const PREP_SECTION = "Before you go";
+
 /**
  * The written sections of each type, in order, as `##` headings. Infoboxes and data blocks are placed by type,
  * not written, so they are not here. `optional` sections may follow the required ones, in that order.
@@ -23,8 +26,8 @@ export interface SectionRule { required: readonly string[]; optional: readonly s
 const STANDARD = (required: string[], optional: string[] = []): SectionRule => ({ required, optional, forever: FOREVER_SECTION });
 
 export const SECTIONS: Record<PageType, SectionRule> = {
-  dungeon: STANDARD(["Overview", "Getting there", "History", FOREVER_SECTION]),
-  raid: STANDARD(["Overview", "Getting there", "History", FOREVER_SECTION]),
+  dungeon: STANDARD(["Overview", "Getting there", "History", FOREVER_SECTION], [PREP_SECTION]),
+  raid: STANDARD(["Overview", "Getting there", "History", FOREVER_SECTION], [PREP_SECTION]),
   zone: STANDARD(["Overview", "History", FOREVER_SECTION]),
   npc: STANDARD(["Who they are", "Where to find them", FOREVER_SECTION]),
   faction: STANDARD(["Overview", "History", "How players gain standing"], [FOREVER_SECTION]),
