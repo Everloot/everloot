@@ -15,20 +15,36 @@ import { authQuery, getUser, siteUrl, type AccountUser, type StorageError } from
 // This code can run before that migration is applied, or after its rollback, which drops save_build_plan and keeps the
 // columns. Without the order columns, builds are read without orders. Without save_build_plan, a save that names no
 // order goes through save_build, and one that names an order, an unknown one too, is refused before anything is
-// written. Only PostgREST's word counts as missing: 42703 naming an order column, PGRST202 or 42883 naming
-// save_build_plan. Either answer means nothing ran. A timeout or any other failure is never retried another way.
+// written. Only PostgREST's exact answer counts as missing (ABSENT below), and it means nothing ran. Anything else, a
+// similar name, a 5xx or a timeout included, is a failure: never retried another way, and never remembered.
 
 /** How long this process goes on without a part of the migration it found missing before it asks again. */
 export const ORDERS_RECHECK_MS = 60_000;
 const missingUntil = { columns: 0, plan: 0 };
 const missing = (part: keyof typeof missingUntil) => Date.now() < missingUntil[part];
 
+/**
+ * PostgREST's answers that a part of the migration is not there, word for word as PostgREST 12.2, 13.0, and Supabase's
+ * 14.4, 14.8 and 16.4 give them: the HTTP status, the error code, and the whole message, naming exactly that column, or
+ * that function with the parameters the site calls it with, in either order.
+ */
+const ABSENT: Record<keyof typeof missingUntil, { status: number; code: string; message: RegExp }[]> = {
+  columns: [{ status: 400, code: "42703", message: /^column saved_builds\.point_order2? does not exist$/ }],
+  plan: [
+    // Not in PostgREST's schema cache.
+    { status: 404, code: "PGRST202",
+      message: /^Could not find the function public\.save_build_plan\((p_payload, p_user_id|p_user_id, p_payload)\) in the schema cache$/ },
+    // In a stale schema cache, but not in PostgreSQL.
+    { status: 404, code: "42883",
+      message: /^function public\.save_build_plan\((p_user_id => uuid, p_payload => jsonb|p_payload => jsonb, p_user_id => uuid)\) does not exist$/ },
+  ],
+};
+
 /** Whether `err` is PostgREST saying that part of the migration is not there. If so, this process goes on without it
- *  for ORDERS_RECHECK_MS. The answer is read from the code and message a StorageError carries. */
+ *  for ORDERS_RECHECK_MS. The answer is read from the status, code and message a StorageError carries. */
 function foundMissing(err: unknown, part: keyof typeof missingUntil): boolean {
-  const { code, reason = "" } = (err ?? {}) as Partial<StorageError>;
-  const said = part === "columns" ? code === "42703" && reason.includes("point_order")
-    : (code === "PGRST202" || code === "42883") && reason.includes("save_build_plan");
+  const { status, code, reason } = (err ?? {}) as Partial<StorageError>;
+  const said = ABSENT[part].some((a) => status === a.status && code === a.code && typeof reason === "string" && a.message.test(reason));
   if (said) missingUntil[part] = Date.now() + ORDERS_RECHECK_MS;
   return said;
 }

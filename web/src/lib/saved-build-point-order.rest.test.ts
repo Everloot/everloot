@@ -229,6 +229,42 @@ describe.skipIf(!databaseUrl || !restUrl || !secret)("saved builds through Postg
     expect(shared).toMatchObject({ code: MAGE, order: ORDER, order2: null });
   });
 
+  test("a function save_build_plan needs, missing, is a failure with nothing written, not the function missing", async () => {
+    // A fault made on purpose: save_build_plan calls a helper the database does not have. PostgREST names that helper.
+    await pool.query(`create or replace function public.save_build_plan(p_user_id uuid, p_payload jsonb) returns jsonb
+      language plpgsql security definer set search_path = '' set lock_timeout = '3s'
+      as $$ begin return public.save_build_plan_validate(p_user_id, p_payload); end; $$`);
+    const probe = await rest("rpc/save_build_plan", { p_user_id: owner, p_payload: { name: "probe" } });
+    console.log("a helper missing:", JSON.stringify(probe));
+    expect(probe).toMatchObject({ status: 404, body: { code: "42883", message: "function public.save_build_plan_validate(uuid, jsonb) does not exist" } });
+    const before = await state(owner, true);
+    expect((await account({ name: "Test fault", code: MAGE, shared: true, showName: false })).status).toBe(503);
+    expect((await chat({ name: "Test fault", code: MAGE })).status).toBe(503);
+    expect((await chat({ id: ordered, name: "Test fault", code: MAGE, code2: MAGE2 })).status).toBe(503);
+    expect(await state(owner, true)).toEqual(before);
+    // The file as it is, again: the very next save with orders goes through save_build_plan, nothing remembered.
+    await pool.query(await migration("20261027120000_saved_build_point_order.sql"));
+    const res = await chat({ id: ordered, name: "Test ordered again", code: MAGE, code2: MAGE2, order: ORDER, order2: ORDER2 });
+    expect(res.status).toBe(200);
+    expect((await state(owner, true)).rows.find((r) => r.id === ordered)).toMatchObject({ name: "Test ordered again", point_order: ORDER, point_order2: ORDER2 });
+  });
+
+  test("a drop PostgREST is not told about, answered from its stale schema cache, is the function missing too", async () => {
+    await pool.query("drop function public.save_build_plan(uuid, jsonb)");
+    const stale = await rest("rpc/save_build_plan", { p_user_id: null, p_payload: {} });
+    console.log("a stale schema cache:", JSON.stringify(stale));
+    expect(stale).toMatchObject({ status: 404, body: { code: "42883", message: "function public.save_build_plan(p_user_id => uuid, p_payload => jsonb) does not exist" } });
+    const before = await state(owner, true);
+    expect((await chat({ id: ordered, name: "Test stale", code: MAGE, code2: MAGE2, order: ORDER })).status).toBe(409);
+    expect(await state(owner, true)).toEqual(before);
+    expect((await chat({ id: ordered, name: "Test stale", code: MAGE, code2: MAGE2 })).status).toBe(200);
+    expect((await state(owner, true)).rows.find((r) => r.id === ordered)).toMatchObject({ name: "Test stale", point_order: ORDER, point_order2: ORDER2 });
+    // Put back, and let this process's minute pass.
+    await pool.query(await migration("20261027120000_saved_build_point_order.sql"));
+    await until(async () => (await rest("rpc/save_build_plan", { p_user_id: null, p_payload: {} })).status === 400, "load save_build_plan");
+    skew += ORDERS_RECHECK_MS;
+  });
+
   test("after the rollback the orders stay, a save that names none goes through save_build, and one that names an order is refused", async () => {
     const doc = (await readFile(new URL("docs/2026-10-27-saved-builds-activation.md", repo), "utf8")).replace(/\r\n/g, "\n");
     const rollback = doc.match(/```sql\n(-- point order rollback\n[\s\S]*?)```/)![1];

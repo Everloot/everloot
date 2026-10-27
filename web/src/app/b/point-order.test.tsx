@@ -134,6 +134,19 @@ test("before the spend-order migration the page opens as it did, and Save a copy
   expect(paths()).toEqual(["rpc/shared_build"]);
 });
 
+test("a read of the orders refused for a similarly named column is a failure, not the migration missing", async () => {
+  auth.authQuery.mockImplementation(async (path: string) => {
+    if (path === "rpc/shared_build") return publicRows;
+    throw Object.assign(new Error("Authentication storage failed (400)"),
+      { status: 400, code: "42703", reason: "column saved_builds.point_order_audit does not exist" });
+  });
+  const html = renderToStaticMarkup(await SharedBuildPage(params()));
+  expect(html).toContain("This build is unavailable right now.");
+  // Nothing was remembered: the next visit reads the orders again.
+  auth.authQuery.mockImplementation(async (path: string) => (path === "rpc/shared_build" ? publicRows : orderRows));
+  expect(renderToStaticMarkup(await SharedBuildPage(params()))).toContain(`&amp;order=${order}&amp;order2=${order2}"`);
+});
+
 test("a signed-in visitor's Save a copy is given both sets' orders to copy", async () => {
   auth.getUser.mockResolvedValue({ id: OWNER, name: "Thrall#1234" });
   const page = await SharedBuildPage(params());

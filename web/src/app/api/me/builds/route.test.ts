@@ -402,6 +402,91 @@ test("a column missing that is not an order column is not taken for the migratio
   expect(auth.authQuery.mock.calls.filter(([p]) => (p as string).startsWith("saved_builds"))).toHaveLength(1);
 });
 
+// Only PostgREST's exact answer says a part is missing: the status, the code and the message naming that very column,
+// or that very function with its parameters. Anything else may mean something ran, so it is a 503, nothing else is
+// tried, and the next request asks again.
+const PLAN_42883 = "function public.save_build_plan(p_user_id => uuid, p_payload => jsonb) does not exist";
+const PLAN_PGRST202 = "Could not find the function public.save_build_plan(p_payload, p_user_id) in the schema cache";
+
+test.each([
+  ["a missing helper named after it", 404, "42883", "function public.save_build_plan_validate(uuid, jsonb) does not exist"],
+  ["a missing helper with its name after a prefix", 404, "42883", "function public.validate_save_build_plan(uuid, jsonb) does not exist"],
+  ["a function whose name starts with more", 404, "42883", "function public.xsave_build_plan(p_user_id => uuid, p_payload => jsonb) does not exist"],
+  ["the name only mentioned", 404, "42883",
+    "function public.audit(uuid) does not exist, called by public.save_build_plan(p_user_id => uuid, p_payload => jsonb)"],
+  ["another schema", 404, "42883", "function other.save_build_plan(p_user_id => uuid, p_payload => jsonb) does not exist"],
+  ["other parameters", 404, "42883", "function public.save_build_plan(p_user_id => uuid) does not exist"],
+  ["other parameter types", 404, "42883", "function public.save_build_plan(p_user_id => text, p_payload => jsonb) does not exist"],
+  ["another function the cache does not have", 404, "PGRST202", "Could not find the function public.save_build_plan_audit(p_payload, p_user_id) in the schema cache"],
+  ["the cache without it for other parameters", 404, "PGRST202", "Could not find the function public.save_build_plan(p_user_id) in the schema cache"],
+  ["a 500 with its very words", 500, "42883", PLAN_42883],
+  ["a 502 with its very words", 502, "PGRST202", PLAN_PGRST202],
+  ["a 503 with its very words", 503, "42883", PLAN_42883],
+  ["a 400 with its very words", 400, "PGRST202", PLAN_PGRST202],
+])("save_build_plan answering with %s is not taken for it missing: a 503, the older save untried, and nothing remembered", async (_kind, status, code, reason) => {
+  auth.authQuery.mockImplementation(async (path: string) => {
+    if (path === "rpc/save_build_plan") throw refused(status, code, reason);
+    if (path === "rpc/save_build") return [saved()];
+    return [row()];
+  });
+  const res = await POST(call("POST", { name: "Fire", code: MAGE, ...NEW }));
+  expect(res.status).toBe(503);
+  expect(writes()).toEqual(["rpc/save_build_plan"]);
+  // The next save, with an order, asks save_build_plan again at once.
+  database([row({ point_order: ORDER })]);
+  auth.authQuery.mockClear();
+  expect((await POST(call("POST", { id: BUILD_ID, name: "Fire", code: MAGE, order: ORDER }))).status).toBe(200);
+  expect(writes()).toEqual(["rpc/save_build_plan"]);
+});
+
+test.each([
+  ["a column named after one", 400, "column saved_builds.point_orderx does not exist"],
+  ["an audit column", 400, "column saved_builds.point_order_audit does not exist"],
+  ["a column with a prefix", 400, "column saved_builds.audit_point_order does not exist"],
+  ["an order column of another table", 400, "column other_table.point_order does not exist"],
+  ["a table whose name starts with more", 400, "column xsaved_builds.point_order does not exist"],
+  ["the column without its table", 400, 'column "point_order" does not exist'],
+  ["a 500 with its very words", 500, "column saved_builds.point_order does not exist"],
+  ["a 404 with its very words", 404, "column saved_builds.point_order does not exist"],
+])("a read answered with %s is not taken for the order columns missing: a 503, and nothing remembered", async (_kind, status, reason) => {
+  auth.authQuery.mockImplementation(async (path: string) => {
+    if (path.includes("point_order")) throw refused(status, "42703", reason);
+    return path.startsWith("build_characters") ? [] : [keyRow()];
+  });
+  expect((await GET(call("GET"))).status).toBe(503);
+  expect(auth.authQuery.mock.calls.filter(([p]) => (p as string).startsWith("saved_builds"))).toHaveLength(1);
+  // The next read asks for the orders again at once.
+  database([row({ point_order: ORDER })]);
+  const list = await GET(call("GET"));
+  expect(list.status).toBe(200);
+  expect((await list.json()).builds[0]).toMatchObject({ order: ORDER });
+});
+
+test.each([
+  ["PostgREST's schema cache", 404, "PGRST202", PLAN_PGRST202],
+  ["its cache, with the parameters the other way round", 404, "PGRST202", "Could not find the function public.save_build_plan(p_user_id, p_payload) in the schema cache"],
+  ["PostgreSQL, through a stale cache", 404, "42883", PLAN_42883],
+  ["PostgreSQL, with the parameters the other way round", 404, "42883", "function public.save_build_plan(p_payload => jsonb, p_user_id => uuid) does not exist"],
+])("save_build_plan missing, in %s's own words, sends a save with no order through save_build", async (_where, status, code, reason) => {
+  auth.authQuery.mockImplementation(async (path: string) => {
+    if (path === "rpc/save_build_plan") throw refused(status, code, reason);
+    if (path === "rpc/save_build") return [saved()];
+    return [row()];
+  });
+  expect((await POST(call("POST", { name: "Fire", code: MAGE, ...NEW }))).status).toBe(201);
+  expect(writes()).toEqual(["rpc/save_build_plan", "rpc/save_build"]);
+});
+
+test("the second order column missing, in PostgreSQL's words, is the order columns missing too", async () => {
+  auth.authQuery.mockImplementation(async (path: string) => {
+    if (path.includes("point_order")) throw refused(400, "42703", "column saved_builds.point_order2 does not exist");
+    return path.startsWith("build_characters") ? [] : [keyRow()];
+  });
+  const res = await GET(call("GET"));
+  expect(res.status).toBe(200);
+  expect((await res.json()).builds[0]).not.toHaveProperty("order");
+});
+
 test("once the migration is in, the process takes save_build_plan again within a minute, orders and all", async () => {
   legacy();
   expect((await POST(call("POST", { name: "Fire", code: MAGE, ...NEW }))).status).toBe(201);

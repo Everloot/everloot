@@ -87,6 +87,22 @@ test("before the spend-order migration, with saved builds off, Chat lists and sa
   expect(legacySent()).toMatchObject({ p_id: BUILD_ID, p_name: "Frost", p_shared: null, p_show_name: null, p_active: null });
 });
 
+test("a function save_build_plan needs, missing, is not save_build_plan missing: unconfirmed, no older save, and the next save asks again", async () => {
+  auth.authQuery.mockImplementation(async (path: string) => {
+    if (path === "rpc/save_build_plan") throw refused(404, "42883", "function public.save_build_plan_validate(uuid, jsonb) does not exist");
+    if (path === "rpc/save_build") return [SAVED];
+    return path.startsWith("build_characters") ? [] : [row()];
+  });
+  const res = await save({ name: "Fire", code: MAGE });
+  expect(res.status).toBe(503);
+  expect(await res.json()).toEqual({ error: "We could not confirm the save. Check your builds before trying again.", code: "save_unconfirmed" });
+  expect(auth.authQuery.mock.calls.find(([p]) => p === "rpc/save_build")).toBeUndefined();
+  database([], row({ shared: false, show_name: false, active: false, point_order: ORDER }));
+  auth.authQuery.mockClear();
+  expect((await save({ name: "Fire", code: MAGE, order: ORDER })).status).toBe(201);
+  expect(saveCall()).toBeDefined();
+});
+
 test("before the migration a Chat save that names an order is refused as not saved, never as unconfirmed", async () => {
   beforeMigration([row()]);
   const res = await save({ name: "Fire", code: MAGE, order: ORDER });

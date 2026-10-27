@@ -353,10 +353,14 @@ the site reads builds without orders, and Chat, which is on in production whatev
 as it did: a save that names no order goes through `save_build`. A save that names an order, an unknown one too, is
 refused before anything is written, with "Saving spend orders isn't available yet, so this build was not saved." The
 calculator's Save always names both sets' orders, so with saved builds on it saves nothing until the migration is
-in: apply it before `EVERLOOT_SAVED_BUILDS` goes on. Only PostgREST's own answer counts as missing: 42703 naming an
-order column, or PGRST202 (42883 when its schema cache is stale) naming `save_build_plan`. A timeout or any other
-failure is never tried again through `save_build`. A server that found the migration missing asks again a minute
-later, so orders are kept from about a minute after the apply.
+in: apply it before `EVERLOOT_SAVED_BUILDS` goes on. Only PostgREST's own answer, word for word, counts as missing:
+a 400 with 42703 and "column saved_builds.point_order does not exist" (or `point_order2`), or a 404 with PGRST202
+naming `public.save_build_plan(p_payload, p_user_id)`, or with 42883 naming
+`public.save_build_plan(p_user_id => uuid, p_payload => jsonb)` when its schema cache is stale. Anything else is a
+failure: another status, a 5xx, a name that merely contains these, or a function `save_build_plan` itself needs. It is
+never tried again through `save_build` and never remembered as the migration missing. A server that did find the
+migration missing asks again a minute later, so orders are kept from about a minute after the apply. If PostgREST ever
+words these answers differently, saving fails safe with a 503 instead of falling back.
 
 ### Test locally
 
@@ -403,8 +407,11 @@ Before the migration PostgREST answers a read of the order columns with 400 and 
 `save_build_plan` with 404 and PGRST202; PostgREST 12.2, 13.0 and Supabase's 14.4, 14.8 and 16.4 answer the same. The
 test checks those answers. Then it checks that Chat lists and saves, that a save with an order is refused with
 nothing written, and that the explicit sharing and the owner checks hold on the older path. After the apply, the
-process goes on without the migration for the rest of its minute, then saves orders through `save_build_plan`. After
-the rollback the orders stay, and a save without one goes through `save_build` again.
+process goes on without the migration for the rest of its minute, then saves orders through `save_build_plan`. A
+fault made on purpose, `save_build_plan` calling a helper the database does not have, gets a 503 with nothing written,
+and once the file is applied again the very next save with orders goes through `save_build_plan`. A drop that PostgREST
+is not told about counts as the function missing, through 42883 from its stale cache. After the rollback the orders
+stay, and a save without one goes through `save_build` again.
 
 ### Preflight (read-only)
 
