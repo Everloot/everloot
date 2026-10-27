@@ -16,6 +16,55 @@ first triage pass moved 216 dead-system and plumbing tables to the never-list (`
 read the live-support group (`3a1c007`), leaving **622 candidates**. Snapshot and scan stay local and
 gitignored; no generator reads the W4 tables yet, so nothing is published.
 
+**Status update 2026-10-27:** W5 executed on the launch product `wowf`, build **1.60.1.70630**
+(`644ffedb`) — Forever went live and the version service now carries retail builds faster than the
+beta bucket. The read set is **346 tables** (344 in this build; 332 before the wave, of 1,159) and
+**599 candidates** remain. Talents (35) and achievements (6) domains are now read in full. The
+committed site data was at 1.60.1.70532 when the wave ran; the scheduled build-watch opens its
+game-data pull request per new build on its own.
+
+**Status update 2026-10-27, W6:** the spell-math remainder plus the item stat scalars (`RandPropPoints`,
+`ArmorLocation`) ran as W6 on the same `wowf 1.60.1.70630` snapshot. 20 tables: 18 spell tables + the two
+item tables, leaving the spell tooltip math complete and items complete within its scalar rule. The read
+set is **366 tables** (364 in this build) and **579 candidates** remain. Dead in
+this build (recorded and left unread): `SpellPowerDifficulty`, `SpellScaling`, `SpellReagentsCurrency`,
+`SpellEffectAutoDescription`, `QuestObjective`, `QuestHub`, `QuestPackageItem`; `CreatureLabel` (1,657
+rows) and `NPCSounds` (196) were considered and dropped. Wave **W7** (the first integration commit) ships
+`kb/src/client-achievements.ts`, the committed `web/src/data/game-data/client-achievements.json`
+(441 achievements, 329 with criteria), the build-watch registration, and the map data's Difficulty join —
+game file text reaching the pages for the first time as pages-only, merged player-first with reports and
+labelled unconfirmed (docs/DATA_POLICY.md). The committed `map.json` stays at 1.60.1.70532: the
+Difficulty fields only appear when the build watch regenerates it on a new build, so no build mixes in.
+
+**Status update 2026-10-27, W8:** the second integration, again not a table wave. `kb/src/client-encounters.ts`
+reads `DungeonEncounter` (read since W1) into the committed `web/src/data/game-data/client-encounters.json`: 341
+named encounters across 41 instance map ids (ids and names in the files' order; two "no longer in use" rows on map
+0 are dropped, `JournalInstance` and `JournalEncounter` are absent from this build so there is no journal text to
+carry). The instance pages merge it player-first with the bosses 3 installs report: a reported boss keeps its
+reported name, a reported boss the installs have not named borrows the files' name marked unconfirmed, and the
+files' remaining encounters follow as unconfirmed rows with no kills, installs or dates. The list page shows the
+files' count, marked, where no boss is reported yet. The files never add an instance row: an instance known only
+from the files (Naxxramas, the Forever-new raids under held-back zones) stays off the list as the map keeps it
+behind the spoiler switch. Pages-only by the data policy; the build watch regenerates the file.
+
+**Status update 2026-10-27, E and W9:** Carlos approved reading E (text-bearing, pages-only) and deferring F to the
+sound feature. E adds 13 tables to the read set: `GossipNPCOption` 1577 rows (1 encrypted block skipped),
+`GossipNPCOptionDisplayInfo` 50, `BroadcastText` 12, `BroadcastTextDuration` 1, `ConversationLine` 634,
+`SceneScript` 147, `SceneScriptText` 147, `SceneScriptGlobalText` 29, `SceneScriptPackage` 9,
+`SceneScriptPackageMember` 69; `GossipXUIDisplayInfo`, `GossipOptionXUIWidgetSet` and `GossipUIDisplayInfoCondition`
+are present with 0 rows. `GossipXGarrTalentTrees` is garrison plumbing and stays on the never side. Nothing from E
+reaches a page yet: the option-to-text binding is server-side, so the client declares option ids and icons, not
+words. The read set is **379 tables** (377 in this build) and **566 candidates** remain. The CDN moved to
+`wowf 1.60.1.70634` (config `7d8ae4cd`) while this ran, and `main` took the build watch's 70634 game data in #505
+meanwhile, so the E extraction and coverage report are from 70634 and the three generated files
+(`client-achievements.json`, `client-encounters.json`, `client-mounts.json`) were regenerated from the 70634
+snapshot before the pull request, so no build mixes once it merges.
+W9 is the third integration: `kb/src/client-mounts.ts` reads `Mount` with the riding skill its type asks for
+(`MountType` → `MountTypeXCapability` → `MountCapability.ReqRidingSkill`, the lowest) into the committed
+`web/src/data/game-data/client-mounts.json` (141 mounts). The collections tool gains a Mounts view:
+the mounts 3 installs list under the "Mounts" collection lead, the files' remaining mounts follow marked
+unconfirmed. No addon module uploads mount collections yet, so today every row is the files'.
+
 ## What the scan measures
 
 - The WoWDBDefs manifest (pinned commit `b9a63096cdd9`) against the build's root listing, by file data id.
@@ -123,6 +172,12 @@ Extending `DOMAIN_RULES` in `kb/src/client-scan.ts` as tables are triaged keeps 
 - **W4 (executed):** the live-support group from the "other" triage (banks, creation pieces, guild
   tabards, barber shop, progression, mail and auction house, emotes, world-object behaviour, creation
   helpers), 45 tables read plus two the build does not ship.
+- **W6 (executed 2026-10-27):** the spell math remainder (18 spell tables) plus the item stat scalars
+  `RandPropPoints` and `ArmorLocation`, per the D bullet's verified stragglers. Seven spell and quest
+  tables are dead in this build and stay on the record.
+- **W7 (executed 2026-10-27):** not a table wave — the first site integration: the achievements
+  generator, the build-watch registration for it, the Difficulty join in the map data, and the
+  achievements pages merging player reports with the files player-first. Pages-only by the data policy.
 
 ### Wave log (2026-10-18)
 
@@ -133,6 +188,12 @@ Extending `DOMAIN_RULES` in `kb/src/client-scan.ts` as tables are triaged keeps 
 | W2 | `d589242` | 69 | no failures; all coverage pins verified in-layout |
 | W3 | `ef82618` | 102 | `LiquidType` dropped (see below); one concurrent edit from origin (PR #73) rebased in first, adding `LoadingScreens` |
 | W4 | `3a1c007` | 45 | the live-support group; `ObjectEffectGroup` and `ObjectEffectPackage` are not in this build, and `ObjectEffectModifier`, `DeclinedWord` and `DeclinedWordCases` read empty; candidates 667 → 622 |
+| W5 | `5a7fdf68` | 14 | achievement criteria (`Criteria` 3297, `CriteriaTree` 6771, `ModifierTree` 2845 rows; `CriteriaTreeXEffect` present, 0 rows), the classic talent family (`Talent` 432, `TalentTab` 27, `NumTalentsAtLevel` 80; `MinorTalent`, `SpecSetMember`, `SpecializationSpells`, `SpecializationSpellsDisplay`, `TalentTreePrimarySpells` present with 0 rows), and two live completes (`Difficulty` 22, `PowerType` 6). Talents and achievements domains now read in full; candidates 613 → 599 |
+| W6 | `15d8a043` | 20 | the spell numbers and rules the tooltips compute from: `SpellPower` 3462, `SpellCategories` 10665, `SpellClassOptions` 6085, `SpellTargetRestrictions` 4454, `SpellInterrupts` 9895, `SpellShapeshift` 3457, `SpellLabel` 4654, `SpellProceduralEffect` 991, `SpellEquippedItems` 1886, `SpellFocusObject` 244, `SpellTotems` 1121, `SpellLearnSpell` 52, `SpellAuraNames` 650, `SpellShapeshiftForm` 32, `SpellMechanic` 36, `SpellDispelType` 11, `SpellDiminish` 11, `SpellProcsPerMinute` 11; plus the item scalars `RandPropPoints` 300 and `ArmorLocation` 23. Encrypted blocks are counted and skipped, never decrypted (several spell tables carry them); 7 spell/quest tables verified dead in this build stay unread. `CreatureLabel` (1,657 rows) and `NPCSounds` (196) considered and dropped; candidates 599 → 579. The items domain rule now also matches `RandPropPoints` and `ArmorLocation` |
+| W7 | `abc3eb9e` | 0 (integration) | first generator to reach the pages: `kb/src/client-achievements.ts` walks `Achievement.Criteria_tree` through `CriteriaTree` into the committed `web/src/data/game-data/client-achievements.json` (441 achievements, 329 with criteria; pages-only per docs/DATA_POLICY.md), the build watch regenerates it, and `map.json` gains its `Difficulty` join (`difficulties` record plus per-entrance `difficultyIds`, applied when the build watch next regenerates it). The achievement pages merge player reports and the files player-first, marking the files' parts unconfirmed |
+| W8 | `116ec4b7` | 0 (integration) | second generator to reach the pages: `kb/src/client-encounters.ts` reads `DungeonEncounter` into the committed `web/src/data/game-data/client-encounters.json` (341 encounters, 41 instances; pages-only), registered with the build watch and the workflow allow-list. The instance pages' boss table is player-first: reported bosses lead, the files' encounters follow as unconfirmed rows, and an unnamed reported boss borrows the files' name. The files add no instance rows, so held-back content stays unlisted |
+| E | `c8b756d1` | 13 | text-bearing, pages-only: the gossip, broadcast, conversation and scene-script tables (rows above); three present with 0 rows; candidates 579 → 566. Extracted and covered on 70634 |
+| W9 | `768d7a17` | 0 (integration) | third generator to reach the pages: `kb/src/client-mounts.ts` reads `Mount` plus the riding-skill join into the committed `web/src/data/game-data/client-mounts.json` (141 mounts; pages-only), registered with the build watch and the workflow allow-list. The collections tool's Mounts view is player-first: reported mounts lead, the files' mounts follow unconfirmed |
 
 Findings the waves surfaced while reading:
 
@@ -160,9 +221,15 @@ Findings the waves surfaced while reading:
    on push; none of the wave commits touch generated site data, so the pushes shipped no visible change.
 3. **"Other" triage appetite.** Draft below; a quick pass can move whole prefixes to a documented "never"
    list, the alternative is leaving them in the catch-all. Groups A and B applied; C ran as W4.
-4. **Next wave.** Nothing is queued: what remains is feature-tied (D with the spell work, E as a
-   reviewed pages-only pass, F with the sound feature, G on demand). The mining loop is at a natural
-   stop until one of those features is picked.
+4. **Next wave.** Praised D and the achievements criteria cluster both executed as W5 (2026-10-27), the
+   spell math remainder plus the item scalars as W6 the same day, and the first site integration
+   (achievements player-first pages, the Difficulty join in the map data) as W7, the files' boss lists on the
+   instance pages as W8, E as a read-only wave and the files' mount list in the collections tool as W9 (all
+   2026-10-27). What remains is
+   feature-tied: E as a reviewed pages-only pass (`GossipNPCOption` 1577 rows declare an NPC's option ids,
+   but the option-to-text binding is server-side, so the read yields declarations only) and F with the
+   sound feature. Further site-merge candidates exist (difficulty names into the instance pages');
+   the mining loop is at a natural stop until a feature is picked.
 
 ## "Other"-bucket triage — first pass applied, rest drafted
 
@@ -197,13 +264,17 @@ These would land across characters, world and item domains.
 
 **D. Classic talent trees → talents domain, with the spell work.** `Talent`, `TalentTab`,
 `TalentTreePrimarySpells`, `SpecializationSpells*`, `SpecSetMember`, `MinorTalent`, `NumTalentsAtLevel`
-(≈8). The W2/W3 talent reads took the retail `Trait*` family; these are the classic trees `/tools/talents`
-would actually render.
+(≈8). ✅ Executed as W5 (2026-10-27): `Talent` 432, `TalentTab` 27 and `NumTalentsAtLevel` 80 carry
+rows; the retail specialization plumbing (`SpecializationSpells*`, `SpecSetMember`, `MinorTalent`,
+`TalentTreePrimarySpells`) is present with 0 rows in this build.
 
-**E. Text-bearing, pages-only.** `BroadcastText*`, `ConversationLine`, `GossipNPCOption*`, `SceneScript*`
+**E. Text-bearing, pages-only.** ✅ Read 2026-10-27 (13 tables, see the status update above). `BroadcastText*`, `ConversationLine`, `GossipNPCOption*`, `SceneScript*`
 (≈20) — same rule as lore text: pages may show reviewed game text; API, MCP and bulk stay clean.
+Verified row counts on 70630: `GossipNPCOption` 1577, `GossipNPCOptionDisplayInfo` 50, `BroadcastText`
+only 12 — NPC dialogue text is mostly server-side, so the client side of this wave is option kinds and
+icons, not words.
 
-**F. Ambience and lighting → defer with the sound feature.** `Light*`, `LightData*`, `LightShaft*`,
+**F. Ambience and lighting → defer with the sound feature (Carlos, 2026-10-27: deferred).** `Light*`, `LightData*`, `LightShaft*`,
 `SkyScene*`, `VolumeFog*`, `Weather*`, `WindSettings`, `Terrain*`, `WaterfallData`, `WorldShadow` (≈30).
 
 **G. Long tail stays "other"** until a feature or a page needs it. Per-table moves can be added to

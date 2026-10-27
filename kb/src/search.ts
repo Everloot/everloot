@@ -38,7 +38,15 @@ const STOPWORDS = new Set([
   "find", "for", "from", "get", "give", "how", "in", "is", "list", "me", "of", "on", "or",
   "please", "show", "should", "tell", "the", "to", "was", "were", "what", "when", "where",
   "which", "who", "whom", "whose", "why", "with", "would",
+  // The same questions typed without the apostrophe ("whats", not "what's").
+  "whats", "wheres", "whos", "hows",
 ]);
+
+/**
+ * Words that ask for a pick, not a topic. They stay in a full search ("Best in Show" is a name), but when
+ * no page has every word, they are what failed it, so the fallback leaves them out.
+ */
+const PICK_WORDS = new Set(["best", "better", "worse", "worst", "good", "top"]);
 
 /**
  * A name as its words: lowercased, split on anything that is not a letter or number, joined by
@@ -194,6 +202,44 @@ export function search(db: DB, query: string, limit = 10, opts: SearchOptions = 
   // different limits stay a stable prefix of one ordering. Rows after them keep the SQL order.
   const head = merged.slice(0, RERANK).sort((a, b) => rank(a) - rank(b) || own(a) - own(b));
   return [...head, ...merged.slice(RERANK)].slice(0, limit);
+}
+
+/** The line an answer starts with when its pages hold only some of the asked words. */
+export const SOME_WORDS = "No page has every word you asked for. Pages with some of them:";
+
+/**
+ * For when no page has every asked word ("whats the best racial class for warlock on horde"): pages with
+ * any of them, those with more of the asked words first, then bm25. Empty for a one-word query, where any
+ * word is every word, so `search` has already said all there is. Pick words ("best") are left out.
+ */
+export function searchSomeWords(db: DB, query: string, limit = 10, opts: SearchOptions = {}): SearchHit[] {
+  const asked = [...new Set(contentTerms(query.trim()))];
+  const terms = asked.filter((t) => !PICK_WORDS.has(t));
+  // One word is a new search only when a pick word was dropped from beside it ("best gnome").
+  if (terms.length === 0 || (terms.length === 1 && asked.length === 1)) return [];
+  const conds = ["entities_fts MATCH ?"];
+  const params: unknown[] = [terms.map((t) => `"${t}"`).join(" OR ")];
+  pushOptionFilters(conds, params, opts);
+  params.push(Math.max(limit, RERANK));
+  const pool = db
+    .prepare(
+      `SELECT ${ROW}, e.name || ' ' || e.body AS words
+       FROM entities_fts JOIN entities e ON e.id = entities_fts.rowid
+       WHERE ${conds.join(" AND ")}
+       ORDER BY bm25(entities_fts, 10.0, 1.0), e.id
+       LIMIT ?`,
+    )
+    .all(...params) as (SearchHit & { words: string })[];
+  const count = (words: string) => {
+    const has = new Set(allTerms(words).split(" "));
+    return terms.filter((t) => has.has(t)).length;
+  };
+  // The sort is stable, so pages with the same count keep their bm25 order.
+  return pool
+    .map(({ words, ...hit }) => ({ hit, count: count(words) }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit)
+    .map((r) => r.hit);
 }
 
 interface EntityRow {

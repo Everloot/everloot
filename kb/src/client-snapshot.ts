@@ -162,6 +162,45 @@ export const CLIENT_TABLES = {
   ObjectEffectPackage: 1090574, ObjectEffectPackageElem: 1090578,
   ParticleColor: 1284820, DeclinedWord: 1279100, DeclinedWordCases: 1279099, NameGen: 1122117,
   Resistances: 1135072, RaceStat: 7722633,
+  // W5 (docs/2026-10-18-client-data-placement.md): achievement criteria the client carries by id —
+  // Criteria and ModifierTree define each criterion and its condition, CriteriaTree orders and names
+  // them — so achievement pages can show criteria from the files before players report them.
+  // Talent and TalentTab are the classic client's talent trees; NumTalentsAtLevel the points per
+  // level. The rest of the classic talent family reads empty today (Specialization* and SpecSetMember
+  // are retail specialization plumbing) but sits in the same topic, so the snapshot stops asking.
+  // Difficulty names the difficulty rows DungeonEncounter and MapDifficulty point at;
+  // PowerType names the power types classes and spells spend.
+  Criteria: 1263817, CriteriaTree: 1263818, CriteriaTreeXEffect: 1345969, ModifierTree: 1267645,
+  Talent: 1369062, TalentTab: 2178102, NumTalentsAtLevel: 1953326, MinorTalent: 1347274,
+  TalentTreePrimarySpells: 5581887, SpecSetMember: 2057624, SpecializationSpells: 1240335,
+  SpecializationSpellsDisplay: 2067238,
+  Difficulty: 1352127, PowerType: 1266022,
+  // W6 (spell tooltip math + item stat scalars): the rest of the classic spell-math set —
+  // SpellPower carries the mana costs, SpellCategories the dispel/mechanic/defense columns,
+  // SpellClassOptions the class masks, SpellAuraNames/SpellDispelType/SpellMechanic/SpellDiminish
+  // give aura, dispel and crowd-control names, SpellEquippedItems/SpellFocusObject/SpellTotems/
+  // SpellShapeshift* the cast requirements, SpellTargetRestrictions targets, SpellInterrupts what
+  // breaks casts, SpellLearnSpell teaches, SpellLabel links collections, SpellProcsPerMinute and
+  // SpellProceduralEffect carry proc behavior. SpellPowerDifficulty, SpellScaling,
+  // SpellReagentsCurrency and SpellEffectAutoDescription stay unread (absent or empty in this build).
+  // RandPropPoints/ArmorLocation are the classic item stat scalars.
+  SpellPower: 982806, SpellCategories: 1139939, SpellClassOptions: 979663, SpellAuraNames: 3055890,
+  SpellDispelType: 1137829, SpellMechanic: 1014438, SpellDiminish: 3055891, SpellEquippedItems: 1140011,
+  SpellTargetRestrictions: 1139993, SpellInterrupts: 1139906, SpellFocusObject: 1280620,
+  SpellTotems: 1002162, SpellShapeshift: 1139929, SpellShapeshiftForm: 1280618,
+  SpellLearnSpell: 1001907, SpellLabel: 1347275, SpellProcsPerMinute: 1133526,
+  SpellProceduralEffect: 1140477,
+  RandPropPoints: 1310245, ArmorLocation: 1284818,
+  // E (text-bearing, pages-only; docs/2026-10-18-client-data-placement.md): what an NPC's gossip window
+  // and the scripted conversations declare on the client. GossipNPCOption names the option ids an NPC
+  // offers and GossipNPCOptionDisplayInfo their icons; the option-to-text binding is server-side, so
+  // BroadcastText and ConversationLine carry only the few lines the client scripts itself. SceneScript*
+  // are the client-side cutscene scripts. Game text: pages only, never API, MCP or bulk.
+  GossipNPCOption: 4278503, GossipNPCOptionDisplayInfo: 4335720, GossipXUIDisplayInfo: 3622253,
+  GossipOptionXUIWidgetSet: 5746391, GossipUIDisplayInfoCondition: 5902977,
+  BroadcastText: 841604, BroadcastTextDuration: 2166900, ConversationLine: 1260801,
+  SceneScript: 801754, SceneScriptGlobalText: 1758036, SceneScriptPackage: 801755,
+  SceneScriptPackageMember: 801756, SceneScriptText: 1758037,
   // Partial on the client: most of what these describe (spawns, quest text) lives on the server.
   Creature: 841631, GameObjects: 841620, QuestV2: 1139443,
   // Loading screens (Map.LoadingScreenID names a row; the row names its picture files), for the page

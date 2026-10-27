@@ -88,6 +88,25 @@ test("lore pages come with their lore link, and tools by title or keyword", asyn
   expect((await search("raid planner")).find((g) => g.type === "tool")!.results[0].href).toBe("/tools/raid");
 });
 
+test("a question that names a class leads with that class's page", async () => {
+  // Found live: "whats the best racial class for warlock on horde" found nothing, and /classes/warlock answers it.
+  const groups = await search("whats the best racial class for warlock on horde");
+  expect(groups[0]).toMatchObject({ type: "class", heading: "Classes" });
+  expect(groups[0].results).toEqual([expect.objectContaining({ label: "Warlock", href: "/classes/warlock", exact: false })]);
+  expect((await search("Warlocks")).find((g) => g.type === "class")!.results[0]).toMatchObject({ href: "/classes/warlock", exact: true });
+  expect((await search("thrall")).some((g) => g.type === "class")).toBe(false);
+  // A class named in passing does not lead an exact item.
+  mocks.names.items = new Map([[1, "Hunter's Mark"]]);
+  expect((await search("hunter's mark")).map((g) => g.type).slice(0, 2)).toEqual(["item", "class"]);
+});
+
+test("when no lore page has every word, the lore archive lists pages with some of them and says so", async () => {
+  const lore = (await search("best warchief horde guide")).find((g) => g.type === "lore")!;
+  expect(lore.heading).toBe("Lore archive, some of your words");
+  expect(lore.results[0]).toMatchObject({ label: "Thrall", href: "/lore/1-thrall", exact: false });
+  expect((await search("thrall")).find((g) => g.type === "lore")!.heading).toBe("Lore archive");
+});
+
 test("the Warcraft Wiki copies never move above Everloot's own pages, even on an exact name", async () => {
   mocks.names.items = new Map([[19019, "Thrall's Cloak"]]);
   const types = (await search("thrall")).map((g) => g.type);

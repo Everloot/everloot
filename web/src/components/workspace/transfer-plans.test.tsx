@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
+import { setTimeout as ioDelay } from "node:timers/promises";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -12,6 +13,9 @@ import {
 import { ORDERS_UNAVAILABLE } from "@/lib/saved-builds";
 import TransferPlans from "./TransferPlans";
 import { V3_BUCKET_TEXT } from "@/lib/player-workspace.fixture";
+
+// Keep the host timer captured before fake timers replace Node's live module exports.
+const hostDelay = ioDelay;
 
 // Saving the plans this browser keeps signed out to the account signed in now, as a player meets it: this browser's
 // localStorage, and the site's /api/auth/me, /api/me/builds and /api/me/characters, answered for the session as it is
@@ -184,9 +188,10 @@ afterEach(async () => {
 
 /** Lets the account lookup and the reads and writes that follow it finish. */
 const settle = () => act(async () => { for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0)); });
-/** Lets everything run that waits on no timer, with fake timers standing still, until `ready`. */
+/** Waits for host I/O with fake request timers standing still, until `ready`. */
 async function pump(ready: () => boolean, what: string) {
-  for (let i = 0; i < 200 && !ready(); i++) await act(async () => { await new Promise((r) => setImmediate(r)); });
+  const deadline = vi.getRealSystemTime() + 5_000;
+  while (!ready() && vi.getRealSystemTime() < deadline) await act(async () => { await hostDelay(1); });
   if (!ready()) throw new Error(`Timed out waiting for ${what}`);
 }
 async function render() {
@@ -311,6 +316,10 @@ test.each(["source", "destination"])("a %s changed to v3 during a character resp
 });
 
 async function open() {
+  await vi.waitFor(async () => {
+    await settle();
+    expect(button(/^Choose plans to save to your account$/)).toBeDefined();
+  }, { timeout: 5_000 });
   await click(button(/^Choose plans to save to your account$/));
 }
 /** Chooses a group of plans (its checkbox) and each plan's sharing. */
@@ -1683,8 +1692,11 @@ describe("one character per alt and account", () => {
     accounts[A_ID].characters = [{ id: serverId(80), name: "Jaina", classSlug: "mage", realm: null, note: null }];
     const jaina = alt({ planIds: [FROST.id] });
     seed(ANON, [FROST], [jaina]);
+    const releaseIdentity = hold("GET /api/auth/me");
     await render();
-    await open();
+    const opening = open();
+    releaseIdentity();
+    await opening;
     await choose("Save Frost to your account", { Frost: "private" });
     await set(field("Character for Frost"), `alt:${jaina.id}`);
     await click(saveButton());
@@ -1729,6 +1741,28 @@ describe("focus with nothing to choose", () => {
 });
 
 describe("a request with no answer", () => {
+  test("waiting for host I/O leaves the request timeout clock still", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date", "performance"] });
+    const now = Date.now();
+    let timedOut = false;
+    const timeout = setTimeout(() => { timedOut = true; }, 20_000);
+    let ready = false;
+    const io = hostDelay(250).then(() => { ready = true; });
+    try {
+      await pump(() => ready, "host I/O");
+      expect(Date.now()).toBe(now);
+      expect(timedOut).toBe(false);
+      await vi.advanceTimersByTimeAsync(19_999);
+      expect(timedOut).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(timedOut).toBe(true);
+    } finally {
+      clearTimeout(timeout);
+      vi.useRealTimers();
+      await io;
+    }
+  });
+
   /** The site, but the first request `which` picks reaches it and its answer never comes back: only giving up on it
    *  ends the wait. */
   function silence(which: (url: string, init?: RequestInit) => boolean) {
