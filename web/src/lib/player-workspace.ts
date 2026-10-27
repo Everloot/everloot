@@ -1,0 +1,535 @@
+import { LIMITS, codeClass, validId } from "./saved-builds";
+import { readPlanHash } from "./talents/import";
+import { decodeBuild, decodeOrder, type OrderError, type OrderOrigin } from "./talents/share";
+
+// The plans, alts and watches a player keeps in this browser, with no account and nothing uploaded: the
+// PlayerWorkspace, format version 1.
+//
+// One bucket per owner, each under its own localStorage key: the browser signed out, and each account by its
+// stable user id, never its name. A plan saved in one bucket is shown in no other, so signing in, out or into
+// another account shows that owner's plans only. That keeps plans apart on a shared browser. It is not
+// encryption: whoever controls the browser can read every bucket.
+//
+// Every read and write says what happened. A write reads the stored bucket, makes one change, checks the result
+// against the format and the limits, and stores it in one go: a plan another tab saved is kept, and nothing is
+// stored unless every step worked. Stored text that is not version 1 (damaged, or from a newer version) is left
+// exactly as it is. A backup is a bucket's own text; it restores only into the bucket it came from, after a
+// preview. A plan saved to an account (by a transfer, which is not made here) is bound to it and moves into that
+// account's bucket (bindTransferred).
+
+export const WORKSPACE_FORMAT = "everloot.player-workspace";
+export const WORKSPACE_VERSION = 1;
+
+/** What one bucket holds at most. Names, notes and codes have the account's own limits (saved-builds.ts), so a
+ *  plan saved to an account later is never cut. Everything fits a backup of 1 MiB. */
+export const WORKSPACE_LIMITS = {
+  plans: 200, alts: 60, altPlans: 10, name: LIMITS.name, notes: LIMITS.notes, code: LIMITS.code, bytes: 1024 * 1024,
+} as const;
+
+/** Whose plans a bucket holds: the browser signed out, or one account by its stable id. */
+export type Owner = { kind: "anonymous" } | { kind: "account"; userId: string };
+
+/** The account a plan was saved to, and when. A bound plan lives in that account's bucket only. */
+export interface Binding { userId: string; at: string }
+
+export interface LocalPlan {
+  id: string;
+  name: string;
+  classSlug: string;
+  /** Set 1's share code, and set 2's when it has points. */
+  code: string;
+  code2: string | null;
+  /** Each set's spend order token as it came, null when the order is unknown. A token this version cannot read
+   *  is kept with the talents, and the calculator opens it as unknown. */
+  order: string | null;
+  order2: string | null;
+  notes: string;
+  updatedAt: string;
+  boundTo: Binding | null;
+}
+
+/** An alt and the plans it uses; the alt planner adds the rest. */
+export interface LocalAlt { id: string; name: string; planIds: string[]; notes: string; updatedAt: string }
+
+/** A plan the player asked to hear about. */
+export interface LocalWatch { id: string; planId: string; addedAt: string }
+
+export interface PlayerWorkspace {
+  format: typeof WORKSPACE_FORMAT;
+  version: typeof WORKSPACE_VERSION;
+  owner: Owner;
+  plans: LocalPlan[];
+  alts: LocalAlt[];
+  watches: LocalWatch[];
+}
+
+/** localStorage, or a stand-in with its three calls. */
+export type DeviceStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+
+export const ANONYMOUS: Owner = { kind: "anonymous" };
+const KEY = "everloot:workspace";
+
+export const bucketKey = (owner: Owner) => (owner.kind === "anonymous" ? `${KEY}:anonymous` : `${KEY}:account:${owner.userId}`);
+export const sameOwner = (a: Owner, b: Owner) => bucketKey(a) === bucketKey(b);
+export const emptyWorkspace = (owner: Owner): PlayerWorkspace =>
+  ({ format: WORKSPACE_FORMAT, version: WORKSPACE_VERSION, owner, plans: [], alts: [], watches: [] });
+
+/** This browser's localStorage, or null when the browser refuses it (blocked site data). */
+export function deviceStorage(): DeviceStorage | null {
+  try { return window.localStorage; } catch { return null; }
+}
+
+// The format, checked field by field. Nothing read is run or kept beyond the fields below.
+
+export type FormatError = "malformed" | "newer-version" | "over-limit" | "bad-reference";
+export type Validation = { ok: true; workspace: PlayerWorkspace } | { ok: false; error: FormatError };
+
+const PLAN_KEYS = ["id", "name", "classSlug", "code", "code2", "order", "order2", "notes", "updatedAt", "boundTo"] as const;
+const ALT_KEYS = ["id", "name", "planIds", "notes", "updatedAt"] as const;
+const WATCH_KEYS = ["id", "planId", "addedAt"] as const;
+const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+/** What a link carries after #plan= or &order=: an order token with anything else would break its plan's link. */
+const TOKEN = /^[A-Za-z0-9_.-]+$/;
+
+/** Characters as the account counts them, so a limit here is the limit there. */
+const length = (s: string) => Array.from(s).length;
+const bytes = (text: string) => new TextEncoder().encode(text).length;
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+const hasKeys = (v: Record<string, unknown>, keys: readonly string[]) => Object.keys(v).length === keys.length && keys.every((k) => Object.hasOwn(v, k));
+const isDate = (v: unknown) => typeof v === "string" && ISO.test(v) && Number.isFinite(Date.parse(v));
+const unique = (ids: string[]) => new Set(ids).size === ids.length;
+
+/** Plain text, as the account keeps it: control characters out (line breaks kept in notes), trimmed. */
+function clean(value: string, multiline: boolean): string {
+  const text = multiline ? value.replace(/\r\n?/g, "\n").replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, "") : value.replace(/[\u0000-\u001f\u007f]/g, "");
+  return text.trim();
+}
+
+const isName = (v: unknown) => typeof v === "string" && v === clean(v, false) && length(v) >= 1 && length(v) <= WORKSPACE_LIMITS.name;
+const isNotes = (v: unknown) => typeof v === "string" && v === clean(v, true) && length(v) <= WORKSPACE_LIMITS.notes;
+const isToken = (v: unknown): v is string | null => v === null || (typeof v === "string" && v.length <= WORKSPACE_LIMITS.code && TOKEN.test(v));
+
+function isOwner(v: unknown): v is Owner {
+  if (!isRecord(v)) return false;
+  return v.kind === "anonymous" ? hasKeys(v, ["kind"]) : v.kind === "account" && hasKeys(v, ["kind", "userId"]) && validId(v.userId);
+}
+
+/** A plan: two codes of its class, each order beside its own code, and bound, if at all, to its bucket's account. */
+function isPlan(v: unknown, owner: Owner): v is LocalPlan {
+  if (!isRecord(v) || !hasKeys(v, PLAN_KEYS)) return false;
+  const { id, name, classSlug, code, code2, order, order2, notes, updatedAt, boundTo } = v;
+  if (!validId(id) || !isName(name) || !isNotes(notes) || !isDate(updatedAt)) return false;
+  if (typeof code !== "string" || codeClass(code) === null || codeClass(code) !== classSlug) return false;
+  if (code2 !== null && (typeof code2 !== "string" || codeClass(code2) !== classSlug)) return false;
+  if (!isToken(order) || !isToken(order2) || (order2 !== null && code2 === null)) return false;
+  if (boundTo === null) return true;
+  return isRecord(boundTo) && hasKeys(boundTo, ["userId", "at"]) && isDate(boundTo.at)
+    && owner.kind === "account" && boundTo.userId === owner.userId;
+}
+
+const isAlt = (v: unknown): v is LocalAlt => isRecord(v) && hasKeys(v, ALT_KEYS) && validId(v.id) && isName(v.name) && isNotes(v.notes)
+  && isDate(v.updatedAt) && Array.isArray(v.planIds) && v.planIds.every(validId);
+const isWatch = (v: unknown): v is LocalWatch => isRecord(v) && hasKeys(v, WATCH_KEYS) && validId(v.id) && validId(v.planId) && isDate(v.addedAt);
+
+/** Is `value` a version 1 workspace within the limits, every alt and watch naming a plan it holds? */
+export function validateWorkspace(value: unknown): Validation {
+  const refuse = (error: FormatError): Validation => ({ ok: false, error });
+  if (!isRecord(value) || value.format !== WORKSPACE_FORMAT) return refuse("malformed");
+  // A newer version may change everything after its number; say so rather than guess.
+  if (typeof value.version === "number" && Number.isInteger(value.version) && value.version > WORKSPACE_VERSION) return refuse("newer-version");
+  const { version, owner, plans, alts, watches } = value;
+  if (version !== WORKSPACE_VERSION || !hasKeys(value, ["format", "version", "owner", "plans", "alts", "watches"]) || !isOwner(owner)) return refuse("malformed");
+  if (!Array.isArray(plans) || !Array.isArray(alts) || !Array.isArray(watches)) return refuse("malformed");
+  // Counts before contents, so an overlong list is refused before each entry is checked.
+  if (plans.length > WORKSPACE_LIMITS.plans || alts.length > WORKSPACE_LIMITS.alts) return refuse("over-limit");
+  if (!plans.every((p) => isPlan(p, owner)) || !alts.every(isAlt) || !watches.every(isWatch)) return refuse("malformed");
+  if (![plans, alts, watches].every((list) => unique(list.map((item) => item.id)))) return refuse("malformed");
+  if (alts.some((a) => a.planIds.length > WORKSPACE_LIMITS.altPlans)) return refuse("over-limit");
+  const planIds = new Set(plans.map((p) => p.id));
+  const named = (id: string) => planIds.has(id);
+  if (!alts.every((a) => unique(a.planIds) && a.planIds.every(named))) return refuse("bad-reference");
+  if (!watches.every((w) => named(w.planId)) || !unique(watches.map((w) => w.planId))) return refuse("bad-reference");
+  if (bytes(JSON.stringify(value)) > WORKSPACE_LIMITS.bytes) return refuse("over-limit");
+  return { ok: true, workspace: value as unknown as PlayerWorkspace };
+}
+
+// Reading and writing a bucket.
+
+export type ReadError = "unavailable" | "corrupt" | "newer-version";
+export type WriteError = ReadError | "full" | "over-limit" | "invalid" | "missing" | "referenced" | "changed" | "other-owner" | "not-transferred" | "partial";
+export type Failure = { ok: false; error: WriteError; message: string };
+export type ReadResult = { ok: true; workspace: PlayerWorkspace; raw: string | null } | (Failure & { error: ReadError; raw: string | null });
+export type WriteResult = { ok: true; workspace: PlayerWorkspace } | Failure;
+
+const MESSAGES: Record<WriteError, string> = {
+  unavailable: "This browser is not letting Everloot keep anything on this device (private browsing or blocked site data), so plans cannot be saved here. Links and share codes still work.",
+  corrupt: "The plans stored on this device could not be read. They are kept as they are, and nothing is saved over them.",
+  "newer-version": "The plans on this device were saved by a newer version of Everloot. Reload the page to open them. Nothing here changes them.",
+  full: "This browser's storage is full, so nothing was saved. The plans on this device are as they were.",
+  "over-limit": `That is more than this device keeps: ${WORKSPACE_LIMITS.plans} plans and ${WORKSPACE_LIMITS.alts} alts, all within a 1 MiB backup. Nothing was changed.`,
+  invalid: "That plan is not valid, so nothing was saved.",
+  missing: "That plan is no longer on this device. It may have been deleted in another tab.",
+  referenced: "An alt or a watch on this device uses that plan, so it was left as it is.",
+  changed: "The plans on this device changed since the preview. Choose the backup again to see what it would do now.",
+  "other-owner": "Those plans belong to another account, so nothing was changed.",
+  "not-transferred": "The transfer did not finish, so nothing on this device changed.",
+  partial: "The plans were saved to the account, but this browser could not take them out of its signed-out plans.",
+};
+
+const failure = (error: WriteError, message = MESSAGES[error]): Failure => ({ ok: false, error, message });
+
+export function readWorkspace(storage: DeviceStorage | null, owner: Owner): ReadResult {
+  let raw: string | null;
+  try {
+    if (!storage) throw new Error("No storage");
+    raw = storage.getItem(bucketKey(owner));
+  } catch {
+    return { ...failure("unavailable"), error: "unavailable", raw: null };
+  }
+  if (raw === null) return { ok: true, workspace: emptyWorkspace(owner), raw };
+  const refuse = (error: ReadError): ReadResult => ({ ...failure(error), error, raw });
+  let value: unknown;
+  try { value = JSON.parse(raw); } catch { return refuse("corrupt"); }
+  const checked = validateWorkspace(value);
+  if (!checked.ok) return refuse(checked.error === "newer-version" ? "newer-version" : "corrupt");
+  // A bucket holds its own owner's plans; one copied under another key is not shown.
+  return sameOwner(checked.workspace.owner, owner) ? { ok: true, workspace: checked.workspace, raw } : refuse("corrupt");
+}
+
+const isQuota = (error: unknown) => error instanceof DOMException
+  && (error.name === "QuotaExceededError" || error.name === "NS_ERROR_DOM_QUOTA_REACHED" || error.code === 22);
+
+/** Check one bucket and store the whole of it in one write. */
+function store(storage: DeviceStorage | null, workspace: PlayerWorkspace): WriteResult {
+  const checked = validateWorkspace(workspace);
+  if (!checked.ok) return failure(checked.error === "over-limit" ? "over-limit" : "invalid");
+  try {
+    if (!storage) throw new Error("No storage");
+    storage.setItem(bucketKey(workspace.owner), JSON.stringify(workspace));
+    return { ok: true, workspace };
+  } catch (error) {
+    return failure(isQuota(error) ? "full" : "unavailable");
+  }
+}
+
+/** The owner's bucket as stored now, `change` made to it, then stored. Nothing is stored unless every step works. */
+function update(storage: DeviceStorage | null, owner: Owner, change: (workspace: PlayerWorkspace) => PlayerWorkspace | Failure): WriteResult {
+  const read = readWorkspace(storage, owner);
+  if (!read.ok) return failure(read.error);
+  const next = change(read.workspace);
+  return "error" in next ? next : store(storage, next);
+}
+
+const replace = (workspace: PlayerWorkspace, plan: LocalPlan): PlayerWorkspace =>
+  ({ ...workspace, plans: workspace.plans.map((p) => (p.id === plan.id ? plan : p)) });
+
+export interface PlanInput {
+  /** The plan to update; left out or null, a new plan. */
+  id?: string | null;
+  name: string;
+  notes: string;
+  classSlug: string;
+  /** Each set's share code and spend order token as the page has them; set 1 needs a code. */
+  codes: [string | null, string | null];
+  orders: [string | null, string | null];
+}
+
+export type PlanResult = ({ ok: true; workspace: PlayerWorkspace; plan: LocalPlan }) | Failure;
+
+function nameAndNotes(input: { name: string; notes: string }): { name: string; notes: string } | Failure {
+  const name = clean(input.name, false);
+  if (!name || length(name) > WORKSPACE_LIMITS.name) return failure("invalid", `Give the plan a name of 1 to ${WORKSPACE_LIMITS.name} characters.`);
+  const notes = clean(input.notes, true);
+  if (length(notes) > WORKSPACE_LIMITS.notes) return failure("invalid", `Notes can be up to ${WORKSPACE_LIMITS.notes.toLocaleString("en-US")} characters.`);
+  return { name, notes };
+}
+
+function planFields(input: PlanInput): Omit<LocalPlan, "id" | "updatedAt" | "boundTo"> | Failure {
+  const text = nameAndNotes(input);
+  if ("error" in text) return text;
+  const [code, code2] = input.codes;
+  if (!code) return failure("invalid", "Spend a point in set 1 to save this plan.");
+  const classSlug = codeClass(code);
+  if (!classSlug || classSlug !== input.classSlug) return failure("invalid", "That share code is not valid.");
+  if (code2 !== null && codeClass(code2) !== classSlug) return failure("invalid", "Both talent sets must be for the same class.");
+  // An order without its set's code has nothing to order; links leave it out too.
+  const [order, order2] = [input.orders[0], code2 === null ? null : input.orders[1]];
+  if (!isToken(order) || !isToken(order2)) return failure("invalid", "A spend order is not one a link can carry.");
+  return { name: text.name, classSlug, code, code2, order, order2, notes: text.notes };
+}
+
+/** A new plan, or with `input.id` that plan updated in place. */
+export function savePlan(storage: DeviceStorage | null, owner: Owner, input: PlanInput, now = new Date()): PlanResult {
+  const fields = planFields(input);
+  if ("error" in fields) return fields;
+  let plan: LocalPlan | undefined;
+  const result = update(storage, owner, (workspace) => {
+    if (!input.id) {
+      plan = { id: crypto.randomUUID(), ...fields, updatedAt: now.toISOString(), boundTo: null };
+      return { ...workspace, plans: [...workspace.plans, plan] };
+    }
+    const old = workspace.plans.find((p) => p.id === input.id);
+    if (!old) return failure("missing");
+    if (old.classSlug !== fields.classSlug) return failure("invalid", "That plan is for another class, so it was not changed.");
+    plan = { ...old, ...fields, updatedAt: now.toISOString() };
+    return replace(workspace, plan);
+  });
+  return result.ok ? { ...result, plan: plan! } : result;
+}
+
+/** A new name and notes; the talents and orders stay. */
+export function editPlan(storage: DeviceStorage | null, owner: Owner, id: string, edit: { name: string; notes: string }, now = new Date()): PlanResult {
+  const text = nameAndNotes(edit);
+  if ("error" in text) return text;
+  let plan: LocalPlan | undefined;
+  const result = update(storage, owner, (workspace) => {
+    const old = workspace.plans.find((p) => p.id === id);
+    if (!old) return failure("missing");
+    plan = { ...old, ...text, updatedAt: now.toISOString() };
+    return replace(workspace, plan);
+  });
+  return result.ok ? { ...result, plan: plan! } : result;
+}
+
+/** "<name> (copy)", cut to stay within the name limit, as the account's Duplicate names it. */
+function copyName(name: string): string {
+  const suffix = " (copy)";
+  return Array.from(name).slice(0, WORKSPACE_LIMITS.name - suffix.length).join("").trimEnd() + suffix;
+}
+
+/** A second plan with the same talents, orders and notes. It is new on this device, so it is bound to no account. */
+export function copyPlan(storage: DeviceStorage | null, owner: Owner, id: string, now = new Date()): PlanResult {
+  let plan: LocalPlan | undefined;
+  const result = update(storage, owner, (workspace) => {
+    const old = workspace.plans.find((p) => p.id === id);
+    if (!old) return failure("missing");
+    plan = { ...old, id: crypto.randomUUID(), name: copyName(old.name), updatedAt: now.toISOString(), boundTo: null };
+    return { ...workspace, plans: [...workspace.plans, plan] };
+  });
+  return result.ok ? { ...result, plan: plan! } : result;
+}
+
+/** Deletes a plan, unless an alt or a watch still names it. */
+export function deletePlan(storage: DeviceStorage | null, owner: Owner, id: string): WriteResult {
+  return update(storage, owner, (workspace) => {
+    if (!workspace.plans.some((p) => p.id === id)) return failure("missing");
+    if (workspace.alts.some((a) => a.planIds.includes(id)) || workspace.watches.some((w) => w.planId === id)) return failure("referenced");
+    return { ...workspace, plans: workspace.plans.filter((p) => p.id !== id) };
+  });
+}
+
+/** What a transfer to an account reports once it is over: the account the plans were saved to, and which ones. */
+export type TransferResult = { ok: true; userId: string; planIds: string[] } | { ok: false };
+
+/**
+ * After a finished transfer, the plans it saved move from the signed-out bucket into that account's, bound to it,
+ * and the rest stay signed out. Only a finished result binds, and only to the account the transfer started for:
+ * an answer that arrives for another account binds nothing. A plan already there is not added twice.
+ */
+export function bindTransferred(storage: DeviceStorage | null, startedFor: Owner, result: TransferResult, now = new Date()): { ok: true; bound: number } | Failure {
+  if (!result.ok) return failure("not-transferred");
+  if (startedFor.kind !== "account" || startedFor.userId !== result.userId) return failure("other-owner");
+  const signedOut = readWorkspace(storage, ANONYMOUS);
+  if (!signedOut.ok) return failure(signedOut.error);
+  const account = readWorkspace(storage, startedFor);
+  if (!account.ok) return failure(account.error);
+  const ids = new Set(result.planIds);
+  const moving = signedOut.workspace.plans.filter((p) => ids.has(p.id));
+  if (moving.length === 0) return { ok: true, bound: 0 };
+  const { alts, watches } = signedOut.workspace;
+  if (alts.some((a) => a.planIds.some((id) => ids.has(id))) || watches.some((w) => ids.has(w.planId))) return failure("referenced");
+  const boundTo = { userId: result.userId, at: now.toISOString() };
+  const into = { ...account.workspace, plans: [...account.workspace.plans.filter((p) => !ids.has(p.id)), ...moving.map((p) => ({ ...p, boundTo }))] };
+  // The account's copy is stored first: if the second write fails, a plan is in both buckets, never in neither.
+  const first = store(storage, into);
+  if (!first.ok) return first;
+  const second = store(storage, { ...signedOut.workspace, plans: signedOut.workspace.plans.filter((p) => !ids.has(p.id)) });
+  return second.ok ? { ok: true, bound: moving.length } : failure("partial");
+}
+
+// Backups.
+
+export type ImportError = FormatError | "too-large" | "other-owner";
+
+const IMPORT_MESSAGES: Record<ImportError, string> = {
+  "too-large": "That file is over 1 MiB, larger than a backup of a device's plans can be. Nothing was changed.",
+  malformed: "That file is not a backup of plans from this site, or it is damaged. Nothing was changed.",
+  "newer-version": "That backup was made by a newer version of Everloot. Reload the page and try again. Nothing was changed.",
+  "over-limit": `Restoring that backup would pass what this device keeps: ${WORKSPACE_LIMITS.plans} plans and ${WORKSPACE_LIMITS.alts} alts, all within 1 MiB. Nothing was changed.`,
+  "bad-reference": "That backup is damaged: something in it names a plan it does not hold. Nothing was changed.",
+  "other-owner": "That backup belongs to a different account. Nothing was changed.",
+};
+
+/** For a page that checks a file's size before reading it. */
+export const BACKUP_TOO_LARGE = IMPORT_MESSAGES["too-large"];
+
+export interface ImportPreview {
+  /** The bucket the preview was made from, as stored then: applyImport writes only while it is still that. */
+  base: string;
+  /** The bucket once restored. */
+  result: PlayerWorkspace;
+  /** Plans the backup adds, brings back newer, leaves because this device's copy is newer, and has the same. */
+  added: number;
+  updated: number;
+  kept: number;
+  unchanged: number;
+  /** Alts and watches it adds or brings back newer. */
+  others: number;
+  /** A line per restored set whose spend order this version cannot read. Its talents are restored all the same. */
+  warnings: string[];
+}
+
+export type PreviewResult = { ok: true; preview: ImportPreview } | { ok: false; error: ImportError; message: string };
+
+/** The fields of an item in one fixed order, to compare two copies whatever order their keys came in. */
+const fields = <T extends object>(item: T, keys: readonly string[]) => JSON.stringify(keys.map((k) => (item as Record<string, unknown>)[k]));
+
+/** This device's items with a backup's merged in by id: a new one is added, a newer one replaces this device's
+ *  copy (through `pick`), and an older or equally old one leaves it as it is. */
+function merge<T extends { id: string }>(here: T[], backup: T[], keys: readonly string[], time: (item: T) => string, pick = (_mine: T, theirs: T) => theirs) {
+  const byId = new Map(here.map((item) => [item.id, item]));
+  const counts = { added: 0, updated: 0, kept: 0, unchanged: 0 };
+  const restored: T[] = [];
+  for (const theirs of backup) {
+    const mine = byId.get(theirs.id);
+    if (!mine) {
+      byId.set(theirs.id, theirs);
+      counts.added++;
+      restored.push(theirs);
+    } else if (fields(mine, keys) === fields(theirs, keys)) {
+      counts.unchanged++;
+    } else if (Date.parse(time(theirs)) > Date.parse(time(mine))) {
+      const next = pick(mine, theirs);
+      byId.set(theirs.id, next);
+      counts.updated++;
+      restored.push(next);
+    } else {
+      counts.kept++;
+    }
+  }
+  return { items: [...byId.values()], counts, restored };
+}
+
+function ownerRefusal(backup: Owner, here: Owner): string {
+  if (here.kind === "anonymous") return "That backup holds an account's plans. Sign in to that account to restore it. Nothing was changed.";
+  if (backup.kind === "anonymous") return "That backup holds plans saved while signed out. Sign out to restore them. Nothing was changed.";
+  return IMPORT_MESSAGES["other-owner"];
+}
+
+/** Why a restored set's order opens as unknown, or null when it reads (or there is none to read). */
+function orderWarning(plan: LocalPlan, set: 1 | 2): string | null {
+  const [code, token] = set === 1 ? [plan.code, plan.order] : [plan.code2, plan.order2];
+  if (code === null || token === null) return null;
+  const state = orderState(code, token);
+  if (state.known) return null;
+  const why = state.reason === "newer-version" ? "was made by a newer version of Everloot" : "cannot be read here";
+  return `${plan.name}: set ${set}'s spend order ${why}, so it opens as unknown. Its talents are restored.`;
+}
+
+/** What restoring `text` into `current` would do, without changing anything. */
+export function previewImport(text: string, current: PlayerWorkspace): PreviewResult {
+  const refuse = (error: ImportError, message = IMPORT_MESSAGES[error]): PreviewResult => ({ ok: false, error, message });
+  // A string's UTF-8 length is at least its length in code units, so the cheap test goes first.
+  if (text.length > WORKSPACE_LIMITS.bytes || bytes(text) > WORKSPACE_LIMITS.bytes) return refuse("too-large");
+  let value: unknown;
+  try { value = JSON.parse(text); } catch { return refuse("malformed"); }
+  const checked = validateWorkspace(value);
+  if (!checked.ok) return refuse(checked.error);
+  const backup = checked.workspace;
+  if (!sameOwner(backup.owner, current.owner)) return refuse("other-owner", ownerRefusal(backup.owner, current.owner));
+  // A restore never takes a binding away: this device's binding stays on the copy the backup brings back.
+  const plans = merge(current.plans, backup.plans, PLAN_KEYS, (p) => p.updatedAt, (mine, theirs) => ({ ...theirs, boundTo: mine.boundTo ?? theirs.boundTo }));
+  const alts = merge(current.alts, backup.alts, ALT_KEYS, (a) => a.updatedAt);
+  const watches = merge(current.watches, backup.watches, WATCH_KEYS, (w) => w.addedAt);
+  const result = { ...current, plans: plans.items, alts: alts.items, watches: watches.items };
+  const merged = validateWorkspace(result);
+  if (!merged.ok) return refuse(merged.error);
+  return {
+    ok: true,
+    preview: {
+      base: JSON.stringify(current), result, ...plans.counts,
+      others: alts.counts.added + alts.counts.updated + watches.counts.added + watches.counts.updated,
+      warnings: plans.restored.flatMap((p) => [orderWarning(p, 1), orderWarning(p, 2)].filter((w): w is string => w !== null)),
+    },
+  };
+}
+
+/** Restores what a preview showed, into the bucket it was made for, only while that bucket is as it was then. */
+export function applyImport(storage: DeviceStorage | null, owner: Owner, preview: ImportPreview): WriteResult {
+  // After an account switch, a preview made for the last account is not applied to this one.
+  if (!sameOwner(preview.result.owner, owner)) return failure("other-owner");
+  const read = readWorkspace(storage, owner);
+  if (!read.ok) return failure(read.error);
+  if (JSON.stringify(read.workspace) !== preview.base) return failure("changed");
+  return store(storage, preview.result);
+}
+
+/** The bucket as a backup file: its stored text, binding and all. Only this bucket, never another owner's. */
+export function exportBackup(workspace: PlayerWorkspace, now = new Date()): { ok: true; text: string; fileName: string } | Failure {
+  const text = JSON.stringify(workspace);
+  if (bytes(text) > WORKSPACE_LIMITS.bytes) return failure("over-limit");
+  return { ok: true, text, fileName: `everloot-plans-${now.toISOString().slice(0, 10)}.json` };
+}
+
+// The account, and plans that arrive as text.
+
+export type OwnerLookup = { ok: true; owner: Owner } | { ok: false };
+
+/** Who is signed in, from the same /api/auth/me the header asks. Only the account's stable id is used. */
+export async function lookupOwner(fetcher: typeof fetch = fetch): Promise<OwnerLookup> {
+  try {
+    const response = await fetcher("/api/auth/me", { cache: "no-store" });
+    if (!response.ok) return { ok: false };
+    const { user } = await response.json() as { user?: { id?: unknown } | null };
+    if (user === null) return { ok: true, owner: ANONYMOUS };
+    return validId(user?.id) ? { ok: true, owner: { kind: "account", userId: user.id } } : { ok: false };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/** A set's spend order as its token reads against its own code. Whether each point could be spent there is the
+ *  calculator's check, against the tree, when the plan opens. */
+export type OrderState = { known: true; origin: OrderOrigin } | { known: false; reason: OrderError | "none" };
+
+export function orderState(code: string, token: string | null): OrderState {
+  if (token === null) return { known: false, reason: "none" };
+  const decoded = decodeBuild(code);
+  if (!decoded.ok) return { known: false, reason: "malformed" };
+  const order = decodeOrder(token, decoded.build.ranks);
+  return order.ok ? { known: true, origin: order.origin } : { known: false, reason: order.error };
+}
+
+export type PlanText =
+  | { ok: true; classSlug: string; codes: [string, string | null]; orders: [string | null, string | null] }
+  | { ok: false; message: string };
+
+const NOT_A_PLAN = "That is not a talent link or a share code. Copy the link from the talent calculator and paste it here.";
+
+const segment = (s: string | undefined) => {
+  if (!s || s === "-") return null;
+  try { return decodeURIComponent(s); } catch { return s; }
+};
+
+/** The plan in pasted text: the calculator's address (#plan= and the rest), a build link's /b/<code>/<code> path,
+ *  or a bare share code. Orders come only with a #plan= address, each with its own set's code. */
+export function readPlanText(text: string): PlanText {
+  const trimmed = text.trim();
+  if (!trimmed) return { ok: false, message: "Paste a talent link or a share code first." };
+  let codes: [string | null, string | null] = [trimmed, null];
+  let orders: [string | null, string | null] = [null, null];
+  const path = /\/b\/([^/?#\s]+)(?:\/([^/?#\s]+))?/.exec(trimmed);
+  if (/[#&]plan2?=/.test(trimmed)) {
+    const hash = readPlanHash(trimmed);
+    codes = [hash.first, hash.second];
+    orders = [hash.firstOrder ?? null, hash.secondOrder ?? null];
+  } else if (path) {
+    codes = [segment(path[1]), segment(path[2])];
+  }
+  const [first, second] = codes;
+  if (!first) return { ok: false, message: second ? "That link has no first talent set. Open it in the calculator, spend a point in set 1 and copy the link again." : NOT_A_PLAN };
+  const classSlug = codeClass(first);
+  if (!classSlug) return { ok: false, message: NOT_A_PLAN };
+  if (second !== null && codeClass(second) !== classSlug) return { ok: false, message: codeClass(second) ? "Both talent sets must be for the same class." : NOT_A_PLAN };
+  return { ok: true, classSlug, codes: [first, second], orders: [orders[0], second === null ? null : orders[1]] };
+}
