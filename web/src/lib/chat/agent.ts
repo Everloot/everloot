@@ -110,8 +110,8 @@ export async function signedIn(send: typeof fetch = fetch): Promise<boolean> {
 }
 
 /** The chat's tools with their input schemas, from the site's published schema files; `account` adds my_builds. */
-export async function loadTools(send: typeof fetch = fetch, account = false): Promise<ToolDef[]> {
-  const tools = await Promise.all(CHAT_TOOLS.map(async (name) => {
+export async function loadTools(send: typeof fetch = fetch, account = false, names: readonly string[] = CHAT_TOOLS): Promise<ToolDef[]> {
+  const tools = await Promise.all(names.map(async (name) => {
     const res = await send(`/schema/mcp/${name}.json`);
     if (!res.ok) throw new Error(`Could not load the ${name} tool (${res.status})`);
     const doc = (await res.json()) as { title?: string; description?: string; inputSchema?: Record<string, unknown> };
@@ -215,8 +215,17 @@ export async function* sseData(stream: ReadableStream<Uint8Array>): AsyncGenerat
   }
 }
 
+/**
+ * How far one answer goes: tool rounds, the characters of each tool result and earlier turn the model is sent,
+ * how many earlier turns, and the tokens it may write per call.
+ */
+export interface AnswerLimits { rounds: number; chars: number; turns: number; maxTokens: number }
+
+const LIMITS: AnswerLimits = { rounds: MAX_ROUNDS, chars: MAX_RESULT, turns: 10, maxTokens: 1500 };
+
 export interface AnswerOptions {
-  provider: ChatProviderPreset;
+  /** A provider from the catalogue, or the free model's proxy on this site. */
+  provider: Pick<ChatProviderPreset, "name" | "api" | "baseUrl" | "headers"> & { kind: string };
   model: string;
   /** The player's key; empty for a provider that needs none. */
   key: string;
@@ -229,6 +238,7 @@ export interface AnswerOptions {
   /** The tool calls' fetch (this site); tests pass a fake. */
   site?: typeof fetch;
   signal?: AbortSignal;
+  limits?: AnswerLimits;
 }
 
 /** What an answer's tool calls found so far, with each tool's output kept for the fallback. */
@@ -245,8 +255,14 @@ async function runTool(o: AnswerOptions, name: string, input: Record<string, unk
   for (const p of pagesIn(out)) if (!found.pages.includes(p)) found.pages.push(p);
   found.steps.push({ tool: name, input: JSON.stringify(input).slice(0, 200), chars: out.length });
   if (!out.startsWith("Tool error:")) found.outputs.push(out.slice(0, FALLBACK_CHARS));
-  return out.slice(0, MAX_RESULT);
+  return out.slice(0, (o.limits ?? LIMITS).chars);
 }
+
+/** The earlier turns the model is sent: the last few, each cut to the limit. */
+const earlier = (o: AnswerOptions) => {
+  const { turns, chars } = o.limits ?? LIMITS;
+  return o.history.slice(-turns).map((m) => ({ role: m.role, content: m.text.slice(0, chars) }));
+};
 
 async function failure(res: Response, label: string): Promise<Error> {
   const body = (await res.json().catch(() => ({}))) as { error?: { message?: string } | string };
@@ -285,7 +301,43 @@ export async function answer(o: AnswerOptions): Promise<ChatReply> {
   }
 }
 
-type AnthropicBlock = { type: "text"; text: string } | { type: "tool_use"; id: string; name: string; input: unknown };
+/**
+ * Everloot (free): the built-in model for a visitor with no key of their own, on a provider's free tier. The page
+ * calls this site's proxy (web/src/lib/chat/free-chat.ts), which holds the key, picks the model and keeps the limits.
+ */
+export const FREE_PROVIDER: AnswerOptions["provider"] = { kind: "everloot-free", name: "Everloot (free)", api: "openai", baseUrl: "/api/chat/free", headers: {} };
+
+/**
+ * The tools the free model is offered. A free tier counts tokens a minute and a day, and every tool's definition
+ * goes with every call, so the free model gets the ones most questions need rather than all of CHAT_TOOLS.
+ */
+export const FREE_TOOLS = [
+  "search_knowledge", "get_by_name", "item_page", "npc_page", "quest_page", "vendor_page",
+  "profession_path", "talent_tree", "market_value", "recent_changes",
+] as const satisfies readonly (typeof CHAT_TOOLS)[number][];
+
+/** A free answer's reach: fewer rounds, shorter tool results and fewer earlier turns, so one fits a free tier's minute. */
+export const FREE_BUDGET: AnswerLimits = { rounds: 3, chars: 4000, turns: 6, maxTokens: 1000 };
+
+/** The line a free answer starts with when the free model could not answer and Everloot search did instead. */
+export const FREE_FALLBACK = "The free model is not available right now (it may be at its limit), so this is Everloot search.";
+
+/**
+ * The free model's answer. When it cannot answer at all (its limit, the provider, or the proxy is off), the reply is
+ * Everloot search for `search`, the question as typed, with one line saying why. A stop by the player is thrown.
+ */
+export async function answerFree(o: Omit<AnswerOptions, "provider" | "model" | "key" | "limits">, search: string): Promise<ChatReply> {
+  try {
+    // The proxy picks the model; this name is only a placeholder.
+    return await answer({ ...o, provider: FREE_PROVIDER, model: "everloot-free", key: "", limits: FREE_BUDGET });
+  } catch (err) {
+    if (o.signal?.aborted) throw err;
+    const found = await searchOnly(search, o.site ?? fetch);
+    return { ...found, text: `${FREE_FALLBACK}\n\n${found.text}` };
+  }
+}
+
+type AnthropicBlock ={ type: "text"; text: string } | { type: "tool_use"; id: string; name: string; input: unknown };
 
 /** A reply with what the tools found, without the kept outputs. */
 const reply = (text: string, model: string | null, found: Found): ChatReply =>
@@ -294,12 +346,10 @@ const reply = (text: string, model: string | null, found: Found): ChatReply =>
 async function anthropicLoop(o: AnswerOptions, found: Found): Promise<ChatReply> {
   const send = o.send ?? fetch;
   const tools = o.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.inputSchema }));
-  const messages: { role: "user" | "assistant"; content: string | unknown[] }[] = [
-    ...o.history.slice(-10).map((m) => ({ role: m.role, content: m.text })),
-    { role: "user", content: o.question },
-  ];
+  const { rounds, maxTokens } = o.limits ?? LIMITS;
+  const messages: { role: "user" | "assistant"; content: string | unknown[] }[] = [...earlier(o), { role: "user", content: o.question }];
   let model = o.model;
-  for (let round = 0; round <= MAX_ROUNDS; round++) {
+  for (let round = 0; round <= rounds; round++) {
     const res = await sendTwice(send, `${o.provider.baseUrl}/messages`, {
       method: "POST",
       headers: {
@@ -309,7 +359,7 @@ async function anthropicLoop(o: AnswerOptions, found: Found): Promise<ChatReply>
         // Anthropic asks a page to say it knows the key is in the browser; here that is the point.
         "anthropic-dangerous-direct-browser-access": "true",
       },
-      body: JSON.stringify({ model: o.model, max_tokens: 1500, system: SYSTEM, tools, messages, stream: true }),
+      body: JSON.stringify({ model: o.model, max_tokens: maxTokens, system: SYSTEM, tools, messages, stream: true }),
       signal: o.signal,
     });
     if (!res.ok || !res.body) throw await failure(res, "Anthropic");
@@ -339,7 +389,7 @@ async function anthropicLoop(o: AnswerOptions, found: Found): Promise<ChatReply>
     });
     const uses = content.filter((b): b is Extract<AnthropicBlock, { type: "tool_use" }> => b.type === "tool_use");
     const text = content.filter((b): b is Extract<AnthropicBlock, { type: "text" }> => b.type === "text").map((b) => b.text).join("\n").trim();
-    if (stop !== "tool_use" || uses.length === 0 || round === MAX_ROUNDS) return reply(text || NO_SOURCED_ANSWER, model, found);
+    if (stop !== "tool_use" || uses.length === 0 || round === rounds) return reply(text || NO_SOURCED_ANSWER, model, found);
     messages.push({ role: "assistant", content });
     const results = [];
     for (const use of uses) {
@@ -379,21 +429,19 @@ export async function readOpenAiStream(stream: ReadableStream<Uint8Array>, onTex
 
 async function openAiLoop(o: AnswerOptions, found: Found): Promise<ChatReply> {
   const send = o.send ?? fetch;
-  const label = new URL(o.provider.baseUrl).host;
+  // The free model's proxy is on this site, with a path and no host of its own: it goes by its name.
+  const label = o.provider.baseUrl.startsWith("/") ? o.provider.name : new URL(o.provider.baseUrl).host;
+  const { rounds, maxTokens } = o.limits ?? LIMITS;
   const tools = o.tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.inputSchema } }));
-  const messages: OaiMessage[] = [
-    { role: "system", content: SYSTEM },
-    ...o.history.slice(-10).map((m): OaiMessage => ({ role: m.role, content: m.text })),
-    { role: "user", content: o.question },
-  ];
+  const messages: OaiMessage[] = [{ role: "system", content: SYSTEM }, ...earlier(o), { role: "user", content: o.question }];
   let model = o.model;
-  for (let round = 0; round <= MAX_ROUNDS; round++) {
+  for (let round = 0; round <= rounds; round++) {
     let res: Response;
     try {
       res = await sendTwice(send, `${o.provider.baseUrl}/chat/completions`, {
         method: "POST",
         headers: { "content-type": "application/json", ...(o.key ? { authorization: `Bearer ${o.key}` } : {}), ...o.provider.headers },
-        body: JSON.stringify({ model: o.model, max_tokens: 1500, messages, tools, stream: true }),
+        body: JSON.stringify({ model: o.model, max_tokens: maxTokens, messages, tools, stream: true }),
         signal: o.signal,
       });
     } catch (err) {
@@ -416,7 +464,7 @@ async function openAiLoop(o: AnswerOptions, found: Found): Promise<ChatReply> {
     }
     const calls = turn.tool_calls ?? [];
     const text = (turn.content ?? "").trim();
-    if (calls.length === 0 || round === MAX_ROUNDS) return reply(text || NO_SOURCED_ANSWER, model, found);
+    if (calls.length === 0 || round === rounds) return reply(text || NO_SOURCED_ANSWER, model, found);
     messages.push({ role: "assistant", content: turn.content ?? null, tool_calls: calls });
     for (const call of calls) {
       let input: Record<string, unknown>;

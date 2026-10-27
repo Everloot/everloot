@@ -68,5 +68,12 @@ test("about one consume call in a hundred prunes rows idle for over an hour", as
   const pruned = fakePool(now);
   await pgRateLimitStore(pruned.pool, () => 0.009).consume("k", { window: 60, max: 3 });
   expect(pruned.query).toHaveBeenCalledTimes(2);
-  expect(pruned.query.mock.calls[1]).toEqual([expect.stringMatching(/^delete from public\.auth_rate_limit where last_request < \$1/), [now - 60 * 60 * 1000]]);
+  expect(pruned.query.mock.calls[1]).toEqual([expect.stringMatching(/^delete from public\.auth_rate_limit where last_request < \$1/), [now - 60 * 60 * 1000, now - 25 * 60 * 60 * 1000]]);
+});
+
+test("a daily: key outlives the hour, so a count over a day is not pruned halfway through it", async () => {
+  const { pgRateLimitStore } = await import("./db");
+  const pruned = fakePool(Date.now());
+  await pgRateLimitStore(pruned.pool, () => 0).consume("k", { window: 60, max: 3 });
+  expect(pruned.query.mock.calls[1][0]).toBe("delete from public.auth_rate_limit where last_request < $1 and (key not like 'daily:%' or last_request < $2)");
 });

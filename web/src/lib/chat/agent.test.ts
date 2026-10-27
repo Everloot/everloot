@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import { MY_BUILDS_LINE, MY_BUILDS_REFUSAL } from "../saved-builds";
 import {
-  ACCOUNT_TOOL, answer, answerOrigin, callTool, CHAT_TOOLS, loadTools, marketReply, MODEL_STOPPED, NO_SOURCED_ANSWER, pagesIn, readOpenAiStream, searchOnly, signedIn,
+  ACCOUNT_TOOL, answer, answerFree, answerOrigin, callTool, CHAT_TOOLS, FREE_BUDGET, FREE_FALLBACK, FREE_PROVIDER, FREE_TOOLS, loadTools, marketReply, MODEL_STOPPED, NO_SOURCED_ANSWER, pagesIn, readOpenAiStream, searchOnly, signedIn,
   SMALL_TALK_REPLY, smallTalk, sourceLink, sourcesIn, SYSTEM, testKey, TOOL_POLICY, UNSOURCED, type ToolDef,
 } from "./agent";
 import { FIXTURE_ANSWER, FIXTURE_STRUCTURED, FIXTURE_URL } from "./market-fixture";
@@ -312,5 +312,79 @@ describe("price questions", () => {
     const pending = marketReply("price 2589 on Forever", { send, signal: ctl.signal });
     ctl.abort();
     await expect(pending).rejects.toThrow();
+  });
+});
+
+describe("the free model (Everloot free)", () => {
+  const FREE_URL = "/api/chat/free/chat/completions";
+  const many = (n: number, chars: number) => Array.from({ length: n }, (_, i) => ({ role: (i % 2 ? "assistant" : "user") as "user" | "assistant", text: `${i}`.padEnd(chars, "x") }));
+
+  test("runs the same loop through this site's proxy: no key, no extra headers, the free budget and only the tools it is given", async () => {
+    const calls: string[] = [];
+    const bodies: { model: string; max_tokens: number; tools: { function: { name: string } }[]; messages: { role: string; content: string | null }[] }[] = [];
+    const headers: Record<string, string>[] = [];
+    const send = vi.fn(async (_url: string, init: { body: string; headers: Record<string, string> }) => {
+      bodies.push(JSON.parse(init.body)); headers.push(init.headers);
+      return bodies.length === 1
+        ? sse([{ model: "openai/gpt-oss-120b", choices: [{ delta: { tool_calls: [{ index: 0, id: "c1", type: "function", function: { name: "search_knowledge", arguments: "{\"query\":\"Leeroy\"}" } }] } }] }])
+        : sse([{ choices: [{ delta: { content: "A paladin." } }] }]);
+    });
+    const big = vi.fn(async (url: string) => { calls.push(url); return new Response(JSON.stringify({ text: HIT + "y".repeat(10_000) }), { status: 200 }); }) as unknown as typeof fetch;
+    const r = await answerFree({ history: many(10, 9000), question: "who is leeroy\n\nMy note", tools: TOOLS, send: send as never, site: big }, "who is leeroy");
+    expect(send.mock.calls[0][0]).toBe(FREE_URL);
+    expect(headers[0]).toEqual({ "content-type": "application/json" });
+    expect(bodies[0].max_tokens).toBe(FREE_BUDGET.maxTokens);
+    expect(bodies[0].tools.map((t) => t.function.name)).toEqual(["search_knowledge"]);
+    // The earlier turns: the last few, each cut to the budget, then the question as asked.
+    const sent = bodies[0].messages;
+    expect(sent.slice(1, -1)).toHaveLength(FREE_BUDGET.turns);
+    for (const m of sent.slice(1, -1)) expect(m.content!.length).toBeLessThanOrEqual(FREE_BUDGET.chars);
+    expect(sent.at(-1)).toEqual({ role: "user", content: "who is leeroy\n\nMy note" });
+    // A tool's output goes back to the model cut to the budget too.
+    expect(bodies[1].messages.at(-1)!.content!.length).toBe(FREE_BUDGET.chars);
+    expect(r).toMatchObject({ text: "A paladin.", model: "openai/gpt-oss-120b", sources: [expect.stringContaining("Leeroy_Jenkins")] });
+  });
+
+  test("the free tools are Everloot chat tools, fewer than all of them, and never the account's own", () => {
+    for (const t of FREE_TOOLS) expect(CHAT_TOOLS as readonly string[]).toContain(t);
+    expect(FREE_TOOLS.length).toBeLessThan(CHAT_TOOLS.length);
+    expect(FREE_TOOLS as readonly string[]).not.toContain("my_builds");
+  });
+
+  test("loadTools can load just the free tools", async () => {
+    const send = vi.fn(async (_url: string) => new Response(JSON.stringify({ title: "T", inputSchema: { type: "object", properties: {} } }), { status: 200 }));
+    expect((await loadTools(send as never, false, FREE_TOOLS)).map((t) => t.name)).toEqual([...FREE_TOOLS]);
+    expect(send).toHaveBeenCalledTimes(FREE_TOOLS.length);
+  });
+
+  test("at its limit (429) the answer is Everloot search, with one line saying why", async () => {
+    const calls: string[] = [];
+    const limited = vi.fn(async () => new Response(JSON.stringify({ error: { message: "The free model has reached its limit for now.", code: "free_chat_limit" } }), { status: 429 }));
+    const r = await answerFree({ history: [], question: "who is leeroy\n\nMy note", tools: TOOLS, send: limited as never, site: site(calls) }, "who is leeroy");
+    expect(limited).toHaveBeenCalledTimes(1);
+    expect(calls).toEqual(["/api/tools/search_knowledge?query=who+is+leeroy&limit=3"]);
+    expect(r.model).toBeNull();
+    expect(r.text.split("\n")[0]).toBe(FREE_FALLBACK);
+    expect(r.text).toContain("Leeroy Jenkins is a valiant human paladin.");
+    expect(r.sources).toHaveLength(1);
+  });
+
+  test("an unavailable or failing proxy falls back the same way; a stop by the player does not", async () => {
+    for (const status of [404, 502, 503]) {
+      const down = vi.fn(async () => new Response(JSON.stringify({ error: { message: "x" } }), { status }));
+      const r = await answerFree({ history: [], question: "who is leeroy", tools: TOOLS, send: down as never, site: site([]) }, "who is leeroy");
+      expect(r.text.startsWith(FREE_FALLBACK)).toBe(true);
+    }
+    const ctl = new AbortController();
+    const hang = vi.fn((_url: string, init?: RequestInit) => new Promise<Response>((_, reject) => init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")))));
+    const pending = answerFree({ history: [], question: "q", tools: TOOLS, send: hang as never, site: site([]), signal: ctl.signal }, "q");
+    ctl.abort();
+    await expect(pending).rejects.toThrow();
+  });
+
+  test("errors from the proxy are labelled with its name, since it has no host of its own", async () => {
+    const http = vi.fn(async () => new Response(JSON.stringify({ error: { message: "nope" } }), { status: 401 }));
+    await expect(answer({ provider: FREE_PROVIDER, model: "m", key: "", history: [], question: "q", tools: TOOLS, send: http as never, site: site([]) }))
+      .rejects.toThrow("Everloot (free): HTTP 401, nope");
   });
 });

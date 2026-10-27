@@ -41,10 +41,12 @@ export function authPool(): Pool {
 }
 
 const PRUNE_AFTER_MS = 60 * 60 * 1000;
+const DAILY_PRUNE_AFTER_MS = 25 * 60 * 60 * 1000;
 
 // One statement, so concurrent requests cannot both pass a stale read. `last_request` holds the
 // start of the current window in ms: an expired window restarts at 1, otherwise the count grows.
-// About one call in a hundred also deletes rows whose window started over an hour ago.
+// About one call in a hundred also deletes rows whose window started over an hour ago, or over
+// a day ago for a key that counts over a day (named `daily:...`, the free chat model's).
 export function pgRateLimitStore(pool: Pool, random: () => number = Math.random): RateLimitStore {
   return {
     async consume(key, { window, max }) {
@@ -58,7 +60,12 @@ export function pgRateLimitStore(pool: Pool, random: () => number = Math.random)
          returning count, last_request`,
         [key, now, windowMs],
       );
-      if (random() < 0.01) await pool.query("delete from public.auth_rate_limit where last_request < $1", [now - PRUNE_AFTER_MS]);
+      if (random() < 0.01) {
+        await pool.query(
+          "delete from public.auth_rate_limit where last_request < $1 and (key not like 'daily:%' or last_request < $2)",
+          [now - PRUNE_AFTER_MS, now - DAILY_PRUNE_AFTER_MS],
+        );
+      }
       const { count, last_request } = rows[0];
       if (count <= max) return { allowed: true, retryAfter: null };
       return { allowed: false, retryAfter: Math.ceil((Number(last_request) + windowMs - now) / 1000) };
