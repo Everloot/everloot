@@ -517,6 +517,15 @@ test("a backup restores every alt detail after a preview that names the alts", a
   expect(stored(ANON)?.plans).toEqual([plan()]);
 });
 
+test("the file reader says up front what today's addon files give, before a file is chosen", async () => {
+  await render();
+  const reader = container.querySelector("#alts-file")!.closest("section")!;
+  const line = "Today's addon files give each character's name and realm, from its gold records. Class, level and faction come once the addon records them.";
+  expect(reader.textContent).toContain(line);
+  // Ahead of the picker.
+  expect(reader.textContent!.indexOf(line)).toBeLessThan(reader.textContent!.indexOf("Choose Everloot.lua"));
+});
+
 test("each file picker shows the site's focus ring while the hidden input inside it has focus", async () => {
   await render();
   for (const label of ["Choose Everloot.lua", "Choose a backup file"]) {

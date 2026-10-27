@@ -138,6 +138,11 @@ export default function ReadSaveFile({ owner, onApplied }: {
       <SectionHeading id="alts-file" note="Adds your characters from the Everloot addon's file. The file is read in this browser and is not uploaded; only the details of the characters you add are kept.">
         Read your Everloot.lua
       </SectionHeading>
+      {/* The addon writes no link records yet (character_link is in the record protocol only), so a file's details
+          are names and realms for now. */}
+      <p className="mb-3 text-sm text-fg-2">
+        Today&apos;s addon files give each character&apos;s name and realm, from its gold records. Class, level and faction come once the addon records them.
+      </p>
       {/* The input inside is hidden, so the label shows the site's focus ring while it has focus. */}
       <label className="btn cursor-pointer text-sm focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent">Choose Everloot.lua
         <input aria-label="Choose Everloot.lua" type="file" accept=".lua" className="sr-only" disabled={reading}
