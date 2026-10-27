@@ -4,6 +4,7 @@ const auth = vi.hoisted(() => ({ getUser: vi.fn(), authQuery: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ getUser: auth.getUser, authQuery: auth.authQuery, siteUrl: () => "https://everloot.app" }));
 
 import { GET, POST } from "./route";
+import { ORDERS_RECHECK_MS } from "@/lib/saved-builds-store";
 
 const SITE = "https://everloot.app";
 const USER = { id: "11111111-2222-4333-8444-555555555555", name: "Thrall#1" };
@@ -41,13 +42,58 @@ function database(owned: object[], saved: object = row()) {
   });
 }
 
+/** A request PostgREST refused, as authQuery throws it: the status, and the code and message from the body. */
+const refused = (status: number, code: string, reason: string) =>
+  Object.assign(new Error(`Authentication storage failed (${status})`), { status, code, reason });
+/** Production's database before 20261027120000_saved_build_point_order.sql, as PostgREST answers for it. */
+function beforeMigration(owned: object[]) {
+  const legacyRow = (r: Record<string, unknown>) => Object.fromEntries(Object.entries(r).filter(([k]) => !k.startsWith("point_order")));
+  auth.authQuery.mockImplementation(async (path: string) => {
+    if (path === "rpc/save_build_plan") throw refused(404, "PGRST202", "Could not find the function public.save_build_plan(p_payload, p_user_id) in the schema cache");
+    if (path.includes("point_order")) throw refused(400, "42703", "column saved_builds.point_order does not exist");
+    if (path.startsWith("build_characters")) return [];
+    if (path === "rpc/save_build") return [SAVED];
+    return owned.map((r) => legacyRow(r as Record<string, unknown>));
+  });
+}
+const legacySent = () => JSON.parse(auth.authQuery.mock.calls.find(([p]) => p === "rpc/save_build")![1].body);
+
+// Each test starts more than a minute after the one before, so a migration one test found missing is asked for again.
+let now = Date.now();
+
 beforeEach(() => {
   vi.stubEnv("EVERLOOT_CHAT_WORKSPACE", "1");
   vi.stubEnv("EVERLOOT_SAVED_BUILDS", "");
   auth.getUser.mockReset().mockResolvedValue(USER);
   auth.authQuery.mockReset();
+  now += ORDERS_RECHECK_MS + 1;
+  vi.spyOn(Date, "now").mockImplementation(() => now);
 });
-afterEach(() => { vi.unstubAllEnvs(); });
+afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
+
+test("before the spend-order migration, with saved builds off, Chat lists and saves its private builds as it did", async () => {
+  beforeMigration([row({ shared: false, show_name: false, active: false })]);
+  const list = await GET(call("GET"));
+  expect(list.status).toBe(200);
+  const { builds } = await list.json();
+  expect(builds[0]).toMatchObject({ id: BUILD_ID, shared: false });
+  expect(builds[0]).not.toHaveProperty("order");
+  // A new build: save_build, private, unmarked and anonymous.
+  expect((await save({ name: "Fire", code: MAGE })).status).toBe(201);
+  expect(legacySent()).toMatchObject({ p_user_id: USER.id, p_id: null, p_name: "Fire", p_code: MAGE, p_shared: false, p_show_name: false, p_active: false });
+  // An edit of the account's own build keeps its switches, through save_build too.
+  auth.authQuery.mockClear();
+  expect((await save({ id: BUILD_ID, name: "Frost", code: MAGE })).status).toBe(200);
+  expect(legacySent()).toMatchObject({ p_id: BUILD_ID, p_name: "Frost", p_shared: null, p_show_name: null, p_active: null });
+});
+
+test("before the migration a Chat save that names an order is refused as not saved, never as unconfirmed", async () => {
+  beforeMigration([row()]);
+  const res = await save({ name: "Fire", code: MAGE, order: ORDER });
+  expect(res.status).toBe(409);
+  expect(await res.json()).toEqual({ error: "Saving spend orders isn't available yet, so this build was not saved.", code: "orders_unavailable" });
+  expect(auth.authQuery.mock.calls.find(([p]) => p === "rpc/save_build")).toBeUndefined();
+});
 
 test("the workspace switch alone opens it: off is a 404 even with saved builds on", async () => {
   vi.stubEnv("EVERLOOT_CHAT_WORKSPACE", "");

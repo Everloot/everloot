@@ -3,8 +3,9 @@
 -- checks, a trigger that drops an order when a save changes its code, and save_build_plan, the one call the site makes
 -- to save a build. The table's other columns, its grants and row security, and the eight functions of
 -- 20261021150000_saved_builds.sql stay exactly as they are. Safe to apply twice.
--- Apply before the site code that reads these columns is deployed: Chat saves builds while EVERLOOT_SAVED_BUILDS is
--- off, and that code reads point_order and point_order2 and calls save_build_plan
+-- The site's code works with or without this file. Without it, builds are read without orders, a save that names no
+-- order goes through save_build, and one that names an order is refused with nothing written; orders are kept from
+-- about a minute after the apply. Apply it before EVERLOOT_SAVED_BUILDS is turned on
 -- (docs/2026-10-27-saved-builds-activation.md, "Spend orders").
 --
 -- An order is stored as its token only: O1, then p (planned by the player) or g (generated, so provisional), a dash
@@ -107,7 +108,8 @@ grant execute on function public.save_build_plan(uuid, jsonb) to service_role;
 notify pgrst, 'reload schema';
 
 -- Every order one account saved: select id, point_order, point_order2 from public.saved_builds where user_id = '<id>';
--- Rollback (run by hand, only once the site code from before this file is deployed again):
+-- Rollback (run by hand). From its next save the site goes back to save_build for a save that names no order, and
+-- refuses one that names an order:
 --   drop function if exists public.save_build_plan(uuid, jsonb);
 --   notify pgrst, 'reload schema';
 -- The columns, every order in them and the trigger stay. Dropping the columns deletes every saved order; dropping the

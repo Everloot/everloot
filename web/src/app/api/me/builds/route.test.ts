@@ -6,7 +6,7 @@ vi.mock("@/lib/supabase/server", () => ({ getUser: auth.getUser, authQuery: auth
 import { GET, POST } from "./route";
 import { DELETE } from "./[id]/route";
 import { hashKey } from "@/lib/api-keys";
-import { newSlug } from "@/lib/saved-builds-store";
+import { newSlug, ORDERS_RECHECK_MS } from "@/lib/saved-builds-store";
 
 const USER = { id: "11111111-2222-4333-8444-555555555555", name: "Thrall#1" };
 const BUILD_ID = "0b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e11";
@@ -44,13 +44,37 @@ const database = (rows: object[] = [row()]) =>
   auth.authQuery.mockImplementation(async (path: string) => (path === "rpc/save_build_plan" ? saved() : rows));
 /** Every call that writes: the RPCs other than the reads. */
 const writes = () => auth.authQuery.mock.calls.map(([path]) => path as string).filter((path) => path.startsWith("rpc/"));
+/** A request PostgREST refused, as authQuery throws it: the status, and the code and message from the body. */
+const refused = (status: number, code: string | null, reason = "") =>
+  Object.assign(new Error(`Authentication storage failed (${status})`), { status, code, reason });
+// PostgREST's answers before 20261027120000_saved_build_point_order.sql, the same on PostgREST 12.2 to 16.4.
+const NO_COLUMN = () => refused(400, "42703", "column saved_builds.point_order does not exist");
+const NO_PLAN = () => refused(404, "PGRST202", "Could not find the function public.save_build_plan(p_payload, p_user_id) in the schema cache");
+/** The database before the migration (or, with `columns`, after its rollback): save_build files the build. */
+function legacy({ columns = false } = {}) {
+  auth.authQuery.mockImplementation(async (path: string) => {
+    if (path === "rpc/save_build_plan") throw NO_PLAN();
+    if (path === "rpc/save_build") return [saved()];
+    if (path.startsWith("build_characters")) return [];
+    if (path.includes("point_order") && !columns) throw NO_COLUMN();
+    return [columns ? row() : keyRow()];
+  });
+}
+const ORDERS_UNAVAILABLE = "Saving spend orders isn't available yet, so this build was not saved.";
+/** The legacy save's named arguments, as save_build takes them. */
+const legacyBody = () => JSON.parse(auth.authQuery.mock.calls.find(([p]) => p === "rpc/save_build")![1].body);
+
+// Each test starts more than a minute after the one before, so a migration one test found missing is asked for again.
+let now = Date.now();
 
 beforeEach(() => {
   vi.stubEnv("EVERLOOT_SAVED_BUILDS", "1");
   auth.getUser.mockReset().mockResolvedValue(USER);
   auth.authQuery.mockReset();
+  now += ORDERS_RECHECK_MS + 1;
+  vi.spyOn(Date, "now").mockImplementation(() => now);
 });
-afterEach(() => { vi.unstubAllEnvs(); });
+afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
 test("with the switch off every route is a 404 and nothing is read", async () => {
   vi.stubEnv("EVERLOOT_SAVED_BUILDS", "");
@@ -293,6 +317,113 @@ test("storage trouble is a 503, never a silent success", async () => {
   expect((await GET(call("GET"))).status).toBe(503);
   expect((await POST(call("POST", { name: "a", code: MAGE, ...NEW }))).status).toBe(503);
   expect((await GET(call("GET", undefined, { authorization: `Bearer ${KEY}` }))).status).toBe(503);
+});
+
+// Before the spend-order migration (the code may be deployed first) the site reads and saves as it did, and refuses
+// only what it cannot keep.
+
+test("before the migration the list reads the file's columns and says nothing of orders, asking again after a minute", async () => {
+  legacy();
+  const res = await GET(call("GET"));
+  expect(res.status).toBe(200);
+  const { builds } = await res.json();
+  expect(builds[0]).toMatchObject({ id: BUILD_ID, code: MAGE });
+  expect(builds[0]).not.toHaveProperty("order");
+  // Found missing once, the order columns are not asked for again until a minute has passed.
+  const asked = () => auth.authQuery.mock.calls.filter(([p]) => (p as string).includes("point_order")).length;
+  expect(asked()).toBe(1);
+  await GET(call("GET"));
+  expect(asked()).toBe(1);
+  now += ORDERS_RECHECK_MS;
+  await GET(call("GET"));
+  expect(asked()).toBe(2);
+});
+
+test("before the migration a save that names no order goes through save_build, with the sharing it says", async () => {
+  legacy();
+  const res = await POST(call("POST", { name: " Fire ", code: MAGE, notes: "For raids", ...NEW }));
+  expect(res.status).toBe(201);
+  expect((await res.json()).build).toMatchObject({ id: BUILD_ID, link: "https://everloot.app/b/AbCd1234" });
+  expect(writes()).toEqual(["rpc/save_build_plan", "rpc/save_build"]);
+  const body = legacyBody();
+  expect(body).toMatchObject({ p_user_id: USER.id, p_id: null, p_character_id: null, p_name: "Fire", p_notes: "For raids", p_code: MAGE,
+    p_code2: null, p_shared: true, p_active: null, p_show_name: false });
+  expect(body.p_slug).toMatch(/^[A-Za-z0-9]{8}$/);
+  // An update, its switches left as they are, the same way; the next one does not ask for save_build_plan again.
+  auth.authQuery.mockClear();
+  expect((await POST(call("POST", { id: BUILD_ID, name: "Fire", code: MAGE }))).status).toBe(200);
+  expect(writes()).toEqual(["rpc/save_build"]);
+  expect(legacyBody()).toMatchObject({ p_id: BUILD_ID, p_slug: null, p_shared: null, p_show_name: null });
+});
+
+test("before the migration a save that names an order, an unknown one too, is refused and nothing is written", async () => {
+  legacy();
+  for (const body of [{ id: BUILD_ID, name: "Fire", code: MAGE, order: ORDER }, { id: BUILD_ID, name: "Fire", code: MAGE, order: null },
+    { name: "Fire", code: MAGE, code2: MAGE2, order2: ORDER2, ...NEW }]) {
+    const res = await POST(call("POST", body));
+    expect(res.status).toBe(409);
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
+    expect(await res.json()).toEqual({ error: ORDERS_UNAVAILABLE });
+  }
+  expect(writes()).toEqual(["rpc/save_build_plan"]);
+});
+
+test("before the migration a new build still says whether it is shared and shows its owner's name", async () => {
+  legacy();
+  expect((await POST(call("POST", { name: "a", code: MAGE, shared: true }))).status).toBe(400);
+  expect(auth.authQuery).not.toHaveBeenCalled();
+});
+
+test.each([
+  ["a network failure", () => new TypeError("fetch failed")],
+  ["a timeout", () => new DOMException("The operation was aborted due to timeout", "TimeoutError")],
+  ["a 500", () => refused(500, null)],
+  ["a 503 from the gateway", () => refused(503, "PGRST000", "Could not connect with the database")],
+  ["a function save_build_plan calls missing", () => refused(404, "42883", "function public.save_build(uuid, uuid, text) does not exist")],
+  ["another function missing", () => refused(404, "PGRST202", "Could not find the function public.save_profile(p_user_id) in the schema cache")],
+  ["a refused payload", () => refused(400, "P0001", "Invalid build")],
+])("after %s from save_build_plan the answer is a 503, and the older save is never tried", async (_kind, failure) => {
+  auth.authQuery.mockImplementation(async (path: string) => {
+    if (path === "rpc/save_build_plan") throw failure();
+    if (path === "rpc/save_build") return [saved()];
+    return [row()];
+  });
+  const res = await POST(call("POST", { name: "Fire", code: MAGE, ...NEW }));
+  expect(res.status).toBe(503);
+  expect(writes()).toEqual(["rpc/save_build_plan"]);
+});
+
+test("a column missing that is not an order column is not taken for the migration missing", async () => {
+  auth.authQuery.mockImplementation(async (path: string) => {
+    if (path.startsWith("saved_builds")) throw refused(400, "42703", "column saved_builds.show_name does not exist");
+    return [];
+  });
+  expect((await GET(call("GET"))).status).toBe(503);
+  expect(auth.authQuery.mock.calls.filter(([p]) => (p as string).startsWith("saved_builds"))).toHaveLength(1);
+});
+
+test("once the migration is in, the process takes save_build_plan again within a minute, orders and all", async () => {
+  legacy();
+  expect((await POST(call("POST", { name: "Fire", code: MAGE, ...NEW }))).status).toBe(201);
+  // Applied now. For the rest of the minute this process goes on without it, refusing orders it cannot be sure of.
+  database([row({ code2: MAGE2, point_order: ORDER, point_order2: ORDER2 })]);
+  auth.authQuery.mockClear();
+  expect((await POST(call("POST", { id: BUILD_ID, name: "Fire", code: MAGE, order: ORDER }))).status).toBe(409);
+  expect(writes()).toEqual([]);
+  now += ORDERS_RECHECK_MS;
+  const res = await POST(call("POST", { id: BUILD_ID, name: "Fire", code: MAGE, code2: MAGE2, order: ORDER, order2: ORDER2 }));
+  expect(res.status).toBe(200);
+  expect(writes()).toEqual(["rpc/save_build_plan"]);
+  expect((await res.json()).build).toMatchObject({ order: ORDER, order2: ORDER2 });
+});
+
+test("after the rollback, which keeps the order columns, the list keeps the orders and the saves without one still work", async () => {
+  legacy({ columns: true });
+  const list = await (await GET(call("GET"))).json();
+  expect(list.builds[0]).toMatchObject({ order: null, order2: null });
+  expect((await POST(call("POST", { id: BUILD_ID, name: "Fire", code: MAGE }))).status).toBe(200);
+  expect((await POST(call("POST", { id: BUILD_ID, name: "Fire", code: MAGE, order: ORDER }))).status).toBe(409);
+  expect(writes()).toEqual(["rpc/save_build_plan", "rpc/save_build"]);
 });
 
 test("short links are eight base62 characters and do not repeat", () => {

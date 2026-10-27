@@ -7,10 +7,11 @@ import { copyName } from "./BuildActions";
 /**
  * "Save a copy" on a shared build's page, for a signed-in visitor: the copy is theirs, with both sets' spend orders,
  * then opens in the calculator. Like a new build from the calculator, the copy has its own short link and does not
- * show the visitor's name, and it says so.
+ * show the visitor's name, and it says so. A build read while the database had no orders gives none, and the copy
+ * names none.
  */
 export default function SaveCopy({ name, notes, code, code2, order, order2 }: {
-  name: string; notes: string | null; code: string; code2: string | null; order: string | null; order2: string | null;
+  name: string; notes: string | null; code: string; code2: string | null; order?: string | null; order2?: string | null;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

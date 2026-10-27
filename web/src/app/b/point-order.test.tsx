@@ -15,6 +15,7 @@ vi.mock("@/lib/supabase/server", () => ({ getUser: auth.getUser, authQuery: auth
 
 import SharedBuildPage from "./[slug]/page";
 import { GET as card } from "@/app/tools/talents/[class]/card/route";
+import { ORDERS_RECHECK_MS } from "@/lib/saved-builds-store";
 import { loadCatalog } from "@/lib/talents/catalogs";
 import { encodeBuild, encodeOrder } from "@/lib/talents/share";
 
@@ -36,8 +37,12 @@ const shared = (over: object = {}) => ({
 });
 const params = (slug = "AbCd1234") => ({ params: Promise.resolve({ slug }) });
 const paths = () => auth.authQuery.mock.calls.map(([path]) => path as string);
+// Each test starts more than a minute after the one before, so a migration one test found missing is asked for again.
+let now = Date.now();
 
 beforeEach(async () => {
+  now += ORDERS_RECHECK_MS + 1;
+  vi.spyOn(Date, "now").mockImplementation(() => now);
   vi.stubEnv("EVERLOOT_SAVED_BUILDS", "1");
   const catalog = await loadCatalog("mage");
   const [first, second] = catalog.nodes.filter((n) => !n.unlock && n.prereqs.length === 0 && !n.anyOf);
@@ -54,7 +59,7 @@ beforeEach(async () => {
     throw new Error(`unexpected ${path}`);
   });
 });
-afterEach(() => { vi.unstubAllEnvs(); });
+afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
 test("the page opens the calculator with both sets and both spend orders, each with its maker's letter", async () => {
   expect([order.slice(0, 4), order2.slice(0, 4)]).toEqual(["O1p-", "O1g-"]);
@@ -104,6 +109,29 @@ test("with orders on the page, the character label, the BattleTag and every id s
   expect(res.status).toBe(200);
   expect(res.headers.get("cache-control")).toBe("private, no-store");
   expect(paths()).toEqual(["rpc/shared_build", ORDER_READ]);
+});
+
+test("before the spend-order migration the page opens as it did, and Save a copy has no orders to send", async () => {
+  auth.getUser.mockResolvedValue({ id: OWNER, name: "Thrall#1234" });
+  auth.authQuery.mockImplementation(async (path: string) => {
+    if (path === "rpc/shared_build") return publicRows;
+    // PostgREST's answer while the order columns are not there yet.
+    if (path.includes("point_order")) {
+      throw Object.assign(new Error("Authentication storage failed (400)"), { status: 400, code: "42703", reason: "column saved_builds.point_order does not exist" });
+    }
+    throw new Error(`unexpected ${path}`);
+  });
+  const page = await SharedBuildPage(params());
+  const html = renderToStaticMarkup(page);
+  expect(html).toContain(`href="/tools/talents/mage#plan=${code}&amp;plan2=${code2}"`);
+  expect(html).not.toContain("order=");
+  const copy = findElement(page, (el) => typeof el.type === "function" && el.type.name === "SaveCopy");
+  expect(copy?.props).toMatchObject({ code, code2 });
+  expect([copy?.props.order, copy?.props.order2]).toEqual([undefined, undefined]);
+  // The card too, and the order columns are not asked for again for a minute.
+  auth.authQuery.mockClear();
+  expect((await card(new Request("https://everloot.app/tools/talents/mage/card?s=AbCd1234"), { params: Promise.resolve({ class: "mage" }) })).status).toBe(200);
+  expect(paths()).toEqual(["rpc/shared_build"]);
 });
 
 test("a signed-in visitor's Save a copy is given both sets' orders to copy", async () => {

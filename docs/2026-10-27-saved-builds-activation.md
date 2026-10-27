@@ -10,8 +10,8 @@ Design: `docs/design/specs/2026-10-20-saved-builds-design.md`.
 
 Saving each talent set's spend order with its build is one more, additive migration,
 `supabase/migrations/20261027120000_saved_build_point_order.sql`. It has its own preflight, apply, postflight and
-rollback under [Spend orders](#spend-orders), and it goes in before the code that uses it is deployed, whatever the
-switch says. The schema checks below hold before it and after it.
+rollback under [Spend orders](#spend-orders). It can go in before or after the code that uses it, which keeps orders
+only once it is in, and it goes in before the switch. The schema checks below hold before it and after it.
 
 Never run the saved-builds file again, and never the rollback in its closing comment. Running the file again replaces
 `create_api_key` and the `api_key_usage` surface check under a lock, for nothing. The commented rollback deletes every
@@ -348,9 +348,15 @@ schema checks above still read `t`; the table keeps its grants and row security.
 key read (`own_builds_for_key`) and the MCP tool list stay as they are: a key's read has no orders, and a short link's
 page reads the orders beside `shared_build`, only for the build it returned and only while that build is shared.
 
-Chat is on in production and saves builds whatever the switch says, and the code that reads the orders calls
-`save_build_plan` and reads the two columns. So the order is fixed: preflight, apply, postflight, and only then merge
-and deploy that code. `EVERLOOT_SAVED_BUILDS` is a separate step, before or after.
+The code and the migration can go out in either order, but orders are kept only once the migration is in. Until then
+the site reads builds without orders, and Chat, which is on in production whatever the switch says, lists and saves
+as it did: a save that names no order goes through `save_build`. A save that names an order, an unknown one too, is
+refused before anything is written, with "Saving spend orders isn't available yet, so this build was not saved." The
+calculator's Save always names both sets' orders, so with saved builds on it saves nothing until the migration is
+in: apply it before `EVERLOOT_SAVED_BUILDS` goes on. Only PostgREST's own answer counts as missing: 42703 naming an
+order column, or PGRST202 (42883 when its schema cache is stale) naming `save_build_plan`. A timeout or any other
+failure is never tried again through `save_build`. A server that found the migration missing asks again a minute
+later, so orders are kept from about a minute after the apply.
 
 ### Test locally
 
@@ -377,6 +383,28 @@ off the public read, orders and all; the browser roles reach neither the columns
 and Chat's saves and reopens keep both orders and their makers; another account changes nothing; the limits hold; a
 key's read is unchanged. Applying twice keeps every order, the rollback keeps the columns, the orders and the trigger,
 and applying again brings the function back, with every other function, grant and table as it was throughout.
+
+`src/lib/saved-build-point-order.rest.test.ts` runs the site's own saved-builds code, the Chat and calculator routes
+with a made-up session, through a real PostgREST on the same legacy schema: first without the migration, then in the
+same process after applying it, then after the rollback below. It is skipped unless its three fixtures are given:
+
+```
+docker network create saved-build-point-order-rest
+docker run -d --name saved-build-point-order-rest-db --network saved-build-point-order-rest -e POSTGRES_HOST_AUTH_METHOD=trust -p 127.0.0.1:54411:5432 postgres:17
+docker exec saved-build-point-order-rest-db createdb -U postgres saved_build_point_order_rest_test
+docker run -d --name saved-build-point-order-rest-api --network saved-build-point-order-rest -p 127.0.0.1:54412:3000 -e PGRST_DB_SCHEMAS=public -e PGRST_DB_ANON_ROLE=anon -e PGRST_JWT_SECRET=<a local secret of 32 characters or more> -e PGRST_DB_URI=postgres://postgres@saved-build-point-order-rest-db:5432/saved_build_point_order_rest_test postgrest/postgrest:v12.2.12
+cd web
+QUOTA_TEST_DATABASE_URL=postgres://postgres@127.0.0.1:54411/saved_build_point_order_rest_test LOCAL_REST_URL=http://127.0.0.1:54412 LOCAL_REST_JWT_SECRET=<the same secret> npx vitest run src/lib/saved-build-point-order.rest.test.ts
+docker rm -f saved-build-point-order-rest-api saved-build-point-order-rest-db
+docker network rm saved-build-point-order-rest
+```
+
+Before the migration PostgREST answers a read of the order columns with 400 and 42703, and a call to
+`save_build_plan` with 404 and PGRST202; PostgREST 12.2, 13.0 and Supabase's 14.4, 14.8 and 16.4 answer the same. The
+test checks those answers. Then it checks that Chat lists and saves, that a save with an order is refused with
+nothing written, and that the explicit sharing and the owner checks hold on the older path. After the apply, the
+process goes on without the migration for the rest of its minute, then saves orders through `save_build_plan`. After
+the rollback the orders stay, and a save without one goes through `save_build` again.
 
 ### Preflight (read-only)
 
@@ -475,8 +503,9 @@ select check_name, ok from (values
 ) as checks(check_name, ok);
 ```
 
-Then merge and deploy the code that reads the orders. From outside, without an account, `GET /api/me/chat/builds`
-still answers 401 and, with the switch off, `GET /api/me/builds` a 404. These show the deploy answers, nothing more.
+If the code that reads the orders is already deployed, it starts keeping them within a minute of the apply; if not,
+it can be deployed now. From outside, without an account, `GET /api/me/chat/builds` still answers 401 and, with the
+switch off, `GET /api/me/builds` a 404. These show the deploy answers, nothing more.
 Saving with orders is proven only by a signed-in check on `https://everloot.app` with a disposable test account,
 never a real player's: in Chat, a new private build saves and an edit keeps it private; with saved builds on, a plan
 from a link with `&order=` saved from the calculator comes back from My builds with the same `&order=` in the
@@ -488,10 +517,11 @@ select count(*) as builds, count(point_order) as with_order from public.saved_bu
 
 ### Rollback
 
-First redeploy the commit from before the code that reads the orders. It never reads or writes them, so it works on
-either schema, and while it runs the trigger drops the order of any build whose code it changes. No SQL is needed for
-this. Only if the function itself must go too, and never while the code that reads the orders is deployed (its saves
-would fail), run:
+The code needs no rollback for the database's sake: it works with the migration, without it and with the function
+alone gone. Redeploying the commit from before it is a rollback of its own, with no SQL; that code never reads or
+writes orders, and while it runs the trigger drops the order of any build whose code it changes. If the function
+itself must go, run the block below. From its next save the site saves a build that names no order through
+`save_build` again and refuses one that names an order, with nothing written.
 
 ```sql
 -- point order rollback

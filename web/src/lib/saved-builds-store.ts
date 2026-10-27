@@ -6,11 +6,45 @@ import {
   ACCOUNT_MISMATCH, BUILD_COLUMNS, CHARACTER_COLUMNS, EXPECTED_OWNER_HEADER, ORDER_COLUMNS, savedBuildsOn, SLUG_PATTERN, toBuild, toCharacters,
   type AccountBuilds, type BuildCharacter, type BuildInput, type BuildRow, type CharacterInput, type CharacterRow, type SavedBuild,
 } from "./saved-builds";
-import { authQuery, getUser, siteUrl, type AccountUser } from "./supabase/server";
+import { authQuery, getUser, siteUrl, type AccountUser, type StorageError } from "./supabase/server";
 
 // Server side of saved builds: reads with the service role, writes through the security definer functions
 // in 20261021150000_saved_builds.sql, which hold the limits. A build and its spend orders are saved together by
 // save_build_plan (20261027120000_saved_build_point_order.sql), in one transaction.
+//
+// This code can run before that migration is applied, or after its rollback, which drops save_build_plan and keeps the
+// columns. Without the order columns, builds are read without orders. Without save_build_plan, a save that names no
+// order goes through save_build, and one that names an order, an unknown one too, is refused before anything is
+// written. Only PostgREST's word counts as missing: 42703 naming an order column, PGRST202 or 42883 naming
+// save_build_plan. Either answer means nothing ran. A timeout or any other failure is never retried another way.
+
+/** How long this process goes on without a part of the migration it found missing before it asks again. */
+export const ORDERS_RECHECK_MS = 60_000;
+const missingUntil = { columns: 0, plan: 0 };
+const missing = (part: keyof typeof missingUntil) => Date.now() < missingUntil[part];
+
+/** Whether `err` is PostgREST saying that part of the migration is not there. If so, this process goes on without it
+ *  for ORDERS_RECHECK_MS. The answer is read from the code and message a StorageError carries. */
+function foundMissing(err: unknown, part: keyof typeof missingUntil): boolean {
+  const { code, reason = "" } = (err ?? {}) as Partial<StorageError>;
+  const said = part === "columns" ? code === "42703" && reason.includes("point_order")
+    : (code === "PGRST202" || code === "42883") && reason.includes("save_build_plan");
+  if (said) missingUntil[part] = Date.now() + ORDERS_RECHECK_MS;
+  return said;
+}
+
+/** A read of builds, with the order columns while the database has them. Without them the rows have no orders at all,
+ *  so toBuild leaves them out rather than calling them unknown. `query` makes the path for a list of columns. */
+async function readBuilds(query: (columns: string) => string): Promise<BuildRow[]> {
+  if (!missing("columns")) {
+    try {
+      return await authQuery<BuildRow[]>(query(`${BUILD_COLUMNS},${ORDER_COLUMNS}`));
+    } catch (err) {
+      if (!foundMissing(err, "columns")) throw err;
+    }
+  }
+  return authQuery<BuildRow[]>(query(BUILD_COLUMNS));
+}
 
 const BASE62 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
@@ -29,13 +63,43 @@ export async function listOwn(userId: string): Promise<AccountBuilds> {
   const user = encodeURIComponent(userId);
   const [characters, builds] = await Promise.all([
     authQuery<CharacterRow[]>(`build_characters?select=${CHARACTER_COLUMNS}&user_id=eq.${user}`),
-    authQuery<BuildRow[]>(`saved_builds?select=${BUILD_COLUMNS},${ORDER_COLUMNS}&user_id=eq.${user}&order=updated_at.desc,id.asc`),
+    readBuilds((columns) => `saved_builds?select=${columns}&user_id=eq.${user}&order=updated_at.desc,id.asc`),
   ]);
   const site = siteUrl();
   return { characters: toCharacters(characters), builds: builds.map((b) => toBuild(b, site)) };
 }
 
-export type BuildRefusal = "not_found" | "class_mismatch" | "build_limit" | "daily_limit";
+/** orders_unavailable: the save names a spend order (null included) and the database cannot keep orders yet. */
+export type BuildRefusal = "not_found" | "class_mismatch" | "build_limit" | "daily_limit" | "orders_unavailable";
+const REFUSALS: string[] = ["not_found", "class_mismatch", "build_limit", "daily_limit", "orders_unavailable"];
+
+type Written = { build_ref: string | null; build_slug: string | null; refusal: string | null } | null;
+
+/** One write: save_build_plan, or save_build while the database has no save_build_plan and the save names no order. */
+async function writeBuild(userId: string, input: BuildInput, slug: string | null): Promise<Written> {
+  if (!missing("plan")) {
+    try {
+      // The payload is the input as parsed, with the server's slug for a new build. An order left out stays left out.
+      return await authQuery<Written>("rpc/save_build_plan", {
+        method: "POST", body: JSON.stringify({ p_user_id: userId, p_payload: { ...input, slug } }),
+      });
+    } catch (err) {
+      if (!foundMissing(err, "plan")) throw err;
+    }
+  }
+  if (input.order !== undefined || input.order2 !== undefined) return { build_ref: null, build_slug: null, refusal: "orders_unavailable" };
+  // save_build_plan's rule for a new build, kept here: it says whether it is shared and shows its owner's name.
+  if (!input.id && (input.shared === null || input.showName === null)) throw new Error("A new build needs shared and showName");
+  const rows = await authQuery<Written[]>("rpc/save_build", {
+    method: "POST",
+    body: JSON.stringify({
+      p_user_id: userId, p_id: input.id, p_slug: slug, p_character_id: input.characterId,
+      p_name: input.name, p_notes: input.notes, p_code: input.code, p_code2: input.code2,
+      p_shared: input.shared, p_active: input.active, p_show_name: input.showName,
+    }),
+  });
+  return Array.isArray(rows) && rows.length === 1 ? rows[0] : null;
+}
 
 /**
  * Creates (no id) or updates one of the user's builds, with its spend orders, in one call: when it fails nothing of
@@ -43,19 +107,13 @@ export type BuildRefusal = "not_found" | "class_mismatch" | "build_limit" | "dai
  */
 export async function saveBuild(userId: string, input: BuildInput): Promise<{ build: SavedBuild; created: boolean } | { refused: BuildRefusal }> {
   for (let attempt = 0; attempt < 3; attempt++) {
-    // The payload is the input as parsed, with the server's slug for a new build. An order left out stays left out.
-    const row = await authQuery<{ build_ref: string | null; build_slug: string | null; refusal: string | null } | null>("rpc/save_build_plan", {
-      method: "POST",
-      body: JSON.stringify({ p_user_id: userId, p_payload: { ...input, slug: input.id ? null : newSlug() } }),
-    });
+    const row = await writeBuild(userId, input, input.id ? null : newSlug());
     if (row?.refusal === "slug_taken") continue;
-    if (row && row.build_ref === null && ["not_found", "class_mismatch", "build_limit", "daily_limit"].includes(row.refusal ?? "")) {
-      return { refused: row.refusal as BuildRefusal };
-    }
+    if (row && row.build_ref === null && REFUSALS.includes(row.refusal ?? "")) return { refused: row.refusal as BuildRefusal };
     if (!row || typeof row.build_ref !== "string" || row.refusal !== null) throw new Error("Build was not saved");
-    const saved = await authQuery<BuildRow[]>(
-      `saved_builds?select=${BUILD_COLUMNS},${ORDER_COLUMNS}&id=eq.${encodeURIComponent(row.build_ref)}&user_id=eq.${encodeURIComponent(userId)}&limit=1`,
-    );
+    const ref = row.build_ref;
+    const saved = await readBuilds((columns) =>
+      `saved_builds?select=${columns}&id=eq.${encodeURIComponent(ref)}&user_id=eq.${encodeURIComponent(userId)}&limit=1`);
     if (!saved[0]) throw new Error("Build was not saved");
     return { build: toBuild(saved[0], siteUrl()), created: !input.id };
   }
@@ -89,8 +147,8 @@ export async function deleteCharacter(userId: string, id: string): Promise<boole
 export interface SharedBuild {
   slug: string; name: string; notes: string | null; classSlug: string; code: string; code2: string | null; gameBuild: string;
   characterName: string | null; characterClass: string | null; ownerName: string | null; updatedAt: string;
-  /** Each set's spend order token, null when unknown. */
-  order: string | null; order2: string | null;
+  /** Each set's spend order token, null when unknown. Left out while the database has no order columns. */
+  order?: string | null; order2?: string | null;
 }
 
 export async function sharedBuild(slug: string): Promise<SharedBuild | null> {
@@ -103,14 +161,22 @@ export async function sharedBuild(slug: string): Promise<SharedBuild | null> {
   if (!r) return null;
   // shared_build decides what is public. The orders are read beside it, for this build only while it is still shared,
   // and kept only with the codes shared_build gave: a build saved again in between opens without them.
-  const [o] = await authQuery<Array<{ code: string; code2: string | null; point_order: string | null; point_order2: string | null }>>(
-    `saved_builds?select=code,code2,${ORDER_COLUMNS}&slug=eq.${slug}&shared=is.true&limit=1`,
-  );
-  const same = o !== undefined && o.code === r.code && o.code2 === r.code2;
+  let orders: Pick<SharedBuild, "order" | "order2"> = {};
+  if (!missing("columns")) {
+    try {
+      const [o] = await authQuery<Array<{ code: string; code2: string | null; point_order: string | null; point_order2: string | null }>>(
+        `saved_builds?select=code,code2,${ORDER_COLUMNS}&slug=eq.${slug}&shared=is.true&limit=1`,
+      );
+      const same = o !== undefined && o.code === r.code && o.code2 === r.code2;
+      orders = { order: same ? o.point_order ?? null : null, order2: same ? o.point_order2 ?? null : null };
+    } catch (err) {
+      if (!foundMissing(err, "columns")) throw err;
+    }
+  }
   return {
     slug, name: r.name, notes: r.notes, classSlug: r.class_slug, code: r.code, code2: r.code2, gameBuild: r.game_build,
     characterName: r.character_name, characterClass: r.character_class, ownerName: r.owner_name, updatedAt: r.updated_at,
-    order: same ? o.point_order ?? null : null, order2: same ? o.point_order2 ?? null : null,
+    ...orders,
   };
 }
 

@@ -62,6 +62,13 @@ test("Save a copy on a shared build's page sends both sets' orders, and says the
   expect(container.querySelector('[role="alert"]')!.textContent).toBe("You have 200 saved builds. Delete one to save another.");
 });
 
+test("Save a copy of a build read before the spend-order migration names no order, so the save does not need one", async () => {
+  answer = () => Response.json({ error: "You have 200 saved builds. Delete one to save another." }, { status: 409 });
+  await act(async () => root.render(<SaveCopy name="Raid frost" notes={null} code={MAGE} code2={null} />));
+  await press("Save a copy");
+  expect(posts).toEqual([{ url: "/api/me/builds", body: { name: "Raid frost (copy)", notes: null, code: MAGE, code2: null, shared: true, showName: false } }]);
+});
+
 test("Duplicate keeps the build's orders and sharing, and says the copy does not show the owner's name", async () => {
   await act(async () => root.render(<BuildActions build={BUILD} />));
   await press("Duplicate");

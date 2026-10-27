@@ -18,6 +18,8 @@ export function savedBuildsOn(env: Record<string, string | undefined> = process.
 export const BUILDS_PER_ACCOUNT = 200;
 export const CHARACTERS_PER_ACCOUNT = 30;
 export const SAVES_PER_DAY = 300;
+/** The refusal of a save that names a spend order while the database cannot keep orders yet. Nothing of it was saved. */
+export const ORDERS_UNAVAILABLE = "Saving spend orders isn't available yet, so this build was not saved.";
 export const LIMITS = { name: 60, notes: 1000, code: 400, characterName: 24, realm: 32, note: 140 } as const;
 
 export const CODE_PATTERN = /^EL1-[a-z]+-\d+-[0-9.]+-[A-Za-z0-9_-]+$/;
