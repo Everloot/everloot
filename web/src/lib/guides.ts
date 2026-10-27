@@ -69,3 +69,7 @@ export function guidesFor(guides: Map<string, Guide>, filter: GuideFilter): Guid
 }
 
 export const guideHref = (slug: string) => `/guides/${slug}`;
+
+/** How the guide pages name an activity and a role. */
+export const ACTIVITY_LABEL: Record<GuideActivity, string> = { leveling: "Leveling", dungeons: "Dungeons", raids: "Raids" };
+export const ROLE_LABEL: Record<GuideRole, string> = { tank: "Tank", healer: "Healer", damage: "Damage" };

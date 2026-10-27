@@ -50,12 +50,20 @@ test("every route that reads the wiki pages carries them in its bundle", () => {
   const keyFor = (route: string) => Object.keys(includes).find((key) => picomatch(key, { dot: true, contains: true })(route));
   // The wiki pages are read from kb/wiki at request time, so a route that lists or shows them needs the
   // folder in its own bundle. Without it the route answers 500 in production while the tests pass.
-  for (const route of ["/wiki/route", "/wiki/[slug]/route", "/sitemap.xml/route"]) {
+  for (const route of ["/wiki/route", "/wiki/[slug]/route", "/sitemap.xml/route", "/guides/route", "/guides/[slug]/route"]) {
     const key = keyFor(route);
     expect(key, route).toBeDefined();
     expect(includes[key!], route).toContain("../kb/wiki/*.md");
     expect(includes[key!], route).toContain("../kb/wiki/categories.yaml");
   }
+});
+
+test("every route that reads the guides carries them in its bundle", () => {
+  const includes = nextConfig.outputFileTracingIncludes!;
+  // The guide index reads kb/guides on each request, a guide page when it is rebuilt and the sitemap on each request.
+  // The class hubs and the guide cards are drawn while the site builds, so they need no copy.
+  const carries = (route: string) => Object.keys(includes).filter((key) => picomatch(key, { dot: true, contains: true })(route)).flatMap((key) => includes[key]);
+  for (const route of ["/guides/route", "/guides/[slug]/route", "/sitemap.xml/route"]) expect(carries(route), route).toContain("../kb/guides/*.md");
 });
 
 test("the build cache checks the protocol package's files, and trusts every other package's version", () => {

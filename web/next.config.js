@@ -88,9 +88,12 @@ const nextConfig = {
     // The news posts are read from kb/news the same way (the key covers /news, /news/[slug] and /news/feed.xml);
     // a post's [[links]] read the wiki pages too.
     "/news": ["../kb/news/*.md", "../kb/wiki/*.md", "../kb/wiki/categories.yaml"],
-    // The sitemap lists the wiki pages too, so it reads them from kb/wiki on every request. Without the
-    // folder in its own bundle the route answers 500 and the site has no sitemap at all.
-    "/sitemap.xml": ["../kb/wiki/*.md", "../kb/wiki/categories.yaml", "../kb/news/*.md"],
+    // The guides are read from kb/guides on each request for the guide index and when a guide page is rebuilt (the
+    // key covers /guides and /guides/[slug]); a guide's [[links]] read the wiki pages too.
+    "/guides": ["../kb/guides/*.md", "../kb/wiki/*.md", "../kb/wiki/categories.yaml"],
+    // The sitemap lists the wiki pages, the news posts and the guides too, so it reads them from kb on every request.
+    // Without the folders in its own bundle the route answers 500 and the site has no sitemap at all.
+    "/sitemap.xml": ["../kb/wiki/*.md", "../kb/wiki/categories.yaml", "../kb/news/*.md", "../kb/guides/*.md"],
     "/lore/browse/[type]": ["./.release/*.sqlite", "./.release/*.manifest.json"],
     "/lore/coverage": ["./.release/*.sqlite", "./.release/*.manifest.json"],
     // The build-link previews draw their card on each request, so they read the Geist fonts at run time.

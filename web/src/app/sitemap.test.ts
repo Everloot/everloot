@@ -1,3 +1,6 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { expect, test, vi } from "vitest";
 import { LAUNCH } from "@/data/wow-forever";
 import { MAP_DATA_EXTRACTED_AT, TALENT_DATA_EXTRACTED_AT } from "@/lib/build-stamp";
@@ -5,6 +8,8 @@ import { loadTimeline, postPath } from "@/lib/changes";
 import { CLIENT_TAXONOMY, ITEMS_PER_PAGE, itemsHref } from "@/lib/items";
 import { filterItems } from "../../../kb/src/item-taxonomy";
 import { instanceHref, instanceRows } from "@/lib/instances";
+import { loadCatalog } from "@/lib/talents/catalogs";
+import { encodeBuild, encodeOrder } from "@/lib/talents/share";
 import sitemap from "./sitemap";
 
 const facts = vi.hoisted(() => ({ rates: [] as unknown[], names: [] as { installId: string; itemId: number; name: string }[], npcs: [] as unknown[], unreachable: false }));
@@ -61,6 +66,42 @@ test("the news hub and its posts are listed only once a post is published, dated
     expect(withOne.find((e) => e.url.endsWith("/news/launch"))?.lastModified).toEqual(new Date("2026-10-25"));
   } finally {
     news.posts = new Map();
+  }
+});
+
+test("a guide is listed only while its page asks to be indexed, dated by its review, with the guide index and its class's hub; a draft never", async () => {
+  const listed = (all: typeof entries) => all.map((e) => new URL(e.url).pathname).filter((p) => /^\/(?:guides|classes)(?:\/|$)/.test(p));
+  expect(listed(entries)).toEqual([]);
+  // One point on the Mage tree the site ships, made and reviewed on its build: a plan that fits.
+  const mage = await loadCatalog("mage");
+  const node = mage.nodes.find((n) => n.row === 1 && n.kind === "single" && !n.unlock && n.prereqs.length === 0 && !n.anyOf?.length);
+  expect(node).toBeDefined();
+  const ranks = { [node!.id]: { rank: 1 } };
+  const file = (id: number, slug: string, { status = "published", words = 48 }: { status?: string; words?: number } = {}) => {
+    const reviewed = status === "published";
+    return [
+      "---", `id: ${id}`, `slug: ${slug}`, "version: 1", `status: ${status}`, `title: ${slug}`, 'summary: "A test guide."', "classSlug: mage",
+      "activity: leveling", "roles: [damage]", "levels: { from: 10, to: 60 }",
+      `code: ${encodeBuild({ classSlug: "mage", specId: mage.specId, build: mage.build, ranks })}`, `order: ${encodeOrder(ranks, [node!.id], "planned")}`, "author: Robin",
+      `reviewed: ${reviewed ? `{ by: Kai, on: 2026-10-20, build: ${mage.build} }` : "null"}`,
+      `history: ${reviewed ? `[{ version: 1, on: 2026-10-20, by: Kai, build: ${mage.build}, note: First published version. }]` : "[]"}`, "---", "",
+      ...["Who it is for", "Why this plan", "How to play it", "What we do not know yet"].flatMap((h) => [`## ${h}`, "", Array.from({ length: words }, (_, i) => `word${i}`).join(" "), ""]),
+    ].join("\n");
+  };
+  const dir = mkdtempSync(join(tmpdir(), "sitemap-guides-"));
+  writeFileSync(join(dir, "README.md"), "# not a guide");
+  writeFileSync(join(dir, "frost-leveling.md"), file(1, "frost-leveling"));
+  writeFileSync(join(dir, "fire-draft.md"), file(2, "fire-draft", { status: "draft" }));
+  // Published, but under the guides' 150 words of their own: shown, and out of search.
+  writeFileSync(join(dir, "thin-guide.md"), file(3, "thin-guide", { words: 2 }));
+  vi.stubEnv("GUIDES_DIR", dir);
+  try {
+    const withGuides = await sitemap();
+    expect(listed(withGuides).sort()).toEqual(["/classes", "/classes/mage", "/guides", "/guides/frost-leveling"]);
+    expect(withGuides.find((e) => e.url.endsWith("/guides/frost-leveling"))?.lastModified).toEqual(new Date("2026-10-20"));
+    expect(withGuides.find((e) => e.url.endsWith("/guides"))?.lastModified).toBeUndefined();
+  } finally {
+    vi.unstubAllEnvs();
   }
 });
 

@@ -5,7 +5,11 @@ import { tools, toolHref } from "@/data/tools";
 import { allDocsPages } from "@/lib/docs/nav";
 import { MAP_DATA_EXTRACTED_AT, TALENT_DATA_EXTRACTED_AT } from "@/lib/build-stamp";
 import { loadTimeline, loadWriteups, postPath, writeupFor } from "@/lib/changes";
-import { TALENT_CLASSES } from "@/lib/talents/catalogs";
+import { classesIndexable, hubIndexable as classHubIndexable } from "@/lib/class-hub";
+import { guideFreshness, guideIndexable } from "@/lib/guide-freshness";
+import { guideHref, loadGuides, publishedGuides } from "@/lib/guides";
+import { TALENT_CLASSES, loadCatalog as loadTalentCatalog } from "@/lib/talents/catalogs";
+import { PUBLISHED_CHANGES, classTalentChanges } from "@/lib/talents/freshness";
 import { CLIENT_LAYER, CLIENT_TAXONOMY, categoryNamedEnough, itemsHref } from "@/lib/items";
 import { DATABASE_HUB_PATHS } from "@/lib/database-hubs";
 import { instancePaths } from "@/lib/database-sitemap";
@@ -54,7 +58,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...(hubIndexable(rankings.weeks) ? ["/rankings"] : []),
     ...RANKINGS.filter((def) => rankingIndexable(rankingView(def, rankings.weeks))).map((def) => rankingPath(def.slug)),
   ];
-  const paths = [...new Set([...staticRoutes, ...rankingRoutes, ...talentRoutes, ...itemRoutes, ...zoneRoutes, ...instanceRoutes, ...catalogRoutes, ...tools.filter((tool) => tool.status !== "coming-soon").map(toolHref), ...allDocsPages().map((page) => page.href)])];
+  // Each guide by the rule its page's robots use, read against its class's tree and the published change records;
+  // the guide index once it lists one. The class hubs once they list a published guide, as their own robots say.
+  const guides = loadGuides();
+  const today = new Date().toISOString().slice(0, 10);
+  const indexedGuides = (await Promise.all(publishedGuides(guides).map(async (g) => {
+    const catalog = await loadTalentCatalog(g.classSlug);
+    return guideIndexable(g, guideFreshness(g, catalog, classTalentChanges(PUBLISHED_CHANGES, catalog.classId), today)) ? [g] : [];
+  }))).flat();
+  const guideRoutes: { path: string; lastModified?: Date }[] = indexedGuides.length ? [{ path: "/guides" }, ...indexedGuides.map((g) => ({ path: guideHref(g.slug), lastModified: g.reviewed ? new Date(g.reviewed.on) : undefined }))] : [];
+  const classRoutes = classesIndexable(guides) ? ["/classes", ...TALENT_CLASSES.filter((slug) => classHubIndexable(slug, guides)).map((slug) => `/classes/${slug}`)] : [];
+  const paths = [...new Set([...staticRoutes, ...rankingRoutes, ...talentRoutes, ...classRoutes, ...itemRoutes, ...zoneRoutes, ...instanceRoutes, ...catalogRoutes, ...tools.filter((tool) => tool.status !== "coming-soon").map(toolHref), ...allDocsPages().map((page) => page.href)])];
 
   const timeline = await loadTimeline();
   const newestChange = timeline[0]?.at;
@@ -85,5 +99,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...wikiSitemapPaths().map(({ path, lastModified }) => ({ url: `${baseUrl}${path}`, ...(lastModified ? { lastModified } : {}) })),
     // The news hub and each published post, dated by the day the post last changed.
     ...newsSitemapPaths(loadNews()).map(({ path, lastModified }) => ({ url: `${baseUrl}${path}`, ...(lastModified ? { lastModified } : {}) })),
+    // The guide index and each indexed guide, dated by the review of the version it shows.
+    ...guideRoutes.map(({ path, lastModified }) => ({ url: `${baseUrl}${path}`, ...(lastModified ? { lastModified } : {}) })),
   ];
 }
