@@ -13,6 +13,15 @@ const SV = `EverlootDB = { ["version"] = "0.3.3", ["installId"] = "inst-1", ["cl
   ["asks"] = { { ["id"] = "ask:inst-1:1", ["question"] = "what drops bindings", ["askedAt"] = "2026-10-18T00:00:00Z" } },
   ["lastScans"] = { ["Nightslayer"] = { ["at"] = "2026-10-18T00:00:00Z" } } }`;
 
+test("switching sites changes the displayed confirmation count even for a cached save file", () => {
+  const d = dir();
+  const file = join(d, "Everloot.lua"), sent = join(d, "sent.json");
+  writeFileSync(file, SV);
+  writeFileSync(sent, JSON.stringify({ "inst-1": ["a"], "https://test.example|inst-1": ["a", "b"] }));
+  expect(summarizeFiles([file], sent, "https://test.example/")[0].confirmed).toBe(2);
+  expect(summarizeFiles([file], sent, "https://everloot.app")[0].confirmed).toBe(1);
+});
+
 test("a file summary counts records per kind, asks, scan realms and confirmed events, and never includes the records", () => {
   const s = summarizeSavedVariables(SV, (id) => (id === "inst-1" ? 5 : 0));
   expect(s).toMatchObject({ ok: true, addonVersion: "0.3.3", clientBuild: "1.60.1.70450", records: 3, confirmed: 5, pendingAsks: 1, scanRealms: ["Nightslayer"], scans: [{ realm: "Nightslayer", at: "2026-10-18T00:00:00Z" }] });

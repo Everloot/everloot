@@ -14,7 +14,9 @@
 -- docs/design/specs/2026-10-20-player-pages-design.md.
 --
 -- One row per character, kept in place: a new level, race, class or guild changes the row, and a new UTC day
--- moves its date (capturedAt), so the file holds the newest sighting, not a history. The row keeps no time of
+-- moves its date (capturedAt), so the file holds the newest sighting, not a history. Each of those changes
+-- gives the row a new event id, so the upload sends the new version of a row it already sent; the site keeps
+-- one current row per character, and a reread that changes nothing keeps its id. The row keeps no time of
 -- day on the site (it keeps the date) and no position. Load on the game and the file:
 --   * a player already read is not read again for 10 minutes, and two reads from target or mouseover are at
 --     least a quarter of a second apart, so mouseover costs a few table lookups; a roster change reads the
@@ -121,6 +123,9 @@ local function keep(name, realm, race, class, level, guild)
       row.level, row.race, row.class = level, race, class
       if guild ~= nil then row.guild = guild end
       row.capturedAt = stamp()
+      -- A new revision: the upload skips every event id it already confirmed, so a row that changed after
+      -- it was sent needs an id of its own to be sent again. An unchanged read keeps the id.
+      row.eventId = eventId()
     end
     return
   end

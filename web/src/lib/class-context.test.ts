@@ -5,8 +5,8 @@ import { describe, expect, test } from "vitest";
 import { GUIDE_ROLES } from "../../../kb/src/guides/guide";
 import { CLASSES } from "@/design/tokens";
 import {
-  CLASS_CONTEXT_SLOT, MAX_LEVEL, ROLES, classHubHref, contextLabel, contextLinks, forgetClassContext, parseClassContext,
-  readClassContext, rememberClassContext, type ClassContext,
+  CLASS_CONTEXT_SLOT, MAX_LEVEL, ROLES, classHubHref, contextLabel, contextLinks, forgetClassContext, hasClassContext, parseClassContext,
+  readClassContext, rememberClassContext, withClassContext, withoutClassContext, type ClassContext,
 } from "./class-context";
 import { TALENT_CLASSES, loadCatalog } from "./talents/catalogs";
 
@@ -93,25 +93,29 @@ describe("contextLinks", () => {
     for (const link of links) expect(link.label.trim(), link.key).not.toBe("");
   });
 
-  test("each link carries only the context its page reads: the hub all of it, the calculator its class, the rest none yet", () => {
+  test("each link carries only the context its page reads: the hub, spells, items, raid and professions all of it, the calculator its class, dungeons none yet", () => {
     expect(Object.fromEntries(contextLinks(full).map((l) => [l.key, l.href]))).toEqual({
       hub: "/classes/mage?level=25&role=damage",
       talents: "/tools/talents/mage",
-      spells: "/database/spells",
-      items: "/database/items",
-      raid: "/tools/raid",
-      professions: "/tools/professions",
+      spells: "/database/spells?class=mage&level=25&role=damage",
+      items: "/database/items?class=mage&level=25&role=damage",
+      raid: "/tools/raid?class=mage&level=25&role=damage",
+      professions: "/tools/professions?class=mage&level=25&role=damage",
       dungeons: "/database/instances",
     });
+    expect(contextLinks({ classSlug: "druid" }).find((l) => l.key === "items")?.href).toBe("/database/items?class=druid");
     expect(classHubHref({ classSlug: "druid" })).toBe("/classes/druid");
     expect(classHubHref({ classSlug: "druid", role: "healer" })).toBe("/classes/druid?role=healer");
   });
 
-  test("a hub link reads back as the context it was made from", () => {
+  test("a link reads back as the context it was made from, on the hub and on every page it leads to", () => {
     const contexts: ClassContext[] = [{ classSlug: "mage" }, full, { classSlug: "warrior", role: "tank" }, { classSlug: "hunter", level: 60 }];
     for (const context of contexts) {
       const url = new URL(classHubHref(context), "https://everloot.app");
       expect(parseClassContext(url.searchParams, url.pathname.split("/").pop()), url.href).toEqual(ok(context));
+      for (const link of contextLinks(context).filter((l) => ["spells", "items", "raid", "professions"].includes(l.key))) {
+        expect(parseClassContext(new URL(link.href, "https://everloot.app").searchParams), link.href).toEqual(ok(context));
+      }
     }
   });
 
@@ -120,6 +124,31 @@ describe("contextLinks", () => {
     expect(contextLabel({ classSlug: "mage", level: 25 })).toBe("Mage, level 25");
     expect(contextLabel({ classSlug: "warrior", role: "tank" })).toBe("Warrior, tank");
     expect(contextLabel(full)).toBe("Mage, level 25, damage");
+  });
+});
+
+describe("a context on the links of the pages it leads to", () => {
+  const full: ClassContext = { classSlug: "mage", level: 25, role: "damage" };
+
+  test("a page's own link keeps its parameters as they are and adds the context after them", () => {
+    expect(withClassContext("/database/items/armor/cloth?quality=rare,epic&sort=-id", full)).toBe("/database/items/armor/cloth?quality=rare,epic&sort=-id&class=mage&level=25&role=damage");
+    expect(withClassContext("/database/spells", { classSlug: "druid" })).toBe("/database/spells?class=druid");
+    expect(withClassContext("/database/spells?q=bolt", null)).toBe("/database/spells?q=bolt");
+  });
+
+  test("taking the context off an address keeps every other parameter as it was given", () => {
+    expect(withoutClassContext("/database/items/armor/cloth", { quality: "rare,epic", class: "mage", sort: "-id", level: "25", role: "damage" }))
+      .toBe("/database/items/armor/cloth?quality=rare,epic&sort=-id");
+    expect(withoutClassContext("/tools/raid", params("class=mage&level=25"))).toBe("/tools/raid");
+    // A context the page refused goes too, so the address holds nothing the page left out.
+    expect(withoutClassContext("/database/spells", params("q=frost&class=deathknight&level=99"))).toBe("/database/spells?q=frost");
+    expect(withoutClassContext("/tools/professions", { profession: ["Tailoring", "Alchemy"], class: "mage" })).toBe("/tools/professions?profession=Tailoring&profession=Alchemy");
+  });
+
+  test("an address carries a context when it gives a class, a level or a role, even one the page cannot read", () => {
+    for (const none of [{}, { q: "bolt", sort: "name" }, { class: "", level: "" }]) expect(hasClassContext(none), JSON.stringify(none)).toBe(false);
+    for (const some of [{ class: "mage" }, { level: "99" }, { class: "deathknight" }, { role: "tank" }]) expect(hasClassContext(some), JSON.stringify(some)).toBe(true);
+    expect(hasClassContext(params("class=mage&level=25"))).toBe(true);
   });
 });
 

@@ -68,20 +68,67 @@ export interface ContextLink { key: ContextDestination; label: string; href: str
 
 /**
  * Where a class context leads: its hub, the class's talent calculator, then the spell, item, raid, profession and
- * dungeon pages. Each link carries the part of the context its page reads: the hub all of it, the calculator its
- * class, the others nothing yet, so their links are plain. A link never holds a value its page would ignore.
+ * dungeon pages. Each link carries the part of the context its page reads: the hub all of it; the calculator its
+ * class; the spell, item, raid and profession pages all of it, which they show and keep on their own links (the
+ * spell list also narrows to the class's talent catalog); the dungeon list nothing yet. A link never holds a value
+ * its page would ignore.
  */
 export function contextLinks(ctx: ClassContext): ContextLink[] {
   return [
     { key: "hub", label: classLabel(ctx.classSlug), href: classHubHref(ctx) },
     { key: "talents", label: "Talent calculator", href: `/tools/talents/${ctx.classSlug}` },
-    { key: "spells", label: "Spells", href: "/database/spells" },
-    { key: "items", label: "Items", href: "/database/items" },
-    { key: "raid", label: "Raid builder", href: "/tools/raid" },
-    { key: "professions", label: "Profession hubs", href: "/tools/professions" },
+    { key: "spells", label: "Spells", href: withClassContext("/database/spells", ctx) },
+    { key: "items", label: "Items", href: withClassContext("/database/items", ctx) },
+    { key: "raid", label: "Raid builder", href: withClassContext("/tools/raid", ctx) },
+    { key: "professions", label: "Profession hubs", href: withClassContext("/tools/professions", ctx) },
     { key: "dungeons", label: "Dungeons and raids", href: "/database/instances" },
   ];
 }
+
+/* ---------- The context on the pages it leads to ---------- */
+
+const CONTEXT_KEYS = ["class", "level", "role"];
+
+/** The parameters a context travels in, in the order a link writes them; a form sends them as hidden fields. */
+export const classContextParams = (ctx: ClassContext): [string, string][] => [
+  ["class", ctx.classSlug],
+  ...(ctx.level !== undefined ? [["level", String(ctx.level)] as [string, string]] : []),
+  ...(ctx.role ? [["role", ctx.role] as [string, string]] : []),
+];
+
+/** A link on or to a page a context leads to: the page's own parameters as they are, then class, level and role. */
+export function withClassContext(href: string, ctx: ClassContext | null): string {
+  return ctx ? `${href}${href.includes("?") ? "&" : "?"}${new URLSearchParams(classContextParams(ctx))}` : href;
+}
+
+/** Every parameter of an address, in order, once per value. */
+const entries = (search: Search): [string, string][] => search instanceof URLSearchParams
+  ? [...search.entries()]
+  : Object.entries(search).flatMap(([k, v]) => ([] as string[]).concat(v ?? []).map((one): [string, string] => [k, one]));
+
+/**
+ * The address without its class context, read or refused: every other parameter as it was given, so taking the
+ * context off never loses a filter. Commas stay commas, as the lists write them.
+ */
+export function withoutClassContext(path: string, search: Search): string {
+  const rest = new URLSearchParams(entries(search).filter(([k]) => !CONTEXT_KEYS.includes(k))).toString().replace(/%2C/g, ",");
+  return rest ? `${path}?${rest}` : path;
+}
+
+/**
+ * An address without a context (withoutClassContext) with one put on it: back on its first page, since the list
+ * it narrows may be shorter, and every other parameter kept. Taking a context off keeps the page.
+ */
+export function switchClassContext(here: string, ctx: ClassContext): string {
+  const [path, query = ""] = here.split("?");
+  const rest = new URLSearchParams(query);
+  rest.delete("page");
+  const kept = rest.toString().replace(/%2C/g, ",");
+  return withClassContext(kept ? `${path}?${kept}` : path, ctx);
+}
+
+/** Whether an address gives a class, a level or a role, read or not: a page with one is not its plain list. */
+export const hasClassContext = (search: Search): boolean => entries(search).some(([k, v]) => CONTEXT_KEYS.includes(k) && v !== "");
 
 /** What a context adds to its class, in words: ["level 25", "damage"]. */
 export const contextExtras = (ctx: ClassContext): string[] => [...(ctx.level !== undefined ? [`level ${ctx.level}`] : []), ...(ctx.role ? [ctx.role] : [])];

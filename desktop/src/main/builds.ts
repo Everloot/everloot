@@ -3,7 +3,8 @@ import { join } from "node:path";
 import { INTERFACE } from "../../../companion/src/bridge/answers";
 import { luaString } from "../../../companion/src/bridge/lua";
 import type { BuildsStatus } from "../shared/types";
-import { readAccountKey, readKeyOrigin, writeKeyOrigin } from "./account";
+import { keySiteOrigin, readAccountKey, readKeyOrigin, writeKeyOrigin } from "./account";
+export { keySiteOrigin } from "./account";
 
 /**
  * The player's saved talent builds into the game: read from everloot.app/api/me/builds with the
@@ -145,14 +146,6 @@ export class BuildsError extends Error {
     this.retryAfterMs = extra.retryAfterMs ?? 0;
     this.revoked = extra.revoked ?? false;
   }
-}
-
-/** The site's origin when the key may go there: https, or http on this computer for development; null otherwise. */
-export function keySiteOrigin(endpoint: string): string | null {
-  let u: URL;
-  try { u = new URL(endpoint); } catch { return null; }
-  if (u.protocol === "https:" || (u.protocol === "http:" && (u.hostname === "localhost" || u.hostname === "127.0.0.1"))) return u.origin;
-  return null;
 }
 
 /** GET /api/me/builds with the key. Only this request carries it, and it does not follow redirects. */

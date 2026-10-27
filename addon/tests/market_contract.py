@@ -221,6 +221,7 @@ drain()
 assert(EverlootDB.lastScans.Forever.at == now, 'the second scan finished and was recorded')
 """)
 
+
 # Community prices: a stale file is marked, thin items say so, and a large file is checked a slice per frame.
 lua.execute((Path(__file__).parent / "fixtures" / "EverlootPrices.lua").read_text(encoding="utf-8"))
 lua.execute("""
@@ -328,4 +329,151 @@ for source in sorted(root.rglob("*.lua")):
 # Every row the addon wrote is a record the site would accept (packages/protocol/schema).
 from protocol_schema import check_all  # noqa: E402
 check_all(lua)
+# The retry for rows whose item data had not loaded is read in chunks of the same size as the first pass, so a
+# large house with slow item data does not read thousands of rows in one frame. Every chunk checks the scan
+# is still the one that started it, so closing the house (or starting another scan) stops the old retry.
+lua.execute("""
+local savedRows = rows
+local savedInfo = C_AuctionHouse.GetReplicateItemInfo
+reads = 0
+loadedLater = false
+rows = {}
+for i = 1, 2501 do
+  -- Every row's item data is missing on the first read; four in five are there on the retry.
+  rows[i] = { hasAllInfo = false, late = i % 5 ~= 0, count = 1, buyout = 0 }
+end
+C_AuctionHouse.GetReplicateItemInfo = function(i)
+  reads = reads + 1
+  local r = rows[i]
+  if r.late and loadedLater then return 'Silk', 1, 2, 1, true, 1, 0, 0, 0, 900, 0, false, nil, nil, nil, 0, 4306, true end
+  return nil, 1, r.count, 1, true, 1, 0, 0, 0, r.buyout, 0, false, nil, nil, nil, 0, nil, false
+end
+-- Runs the pending timers one at a time, returning the most reads any one callback made. The retry's data
+-- becomes available when its timer is reached, as it does in the game.
+function biggestStep()
+  local biggest = 0
+  while #timers > 0 do
+    local t = table.remove(timers, 1)
+    if t.seconds == 2 then loadedLater = true end
+    local before = reads
+    t.f()
+    biggest = math.max(biggest, reads - before)
+  end
+  return biggest
+end
+
+now = now + 901
+fire('AUCTION_HOUSE_SHOW')
+timers = {}; printed = {}
+SlashCmdList.EVERLOOT('scan')
+fire('REPLICATE_ITEM_LIST_UPDATE')
+assert(reads <= Everloot.SCAN_CHUNK, 'the first pass reads one chunk a frame; got ' .. reads)
+local biggest = math.max(reads, biggestStep())
+assert(biggest <= Everloot.SCAN_CHUNK, 'no callback, including the retry, reads more than one chunk; got ' .. biggest)
+assert(reads == 2501 + 2501, 'every incomplete row is read once more on the retry; got ' .. reads)
+assert(not Everloot:Scanning(), 'the scan finished')
+local last = EverlootDB.records.auction_snapshot[#EverlootDB.records.auction_snapshot]
+assert(#last.items == 1 and last.items[1][1] == 4306, 'the retried rows that loaded are kept')
+assert(last.items[1][2] == 2001 and last.items[1][3] == 4002 and last.items[1][4] == 450, 'with their listings, quantity and per-unit price; got ' .. table.concat(last.items[1], ','))
+assert(said('500 not loaded'), 'rows that still had no item data are counted, not lost')
+
+-- Closing the house between retry chunks stops the retry: no more reads and nothing stored.
+timers = {}; printed = {}; reads = 0; loadedLater = false
+now = now + 901
+fire('AUCTION_HOUSE_SHOW')
+local storedBefore = #EverlootDB.records.auction_snapshot
+SlashCmdList.EVERLOOT('scan')
+fire('REPLICATE_ITEM_LIST_UPDATE')
+local retryTimer
+repeat
+  local t = table.remove(timers, 1)
+  if t.seconds == 2 then loadedLater = true; retryTimer = t end
+  if not retryTimer then t.f() end
+until retryTimer or #timers == 0
+assert(retryTimer, 'the first pass leaves a retry')
+local before = reads
+retryTimer.f()
+assert(reads - before == Everloot.SCAN_CHUNK and Everloot:Scanning(), 'the first retry chunk reads one chunk and the scan carries on')
+assert(#timers >= 1 and timers[#timers].seconds == 0, 'the next retry chunk waits for the next frame')
+fire('AUCTION_HOUSE_CLOSED')
+assert(not Everloot:Scanning() and said('auction house closed'))
+before = reads
+while #timers > 0 do table.remove(timers, 1).f() end
+assert(reads == before, 'a stopped scan reads no more retry rows; read ' .. (reads - before))
+assert(#EverlootDB.records.auction_snapshot == storedBefore, 'and stores nothing')
+
+-- A retry left behind by a closed house does not touch the next scan.
+timers = {}; printed = {}; reads = 0; loadedLater = false
+now = now + 901
+fire('AUCTION_HOUSE_SHOW')
+SlashCmdList.EVERLOOT('scan')
+fire('REPLICATE_ITEM_LIST_UPDATE')
+local stale
+repeat
+  local t = table.remove(timers, 1)
+  if t.seconds == 2 then stale = t else t.f() end
+until stale or #timers == 0
+assert(stale, 'a retry is waiting')
+fire('AUCTION_HOUSE_CLOSED')
+now = now + 901
+fire('AUCTION_HOUSE_SHOW')
+SlashCmdList.EVERLOOT('scan')
+assert(Everloot:Scanning(), 'a new scan is waiting for the house')
+printed = {}
+reads = 0
+stale.f()
+assert(reads == 0 and #timers == 1, 'the old retry reads no rows and schedules no more; read ' .. reads)
+assert(Everloot:Scanning() and not said('no buyouts'), 'the old retry leaves the new scan alone')
+timers = {}; fire('AUCTION_HOUSE_CLOSED')
+
+-- A first-pass step left behind by a closed house does not touch the next scan either: it reads nothing, schedules
+-- nothing, stores nothing, and the new scan keeps waiting for its own list update and then finishes normally.
+timers = {}; printed = {}; reads = 0; loadedLater = false
+now = now + 901
+fire('AUCTION_HOUSE_SHOW')
+SlashCmdList.EVERLOOT('scan')
+fire('REPLICATE_ITEM_LIST_UPDATE')
+local staleStep
+for k, t in ipairs(timers) do if t.seconds == 0 then staleStep = table.remove(timers, k); break end end
+assert(staleStep, 'the first pass leaves its next chunk for the next frame')
+fire('AUCTION_HOUSE_CLOSED')
+timers = {}
+now = now + 901
+fire('AUCTION_HOUSE_SHOW')
+local storedBeforeStep = #EverlootDB.records.auction_snapshot
+SlashCmdList.EVERLOOT('scan')
+assert(Everloot:Scanning(), 'a new scan is waiting for the house')
+local timersBefore = #timers
+printed = {}
+reads = 0
+staleStep.f()
+assert(reads == 0, 'the old first-pass step reads no rows; read ' .. reads)
+assert(#timers == timersBefore, 'and schedules nothing')
+assert(Everloot:Scanning() and not said('no buyouts'), 'the old step leaves the new scan waiting')
+assert(#EverlootDB.records.auction_snapshot == storedBeforeStep, 'and stores nothing')
+fire('REPLICATE_ITEM_LIST_UPDATE')
+assert(reads <= Everloot.SCAN_CHUNK and reads > 0, 'the new scan still reads its own first chunk when the house answers; read ' .. reads)
+assert(biggestStep() <= Everloot.SCAN_CHUNK, 'the new scan carries on one chunk a frame')
+assert(not Everloot:Scanning(), 'and finishes')
+local fresh = EverlootDB.records.auction_snapshot[#EverlootDB.records.auction_snapshot]
+assert(fresh.items[1][1] == 4306 and EverlootDB.lastScans.Forever.scanId == fresh.scanId, 'with its own result stored as the latest scan')
+assert(said('500 not loaded'), 'and its own counts reported')
+
+-- Closing the house between first-pass chunks stops the pass: later steps read nothing and store nothing.
+timers = {}; printed = {}; reads = 0; loadedLater = false
+now = now + 901
+fire('AUCTION_HOUSE_SHOW')
+storedBeforeStep = #EverlootDB.records.auction_snapshot
+SlashCmdList.EVERLOOT('scan')
+fire('REPLICATE_ITEM_LIST_UPDATE')
+fire('AUCTION_HOUSE_CLOSED')
+assert(not Everloot:Scanning())
+reads = 0
+while #timers > 0 do table.remove(timers, 1).f() end
+assert(reads == 0 and #EverlootDB.records.auction_snapshot == storedBeforeStep, 'a stopped first pass reads and stores nothing; read ' .. reads)
+
+rows = savedRows
+C_AuctionHouse.GetReplicateItemInfo = savedInfo
+loadedLater = false
+""")
 print("Lua 5.1 market: clicked full scan, chunked reads, retry, parts, cooldown, 3 scans kept, scan timeout, tooltips with sliced checksums, stale and thin labels, /everloot price in chat, no buy or post call")

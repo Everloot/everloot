@@ -3,6 +3,19 @@ import type { AppState } from "./types";
 /** `C:\Users\name`, `/Users/name` and `/home/name` become `~`, so a pasted report does not carry the account name. */
 export const hideHome = (text: string) => text.replace(/([A-Za-z]:\\Users\\|\/Users\/|\/home\/)[^\\/\n"']+/g, "~");
 
+export const redactDiagnostics = (text: string) => hideHome(text)
+  .replace(/(WTF[\\/]Account[\\/])[^\\/\n"']+/gi, "$1<account>")
+  .replace(/\b(upload|ask) [^:\n]+:/g, "$1 <account>:");
+
+/** Keep the version/settings header and the newest failure when the report form has a size limit. */
+export function reportDiagnostics(text: string, limit = 4000): string {
+  const safe = redactDiagnostics(text);
+  if (safe.length <= limit) return safe;
+  const marker = "\n[older log lines omitted]\n";
+  const head = Math.floor((limit - marker.length) / 2);
+  return safe.slice(0, head) + marker + safe.slice(-(limit - marker.length - head));
+}
+
 /**
  * The text behind "Copy diagnostics" on the Log page: version, platform, settings (never the token,
  * only where the token file is), the files watched, each job's last state and the last hundred log
@@ -30,5 +43,5 @@ export function diagnostics(s: AppState, lines = 100, now = new Date()): string 
     `log (last ${Math.min(lines, s.engine.log.length)} of ${s.engine.log.length}):`,
     ...s.engine.log.slice(-lines).map((l) => `${l.at} ${l.level === "error" ? "ERROR " : ""}${l.text}`),
   ];
-  return hideHome(out.filter((l) => l !== "").join("\n")) + "\n";
+  return redactDiagnostics(out.filter((l) => l !== "").join("\n")) + "\n";
 }

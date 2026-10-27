@@ -57,6 +57,7 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
   const state: EngineState = { files: [], jobs: { upload: off(), prices: off(), ask: off() }, log: [], paused: false };
   const listeners = new Set<(s: EngineState) => void>();
   let settings: Settings | null = null;
+  let session = 0;
   let unwatchers: (() => void)[] = [];
   const timers = new Map<Job, ReturnType<typeof setTimeout>>();
   let pricesTimer: ReturnType<typeof setInterval> | null = null;
@@ -80,22 +81,29 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
     if (state.paused) { log("info", `${job}: paused, skipped`); emit(); return; }
     if (running.has(job)) { again.add(job); return; }
     if (state.files.length === 0) { set(job, { state: "idle", message: "No Everloot.lua to read", at: now() }); emit(); return; }
+    const started = session;
+    const files = [...state.files];
     running.add(job);
     set(job, { state: "running", message: "", at: now() });
     emit();
     const failures: string[] = [];
     const lines: string[] = [];
     const attempt = async (label: string, work: () => Promise<string>) => {
-      try { const line = await work(); lines.push(line); log("info", `${label}: ${line}`); }
-      catch (err) { const m = err instanceof Error ? err.message : String(err); failures.push(m); log("error", `${label}: ${m}`); }
+      if (started !== session) return;
+      try { const line = await work(); if (started !== session) return; lines.push(line); log("info", `${label}: ${line}`); }
+      catch (err) { if (started !== session) return; const m = err instanceof Error ? err.message : String(err); failures.push(m); log("error", `${label}: ${m}`); }
     };
-    if (job === "upload") for (const file of state.files) await attempt(`upload ${accountOf(file)}`, () => deps.upload(file));
-    else if (job === "ask") for (const file of state.files) await attempt(`ask ${accountOf(file)}`, () => deps.ask(file));
-    else await attempt("prices", () => deps.prices(state.files));
+    if (job === "upload") for (const file of files) await attempt(`upload ${accountOf(file)}`, () => deps.upload(file));
+    else if (job === "ask") for (const file of files) await attempt(`ask ${accountOf(file)}`, () => deps.ask(file));
+    else await attempt("prices", () => deps.prices(files));
+    running.delete(job);
+    if (started !== session) {
+      if (again.delete(job)) void run(job);
+      return;
+    }
     set(job, failures.length
       ? { state: "error", message: failures[failures.length - 1], at: now() }
       : { state: "ok", message: lines[lines.length - 1] ?? "", at: now() });
-    running.delete(job);
     // Usually the network or the site; try again a few times instead of waiting for the next logout.
     // Prices have their own hourly timer. A run after stop() belongs to an old session: no retry.
     if (failures.length === 0) retries.delete(job);
@@ -130,6 +138,7 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
   }
 
   function stop(): void {
+    session++;
     for (const u of unwatchers) u();
     unwatchers = [];
     for (const t of timers.values()) clearTimeout(t);
