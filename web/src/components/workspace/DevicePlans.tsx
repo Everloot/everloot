@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { className } from "@/components/builds/describe";
 import { Card, CopyButton, Field, SectionHeading } from "@/components/ui";
+import { restoreLines } from "@/lib/alt-workspace";
 import {
   BACKUP_TOO_LARGE, WORKSPACE_LIMITS, applyImport, bucketKey, copyPlan, deletePlan, deviceStorage, editPlan, exportBackup, storedCounts,
   orderState, previewImport, readPlanText, readWorkspace, sameOwner, savePlan,
-  type Failure, type ImportPreview, type LocalPlan, type Owner, type PlanText, type PlayerWorkspace, type ReadResult,
+  type Failure, type ImportPreview, type LocalPlan, type Owner, type PlanText, type ReadResult,
 } from "@/lib/player-workspace";
 import { planHash, replacePlanHash } from "@/lib/talents/import";
 import { useWorkspaceOwner } from "./LocalPlanSave";
@@ -363,22 +364,10 @@ function previewLine(p: ImportPreview): string {
   return `Restoring ${said}.${kept}`;
 }
 
-/** Alt by alt, what a restore does to this device's alts, which a backup holds as well as the plans: each it adds,
- *  and each it replaces with the backup's newer copy, saying whether that changes its notes. */
-function restoreLines(current: PlayerWorkspace, preview: ImportPreview): string[] {
-  const here = new Map(current.alts.map((a) => [a.id, a]));
-  return preview.result.alts.flatMap((alt) => {
-    const mine = here.get(alt.id);
-    if (!mine) return [`Adds the alt ${alt.name}.`];
-    if (JSON.stringify(mine) === JSON.stringify(alt)) return [];
-    return [`Replaces the alt ${mine.name} with the backup's newer copy${mine.notes === alt.notes ? ". Its notes stay as they are." : ", which changes its notes."}`];
-  });
-}
-
 /** Download a backup of this bucket, or restore one after seeing what it would do. */
 function Backup({ owner, onRestored }: { owner: Owner; onRestored: (result: { ok: true } | Failure, done: string) => void }) {
   const [preview, setPreview] = useState<ImportPreview | null>(null);
-  // Alt by alt, what the restore adds or replaces: a backup holds the alts too, notes and all.
+  // Alt by alt, what the restore adds or replaces, as Alts on this device shows it: a backup holds the alts too.
   const [altLines, setAltLines] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [reading, setReading] = useState(false);

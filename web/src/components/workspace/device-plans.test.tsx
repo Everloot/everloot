@@ -425,13 +425,13 @@ test("a restore that replaces an alt's notes names the alt and says its notes ch
   backup.alts[0] = { ...backup.alts[0], notes: "Backup notes replace the local ones", updatedAt: "2026-10-27T12:00:00.000Z" };
   await render();
   await choose(new File([JSON.stringify(backup)], "backup.json", { type: "application/json" }));
-  expect(restoreGroup()?.textContent).toContain("Replaces the alt Thrall with the backup's newer copy, which changes its notes.");
+  expect(restoreGroup()?.textContent).toContain("Replaces Thrall (Moon Guard) with the backup's newer copy, which changes its notes.");
   expect(stored(ANON)?.alts[0].notes).toBe("Bank alt.\nTuesdays.");
   await click(button(/^Restore$/, restoreGroup()!));
   expect(stored(ANON)?.alts[0].notes).toBe("Backup notes replace the local ones");
 });
 
-test("the restore preview names each alt it adds, and says when an alt it replaces keeps its notes", async () => {
+test("the restore preview names each alt it adds, and what a replacement that keeps the notes changes", async () => {
   localStorage.setItem(bucketKey(ANON), V2_BUCKET_TEXT);
   const alt = JSON.parse(V2_ALT_TEXT);
   const backup = { ...JSON.parse(V2_BUCKET_TEXT), alts: [
@@ -441,11 +441,30 @@ test("the restore preview names each alt it adds, and says when an alt it replac
   await render();
   await choose(new File([JSON.stringify(backup)], "backup.json", { type: "application/json" }));
   const copy = restoreGroup()?.textContent;
-  expect(copy).toContain("Adds the alt Jaina.");
-  expect(copy).toContain("Replaces the alt Thrall with the backup's newer copy. Its notes stay as they are.");
+  expect(copy).toContain("Adds Jaina (Moon Guard).");
+  expect(copy).toContain("Replaces Thrall (Moon Guard) with the backup's newer copy, which changes its level.");
   // An alt the backup holds as it is here is not named.
   await choose(new File([V2_BUCKET_TEXT], "backup.json", { type: "application/json" }));
   expect(restoreGroup()?.textContent).not.toContain("Thrall");
+});
+
+test("the restore preview names each alt it adds or replaces and what that changes, notes included (reported case)", async () => {
+  localStorage.setItem(bucketKey(ANON), V2_BUCKET_TEXT);
+  const alt = JSON.parse(V2_ALT_TEXT);
+  const backup = { ...JSON.parse(V2_BUCKET_TEXT), alts: [
+    { ...alt, notes: "older backup private notes", updatedAt: "2026-10-27T12:00:00.000Z" },
+    { ...alt, id: id(501), name: "Jaina", realm: null, classSlug: null, faction: null, level: null, professions: [], planIds: [],
+      provenance: { source: "manual", fileRecordAt: null, fileDetails: [] } },
+  ] };
+  await render();
+  await choose(new File([JSON.stringify(backup)], "backup.json", { type: "application/json" }));
+  const preview = container.querySelector<HTMLElement>('[aria-label="What the restore would do"]')!;
+  const copy = preview.textContent;
+  expect(copy).toContain("Adds Jaina.");
+  expect(copy).toContain("Replaces Thrall (Moon Guard) with the backup's newer copy, which changes its notes.");
+  await click(button(/^Restore$/, preview));
+  expect(JSON.parse(localStorage.getItem(bucketKey(ANON))!).alts[0].notes).toBe("older backup private notes");
+  expect(copy).toMatch(/Thrall.*notes|notes.*Thrall/i);
 });
 
 test("a backup from another account is refused at the preview, and nothing changes", async () => {
