@@ -10,6 +10,7 @@ import { hasNodeFrames, loadGameAssets, type GameAssets } from "@/lib/talents/as
 import { HOW_IT_WORKS_ID } from "@/lib/talents/facts";
 import { encodeBuild } from "@/lib/talents/share";
 import { track } from "@/lib/analytics/track";
+import { DATA_SIZE } from "@/design/tokens";
 import { buildTitle, previewPath, summarizeBuild } from "@/lib/talents/summary";
 import type { Ranks, TalentCatalog } from "@/lib/talents/types";
 import GameIcon from "@/components/game/GameIcon";
@@ -387,11 +388,52 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
     how?.scrollIntoView({ block: "start" });
   }
 
+  // A browser brings a talent that takes focus into the window, but leaves it where it is if it is already in it, even
+  // under the site header, the phone's stuck tree switch or the cookie banner (which sets the strip it covers as the
+  // page's bottom scroll padding while it is open). So a talent, or the phone's Reset after the talents, that takes
+  // keyboard focus there moves to 8 px clear of them. Not one focused by a press: moving it then would put the release
+  // on another control. The switch counts where it sticks, under the header: the end of the trees can push it up, and
+  // it drops back there as soon as the page scrolls up. Where it does not stick, it scrolls with the trees above them.
+  const treeSwitch = useRef<HTMLDivElement>(null);
+  function keepClear(e: React.FocusEvent<HTMLElement>) {
+    const bar = treeSwitch.current;
+    const el = e.target as HTMLElement;
+    if (!bar || !el.matches("[data-node], [data-tree-reset]") || !el.matches(":focus-visible")) return;
+    const sticks = bar.getClientRects().length > 0 && getComputedStyle(bar).position === "sticky";
+    const top = DATA_SIZE.header + (sticks ? bar.offsetHeight : 0) + 8;
+    const bottom = window.innerHeight - (parseFloat(getComputedStyle(document.documentElement).scrollPaddingBottom) || 0);
+    const box = el.getBoundingClientRect();
+    if (box.top < top) window.scrollBy(0, box.top - top);
+    else if (box.bottom > bottom) window.scrollBy(0, Math.min(box.bottom - bottom, box.top - top));
+  }
+
+  // The switch sticks only while it and the site header take a quarter of the window at most, so a talent with focus
+  // keeps room under them. The media query on its class answers to the reader's text-size setting; this also answers to
+  // a root font set by a page or a reader's style sheet, which a media query cannot see.
+  const [switchSticks, setSwitchSticks] = useState(true);
+  useEffect(() => {
+    const bar = treeSwitch.current;
+    if (!bar) return;
+    const fit = () => setSwitchSticks(DATA_SIZE.header + bar.offsetHeight <= window.innerHeight / 4);
+    fit();
+    const observer = typeof ResizeObserver === "function" ? new ResizeObserver(fit) : null;
+    observer?.observe(bar);
+    window.addEventListener("resize", fit);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", fit);
+    };
+  }, []);
+
   return (
-    <div onKeyDown={onKeyDown} data-calculator>
-      <Card padding="none">
+    // On a phone the set and tree switches are 44 px tall like the calculator's other buttons (the switch itself is 40).
+    <div onKeyDown={onKeyDown} data-calculator className="max-md:[&_[data-segmented]_button]:min-h-11">
+      {/* Clipped rather than hidden: a card with overflow hidden is a scroll container, and the phone's tree switch
+          below could not stick to the window from inside it. Marked important so it wins over the card's own
+          overflow-hidden whatever order the two utilities are written in. */}
+      <Card padding="none" className="!overflow-clip">
         {/* The build at a glance: which tree leads, the split, points left, the level it needs, and the link. */}
-        <section aria-label="Build" className="flex flex-wrap items-center gap-x-8 gap-y-3 border-b border-line px-4 py-3">
+        <section aria-label="Build" className="flex flex-wrap items-center gap-x-8 gap-y-2 border-b border-line px-4 py-2 md:gap-y-3 md:py-3">
           {/* A phone puts the link beside the build and the figures under them; a wide screen keeps them on one line. */}
           <div className="flex min-w-0 flex-1 items-center gap-3 lg:flex-none">
             {classIcon && <GameIcon src={classIcon} size={36} />}
@@ -429,7 +471,7 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
           )}
         </section>
 
-        <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2 md:py-3">
           <Segmented
             label="Talent set"
             value={active}
@@ -456,36 +498,49 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
           <p role="status" aria-live="polite" className="min-h-5 basis-full text-sm text-fg-2 lg:ml-auto lg:basis-auto">{message}</p>
         </div>
 
-        <div className="px-4 pt-4 md:hidden">
-          <Segmented stretch label="Show tree" value={view} onChange={setView} options={catalog.trees.map((t, i) => ({ value: i, label: `${t.name} ${perTree.get(t.id) ?? 0}` }))} />
-        </div>
+        {/* The trees. A phone shows one at a time, and its switch sticks under the site header while the tree scrolls,
+            with what is left to spend and the set. Only in a window at least 37.5rem (600 px) tall, and while there is
+            room for it (switchSticks): zoomed in further, the header, the switch and an open cookie banner would leave no
+            room for a talent with focus. */}
+        <div>
+          <div ref={treeSwitch} className={`top-header z-10 border-b border-line bg-panel px-4 pb-2 pt-1 md:hidden ${switchSticks ? "[@media(min-height:37.5rem)]:sticky" : ""}`}>
+            {/* A long tree name wraps inside its button, and a word too long for it is hyphenated, rather than running
+                into the next one. */}
+            <Segmented stretch label="Show tree" value={view} onChange={setView} options={catalog.trees.map((t, i) => ({ value: i, label: <span className="min-w-0 whitespace-normal text-center leading-tight [overflow-wrap:anywhere] hyphens-auto">{t.name} {perTree.get(t.id) ?? 0}</span> }))} />
+            {/* The status line already reads every change out; this copy is for the eye only. */}
+            <p aria-hidden="true" data-tree-status className="mt-1 text-xs text-fg-2">{left} left · Set {active + 1}</p>
+          </div>
 
-        <div className="grid gap-4 p-4 md:grid-cols-3" onPointerDown={onPointerDown} onPointerUp={endPress} onPointerLeave={endPress} onPointerCancel={endPress} onClickCapture={onClickCapture} onContextMenu={onContextMenu}>
-          {catalog.trees.map((tree, i) => {
-            const points = perTree.get(tree.id) ?? 0;
-            return (
-              <section key={tree.id} className={`min-w-0 ${i === view ? "" : "hidden md:block"}`} aria-label={tree.name}>
-                <div className="mb-2 space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    {treeIcons?.[i] && <GameIcon src={treeIcons[i]!} size={24} />}
-                    <h2 className={`min-w-0 truncate text-base font-semibold ${classText}`}>{tree.name}</h2>
-                    <span className={`ml-auto font-mono text-xl tabular-nums ${points === 0 ? "text-muted" : "text-fg"}`}>{points}</span>
-                    {!readOnly && <button type="button" className="min-h-11 px-1 text-sm text-muted hover:text-fg disabled:opacity-50" disabled={points === 0} aria-label={`Reset ${tree.name}`} onClick={() => resetTree(tree.id, tree.name)}>Reset</button>}
+          <div className="grid gap-4 p-4 max-md:pt-2 md:grid-cols-3" onFocus={keepClear} onPointerDown={onPointerDown} onPointerUp={endPress} onPointerLeave={endPress} onPointerCancel={endPress} onClickCapture={onClickCapture} onContextMenu={onContextMenu}>
+            {catalog.trees.map((tree, i) => {
+              const points = perTree.get(tree.id) ?? 0;
+              return (
+                <section key={tree.id} className={`min-w-0 ${i === view ? "" : "hidden md:block"}`} aria-label={tree.name}>
+                  {/* On a phone the switch above carries the tree's name and points, and its Reset follows the talents; the
+                      heading stays for screen readers. */}
+                  <div className="mb-2 space-y-1.5 max-md:mb-0">
+                    <div className="flex items-center gap-2">
+                      {treeIcons?.[i] && <GameIcon src={treeIcons[i]!} size={24} className="max-md:hidden" />}
+                      <h2 className={`min-w-0 truncate text-base font-semibold max-md:sr-only ${classText}`}>{tree.name}</h2>
+                      <span className={`ml-auto font-mono text-xl tabular-nums max-md:hidden ${points === 0 ? "text-muted" : "text-fg"}`}>{points}</span>
+                      {!readOnly && <button type="button" className="min-h-11 px-1 text-sm text-muted hover:text-fg disabled:opacity-50 max-md:hidden" disabled={points === 0} aria-label={`Reset ${tree.name}`} onClick={() => resetTree(tree.id, tree.name)}>Reset</button>}
+                    </div>
+                    <div className="h-1 overflow-hidden rounded-full bg-canvas max-md:hidden" aria-hidden="true">
+                      <div className={`h-full rounded-full bg-current ${classText}`} style={{ width: `${available ? Math.min(100, (points / available) * 100) : 0}%` }} />
+                    </div>
                   </div>
-                  <div className="h-1 overflow-hidden rounded-full bg-canvas" aria-hidden="true">
-                    <div className={`h-full rounded-full bg-current ${classText}`} style={{ width: `${available ? Math.min(100, (points / available) * 100) : 0}%` }} />
-                  </div>
-                </div>
-                {(() => {
-                  const props = {
-                    catalog, tree, ranks, available, spent: points, selected, roving: rovingFor(tree.id), onAdd: doAdd, onTip,
-                    onSelect: (id: number) => { setSelected(id); setRovingByTree((r) => ({ ...r, [nodes.get(id)!.treeId]: id })); },
-                  };
-                  return game ? <GameTree {...props} assets={assets} /> : <TalentTreeView {...props} assets={assets} />;
-                })()}
-              </section>
-            );
-          })}
+                  {(() => {
+                    const props = {
+                      catalog, tree, ranks, available, spent: points, selected, roving: rovingFor(tree.id), onAdd: doAdd, onTip,
+                      onSelect: (id: number) => { setSelected(id); setRovingByTree((r) => ({ ...r, [nodes.get(id)!.treeId]: id })); },
+                    };
+                    return game ? <GameTree {...props} assets={assets} /> : <TalentTreeView {...props} assets={assets} />;
+                  })()}
+                  {!readOnly && <button type="button" data-tree-reset className="mt-2 min-h-11 px-1 text-sm text-muted hover:text-fg disabled:opacity-50 md:hidden" disabled={points === 0} aria-label={`Reset ${tree.name}`} onClick={() => resetTree(tree.id, tree.name)}>Reset {tree.name}</button>}
+                </section>
+              );
+            })}
+          </div>
         </div>
         {assets && tipContent && tip && <TalentTooltip anchorId={tipAnchor!} id="talent-tooltip" content={tipContent} />}
 
