@@ -33,6 +33,8 @@ const fullNote = (size: GroupSize) => `All ${size} places are filled. Remove a c
 const places = ({ size, classes }: GroupPlan) =>
   classes.length < size ? `${classes.length} of ${size} places filled, ${size - classes.length} open.` : `All ${size} places are filled.`;
 const partyOf = (index: number) => Math.floor(index / GROUP_SIZE) + 1;
+/** Puts the group in the address, which is then its link: the size and the classes, nothing else. Fires no hashchange. */
+const showInAddress = (plan: GroupPlan) => history.replaceState(null, "", `${location.pathname}${location.search}${groupHash(plan)}`);
 
 /**
  * The group planner: a size, the classes in parties of five, and what they bring. The group lives in the address's
@@ -42,30 +44,27 @@ const partyOf = (index: number) => Math.floor(index / GROUP_SIZE) + 1;
 export default function GroupPlanner({ roles }: { roles: Record<ClassSlug, GuideRole[]> }) {
   const [plan, setPlan] = useState<GroupPlan>(EMPTY_GROUP);
   const [error, setError] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
   // What the last change did, for the status line; it is in the page from the start, so a screen reader hears each one.
   const [said, setSaid] = useState("");
 
   useEffect(() => {
-    // Read once the page is in the browser, and again when a link is pasted into the address bar of this tab.
+    // Read once the page is in the browser, and again when a link is pasted into the address bar of this tab. Each read
+    // writes back the group it opened, even one already shown, so nothing else the link carried stays in the address.
     const read = () => {
       const opened = parseGroup(new URLSearchParams(location.hash.slice(1)));
-      setPlan(opened.ok ? opened.plan : EMPTY_GROUP);
+      const shown = opened.ok ? opened.plan : EMPTY_GROUP;
+      showInAddress(shown);
+      setPlan(shown);
       setError(opened.ok ? null : opened.error);
       setSaid("");
     };
     read();
-    setReady(true);
     window.addEventListener("hashchange", read);
     return () => window.removeEventListener("hashchange", read);
   }, []);
 
-  // The address follows the group. replaceState does not fire hashchange.
-  useEffect(() => {
-    if (ready) history.replaceState(null, "", `${location.pathname}${location.search}${groupHash(plan)}`);
-  }, [ready, plan]);
-
   const edit = (next: GroupPlan) => {
+    showInAddress(next);
     setPlan(next);
     setError(null);
   };

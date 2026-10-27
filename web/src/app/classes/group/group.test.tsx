@@ -237,6 +237,24 @@ describe("the group page", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  test("every link read is cleaned in the address, even when it opens the group already shown", async () => {
+    const paste = async (hash: string) => {
+      history.replaceState(null, "", `/classes/group${hash}`);
+      await act(async () => window.dispatchEvent(new HashChangeEvent("hashchange")));
+    };
+    await open("#classes=Mage&name=Arthas");
+    expect(location.hash).toBe("");
+    // Unreadable again, so the page shows the same empty group and nothing in it changes.
+    await paste("#size=7&name=Jaina");
+    expect(location.hash).toBe("");
+    expect(container!.querySelector('[role="alert"]')?.textContent).toBe('"7" is not a group size: 5, 10, 20 or 40. This page opens an empty group instead.');
+    expect(container!.innerHTML).not.toContain("Jaina");
+    await paste("#size=5&classes=mage&name=Thrall");
+    expect(location.hash).toBe("#size=5&classes=mage");
+    await paste("#size=5&classes=mage&realm=Dreadmist");
+    expect(location.hash).toBe("#size=5&classes=mage");
+  });
+
   test("a link pasted into the address bar opens its group", async () => {
     await open("#size=5&classes=mage");
     history.replaceState(null, "", "/classes/group#size=10&classes=druid,druid");
