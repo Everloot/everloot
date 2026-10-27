@@ -80,17 +80,24 @@ export function answersHash(answers: Answers, data: ClassChooserData): string {
 
 /* ---------- Choosing ---------- */
 
-export interface Weighed { classSlug: ClassSlug; weight: number; why: string }
+/** How the page names a reading: a weight that is Everloot's reading of a description, where the source names no role. */
+export const READING = "Everloot's reading of Blizzard's description, not a role Blizzard names";
 
-/** What an option gives each class it weighs, with why; a role's classes and reasons are the facts'. The heaviest first. */
+/** A weight an option gives a class, with why; `reading` when it is Everloot's reading rather than a role the facts give. */
+export interface Weighed { classSlug: ClassSlug; weight: number; why: string; reading?: true }
+
+/** What an option gives each class it weighs, with why: a role's classes and reasons are the facts', then its readings. The heaviest first. */
 export function optionWeights(option: ChooserOption, { roles }: ClassChooserData): Weighed[] {
   const weighed: Weighed[] = option.role
-    ? CLASSES.flatMap((c) => roles.classes[c].roles.filter((r) => r.role === option.role).map((r) => ({ classSlug: c, weight: option.weight!, why: r.basis })))
+    ? [
+      ...CLASSES.flatMap((c) => roles.classes[c].roles.filter((r) => r.role === option.role).map((r) => ({ classSlug: c, weight: option.weight!, why: r.basis }))),
+      ...(option.readings ?? []).map((r) => ({ classSlug: r.class, weight: r.weight, why: r.why, reading: true as const })),
+    ]
     : (option.classes ?? []).map((c) => ({ classSlug: c.class, weight: c.weight, why: c.why }));
   return weighed.sort((a, b) => b.weight - a.weight || byName(a.classSlug, b.classSlug));
 }
 
-export interface Reason { question: string; answer: string; weight: number; why: string }
+export interface Reason { question: string; answer: string; weight: number; why: string; reading?: true }
 export interface ClassFit { classSlug: ClassSlug; score: number; reasons: Reason[] }
 
 export interface ChooserResult {
@@ -128,7 +135,7 @@ export function chooseClasses(answers: Answers, data: ClassChooserData): Chooser
     for (const w of weighed) {
       const fit = fits.get(w.classSlug)!;
       fit.score += w.weight;
-      fit.reasons.push({ question: question.text, answer: option.text, weight: w.weight, why: w.why });
+      fit.reasons.push({ question: question.text, answer: option.text, weight: w.weight, why: w.why, ...(w.reading ? { reading: true as const } : {}) });
     }
     // Only a role can weigh no class at all: an option that names classes names at least one.
     if (!weighed.length && option.role) silent.push({ question: question.text, answer: option.text, reason: "none", role: option.role });

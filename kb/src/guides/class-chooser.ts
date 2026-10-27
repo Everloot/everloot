@@ -3,7 +3,8 @@
  * Blizzard's race and class article gives each class, and the races its tables let play each class. class-chooser.yaml
  * holds Everloot's own editorial choices: the questions the chooser asks and the weight each answer gives a class. An
  * option that weighs a role weighs the classes class-roles.yaml gives that role, so how much a role counts is decided
- * in one file and who has it in the other.
+ * in one file and who has it in the other. Beside them it may weigh readings: classes the source describes without
+ * naming the role, by Everloot's reading of the description, which the page labels as such.
  *
  * Each file is versioned and names its review: a reviewed file says who reviewed this version and on which day, and a
  * draft names no one. Pure, with no file access, so the check and the site read the files the same way, and the site
@@ -91,6 +92,7 @@ export type ClassRoles = z.infer<typeof ClassRolesFile>;
 
 /** How much an answer counts for a class: 1, 2 or 3. Small on purpose: an answer leans toward a class, it does not measure it. */
 const weight = z.number().int().min(1).max(3);
+const weighed = z.strictObject({ class: z.enum(TALENT_CLASSES), weight, why: words(200) });
 
 const option = z.strictObject({
   id,
@@ -98,8 +100,10 @@ const option = z.strictObject({
   /** Weighs each class class-roles.yaml gives this role, by `weight`... */
   role: z.enum(GUIDE_ROLES).optional(),
   weight: weight.optional(),
-  /** ...or weighs classes one by one, each with why, in our words. */
-  classes: z.array(z.strictObject({ class: z.enum(TALENT_CLASSES), weight, why: words(200) })).optional(),
+  /** ...and with it, classes the source describes without naming the role, by Everloot's reading; the page says so. */
+  readings: z.array(weighed).optional(),
+  /** Or weighs classes one by one, each with why, in our words. */
+  classes: z.array(weighed).optional(),
 });
 
 const ChooserFields = z.strictObject({
@@ -118,12 +122,14 @@ export const ClassChooserFile = ChooserFields.superRefine((f, ctx) => {
       const at = `questions.${i}.options.${j}`;
       const path = ["questions", i, "options", j];
       if (q.options.findIndex((other) => other.id === o.id) !== j) issue(`${at}: the id "${o.id}" is already used in this question`, path);
-      if (o.classes !== undefined && (o.role !== undefined || o.weight !== undefined)) issue(`${at} weighs classes by role or one by one, not both`, path);
+      if (o.classes !== undefined && (o.role !== undefined || o.weight !== undefined || o.readings !== undefined)) issue(`${at} weighs classes by role or one by one, not both`, path);
+      else if (o.readings !== undefined && o.role === undefined) issue(`${at} gives readings without the role they read`, path);
       else if (o.role !== undefined && o.weight === undefined) issue(`${at} gives the role ${o.role} without the weight each class with it gets`, path);
       else if (o.role === undefined && o.weight !== undefined) issue(`${at} gives a weight without the role it applies to`, path);
       else if (o.role === undefined && !o.classes?.length) issue(`${at} weighs no class: give a role and a weight, or classes`, path);
-      o.classes?.forEach((c, k) => {
-        if (o.classes!.findIndex((other) => other.class === c.class) !== k) issue(`${at} weighs ${c.class} twice`, path);
+      const named = [...(o.classes ?? []), ...(o.readings ?? [])];
+      named.forEach((c, k) => {
+        if (named.findIndex((other) => other.class === c.class) !== k) issue(`${at} weighs ${c.class} twice`, path);
       });
     });
   });
@@ -131,6 +137,13 @@ export const ClassChooserFile = ChooserFields.superRefine((f, ctx) => {
 export type ClassChooser = z.infer<typeof ClassChooserFile>;
 
 export interface ClassChooserData { roles: ClassRoles; chooser: ClassChooser }
+
+/** The rule between the files: a reading is for a class the facts give no such role, or the class would count twice. */
+function crossIssues({ roles, chooser }: ClassChooserData): { message: string; path: PropertyKey[] }[] {
+  return chooser.questions.flatMap((q, i) => q.options.flatMap((o, j) => (o.readings ?? [])
+    .filter((r) => roles.classes[r.class].roles.some((fact) => fact.role === o.role))
+    .map((r) => ({ message: `questions.${i}.options.${j} reads ${r.class} as ${o.role}, a role class-roles.yaml already gives it`, path: ["questions", i, "options", j] }))));
+}
 
 /* ---------- Reading and checking ---------- */
 
@@ -194,7 +207,7 @@ function readFile<T>(file: ChooserFile, schema: z.ZodType<T>): { value: T | null
  */
 export function checkClassChooser(files: ChooserFiles, today: string): { data: ClassChooserData | null; problems: Problem[] } {
   const problems: Problem[] = [];
-  const read = <T>(key: keyof ChooserFiles, schema: z.ZodType<T>): T | null => {
+  const read = <T>(key: keyof ChooserFiles, schema: z.ZodType<T>): { value: T | null; lineOf: LineOf } | null => {
     const file = files[key];
     if (!file) {
       problems.push({ file: `guides/${CHOOSER_FILES[key]}`, message: `guides/${CHOOSER_FILES[key]} is missing: the class chooser reads ${CHOOSER_FILES.roles} and ${CHOOSER_FILES.chooser} together` });
@@ -204,16 +217,19 @@ export function checkClassChooser(files: ChooserFiles, today: string): { data: C
     problems.push(...found);
     const on = (value as { reviewedOn?: string | null } | null)?.reviewedOn;
     if (on && on > today) problems.push({ file: file.path, line: lineOf(["reviewedOn"]), message: `reviewedOn ${on} is after today (${today})` });
-    return value;
+    return { value, lineOf };
   };
   const roles = read("roles", ClassRolesFile);
   const chooser = read("chooser", ClassChooserFile);
-  return { data: roles && chooser && !problems.length ? { roles, chooser } : null, problems };
+  if (roles?.value && chooser?.value) {
+    for (const c of crossIssues({ roles: roles.value, chooser: chooser.value })) problems.push({ file: files.chooser!.path, line: chooser.lineOf(c.path), message: c.message });
+  }
+  return { data: roles?.value && chooser?.value && !problems.length ? { roles: roles.value, chooser: chooser.value } : null, problems };
 }
 
-/** The two files as the site reads them: their data, or null when either breaks a rule of its schema. */
+/** The two files as the site reads them: their data, or null when either breaks a rule of its schema or of the two together. */
 export function parseClassChooser(roles: string, chooser: string): ClassChooserData | null {
   const r = readFile({ path: CHOOSER_FILES.roles, source: roles }, ClassRolesFile).value;
   const c = readFile({ path: CHOOSER_FILES.chooser, source: chooser }, ClassChooserFile).value;
-  return r && c ? { roles: r, chooser: c } : null;
+  return r && c && !crossIssues({ roles: r, chooser: c }).length ? { roles: r, chooser: c } : null;
 }

@@ -164,11 +164,16 @@ describe("the chooser page", () => {
       "Rogue: +2. Blizzard's article says rogues rely on stealth and are fond of poisons.",
       "Priest: +1. Power Word: Fortitude, Divine Spirit and Shadow Protection, in the raid builder's table.",
       "A race keeps the classes Blizzard's race tables let it be, and adds no weight.",
+      "And by Everloot's reading of Blizzard's description, not a role Blizzard names:",
+      "Warrior: +2. Blizzard's article says warriors strive for perfection in armed combat.",
+      "Rogue: +2. Blizzard's article says rogues are hired to eliminate designated targets.",
     ]) expect(page, line).toContain(line);
     for (const limit of [
       "The weights are Everloot's editorial choices, not measurements",
       "The source does not say which classes protect a group.",
-      "It describes Druids, Hunters and Shaman without naming a role",
+      "It describes Druids, Hunters, Rogues, Shaman and Warriors without naming a role.",
+      "\"Deal damage\" weighs Rogues and Warriors by Everloot's reading of their descriptions, marked as such.",
+      "No role answer weighs Druids, Hunters or Shaman.",
       "Classes with the same weight are shown together, in alphabetical order. The chooser does not break a tie.",
       "Your answers stay in this page's address, after the # sign",
     ]) expect(page, limit).toContain(limit);
@@ -211,6 +216,12 @@ describe("choosing in the browser", () => {
     expect(document.activeElement?.id).toBe("result");
     expect(result()).toContain("Warrior fits your answers most");
     expect(result()).toContain("A Tauren cannot be a Mage, Paladin, Priest, Rogue or Warlock in Blizzard's tables");
+  });
+
+  test("a weight that is Everloot's reading of a description, not a role Blizzard names, says so in its reason", async () => {
+    await open("#role=damage");
+    expect(result()).toContain("Deal damage: +2. Everloot's reading of Blizzard's description, not a role Blizzard names: Blizzard's article says warriors strive for perfection in armed combat.");
+    expect(result()).toContain("Deal damage: +2. Blizzard's article says mages attack from a distance with bolts of frost and flame.");
   });
 
   test("a tie is shown together, in alphabetical order, and the page says no tie is broken", async () => {

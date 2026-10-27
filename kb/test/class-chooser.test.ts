@@ -172,6 +172,19 @@ describe("class-chooser.yaml", () => {
     expect(problemsOf(ROLES, unknown)).toEqual([at(CHOOSER_PATH, unknown, "- { class: monk", "questions.1.options.0.classes.0.class")]);
   });
 
+  test("a role answer may also weigh classes the facts give no such role, as Everloot's reading of the source", () => {
+    const read = CHOOSER.replace("{ id: damage, text: Deal damage, role: damage, weight: 2 }", '{ id: damage, text: Deal damage, role: damage, weight: 2, readings: [{ class: rogue, weight: 2, why: "Rogues eliminate their targets." }] }');
+    expect(problemsOf(ROLES, read)).toEqual([]);
+    expect(parseClassChooser(ROLES, read)?.chooser.questions[0].options[1].readings).toEqual([{ class: "rogue", weight: 2, why: "Rogues eliminate their targets." }]);
+    const twice = read.replace("class: rogue", "class: mage");
+    expect(problemsOf(ROLES, twice)).toEqual([at(CHOOSER_PATH, twice, "- { id: damage", "questions.0.options.1 reads mage as damage, a role class-roles.yaml already gives it")]);
+    expect(parseClassChooser(ROLES, twice)).toBeNull();
+    const again = read.replace('[{ class: rogue, weight: 2, why: "Rogues eliminate their targets." }]', '[{ class: rogue, weight: 2, why: "One." }, { class: rogue, weight: 1, why: "Two." }]');
+    expect(problemsOf(ROLES, again)).toEqual([at(CHOOSER_PATH, again, "- { id: damage", "questions.0.options.1 weighs rogue twice")]);
+    const roleless = CHOOSER.replace("        classes:\n          - { class: mage", "        readings:\n          - { class: mage");
+    expect(problemsOf(ROLES, roleless)).toEqual([at(CHOOSER_PATH, roleless, "- id: frost-and-flame", "questions.1.options.0 gives readings without the role they read")]);
+  });
+
   test("ids are unique, and race belongs to the race question", () => {
     const sameQuestion = CHOOSER.replace("- id: theme", "- id: role");
     expect(problemsOf(ROLES, sameQuestion)).toEqual([{ file: CHOOSER_PATH, line: 11, message: expect.stringContaining('questions.1: the id "role" is already used by questions.0') }]);

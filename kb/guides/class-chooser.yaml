@@ -8,6 +8,8 @@
 #
 # Where each weight comes from:
 # - role: each class class-roles.yaml gives the role gets the weight, with what Blizzard's article says as the reason.
+#   A reading weighs a class the article describes without naming the role, by Everloot's reading of that
+#   description; the page labels it "Everloot's reading of Blizzard's description, not a role Blizzard names".
 # - theme and companion: the class Blizzard's article describes that way, in its own terms.
 # - group: the raid builder's table, read from the game files. A class gets 2 for four or more effects of the kind
 #   that need no talent, and 1 for two or three. Most classes bring at least one; one alone adds no weight.
@@ -20,7 +22,13 @@ questions:
     text: What would you like to do in a group?
     options:
       - { id: heal, text: Heal my allies, role: healer, weight: 2 }
-      - { id: damage, text: Deal damage, role: damage, weight: 2 }
+      - id: damage
+        text: Deal damage
+        role: damage
+        weight: 2
+        readings:
+          - { class: warrior, weight: 2, why: "Blizzard's article says warriors strive for perfection in armed combat." }
+          - { class: rogue, weight: 2, why: "Blizzard's article says rogues are hired to eliminate designated targets." }
       - { id: protect, text: Protect my group, role: tank, weight: 2 }
   - id: theme
     text: Which of these draws you in?

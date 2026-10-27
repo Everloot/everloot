@@ -107,7 +107,9 @@ skips them. Like the guides they are content under CC BY-SA 4.0, and the game fa
   holds them equal.
 - `class-chooser.yaml` holds Everloot's editorial choices: the questions, their answers and the weight each answer
   gives a class (1, 2 or 3), with why. An answer that names a role weighs the classes `class-roles.yaml` gives that
-  role. A weight leans toward a class; it never measures one or names a best class.
+  role. Its `readings` may also weigh a class the source describes without naming the role, by our reading of the
+  description: the page labels each one as Everloot's reading, and a reading never repeats a role the facts give. A
+  weight leans toward a class; it never measures one or names a best class.
 
 Each file carries its own review:
 

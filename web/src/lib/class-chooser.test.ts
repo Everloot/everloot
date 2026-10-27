@@ -122,6 +122,20 @@ describe("choosing", () => {
     expect(frost.unweighed).toEqual(["druid", "hunter", "shaman", "warrior"]);
   });
 
+  test("a reading weighs a class the facts give no such role, and says it is Everloot's reading", () => {
+    const read = parseClassChooser(ROLES, CHOOSER.replace("{ id: damage, text: Deal damage, role: damage, weight: 2 }", '{ id: damage, text: Deal damage, role: damage, weight: 2, readings: [{ class: rogue, weight: 1, why: "Rogues eliminate their targets." }] }'))!;
+    expect(optionWeights(read.chooser.questions[0].options[1], read)).toEqual([
+      { classSlug: "mage", weight: 2, why: "Hurls frost and flame." },
+      { classSlug: "paladin", weight: 2, why: "Smites evil." },
+      { classSlug: "warrior", weight: 2, why: "Fights with weapons." },
+      { classSlug: "rogue", weight: 1, why: "Rogues eliminate their targets.", reading: true },
+    ]);
+    const result = chooseClasses({ role: "damage" }, read)!;
+    expect(slugs(result.top)).toEqual(["mage", "paladin", "warrior"]);
+    expect(result.top[0].reasons[0].reading).toBeUndefined();
+    expect(result.alternatives).toEqual([{ classSlug: "rogue", score: 1, reasons: [{ question: ROLE_Q, answer: "Deal damage", weight: 1, why: "Rogues eliminate their targets.", reading: true }] }]);
+  });
+
   test("a race alone lists the classes it can be, none ahead of another", () => {
     const result = choose({ race: "alliance-night-elf" });
     expect(result.top).toEqual([]);
@@ -212,6 +226,13 @@ describe("the committed chooser", () => {
         expect(committed.roles.classes[slug].races[faction], `${slug} ${faction}`).toEqual(site.find((f) => f.faction === faction)?.races.map((r) => r.race) ?? []);
       }
     }
+  });
+
+  test("Warriors and Rogues deal damage only by Everloot's reading: the facts give them no role", () => {
+    expect(committed.roles.classes.warrior.roles).toEqual([]);
+    expect(committed.roles.classes.rogue.roles).toEqual([]);
+    const damage = committed.chooser.questions.find((q) => q.id === "role")!.options.find((o) => o.id === "damage")!;
+    expect(optionWeights(damage, committed).filter((w) => w.reading).map((w) => w.classSlug)).toEqual(["rogue", "warrior"]);
   });
 
   test("every class is the one class the answers fit most under some answers the form allows", () => {

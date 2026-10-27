@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { Container, PageHeader, SectionHeading } from "@/components/ui";
 import { CURRENT_BUILD } from "@/data/game-data/raid";
 import { CLASSES } from "@/design/tokens";
-import { ROLE_DOES, chooserReviewed, listed, optionWeights } from "@/lib/class-chooser";
+import { READING, ROLE_DOES, chooserReviewed, listed, optionWeights } from "@/lib/class-chooser";
 import { ROLES, classLabel, type ClassSlug } from "@/lib/class-context";
 import { guidesDir } from "@/lib/guides";
 import { pageMetadata } from "@/lib/seo";
@@ -111,15 +111,25 @@ function Weights({ data }: { data: ClassChooserData }) {
           <ul className="mt-2 space-y-3">
             {q.options.map((o) => {
               const weighed = optionWeights(o, data);
+              const facts = weighed.filter((w) => !w.reading);
+              const readings = weighed.filter((w) => w.reading);
               return (
                 <li key={o.id} data-option={`${q.id}.${o.id}`}>
                   <span className="font-semibold text-fg">{o.text}</span>{" "}
                   {o.role && `+${o.weight} for each class the source says ${ROLE_DOES[o.role].one}.`}
-                  {o.role && !weighed.length && ` No class: the source does not say which classes ${ROLE_DOES[o.role].many}.`}
-                  {weighed.length > 0 && (
+                  {o.role && !facts.length && ` No class: the source does not say which classes ${ROLE_DOES[o.role].many}.`}
+                  {facts.length > 0 && (
                     <ul className="mt-1 space-y-1 pl-4">
-                      {weighed.map((w) => <li key={w.classSlug}>{o.role ? `${classLabel(w.classSlug)}: ${w.why}` : `${classLabel(w.classSlug)}: +${w.weight}. ${w.why}`}</li>)}
+                      {facts.map((w) => <li key={w.classSlug}>{o.role ? `${classLabel(w.classSlug)}: ${w.why}` : `${classLabel(w.classSlug)}: +${w.weight}. ${w.why}`}</li>)}
                     </ul>
+                  )}
+                  {readings.length > 0 && (
+                    <>
+                      <p className="mt-1">{`And by ${READING}:`}</p>
+                      <ul className="mt-1 space-y-1 pl-4">
+                        {readings.map((w) => <li key={w.classSlug}>{`${classLabel(w.classSlug)}: +${w.weight}. ${w.why}`}</li>)}
+                      </ul>
+                    </>
                   )}
                 </li>
               );
@@ -134,8 +144,13 @@ function Weights({ data }: { data: ClassChooserData }) {
 /** What the chooser leans on and what it cannot say, worked out from its files so it stays true when they change. */
 function Limits({ data }: { data: ClassChooserData }) {
   const { classes } = data.roles;
+  const byName = (a: ClassSlug, b: ClassSlug) => classLabel(a).localeCompare(classLabel(b));
   const unsourced = ROLES.filter((role) => !CLASSES.some((c) => classes[c].roles.some((r) => r.role === role)));
-  const roleless = CLASSES.filter((c) => !classes[c].roles.length).sort((a, b) => classLabel(a).localeCompare(classLabel(b)));
+  const roleless = CLASSES.filter((c) => !classes[c].roles.length).sort(byName);
+  // The role answers that weigh classes by Everloot's reading, each with the classes it reads.
+  const reads = data.chooser.questions.flatMap((q) => q.options).filter((o) => o.role && o.readings?.length)
+    .map((o) => ({ answer: o.text, classes: o.readings!.map((r) => r.class).sort(byName) }));
+  const unread = roleless.filter((c) => !reads.some((r) => r.classes.includes(c)));
   return (
     <section aria-labelledby="limits" className="mt-12 max-w-[75ch] text-sm text-fg-2">
       <SectionHeading id="limits">What the chooser does not know</SectionHeading>
@@ -147,7 +162,9 @@ function Limits({ data }: { data: ClassChooserData }) {
         <li>
           A role counts only where the source gives it.
           {unsourced.map((role) => ` The source does not say which classes ${ROLE_DOES[role].many}.`)}
-          {roleless.length > 0 && ` It describes ${listed(roleless.map((c) => PLURAL[c]))} without naming a role, so no role answer weighs them.`}
+          {roleless.length > 0 && ` It describes ${listed(roleless.map((c) => PLURAL[c]))} without naming a role.`}
+          {reads.map((r) => ` "${r.answer}" weighs ${listed(r.classes.map((c) => PLURAL[c]))} by Everloot's reading of their descriptions, marked as such.`)}
+          {unread.length > 0 && ` No role answer weighs ${listed(unread.map((c) => PLURAL[c]), "or")}.`}
           {" "}A class without a role here may still fill one; the source just does not say so.
         </li>
         <li>

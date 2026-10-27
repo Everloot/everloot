@@ -4,8 +4,9 @@
 #
 # A role is listed only where the article says the class does it, with what it says in our words. The article names
 # three roles (healing allies, dealing damage and protecting your group) but does not say which classes protect a
-# group, and it describes Hunters, Shaman and Druids without naming a role, so they list none. A class that lists no
-# role may still fill one; the article just does not say so.
+# group, and it describes Warriors, Hunters, Rogues, Shaman and Druids without naming a role, so they list none. A
+# class that lists no role may still fill one; the article just does not say so. Where class-chooser.yaml weighs one
+# of those classes for a role anyway, it is Everloot's reading of the description, kept there and labelled so.
 #
 # The races are the site's copy of the article's two tables (web/src/data/wow-forever.ts, read from the article on
 # 2026-10-18), and a test holds them equal to it. Every class can be played on both sides.
@@ -19,8 +20,7 @@ source:
   checkedOn: 2026-10-27
 classes:
   warrior:
-    roles:
-      - { role: damage, basis: "Blizzard's article says warriors strive for perfection in armed combat." }
+    roles: []
     races:
       Alliance: [Dwarf, Gnome, Human, Night Elf, Skyborne]
       Horde: [Orc, Tauren, Troll, Undead, Skyborne]
@@ -37,8 +37,7 @@ classes:
       Alliance: [Dwarf, Human, Night Elf, Skyborne]
       Horde: [Orc, Tauren, Troll, Skyborne]
   rogue:
-    roles:
-      - { role: damage, basis: "Blizzard's article says rogues are hired to eliminate designated targets." }
+    roles: []
     races:
       Alliance: [Dwarf, Gnome, Human, Night Elf, Skyborne]
       Horde: [Orc, Troll, Undead, Skyborne]

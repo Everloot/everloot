@@ -5,7 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "re
 import { CLASS_TEXT } from "@/components/talents/TalentTreeView";
 import { Card, SectionHeading } from "@/components/ui";
 import {
-  FACTIONS, RACE, ROLE_DOES, answersHash, article, chooseClasses, listed, parseAnswers, raceChoices, raceLabel,
+  FACTIONS, RACE, READING, ROLE_DOES, answersHash, article, chooseClasses, listed, parseAnswers, raceChoices, raceLabel,
   type Answers, type ChooserResult, type ClassFit, type RaceChoice,
 } from "@/lib/class-chooser";
 import { classHubHref, classLabel } from "@/lib/class-context";
@@ -41,7 +41,7 @@ function Fit({ fit }: { fit: ClassFit }) {
       <Link href={classHubHref({ classSlug: fit.classSlug })} className={`font-semibold ${LINK} ${CLASS_TEXT[fit.classSlug]}`}>{classLabel(fit.classSlug)}</Link>
       <span className="ml-2 text-meta text-muted">{`Weight from your answers: ${fit.score}`}</span>
       <ul className="mt-1 space-y-1 text-sm text-fg-2">
-        {fit.reasons.map((r) => <li key={r.question}>{`${r.answer}: +${r.weight}. ${r.why}`}</li>)}
+        {fit.reasons.map((r) => <li key={r.question}>{`${r.answer}: +${r.weight}. ${r.reading ? `${READING}: ` : ""}${r.why}`}</li>)}
       </ul>
     </>
   );
