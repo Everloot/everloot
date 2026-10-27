@@ -676,13 +676,73 @@ describe("binding a transfer on this device", () => {
   const saved = (owner: Owner, ...plans: LocalPlan[]) => ({ ok: true as const, userId: owner.kind === "account" ? owner.userId : "", planIds: plans.map((p) => p.id) });
   const NOW = new Date("2026-10-27T12:00:00.000Z");
 
-  test("a plan the account's bucket already holds bound to it keeps the account's copy, and a copy here that differs stays here", () => {
+  test("a plan the account's bucket already holds bound to it keeps the account's copy, and the copy here, the one sent, goes", () => {
     const accountCopy = { ...FROST, name: "Renamed on the account side", updatedAt: "2026-10-22T12:00:00.000Z", boundTo: { userId: A_ID, at: AT } };
     seed(ANON, [FROST]);
     seed(A, [accountCopy]);
     expect(bindTransferred(localStorage, sent(A, FROST), saved(A, FROST), NOW)).toEqual({ ok: true, bound: 1 });
     expect(stored(A)!.plans).toEqual([accountCopy]);
+    expect(stored(ANON)!.plans).toEqual([]);
+  });
+
+  test("a copy here that the account saved is not refused as a second build when the account's copy here was renamed since: it goes", async () => {
+    const { planContent, receiptSaved, transferKey } = await import("@/lib/player-workspace");
+    const accountCopy = { ...FROST, name: "Renamed on the account side", updatedAt: "2026-10-22T12:00:00.000Z", boundTo: { userId: A_ID, at: AT } };
+    seed(ANON, [FROST]);
+    seed(A, [accountCopy]);
+    const key = transferKey(localStorage, A, FROST.id);
+    if (!key.ok) throw new Error(key.message);
+    expect(receiptSaved(localStorage, A, FROST.id, key.key, planContent(FROST)).ok).toBe(true);
+    await render();
+    await open();
+    expect(text()).toContain("Frost is in your account already (saved");
+    expect(text()).not.toContain("differs from it");
+    await click(field("Save Frost to your account"));
+    await click(saveButton());
+    expect(posts).toEqual([]);
+    expect(stored(A)!.plans).toEqual([accountCopy]);
+    expect(stored(ANON)!.plans).toEqual([]);
+  });
+
+  test("a receipt alone moves and hides nothing: a plan leaves the signed-out ones only once the account's copy is on this device", async () => {
+    const { hiddenFrom, planContent, readWorkspace, receiptSaved, transferKey } = await import("@/lib/player-workspace");
+    seed(ANON, [FROST]);
+    const key = transferKey(localStorage, A, FROST.id);
+    if (!key.ok) throw new Error(key.message);
+    expect(receiptSaved(localStorage, A, FROST.id, key.key, planContent(FROST)).ok).toBe(true);
+    // The site said it has Frost, but this device holds no copy for the account: Frost stays, and nobody is kept from it.
+    expect(settleTransferred(localStorage, A, [FROST.id])).toEqual({ ok: true, moved: 0 });
     expect(stored(ANON)!.plans).toEqual([FROST]);
+    expect(stored(A)).toBeNull();
+    const read = readWorkspace(localStorage, ANON);
+    if (!read.ok) throw new Error(read.message);
+    expect(hiddenFrom(localStorage, ANON, read.workspace).size).toBe(0);
+    expect(hiddenFrom(localStorage, B, read.workspace).size).toBe(0);
+    // The transfer finishes moving it as any plan the account has: the account's copy on this device first, then out.
+    await render();
+    await open();
+    await click(field("Save Frost to your account"));
+    await click(saveButton());
+    expect(posts).toEqual([]);
+    expect(stored(A)!.plans).toEqual([bound(FROST)]);
+    expect(stored(ANON)!.plans).toEqual([]);
+  });
+
+  test("an alt goes with its plans only when the account's copy of it has the same content, whatever either one's date", () => {
+    const boundFrost = { ...FROST, boundTo: { userId: A_ID, at: AT } };
+    // Edited here while the clock said Oct 27; the account's copy is a restored backup's, dated Nov 1. Neither date
+    // decides: they differ, so the one here stays, and Frost with it.
+    const jaina = alt({ planIds: [FROST.id], notes: "Edited here", updatedAt: "2026-10-27T12:00:00.000Z" });
+    seed(ANON, [FROST], [jaina]);
+    seed(A, [boundFrost], [{ ...jaina, notes: "", updatedAt: "2026-11-01T12:00:00.000Z" }]);
+    expect(settleTransferred(localStorage, A, [FROST.id])).toEqual({ ok: true, moved: 0 });
+    expect(stored(ANON)).toMatchObject({ plans: [FROST], alts: [jaina] });
+    // The same Jaina with only another date is the same alt: it goes, and the account keeps its own copy.
+    const accountJaina = { ...jaina, updatedAt: "2026-11-01T12:00:00.000Z" };
+    seed(A, [boundFrost], [accountJaina]);
+    expect(settleTransferred(localStorage, A, [FROST.id])).toEqual({ ok: true, moved: 1 });
+    expect(stored(ANON)).toMatchObject({ plans: [], alts: [] });
+    expect(stored(A)).toMatchObject({ plans: [boundFrost], alts: [accountJaina] });
   });
 
   test("a plan an alt uses stays signed out as well until every plan of the alt is the account's; then the alt, its plans and their watches move whole", () => {

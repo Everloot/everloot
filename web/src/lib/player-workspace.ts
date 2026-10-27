@@ -591,24 +591,31 @@ function withBound(account: PlayerWorkspace, plans: LocalPlan[], boundTo: Bindin
   };
 }
 
+/** An alt as it is, its date aside: two copies alike in this are the same alt, whichever is newer. */
+const altContent = (alt: LocalAlt) => whole({ ...alt, updatedAt: null });
+
 /**
- * Of the signed-out groups holding any of `ids`, those the account's bucket holds whole: each plan bound there and saved
- * by content (transferStanding, never a date), and once `taken`, each alt and each watch on their plans there as well,
- * the alts exactly as the account's bucket took them. What the account's bucket takes of them (an alt or watch it holds
- * already keeps the account's copy), and the signed-out bucket without them.
+ * Of the signed-out groups holding any of `ids`, those the account's bucket holds whole, judged by content and never by
+ * date: each plan bound there, with the copy here what the account has (transferStanding) or the very copy just `sent`
+ * (planContent by id), and once `taken`, each alt and each watch on their plans there as well, each alt as the account's
+ * bucket has it. A plan the site has but this device holds no copy of for the account goes nowhere. What the account's
+ * bucket takes of them (an alt or watch it holds already keeps the account's copy), and the signed-out bucket without
+ * them.
  */
-function settle(signedOut: PlayerWorkspace, account: PlayerWorkspace, ids: Set<string>, taken = false, transfers?: Transfers) {
+function settle(signedOut: PlayerWorkspace, account: PlayerWorkspace, ids: Set<string>, taken = false, transfers?: Transfers, sent?: Map<string, string>) {
   const plans = new Map(signedOut.plans.map((p) => [p.id, p]));
   const alts = new Map(signedOut.alts.map((a) => [a.id, a]));
   const theirAlts = new Map(account.alts.map((a) => [a.id, a]));
   const watched = new Set(account.watches.map((w) => w.planId));
   const held = new Set(account.plans.filter((p) => p.boundTo !== null).map((p) => p.id));
+  const planGoes = (plan: LocalPlan) => held.has(plan.id)
+    && (sent?.get(plan.id) === planContent(plan) || transferStanding(plan, account, new Set(), transfers).kind === "saved");
   const altGoes = (alt: LocalAlt) => {
     const theirs = theirAlts.get(alt.id);
-    return theirs ? whole(theirs) === whole(alt) : !taken;
+    return theirs ? altContent(theirs) === altContent(alt) : !taken;
   };
   const going = planGroups(signedOut).filter((g) => g.planIds.some((id) => ids.has(id))
-    && g.planIds.every((id) => held.has(id) && transferStanding(plans.get(id)!, account, new Set(), transfers).kind === "saved")
+    && g.planIds.every((id) => planGoes(plans.get(id)!))
     && g.altIds.every((id) => altGoes(alts.get(id)!))
     && (!taken || signedOut.watches.every((w) => !g.planIds.includes(w.planId) || watched.has(w.planId))));
   const planIds = new Set(going.flatMap((g) => g.planIds));
@@ -634,21 +641,21 @@ function settle(signedOut: PlayerWorkspace, account: PlayerWorkspace, ids: Set<s
  * The account's bucket takes their alts and watches first. Then the signed-out bucket, read again as it is stored at that
  * moment, lets go of only what the account's bucket now holds, so anything another tab added in between stays. Each
  * write is made to its bucket as stored, never from an earlier snapshot. If the second fails, a plan is in both
- * buckets, never in neither.
+ * buckets, never in neither. `sent`: what each plan just sent held (planContent), for a copy here still the same.
  */
-function moveSaved(storage: DeviceStorage | null, owner: Owner, ids: Set<string>): { ok: true; moved: number } | Failure {
+function moveSaved(storage: DeviceStorage | null, owner: Owner, ids: Set<string>, sent?: Map<string, string>): { ok: true; moved: number } | Failure {
   const signedOut = readWorkspace(storage, ANONYMOUS);
   if (!signedOut.ok) return failure(signedOut.error);
   const account = readWorkspace(storage, owner);
   if (!account.ok) return failure(account.error);
   const record = readTransfers(storage);
   const transfers = record.ok ? record.transfers : undefined;
-  if (settle(signedOut.workspace, account.workspace, ids, false, transfers).moved === 0) return { ok: true, moved: 0 };
-  const first = update(storage, owner, (mine) => settle(signedOut.workspace, mine, ids, false, transfers).account);
+  if (settle(signedOut.workspace, account.workspace, ids, false, transfers, sent).moved === 0) return { ok: true, moved: 0 };
+  const first = update(storage, owner, (mine) => settle(signedOut.workspace, mine, ids, false, transfers, sent).account);
   if (!first.ok) return first;
   let moved = 0;
   const second = update(storage, ANONYMOUS, (theirs) => {
-    const next = settle(theirs, first.workspace, ids, true, transfers);
+    const next = settle(theirs, first.workspace, ids, true, transfers, sent);
     moved = next.moved;
     return next.signedOut;
   });
@@ -669,8 +676,8 @@ export type TransferResult = { ok: true; userId: string; planIds: string[] } | {
  * of that alt is the account's, so the alt never names a plan its bucket lacks, and a transfer that stops part way has
  * a record of what the account has. Anything less binds nothing: a failed result, one that confirms only some of the
  * plans or others than were sent, or an answer for another account than the transfer was sent for. Given the plans as
- * they were sent, the account's bucket keeps those, and a copy here changed since stays signed out, unsaved. `bound`
- * counts the plans bound. This is the browser's own record: the transfer reads it to send no plan twice, and none to a
+ * they were sent, the account's bucket keeps those, and a copy here changed since stays signed out, unsaved, while one
+ * still as it was sent goes, even beside a copy of the account's own that differs. `bound` counts the plans bound. This is the browser's own record: the transfer reads it to send no plan twice, and none to a
  * second account.
  */
 export function bindTransferred(storage: DeviceStorage | null, sent: TransferRequest, result: TransferResult, now = new Date()): { ok: true; bound: number } | Failure {
@@ -686,7 +693,7 @@ export function bindTransferred(storage: DeviceStorage | null, sent: TransferReq
   if (sending.length === 0) return { ok: true, bound: 0 };
   const into = update(storage, owner, (account) => withBound(account, sending, { userId: result.userId, at: now.toISOString() }));
   if (!into.ok) return into;
-  const moved = moveSaved(storage, owner, ids);
+  const moved = moveSaved(storage, owner, ids, new Map(sending.map((p) => [p.id, planContent(p)])));
   return moved.ok ? { ok: true, bound: sending.length } : moved;
 }
 
