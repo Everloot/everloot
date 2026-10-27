@@ -1,20 +1,20 @@
 {
   "schema": 1,
-  "refreshedAt": "2026-10-27T12:25:40.759Z",
+  "refreshedAt": "2026-10-27T22:24:52.949Z",
   "projects": {
     "everloot": {
       "status": "ok",
-      "fetchedAt": "2026-10-27T12:25:40.760Z",
+      "fetchedAt": "2026-10-27T22:24:52.949Z",
       "stars": 0,
       "archived": false,
       "license": "AGPL-3.0",
-      "lastCommit": "2026-10-27T09:17:47Z",
+      "lastCommit": "2026-10-27T22:21:54Z",
       "release": {
         "tag": "desktop-v0.1.7",
         "date": "2026-10-24T13:33:00Z",
         "url": "https://github.com/Everloot/everloot/releases/tag/desktop-v0.1.7"
       },
-      "commits4w": 1625,
+      "commits4w": 1656,
       "contributors": 2,
       "openIssues": 5,
       "closedIssues": 6,
@@ -26,7 +26,7 @@
     },
     "polestar": {
       "status": "ok",
-      "fetchedAt": "2026-10-27T12:25:48.059Z",
+      "fetchedAt": "2026-10-27T22:25:00.463Z",
       "stars": 165,
       "archived": false,
       "license": null,
@@ -48,7 +48,7 @@
     },
     "olympus": {
       "status": "ok",
-      "fetchedAt": "2026-10-27T12:25:55.554Z",
+      "fetchedAt": "2026-10-27T22:25:08.495Z",
       "stars": 20,
       "archived": false,
       "license": "MIT",
@@ -72,13 +72,13 @@
     },
     "forever-ref": {
       "status": "ok",
-      "fetchedAt": "2026-10-27T12:26:05.261Z",
+      "fetchedAt": "2026-10-27T22:25:19.000Z",
       "stars": 0,
       "archived": false,
       "license": null,
       "lastCommit": "2026-10-27T12:13:21Z",
       "release": null,
-      "commits4w": 18,
+      "commits4w": 17,
       "contributors": 2,
       "openIssues": 0,
       "closedIssues": 1,
@@ -130,7 +130,7 @@
         "stars": 0
       },
       {
-        "at": "2026-10-27T12:25:40.759Z",
+        "at": "2026-10-27T22:24:52.949Z",
         "stars": 0
       }
     ],
@@ -176,7 +176,7 @@
         "stars": 163
       },
       {
-        "at": "2026-10-27T12:25:40.759Z",
+        "at": "2026-10-27T22:24:52.949Z",
         "stars": 165
       }
     ],
@@ -222,7 +222,7 @@
         "stars": 20
       },
       {
-        "at": "2026-10-27T12:25:40.759Z",
+        "at": "2026-10-27T22:24:52.949Z",
         "stars": 20
       }
     ],
@@ -268,7 +268,7 @@
         "stars": 0
       },
       {
-        "at": "2026-10-27T12:25:40.759Z",
+        "at": "2026-10-27T22:24:52.949Z",
         "stars": 0
       }
     ]
