@@ -111,7 +111,7 @@ const BAD_OUT = `{"ok":false,"error":"name: Invalid input: expected string, rece
 400`;
 const BAD_ENUM = `{"ok":false,"error":"kind: Invalid option: expected one of \\"item\\"|\\"npc\\"|\\"object\\"|\\"quest\\"|\\"zone\\"|\\"spell\\"|\\"lore_page\\"|\\"creator\\"|\\"realm\\". The parameters are described at https://everloot.app/schema/mcp/get_by_name.json."}
 400`;
-const NOTOOL_OUT = `{"ok":false,"error":"No tool named nope. Tools: search_knowledge, get_entity, get_by_name, search, fetch, answer_sources, profession_path, recipe_thresholds, item_page, npc_page, object_page, quest_page, vendor_page, world_map_near, entity_relations, item_categories, talent_tree, talent_plan, collection_gap, completion_progress, guild_board, auction_history, market_value, gold_ledger, population, recent_changes, ecosystem_projects, everloot_plan."}
+const NOTOOL_OUT = `{"ok":false,"error":"No tool named nope. Tools: search_knowledge, get_entity, get_by_name, search, fetch, answer_sources, profession_path, recipe_thresholds, item_page, npc_page, object_page, quest_page, vendor_page, world_map_near, entity_relations, item_categories, talent_tree, talent_plan, class_races, collection_gap, completion_progress, guild_board, auction_history, market_value, gold_ledger, population, recent_changes, ecosystem_projects, everloot_plan."}
 404`;
 const LIMIT_OUT = `HTTP/1.1 429 Too Many Requests
 Cache-Control: no-store
