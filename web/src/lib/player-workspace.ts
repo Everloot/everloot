@@ -18,8 +18,8 @@ import { decodeBuild, decodeOrder, type OrderError, type OrderOrigin } from "./t
 // against the format and the limits, and stores it in one go: a plan another tab saved is kept, and nothing is
 // stored unless every step worked. Stored text that does not read (damaged, or from a newer version) is left
 // exactly as it is. A backup is a bucket's own text; it restores only into the bucket it came from, after a
-// preview. A plan saved to an account (by a transfer, which is not made here) is bound to it and moves into that
-// account's bucket (bindTransferred).
+// preview. A plan saved to an account by a transfer (components/workspace/TransferPlans.tsx) is bound to it and moves
+// into that account's bucket, with the alts and watches that use it (bindTransferred).
 
 export const WORKSPACE_FORMAT = "everloot.player-workspace";
 /** The version a new bucket is stored in, and a version 1 bucket once an alt has version 2's details. */
@@ -104,8 +104,9 @@ export interface PlayerWorkspace {
   watches: LocalWatch[];
 }
 
-/** localStorage, or a stand-in with its three calls. */
-export type DeviceStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+/** localStorage, or a stand-in with its three calls. Its list of keys, where it has one, lets a transfer find a plan
+ *  this browser holds for another account (boundElsewhere). */
+export type DeviceStorage = Pick<Storage, "getItem" | "setItem" | "removeItem"> & Partial<Pick<Storage, "key" | "length">>;
 
 export const ANONYMOUS: Owner = { kind: "anonymous" };
 const KEY = "everloot:workspace";
@@ -320,15 +321,22 @@ export function newFormatOverflow(workspace: PlayerWorkspace): number | null {
   return size > WORKSPACE_LIMITS.bytes ? size : null;
 }
 
-function store(storage: DeviceStorage | null, workspace: PlayerWorkspace): WriteResult {
+/** A bucket as it would be stored, or why it cannot be: checked against the format and the limits as stored. */
+function storable(workspace: PlayerWorkspace): { ok: true; doc: ReturnType<typeof storedForm> } | Failure {
   const doc = storedForm(workspace);
   const checked = validateWorkspace(doc);
-  if (!checked.ok && checked.error === "over-limit" && workspace.version === 1 && doc.version === 2) return failure("format-room");
-  if (!checked.ok) return failure(checked.error === "over-limit" ? "over-limit" : "invalid");
+  if (checked.ok) return { ok: true, doc };
+  if (checked.error === "over-limit" && workspace.version === 1 && doc.version === 2) return failure("format-room");
+  return failure(checked.error === "over-limit" ? "over-limit" : "invalid");
+}
+
+function store(storage: DeviceStorage | null, workspace: PlayerWorkspace): WriteResult {
+  const checked = storable(workspace);
+  if (!checked.ok) return checked;
   try {
     if (!storage) throw new Error("No storage");
-    storage.setItem(bucketKey(workspace.owner), JSON.stringify(doc));
-    return { ok: true, workspace: { ...workspace, version: doc.version } };
+    storage.setItem(bucketKey(workspace.owner), JSON.stringify(checked.doc));
+    return { ok: true, workspace: { ...workspace, version: checked.doc.version } };
   } catch (error) {
     return failure(isQuota(error) ? "full" : "unavailable");
   }
@@ -441,6 +449,125 @@ export function deletePlan(storage: DeviceStorage | null, owner: Owner, id: stri
   });
 }
 
+// Transfers: signed-out plans saved to an account (components/workspace/TransferPlans.tsx).
+
+/** Signed-out plans that go to an account together: a plan, every other plan of the alts that use it, and so on, so no
+ *  alt is left naming a plan its bucket no longer holds. A plan no alt uses is a group of its own. Groups, their plans
+ *  and their alts come in the bucket's order. */
+export interface PlanGroup { planIds: string[]; altIds: string[] }
+
+export function planGroups(workspace: PlayerWorkspace): PlanGroup[] {
+  const parent = new Map(workspace.plans.map((p) => [p.id, p.id]));
+  const root = (id: string): string => { let r = id; while (parent.get(r) !== r) r = parent.get(r)!; return r; };
+  for (const alt of workspace.alts) {
+    const [first, ...rest] = alt.planIds;
+    for (const id of rest) parent.set(root(id), root(first));
+  }
+  const groups = new Map<string, PlanGroup>();
+  for (const plan of workspace.plans) {
+    const key = root(plan.id);
+    if (!groups.has(key)) groups.set(key, { planIds: [], altIds: [] });
+    groups.get(key)!.planIds.push(plan.id);
+  }
+  for (const alt of workspace.alts) if (alt.planIds.length > 0) groups.get(root(alt.planIds[0]))!.altIds.push(alt.id);
+  return [...groups.values()];
+}
+
+/**
+ * How a signed-out plan stands with the account a transfer is for. `saved`: the account's bucket holds it, bound to
+ * the account, and the copy here is the same or older, so the account's copy is the one kept and nothing is sent
+ * again. `changed`: it is bound there, and the copy here was changed after, so sending it again would make a second
+ * build. `elsewhere`: this browser holds it bound to another account (boundElsewhere).
+ */
+export type Standing = { kind: "new" } | { kind: "saved" | "changed"; at: string } | { kind: "elsewhere" };
+
+const content = (plan: LocalPlan) => fields({ ...plan, boundTo: null }, PLAN_KEYS);
+
+export function transferStanding(plan: LocalPlan, account: PlayerWorkspace, elsewhere: Set<string>): Standing {
+  const theirs = account.plans.find((p) => p.id === plan.id && p.boundTo !== null);
+  if (theirs?.boundTo) {
+    const kept = content(plan) === content(theirs) || Date.parse(plan.updatedAt) <= Date.parse(theirs.updatedAt);
+    return { kind: kept ? "saved" : "changed", at: theirs.boundTo.at };
+  }
+  return elsewhere.has(plan.id) ? { kind: "elsewhere" } : { kind: "new" };
+}
+
+const ACCOUNT_KEY = `${KEY}:account:`;
+
+/** Which of these plans this browser holds bound to an account other than `owner`: saved to it by a transfer from
+ *  here, with a copy left signed out. Only the plans' ids are looked at, and nothing of that account is shown. */
+export function boundElsewhere(storage: DeviceStorage | null, owner: Owner, planIds: string[]): Set<string> {
+  const wanted = new Set(planIds);
+  const found = new Set<string>();
+  try {
+    for (let i = 0; storage?.key && i < (storage.length ?? 0); i++) {
+      const key = storage.key(i);
+      const userId = key?.startsWith(ACCOUNT_KEY) ? key.slice(ACCOUNT_KEY.length) : null;
+      if (!validId(userId) || (owner.kind === "account" && owner.userId === userId)) continue;
+      const read = readWorkspace(storage, { kind: "account", userId });
+      if (read.ok) for (const p of read.workspace.plans) if (p.boundTo && wanted.has(p.id)) found.add(p.id);
+    }
+  } catch {
+    // A browser that refuses its key list has nothing more to find.
+  }
+  return found;
+}
+
+/** The account's bucket with these plans in it, bound to the account. A plan it holds bound already keeps its copy. */
+function withBound(account: PlayerWorkspace, plans: LocalPlan[], boundTo: Binding): PlayerWorkspace {
+  const held = new Set(account.plans.filter((p) => p.boundTo !== null).map((p) => p.id));
+  const ids = new Set(plans.map((p) => p.id));
+  return {
+    ...account,
+    plans: [...account.plans.filter((p) => held.has(p.id) || !ids.has(p.id)), ...plans.filter((p) => !held.has(p.id)).map((p) => ({ ...p, boundTo }))],
+  };
+}
+
+/**
+ * What moves out of the signed-out bucket into the account's: of the groups holding any of `ids`, each whose plans the
+ * account's bucket all holds as saved (transferStanding), with the alts that use them, every detail kept, and the
+ * watches on them. The account's copy of a plan, alt or watch it holds already is kept, and a group with an alt
+ * changed here after the account's copy stays.
+ */
+function settle(signedOut: PlayerWorkspace, account: PlayerWorkspace, ids: Set<string>) {
+  const plans = new Map(signedOut.plans.map((p) => [p.id, p]));
+  const alts = new Map(signedOut.alts.map((a) => [a.id, a]));
+  const theirAlts = new Map(account.alts.map((a) => [a.id, a]));
+  const altKept = (alt: LocalAlt) => {
+    const theirs = theirAlts.get(alt.id);
+    return !theirs || whole(theirs) === whole(alt) || Date.parse(alt.updatedAt) <= Date.parse(theirs.updatedAt);
+  };
+  const going = planGroups(signedOut).filter((g) => g.planIds.some((id) => ids.has(id))
+    && g.planIds.every((id) => transferStanding(plans.get(id)!, account, new Set()).kind === "saved")
+    && g.altIds.every((id) => altKept(alts.get(id)!)));
+  const planIds = new Set(going.flatMap((g) => g.planIds));
+  const altIds = new Set(going.flatMap((g) => g.altIds));
+  const watched = new Set(account.watches.map((w) => w.planId));
+  return {
+    moved: planIds.size,
+    account: {
+      ...account,
+      alts: [...account.alts, ...signedOut.alts.filter((a) => altIds.has(a.id) && !theirAlts.has(a.id))],
+      watches: [...account.watches, ...signedOut.watches.filter((w) => planIds.has(w.planId) && !watched.has(w.planId))],
+    },
+    signedOut: {
+      ...signedOut,
+      plans: signedOut.plans.filter((p) => !planIds.has(p.id)),
+      alts: signedOut.alts.filter((a) => !altIds.has(a.id)),
+      watches: signedOut.watches.filter((w) => !planIds.has(w.planId)),
+    },
+  };
+}
+
+/** Stores the account's bucket, then the signed-out one when anything left it: if the second write fails, a plan is in
+ *  both buckets, never in neither. */
+function commit(storage: DeviceStorage | null, next: ReturnType<typeof settle>): { ok: true; moved: number } | Failure {
+  const first = store(storage, next.account);
+  if (!first.ok) return first;
+  if (next.moved === 0) return { ok: true, moved: 0 };
+  return store(storage, next.signedOut).ok ? { ok: true, moved: next.moved } : failure("left-signed-out");
+}
+
 /** A transfer of device plans to an account, as it was sent: the account, and which plans. */
 export interface TransferRequest { owner: Owner; planIds: string[] }
 
@@ -448,11 +575,14 @@ export interface TransferRequest { owner: Owner; planIds: string[] }
 export type TransferResult = { ok: true; userId: string; planIds: string[] } | { ok: false };
 
 /**
- * Once a transfer reports that it saved every plan it was sent, those plans move from the signed-out bucket into
- * that account's, bound to it, and the rest stay signed out. Anything less binds nothing: a failed result, one that
- * confirms only some of the plans or others than were sent, or an answer for another account than the transfer was
- * sent for. A plan already moved there is not added to that bucket twice. This is the browser's own record: keeping
- * a plan from being transferred again, into another account, is the transfer's job.
+ * Once a transfer reports that it saved every plan it was sent, those plans are the account's: its bucket keeps them,
+ * bound to it (a plan it holds bound already keeps the account's copy), and they move out of the signed-out bucket
+ * with the alts and watches that go with them (settle). A plan an alt uses stays signed out as well until every plan
+ * of that alt is the account's, so the alt never names a plan its bucket lacks, and a transfer that stops part way has
+ * a record of what the account has. Anything less binds nothing: a failed result, one that confirms only some of the
+ * plans or others than were sent, or an answer for another account than the transfer was sent for. `bound` counts the
+ * plans sent that were signed out. This is the browser's own record: the transfer reads it to send no plan twice, and
+ * none to a second account.
  */
 export function bindTransferred(storage: DeviceStorage | null, sent: TransferRequest, result: TransferResult, now = new Date()): { ok: true; bound: number } | Failure {
   if (!result.ok) return failure("not-transferred");
@@ -465,17 +595,33 @@ export function bindTransferred(storage: DeviceStorage | null, sent: TransferReq
   if (!signedOut.ok) return failure(signedOut.error);
   const account = readWorkspace(storage, owner);
   if (!account.ok) return failure(account.error);
-  const moving = signedOut.workspace.plans.filter((p) => ids.has(p.id));
-  if (moving.length === 0) return { ok: true, bound: 0 };
-  const { alts, watches } = signedOut.workspace;
-  if (alts.some((a) => a.planIds.some((id) => ids.has(id))) || watches.some((w) => ids.has(w.planId))) return failure("referenced");
-  const boundTo = { userId: result.userId, at: now.toISOString() };
-  const into = { ...account.workspace, plans: [...account.workspace.plans.filter((p) => !ids.has(p.id)), ...moving.map((p) => ({ ...p, boundTo }))] };
-  // The account's copy is stored first: if the second write fails, a plan is in both buckets, never in neither.
-  const first = store(storage, into);
-  if (!first.ok) return first;
-  const second = store(storage, { ...signedOut.workspace, plans: signedOut.workspace.plans.filter((p) => !ids.has(p.id)) });
-  return second.ok ? { ok: true, bound: moving.length } : failure("left-signed-out");
+  const sending = signedOut.workspace.plans.filter((p) => ids.has(p.id));
+  if (sending.length === 0) return { ok: true, bound: 0 };
+  const into = withBound(account.workspace, sending, { userId: result.userId, at: now.toISOString() });
+  const done = commit(storage, settle(signedOut.workspace, into, ids));
+  return done.ok ? { ok: true, bound: sending.length } : done;
+}
+
+/** For plans a transfer has nothing to send for, as the account's bucket holds them already: moves them out of the
+ *  signed-out bucket with what goes with them, as bindTransferred does once a plan is saved. */
+export function settleTransferred(storage: DeviceStorage | null, owner: Owner, planIds: string[]): { ok: true; moved: number } | Failure {
+  if (owner.kind !== "account") return failure("other-owner");
+  const signedOut = readWorkspace(storage, ANONYMOUS);
+  if (!signedOut.ok) return failure(signedOut.error);
+  const account = readWorkspace(storage, owner);
+  if (!account.ok) return failure(account.error);
+  const next = settle(signedOut.workspace, account.workspace, new Set(planIds));
+  return next.moved === 0 ? { ok: true, moved: 0 } : commit(storage, next);
+}
+
+/** Why the account's bucket could not take these signed-out plans and what goes with them once the account has them,
+ *  or null when it can: its limits and its size, as it would be stored. */
+export function transferRoom(signedOut: PlayerWorkspace, account: PlayerWorkspace, planIds: string[]): Failure | null {
+  if (account.owner.kind !== "account") return failure("other-owner");
+  const ids = new Set(planIds);
+  const into = withBound(account, signedOut.plans.filter((p) => ids.has(p.id)), { userId: account.owner.userId, at: new Date().toISOString() });
+  const checked = storable(settle(signedOut, into, ids).account);
+  return checked.ok ? null : checked;
 }
 
 // Backups.
