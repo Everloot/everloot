@@ -138,7 +138,13 @@ export default function GroupPlanner({ roles }: { roles: Record<ClassSlug, Guide
           <p className="text-meta text-fg-2">{`${filled} of ${plan.size} places filled${open ? `, ${open} open` : ""}`}</p>
           <div className="flex flex-wrap gap-2 sm:ml-auto">
             <button type="button" className="btn" aria-disabled={!filled} onClick={clear}>Clear</button>
-            <CopyButton className="btn btn-primary" text={() => `${location.origin}${groupHref(plan)}`} label="Copy link" />
+            <CopyButton
+              className="btn btn-primary"
+              text={() => `${location.origin}${groupHref(plan)}`}
+              label="Copy link"
+              failedLabel="Copy failed"
+              onResult={(ok) => setSaid(ok ? "Link copied." : "The browser did not copy the link. Copy it from the address bar.")}
+            />
           </div>
         </div>
 

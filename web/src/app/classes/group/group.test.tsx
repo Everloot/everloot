@@ -255,6 +255,22 @@ describe("the group page", () => {
     expect(location.hash).toBe("#size=5&classes=mage");
   });
 
+  test("a copy the browser refuses says so on the button and points to the address bar", async () => {
+    writeText.mockRejectedValue(new Error("denied"));
+    await open("#size=5&classes=mage");
+    const copy = [...container!.querySelectorAll("button")].find((b) => words(b).startsWith("Copy link"))!;
+    const shown = () => copy.querySelector("[data-copy-labels] > span:not([aria-hidden])")?.textContent;
+    const status = () => container!.querySelector('[role="status"]')?.textContent;
+    await press(copy);
+    expect(writeText).toHaveBeenCalledWith(`${location.origin}/classes/group#size=5&classes=mage`);
+    expect(shown()).toBe("Copy failed");
+    expect(status()).toBe("The browser did not copy the link. Copy it from the address bar.");
+    writeText.mockResolvedValue(undefined);
+    await press(copy);
+    expect(shown()).toBe("Copied");
+    expect(status()).toBe("Link copied.");
+  });
+
   test("a link pasted into the address bar opens its group", async () => {
     await open("#size=5&classes=mage");
     history.replaceState(null, "", "/classes/group#size=10&classes=druid,druid");
