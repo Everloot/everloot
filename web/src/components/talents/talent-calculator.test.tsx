@@ -1,13 +1,18 @@
 // @vitest-environment jsdom
-import { act } from "react";
+import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { fixture } from "@/lib/talents/fixture";
 import { encodeBuild } from "@/lib/talents/share";
 import TalentCalculator from "./TalentCalculator";
+import TalentClassView from "./TalentClassView";
 import { track } from "@/lib/analytics/track";
 
 vi.mock("@/lib/analytics/track", () => ({ track: vi.fn() }));
+vi.mock("next/link", () => ({
+  default: (props: { href: string; children: ReactNode; className?: string; "aria-current"?: "page" }) => <a {...props} />,
+}));
 
 let container: HTMLDivElement;
 let root: Root;
@@ -275,4 +280,198 @@ test("without the game's tooltips there is no empty talent panel; selecting a ta
   await act(async () => node(22).focus());
   await click(node(22));
   expect(container.querySelector('[aria-label="Selected talent"]')?.textContent).toContain("Needs Talent 12 at full rank.");
+});
+
+// The phone layout. jsdom has no layout, so these pin the wiring and the classes the browser check rests on; the
+// first-screen and focus geometry are measured in a browser.
+const section = (tree: string) => container.querySelector(`section[aria-label="${tree}"]`)!;
+/** The line under the phone's tree switch: points left and the set being planned. */
+const treeStatus = () => container.querySelector("[data-tree-status]")!;
+const liveRegions = () => container.querySelectorAll('[aria-live], [role="status"], [role="alert"], [role="log"]');
+const switchBar = () => treeStatus().parentElement!;
+
+test("the phone's tree switch says how many points are left and which set is planned, for the eye only", async () => {
+  await render();
+  expect(treeStatus().textContent).toBe("51 left · Set 1");
+  expect(treeStatus().getAttribute("aria-hidden")).toBe("true");
+  await click(node(11));
+  expect(treeStatus().textContent).toBe("50 left · Set 1");
+  await click(button(/^Set 2$/));
+  expect(treeStatus().textContent).toBe("51 left · Set 2");
+  // Below level 40 the second set closes and the page is back on set 1, with its one point spent.
+  await setLevel("30");
+  expect(treeStatus().textContent).toBe("20 left · Set 1");
+});
+
+test("the status line is the calculator's only live region; the sticky switch's line is never announced", async () => {
+  await render();
+  expect(liveRegions()).toHaveLength(1);
+  expect(liveRegions()[0].textContent).toBe("");
+  await click(node(11));
+  await click(node(21));
+  expect(liveRegions()).toHaveLength(1);
+  expect(status()).toBe("Needs 5 points spent in Left on rows above.");
+  expect(container.querySelectorAll("[data-tree-status]")).toHaveLength(1);
+  expect(treeStatus().closest("[aria-hidden='true']")).toBe(treeStatus());
+  expect(treeStatus().closest("[aria-live], [role='status']")).toBeNull();
+});
+
+test("on a tall enough phone the tree switch sticks under the site header, over the trees only (class proxy)", async () => {
+  await render();
+  expect(switchBar().className.split(" ")).toEqual(expect.arrayContaining(["[@media(min-height:37.5rem)]:sticky", "top-header", "bg-panel", "md:hidden"]));
+  expect(switchBar().querySelector('[aria-label="Show tree"]')).not.toBeNull();
+  const trees = section("Left").parentElement!;
+  // The switch sticks only while the trees are on screen, never over the share fields under them.
+  expect(switchBar().parentElement!.contains(trees)).toBe(true);
+  expect(switchBar().parentElement!.querySelector('[aria-label="Share"]')).toBeNull();
+  // A card that clips with overflow: hidden is a scroll container, and nothing inside it sticks to the window.
+  expect(container.querySelector("[data-card]")!.className.split(" ")).toContain("overflow-clip");
+});
+
+/** Whether the browser counts an element's focus as keyboard focus; jsdom's own answer depends on earlier tests' clicks. */
+const keyboardFocus = (el: Element, keyboard: boolean) => {
+  const matches = el.matches.bind(el);
+  vi.spyOn(el, "matches").mockImplementation((selector) => (selector === ":focus-visible" ? keyboard : matches(selector)));
+};
+
+test("a talent that takes keyboard focus under the site header, the stuck tree switch or the cookie banner's strip is scrolled clear", async () => {
+  await render();
+  const box = (top: number, height: number) => ({ top, bottom: top + height, left: 0, right: 50, width: 50, height, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+  const scrollBy = vi.spyOn(window, "scrollBy").mockImplementation(() => {});
+  const place = (el: Element, top: number, height: number) => vi.spyOn(el, "getBoundingClientRect").mockReturnValue(box(top, height));
+  const focus = (el: HTMLElement) => act(async () => { el.blur(); el.focus(); });
+  keyboardFocus(node(12), true);
+  try {
+    // The switch stuck under the 44 px header, 83 px tall: a talent at 74 goes down to 8 px below it.
+    place(switchBar(), 44, 83);
+    vi.spyOn(switchBar(), "getClientRects").mockReturnValue([box(44, 83)] as unknown as DOMRectList);
+    place(node(12), 74, 88);
+    await focus(node(12));
+    expect(scrollBy).toHaveBeenLastCalledWith(0, 74 - (127 + 8));
+    // Clear of everything: left where it is.
+    scrollBy.mockClear();
+    place(node(12), 300, 88);
+    await focus(node(12));
+    expect(scrollBy).not.toHaveBeenCalled();
+    // The open banner covers the strip it sets as the page's bottom scroll padding: a talent whose foot is 49 px into
+    // that strip comes up by 49 px.
+    document.documentElement.style.scrollPaddingBottom = "161px";
+    place(node(12), window.innerHeight - 200, 88);
+    await focus(node(12));
+    expect(scrollBy).toHaveBeenLastCalledWith(0, 49);
+    // Where the switch is not shown (a wide screen), only the site header counts.
+    document.documentElement.style.scrollPaddingBottom = "";
+    vi.spyOn(switchBar(), "getClientRects").mockReturnValue([] as unknown as DOMRectList);
+    place(node(12), 20, 88);
+    await focus(node(12));
+    expect(scrollBy).toHaveBeenLastCalledWith(0, 20 - (44 + 8));
+    // Only talents: a button in the switch itself is never moved.
+    scrollBy.mockClear();
+    const option = switchBar().querySelector<HTMLButtonElement>('[aria-label="Show tree"] button')!;
+    keyboardFocus(option, true);
+    place(option, 0, 40);
+    await focus(option);
+    expect(scrollBy).not.toHaveBeenCalled();
+    // A press that focuses a half-covered talent leaves it in place, so the release lands on the same talent.
+    keyboardFocus(node(12), false);
+    await focus(node(12));
+    expect(scrollBy).not.toHaveBeenCalled();
+  } finally {
+    document.documentElement.style.scrollPaddingBottom = "";
+    vi.restoreAllMocks();
+  }
+});
+
+test("the phone's tree switch names each tree with its points and shows one tree at a time, with its Reset after its talents", async () => {
+  await render();
+  const option = (tree: string) => [...switchBar().querySelectorAll('[aria-label="Show tree"] button')].find((b) => b.textContent!.startsWith(tree))!;
+  /** The phone's Reset, named in full, after the tree's talents (a wide screen has it in the tree's header). */
+  const reset = (tree: string) => [...section(tree).querySelectorAll("button")].find((b) => b.textContent === `Reset ${tree}`)!;
+  expect(option("Left").textContent).toBe("Left 0");
+  expect(reset("Left").disabled).toBe(true);
+  expect(reset("Left").compareDocumentPosition(node(41)) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+  await click(node(11));
+  expect(option("Left").textContent).toBe("Left 1");
+  expect(section("Right").classList.contains("hidden")).toBe(true);
+  await click(option("Right"));
+  expect(option("Right").getAttribute("aria-pressed")).toBe("true");
+  expect(section("Right").classList.contains("hidden")).toBe(false);
+  expect(section("Left").classList.contains("hidden")).toBe(true);
+  expect(reset("Right").disabled).toBe(true);
+  await click(node(51));
+  await click(reset("Right"));
+  expect(status()).toBe("Right was reset. Undo brings it back.");
+  expect(node(51).textContent).toContain("0/5");
+  expect(node(11).textContent).toContain("1/5");
+});
+
+test("Copy link stays in the build bar beside Save, and without it", async () => {
+  await render();
+  expect(button(/^Copy link/)?.closest('section[aria-label="Build"]')).not.toBeNull();
+  expect(button(/^Save$/)).toBeUndefined();
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ error: "Sign in to save builds." }, { status: 401 })));
+  try {
+    await act(async () => root.render(<TalentCalculator catalog={fixture} savedBuilds />));
+    const bar = container.querySelector('section[aria-label="Build"]')!;
+    expect(button(/^Save$/)?.closest('section[aria-label="Build"]')).toBe(bar);
+    expect(button(/^Copy link/)?.closest('section[aria-label="Build"]')).toBe(bar);
+  } finally {
+    vi.unstubAllGlobals();
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  }
+});
+
+test("a saved build's short link shows the build and its points without one editing control, and says why", async () => {
+  const one = encodeBuild({ classSlug: "mage", specId: 1482, build: "1.0.0.1", ranks: { 11: { rank: 3 } } });
+  await act(async () => root.render(<TalentCalculator catalog={fixture} initialCodes={[one, null]} readOnly />));
+  expect(node(11).textContent).toContain("3/5");
+  expect(stat("Points left")).toBe("48");
+  expect(treeStatus().textContent).toBe("48 left · Set 1");
+  for (const label of [/^Undo$/, /^Redo$/, /^Reset/, /Take back/, /^Copy link/, /^Copy for addon/]) expect(button(label)).toBeUndefined();
+  await click(node(11));
+  expect(status()).toBe("This is a saved build. Open it in the calculator to change it.");
+  expect(node(11).textContent).toContain("3/5");
+});
+
+test("with the game's art the switch's line and the talents' clearance work the same", async () => {
+  const file = (name: string) => ({ file: name, width: 50, height: 50 });
+  const frames = Object.fromEntries(["circle", "square"].flatMap((s) => ["gray", "green", "yellow"].map((st) => [`talents-node-${s}-${st}`, file(`frames/${s}-${st}.webp`)])));
+  vi.stubEnv("NEXT_PUBLIC_GAME_ASSETS_URL", "https://assets.example.test/b");
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({
+    schema: "everloot.game-assets/1", label: "test", build: { version: "9.9.9.1", buildId: 1 },
+    spells: { 1: { name: "x", icon: null, passive: null, description: null } }, frames, backgrounds: {},
+  })));
+  try {
+    await render();
+    expect(container.querySelector("[data-game-look]")).not.toBeNull();
+    await click(node(11));
+    expect(treeStatus().textContent).toBe("50 left · Set 1");
+    expect(liveRegions()).toHaveLength(1);
+    // A game-art node under the stuck switch moves clear of it too.
+    const box = (top: number, height: number) => ({ top, bottom: top + height, left: 0, right: 50, width: 50, height, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+    const scrollBy = vi.spyOn(window, "scrollBy").mockImplementation(() => {});
+    vi.spyOn(switchBar(), "getBoundingClientRect").mockReturnValue(box(44, 83));
+    vi.spyOn(switchBar(), "getClientRects").mockReturnValue([box(44, 83)] as unknown as DOMRectList);
+    vi.spyOn(node(12), "getBoundingClientRect").mockReturnValue(box(100, 50));
+    keyboardFocus(node(12), true);
+    await act(async () => { node(12).focus(); });
+    expect(scrollBy).toHaveBeenLastCalledWith(0, 100 - (127 + 8));
+  } finally {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  }
+});
+
+test("the class page keeps its lede in the page but drops it below the phone breakpoint (class proxy)", async () => {
+  const page = new DOMParser().parseFromString(renderToStaticMarkup(await TalentClassView({ slug: "mage" })), "text/html");
+  const lede = page.querySelector("[data-page-header] p")!;
+  expect(lede.textContent).toMatch(/^Plan Mage talents for WoW: Forever: 51 points at level 60 across Arcane, Fire and Frost/);
+  expect(lede.firstElementChild?.className).toBe("hidden sm:inline");
+  // The title and the class strip stay on every screen.
+  expect(page.querySelector("h1")?.textContent).toBe("WoW Forever Mage Talent Calculator");
+  expect(page.querySelector('nav[aria-label="Classes"] a[aria-current="page"]')?.getAttribute("href")).toBe("/tools/talents/mage");
 });

@@ -48,9 +48,10 @@ export default async function TalentClassView({ slug, initialCodes, saved }: {
   return (
     <Container>
       <JsonLd data={webApplicationJsonLd({ name: pageTitle(catalog.className), path, description: classLede(facts), hubPath: "/tools/talents" })} />
-      <PageHeader trail={trailFor(path)!} title={<span className={CLASS_TEXT[slug]}>{pageTitle(catalog.className)}</span>} lede={classLede(facts)} />
+      {/* On a phone the lede gives its lines to the calculator, which shows the same points, level and trees. */}
+      <PageHeader trail={trailFor(path)!} title={<span className={CLASS_TEXT[slug]}>{pageTitle(catalog.className)}</span>} lede={<span className="hidden sm:inline">{classLede(facts)}</span>} />
 
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         <ClassPicker variant="strip" classes={classes} current={slug} />
         <TalentCalculator catalog={catalog} treeIcons={treeIcons} classIcon={classIcon} initialCodes={initialCodes} savedBuilds={savedBuildsOn()} />
       </div>
