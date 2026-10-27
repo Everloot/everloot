@@ -371,6 +371,14 @@ test("every change record the build watch publishes is read, and reads", () => {
   expect(read.steps.every((s) => s.readable)).toBe(true);
 });
 
+test("the published records chain the Mage tree from 1.60.1.70450 to 70630, whose change to a plan's talent is a spoiler", () => {
+  // Elemental Precision (Frost, node 105778) went from 5 ranks to 3 in 70630, the first build of the retail product.
+  const f = planFreshness({ ...fixture, build: "1.60.1.70630" }, classTalentChanges(PUBLISHED_CHANGES, 8), "1.60.1.70450", { 105778: { rank: 5 } });
+  expect(f).toMatchObject({ relation: "older", gaps: [], changed: true });
+  expect(f.touched[0].changes).toEqual([expect.objectContaining({ kind: "ranks", build: "1.60.1.70630", before: 5, after: 3, spoiler: true })]);
+  expect(freshnessLines(f)[1]).toBe("1 of this plan's talents changed in a build players cannot play yet (1.60.1.70630). Spoilers are not shown here.");
+});
+
 test("the engine and the note only read: nothing in them can save a plan, restamp its code or run in the browser", () => {
   const writes = /\bencode(?:Build|Order)\b|\b(?:replace)?[pP]lanHash\b|localStorage|sessionStorage|\bfetch\(|player-workspace|saved-builds|SaveBuild|(?:replace|push)State|location\.(?:hash|href)\s*=(?!=)|location\.(?:assign|replace)\(/;
   for (const file of ["lib/talents/freshness.ts", "components/talents/FreshnessNote.tsx"]) {

@@ -1,4 +1,5 @@
 import beta70532 from "@/data/game-data/changes/wow_classic_beta-70532.json";
+import wowf70630 from "@/data/game-data/changes/wowf-70630.json";
 import { ChangeEntry, type TalentChanges } from "../../../../kb/src/build-watch/changes";
 import { decodeBuild } from "./share";
 import type { Ranks, TalentCatalog } from "./types";
@@ -12,7 +13,7 @@ import type { Ranks, TalentCatalog } from "./types";
 
 /** The build watch's published records, bundled with the pages that read them. A new build's pull request adds
  *  its record to the folder; list it here in the same pull request (freshness.test.ts fails until it is). */
-export const PUBLISHED_CHANGES: readonly unknown[] = [beta70532];
+export const PUBLISHED_CHANGES: readonly unknown[] = [beta70532, wowf70630];
 
 const BUILD = /^\d+(?:\.\d+)*$/;
 
