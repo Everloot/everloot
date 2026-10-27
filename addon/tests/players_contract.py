@@ -189,6 +189,9 @@ assert(r.installId == EverlootDB.installId and r.capturedAt == '2026-10-18T00:00
 NOW_T = NOW_T + 60
 event('PLAYER_LEVEL_UP', 13)
 assert(#rows() == 1 and rows()[1].level == 13 and rows()[1].capturedAt == '2026-10-18T00:01:00Z', 'level-up updates your row in place')
+-- A changed row is a new revision: the uploader skips every event id it already confirmed, so the changed row
+-- needs an id of its own or it would never be sent again.
+assert(rows()[1].eventId == 'player_seen:2', 'a level-up takes the next event id, got ' .. tostring(rows()[1].eventId))
 
 GT = GT + 5
 units.target = player(1, { level = 30, guild = 'Red Hand' })
@@ -200,7 +203,7 @@ units.party1 = player(3, { race = 'Human' }); units.party2 = player(4)
 event('GROUP_ROSTER_UPDATE')
 local seen = rows()
 assert(#seen == 5, 'you, target, mouseover and two party members; got ' .. #seen)
-assert(seen[2].name == nameOf(1) and seen[2].level == 30 and seen[2].guild == 'Red Hand' and seen[2].eventId == 'player_seen:2')
+assert(seen[2].name == nameOf(1) and seen[2].level == 30 and seen[2].guild == 'Red Hand' and seen[2].eventId == 'player_seen:3')
 assert(seen[3].race == 'Scourge' and seen[3].class == 'PRIEST' and seen[3].guild == nil, 'no guild is no field')
 assert(seen[4].race == 'Human' and seen[5].name == nameOf(4))
 
@@ -255,26 +258,53 @@ GT = GT + 700
 units.mouseover = player(1, { level = 30, guild = 'Red Hand' })
 event('UPDATE_MOUSEOVER_UNIT')
 for k, v in pairs(seen[2]) do assert(snapshot[k] == v, 'a repeat changed ' .. k) end
+assert(seen[2].eventId == 'player_seen:3', 'an unchanged reread keeps the event id')
+
+-- Each changed row takes an id above every id handed out so far, so an id is never reused.
+local function highest()
+  local top = 0
+  for _, row in ipairs(seen) do top = math.max(top, tonumber(row.eventId:match(':(%d+)$'))) end
+  return top
+end
 
 -- A new level changes the row and its time; a missing guild keeps the one it had.
 NOW_T = NOW_T + 3600
 GT = GT + 700
+local top = highest()
 units.mouseover = player(1, { level = 31, guild = false })
 event('UPDATE_MOUSEOVER_UNIT')
 assert(#seen == count and seen[2].level == 31 and seen[2].guild == 'Red Hand' and seen[2].capturedAt == '2026-10-18T01:01:00Z', 'new level, kept guild')
-assert(seen[2].eventId == 'player_seen:2', 'the row keeps its event id')
--- A new guild replaces the old one.
+assert(seen[2].eventId == 'player_seen:' .. (top + 1), 'a new level is a new revision, got ' .. tostring(seen[2].eventId))
+-- Rereading the same level and guild keeps that revision.
+GT = GT + 700
+units.mouseover = player(1, { level = 31, guild = false })
+event('UPDATE_MOUSEOVER_UNIT')
+assert(seen[2].eventId == 'player_seen:' .. (top + 1), 'the same data keeps its revision')
+-- A new guild replaces the old one, under a new revision.
 GT = GT + 700
 units.mouseover = player(1, { level = 31, guild = 'Blue Hand' })
 event('UPDATE_MOUSEOVER_UNIT')
 assert(seen[2].guild == 'Blue Hand')
+assert(seen[2].eventId == 'player_seen:' .. (top + 2), 'a new guild is a new revision, got ' .. tostring(seen[2].eventId))
 
--- The next UTC day moves the date of a character seen again, with no new row.
+-- The next UTC day moves the date of a character seen again, with no new row, under a new revision: the
+-- dated row has to be sent again for the site to show when the character was last seen.
 NOW_T = 1792281600 + 86400 + 5
 GT = GT + 700
 units.mouseover = player(1, { level = 31, guild = 'Blue Hand' })
 event('UPDATE_MOUSEOVER_UNIT')
 assert(#seen == count and seen[2].capturedAt == '2026-10-19T00:00:05Z', 'a new day moves the date, not the row count')
+assert(seen[2].eventId == 'player_seen:' .. (top + 3), 'a new day is a new revision, got ' .. tostring(seen[2].eventId))
+-- A second read the same day changes nothing.
+GT = GT + 700
+units.mouseover = player(1, { level = 31, guild = 'Blue Hand' })
+event('UPDATE_MOUSEOVER_UNIT')
+assert(seen[2].eventId == 'player_seen:' .. (top + 3), 'the same day keeps the revision')
+local seenIds = {}
+for _, row in ipairs(seen) do assert(not seenIds[row.eventId], 'duplicate event id ' .. row.eventId); seenIds[row.eventId] = true end
+-- The counter lives in the file, so a revision after a reload still goes up.
+local stored = EverlootDB.playersNext
+assert(stored == top + 3, 'the saved counter is the last id handed out, got ' .. tostring(stored))
 """)
 
 # --- Throttle: a player is read again after 10 minutes, and target/mouseover reads keep a quarter-second apart ---

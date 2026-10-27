@@ -35,6 +35,20 @@ export function readAccountKey(dataFolder: string): string | null {
   } catch { return null; }
 }
 
+/** Account keys travel over https, or to a local development server. */
+export function keySiteOrigin(endpoint: string): string | null {
+  let u: URL;
+  try { u = new URL(endpoint); } catch { return null; }
+  if (u.protocol === "https:" || (u.protocol === "http:" && (u.hostname === "localhost" || u.hostname === "127.0.0.1"))) return u.origin;
+  return null;
+}
+
+/** A changed site can still answer anonymously, but never receives the saved account key. */
+export function accountKeyForSite(dataFolder: string, endpoint: string): string | null {
+  const origin = keySiteOrigin(endpoint);
+  return origin && origin === readKeyOrigin(dataFolder) ? readAccountKey(dataFolder) : null;
+}
+
 export function accountInfo(dataFolder: string): Account {
   const key = readAccountKey(dataFolder);
   return key ? { signedIn: true, hint: key.slice(-4) } : { signedIn: false, hint: null };
@@ -47,10 +61,13 @@ export function accountInfo(dataFolder: string): Account {
 export async function signIn(dataFolder: string, endpoint: string, raw: string, send: typeof fetch = fetch): Promise<Account> {
   const key = raw.trim();
   if (!EVERLOOT_KEY.test(key)) throw new Error("That is not an Everloot key. It starts with evl_ and is shown once when you make it on everloot.app.");
+  const origin = keySiteOrigin(endpoint);
+  if (!origin) throw new Error("The site address must use https before your key is sent to it.");
   let status: number;
   try {
-    const res = await send(`${endpoint.replace(/\/$/, "")}/api/market/prices?realm=!`, {
+    const res = await send(`${origin}/api/market/prices?realm=!`, {
       headers: { authorization: `Bearer ${key}`, "user-agent": "everloot-desktop" },
+      redirect: "error",
       signal: AbortSignal.timeout(15_000),
     });
     status = res.status;

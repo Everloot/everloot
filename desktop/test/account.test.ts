@@ -1,6 +1,7 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createServer } from "node:http";
 import { afterEach, expect, test, vi } from "vitest";
 import { ACCOUNT_KEY_FILE, accountInfo, explainKeyError, readAccountKey, signIn, signOut } from "../src/main/account";
 
@@ -48,4 +49,23 @@ test("the site's refusal of the key reads as what to do; other errors pass throu
   const raw = 'Streamable HTTP error: Error POSTing to endpoint: {"ok":false,"error":"This API key is not valid or was revoked. Make a new one at https://everloot.app/connect#keys."}';
   expect(explainKeyError(raw)).toMatch(/^everloot.app refused your account key/);
   expect(explainKeyError("fetch failed")).toBe("fetch failed");
+});
+
+test("sign in refuses to send an account key to a remote site over plain http", async () => {
+  const send = answering(400);
+  await expect(signIn(dir(), "http://everloot.app", KEY, send)).rejects.toThrow(/https/i);
+  expect(send).not.toHaveBeenCalled();
+});
+
+test("sign in refuses a redirect without sending a second request or saving the key", async () => {
+  const requests: string[] = [];
+  const server = createServer((req, res) => { requests.push(req.url!); res.writeHead(302, { location: "/capture" }); res.end(); });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const address = server.address() as { port: number };
+    const d = dir();
+    await expect(signIn(d, `http://127.0.0.1:${address.port}`, KEY)).rejects.toThrow(/Could not reach/);
+    expect(requests).toEqual(["/api/market/prices?realm=!"]);
+    expect(readAccountKey(d)).toBeNull();
+  } finally { await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve())); }
 });

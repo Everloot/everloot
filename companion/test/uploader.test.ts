@@ -140,6 +140,23 @@ describe("uploading", () => {
     expect(api.bodies[0].records.map((r) => r.kind)).toEqual(["loot", "player_seen"]);
   });
 
+  test("a player or census row the addon revised under a new event id is sent again; an unchanged row is not", async () => {
+    const player = (id: number, level: number, day: string) => ({ kind: "player_seen", lua: `["eventId"] = "player_seen:${id}", ["capturedAt"] = "${day}T00:00:00Z", ["name"] = "Thrallina", ["realm"] = "Forever", ["race"] = "Orc", ["class"] = "SHAMAN", ["level"] = ${level}` });
+    const census = (id: number, level: number) => ({ kind: "census_seen", lua: `["eventId"] = "census_seen:2026-10-18:${id}", ["capturedAt"] = "2026-10-18T00:00:00Z", ["guid"] = "Player-4242-00000001", ["race"] = "Orc", ["class"] = "WARRIOR", ["level"] = ${level}, ["faction"] = "Horde", ["via"] = "target"` });
+    const w = workspace(luaFile([player(1, 20, "2026-10-18"), census(1, 20)]));
+    const options = { endpoint: "https://everloot.example", state: w.state, players: true, census: true };
+    const api = intake();
+    expect(await uploadFile(w.file, { ...options, fetch: api.send })).toMatchObject({ sent: 2 });
+    // The same file again: nothing changed, so nothing goes.
+    expect(await uploadFile(w.file, { ...options, fetch: api.send })).toMatchObject({ sent: 0, batches: 0 });
+    // The character reached level 21 and was seen the next day: the addon gave each row a new event id.
+    writeFileSync(w.file, luaFile([player(2, 21, "2026-10-19"), census(2, 21)]));
+    expect(await uploadFile(w.file, { ...options, fetch: api.send })).toMatchObject({ sent: 2 });
+    expect(api.bodies[1].records.map((r) => r.eventId).sort()).toEqual(["census_seen:2026-10-18:2", "player_seen:2"]);
+    expect(await uploadFile(w.file, { ...options, fetch: api.send })).toMatchObject({ sent: 0, batches: 0 });
+    expect(api.bodies).toHaveLength(2);
+  });
+
   test("player rows never leave from here: the upload page says what they are first", async () => {
     const player = { kind: "player_seen", lua: `["eventId"] = "player_seen:1", ["capturedAt"] = "2026-10-20T00:00:00Z", ["name"] = "Thrallina", ["realm"] = "Forever", ["race"] = "Orc", ["class"] = "SHAMAN", ["level"] = 20, ["guild"] = "Night Watch"` };
     const { file, state } = workspace(luaFile([loot(1), player]));
@@ -163,7 +180,7 @@ describe("uploading", () => {
     const api = intake((call) => (call === 1 ? new Response("down", { status: 500 }) : undefined));
     await expect(uploadFile(file, { endpoint: "https://everloot.example", fetch: api.send, state })).rejects.toThrow();
     const saved = JSON.parse(readFileSync(join(dir, "state", "sent.json"), "utf8"));
-    expect(saved["abcd-1234-ef56-7890"]).toHaveLength(2000);
+    expect(saved["https://everloot.example|abcd-1234-ef56-7890"]).toHaveLength(2000);
     const retry = intake();
     const result = await uploadFile(file, { endpoint: "https://everloot.example", fetch: retry.send, state: createSentState(join(dir, "state", "sent.json")) });
     expect(result.sent).toBe(500);

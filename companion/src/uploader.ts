@@ -3,7 +3,7 @@ import type { RecordKind } from "@everloot/protocol";
 import { parseEverlootLua } from "../../web/src/lib/sv-parse";
 import { prepareUpload, sendBatches } from "../../web/src/lib/upload-batches";
 import { settledSkip, type SettledList } from "../../kb/src/settled-list";
-import type { SentState } from "./sent-state";
+import { receiptKeyForSite, type SentState } from "./sent-state";
 
 export interface UploadOptions {
   /** Site origin, e.g. https://everloot.app. */
@@ -43,7 +43,8 @@ export interface UploadResult { sent: number; batches: number; skipped: number; 
  */
 export async function uploadFile(file: string, options: UploadOptions): Promise<UploadResult> {
   const parsed = parseEverlootLua(readFileSync(file, "utf8"));
-  const unsent = parsed.records.filter((r) => typeof r.eventId !== "string" || !options.state.has(parsed.installId, r.eventId));
+  const receiptKey = receiptKeyForSite(parsed.installId, options.endpoint);
+  const unsent = parsed.records.filter((r) => typeof r.eventId !== "string" || !options.state.has(receiptKey, r.eventId));
   const held = (r: Record<string, unknown>) => !options.census && CENSUS.has(String(r.kind));
   const heldCensus = unsent.filter(held).length;
   const heldPlayer = (r: Record<string, unknown>) => !options.players && r.kind === PLAYERS;
@@ -52,13 +53,13 @@ export async function uploadFile(file: string, options: UploadOptions): Promise<
   const list = typeof options.settled === "function" ? await options.settled(parsed.clientBuild) : options.settled;
   const session = prepareUpload({ addonVersion: parsed.version, clientBuild: parsed.clientBuild, records }, {}, [], undefined, settledSkip(list, parsed.clientBuild));
   // A settled row is handled: it is not weighed again next time, whether or not the rest is sent.
-  if (session.skipped.length) options.state.add(parsed.installId, session.skipped);
+  if (session.skipped.length) options.state.add(receiptKey, session.skipped);
   const result = { sent: 0, batches: session.batches.length, skipped: session.skipped.length, heldNamed: session.held.named, heldLegacy: session.held.legacy,
     heldAddons: unsent.length - records.length - heldCensus - heldPlayers, heldCensus, heldPlayers, invalid: session.held.invalid };
   if (session.batches.length === 0) return result;
   await sendBatches(session, options.fetch ?? fetch, () => {
     const confirmed = JSON.parse(session.batches[session.next - 1]).records as { eventId: string }[];
-    options.state.add(parsed.installId, confirmed.map((r) => r.eventId));
+    options.state.add(receiptKey, confirmed.map((r) => r.eventId));
     result.sent += confirmed.length;
   }, new URL("/api/intake", options.endpoint).href);
   return result;

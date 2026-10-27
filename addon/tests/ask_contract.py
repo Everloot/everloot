@@ -66,4 +66,43 @@ printed = {}
 Everloot:InitModules()
 assert(not string.find(table.concat(printed, '\\n'), 'Warchief'), 'an answer is shown once')
 """)
-print("Lua 5.1 ask: /ask stores bounded questions, verified answers show once, bad checksums are refused")
+# A full queue refuses the new question and keeps every waiting one: an unanswered question is never dropped to
+# make room, because its answer could then never be matched.
+lua.execute("""
+EverlootDB.asks = {}
+EverlootAnswersDB = {}
+printed = {}
+for i = 1, 20 do SLASH_ASK('question ' .. i) end
+assert(#EverlootDB.asks == 20, 'twenty questions fit; got ' .. #EverlootDB.asks)
+counter = EverlootDB.askCounter
+ids = {}
+for i, ask in ipairs(EverlootDB.asks) do ids[i] = ask.id end
+printed = {}
+SLASH_ASK('question 21')
+assert(#EverlootDB.asks == 20, 'the 21st question is refused; got ' .. #EverlootDB.asks)
+for i, ask in ipairs(EverlootDB.asks) do
+  assert(ask.id == ids[i] and ask.question == 'question ' .. i, 'every waiting question survives; slot ' .. i .. ' is ' .. tostring(ask.question))
+end
+assert(EverlootDB.askCounter == counter, 'a refused question uses no id')
+local said = table.concat(printed, '\\n')
+assert(not string.find(said, 'saved'), 'a refused question is not reported as saved: ' .. said)
+assert(string.find(said, '20 questions', 1, true) and string.find(said, 'waiting', 1, true) and string.find(said, '/reload', 1, true) and string.find(said, 'ask again', 1, true), 'the refusal says what to do: ' .. said)
+""")
+lua.execute(f"""
+-- A bad checksum frees nothing: that answer was never shown.
+EverlootAnswersDB = {{ [ids[1]] = {{ answer = "Tampered.", source = "none", answeredAt = "x", sum = 1 }} }}
+Everloot:InitModules()
+assert(#EverlootDB.asks == 20, 'a failed checksum keeps its slot; got ' .. #EverlootDB.asks)
+printed = {{}}
+SLASH_ASK('question 21')
+assert(#EverlootDB.asks == 20 and string.find(table.concat(printed, '\\n'), '20 questions', 1, true), 'still refused')
+-- A verified answer frees exactly one slot, and the next question then fits behind the others.
+EverlootAnswersDB = {{ [ids[1]] = {{ answer = "Done.", source = "none", answeredAt = "x", sum = {adler32("Done.")} }} }}
+Everloot:InitModules()
+assert(#EverlootDB.asks == 19 and EverlootDB.asks[1].id == ids[2], 'the answered question leaves; got ' .. #EverlootDB.asks)
+printed = {{}}
+SLASH_ASK('question 21')
+assert(#EverlootDB.asks == 20 and EverlootDB.asks[20].question == 'question 21' and EverlootDB.asks[1].id == ids[2], 'the freed slot takes the new question')
+assert(string.find(table.concat(printed, '\\n'), 'question saved', 1, true), 'and it is saved')
+""")
+print("Lua 5.1 ask: /ask stores bounded questions, a full queue refuses a new one and keeps every waiting question, verified answers show once, bad checksums are refused")

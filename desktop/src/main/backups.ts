@@ -6,7 +6,7 @@ import { accountOf } from "./engine";
 export const BACKUPS_KEPT = 10;
 
 /**
- * Keeps a copy of an account's Everloot.lua in the data folder after each upload, the newest
+ * Keeps a copy of an account's Everloot.lua in the data folder before each upload attempt, the newest
  * BACKUPS_KEPT per account. A game crash during a write, or a CurseForge update that resets the
  * addon, no longer costs the player the scans and records they had not uploaded yet.
  */
