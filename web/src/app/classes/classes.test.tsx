@@ -23,7 +23,7 @@ import ClassPage, * as hubRoute from "./[class]/page";
 import UseClassButton, { RememberedClass } from "@/components/classes/UseClassButton";
 import { PRIMARY } from "@/components/Header";
 import { toolGroups } from "@/data/tools";
-import { classRaces } from "@/lib/class-hub";
+import { classesIndexable, classRaces, hubIndexable } from "@/lib/class-hub";
 import { CLASS_CONTEXT_SLOT, contextLinks } from "@/lib/class-context";
 import { RACE_TABLE } from "@/lib/race-traits";
 import { TALENT_CLASSES, loadCatalog } from "@/lib/talents/catalogs";
@@ -131,7 +131,7 @@ describe("class hubs", () => {
     expect((await hubMetadata("deathknight")).robots).toEqual({ index: false, follow: true });
   });
 
-  test("with no reviewed guide a hub says so, names no role or talent tree, and stays out of search", async () => {
+  test("with no reviewed guide a hub says so, names no role or talent tree, and is indexed for its racial traits", async () => {
     const html = await hub("mage");
     const page = visible(html);
     expect(page).toContain("No Mage guide is reviewed yet.");
@@ -144,8 +144,19 @@ describe("class hubs", () => {
     for (const role of ["tank", "healer", "damage", "dps"]) expect(ours.toLowerCase(), role).not.toContain(role);
     for (const tree of (await loadCatalog("mage")).trees) expect(page, tree.name).not.toContain(tree.name);
     const m = await hubMetadata("mage");
-    expect(m.robots).toEqual({ index: false, follow: true });
+    // The game files' racial traits for the races that can play it are content a search can land on.
+    expect(m.robots).toEqual({ index: true, follow: true });
     complete("/classes/mage", m);
+  });
+
+  test("a hub with neither a reviewed guide nor any racial trait stays out of search, and so does the index", () => {
+    const empty = { ...RACE_TABLE, races: RACE_TABLE.races.map((r) => ({ ...r, traits: [] })) };
+    for (const slug of TALENT_CLASSES) {
+      expect(hubIndexable(slug, new Map(), empty), slug).toBe(false);
+      expect(hubIndexable(slug, new Map()), slug).toBe(true);
+    }
+    expect(classesIndexable(new Map(), empty)).toBe(false);
+    expect(classesIndexable(new Map())).toBe(true);
   });
 
   test("a reviewed guide shows on its own class's hub only, with the activity, levels and roles it was reviewed for; a draft never does", async () => {
@@ -163,7 +174,7 @@ describe("class hubs", () => {
     expect(visible(await hub("priest"))).toContain("No Priest guide is reviewed yet.");
     expect((await hubMetadata("mage")).robots).toEqual({ index: true, follow: true });
     expect((await hubMetadata("warrior")).robots).toEqual({ index: true, follow: true });
-    expect((await hubMetadata("priest")).robots).toEqual({ index: false, follow: true });
+    expect((await hubMetadata("priest")).robots).toEqual({ index: true, follow: true });
   });
 
   test("every hub's title and description fit, with and without reviewed guides", async () => {
@@ -235,12 +246,13 @@ describe("class hubs", () => {
 describe("the class index", () => {
   const row = (html: string, slug: string) => html.match(new RegExp(`<tr[^>]*>(?:(?!</tr>)[\\s\\S])*href="/classes/${slug}"[\\s\\S]*?</tr>`))?.[0] ?? "";
 
-  test("lists the nine hubs with their reviewed guides, and stays out of search until one has a guide", async () => {
+  test("lists the nine hubs with their reviewed guides, and is indexed once one hub is", async () => {
     const empty = await index();
     for (const slug of TALENT_CLASSES) expect(empty, slug).toContain(`href="/classes/${slug}"`);
     expect(visible(empty)).toContain("No class guide is reviewed yet.");
     expect(ledeOf(empty)).not.toMatch(/guide/i);
-    expect((await indexRoute.generateMetadata()).robots).toEqual({ index: false, follow: true });
+    // No guide yet, but every hub carries its races' traits, so the index is indexed too.
+    expect((await indexRoute.generateMetadata()).robots).toEqual({ index: true, follow: true });
 
     stubGuides(SOME);
     const listed = await index();
