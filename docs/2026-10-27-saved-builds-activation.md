@@ -29,7 +29,9 @@ saved build and character label, including the builds Chat entries point to, and
 Save shows one account's builds: the one this tab last confirmed through `/api/auth/me`, asked again whenever the tab
 comes back. Each save sends that account's id in `x-everloot-expected-owner`, and the site answers a private 409
 `account_mismatch`, before anything is read or written, when another account is signed in now. So a save pressed
-just after another tab switched accounts is refused instead of landing in the new account. When a check of the
+just after another tab switched accounts is refused instead of landing in the new account. The list of builds is
+asked for with the same header, so another account's builds never show under this one; on a 409 Save asks who is
+signed in again before it shows any list. When a check of the
 account fails, Save shows no builds and stays off, with the reason beside it, until a check works again.
 
 A shared build's short link shows its name and notes, its class and split, the game build it was made on, and both
