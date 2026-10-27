@@ -365,6 +365,8 @@ describe("the free model (Everloot free)", () => {
     for (const t of FREE_TOOLS) expect(CHAT_TOOLS as readonly string[]).toContain(t);
     expect(FREE_TOOLS.length).toBeLessThan(CHAT_TOOLS.length);
     expect(FREE_TOOLS as readonly string[]).not.toContain("my_builds");
+    // "Which race for a Horde warlock?" is answered by class_races; the free model must have it.
+    expect(FREE_TOOLS as readonly string[]).toContain("class_races");
   });
 
   test("loadTools can load just the free tools", async () => {

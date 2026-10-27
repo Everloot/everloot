@@ -324,7 +324,7 @@ export const FREE_PROVIDER: AnswerOptions["provider"] = { kind: "everloot-free",
  */
 export const FREE_TOOLS = [
   "search_knowledge", "get_by_name", "item_page", "npc_page", "quest_page", "vendor_page",
-  "profession_path", "talent_tree", "market_value", "recent_changes",
+  "profession_path", "talent_tree", "class_races", "market_value", "recent_changes",
 ] as const satisfies readonly (typeof CHAT_TOOLS)[number][];
 
 /** A free answer's reach: fewer rounds, shorter tool results and fewer earlier turns, so one fits a free tier's minute. */
