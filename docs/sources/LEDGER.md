@@ -49,6 +49,8 @@ The site links to these and stores nothing from them: [warcraft.wiki.gg](https:/
 and the [Polestar Discord](https://discord.gg/vMbee6F2e9) from the addons pages,
 [Wago Addons](https://addons.wago.io) and [WoWInterface](https://www.wowinterface.com) (checked 2026-10-18 for the ecosystem tracker: Wago documents no read API for listings and WoWInterface's terms forbid automated access, so neither is read; CurseForge's API terms forbid caching, so it is not called either),
 [Blizzard news](https://news.blizzard.com) (no feed and no robots.txt, so link only) and Blizzard forum threads as citations.
+Guides (`kb/guides/`) cite the same way: Blizzard's posts on worldofwarcraft.blizzard.com, news.blizzard.com and the
+US and EU forums, link only, and no other site ([guide contract](../GUIDES.md#sources-and-links)).
 
 ## Research only
 
