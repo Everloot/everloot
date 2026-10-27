@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { groupAnnouncements, postPathForUrl, type ChangeEntry } from "./changes";
+import { couldBeBluePost, groupAnnouncements, postPathForUrl, type ChangeEntry } from "./changes";
 
 const us: ChangeEntry = {
   id: "forum:30590866", type: "post", game: "forever", at: "2026-10-23T18:00:00.000Z", title: "Thank You For Testing the WoW Forever Beta",
@@ -23,4 +23,11 @@ test("any other link has no page", () => {
   expect(postPathForUrl("https://news.blizzard.com/en-us/article/24302070/choose-your-ruleset", timeline)).toBeNull();
   expect(postPathForUrl("https://us.forums.blizzard.com/en/wow/t/thank-you-for-testing-the-wow-forever-beta/2390466", timeline)).toBeNull();
   expect(postPathForUrl("https://example.org", [])).toBeNull();
+});
+
+test("only a link on the forums or Bluesky could be a stored Blizzard post", () => {
+  for (const url of [us.url!, eu.url!, "https://bsky.app/profile/worldofwarcraft.blizzard.com/post/3mydklukhq22f"]) expect(couldBeBluePost(url), url).toBe(true);
+  for (const url of ["https://news.blizzard.com/en-us/article/24302070", "https://worldofwarcraft.blizzard.com/en-us/news/1", "https://www.wowhead.com/news/1", "https://forums.blizzard.com.example.org/t/1", "not a url"]) {
+    expect(couldBeBluePost(url), url).toBe(false);
+  }
 });
