@@ -18,11 +18,13 @@ def export_guides(sha: str, out: Path, cwd: str | Path | None = None) -> int:
         return subprocess.run(["git", *args], cwd=cwd, capture_output=True, check=True).stdout
 
     # All zeros is what a push that created its branch reports: there is no base to compare with.
-    if not COMMIT.match(sha) or not sha.strip("0"):
+    if not COMMIT.fullmatch(sha) or not sha.strip("0"):
         raise ValueError(f"{sha!r} is not a commit id (40 lowercase hex digits)")
     if out.exists() and (not out.is_dir() or any(out.iterdir())):
         raise ValueError(f"{out} must be new or empty")
-    git("fetch", "--quiet", "--no-tags", "--depth=1", "origin", sha)
+    # --depth keeps CI's shallow checkout small; in a full clone it would make the clone shallow, so it is left off.
+    shallow = git("rev-parse", "--is-shallow-repository").strip() == b"true"
+    git("fetch", "--quiet", "--no-tags", *(["--depth=1"] if shallow else []), "origin", sha)
     git("cat-file", "-e", f"{sha}^{{commit}}")
     entry = git("ls-tree", "-z", sha, "--", GUIDES)
     found = []

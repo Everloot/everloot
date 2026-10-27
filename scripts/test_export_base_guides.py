@@ -55,10 +55,20 @@ with tempfile.TemporaryDirectory() as tmp:
     assert export_guides(without, out, cwd=clone) == 0
     assert out.is_dir() and not any(out.iterdir())
 
+    # A contributor's full clone stays full: the export fetches without --depth there, and writes the same files.
+    full = root / "full"
+    subprocess.run(["git", "clone", "-q", origin.as_uri(), str(full)], check=True)
+    assert git(full, "rev-parse", "--is-shallow-repository") == "false"
+    out = root / "from-full"
+    assert export_guides(with_guides, out, cwd=full) == 2
+    assert (out / "frost-leveling.md").read_bytes() == b"---\nid: 1\n---\r\n\xc3\xa9\n"
+    assert git(full, "rev-parse", "--is-shallow-repository") == "false"
+
     # Anything else fails: a value that is not a commit id, a commit the remote does not have, a folder already in use.
     assert "not a commit id" in refused("main", root / "a", clone)
     assert "not a commit id" in refused("0" * 40, root / "b", clone)
     assert "not a commit id" in refused(with_guides[:12], root / "c", clone)
+    assert "not a commit id" in refused(with_guides + "\n", root / "c", clone)
     refused("1" * 40, root / "d", clone)
     assert not (root / "d").exists()
     (root / "e").mkdir()
@@ -78,4 +88,4 @@ with tempfile.TemporaryDirectory() as tmp:
     git(origin, "commit", "-q", "-m", "a link")
     assert "not a regular file" in refused(git(origin, "rev-parse", "HEAD"), root / "g", clone)
 
-print("export_base_guides: 10 cases pass")
+print("export_base_guides: 12 cases pass")
