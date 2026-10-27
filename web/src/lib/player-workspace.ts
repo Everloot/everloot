@@ -359,13 +359,20 @@ export function update(storage: DeviceStorage | null, owner: Owner, change: (wor
 /** The lock every tab takes to change these buckets: Plans on this device's writes and a transfer's, one at a time. */
 export const WORKSPACE_LOCK = "everloot:player-workspace";
 
+const lockManager = () => (typeof navigator === "undefined" ? undefined : (navigator as { locks?: LockManager }).locks);
+
+/** Whether this browser has the Web Locks API. Without it a transfer is refused: its writes could not be kept apart from
+ *  another tab's. A plain change to a bucket still goes ahead, checked as `store` checks it. */
+export const locksAvailable = () => lockManager() !== undefined;
+
 /**
- * Runs `task` holding the workspace lock (the Web Locks API), so no other tab's change to these buckets runs in between,
- * or at once in a browser without it. Either way each write still checks that its bucket is as the change read it
- * (store), and writes nothing over another tab's change.
+ * Runs `task` holding the workspace lock (the Web Locks API), so no other tab's change to these buckets or to the record
+ * of sends runs in between: every writer takes it (Plans on this device, Save on this device, the alt planner, the
+ * Everloot.lua import and the transfer). Without the API the task runs at once. Either way each write still checks that
+ * its bucket is as the change read it (store), and writes nothing over another tab's change.
  */
 export async function withWorkspaceLock<T>(task: () => T | Promise<T>): Promise<T> {
-  const locks = typeof navigator === "undefined" ? undefined : (navigator as { locks?: LockManager }).locks;
+  const locks = lockManager();
   if (!locks) return task();
   return locks.request(WORKSPACE_LOCK, () => task()) as Promise<T>;
 }

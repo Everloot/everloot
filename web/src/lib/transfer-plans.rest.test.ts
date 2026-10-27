@@ -63,6 +63,16 @@ const stored = (owner: Owner) => JSON.parse(localStorage.getItem(bucketKey(owner
 /** Everything this browser keeps, to show that nothing changed. */
 const device = () => Object.fromEntries(Object.keys(localStorage).map((k) => [k, localStorage.getItem(k)]));
 
+/** Web Locks as a browser gives them, which jsdom has not: one holder at a time, in the order asked. */
+function installLocks() {
+  let queue: Promise<unknown> = Promise.resolve();
+  Object.defineProperty(navigator, "locks", { configurable: true, value: { request: (_: string, task: () => unknown) => {
+    const next = queue.then(task);
+    queue = next.catch(() => undefined);
+    return next;
+  } } });
+}
+
 describe.skipIf(!databaseUrl || !restUrl || !secret || !databaseUrl.endsWith(`/${DATABASE}`))("saving device plans to an account through the routes and PostgREST", () => {
   let pool: Pool;
   let direct: typeof fetch;
@@ -185,6 +195,7 @@ describe.skipIf(!databaseUrl || !restUrl || !secret || !databaseUrl.endsWith(`/$
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     vi.stubGlobal("fetch", site);
     localStorage.clear();
+    installLocks();
     sent = [];
     onAnswer = null;
     mounted = [];
@@ -195,6 +206,7 @@ describe.skipIf(!databaseUrl || !restUrl || !secret || !databaseUrl.endsWith(`/$
       await act(async () => panel.root.unmount());
       panel.container.remove();
     }
+    delete (navigator as { locks?: unknown }).locks;
   });
 
   afterAll(async () => {

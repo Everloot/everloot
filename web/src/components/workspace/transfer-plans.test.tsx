@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { readdirSync, readFileSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -50,6 +52,16 @@ const names = (owner: Owner) => (stored(owner)?.plans ?? []).map((p) => p.name);
 const bound = (p: LocalPlan, userId = A_ID) => ({ ...p, boundTo: { userId, at: expect.any(String) } });
 /** Everything this browser keeps, to show that nothing changed. */
 const device = () => Object.fromEntries(Object.keys(localStorage).map((k) => [k, localStorage.getItem(k)]));
+
+/** Web Locks as a browser gives them: one holder at a time per name, in the order asked. */
+function installLocks() {
+  let queue: Promise<unknown> = Promise.resolve();
+  Object.defineProperty(navigator, "locks", { configurable: true, value: { request: (_: string, task: () => unknown) => {
+    const next = queue.then(task);
+    queue = next.catch(() => undefined);
+    return next;
+  } } });
+}
 
 // The site, as far as the transfer talks to it.
 
@@ -151,6 +163,7 @@ beforeEach(() => {
     if (wait) { held.delete(request); await wait; }
     return response;
   }));
+  installLocks();
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -158,6 +171,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
+  delete (navigator as { locks?: unknown }).locks;
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
@@ -714,7 +728,6 @@ describe("writes from more than one tab", () => {
     Object.defineProperty(navigator, "locks", { value: { request }, configurable: true });
     return { names, overlapped: () => overlapped };
   }
-  afterEach(() => { delete (navigator as { locks?: unknown }).locks; });
 
   test("a plan another tab saves between the two binding writes is kept", () => {
     seed(ANON, [FROST]);
@@ -1057,5 +1070,154 @@ describe("the missing spend-order migration", () => {
       // A refusal before anything was written lets its key go: nothing records the plan as sent.
       expect(device()).toEqual(before);
     }
+  });
+});
+
+describe("one lock for every writer", () => {
+  /** Web Locks that record each name asked for and whether two holders ever overlapped. */
+  function recordLocks() {
+    const names: string[] = [];
+    let held = 0;
+    let overlapped = false;
+    let queue: Promise<unknown> = Promise.resolve();
+    const request = (name: string, task: () => unknown) => {
+      names.push(name);
+      const run = queue.then(async () => {
+        held++;
+        if (held > 1) overlapped = true;
+        try { return await task(); } finally { held--; }
+      });
+      queue = run.catch(() => undefined);
+      return run;
+    };
+    Object.defineProperty(navigator, "locks", { configurable: true, value: { request } });
+    return { names, overlapped: () => overlapped };
+  }
+
+  /** The site's source with comments and the text of strings blanked out, so only code is left, at the same offsets. */
+  function codeOnly(source: string): string {
+    const out = source.split("");
+    const blank = (from: number, to: number) => { for (let k = from; k < to; k++) if (out[k] !== "\n") out[k] = " "; };
+    const stack: string[] = [];
+    let i = 0;
+    while (i < source.length) {
+      const c = source[i];
+      const top = stack[stack.length - 1];
+      if (top === "`") {
+        if (c === "\\") { blank(i, i + 2); i += 2; continue; }
+        if (c === "`") { stack.pop(); i++; continue; }
+        if (c === "$" && source[i + 1] === "{") { stack.push("${"); i += 2; continue; }
+        blank(i, i + 1);
+        i++;
+        continue;
+      }
+      if (c === "/" && source[i + 1] === "/") { const end = source.indexOf("\n", i); const stop = end < 0 ? source.length : end; blank(i, stop); i = stop; continue; }
+      if (c === "/" && source[i + 1] === "*") { const end = source.indexOf("*/", i + 2); const stop = end < 0 ? source.length : end + 2; blank(i, stop); i = stop; continue; }
+      if (c === "\"" || c === "'") {
+        let j = i + 1;
+        while (j < source.length && source[j] !== c && source[j] !== "\n") j += source[j] === "\\" ? 2 : 1;
+        blank(i + 1, j);
+        i = j + 1;
+        continue;
+      }
+      if (c === "`") { stack.push("`"); i++; continue; }
+      if (c === "{" && stack.length > 0) { stack.push("{"); i++; continue; }
+      if (c === "}" && (top === "{" || top === "${")) { stack.pop(); i++; continue; }
+      i++;
+    }
+    return out.join("");
+  }
+
+  /** The functions that write the plan buckets or the record of sends, by the module that exports them. */
+  const WRITERS: Record<string, string[]> = {
+    "@/lib/player-workspace": [
+      "savePlan", "editPlan", "copyPlan", "deletePlan", "applyImport", "update", "bindTransferred", "settleTransferred",
+      "transferKey", "receiptSaved", "receiptFailed", "rememberCharacter",
+    ],
+    "@/lib/alt-workspace": ["saveAlt", "deleteAlt", "changeAlts"],
+    "@/lib/alt-import": ["applyAltImport"],
+  };
+  /** The modules that are the writing itself: they run inside the lock their callers take. */
+  const LAYER = ["lib/player-workspace.ts", "lib/alt-workspace.ts", "lib/alt-import.ts"];
+
+  /** Every call of a writer in the site's source outside the writing layer, and those not inside withWorkspaceLock(…). */
+  function scan() {
+    const src = resolve(import.meta.dirname, "../..");
+    const calls: Array<{ file: string; name: string; locked: boolean }> = [];
+    for (const entry of readdirSync(src, { recursive: true }) as string[]) {
+      const file = relative(src, join(src, entry)).replace(/\\/g, "/");
+      if (!/\.tsx?$/.test(file) || /\.test\.tsx?$/.test(file) || LAYER.includes(file)) continue;
+      const source = readFileSync(join(src, entry), "utf8");
+      const names = new Set<string>();
+      for (const m of source.matchAll(/import\s*\{([^}]*)\}\s*from\s*"([^"]+)"/g)) {
+        const writers = WRITERS[m[2]];
+        if (!writers) continue;
+        for (const part of m[1].split(",")) {
+          const name = part.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0];
+          if (writers.includes(name)) names.add(name);
+        }
+      }
+      const code = codeOnly(source);
+      const spans: Array<[number, number]> = [];
+      for (const m of code.matchAll(/\bwithWorkspaceLock\s*\(/g)) {
+        let depth = 0;
+        for (let k = m.index! + m[0].length - 1; k < code.length; k++) {
+          if (code[k] === "(") depth++;
+          else if (code[k] === ")" && --depth === 0) { spans.push([m.index!, k]); break; }
+        }
+      }
+      const inside = (at: number) => spans.some(([from, to]) => from < at && at < to);
+      for (const name of names) {
+        for (const m of code.matchAll(new RegExp(`(?<![\\w.])${name}\\s*\\(`, "g"))) calls.push({ file, name, locked: inside(m.index!) });
+      }
+      // A bucket cleared by hand is a write too.
+      for (const m of code.matchAll(/\.removeItem\s*\(\s*bucketKey\s*\(/g)) calls.push({ file, name: "removeItem(bucketKey(…))", locked: inside(m.index!) });
+    }
+    return calls;
+  }
+
+  test("without Web Locks a transfer is refused before anything is allocated or sent", async () => {
+    delete (navigator as { locks?: unknown }).locks;
+    seed(ANON, [FROST]);
+    const before = device();
+    await render();
+    await open();
+    expect(alerts()).toContain("This browser can't move plans safely; try a current browser.");
+    expect(accountReads()).toEqual([]);
+    expect(posts).toEqual([]);
+    expect(device()).toEqual(before);
+    expect(button(/^Save to your account$/)).toBeUndefined();
+  });
+
+  test("every writer of the plan buckets and the record of sends holds the workspace lock", () => {
+    const calls = scan();
+    expect(calls.filter((c) => !c.locked)).toEqual([]);
+    // The scan finds the writers where they are: Plans on this device, the transfer, Save on this device, the alt
+    // planner and the Everloot.lua import.
+    expect([...new Set(calls.map((c) => c.file))].sort()).toEqual([
+      "app/tools/alts/AltPlanner.tsx", "app/tools/alts/ReadSaveFile.tsx", "components/workspace/DevicePlans.tsx",
+      "components/workspace/LocalPlanSave.tsx", "components/workspace/TransferPlans.tsx",
+    ]);
+    expect(calls.length).toBeGreaterThanOrEqual(15);
+  });
+
+  test("Save on this device and the alt planner write under that lock, one at a time", async () => {
+    const lock = recordLocks();
+    who = null;
+    const { default: LocalPlanSave } = await import("./LocalPlanSave");
+    await act(async () => root.render(<LocalPlanSave classSlug="mage" codes={[MAGE, null]} orders={[PLANNED, null]} defaultName="Mage plan" onMessage={() => {}} />));
+    await settle();
+    await click(button(/^Save on this device$/));
+    await click(button(/^Save plan$/));
+    expect(names(ANON)).toEqual(["Mage plan"]);
+    expect(lock.names).toEqual(["everloot:player-workspace"]);
+    const { default: AltPlanner } = await import("@/app/tools/alts/AltPlanner");
+    await act(async () => root.render(<AltPlanner />));
+    await settle();
+    await set(field("Name") as HTMLInputElement, "Thrall");
+    await click(button(/^Add alt$/));
+    expect(stored(ANON)!.alts.map((a) => a.name)).toEqual(["Thrall"]);
+    expect(lock.names).toEqual(["everloot:player-workspace", "everloot:player-workspace"]);
+    expect(lock.overlapped()).toBe(false);
   });
 });

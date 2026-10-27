@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { ACCOUNT_CHANGED_EVENT } from "@/components/AccountControls";
 import { Input } from "@/components/ui";
 import {
-  WORKSPACE_LIMITS, deviceStorage, hiddenFrom, lookupOwner, orderState, readWorkspace, sameOwner, savePlan, type LocalPlan, type Owner,
+  WORKSPACE_LIMITS, deviceStorage, hiddenFrom, lookupOwner, orderState, readWorkspace, sameOwner, savePlan, withWorkspaceLock,
+  type LocalPlan, type Owner,
 } from "@/lib/player-workspace";
 
 // Save on this device, for the talent calculator beside its account Save: the plan is kept by name in this
@@ -89,6 +90,8 @@ export default function LocalPlanSave({ classSlug, codes, orders, defaultName, o
   // The name the build bar shows now, for a new plan.
   const nameNow = useRef(defaultName);
   nameNow.current = defaultName;
+  /** A save waiting for the workspace lock: pressing Save again meanwhile saves nothing more. */
+  const saving = useRef(false);
 
   // What was typed for one account is never saved into another: a switch closes the panel, and so does a sign-out,
   // which leaves no owner until the next answer.
@@ -120,10 +123,13 @@ export default function LocalPlanSave({ classSlug, codes, orders, defaultName, o
     setOpenFor(owner);
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!openFor || !owner || !sameOwner(openFor, owner)) return;
-    const result = savePlan(deviceStorage(), openFor, { id: form.target || null, name: form.name, notes: form.notes, classSlug, codes, orders });
+    if (!openFor || !owner || !sameOwner(openFor, owner) || saving.current) return;
+    // Under the workspace lock every writer of these plans takes, so no other tab's change lands in between.
+    saving.current = true;
+    const result = await withWorkspaceLock(() => savePlan(deviceStorage(), openFor, { id: form.target || null, name: form.name, notes: form.notes, classSlug, codes, orders }))
+      .finally(() => { saving.current = false; });
     if (!result.ok) { setError(result.message); return; }
     setLastSaved(result.plan.id);
     setOpenFor(null);

@@ -6,9 +6,9 @@ import { className } from "@/components/builds/describe";
 import { Card, Field, SectionHeading } from "@/components/ui";
 import { detailValue, listOf } from "@/lib/alt-workspace";
 import {
-  ANONYMOUS, WORKSPACE_LIMITS, bindTransferred, boundElsewhere, bucketKey, deviceStorage, emptyWorkspace, hiddenFrom, madeCharacter,
-  orderState, planContent, planGroups, readTransfers, readWorkspace, receiptDropped, receiptSaved, rememberCharacter, settleTransferred,
-  transferKey, transferRoom, transferStanding, withWorkspaceLock,
+  ANONYMOUS, WORKSPACE_LIMITS, bindTransferred, boundElsewhere, bucketKey, deviceStorage, emptyWorkspace, hiddenFrom, locksAvailable,
+  madeCharacter, orderState, planContent, planGroups, readTransfers, readWorkspace, receiptDropped, receiptSaved, rememberCharacter,
+  settleTransferred, transferKey, transferRoom, transferStanding, withWorkspaceLock,
   type Failure, type LocalAlt, type LocalPlan, type Owner, type PlayerWorkspace, type Standing, type TransfersRead,
 } from "@/lib/player-workspace";
 import {
@@ -42,6 +42,7 @@ const SHARING: Record<Exclude<Sharing, "">, { label: string; words: string; shar
 const CHANGED = "The account signed in here changed, so the transfer stopped.";
 const NOTHING_SENT = "The account signed in here changed, so nothing was sent.";
 const KEPT = "What was not saved is still on this device, as it was.";
+const NO_LOCKS = "This browser can't move plans safely; try a current browser.";
 const select = "min-h-11 w-full rounded-control border border-edge bg-canvas px-3 text-base text-fg";
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
@@ -210,7 +211,7 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
     return () => { live.current = false; window.removeEventListener(ACCOUNT_CHANGED_EVENT, end); };
   }, []);
 
-  const [account, setAccount] = useState<{ status: "closed" | "loading" } | { status: "open"; data: AccountBuilds; name: string } | { status: "failed"; message: string }>({ status: "closed" });
+  const [account, setAccount] = useState<{ status: "closed" | "loading" } | { status: "open"; data: AccountBuilds; name: string } | { status: "failed"; message: string; retry: boolean }>({ status: "closed" });
   const [included, setIncluded] = useState<Set<string>>(new Set());
   const [choices, setChoices] = useState<Record<string, Choice>>({});
   const [characters, setCharacters] = useState<Record<string, NewCharacter>>({});
@@ -234,6 +235,8 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
   async function open() {
     onStopped(null);
     setOutcome(null);
+    // Without the lock another tab could write between the transfer's reads and writes: nothing is read or sent.
+    if (!locksAvailable()) { setAccount({ status: "failed", message: NO_LOCKS, retry: false }); return; }
     setAccount({ status: "loading" });
     try {
       // Who /api/auth/me says is signed in: the name shown, for the same id every request names.
@@ -247,14 +250,14 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
       // Checking the account again starts this over, for whichever account it finds.
       if (response.status === 409 && body.code === ACCOUNT_MISMATCH) { onStopped(NOTHING_SENT); recheck(); return; }
       if (response.status === 401) { onStopped("You are signed out now, so nothing was sent."); recheck(); return; }
-      if (response.status === 404) { setAccount({ status: "failed", message: "Saving plans to an account isn't available right now. Your plans stay on this device." }); return; }
+      if (response.status === 404) { setAccount({ status: "failed", message: "Saving plans to an account isn't available right now. Your plans stay on this device.", retry: true }); return; }
       if (!response.ok) throw new Error("unavailable");
       setIncluded(new Set());
       setChoices({});
       setCharacters({});
       setAccount({ status: "open", data: body as AccountBuilds, name: me.name });
     } catch {
-      if (live.current) setAccount({ status: "failed", message: "Your account could not be read, so nothing was sent. Try again in a minute." });
+      if (live.current) setAccount({ status: "failed", message: "Your account could not be read, so nothing was sent. Try again in a minute.", retry: true });
     }
   }
 
@@ -558,7 +561,7 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
         <div className="mt-4 space-y-3">
           <p role="alert" className="text-sm text-fg">{account.message}</p>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="btn text-sm" onClick={open}>Try again</button>
+            {account.retry && <button type="button" className="btn text-sm" onClick={open}>Try again</button>}
             <button type="button" className="btn text-sm" onClick={cancel}>Cancel</button>
           </div>
         </div>
