@@ -225,6 +225,11 @@ describe("Everloot first", () => {
     expect(SYSTEM).toContain(UNSOURCED);
   });
 
+  test("which race to pick for a class is a builds question: class_races sits with the talent trees", () => {
+    expect(CHAT_TOOLS).toContain("class_races");
+    expect(TOOL_POLICY.find((g) => g.label === "builds and talents")?.tools).toEqual(["talent_tree", "class_races", "my_builds"]);
+  });
+
   test("an answer's Everloot pages come from the tools' More lines; sources lose their licence note", async () => {
     const page = "[item] Linen Cloth\nDropped by humanoids.\nMore: https://everloot.app/database/item/2589\nSource: https://warcraft.wiki.gg/wiki/Linen_Cloth (CC-BY-SA-4.0, retrieved 2023-11-13)\nMore: https://evil.example/x";
     expect(pagesIn(page + "\n" + page)).toEqual(["https://everloot.app/database/item/2589"]);

@@ -18,6 +18,7 @@ import { writeClientAchievements } from "./client-achievements.js";
 import { writeClientEncounters } from "./client-encounters.js";
 import { writeClientMounts } from "./client-mounts.js";
 import { writeClientLayer } from "./client-layer.js";
+import { writeRaceTable } from "./client-races.js";
 import { buildQuestionBank, gameDataSubjects, parseQuestionBank, serializeQuestionBank, wikiSubjects } from "./question-bank.js";
 import { evaluateBank, formatEvalReport } from "./question-eval.js";
 import { diffSnapshots } from "./client-diff.js";
@@ -165,6 +166,10 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
   client-layer <snapshot.sqlite> [--out ../web/src/data/game-data/client-layer.json]
     (relation edges derived from the game files, one build-stamped file for the database pages. Game file data,
     labelled found in game files, unconfirmed. See docs/DATA_POLICY.md)
+  client-races <snapshot.sqlite> [--out ../web/src/data/game-data/races.json]
+    (each playable race with its faction, the classes it can be and its racial traits, one build-stamped file
+    for the class pages and the class_races tool. Game file data, labelled found in game files, unconfirmed;
+    trait descriptions are for pages only. See docs/DATA_POLICY.md)
   client-achievements <snapshot.sqlite> [--out ../web/src/data/game-data/client-achievements.json]
     (every achievement the game files carry with its criteria walked from CriteriaTree, one build-stamped file the
     achievement pages merge with player reports player-first. Pages only: the API, MCP and bulk exports stay clean. See docs/DATA_POLICY.md)
@@ -587,6 +592,14 @@ async function main(): Promise<number> {
       const path = flags.get("out") || "../web/src/data/game-data/client-layer.json";
       const layer = writeClientLayer(args[0], path);
       for (const [rel, n] of Object.entries(layer.counts)) console.log(`${rel}: ${n} edges`);
+      console.log(`-> ${path}`);
+      return 0;
+    }
+    case "client-races": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/races.json";
+      const table = writeRaceTable(args[0], path);
+      for (const r of table.races) console.log(`${r.faction} ${r.name}: ${r.classes.length} classes, ${r.traits.length} traits`);
       console.log(`-> ${path}`);
       return 0;
     }

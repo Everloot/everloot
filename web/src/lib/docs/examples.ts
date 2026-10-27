@@ -152,6 +152,7 @@ export const TOOL_ARGS: Record<McpToolName, Record<string, string | number>> = {
   item_categories: { quality: "epic" },
   talent_tree: { class: "mage" },
   talent_plan: { code: "YOUR-SHARE-CODE" },
+  class_races: { class: "warlock", faction: "horde" },
   collection_gap: { collection: "mounts", ownerInstallId: "your-install-id" },
   completion_progress: { ownerInstallId: "your-install-id" },
   guild_board: { guildName: "Your Guild", realm: "YourRealm" },

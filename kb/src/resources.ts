@@ -38,7 +38,7 @@ export function methodologyText(sourceUrl: string): string {
     "",
     "## Game files and play are kept apart",
     "",
-    "Some answers (entity_relations, item_categories, the talent calculator, the map) use data read from the game's own files. " +
+    "Some answers (entity_relations, item_categories, class_races, the talent calculator, the map) use data read from the game's own files. " +
       "It is labelled found in game files, unconfirmed, with the build it came from, until players see it in play. The build is in everloot://builds. " +
       `That data is Blizzard's and is not under Everloot's licence. ${GAME_DATA_CREDIT}`,
     "",
