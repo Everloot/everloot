@@ -35,7 +35,7 @@ export interface ChatProviderPreset {
   colour: string;
 }
 
-const OLLAMA_NOTE = "Nothing leaves your computer. Start Ollama with OLLAMA_ORIGINS=https://everloot.app so this page may reach it, and pick a model that supports tool calling, such as qwen3.";
+const OLLAMA_NOTE = "Runs on your computer: private and free, but slower than a cloud model, and it uses your computer's memory while it answers. Start Ollama with OLLAMA_ORIGINS=https://everloot.app so this page may reach it, then start with qwen3:4b (ollama pull qwen3:4b). If answers are slow, switch back to a free cloud model.";
 
 export const CHAT_PROVIDERS: ChatProviderPreset[] = CATALOGUE.filter((p) => p.browser).map((p) => ({
   kind: p.kind, name: p.name, label: p.label, api: p.api, baseUrl: p.baseUrl,
