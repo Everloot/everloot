@@ -4,6 +4,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { LAUNCH } from "@/data/wow-forever";
 import { POSTS, RULESETS, RULESETS_POST } from "@/data/wow-forever-launch";
 import { postPath } from "@/lib/changes";
+import { RACE_TABLE } from "@/lib/race-traits";
 
 vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a>,
@@ -70,4 +71,14 @@ test("the FAQ has eight questions, every answer carries a link, and each date ma
   expect(text).toContain("closed it on October 23");
   expect(faq).toContain(`href="${LAUNCH.sourceUrl}"`);
   for (const ref of Object.values(POSTS)) expect(html).toContain(`href="${postPath(ref)}"`);
+});
+
+test("each faction's racial traits sit under its race table, by name with active or passive, labelled once with the build", async () => {
+  const races = section(await at("2026-10-26T12:00:00Z"), "races");
+  expect(races).toContain("Horde: racial traits");
+  expect(races).toContain("Alliance: racial traits");
+  const text = visible(races);
+  for (const trait of ["Blood Fury", "War Stomp", "Will to Survive", "Shadowmeld", "Skysight", "Read Leyline"]) expect(text, trait).toContain(trait);
+  expect(text.match(/found in game files, unconfirmed/gi)).toHaveLength(1);
+  expect(text).toContain(RACE_TABLE.build.version);
 });

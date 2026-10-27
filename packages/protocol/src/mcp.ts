@@ -786,6 +786,38 @@ export const MCP_TOOLS = {
     },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
+  class_races: {
+    title: "Races that can be a class, with their racial traits",
+    description:
+      "Which races can be one class in WoW: Forever, on which faction, and each race's racial traits (name, active or passive) from the game files (found in game files, unconfirmed, with the build). Narrow to one faction. What each trait does is on the class page, linked from the answer.",
+    inputSchema: {
+      class: z.string().min(1).max(40).describe("Class name or slug, such as Warlock or warlock."),
+      faction: z.enum(GUILD_FACTIONS).optional().describe("alliance or horde. Without it, both."),
+    },
+    outputSchema: {
+      label: z.string(),
+      build: z.string().describe("The game build the races were read from."),
+      class: z.enum(TALENT_CLASSES).optional().describe("Absent when the class is not one the files list."),
+      className: z.string().optional(),
+      faction: z.enum(GUILD_FACTIONS).optional(),
+      factions: z.array(z.object({
+        faction: z.enum(["Alliance", "Horde", "Neutral"]),
+        races: z.array(z.object({
+          id: z.number().int().describe("The client's race id (ChrRaces)."),
+          name: z.string().describe("The race's name in the game files."),
+          traits: z.array(z.object({
+            name: z.string(),
+            kind: z.enum(["active", "passive"]),
+            order: z.number().int().describe("The order on the character screen."),
+          })),
+        })),
+      })).describe("Alliance first. Empty when the class is unknown."),
+      error: z.string().optional().describe("A class the files do not list."),
+      credit: z.string(),
+      url: z.string().optional().describe(PAGE_URL),
+    },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
   collection_gap: {
     title: "Owned versus missing in a collection",
     description:

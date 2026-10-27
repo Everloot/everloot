@@ -97,6 +97,19 @@ export function collectionGap(collection: string, ownerInstallId: string, facts:
   };
 }
 
+/** The item ids 3 installs list for a collection, whatever the source: the set a files list is checked against. */
+export function agreedCollectionItems(collection: string, facts: CollectionFacts): Set<number> {
+  const wanted = clean(collection);
+  const installs = new Map<number, Set<string>>();
+  for (const row of facts.catalog) {
+    if (!row.installId.trim() || clean(row.collection) !== wanted || !positiveId(row.itemId)) continue;
+    const set = installs.get(row.itemId) ?? new Set<string>();
+    set.add(row.installId.trim());
+    installs.set(row.itemId, set);
+  }
+  return new Set([...installs].filter(([, set]) => set.size >= COLLECTION_AGREEMENT).map(([id]) => id));
+}
+
 export function formatCollectionGap(gap: CollectionGap): string {
   const lines = [
     `Collection ${gap.collection} for install ${gap.ownerInstallId}`,

@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from "vitest";
 import { MY_BUILDS_LINE, MY_BUILDS_REFUSAL } from "../saved-builds";
 import {
   ACCOUNT_TOOL, answer, answerFree, answerOrigin, callTool, CHAT_TOOLS, FREE_BUDGET, FREE_FALLBACK, FREE_PROVIDER, FREE_TOOLS, loadTools, marketReply, MODEL_STOPPED, NO_SOURCED_ANSWER, pagesIn, readOpenAiStream, searchOnly, signedIn,
-  SMALL_TALK_REPLY, smallTalk, sourceLink, sourcesIn, SYSTEM, testKey, TOOL_POLICY, UNSOURCED, type ToolDef,
+  SMALL_TALK_REPLY, smallTalk, asksForRanking, RANKING_NOTE, sourceLink, sourcesIn, SYSTEM, testKey, TOOL_POLICY, UNSOURCED, type ToolDef,
 } from "./agent";
 import { FIXTURE_ANSWER, FIXTURE_STRUCTURED, FIXTURE_URL } from "./market-fixture";
 import { chatProvider } from "./providers";
@@ -82,6 +82,17 @@ test("without a key the answer is the search hits, or no sourced answer", async 
   expect(r).toMatchObject({ model: null, sources: [expect.stringContaining("Leeroy_Jenkins")] });
   const none = vi.fn(async () => new Response(JSON.stringify({ text: "No results." }), { status: 200 }));
   expect((await searchOnly("whos is leroy jenkins", none as never)).text).toBe(NO_SOURCED_ANSWER);
+});
+
+test("without a key, a question asking for the best gets the facts to compare and says it is not a pick", async () => {
+  const r = await searchOnly("whats the best racial for warlock on horde", site([]));
+  expect(r.text.startsWith(`${RANKING_NOTE}\n\n`)).toBe(true);
+  expect(r.sources).toEqual([expect.stringContaining("Leeroy_Jenkins")]);
+  expect((await searchOnly("Leeroy Jenkins", site([]))).text).not.toContain(RANKING_NOTE);
+  const none = vi.fn(async () => new Response(JSON.stringify({ text: "No results." }), { status: 200 }));
+  expect((await searchOnly("which race should i pick", none as never)).text).toBe(NO_SOURCED_ANSWER);
+  for (const q of ["is orc better than undead", "strongest warlock race", "what do you recommend for a warlock"]) expect(asksForRanking(q)).toBe(true);
+  for (const q of ["Leeroy Jenkins", "where does Linen Cloth drop", "Bested by the Bog"]) expect(asksForRanking(q)).toBe(false);
 });
 
 test("OpenRouter: the streamed tool call is rebuilt, run on this site, and the answer streams with its sources", async () => {
@@ -212,6 +223,11 @@ describe("Everloot first", () => {
     expect(SYSTEM.indexOf("your own knowledge")).toBeGreaterThan(at.at(-1)!);
     expect(SYSTEM.indexOf("Everloot's data comes first")).toBeLessThan(at[0]);
     expect(SYSTEM).toContain(UNSOURCED);
+  });
+
+  test("which race to pick for a class is a builds question: class_races sits with the talent trees", () => {
+    expect(CHAT_TOOLS).toContain("class_races");
+    expect(TOOL_POLICY.find((g) => g.label === "builds and talents")?.tools).toEqual(["talent_tree", "class_races", "my_builds"]);
   });
 
   test("an answer's Everloot pages come from the tools' More lines; sources lose their licence note", async () => {

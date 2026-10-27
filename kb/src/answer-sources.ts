@@ -3,7 +3,7 @@ import type { DB } from "./db.js";
 import { itemFactsFromRecords } from "./drop-rollup.js";
 import { itemPage, ITEM_AGREEMENT, type ItemFacts } from "./item-page.js";
 import { loreUrls, moreLine } from "./page-urls.js";
-import { search, type SearchHit } from "./search.js";
+import { search, searchSomeWords, SOME_WORDS, type SearchHit } from "./search.js";
 import { agreedNpcNames, npcPage, WORLD_AGREEMENT, worldFactsFromRecords, type WorldFacts } from "./world-pages.js";
 import type { RecheckScope } from "./coverage.js";
 
@@ -39,6 +39,8 @@ export interface AnswerSources {
   evidence: Evidence[];
   furtherReading: FurtherReading[];
   dataAsOf: string | null;
+  /** Set when no page held every asked word and the lore is the pages with some of them; said in the text only. */
+  someWords?: true;
 }
 
 /** The two fact sets the tool reads from the corpus, built once per corpus version like the other tools. */
@@ -150,15 +152,18 @@ export function furtherReading(question: string): FurtherReading[] {
 /**
  * Lore and curated hits for the question as a whole, then for each name in it on its own, so a
  * question that names two things ("Peacebloom and Thrall") still finds both pages. Deduplicated by id.
+ * When neither finds a page, the pages with some of the question's words, marked `some`.
  */
-function knowledgeHits(db: DB, question: string, limit: number): SearchHit[] {
+function knowledgeHits(db: DB, question: string, limit: number): { hits: SearchHit[]; some: boolean } {
   const seen = new Set<number>();
   const out: SearchHit[] = [];
   const add = (hits: SearchHit[]) => { for (const hit of hits) if (!seen.has(hit.id) && out.length < limit) { seen.add(hit.id); out.push(hit); } };
   add(search(db, question, limit));
   const names = question.match(/\p{Lu}[\p{L}'-]+(?:\s+\p{Lu}[\p{L}'-]+)*/gu) ?? [];
   for (const name of names) if (name.length >= 3) add(search(db, name, 3));
-  return out;
+  if (out.length) return { hits: out, some: false };
+  add(searchSomeWords(db, question, limit));
+  return { hits: out, some: out.length > 0 };
 }
 
 /**
@@ -170,18 +175,21 @@ export function answerSources(
 ): AnswerSources {
   const question = args.question.trim();
   const observed = facts ? observedEvidence(question, facts, dataAsOf) : [];
-  const found = knowledgeHits(db, question, args.limit);
+  const { hits: found, some } = knowledgeHits(db, question, args.limit);
   const pages = loreUrls(db, found);
   const hits = found.map((hit) => loreEvidence(hit, pages.get(hit.id)));
   const curated = hits.filter((e) => e.kind === "curated");
   const lore = hits.filter((e) => e.kind === "lore");
-  return { evidence: [...observed, ...curated, ...lore].slice(0, Math.max(args.limit, observed.length)), furtherReading: furtherReading(question), dataAsOf };
+  const evidence = [...observed, ...curated, ...lore].slice(0, Math.max(args.limit, observed.length));
+  // Observed facts answer the question's own names, so only an answer of fallback pages alone is marked.
+  return { evidence, furtherReading: furtherReading(question), dataAsOf, ...(some && observed.length === 0 ? { someWords: true as const } : {}) };
 }
 
 const KIND_LABEL: Record<EvidenceKind, string> = { observed: "observed in play", curated: "curated", lore: "lore (Warcraft Wiki 2023, may differ in WoW: Forever)" };
 
 export function formatAnswerSources(result: AnswerSources, corpusConnected: boolean): string {
   const lines: string[] = [];
+  if (result.someWords) lines.push(SOME_WORDS);
   if (result.evidence.length === 0) lines.push("No evidence found for that question. Nothing here is invented: try other words or an exact name.");
   for (const e of result.evidence) {
     const support = e.support !== undefined ? `, ${e.support} installs` : "";

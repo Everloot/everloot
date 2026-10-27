@@ -33,6 +33,8 @@ import { formatNpcPage, formatQuestPage, formatVendorPage, npcFactsFromRecords, 
 import { handleWorldMapNear, mapFactsFromRecords, nearResult, nearZoneSpot } from "./world-map-near.js";
 import { WORLD_MAP_DATA } from "./world-map-file.js";
 import { CLIENT_EDGES, CLIENT_LAYER, CLIENT_TAXONOMY } from "./client-layer-file.js";
+import { RACE_TABLE } from "./client-races-file.js";
+import { handleClassRaces } from "./class-races-tool.js";
 import { categoryOf, handleItemCategories, itemCategoriesStructured } from "./item-taxonomy.js";
 import { entityRelationsStructured, handleEntityRelations, observedEdgesFromRecords, type Edge } from "./edges.js";
 import type { DB } from "./db.js";
@@ -41,7 +43,7 @@ import {
   changesUrl, collectionsUrl, ECOSYSTEM_URL, goldLedgerUrl, guildBoardUrl, guildPageUrl, guildsUrl, itemPageUrl, ITEMS_URL, loreUrls, mapSpotUrl, marketItemUrl,
   npcPageUrl, npcUrl, objectPageUrl, professionsUrl, questPageUrl, vendorPageUrl, withMore,
 } from "./page-urls.js";
-import { getByName, getDocument, getEntity, search, type SearchHit } from "./search.js";
+import { getByName, getDocument, getEntity, search, searchSomeWords, SOME_WORDS, type SearchHit } from "./search.js";
 
 export const SERVER_NAME = "everloot-knowledge";
 export const SERVER_VERSION = "0.8.0";
@@ -450,18 +452,24 @@ function formatHits(db: DB, hits: SearchHit[]): string {
   return withPages(db, hits).map((h) => withMore(`[${h.kind}/${h.gameVersion}] ${h.name}\n${h.snippet}\nSource: ${h.sourceUrl} (${h.licence}, retrieved ${h.retrievedAt})`, h.url)).join("\n\n");
 }
 
+export { SOME_WORDS };
+
+/** The hits for every asked word, or, when no page has them all, the pages with some of them. */
+function searchResult(db: DB, args: SearchArgs): { hits: SearchHit[]; some: boolean } {
+  const opts = { kinds: args.kind ? [args.kind] : undefined, versions: args.version ? [args.version] : undefined };
+  const hits = search(db, args.query, args.limit, opts);
+  return hits.length ? { hits, some: false } : { hits: searchSomeWords(db, args.query, args.limit, opts), some: true };
+}
+
 /** Pure handlers — tested directly; the MCP registration below is a thin wrapper. */
 export function searchHits(db: DB, args: SearchArgs): SearchHit[] {
-  return search(db, args.query, args.limit, {
-    kinds: args.kind ? [args.kind] : undefined,
-    versions: args.version ? [args.version] : undefined,
-  });
+  return searchResult(db, args).hits;
 }
 
 export function handleSearch(db: DB, args: SearchArgs): string {
-  const hits = searchHits(db, args);
+  const { hits, some } = searchResult(db, args);
   if (hits.length === 0) return "No matches. Try fewer or different words.";
-  return formatHits(db, hits);
+  return some ? `${SOME_WORDS}\n\n${formatHits(db, hits)}` : formatHits(db, hits);
 }
 
 /** A tool answer: the text every client gets, plus structured content for tools with an output schema. */
@@ -603,7 +611,9 @@ export function createToolHandlers(db: DB, options: ToolOptions = {}): ToolHandl
     answer_sources: async (args) => {
       const read = await readTooledFacts<AnswerSourcesFacts>("answer_sources", options.corpus, recheck);
       const result = answerSources(db, args, read?.facts ?? null, read?.dataAsOf ?? null);
-      return { text: `${formatAnswerSources(result, read !== null)}\n${read ? answerFooter(read.dataAsOf) : MCP_CREDIT}`, structured: result };
+      // The fallback is said in the text; the structured answer keeps its published shape.
+      const { someWords: _someWords, ...structured } = result;
+      return { text: `${formatAnswerSources(result, read !== null)}\n${read ? answerFooter(read.dataAsOf) : MCP_CREDIT}`, structured };
     },
     profession_path: (args) => {
       // The same defaults the text handler applies: from 1, to the start when no end is given.
@@ -676,6 +686,7 @@ export function createToolHandlers(db: DB, options: ToolOptions = {}): ToolHandl
     },
     talent_tree: (args) => handleTalentTree(args),
     talent_plan: (args) => handleTalentPlan(args),
+    class_races: (args) => handleClassRaces(args, RACE_TABLE),
     collection_gap: (args) => readPageIn("collection_gap", (facts: ReturnType<typeof collectionFactsFromRecords>) => {
       const page = collectionGap(args.collection, args.ownerInstallId, facts);
       const url = page.groups.length ? collectionsUrl({ collection: args.collection, install: args.ownerInstallId }) : undefined;

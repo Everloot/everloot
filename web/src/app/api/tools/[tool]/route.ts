@@ -8,6 +8,7 @@ import { myBuildsRoute } from "@/lib/my-builds-tool";
 import { getRelease } from "@/lib/release";
 import { MY_BUILDS, savedBuildsOn } from "@/lib/saved-builds";
 import { argumentsFromQuery } from "@/lib/tool-query";
+import { ledgerMetrics } from "@/lib/question-ledger";
 import { recordUsage } from "@/lib/usage-metrics";
 
 /**
@@ -61,6 +62,8 @@ export async function GET(req: Request, context: { params: Promise<{ tool: strin
   }
   const text = typeof answer === "string" ? answer : answer.text;
   const structured = typeof answer === "string" ? { text } : answer.structured;
+  // The question ledger: whether a lookup found anything, as a counter named by the tool alone.
+  recordUsage(ledgerMetrics(name, structured));
   return NextResponse.json(
     { tool: name, arguments: parsed.data, answer: structured, text, schema: `${SITE}/schema/mcp/${name}.json` },
     { headers: { ...NO_STORE, ...attributionHeaders() } },

@@ -22,7 +22,7 @@ export interface ToolDef { name: string; description: string; inputSchema: Recor
 export const CHAT_TOOLS = [
   "search_knowledge", "get_by_name", "get_entity", "answer_sources",
   "item_page", "npc_page", "quest_page", "vendor_page", "object_page", "entity_relations", "item_categories",
-  "profession_path", "recipe_thresholds", "talent_tree",
+  "profession_path", "recipe_thresholds", "talent_tree", "class_races",
   "market_value", "auction_history", "population", "recent_changes", "world_map_near",
 ] as const;
 
@@ -45,7 +45,7 @@ export const TOOL_POLICY: { label: string; tools: string[] }[] = [
   { label: "the database", tools: ["get_by_name", "item_page", "npc_page", "quest_page", "vendor_page", "object_page", "entity_relations", "item_categories", "profession_path", "recipe_thresholds", "world_map_near", "recent_changes"] },
   { label: "the wiki and lore archive", tools: ["search_knowledge", "answer_sources", "get_entity"] },
   { label: "the market", tools: ["market_value", "auction_history", "population"] },
-  { label: "builds and talents", tools: ["talent_tree", MY_BUILDS] },
+  { label: "builds and talents", tools: ["talent_tree", "class_races", MY_BUILDS] },
 ];
 
 export const SYSTEM = [
@@ -158,13 +158,24 @@ export function smallTalk(question: string): boolean {
 export const SMALL_TALK_REPLY =
   "Hello. Ask about an item, quest, NPC, zone or build in WoW: Forever, for example \"Where does Linen Cloth drop?\". Without a model key, Send shows what Everloot's data has on it; add a key on Account, Chat keys, and a model writes the answer from that data.";
 
+/** A question that asks for a pick ("best race for a warlock"), which a search cannot make. */
+export function asksForRanking(question: string): boolean {
+  return /\b(best|better|worse|worst|strongest|weakest|should i|recommend\w*)\b/i.test(question);
+}
+
+/** What a search-only answer to a ranking question starts with: the hits are facts to compare, not a pick. */
+export const RANKING_NOTE =
+  "Everloot lists facts, not rankings: here is what its data has to compare. Add a model key on Account, Chat keys and a model weighs it for you.";
+
 /** No key: the top sourced hits for the question, verbatim. Small talk gets the page's own reply, with no lookup. */
 export async function searchOnly(question: string, send: typeof fetch = fetch): Promise<ChatReply> {
   if (smallTalk(question)) return { text: SMALL_TALK_REPLY, model: null, sources: [], pages: [], steps: [] };
   const hits = await callTool("search_knowledge", { query: question, limit: 3 }, send);
   const sources = sourcesIn(hits);
   const steps = [{ tool: "search_knowledge", input: question, chars: hits.length }];
-  return sources.length ? { text: hits.trim(), model: null, sources, pages: pagesIn(hits), steps } : { text: NO_SOURCED_ANSWER, model: null, sources: [], pages: [], steps };
+  if (!sources.length) return { text: NO_SOURCED_ANSWER, model: null, sources: [], pages: [], steps };
+  const text = asksForRanking(question) ? `${RANKING_NOTE}\n\n${hits.trim()}` : hits.trim();
+  return { text, model: null, sources, pages: pagesIn(hits), steps };
 }
 
 /** market_value for one realm and item through this site's tool API, as its structured answer. Anything but a 200 is thrown. */
