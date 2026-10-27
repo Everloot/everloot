@@ -46,9 +46,10 @@ function Entry({ letters, name, badge, action, children }: { letters?: string; n
 
 /**
  * Integrations on /account. Connected is only what the server knows for this account: the Battle.net sign-in (it has
- * no unlink, so nothing to press) and each live key, the Desktop App's by the name its connect page gives it, each with
- * Remove access, which is the list's own Revoke. Claude, ChatGPT and the addon keep nothing per account, so they are
- * only ever Available, with a link to their docs or download; so is the Desktop App while it has no live key.
+ * no unlink, so nothing to press) and each live key, each with Remove access, which is the list's own Revoke. A key
+ * with the name the Desktop App's connect page gives is the "Desktop App key": a name is not proof the app is
+ * installed. Claude, ChatGPT and the addon keep nothing per account, so they are only ever Available, with a link to
+ * their docs or download; so is the Desktop App while the overview finds no live key of its own.
  */
 export default function Integrations({ methods, name, overview }: { methods: string[]; name: string; overview: AccountOverview | null }) {
   const battlenet = methods.includes("battlenet");
@@ -57,7 +58,7 @@ export default function Integrations({ methods, name, overview }: { methods: str
   // With keys on, no overview means the keys could not be read: say so, and claim nothing about the Desktop App.
   const unread = guardOn() && !overview;
   const live = overview?.keys?.liveKeys ?? [];
-  const desktop = live.some((k) => k.label === DESKTOP_KEY_LABEL);
+  const desktop = overview?.keys?.desktop ?? false;
   return (
     <>
       {live.length > 0 && (
@@ -76,9 +77,10 @@ export default function Integrations({ methods, name, overview }: { methods: str
               </Entry>
             )}
             {live.map((k) => {
-              const keyName = k.label || "Unnamed key";
+              const desktopKey = k.label === DESKTOP_KEY_LABEL;
+              const keyName = desktopKey ? "Desktop App key" : k.label || "Unnamed key";
               return (
-                <Entry key={k.id} letters={k.label === DESKTOP_KEY_LABEL ? undefined : "API"} name={keyName}
+                <Entry key={k.id} letters={desktopKey ? undefined : "API"} name={keyName}
                   action={<RemoveAccess id={k.id} name={keyName} hint={k.hint} focusAfter="connected-heading" />}>
                   <p className="text-meta text-muted">
                     <code className="font-mono">evl_…{k.hint}</code> · {k.last_used_at ? `Last used ${k.last_used_at.slice(0, 10)}` : "Never used"}

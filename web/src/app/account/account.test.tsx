@@ -183,12 +183,12 @@ test("Integrations: Connected is what the server knows, the Battle.net sign-in a
   const html = await render();
   const connected = list(html, "connected");
   expect(connected).toMatch(/Battle\.net.*Thrall#1234/);
-  expect(connected).toContain("Everloot Desktop App");
+  expect(connected).toContain("Desktop App key");
   expect(connected).toContain("evl_…abcd</code> · Never used");
   expect(connected).toContain("Drop-rate script");
   expect(connected).toContain("evl_…c0de</code> · Last used 2026-10-20");
   expect(connected.match(/<button[^>]*>Remove access<\/button>/g)).toEqual([
-    '<button type="button" class="btn min-h-11 px-3 text-sm" aria-label="Remove access for Everloot Desktop App">Remove access</button>',
+    '<button type="button" class="btn min-h-11 px-3 text-sm" aria-label="Remove access for Desktop App key">Remove access</button>',
     '<button type="button" class="btn min-h-11 px-3 text-sm" aria-label="Remove access for Drop-rate script">Remove access</button>',
   ]);
   // A revoked or expired key no longer reaches the account, so it is not connected.
@@ -219,11 +219,11 @@ test("Integrations: Claude, ChatGPT and the addon keep no state per account, so 
 
 test("Integrations: the Desktop App is Connected while it has a live key, and Available once it has none", async () => {
   let html = await render();
-  expect(list(html, "connected")).toContain("Everloot Desktop App");
+  expect(list(html, "connected")).toContain("Desktop App key");
   expect(list(html, "available")).not.toContain("Everloot Desktop App");
   withKeys([row({ revoked_at: "2026-10-21T00:00:00Z" })]);
   html = await render();
-  expect(list(html, "connected")).not.toContain("Everloot Desktop App");
+  expect(list(html, "connected")).not.toContain("Desktop App key");
   expect(list(html, "available")).toMatch(/Everloot Desktop App.*href="\/addon#desktop"/);
   // Nothing left to remove: no callout asking to.
   expect(html).not.toContain("Don&#x27;t recognise");
@@ -258,6 +258,22 @@ test("Integrations: with no Battle.net sign-in and no live key, Connected says s
   expect(html).not.toContain("Battle.net");
   expect(html).not.toContain("Don&#x27;t recognise");
   expect(list(html, "available")).toContain("Everloot Desktop App");
+});
+
+test("Integrations: a key with the Desktop App's name is called the Desktop App key, never the app, since a name proves no install", async () => {
+  withKeys(KEYS);
+  const connected = list(await render(), "connected");
+  expect(connected).toContain(">Desktop App key</p>");
+  expect(connected).toContain('aria-label="Remove access for Desktop App key"');
+  expect(connected).not.toContain("Everloot Desktop App");
+});
+
+test("Integrations: whether the Desktop App is Available follows the overview's own desktop flag", () => {
+  const keys = { live: 0, requests: 0, desktop: true, liveKeys: [] };
+  const html = renderToStaticMarkup(
+    <Integrations methods={["battlenet"]} name="Thrall#1234" overview={{ memberSince: null, profile: null, characters: null, builds: null, keys }} />,
+  );
+  expect(list(html, "available")).not.toContain("Everloot Desktop App");
 });
 
 test("Integrations: a BattleTag is shown only when Battle.net is the one way in; another sign-in name is not passed off as one", () => {

@@ -61,7 +61,7 @@ test("Remove access on a connected key revokes that key through the keys API, af
   // Its card leaves once the page is read again; focus waits on the list's heading meanwhile.
   expect(document.activeElement).toBe(document.getElementById("connected-heading"));
   // The other key was not touched.
-  expect(buttonNamed("Remove access for Everloot Desktop App")).toBeDefined();
+  expect(buttonNamed("Remove access for Desktop App key")).toBeDefined();
 });
 
 test("the removal is said in a status line that is on the page before the click and still says it after the card is gone", async () => {
