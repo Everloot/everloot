@@ -13,7 +13,7 @@ import { ACTIVITY_LABEL, ROLE_LABEL, guideHref, loadGuides, publishedGuide, publ
 import { guideArticleJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
 import { loadCatalog } from "@/lib/talents/catalogs";
-import { PUBLISHED_CHANGES, classTalentChanges } from "@/lib/talents/freshness";
+import { PUBLISHED_CHANGES, classTalentChanges } from "@/lib/talents/freshness-records";
 import type { TalentCatalog } from "@/lib/talents/types";
 import { loadWiki, publishedPage, type Block } from "@/lib/wiki";
 import { resolveTokens } from "@/lib/wiki-names";

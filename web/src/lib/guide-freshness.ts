@@ -11,7 +11,7 @@ import type { PlanSet, TalentCatalog } from "./talents/types";
 // review. People set a guide's status through review; this only reads. Nothing here writes or re-stamps: a guide
 // keeps its codes, the builds they were made on and its review, and the page shows what changed since. Pure: the
 // caller passes the guide, its class's tree, the class's changes from the build watch's records (read on the
-// server, classTalentChanges) and today's date. The change evidence is the talent lane's one engine (freshness.ts).
+// server, by freshness-records.ts) and today's date. The change evidence is the talent lane's one engine (freshness.ts).
 
 /** Days after its last review that a guide is due for another one. */
 export const REVIEW_AFTER_DAYS = 60;

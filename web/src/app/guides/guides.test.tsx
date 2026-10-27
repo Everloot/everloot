@@ -28,7 +28,7 @@ vi.mock("@/lib/talents/catalogs", async (importOriginal) => {
     }),
   };
 });
-vi.mock("@/lib/talents/freshness", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/talents/freshness")>()), PUBLISHED_CHANGES: records }));
+vi.mock("@/lib/talents/freshness-records", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/talents/freshness-records")>()), PUBLISHED_CHANGES: records }));
 
 import GuidesIndex, * as indexRoute from "./page";
 import GuidePage, * as guideRoute from "./[slug]/page";
@@ -37,7 +37,7 @@ import GuidePlan, { guideAddonLink, guideCalculatorHref } from "@/components/gui
 import { guideFreshness } from "@/lib/guide-freshness";
 import { loadGuides, publishedGuide } from "@/lib/guides";
 import { loadCatalog } from "@/lib/talents/catalogs";
-import { classTalentChanges } from "@/lib/talents/freshness";
+import { classTalentChanges } from "@/lib/talents/freshness-records";
 import { fixture } from "@/lib/talents/fixture";
 import { importPlan, readPlanHash } from "@/lib/talents/import";
 import { encodeBuild, encodeOrder } from "@/lib/talents/share";

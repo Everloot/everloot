@@ -9,7 +9,7 @@ import { classesIndexable, hubIndexable as classHubIndexable } from "@/lib/class
 import { guideFreshness, guideIndexable } from "@/lib/guide-freshness";
 import { guideHref, loadGuides, publishedGuides } from "@/lib/guides";
 import { TALENT_CLASSES, loadCatalog as loadTalentCatalog } from "@/lib/talents/catalogs";
-import { PUBLISHED_CHANGES, classTalentChanges } from "@/lib/talents/freshness";
+import { PUBLISHED_CHANGES, classTalentChanges } from "@/lib/talents/freshness-records";
 import { CLIENT_LAYER, CLIENT_TAXONOMY, categoryNamedEnough, itemsHref } from "@/lib/items";
 import { DATABASE_HUB_PATHS } from "@/lib/database-hubs";
 import { instancePaths } from "@/lib/database-sitemap";
