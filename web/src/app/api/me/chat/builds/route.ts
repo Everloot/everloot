@@ -6,8 +6,9 @@ import { answer, fail, workspaceRead, workspaceWrite } from "@/lib/chat/workspac
 /**
  * The player's saved builds, for Chat projects. Opens with EVERLOOT_CHAT_WORKSPACE=1, whatever EVERLOOT_SAVED_BUILDS
  * says. Session only: no API key or MCP reaches it.
- * GET lists the account's builds and character labels. POST saves one: without an id a new private build, with one
- * an edit of the account's own build that keeps its sharing as it was.
+ * GET lists the account's builds and character labels, each set's spend order included. POST saves one: without an id
+ * a new private build, with one an edit of the account's own build that keeps its sharing as it was. Spend orders are
+ * saved with their codes in the same write.
  */
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ export async function POST(req: Request) {
     try {
       saved = await saveWorkspaceBuild(user.id, input.value);
     } catch (err) {
-      // Past save_build the shared "Nothing was saved" may be untrue; say what is known instead.
+      // Past save_build_plan the shared "Nothing was saved" may be untrue; say what is known instead.
       if (err instanceof SaveUnconfirmed) return fail(503, "We could not confirm the save. Check your builds before trying again.", "save_unconfirmed");
       throw err;
     }

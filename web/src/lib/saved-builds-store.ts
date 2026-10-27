@@ -3,13 +3,14 @@ import { NextResponse } from "next/server";
 import { hashKey, KEY_PATTERN } from "./api-keys";
 import { signInPath } from "./auth/return-to";
 import {
-  ACCOUNT_MISMATCH, BUILD_COLUMNS, CHARACTER_COLUMNS, EXPECTED_OWNER_HEADER, savedBuildsOn, SLUG_PATTERN, toBuild, toCharacters,
+  ACCOUNT_MISMATCH, BUILD_COLUMNS, CHARACTER_COLUMNS, EXPECTED_OWNER_HEADER, ORDER_COLUMNS, savedBuildsOn, SLUG_PATTERN, toBuild, toCharacters,
   type AccountBuilds, type BuildCharacter, type BuildInput, type BuildRow, type CharacterInput, type CharacterRow, type SavedBuild,
 } from "./saved-builds";
 import { authQuery, getUser, siteUrl, type AccountUser } from "./supabase/server";
 
 // Server side of saved builds: reads with the service role, writes through the security definer functions
-// in 20261021150000_saved_builds.sql, which hold the limits.
+// in 20261021150000_saved_builds.sql, which hold the limits. A build and its spend orders are saved together by
+// save_build_plan (20261027120000_saved_build_point_order.sql), in one transaction.
 
 const BASE62 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
@@ -28,7 +29,7 @@ export async function listOwn(userId: string): Promise<AccountBuilds> {
   const user = encodeURIComponent(userId);
   const [characters, builds] = await Promise.all([
     authQuery<CharacterRow[]>(`build_characters?select=${CHARACTER_COLUMNS}&user_id=eq.${user}`),
-    authQuery<BuildRow[]>(`saved_builds?select=${BUILD_COLUMNS}&user_id=eq.${user}&order=updated_at.desc,id.asc`),
+    authQuery<BuildRow[]>(`saved_builds?select=${BUILD_COLUMNS},${ORDER_COLUMNS}&user_id=eq.${user}&order=updated_at.desc,id.asc`),
   ]);
   const site = siteUrl();
   return { characters: toCharacters(characters), builds: builds.map((b) => toBuild(b, site)) };
@@ -36,24 +37,25 @@ export async function listOwn(userId: string): Promise<AccountBuilds> {
 
 export type BuildRefusal = "not_found" | "class_mismatch" | "build_limit" | "daily_limit";
 
-/** Creates (no id) or updates one of the user's builds. A taken slug is retried with a new one. */
+/**
+ * Creates (no id) or updates one of the user's builds, with its spend orders, in one call: when it fails nothing of
+ * it was saved, and no second request is left to make. A taken slug is retried with a new one.
+ */
 export async function saveBuild(userId: string, input: BuildInput): Promise<{ build: SavedBuild; created: boolean } | { refused: BuildRefusal }> {
   for (let attempt = 0; attempt < 3; attempt++) {
-    const rows = await authQuery<Array<{ build_ref: string | null; build_slug: string | null; refusal: string | null }>>("rpc/save_build", {
+    // The payload is the input as parsed, with the server's slug for a new build. An order left out stays left out.
+    const row = await authQuery<{ build_ref: string | null; build_slug: string | null; refusal: string | null } | null>("rpc/save_build_plan", {
       method: "POST",
-      body: JSON.stringify({
-        p_user_id: userId, p_id: input.id, p_slug: input.id ? null : newSlug(), p_character_id: input.characterId,
-        p_name: input.name, p_notes: input.notes, p_code: input.code, p_code2: input.code2,
-        p_shared: input.shared, p_active: input.active, p_show_name: input.showName,
-      }),
+      body: JSON.stringify({ p_user_id: userId, p_payload: { ...input, slug: input.id ? null : newSlug() } }),
     });
-    const row = Array.isArray(rows) && rows.length === 1 ? rows[0] : null;
     if (row?.refusal === "slug_taken") continue;
     if (row && row.build_ref === null && ["not_found", "class_mismatch", "build_limit", "daily_limit"].includes(row.refusal ?? "")) {
       return { refused: row.refusal as BuildRefusal };
     }
     if (!row || typeof row.build_ref !== "string" || row.refusal !== null) throw new Error("Build was not saved");
-    const saved = await authQuery<BuildRow[]>(`saved_builds?select=${BUILD_COLUMNS}&id=eq.${encodeURIComponent(row.build_ref)}&user_id=eq.${encodeURIComponent(userId)}&limit=1`);
+    const saved = await authQuery<BuildRow[]>(
+      `saved_builds?select=${BUILD_COLUMNS},${ORDER_COLUMNS}&id=eq.${encodeURIComponent(row.build_ref)}&user_id=eq.${encodeURIComponent(userId)}&limit=1`,
+    );
     if (!saved[0]) throw new Error("Build was not saved");
     return { build: toBuild(saved[0], siteUrl()), created: !input.id };
   }
@@ -87,6 +89,8 @@ export async function deleteCharacter(userId: string, id: string): Promise<boole
 export interface SharedBuild {
   slug: string; name: string; notes: string | null; classSlug: string; code: string; code2: string | null; gameBuild: string;
   characterName: string | null; characterClass: string | null; ownerName: string | null; updatedAt: string;
+  /** Each set's spend order token, null when unknown. */
+  order: string | null; order2: string | null;
 }
 
 export async function sharedBuild(slug: string): Promise<SharedBuild | null> {
@@ -97,9 +101,16 @@ export async function sharedBuild(slug: string): Promise<SharedBuild | null> {
   }>>("rpc/shared_build", { method: "POST", body: JSON.stringify({ p_slug: slug }) });
   const r = rows[0];
   if (!r) return null;
+  // shared_build decides what is public. The orders are read beside it, for this build only while it is still shared,
+  // and kept only with the codes shared_build gave: a build saved again in between opens without them.
+  const [o] = await authQuery<Array<{ code: string; code2: string | null; point_order: string | null; point_order2: string | null }>>(
+    `saved_builds?select=code,code2,${ORDER_COLUMNS}&slug=eq.${slug}&shared=is.true&limit=1`,
+  );
+  const same = o !== undefined && o.code === r.code && o.code2 === r.code2;
   return {
     slug, name: r.name, notes: r.notes, classSlug: r.class_slug, code: r.code, code2: r.code2, gameBuild: r.game_build,
     characterName: r.character_name, characterClass: r.character_class, ownerName: r.owner_name, updatedAt: r.updated_at,
+    order: same ? o.point_order ?? null : null, order2: same ? o.point_order2 ?? null : null,
   };
 }
 

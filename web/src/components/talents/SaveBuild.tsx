@@ -5,6 +5,8 @@ import { ACCOUNT_CHANGED_EVENT } from "@/components/AccountControls";
 import { useWorkspaceOwner } from "@/components/workspace/LocalPlanSave";
 import { signInPath } from "@/lib/auth/return-to";
 import { ACCOUNT_MISMATCH, editPath, EXPECTED_OWNER_HEADER, LIMITS, validId, type AccountBuilds, type SavedBuild } from "@/lib/saved-builds";
+import { readPlanHash } from "@/lib/talents/import";
+import { decodeBuild, decodeOrder } from "@/lib/talents/share";
 import { Input } from "@/components/ui";
 
 // Save in the talent calculator (docs/design/specs/2026-10-20-saved-builds-design.md). Signed out, Save offers
@@ -63,6 +65,22 @@ function rewriteSearch(saved: string | null) {
 function returnPath(classSlug: string): string {
   const saved = new URLSearchParams(window.location.search).get("saved");
   return `/tools/talents/${classSlug}?${validId(saved) ? `saved=${saved}&` : ""}save=1`;
+}
+
+/**
+ * Each set's spend order token as the calculator keeps it, in the address beside that set's code. A token goes with a
+ * code only when the address holds that very code next to it and the token names exactly its points; otherwise the
+ * set's order is unknown (null). A token the page could not use (a newer version's, say) stays in the address but is
+ * not saved as the build's order.
+ */
+function ordersFor(codes: [string | null, string | null]): [string | null, string | null] {
+  const plan = readPlanHash(window.location.hash);
+  const order = (code: string | null, beside: string | null, token: string | null | undefined) => {
+    if (!code || beside !== code || !token) return null;
+    const decoded = decodeBuild(code);
+    return decoded.ok && decodeOrder(token, decoded.build.ranks).ok ? token : null;
+  };
+  return [order(codes[0], plan.first, plan.firstOrder), order(codes[1], plan.second, plan.secondOrder)];
 }
 
 /** `unchecked`: this tab cannot say which account is signed in, so it shows no one's builds and Save is off. */
@@ -262,9 +280,12 @@ export default function SaveBuild({ classSlug, codes, defaultName, onMessage }: 
         setForm((f) => ({ ...f, characterId: character.id, newName: "", newRealm: "" }));
       }
       const update = editing && !asNew;
+      // The codes and their orders in the one write, an unknown order as null: the saved build is the plan on screen.
+      const [order, order2] = ordersFor(codes);
       const answer = await post<{ build: SavedBuild }>("/api/me/builds", {
         ...(update ? { id: editing.id } : {}),
         name: form.name, notes: form.notes, characterId, code: codes[0], code2: codes[1], shared: form.shared, showName: form.showName,
+        order, order2,
       }, ask, owner);
       if (!answer) return;
       const { build } = answer;

@@ -8,7 +8,9 @@ import { fail, limitedText, listOwn, meAccount, NO_STORE, ownBuildsForKey, saveB
  * EVERLOOT_SAVED_BUILDS=1.
  * GET lists builds (newest first) and character labels, for the signed-in player or for a key with read:own
  * sent as `Authorization: Bearer evl_...` (the Desktop App, MCP and scripts).
- * POST saves one: without an id it makes a new build, with one it updates that build in place.
+ * POST saves one: without an id it makes a new build, with one it updates that build in place. Each set's spend order
+ * (order, order2) is saved with its code in the same write. A new build says whether it is shared and shows its owner's
+ * name; nothing here picks for it, so a page that forgets cannot publish a link by default.
  */
 export const dynamic = "force-dynamic";
 
@@ -41,6 +43,9 @@ export async function POST(req: Request) {
     try { body = await req.json(); } catch {}
     const input = parseBuildInput(body);
     if (!input.ok) return fail(400, input.error);
+    if (!input.value.id && (input.value.shared === null || input.value.showName === null)) {
+      return fail(400, "A new build needs shared and showName, each true or false.");
+    }
     const saved = await saveBuild(user.id, input.value);
     if ("refused" in saved) {
       switch (saved.refused) {

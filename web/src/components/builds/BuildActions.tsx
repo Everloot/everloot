@@ -34,12 +34,14 @@ export default function BuildActions({ build, canActivate = false }: { build: Sa
     }
   }
 
-  const fields = { name: build.name, notes: build.notes, characterId: build.characterId, code: build.code, code2: build.code2 };
+  // The build as saved, both sets' spend orders included. A duplicate keeps its sharing and, as any new build says, does
+  // not show the owner's name.
+  const fields = { name: build.name, notes: build.notes, characterId: build.characterId, code: build.code, code2: build.code2, order: build.order, order2: build.order2 };
   return (
     <span className="inline-flex flex-wrap items-center gap-x-1">
       <a href={editPath(build)} className={action}>Open</a>
       <button type="button" className={action} disabled={busy}
-        onClick={() => send("/api/me/builds", { method: "POST", body: JSON.stringify({ ...fields, name: copyName(build.name), shared: build.shared }) })}>Duplicate</button>
+        onClick={() => send("/api/me/builds", { method: "POST", body: JSON.stringify({ ...fields, name: copyName(build.name), shared: build.shared, showName: false }) })}>Duplicate</button>
       {canActivate && build.characterId && !build.active && (
         <button type="button" className={action} disabled={busy}
           onClick={() => send("/api/me/builds", { method: "POST", body: JSON.stringify({ id: build.id, ...fields, active: true }) })}>Make active</button>

@@ -11,9 +11,14 @@ const OTHER = "99999999-2222-4333-8444-555555555555";
 const BUILD_ID = "0b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e11";
 const CHARACTER_ID = "2b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e22";
 const MAGE = "EL1-mage-0-1.60.1.70450-MTE6NQ";
+const MAGE2 = "EL1-mage-1482-1.60.1.70450-MjE6MQ";
+// MAGE's 5 points in node 11 and MAGE2's one in node 21, in spend order: one planned, one generated.
+const ORDER = "O1p-AAAAA";
+const ORDER2 = "O1g-A";
 const row = (over: object = {}) => ({
   id: BUILD_ID, slug: "AbCd1234", name: "Fire", notes: null, class_slug: "mage", character_id: CHARACTER_ID, code: MAGE, code2: null,
-  game_build: "1.60.1.70450", shared: true, show_name: true, active: true, updated_at: "2026-10-20T12:00:00+00:00", ...over,
+  game_build: "1.60.1.70450", shared: true, show_name: true, active: true, updated_at: "2026-10-20T12:00:00+00:00",
+  point_order: null, point_order2: null, ...over,
 });
 const call = (method: string, body?: object, headers: Record<string, string> = {}) =>
   new Request(`${SITE}/api/me/chat/builds`, {
@@ -21,13 +26,16 @@ const call = (method: string, body?: object, headers: Record<string, string> = {
   });
 const save = (build: object, over: object = {}, headers: Record<string, string> = {}) =>
   POST(call("POST", { expectedAccountId: USER.id, build, ...over }, headers));
-const saveCall = () => auth.authQuery.mock.calls.find(([p]) => p === "rpc/save_build");
-const sent = () => JSON.parse(saveCall()![1].body);
-/** The database: the owner's list, save_build's answer and the saved row read back. */
+const saveCall = () => auth.authQuery.mock.calls.find(([p]) => p === "rpc/save_build_plan");
+/** What save_build_plan was sent: the account, and the build with its orders. */
+const rpc = () => JSON.parse(saveCall()![1].body) as { p_user_id: string; p_payload: Record<string, unknown> };
+const sent = () => rpc().p_payload;
+const SAVED = { build_ref: BUILD_ID, build_slug: "AbCd1234", refusal: null };
+/** The database: the owner's list, save_build_plan's answer and the saved row read back. */
 function database(owned: object[], saved: object = row()) {
   auth.authQuery.mockImplementation(async (path: string) => {
     if (path.startsWith("build_characters")) return [];
-    if (path === "rpc/save_build") return [{ build_ref: BUILD_ID, build_slug: "AbCd1234", refusal: null }];
+    if (path === "rpc/save_build_plan") return SAVED;
     if (path.includes("&id=eq.")) return [saved];
     return owned;
   });
@@ -92,9 +100,11 @@ test("a new build is private: shared, showName and active are false even when th
     { shared: true });
   expect(res.status).toBe(201);
   expect(await res.json()).toMatchObject({ accountId: USER.id, build: { id: BUILD_ID, shared: false, link: null } });
-  expect(sent()).toMatchObject({ p_user_id: USER.id, p_id: null, p_name: "Fire", p_notes: "Raids", p_code: MAGE,
-    p_shared: false, p_show_name: false, p_active: false });
-  expect(sent().p_slug).toMatch(/^[A-Za-z0-9]{8}$/);
+  expect(rpc().p_user_id).toBe(USER.id);
+  expect(sent()).toMatchObject({ id: null, name: "Fire", notes: "Raids", code: MAGE, shared: false, showName: false, active: false });
+  expect(sent().slug).toMatch(/^[A-Za-z0-9]{8}$/);
+  // Only the build's own fields go on: nothing posted beside them reaches the database.
+  expect(Object.keys(sent()).sort()).toEqual(["active", "characterId", "code", "code2", "id", "name", "notes", "shared", "showName", "slug"]);
 });
 
 test("updating an owned build keeps its sharing, name display, mark and character as they are", async () => {
@@ -102,17 +112,44 @@ test("updating an owned build keeps its sharing, name display, mark and characte
   const res = await save({ id: BUILD_ID, name: "Frost", code: MAGE, shared: false, showName: false, active: false });
   expect(res.status).toBe(200);
   expect(await res.json()).toMatchObject({ accountId: USER.id, build: { id: BUILD_ID, shared: true } });
-  // Null leaves the stored value in save_build, read at write time, so sharing is never switched off here.
-  expect(sent()).toMatchObject({ p_id: BUILD_ID, p_slug: null, p_name: "Frost", p_character_id: CHARACTER_ID,
-    p_shared: null, p_show_name: null, p_active: null });
+  // Null leaves the stored value in save_build_plan, read at write time, so sharing is never switched off here.
+  expect(sent()).toMatchObject({ id: BUILD_ID, slug: null, name: "Frost", characterId: CHARACTER_ID, shared: null, showName: null, active: null });
   // The ownership check came first.
-  expect(auth.authQuery.mock.calls[0][0]).not.toBe("rpc/save_build");
+  expect(auth.authQuery.mock.calls[0][0]).not.toBe("rpc/save_build_plan");
 });
 
 test("an update may move the build to another character label or none", async () => {
   database([row()]);
   expect((await save({ id: BUILD_ID, name: "Frost", code: MAGE, characterId: null })).status).toBe(200);
-  expect(sent()).toMatchObject({ p_character_id: null, p_shared: null });
+  expect(sent()).toMatchObject({ characterId: null, shared: null });
+});
+
+test("a new private build keeps both sets' spend orders, each with its maker's letter", async () => {
+  database([], row({ code2: MAGE2, shared: false, show_name: false, active: false, point_order: ORDER, point_order2: ORDER2 }));
+  const res = await save({ name: "Fire", code: MAGE, code2: MAGE2, order: ORDER, order2: ORDER2 });
+  expect(res.status).toBe(201);
+  expect(sent()).toMatchObject({ code: MAGE, code2: MAGE2, order: ORDER, order2: ORDER2, shared: false, showName: false });
+  expect((await res.json()).build).toMatchObject({ order: ORDER, order2: ORDER2, shared: false });
+});
+
+test("an edit without orders sends none: the database keeps the stored ones while the codes stay as they are", async () => {
+  database([row({ code2: MAGE2, point_order: ORDER, point_order2: ORDER2 })], row({ name: "Frost", code2: MAGE2, point_order: ORDER, point_order2: ORDER2 }));
+  const res = await save({ id: BUILD_ID, name: "Frost", code: MAGE, code2: MAGE2 });
+  expect(res.status).toBe(200);
+  expect(sent()).not.toHaveProperty("order");
+  expect(sent()).not.toHaveProperty("order2");
+  expect((await res.json()).build).toMatchObject({ name: "Frost", order: ORDER, order2: ORDER2 });
+  // An edit that brings orders sends them, an unknown one as null.
+  auth.authQuery.mockClear();
+  expect((await save({ id: BUILD_ID, name: "Frost", code: MAGE, code2: MAGE2, order: ORDER, order2: null })).status).toBe(200);
+  expect(sent()).toMatchObject({ order: ORDER, order2: null });
+});
+
+test("the list carries each set's order, so a build reopened from Chat opens with it", async () => {
+  auth.authQuery.mockImplementation(async (path: string) => path.startsWith("build_characters") ? []
+    : [row({ shared: false, code2: MAGE2, point_order: ORDER, point_order2: ORDER2 })]);
+  const body = await (await GET(call("GET"))).json();
+  expect(body.builds[0]).toMatchObject({ code: MAGE, code2: MAGE2, order: ORDER, order2: ORDER2 });
 });
 
 test("an id that is not one of the account's builds is a 404 and nothing is saved", async () => {
@@ -125,7 +162,8 @@ test("an id that is not one of the account's builds is a 404 and nothing is save
 
 test("bad input is a 400 before the database is asked", async () => {
   for (const build of [undefined, { name: "", code: MAGE }, { name: "a", code: "nope" }, { name: "a", code: MAGE, code2: "EL1-warrior-0-1.60-MTE6NQ" },
-    { id: "x", name: "a", code: MAGE }, { name: "a", code: MAGE, characterId: "x" }]) {
+    { id: "x", name: "a", code: MAGE }, { name: "a", code: MAGE, characterId: "x" },
+    { name: "a", code: MAGE, order: "O1p-AAAA" }, { name: "a", code: MAGE, order2: ORDER2 }, { id: BUILD_ID, name: "a", code: MAGE, code2: MAGE2, order2: ORDER }]) {
     expect((await save(build as object)).status).toBe(400);
   }
   expect(auth.authQuery).not.toHaveBeenCalled();
@@ -133,9 +171,9 @@ test("bad input is a 400 before the database is asked", async () => {
 
 test.each([
   ["not_found", 404, "not_found"], ["class_mismatch", 400, "class_mismatch"], ["build_limit", 409, "build_limit"], ["daily_limit", 429, "daily_limit"],
-])("save_build refusing %s is a %i that says so", async (refusal, status, code) => {
+])("save_build_plan refusing %s is a %i that says so", async (refusal, status, code) => {
   auth.authQuery.mockImplementation(async (path: string) =>
-    path === "rpc/save_build" ? [{ build_ref: null, build_slug: null, refusal }] : []);
+    path === "rpc/save_build_plan" ? { build_ref: null, build_slug: null, refusal } : []);
   const res = await save({ name: "a", code: MAGE, characterId: CHARACTER_ID });
   expect(res.status).toBe(status);
   const body = await res.json();
@@ -146,12 +184,12 @@ test.each([
 const UNCONFIRMED = "We could not confirm the save. Check your builds before trying again.";
 
 test.each([
-  ["save_build fails", (path: string) => path === "rpc/save_build"],
+  ["save_build_plan fails", (path: string) => path === "rpc/save_build_plan"],
   ["the saved row cannot be read back", (path: string) => path.includes("&id=eq.")],
 ])("when %s the answer is a 503 that says the save is unconfirmed, not unsaved", async (_name, broken) => {
   auth.authQuery.mockImplementation(async (path: string) => {
     if (broken(path)) throw new Error("down");
-    if (path === "rpc/save_build") return [{ build_ref: BUILD_ID, build_slug: "AbCd1234", refusal: null }];
+    if (path === "rpc/save_build_plan") return SAVED;
     return [];
   });
   const res = await save({ name: "a", code: MAGE });

@@ -1,4 +1,5 @@
-import { decodeBuild } from "./talents/share";
+import { planHash } from "./talents/import";
+import { decodeBuild, decodeOrder } from "./talents/share";
 import { TALENT_CLASSES, isTalentClass, type TalentClassSlug } from "./talents/catalogs";
 
 /**
@@ -7,7 +8,8 @@ import { TALENT_CLASSES, isTalentClass, type TalentClassSlug } from "./talents/c
  * with it unset there is no Save button and /me, /b/<slug> and /api/me/* answer 404.
  *
  * This file has no server imports, so the calculator can use the limits and checks too. The database checks the
- * same rules again (supabase/migrations/20261021150000_saved_builds.sql).
+ * same rules again (supabase/migrations/20261021150000_saved_builds.sql, and for spend orders
+ * 20261027120000_saved_build_point_order.sql).
  */
 export function savedBuildsOn(env: Record<string, string | undefined> = process.env): boolean {
   return env.EVERLOOT_SAVED_BUILDS === "1";
@@ -48,6 +50,10 @@ export interface SavedBuild {
   link: string | null;
   updatedAt: string;
   showName: boolean;
+  /** Each set's spend order token, its maker in its letter (O1p- planned, O1g- generated); null when unknown. Absent
+   *  from a key's read, which carries no orders. */
+  order?: string | null;
+  order2?: string | null;
 }
 
 /** A character label: typed by the player, not checked against the game. */
@@ -63,10 +69,15 @@ export interface BuildInput {
   characterId: string | null;
   code: string;
   code2: string | null;
-  /** Null keeps the stored value on an update; a new build is shared, not active and anonymous by default. */
+  /** Null keeps the stored value on an update. A new build is not active unless asked; whether it is shared and shows
+   *  its owner's name it must say (save_build_plan refuses a new build without them). */
   shared: boolean | null;
   active: boolean | null;
   showName: boolean | null;
+  /** Each set's spend order token, null for an unknown order. Left out, the stored one stays while its code stays the
+   *  same and goes when the code changes. */
+  order?: string | null;
+  order2?: string | null;
 }
 
 export interface CharacterInput { id: string | null; name: string; classSlug: TalentClassSlug; realm: string | null; note: string | null }
@@ -97,6 +108,16 @@ export function codeClass(code: string): TalentClassSlug | null {
   return isTalentClass(decoded.build.classSlug) ? decoded.build.classSlug : null;
 }
 
+/** A set's spend order (docs/2026-10-17-talent-share-code.md, "Spend order"), read against that set's own code: the
+ *  token as sent, trimmed; null for none; false when it does not name exactly the code's points. */
+function readOrder(value: unknown, code: string | null): string | null | false {
+  if (value === null || value === "") return null;
+  if (typeof value !== "string" || code === null) return false;
+  const decoded = decodeBuild(code);
+  const token = value.trim();
+  return decoded.ok && decodeOrder(token, decoded.build.ranks).ok ? token : false;
+}
+
 /** The body of POST /api/me/builds. */
 export function parseBuildInput(body: unknown): Parsed<BuildInput> {
   const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
@@ -124,7 +145,12 @@ export function parseBuildInput(body: unknown): Parsed<BuildInput> {
   const active = optionalBoolean(b.active);
   const showName = optionalBoolean(b.showName);
   if (shared === undefined || active === undefined || showName === undefined) return { ok: false, error: "shared, active and showName are true or false." };
-  return { ok: true, value: { id, name, notes: notes || null, characterId, code, code2, shared, active, showName } };
+  // A body from before orders has none: they stay left out, which is not the same as unknown.
+  const order = b.order === undefined ? undefined : readOrder(b.order, code);
+  if (order === false) return { ok: false, error: "The spend order does not fit the talents in the share code." };
+  const order2 = b.order2 === undefined ? undefined : readOrder(b.order2, code2);
+  if (order2 === false) return { ok: false, error: "The second spend order does not fit the talents in the second share code." };
+  return { ok: true, value: { id, name, notes: notes || null, characterId, code, code2, shared, active, showName, order, order2 } };
 }
 
 /** The body of POST /api/me/characters. */
@@ -142,14 +168,18 @@ export function parseCharacterInput(body: unknown): Parsed<CharacterInput> {
   return { ok: true, value: { id, name, classSlug: b.classSlug, realm: realm || null, note: note || null } };
 }
 
-/** A build row as the database returns it, from a table read or from own_builds_for_key. */
+/** A build row as the database returns it, from a table read or from own_builds_for_key. Only a table read that asks
+ *  for ORDER_COLUMNS has the orders. */
 export interface BuildRow {
   id: string; slug: string; name: string; notes: string | null; class_slug: string; character_id: string | null;
   code: string; code2: string | null; game_build: string; shared: boolean; show_name: boolean; active: boolean; updated_at: string;
+  point_order?: string | null; point_order2?: string | null;
 }
 export interface CharacterRow { id: string; name: string; class_slug: string; realm: string | null; note: string | null }
 
+/** The columns of the saved-builds file; the spend orders are 20261027120000_saved_build_point_order.sql's. */
 export const BUILD_COLUMNS = "id,slug,name,notes,class_slug,character_id,code,code2,game_build,shared,show_name,active,updated_at";
+export const ORDER_COLUMNS = "point_order,point_order2";
 export const CHARACTER_COLUMNS = "id,name,class_slug,realm,note";
 
 export const shortPath = (slug: string) => `/b/${slug}`;
@@ -165,6 +195,8 @@ export function toBuild(row: BuildRow, site: string): SavedBuild {
     id: row.id, slug: row.slug, name: row.name, notes: row.notes, classSlug: row.class_slug, characterId: row.character_id,
     code: row.code, code2: row.code2, gameBuild: row.game_build, shared: row.shared, active: row.active,
     link: row.shared ? `${site}${shortPath(row.slug)}` : null, updatedAt: new Date(row.updated_at).toISOString(), showName: row.show_name,
+    // A key's read has no orders to give: they are left out rather than called unknown.
+    ...(row.point_order === undefined ? {} : { order: row.point_order, order2: row.point_order2 ?? null }),
   };
 }
 
@@ -182,7 +214,8 @@ export function toCharacters(rows: CharacterRow[]): BuildCharacter[] {
   });
 }
 
-/** Where the calculator opens a saved build: its class page, marked as editing it, with both sets in the address. */
-export function editPath(build: Pick<SavedBuild, "id" | "classSlug" | "code" | "code2">): string {
-  return `/tools/talents/${build.classSlug}?saved=${build.id}#plan=${build.code}${build.code2 ? `&plan2=${build.code2}` : ""}`;
+/** Where the calculator opens a saved build: its class page, marked as editing it, with both sets and their spend
+ *  orders in the address. */
+export function editPath(build: Pick<SavedBuild, "id" | "classSlug" | "code" | "code2" | "order" | "order2">): string {
+  return `/tools/talents/${build.classSlug}?saved=${build.id}${planHash(build.code, build.code2, build.order, build.order2)}`;
 }

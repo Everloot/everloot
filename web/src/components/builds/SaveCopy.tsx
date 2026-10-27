@@ -4,8 +4,14 @@ import { useState } from "react";
 import { editPath, type SavedBuild } from "@/lib/saved-builds";
 import { copyName } from "./BuildActions";
 
-/** "Save a copy" on a shared build's page, for a signed-in visitor: the copy is theirs, then opens in the calculator. */
-export default function SaveCopy({ name, notes, code, code2 }: { name: string; notes: string | null; code: string; code2: string | null }) {
+/**
+ * "Save a copy" on a shared build's page, for a signed-in visitor: the copy is theirs, with both sets' spend orders,
+ * then opens in the calculator. Like a new build from the calculator, the copy has its own short link and does not
+ * show the visitor's name, and it says so.
+ */
+export default function SaveCopy({ name, notes, code, code2, order, order2 }: {
+  name: string; notes: string | null; code: string; code2: string | null; order: string | null; order2: string | null;
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -15,7 +21,7 @@ export default function SaveCopy({ name, notes, code, code2 }: { name: string; n
     try {
       const response = await fetch("/api/me/builds", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: copyName(name), notes, code, code2 }),
+        body: JSON.stringify({ name: copyName(name), notes, code, code2, order, order2, shared: true, showName: false }),
       });
       const result = await response.json().catch(() => ({})) as { build?: SavedBuild; error?: string };
       if (!response.ok || !result.build) throw new Error(result.error ?? "That did not work. Try again.");
