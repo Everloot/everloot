@@ -2,7 +2,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { fixture } from "./fixture";
-import { PUBLISHED_CHANGES, classTalentChanges, compareGameBuilds, freshnessLines, planFreshness, type HistoryGap, type PlanFreshness } from "./freshness";
+import { compareGameBuilds, freshnessLines, planFreshness, type HistoryGap, type PlanFreshness } from "./freshness";
+import { PUBLISHED_CHANGES, classTalentChanges } from "./freshness-records";
 import type { Ranks, TalentCatalog } from "./types";
 
 // Change records in the shape the build watch writes (kb/src/build-watch/changes.ts). Made-up builds and
@@ -364,7 +365,7 @@ test("every change record the build watch publishes is read, and reads", () => {
   const files = readdirSync(join(src, "data/game-data/changes")).filter((f) => f.endsWith(".json")).sort();
   const listed = PUBLISHED_CHANGES.map((e) => `${(e as { id: string }).id}.json`).sort();
   // A new build's pull request adds its record to the folder; list it in PUBLISHED_CHANGES in the same pull request.
-  expect(listed, "web/src/lib/talents/freshness.ts PUBLISHED_CHANGES").toEqual(files);
+  expect(listed, "web/src/lib/talents/freshness-records.ts PUBLISHED_CHANGES").toEqual(files);
   const read = classTalentChanges(PUBLISHED_CHANGES, 8);
   expect(read.unplaced).toBe(0);
   expect(read.steps.length).toBe(files.length);
@@ -381,7 +382,7 @@ test("the published records chain the Mage tree from 1.60.1.70450 to 70630, whos
 
 test("the engine and the note only read: nothing in them can save a plan, restamp its code or run in the browser", () => {
   const writes = /\bencode(?:Build|Order)\b|\b(?:replace)?[pP]lanHash\b|localStorage|sessionStorage|\bfetch\(|player-workspace|saved-builds|SaveBuild|(?:replace|push)State|location\.(?:hash|href)\s*=(?!=)|location\.(?:assign|replace)\(/;
-  for (const file of ["lib/talents/freshness.ts", "components/talents/FreshnessNote.tsx"]) {
+  for (const file of ["lib/talents/freshness.ts", "lib/talents/freshness-records.ts", "components/talents/FreshnessNote.tsx"]) {
     const text = readFileSync(join(src, file), "utf8");
     expect(text, file).not.toMatch(writes);
     expect(text, file).not.toMatch(/"use client"|\buse(?:Effect|State)\b/);

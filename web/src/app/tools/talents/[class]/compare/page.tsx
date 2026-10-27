@@ -6,7 +6,7 @@ import { CLASS_TEXT } from "@/components/talents/TalentTreeView";
 import { Container, PageHeader } from "@/components/ui";
 import { pageMetadata } from "@/lib/seo";
 import { TALENT_CLASSES, loadCatalog, type TalentClassSlug } from "@/lib/talents/catalogs";
-import { PUBLISHED_CHANGES, classTalentChanges } from "@/lib/talents/freshness";
+import { PUBLISHED_CHANGES, classTalentChanges } from "@/lib/talents/freshness-records";
 
 // Two plans of one class side by side: /tools/talents/<class>/compare#a=<code>&ao=<order>&b=<code>&bo=<order>. The plans
 // ride in the fragment, which only the browser reads, so the page is built once per class and cached, like the class

@@ -4,7 +4,8 @@ import { createRoot, hydrateRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup, renderToString } from "react-dom/server";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { TALENT_CLASSES } from "@/lib/talents/catalogs";
-import { classTalentChanges, type ClassTalentChanges } from "@/lib/talents/freshness";
+import type { ClassTalentChanges } from "@/lib/talents/freshness";
+import { classTalentChanges } from "@/lib/talents/freshness-records";
 import { fixture } from "@/lib/talents/fixture";
 import { DESCRIPTION_MAX, DESCRIPTION_MIN } from "@/lib/seo";
 import { encodeBuild, encodeOrder } from "@/lib/talents/share";
@@ -321,4 +322,20 @@ test("the compare pages are noindex, point at their class page and stay out of t
   const paths = (await sitemap()).map((e) => new URL(e.url).pathname);
   expect(paths).toContain("/tools/talents/mage");
   expect(paths.filter((p) => /^\/tools\/talents\/.*compare/.test(p))).toEqual([]);
+});
+
+// Last in the file: it loads the browser code again from a fresh module registry.
+test("the page's browser code loads without the change records or the schemas that check them", async () => {
+  // The server reads the records and hands the browser this class's changes; the browser only compares.
+  const serverOnly = ["../../../../kb/src/build-watch/changes", "zod", "@/data/game-data/changes/wowf-70630.json", "@/data/game-data/changes/wow_classic_beta-70532.json"];
+  const loaded: string[] = [];
+  vi.resetModules();
+  for (const id of serverOnly) vi.doMock(id, () => { loaded.push(id); return { default: {} }; });
+  try {
+    await import("./TalentCompare");
+    expect(loaded).toEqual([]);
+  } finally {
+    for (const id of serverOnly) vi.doUnmock(id);
+    vi.resetModules();
+  }
 });

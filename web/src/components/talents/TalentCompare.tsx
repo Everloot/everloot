@@ -32,7 +32,7 @@ const plans = (sides: Side[]) => (sides.length === 1 ? `plan ${LETTER[sides[0]]}
 
 export default function TalentCompare({ catalog, changes }: {
   catalog: TalentCatalog;
-  /** This class's change records (freshness.ts classTalentChanges), read on the server. */
+  /** This class's changes from the records (freshness-records.ts), read on the server. */
   changes: ClassTalentChanges;
 }) {
   const [pair, setPair] = useState<Pair | null>(null);
