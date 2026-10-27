@@ -25,6 +25,7 @@ import { PRIMARY } from "@/components/Header";
 import { toolGroups } from "@/data/tools";
 import { classRaces } from "@/lib/class-hub";
 import { CLASS_CONTEXT_SLOT, contextLinks } from "@/lib/class-context";
+import { RACE_TABLE } from "@/lib/race-traits";
 import { TALENT_CLASSES, loadCatalog } from "@/lib/talents/catalogs";
 import { fixture } from "@/lib/talents/fixture";
 import { encodeBuild, encodeOrder } from "@/lib/talents/share";
@@ -137,7 +138,10 @@ describe("class hubs", () => {
     // The line under the title does not promise guides that are not there.
     expect(ledeOf(html)).toContain("talent calculator");
     expect(ledeOf(html)).not.toMatch(/guide/i);
-    for (const role of ["tank", "healer", "damage", "dps"]) expect(page.toLowerCase(), role).not.toContain(role);
+    // The racial traits quote the game's own text ("increased damage or healing"), which names no role for the class.
+    const races = section(html, "races");
+    const ours = visible(html.replace(races, ""));
+    for (const role of ["tank", "healer", "damage", "dps"]) expect(ours.toLowerCase(), role).not.toContain(role);
     for (const tree of (await loadCatalog("mage")).trees) expect(page, tree.name).not.toContain(tree.name);
     const m = await hubMetadata("mage");
     expect(m.robots).toEqual({ index: false, follow: true });
@@ -203,6 +207,23 @@ describe("class hubs", () => {
     for (const race of ["Orc", "Troll", "Undead", "Gnome", "Human", "Skyborne"]) expect(visible(races), race).toContain(race);
     for (const race of ["Tauren", "Dwarf", "Night Elf"]) expect(visible(races), race).not.toContain(race);
     expect(races).toContain('href="/wow-forever#races"');
+  });
+
+  test("each race that can be the class shows its racial traits from the game files, labelled once with the build", async () => {
+    const races = visible(section(await hub("warlock"), "races"));
+    // Orc's four, each with active or passive and the short text, colour codes gone.
+    expect(races).toContain("Blood Fury");
+    expect(races).toContain("Increases Attack Power and Spell Power by 10% for 15 sec");
+    expect(races).toContain("Hardiness");
+    expect(races).toMatch(/Active/);
+    expect(races).toMatch(/Passive/);
+    expect(races).not.toMatch(/\|c|\|r/);
+    // Undead, Troll, Human and Gnome are Warlocks too; Tauren and Dwarf are not, so their traits are not here.
+    for (const trait of ["Will of the Forsaken", "Berserking", "Will to Survive", "Escape Artist"]) expect(races, trait).toContain(trait);
+    for (const trait of ["War Stomp", "Stoneform"]) expect(races, trait).not.toContain(trait);
+    // The label is said once for the section, with the build, not on every row.
+    expect(races.match(/found in game files, unconfirmed/gi)).toHaveLength(1);
+    expect(races).toContain(RACE_TABLE.build.version);
   });
 
   test("no header or Tools menu link points at the class pages yet", () => {

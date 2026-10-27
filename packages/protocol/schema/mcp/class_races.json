@@ -1,0 +1,167 @@
+{
+  "$id": "https://everloot.app/schema/mcp/class_races.json",
+  "title": "Races that can be a class, with their racial traits",
+  "description": "Which races can be one class in WoW: Forever, on which faction, and each race's racial traits (name, active or passive) from the game files (found in game files, unconfirmed, with the build). Narrow to one faction. What each trait does is on the class page, linked from the answer.",
+  "annotations": {
+    "readOnlyHint": true,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "class": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40,
+        "description": "Class name or slug, such as Warlock or warlock."
+      },
+      "faction": {
+        "description": "alliance or horde. Without it, both.",
+        "type": "string",
+        "enum": [
+          "alliance",
+          "horde"
+        ]
+      }
+    },
+    "required": [
+      "class"
+    ]
+  },
+  "outputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "label": {
+        "type": "string"
+      },
+      "build": {
+        "type": "string",
+        "description": "The game build the races were read from."
+      },
+      "class": {
+        "description": "Absent when the class is not one the files list.",
+        "type": "string",
+        "enum": [
+          "warrior",
+          "paladin",
+          "hunter",
+          "rogue",
+          "priest",
+          "shaman",
+          "mage",
+          "warlock",
+          "druid"
+        ]
+      },
+      "className": {
+        "type": "string"
+      },
+      "faction": {
+        "type": "string",
+        "enum": [
+          "alliance",
+          "horde"
+        ]
+      },
+      "factions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "faction": {
+              "type": "string",
+              "enum": [
+                "Alliance",
+                "Horde",
+                "Neutral"
+              ]
+            },
+            "races": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991,
+                    "description": "The client's race id (ChrRaces)."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The race's name in the game files."
+                  },
+                  "traits": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "active",
+                            "passive"
+                          ]
+                        },
+                        "order": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "The order on the character screen."
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "kind",
+                        "order"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "traits"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "faction",
+            "races"
+          ],
+          "additionalProperties": false
+        },
+        "description": "Alliance first. Empty when the class is unknown."
+      },
+      "error": {
+        "description": "A class the files do not list.",
+        "type": "string"
+      },
+      "credit": {
+        "type": "string"
+      },
+      "url": {
+        "description": "The everloot.app page that shows this answer, absolute. Absent when there is no such page or it would be empty.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "label",
+      "build",
+      "factions",
+      "credit"
+    ],
+    "additionalProperties": false
+  },
+  "x-everloot-output": {
+    "type": "text"
+  }
+}

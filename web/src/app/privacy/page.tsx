@@ -34,7 +34,7 @@ function Section({ id, children }: { id: string; children: React.ReactNode }) {
 }
 
 export default function PrivacyPage() {
-  const updated = "24 October 2026";
+  const updated = "27 October 2026";
   return (
     <article>
       <Container width="reading">
@@ -77,8 +77,10 @@ export default function PrivacyPage() {
               <li>
                 <strong>Our own counters:</strong> our servers keep a daily count of
                 calls to our API and to the public MCP endpoint, by endpoint or tool
-                name. These counts contain no IP address, install id, search text or
-                other detail about who made the call. Rate limiting separately keeps
+                name, and, for the lookup tools the chat uses, whether the lookup found
+                something or nothing. These counts contain no IP address, install id,
+                question or search text, looked-up name, account or other detail about
+                who made the call. Rate limiting separately keeps
                 a one-way hash of an address for a short time to enforce limits.
               </li>
               <li>
@@ -151,6 +153,18 @@ export default function PrivacyPage() {
                 you choose Import. Chat keys, unsent drafts and audio are never stored in your
                 account. In Chat&apos;s All chats view you can download all of it or delete all of
                 it; deleting your account deletes it too.
+              </li>
+              <li id="free-chat">
+                <strong>Chat&apos;s free model (optional):</strong> when Chat offers Everloot (free) and you ask with
+                it, your question, the earlier turns of that chat and what Everloot&apos;s lookups found go through
+                our server to Groq, or to Cloudflare Workers AI when Groq is busy or at its limit, which writes the
+                answer. Each answer names the provider that wrote it. A character or note goes only if you attach it.
+                Nothing else of yours goes: no account details, no key, no cookie and not your address. We don&apos;t
+                keep the questions or the answers. To enforce the daily limit our server keeps a keyed one-way hash of
+                your address for a day. Groq&apos;s terms say it does not train models on them and keeps them at most 30
+                days, for reliability and abuse checks. Cloudflare says it does not use Workers AI content to train
+                models and does not keep it once the request is answered. Everloot search, and a model you set up with
+                your own key, do not use this.
               </li>
               <li>
                 <strong>Uploads:</strong> files you send on the upload page
@@ -356,7 +370,7 @@ export default function PrivacyPage() {
               <li><strong>Saved builds and characters:</strong> until you delete them or your account.</li>
               <li><strong>Chat projects, account chats, notes and saved entries:</strong> until you delete them, clear them in Chat or delete your account.</li>
               <li><strong>Handle, display name, status and profile choices:</strong> until you change them or delete your account. A status with a clear-after time stops showing at that time.</li>
-              <li><strong>Rate-limit hashes:</strong> a short time, long enough to enforce the limit, then discarded.</li>
+              <li><strong>Rate-limit hashes:</strong> a short time, long enough to enforce the limit (a day for Chat&apos;s free model), then discarded.</li>
               <li><strong>Uploads:</strong> until you ask us to remove them. They are the public database.</li>
               <li><strong>Census rows:</strong> as long as the upload they came in, and removed with it. They hold the character&apos;s hash, never its id, and a one-way hash of the address they came from, never the address. They are only ever published as counts.</li>
               <li><strong>Upload address hash:</strong> as long as the upload it belongs to. The completion rollup keeps its link between an address hash and an install until the rollup is next rebuilt.</li>

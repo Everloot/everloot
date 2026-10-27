@@ -122,12 +122,16 @@ describe.skipIf(!databaseUrl)("Better Auth on Postgres as everloot_auth", () => 
     expect((await store.consume("key-b", { window: 60, max: 3 })).allowed).toBe(true);
 
     await authDb.query("insert into public.auth_rate_limit (key, count, last_request) values ('stale', 1, $1)", [Date.now() - 2 * 60 * 60 * 1000]);
+    // A day's count outlives the hour; one older than a day goes with the rest.
+    await authDb.query("insert into public.auth_rate_limit (key, count, last_request) values ('daily:today', 1, $1), ('daily:yesterday', 1, $2)", [Date.now() - 2 * 60 * 60 * 1000, Date.now() - 26 * 60 * 60 * 1000]);
     await store.consume("key-a", { window: 60, max: 3 });
     expect((await admin.query("select count(*)::int as n from public.auth_rate_limit where key = 'stale'")).rows[0].n).toBe(1);
 
     await pgRateLimitStore(authDb, () => 0).consume("key-c", { window: 60, max: 3 });
     const keys = (await admin.query("select key from public.auth_rate_limit")).rows.map((r) => r.key);
     expect(keys).not.toContain("stale");
+    expect(keys).toContain("daily:today");
+    expect(keys).not.toContain("daily:yesterday");
     expect(keys).toEqual(expect.arrayContaining(["key-a", "key-b", "key-c"]));
   });
 });

@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import { answerSources, answerSourcesFactsFromRecords, formatAnswerSources, furtherReading, type AnswerSourcesFacts } from "../src/answer-sources.js";
 import { openDb } from "../src/db.js";
+import { SOME_WORDS } from "../src/search.js";
 import { replaceSourceRows, type EntityInput } from "../src/entities.js";
 import { parseRecords } from "@everloot/protocol";
 
@@ -72,6 +73,17 @@ test("nothing found is said plainly, never invented; without the corpus, lore st
   const loreOnly = answerSources(await seed(), { question: "Who is Thrall?", limit: 8 }, null, null);
   expect(loreOnly.evidence.map((e) => e.kind)).toEqual(["curated", "lore"]);
   expect(formatAnswerSources(loreOnly, false)).toContain("not connected here, so the observed layer is unrecorded, not empty");
+});
+
+test("a question no page answers in full gets the pages with some of its words, and the text says so first", async () => {
+  // Found live: "whats the best racial class for warlock on horde" gave "No evidence found".
+  const some = answerSources(await seed(), { question: "whats the best warchief for horde mains", limit: 8 }, null, null);
+  expect(some.someWords).toBe(true);
+  expect(some.evidence.map((e) => e.source.url)).toContain("https://example.test/thrall");
+  expect(formatAnswerSources(some, false).startsWith(SOME_WORDS)).toBe(true);
+  const full = answerSources(await seed(), { question: "Who is Thrall?", limit: 8 }, null, null);
+  expect(full.someWords).toBeUndefined();
+  expect(formatAnswerSources(full, false)).not.toContain(SOME_WORDS);
 });
 
 test("further-reading links are search URLs with the question encoded, and nothing for an empty question", () => {

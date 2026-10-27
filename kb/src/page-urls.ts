@@ -131,6 +131,11 @@ export function talentsUrl(classSlug: TalentClass): string {
   return abs(`/tools/talents/${classSlug}`);
 }
 
+/** The class's hub: who can be one, with racial traits, its guides and the pages to plan with. */
+export function classUrl(classSlug: TalentClass): string {
+  return abs(`/classes/${classSlug}`);
+}
+
 /** A build's own link: the calculator opened on the plan, with a preview card. */
 export function talentBuildUrl(classSlug: string, code: string): string {
   return abs(previewPath(classSlug, code, null)!);
