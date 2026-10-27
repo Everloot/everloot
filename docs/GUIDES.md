@@ -104,3 +104,34 @@ reviewer checks each one against its evidence.
 A draft, or a file that fails the schema, is shown nowhere. In the site's reader, `publishedGuides`, `publishedGuide`
 and `guidesFor` return published guides only, and `guidesFor` narrows them by class, activity, role and level.
 Anything that shows guides reads them through these.
+
+## Guide pages
+
+`/guides` lists the published guides by class, and `/guides/<slug>` shows one: its review, its plan, its four
+sections, its sources and every published version. A draft, or a file that fails the schema, is a 404 there, on the
+guide's social card and in the sitemap. A link in a guide's body to a guide that is not published is drawn as its
+words alone, also through a version's prefix such as `/beta`, so no draft's address shows even if one reached main.
+
+How current a guide is, its page works out each time it is rebuilt, at most once an hour
+([`web/src/lib/guide-freshness.ts`](../web/src/lib/guide-freshness.ts)), and says why when it is not current:
+
+- **Broken**: its plan no longer fits the talent tree, in the calculator's own words: a talent is gone or its rank
+  is cut, the order breaks the tree's rules, or the tree's points or the guide's levels no longer hold the plan. A
+  second set is broken, too, when it opens at a level after the guide's levels end. Copy for addon is off for that
+  set.
+- **Stale**: the build watch's change records show a change to the plan's talents, or to the levels points arrive
+  at, after the build the guide was reviewed against, whatever build its code was made on. A missing or incomplete
+  record is never read as a change. The
+  note lists only the changes after that build; one at or before it is a change the review saw.
+- **Review due**: 60 days have passed since the last review, or a live build is newer than the one it was reviewed
+  against.
+
+The page reads the codes, their builds and the review as the file has them, and never re-stamps one. A person acts,
+with a new reviewed version or with `status: draft`.
+
+A guide is indexed, and listed in the sitemap dated by its review, only while it is published and reviewed, has the
+150 words of its own, and is neither stale nor broken. A filtered list of guides is noindex.
+
+The page's calculator link carries both sets exactly as the file stores them. Copy for addon copies one set as a
+full calculator link, `#plan=<code>&order=<order>` for the first and `#plan2=<code2>&order2=<order2>` for the second;
+in the game, `/everloot` → Talents → paste → Import. Addon 0.3.12 loads the talents from it, not the order.

@@ -11,21 +11,25 @@ import { MARKDOWN_LINK, wikiLinkTarget } from "../../../../kb/src/wiki/page";
 export interface TextContext {
   tokens: Map<string, TokenTarget>;
   pages: (slug: string) => WikiPage | null;
+  /** Whether a Markdown link may be drawn; one that may not stands as its words alone. A guide's page refuses links
+   *  to guides that are not published. Without it, every link is drawn but one to a wiki page that is not published. */
+  linkable?: (href: string) => boolean;
 }
 
 // The Markdown a text run may carry: [text](an https address or a /path), **bold**, *emphasis* or _emphasis_. The link
 // form is the page check's, so the check reads every link this draws.
 const MARKS = new RegExp(String.raw`${MARKDOWN_LINK.source}|\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|\b_([^_\n]+)_\b`, "g");
 
-function marked(text: string, key: string, pages: TextContext["pages"]): ReactNode[] {
+function marked(text: string, key: string, ctx: TextContext): ReactNode[] {
   const out: ReactNode[] = [];
   let last = 0;
   for (const m of text.matchAll(MARKS)) {
     if (m.index > last) out.push(text.slice(last, m.index));
     const k = `${key}.${m.index}`;
     // A link into the wiki is drawn only to a published page; to any other its words stand alone, as a [[slug]]'s do.
+    // So is a link the page refuses.
     const slug = m[1] ? wikiLinkTarget(m[2]) : null;
-    if (slug !== null && !pages(slug)) out.push(m[1]);
+    if ((slug !== null && !ctx.pages(slug)) || (m[1] && ctx.linkable && !ctx.linkable(m[2]))) out.push(m[1]);
     else if (m[1]) out.push(m[2].startsWith("/") ? <Link key={k} href={m[2]}>{m[1]}</Link> : <a key={k} href={m[2]} rel="noopener">{m[1]}</a>);
     else if (m[3]) out.push(<strong key={k}>{m[3]}</strong>);
     else out.push(<em key={k}>{m[4] ?? m[5]}</em>);
@@ -39,7 +43,7 @@ export function InlineText({ inline, ctx }: { inline: Inline[]; ctx: TextContext
   return (
     <>
       {inline.map((t, i) => {
-        if (t.kind === "text") return <Fragment key={i}>{marked(t.text, String(i), ctx.pages)}</Fragment>;
+        if (t.kind === "text") return <Fragment key={i}>{marked(t.text, String(i), ctx)}</Fragment>;
         if (t.kind === "entity") {
           const target = ctx.tokens.get(tokenKey(t.entity, t.id));
           if (!target) return null;

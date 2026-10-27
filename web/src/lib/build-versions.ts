@@ -28,5 +28,14 @@ export function versionHref(v: GameVersion, path = "/"): string {
   return path === "/" ? prefix : `${prefix}${path}`;
 }
 
+/** A path without the version prefix it starts with, for any prefix the table lists: /beta/guides/x is /guides/x, and
+ *  /beta is /. A path that only starts with a prefix's letters, or with none, comes back as it is. */
+export function withoutVersionPrefix(path: string): string {
+  for (const prefix of Object.values(PREFIXES)) {
+    if (prefix && (path === prefix || path.startsWith(`${prefix}/`))) return path.slice(prefix.length) || "/";
+  }
+  return path;
+}
+
 /** The versions with a prefix that has no snapshot: their prefix answers with the notice page. */
 export const WITHOUT_SNAPSHOT: GameVersion[] = GAME_VERSIONS.filter((v) => PREFIXES[v.id] && v.id !== SERVED.id);
