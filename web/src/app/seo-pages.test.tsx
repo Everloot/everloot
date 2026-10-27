@@ -46,8 +46,8 @@ test("the footer shows the email and the blurb the Organization repeats", async 
   const text = visible(renderToStaticMarkup(<Footer />));
   const org = organizationJsonLd() as { email: string; description: string };
   expect(text).toContain(org.email);
-  expect(org.description).toContain(SITE_BLURB);
-  expect(text).toContain(SITE_BLURB);
+  expect(org.description).toBe(SITE_BLURB);
+  for (const sentence of org.description.split(/(?<=\.) /)) expect(text).toContain(sentence);
 });
 
 test("a class page: name matches the H1, description and facts are visible, the hub is its parent, and the breadcrumb is real links", async () => {
