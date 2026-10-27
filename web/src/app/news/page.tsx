@@ -3,7 +3,7 @@ import Link from "next/link";
 import AdSlot from "@/components/AdSlot";
 import { Card, Container, PageHeader, SectionHeading } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
-import { filterTimeline, loadTimeline } from "@/lib/changes";
+import { filterTimeline, loadTimeline, type ChangeEntry } from "@/lib/changes";
 import { hubIndexable, loadNews, publishedPosts } from "@/lib/news";
 import { pageMetadata } from "@/lib/seo";
 import ChangeList from "../changes/change-list";
@@ -21,6 +21,8 @@ const FEED_AD_AFTER = 6;
 const LINK = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 /** How many of Blizzard's newest entries the section under the cards lists. */
 const FROM_BLIZZARD = 6;
+/** Blizzard's own entries: its forum and Bluesky posts and hotfixes, and the game builds. An entry Everloot wrote never counts. */
+const fromBlizzard = (e: ChangeEntry) => e.type === "build" || e.source === "forum" || e.source === "bluesky";
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
@@ -33,7 +35,8 @@ export async function generateMetadata(): Promise<Metadata> {
 /** The news hub: the newest post as a featured card, the rest as a card grid, then Blizzard's newest posts, hotfixes and builds. */
 export default async function NewsHub() {
   const posts = publishedPosts(loadNews());
-  const blizzard = filterTimeline(await loadTimeline(), "all", "forever").slice(0, FROM_BLIZZARD);
+  // Who wrote it is checked before the six newest are taken, so an Everloot entry can neither show nor push one out.
+  const blizzard = filterTimeline(await loadTimeline(), "all", "forever").filter(fromBlizzard).slice(0, FROM_BLIZZARD);
   return (
     <Container width="wide">
       <PageHeader trail={trailFor("/news")!} title="News" lede={LEDE} meta={<a href="/news/feed.xml" className={LINK}>RSS</a>} />

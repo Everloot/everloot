@@ -85,6 +85,28 @@ test("under the cards, the newest Forever entries from the changes timeline, eac
   expect(renderToStaticMarkup(await NewsHub())).toContain("Open the changes timeline");
 });
 
+test("an entry Everloot wrote never shows under From Blizzard, and is left out before the six newest are taken", async () => {
+  fixtures();
+  // The newest entry is a hand-written one (source "manual"), then seven of Blizzard's: forum posts, a Bluesky post and a build.
+  const hour = (h: number) => new Date(Date.UTC(2026, 9, 26, 23 - h)).toISOString();
+  const titles = ["Alpha notice", "Bravo maintenance", "Charlie hotfixes", "Delta podcast", "Echo stress test", "Foxtrot realms", "Golf roadmap"];
+  timeline.entries = [
+    { ...cited, id: "manual:everloot-note", type: "hotfix", source: "manual", region: undefined, at: hour(0), title: "Everloot's own note", url: "https://worldofwarcraft.blizzard.com/en-us/news/1" },
+    ...titles.map((title, i): ChangeEntry => (i === 3
+      ? { id: "build:x", type: "build", game: "forever", at: hour(i + 1), title, url: null, version: "1.60.1.70600", diffUrl: null }
+      : i === 4
+        ? { ...cited, id: "bluesky:3mzzz", source: "bluesky", region: undefined, category: "Bluesky", at: hour(i + 1), title, url: "https://bsky.app/profile/worldofwarcraft.blizzard.com/post/3mzzz" }
+        : { ...cited, id: `forum:${900 + i}`, at: hour(i + 1), title, url: `https://us.forums.blizzard.com/en/wow/t/x/${900 + i}` })),
+  ];
+  const { default: NewsHub } = await import("./page");
+  const section = renderToStaticMarkup(await NewsHub()).split('id="blizzard"')[1];
+  expect(section).not.toContain("Everloot&#x27;s own note");
+  expect(section).not.toContain("Everloot's own note");
+  // Six of Blizzard's newest, the build and the Bluesky post among them; the seventh waits its turn.
+  for (const title of titles.slice(0, 6)) expect(section).toContain(title);
+  expect(section).not.toContain("Golf roadmap");
+});
+
 test("with no published post the hub says so, points to the changes and the feed, and stays out of search", async () => {
   vi.stubEnv("NEWS_DIR", mkdtempSync(join(tmpdir(), "news-")));
   const { default: NewsHub, generateMetadata } = await import("./page");
