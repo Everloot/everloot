@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { hashKey, KEY_PATTERN } from "./api-keys";
 import { signInPath } from "./auth/return-to";
 import {
-  ACCOUNT_MISMATCH, BUILD_COLUMNS, CHARACTER_COLUMNS, EXPECTED_OWNER_HEADER, ORDER_COLUMNS, savedBuildsOn, SLUG_PATTERN, toBuild, toCharacters,
+  ACCOUNT_MISMATCH, BUILD_COLUMNS, CHARACTER_COLUMNS, EXPECTED_OWNER_HEADER, ORDER_COLUMNS, savedBuildsOn, SLUG_PATTERN, toBuild, toCharacters, validId,
   type AccountBuilds, type BuildCharacter, type BuildInput, type BuildRow, type CharacterInput, type CharacterRow, type SavedBuild,
 } from "./saved-builds";
 import { authQuery, getUser, siteUrl, type AccountUser, type StorageError } from "./supabase/server";
@@ -219,8 +219,26 @@ export async function ownBuildsForKey(token: string, count = true): Promise<KeyR
     return { ok: false, refusal: row.refusal, retryAfter };
   }
   if (row.refusal !== null || !Array.isArray(row.characters) || !Array.isArray(row.builds)) throw new Error("Invalid key response");
+  // The RPC alone authorizes these ids and counts usage. Never query a caller-supplied owner or id,
+  // or merge an order with ranks saved again between the authorized snapshot and this read.
+  if (row.builds.some((b) => !b || !validId(b.id) || typeof b.code !== "string"
+    || (b.code2 !== null && typeof b.code2 !== "string"))) throw new Error("Invalid key response");
+  let builds = row.builds;
+  if (builds.length && !missing("columns")) {
+    try {
+      const orders = await authQuery<Array<Pick<BuildRow, "id" | "code" | "code2" | "point_order" | "point_order2">>>(
+        `saved_builds?select=id,code,code2,${ORDER_COLUMNS}&id=in.(${builds.map((b) => b.id).join(",")})`,
+      );
+      builds = builds.map((b) => {
+        const o = orders.find((o) => o.id === b.id && o.code === b.code && o.code2 === b.code2);
+        return { ...b, point_order: o?.point_order ?? null, point_order2: o?.point_order2 ?? null };
+      });
+    } catch (err) {
+      if (!foundMissing(err, "columns")) throw err;
+    }
+  }
   const site = siteUrl();
-  return { ok: true, value: { characters: toCharacters(row.characters), builds: row.builds.map((b) => toBuild(b, site)) } };
+  return { ok: true, value: { characters: toCharacters(row.characters), builds: builds.map((b) => toBuild(b, site)) } };
 }
 
 /** Whether a live key has read:own, without counting a request. Decides if MCP lists my_builds for the key. */

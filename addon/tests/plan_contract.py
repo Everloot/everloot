@@ -730,5 +730,40 @@ Everloot.Plan.HideMarks()
 for _, f in ipairs(frames) do if f.target then assert(not f.shown) end end
 """)
 
+# Saved selection carries only the selected set's token and set marker, including on the return link.
+lua = fresh(me)
+lua.execute(f"""
+local P = Everloot.Plan
+local b = P.SavedBuilds()[1]
+assert(b.order == 'O1p-ABACC' and b.order2 == 'O1g-BA', 'the shared golden carries both tokens')
+assert(P.LoadSaved(1))
+assert(EverlootDB.planOrder == 'O1p-ABACC' and EverlootDB.planSet == nil, 'saved first set keeps its order')
+assert(P.Link() == 'https://everloot.app/tools/talents/mage#plan={CODE}&order=O1p-ABACC')
+assert(P.LoadSaved(1, 2))
+assert(EverlootDB.plan == '{CODE2}' and EverlootDB.planOrder == 'O1g-BA' and EverlootDB.planSet == 2)
+assert(P.Link() == 'https://everloot.app/tools/talents/mage#plan2={CODE2}&order2=O1g-BA')
+assert(string.find(panel().body.text, 'Spend order: provisional', 1, true))
+b.order2 = nil
+assert(P.LoadSaved(1, 2))
+assert(EverlootDB.planOrder == nil and EverlootDB.planSet == 2, 'missing second order never borrows the first')
+assert(string.find(panel().body.text, 'Spend order: unknown', 1, true))
+-- Legacy slot readers use only the ranks; a version 1 file without metadata remains readable.
+assert(P.Decode(b.code) and P.Decode(b.code2))
+b.order = nil
+assert(P.LoadSaved(1))
+assert(EverlootDB.planOrder == nil and EverlootDB.planSet == nil)
+assert(P.Link() == 'https://everloot.app/tools/talents/mage#plan={CODE}')
+""")
+for token in ["O2p-BA", "O1p-AA", "O1p-BA B", "O1p-" + "A" * 65]:
+    lua.globals().TOKEN = token
+    lua.execute(f"""
+local P = Everloot.Plan
+P.SavedBuilds()[1].order2 = TOKEN
+assert(P.LoadSaved(1, 2))
+assert(EverlootDB.plan == '{CODE2}' and EverlootDB.planOrder == nil and EverlootDB.planSet == 2)
+assert(string.find(panel().body.text, 'Spend order: unknown', 1, true))
+assert(P.Link() == 'https://everloot.app/tools/talents/mage#plan2={CODE2}')
+""")
+
 print("Lua 5.1 plan: EL1 share code (independent base64url check), spend order token (shared vectors, exact whitespace), "
       "next point only from an order, mismatches, panel, display only, saved builds list")

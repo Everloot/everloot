@@ -248,7 +248,11 @@ Drag its header beside the game's talent window to keep the next-point highlight
   its order are kept in your SavedVariables file.
 - **Saved builds.** When the Desktop App has synced your everloot.app builds into the `EverlootBuilds`
   slot addon, `/everloot plan` also lists them in chat, this character's first (the label's name, and its realm when it has one), then the rest of your class,
-  and `/everloot plan <number>` loads one as if you pasted its code (`/everloot plan <number> 2` loads its second talent set, marked `[2 sets]` in the list). Nothing is saved or uploaded for it.
+  and `/everloot plan <number>` loads one (`/everloot plan <number> 2` loads its second talent set, marked `[2 sets]` in the list).
+  Each set keeps its own planned or provisional spend order when available; its code, validated order and set
+  are kept in SavedVariables and in Copy plan link. Missing or unusable metadata leaves ranks readable with
+  unknown order. Older version 1 slot files still load. Addon 0.3.12 ignores the new order fields and keeps
+  ranks only; update the addon to follow spend order. Nothing is uploaded by selecting a build.
 
 ### Share code, version 1
 

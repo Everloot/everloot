@@ -6,7 +6,8 @@ vi.mock("@/lib/supabase/server", () => ({ getUser: auth.getUser, authQuery: auth
 import { GET, POST } from "./route";
 import { DELETE } from "./[id]/route";
 import { hashKey } from "@/lib/api-keys";
-import { newSlug, ORDERS_RECHECK_MS } from "@/lib/saved-builds-store";
+import { newSlug, ORDERS_RECHECK_MS, ownBuildsForKey } from "@/lib/saved-builds-store";
+import { fetchBuilds, renderBuildsAddon } from "../../../../../../desktop/src/main/builds";
 
 const USER = { id: "11111111-2222-4333-8444-555555555555", name: "Thrall#1" };
 const BUILD_ID = "0b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e11";
@@ -273,15 +274,18 @@ test("deleting is for the owner's builds only", async () => {
 
 test("a key with read:own reads its owner's builds; the key itself never reaches the database", async () => {
   auth.authQuery.mockResolvedValueOnce([{ refusal: null, retry_after: 0, characters: [], builds: [keyRow()] }]);
+  auth.authQuery.mockResolvedValueOnce([row({ point_order: ORDER })]);
   const res = await GET(call("GET", undefined, { authorization: `Bearer ${KEY}`, origin: "" }));
   expect(res.status).toBe(200);
   const body = await res.json();
   expect(body).toMatchObject({ characters: [], builds: [{ id: BUILD_ID, link: "https://everloot.app/b/AbCd1234" }] });
-  // own_builds_for_key carries no orders, so the keyed answer keeps the shape it had: no order fields at all.
+  expect(body.builds[0]).toMatchObject({ order: ORDER, order2: null });
   expect(Object.keys(body.builds[0]).sort()).toEqual(["active", "characterId", "classSlug", "code", "code2", "gameBuild", "id", "link", "name", "notes",
-    "shared", "showName", "slug", "updatedAt"]);
+    "order", "order2", "shared", "showName", "slug", "updatedAt"].sort());
   expect(auth.authQuery.mock.calls[0][0]).toBe("rpc/own_builds_for_key");
   expect(rpcBody()).toEqual({ p_token_hash: hashKey(KEY), p_count: true });
+  expect(auth.authQuery.mock.calls[1][0]).toBe(`saved_builds?select=id,code,code2,point_order,point_order2&id=in.(${BUILD_ID})`);
+  expect(auth.authQuery).toHaveBeenCalledTimes(2);
   expect(auth.getUser).not.toHaveBeenCalled();
 });
 
@@ -291,6 +295,72 @@ test("an expired key is a 401: the database answers unknown_key for a key past i
   expect(res.status).toBe(401);
   expect(res.headers.get("www-authenticate")).toContain('error="invalid_token"');
   expect(await res.json()).not.toHaveProperty("builds");
+});
+
+test("key orders are joined only to authorized ids with both unchanged codes; no extra quota count", async () => {
+  const snapshot = { ...keyRow(), code2: MAGE2 };
+  for (const changed of [{}, { id: CHARACTER_ID }, { code: MAGE2 }, { code2: null }]) {
+    auth.authQuery.mockReset()
+      .mockResolvedValueOnce([{ refusal: null, retry_after: 0, characters: [], builds: [snapshot] }])
+      .mockResolvedValueOnce([row({ code2: MAGE2, point_order: ORDER, point_order2: ORDER2, transfer_key: "private", ...changed })]);
+    const result = await ownBuildsForKey(KEY, false);
+    expect(result).toMatchObject({ ok: true, value: { builds: [{ code: MAGE, code2: MAGE2,
+      order: Object.keys(changed).length ? null : ORDER, order2: Object.keys(changed).length ? null : ORDER2 }] } });
+    expect(rpcBody()).toEqual({ p_token_hash: hashKey(KEY), p_count: false });
+    expect(auth.authQuery).toHaveBeenCalledTimes(2);
+    expect(JSON.stringify(result)).not.toContain("private");
+  }
+});
+
+test("authorized key GET reaches the Desktop Lua slot with both exact codes and origins", async () => {
+  // The same two codes and orders are loaded independently by the shared Lua golden contract.
+  const code = "EL1-mage-1482-1.60.1.70450-OTAwMDE6Miw5MDAwMjoxOjEsOTAwMDQ6Mg";
+  const code2 = "EL1-mage-0-1.60.1.70450-MToxLDI6MQ";
+  auth.authQuery.mockResolvedValueOnce([{ refusal: null, retry_after: 0,
+    characters: [{ id: CHARACTER_ID, name: "Aerin", class_slug: "mage", realm: "Nightslayer", note: "private-note" }],
+    builds: [{ ...keyRow(), code, code2, notes: "private-notes", transfer_key: "private-transfer", user_id: USER.id }],
+  }]).mockResolvedValueOnce([row({ code, code2, point_order: "O1p-ABACC", point_order2: "O1g-BA" })]);
+  const builds = await fetchBuilds("https://everloot.app", KEY, (async (_url, init) =>
+    GET(call("GET", undefined, init?.headers as Record<string, string>))) as typeof fetch);
+  const { lua } = renderBuildsAddon(builds, "2026-10-20T12:00:00.000Z");
+  expect(lua).toContain(`code = "${code}", code2 = "${code2}", order = "O1p-ABACC", order2 = "O1g-BA"`);
+  expect(lua).toContain('character = "Aerin", realm = "Nightslayer"');
+  for (const secret of [KEY, USER.id, "private-", "transfer_key", "notes ="]) expect(lua).not.toContain(secret);
+  expect(auth.authQuery).toHaveBeenCalledTimes(2);
+});
+
+test("refused, invalid and empty key snapshots never issue an order lookup", async () => {
+  for (const snapshot of [
+    ...["unknown_key", "no_scope", "limited"].map((refusal) => ({ refusal, retry_after: 60, characters: null, builds: null })),
+    { refusal: null, characters: [], builds: [] },
+    { refusal: "unexpected", characters: [], builds: [keyRow()] },
+    { refusal: null, characters: [], builds: [{ ...keyRow(), id: "malformed),or=(id.neq.anything" }] },
+    { refusal: null, characters: [], builds: [null] },
+  ]) {
+    auth.authQuery.mockReset().mockResolvedValueOnce([snapshot]);
+    await ownBuildsForKey(KEY).catch(() => null);
+    expect(auth.authQuery).toHaveBeenCalledTimes(1);
+  }
+});
+
+test("key enrichment tolerates only exact documented missing columns; all other failures close the read", async () => {
+  for (const failure of [
+    refused(400, "42703", "column saved_builds.point_order does not exist"),
+    refused(500, "42703", "column saved_builds.point_order does not exist"),
+    refused(400, "42703", "column saved_builds.point_orders does not exist"),
+    new Error("timeout"),
+  ]) {
+    now += ORDERS_RECHECK_MS + 1;
+    auth.authQuery.mockReset()
+      .mockResolvedValueOnce([{ refusal: null, retry_after: 0, characters: [], builds: [keyRow()] }])
+      .mockRejectedValueOnce(failure);
+    const res = await GET(call("GET", undefined, { authorization: `Bearer ${KEY}` }));
+    const exact = (failure as { status?: number; reason?: string }).status === 400
+      && (failure as { reason?: string }).reason === "column saved_builds.point_order does not exist";
+    expect(res.status).toBe(exact ? 200 : 503);
+    if (exact) expect((await res.json()).builds[0]).not.toHaveProperty("order");
+    expect(auth.authQuery).toHaveBeenCalledTimes(2);
+  }
 });
 
 test("a key without read:own is a 403, a dead key a 401, a spent allowance a 429 with Retry-After", async () => {
