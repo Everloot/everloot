@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "vitest";
 import { DATES, POSTS, RULESETS, RULESETS_POST, hasLaunched, windowAt } from "./wow-forever-launch";
-import { longDate } from "./wow-forever";
+import { BETA, longDate } from "./wow-forever";
 
 type Stored = { id: string; title: string; url: string; excerpt: string; postedAt: string };
 const posts = (JSON.parse(readFileSync(new URL("../../../kb/changes/blue-posts.json", import.meta.url), "utf8")) as { posts: Stored[] }).posts;
@@ -22,6 +22,7 @@ test("each date we state is the day the post gives", () => {
   expect(noYear(DATES.namesClose)).toBe("November 3");
   expect(noYear(DATES.raids)).toBe("December 9");
   expect(noYear(DATES.betaClosed)).toBe("October 23");
+  expect(BETA.endsOn).toBe(DATES.betaClosed);
   const names = posts.find((p) => p.id === POSTS.names.id)!;
   expect(names.excerpt).toContain(`${noYear(DATES.namesOpen)} through ${noYear(DATES.namesClose)}`);
   expect(posts.find((p) => p.id === POSTS.raids.id)!.excerpt).toContain(`on ${noYear(DATES.raids)}`);
