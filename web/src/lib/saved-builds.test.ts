@@ -95,6 +95,26 @@ test("an order that does not name exactly its own set's points is refused, whoev
   expect(refused({ order2: ORDER2 })).toEqual({ ok: false, error: "The second spend order does not fit the talents in the second share code." });
 });
 
+test("a new build may carry a transfer key: 16 to 64 letters, digits, - or _, taken as sent", () => {
+  for (const key of ["a".repeat(16), "Ab3_-".repeat(12) + "Ab3_", "device-plan_0123456789"]) {
+    expect(parseBuildInput({ name: "a", code: MAGE, transferKey: key })).toMatchObject({ ok: true, value: { transferKey: key } });
+  }
+  // Left out or null, there is none, and the parsed build says nothing of one.
+  for (const body of [{ name: "a", code: MAGE }, { name: "a", code: MAGE, transferKey: null }]) {
+    const parsed = parseBuildInput(body);
+    expect(parsed.ok).toBe(true);
+    expect(JSON.stringify(parsed.ok && parsed.value)).not.toContain("transferKey");
+  }
+});
+
+test("a transfer key of another shape, or on an update, is refused", () => {
+  for (const transferKey of ["a".repeat(15), "a".repeat(65), " device-plan-0123456", "device plan 0123456789", "device.plan.0123456789", "dévice-plan-0123456789", 1234567890123456, ["device-plan-0123456789"]]) {
+    expect(parseBuildInput({ name: "a", code: MAGE, transferKey })).toEqual({ ok: false, error: "A transfer key is 16 to 64 letters, digits, - or _." });
+  }
+  expect(parseBuildInput({ id: ID, name: "a", code: MAGE, transferKey: "device-plan-0123456789" }))
+    .toEqual({ ok: false, error: "A transfer key is for a new build only." });
+});
+
 test("a character label: a name of 1 to 24, a class, optional realm and note", () => {
   expect(parseCharacterInput({ name: " Jaina ", classSlug: "mage", realm: " ", note: "" }))
     .toEqual({ ok: true, value: { id: null, name: "Jaina", classSlug: "mage", realm: null, note: null } });

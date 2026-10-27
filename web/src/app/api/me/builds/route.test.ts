@@ -319,8 +319,47 @@ test("storage trouble is a 503, never a silent success", async () => {
   expect((await GET(call("GET", undefined, { authorization: `Bearer ${KEY}` }))).status).toBe(503);
 });
 
+// A transfer key makes a new build's save safe to send again: the same key is answered with the build it made.
+const TRANSFER_KEY = "device-plan-0123456789";
+
+test("a new build with a transfer key: 201 the first time, and the same save sent again is a 200 with the same build", async () => {
+  let made = false;
+  auth.authQuery.mockImplementation(async (path: string) => {
+    if (path !== "rpc/save_build_plan") return [row({ code2: MAGE2, point_order: ORDER, point_order2: ORDER2 })];
+    const answer = made ? { ...saved(), replayed: true } : saved();
+    made = true;
+    return answer;
+  });
+  const body = { name: "Fire", code: MAGE, code2: MAGE2, order: ORDER, order2: ORDER2, ...NEW, transferKey: TRANSFER_KEY };
+  const first = await POST(call("POST", body));
+  expect(first.status).toBe(201);
+  expect(rpcBody(0).p_payload).toMatchObject({ id: null, transferKey: TRANSFER_KEY });
+  const again = await POST(call("POST", body));
+  expect(again.status).toBe(200);
+  expect(again.headers.get("cache-control")).toBe("private, no-store");
+  // The same body: the build as saved, read back for this account.
+  expect(await again.json()).toEqual(await first.json());
+  expect(writes()).toEqual(["rpc/save_build_plan", "rpc/save_build_plan"]);
+});
+
+test("a transfer key of another shape, or one on an update, is a 400 before the database is asked", async () => {
+  for (const body of [{ name: "a", code: MAGE, ...NEW, transferKey: "short" }, { name: "a", code: MAGE, ...NEW, transferKey: `${TRANSFER_KEY}!` },
+    { id: BUILD_ID, name: "a", code: MAGE, transferKey: TRANSFER_KEY }]) {
+    expect((await POST(call("POST", body))).status).toBe(400);
+  }
+  expect(auth.authQuery).not.toHaveBeenCalled();
+});
+
 // Before the spend-order migration (the code may be deployed first) the site reads and saves as it did, and refuses
 // only what it cannot keep.
+
+test("before the migration a save with a transfer key is refused with the code, and never goes to save_build", async () => {
+  legacy();
+  const res = await POST(call("POST", { name: "Fire", code: MAGE, ...NEW, transferKey: TRANSFER_KEY }));
+  expect(res.status).toBe(409);
+  expect(await res.json()).toEqual({ error: ORDERS_UNAVAILABLE, code: "orders_unavailable" });
+  expect(writes()).toEqual(["rpc/save_build_plan"]);
+});
 
 test("before the migration the list reads the file's columns and says nothing of orders, asking again after a minute", async () => {
   legacy();

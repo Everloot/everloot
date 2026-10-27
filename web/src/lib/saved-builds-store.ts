@@ -85,11 +85,12 @@ export async function listOwn(userId: string): Promise<AccountBuilds> {
   return { characters: toCharacters(characters), builds: builds.map((b) => toBuild(b, site)) };
 }
 
-/** orders_unavailable: the save names a spend order (null included) and the database cannot keep orders yet. */
+/** orders_unavailable: the save names a spend order (null included) or a transfer key, and the database cannot keep them yet. */
 export type BuildRefusal = "not_found" | "class_mismatch" | "build_limit" | "daily_limit" | "orders_unavailable";
 const REFUSALS: string[] = ["not_found", "class_mismatch", "build_limit", "daily_limit", "orders_unavailable"];
 
-type Written = { build_ref: string | null; build_slug: string | null; refusal: string | null } | null;
+/** A write's answer. `replayed`: a new build's transfer key the account had used, so this is the build it made then. */
+type Written = { build_ref: string | null; build_slug: string | null; refusal: string | null; replayed?: boolean } | null;
 
 /** One write: save_build_plan, or save_build while the database has no save_build_plan and the save names no order. */
 async function writeBuild(userId: string, input: BuildInput, slug: string | null): Promise<Written> {
@@ -103,7 +104,10 @@ async function writeBuild(userId: string, input: BuildInput, slug: string | null
       if (!foundMissing(err, "plan")) throw err;
     }
   }
-  if (input.order !== undefined || input.order2 !== undefined) return { build_ref: null, build_slug: null, refusal: "orders_unavailable" };
+  // save_build keeps neither orders nor a transfer key: a save that names one is refused, not saved without it.
+  if (input.order !== undefined || input.order2 !== undefined || input.transferKey !== undefined) {
+    return { build_ref: null, build_slug: null, refusal: "orders_unavailable" };
+  }
   // save_build_plan's rule for a new build, kept here: it says whether it is shared and shows its owner's name.
   if (!input.id && (input.shared === null || input.showName === null)) throw new Error("A new build needs shared and showName");
   const rows = await authQuery<Written[]>("rpc/save_build", {
@@ -131,7 +135,8 @@ export async function saveBuild(userId: string, input: BuildInput): Promise<{ bu
     const saved = await readBuilds((columns) =>
       `saved_builds?select=${columns}&id=eq.${encodeURIComponent(ref)}&user_id=eq.${encodeURIComponent(userId)}&limit=1`);
     if (!saved[0]) throw new Error("Build was not saved");
-    return { build: toBuild(saved[0], siteUrl()), created: !input.id };
+    // A replay made nothing now: the route answers it as an update, with the same body.
+    return { build: toBuild(saved[0], siteUrl()), created: !input.id && row.replayed !== true };
   }
   throw new Error("No free short link");
 }

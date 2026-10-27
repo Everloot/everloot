@@ -10,7 +10,9 @@ import { fail, limitedText, listOwn, meAccount, NO_STORE, ownBuildsForKey, saveB
  * sent as `Authorization: Bearer evl_...` (the Desktop App, MCP and scripts).
  * POST saves one: without an id it makes a new build, with one it updates that build in place. Each set's spend order
  * (order, order2) is saved with its code in the same write. A new build says whether it is shared and shows its owner's
- * name; nothing here picks for it, so a page that forgets cannot publish a link by default.
+ * name; nothing here picks for it, so a page that forgets cannot publish a link by default. A new build may carry a
+ * transfer key (transferKey): sent again with the same key, the save is answered 200 with the build it made, the same
+ * body as its 201, and nothing is written.
  */
 export const dynamic = "force-dynamic";
 

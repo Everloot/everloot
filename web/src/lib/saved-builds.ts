@@ -26,6 +26,8 @@ export const LIMITS = { name: 60, notes: 1000, code: 400, characterName: 24, rea
 
 export const CODE_PATTERN = /^EL1-[a-z]+-\d+-[0-9.]+-[A-Za-z0-9_-]+$/;
 export const SLUG_PATTERN = /^[A-Za-z0-9]{8}$/;
+/** A new build's transfer key, chosen by the client that sends it; the database checks the same shape. */
+export const TRANSFER_KEY_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
 const ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 export const validId = (id: unknown): id is string => typeof id === "string" && ID_PATTERN.test(id);
@@ -82,6 +84,9 @@ export interface BuildInput {
    *  same and goes when the code changes. */
   order?: string | null;
   order2?: string | null;
+  /** A new build only: the same key sent again by the same account is answered with the build it made, and nothing is
+   *  written (save_build_plan). */
+  transferKey?: string;
 }
 
 export interface CharacterInput { id: string | null; name: string; classSlug: TalentClassSlug; realm: string | null; note: string | null }
@@ -154,7 +159,13 @@ export function parseBuildInput(body: unknown): Parsed<BuildInput> {
   if (order === false) return { ok: false, error: "The spend order does not fit the talents in the share code." };
   const order2 = b.order2 === undefined ? undefined : readOrder(b.order2, code2);
   if (order2 === false) return { ok: false, error: "The second spend order does not fit the talents in the second share code." };
-  return { ok: true, value: { id, name, notes: notes || null, characterId, code, code2, shared, active, showName, order, order2 } };
+  // Taken as sent, never trimmed: a key is made by a program, and one changed here would not find its build again.
+  const transferKey = b.transferKey ?? undefined;
+  if (transferKey !== undefined && (typeof transferKey !== "string" || !TRANSFER_KEY_PATTERN.test(transferKey))) {
+    return { ok: false, error: "A transfer key is 16 to 64 letters, digits, - or _." };
+  }
+  if (transferKey !== undefined && id !== null) return { ok: false, error: "A transfer key is for a new build only." };
+  return { ok: true, value: { id, name, notes: notes || null, characterId, code, code2, shared, active, showName, order, order2, transferKey } };
 }
 
 /** The body of POST /api/me/characters. */

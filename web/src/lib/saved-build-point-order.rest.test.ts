@@ -175,6 +175,8 @@ describe.skipIf(!databaseUrl || !restUrl || !secret)("saved builds through Postg
       await chat({ name: "Test order", code: MAGE, order: ORDER }),
       await account({ name: "Test order", code: MAGE, order: null, order2: null, shared: true, showName: false }),
       await account({ id: chatBuild, name: "Test order", code: MAGE, order: ORDER }),
+      // A transfer key is kept only by save_build_plan too: never sent to save_build, which would drop it.
+      await account({ name: "Test transfer", code: MAGE, shared: false, showName: false, transferKey: "Test-transfer-key-0000" }),
     ]) {
       expect(res.status).toBe(409);
       expect(await res.json()).toEqual({ error: UNAVAILABLE, code: "orders_unavailable" });
@@ -227,6 +229,39 @@ describe.skipIf(!databaseUrl || !restUrl || !secret)("saved builds through Postg
     expect(calc.status).toBe(201);
     const shared = await sharedBuild((await calc.json()).build.slug);
     expect(shared).toMatchObject({ code: MAGE, order: ORDER, order2: null });
+  });
+
+  test("a new build sent again with its transfer key is answered with the build it made, and two at once make one", async () => {
+    const key = "Test-transfer-key-0001";
+    const body = { name: "Test transferred", code: MAGE, code2: MAGE2, order: ORDER, order2: ORDER2, shared: false, showName: false, transferKey: key };
+    const before = await state(owner, true);
+    const first = await account(body);
+    expect(first.status).toBe(201);
+    const made = await first.json();
+    const after = await state(owner, true);
+    expect([after.rows.length, after.saves]).toEqual([before.rows.length + 1, before.saves + 1]);
+    // Its first answer lost, the same save again: a 200 with the same build, nothing written and no save counted.
+    const again = await account({ ...body, name: "Test renamed" });
+    expect(again.status).toBe(200);
+    expect(await again.json()).toEqual(made);
+    expect(await state(owner, true)).toEqual(after);
+    // Another account's same key is its own.
+    session.user = { id: other, name: "Jaina#2002" };
+    const theirs = await account(body);
+    expect(theirs.status).toBe(201);
+    expect((await theirs.json()).build.id).not.toBe(made.build.id);
+    session.user = { id: owner, name: "Thrall#1234" };
+    // Two at once with a new key: one build, one 201, and the other a 200 with that build.
+    const raced = await Promise.all([account({ ...body, transferKey: "Test-transfer-key-0002" }), account({ ...body, transferKey: "Test-transfer-key-0002" })]);
+    expect(raced.map((r) => r.status).sort()).toEqual([200, 201]);
+    const [one, two] = await Promise.all(raced.map((r) => r.json()));
+    expect(one).toEqual(two);
+    expect((await pool.query("select count(*)::int as n from public.saved_builds where user_id = $1 and transfer_key = $2", [owner, "Test-transfer-key-0002"])).rows[0].n).toBe(1);
+    // A key of another shape, or one on an update, is refused before anything is asked.
+    const counted = await state(owner, true);
+    expect((await account({ ...body, transferKey: "short" })).status).toBe(400);
+    expect((await account({ id: made.build.id, name: "Test transferred", code: MAGE, transferKey: key })).status).toBe(400);
+    expect(await state(owner, true)).toEqual(counted);
   });
 
   test("a function save_build_plan needs, missing, is a failure with nothing written, not the function missing", async () => {

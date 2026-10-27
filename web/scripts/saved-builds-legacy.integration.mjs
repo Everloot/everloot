@@ -163,6 +163,13 @@ async function schemaChecksCatchEachCondition() {
   assert.deepEqual(await only("alter table public.build_characters rename column note to label"), ["build_characters has the file's columns"]);
   // A column from a later migration means these checks no longer describe production: stop and update them.
   assert.deepEqual(await only("alter table public.saved_builds add column point_order text"), ["saved_builds has the file's columns"]);
+  // The one later set they allow is the spend-order file's, all three of its columns and nothing short of them.
+  const spendOrder = ["point_order", "point_order2", "transfer_key"];
+  assert.deepEqual(await only(`alter table public.saved_builds ${spendOrder.map((c) => `add column ${c} text`).join(", ")}`), []);
+  for (const short of [spendOrder.slice(0, 2), spendOrder.slice(1), [spendOrder[0], spendOrder[2]]]) {
+    assert.deepEqual(await only(`alter table public.saved_builds ${short.map((c) => `add column ${c} text`).join(", ")}`),
+      ["saved_builds has the file's columns"], short.join(", "));
+  }
   assert.deepEqual(await only("alter table public.saved_builds drop constraint saved_builds_character_id_fkey, "
     + "add foreign key (character_id) references public.build_characters(id) on delete cascade"),
   ["rows go with their account, and a build loses only its label when the label goes"]);

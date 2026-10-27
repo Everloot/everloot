@@ -36,7 +36,9 @@ const CHAIN = [
 ];
 const migration = await read("20261027120000_saved_build_point_order.sql");
 const FUNCTIONS = ["save_build_plan", "saved_build_order_follows_code"];
-const CONSTRAINTS = ["saved_builds_point_order_check", "saved_builds_point_order2_check"];
+const COLUMNS = ["point_order", "point_order2", "transfer_key"];
+const CONSTRAINTS = ["saved_builds_point_order_check", "saved_builds_point_order2_check", "saved_builds_transfer_key_check"];
+const INDEX = "saved_builds_transfer_key";
 const TRIGGER = "saved_builds_order_follows_code";
 
 // The runbook's SQL, run as written.
@@ -148,20 +150,20 @@ const others = async () => (await pool.query(`
   select format('table %s %s %s %s', c.oid::regclass, c.relrowsecurity, c.relacl,
       (select string_agg(a.attname || ' ' || format_type(a.atttypid, a.atttypmod) || coalesce(' ' || a.attacl::text, ''), ', ' order by a.attnum)
          from pg_attribute a where a.attrelid = c.oid and a.attnum > 0 and not a.attisdropped
-           and (a.attrelid <> 'public.saved_builds'::regclass or a.attname not in ('point_order', 'point_order2'))))
+           and (a.attrelid <> 'public.saved_builds'::regclass or a.attname::text <> all ($5::text[]))))
     from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind in ('r', 'p', 'v', 'm')
   union all
   select format('constraint %s %s', conrelid::regclass, pg_get_constraintdef(oid)) from pg_constraint
     where connamespace = 'public'::regnamespace and conname::text <> all ($2::text[])
   union all
   select format('index %s', pg_get_indexdef(indexrelid)) from pg_index i join pg_class c on c.oid = i.indrelid
-    where c.relnamespace = 'public'::regnamespace
+    join pg_class x on x.oid = i.indexrelid where c.relnamespace = 'public'::regnamespace and x.relname <> $4
   union all
   select format('trigger %s', pg_get_triggerdef(t.oid)) from pg_trigger t join pg_class c on c.oid = t.tgrelid
     where c.relnamespace = 'public'::regnamespace and not t.tgisinternal and t.tgname <> $3
   union all
   select format('policy %s %s', tablename, policyname) from pg_policies where schemaname = 'public'
-  order by 1`, [FUNCTIONS, CONSTRAINTS, TRIGGER])).rows.map((r) => r.item);
+  order by 1`, [FUNCTIONS, CONSTRAINTS, TRIGGER, INDEX, COLUMNS])).rows.map((r) => r.item);
 
 const ROLES = ["anon", "authenticated", "service_role"];
 async function legacySchema(defaults) {
@@ -192,9 +194,13 @@ async function legacySchema(defaults) {
 async function preflightCatchesEachCondition() {
   const only = (setup) => rolledBack(async (db) => { await db.query(setup); return failing(PREFLIGHT, db); });
   // Half applied by hand, or applied already: stop, and look before applying again.
-  assert.deepEqual(await only("alter table public.saved_builds add column point_order text"), ["saved_builds has no point_order or point_order2 column yet"]);
-  assert.deepEqual(await only("alter table public.saved_builds add constraint saved_builds_point_order2_check check (true)"),
-    ["no constraint has a name the file adds"]);
+  for (const column of COLUMNS) {
+    assert.deepEqual(await only(`alter table public.saved_builds add column ${column} text`), ["saved_builds has none of the columns the file adds yet"], column);
+  }
+  for (const constraint of ["saved_builds_point_order2_check", "saved_builds_transfer_key_check"]) {
+    assert.deepEqual(await only(`alter table public.saved_builds add constraint ${constraint} check (true)`), ["no constraint has a name the file adds"], constraint);
+  }
+  assert.deepEqual(await only("create index saved_builds_transfer_key on public.saved_builds (slug)"), ["no index or table has the name of the file's index"]);
   assert.deepEqual(await only("create function public.t() returns trigger language plpgsql as $$ begin return new; end; $$; "
     + "create trigger saved_builds_order_follows_code before update on public.saved_builds for each row execute function public.t()"),
   ["no trigger has the name the file adds"]);
@@ -229,9 +235,20 @@ async function heldLockChangesNothing() {
 
 async function postflightCatchesEachCondition() {
   const only = (setup) => rolledBack(async (db) => { await db.query(setup); return failing(POSTFLIGHT, db); });
-  assert.deepEqual(await only("alter table public.saved_builds add column point_order3 text"), ["saved_builds ends with point_order and point_order2, nullable text"]);
-  assert.deepEqual(await only("alter table public.saved_builds drop constraint saved_builds_point_order2_check"),
-    ["each order has the token's shape, and a second order needs a second set"]);
+  const columns = "saved_builds ends with point_order, point_order2 and transfer_key, nullable text";
+  assert.deepEqual(await only("alter table public.saved_builds add column point_order3 text"), [columns]);
+  const shapes = "each order has the token's shape, a second order needs a second set, and a transfer key has its own shape";
+  for (const constraint of CONSTRAINTS) {
+    assert.deepEqual(await only(`alter table public.saved_builds drop constraint ${constraint}`), [shapes], constraint);
+  }
+  // Without its unique index, or with one that is not unique, per owner and only where a key is set, a retry could make
+  // a second build.
+  const once = "a transfer key names one build of its owner: a unique index on user_id and transfer_key, where one is set";
+  for (const index of ["", "create index saved_builds_transfer_key on public.saved_builds (user_id, transfer_key) where transfer_key is not null",
+    "create unique index saved_builds_transfer_key on public.saved_builds (transfer_key) where transfer_key is not null",
+    "create unique index saved_builds_transfer_key on public.saved_builds (user_id, transfer_key)"]) {
+    assert.deepEqual(await only(`drop index public.saved_builds_transfer_key; ${index}`), [once], index || "no index");
+  }
   assert.deepEqual(await only("alter table public.saved_builds disable trigger saved_builds_order_follows_code"),
     ["a save that changes a code drops its order: the trigger runs before each update of code or code2, and is on"]);
   // A definer function with no settings left: its proconfig is NULL, which an aggregate would skip.
@@ -429,6 +446,106 @@ async function legacyAccounts() {
   return { owner, chat: chat.build_ref };
 }
 
+/** Until a save is waiting for a lock another one, still open, holds. */
+async function waitForLock() {
+  for (let i = 0; i < 100; i++) {
+    const [{ n }] = (await pool.query(
+      "select count(*)::int as n from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock'")).rows;
+    if (n > 0) return;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error("The second save never waited for the first");
+}
+
+/** A new build's transfer key: the same save sent again is answered with the build it made, and nothing is written. */
+async function transferKeys() {
+  const owner = await user("bnet-87030", "Rexxar#3003");
+  const other = await user("bnet-87031", "Garrosh#3004");
+  const KEY = "device-plan-0123456789";
+  const totals = async (u) => [await count(u), await saves(u)];
+  const keyOf = async (id) => (await pool.query("select transfer_key from public.saved_builds where id = $1", [id])).rows[0].transfer_key;
+
+  // The first save makes the build as any create does, and the build keeps the key.
+  const made = await savePlan(owner, fresh({ name: "Test moved", code2: MAGE2, order: ORDER, order2: ORDER2, transferKey: KEY }));
+  assert.equal(made.refusal, null);
+  assert.deepEqual(Object.keys(made).sort(), ["build_ref", "build_slug", "refusal"]);
+  assert.deepEqual(await totals(owner), [1, 1]);
+  assert.equal(await keyOf(made.build_ref), KEY);
+  const stored = await own(owner, made.build_ref);
+  // Sent again, its first answer lost on the way: the build it made, answered as its create was, plus replayed. Nothing
+  // is written, whatever else the payload says, and no save is counted, not even at the day's limit.
+  assert.deepEqual(await savePlan(owner, fresh({ name: "Test renamed", code: MAGE4, transferKey: KEY })), { ...made, replayed: true });
+  assert.deepEqual(await totals(owner), [1, 1]);
+  assert.deepEqual(await own(owner, made.build_ref), stored);
+  await pool.query("update public.intake_quota_buckets set count = 300 where bucket = $1", [`builds:${owner}`]);
+  assert.deepEqual(await savePlan(owner, fresh({ transferKey: KEY })), { ...made, replayed: true });
+  assert.equal((await savePlan(owner, fresh({ transferKey: "device-plan-9999999999" }))).refusal, "daily_limit");
+  await pool.query("update public.intake_quota_buckets set count = 1 where bucket = $1", [`builds:${owner}`]);
+
+  // Another owner's same key is a key of its own: its own build, and neither is ever answered with the other's.
+  const theirs = await savePlan(other, fresh({ name: "Test theirs", transferKey: KEY }));
+  assert.deepEqual([theirs.refusal, theirs.replayed], [null, undefined]);
+  assert.notEqual(theirs.build_ref, made.build_ref);
+  assert.deepEqual(await savePlan(owner, fresh({ transferKey: KEY })), { ...made, replayed: true });
+  assert.deepEqual(await savePlan(other, fresh({ transferKey: KEY })), { ...theirs, replayed: true });
+  assert.deepEqual([await totals(owner), await totals(other)], [[1, 1], [1, 1]]);
+
+  // A key of another shape, or one on an update, is refused, and nothing is written.
+  for (const transferKey of ["a".repeat(15), "a".repeat(65), " device-plan-0123456", "device plan 0123456789", "device.plan.0123456789", 1234567890123456]) {
+    await assert.rejects(savePlan(owner, fresh({ transferKey })), /Invalid build/, String(transferKey));
+  }
+  for (const transferKey of [KEY, "device-plan-9999999999"]) {
+    await assert.rejects(savePlan(owner, edit(made.build_ref, { transferKey })), /Invalid build/);
+  }
+  assert.deepEqual(await totals(owner), [1, 1]);
+  // An update without one keeps the key the build was made with, so a late retry still finds it.
+  assert.equal((await savePlan(owner, edit(made.build_ref, { name: "Test moved 2", code2: MAGE2 }))).refusal, null);
+  assert.equal(await keyOf(made.build_ref), KEY);
+  assert.deepEqual(await savePlan(owner, fresh({ transferKey: KEY })), { ...made, replayed: true });
+  // The table holds the same rules for any writer: the key's shape, and one build per owner and key.
+  await assert.rejects(pool.query("update public.saved_builds set transfer_key = 'too short' where id = $1", [made.build_ref]),
+    /violates check constraint "saved_builds_transfer_key_check"/);
+  const second = await savePlan(owner, fresh({ name: "Test second" }));
+  await assert.rejects(pool.query("update public.saved_builds set transfer_key = $1 where id = $2", [KEY, second.build_ref]),
+    /duplicate key value violates unique constraint "saved_builds_transfer_key"/);
+
+  // Two saves racing with one new key make one build. The late one looked for the key before the first was in, then
+  // waited for the account inside save_build: the unique index refuses it the key, and it is answered as the first one's
+  // replay, with its own row and its count undone.
+  const RACE = "device-plan-race-000001";
+  const counted = await totals(owner);
+  const first = await pool.connect();
+  const late = await pool.connect();
+  let won;
+  let lost;
+  try {
+    await first.query("BEGIN");
+    await first.query("SET LOCAL ROLE service_role");
+    won = (await first.query("select public.save_build_plan(p_user_id => $1, p_payload => $2) as saved",
+      [owner, JSON.stringify(fresh({ name: "Test race", transferKey: RACE }))])).rows[0].saved;
+    const pending = savePlan(owner, fresh({ name: "Test race late", transferKey: RACE }), late);
+    await waitForLock();
+    await first.query("COMMIT");
+    lost = await pending;
+  } finally {
+    first.release();
+    late.release();
+  }
+  assert.equal(won.refusal, null);
+  assert.deepEqual(lost, { ...won, replayed: true });
+  assert.deepEqual(await totals(owner), [counted[0] + 1, counted[1] + 1]);
+  const rowsWith = async (key) => (await pool.query("select count(*)::int as n from public.saved_builds where user_id = $1 and transfer_key = $2", [owner, key])).rows[0].n;
+  assert.equal(await rowsWith(RACE), 1);
+  // Sent at the same moment, the same: one build and one save counted; one answer is the other's replay.
+  const SAME = "device-plan-race-000002";
+  const both = await Promise.all([savePlan(owner, fresh({ transferKey: SAME })), savePlan(owner, fresh({ transferKey: SAME }))]);
+  assert.equal(both[0].build_ref, both[1].build_ref);
+  assert.deepEqual(both.map((b) => b.replayed === true).sort(), [false, true]);
+  assert.equal(await rowsWith(SAME), 1);
+  assert.deepEqual(await totals(owner), [counted[0] + 2, counted[1] + 2]);
+  return { owner, made };
+}
+
 try {
   const [{ database }] = (await pool.query("select current_database() as database")).rows;
   assert.equal(database, DATABASE, "Connected to the dedicated test database");
@@ -455,7 +572,7 @@ try {
 
       await run(APPLY);
       assert.deepEqual(await failing(POSTFLIGHT), []);
-      // The saved-builds checks hold with the two columns, and nothing was published.
+      // The saved-builds checks hold with the file's three columns, and nothing was published.
       assert.deepEqual(await failing(SCHEMA), []);
       assert.deepEqual(await failing(PRIVATE), []);
       assert.deepEqual(await others(), before, "the migration alters nothing it does not own");
@@ -473,15 +590,17 @@ try {
     if (defaults === "supabase") await postflightCatchesEachCondition();
     assert.deepEqual(await failing(POSTFLIGHT), []);
     const { owner, chat } = await legacyAccounts();
+    const moved = await transferKeys();
     assert.deepEqual(await others(), before, "saving, sharing and deleting change no function, grant or table");
 
-    // Applied a second time, it keeps every order.
+    // Applied a second time, it keeps every order and every transfer key.
     await run(APPLY);
     assert.deepEqual(await failing(POSTFLIGHT), []);
     assert.deepEqual(await orders(owner, chat), [MAGE, MAGE2, ORDER_G, ORDER2]);
+    assert.deepEqual(await savePlan(moved.owner, fresh({ transferKey: "device-plan-0123456789" })), { ...moved.made, replayed: true });
 
-    // Rollback: the function goes; the columns, the orders in them and the trigger stay, and the saved-builds checks
-    // still read `t`. Only the postflight's rows about save_build_plan fail.
+    // Rollback: the function goes; the columns, the orders and keys in them, the index and the trigger stay, and the
+    // saved-builds checks still read `t`. Only the postflight's rows about save_build_plan fail.
     await run(ROLLBACK);
     assert.deepEqual(await failing(SCHEMA), []);
     assert.deepEqual(await failing(POSTFLIGHT), [
@@ -491,6 +610,8 @@ try {
     ]);
     assert.deepEqual(await others(), before, "the rollback alters nothing it does not own");
     assert.deepEqual(await orders(owner, chat), [MAGE, MAGE2, ORDER_G, ORDER2]);
+    assert.equal((await pool.query("select transfer_key from public.saved_builds where id = $1", [moved.made.build_ref])).rows[0].transfer_key,
+      "device-plan-0123456789");
     // The site from before this file saves as it did, and the trigger still drops an order whose code it changes.
     assert.equal((await oldSave(owner, { id: chat, name: "Chat build 3", code: MAGE, code2: MAGE }, null)).refusal, null);
     assert.deepEqual(await orders(owner, chat), [MAGE, MAGE, ORDER_G, null]);

@@ -97,9 +97,9 @@ select check_name, ok from (values
        || 'realm text, note text, created_at timestamp with time zone not null, updated_at timestamp with time zone not null'
        from pg_attribute where attrelid = to_regclass('public.build_characters') and attnum > 0 and not attisdropped)),
   ('saved_builds has the file''s columns',
-    -- Once 20261027120000_saved_build_point_order.sql is applied they are followed by point_order and point_order2.
+    -- Once 20261027120000_saved_build_point_order.sql is applied they are followed by point_order, point_order2 and transfer_key.
     (select regexp_replace(coalesce(string_agg(attname || ' ' || format_type(atttypid, atttypmod) || case when attnotnull then ' not null' else '' end,
-       ', ' order by attnum), ''), ', point_order text, point_order2 text$', '') = 'id uuid not null, user_id uuid not null, character_id uuid, slug text not null, '
+       ', ' order by attnum), ''), ', point_order text, point_order2 text, transfer_key text$', '') = 'id uuid not null, user_id uuid not null, character_id uuid, slug text not null, '
        || 'name text not null, notes text, class_slug text not null, code text not null, code2 text, game_build text not null, '
        || 'shared boolean not null, show_name boolean not null, active boolean not null, '
        || 'created_at timestamp with time zone not null, updated_at timestamp with time zone not null'
@@ -339,6 +339,14 @@ migration holds them, `supabase/migrations/20261027120000_saved_build_point_orde
   orders in the same transaction, so a failure anywhere saves nothing and costs no save. A new build must say `shared`
   and `showName`, and Chat sends false for both. An order left out of a save stays only while its code stays the same.
   The server reads every token against its own set's code before calling it.
+- `transfer_key` on `saved_builds`, nullable text after the orders, checked to `^[A-Za-z0-9_-]{16,64}$`, with the
+  unique index `saved_builds_transfer_key` on `(user_id, transfer_key)` where a key is set. A client that may send the
+  same new build twice, such as the device transfer, gives it a key (`transferKey`). If the account already has a build
+  with that key, `save_build_plan` answers with that build as its create did, plus `"replayed": true`; nothing is
+  written and no save is counted, and the route answers 200 rather than 201 with the same body. Two saves racing with
+  one key make one build: the index refuses the second its key, and it is answered as the first one's replay with all it
+  did undone. Another account's same key is a key of its own. A key is for a new build only; an update that sends one
+  is refused.
 - The trigger `saved_builds_order_follows_code`, with its function `saved_build_order_follows_code()`: an update that
   changes a code drops that set's order. That keeps the orders right for every caller of `save_build`, the site from
   before this migration included.
@@ -350,8 +358,9 @@ page reads the orders beside `shared_build`, only for the build it returned and 
 
 The code and the migration can go out in either order, but orders are kept only once the migration is in. Until then
 the site reads builds without orders, and Chat, which is on in production whatever the switch says, lists and saves
-as it did: a save that names no order goes through `save_build`. A save that names an order, an unknown one too, is
-refused before anything is written, with "Saving spend orders isn't available yet, so this build was not saved." The
+as it did: a save that names no order goes through `save_build`. A save that names an order, an unknown one too, or a
+transfer key, is refused before anything is written: a 409 with "Saving spend orders isn't available yet, so this
+build was not saved." and the code `orders_unavailable` on both build routes. The
 calculator's Save always names both sets' orders, so with saved builds on it saves nothing until the migration is
 in: apply it before `EVERLOOT_SAVED_BUILDS` goes on. Only PostgREST's own answer, word for word, counts as missing:
 a 400 with 42703 and "column saved_builds.point_order does not exist" (or `point_order2`), or a 404 with PGRST202
@@ -385,8 +394,12 @@ update alike; an older save that changes a code drops its order, and one that ke
 without `shared` and `showName` is refused; malformed payloads write nothing; unshared, private and unknown builds stay
 off the public read, orders and all; the browser roles reach neither the columns nor the function; the calculator's
 and Chat's saves and reopens keep both orders and their makers; another account changes nothing; the limits hold; a
-key's read is unchanged. Applying twice keeps every order, the rollback keeps the columns, the orders and the trigger,
-and applying again brings the function back, with every other function, grant and table as it was throughout.
+key's read is unchanged. A new build's transfer key: the same save again is answered with the build it made, as its
+create was plus `replayed`, with nothing written and no save counted, even at the day's limit; another account's same
+key makes its own build; two saves racing with one key make one build, both when one waits for the other's account and
+when they are sent together; a key of another shape or on an update is refused. Applying twice keeps every order and
+key, the rollback keeps the columns, the orders and keys, the index and the trigger, and applying again brings the
+function back, with every other function, grant and table as it was throughout.
 
 `src/lib/saved-build-point-order.rest.test.ts` runs the site's own saved-builds code, the Chat and calculator routes
 with a made-up session, through a real PostgREST on the same legacy schema: first without the migration, then in the
@@ -405,9 +418,11 @@ docker network rm saved-build-point-order-rest
 
 Before the migration PostgREST answers a read of the order columns with 400 and 42703, and a call to
 `save_build_plan` with 404 and PGRST202; PostgREST 12.2, 13.0 and Supabase's 14.4, 14.8 and 16.4 answer the same. The
-test checks those answers. Then it checks that Chat lists and saves, that a save with an order is refused with
-nothing written, and that the explicit sharing and the owner checks hold on the older path. After the apply, the
-process goes on without the migration for the rest of its minute, then saves orders through `save_build_plan`. A
+test checks those answers. Then it checks that Chat lists and saves, that a save with an order or a transfer key is
+refused with nothing written, and that the explicit sharing and the owner checks hold on the older path. After the
+apply, the process goes on without the migration for the rest of its minute, then saves orders through
+`save_build_plan`. Through the calculator's route, a new build with a transfer key is a 201, the same save again a 200
+with the same body and nothing written, another account's same key its own build, and two sent together one build. A
 fault made on purpose, `save_build_plan` calling a helper the database does not have, gets a 503 with nothing written,
 and once the file is applied again the very next save with orders goes through `save_build_plan`. A drop that PostgREST
 is not told about counts as the function missing, through 42883 from its stale cache. After the rollback the orders
@@ -421,11 +436,14 @@ this block. Every row must be `t`; anything else (`f`, NULL or an error) means s
 ```sql
 -- point order preflight
 select check_name, ok from (values
-  ('saved_builds has no point_order or point_order2 column yet',
+  ('saved_builds has none of the columns the file adds yet',
     not exists (select 1 from pg_attribute where attrelid = to_regclass('public.saved_builds')
-      and attname in ('point_order', 'point_order2') and not attisdropped)),
+      and attname in ('point_order', 'point_order2', 'transfer_key') and not attisdropped)),
   ('no constraint has a name the file adds',
-    not exists (select 1 from pg_constraint where conname in ('saved_builds_point_order_check', 'saved_builds_point_order2_check'))),
+    not exists (select 1 from pg_constraint where conname in ('saved_builds_point_order_check', 'saved_builds_point_order2_check',
+      'saved_builds_transfer_key_check'))),
+  ('no index or table has the name of the file''s index',
+    to_regclass('public.saved_builds_transfer_key') is null),
   ('no trigger has the name the file adds',
     not exists (select 1 from pg_trigger where tgname = 'saved_builds_order_follows_code')),
   ('no function has either name the file adds',
@@ -442,8 +460,8 @@ select check_name, ok from (values
 ### Apply (maintainer only, after review)
 
 Back up as usual. In the SQL editor, paste the migration file unchanged between these lines and run it once. The
-bounded lock wait matters: adding the columns and the trigger needs `saved_builds` to itself for a moment, and a save
-in progress holds it. If it stops with an error, nothing was applied: run `rollback;`, run the preflight again and
+bounded lock wait matters: adding the columns, the index and the trigger needs `saved_builds` to itself for a moment,
+and a save in progress holds it. If it stops with an error, nothing was applied: run `rollback;`, run the preflight again and
 retry later.
 
 ```sql
@@ -464,17 +482,25 @@ function.
 ```sql
 -- point order postflight
 select check_name, ok from (values
-  ('saved_builds ends with point_order and point_order2, nullable text',
+  ('saved_builds ends with point_order, point_order2 and transfer_key, nullable text',
     (select string_agg(attname || ' ' || format_type(atttypid, atttypmod) || case when attnotnull then ' not null' else '' end,
        ', ' order by attnum) from (select attname, atttypid, atttypmod, attnotnull, attnum from pg_attribute
-         where attrelid = to_regclass('public.saved_builds') and attnum > 0 and not attisdropped order by attnum desc limit 3) last)
-      = 'updated_at timestamp with time zone not null, point_order text, point_order2 text'),
-  ('each order has the token''s shape, and a second order needs a second set',
+         where attrelid = to_regclass('public.saved_builds') and attnum > 0 and not attisdropped order by attnum desc limit 4) last)
+      = 'updated_at timestamp with time zone not null, point_order text, point_order2 text, transfer_key text'),
+  ('each order has the token''s shape, a second order needs a second set, and a transfer key has its own shape',
     (select string_agg(conname || ' ' || pg_get_constraintdef(oid), ' | ' order by conname) from pg_constraint
-      where conrelid = to_regclass('public.saved_builds') and conname in ('saved_builds_point_order_check', 'saved_builds_point_order2_check'))
+      where conrelid = to_regclass('public.saved_builds')
+        and conname in ('saved_builds_point_order_check', 'saved_builds_point_order2_check', 'saved_builds_transfer_key_check'))
       = 'saved_builds_point_order2_check CHECK (((point_order2 IS NULL) OR ((code2 IS NOT NULL) AND '
       || '(point_order2 ~ ''^O1[pg]-[A-Za-z0-9_-]{1,64}$''::text)))) | saved_builds_point_order_check CHECK (((point_order IS NULL) '
-      || 'OR (point_order ~ ''^O1[pg]-[A-Za-z0-9_-]{1,64}$''::text)))'),
+      || 'OR (point_order ~ ''^O1[pg]-[A-Za-z0-9_-]{1,64}$''::text))) | saved_builds_transfer_key_check CHECK (((transfer_key IS NULL) '
+      || 'OR (transfer_key ~ ''^[A-Za-z0-9_-]{16,64}$''::text)))'),
+  ('a transfer key names one build of its owner: a unique index on user_id and transfer_key, where one is set',
+    exists (select 1 from pg_index i where i.indexrelid = to_regclass('public.saved_builds_transfer_key')
+      and i.indrelid = to_regclass('public.saved_builds') and i.indisunique and i.indisvalid and i.indnkeyatts = 2
+      and (select array_agg(a.attname::text order by k.n) from unnest(i.indkey::int2[]) with ordinality as k(attnum, n)
+        join pg_attribute a on a.attrelid = i.indrelid and a.attnum = k.attnum) = array['user_id', 'transfer_key']
+      and pg_get_expr(i.indpred, i.indrelid) = '(transfer_key IS NOT NULL)')),
   ('a save that changes a code drops its order: the trigger runs before each update of code or code2, and is on',
     exists (select 1 from pg_trigger t where t.tgrelid = to_regclass('public.saved_builds') and t.tgname = 'saved_builds_order_follows_code'
       and t.tgfoid = to_regprocedure('public.saved_build_order_follows_code()') and t.tgtype = 19 and t.tgenabled = 'O'
@@ -491,7 +517,7 @@ select check_name, ok from (values
   ('their bodies are the file''s, word for word',
     (select md5(string_agg(proname || ':' || regexp_replace(prosrc, '\s+', ' ', 'g'), '|' order by proname)) from pg_proc
       where pronamespace = 'public'::regnamespace and proname in ('save_build_plan', 'saved_build_order_follows_code'))
-      = 'bcbde94dd7217fdfd8e0a965a4815fe6'),
+      = '5d5076f1049d691143e4d97e6a4e4c1a'),
   ('only service_role may call save_build_plan',
     coalesce(has_function_privilege('service_role', to_regprocedure('public.save_build_plan(uuid, jsonb)'), 'execute')
       and not has_function_privilege('anon', to_regprocedure('public.save_build_plan(uuid, jsonb)'), 'execute')
@@ -527,8 +553,8 @@ select count(*) as builds, count(point_order) as with_order from public.saved_bu
 The code needs no rollback for the database's sake: it works with the migration, without it and with the function
 alone gone. Redeploying the commit from before it is a rollback of its own, with no SQL; that code never reads or
 writes orders, and while it runs the trigger drops the order of any build whose code it changes. If the function
-itself must go, run the block below. From its next save the site saves a build that names no order through
-`save_build` again and refuses one that names an order, with nothing written.
+itself must go, run the block below. From its next save the site saves a build that names no order and no transfer
+key through `save_build` again and refuses one that names either, with nothing written.
 
 ```sql
 -- point order rollback
@@ -539,6 +565,7 @@ notify pgrst, 'reload schema';
 commit;
 ```
 
-The columns, every order in them and the trigger stay, and the schema checks above still read `t`. Never drop the
-columns, which deletes every saved order, or the trigger, without which an older save could leave an order beside a
-code it was not made for. Applying the file again brings the function back.
+The columns, every order and transfer key in them, the key's unique index and the trigger stay, and the schema checks
+above still read `t`. Never drop the columns, which deletes every saved order and key, or the trigger, without which
+an older save could leave an order beside a code it was not made for. Applying the file again brings the function
+back, and a build's key finds it again.
