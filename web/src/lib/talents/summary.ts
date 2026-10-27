@@ -1,5 +1,6 @@
 import { importCode } from "./import";
 import { pointsByTree, pointsSpent } from "./rules";
+import { decodeBuild } from "./share";
 import type { Ranks, TalentCatalog } from "./types";
 
 // A build as players say it: the tree with the most points and the split ("Fire 17/34/0"). Used by
@@ -29,13 +30,14 @@ export function buildTitle(catalog: TalentCatalog, summary: BuildSummary): strin
 
 /**
  * The share codes in a preview link's path, `/b/<first>/<second>`, with "-" for an empty first set.
- * Each is checked against the catalog; a code that does not load is dropped, and none loading means
- * the link is not a build.
+ * Each must read as a code whole, as the calculator reads it, and is checked against the catalog; a
+ * code that does not load is dropped, and none loading means the link is not a build.
  */
 export function readPathCodes(catalog: TalentCatalog, segments: string[]): { first: string | null; second: string | null; sets: Ranks[] } | null {
   const [a, b] = segments.map((s) => decodeURIComponent(s));
   const load = (code: string | undefined) => {
-    if (!code || code === "-") return null;
+    // importCode reads links too, and would find a code inside a segment that is not one.
+    if (!code || code === "-" || !decodeBuild(code).ok) return null;
     const r = importCode(catalog, code);
     return r.ok ? { code, ranks: r.ranks } : null;
   };
