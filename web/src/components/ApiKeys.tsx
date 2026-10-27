@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useId, useRef, useState, type FormEvent, type Ref } from "react";
 import CopyButton from "@/components/ui/CopyButton";
 import {
   DEFAULT_EXPIRY_DAYS, EXPIRY_DAYS, KEY_SCOPES, MAX_EXPIRY_DAYS, PURPOSE_MAX, daysUntil, expiryFrom, keyExpired, type KeyRow,
@@ -30,6 +31,35 @@ async function send(method: "POST" | "DELETE", url: string, body?: object) {
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.error ?? "That did not work. Try again.");
   return result;
+}
+
+/**
+ * Dispatched on window whenever this account's keys change (made, rolled, revoked or deleted), from the list or from
+ * Remove access. The list reads its keys again, and on /account KeysRefresh reads the server-rendered parts again.
+ */
+export const KEYS_CHANGED_EVENT = "everloot:keys-changed";
+const changed = () => window.dispatchEvent(new Event(KEYS_CHANGED_EVENT));
+
+/** The question before a key is revoked or rolled: what stops working, then the action or Cancel. */
+function Confirm({ action, name, hint, busy, confirmRef, onConfirm, onCancel }: {
+  action: "revoke" | "roll"; name: string; hint: string; busy: boolean;
+  confirmRef: Ref<HTMLButtonElement>; onConfirm: () => void; onCancel: () => void;
+}) {
+  return (
+    <div role="group" aria-label={`Confirm ${action} ${name}`} className="space-y-2 rounded-lg border border-line bg-panel p-3">
+      <p className="text-sm text-fg">
+        {action === "revoke"
+          ? `Revoke ${name}? Anything using evl_…${hint} stops working at once.`
+          : `Roll ${name}? You get a new secret with the same name, permissions and lifetime. evl_…${hint} stops working at once.`}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <button ref={confirmRef} type="button" className={primary} disabled={busy} onClick={onConfirm}>
+          {action === "revoke" ? "Revoke key" : "Roll key"}
+        </button>
+        <button type="button" className={button} onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
 }
 
 /** The one-time reveal of a new or rolled key, with a copy button. */
@@ -204,6 +234,13 @@ export default function ApiKeys() {
     setReturnTo(null);
   }, [returnTo, confirming, state]);
 
+  // Every change, this list's own included, comes back through the event, so the list reads its keys again.
+  useEffect(() => {
+    const again = () => setReload((n) => n + 1);
+    window.addEventListener(KEYS_CHANGED_EVENT, again);
+    return () => window.removeEventListener(KEYS_CHANGED_EVENT, again);
+  }, []);
+
   useEffect(() => {
     let active = true;
     (async () => {
@@ -239,14 +276,14 @@ export default function ApiKeys() {
     await send("DELETE", `/api/keys?id=${encodeURIComponent(k.id)}`);
     setConfirming(null);
     setReturnTo({ id: k.id, action: "row" });
-    setReload((n) => n + 1);
+    changed();
   });
-  const erase = (k: KeyRow) => act(async () => { await send("DELETE", `/api/keys?id=${encodeURIComponent(k.id)}&erase=1`); setReload((n) => n + 1); });
+  const erase = (k: KeyRow) => act(async () => { await send("DELETE", `/api/keys?id=${encodeURIComponent(k.id)}&erase=1`); changed(); });
   const roll = (k: KeyRow) => act(async () => {
     const made = await send("POST", `/api/keys?roll=${encodeURIComponent(k.id)}`);
     setConfirming(null);
     setFresh({ token: made.token, name: k.label || `evl_…${k.hint}`, expiresAt: made.expires_at ?? null, rolled: true });
-    setReload((n) => n + 1);
+    changed();
   });
 
   if (state.status === "loading") return <p className="text-sm text-muted">Checking your account…</p>;
@@ -274,7 +311,7 @@ export default function ApiKeys() {
 
       {creating && (
         <CreateForm ready={state}
-          onMade={(made) => { setCreating(false); setFresh(made); setReload((n) => n + 1); }}
+          onMade={(made) => { setCreating(false); setFresh(made); changed(); }}
           onCancel={() => { setCreating(false); setTimeout(() => createButton.current?.focus(), 0); }} />
       )}
 
@@ -300,19 +337,9 @@ export default function ApiKeys() {
                   <dt className="text-muted">Last used</dt><dd className="text-fg-2">{day(k.last_used_at)}</dd>
                 </dl>
                 {asking ? (
-                  <div role="group" aria-label={`Confirm ${asking} ${name}`} className="space-y-2 rounded-lg border border-line bg-panel p-3">
-                    <p className="text-sm text-fg">
-                      {asking === "revoke"
-                        ? `Revoke ${name}? Anything using evl_…${k.hint} stops working at once.`
-                        : `Roll ${name}? You get a new secret with the same name, permissions and lifetime. evl_…${k.hint} stops working at once.`}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <button ref={confirmButton} type="button" className={primary} disabled={busy} onClick={() => void (asking === "revoke" ? revoke(k) : roll(k))}>
-                        {asking === "revoke" ? "Revoke key" : "Roll key"}
-                      </button>
-                      <button type="button" className={button} onClick={() => { setConfirming(null); setReturnTo({ id: k.id, action: asking }); }}>Cancel</button>
-                    </div>
-                  </div>
+                  <Confirm action={asking} name={name} hint={k.hint} busy={busy} confirmRef={confirmButton}
+                    onConfirm={() => void (asking === "revoke" ? revoke(k) : roll(k))}
+                    onCancel={() => { setConfirming(null); setReturnTo({ id: k.id, action: asking }); }} />
                 ) : (
                   <div className="flex flex-wrap gap-2">
                     {!k.revoked_at && state.records && (
@@ -334,4 +361,62 @@ export default function ApiKeys() {
       {error && <p role="alert" className="text-sm text-fg">{error}</p>}
     </div>
   );
+}
+
+/**
+ * Remove access, on the Integrations of /account: one key's Revoke, asked with the list's own question and sent the
+ * way the list sends it. The key's card leaves once the page is read again, so focus first moves to `focusAfter` (an id).
+ */
+export function RemoveAccess({ id, name, hint, focusAfter }: { id: string; name: string; hint: string; focusAfter: string }) {
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [removed, setRemoved] = useState(false);
+  const opener = useRef<HTMLButtonElement>(null);
+  const confirmButton = useRef<HTMLButtonElement>(null);
+  const asked = useRef(false);
+
+  // Into the question when it opens; back to Remove access when Cancel closes it.
+  useEffect(() => {
+    if (asking) asked.current = true;
+    if (asked.current) (asking ? confirmButton : opener).current?.focus();
+  }, [asking]);
+
+  async function revoke() {
+    setBusy(true);
+    setError(null);
+    try {
+      await send("DELETE", `/api/keys?id=${encodeURIComponent(id)}`);
+      setRemoved(true);
+      document.getElementById(focusAfter)?.focus();
+      changed();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "That did not work. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (removed) return <p role="status" className="text-sm text-fg-2">Access removed.</p>;
+  return (
+    <div className="space-y-2">
+      {asking ? (
+        <Confirm action="revoke" name={name} hint={hint} busy={busy} confirmRef={confirmButton} onConfirm={() => void revoke()} onCancel={() => setAsking(false)} />
+      ) : (
+        <button ref={opener} type="button" className="btn min-h-11 px-3 text-sm" aria-label={`Remove access for ${name}`} onClick={() => setAsking(true)}>Remove access</button>
+      )}
+      {error && <p role="alert" className="text-sm text-fg">{error}</p>}
+    </div>
+  );
+}
+
+/** On /account: when the keys change, the parts the server renders (the overview's counts, Integrations) are read again. */
+export function KeysRefresh() {
+  const router = useRouter();
+  useEffect(() => {
+    const refresh = () => router.refresh();
+    window.addEventListener(KEYS_CHANGED_EVENT, refresh);
+    return () => window.removeEventListener(KEYS_CHANGED_EVENT, refresh);
+  }, [router]);
+  return null;
 }

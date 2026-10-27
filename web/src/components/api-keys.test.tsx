@@ -2,10 +2,15 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import ApiKeys from "./ApiKeys";
+import ApiKeys, { KEYS_CHANGED_EVENT, KeysRefresh, RemoveAccess } from "./ApiKeys";
+
+const router = vi.hoisted(() => ({ refresh: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
 
 let container: HTMLDivElement;
 let root: Root;
+/** Hears every "the keys changed" the page is told. */
+const heard = vi.fn();
 const DAY = 86_400_000;
 const KEY = {
   id: "0b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e11", hint: "beef", label: "bot", purpose: "Drop rates", scopes: ["read:public"],
@@ -19,10 +24,14 @@ beforeEach(() => {
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
+  heard.mockClear();
+  router.refresh.mockClear();
+  window.addEventListener(KEYS_CHANGED_EVENT, heard);
 });
 afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
+  window.removeEventListener(KEYS_CHANGED_EVENT, heard);
   vi.unstubAllGlobals();
 });
 
@@ -229,4 +238,80 @@ test("a revoked key offers Delete, which erases it", async () => {
   expect(buttonNamed("Roll bot")).toBeUndefined();
   await click("Delete bot");
   expect(calls.filter((c) => c.method === "DELETE").map((c) => c.url)).toEqual([`/api/keys?id=${KEY.id}&erase=1`]);
+});
+
+test("a change made in the list is announced, so the rest of the page can read the keys again", async () => {
+  api(ready());
+  await act(async () => root.render(<ApiKeys />));
+  await click("Revoke bot");
+  await click("Revoke key");
+  expect(heard).toHaveBeenCalledTimes(1);
+});
+
+test("the list reads the keys again when something else on the page changes them", async () => {
+  let revoked: string | null = null;
+  const reads = vi.fn();
+  vi.stubGlobal("fetch", async (_url: string, init?: RequestInit) => {
+    if (!init?.method) reads();
+    return Response.json(ready({ keys: [{ ...KEY, revoked_at: revoked }] }));
+  });
+  await act(async () => root.render(<ApiKeys />));
+  expect(buttonNamed("Revoke bot")).toBeDefined();
+  revoked = "2026-10-20T00:00:00Z";
+  await act(async () => { window.dispatchEvent(new Event(KEYS_CHANGED_EVENT)); });
+  expect(reads).toHaveBeenCalledTimes(2);
+  expect(container.textContent).toContain("Revoked 2026-10-20");
+  expect(buttonNamed("Revoke bot")).toBeUndefined();
+});
+
+/** Where focus goes once Remove access has revoked the key and its card is about to leave the page. */
+function focusTarget() {
+  const target = document.createElement("h3");
+  target.id = "after";
+  target.tabIndex = -1;
+  document.body.append(target);
+  return target;
+}
+
+test("Remove access asks the list's own question first; Cancel sends nothing and returns focus to it", async () => {
+  const calls = api(ready());
+  await act(async () => root.render(<RemoveAccess id={KEY.id} name="bot" hint="beef" focusAfter="after" />));
+  buttonNamed("Remove access for bot")!.focus();
+  await click("Remove access for bot");
+  expect(container.querySelector('[role="group"]')?.getAttribute("aria-label")).toBe("Confirm revoke bot");
+  expect(container.textContent).toContain("Revoke bot? Anything using evl_…beef stops working at once.");
+  expect(document.activeElement).toBe(buttonNamed("Revoke key"));
+  await click("Cancel");
+  expect(calls).toEqual([]);
+  expect(document.activeElement).toBe(buttonNamed("Remove access for bot"));
+});
+
+test("Remove access revokes with the list's own request, moves focus on and tells the page its keys changed", async () => {
+  const calls = api(ready());
+  const target = focusTarget();
+  await act(async () => root.render(<RemoveAccess id={KEY.id} name="bot" hint="beef" focusAfter="after" />));
+  await click("Remove access for bot");
+  await click("Revoke key");
+  expect(calls).toEqual([{ url: `/api/keys?id=${KEY.id}`, method: "DELETE", body: null }]);
+  expect(heard).toHaveBeenCalledTimes(1);
+  expect(document.activeElement).toBe(target);
+  expect(container.querySelector('[role="status"]')?.textContent).toBe("Access removed.");
+  target.remove();
+});
+
+test("a refused Remove access says why, keeps the question open and announces nothing", async () => {
+  vi.stubGlobal("fetch", async () => Response.json({ ok: false, error: "No live key with that id on this account." }, { status: 404 }));
+  await act(async () => root.render(<RemoveAccess id={KEY.id} name="bot" hint="beef" focusAfter="after" />));
+  await click("Remove access for bot");
+  await click("Revoke key");
+  expect(container.querySelector('[role="alert"]')?.textContent).toBe("No live key with that id on this account.");
+  expect(buttonNamed("Revoke key")).toBeDefined();
+  expect(heard).not.toHaveBeenCalled();
+});
+
+test("on the account page, a change to the keys reads the server's parts again", async () => {
+  await act(async () => root.render(<KeysRefresh />));
+  expect(router.refresh).not.toHaveBeenCalled();
+  await act(async () => { window.dispatchEvent(new Event(KEYS_CHANGED_EVENT)); });
+  expect(router.refresh).toHaveBeenCalledTimes(1);
 });
