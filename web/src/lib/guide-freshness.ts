@@ -45,6 +45,9 @@ export interface GuideSet {
   changes: string[];
   /** A change the records show to the set's talents came after the build the guide was reviewed against. */
   stale: boolean;
+  /** When it is stale, those changes alone, with what the records cannot say about the builds since the review, in the
+   *  change engine's words; empty otherwise. A change at or before the reviewed build is one the review saw. */
+  sinceReview: string[];
 }
 
 export interface GuideFreshness {
@@ -56,16 +59,22 @@ export interface GuideFreshness {
 
 const PROVISIONAL = "The spend order is provisional, made by the calculator when asked; a published guide carries only an order a player planned.";
 
-/** Whether the records show a change to the plan after `build`. One whose build cannot be compared with it counts;
- *  with no review, every change does. */
-function changedAfter(f: PlanFreshness, build: string | null): boolean {
+/** The part of a plan's freshness after `build`, the one its guide was reviewed against: the changes the records place
+ *  after it, and the gaps that leave the builds after it unknown. A build that cannot be compared with it counts as
+ *  after; with no review, everything does. */
+function afterReview(f: PlanFreshness, build: string | null): PlanFreshness {
   const after = (b: string) => build === null || (compareGameBuilds(b, build) ?? 1) === 1;
-  return f.touched.some((t) => t.changes.some((c) => after(c.build))) || f.pointLevels.some((p) => after(p.build));
+  return {
+    ...f,
+    touched: f.touched.map((t) => ({ ...t, changes: t.changes.filter((c) => after(c.build)) })).filter((t) => t.changes.length > 0),
+    pointLevels: f.pointLevels.filter((p) => after(p.build)),
+    gaps: f.gaps.filter((g) => g.kind === "unplaced" || after(g.kind === "unrecorded" ? g.to : g.build)),
+  };
 }
 
 function readSet(set: 1 | 2, code: string, order: string | null, guide: GuidePlanFields, catalog: TalentCatalog, changes: ClassTalentChanges): GuideSet {
   const opened = importPlan(catalog, code, order);
-  if (!opened.ok) return { set, code, order, plan: null, problems: [opened.message], changes: [], stale: false };
+  if (!opened.ok) return { set, code, order, plan: null, problems: [opened.message], changes: [], stale: false, sinceReview: [] };
   // The calculator's own sentences for what did not place and why the order was lost. Its first, when the code was made
   // on another build, is for the change records to explain (`changes`).
   const { report } = opened;
@@ -77,7 +86,10 @@ function readSet(set: 1 | 2, code: string, order: string | null, guide: GuidePla
   if (asked > most) problems.push(`It spends ${asked} points, and this tree gives ${most} by level ${catalog.rules.maxLevel}.`);
   else if (needs > guide.levels.to) problems.push(`It needs level ${needs}, above level ${guide.levels.to}, the last this guide covers.`);
   const f = codeFreshness(catalog, changes, code);
-  return { set, code, order, plan: opened.set, problems, changes: f ? freshnessLines(f) : [], stale: f !== null && changedAfter(f, guide.reviewed?.build ?? null) };
+  const since = f && afterReview(f, guide.reviewed?.build ?? null);
+  const stale = since !== null && (since.touched.length > 0 || since.pointLevels.length > 0);
+  // Without the engine's first line, which dates the plan: the note dates the review itself.
+  return { set, code, order, plan: opened.set, problems, changes: f ? freshnessLines(f) : [], stale, sinceReview: since && stale ? freshnessLines(since).slice(1) : [] };
 }
 
 const DAY = 86_400_000;
@@ -101,7 +113,7 @@ export function guideFreshness(guide: GuidePlanFields, catalog: TalentCatalog, c
   if (guide.code2 !== undefined) sets.push(readSet(2, guide.code2, guide.order2 ?? null, guide, catalog, changes));
   const named = (s: GuideSet, line: string) => (sets.length > 1 ? `Set ${s.set}: ${line}` : line);
   const broken = sets.flatMap((s) => s.problems.map((p) => named(s, p)));
-  const stale = sets.filter((s) => s.stale).flatMap((s) => s.changes.map((l) => named(s, l)));
+  const stale = sets.flatMap((s) => s.sinceReview.map((l) => named(s, l)));
   const due = dueReasons(guide.reviewed, changes, today);
   const state: GuideState = broken.length ? "broken" : stale.length ? "stale" : due.length ? "review-due" : "current";
   return { state, reasons: [...broken, ...stale, ...due], sets };

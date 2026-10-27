@@ -97,12 +97,44 @@ describe("guideFreshness", () => {
     expect(lines).toContain("Talent 12: its spell changed in build 1.0.0.5: 1 number.");
     expect(f.state).toBe("stale");
     expect(f.sets[0]).toMatchObject({ changes: lines, stale: true, problems: [] });
-    // The worst first: the changes, then why it is also due for review.
-    expect(f.reasons).toEqual([...lines, "Game build 1.0.0.5 is live and newer than 1.0.0.1, the build this guide was reviewed against."]);
+    // The worst first: the changes since the review, then why it is also due for review. The engine's first line dates
+    // the plan; the note names the review's build itself.
+    expect(lines[0]).toBe("Made on game build 1.0.0.1; this tree is build 1.0.0.5.");
+    expect(f.reasons).toEqual([...lines.slice(1), "Game build 1.0.0.5 is live and newer than 1.0.0.1, the build this guide was reviewed against."]);
 
     // A change to the levels talent points arrive at is evidence too.
     const levels = [record("1.0.0.3", "1.0.0.1", { pointLevels: [{ classId: 8, className: "Mage", before: [10, 11, 12], after: [10, 12, 14], spoiler: false }] })];
     expect(guideFreshness(guide(), tree("1.0.0.3"), changes(levels), TODAY).state).toBe("stale");
+  });
+
+  test("a stale guide's reasons list only the changes after the build it was reviewed against; one its review saw is left to the plan's history", () => {
+    // Made on 1.0.0.1, reviewed against 1.0.0.3; the records change Talent 11 in 1.0.0.3 and Talent 12 in 1.0.0.5.
+    const records = [record("1.0.0.3", "1.0.0.1", { spellValues: [spellChange(11)] }), record("1.0.0.5", "1.0.0.3", { spellValues: [spellChange(12)] })];
+    const two = guide({ code2: code(RANKS2), order2: token(RANKS2, ORDER2), reviewed: { ...REVIEWED, build: "1.0.0.3" } });
+    const f = guideFreshness(two, tree("1.0.0.5"), changes(records), TODAY);
+    expect(f.state).toBe("stale");
+    expect(f.reasons).toEqual([
+      "Set 1: Talent 12: its spell changed in build 1.0.0.5: 1 number.",
+      "Set 1: Check these talents before you follow the plan.",
+      "Game build 1.0.0.5 is live and newer than 1.0.0.3, the build this guide was reviewed against.",
+    ]);
+    expect(f.sets[0].sinceReview).toEqual(["Talent 12: its spell changed in build 1.0.0.5: 1 number.", "Check these talents before you follow the plan."]);
+    // The set's whole history since its plan was made stays with it, for the plan to show on its own.
+    expect(f.sets[0].changes).toEqual(freshnessLines(planFreshness(tree("1.0.0.5"), changes(records), "1.0.0.1", RANKS)));
+    expect(f.sets[0].changes).toContain("Talent 11: its spell changed in build 1.0.0.3: 1 number.");
+    // The second set's talents did not change: it is not stale and lists nothing since the review.
+    expect(f.sets[1]).toMatchObject({ stale: false, sinceReview: [] });
+
+    // A gap after the review is told with the changes; one before it, which the review saw past, is not.
+    const limited = [
+      record("1.0.0.3", "1.0.0.1", {}, { warnings: ["no committed spell values to compare with, so spell number changes are not listed"] }),
+      record("1.0.0.5", "1.0.0.3", { spellValues: [spellChange(12)] }, { warnings: ["Mage: something this site does not know"] }),
+    ];
+    expect(guideFreshness(two, tree("1.0.0.5"), changes(limited), TODAY).sets[0].sinceReview).toEqual([
+      "Talent 12: its spell changed in build 1.0.0.5: 1 number.",
+      "The change record for game build 1.0.0.5 warns that part of its comparison may be missing, so changes in that build may not all be listed.",
+      "Check each talent before you follow the plan.",
+    ]);
   });
 
   test("a change made before the build the guide was reviewed against is one the review saw: shown with the plan, not stale", () => {

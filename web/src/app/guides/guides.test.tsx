@@ -65,15 +65,18 @@ interface FixtureGuide {
   /** null leaves the order out. */
   order?: string | null;
   second?: boolean; reviewed?: boolean; versions?: 1 | 2; sources?: boolean; thin?: boolean; built?: string;
+  /** The game build the shown version was reviewed against. */
+  reviewedBuild?: string;
 }
 
 function guideFile(g: FixtureGuide, id: number): string {
   const classSlug = g.classSlug ?? "mage";
   const published = (g.status ?? "published") === "published";
   const reviewed = g.reviewed ?? published;
+  const build = g.reviewedBuild ?? "1.0.0.1";
   const history = !reviewed ? "[]" : g.versions === 2
-    ? "[{ version: 1, on: 2026-09-01, by: Kai, build: 1.0.0.1, note: First published version. }, { version: 2, on: 2026-10-20, by: Kai, build: 1.0.0.1, note: The second set is added. }]"
-    : "[{ version: 1, on: 2026-10-20, by: Kai, build: 1.0.0.1, note: First published version. }]";
+    ? `[{ version: 1, on: 2026-09-01, by: Kai, build: 1.0.0.1, note: First published version. }, { version: 2, on: 2026-10-20, by: Kai, build: ${build}, note: The second set is added. }]`
+    : `[{ version: 1, on: 2026-10-20, by: Kai, build: ${build}, note: First published version. }]`;
   const lines = [
     "---", `id: ${id}`, `slug: ${g.slug}`, `version: ${reviewed ? g.versions ?? 1 : 1}`, `status: ${published ? "published" : "draft"}`,
     `title: ${g.title ?? "Frost leveling"}`, `summary: "${g.summary ?? "A test guide summary for the fixture tree, long enough to stand as the page's meta description in search results."}"`,
@@ -82,7 +85,7 @@ function guideFile(g: FixtureGuide, id: number): string {
     ...(g.order === null ? [] : [`order: ${g.order ?? PLANNED}`]),
     ...(g.second ? [`code2: ${code(classSlug, RANKS2, g.built)}`, `order2: ${PLANNED2}`] : []),
     "author: Robin",
-    `reviewed: ${reviewed ? "{ by: Kai, on: 2026-10-20, build: 1.0.0.1 }" : "null"}`,
+    `reviewed: ${reviewed ? `{ by: Kai, on: 2026-10-20, build: ${build} }` : "null"}`,
     `sources: ${g.sources ? `[{ title: ${SOURCE.title}, url: "${SOURCE.url}", checkedOn: ${SOURCE.checkedOn} }]` : "[]"}`,
     `history: ${history}`, "---", "",
   ];
@@ -315,6 +318,26 @@ describe("a guide's page", () => {
     expect(due.querySelector("h2")?.textContent).toBe("Review due");
     expect(visible(due.outerHTML)).toContain("Last reviewed 77 days ago, on 2026-10-20; a guide is due for another review after 60 days.");
     expect((await metadata("frost-leveling")).robots).toEqual({ index: true, follow: true });
+  });
+
+  test("a stale guide's note lists only what changed after its review; a change its review saw is not under Since then", async () => {
+    // Made on 1.0.0.1 and reviewed against 1.0.0.3; the records change Talent 11 in 1.0.0.3 and Talent 12 in 1.0.0.5.
+    stubGuides([{ slug: "frost-leveling", second: true, reviewedBuild: "1.0.0.3" }]);
+    trees.build = "1.0.0.5";
+    records.push(record("1.0.0.3", "1.0.0.1", { spellValues: [spellChange(11)] }), record("1.0.0.5", "1.0.0.3", { spellValues: [spellChange(12)] }));
+    const html = await page("frost-leveling");
+    const note = dom(html).querySelector('[data-guide-state="stale"]')!;
+    expect(visible(note.outerHTML)).toContain("against game build 1.0.0.3. Since then the game files changed talents its plan uses");
+    expect([...note.querySelectorAll("li")].map((li) => li.textContent)).toEqual([
+      "Set 1: Talent 12: its spell changed in build 1.0.0.5: 1 number.",
+      "Set 1: Check these talents before you follow the plan.",
+      "Game build 1.0.0.5 is live and newer than 1.0.0.3, the build this guide was reviewed against.",
+    ]);
+    // The stale set's plan does not repeat the note; the untouched set shows its own history under the plan.
+    const [one, two] = [...dom(html).querySelectorAll("[data-guide-set]")];
+    expect(one.querySelector("[data-guide-changes]")).toBeNull();
+    expect(visible(two.querySelector("[data-guide-changes]")!.outerHTML)).toContain("Made on game build 1.0.0.1; this tree is build 1.0.0.5.");
+    expect(html).not.toContain("Talent 11: its spell changed");
   });
 
   test("a guide that cites no Blizzard post says what it rests on instead", async () => {
