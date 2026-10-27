@@ -191,6 +191,16 @@ export const CLIENT_TABLES = {
   SpellLearnSpell: 1001907, SpellLabel: 1347275, SpellProcsPerMinute: 1133526,
   SpellProceduralEffect: 1140477,
   RandPropPoints: 1310245, ArmorLocation: 1284818,
+  // E (text-bearing, pages-only; docs/2026-10-18-client-data-placement.md): what an NPC's gossip window
+  // and the scripted conversations declare on the client. GossipNPCOption names the option ids an NPC
+  // offers and GossipNPCOptionDisplayInfo their icons; the option-to-text binding is server-side, so
+  // BroadcastText and ConversationLine carry only the few lines the client scripts itself. SceneScript*
+  // are the client-side cutscene scripts. Game text: pages only, never API, MCP or bulk.
+  GossipNPCOption: 4278503, GossipNPCOptionDisplayInfo: 4335720, GossipXUIDisplayInfo: 3622253,
+  GossipOptionXUIWidgetSet: 5746391, GossipUIDisplayInfoCondition: 5902977,
+  BroadcastText: 841604, BroadcastTextDuration: 2166900, ConversationLine: 1260801,
+  SceneScript: 801754, SceneScriptGlobalText: 1758036, SceneScriptPackage: 801755,
+  SceneScriptPackageMember: 801756, SceneScriptText: 1758037,
   // Partial on the client: most of what these describe (spawns, quest text) lives on the server.
   Creature: 841631, GameObjects: 841620, QuestV2: 1139443,
   // Loading screens (Map.LoadingScreenID names a row; the row names its picture files), for the page

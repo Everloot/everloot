@@ -242,6 +242,18 @@ test("the W6 tables are read by the file data ids the WoWDBDefs manifest lists f
   });
 });
 
+test("the E tables (text-bearing, pages-only) are read by the file data ids the WoWDBDefs manifest lists for them", () => {
+  // manifest.json at WoWDBDefs 05e242b6acdc (verified against the live wowf 70630 scan: GossipNPCOption 1577,
+  // GossipNPCOptionDisplayInfo 50, BroadcastText 12 rows; GossipXGarrTalentTrees is garrison plumbing and stays never).
+  expect(CLIENT_TABLES).toMatchObject({
+    GossipNPCOption: 4278503, GossipNPCOptionDisplayInfo: 4335720, GossipXUIDisplayInfo: 3622253,
+    GossipOptionXUIWidgetSet: 5746391, GossipUIDisplayInfoCondition: 5902977,
+    BroadcastText: 841604, BroadcastTextDuration: 2166900, ConversationLine: 1260801,
+    SceneScript: 801754, SceneScriptGlobalText: 1758036, SceneScriptPackage: 801755,
+    SceneScriptPackageMember: 801756, SceneScriptText: 1758037,
+  });
+});
+
 test("a table the build does not have is reported as missing, not invented", async () => {
   const { tables, missing } = await extractTables(fake({ [CLIENT_TABLES.Item]: { rows: [[1, { ID: 1 }]] } }));
   expect(tables.map((t) => t.table)).toEqual(["Item"]);
