@@ -72,8 +72,12 @@ How the fields are derived, and what is not confirmed:
   default is `"unconfirmed"`. The build also lists groups that hold exactly the nodes above each gated
   row (companion groups). Where one matches the nodes above the row inside this talent tree, `scope` is
   `"tree"` and `companionGroupId` names it. Where one matches the nodes above the row across all three
-  talent trees, it is `"class"`. Nothing in the tables links a gate to its companion, so even `"tree"` is
-  an inference from that match. The addon `talents` selftest is what would confirm it in game.
+  talent trees, it is `"class"`. The condition row itself also names a node group, `TraitCond.TraitNodeGroupID`:
+  in build 70532 every spend condition of the class trees sets it, and in 130 of the 131 gates where this match
+  finds a companion it names that companion (one gate names another group; the 31 gates with no companion name
+  one too). The extractor does not read that field yet. It points the same way as the match, but its meaning is
+  read from the column name, so even `"tree"` remains an inference. The addon `talents` selftest is what would
+  confirm it in game.
 - **Rank gates on nodes.** Conditions tied to a node that name another node become `unlock.ranksInNodes`,
   one entry per condition. One node has any in build 70450 (a Rogue node). The meaning of that field is
   inferred from the column names.
