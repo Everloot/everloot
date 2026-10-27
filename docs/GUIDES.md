@@ -112,6 +112,10 @@ sections, its sources and every published version. A draft, or a file that fails
 guide's social card and in the sitemap. A link in a guide's body to a guide that is not published is drawn as its
 words alone, also through a version's prefix such as `/beta`, so no draft's address shows even if one reached main.
 
+`write` is never a guide's slug: `/guides/write` is the page where a player writes a community guide, so a guide by
+that name could never be shown. The schema refuses it (`RESERVED_GUIDE_SLUGS` in
+[`kb/src/guides/guide.ts`](../kb/src/guides/guide.ts)), draft or published, and the check names the slug's line.
+
 How current a guide is, its page works out each time it is rebuilt, at most once an hour
 ([`web/src/lib/guide-freshness.ts`](../web/src/lib/guide-freshness.ts)), and says why when it is not current:
 

@@ -17,7 +17,7 @@ code.
 ```yaml
 ---
 id: 1                         # stable, never reused
-slug: mage-leveling           # the file name and the address, /guides/mage-leveling; kept once published
+slug: mage-leveling           # the file name and the address, /guides/mage-leveling; kept once published; never write
 version: 1                    # the version this file holds
 status: draft                 # draft guides are not shown on the site
 title: Mage leveling

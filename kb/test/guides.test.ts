@@ -75,6 +75,7 @@ Whether the point levels hold in the live game is not confirmed. ${filler(20)}
 
 const GUIDE = `${FRONT}\n${BODY}`;
 const PATH = "guides/frost-leveling.md";
+const RESERVED = 'slug "write" is reserved: /guides/write is the page where a player writes a community guide; pick another slug';
 
 const file = (source: string, path = PATH): GuideFile => ({ path, source });
 const problemsOf = (files: GuideFile[], c: GuideCheckContext = ctx): Problem[] => checkGuides(files, c).problems;
@@ -437,6 +438,18 @@ describe("files", () => {
     expect(problemsOf([file(GUIDE), file(twin, "guides/fire-leveling.md")])).toEqual([{ file: "guides/fire-leveling.md", line: lineOf(twin, "id:"), message: expect.stringContaining("id 1 is already used by guides/frost-leveling.md") }]);
   });
 
+  test("write is never a guide's slug: /guides/write is the page where a player writes a community guide", () => {
+    const write = GUIDE.replace("slug: frost-leveling", "slug: write");
+    const reserved = { file: "guides/write.md", line: lineOf(write, "slug:"), message: RESERVED };
+    expect(problemsOf([file(write, "guides/write.md")])).toEqual([reserved]);
+    // As a draft too: the page holds the address, so a guide by that name could never be shown.
+    expect(problemsOf([file(asDraft(write), "guides/write.md")])).toEqual([reserved]);
+    // Names that only hold the word are a guide's own.
+    for (const slug of ["write-up", "rewrite", "writer"]) {
+      expect(problemsOf([file(GUIDE.replace("slug: frost-leveling", `slug: ${slug}`), `guides/${slug}.md`)]), slug).toEqual([]);
+    }
+  });
+
   test("a file without front matter is one problem", () => {
     expect(problemsOf([file("Just words.")])).toEqual([{ file: PATH, line: 1, message: "the page must start with front matter between --- lines" }]);
   });
@@ -491,5 +504,12 @@ describe("guide-check", () => {
 
   test("without --previous it says the comparison was not made", { timeout: 60_000 }, () => {
     expect(guideCheck("--dir", folder())).toMatchObject({ code: 0, stdout: expect.stringContaining("0 guides (0 published, 0 draft), 0 problems\nnot compared") });
+  });
+
+  test("a guide named write fails, with its file, its slug's line and why", { timeout: 60_000 }, () => {
+    const write = GUIDE.replace("slug: frost-leveling", "slug: write");
+    expect(guideCheck("--dir", folder({ "write.md": write }))).toMatchObject({
+      code: 1, stderr: expect.stringContaining(`guides/write.md:${lineOf(write, "slug:")}: ${RESERVED}`),
+    });
   });
 });

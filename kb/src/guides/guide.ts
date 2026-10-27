@@ -26,6 +26,11 @@ export const GUIDE_SECTIONS = ["Who it is for", "Why this plan", "How to play it
 /** Each talent set's fields: its share code, and the spend order that rides with it. */
 export const GUIDE_SETS = [["code", "order"], ["code2", "order2"]] as const;
 
+/** Addresses under /guides that are pages of their own, so no guide may take them as its slug. */
+export const RESERVED_GUIDE_SLUGS: Readonly<Record<string, string>> = {
+  write: "/guides/write is the page where a player writes a community guide",
+};
+
 const id = z.number().int().positive();
 const slug = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "lowercase letters and digits joined by single hyphens");
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "a date as YYYY-MM-DD");
@@ -37,8 +42,10 @@ const level = z.number().int().min(1);
 const Fields = z.strictObject({
   /** Stable and never reused. */
   id,
-  /** The file name and the address, /guides/<slug>. A published guide keeps it. */
-  slug,
+  /** The file name and the address, /guides/<slug>. A published guide keeps it. Never a reserved address. */
+  slug: slug.superRefine((s, ctx) => {
+    if (Object.hasOwn(RESERVED_GUIDE_SLUGS, s)) ctx.addIssue({ code: "custom", message: `slug "${s}" is reserved: ${RESERVED_GUIDE_SLUGS[s]}; pick another slug` });
+  }),
   /** The version the file holds: the last published one, or while it is a draft, the next. */
   version: id,
   /** Set by people, through review. How current a published guide still is, readers work out from the data. */
