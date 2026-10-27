@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Fragment } from "react";
 import { ClassContextLink } from "@/components/classes/ClassContextChip";
 import UseClassButton from "@/components/classes/UseClassButton";
 import { CLASS_TEXT } from "@/components/talents/TalentTreeView";
@@ -9,6 +8,7 @@ import { Container, PageHeader, SectionHeading } from "@/components/ui";
 import { classLabel, contextLinks, type ContextDestination, type ContextLink } from "@/lib/class-context";
 import { classGuides, classRaces, hubIndexable } from "@/lib/class-hub";
 import { guideHref } from "@/lib/guides";
+import { RACE_TABLE, traitsFor } from "@/lib/race-traits";
 import { pageMetadata } from "@/lib/seo";
 import { TALENT_CLASSES, isTalentClass } from "@/lib/talents/catalogs";
 import type { GuideActivity, GuideRole } from "../../../../../kb/src/guides/guide";
@@ -119,24 +119,37 @@ export default async function ClassHubPage({ params }: Params) {
 
         <section aria-labelledby="races">
           <SectionHeading id="races">{`Who can be a ${name}`}</SectionHeading>
-          <dl className="space-y-1 text-sm">
+          <div className="space-y-5">
             {races.map((f) => (
-              <div key={f.faction} className="flex flex-wrap gap-x-3">
-                <dt className="w-20 shrink-0 text-muted">{f.faction}</dt>
-                <dd className="text-fg">
-                  {f.races.map((r, i) => (
-                    <Fragment key={r.race}>
-                      {i > 0 && ", "}
-                      {r.race}
-                      {r.isNew && <span className="ml-1 text-xs font-semibold text-accent">New</span>}
-                    </Fragment>
+              <div key={f.faction}>
+                <h3 className="text-sm font-semibold text-muted">{f.faction}</h3>
+                <dl className="mt-1 divide-y divide-line text-sm">
+                  {f.races.map((r) => (
+                    <div key={r.race} className="grid gap-x-4 gap-y-1 py-2 sm:grid-cols-[9rem_minmax(0,1fr)]">
+                      <dt className="font-medium text-fg">
+                        {r.race}
+                        {r.isNew && <span className="ml-1 text-xs font-semibold text-accent">New</span>}
+                      </dt>
+                      <dd>
+                        <ul className="space-y-0.5">
+                          {traitsFor(f.faction, r.race).map((t) => (
+                            <li key={t.name}>
+                              <span className="font-medium text-fg">{t.name}</span>
+                              <span className="ml-1.5 text-xs text-muted">{t.kind === "active" ? "Active" : "Passive"}</span>
+                              <span className="text-fg-2">{` ${t.description}`}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </dd>
+                    </div>
                   ))}
-                </dd>
+                </dl>
               </div>
             ))}
-          </dl>
+          </div>
           <p className="mt-3 text-sm text-muted">
             {races.some((f) => f.races.some((r) => r.isNew)) && <><span className="font-semibold text-accent">New</span> marks the combinations Blizzard names as new in WoW: Forever. </>}
+            {`Racial traits found in game files, unconfirmed, build ${RACE_TABLE.build.version}. `}
             <Link href="/wow-forever#races" className={LINK}>Every race and class</Link>
           </p>
         </section>

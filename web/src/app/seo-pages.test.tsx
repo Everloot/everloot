@@ -225,7 +225,8 @@ test("/wow-forever shows Blizzard's race and class tables with the new combinati
   expect(html).toContain(`href="${RACES.sourceUrl}"`);
   expect(visible(html)).toContain("published September 22, 2026");
   const races = html.slice(html.indexOf('aria-labelledby="races"'), html.indexOf('aria-labelledby="latest"'));
-  expect(races.match(/<table/g)).toHaveLength(2);
+  // Per faction: who can be what, then the racial traits.
+  expect(races.match(/<table/g)).toHaveLength(4);
   const tables = races.match(/<table[\s\S]*?<\/table>/g)!.join("");
   expect(tables.match(/>New</g)).toHaveLength(NEW_COMBOS.length);
 });
