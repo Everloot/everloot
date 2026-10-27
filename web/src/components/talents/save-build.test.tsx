@@ -424,6 +424,23 @@ test("keys typed in the panel stay in it: Ctrl+Z in the notes leaves the talents
   expect(panel()).not.toBeNull();
 });
 
+test("a 60-character build name cannot widen the build bar: My builds and Editing may shrink, and the name is cut off", async () => {
+  const long = "Frostfire raid build for Molten Core nights with Shatter set";
+  expect(long).toHaveLength(60);
+  api("in", [saved({ name: long })]);
+  window.history.replaceState(null, "", `/tools/talents/mage?saved=${ID}#plan=${CODE}`);
+  await render();
+  // jsdom lays nothing out: these are the rules that keep the menu inside a 390 px phone (checked in a browser too).
+  const classes = (el: Element) => el.className.split(/\s+/);
+  expect(classes(menu()!)).toContain("min-w-0");
+  const entry = menu()!.querySelector("a")!;
+  expect(entry.textContent).toBe(long);
+  expect(classes(entry)).toContain("truncate");
+  const editing = [...container.querySelectorAll('section[aria-label="Build"] p')].find((p) => p.textContent?.startsWith("Editing:"))!;
+  expect(editing.textContent).toBe(`Editing: ${long}`);
+  expect(classes(editing)).toEqual(expect.arrayContaining(["min-w-0", "truncate"]));
+});
+
 test("My builds closes on Escape, with the focus back on its button, and on a press anywhere else", async () => {
   api("in");
   await render();

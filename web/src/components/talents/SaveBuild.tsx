@@ -287,10 +287,11 @@ export default function SaveBuild({ classSlug, codes, defaultName, onMessage }: 
         title={codes[0] ? undefined : "Spend a point in set 1 to save"}>Save</button>
       {account.status === "unchecked" && <p id="save-build-unchecked" className="text-sm text-fg-2">{UNCHECKED}</p>}
       {mine.length > 0 && (
-        <details ref={menu} className="relative max-sm:open:basis-full" onKeyDown={onMenuKey}>
+        <details ref={menu} className="relative min-w-0 max-sm:open:basis-full" onKeyDown={onMenuKey}>
           <summary className={`${button} cursor-pointer list-none`}>My builds</summary>
           {/* On a phone the list opens in the page, across the bar under its button: pinned to the button's right edge
-              as a dropdown, it ran off the left side of a 390 px screen. */}
+              as a dropdown, it ran off the left side of a 390 px screen. min-w-0 lets it shrink to the bar, so a long
+              name is cut off instead of widening the bar past the screen. */}
           <ul className="z-20 mt-1 max-h-80 overflow-y-auto rounded-control border border-edge bg-panel p-1 sm:absolute sm:right-0 sm:w-72">
             {mine.map((b) => (
               <li key={b.id}><a href={editPath(b)} className="block truncate rounded-control px-3 py-2 text-sm text-fg-2 hover:bg-canvas hover:text-accent">{b.name}</a></li>
@@ -299,7 +300,7 @@ export default function SaveBuild({ classSlug, codes, defaultName, onMessage }: 
           </ul>
         </details>
       )}
-      {editing && <p className="text-sm text-fg-2">Editing: <span className="text-fg">{editing.name}</span></p>}
+      {editing && <p className="min-w-0 truncate text-sm text-fg-2">Editing: <span className="text-fg">{editing.name}</span></p>}
 
       {panel === "sign-in" && (
         <section aria-label="Sign in to save builds" onKeyDown={onPanelKey} className="order-last basis-full rounded-control border border-line bg-canvas p-3 text-sm text-fg-2">
