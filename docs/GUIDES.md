@@ -109,7 +109,8 @@ Anything that shows guides reads them through these.
 
 `/guides` lists the published guides by class, and `/guides/<slug>` shows one: its review, its plan, its four
 sections, its sources and every published version. A draft, or a file that fails the schema, is a 404 there, on the
-guide's social card and in the sitemap.
+guide's social card and in the sitemap. A link in a guide's body to a guide that is not published is drawn as its
+words alone, so no draft's address shows even if one reached main.
 
 How current a guide is, its page works out each time it is rebuilt, at most once an hour
 ([`web/src/lib/guide-freshness.ts`](../web/src/lib/guide-freshness.ts)), and says why when it is not current:

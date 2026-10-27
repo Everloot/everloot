@@ -70,6 +70,8 @@ interface FixtureGuide {
   second?: boolean; reviewed?: boolean; versions?: 1 | 2; sources?: boolean; thin?: boolean; built?: string;
   /** The game build the shown version was reviewed against. */
   reviewedBuild?: string;
+  /** A sentence of links, added to the second section. */
+  links?: string;
 }
 
 function guideFile(g: FixtureGuide, id: number): string {
@@ -92,7 +94,7 @@ function guideFile(g: FixtureGuide, id: number): string {
     `sources: ${g.sources ? `[{ title: ${SOURCE.title}, url: "${SOURCE.url}", checkedOn: ${SOURCE.checkedOn} }]` : "[]"}`,
     `history: ${history}`, "---", "",
   ];
-  const body = SECTIONS.map((h, i) => `## ${h}\n\n${g.thin ? "Test words." : `${FILLER} ${FILLER} ${FILLER} ${FILLER}`}${i === 1 && g.sources ? ` [Blizzard's post](${SOURCE.url}) says so.` : ""}\n`).join("\n");
+  const body = SECTIONS.map((h, i) => `## ${h}\n\n${g.thin ? "Test words." : `${FILLER} ${FILLER} ${FILLER} ${FILLER}`}${i === 1 && g.sources ? ` [Blizzard's post](${SOURCE.url}) says so.` : ""}${i === 1 && g.links ? ` ${g.links}` : ""}\n`).join("\n");
   return `${lines.join("\n")}${body}`;
 }
 
@@ -341,6 +343,25 @@ describe("a guide's page", () => {
     expect(one.querySelector("[data-guide-changes]")).toBeNull();
     expect(visible(two.querySelector("[data-guide-changes]")!.outerHTML)).toContain("Made on game build 1.0.0.1; this tree is build 1.0.0.5.");
     expect(html).not.toContain("Talent 11: its spell changed");
+  });
+
+  test("a guide links only to published guides: a link to a draft or a missing one is drawn as its words alone", async () => {
+    const links = "See [the fire draft](/guides/fire-draft), [the draft by its address](https://everloot.app/guides/fire-draft/), "
+      + "[a missing guide](/guides/no-such-guide), [warrior tanking](/guides/warrior-tanking) and [every guide](/guides).";
+    stubGuides([
+      { slug: "frost-leveling", links },
+      { slug: "fire-draft", title: "Fire draft", status: "draft", reviewed: false },
+      { slug: "warrior-tanking", title: "Warrior tanking", classSlug: "warrior" },
+    ]);
+    const html = await page("frost-leveling");
+    expect(html).toContain('href="/guides/warrior-tanking"');
+    expect(html).toContain('href="/guides"');
+    // No draft slug reaches the page, as a link or at all.
+    expect(html).not.toContain("fire-draft");
+    expect(html).not.toContain("no-such-guide");
+    const text = visible(html);
+    for (const words of ["the fire draft", "the draft by its address", "a missing guide"]) expect(text, words).toContain(words);
+    expect([...dom(html).querySelectorAll("a")].map((a) => a.textContent)).not.toContain("the fire draft");
   });
 
   test("a guide that cites no Blizzard post says what it rests on instead", async () => {

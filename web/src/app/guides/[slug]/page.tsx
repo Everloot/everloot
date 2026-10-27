@@ -17,6 +17,7 @@ import { PUBLISHED_CHANGES, classTalentChanges } from "@/lib/talents/freshness-r
 import type { TalentCatalog } from "@/lib/talents/types";
 import { loadWiki, publishedPage, type Block } from "@/lib/wiki";
 import { resolveTokens } from "@/lib/wiki-names";
+import { guideLinkTarget } from "../../../../../kb/src/guides/guide";
 import { slugify } from "../../../../../kb/src/lore-slug";
 import { WikiBlock, type TextContext } from "../../wiki/wiki-text";
 
@@ -107,12 +108,21 @@ function Freshness({ guide, freshness }: { guide: Guide; freshness: GuideFreshne
 
 export default async function GuidePage({ params }: Params) {
   const { slug } = await params;
-  const guide = publishedGuide(loadGuides(), slug);
+  const guides = loadGuides();
+  const guide = publishedGuide(guides, slug);
   if (!guide) notFound();
 
   const { catalog, freshness } = await freshnessOf(guide);
   const wiki = loadWiki();
-  const ctx: TextContext = { tokens: await resolveTokens(guide), pages: (s) => publishedPage(wiki, s) };
+  const ctx: TextContext = {
+    tokens: await resolveTokens(guide),
+    pages: (s) => publishedPage(wiki, s),
+    // A link to another guide is drawn only while that guide is published, whatever reached main.
+    linkable: (href) => {
+      const target = guideLinkTarget(href);
+      return target === null || publishedGuide(guides, target) !== null;
+    },
+  };
   const sections = sectionsOf(guide.blocks);
   const path = guideHref(guide.slug);
   const name = classLabel(guide.classSlug);
