@@ -55,6 +55,9 @@ test("the canonical address renders the post: blue title and author, date, sourc
   expect(html).toContain("WoW: Forever General Discussion");
   expect(html).toMatch(/<figure data-excerpt="true" class="[^"]*border-blue-post[^"]*"><blockquote cite="https:\/\/us\.forums[^"]*" class="text-blue-post"><p>Get ready to make your mark in Azeroth! Name reservations open soon\.<\/p><\/blockquote><figcaption[^>]*>Blizzard(&#x27;|')s words, an excerpt\.<\/figcaption>/);
   expect(html).toMatch(/<a data-original="true" href="https:\/\/us\.forums\.blizzard\.com\/en\/wow\/t\/claim-your-world-of-warcraft-forever-character-names\/2387945" rel="noopener"[^>]*>Read the full post on Blizzard(&#x27;|')s forums<\/a>/);
+  // Nothing above the title: what kind of post it is leads the line under it.
+  expect(html).toContain('<header class="mb-6"><h1 ');
+  expect(html).toMatch(/<\/h1><div class="[^"]*"><span data-badge="neutral"[^>]*>Blue post · WoW: Forever<\/span><p/);
   // No visible breadcrumb or provenance prose; the trail is JSON-LD only.
   expect(html).not.toContain('aria-label="breadcrumb"');
   expect(html).toContain('"@type":"BreadcrumbList"');
@@ -135,6 +138,25 @@ test("More from the author and Same day link to the other posts' pages, never to
   expect(html).not.toContain("1.60.1.70460");
 });
 
+test("the related lists sit in a column beside the post, after it on a phone, with long dates that never break", async () => {
+  const html = await page(CANONICAL);
+  expect(html).toMatch(/<div data-container="wide" class="[^"]*lg:grid-cols-\[minmax\(0,48rem\)_minmax\(0,1fr\)\]"><article data-blue-post="true"/);
+  const aside = html.slice(html.indexOf('<aside aria-label="More Blizzard posts"'));
+  expect(aside).toContain('id="more-from"');
+  expect(aside).toContain('id="same-day"');
+  expect(aside).toContain('<time dateTime="2026-10-12T10:00:00.000Z" class="whitespace-nowrap">October 12, 2026</time>');
+  // The post comes first: its original, then newer and older, then the lists.
+  expect(html.indexOf("data-original")).toBeLessThan(html.indexOf("data-nearby"));
+  expect(html.indexOf("data-nearby")).toBeLessThan(html.indexOf("<aside"));
+  // Nothing beside the post when there is nothing to list.
+  data.entries = [post];
+  try {
+    expect(await page(CANONICAL)).not.toContain("<aside");
+  } finally {
+    data.entries = [sky, eu, post, build, older, euOnly];
+  }
+});
+
 test("newer and older step through the same game's posts, skipping builds and copies; the ends have one card", async () => {
   const html = await page(CANONICAL);
   const nearby = html.slice(html.indexOf('data-nearby'), html.indexOf('id="more-from"'));
@@ -145,11 +167,14 @@ test("newer and older step through the same game's posts, skipping builds and co
   expect(nearby).toContain(">Older</span>");
   expect(nearby).not.toContain("1.60.1.70460");
   expect(nearby).not.toContain("eu-6443686");
-  // The newest post has no newer neighbour: its card is an empty cell, the older one stays.
+  expect(nearby).not.toContain("sm:col-span-2");
+  // The newest post has no newer neighbour: the older card takes the whole row, no empty cell beside it.
   const newest = await page("bsky-3mydklukhq22f-good-news-everyone");
   const top = newest.slice(newest.indexOf('data-nearby'), newest.indexOf('id="same-day"'));
   expect(top).not.toContain(">Newer</span>");
   expect(top).toContain(`href="/changes/${CANONICAL}"`);
+  expect(top).toMatch(/<a href="\/changes\/[^"]+" class="[^"]*sm:col-span-2[^"]*"><span class="text-meta text-muted">Older<\/span>/);
+  expect(top).not.toContain('aria-hidden="true"');
 });
 
 test("without a write-up there is no notes card at all, and the original is the one button", async () => {

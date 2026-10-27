@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import AdSlot from "@/components/AdSlot";
 import JsonLd from "@/components/JsonLd";
-import { Badge, Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, type FilterControl } from "@/components/ui";
+import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, type FilterControl } from "@/components/ui";
 import { CHANGE_FILTERS, GAME_LABEL, TYPE_LABEL, filterTimeline, forumRegions, loadTimeline, parseFilter, postPath, type ChangeEntry, type ChangeFilter } from "@/lib/changes";
 import { latestBuildLine } from "@/lib/changes-facts";
 import { loadSiteAssets } from "@/lib/game-assets";
@@ -107,6 +107,9 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
   const index = mentionIndex(assets, assets ? await siteSpellNames() : []);
 
   const dash = <span className="text-muted">—</span>;
+  // Sorted by date, a day's date shows once, on its first row on this page (in the date column, or a phone's muted
+  // line); the rows under it keep it for screen readers.
+  const sameDayAsAbove = new Set(sort.key === "date" ? shown.filter((e, i) => i > 0 && e.at.slice(0, 10) === shown[i - 1].at.slice(0, 10)).map((e) => e.id) : []);
   const titleLink = (e: ChangeEntry) => {
     const page = postPath(e);
     return page
@@ -118,12 +121,19 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
       // On a phone this is the only column shown, so it carries the title and the muted line holds the date.
       key: "date", header: "Date", sortable: true, nowrap: true, cell: (e) => (
         <>
-          <time dateTime={e.at} title={e.type === "build" ? `${stamp(e.at)}, when Everloot first saw it` : stamp(e.at)} className="hidden font-mono tabular-nums text-fg-2 sm:inline">{e.at.slice(0, 10)}</time>
+          <time
+            dateTime={e.at}
+            title={e.type === "build" ? `${stamp(e.at)}, when Everloot first saw it` : stamp(e.at)}
+            className={sameDayAsAbove.has(e.id) ? "sr-only" : "hidden font-mono tabular-nums text-fg-2 sm:inline"}
+          >
+            {e.at.slice(0, 10)}
+          </time>
           <div data-phone-title className="whitespace-normal py-1 sm:hidden">{titleLink(e)}</div>
         </>
       ),
     },
-    { key: "type", header: "Type", sortable: true, nowrap: true, cell: (e) => <Badge tone="neutral">{TYPE_LABEL[e.type]}</Badge> },
+    // Plain mono, as on the home page: a pill on every row is noise (design system rule 8).
+    { key: "type", header: "Type", sortable: true, nowrap: true, cell: (e) => <span data-type className="font-mono text-xs text-muted">{TYPE_LABEL[e.type]}</span> },
     {
       key: "title", header: "Title", sortable: true, cell: (e) => {
         const line = e.type === "build"
@@ -203,7 +213,7 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
         <JsonLd data={changesJsonLd({ name: TITLE, description: LEAD, path: "/changes", entries: shown })} />
         <DataTitle
           title={TITLE}
-          meta={<>{LEAD} {latestBuildLine(all)} <a href="/changes/feed.xml" className={LINK}>RSS</a></>}
+          meta={<>{LEAD} {latestBuildLine(all)} <a href="/changes/feed.xml" className={LINK}>RSS</a> · <Link href="/news" className={LINK}>Everloot news</Link></>}
           aside={strip}
         />
         <FilterBar
@@ -222,7 +232,7 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
             rowKey={(e) => e.id}
             sort={{ key: sort.key, direction: sort.desc ? "desc" : "asc" }}
             sortHref={(k, d) => here({ sort: nextSort(k, d, DEFAULT_SORT) })}
-            meta={(e) => [e.at.slice(0, 10), TYPE_LABEL[e.type], e.author, SOURCE_LABEL(e)].filter(Boolean).join(" · ")}
+            meta={(e) => [sameDayAsAbove.has(e.id) ? undefined : e.at.slice(0, 10), TYPE_LABEL[e.type], e.author, SOURCE_LABEL(e)].filter(Boolean).join(" · ")}
             empty={empty}
           />
         </div>

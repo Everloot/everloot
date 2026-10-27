@@ -46,6 +46,8 @@ test("one compact title row: the name Changes, one intro line, the latest build 
   expect(html).toContain("Blue posts, hotfixes and new game builds, newest first.");
   expect(html).toContain("Latest build: WoW: Forever 1.60.1.70460, first seen by Everloot on 2026-10-17.");
   expect(html).toMatch(/<a href="\/changes\/feed.xml"[^>]*>RSS<\/a>/);
+  // Everloot's own write-ups are one click away.
+  expect(html).toMatch(/<a href="\/news"[^>]*>Everloot news<\/a>/);
   expect(html).toContain('role="search"');
   expect(html).toContain("data-filter-bar");
   const lower = html.toLowerCase();
@@ -53,14 +55,16 @@ test("one compact title row: the name Changes, one intro line, the latest build 
   for (const word of ["sponsor", "advert", "premium", "subscribe", "buy now"]) expect(lower).not.toContain(word);
 });
 
-test("dense rows: date, type badge, title linked to the post's page on Everloot, author, region and a short excerpt, newest first", async () => {
+test("dense rows: date, type, title linked to the post's page on Everloot, author, region and a short excerpt, newest first", async () => {
   const html = await page();
   expect(html).toContain("data-dense");
   expect(rows(html)).toBe(4);
   expect(html.indexOf("1.60.1.70460")).toBeLessThan(html.indexOf("Synthetic beta notice"));
   expect(html).toMatch(/<time dateTime="2026-10-16T22:00:00.000Z"[^>]*>2026-10-16<\/time>/);
-  expect(html).toMatch(/data-badge="neutral"[^>]*>Blue post</);
-  expect(html).toMatch(/data-badge="neutral"[^>]*>Hotfix</);
+  // The type is plain mono text, as on the home page: no pill on every row.
+  expect(html).toContain('<span data-type="true" class="font-mono text-xs text-muted">Blue post</span>');
+  expect(html).toContain('<span data-type="true" class="font-mono text-xs text-muted">Hotfix</span>');
+  expect(html.split("<tr").slice(1).some((r) => r.includes("data-badge"))).toBe(false);
   expect(html).toMatch(/<a href="\/changes\/us-1-synthetic-beta-notice-b"[^>]*>Synthetic beta notice &lt;b&gt;<\/a>/);
   expect(html).toContain('href="/changes/eu-2-wow-forever-hotfixes"');
   // The original is one click further, on the post's page.
@@ -83,6 +87,27 @@ test("on a phone the first column carries the title once, and the date sits in t
   expect(phone[1][1]).not.toContain("2026-10-16");
   // The date is a table-cell time hidden on phones, so only the muted line shows it there.
   expect(html).toMatch(/<time dateTime="2026-10-16T22:00:00.000Z"[^>]*class="hidden [^"]*sm:inline"/);
+});
+
+test("sorted by date, a day's date shows on its first row only; the rows under it keep it for screen readers", async () => {
+  const html = await page();
+  // October 16 has two rows: the first shows the date, the second carries it for screen readers only.
+  expect(html).toMatch(/<time dateTime="2026-10-16T22:00:00.000Z"[^>]*class="hidden font-mono tabular-nums text-fg-2 sm:inline">2026-10-16<\/time>/);
+  expect(html).toMatch(/<time dateTime="2026-10-16T18:00:00.000Z"[^>]*class="sr-only">2026-10-16<\/time>/);
+  expect(html.match(/<time [^>]*class="sr-only"/g)).toHaveLength(1);
+  // The same on a phone: the muted line under the title leaves the repeated date out.
+  const phone = [...html.matchAll(/<div data-phone-title[^>]*>.*?<\/div><div class="[^"]*sm:hidden">(.*?)<\/div>/g)].map((m) => m[1]);
+  expect(phone[1]).toBe("2026-10-16 · Blue post · Linxy · US forum");
+  expect(phone[2]).toBe("Hotfix · Kaivax · EU forum");
+  // Sorted by anything else, every row shows its own date.
+  const byTitle = await page({ sort: "title" });
+  expect(byTitle).not.toMatch(/<time [^>]*class="sr-only"/);
+  const lines = [...byTitle.matchAll(/<div class="text-cell-2 text-muted sm:hidden">(.*?)<\/div>/g)].map((m) => m[1]);
+  expect(lines).toHaveLength(4);
+  expect(lines.every((line) => /^\d{4}-\d{2}-\d{2} · /.test(line))).toBe(true);
+  // Oldest first, the repeat is the later row of the day.
+  const oldest = await page({ sort: "date" });
+  expect(oldest).toMatch(/<time dateTime="2026-10-16T22:00:00.000Z"[^>]*class="sr-only">/);
 });
 
 test("markup in a title is escaped, not rendered", async () => {
