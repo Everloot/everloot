@@ -215,6 +215,10 @@ const comeBack = async () => { await act(async () => { window.dispatchEvent(new 
 const accountReads = () => requests.filter((r) => r.request !== "GET /api/auth/me");
 
 async function open() {
+  await vi.waitFor(async () => {
+    await settle();
+    expect(button(/^Choose plans to save to your account$/)).toBeDefined();
+  }, { timeout: 5_000 });
   await click(button(/^Choose plans to save to your account$/));
 }
 /** Chooses a group of plans (its checkbox) and each plan's sharing. */
@@ -1587,8 +1591,11 @@ describe("one character per alt and account", () => {
     accounts[A_ID].characters = [{ id: serverId(80), name: "Jaina", classSlug: "mage", realm: null, note: null }];
     const jaina = alt({ planIds: [FROST.id] });
     seed(ANON, [FROST], [jaina]);
+    const releaseIdentity = hold("GET /api/auth/me");
     await render();
-    await open();
+    const opening = open();
+    releaseIdentity();
+    await opening;
     await choose("Save Frost to your account", { Frost: "private" });
     await set(field("Character for Frost"), `alt:${jaina.id}`);
     await click(saveButton());
