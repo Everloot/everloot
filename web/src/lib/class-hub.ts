@@ -7,16 +7,27 @@
 import { NEW_COMBOS, RACES, type ClassName } from "@/data/wow-forever";
 import { classLabel, type ClassSlug } from "./class-context";
 import { guidesFor, loadGuides, type Guide } from "./guides";
+import { RACE_TABLE } from "./race-traits";
+import type { RaceTable } from "../../../kb/src/client-races";
 import { TALENT_CLASSES } from "./talents/catalogs";
 
 /** The class's published guides, the lowest levels first. */
 export const classGuides = (slug: ClassSlug, guides: Map<string, Guide> = loadGuides()): Guide[] => guidesFor(guides, { classSlug: slug });
 
-/** A hub is indexed once it lists a reviewed guide; an empty one stays out of search, like an empty wiki hub. */
-export const hubIndexable = (slug: ClassSlug, guides: Map<string, Guide> = loadGuides()): boolean => classGuides(slug, guides).length > 0;
+/** Whether the game files give racial traits for a race that can be the class: content of its own on the hub. */
+const hasRaceTraits = (slug: ClassSlug, table: RaceTable): boolean =>
+  table.races.some((r) => r.traits.length > 0 && r.classes.some((c) => c.name === classLabel(slug)));
+
+/**
+ * A hub is indexed once it lists a reviewed guide or its races' traits from the game files; one with neither stays
+ * out of search, like an empty wiki hub.
+ */
+export const hubIndexable = (slug: ClassSlug, guides: Map<string, Guide> = loadGuides(), table: RaceTable = RACE_TABLE): boolean =>
+  classGuides(slug, guides).length > 0 || hasRaceTraits(slug, table);
 
 /** The class index is indexed once one of its hubs is. */
-export const classesIndexable = (guides: Map<string, Guide> = loadGuides()): boolean => TALENT_CLASSES.some((slug) => hubIndexable(slug, guides));
+export const classesIndexable = (guides: Map<string, Guide> = loadGuides(), table: RaceTable = RACE_TABLE): boolean =>
+  TALENT_CLASSES.some((slug) => hubIndexable(slug, guides, table));
 
 export interface FactionRaces { faction: string; races: { race: string; isNew: boolean }[] }
 

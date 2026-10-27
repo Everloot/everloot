@@ -8,7 +8,7 @@ import { loadTimeline, postPath } from "@/lib/changes";
 import { CLIENT_TAXONOMY, ITEMS_PER_PAGE, itemsHref } from "@/lib/items";
 import { filterItems } from "../../../kb/src/item-taxonomy";
 import { instanceHref, instanceRows } from "@/lib/instances";
-import { loadCatalog } from "@/lib/talents/catalogs";
+import { loadCatalog, TALENT_CLASSES } from "@/lib/talents/catalogs";
 import { encodeBuild, encodeOrder } from "@/lib/talents/share";
 import sitemap from "./sitemap";
 
@@ -69,9 +69,10 @@ test("the news hub and its posts are listed only once a post is published, dated
   }
 });
 
-test("a guide is listed only while its page asks to be indexed, dated by its review, with the guide index and its class's hub; a draft never", async () => {
+test("a guide is listed only while its page asks to be indexed, dated by its review, with the guide index; a draft never; the class hubs carry their races' traits, so they are listed without one", async () => {
   const listed = (all: typeof entries) => all.map((e) => new URL(e.url).pathname).filter((p) => /^\/(?:guides|classes)(?:\/|$)/.test(p));
-  expect(listed(entries)).toEqual([]);
+  const hubs = ["/classes", ...TALENT_CLASSES.map((slug) => `/classes/${slug}`)];
+  expect(listed(entries).sort()).toEqual([...hubs].sort());
   // One point on the Mage tree the site ships, made and reviewed on its build: a plan that fits.
   const mage = await loadCatalog("mage");
   const node = mage.nodes.find((n) => n.row === 1 && n.kind === "single" && !n.unlock && n.prereqs.length === 0 && !n.anyOf?.length);
@@ -97,7 +98,7 @@ test("a guide is listed only while its page asks to be indexed, dated by its rev
   vi.stubEnv("GUIDES_DIR", dir);
   try {
     const withGuides = await sitemap();
-    expect(listed(withGuides).sort()).toEqual(["/classes", "/classes/mage", "/guides", "/guides/frost-leveling"]);
+    expect(listed(withGuides).sort()).toEqual([...hubs, "/guides", "/guides/frost-leveling"].sort());
     expect(withGuides.find((e) => e.url.endsWith("/guides/frost-leveling"))?.lastModified).toEqual(new Date("2026-10-20"));
     expect(withGuides.find((e) => e.url.endsWith("/guides"))?.lastModified).toBeUndefined();
   } finally {
