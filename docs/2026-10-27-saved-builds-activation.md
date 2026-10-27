@@ -330,6 +330,16 @@ Until the spend-order migration is in, the route refuses such a save with the co
 says so and keeps every plan on the device as it was. The panel needs the browser's Web Locks API, which every current
 browser has; without it, it says "This browser can't move plans safely; try a current browser." and sends nothing.
 
+A plan can go under a new character made from one of the player's alts. The panel looks for that character on the
+account before it asks `POST /api/me/characters` for one, and records the request first. When a request gets no answer
+within 20 seconds, or the connection drops, the panel cannot tell whether the character was made. For two minutes after
+that request it asks for no other character for that alt: a retry in that time finds the character if it was made, and
+otherwise says "The last attempt may still finish; try again in a couple of minutes." After two minutes a retry reads
+the account's characters again and asks for the character only if it is still not there. The risk that remains is a
+request the site carries out more than two minutes after it was sent, for example one held up behind a stalled
+connection: the account can then hold two characters made from the same alt, one with no builds. A player can delete
+the spare one on `/me`.
+
 Add these to the signed-in acceptance, with the same disposable test account and the window 390 px wide:
 
 1. Signed out, save two test plans on `/tools/builds`. Sign in: the panel offers them, and the network tab shows no
