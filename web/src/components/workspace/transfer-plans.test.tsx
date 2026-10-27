@@ -1862,30 +1862,24 @@ describe("a character asked for and not heard back on", () => {
     await choose("Save Frost to your account", { Frost: "private" });
     await set(field("Character for Frost"), `alt:${jaina.id}`);
   }
-  /** The site, but the first character request is taken and never answered: `late` makes it on the site later. */
-  function unanswered() {
+  /** The site, but the first character request's answer is lost on its way back: the site makes that character only
+   *  when `late` is called, if ever. */
+  function lost() {
     const site = globalThis.fetch;
     const state = { asked: false, late: () => {} };
     vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
       if (state.asked || String(input) !== "/api/me/characters" || init?.method !== "POST") return site(input, init);
       state.asked = true;
       state.late = () => { void site(input, init); };
-      return new Promise<Response>((_, reject) => init.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError"))));
+      throw new TypeError("The connection dropped before the answer came");
     });
     return state;
   }
-  /** Save pressed, and the character request given up on after its 20 seconds. */
-  async function giveUp(state: { asked: boolean }) {
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
-    try {
-      await act(async () => { saveButton()!.click(); });
-      await pump(() => state.asked, "the character request");
-      await act(async () => { await vi.advanceTimersByTimeAsync(20_000); });
-      await pump(() => alerts().includes("may or may not have been made"), "giving up");
-    } finally {
-      vi.useRealTimers();
-    }
-  }
+  /** The page's two clocks, faked and standing still until moved: the wall clock (Date), which `vi.setSystemTime`
+   *  corrects as a computer's clock is corrected, and the monotonic one (performance), which only time passing moves,
+   *  as `vi.advanceTimersByTime` moves both. */
+  const fakeClocks = () => vi.useFakeTimers({ toFake: ["Date", "performance"] });
+  const WAIT = "The last attempt may still finish; try again in a couple of minutes.";
 
   test("a retry looks for the character by the label the last try asked with, before any change made to it since", async () => {
     const jaina = alt({ planIds: [FROST.id] });
@@ -1914,17 +1908,17 @@ describe("a character asked for and not heard back on", () => {
   test("inside two minutes of a try that got no answer, a retry that does not find its character makes none; once the site makes it, it is used", async () => {
     const jaina = alt({ planIds: [FROST.id] });
     seed(ANON, [FROST], [jaina]);
-    const request = unanswered();
-    await render();
-    await prepare(jaina);
-    const asked = Date.now();
-    await giveUp(request);
-    vi.useFakeTimers({ toFake: ["Date"] });
+    fakeClocks();
     try {
-      vi.setSystemTime(asked + 60_000);
+      const request = lost();
+      await render();
       await prepare(jaina);
       await click(saveButton());
-      expect(alerts()).toContain("The character Jaina was asked for on your account for Frost and is not there yet. The last attempt may still finish; try again in a couple of minutes.");
+      expect(alerts()).toContain("so it may or may not have been made.");
+      vi.advanceTimersByTime(60_000);
+      await prepare(jaina);
+      await click(saveButton());
+      expect(alerts()).toContain(`The character Jaina was asked for on your account for Frost and is not there yet. ${WAIT}`);
       expect(posts).toEqual([]);
       // The site makes it after all, late.
       request.late();
@@ -1943,20 +1937,19 @@ describe("a character asked for and not heard back on", () => {
   test("past two minutes, a retry reads the account once more and makes the character only while it is still not there", async () => {
     const jaina = alt({ planIds: [FROST.id] });
     seed(ANON, [FROST], [jaina]);
-    // Taken and never made: the site never handles it.
-    const request = unanswered();
-    await render();
-    await prepare(jaina);
-    const asked = Date.now();
-    await giveUp(request);
-    vi.useFakeTimers({ toFake: ["Date"] });
+    fakeClocks();
     try {
-      vi.setSystemTime(asked + 119_000);
+      // Taken and never made: the site never handles it.
+      lost();
+      await render();
       await prepare(jaina);
       await click(saveButton());
-      expect(alerts()).toContain("The last attempt may still finish; try again in a couple of minutes.");
+      vi.advanceTimersByTime(119_000);
+      await prepare(jaina);
+      await click(saveButton());
+      expect(alerts()).toContain(WAIT);
       expect(posts).toEqual([]);
-      vi.setSystemTime(asked + 121_000);
+      vi.advanceTimersByTime(2_000);
       await prepare(jaina);
       await click(saveButton());
       expect(accounts[A_ID].characters).toHaveLength(1);
@@ -1965,6 +1958,97 @@ describe("a character asked for and not heard back on", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  test.each([["back", -180_000], ["forward", 180_000]])("a wall clock put %s three minutes after a request got no answer does not end its wait: one character", async (_, correction) => {
+    const jaina = alt({ planIds: [FROST.id] });
+    seed(ANON, [FROST], [jaina]);
+    fakeClocks();
+    try {
+      const request = lost();
+      await render();
+      await prepare(jaina);
+      await click(saveButton());
+      expect(alerts()).toContain("so it may or may not have been made.");
+      // The computer's clock is corrected at once; no time passes on the page's own clock.
+      vi.setSystemTime(Date.now() + correction);
+      await prepare(jaina);
+      await click(saveButton());
+      expect(alerts()).toContain(WAIT);
+      expect(posts).toEqual([]);
+      // The first request is made after all, and is the one used.
+      request.late();
+      await prepare(jaina);
+      await click(saveButton());
+      expect(accounts[A_ID].characters).toHaveLength(1);
+      expect(posts.map((p) => p.url)).toEqual(["/api/me/characters", "/api/me/builds"]);
+      expect(posts[1].body.characterId).toBe(accounts[A_ID].characters[0].id);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("a request with no answer stored at a time still to come, read back after a reload, is waited out from when the page meets it: one character", async () => {
+    const jaina = alt({ planIds: [FROST.id] });
+    seed(ANON, [FROST], [jaina]);
+    fakeClocks();
+    try {
+      // Left by an earlier page that never heard back, at a time three minutes ahead of the clock now, since put back.
+      const label = { name: "Jaina", classSlug: "mage", realm: null, note: null };
+      localStorage.setItem("everloot:transfers", JSON.stringify({ format: "everloot.transfers", version: 1, receipts: [],
+        characters: [{ altId: jaina.id, userId: A_ID, characterId: null, label, at: new Date(Date.now() + 180_000).toISOString() }] }));
+      await render();
+      await prepare(jaina);
+      expect(text()).toContain("Your last try asked your account for the character Jaina and did not hear back.");
+      await click(saveButton());
+      expect(alerts()).toContain(WAIT);
+      vi.advanceTimersByTime(119_000);
+      await prepare(jaina);
+      await click(saveButton());
+      expect(alerts()).toContain(WAIT);
+      expect(posts).toEqual([]);
+      // That earlier request is made after all: it is used, and it is the only one.
+      accounts[A_ID].characters.push({ id: serverId(77), ...label });
+      await prepare(jaina);
+      await click(saveButton());
+      expect(accounts[A_ID].characters).toHaveLength(1);
+      expect(posts.map((p) => p.url)).toEqual(["/api/me/builds"]);
+      expect(posts[0].body.characterId).toBe(serverId(77));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("a request with no answer stored long before, read back after a reload, is looked for on the account first, and used when there", async () => {
+    const jaina = alt({ planIds: [FROST.id] });
+    seed(ANON, [FROST], [jaina]);
+    const label = { name: "Jaina", classSlug: "mage", realm: null, note: null };
+    localStorage.setItem("everloot:transfers", JSON.stringify({ format: "everloot.transfers", version: 1, receipts: [],
+      characters: [{ altId: jaina.id, userId: A_ID, characterId: null, label, at: new Date(Date.now() - 600_000).toISOString() }] }));
+    accounts[A_ID].characters.push({ id: serverId(78), ...label });
+    await render();
+    await prepare(jaina);
+    await click(saveButton());
+    expect(accounts[A_ID].characters).toHaveLength(1);
+    expect(posts.map((p) => p.url)).toEqual(["/api/me/builds"]);
+    expect(posts[0].body.characterId).toBe(serverId(78));
+  });
+
+  test("a request with no answer stored long before, read back after a reload, is made again only once the account read just now does not have it", async () => {
+    const jaina = alt({ planIds: [FROST.id] });
+    seed(ANON, [FROST], [jaina]);
+    const label = { name: "Jaina", classSlug: "mage", realm: null, note: null };
+    localStorage.setItem("everloot:transfers", JSON.stringify({ format: "everloot.transfers", version: 1, receipts: [],
+      characters: [{ altId: jaina.id, userId: A_ID, characterId: null, label, at: new Date(Date.now() - 600_000).toISOString() }] }));
+    await render();
+    await prepare(jaina);
+    const reads = requests.filter((r) => r.request === "GET /api/me/builds").length;
+    await click(saveButton());
+    // The account was read again before the character was asked for, and it is made once.
+    expect(requests.map((r) => r.request).slice(-4)).toEqual(["GET /api/auth/me", "GET /api/me/builds", "POST /api/me/characters", "POST /api/me/builds"]);
+    expect(requests.filter((r) => r.request === "GET /api/me/builds").length).toBe(reads + 1);
+    expect(accounts[A_ID].characters).toHaveLength(1);
+    expect(text()).toContain("Saved 1 plan to your account.");
   });
 
   test("a character request the site refused outright made nothing, so the next try asks again at once", async () => {

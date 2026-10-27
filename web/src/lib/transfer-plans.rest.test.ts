@@ -425,7 +425,8 @@ describe.skipIf(!databaseUrl || !restUrl || !secret || !databaseUrl.endsWith(`/$
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     try {
       await click(button(/^Save to your account$/));
-      for (let i = 0; i < 250 && !late; i++) await act(async () => { await new Promise((r) => setImmediate(r)); });
+      // Up to five seconds of real time for the request to get through the routes and PostgREST to the stand-in.
+      for (const end = performance.now() + 5_000; !late && performance.now() < end;) await act(async () => { await new Promise((r) => setImmediate(r)); });
       expect(late).toBeDefined();
       await act(async () => { await vi.advanceTimersByTimeAsync(20_000); });
     } finally {
@@ -446,5 +447,65 @@ describe.skipIf(!databaseUrl || !restUrl || !secret || !databaseUrl.endsWith(`/$
     const made = await characters();
     expect(made).toHaveLength(1);
     expect((await pool.query("select character_id from public.saved_builds where user_id = $1 and name = 'Late'", [owner])).rows).toEqual([{ character_id: made[0].id }]);
+  });
+
+  test.each([["back", -180_000], ["forward", 180_000]])("a wall clock put %s three minutes after the panel gave up on a character request does not end its wait: one character", async (way, correction) => {
+    const n = way === "back" ? 10 : 11;
+    const jaina = alt(493 + n, `Jaina Clock ${way}`, id(n));
+    const name = `Clock ${way}`;
+    seed([plan(n, name)], [jaina]);
+    const fixture = globalThis.fetch;
+    let asked = 0;
+    let release = () => {};
+    let late: Promise<Response> | undefined;
+    vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) !== "/api/me/characters") return fixture(input, init);
+      asked++;
+      if (late) return fixture(input, init);
+      // The request reaches the site, which handles it only once released, after the panel has stopped waiting.
+      late = new Promise<void>((r) => { release = r; }).then(() => fixture(input, init));
+      return new Promise<Response>((resolve, reject) => {
+        late!.then(resolve, reject);
+        init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+      });
+    });
+    const characters = async () => (await pool.query("select id from public.build_characters where user_id = $1 and name = $2", [owner, jaina.name])).rows;
+    const priorSkew = skew;
+    try {
+      // Ahead of the earlier tests' clock, so putting it back cannot bring back what the routes cached then.
+      skew = priorSkew + 240_000;
+      await mount();
+      await prepare(name, jaina);
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      try {
+        await click(button(/^Save to your account$/));
+        // Up to five seconds of real time for the request to get through the routes and PostgREST to the stand-in.
+        for (const end = performance.now() + 5_000; !late && performance.now() < end;) await act(async () => { await new Promise((r) => setImmediate(r)); });
+        expect(late).toBeDefined();
+        await act(async () => { await vi.advanceTimersByTimeAsync(20_000); });
+      } finally {
+        vi.useRealTimers();
+      }
+      await until(() => text().includes("may or may not have been made"), "giving up");
+      // The computer's clock is corrected; no time passes on the page's own clock.
+      skew += correction;
+      await prepare(name, jaina);
+      await click(button(/^Save to your account$/));
+      await until(() => text().includes("The last attempt may still finish; try again in a couple of minutes."), "the wait");
+      expect(asked).toBe(1);
+      release();
+      expect((await late!).status).toBe(201);
+      await prepare(name, jaina);
+      await click(button(/^Save to your account$/));
+      await until(() => text().includes("Saved 1 plan to your account."), "the retry");
+      expect(asked).toBe(1);
+      const made = await characters();
+      expect(made).toHaveLength(1);
+      expect((await pool.query("select character_id from public.saved_builds where user_id = $1 and name = $2", [owner, name])).rows).toEqual([{ character_id: made[0].id }]);
+    } finally {
+      release();
+      if (late) await late;
+      skew = priorSkew;
+    }
   });
 });

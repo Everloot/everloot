@@ -57,6 +57,33 @@ const waited = `did not answer within ${ANSWER_WAIT_MS / 1000} seconds`;
 /** How long after a character request no answer settled no other is asked for: it may still be made in that time. */
 const CHARACTER_WAIT_MS = 2 * 60_000;
 const MAY_STILL_FINISH = "The last attempt may still finish; try again in a couple of minutes.";
+
+/**
+ * When this page asked for each character request no answer has settled, or first met one stored by another page, on
+ * its monotonic clock (performance.now), by account, alt and the request's stored time. The wall clock a request is
+ * stored with can be corrected, forward or back, at any moment; while the page lives, its wait is counted by this.
+ */
+const metOnThisPage = new Map<string, number>();
+const requestKey = (userId: string, request: { altId: string; at: string }) => `${userId} ${request.altId} ${request.at}`;
+
+/**
+ * Whether a character request no answer has settled may still be made, so no other is asked for, as of `now` on this
+ * page's monotonic clock and `wall` on the wall clock. One this page asked for, or has met before, is counted on the
+ * monotonic clock. One stored by another page is counted from its stored time where that can be believed: a time still
+ * to come, from a clock since put back, starts the wait again from now; one more than the wait ago is past it, and the
+ * account's characters, read just before, decide whether to ask again.
+ */
+function stillWaiting(userId: string, request: { altId: string; at: string }, now: number, wall: number): boolean {
+  const key = requestKey(userId, request);
+  let since = metOnThisPage.get(key);
+  if (since === undefined) {
+    const age = wall - Date.parse(request.at);
+    if (age >= CHARACTER_WAIT_MS) return false;
+    since = age < 0 ? now : now - age;
+    metOnThisPage.set(key, since);
+  }
+  return now - since < CHARACTER_WAIT_MS;
+}
 const select = "min-h-11 w-full rounded-control border border-edge bg-canvas px-3 text-base text-fg";
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
@@ -534,8 +561,9 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
      * with its label and when, before it is asked for, so after an answer that never came the next try finds it.
      */
     const characterFor = (altId: string, label: CharacterLabel, name: string) => withWorkspaceLock(async (): Promise<{ ok: true; id: string } | { ok: false; text: string | null }> => {
-      // Timed by Date.now, as the stored requests are, from when the account was asked.
-      const listedAt = Date.now();
+      // When the account is asked for its characters: a wait counted to then has passed only if this list came after it.
+      const listedAt = performance.now();
+      const listedWall = Date.now();
       const listed = await request("/api/me/builds");
       if (!listed.ok && (listed.why === "stopped" || listed.why === "changed" || listed.why === "signed-out")) return { ok: false, text: refusal(listed, name) };
       const characters = listed.ok && Array.isArray(listed.body.characters) ? listed.body.characters as AccountBuilds["characters"] : null;
@@ -552,7 +580,7 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
           if (!sameCharacter(pending.label, label)) earlier.push({ plan: name, character: pending.label.name });
           return { ok: true, id: asked.id };
         }
-        if (Math.abs(listedAt - Date.parse(pending.at)) < CHARACTER_WAIT_MS) {
+        if (stillWaiting(owner.userId, pending, listedAt, listedWall)) {
           return { ok: false, text: `${savedFirst()}The character ${pending.label.name} was asked for on your account for ${name} and is not there yet. ${MAY_STILL_FINISH} ${name} was not sent.${madeNote()}` };
         }
       }
@@ -564,6 +592,7 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
       const at = new Date(Date.now());
       const stored = rememberCharacter(deviceStorage(), owner, altId, label, null, at);
       if (!stored.ok) return { ok: false, text: `${savedFirst()}${stored.message} ${KEPT}${madeNote()}` };
+      metOnThisPage.set(requestKey(owner.userId, { altId, at: at.toISOString() }), performance.now());
       const answer = await request("/api/me/characters", label);
       if (!answer.ok && (answer.why === "unreachable" || answer.why === "timeout" || answer.why === "server")) {
         const why = answer.why === "server"
