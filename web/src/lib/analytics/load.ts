@@ -42,8 +42,9 @@ export function loadConsented(config: AnalyticsConfig, win: Window, doc: Documen
     const gtag = function (..._args: unknown[]) { w.dataLayer!.push(arguments); };
     win.gtag = gtag as unknown as Window["gtag"];
     gtag("js", new Date());
-    // A page opened with a fragment (the calculator's #plan=…) is measured at its URL without it.
-    gtag("config", config.gaId, ...(win.location.hash ? [{ page_location: stripFragment(win.location.href) }] : []));
+    // No page location is set here: one set at load would hold for every page after it. The tag measures each event at
+    // the address as it is then, and leaves the fragment out itself (the calculator's #plan=…).
+    gtag("config", config.gaId);
     const script = doc.createElement("script");
     script.id = GA_ID;
     script.async = true;
@@ -59,15 +60,22 @@ export function loadConsented(config: AnalyticsConfig, win: Window, doc: Documen
     script.src = "https://tracker.metricool.com/resources/be.js";
     script.onload = () => {
       if (started === generation && doc.getElementById(METRICOOL_ID) === script) {
-        // The tracker sets the visit's `u` from the address bar itself. Given a `u` it cannot change, it sends the
-        // page's URL without the fragment instead; a tracker that refuses that sends nothing.
+        // The tracker sets the visit's `u` from the address bar and its `ref` from the referrer itself. Given values it
+        // cannot change, it sends the page's URL without the fragment or search terms, and a referrer on this site
+        // without search terms, instead; a tracker that refuses that sends nothing.
         const visit = { hash: config.metricoolHash! };
-        Object.defineProperty(visit, "u", { value: stripFragment(win.location.href), enumerable: true });
+        Object.defineProperty(visit, "u", { value: stripSearchQuery(stripFragment(win.location.href)), enumerable: true });
+        if (sameSite(doc.referrer, win.location.origin)) Object.defineProperty(visit, "ref", { value: stripSearchQuery(doc.referrer), enumerable: true });
         try { win.beTracker?.t(visit); } catch {}
       }
     };
     doc.head.appendChild(script);
   }
+}
+
+/** Whether a URL is on this site's origin. */
+function sameSite(url: string, origin: string): boolean {
+  try { return url !== "" && new URL(url).origin === origin; } catch { return false; }
 }
 
 /** Removes the `q` (search terms) parameter from a URL. Relative or unparsable values are returned unchanged. */

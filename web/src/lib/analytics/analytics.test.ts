@@ -322,33 +322,55 @@ describe("a plan in the address never reaches an analytics tool", () => {
     expect(event.$set_once.$initial_current_url).toBe(`${window.location.origin}/b`);
   });
 
-  it("Google Analytics: a page opened with a plan is configured with its URL without the fragment", () => {
+  // The production Google tag measures every event at the address it has then, and leaves the fragment out itself:
+  // run in Chrome with it, a page opened with a plan and a client move to one both sent no fragment.
+  it("Google Analytics: a page opened with a plan gives the tag nothing from its address, so no fragment", () => {
     at(`/tools/talents/mage${PLAN}`);
     loadConsented({ gaId: GA }, window, document);
-    expect(dataLayer().find((args) => args[0] === "config")).toEqual(["config", GA, { page_location: `${window.location.origin}/tools/talents/mage` }]);
+    expect(dataLayer().find((args) => args[0] === "config")).toEqual(["config", GA]);
     expect(JSON.stringify(dataLayer())).not.toContain(CODE);
   });
 
-  it("Google Analytics: a page with no fragment is configured as before, with nothing set in its place", () => {
-    at("/tools/talents/mage");
+  it("Google Analytics: entering with a fragment does not pin the page location, so later events count where they happen (reported case)", () => {
+    at("/start#chapter");
     loadConsented({ gaId: GA }, window, document);
-    expect(dataLayer().find((args) => args[0] === "config")).toEqual(["config", GA]);
+    expect(dataLayer().filter((args) => args[0] === "config" || args[0] === "set")).toEqual([["config", GA]]);
   });
 
-  it("Metricool: its tracker reads the address bar itself, and still sends the page URL without the fragment", () => {
-    at(`/tools/talents/mage${PLAN}`);
-    // What tracker.metricool.com/resources/be.js does: set `u` from the address bar, then send every field it holds.
+  /** What tracker.metricool.com/resources/be.js does: set `u` from the address bar and `ref` from the referrer, then
+   *  send every field it holds. */
+  function metricool(): Record<string, string>[] {
     const sent: string[] = [];
     (globalThis as { metricoolSent?: string[] }).metricoolSent = sent;
-    const t = new Function("a", "a.u = document.location.href; a.bw = 1280; var b = []; for (var c in a) if (a.hasOwnProperty(c)) b.push(encodeURIComponent(c) + '=' + encodeURIComponent(a[c])); globalThis.metricoolSent.push(b.join('&'));");
+    const t = new Function("a", "a.u = document.location.href; a.bw = 1280; document.referrer && (a.ref = document.referrer); var b = []; for (var c in a) if (a.hasOwnProperty(c)) b.push(encodeURIComponent(c) + '=' + encodeURIComponent(a[c])); globalThis.metricoolSent.push(b.join('&'));");
     window.beTracker = { t: t as (options: { hash: string }) => void };
     loadConsented({ metricoolHash: METRICOOL }, window, document);
     document.querySelector('script[src="https://tracker.metricool.com/resources/be.js"]')!.dispatchEvent(new Event("load"));
-    expect(sent).toHaveLength(1);
-    expect(sent[0]).toContain(`u=${encodeURIComponent(`${window.location.origin}/tools/talents/mage`)}&`);
-    expect(decodeURIComponent(sent[0])).not.toContain("#");
-    expect(decodeURIComponent(sent[0])).not.toContain(CODE);
     delete (globalThis as { metricoolSent?: string[] }).metricoolSent;
+    return sent.map((query) => Object.fromEntries(new URLSearchParams(query)));
+  }
+
+  it("Metricool: its tracker reads the address bar itself, and still sends the page URL without the fragment or search terms", () => {
+    at(`/tools/talents/mage?q=thunderfury&tab=2${PLAN}`);
+    const [visit, ...more] = metricool();
+    expect(more).toEqual([]);
+    expect(visit.u).toBe(`${window.location.origin}/tools/talents/mage?tab=2`);
+    expect(JSON.stringify(visit)).not.toContain(CODE);
+    expect(JSON.stringify(visit)).not.toContain("thunderfury");
+  });
+
+  it("Metricool: a referrer on this site goes without its search terms; another site's is the tracker's own", () => {
+    at("/tools/talents/mage");
+    const referrer = (value: string) => Object.defineProperty(document, "referrer", { value, configurable: true });
+    try {
+      referrer(`${window.location.origin}/search?q=thunderfury&scope=items`);
+      expect(metricool()[0].ref).toBe(`${window.location.origin}/search?scope=items`);
+      document.head.innerHTML = "";
+      referrer("https://www.google.com/");
+      expect(metricool()[0].ref).toBe("https://www.google.com/");
+    } finally {
+      delete (document as { referrer?: string }).referrer;
+    }
   });
 
   it("Cloudflare: the beacon is given no page URL here (it reads the address itself, and drops fragments and queries)", () => {
