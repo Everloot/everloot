@@ -27,8 +27,8 @@ const messages = (files: NewsFile[], c = ctx) => checkNews(files, c).problems.ma
 
 test("hero alt preserves the full weekly description and accepts up to 500 characters", () => {
   const weekly = readNewsPosts().find((f) => f.path.includes("wow-weekly-forever-name-reservations"))!;
-  const data = parsePost(weekly.source).data;
-  const hero = (data as { hero: { src: string; alt: string } }).hero;
+  const data = PostFrontMatter.parse(parsePost(weekly.source).data);
+  const hero = data.hero!;
   expect(hero.alt).toHaveLength(203);
   expect(PostFrontMatter.parse(data).hero?.alt).toBe(hero.alt);
   for (const length of [203, 499, 500]) {
