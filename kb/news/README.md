@@ -30,6 +30,10 @@ status: draft                    # draft posts are not built on the site
 ---
 ```
 
+Optional `hero` front matter has `src` and nonempty `alt` text (at most 500 characters), with optional
+`thumb` and `share` paths. Keep the full image description. The supplied images are 16:9: source 1600×900,
+thumbnail 800×450, share 1200×675. Without a hero the post uses the site's default share image.
+
 Quote a title or summary that holds a colon and a space, such as "WoW: Forever", or YAML reads it as a nested
 field and the check refuses the file.
 

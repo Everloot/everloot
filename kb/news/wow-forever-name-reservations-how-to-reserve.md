@@ -10,6 +10,11 @@ sources:
     url: https://news.blizzard.com/en-us/article/24303866/claim-your-world-of-warcraft-forever-character-names
   - title: "Wowhead: How to reserve your WoW: Forever character name on October 27th"
     url: https://www.wowhead.com/forever/news/how-to-reserve-your-world-of-warcraft-forever-character-name-on-october-27th-383515
+hero:
+  src: /news/heroes/wow-forever-name-reservations-how-to-reserve/wow-forever-name-reservations-how-to-reserve-clean.webp
+  alt: "Everloot illustration: a sign reading Opens Oct 27 above a purple Reserved name tag, with the WoW: Forever logo"
+  thumb: /news/heroes/wow-forever-name-reservations-how-to-reserve/wow-forever-name-reservations-how-to-reserve-card.webp
+  share: /news/heroes/wow-forever-name-reservations-how-to-reserve/wow-forever-name-reservations-how-to-reserve-share.png
 status: published
 ---
 
