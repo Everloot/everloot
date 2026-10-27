@@ -138,6 +138,43 @@ describe("guideFreshness", () => {
     ]);
   });
 
+  test("a change after the build the guide was reviewed against makes it stale even when its code was made on a later build", () => {
+    // The review's case: reviewed against 1.0.0.1, its code made on 1.0.0.5, the tree's build; the record for 1.0.0.5
+    // changes Talent 12. The guide check and the schema both pass such a guide.
+    const records = [record("1.0.0.5", "1.0.0.1", { spellValues: [spellChange(12)] })];
+    const newer = guide({ code: code(RANKS, "1.0.0.5") });
+    const f = guideFreshness(newer, tree("1.0.0.5"), changes(records), TODAY);
+    expect(f.state).toBe("stale");
+    expect(f.reasons).toEqual([
+      "Talent 12: its spell changed in build 1.0.0.5: 1 number.",
+      "Check these talents before you follow the plan.",
+      "Game build 1.0.0.5 is live and newer than 1.0.0.1, the build this guide was reviewed against.",
+    ]);
+    expect(f.sets[0]).toMatchObject({ stale: true, sinceReview: f.reasons.slice(0, 2) });
+    // The plan's own history still starts at the build its code carries: made on the tree's, it has none.
+    expect(f.sets[0].changes).toEqual([]);
+    const blocks: Block[] = [{ type: "paragraph", inline: [{ kind: "text", text: Array.from({ length: 150 }, (_, i) => `word${i}`).join(" ") }], line: 1 }];
+    expect(guideIndexable({ status: "published", reviewed: REVIEWED, blocks }, f)).toBe(false);
+    // The same guide with its code made on 1.0.0.1 reads the same.
+    expect(guideFreshness(guide(), tree("1.0.0.5"), changes(records), TODAY).reasons).toEqual(f.reasons);
+
+    // A code made between the review and the tree: every change after the review counts, and the plan's own history
+    // lists only those after its code's build.
+    const both = [record("1.0.0.3", "1.0.0.1", { spellValues: [spellChange(12)] }), record("1.0.0.5", "1.0.0.3", { spellValues: [spellChange(11)] })];
+    const between = guideFreshness(guide({ code: code(RANKS, "1.0.0.3") }), tree("1.0.0.5"), changes(both), TODAY);
+    expect(between.state).toBe("stale");
+    expect(between.sets[0].sinceReview).toEqual([
+      "Talent 12: its spell changed in build 1.0.0.3: 1 number.",
+      "Talent 11: its spell changed in build 1.0.0.5: 1 number.",
+      "Check these talents before you follow the plan.",
+    ]);
+    expect(between.sets[0].changes).toEqual([
+      "Made on game build 1.0.0.3; this tree is build 1.0.0.5.",
+      "Talent 11: its spell changed in build 1.0.0.5: 1 number.",
+      "Check these talents before you follow the plan.",
+    ]);
+  });
+
   test("a change made before the build the guide was reviewed against is one the review saw: shown with the plan, not stale", () => {
     const records = [record("1.0.0.5", "1.0.0.3"), record("1.0.0.3", "1.0.0.1", { spellValues: [spellChange(12)] })];
     const reviewedLater = guide({ reviewed: { by: "Kai", on: "2026-10-20", build: "1.0.0.5" } });

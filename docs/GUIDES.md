@@ -120,7 +120,8 @@ How current a guide is, its page works out each time it is rebuilt, at most once
   second set is broken, too, when it opens at a level after the guide's levels end. Copy for addon is off for that
   set.
 - **Stale**: the build watch's change records show a change to the plan's talents, or to the levels points arrive
-  at, after the build the guide was reviewed against. A missing or incomplete record is never read as a change. The
+  at, after the build the guide was reviewed against, whatever build its code was made on. A missing or incomplete
+  record is never read as a change. The
   note lists only the changes after that build; one at or before it is a change the review saw.
 - **Review due**: 60 days have passed since the last review, or a live build is newer than the one it was reviewed
   against.

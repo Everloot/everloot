@@ -1,7 +1,7 @@
 import type { GuideFrontMatter } from "../../../kb/src/guides/guide";
 import { MIN_PROSE_WORDS, proseWords } from "../../../kb/src/wiki/check";
 import type { Guide } from "./guides";
-import { codeFreshness, compareGameBuilds, freshnessLines, type ClassTalentChanges, type PlanFreshness } from "./talents/freshness";
+import { codeFreshness, compareGameBuilds, freshnessLines, planFreshness, type ClassTalentChanges, type PlanFreshness } from "./talents/freshness";
 import { importPlan } from "./talents/import";
 import { forSet, levelFor, pointsAtLevel, pointsSpent } from "./talents/rules";
 import type { PlanSet, TalentCatalog } from "./talents/types";
@@ -90,11 +90,16 @@ function readSet(set: 1 | 2, code: string, order: string | null, guide: GuidePla
   // A guide that ends before its second set opens cannot use that set.
   else if (set === 2 && opens > guide.levels.to) problems.push(`The second set opens at level ${opens}, after this guide's levels end.`);
   else if (needs > guide.levels.to) problems.push(`It needs level ${needs}, above level ${guide.levels.to}, the last this guide covers.`);
+  // The plan's own history starts at the build its code carries. What changed since the review is read from the
+  // build it was reviewed against, or from the code's when that is older, so a code made on a later build than its
+  // review still answers for the builds in between.
   const f = codeFreshness(catalog, changes, code);
-  const since = f && afterReview(f, guide.reviewed?.build ?? null);
-  const stale = since !== null && (since.touched.length > 0 || since.pointLevels.length > 0);
-  // Without the engine's first line, which dates the plan: the note dates the review itself.
-  return { set, code, order, plan: opened.set, problems, changes: f ? freshnessLines(f) : [], stale, sinceReview: since && stale ? freshnessLines(since).slice(1) : [] };
+  const review = guide.reviewed?.build ?? null;
+  const from = review !== null && compareGameBuilds(review, report.codeBuild) === -1 ? review : report.codeBuild;
+  const since = afterReview(planFreshness(catalog, changes, from, opened.requested), review);
+  const stale = since.touched.length > 0 || since.pointLevels.length > 0;
+  // Without the engine's first line, which dates where it started: the note dates the review itself.
+  return { set, code, order, plan: opened.set, problems, changes: f ? freshnessLines(f) : [], stale, sinceReview: stale ? freshnessLines(since).slice(1) : [] };
 }
 
 const DAY = 86_400_000;
