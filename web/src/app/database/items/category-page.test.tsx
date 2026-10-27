@@ -5,6 +5,7 @@ import { expect, test, vi } from "vitest";
 const facts = vi.hoisted(() => ({ rates: [] as unknown[], names: [] as unknown[], npcs: [] as unknown[], unreachable: false }));
 vi.mock("@/lib/rollup-compute", () => ({
   loadItemFacts: async () => facts,
+  loadReportedItemFacts: async () => ({ shown: [], contested: [], progress: [], unreachable: false }),
   loadWorldFacts: async () => ({ npcs: [], quests: [], vendors: [], unreachable: false }),
   loadCraftedItems: async () => ({ items: new Set<number>(), unreachable: false }),
   loadObservedEdges: async () => ({ edges: [], unreachable: false, dataAsOf: null }),

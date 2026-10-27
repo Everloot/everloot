@@ -5,6 +5,7 @@ import { beforeEach, expect, test, vi } from "vitest";
 const state = vi.hoisted(() => ({
   assets: null as unknown, names: [] as unknown[], tipCalls: [] as number[][], matched: null as unknown,
   levels: new Map<number, { level: number; required: number; binding: number }>(),
+  progress: [] as { fact: "armor"; reporters: number; build: string }[],
 }));
 vi.mock("@/lib/game-assets", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/game-assets")>()),
@@ -22,7 +23,7 @@ vi.mock("@/lib/rollup-compute", () => ({
   loadCraftedItems: async () => ({ items: new Set<number>(), unreachable: false }),
   loadObservedEdges: async () => ({ edges: [], unreachable: false, dataAsOf: null }),
   loadLootTables: async () => ({ tables: { sources: new Map(), leftOut: 0 }, unreachable: false, dataAsOf: null }),
-  loadReportedItemFacts: async () => ({ shown: [], contested: [], unreachable: false }),
+  loadReportedItemFacts: async () => ({ shown: [], contested: [], progress: state.progress, unreachable: false }),
 }));
 vi.mock("@/lib/upload-store", () => ({ STORAGE_UNREACHABLE: "Storage unavailable", uploadStore: { loadCompletion: async () => ({ state: null, dataAsOf: null, unreachable: true }) } }));
 vi.mock("next/link", () => ({ default: ({ href, children, style, title }: { href: string; children: ReactNode; style?: object; title?: string }) => <a href={href} title={title} style={style}>{children}</a> }));
@@ -47,7 +48,15 @@ const html = async (el: Promise<ReactNode>) => renderToStaticMarkup(await el);
 const props = (id: string) => ({ params: Promise.resolve({ id }), searchParams: Promise.resolve({}) });
 const agreed = (itemId: number) => ["a", "b", "c"].map((installId) => ({ installId, itemId, name: `Agreed ${itemId}` }));
 
-beforeEach(() => { state.assets = null; state.names = []; state.tipCalls = []; state.matched = null; state.levels = new Map(); });
+beforeEach(() => { state.assets = null; state.names = []; state.tipCalls = []; state.matched = null; state.levels = new Map(); state.progress = []; });
+
+test("a below-threshold item fact shows report progress even without a game-file tooltip", async () => {
+  state.progress = [{ fact: "armor", reporters: 1, build: "1.60.1.70450" }];
+  const page = await html(ItemPage(props(String(made.fromId))));
+  expect(page).toContain("Armor: 1 of 3 installs reported");
+  expect(page).toContain("Not yet confirmed");
+  expect(state.tipCalls).toEqual([]);
+});
 
 test("an unreported item: the creating spell's icon, but no game file tooltip; the credit is the site footer's", async () => {
   state.assets = assets;

@@ -16,7 +16,7 @@ import { isDevelopmentItemName } from "../../../../../../kb/src/dev-item-names";
 import { categoryOf } from "../../../../../../kb/src/item-taxonomy";
 import { edgesFrom, evidenceLabel, type Edge, type Rel } from "../../../../../../kb/src/edges";
 import { CLIENT_LAYER, CLIENT_TAXONOMY, itemsHref, shownItemName, subclassLabel as labelOf } from "@/lib/items";
-import { tipLines, withReported } from "@/lib/item-names";
+import { FACT_WORD, tipLines, withReported } from "@/lib/item-names";
 import type { Crumb } from "@/lib/jsonld";
 import { loadNames, nameOf } from "@/lib/names";
 import { loreForEntity } from "@/lib/lore";
@@ -100,7 +100,8 @@ export default async function ItemPage(props: Props) {
   const assets = tipped || spellLinked ? await loadSiteAssets() : null;
   const filesTip = tipped ? (await loadItemTips(assets, [itemId])).get(itemId) : undefined;
   // The numbers 3 installs' tooltips agree on fill the files' placeholders, each with its installs, build and date.
-  const tip = filesTip && withReported(filesTip, await loadReportedItemFacts(itemId));
+  const reported = await loadReportedItemFacts(itemId);
+  const tip = filesTip && withReported(filesTip, reported);
   const spellIcon = (spellId: number) => assets?.spellIcons.get(spellId);
   const category = categoryOf(CLIENT_TAXONOMY, itemId);
   const quality = category?.quality && category.quality.id <= 5 ? qualityOf(category.quality.id) : undefined;
@@ -274,6 +275,14 @@ export default async function ItemPage(props: Props) {
           }
           facts={<Facts layout="list" label={`${title}: quick facts`} items={quickFacts} />}
         />
+        {!reported.unreachable && Boolean(reported.progress?.length) && (
+          <section aria-label="Item report progress" className="mt-3 space-y-1 text-meta text-fg-2">
+            <p>Not yet confirmed. Each value needs 3 installs to agree.</p>
+            <ul>
+              {reported.progress!.map((p) => <li key={p.fact}>{`${FACT_WORD[p.fact]}: ${p.reporters} of 3 installs reported (build ${p.build}).`}</li>)}
+            </ul>
+          </section>
+        )}
         <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
         <OpenData
           text={[

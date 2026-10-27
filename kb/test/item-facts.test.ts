@@ -1,6 +1,6 @@
 import { parseRecords } from "@everloot/protocol";
 import { describe, expect, test } from "vitest";
-import { itemFactRowsFromRecords, reportedItemFacts } from "../src/item-facts.js";
+import { itemFactProgress, itemFactRowsFromRecords, reportedItemFacts } from "../src/item-facts.js";
 
 const BUILD = "1.60.1.70450";
 const asOf = new Date("2026-11-10T00:00:00Z");
@@ -11,6 +11,33 @@ const fact = (installId: string, fact: string, value: number, extra: Record<stri
 const state = (records: unknown[]) => reportedItemFacts(itemFactRowsFromRecords(records).get(2075), asOf);
 
 describe("item facts players report", () => {
+  test("progress counts distinct installs per line on the newest build without exposing values", () => {
+    const rows = itemFactRowsFromRecords([
+      fact("install-a", "stamina", 9876), fact("install-a", "stamina", 9876),
+      fact("install-b", "stamina", 1234), fact("install-a", "armor", 999), fact("install-a", "armor", 999),
+      ...["a", "b", "c"].map((i) => fact(`install-${i}`, "spirit", 10)),
+      fact("install-z", "stamina", 4567, { clientBuild: "1.60.2.70532" }),
+    ]).get(2075);
+    expect(itemFactProgress(rows)).toEqual([
+      { fact: "armor", reporters: 1, build: BUILD },
+      { fact: "stamina", reporters: 1, build: "1.60.2.70532" },
+    ]);
+    expect(itemFactProgress(undefined)).toEqual([]);
+    expect(reportedItemFacts(rows).shown.map((x) => x.fact)).toEqual(["spirit"]);
+  });
+
+  test("a newer partial build does not relabel an agreed or contested line as unconfirmed", () => {
+    const rows = itemFactRowsFromRecords([
+      ...["a", "b", "c"].map((i) => fact(`install-${i}`, "armor", 100)),
+      ...["a", "b", "c"].map((i, n) => fact(`install-${i}`, "stamina", n)),
+      fact("install-d", "armor", 101, { clientBuild: "1.60.2.70532" }),
+      fact("install-d", "stamina", 10, { clientBuild: "1.60.2.70532" }),
+    ]).get(2075);
+    expect(itemFactProgress(rows)).toEqual([]);
+    expect(reportedItemFacts(rows).shown.map((f) => f.fact)).toEqual(["armor"]);
+    expect(reportedItemFacts(rows).contested).toEqual(["stamina"]);
+  });
+
   test("the rows the readers use are rows the protocol accepts", () => {
     const rows = [fact("install-a", "stamina", 5), fact("install-b", "damage_per_second", 12.4)];
     expect(parseRecords(rows).records).toHaveLength(2);

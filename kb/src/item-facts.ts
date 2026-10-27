@@ -45,6 +45,12 @@ export interface ItemFactState {
 
 export const NO_REPORTED_FACTS: ItemFactState = { shown: [], contested: [] };
 
+export interface ItemFactProgress {
+  fact: ItemFactName;
+  reporters: number;
+  build: string;
+}
+
 const FACTS = new Set<string>(ITEM_FACTS);
 const BUILD = /^\d+(\.\d+)+$/;
 
@@ -81,6 +87,22 @@ function compareBuilds(a: string, b: string): number {
 const time = (r: ItemFactRow) => (r.capturedAt === undefined ? -Infinity : Date.parse(r.capturedAt));
 /** One decimal is the most the tooltip prints, so values are compared at that precision. */
 const key = (value: number) => value.toFixed(1);
+
+/** Counts only, for undecided lines in their newest reported build. Never includes a value. */
+export function itemFactProgress(rows: readonly ItemFactRow[] | undefined): ItemFactProgress[] {
+  const progress: ItemFactProgress[] = [];
+  for (const fact of ITEM_FACTS) {
+    const reported = rows?.filter((r) => r.fact === fact) ?? [];
+    const builds = [...new Set(reported.map((r) => r.clientBuild))].sort(compareBuilds);
+    // A shown or contested line already has a decision; a newer partial build must not relabel it unconfirmed.
+    if (builds.some((b) => new Set(reported.filter((r) => r.clientBuild === b).map((r) => r.installId)).size >= ITEM_AGREEMENT)) continue;
+    const build = builds[0];
+    if (!build) continue;
+    const reporters = new Set(reported.filter((r) => r.clientBuild === build).map((r) => r.installId)).size;
+    if (reporters < ITEM_AGREEMENT) progress.push({ fact, reporters, build });
+  }
+  return progress;
+}
 
 /** One item's agreed and contested lines, from its rows (the item's entry of `itemFactRowsFromRecords`). */
 export function reportedItemFacts(rows: readonly ItemFactRow[] | undefined, asOf: Date = new Date()): ItemFactState {
