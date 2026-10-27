@@ -91,6 +91,7 @@ const nextConfig = {
     // The guides are read from kb/guides on each request for the guide index and when a guide page is rebuilt (the
     // key covers /guides and /guides/[slug]); a guide's [[links]] read the wiki pages too.
     "/guides": ["../kb/guides/*.md", "../kb/wiki/*.md", "../kb/wiki/categories.yaml"],
+    "/classes/\\[class\\]/feed.xml": ["../kb/guides/*.md"],
     // The sitemap lists the wiki pages, the news posts and the guides too, so it reads them from kb on every request.
     // Without the folders in its own bundle the route answers 500 and the site has no sitemap at all.
     "/sitemap.xml": ["../kb/wiki/*.md", "../kb/wiki/categories.yaml", "../kb/news/*.md", "../kb/guides/*.md"],
