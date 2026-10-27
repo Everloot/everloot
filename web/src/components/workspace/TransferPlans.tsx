@@ -6,8 +6,8 @@ import { className } from "@/components/builds/describe";
 import { Card, Field, SectionHeading } from "@/components/ui";
 import { detailValue, listOf } from "@/lib/alt-workspace";
 import {
-  ANONYMOUS, WORKSPACE_LIMITS, bindTransferred, boundElsewhere, bucketKey, deviceStorage, emptyWorkspace, hiddenFrom, locksAvailable,
-  madeCharacter, orderState, planContent, planGroups, readTransfers, readWorkspace, receiptFailed, receiptSaved, rememberCharacter,
+  ANONYMOUS, WORKSPACE_LIMITS, bindTransferred, boundElsewhere, bucketKey, contentDigest, deviceStorage, emptyWorkspace, hiddenFrom,
+  locksAvailable, madeCharacter, orderState, planContent, planGroups, readTransfers, readWorkspace, receiptFailed, receiptSaved, rememberCharacter,
   settleTransferred, transferKey, transferRoom, transferStanding, withWorkspaceLock,
   type CharacterLabel, type Failure, type LocalAlt, type LocalPlan, type Owner, type PlayerWorkspace, type Standing, type TransfersRead,
 } from "@/lib/player-workspace";
@@ -146,9 +146,10 @@ interface Row {
 }
 interface Group { key: string; rows: Row[]; alts: LocalAlt[]; watches: number; refused: boolean; another: boolean }
 
-/** The signed-out plans in the groups they go in (planGroups), each as it stands with the account. A plan that is
- *  another account's now (hiddenFrom) is not shown, and the group it is in stays here. */
-function groupsOf(signedOut: PlayerWorkspace, account: PlayerWorkspace, elsewhere: Set<string>, readable: boolean, transfers: TransfersRead, hidden: Set<string>): Group[] {
+/** The signed-out plans in the groups they go in (planGroups), each as it stands with the account, a receipt read by
+ *  the plan's fingerprint (`digests`, by planContent) once it is worked out. A plan that is another account's now
+ *  (hiddenFrom) is not shown, and the group it is in stays here. */
+function groupsOf(signedOut: PlayerWorkspace, account: PlayerWorkspace, elsewhere: Set<string>, readable: boolean, transfers: TransfersRead, hidden: Set<string>, digests: Map<string, string>): Group[] {
   const plans = new Map(signedOut.plans.map((p) => [p.id, p]));
   const alts = new Map(signedOut.alts.map((a) => [a.id, a]));
   return planGroups(signedOut).flatMap(({ planIds, altIds }) => {
@@ -158,7 +159,7 @@ function groupsOf(signedOut: PlayerWorkspace, account: PlayerWorkspace, elsewher
     const groupAlts = altIds.map((id) => alts.get(id)!);
     const rows = shown.map((id): Row => {
       const plan = plans.get(id)!;
-      const standing = transferStanding(plan, account, elsewhere, transfers.ok ? transfers.transfers : undefined);
+      const standing = transferStanding(plan, account, elsewhere, transfers.ok ? transfers.transfers : undefined, digests.get(planContent(plan)));
       const unreadable = standing.kind === "new" ? unreadableOrder(plan) : null;
       return {
         plan, standing, line: unreadable ?? standingLine(plan, standing),
@@ -223,6 +224,16 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
     window.addEventListener("storage", reload);
     return () => window.removeEventListener("storage", reload);
   }, [reload]);
+  /** Each signed-out plan's fingerprint (contentDigest) by its content, worked out as the plans change, to read a
+   *  receipt by. Until it is, or without crypto.subtle, a receipt confirms nothing. */
+  const [digests, setDigests] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    if (!device) return;
+    let current = true;
+    Promise.all(device.signedOut.plans.map(async (p) => [planContent(p), await contentDigest(p)] as const))
+      .then((pairs) => { if (current) setDigests(new Map(pairs)); }, () => {});
+    return () => { current = false; };
+  }, [device]);
   /** False once this account's transfer is over: unmounted for another account, or signed out in this tab. */
   const live = useRef(true);
   useEffect(() => {
@@ -305,7 +316,7 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
   const readable = device.account !== null;
   const accountBucket = device.account ?? emptyWorkspace(owner);
   const transfers = device.transfers.ok ? device.transfers.transfers : null;
-  const groups = groupsOf(device.signedOut, accountBucket, device.elsewhere, readable, device.transfers, hidden);
+  const groups = groupsOf(device.signedOut, accountBucket, device.elsewhere, readable, device.transfers, hidden, digests);
   const altsById = new Map(device.signedOut.alts.map((a) => [a.id, a]));
   const known = account.status === "open" ? account.data.characters : [];
   /** The character made on this account from an alt by an earlier transfer, while the account still has it. */
@@ -428,6 +439,8 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
     /** The characters this transfer made from alts, and whether any plan went under one. */
     const made = new Map<string, { name: string; used: boolean }>();
     const saved: string[] = [];
+    /** The plans the site confirmed in this transfer, as they were: a copy here still exactly the same goes with its group. */
+    const confirmed: LocalPlan[] = [];
     /** Saved, but changed here while it was on its way: the account has it as it was sent. */
     const changedAfter: string[] = [];
     /** Sent again, and the site had an earlier version of it from the same key. */
@@ -468,13 +481,14 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
     };
     const changedNote = (name: string) => `${savedFirst()}${name} changed on this device after the preview, so it was not sent. ${KEPT}${madeNote()}`;
 
-    type Step = { kind: "stop"; text: string | null } | { kind: "done" } | { kind: "send"; plan: LocalPlan; key: string | null };
+    type Step = { kind: "stop"; text: string | null } | { kind: "done"; plan: LocalPlan | null } | { kind: "send"; plan: LocalPlan; key: string | null };
     /**
-     * The plan, the account's plans and the record of sends as stored now, read under the lock. One the account has
-     * already is bound to it here and not sent again (done). One changed or gone since the preview, or saved somewhere
-     * by another tab, stops the transfer. One still to send goes on, with its key, stored first, when `key` is asked for.
+     * The plan, the account's plans and the record of sends as stored now, read under the lock, a receipt by the plan's
+     * fingerprint as stored now. One the account has already is bound to it here and not sent again (done). One changed
+     * or gone since the preview, or saved somewhere by another tab, stops the transfer. One still to send goes on, with
+     * its key, stored first, when `key` is asked for.
      */
-    const step = (row: Row, key: boolean) => withWorkspaceLock((): Step => {
+    const step = (row: Row, key: boolean) => withWorkspaceLock(async (): Promise<Step> => {
       if (!live.current) return { kind: "stop", text: null };
       const storage = deviceStorage();
       const signedOut = readWorkspace(storage, ANONYMOUS);
@@ -484,13 +498,14 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
       if (!record.ok) return { kind: "stop", text: `${savedFirst()}${record.message}${madeNote()}` };
       const plan = signedOut.ok ? signedOut.workspace.plans.find((p) => p.id === row.plan.id) : undefined;
       // Moved already with its group, once the group's last plan was saved: the account's bucket has it, bound to it.
-      if (!plan && mine.workspace.plans.some((p) => p.id === row.plan.id && p.boundTo !== null)) return { kind: "done" };
+      if (!plan && mine.workspace.plans.some((p) => p.id === row.plan.id && p.boundTo !== null)) return { kind: "done", plan: null };
       const same = plan !== undefined && JSON.stringify(plan) === JSON.stringify(row.plan);
-      const standing = plan ? transferStanding(plan, mine.workspace, boundElsewhere(storage, owner, [plan.id]), record.transfers) : null;
+      const digest = plan ? await contentDigest(plan) : null;
+      const standing = plan ? transferStanding(plan, mine.workspace, boundElsewhere(storage, owner, [plan.id]), record.transfers, digest) : null;
       if (plan && same && standing?.kind === "saved") {
         // The account has it, from this preview or from another tab since: bound here as it is, and not sent again.
         const bound = bindTransferred(storage, { owner, planIds: [plan.id], plans: [plan] }, { ok: true, userId: owner.userId, planIds: [plan.id] });
-        return bound.ok ? { kind: "done" } : { kind: "stop", text: unrecorded(bound) };
+        return bound.ok ? { kind: "done", plan } : { kind: "stop", text: unrecorded(bound) };
       }
       // Changed or gone in another tab since the preview, or saved somewhere by one: not sent.
       if (!plan || !same || standing?.kind !== "new" || row.standing.kind !== "new") return { kind: "stop", text: changedNote(row.plan.name) };
@@ -548,7 +563,7 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
             // Checked first, so no character is made for a plan that is not sent.
             const first = await step(row, false);
             if (first.kind === "stop") return first.text;
-            if (first.kind === "done") { tell(); finished++; continue; }
+            if (first.kind === "done") { tell(); finished++; if (first.plan) confirmed.push(first.plan); continue; }
             const character = await characterFor(altId, wanted.get(altId)!, row.plan.name);
             if (!character.ok) return character.text;
             filed.set(altId, character.id);
@@ -557,7 +572,7 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
           // The plan checked again, and its key stored before the build is sent: a retry sends the same one.
           const next = await step(row, true);
           if (next.kind === "stop") return next.text;
-          if (next.kind === "done") { tell(); finished++; continue; }
+          if (next.kind === "done") { tell(); finished++; if (next.plan) confirmed.push(next.plan); continue; }
           const { plan, key } = next as { plan: LocalPlan; key: string };
           const { shared, showName } = SHARING[choice.sharing as Exclude<Sharing, "">];
           const answer = await request("/api/me/builds", {
@@ -571,29 +586,32 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
             return refusal(answer, plan.name);
           }
           const build = (answer.body.build ?? {}) as { name?: string; notes?: string | null; code?: string; code2?: string | null; order?: string | null; order2?: string | null };
-          const kept = planContent(plan);
-          // The route answers a new build 201, and the same save sent again 200, with the build it made then.
+          // The route answers a new build 201, and the same save sent again 200, with the build it made then: compared
+          // with the copy sent exactly, and kept in the receipt by its fingerprint.
           const theirs = answer.status === 200 || answer.body.replayed === true
-            ? planContent({ name: build.name ?? "", notes: build.notes ?? "", code: build.code ?? "", code2: build.code2 ?? null, order: build.order, order2: build.order2 })
-            : kept;
+            ? { name: build.name ?? "", notes: build.notes ?? null, code: build.code ?? "", code2: build.code2 ?? null, order: build.order, order2: build.order2 }
+            : plan;
+          const same = planContent(theirs) === planContent(plan);
+          const fingerprint = await contentDigest(theirs);
           // The account has it as it was sent: bound to that account on this device at once, whoever is signed in here
           // when it lands, and the copy here goes with it unless it changed meanwhile. A copy that differs from what the
           // site had from the same key stays here, unsaved.
           const bound = await withWorkspaceLock(() => {
-            receiptSaved(deviceStorage(), owner, plan.id, key, theirs);
-            return theirs === kept ? bindTransferred(deviceStorage(), { owner, planIds: [plan.id], plans: [plan] }, { ok: true, userId: owner.userId, planIds: [plan.id] }) : null;
+            receiptSaved(deviceStorage(), owner, plan.id, key, fingerprint);
+            return same ? bindTransferred(deviceStorage(), { owner, planIds: [plan.id], plans: [plan] }, { ok: true, userId: owner.userId, planIds: [plan.id] }) : null;
           });
           if (!bound) { differs.push(plan.name); continue; }
           tell();
           if (!bound.ok) return unrecorded(bound);
           saved.push(plan.name);
+          confirmed.push(plan);
           if (altId && made.has(altId)) made.get(altId)!.used = true;
           const after = readWorkspace(deviceStorage(), ANONYMOUS);
           const left = after.ok ? after.workspace.plans.find((p) => p.id === plan.id) : undefined;
-          if (left && planContent(left) !== kept) changedAfter.push(plan.name);
+          if (left && planContent(left) !== planContent(plan)) changedAfter.push(plan.name);
         }
         if (!live.current) return null;
-        const settled = await withWorkspaceLock(() => settleTransferred(deviceStorage(), owner, group.map((r) => r.plan.id)));
+        const settled = await withWorkspaceLock(() => settleTransferred(deviceStorage(), owner, group.map((r) => r.plan.id), confirmed));
         tell();
         if (!settled.ok) return unrecorded(settled);
       }

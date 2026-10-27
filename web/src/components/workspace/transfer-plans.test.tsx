@@ -686,13 +686,13 @@ describe("binding a transfer on this device", () => {
   });
 
   test("a copy here that the account saved is not refused as a second build when the account's copy here was renamed since: it goes", async () => {
-    const { planContent, receiptSaved, transferKey } = await import("@/lib/player-workspace");
+    const { contentDigest, receiptSaved, transferKey } = await import("@/lib/player-workspace");
     const accountCopy = { ...FROST, name: "Renamed on the account side", updatedAt: "2026-10-22T12:00:00.000Z", boundTo: { userId: A_ID, at: AT } };
     seed(ANON, [FROST]);
     seed(A, [accountCopy]);
     const key = transferKey(localStorage, A, FROST.id);
     if (!key.ok) throw new Error(key.message);
-    expect(receiptSaved(localStorage, A, FROST.id, key.key, planContent(FROST)).ok).toBe(true);
+    expect(receiptSaved(localStorage, A, FROST.id, key.key, await contentDigest(FROST)).ok).toBe(true);
     await render();
     await open();
     expect(text()).toContain("Frost is in your account already (saved");
@@ -705,11 +705,11 @@ describe("binding a transfer on this device", () => {
   });
 
   test("a receipt alone moves and hides nothing: a plan leaves the signed-out ones only once the account's copy is on this device", async () => {
-    const { hiddenFrom, planContent, readWorkspace, receiptSaved, transferKey } = await import("@/lib/player-workspace");
+    const { contentDigest, hiddenFrom, readWorkspace, receiptSaved, transferKey } = await import("@/lib/player-workspace");
     seed(ANON, [FROST]);
     const key = transferKey(localStorage, A, FROST.id);
     if (!key.ok) throw new Error(key.message);
-    expect(receiptSaved(localStorage, A, FROST.id, key.key, planContent(FROST)).ok).toBe(true);
+    expect(receiptSaved(localStorage, A, FROST.id, key.key, await contentDigest(FROST)).ok).toBe(true);
     // The site said it has Frost, but this device holds no copy for the account: Frost stays, and nobody is kept from it.
     expect(settleTransferred(localStorage, A, [FROST.id])).toEqual({ ok: true, moved: 0 });
     expect(stored(ANON)!.plans).toEqual([FROST]);
@@ -1384,10 +1384,10 @@ describe("records that are never dropped", () => {
   });
 
   test("at capacity a destination is kept after its copy here is deleted and a backup restored, and another account is refused it", async () => {
-    const { TRANSFERS_KEPT, planContent, receiptSaved, transferKey } = await import("@/lib/player-workspace");
+    const { TRANSFERS_KEPT, contentDigest, receiptSaved, transferKey } = await import("@/lib/player-workspace");
     const original = transferKey(localStorage, A, FROST.id);
     if (!original.ok) throw new Error(original.message);
-    expect(receiptSaved(localStorage, A, FROST.id, original.key, planContent(FROST)).ok).toBe(true);
+    expect(receiptSaved(localStorage, A, FROST.id, original.key, await contentDigest(FROST)).ok).toBe(true);
     await fill(TRANSFERS_KEPT - 1);
     expect(transferKey(localStorage, A, id(99999))).toMatchObject({ ok: false, message: FULL });
     seed(ANON, [FROST]);
@@ -1761,5 +1761,89 @@ describe("a request with no answer", () => {
     expect(accounts[A_ID].characters).toEqual([]);
     expect(journal()).toBeNull();
     await expect(withWorkspaceLock(() => "free")).resolves.toBe("free");
+  });
+});
+
+describe("content compared exactly", () => {
+  // Two notes that the 32-bit fingerprint receipts once kept cannot tell apart, for this Frost.
+  const SENT_NOTE = "For raids 1thyt39 8hcfmp";
+  const OTHER_NOTE = "For raids 5gxikf gj9jb";
+
+  test("content is compared exactly: key order aside, an empty note and a missing one alike, a missing order as none", async () => {
+    const { planContent } = await import("@/lib/player-workspace");
+    const p = { ...FROST, order: null };
+    const reversed = Object.fromEntries(Object.entries(p).reverse()) as unknown as LocalPlan;
+    expect(planContent(reversed)).toBe(planContent(p));
+    expect(planContent({ name: p.name, notes: null, code: p.code, code2: null })).toBe(planContent(p));
+    expect(planContent({ ...p, notes: "Unsent note" })).not.toBe(planContent(p));
+  });
+
+  test("two notes the old 32-bit fingerprint cannot tell apart are told apart: the edit here is never removed as the copy sent", async () => {
+    const { editPlan, legacyFingerprint, planContent } = await import("@/lib/player-workspace");
+    const sent = { ...FROST, notes: SENT_NOTE };
+    expect(legacyFingerprint({ ...sent, notes: OTHER_NOTE })).toBe(legacyFingerprint(sent));
+    expect(planContent({ ...sent, notes: OTHER_NOTE })).not.toBe(planContent(sent));
+    seed(ANON, [sent]);
+    expect(editPlan(localStorage, ANON, sent.id, { name: sent.name, notes: OTHER_NOTE }).ok).toBe(true);
+    expect(bindTransferred(localStorage, { owner: A, planIds: [sent.id], plans: [sent] }, { ok: true, userId: A_ID, planIds: [sent.id] }).ok).toBe(true);
+    expect(stored(ANON)!.plans.map((p) => p.notes)).toEqual([OTHER_NOTE]);
+    expect(stored(A)!.plans.map((p) => p.notes)).toEqual([SENT_NOTE]);
+  });
+
+  test("a receipt keeps a SHA-256 fingerprint of what the site saved", async () => {
+    const { contentDigest } = await import("@/lib/player-workspace");
+    seed(ANON, [FROST]);
+    await render();
+    await open();
+    await choose("Save Frost to your account", { Frost: "private" });
+    await click(saveButton());
+    expect(journal()!.receipts).toMatchObject([{ planId: FROST.id, state: "saved", content: await contentDigest(FROST) }]);
+    expect(journal()!.receipts[0].content).toMatch(/^sha256:[0-9a-f]{64}$/);
+  });
+
+  test("a receipt's old 32-bit fingerprint never stands for the content: the plan is asked for again by its key, and the edit here stays", async () => {
+    const { legacyFingerprint, transferKey } = await import("@/lib/player-workspace");
+    const sent = { ...FROST, notes: SENT_NOTE };
+    const edited = { ...sent, notes: OTHER_NOTE };
+    seed(ANON, [edited]);
+    // An earlier version saved Frost with the first note, under this key, and kept the fingerprint the edit here shares.
+    const key = transferKey(localStorage, A, FROST.id);
+    if (!key.ok) throw new Error(key.message);
+    const record = journal()!;
+    record.receipts[0] = { ...record.receipts[0], state: "saved", content: legacyFingerprint(sent) };
+    localStorage.setItem("everloot:transfers", JSON.stringify(record));
+    const build = { id: serverId(90), slug: "Slug0090", name: sent.name, notes: SENT_NOTE, code: sent.code, code2: null, order: sent.order, order2: null, shared: false, showName: false, characterId: null, link: null };
+    keyed[A_ID] = { [key.key]: build };
+    accounts[A_ID].builds = [build];
+    await render();
+    await open();
+    expect(text()).not.toContain("Frost is in your account already");
+    await choose("Save Frost to your account", { Frost: "private" });
+    await click(saveButton());
+    // Sent again by its key, the site answers with what it has, and that differs from the copy here, which stays.
+    expect(posts.map((p) => p.body.transferKey)).toEqual([key.key]);
+    expect(accounts[A_ID].builds).toHaveLength(1);
+    expect(text()).toContain("Frost was saved to your account before, and the copy here differs from it now, so the copy here stays, signed out.");
+    expect(stored(ANON)!.plans).toEqual([edited]);
+    expect(stored(A)).toBeNull();
+  });
+
+  test("a group whose plan the account saved, and renamed here since, moves whole in one transfer with the plan still to send", async () => {
+    const { contentDigest, receiptSaved, transferKey } = await import("@/lib/player-workspace");
+    const jaina = alt({ planIds: [FROST.id, FIRE.id] });
+    const renamed = { ...FROST, name: "Renamed on the account side", boundTo: { userId: A_ID, at: AT } };
+    seed(ANON, [FROST, FIRE], [jaina]);
+    seed(A, [renamed]);
+    const key = transferKey(localStorage, A, FROST.id);
+    if (!key.ok) throw new Error(key.message);
+    expect(receiptSaved(localStorage, A, FROST.id, key.key, await contentDigest(FROST)).ok).toBe(true);
+    await render();
+    await open();
+    expect(text()).toContain("Frost is in your account already (saved");
+    await choose("Save Frost and Fire to your account", { Fire: "private" });
+    await click(saveButton());
+    expect(posts.map((p) => p.body.name)).toEqual(["Fire"]);
+    expect(stored(ANON)).toMatchObject({ plans: [], alts: [] });
+    expect(stored(A)).toMatchObject({ plans: [renamed, bound(FIRE)], alts: [jaina] });
   });
 });

@@ -513,32 +513,60 @@ export function planGroups(workspace: PlayerWorkspace): PlanGroup[] {
 
 /**
  * How a signed-out plan stands with the account a transfer is for, by content alone, never by date. `saved`: the
- * account has this very copy: its bucket here holds it bound to it with the same content, or the site said it saved
- * this content (its receipt, transferKey). Nothing is sent again, and the account's copy is the one kept. `changed`: the
- * account has the plan, and the copy here differs, whichever is newer: sending it again would not change what the
- * account has. `elsewhere`: this browser sent it, or holds it bound, to another account. `new`, with `sentBefore` when it
- * was sent to this account and the site did not say it saved it: sent again with the same key, the site answers with
- * what it made, if it made it.
+ * account has this very copy: its bucket here holds it bound to it with exactly this content, or the site said it saved
+ * this content (its receipt, transferKey), by a SHA-256 fingerprint. Nothing is sent again, and the account's copy is
+ * the one kept. `changed`: the account has the plan, and the copy here differs, whichever is newer: sending it again
+ * would not change what the account has. `elsewhere`: this browser sent it, or holds it bound, to another account.
+ * `new`, with `sentBefore` when it was sent to this account and the site did not say, in a way that can be relied on,
+ * that it saved this content: sent again with the same key, the site answers with what it made, if it made it.
  */
 export type Standing = { kind: "new"; sentBefore?: boolean } | { kind: "saved" | "changed"; at: string } | { kind: "elsewhere" };
 
-/** A short fingerprint of what an account keeps of a plan: its name, notes, codes and orders. A build the site returns
- *  has the same fields, so the two compare. */
-export function planContent(plan: { name: string; notes: string | null; code: string; code2: string | null; order?: string | null; order2?: string | null }): string {
+type Content = { name: string; notes: string | null; code: string; code2: string | null; order?: string | null; order2?: string | null };
+
+/** What an account keeps of a plan, as one exact string: its name, notes, codes and orders, in that order, an empty one
+ *  and a missing one alike. Two copies hold the same content only when their strings are equal. A build the site returns
+ *  has the same fields, so it compares too. */
+export function planContent(plan: Content): string {
+  const text = (value: string | null | undefined) => value || null;
+  return JSON.stringify([plan.name, text(plan.notes), plan.code, text(plan.code2), text(plan.order), text(plan.order2)]);
+}
+
+/** The fingerprint a receipt keeps of what the site saved: SHA-256 of planContent, in hex, tagged as such. */
+export async function contentDigest(plan: Content): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(planContent(plan)));
+  return `sha256:${Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("")}`;
+}
+
+/** The 32-bit fingerprint receipts kept before contentDigest, as they computed it. Plans that differ can share one, so
+ *  it can tell two plans apart but never says they are the same. */
+export function legacyFingerprint(plan: Content): string {
   const text = JSON.stringify([plan.name, plan.notes ?? "", plan.code, plan.code2, plan.order ?? null, plan.order2 ?? null]);
   let hash = 0x811c9dc5;
   for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 0x01000193) >>> 0;
   return hash.toString(16).padStart(8, "0");
 }
 
-export function transferStanding(plan: LocalPlan, account: PlayerWorkspace, elsewhere: Set<string>, transfers?: Transfers): Standing {
+/** What a receipt's fingerprint says of a plan: the very content the site saved, other content, or nothing that can be
+ *  relied on. A SHA-256 one says which, given the plan's own (`digest`); a 32-bit one only ever that it differs. */
+function receiptSays(content: string | null, plan: LocalPlan, digest: string | null | undefined): "same" | "differs" | null {
+  if (content === null) return null;
+  if (!content.startsWith("sha256:")) return legacyFingerprint(plan) === content ? null : "differs";
+  if (!digest) return null;
+  return digest === content ? "same" : "differs";
+}
+
+/** `digest`: the plan's contentDigest, when the caller has it, to read a receipt's fingerprint by. */
+export function transferStanding(plan: LocalPlan, account: PlayerWorkspace, elsewhere: Set<string>, transfers?: Transfers, digest?: string | null): Standing {
   const userId = account.owner.kind === "account" ? account.owner.userId : null;
   const receipt = transfers?.receipts.find((r) => r.planId === plan.id);
   const mine = receipt && receipt.userId === userId ? receipt : undefined;
   const theirs = account.plans.find((p) => p.id === plan.id && p.boundTo !== null);
-  // What the account has of the plan: its copy here, bound to it, and what the site said it saved.
-  const has = [theirs ? planContent(theirs) : null, mine?.state === "saved" ? mine.content : null].filter((c): c is string => c !== null);
-  if (has.length > 0) return { kind: has.includes(planContent(plan)) ? "saved" : "changed", at: theirs?.boundTo?.at ?? mine!.at };
+  // What the account has of the plan: its copy here, bound to it, compared exactly, and what the site said it saved.
+  const said = [theirs ? (planContent(theirs) === planContent(plan) ? "same" : "differs") : null, mine?.state === "saved" ? receiptSays(mine.content, plan, digest) : null];
+  const at = () => theirs?.boundTo?.at ?? mine!.at;
+  if (said.includes("same")) return { kind: "saved", at: at() };
+  if (said.includes("differs")) return { kind: "changed", at: at() };
   if (mine) return { kind: "new", sentBefore: true };
   return receipt || elsewhere.has(plan.id) ? { kind: "elsewhere" } : { kind: "new" };
 }
@@ -595,21 +623,21 @@ function withBound(account: PlayerWorkspace, plans: LocalPlan[], boundTo: Bindin
 const altContent = (alt: LocalAlt) => whole({ ...alt, updatedAt: null });
 
 /**
- * Of the signed-out groups holding any of `ids`, those the account's bucket holds whole, judged by content and never by
- * date: each plan bound there, with the copy here what the account has (transferStanding) or the very copy just `sent`
- * (planContent by id), and once `taken`, each alt and each watch on their plans there as well, each alt as the account's
- * bucket has it. A plan the site has but this device holds no copy of for the account goes nowhere. What the account's
- * bucket takes of them (an alt or watch it holds already keeps the account's copy), and the signed-out bucket without
- * them.
+ * Of the signed-out groups holding any of `ids`, those the account's bucket holds whole, judged by content compared
+ * exactly, never by date or by a fingerprint: each plan bound there, with the copy here the same as the account's copy
+ * here or as one the site has just confirmed (`sent`, planContent by id), and once `taken`, each alt and each watch on
+ * their plans there as well, each alt as the account's bucket has it. A plan the site has but this device holds no copy
+ * of for the account goes nowhere. What the account's bucket takes of them (an alt or watch it holds already keeps the
+ * account's copy), and the signed-out bucket without them.
  */
-function settle(signedOut: PlayerWorkspace, account: PlayerWorkspace, ids: Set<string>, taken = false, transfers?: Transfers, sent?: Map<string, string>) {
+function settle(signedOut: PlayerWorkspace, account: PlayerWorkspace, ids: Set<string>, taken = false, sent?: Map<string, string>) {
   const plans = new Map(signedOut.plans.map((p) => [p.id, p]));
   const alts = new Map(signedOut.alts.map((a) => [a.id, a]));
   const theirAlts = new Map(account.alts.map((a) => [a.id, a]));
   const watched = new Set(account.watches.map((w) => w.planId));
   const held = new Set(account.plans.filter((p) => p.boundTo !== null).map((p) => p.id));
   const planGoes = (plan: LocalPlan) => held.has(plan.id)
-    && (sent?.get(plan.id) === planContent(plan) || transferStanding(plan, account, new Set(), transfers).kind === "saved");
+    && (sent?.get(plan.id) === planContent(plan) || transferStanding(plan, account, new Set()).kind === "saved");
   const altGoes = (alt: LocalAlt) => {
     const theirs = theirAlts.get(alt.id);
     return theirs ? altContent(theirs) === altContent(alt) : !taken;
@@ -641,21 +669,20 @@ function settle(signedOut: PlayerWorkspace, account: PlayerWorkspace, ids: Set<s
  * The account's bucket takes their alts and watches first. Then the signed-out bucket, read again as it is stored at that
  * moment, lets go of only what the account's bucket now holds, so anything another tab added in between stays. Each
  * write is made to its bucket as stored, never from an earlier snapshot. If the second fails, a plan is in both
- * buckets, never in neither. `sent`: what each plan just sent held (planContent), for a copy here still the same.
+ * buckets, never in neither. `sent`: the content of each plan the site has just confirmed (planContent), for a copy here
+ * still exactly the same.
  */
 function moveSaved(storage: DeviceStorage | null, owner: Owner, ids: Set<string>, sent?: Map<string, string>): { ok: true; moved: number } | Failure {
   const signedOut = readWorkspace(storage, ANONYMOUS);
   if (!signedOut.ok) return failure(signedOut.error);
   const account = readWorkspace(storage, owner);
   if (!account.ok) return failure(account.error);
-  const record = readTransfers(storage);
-  const transfers = record.ok ? record.transfers : undefined;
-  if (settle(signedOut.workspace, account.workspace, ids, false, transfers, sent).moved === 0) return { ok: true, moved: 0 };
-  const first = update(storage, owner, (mine) => settle(signedOut.workspace, mine, ids, false, transfers, sent).account);
+  if (settle(signedOut.workspace, account.workspace, ids, false, sent).moved === 0) return { ok: true, moved: 0 };
+  const first = update(storage, owner, (mine) => settle(signedOut.workspace, mine, ids, false, sent).account);
   if (!first.ok) return first;
   let moved = 0;
   const second = update(storage, ANONYMOUS, (theirs) => {
-    const next = settle(theirs, first.workspace, ids, true, transfers, sent);
+    const next = settle(theirs, first.workspace, ids, true, sent);
     moved = next.moved;
     return next.signedOut;
   });
@@ -698,10 +725,12 @@ export function bindTransferred(storage: DeviceStorage | null, sent: TransferReq
 }
 
 /** For plans a transfer has nothing to send for, as the account's bucket holds them already: moves them out of the
- *  signed-out bucket with what goes with them, as bindTransferred does once a plan is saved. */
-export function settleTransferred(storage: DeviceStorage | null, owner: Owner, planIds: string[]): { ok: true; moved: number } | Failure {
+ *  signed-out bucket with what goes with them, as bindTransferred does once a plan is saved. `confirmed`: the plans the
+ *  site confirmed during this transfer, as they were, for a copy here exactly the same when the account's copy here
+ *  differs. */
+export function settleTransferred(storage: DeviceStorage | null, owner: Owner, planIds: string[], confirmed: LocalPlan[] = []): { ok: true; moved: number } | Failure {
   if (owner.kind !== "account") return failure("other-owner");
-  return moveSaved(storage, owner, new Set(planIds));
+  return moveSaved(storage, owner, new Set(planIds), new Map(confirmed.map((p) => [p.id, planContent(p)])));
 }
 
 // Where plans went: for each plan sent to an account from this browser, the account, by its stable id, and the key the
@@ -718,7 +747,8 @@ const TRANSFERS_FULL = "This browser keeps a record of every plan it sends to an
 
 /**
  * A plan sent to an account, under its key. `sending` from the moment the key is stored until the site answers, and
- * again for each retry; `saved` once the site says it has it, with what it has (planContent); `failed` when the site
+ * again for each retry; `saved` once the site says it has it, with a fingerprint of what it has (contentDigest; one
+ * written before that is 32 bits, legacyFingerprint, and only ever tells content apart); `failed` when the site
  * refused the last send before writing anything, with why (`reason`). The key is kept in every state: another tab may
  * have sent the same key and been saved, so a retry always sends it again.
  */
@@ -738,7 +768,7 @@ const isReason = (v: unknown) => v === null || (typeof v === "string" && /^[a-z0
 const isReceipt = (v: unknown): v is Receipt => isRecord(v) && hasKeys(v, ["planId", "userId", "key", "state", "reason", "content", "at"])
   && validId(v.planId) && validId(v.userId) && typeof v.key === "string" && TRANSFER_KEY_PATTERN.test(v.key)
   && (v.state === "sending" || v.state === "failed" || v.state === "saved") && isReason(v.reason)
-  && (v.content === null || (typeof v.content === "string" && /^[0-9a-f]{8}$/.test(v.content))) && isDate(v.at);
+  && (v.content === null || (typeof v.content === "string" && /^(?:sha256:[0-9a-f]{64}|[0-9a-f]{8})$/.test(v.content))) && isDate(v.at);
 const isText = (v: unknown, limit: number) => typeof v === "string" && Array.from(v).length <= limit;
 const isLabel = (v: unknown): v is CharacterLabel => isRecord(v) && hasKeys(v, ["name", "classSlug", "realm", "note"])
   && isText(v.name, LIMITS.characterName) && (TALENT_CLASSES as readonly unknown[]).includes(v.classSlug)
