@@ -39,3 +39,17 @@ test("an instance's page lists its level in the facts, or a dash when the files 
   expect(await facts("409-molten-core")).toMatch(/\|Level\|60\|/);
   expect(await facts("249-onyxia-s-lair")).toMatch(/\|Level\|–\|/);
 });
+
+test("with storage down, an instance's page lists the bosses the game files give it, each marked unconfirmed; the list shows their count", async () => {
+  const html = renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: "409-molten-core" }) }));
+  const bosses = html.split('id="bosses"')[1] ?? "";
+  expect(bosses).toContain("Ragnaros");
+  expect(bosses.indexOf("Lucifron")).toBeLessThan(bosses.indexOf("Ragnaros")); // the files' order
+  const rows = bosses.split("<tr").slice(2); // the header row and the caption split
+  expect(rows.length).toBeGreaterThan(5);
+  for (const r of rows) expect(r).toContain('data-badge="files"');
+  expect(text(html)).toMatch(/\|Bosses reported\|\[\?\]\|unconfirmed\|in the files, 11\|/);
+  const list = renderToStaticMarkup(await InstancesPage());
+  const col = [...list.matchAll(/<th[^>]*>(.*?)<\/th>/g)].map((m) => text(m[1]!).replace(/\|/g, "")).indexOf("Bosses");
+  expect(cells(list, "/database/instances/409-molten-core")[col]).toMatch(/unconfirmed\|11$/);
+});

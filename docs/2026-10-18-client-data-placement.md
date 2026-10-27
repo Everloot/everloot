@@ -36,6 +36,17 @@ game file text reaching the pages for the first time as pages-only, merged playe
 labelled unconfirmed (docs/DATA_POLICY.md). The committed `map.json` stays at 1.60.1.70532: the
 Difficulty fields only appear when the build watch regenerates it on a new build, so no build mixes in.
 
+**Status update 2026-10-27, W8:** the second integration, again not a table wave. `kb/src/client-encounters.ts`
+reads `DungeonEncounter` (read since W1) into the committed `web/src/data/game-data/client-encounters.json`: 341
+named encounters across 41 instance map ids (ids and names in the files' order; two "no longer in use" rows on map
+0 are dropped, `JournalInstance` and `JournalEncounter` are absent from this build so there is no journal text to
+carry). The instance pages merge it player-first with the bosses 3 installs report: a reported boss keeps its
+reported name, a reported boss the installs have not named borrows the files' name marked unconfirmed, and the
+files' remaining encounters follow as unconfirmed rows with no kills, installs or dates. The list page shows the
+files' count, marked, where no boss is reported yet. The files never add an instance row: an instance known only
+from the files (Naxxramas, the Forever-new raids under held-back zones) stays off the list as the map keeps it
+behind the spoiler switch. Pages-only by the data policy; the build watch regenerates the file.
+
 ## What the scan measures
 
 - The WoWDBDefs manifest (pinned commit `b9a63096cdd9`) against the build's root listing, by file data id.
@@ -161,7 +172,8 @@ Extending `DOMAIN_RULES` in `kb/src/client-scan.ts` as tables are triaged keeps 
 | W4 | `3a1c007` | 45 | the live-support group; `ObjectEffectGroup` and `ObjectEffectPackage` are not in this build, and `ObjectEffectModifier`, `DeclinedWord` and `DeclinedWordCases` read empty; candidates 667 → 622 |
 | W5 | `c9f14c15` | 14 | achievement criteria (`Criteria` 3297, `CriteriaTree` 6771, `ModifierTree` 2845 rows; `CriteriaTreeXEffect` present, 0 rows), the classic talent family (`Talent` 432, `TalentTab` 27, `NumTalentsAtLevel` 80; `MinorTalent`, `SpecSetMember`, `SpecializationSpells`, `SpecializationSpellsDisplay`, `TalentTreePrimarySpells` present with 0 rows), and two live completes (`Difficulty` 22, `PowerType` 6). Talents and achievements domains now read in full; candidates 613 → 599 |
 | W6 | `2b7ea4fe` | 20 | the spell numbers and rules the tooltips compute from: `SpellPower` 3462, `SpellCategories` 10665, `SpellClassOptions` 6085, `SpellTargetRestrictions` 4454, `SpellInterrupts` 9895, `SpellShapeshift` 3457, `SpellLabel` 4654, `SpellProceduralEffect` 991, `SpellEquippedItems` 1886, `SpellFocusObject` 244, `SpellTotems` 1121, `SpellLearnSpell` 52, `SpellAuraNames` 650, `SpellShapeshiftForm` 32, `SpellMechanic` 36, `SpellDispelType` 11, `SpellDiminish` 11, `SpellProcsPerMinute` 11; plus the item scalars `RandPropPoints` 300 and `ArmorLocation` 23. Encrypted blocks are counted and skipped, never decrypted (several spell tables carry them); 7 spell/quest tables verified dead in this build stay unread. `CreatureLabel` (1,657 rows) and `NPCSounds` (196) considered and dropped; candidates 599 → 579. The items domain rule now also matches `RandPropPoints` and `ArmorLocation` |
-| W7 | this change | 0 (integration) | first generator to reach the pages: `kb/src/client-achievements.ts` walks `Achievement.Criteria_tree` through `CriteriaTree` into the committed `web/src/data/game-data/client-achievements.json` (441 achievements, 329 with criteria; pages-only per docs/DATA_POLICY.md), the build watch regenerates it, and `map.json` gains its `Difficulty` join (`difficulties` record plus per-entrance `difficultyIds`, applied when the build watch next regenerates it). The achievement pages merge player reports and the files player-first, marking the files' parts unconfirmed |
+| W7 | `22d231e5` | 0 (integration) | first generator to reach the pages: `kb/src/client-achievements.ts` walks `Achievement.Criteria_tree` through `CriteriaTree` into the committed `web/src/data/game-data/client-achievements.json` (441 achievements, 329 with criteria; pages-only per docs/DATA_POLICY.md), the build watch regenerates it, and `map.json` gains its `Difficulty` join (`difficulties` record plus per-entrance `difficultyIds`, applied when the build watch next regenerates it). The achievement pages merge player reports and the files player-first, marking the files' parts unconfirmed |
+| W8 | this change | 0 (integration) | second generator to reach the pages: `kb/src/client-encounters.ts` reads `DungeonEncounter` into the committed `web/src/data/game-data/client-encounters.json` (341 encounters, 41 instances; pages-only), registered with the build watch and the workflow allow-list. The instance pages' boss table is player-first: reported bosses lead, the files' encounters follow as unconfirmed rows, and an unnamed reported boss borrows the files' name. The files add no instance rows, so held-back content stays unlisted |
 
 Findings the waves surfaced while reading:
 
@@ -191,7 +203,8 @@ Findings the waves surfaced while reading:
    list, the alternative is leaving them in the catch-all. Groups A and B applied; C ran as W4.
 4. **Next wave.** Praised D and the achievements criteria cluster both executed as W5 (2026-10-27), the
    spell math remainder plus the item scalars as W6 the same day, and the first site integration
-   (achievements player-first pages, the Difficulty join in the map data) as W7. What remains is
+   (achievements player-first pages, the Difficulty join in the map data) as W7, and the files' boss lists on the
+   instance pages as W8. What remains is
    feature-tied: E as a reviewed pages-only pass (`GossipNPCOption` 1577 rows declare an NPC's option ids,
    but the option-to-text binding is server-side, so the read yields declarations only) and F with the
    sound feature. Further site-merge candidates exist (difficulty names into the instance pages');

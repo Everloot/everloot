@@ -5,7 +5,10 @@ import type { EncounterRow, InstanceEntranceRow } from "../../../kb/src/instance
 // The loaders read storage; these tests hand the readers their facts directly.
 vi.mock("./rollup-compute", () => ({ loadInstanceFacts: vi.fn(), loadItemFacts: vi.fn() }));
 
-import { bossLine, compareInstances, difficultyLabel, difficultyLabelIn, entranceLinks, instanceHref, instanceRows, levelLabel, parseInstanceSegment } from "./instances";
+import { bossLine, bossRows, compareInstances, difficultyLabel, difficultyLabelIn, entranceLinks, instanceHref, instanceRows as rowsWith, levelLabel, parseInstanceSegment } from "./instances";
+
+// The synthetic world has no encounter list of its own; the one test that merges the files' bosses hands one in.
+const instanceRows = (seen?: Parameters<typeof rowsWith>[0], data?: Parameters<typeof rowsWith>[1]) => rowsWith(seen, data, {});
 import { continentPinSet, continentTreasureCandidates } from "./world-map";
 import { zoneContents, type ZoneSightings } from "./zones";
 
@@ -68,8 +71,25 @@ describe("instance rows", () => {
         { encounterId: 1, name: "Warden", kills: 3, npcIds: [10], reporters: 3, lastSeen: "2026-10-18T11:00:00.000Z" },
         { encounterId: 2, name: "Hogger", kills: 4, npcIds: [20], reporters: 3, lastSeen: "2026-10-21T11:00:00.000Z" },
       ],
+      encounters: [],
     });
     expect(bossLine(stockade.bosses[1]!)).toBe("Hogger (4 kills) from 3 installs, last seen 2026-10-21");
+  });
+
+  test("the files' encounters merge player-first: reported bosses lead, a nameless one borrows the files' name, the rest follow unconfirmed", () => {
+    const files = { "34": [{ id: 3, name: "Synthetic Jailer" }, { id: 1, name: "Files Warden" }, { id: 2, name: "Files Hogger" }] };
+    const stockade = rowsWith(seen, data, files).get(34)!;
+    expect(stockade.encounters).toEqual(files["34"]);
+    const unnamed = { ...stockade, bosses: stockade.bosses.map((b) => (b.encounterId === 2 ? { ...b, name: null } : b)) };
+    expect(bossRows(unnamed).map((r) => [r.encounterId, r.name, r.filesName, r.boss !== null])).toEqual([
+      [1, "Warden", false, true],
+      [2, "Files Hogger", true, true],
+      [3, "Synthetic Jailer", true, false],
+    ]);
+    // An instance the files list bosses for but nobody has entered has no row: the list never adds one.
+    expect(rowsWith(seen, data, { "777": [{ id: 9, name: "Nobody's Boss" }] }).has(777)).toBe(false);
+    // Without a files list the table is the reports alone, named as reported.
+    expect(bossRows({ ...stockade, encounters: [] }).map((r) => [r.name, r.filesName])).toEqual([["Warden", false], ["Hogger", false]]);
   });
 
   test("an instance with an entrance nobody confirmed lists the files' entrance and no confirmed one", () => {

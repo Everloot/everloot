@@ -15,6 +15,7 @@ import { checkBuilds, loadRegistry, recordBuilds, saveRegistry, versionsUrl } fr
 import { clientCoverage, formatCoverage } from "./client-coverage.js";
 import { formatScanReport, loadManifest, scanBuild } from "./client-scan.js";
 import { writeClientAchievements } from "./client-achievements.js";
+import { writeClientEncounters } from "./client-encounters.js";
 import { writeClientLayer } from "./client-layer.js";
 import { diffSnapshots } from "./client-diff.js";
 import { parseRegistry } from "./ecosystem.js";
@@ -154,6 +155,9 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
   client-achievements <snapshot.sqlite> [--out ../web/src/data/game-data/client-achievements.json]
     (every achievement the game files carry with its criteria walked from CriteriaTree, one build-stamped file the
     achievement pages merge with player reports player-first. Pages only: the API, MCP and bulk exports stay clean. See docs/DATA_POLICY.md)
+  client-encounters <snapshot.sqlite> [--out ../web/src/data/game-data/client-encounters.json]
+    (every boss encounter the game files list per instance, from DungeonEncounter, one build-stamped file the
+    instance pages merge with player reports player-first. Pages only, as above)
   item-names <snapshot.sqlite> --wiki <knowledge base or release .sqlite> [--ledger data/item-names/ledger.json] [--out data/assets]
     (adds the snapshot's item names and the Warcraft Wiki dump's item names to the name ledger, which only
     grows, and writes the name the site shows for every item a source names (the game files' first, with the wiki
@@ -540,6 +544,15 @@ async function main(): Promise<number> {
       const listed = Object.keys(table.achievements).length;
       const withCriteria = Object.values(table.achievements).filter((a) => a.criteria.length > 0).length;
       console.log(`${table.build.product} ${table.build.version}: ${listed} achievements, ${withCriteria} with criteria -> ${path}`);
+      return 0;
+    }
+    case "client-encounters": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-encounters.json";
+      const table = writeClientEncounters(args[0], path);
+      const instances = Object.keys(table.instances).length;
+      const encounters = Object.values(table.instances).reduce((n, list) => n + list.length, 0);
+      console.log(`${table.build.product} ${table.build.version}: ${encounters} encounters in ${instances} instances -> ${path}`);
       return 0;
     }
     case "client-diff": {

@@ -1,4 +1,6 @@
 import { agreedDifficulties, bossLabel, confirmedEntrances, instanceBosses, type InstanceBoss } from "../../../kb/src/instances";
+import type { ClientEncounter } from "../../../kb/src/client-encounters";
+import { CLIENT_ENCOUNTERS } from "@/data/game-data/client-encounters";
 import { dayLabel } from "./report-labels";
 import type { WorldMapData } from "../../../kb/src/world-map-data";
 import { slugify } from "../../../kb/src/lore-slug";
@@ -32,6 +34,34 @@ export interface InstanceRow {
   confirmed: (InstancePlace & { installs: number; lastSeen: string | null })[];
   reported: number;
   bosses: InstanceBoss[];
+  /** The encounters the game files list for it (DungeonEncounter), in the files' order; empty when they list none. */
+  encounters: ClientEncounter[];
+}
+
+/**
+ * One line of an instance's boss table, player-first: every boss 3 installs report, in the reports' order, then the
+ * encounters the files list that no report has confirmed. A reported boss the installs have not named borrows the
+ * files' name (`filesName`); a files-only encounter has no `boss`.
+ */
+export interface BossRow {
+  encounterId: number;
+  name: string | null;
+  /** True when the name shown is the files', not one 3 installs agreed on. */
+  filesName: boolean;
+  boss: InstanceBoss | null;
+}
+
+export function bossRows(row: Pick<InstanceRow, "bosses" | "encounters">): BossRow[] {
+  const files = new Map(row.encounters.map((e) => [e.id, e.name]));
+  const out: BossRow[] = row.bosses.map((b) => ({
+    encounterId: b.encounterId,
+    name: b.name ?? files.get(b.encounterId) ?? null,
+    filesName: b.name === null && files.has(b.encounterId),
+    boss: b,
+  }));
+  const reported = new Set(row.bosses.map((b) => b.encounterId));
+  for (const e of row.encounters) if (!reported.has(e.id)) out.push({ encounterId: e.id, name: e.name, filesName: true, boss: null });
+  return out;
 }
 
 /**
@@ -101,10 +131,15 @@ export function parseInstanceSegment(segment: string): number | null {
 /**
  * Every instance the site shows, by id. An instance is listed when the files place its entrance in a released zone,
  * when 3 installs confirm an entrance in one, or when 3 installs report a boss in it: an instance known only from an
- * entrance in a held-back zone has no row, as on the map without spoilers. Entrances come from `placedEntrances`, the
+ * entrance in a held-back zone has no row, as on the map without spoilers, and the files' encounter list never adds
+ * a row by itself. Entrances come from `placedEntrances`, the
  * list the zone pages and the map read, so the three never disagree.
  */
-export function instanceRows(seen: ZoneSightings = {}, data: Pick<WorldMapData, "zones" | "continents" | "entrances"> = WORLD_MAP): Map<number, InstanceRow> {
+export function instanceRows(
+  seen: ZoneSightings = {},
+  data: Pick<WorldMapData, "zones" | "continents" | "entrances"> = WORLD_MAP,
+  encounters: Readonly<Record<string, ClientEncounter[]>> = CLIENT_ENCOUNTERS.instances,
+): Map<number, InstanceRow> {
   const zoneName = new Map(publicZones(data).map((z) => [z.mapId, z.name]));
   const place = (mapId: number, x: number, y: number): InstancePlace | null => (zoneName.has(mapId) ? { mapId, zoneName: zoneName.get(mapId)!, x, y } : null);
   const asOf = seen.asOf ?? new Date();
@@ -114,7 +149,7 @@ export function instanceRows(seen: ZoneSightings = {}, data: Pick<WorldMapData, 
   const row = (id: number): InstanceRow => {
     const lv = data.entrances.find((f) => f.mapId === id);
     const level = lv?.minLevel !== undefined && lv.maxLevel !== undefined ? { min: lv.minLevel, max: lv.maxLevel } : null;
-    const r = out.get(id) ?? { instanceMapId: id, name: null, raid: null, difficulty: difficulty.get(id) ?? null, level, difficulties: lv?.difficultyIds ?? [], files: [], confirmed: [], reported: 0, bosses: [] };
+    const r = out.get(id) ?? { instanceMapId: id, name: null, raid: null, difficulty: difficulty.get(id) ?? null, level, difficulties: lv?.difficultyIds ?? [], files: [], confirmed: [], reported: 0, bosses: [], encounters: encounters[String(id)] ?? [] };
     out.set(id, r);
     return r;
   };
