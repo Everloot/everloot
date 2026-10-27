@@ -158,6 +158,12 @@ describe("reading the file", () => {
     expect(file.skipped).toEqual({ noRealm: 2, unreadable: 4 });
   });
 
+  test("a sighting cannot declare itself to be an own money row (reported case)", () => {
+    const result = readAddonFile(`EverlootDB = { version="0.3.12", installId="fixture", records={ ["census_seen"]={ { kind="gold_snapshot", character="Arthas", realm="Forever", capturedAt="2026-10-27T00:00:00Z" } } } }`);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.characters).toEqual([]);
+  });
+
   test("a file with none of the player's own records reads, with no characters", () => {
     const file = read(lua({ census_seen: [{ capturedAt: "2026-10-18T00:01:00Z", guid: "Player-4242-00000001", class: "PRIEST" }] }));
     expect(file).toEqual({ ok: true, characters: [], skipped: { noRealm: 0, unreadable: 0 }, others: 1 });

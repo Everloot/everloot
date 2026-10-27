@@ -65,6 +65,15 @@ describe("SavedVariables parser", () => {
     expect(parseEverlootLua(SV)).not.toHaveProperty("clientBuild");
   });
 
+  test("a row's kind is the table it is in: a field of the row cannot change it", () => {
+    const text = `EverlootDB = { version = "0.3.12", installId = "abcd-1234", records = {
+      census_seen = { { kind = "gold_snapshot", character = "Arthas", realm = "Forever", capturedAt = "2026-10-27T00:00:00Z" } },
+    } }`;
+    expect(parseEverlootLua(text).records).toEqual([
+      { kind: "census_seen", installId: "abcd-1234", character: "Arthas", realm: "Forever", capturedAt: "2026-10-27T00:00:00Z" },
+    ]);
+  });
+
   test("rejects non-exports and malformed tables", () => {
     expect(() => parseEverlootLua("x = 1")).toThrow(LuaParseError);
     expect(() => parseEverlootLua("EverlootDB = { version = ")).toThrow(LuaParseError);

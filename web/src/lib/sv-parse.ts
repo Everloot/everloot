@@ -188,8 +188,10 @@ export function parseEverlootLua(text: string): EverlootFile {
       if (typeof row !== "object" || row === null || Array.isArray(row)) {
         throw new LuaParseError(`records.${kind} holds a non-row`);
       }
-      // kind lives in the table key, not the row — the intake contract needs it per record.
-      records.push({ kind, installId, ...(row as Record<string, unknown>) });
+      // kind lives in the table key, not the row — the intake contract needs it per record. The table's kind is set
+      // last, so a field of the row cannot make a sighting read as another kind. A row's own installId stays, so
+      // intake still sees, and refuses, an upload that mixes installs.
+      records.push({ installId, ...(row as Record<string, unknown>), kind });
     }
   }
   const clientBuild = get("clientBuild");

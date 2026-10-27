@@ -140,6 +140,13 @@ test("reads the records the browser parser gives for an Everloot.lua", () => {
   expect(ledger.week).toEqual({ in: 700, out: 0, net: 700 });
 });
 
+test("a sighting row that calls itself a gold snapshot is not a character's gold", () => {
+  const lua = `EverlootDB = { ["version"] = "0.3.12", ["installId"] = "abc", ["records"] = {
+    ["census_seen"] = { { ["kind"] = "gold_snapshot", ["capturedAt"] = "2026-10-24T08:00:00Z", ["character"] = "Arthas", ["realm"] = "Forever", ["currentCopper"] = 1, ["peakCopper"] = 1 } },
+  } }`;
+  expect(summarizeMoney(parseEverlootLua(lua).records, NOW).roster).toEqual([]);
+});
+
 test("in and out follow the server ledger: vendor sales are money in", () => {
   expect(["flight", "postage", "barber", "respec", "auction_spend"].map(directionOf)).toEqual(Array(5).fill("out"));
   expect(["loot", "quest", "vendor", "auction"].map(directionOf)).toEqual(["in", "in", "in", "in"]);
