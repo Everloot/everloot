@@ -328,6 +328,24 @@ test("on a tall enough phone the tree switch sticks under the site header, over 
   expect(container.querySelector("[data-card]")!.className.split(" ")).toContain("overflow-clip");
 });
 
+test("the tree switch stops sticking once it and the site header would take more than a quarter of the window", async () => {
+  await render();
+  const sticks = () => switchBar().className.split(" ").includes("[@media(min-height:37.5rem)]:sticky");
+  const tall = (px: number) => act(async () => {
+    Object.defineProperty(switchBar(), "offsetHeight", { configurable: true, get: () => px });
+    window.dispatchEvent(new Event("resize"));
+  });
+  // jsdom's window is 768 px tall, so the header (44) and the switch may take up to 192 px between them.
+  await tall(83);
+  expect(sticks()).toBe(true);
+  // Text twice the size, from the page's own root font or a reader's style sheet, which the media query cannot see.
+  await tall(287);
+  expect(sticks()).toBe(false);
+  expect(switchBar().className.split(" ")).toContain("md:hidden");
+  await tall(148);
+  expect(sticks()).toBe(true);
+});
+
 /** Whether the browser counts an element's focus as keyboard focus; jsdom's own answer depends on earlier tests' clicks. */
 const keyboardFocus = (el: Element, keyboard: boolean) => {
   const matches = el.matches.bind(el);

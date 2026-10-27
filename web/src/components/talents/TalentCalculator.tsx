@@ -404,6 +404,24 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
     else if (box.bottom > bottom) window.scrollBy(0, Math.min(box.bottom - bottom, box.top - top));
   }
 
+  // The switch sticks only while it and the site header take a quarter of the window at most, so a talent with focus
+  // keeps room under them. The media query on its class answers to the reader's text-size setting; this also answers to
+  // a root font set by a page or a reader's style sheet, which a media query cannot see.
+  const [switchSticks, setSwitchSticks] = useState(true);
+  useEffect(() => {
+    const bar = treeSwitch.current;
+    if (!bar) return;
+    const fit = () => setSwitchSticks(DATA_SIZE.header + bar.offsetHeight <= window.innerHeight / 4);
+    fit();
+    const observer = typeof ResizeObserver === "function" ? new ResizeObserver(fit) : null;
+    observer?.observe(bar);
+    window.addEventListener("resize", fit);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", fit);
+    };
+  }, []);
+
   return (
     // On a phone the set and tree switches are 44 px tall like the calculator's other buttons (the switch itself is 40).
     <div onKeyDown={onKeyDown} data-calculator className="max-md:[&_[data-segmented]_button]:min-h-11">
@@ -477,10 +495,11 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
         </div>
 
         {/* The trees. A phone shows one at a time, and its switch sticks under the site header while the tree scrolls,
-            with what is left to spend and the set. Only in a window at least 37.5rem (600 px) tall: zoomed in further,
-            the header, the switch and an open cookie banner would leave no room for a talent with focus. */}
+            with what is left to spend and the set. Only in a window at least 37.5rem (600 px) tall, and while there is
+            room for it (switchSticks): zoomed in further, the header, the switch and an open cookie banner would leave no
+            room for a talent with focus. */}
         <div>
-          <div ref={treeSwitch} className="top-header z-10 border-b border-line bg-panel px-4 pb-2 pt-1 md:hidden [@media(min-height:37.5rem)]:sticky">
+          <div ref={treeSwitch} className={`top-header z-10 border-b border-line bg-panel px-4 pb-2 pt-1 md:hidden ${switchSticks ? "[@media(min-height:37.5rem)]:sticky" : ""}`}>
             {/* A long tree name wraps inside its button, and a word too long for it is hyphenated, rather than running
                 into the next one. */}
             <Segmented stretch label="Show tree" value={view} onChange={setView} options={catalog.trees.map((t, i) => ({ value: i, label: <span className="min-w-0 whitespace-normal text-center leading-tight [overflow-wrap:anywhere] hyphens-auto">{t.name} {perTree.get(t.id) ?? 0}</span> }))} />
