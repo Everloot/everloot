@@ -28,7 +28,7 @@ vi.mock("@/lib/changes", () => ({
   filterTimeline: (all: Array<{ game: string }>, _f: string, game?: string) => all.filter((e) => !game || e.game === game),
 }));
 
-import SignedInHome from "./page";
+import SignedInHome, { dynamic, metadata } from "./page";
 
 const USER = { id: "11111111-2222-4333-8444-555555555555", name: "Thrall#1234" };
 const JAINA = "2b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e22";
@@ -117,6 +117,37 @@ test("disabled saved builds keeps Home useful without character or build navigat
   expect(html).not.toContain('id="active-builds"');
   expect(html).not.toContain('name="character"');
   expect(auth.authQuery.mock.calls.some(([path]) => path.startsWith("saved_builds"))).toBe(false);
+});
+
+test("every PROFILES and SAVED_BUILDS combination: the profiles switch decides /home, saved builds only its build sections", async () => {
+  for (const [profiles, savedBuilds] of [["0", "0"], ["0", "1"], ["1", "0"], ["1", "1"]]) {
+    vi.stubEnv("EVERLOOT_PROFILES", profiles);
+    vi.stubEnv("EVERLOOT_SAVED_BUILDS", savedBuilds);
+    auth.getUser.mockClear();
+    auth.authQuery.mockClear();
+    if (profiles === "0") {
+      await expect(SignedInHome({})).rejects.toThrow("NEXT_NOT_FOUND");
+      expect(auth.getUser).not.toHaveBeenCalled();
+      continue;
+    }
+    const html = renderToStaticMarkup(await SignedInHome({})).replace(/&#x27;/g, "'");
+    expect(html).toContain("Hello, Go'el!");
+    expect(html).toContain("@thrall");
+    expect(html).toContain("🔥 Raiding");
+    expect(html.includes("Recent builds"), `${profiles}/${savedBuilds}`).toBe(savedBuilds === "1");
+    expect(/href="\/me(?:"|\/)/.test(html)).toBe(savedBuilds === "1");
+    expect(auth.authQuery.mock.calls.some(([path]) => path.startsWith("saved_builds"))).toBe(savedBuilds === "1");
+  }
+});
+
+test("the home behind a rewritten / is per user: rendered on every request, never indexed, no BattleTag or account id", async () => {
+  expect(dynamic).toBe("force-dynamic");
+  expect(metadata.robots).toEqual({ index: false, follow: false });
+  // A legacy Battle.net session: the account name is the BattleTag.
+  request.headers = new Headers({ "x-everloot-home": "1" });
+  const html = renderToStaticMarkup(await SignedInHome({}));
+  expect(html).not.toContain(USER.id);
+  expect(html).not.toContain("Thrall#1234");
 });
 
 test("the Ask box hands the question and the active character to Chat", async () => {
