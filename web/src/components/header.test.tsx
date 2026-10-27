@@ -76,6 +76,13 @@ test("Plans on this device is in the Plan group, after the calculator, and not i
   expect(tools.map(toolHref)).not.toContain("/tools/builds");
 });
 
+test("Alts on this device is in the Plan group, after Plans on this device, and not in the catalogue that feeds the sitemap", () => {
+  const plan = TOOL_GROUPS.find((g) => g.title === "Plan")!.links;
+  expect(plan.slice(1, 3)).toEqual([{ label: "Plans on this device", href: "/tools/builds" }, { label: "Alts on this device", href: "/tools/alts" }]);
+  expect(html).toContain('href="/tools/alts"');
+  expect(tools.map(toolHref)).not.toContain("/tools/alts");
+});
+
 test("every tool in the catalogue is in the Tools menu", () => {
   const menu = TOOL_GROUPS.flatMap((g) => g.links.map((l) => l.href));
   const topLevel = PRIMARY.map((l) => l.href);

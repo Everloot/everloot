@@ -144,8 +144,9 @@ export const TOOL_GROUPS: { title: string; links: { label: string; href: string 
     title: "Plan",
     links: [
       { label: "Talent calculator", href: "/tools/talents" },
-      // Not in the catalogue above, which also feeds the sitemap and search: the page is a private list.
+      // Not in the catalogue above, which also feeds the sitemap and search: the pages are private lists.
       { label: "Plans on this device", href: "/tools/builds" },
+      { label: "Alts on this device", href: "/tools/alts" },
       { label: "Raid builder", href: "/tools/raid" },
       { label: "Professions", href: "/tools/professions" },
       { label: "Farming routes", href: "/tools/farming-routes" },
@@ -176,6 +177,7 @@ export const TOOL_GROUPS: { title: string; links: { label: string; href: string 
 export const TOOL_LINES: Record<string, string> = {
   "/tools/talents": "Plan a talent build for any class and share it with its game build attached.",
   "/tools/builds": "Talent plans kept by name in this browser, with a backup to restore them. No account needed, and nothing is uploaded.",
+  "/tools/alts": "Your characters kept in this browser, with their realm, class, level, professions, notes and plans. Add them by hand or from your Everloot.lua. No account needed, and nothing is uploaded.",
   "/tools/raid": "Fill a 10, 20 or 40 player raid and see which buffs and debuffs it covers.",
   "/tools/professions": "Skill-up paths and recipe ranges for each profession, from recipes and prices players uploaded.",
   "/tools/farming-routes": "Farming areas by what you farm, filled in from what players upload.",

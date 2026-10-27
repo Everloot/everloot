@@ -53,6 +53,7 @@ const NAMES: Record<string, string> = {
   "/addons/polestar/wanted": "Pack ideas",
   "/tools/talents": "Talent calculator",
   "/tools/builds": "Plans on this device",
+  "/tools/alts": "Alts on this device",
   "/tools/raid": "Raid builder",
   "/tools/collections": "Collection gap",
   "/tools/guild-board": "Guild board",
