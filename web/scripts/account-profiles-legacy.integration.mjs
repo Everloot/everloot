@@ -166,6 +166,13 @@ async function preflightCatchesEachCondition() {
   assert.deepEqual(await rolledBack(async (db) => { await db.query(collision); await db.query(migration); return failing(POSTFLIGHT, db); }), [
     "the six functions, one signature each", "each runs as its owner with an empty search_path", "only service_role may call the five site functions",
   ]);
+  // A definer function with no settings left: its proconfig is NULL, which an aggregate would skip.
+  assert.deepEqual(await rolledBack(async (db) => {
+    await db.query(migration);
+    assert.deepEqual(await failing(POSTFLIGHT, db), []);
+    await db.query("alter function public.set_status(uuid, text, text, timestamptz) reset all");
+    return failing(POSTFLIGHT, db);
+  }), ["each runs as its owner with an empty search_path"]);
 
   // Quota columns out of order: the migration applies, and the first handle change then fails.
   const reordered = "alter table public.intake_quota_buckets rename to intake_quota_buckets_kept; "

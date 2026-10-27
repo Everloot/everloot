@@ -47,8 +47,9 @@ otherwise. A public profile is indexable with the canonical `/u/<handle>` and is
 does not change that.
 
 The signed-in home that `/` becomes is rendered per request with `noindex`, and the middleware adds no caching of
-its own. The header check in the preview step confirms that the response for a session cookie is `private, no-store`,
-so one player's home is not stored and served to another visitor.
+its own. The header checks below, with a made-up cookie on a preview and with a real session in the production
+acceptance, confirm that the response is `private, no-store`, so one player's home is not stored and served to
+another visitor.
 
 ## Test locally
 
@@ -60,7 +61,7 @@ docker run -d --name profiles-legacy-test -e POSTGRES_HOST_AUTH_METHOD=trust -p 
 docker exec profiles-legacy-test createdb -U postgres account_profiles_legacy_test
 cd web
 QUOTA_TEST_DATABASE_URL=postgres://postgres@127.0.0.1:54405/account_profiles_legacy_test node scripts/account-profiles-legacy.integration.mjs
-npx vitest run src/middleware.test.ts src/app/home/home.test.tsx src/app/settings/settings.test.tsx "src/app/u/[handle]/public-profile.test.tsx"
+npx vitest run src/middleware.test.ts src/app/home/home.test.tsx src/app/settings/settings.test.tsx "src/app/u/[handle]/public-profile.test.tsx" src/components/account-menu.test.tsx
 ```
 
 The script builds the schema production has (the legacy users table without accounts v2, players, the #450
@@ -71,13 +72,13 @@ arguments the site sends; private, unknown and malformed handles; each public to
 id, account or character id, note or unshared build reaches the public read; the handle limit and a handle race;
 that a held lock makes the apply fail with nothing changed; that the preflight catches accounts v2, a missing
 column, the shared_build from before #450, quota columns out of order, leftover handle counters, an existing
-`user_profiles`, a function name collision and a missing grant; and that apply and rollback leave every other
-function, grant and table as it was. `scripts/account-profiles.integration.mjs` covers the same functions with
+`user_profiles`, a function name collision and a missing grant; that the postflight catches a profile function left
+without its settings; and that apply and rollback leave every other function, grant and table as it was. `scripts/account-profiles.integration.mjs` covers the same functions with
 every migration applied.
 
 ## Preflight (read-only)
 
-In the Supabase SQL editor. Every row must be `t`; any `f`, or an error, means stop.
+In the Supabase SQL editor. Every row must be `t`; anything else (`f`, NULL or an error) means stop.
 
 ```sql
 -- preflight
@@ -142,7 +143,8 @@ commit;
 
 ## Postflight (read-only)
 
-Every row must be `t`.
+Every row must be `t`. Anything else (`f`, NULL or an error) means stop: leave `EVERLOOT_PROFILES` off and find out
+why; the rollback below removes the migration.
 
 ```sql
 -- postflight
@@ -171,7 +173,7 @@ select check_name, ok from (values
     and to_regprocedure('public.set_active_character(uuid, uuid)') is not null
     and to_regprocedure('public.public_profile(text)') is not null),
   ('each runs as its owner with an empty search_path',
-    (select bool_and(prosecdef and 'search_path=""' = any(proconfig)) from pg_proc
+    (select count(*) = 6 and bool_and(prosecdef and coalesce('search_path=""' = any(proconfig), false)) from pg_proc
       where pronamespace = 'public'::regnamespace and proname in
         ('take_handle_change', 'save_profile', 'set_status', 'set_main_character', 'set_active_character', 'public_profile'))),
   ('only service_role may call the five site functions',
@@ -214,8 +216,8 @@ the redirect or the origin check, copy a session cookie, or make a session to ge
 Change only `EVERLOOT_PROFILES`. Keep `EVERLOOT_SAVED_BUILDS` and `EVERLOOT_AUTH_V2` as they are, along with every
 other switch.
 
-1. After the preflight, apply and postflight, set `EVERLOOT_PROFILES=1` in Production and redeploy main. Unsetting it
-   and redeploying undoes this step.
+1. Only once the preflight and the postflight read `t` in every row, set `EVERLOOT_PROFILES=1` in Production and
+   redeploy main. Unsetting it and redeploying undoes this step.
 2. On `https://everloot.app`, sign in with a disposable Battle.net test account, never a real player's or the
    owner's, and do not make anyone else's profile public or pick a handle for them. Without such an account the
    signed-in acceptance has not happened: record it as open, not passed.
