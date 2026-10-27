@@ -7,10 +7,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, expect, test, vi } from "vitest";
 import type { ChangeEntry } from "@/lib/changes";
 
-const timeline = vi.hoisted((): { entries: ChangeEntry[] } => ({ entries: [] }));
+// `loads` counts the timeline lookups, so a test can tell a page that never asked for the timeline.
+const timeline = vi.hoisted((): { entries: ChangeEntry[]; loads: number } => ({ entries: [], loads: 0 }));
 vi.mock("@/lib/changes", async (importOriginal) => {
   const real = await importOriginal<typeof import("@/lib/changes")>();
-  return { ...real, loadTimeline: async () => real.groupAnnouncements(timeline.entries) };
+  return { ...real, loadTimeline: async () => { timeline.loads++; return real.groupAnnouncements(timeline.entries); } };
 });
 vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a>,
@@ -25,9 +26,9 @@ vi.mock("@/lib/wiki-names", async (importOriginal) => ({
 const FIXTURES = fileURLToPath(new URL("../../test/news", import.meta.url));
 const WIKI = fileURLToPath(new URL("../../test/wiki", import.meta.url));
 
-// Blizzard's side of the timeline: a forum post the fixture post cites, a hotfix, a build and a Classic post.
+// Blizzard's side of the timeline: a forum post a test post cites, a hotfix, a build and a Classic post.
 const cited: ChangeEntry = {
-  id: "forum:777", type: "post", game: "forever", at: "2026-10-23T18:00:00.000Z", title: "A Blizzard post", url: "https://worldofwarcraft.blizzard.com/en-us/news/example/",
+  id: "forum:777", type: "post", game: "forever", at: "2026-10-23T18:00:00.000Z", title: "A Blizzard post", url: "https://us.forums.blizzard.com/en/wow/t/a-blizzard-post/777",
   author: "Kaivax", role: "Community Manager", category: "WoW: Forever General Discussion", source: "forum", region: "us", excerpt: "Words.",
 };
 const ENTRIES: ChangeEntry[] = [
@@ -37,7 +38,7 @@ const ENTRIES: ChangeEntry[] = [
   { ...cited, id: "forum:779", game: "classic", title: "A Classic notice", url: "https://us.forums.blizzard.com/en/wow/t/classic/10" },
 ];
 timeline.entries = ENTRIES;
-afterEach(() => { vi.unstubAllEnvs(); timeline.entries = ENTRIES; });
+afterEach(() => { vi.unstubAllEnvs(); timeline.entries = ENTRIES; timeline.loads = 0; });
 
 const fixtures = () => { vi.stubEnv("NEWS_DIR", FIXTURES); vi.stubEnv("WIKI_DIR", WIKI); };
 
@@ -119,8 +120,9 @@ test("a post page shows the byline, the body with its links and tokens, the sour
   expect(html).toContain("<span>test draft</span>");
   expect(html).toContain("<blockquote");
   expect(html).toContain('href="https://worldofwarcraft.blizzard.com/en-us/news/example"');
-  // The source is a Blizzard post Everloot keeps a page for: that page is linked too.
-  expect(html).toMatch(/>A Blizzard post<\/a> · <a href="\/changes\/us-777-a-blizzard-post"[^>]*>On Everloot<\/a>/);
+  // Its one source is a Blizzard news article, which is never a stored post: no timeline lookup, no "On Everloot".
+  expect(timeline.loads).toBe(0);
+  expect(html).not.toContain("On Everloot");
   // The body's text runs at reading measure; the column, its headings and an in-article ad keep their width.
   expect(html).toContain('<div data-news-body="true" class="mt-8 [&amp;_[data-prose]&gt;:is(p,ul,ol,blockquote)]:max-w-[48ch]">');
   expect(html).toContain('href="/news/older-post"');
@@ -137,6 +139,31 @@ test("a post page shows the byline, the body with its links and tokens, the sour
   expect(meta.robots).toEqual({ index: true, follow: true });
   expect(meta.alternates?.canonical).toBe("/news/test-post");
   expect(meta.openGraph).toMatchObject({ type: "article", publishedTime: "2026-10-24", modifiedTime: "2026-10-25" });
+});
+
+test("a post citing a Blizzard forum post links its Everloot page; a post citing only other sites never loads the timeline", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "news-sources-"));
+  const post = (slug: string, sources: [string, string][]) => writeFileSync(join(dir, `${slug}.md`), [
+    "---", `slug: ${slug}`, `title: ${slug}`, "summary: A summary long enough to read as one.", "author: Everloot Team", "published: 2026-10-25",
+    "sources:", ...sources.flatMap(([title, url]) => [`  - title: "${title}"`, `    url: ${url}`]), "status: published", "---", "", "Body.",
+  ].join("\n"));
+  post("cites-forum", [["Blizzard forums: A Blizzard post", `${cited.url}/`], ["Wowhead: a story", "https://www.wowhead.com/news/1"]]);
+  post("third-party", [["Wowhead: a story", "https://www.wowhead.com/news/1"], ["PC Gamer: a column", "https://www.pcgamer.com/a"]]);
+  post("blizzard-article", [["Blizzard: an article", "https://news.blizzard.com/en-us/article/1"]]);
+  vi.stubEnv("NEWS_DIR", dir); vi.stubEnv("WIKI_DIR", WIKI);
+  const { default: NewsArticle } = await import("./[slug]/page");
+  const render = async (slug: string) => renderToStaticMarkup(await NewsArticle({ params: Promise.resolve({ slug }) }));
+
+  const forum = await render("cites-forum");
+  expect(timeline.loads).toBe(1);
+  expect(forum).toMatch(/>Blizzard forums: A Blizzard post<\/a> · <a href="\/changes\/us-777-a-blizzard-post"[^>]*>On Everloot<\/a>/);
+  // Third-party sources, or a Blizzard host that is not the forums or Bluesky, can never be a stored post.
+  for (const slug of ["third-party", "blizzard-article"]) {
+    const html = await render(slug);
+    expect(html).not.toContain("On Everloot");
+    expect(html).toContain('id="sources"');
+  }
+  expect(timeline.loads).toBe(1);
 });
 
 test("a draft or unknown slug is a 404 and is not indexed", async () => {

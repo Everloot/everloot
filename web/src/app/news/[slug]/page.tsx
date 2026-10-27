@@ -6,7 +6,7 @@ import JsonLd from "@/components/JsonLd";
 import { PageHeader, Prose, ReadingLayout, type TocItem } from "@/components/ui";
 import { longDate } from "@/data/wow-forever";
 import { trailFor } from "@/lib/breadcrumbs";
-import { loadTimeline, postPathForUrl } from "@/lib/changes";
+import { couldBeBluePost, loadTimeline, postPathForUrl } from "@/lib/changes";
 import { newsArticleJsonLd } from "@/lib/jsonld";
 import { bodyForPage, lastChanged, loadNews, newsHref, postDescription, publishedPost, publishedPosts, readingMinutes, relatedPosts, sourceNames } from "@/lib/news";
 import { pageMetadata } from "@/lib/seo";
@@ -24,7 +24,10 @@ import { WikiBlock, type TextContext } from "../../wiki/wiki-text";
  * list, so a body's own closing "Sources" / "Related" sections are left out (lib/news bodyForPage).
  */
 
-// Posts change only with a deploy, but their tokens read the database's names, so a page is rebuilt at most once an hour.
+// A post changes only with a deploy, but its tokens read the database's names, so the page is rebuilt at most once
+// an hour. A post citing a Blizzard forum or Bluesky post also reads the changes timeline: with the blue store
+// configured, that fetch revalidates every 10 minutes and on the "blue" tag the cron sets when it adds posts, so
+// such a page is rebuilt at most every 10 minutes and after each new Blizzard post. Every other post stays hourly.
 export const revalidate = 3600;
 export function generateStaticParams() {
   return publishedPosts(loadNews()).map((p) => ({ slug: p.slug }));
@@ -70,8 +73,9 @@ export default async function NewsArticle(props: { params: Promise<{ slug: strin
   const body = bodyForPage(post);
   const related = relatedPosts(news, post, body.relatedSlugs, RELATED);
   const sources = sourceNames(post);
-  // A source that is a Blizzard post Everloot keeps a page for links that page too.
-  const timeline = post.sources.length > 0 ? await loadTimeline() : [];
+  // A source that is a Blizzard post Everloot keeps a page for links that page too. Only a source on the forums or
+  // Bluesky can be one, so a post citing nothing there never loads the timeline (and keeps its hourly rebuild).
+  const timeline = post.sources.some((s) => couldBeBluePost(s.url)) ? await loadTimeline() : [];
   const minutes = readingMinutes(post.blocks);
   // Index of the block after which the in-article ad sits; -1 for a short post, which gets none.
   const paragraphs = body.blocks.flatMap((b, i) => (b.type === "paragraph" ? [i] : []));

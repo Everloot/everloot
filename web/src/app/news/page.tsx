@@ -9,7 +9,9 @@ import { pageMetadata } from "@/lib/seo";
 import ChangeList from "../changes/change-list";
 import { FeaturedNewsCard, NewsCard } from "./news-card";
 
-// The posts change only with a deploy; an hour matches the pages themselves.
+// The posts change only with a deploy, so the hub asks to be rebuilt at most once an hour. "From Blizzard" reads the
+// changes timeline: with the blue store configured, that fetch revalidates every 10 minutes and on the "blue" tag the
+// cron sets when it adds posts, so the hub is rebuilt at most every 10 minutes and after each new Blizzard post.
 export const revalidate = 3600;
 
 const DESCRIPTION = "What is new on Everloot and what it means for WoW: Forever players: site updates, data milestones and launch notes, in Everloot's own words.";

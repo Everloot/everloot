@@ -42,6 +42,18 @@ export function writeupFor(entry: ChangeEntry, writeups: Map<string, BlueWriteup
   return [entry, ...(entry.copies ?? [])].map((c) => writeups.get(c.id)).find(Boolean) ?? null;
 }
 
+/** Where a stored Blizzard post lives: the WoW forums (any region) and Bluesky. */
+const BLUE_POST_HOST = /(?:^|\.)forums\.blizzard\.com$|^bsky\.app$/;
+
+/** Whether a link could be a Blizzard post the timeline stores, from its host alone, so a caller can skip loading the timeline. */
+export function couldBeBluePost(url: string): boolean {
+  try {
+    return BLUE_POST_HOST.test(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}
+
 const sameAddress = (url: string) => url.trim().replace(/[?#].*$/, "").replace(/\/+$/, "").toLowerCase();
 
 /** The Everloot page of the Blizzard post a link points at (the announcement or one of its copies), or null. */
