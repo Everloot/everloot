@@ -71,21 +71,25 @@ function W.Import()
   if not f then return end
   local input = f.box:GetText():match("^%s*(.-)%s*$")
   local isLink = input:match("^https?://") ~= nil
-  local ok, reason
+  local ok, reason, twoSets
   if W.tab == "talents" and not hasTalents() then
     notice("Talent import is unavailable: this client's trait API is missing."); return
   elseif W.tab == "talents" then
     if #input > 16000 then notice("That talent code is too long."); return end
-    local first = input:match("^https?://[^/]+/tools/talents/%a+[^#]*#plan=([^&]+)")
-      or input:match("^https?://[^/]+/tools/talents/%a+/b/([^/?#]+)")
-    local second = input:match("^https?://[^/]+/tools/talents/%a+[^#]*#plan2=([^&]+)")
-      or input:match("^https?://[^/]+/tools/talents/%a+/b/%-/([^/?#]+)")
+    -- A calculator link carries each set's code and order (plan= and order=, plan2= and order2=); a build
+    -- link's path carries codes only. One set loads, the first or else the second, with its own order only.
+    local link = E.Plan.ReadLink(input)
+    local first = link.first or input:match("^https?://[^/]+/tools/talents/%a+/b/([^/?#]+)")
+    local second = link.second or input:match("^https?://[^/]+/tools/talents/%a+/b/%-/([^/?#]+)")
     if first == "-" then first = nil end
-    if first or second then input = first or second end
+    local order, set
+    if first then input, order = first, link.firstOrder
+    elseif second then input, order, set = second, link.secondOrder, 2 end
     if not input:match("^EL%d+%-") and isLink then
       notice("Open this link on the website and use Copy for addon for the set you want."); return
     end
-    ok, reason = E.Plan.Load(input, true)
+    twoSets = link.first ~= nil and link.second ~= nil
+    ok, reason = E.Plan.Load(input, true, order, set)
   elseif E.Raid then
     ok, reason = E.Raid.Load(input)
   end
@@ -93,8 +97,10 @@ function W.Import()
     f.box:SetText("")
     f.box:ClearFocus()
     if W.tab == "raid" then notice("Plan loaded. Compare class counts by group below; arrange players yourself.")
-    elseif isLink then notice("Plan loaded. Talent links use the first available set; Copy for addon selects the set you want.")
-    else notice("Plan loaded. Compare your build and next planned point below.") end
+    else
+      notice("Plan loaded. " .. E.Plan.OrderText() .. (twoSets
+        and " The link has two talent sets, so the first loaded; Copy for addon on the website copies the one you choose." or ""))
+    end
     W.Refresh()
     f.scroll:SetVerticalScroll(0)
   else
@@ -124,8 +130,7 @@ end
 
 local function exportPlan()
   if W.tab == "talents" then
-    local plan = E.Plan and E.Plan.Decode(EverlootDB.plan)
-    copy(plan and ("https://everloot.app/tools/talents/" .. plan.class:lower() .. "#plan=" .. EverlootDB.plan))
+    copy(E.Plan and E.Plan.Link())
   else
     local plan = E.Raid and E.Raid.Decode(EverlootDB.raidPlan)
     copy(plan and ("https://everloot.app/tools/raid#raid=" .. EverlootDB.raidPlan))
@@ -233,7 +238,7 @@ function W.Open(tab)
   local raid = W.tab == "raid"
   f.heading:SetText(raid and "Bring your raid plan" or "Follow your talent plan")
   f.hint:SetText(raid and "Website > Copy for addon > Import here. Compare class counts, then arrange your raid."
-    or "Website > Copy for addon > Import here. Compare your build and follow the next point.")
+    or "Website > Copy for addon > Import here. Compare your build, then spend points yourself.")
   for key, b in pairs(f.tabs) do
     b.text:SetTextColor(unpack(key == W.tab and COLORS.accent or COLORS.muted))
     if key == W.tab then b.selected:Show() else b.selected:Hide() end

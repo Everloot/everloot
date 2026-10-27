@@ -205,17 +205,22 @@ Right-click the minimap button, or use `/everloot options`, for collection setti
 `/everloot status` still prints the collector status.
 
 1. Make a build on everloot.app's talent calculator or raid planner and choose **Copy for addon**.
-2. Open the matching tab in the addon, paste the code, and click **Import** (or press Enter).
-3. Talents shows your progress and next planned point. Raid compares class counts per group and
-   checks buffs on the current roster. Apply points and arrange players yourself.
+2. Open the matching tab in the addon, paste the link or code, and click **Import** (or press Enter).
+3. Talents shows your progress, and the next point when the plan carries a spend order (see
+   [Spend order](#spend-order)). Raid compares class counts per group and checks buffs on the current
+   roster. Apply points and arrange players yourself.
 
 Talent export copies the selected set only. Talent links with two sets import the first; a second-set-only
-link imports that set. For saved short links, open the website and use **Copy for addon** to choose the set.
+link imports that set. A link carries each set's spend order beside its code, `#plan=<code>&order=<order>`
+for the first set and `#plan2=<code>&order2=<order>` for the second, and the set that loads takes its own
+order only. Paste links into this Import box: `/everloot plan` takes a bare share code, not a link. For
+saved short links, open the website and use **Copy for addon** to choose the set.
 Raid codes preserve planned talent trees for the website. The addon cannot verify another player's talent
 choices or identify players from a class-only code.
 Differences in game build remain visible. Imports stay in your local SavedVariables file; roster names
-are never saved by this workspace. **Copy plan link** returns an imported plan to the website;
-**Copy current raid** opens your actual roster there. Use Ctrl+C in the selected field.
+are never saved by this workspace. **Copy plan link** returns the loaded set to the website under the same
+keys, with the order it came with when the addon could read it; an order it could not read is left out,
+never made up. **Copy current raid** opens your actual roster there. Use Ctrl+C in the selected field.
 
 The window is created when opened, refreshes on relevant character/group changes while visible, and
 uses no polling loop. Escape closes it. This workspace still needs a live-client layout and behavior
@@ -235,10 +240,12 @@ Drag its header beside the game's talent window to keep the next-point highlight
   Run it once with the talent window closed and once open. It also prints your race token (`INFO player
   race`), the value the census stores.
 - **Plan panel (display only).** `/everloot plan <share code>` loads an Everloot talent plan and shows,
-  beside the talent window, the next point to spend and where your build differs. `/everloot plan` reopens
-  it (it also has a paste box), `plan hide` closes it, `plan clear` forgets it. When the talent window is
-  open it also puts a green overlay on the next talent and red ones on mismatches. It never spends a
-  point, clicks, imports a loadout or acts for you. The plan is kept in your SavedVariables file.
+  beside the talent window, where your build differs and, for a plan with a spend order, the next point to
+  spend. A pasted code has no order; a link brings its own through the workspace's Import box.
+  `/everloot plan` reopens it (it also has a paste box), `plan hide` closes it, `plan clear` forgets it.
+  When the talent window is open it also puts a green overlay on the next talent, when there is one, and
+  red ones on mismatches. It never spends a point, clicks, imports a loadout or acts for you. The plan and
+  its order are kept in your SavedVariables file.
 - **Saved builds.** When the Desktop App has synced your everloot.app builds into the `EverlootBuilds`
   slot addon, `/everloot plan` also lists them in chat, this character's first (the label's name, and its realm when it has one), then the rest of your class,
   and `/everloot plan <number>` loads one as if you pasted its code (`/everloot plan <number> 2` loads its second talent set, marked `[2 sets]` in the list). Nothing is saved or uploaded for it.
@@ -258,10 +265,30 @@ same format (see `docs/2026-10-17-talent-share-code.md`):
 | `build` | Client build the plan was made on, e.g. `1.60.1.70450`. A different build shows a warning because node ids can move. |
 | `payload` | base64url (RFC 4648 section 5, no `=` padding) of the ASCII text `node:rank,node:rank:choice,...`. |
 
-Payload items are in spend order: `node` is the client's trait node id, `rank` is the target rank (1 to
-50), and an optional third number is the zero-based entry of a choice node. A node absent from the list is
-planned at zero. Example: `EL1-mage-1482-1.60.1.70450-OTAwMDE6Miw5MDAwMjoxOjEsOTAwMDQ6Mg` carries
-`90001:2,90002:1:1,90004:2`.
+`node` is the client's trait node id, `rank` is the target rank (1 to 50), and an optional third number is
+the zero-based entry of a choice node. A node absent from the list is planned at zero. The site lists the
+items by node id, and their order is not a spend order. Example:
+`EL1-mage-1482-1.60.1.70450-OTAwMDE6Miw5MDAwMjoxOjEsOTAwMDQ6Mg` carries `90001:2,90002:1:1,90004:2`.
+
+### Spend order
+
+A plan can carry the order its points are spent in, as a token of its own beside the code:
+`O1p-<sequence>` when a player planned it, `O1g-<sequence>` when a tool generated it. The format, its
+64-point limit and its test vectors are in `docs/2026-10-17-talent-share-code.md` under "Spend order".
+For the example code above, `O1p-AABCC` is both points in 90001, then 90002, then 90004 twice.
+
+- With an order, Talents names the next point: the first point in the order you have not spent, even
+  when the game says it cannot be bought yet. A generated order is labelled provisional, which is neither
+  a recommendation nor a record of anyone's play. The addon does not check that each point could be spent
+  at its place in the order; the game says whether the next one can be bought now.
+- Without one, the order is unknown and no point is named next. Talents lists the missing points the
+  game says you can add now, none of them first, and apart from them any the game says nothing about.
+  Item order and node ids are never used as an order.
+- An order the addon cannot read (damaged, made by a newer version, of a kind it does not know, over 64
+  points, or not matching the code's points) leaves the talents loaded, and Talents says why the order is
+  unknown. An order that names a talent your tree does not have is not followed either.
+- Addon 0.3.12 loads the talents from these links but not their order: it stops at `&`, and still names
+  a next point from the code's item order.
 
 ## Test it
 
