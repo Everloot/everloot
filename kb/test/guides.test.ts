@@ -371,10 +371,13 @@ describe("crosslinks", () => {
   const withLink = (link: string) => GUIDE.replace("[[deadmines]]", link);
 
   test("a published guide links only to published wiki pages", () => {
-    for (const link of ["[[stockades]]", "[the Stockades](/wiki/stockades)", "[the Stockades](https://everloot.app/wiki/stockades/)"]) {
+    for (const link of ["[[stockades]]", "[the Stockades](/wiki/stockades)", "[the Stockades](https://everloot.app/wiki/stockades/)", "[the Stockades](/beta/wiki/stockades#bosses)",
+      "[the Stockades](https://everloot.app/ptr/wiki/stockades?from=guide)"]) {
       const g = withLink(link);
       expect(problemsOf([file(g)])).toEqual([at(g, "At level 10", `${link} links to a draft; a published guide links only to published pages`)]);
     }
+    // A published page through a game version's prefix is still published.
+    expect(problemsOf([file(withLink("[the Deadmines](/beta/wiki/deadmines?from=guide)"))])).toEqual([]);
     const g = withLink("[[nowhere]]");
     expect(problemsOf([file(g)])).toEqual([at(g, "At level 10", "[[nowhere]] links to a page that does not exist")]);
   });
@@ -383,6 +386,12 @@ describe("crosslinks", () => {
     const other = asDraft(GUIDE).replace("id: 1", "id: 2").replace("slug: frost-leveling", "slug: fire-leveling");
     const g = withLink("[the fire guide](/guides/fire-leveling)");
     expect(problemsOf([file(g), file(other, "guides/fire-leveling.md")])).toEqual([at(g, "At level 10", "[the fire guide](/guides/fire-leveling) links to a draft")]);
+    // A game version's prefix shows the same guide; a path that only starts with a prefix's letters is no guide.
+    for (const href of ["/beta/guides/fire-leveling", "/ptr/guides/fire-leveling#talents", "https://everloot.app/beta/guides/fire-leveling?from=hub"]) {
+      const via = withLink(`[the fire guide](${href})`);
+      expect(problemsOf([file(via), file(other, "guides/fire-leveling.md")]), href).toEqual([at(via, "At level 10", `[the fire guide](${href}) links to a draft`)]);
+    }
+    expect(problemsOf([file(withLink("[the fire guide](/betamax/guides/fire-leveling)")), file(other, "guides/fire-leveling.md")])).toEqual([]);
     const gone = withLink("[the arcane guide](/guides/arcane-leveling)");
     expect(problemsOf([file(gone)])).toEqual([at(gone, "At level 10", "links to a page that does not exist")]);
   });

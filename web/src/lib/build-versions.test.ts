@@ -1,5 +1,6 @@
 import { getPathMatch } from "next/dist/shared/lib/router/utils/path-match";
 import { describe, expect, test } from "vitest";
+import { withoutVersionPrefix as kbWithoutVersionPrefix } from "../../../kb/src/wiki/page";
 import nextConfig from "../../next.config.js";
 import { PREFIXES, SERVED, WITHOUT_SNAPSHOT, hasSnapshot, versionHref, withoutVersionPrefix } from "./build-versions";
 import { CURRENT_VERSION, GAME_VERSIONS } from "./game-version";
@@ -61,6 +62,12 @@ describe("game version routing", () => {
     // Paths without a prefix, and ones that only start with a prefix's letters, are left as they are.
     expect(withoutVersionPrefix("/guides/fire-draft")).toBe("/guides/fire-draft");
     expect(withoutVersionPrefix("/betamax/guides/x")).toBe("/betamax/guides/x");
+  });
+
+  test("the kb's copy, which its page checks and the wiki's link reading use, takes off the same prefixes", () => {
+    for (const path of ["/beta/wiki/x", "/ptr/guides/x", "/beta", "/ptr", "/wiki/x", "/betamax/wiki/x", "/ptrx", "/"]) {
+      expect(kbWithoutVersionPrefix(path), path).toBe(withoutVersionPrefix(path));
+    }
   });
 
   test("the notice's internal address redirects to its prefix", async () => {

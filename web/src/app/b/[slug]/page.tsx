@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import SaveCopy from "@/components/builds/SaveCopy";
 import TalentClassView from "@/components/talents/TalentClassView";
 import { Badge, Container, PageHeader } from "@/components/ui";
+import { compareGameBuilds } from "@/lib/talents/freshness";
 import { planHash } from "@/lib/talents/import";
 import { isTalentClass, loadCatalog, type TalentClassSlug } from "@/lib/talents/catalogs";
 import { buildTitle, readPathCodes, summarizeBuild } from "@/lib/talents/summary";
@@ -63,7 +64,8 @@ export default async function SharedBuildPage({ params }: Params) {
   const read = readPathCodes(catalog, [build.code, build.code2 ?? "-"]);
   const summary = read ? buildTitle(catalog, summarizeBuild(catalog, read.sets[read.first ? 0 : 1])) : catalog.className;
   const signedIn = Boolean(await getUser().catch(() => null));
-  const older = build.gameBuild !== catalog.build;
+  // -1 older than the tree, 1 newer; null when either build cannot be read, and then the page says nothing.
+  const order = compareGameBuilds(build.gameBuild, catalog.build);
 
   return TalentClassView({
     slug: build.classSlug,
@@ -76,7 +78,8 @@ export default async function SharedBuildPage({ params }: Params) {
           <span>{summary}</span>
           <span className="inline-flex items-center gap-1.5 font-mono tabular-nums">
             game build {build.gameBuild}
-            {older && <Badge tone="files" title="Made on an older game build than the calculator's tree. Opening it lists what changed.">made on an older game build</Badge>}
+            {order === -1 && <Badge tone="files" title="Made on an older game build than the calculator's tree. Opening it lists what changed.">made on an older game build</Badge>}
+            {order === 1 && <Badge tone="files" title="Made on a newer game build than the calculator's tree, which has not caught up with it yet.">made on a newer game build</Badge>}
           </span>
           {build.ownerName && <span>Shared by {build.ownerName}</span>}
         </>
