@@ -28,8 +28,8 @@ export default function Composer(p: {
   /** Where to set keys up: /account#chat-keys, through sign-in when signed out. */
   keysHref: string;
   signed: boolean | null;
-  /** The free model's provider while it is on, else null; `mode` is what Send uses without a key. */
-  free?: string | null;
+  /** The free model's providers, in the order they are tried; empty while it is off. `mode` is what Send uses without a key. */
+  free?: string[];
   mode?: "free" | "search";
   onMode?: (mode: "free" | "search") => void;
   characters: ShellCharacter[];
@@ -43,7 +43,8 @@ export default function Composer(p: {
 }) {
   const ready = p.providers.length > 0;
   const active = p.providers[0] ?? null;
-  const free = !ready && p.free ? p.free : null;
+  const names = !ready ? p.free ?? [] : [];
+  const free = names.length > 0 ? names.join(" or ") : null;
   const mode = free ? p.mode ?? "free" : "search";
   const setup = (
     <><a href={p.keysHref} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Assistant setup</a>{p.signed === false ? " (sign in first)" : ""}</>
@@ -63,7 +64,7 @@ export default function Composer(p: {
       <div className="rounded-card border border-edge bg-panel focus-within:border-accent">
         {!ready && (mode === "free" ? (
           <p className="border-b border-line px-4 py-2 text-sm text-fg-2">
-            Everloot (free) answers with a free AI model on {free}, from Everloot&apos;s data, a limited number a day. Your question and this chat go to {free}; no key, and no account details unless you attach a character or note. At the limit, Send shows Everloot search. {setup} adds your own model.
+            Everloot (free) answers with a free AI model on {free}, from Everloot&apos;s data, a limited number a day. Your question and this chat go to {names.length > 1 ? `whichever of ${free} answers` : free}, and each answer names it; no key, and no account details unless you attach a character or note. At the limit, Send shows Everloot search. {setup} adds your own model.
           </p>
         ) : (
           <p className="border-b border-line px-4 py-2 text-sm text-fg-2">

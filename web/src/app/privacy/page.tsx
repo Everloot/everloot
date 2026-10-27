@@ -155,12 +155,14 @@ export default function PrivacyPage() {
               <li id="free-chat">
                 <strong>Chat&apos;s free model (optional):</strong> when Chat offers Everloot (free) and you ask with
                 it, your question, the earlier turns of that chat and what Everloot&apos;s lookups found go through
-                our server to the AI provider Chat names next to the question box (Groq, unless it says otherwise),
-                which writes the answer. A character or note goes only if you attach it. Nothing else of yours goes:
-                no account details, no key, no cookie and not your address. We don&apos;t keep the questions or the
-                answers. To enforce the daily limit our server keeps a keyed one-way hash of your address for a day.
-                Groq&apos;s terms say it does not train models on them and keeps them at most 30 days, for reliability
-                and abuse checks. Everloot search, and a model you set up with your own key, do not use this.
+                our server to Groq, or to Cloudflare Workers AI when Groq is busy or at its limit, which writes the
+                answer. Each answer names the provider that wrote it. A character or note goes only if you attach it.
+                Nothing else of yours goes: no account details, no key, no cookie and not your address. We don&apos;t
+                keep the questions or the answers. To enforce the daily limit our server keeps a keyed one-way hash of
+                your address for a day. Groq&apos;s terms say it does not train models on them and keeps them at most 30
+                days, for reliability and abuse checks. Cloudflare says it does not use Workers AI content to train
+                models and does not keep it once the request is answered. Everloot search, and a model you set up with
+                your own key, do not use this.
               </li>
               <li>
                 <strong>Uploads:</strong> files you send on the upload page

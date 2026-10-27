@@ -79,7 +79,7 @@ async function send(question: string) {
 describe("Everloot (free) on /chat", () => {
   test("without a key it is the default mode, says what it is and who sees the question, and keeps search selectable", async () => {
     api();
-    await render(<ChatClient freeChat="Groq" />);
+    await render(<ChatClient freeChat={["Groq"]} />);
     const menu = modelMenu();
     expect(menu?.value).toBe("free");
     expect(Array.from(menu!.options).map((o) => o.textContent)).toEqual(["Everloot (free)", "Everloot search", "Assistant setup…"]);
@@ -89,9 +89,16 @@ describe("Everloot (free) on /chat", () => {
     expect(text()).not.toContain("Everloot search is ready");
   });
 
+  test("with two free providers the banner names both", async () => {
+    api();
+    await render(<ChatClient freeChat={["Groq", "Cloudflare"]} />);
+    expect(text()).toContain("a free AI model on Groq or Cloudflare");
+    expect(text()).toContain("Your question and this chat go to whichever of Groq or Cloudflare answers");
+  });
+
   test("Send runs the model through the proxy with the free tools only, and shows its answer", async () => {
     api();
-    await render(<ChatClient freeChat="Groq" />);
+    await render(<ChatClient freeChat={["Groq"]} />);
     await send("Where does Linen Cloth drop?");
     const proxied = calls.filter((c) => c.url === FREE);
     expect(proxied).toHaveLength(2);
@@ -104,7 +111,7 @@ describe("Everloot (free) on /chat", () => {
 
   test("at the limit the reply is Everloot search, with one line saying so", async () => {
     api("limit");
-    await render(<ChatClient freeChat="Groq" />);
+    await render(<ChatClient freeChat={["Groq"]} />);
     await send("Where does Linen Cloth drop?");
     expect(text()).toContain(FREE_FALLBACK);
     expect(text()).toContain("Dropped by humanoids.");
@@ -113,7 +120,7 @@ describe("Everloot (free) on /chat", () => {
 
   test("choosing Everloot search sends no question to the model", async () => {
     api();
-    await render(<ChatClient freeChat="Groq" />);
+    await render(<ChatClient freeChat={["Groq"]} />);
     await act(async () => setValue(modelMenu()!, "search"));
     expect(text()).toContain("Everloot search is ready");
     await send("Where does Linen Cloth drop?");
@@ -124,7 +131,7 @@ describe("Everloot (free) on /chat", () => {
   test("a key the player added takes precedence over the free model", async () => {
     api();
     sessionStorage.setItem(PROVIDERS, JSON.stringify([{ kind: "openrouter", model: "deepseek/deepseek-v4.1-flash", key: KEY }]));
-    await render(<ChatClient freeChat="Groq" />);
+    await render(<ChatClient freeChat={["Groq"]} />);
     await send("Where does Linen Cloth drop?");
     expect(calls.some((c) => c.url === FREE)).toBe(false);
     expect(text()).toContain("Own key answer.");

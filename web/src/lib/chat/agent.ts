@@ -430,11 +430,15 @@ export async function readOpenAiStream(stream: ReadableStream<Uint8Array>, onTex
 async function openAiLoop(o: AnswerOptions, found: Found): Promise<ChatReply> {
   const send = o.send ?? fetch;
   // The free model's proxy is on this site, with a path and no host of its own: it goes by its name.
-  const label = o.provider.baseUrl.startsWith("/") ? o.provider.name : new URL(o.provider.baseUrl).host;
+  const proxied = o.provider.baseUrl.startsWith("/");
+  const label = proxied ? o.provider.name : new URL(o.provider.baseUrl).host;
   const { rounds, maxTokens } = o.limits ?? LIMITS;
   const tools = o.tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.inputSchema } }));
   const messages: OaiMessage[] = [{ role: "system", content: SYSTEM }, ...earlier(o), { role: "user", content: o.question }];
   let model = o.model;
+  // The proxy names the provider that wrote each call; the answer goes by the one that wrote its last.
+  let via: string | null = null;
+  const named = () => (via ? `${model} (${via})` : model);
   for (let round = 0; round <= rounds; round++) {
     let res: Response;
     try {
@@ -448,6 +452,7 @@ async function openAiLoop(o: AnswerOptions, found: Found): Promise<ChatReply> {
       throw new Error(`${label}: ${err instanceof Error ? err.message : String(err)}${o.provider.kind === "ollama" ? ". Is Ollama running with OLLAMA_ORIGINS=https://everloot.app?" : ""}`);
     }
     if (!res.ok || !res.body) throw await failure(res, label);
+    if (proxied) via = res.headers.get("x-everloot-provider") ?? via;
     let turn: OaiMessage;
     if ((res.headers.get("content-type") ?? "").includes("text/event-stream")) {
       try {
@@ -464,7 +469,7 @@ async function openAiLoop(o: AnswerOptions, found: Found): Promise<ChatReply> {
     }
     const calls = turn.tool_calls ?? [];
     const text = (turn.content ?? "").trim();
-    if (calls.length === 0 || round === rounds) return reply(text || NO_SOURCED_ANSWER, model, found);
+    if (calls.length === 0 || round === rounds) return reply(text || NO_SOURCED_ANSWER, named(), found);
     messages.push({ role: "assistant", content: turn.content ?? null, tool_calls: calls });
     for (const call of calls) {
       let input: Record<string, unknown>;
@@ -476,7 +481,7 @@ async function openAiLoop(o: AnswerOptions, found: Found): Promise<ChatReply> {
       messages.push({ role: "tool", tool_call_id: call.id, content: await runTool(o, call.function.name, input, found) });
     }
   }
-  return reply(NO_SOURCED_ANSWER, model, found);
+  return reply(NO_SOURCED_ANSWER, named(), found);
 }
 
 /**

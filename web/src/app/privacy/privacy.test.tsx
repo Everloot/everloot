@@ -88,17 +88,21 @@ test("profiles: private by default, what a public profile shows and never shows,
 test("chat's free model: what goes to the provider, what never does, and what we keep", () => {
   for (const claim of [
     "Chat's free model (optional):",
-    "go through our server to the AI provider Chat names next to the question box (Groq, unless it says otherwise)",
+    "go through our server to Groq, or to Cloudflare Workers AI when Groq is busy or at its limit",
+    "Each answer names the provider that wrote it.",
     "A character or note goes only if you attach it.",
     "Nothing else of yours goes: no account details, no key, no cookie and not your address.",
     "We don't keep the questions or the answers.",
     "Groq's terms say it does not train models on them",
+    "Cloudflare says it does not use Workers AI content to train models",
     "Rate-limit hashes: a short time, long enough to enforce the limit (a day for Chat's free model), then discarded.",
   ]) expect(text).toContain(claim);
   for (const claim of [
     "## Chat",
     "Everloot (free)",
+    "Groq first, then Cloudflare Workers AI",
     "No account data, no key, no cookie and no address goes to the provider.",
+    "Cloudflare's say it does not use Workers AI content to train models",
   ]) expect(policy).toContain(claim);
 });
 

@@ -382,6 +382,21 @@ describe("the free model (Everloot free)", () => {
     await expect(pending).rejects.toThrow();
   });
 
+  test("the reply names the provider that wrote it, from the proxy's header; another provider's header is ignored", async () => {
+    let n = 0;
+    const send = vi.fn(async () => {
+      const res = n++ === 0
+        ? sse([{ model: "openai/gpt-oss-120b", choices: [{ delta: { tool_calls: [{ index: 0, id: "c1", type: "function", function: { name: "search_knowledge", arguments: "{\"query\":\"Leeroy\"}" } }] } }] }])
+        : sse([{ model: "@cf/openai/gpt-oss-20b", choices: [{ delta: { content: "A paladin." } }] }]);
+      res.headers.set("x-everloot-provider", n === 1 ? "Groq" : "Cloudflare");
+      return res;
+    });
+    const r = await answerFree({ history: [], question: "who is leeroy", tools: TOOLS, send: send as never, site: site([]) }, "who is leeroy");
+    expect(r.model).toBe("@cf/openai/gpt-oss-20b (Cloudflare)");
+    const own = vi.fn(async () => { const res = sse([{ model: "m1", choices: [{ delta: { content: "Hi." } }] }]); res.headers.set("x-everloot-provider", "Spoofed"); return res; });
+    expect((await answer({ provider: chatProvider("openrouter")!, model: "m", key: "k", history: [], question: "q", tools: TOOLS, send: own as never, site: site([]) })).model).toBe("m1");
+  });
+
   test("errors from the proxy are labelled with its name, since it has no host of its own", async () => {
     const http = vi.fn(async () => new Response(JSON.stringify({ error: { message: "nope" } }), { status: 401 }));
     await expect(answer({ provider: FREE_PROVIDER, model: "m", key: "", history: [], question: "q", tools: TOOLS, send: http as never, site: site([]) }))
