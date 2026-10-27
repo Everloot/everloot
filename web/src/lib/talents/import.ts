@@ -27,7 +27,7 @@ export type ImportResult =
   | { ok: true; ranks: Ranks; minLevel: number; report: ImportReport; order?: ImportedOrder }
   | { ok: false; message: string };
 
-const DECODE_MESSAGES: Record<DecodeError, string> = {
+export const DECODE_MESSAGES: Record<DecodeError, string> = {
   empty: "Paste a share code or a link first.",
   "not-base64url": "That is not a share code. Codes start with EL1 and use letters, digits, - and _ only.",
   malformed: "That share code is damaged or cut short.",

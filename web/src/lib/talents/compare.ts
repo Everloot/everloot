@@ -1,4 +1,4 @@
-import { importPlan, type ImportReport } from "./import";
+import { DECODE_MESSAGES, importPlan, type ImportReport } from "./import";
 import { prefixRanks } from "./order";
 import { nodeMap, pointsAtLevel, pointsSpent, rankOf } from "./rules";
 import { decodeBuild } from "./share";
@@ -130,8 +130,10 @@ function load(catalog: TalentCatalog, side: Side, input: PlanInput): ComparedPla
   const { code, order } = input.order === undefined ? planRef(input.code) : { code: planRef(input.code).code, order: input.order || null };
   const plan = `Plan ${LETTER[side]}`;
   if (!code) return { side, message: `${plan} is empty. Paste a share code or a calculator link.` };
+  // The value must read as a code whole. The import also reads links, and would find a code inside text that is not one.
   const decoded = decodeBuild(code);
-  if (decoded.ok && decoded.build.classSlug !== catalog.classSlug) {
+  if (!decoded.ok) return { side, message: `${plan}: ${DECODE_MESSAGES[decoded.error]}` };
+  if (decoded.build.classSlug !== catalog.classSlug) {
     return { side, message: `${plan} is a ${titleCase(decoded.build.classSlug)} code. Both plans must be ${catalog.className} plans to compare them here.` };
   }
   const result = importPlan(catalog, code, order);

@@ -290,6 +290,17 @@ describe("a damaged code or order", () => {
     expect(c.milestones).toBeNull();
   });
 
+  test("a value that does not read whole is refused before the import, which would find the code inside it", () => {
+    const nested = `${p}!damaged?plan=${p}!tail`;
+    // From the comparison's address, escaped as the page writes it.
+    const sent = readCompareHash(compareHash({ code: nested, order: null }, { code: p, order: null }));
+    expect(sent.a).toEqual({ code: nested, order: null });
+    expect(errors(comparePlans(fixture, sent.a!, sent.b!))).toEqual([{ side: "a", message: notACode }]);
+    // From a calculator link's #plan=, on either side.
+    expect(errors(comparePlans(fixture, { code: link(`plan=${nested}`) }, { code: p }))).toEqual([{ side: "a", message: notACode }]);
+    expect(errors(comparePlans(fixture, { code: p }, { code: link(`plan=${nested}&order=${t}`) }))).toEqual([{ side: "b", message: notACode.replace("Plan A", "Plan B") }]);
+  });
+
   test("a link copied with spaces or a line break around it still reads", () => {
     expect(planRef(`  ${link(`plan=${p}&order=${t}`)}\n`)).toEqual({ code: p, order: t });
   });

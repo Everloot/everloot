@@ -214,6 +214,18 @@ test("a damaged code in the address fails with its side named; a damaged order k
   expect(container.querySelector("[data-level-order]")!.textContent).toBe("Level by level needs both plans' spend orders, and plan A has none this page can use.");
 });
 
+test("a value with a code inside it is refused from the address and from a pasted link, not read as the code inside", async () => {
+  const nested = `${code(P)}!damaged?plan=${code(P)}!tail`;
+  await open(`#a=${encodeURIComponent(nested)}&b=${code(P)}`);
+  expect(status()).toBe(NOT_A_CODE);
+  expect(container.querySelector("[data-comparison]")).toBeNull();
+
+  await type("a", `https://everloot.app/tools/talents/mage#plan=${nested}`);
+  await compare();
+  expect(status()).toBe(NOT_A_CODE);
+  expect(container.querySelector("[data-comparison]")).toBeNull();
+});
+
 test("a pasted calculator link is read whole: a damaged order compares the talents without levels and stays in the address as it came", async () => {
   await open("");
   const damaged = `${t(P, leftFirst)}!damaged`;
