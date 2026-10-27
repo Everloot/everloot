@@ -139,6 +139,20 @@ export function inlineText(inline: Inline[], tokenWord = "X"): string {
   return inline.map((i) => (i.kind === "text" ? i.text : tokenWord)).join("");
 }
 
+/** A Markdown link in a text run that the site draws: `[text](https://…)` or `[text](/path)`. Other forms stay text. */
+export const MARKDOWN_LINK = /\[([^\]\n]+)\]\((https:\/\/[^)\s]+|\/[^)\s]*)\)/g;
+
+const WIKI_PAGE_ADDRESS = /^(?:(?:https:)?\/\/(?:www\.)?everloot\.app)?\/wiki\/([^?#]*)/;
+
+/**
+ * The wiki page a link's address points at: "deadmines" for `/wiki/deadmines`, also with a trailing slash, a query or a
+ * fragment, or written out in full on everloot.app. Null for any other address, the hub included. The rest of the path
+ * is kept as written, so an address in any other spelling names no page.
+ */
+export function wikiLinkTarget(href: string): string | null {
+  return WIKI_PAGE_ADDRESS.exec(href)?.[1].replace(/\/+$/, "") || null;
+}
+
 const LIST_ITEM = /^\s*(?:[-*+]|\d+\.)\s+/;
 
 /** Splits a page file into its front matter (parsed YAML) and body blocks. Throws when the front matter is missing or not YAML. */

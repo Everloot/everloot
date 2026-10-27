@@ -91,6 +91,16 @@ test("tokens link to their database pages under the name rules, and [[links]] to
   expect(html).toContain("&quot;a short quote stays a quote&quot;");
 });
 
+test("a Markdown link into the wiki is drawn only to a published page; to a draft or a missing page it stays words, in every written form", async () => {
+  const html = await render("test-dungeon");
+  expect(html).toContain('<a href="/wiki/test-zone#history">the zone page</a> is published');
+  expect(html).toContain("while the draft, the draft in full and a page never written stay words.");
+  expect(html).not.toMatch(/href="[^"]*(?:test-draft|no-such-page)/);
+  // Links that are not wiki pages are drawn as before.
+  expect(html).toContain('<a href="https://worldofwarcraft.blizzard.com/en-us/news/1" rel="noopener">Blizzard&#x27;s post</a>');
+  expect(html).toContain('<a href="/database/zones/1436-westfall">the zone&#x27;s database page</a>');
+});
+
 test("the page shows title, summary, sections in type order, categories and Linked from, with no visible breadcrumb", async () => {
   const html = await render("test-dungeon");
   expect(html).toContain("<h1");

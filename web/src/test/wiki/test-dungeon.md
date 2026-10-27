@@ -32,6 +32,11 @@ The entrance lies in {zone:1436}, under the hills south of the main road. See [[
 itself, and [[test-draft]] is a draft, so it never becomes a link. Players reach it by road from the town
 in the middle of the zone, and the way down is easy to miss the first time.
 
+Markdown links follow the same rule: [the zone page](/wiki/test-zone#history) is published, so it stays a
+link, while [the draft](/wiki/test-draft/), [the draft in full](https://everloot.app/wiki/test-draft?from=here)
+and [a page never written](/wiki/no-such-page) stay words. [Blizzard's post](https://worldofwarcraft.blizzard.com/en-us/news/1)
+and [the zone's database page](/database/zones/1436-westfall) are not wiki pages.
+
 ## Before you go
 
 Go with a full group and someone who can heal. The tunnels are narrow, so pull one pack at a time, and
