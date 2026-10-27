@@ -6,6 +6,7 @@ import { classTalentChanges } from "./talents/freshness-records";
 import { fixture } from "./talents/fixture";
 import { importPlan } from "./talents/import";
 import { orderRefusalText, validateOrder } from "./talents/order";
+import { forSet } from "./talents/rules";
 import { encodeBuild, encodeOrder } from "./talents/share";
 import type { Ranks, TalentCatalog, TalentNode } from "./talents/types";
 
@@ -218,6 +219,18 @@ describe("guideFreshness", () => {
     expect(guideFreshness({ ...two, levels: { from: 10, to: 40 } }, tree("1.0.0.1"), changes([]), TODAY)).toMatchObject({ state: "current", reasons: [] });
     // A guide with one set has no second set to open.
     expect(guideFreshness(guide({ levels: { from: 10, to: 30 } }), tree("1.0.0.1"), changes([]), TODAY)).toMatchObject({ state: "current", reasons: [] });
+  });
+
+  test("the second set is read on its own schedule, as the calculator opens it: a refused order names the level its point comes at", () => {
+    // Talent 52 asks for 6 points spent elsewhere, and this order takes it at the set's 6th point, after only 5.
+    const ranks: Ranks = { 51: { rank: 5 }, 53: { rank: 2 }, 52: { rank: 1 } };
+    const order = [51, 51, 51, 51, 51, 52, 53, 53];
+    const two = guide({ code2: code(ranks), order2: token(ranks, order) });
+    const f = guideFreshness(two, tree("1.0.0.1"), changes([]), TODAY);
+    // The second set opens at level 40, so its 6th point comes at 40, not at 15 as the first set's would.
+    expect(f.sets[1].problems[0]).toContain("Talent 52 at level 40:");
+    const opened = importPlan(tree("1.0.0.1"), two.code2!, two.order2!, forSet(tree("1.0.0.1"), 1));
+    expect(opened.ok && opened.report.problems).toEqual(f.sets[1].problems);
   });
 
   test("a plan the tree's points or the guide's levels cannot hold is broken", () => {

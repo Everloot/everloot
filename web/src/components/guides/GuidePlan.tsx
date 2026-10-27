@@ -3,7 +3,7 @@ import type { GuideSet } from "@/lib/guide-freshness";
 import { absoluteUrl } from "@/lib/seo";
 import { planHash } from "@/lib/talents/import";
 import { orderSteps } from "@/lib/talents/order";
-import { entryAtRank, levelFor, nodeMap, pointsSpent } from "@/lib/talents/rules";
+import { entryAtRank, forSet, levelFor, nodeMap, pointsSpent } from "@/lib/talents/rules";
 import { buildTitle, summarizeBuild } from "@/lib/talents/summary";
 import type { Ranks, TalentCatalog } from "@/lib/talents/types";
 
@@ -51,14 +51,16 @@ function SetPlan({ catalog, set, copy }: { catalog: TalentCatalog; set: GuideSet
   const plan = set.plan;
   const points = plan ? pointsSpent(plan.ranks) : 0;
   const summary = plan && points > 0 ? summarizeBuild(catalog, plan.ranks) : null;
-  const steps = plan ? orderSteps(catalog, plan) : null;
+  // The levels the set's points come at, as the calculator lists them: the second set's wait for the level it opens at.
+  const schedule = forSet(catalog, set.set === 1 ? 0 : 1);
+  const steps = plan ? orderSteps(schedule, plan) : null;
   const [label, about] = orderLabel(set);
   const [lead, ...rest] = set.stale ? [] : set.changes;
   return (
     <div data-guide-set={set.set} className="space-y-2 rounded-card border border-line bg-panel p-4 text-sm text-fg-2">
       <h3 className="text-base font-semibold text-fg">Set {set.set}{summary ? `: ${buildTitle(catalog, summary)}` : ""}</h3>
       {plan
-        ? <p>{set.set === 1 ? `${points} talent points, the last at level ${levelFor(catalog, points)}.` : `${points} talent points. The second set opens at level ${catalog.rules.dualSpecLevel}.`}</p>
+        ? <p>{set.set === 1 ? `${points} talent points, the last at level ${levelFor(schedule, points)}.` : `${points} talent points. The second set opens at level ${levelFor(schedule, 1)}.`}</p>
         : <p>This set&apos;s code does not load on this tree.</p>}
       <p><span className="font-semibold text-fg">{label}</span> {about}</p>
       {plan && steps && steps.length > 0 && (

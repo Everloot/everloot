@@ -244,6 +244,16 @@ describe("a guide's page", () => {
     expect(plain).not.toMatch(/order2?=/);
   });
 
+  test("the second set's points are listed at the levels it gets them, from the level it opens at, as the calculator lists them", async () => {
+    stubGuides(SOME);
+    const two = [...dom(await page("frost-leveling")).querySelectorAll("[data-guide-set]")][1];
+    const steps = [...two.querySelectorAll("li")].map((li) => li.textContent);
+    expect(steps).toHaveLength(7);
+    expect(steps[0]).toBe("Level 40: Talent 51, rank 1");
+    expect(steps.at(-1)).toBe("Level 40: Talent 52, rank 1");
+    expect(visible(two.outerHTML)).toContain("7 talent points. The second set opens at level 40.");
+  });
+
   test("Copy for addon copies one set as a full calculator link under that set's own pair, and says how to import it and what addon 0.3.12 cannot do", async () => {
     stubGuides(SOME);
     const html = await page("frost-leveling");

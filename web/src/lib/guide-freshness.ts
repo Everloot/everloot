@@ -3,7 +3,7 @@ import { MIN_PROSE_WORDS, proseWords } from "../../../kb/src/wiki/check";
 import type { Guide } from "./guides";
 import { codeFreshness, compareGameBuilds, freshnessLines, type ClassTalentChanges, type PlanFreshness } from "./talents/freshness";
 import { importPlan } from "./talents/import";
-import { levelFor, pointsAtLevel, pointsSpent } from "./talents/rules";
+import { forSet, levelFor, pointsAtLevel, pointsSpent } from "./talents/rules";
 import type { PlanSet, TalentCatalog } from "./talents/types";
 
 // How current a published guide still is, for its readers: whether its plan still fits the talent tree, whether the
@@ -73,7 +73,9 @@ function afterReview(f: PlanFreshness, build: string | null): PlanFreshness {
 }
 
 function readSet(set: 1 | 2, code: string, order: string | null, guide: GuidePlanFields, catalog: TalentCatalog, changes: ClassTalentChanges): GuideSet {
-  const opened = importPlan(catalog, code, order);
+  // The levels the set's points come at, as the calculator gives them: the second set's wait for the level it opens at.
+  const schedule = forSet(catalog, set === 1 ? 0 : 1);
+  const opened = importPlan(catalog, code, order, schedule);
   if (!opened.ok) return { set, code, order, plan: null, problems: [opened.message], changes: [], stale: false, sinceReview: [] };
   // The calculator's own sentences for what did not place and why the order was lost. Its first, when the code was made
   // on another build, is for the change records to explain (`changes`).
@@ -81,13 +83,13 @@ function readSet(set: 1 | 2, code: string, order: string | null, guide: GuidePla
   const problems = report.problems.slice(report.codeBuild === report.treeBuild ? 0 : 1);
   if (opened.set.orderOrigin === "provisional") problems.push(PROVISIONAL);
   const asked = pointsSpent(opened.requested);
-  const most = pointsAtLevel(catalog, catalog.rules.maxLevel);
-  const needs = levelFor(catalog, asked);
+  const most = pointsAtLevel(schedule, catalog.rules.maxLevel);
+  const opens = levelFor(schedule, 1);
+  const needs = levelFor(schedule, asked);
   if (asked > most) problems.push(`It spends ${asked} points, and this tree gives ${most} by level ${catalog.rules.maxLevel}.`);
+  // A guide that ends before its second set opens cannot use that set.
+  else if (set === 2 && opens > guide.levels.to) problems.push(`The second set opens at level ${opens}, after this guide's levels end.`);
   else if (needs > guide.levels.to) problems.push(`It needs level ${needs}, above level ${guide.levels.to}, the last this guide covers.`);
-  // The second set opens at the level the tree's rules set; a guide that ends before it cannot use the set.
-  const opens = catalog.rules.dualSpecLevel;
-  if (set === 2 && opens > guide.levels.to) problems.push(`The second set opens at level ${opens}, after this guide's levels end.`);
   const f = codeFreshness(catalog, changes, code);
   const since = f && afterReview(f, guide.reviewed?.build ?? null);
   const stale = since !== null && (since.touched.length > 0 || since.pointLevels.length > 0);
