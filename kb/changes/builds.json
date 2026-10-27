@@ -46,7 +46,24 @@
         "us"
       ],
       "firstSeen": "2026-10-22T19:27:13.893Z",
-      "lastSeen": "2026-10-23T20:19:57.398Z",
+      "lastSeen": "2026-10-27T00:45:35.450Z",
+      "status": "queued"
+    },
+    {
+      "key": "wow_classic_era:5604ce35a8644bdcf0e26c1daf979c15",
+      "product": "wow_classic_era",
+      "buildConfig": "5604ce35a8644bdcf0e26c1daf979c15",
+      "buildId": 70576,
+      "version": "1.15.9.70576",
+      "regions": [
+        "cn",
+        "eu",
+        "kr",
+        "tw",
+        "us"
+      ],
+      "firstSeen": "2026-10-27T00:45:35.450Z",
+      "lastSeen": "2026-10-27T00:45:35.450Z",
       "status": "queued"
     }
   ]
