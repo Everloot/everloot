@@ -297,9 +297,10 @@ export default function ApiKeys() {
     setConfirming(null);
   }, [confirming, state]);
 
-  // Every change, this list's own included, comes back through the event, so the list reads its keys again.
+  // Every change, this list's own included, comes back through the event, so the list reads its keys again. The event
+  // only follows a change that succeeded, so an error left from an earlier failed try is out of date and goes too.
   useEffect(() => {
-    const again = () => setReload((n) => n + 1);
+    const again = () => { setReload((n) => n + 1); setError(null); };
     window.addEventListener(KEYS_CHANGED_EVENT, again);
     return () => window.removeEventListener(KEYS_CHANGED_EVENT, again);
   }, []);

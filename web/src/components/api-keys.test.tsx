@@ -540,6 +540,27 @@ test("finishing Remove access leaves focus where the user moved it meanwhile", a
   expect(document.activeElement).toBe(other);
 });
 
+test("a revoke that succeeds elsewhere clears the error the list kept from its own failed try", async () => {
+  let deletes = 0;
+  let revoked: string | null = null;
+  vi.stubGlobal("fetch", async (_url: string, init?: RequestInit) => {
+    if (init?.method !== "DELETE") return Response.json(ready({ keys: [{ ...KEY, revoked_at: revoked }] }));
+    if (++deletes === 1) return Response.json({ ok: false, error: "Keys are temporarily unavailable." }, { status: 503 });
+    revoked = "2026-10-27T00:00:00Z";
+    return Response.json({ ok: true });
+  });
+  await act(async () => root.render(<>{both}<KeysRefresh /></>));
+  await click("Revoke bot");
+  await click("Revoke key");
+  expect(container.querySelector('[role="alert"]')?.textContent).toBe("Keys are temporarily unavailable.");
+  await click("Remove access for bot");
+  await act(async () => buttonsNamed("Revoke key")[1]!.click());
+  expect(deletes).toBe(2);
+  expect(row().textContent).toContain("Revoked 2026-10-27");
+  expect(said()).toBe("Access removed for bot (evl_…beef).");
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+});
+
 test("an open Roll question closes once the key is revoked elsewhere, and focus moves to the key's row", async () => {
   let revoked: string | null = null;
   vi.stubGlobal("fetch", async () => Response.json(ready({ keys: [{ ...KEY, revoked_at: revoked }] })));
