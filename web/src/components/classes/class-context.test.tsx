@@ -207,6 +207,17 @@ describe("the spell list", () => {
     expect(all).not.toContain("data-class-context");
   });
 
+  test("the talent catalog subset carries the quiet unconfirmed marker beside its explanation", async () => {
+    await names();
+    const chip = (html: string) => new DOMParser().parseFromString(html, "text/html").querySelector("[data-class-context]")!;
+    const subset = chip(await spells({ class: "mage" }));
+    expect(subset.textContent).toContain("Spells in the Mage talent catalog only, not every Mage spell.");
+    expect(subset.querySelector('[data-badge="files"]')?.getAttribute("title")).toBe("From the game files, not yet confirmed by players");
+    // Listing every spell because the catalog could not be read is no catalog fact, and carries no marker.
+    files.withdrawn = true;
+    expect(chip(await spells({ class: "mage" })).querySelector('[data-badge="files"]')).toBeNull();
+  });
+
   test("a remembered class used from a later page opens the first page of its subset, not a page the subset lacks", async () => {
     const catalog = [...new Set((await loadCatalog("mage")).nodes.flatMap((n) => n.entries.map((e) => e.spellId)).filter((id): id is number => id !== null))];
     files.spells = { version: "1.60.1.70630", names: new Map([...catalog.map((id): [number, string] => [id, `Talent ${id}`]), ...Array.from({ length: 150 }, (_, n): [number, string] => [9_000_000 + n, `Other ${n}`])]) };

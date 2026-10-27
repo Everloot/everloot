@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import ClassContextChip from "@/components/classes/ClassContextChip";
 import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column } from "@/components/ui";
+import Badge from "@/components/ui/Badge";
 import { classLabel, hasClassContext, parseClassContext, withClassContext, withoutClassContext, type ClassContext, type ClassSlug } from "@/lib/class-context";
 import { loadSpellNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";
@@ -91,7 +92,10 @@ export default async function SpellListPage(props: { searchParams?: Promise<Sear
           clearHref={clear}
         />
         <ClassContextChip read={read} here={withoutClassContext("/database/spells", search)}>
-          {context && (subset ? `${subset} only, not every ${className} spell.` : `The ${className} talent catalog could not be read, so every spell is listed.`)}
+          {/* The catalog is from the game files: its subset carries the quiet unconfirmed marker (DATA_POLICY.md, the talent catalog). */}
+          {context && (subset
+            ? <span>{`${subset} only, not every ${className} spell.`} <Badge tone="files" /></span>
+            : `The ${className} talent catalog could not be read, so every spell is listed.`)}
         </ClassContextChip>
         <div className="mt-2">
           <DataTable
