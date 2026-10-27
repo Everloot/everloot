@@ -191,6 +191,7 @@ describe("plan links", () => {
     expect(readPlanHash(planHash(first, second, null, secondOrder))).toEqual({ first, second, firstOrder: null, secondOrder });
     // An order without its set has nothing to order.
     expect(planHash(null, second, firstOrder, secondOrder)).toBe(`#plan2=${second}&order2=${secondOrder}`);
+    expect(readPlanHash(`#plan2=${second}&order2=${secondOrder}`)).toEqual({ first: null, second, firstOrder: null, secondOrder });
     expect(planHash(first, null, firstOrder, secondOrder)).toBe(`#plan=${first}&order=${firstOrder}`);
   });
 
@@ -235,7 +236,7 @@ describe("importCode with a spend order", () => {
   test("an unsupported, mismatched, newer or damaged order keeps the talents and reports the order unknown", () => {
     const cases: [string, string, string][] = [
       ["O1x-ABABABABABCCD", "unsupported-mode", "The plan's spend order is of a kind this tool does not read, so the order is unknown. The talents still loaded."],
-      ["O2p-ABABABABABCCD", "newer-version", "The plan's spend order was made by a newer version of this tool, so the order is unknown. Reload the page to read it. The talents still loaded."],
+      ["O2p-ABABABABABCCD", "newer-version", "The plan's spend order was made by a newer version of this tool, so the order is unknown. Reload the page, and if it is still unknown, ask the person who shared it to share it again. The talents still loaded."],
       ["O1p-ABABABABABCCDD", "extra-points", "The plan's spend order lists points the code does not have, so the order is unknown. The talents still loaded."],
       ["O1p-ABABABABABCD", "missing-points", "The plan's spend order leaves out points the code has, so the order is unknown. The talents still loaded."],
       [`O1p-${"A".repeat(65)}`, "over-limit", "The plan's spend order is for more than 64 points, the most an order carries, so the order is unknown. The talents still loaded."],
@@ -262,6 +263,26 @@ describe("importCode with a spend order", () => {
       "1 talent in the code is not in this tree and was left out: node 777 (1 point).",
       "Not every point in the code placed on this tree, so the plan's spend order is unknown.",
     ]);
+  });
+
+  test("a rank cut back or a point the rules reject also leaves the order unknown", () => {
+    const notPlaced = "Not every point in the code placed on this tree, so the plan's spend order is unknown.";
+    const cases: [Ranks, Ranks, unknown][] = [
+      // Talent 11 has 5 ranks at most.
+      [{ 11: { rank: 6 } }, { 11: { rank: 5 } }, "Talent 11: the code asked for rank 6, but the most this tree allows is 5."],
+      // Row 4 opens at 16 points in its tree, and Talent 22 needs Talent 12.
+      [{ 41: { rank: 1 } }, {}, expect.stringMatching(/^Talent 41: 1 point not placed\. /)],
+      [{ 11: { rank: 5 }, 22: { rank: 1 } }, { 11: { rank: 5 } }, expect.stringMatching(/^Talent 22: 1 point not placed\. /)],
+    ];
+    for (const [asked, placed, problem] of cases) {
+      const label = JSON.stringify(asked);
+      const points = Object.entries(asked).flatMap(([id, r]) => Array<number>(r.rank).fill(Number(id)));
+      const result = importCode(fixture, encodeBuild({ ...shared, ranks: asked }), encodeOrder(asked, points, "planned"));
+      if (!result.ok) throw new Error(`expected ok for ${label}`);
+      expect(result.ranks, label).toEqual(placed);
+      expect(result.order, label).toEqual({ known: false, reason: "not-placed" });
+      expect(result.report.problems, label).toEqual([problem, notPlaced]);
+    }
   });
 
   test("who made the order comes from the token, never from how it arrived", () => {

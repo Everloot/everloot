@@ -13,7 +13,9 @@ export interface ImportReport {
   problems: string[];
 }
 
-/** The spend order that came with a code: known, with who made it, or unknown and why. */
+/** The spend order that came with a code: known, with who made it, or unknown and why. Known only
+ *  means the token's points match the talents that loaded; whether each point could be spent at its
+ *  place in the order is a separate check against the tree's rules. */
 export type ImportedOrder =
   | { known: true; origin: OrderOrigin; order: number[] }
   | { known: false; reason: OrderError | "not-placed" };
@@ -31,7 +33,7 @@ const DECODE_MESSAGES: Record<DecodeError, string> = {
 
 const ORDER_MESSAGES: Record<OrderError | "not-placed", string> = {
   malformed: "The plan's spend order is damaged, so the order is unknown. The talents still loaded.",
-  "newer-version": "The plan's spend order was made by a newer version of this tool, so the order is unknown. Reload the page to read it. The talents still loaded.",
+  "newer-version": "The plan's spend order was made by a newer version of this tool, so the order is unknown. Reload the page, and if it is still unknown, ask the person who shared it to share it again. The talents still loaded.",
   "unsupported-mode": "The plan's spend order is of a kind this tool does not read, so the order is unknown. The talents still loaded.",
   "over-limit": `The plan's spend order is for more than ${ORDER_LIMIT} points, the most an order carries, so the order is unknown. The talents still loaded.`,
   "extra-points": "The plan's spend order lists points the code does not have, so the order is unknown. The talents still loaded.",

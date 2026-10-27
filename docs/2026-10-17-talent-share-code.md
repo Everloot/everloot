@@ -23,9 +23,11 @@ addon's `/everloot talents` prints a code the site can open.
   - `rank`: the target rank, 1 to 50.
   - `choice`: optional, the zero-based entry of a choice node (the same index Blizzard's loadout
     string uses).
-  - Items are in spend order, which is what "next point to spend" follows. A node that is not listed
-    is planned at zero. At most 600 items, and a node id may appear only once (a reader rejects
-    duplicates). Trailing `=` padding is ignored on read but never written.
+  - The site writes items in numerically ascending node id order, and a reader accepts any order.
+    Item order is not a spend order, although addon 0.3.12 still names its next point to spend from
+    it; see "Spend order" below. A node that is not listed is planned at zero. At most 600 items,
+    and a node id may appear only once (a reader rejects duplicates). Trailing `=` padding is
+    ignored on read but never written.
 - `build` is digits in dot-separated groups with at least two groups, the same shape as the upload
   `clientBuild`.
 
@@ -44,21 +46,27 @@ reaches the server, so a shared build stays private, and it still opens in the b
 
 A plan can carry the order its points are spent in. The order is a token of its own next to the
 code, never part of it, so every EL1 code, link and addon example stays byte for byte what it was.
+A code without an order token has no known spend order: a reader treats the order as unknown and
+must not derive one from item order or node ids.
 
     O1<mode>-<sequence>
 
-- `O1`: order format version. Bump it for any change a version 1 reader would misread, a new mode
-  included. `O2` and later are newer than a version 1 reader; `O0` and `O01` are damaged.
-- `mode`: who made the order. It is read from the token only, never from how the plan arrived (a
-  link, a paste, a saved build or the addon).
+- `O1`: order format version, in digits with no leading zero. Bump it for any change a version 1
+  reader would misread, a new mode included. `O2` and later are newer than a version 1 reader,
+  whatever follows the number; `O0` and `O01` are malformed.
+- `mode`: one lowercase letter saying who made the order. It is read from the token only, never
+  from how the plan arrived (a link, a paste, a saved build or the addon).
   - `p`, planned: the player planned it.
   - `g`, provisional: a tool generated it.
 
-  Version 1 has only these two. Any other letter is an unsupported mode.
-- `sequence`: one character per point, in spend order. Each character is a node's index among the
-  code's nodes that have points, sorted by ascending node id, written in the base64url alphabet of
-  RFC 4648 section 5 (`A` is 0, `_` is 63). The order of the payload's items never changes an
-  index. Each node appears exactly as many times as its rank in the code.
+  Version 1 defines only these two: any other lowercase letter is an unsupported mode. Anything else
+  in that place (an uppercase letter, two letters, no letter) makes the token malformed; a digit
+  there is part of the version number.
+- `sequence`: one or more characters, one per point, in spend order. Each character is a node's
+  index among the code's nodes that have points, sorted by numerically ascending node id (9 before
+  10), written in the base64url alphabet of RFC 4648 section 5 (`A` is 0, `_` is 63). The order of
+  the payload's items never changes an index. Each node appears exactly as many times as its rank
+  in the code.
 - At most 64 points, and so at most 64 nodes: one character per point from a 64-character alphabet.
   That is a limit of the token, not a game rule. A plan with more points gets no order token.
 
@@ -69,16 +77,21 @@ A reader checks the token against the code it came with:
 
 | Token | Error |
 |---|---|
-| not `O<version><mode>-<sequence>` in base64url | `malformed` |
+| not `O`, a version, a mode letter, `-` and a sequence as above | `malformed` |
 | a version above 1 | `newer-version` |
-| a mode other than `p` or `g` | `unsupported-mode` |
+| a lowercase mode letter other than `p` or `g` | `unsupported-mode` |
 | more than 64 characters, or a code with more than 64 points | `over-limit` |
 | a node more often than its rank, or an index past the code's nodes | `extra-points` |
 | a node less often than its rank | `missing-points` |
 
-Whatever the error, the talents load as the code has them and the order is unknown. The site also
-calls the order unknown when not every point of the code places on the tree on screen, because the
-order names points the build no longer holds.
+Whatever the error, the talents load exactly as they would without the order, and the order is
+unknown. The web importer (`importCode`) also calls the order unknown when not every point of the
+code places on the tree on screen, because the order names points the build no longer holds.
+
+A known order only means the token's points match the talents that loaded. Whether each point could
+be spent at its place in the order (row gates, prerequisites, the level each point arrives at) is a
+separate check against the tree's rules, and reading the token does not make it. The calculator does
+not read or keep orders yet.
 
 ### Orders in a link
 
@@ -87,9 +100,10 @@ Each set's order rides after both codes: the first set's after `&order=`, the se
 
     /tools/talents/mage#plan=EL1-...&plan2=EL1-...&order=O1p-...&order2=O1g-...
 
-The codes keep their places, so a reader that stops at `&` (the addon, and the site before orders)
-reads both sets as before and ignores the orders. An order is left out when its set has no code. A
-link without orders is the same address as before.
+The codes keep their places, and a reader that stops at `&` ignores the orders: the site before
+orders still reads both sets, and the addon still reads the one set it always read (the first set,
+or the second when the link carries only that one). An order is left out when its set has no code.
+A link without orders is the same address as before.
 
 ## Not this format
 
