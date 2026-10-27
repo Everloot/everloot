@@ -4,7 +4,7 @@ import { TALENT_CLASSES as PROTOCOL_TALENT_CLASSES } from "@everloot/protocol";
 import { describe, expect, test } from "vitest";
 import { CURRENT_VERSION } from "../game-version";
 import { CatalogError, normalizeCatalog } from "./adapter";
-import { TALENT_CLASSES, loadCatalog } from "./catalogs";
+import { TALENT_CLASSES, isTalentClass, loadCatalog } from "./catalogs";
 import { add, isLegal, pointsAtLevel, pointsSpent, remove } from "./rules";
 import { decodeBuild, encodeBuild, resolveBuild } from "./share";
 import type { Ranks } from "./types";
@@ -15,6 +15,13 @@ const BUILD = CURRENT_VERSION.build;
 
 test("the protocol's class list is the site's, in the same order, so the MCP talent tools and the pages agree", () => {
   expect([...PROTOCOL_TALENT_CLASSES]).toEqual(TALENT_CLASSES);
+});
+
+test("only the class list's own names are classes, never a name every object inherits", () => {
+  for (const slug of TALENT_CLASSES) expect(isTalentClass(slug), slug).toBe(true);
+  for (const slug of ["constructor", "toString", "hasOwnProperty", "__proto__", "valueOf", "Mage", ""]) {
+    expect(isTalentClass(slug), slug).toBe(false);
+  }
 });
 
 describe.each(TALENT_CLASSES)("%s game data", (slug) => {
