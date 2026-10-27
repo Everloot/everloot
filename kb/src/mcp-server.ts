@@ -41,7 +41,7 @@ import {
   changesUrl, collectionsUrl, ECOSYSTEM_URL, goldLedgerUrl, guildBoardUrl, guildPageUrl, guildsUrl, itemPageUrl, ITEMS_URL, loreUrls, mapSpotUrl, marketItemUrl,
   npcPageUrl, npcUrl, objectPageUrl, professionsUrl, questPageUrl, vendorPageUrl, withMore,
 } from "./page-urls.js";
-import { getByName, getDocument, getEntity, search, type SearchHit } from "./search.js";
+import { getByName, getDocument, getEntity, search, searchSomeWords, type SearchHit } from "./search.js";
 
 export const SERVER_NAME = "everloot-knowledge";
 export const SERVER_VERSION = "0.8.0";
@@ -450,18 +450,25 @@ function formatHits(db: DB, hits: SearchHit[]): string {
   return withPages(db, hits).map((h) => withMore(`[${h.kind}/${h.gameVersion}] ${h.name}\n${h.snippet}\nSource: ${h.sourceUrl} (${h.licence}, retrieved ${h.retrievedAt})`, h.url)).join("\n\n");
 }
 
+/** The line a search answer starts with when the hits match only some of the asked words. */
+export const SOME_WORDS = "No page has every word you asked for. Pages with some of them:";
+
+/** The hits for every asked word, or, when no page has them all, the pages with some of them. */
+function searchResult(db: DB, args: SearchArgs): { hits: SearchHit[]; some: boolean } {
+  const opts = { kinds: args.kind ? [args.kind] : undefined, versions: args.version ? [args.version] : undefined };
+  const hits = search(db, args.query, args.limit, opts);
+  return hits.length ? { hits, some: false } : { hits: searchSomeWords(db, args.query, args.limit, opts), some: true };
+}
+
 /** Pure handlers — tested directly; the MCP registration below is a thin wrapper. */
 export function searchHits(db: DB, args: SearchArgs): SearchHit[] {
-  return search(db, args.query, args.limit, {
-    kinds: args.kind ? [args.kind] : undefined,
-    versions: args.version ? [args.version] : undefined,
-  });
+  return searchResult(db, args).hits;
 }
 
 export function handleSearch(db: DB, args: SearchArgs): string {
-  const hits = searchHits(db, args);
+  const { hits, some } = searchResult(db, args);
   if (hits.length === 0) return "No matches. Try fewer or different words.";
-  return formatHits(db, hits);
+  return some ? `${SOME_WORDS}\n\n${formatHits(db, hits)}` : formatHits(db, hits);
 }
 
 /** A tool answer: the text every client gets, plus structured content for tools with an output schema. */

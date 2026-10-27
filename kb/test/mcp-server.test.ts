@@ -16,6 +16,8 @@ import {
   handleGetEntity,
   handleSearch,
   registeredToolNames,
+  searchHits,
+  SOME_WORDS,
 } from "../src/mcp-server.js";
 import type { GuildReader } from "../src/guilds.js";
 import { CREDIT_LINE, MCP_CREDIT } from "@everloot/protocol";
@@ -51,6 +53,16 @@ test("search handler answers questions and shows provenance", async () => {
 
 test("search handler says so when nothing matches", async () => {
   expect(handleSearch(await seed(), { query: "xyznothinghere", limit: 8 })).toContain("No matches");
+});
+
+test("search handler falls back to pages with some of the words, and says so first", async () => {
+  // Found live: "whats the best racial class for warlock on horde" matched no page, so the chat had nothing.
+  const db = await seed();
+  const text = handleSearch(db, { query: "best sword Thunderfury", limit: 8 });
+  expect(text.startsWith(SOME_WORDS)).toBe(true);
+  expect(text).toContain("Thunderfury, Blessed Blade");
+  expect(searchHits(db, { query: "best sword Thunderfury", limit: 8 }).map((h) => h.name)[0]).toBe("Thunderfury, Blessed Blade");
+  expect(handleSearch(db, { query: "Thunderfury", limit: 8 })).not.toContain(SOME_WORDS);
 });
 
 test("get_entity handler returns the row or names the missing id", async () => {
