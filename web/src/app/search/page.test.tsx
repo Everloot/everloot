@@ -18,6 +18,10 @@ afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); vi.restoreAllMocks(); n
 const siteSearch = vi.hoisted(() => ({ groups: [] as unknown[], names: undefined as unknown }));
 const namesRead = vi.hoisted(() => ({ pending: null as Promise<unknown> | null }));
 vi.mock("@/lib/site-search", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/site-search")>()), siteSearch: async (_q: string, options: { names?: unknown }) => { siteSearch.names = options.names; await options.names; return siteSearch.groups; } }));
+vi.mock("@/lib/shown-item-names", () => ({ loadShownNames: async () => ({
+  facts: { rates: [], names: [], npcs: [], unreachable: false }, agreed: new Map(), matched: null,
+  named: { has: () => false }, showsTip: () => false,
+}) }));
 vi.mock("@/lib/shown-search-names", () => ({ loadShownSearchNames: () => namesRead.pending ?? Promise.resolve({ items: new Map(), npcs: new Map(), quests: new Map() }) }));
 const icons = vi.hoisted(() => ({ asked: [] as number[][], map: new Map<number, string>() }));
 vi.mock("@/lib/item-icons", () => ({ shownItemIcons: async (ids: number[]) => { icons.asked.push(ids); return icons.map; } }));
