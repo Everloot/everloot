@@ -4,9 +4,9 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { className } from "@/components/builds/describe";
 import { Card, CopyButton, Field, SectionHeading } from "@/components/ui";
 import {
-  BACKUP_TOO_LARGE, WORKSPACE_LIMITS, applyImport, bucketKey, copyPlan, deletePlan, deviceStorage, editPlan, exportBackup,
+  BACKUP_TOO_LARGE, WORKSPACE_LIMITS, applyImport, bucketKey, copyPlan, deletePlan, deviceStorage, editPlan, exportBackup, storedCounts,
   orderState, previewImport, readPlanText, readWorkspace, sameOwner, savePlan,
-  type Failure, type ImportPreview, type LocalPlan, type Owner, type PlanText, type ReadResult,
+  type Failure, type ImportPreview, type LocalPlan, type Owner, type PlanText, type PlayerWorkspace, type ReadResult,
 } from "@/lib/player-workspace";
 import { planHash, replacePlanHash } from "@/lib/talents/import";
 import { useWorkspaceOwner } from "./LocalPlanSave";
@@ -358,9 +358,23 @@ function previewLine(p: ImportPreview): string {
   return `Restoring ${said}.${kept}`;
 }
 
+/** Alt by alt, what a restore does to this device's alts, which a backup holds as well as the plans: each it adds,
+ *  and each it replaces with the backup's newer copy, saying whether that changes its notes. */
+function restoreLines(current: PlayerWorkspace, preview: ImportPreview): string[] {
+  const here = new Map(current.alts.map((a) => [a.id, a]));
+  return preview.result.alts.flatMap((alt) => {
+    const mine = here.get(alt.id);
+    if (!mine) return [`Adds the alt ${alt.name}.`];
+    if (JSON.stringify(mine) === JSON.stringify(alt)) return [];
+    return [`Replaces the alt ${mine.name} with the backup's newer copy${mine.notes === alt.notes ? ". Its notes stay as they are." : ", which changes its notes."}`];
+  });
+}
+
 /** Download a backup of this bucket, or restore one after seeing what it would do. */
 function Backup({ owner, onRestored }: { owner: Owner; onRestored: (result: { ok: true } | Failure, done: string) => void }) {
   const [preview, setPreview] = useState<ImportPreview | null>(null);
+  // Alt by alt, what the restore adds or replaces: a backup holds the alts too, notes and all.
+  const [altLines, setAltLines] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
   // Gone with its bucket: a file still being read when the account changes is not previewed for the next one.
@@ -396,6 +410,7 @@ function Backup({ owner, onRestored }: { owner: Owner; onRestored: (result: { ok
     const result = previewImport(text, now.workspace);
     if (!result.ok) { setError(result.message); return; }
     setPreview(result.preview);
+    setAltLines(restoreLines(now.workspace, result.preview));
   }
 
   function restore() {
@@ -421,6 +436,8 @@ function Backup({ owner, onRestored }: { owner: Owner; onRestored: (result: { ok
       {preview && (
         <div role="group" aria-label="What the restore would do" className="mt-4 space-y-3 rounded-control border border-line bg-canvas p-3">
           <p className="text-sm text-fg">{previewLine(preview)}</p>
+          {/* Two alts of one name read alike here, so a line is known by its place. */}
+          {altLines.map((line, i) => <p key={i} className="text-sm text-fg">{line}</p>)}
           {preview.warnings.length > 0 && (
             <ul className="list-disc space-y-1 pl-5 text-sm text-fg-2">{preview.warnings.map((w) => <li key={w}>{w}</li>)}</ul>
           )}
@@ -435,7 +452,8 @@ function Backup({ owner, onRestored }: { owner: Owner; onRestored: (result: { ok
 }
 
 /** Stored plans that do not read: kept as they are, with their text to download. Damaged ones can be cleared,
- *  after asking; a newer version's are left for that version to open. */
+ *  after saying everything that deletes and offering the download again; a newer version's are left for that
+ *  version to open. */
 function StoredProblem({ read, owner, onCleared }: { read: Extract<ReadResult, { ok: false }>; owner: Owner; onCleared: () => void }) {
   const [confirming, setConfirming] = useState(false);
   const raw = read.raw;
@@ -443,18 +461,38 @@ function StoredProblem({ read, owner, onCleared }: { read: Extract<ReadResult, {
     try { deviceStorage()?.removeItem(bucketKey(owner)); } catch { /* the read that follows says what is still there */ }
     onCleared();
   }
+  const download = (text: string) => saveFile(text, `everloot-plans-stored-${new Date().toISOString().slice(0, 10)}.txt`);
   return (
     <Card>
       <p role="alert" className="text-fg">{read.message}</p>
-      {raw !== null && (
+      {raw !== null && !confirming && (
         <div className="mt-4 flex flex-wrap gap-2">
-          <button type="button" className="btn text-sm" onClick={() => saveFile(raw, `everloot-plans-stored-${new Date().toISOString().slice(0, 10)}.txt`)}>Download what is stored</button>
-          {read.error === "corrupt" && (confirming
-            ? <button type="button" className="btn text-sm" onClick={clear}>Clear for good</button>
-            : <button type="button" className="btn text-sm" onClick={() => setConfirming(true)}>Clear stored plans</button>)}
+          <button type="button" className="btn text-sm" onClick={() => download(raw)}>Download what is stored</button>
+          {read.error === "corrupt" && <button type="button" className="btn text-sm" onClick={() => setConfirming(true)}>Clear stored plans</button>}
         </div>
       )}
-      {read.error === "corrupt" && <p className="mt-3 text-sm text-muted">Clearing removes them from this browser for good. Download them first to keep a copy.</p>}
+      {raw !== null && read.error === "corrupt" && confirming && (
+        <div role="group" aria-label="Clear what is stored" className="mt-4 space-y-3 rounded-control border border-line bg-canvas p-3">
+          <p className="text-sm text-fg">{clearingLine(raw, owner)}</p>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn text-sm" onClick={() => download(raw)}>Download what is stored</button>
+            <button type="button" className="btn text-sm" onClick={clear}>Clear for good</button>
+            <button type="button" className="btn text-sm" onClick={() => setConfirming(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {read.error === "corrupt" && !confirming && <p className="mt-3 text-sm text-muted">Clearing removes it from this browser for good. Download it first to keep a copy.</p>}
     </Card>
   );
+}
+
+/** Everything clearing a damaged bucket deletes, counted where the stored text allows: the bucket holds alts and
+ *  watches as well as plans, so all of them are named. */
+function clearingLine(raw: string, owner: Owner): string {
+  const whose = owner.kind === "account" ? "this account" : "this browser while signed out";
+  const counts = storedCounts(raw);
+  const held = counts
+    ? `Here that is ${plural(counts.plans, "plan")}, ${plural(counts.alts, "alt")} and ${plural(counts.watches, "watch", "watches")}${counts.notes > 0 ? `, with notes on ${counts.notes.toLocaleString("en-US")} of them` : ""}.`
+    : "It could not be read, so they cannot be counted.";
+  return `Clearing deletes everything stored on this device for ${whose}: its plans, alts and watches, and their notes. ${held} This cannot be undone, so download it first to keep a copy.`;
 }

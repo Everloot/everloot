@@ -3,7 +3,8 @@ import { readPlanHash } from "./talents/import";
 import { decodeBuild, decodeOrder, type OrderError, type OrderOrigin } from "./talents/share";
 
 // The plans, alts and watches a player keeps in this browser, with no account and nothing uploaded: the
-// PlayerWorkspace, format version 1.
+// PlayerWorkspace. This version writes format version 1, and reads version 2 too: version 2 gives alts more fields,
+// which this version does not use and keeps exactly as they are. A bucket stays in the version it was stored in.
 //
 // One bucket per owner, each under its own localStorage key: the browser signed out, and each account by its
 // stable user id, never its name. A plan saved in one bucket is shown in no other, so signing in, out or into
@@ -12,13 +13,17 @@ import { decodeBuild, decodeOrder, type OrderError, type OrderOrigin } from "./t
 //
 // Every read and write says what happened. A write reads the stored bucket, makes one change, checks the result
 // against the format and the limits, and stores it in one go: a plan another tab saved is kept, and nothing is
-// stored unless every step worked. Stored text that is not version 1 (damaged, or from a newer version) is left
+// stored unless every step worked. Stored text that does not read (damaged, or from a newer version) is left
 // exactly as it is. A backup is a bucket's own text; it restores only into the bucket it came from, after a
 // preview. A plan saved to an account (by a transfer, which is not made here) is bound to it and moves into that
 // account's bucket (bindTransferred).
 
 export const WORKSPACE_FORMAT = "everloot.player-workspace";
+/** The version a new bucket is stored in. */
 export const WORKSPACE_VERSION = 1;
+/** The newest version this version reads. A bucket in a newer one is left alone. */
+export const NEWEST_VERSION = 2;
+export type WorkspaceVersion = 1 | 2;
 
 /** What one bucket holds at most. Names, notes and codes have the account's own limits (saved-builds.ts), so a
  *  plan saved to an account later is never cut. Everything fits a backup of 1 MiB. */
@@ -48,7 +53,8 @@ export interface LocalPlan {
   boundTo: Binding | null;
 }
 
-/** An alt and the plans it uses; the alt planner adds the rest. */
+/** An alt and the plans it uses; the alt planner adds the rest. A version 2 alt has more fields, which this version
+ *  does not use: they stay on the alt as they were stored. */
 export interface LocalAlt { id: string; name: string; planIds: string[]; notes: string; updatedAt: string }
 
 /** A plan the player asked to hear about. */
@@ -56,7 +62,8 @@ export interface LocalWatch { id: string; planId: string; addedAt: string }
 
 export interface PlayerWorkspace {
   format: typeof WORKSPACE_FORMAT;
-  version: typeof WORKSPACE_VERSION;
+  /** The version the bucket is stored in, kept on every change. */
+  version: WorkspaceVersion;
   owner: Owner;
   plans: LocalPlan[];
   alts: LocalAlt[];
@@ -127,22 +134,27 @@ function isPlan(v: unknown, owner: Owner): v is LocalPlan {
     && owner.kind === "account" && boundTo.userId === owner.userId;
 }
 
-const isAlt = (v: unknown): v is LocalAlt => isRecord(v) && hasKeys(v, ALT_KEYS) && validId(v.id) && isName(v.name) && isNotes(v.notes)
-  && isDate(v.updatedAt) && Array.isArray(v.planIds) && v.planIds.every(validId);
+/** An alt's fields this version uses. Version 1 alts have exactly these; version 2 alts have them and more, the
+ *  rest kept as they are. */
+function isAlt(v: unknown, version: WorkspaceVersion): v is LocalAlt {
+  if (!isRecord(v) || !(version === 1 ? hasKeys(v, ALT_KEYS) : ALT_KEYS.every((k) => Object.hasOwn(v, k)))) return false;
+  return validId(v.id) && isName(v.name) && isNotes(v.notes) && isDate(v.updatedAt) && Array.isArray(v.planIds) && v.planIds.every(validId);
+}
 const isWatch = (v: unknown): v is LocalWatch => isRecord(v) && hasKeys(v, WATCH_KEYS) && validId(v.id) && validId(v.planId) && isDate(v.addedAt);
 
-/** Is `value` a version 1 workspace within the limits, every alt and watch naming a plan it holds? */
+/** Is `value` a workspace this version reads (version 1 or 2) within the limits, every alt and watch naming a plan
+ *  it holds? It comes back as it is, in its own version. */
 export function validateWorkspace(value: unknown): Validation {
   const refuse = (error: FormatError): Validation => ({ ok: false, error });
   if (!isRecord(value) || value.format !== WORKSPACE_FORMAT) return refuse("malformed");
   // A newer version may change everything after its number; say so rather than guess.
-  if (typeof value.version === "number" && Number.isInteger(value.version) && value.version > WORKSPACE_VERSION) return refuse("newer-version");
+  if (typeof value.version === "number" && Number.isInteger(value.version) && value.version > NEWEST_VERSION) return refuse("newer-version");
   const { version, owner, plans, alts, watches } = value;
-  if (version !== WORKSPACE_VERSION || !hasKeys(value, ["format", "version", "owner", "plans", "alts", "watches"]) || !isOwner(owner)) return refuse("malformed");
+  if ((version !== 1 && version !== 2) || !hasKeys(value, ["format", "version", "owner", "plans", "alts", "watches"]) || !isOwner(owner)) return refuse("malformed");
   if (!Array.isArray(plans) || !Array.isArray(alts) || !Array.isArray(watches)) return refuse("malformed");
   // Counts before contents, so an overlong list is refused before each entry is checked.
   if (plans.length > WORKSPACE_LIMITS.plans || alts.length > WORKSPACE_LIMITS.alts) return refuse("over-limit");
-  if (!plans.every((p) => isPlan(p, owner)) || !alts.every(isAlt) || !watches.every(isWatch)) return refuse("malformed");
+  if (!plans.every((p) => isPlan(p, owner)) || !alts.every((a) => isAlt(a, version)) || !watches.every(isWatch)) return refuse("malformed");
   if (![plans, alts, watches].every((list) => unique(list.map((item) => item.id)))) return refuse("malformed");
   if (alts.some((a) => a.planIds.length > WORKSPACE_LIMITS.altPlans)) return refuse("over-limit");
   const planIds = new Set(plans.map((p) => p.id));
@@ -197,6 +209,18 @@ export function readWorkspace(storage: DeviceStorage | null, owner: Owner): Read
   if (!checked.ok) return refuse(checked.error === "newer-version" ? "newer-version" : "corrupt");
   // A bucket holds its own owner's plans; one copied under another key is not shown.
   return sameOwner(checked.workspace.owner, owner) ? { ok: true, workspace: checked.workspace, raw } : refuse("corrupt");
+}
+
+/** What stored text that does not read holds, as far as it can be counted: its plans, alts and watches, and how many
+ *  of the plans and alts have notes. Null when it holds no list that can be counted. Nothing in it is checked. */
+export function storedCounts(raw: string): { plans: number; alts: number; watches: number; notes: number } | null {
+  let value: unknown;
+  try { value = JSON.parse(raw); } catch { return null; }
+  if (!isRecord(value) || ![value.plans, value.alts, value.watches].some(Array.isArray)) return null;
+  const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+  const [plans, alts, watches] = [list(value.plans), list(value.alts), list(value.watches)];
+  const notes = [...plans, ...alts].filter((item) => isRecord(item) && typeof item.notes === "string" && item.notes.trim() !== "").length;
+  return { plans: plans.length, alts: alts.length, watches: watches.length, notes };
 }
 
 const isQuota = (error: unknown) => error instanceof DOMException
@@ -360,7 +384,7 @@ export function bindTransferred(storage: DeviceStorage | null, sent: TransferReq
 
 // Backups.
 
-export type ImportError = FormatError | "too-large" | "other-owner";
+export type ImportError = FormatError | "too-large" | "other-owner" | "mixed-versions";
 
 const IMPORT_MESSAGES: Record<ImportError, string> = {
   "too-large": "That file is over 1 MiB, larger than a backup of a device's plans can be. Nothing was changed.",
@@ -369,6 +393,7 @@ const IMPORT_MESSAGES: Record<ImportError, string> = {
   "over-limit": `Restoring that backup would pass what this device keeps: ${WORKSPACE_LIMITS.plans} plans and ${WORKSPACE_LIMITS.alts} alts, all within 1 MiB. Nothing was changed.`,
   "bad-reference": "That backup is damaged: something in it names a plan it does not hold. Nothing was changed.",
   "other-owner": "That backup belongs to a different account. Nothing was changed.",
+  "mixed-versions": "That backup and this device keep their alts in two different formats, which this version of Everloot cannot put together. Nothing was changed.",
 };
 
 /** For a page that checks a file's size before reading it. */
@@ -394,10 +419,13 @@ export type PreviewResult = { ok: true; preview: ImportPreview } | { ok: false; 
 
 /** The fields of an item in one fixed order, to compare two copies whatever order their keys came in. */
 const fields = <T extends object>(item: T, keys: readonly string[]) => JSON.stringify(keys.map((k) => (item as Record<string, unknown>)[k]));
+/** Every field of a value, keys sorted at every level: an alt is compared whole, the fields this version does not
+ *  use included. */
+const whole = (value: unknown) => JSON.stringify(value, (_key, v: unknown) => (isRecord(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : v));
 
 /** This device's items with a backup's merged in by id: a new one is added, a newer one replaces this device's
- *  copy (through `pick`), and an older or equally old one leaves it as it is. */
-function merge<T extends { id: string }>(here: T[], backup: T[], keys: readonly string[], time: (item: T) => string, pick = (_mine: T, theirs: T) => theirs) {
+ *  copy (through `pick`), and an older or equally old one leaves it as it is. `same` says two copies are alike. */
+function merge<T extends { id: string }>(here: T[], backup: T[], same: (item: T) => string, time: (item: T) => string, pick = (_mine: T, theirs: T) => theirs) {
   const byId = new Map(here.map((item) => [item.id, item]));
   const counts = { added: 0, updated: 0, kept: 0, unchanged: 0 };
   const restored: T[] = [];
@@ -407,7 +435,7 @@ function merge<T extends { id: string }>(here: T[], backup: T[], keys: readonly 
       byId.set(theirs.id, theirs);
       counts.added++;
       restored.push(theirs);
-    } else if (fields(mine, keys) === fields(theirs, keys)) {
+    } else if (same(mine) === same(theirs)) {
       counts.unchanged++;
     } else if (Date.parse(time(theirs)) > Date.parse(time(mine))) {
       const next = pick(mine, theirs);
@@ -448,11 +476,16 @@ export function previewImport(text: string, current: PlayerWorkspace): PreviewRe
   if (!checked.ok) return refuse(checked.error);
   const backup = checked.workspace;
   if (!sameOwner(backup.owner, current.owner)) return refuse("other-owner", ownerRefusal(backup.owner, current.owner));
+  // The restored bucket is in the newer of the two versions, so no version 2 field is lost. This version cannot give
+  // a version 1 alt version 2's fields, so it does not put alts of the two versions together.
+  const version = backup.version > current.version ? backup.version : current.version;
+  const older = current.version < version ? current : backup.version < version ? backup : null;
+  if (older && older.alts.length > 0) return refuse("mixed-versions");
   // A restore never takes a binding away: this device's binding stays on the copy the backup brings back.
-  const plans = merge(current.plans, backup.plans, PLAN_KEYS, (p) => p.updatedAt, (mine, theirs) => ({ ...theirs, boundTo: mine.boundTo ?? theirs.boundTo }));
-  const alts = merge(current.alts, backup.alts, ALT_KEYS, (a) => a.updatedAt);
-  const watches = merge(current.watches, backup.watches, WATCH_KEYS, (w) => w.addedAt);
-  const result = { ...current, plans: plans.items, alts: alts.items, watches: watches.items };
+  const plans = merge(current.plans, backup.plans, (p) => fields(p, PLAN_KEYS), (p) => p.updatedAt, (mine, theirs) => ({ ...theirs, boundTo: mine.boundTo ?? theirs.boundTo }));
+  const alts = merge(current.alts, backup.alts, whole, (a) => a.updatedAt);
+  const watches = merge(current.watches, backup.watches, (w) => fields(w, WATCH_KEYS), (w) => w.addedAt);
+  const result = { ...current, version, plans: plans.items, alts: alts.items, watches: watches.items };
   const merged = validateWorkspace(result);
   if (!merged.ok) return refuse(merged.error);
   return {

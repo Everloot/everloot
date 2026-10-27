@@ -3,7 +3,8 @@ import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import AccountControls, { ACCOUNT_CHANGED_EVENT } from "@/components/AccountControls";
-import { bucketKey, type LocalPlan, type Owner, type PlayerWorkspace } from "@/lib/player-workspace";
+import { NEWEST_VERSION, bucketKey, type LocalPlan, type Owner, type PlayerWorkspace } from "@/lib/player-workspace";
+import { FIXTURE_PLAN_ID, V2_ALT_TEXT, V2_BUCKET_TEXT } from "@/lib/player-workspace.fixture";
 import DevicePlans from "./DevicePlans";
 import LocalPlanSave from "./LocalPlanSave";
 
@@ -416,6 +417,37 @@ test("a restore shows what it would do and changes nothing until Restore is pres
   expect(item("Future")?.textContent).toContain("Set 1: order from a newer version");
 });
 
+const restoreGroup = () => container.querySelector<HTMLElement>('[role="group"][aria-label="What the restore would do"]');
+
+test("a restore that replaces an alt's notes names the alt and says its notes change (reported case)", async () => {
+  localStorage.setItem(bucketKey(ANON), V2_BUCKET_TEXT);
+  const backup = JSON.parse(V2_BUCKET_TEXT);
+  backup.alts[0] = { ...backup.alts[0], notes: "Backup notes replace the local ones", updatedAt: "2026-10-27T12:00:00.000Z" };
+  await render();
+  await choose(new File([JSON.stringify(backup)], "backup.json", { type: "application/json" }));
+  expect(restoreGroup()?.textContent).toContain("Replaces the alt Thrall with the backup's newer copy, which changes its notes.");
+  expect(stored(ANON)?.alts[0].notes).toBe("Bank alt.\nTuesdays.");
+  await click(button(/^Restore$/, restoreGroup()!));
+  expect(stored(ANON)?.alts[0].notes).toBe("Backup notes replace the local ones");
+});
+
+test("the restore preview names each alt it adds, and says when an alt it replaces keeps its notes", async () => {
+  localStorage.setItem(bucketKey(ANON), V2_BUCKET_TEXT);
+  const alt = JSON.parse(V2_ALT_TEXT);
+  const backup = { ...JSON.parse(V2_BUCKET_TEXT), alts: [
+    { ...alt, level: 25, updatedAt: "2026-10-27T12:00:00.000Z" },
+    { ...alt, id: id(501), name: "Jaina", notes: "", planIds: [] },
+  ] };
+  await render();
+  await choose(new File([JSON.stringify(backup)], "backup.json", { type: "application/json" }));
+  const copy = restoreGroup()?.textContent;
+  expect(copy).toContain("Adds the alt Jaina.");
+  expect(copy).toContain("Replaces the alt Thrall with the backup's newer copy. Its notes stay as they are.");
+  // An alt the backup holds as it is here is not named.
+  await choose(new File([V2_BUCKET_TEXT], "backup.json", { type: "application/json" }));
+  expect(restoreGroup()?.textContent).not.toContain("Thrall");
+});
+
 test("a backup from another account is refused at the preview, and nothing changes", async () => {
   seed(B, [plan({ id: id(3), name: "B's plan" })]);
   who = { id: B_ID, name: "Jaina#5678" };
@@ -459,8 +491,67 @@ test("damaged stored plans are kept: their text can be downloaded, nothing is sa
   expect(field("Talent link or share code")).not.toBeNull();
 });
 
+const clearGroup = () => container.querySelector<HTMLElement>('[role="group"][aria-label="Clear what is stored"]');
+
+test("clearing damaged stored data names every plan, alt, watch and note it deletes, and offers the download first", async () => {
+  // Valid alts and a watch, with one damaged plan beside them: the whole bucket reads as damaged.
+  const stored = { format: "everloot.player-workspace", version: 2, owner: ANON,
+    plans: [plan({ notes: "Raid notes" }), plan({ id: id(2), name: "Broken", code: "damaged" })],
+    alts: [{ ...JSON.parse(V2_ALT_TEXT), planIds: [id(1)] }],
+    watches: [{ id: id(700), planId: id(1), addedAt: "2026-10-20T12:00:00.000Z" }] };
+  const raw = JSON.stringify(stored);
+  localStorage.setItem(bucketKey(ANON), raw);
+  await render();
+  expect(alerts()).toContain("could not be read");
+  await click(button(/^Clear stored plans$/));
+  const group = clearGroup()!;
+  expect(group.textContent).toContain("its plans, alts and watches, and their notes. Here that is 2 plans, 1 alt and 1 watch, with notes on 2 of them.");
+  expect(localStorage.getItem(bucketKey(ANON))).toBe(raw);
+  // The download is offered before Clear for good, in the same place.
+  const labels = [...group.querySelectorAll("button")].map((b) => b.textContent);
+  expect(labels).toEqual(["Download what is stored", "Clear for good", "Cancel"]);
+  const d = watchDownload();
+  await click(button(/^Download what is stored$/, group));
+  expect(await d.blobs[0].text()).toBe(raw);
+  await click(button(/^Clear for good$/, clearGroup()!));
+  expect(localStorage.getItem(bucketKey(ANON))).toBeNull();
+});
+
+test("the clearing of stored data that cannot be counted says what it may hold", async () => {
+  localStorage.setItem(bucketKey(ANON), "{not json");
+  await render();
+  await click(button(/^Clear stored plans$/));
+  expect(clearGroup()?.textContent).toContain("its plans, alts and watches, and their notes. It could not be read, so they cannot be counted.");
+  await click(button(/^Cancel$/, clearGroup()!));
+  expect(clearGroup()).toBeNull();
+  expect(localStorage.getItem(bucketKey(ANON))).toBe("{not json");
+});
+
+test("clearing stored plans says it also deletes alts and their notes (reported case)", async () => {
+  const alt = { ...JSON.parse(V2_ALT_TEXT), notes: "original notes", planIds: [] };
+  localStorage.setItem(bucketKey(ANON), JSON.stringify({ format: "everloot.player-workspace", version: 2, owner: ANON, alts: [alt],
+    plans: [plan({ code: "damaged" })], watches: [] }));
+  await render();
+  await click(button(/^Clear stored plans$/));
+  const copyBeforeClear = container.textContent;
+  await click(button(/^Clear for good$/));
+  expect(localStorage.getItem(bucketKey(ANON))).toBeNull();
+  expect(copyBeforeClear).toMatch(/alts/i);
+});
+
+test("a version 2 bucket's plans show and can be edited, and its alts are kept as they were", async () => {
+  localStorage.setItem(bucketKey(ANON), V2_BUCKET_TEXT);
+  await render();
+  await click(button(/^Edit$/, item("Frost")!));
+  await type(field("Notes", item("Frost")!), "Raid notes");
+  await click(button(/^Save$/, item("Frost")!));
+  const text = localStorage.getItem(bucketKey(ANON))!;
+  expect(JSON.parse(text)).toMatchObject({ version: 2, plans: [{ id: FIXTURE_PLAN_ID, notes: "Raid notes" }] });
+  expect(text).toContain(`"alts":[${V2_ALT_TEXT}]`);
+});
+
 test("plans saved by a newer version are left alone, and the page says to reload", async () => {
-  const newer = JSON.stringify({ format: "everloot.player-workspace", version: 2, owner: ANON });
+  const newer = JSON.stringify({ format: "everloot.player-workspace", version: NEWEST_VERSION + 1, owner: ANON });
   localStorage.setItem(bucketKey(ANON), newer);
   await render();
   expect(alerts()).toContain("saved by a newer version of Everloot. Reload the page");
