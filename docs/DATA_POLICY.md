@@ -191,7 +191,7 @@ Game files show what exists; play shows what is real. Everloot keeps the two apa
 is which.
 
 **What the game files contain.** *Status: the table data is not published yet, except the talent catalog, the map layer, the
-raid buff table, the client layer, the race table and the build changes described below.* A maintainer can read tables of a game's current build from the files Blizzard's
+raid buff table, the client layer, the race table, the Legacy perk catalog and the build changes described below.* A maintainer can read tables of a game's current build from the files Blizzard's
 launcher downloads from its public CDN, the same files every player receives, and compare two
 builds field by field. The [source ledger](sources/LEDGER.md) lists the tables we read. Those
 snapshots and comparisons stay on the maintainer's machine. Encrypted blocks are skipped, never
@@ -421,6 +421,17 @@ game-data file with a README that says it is Blizzard's and outside our licence.
 *found in game files, unconfirmed* until someone has checked it in the game, and the spoiler rules
 above apply. Tooltip text, icons and frame art shown with it keep the rules above: asset storage,
 not git.
+
+**The Legacy perk catalog.** Decided 2026-10-27 by the maintainer: the catalog of WoW: Forever's Legacy perks comes
+from the game files only, the Legacy trait trees read from the public client by a maintainer. No other site, guide or
+post supplies a value, and nothing third-party ships in it. It holds the tree, node and entry ids, positions, ranks,
+prerequisites, spend gates, the cost and the cap, with spell ids, perk names and the build stamp, and no descriptions,
+icons or tooltip text. Like the talent catalog it may be committed to the git repository as a clearly marked game-data
+file (`web/src/data/game-data/legacy-perks.json`, see [LEGACY_PERKS](LEGACY_PERKS.md)), labelled *found in game
+files, unconfirmed*: it is Blizzard's data, kept apart from our CC BY-SA data and outside our licence. Each rule says
+how it was read, and a rule the files do not settle has no value. No page shows it and no planner uses it: a Legacy
+planner waits until the cost, the cap and the spend gates it would enforce are confirmed in game or by Blizzard. It is
+not in the dataset, the API or the MCP server.
 
 **The map layer.** From the map tables we publish zone rectangles (`UiMapAssignment`), continents
 and instances (`Map`, `UiMap`), dungeon and raid entrance points (`Map.Corpse`) and, for each entrance
