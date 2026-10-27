@@ -1,10 +1,10 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { GAME_DATA_CREDIT } from "@everloot/protocol";
 import { ClientDigests, tableHash } from "../src/build-watch/client-digests.js";
-import { writeClientSnapshot } from "../src/client-snapshot.js";
+import { clientSnapshotName, writeClientSnapshot } from "../src/client-snapshot.js";
 import { buildLegacyPerkCatalog, serializeLegacyPerkCatalog, writeLegacyPerkCatalog } from "../src/legacy-perks/build-catalog.js";
 import { LEGACY_PERKS_SCHEMA, LEGACY_TRAIT_SYSTEM_ID, LegacyPerkCatalog } from "../src/legacy-perks/catalog.js";
 import type { Row, Rows, TableReader } from "../src/talents/build-catalog.js";
@@ -544,15 +544,35 @@ describe("determinism", () => {
 
 describe("the committed catalog", () => {
   const dataDir = join(import.meta.dirname, "..", "..", "web", "src", "data", "game-data");
+  const committedPath = join(dataDir, "legacy-perks.json");
   /** Git may check the file out with CRLF line ends; the generator writes LF. */
-  const text = () => readFileSync(join(dataDir, "legacy-perks.json"), "utf8").split("\r\n").join("\n");
+  const text = () => readFileSync(committedPath, "utf8").split("\r\n").join("\n");
   const read = () => LegacyPerkCatalog.parse(JSON.parse(text()));
 
-  test("is exactly what the generator writes for it, so it was not edited by hand", () => {
+  test("is in the generator's serialized form (a check of the formatting, not of the data)", () => {
     const committed = read();
     expect(serializeLegacyPerkCatalog(committed)).toBe(text());
     expect(committed).toMatchObject({ schema: LEGACY_PERKS_SCHEMA, label: "found in game files, unconfirmed", credit: GAME_DATA_CREDIT, traitSystemId: 45 });
   });
+
+  test("is what the generator writes from the snapshot it names, where that snapshot is kept", (ctx) => {
+    const committed = read();
+    const name = clientSnapshotName(committed.build);
+    const snapshot = join(import.meta.dirname, "..", "data", "client", name);
+    if (!existsSync(snapshot)) {
+      ctx.skip(`kb/data/client/${name} is not here: snapshots stay out of git, so CI skips this; run client-extract for the build to check the data`);
+    }
+    const dir = mkdtempSync(join(tmpdir(), "legacy-perks-"));
+    try {
+      // The committed file is the previous catalog, as when the generator runs in place.
+      const regenerated = writeLegacyPerkCatalog(snapshot, join(dir, "legacy-perks.json"), committedPath);
+      // Another extraction of the same build differs only in when it was made.
+      const sameExtraction = { ...regenerated, build: { ...regenerated.build, extractedAt: committed.build.extractedAt } };
+      expect(serializeLegacyPerkCatalog(sameExtraction)).toBe(text());
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 60_000);
 
   test("names only nodes of its own tree in prerequisites and gates", () => {
     for (const t of read().trees) {

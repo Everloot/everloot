@@ -25,8 +25,10 @@ npx tsx src/legacy-perks/build-catalog.ts data/client/wowf-<build>-<config>.sqli
 
 It writes `../web/src/data/game-data/legacy-perks.json` (`--out` to change that). The file already there is the
 previous catalog, which is how withdrawn ids carry over (below). The build watch does not regenerate this file: after
-a new build, run the command and commit the result with the build in the message. Do not edit the file by hand;
-`kb/test/legacy-perks.test.ts` fails if it is not exactly what the generator writes for it.
+a new build, run the command and commit the result with the build in the message. Do not edit the file by hand.
+`kb/test/legacy-perks.test.ts` checks that it is in the generator's serialized form everywhere, and, where the snapshot
+its build names is kept in `kb/data/client/`, that it is what the generator writes from that snapshot. Snapshots stay
+out of git, so CI skips that second check and says why.
 
 ## What it reads
 
@@ -196,6 +198,8 @@ The two warnings are the six "Unknown" nodes' flags and their shared spell.
   build, in the builder and in the writer;
 - conditions it does not model, deprecated edge types, differing flags and shared spells are warnings;
 - withdrawn ids are kept, carried forward and released when they come back, and the refusals above hold;
-- the same rows give the same bytes in any order, and the committed file is exactly what the generator writes;
+- the same rows give the same bytes in any order, and the committed file is in the generator's serialized form;
+- where its snapshot is kept, the committed file is what the generator writes from it (another extraction of the same
+  build may differ only in `extractedAt`); without the snapshot, as in CI, that test is skipped with the reason;
 - the committed file holds no text, descriptions or icons, and its tables' row counts and hashes match
   `client-digests.json` whenever both come from the same build.
