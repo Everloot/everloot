@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import { act, type ReactNode } from "react";
-import { createRoot } from "react-dom/client";
-import { renderToStaticMarkup } from "react-dom/server";
+import { act, useLayoutEffect, type ReactNode } from "react";
+import { createRoot, hydrateRoot, type Root } from "react-dom/client";
+import { renderToStaticMarkup, renderToString } from "react-dom/server";
 import { afterEach, expect, test, vi } from "vitest";
 import { loadCatalog } from "@/lib/talents/catalogs";
 import { fixture } from "@/lib/talents/fixture";
@@ -48,8 +48,11 @@ function deepFreeze<T>(value: T): T {
   return value;
 }
 
+// The tests of what the note says read it as a saved build's page renders it, at once (followsAddress={false}). A build
+// link's note waits for the browser to read the address; the tests further down cover that.
+
 test("says nothing without a plan from an older build: no codes, codes made on this tree's build, damaged codes or another class's", () => {
-  const html = (codes?: (string | null)[]) => renderToStaticMarkup(<FreshnessNote catalog={tree} codes={codes} entries={records()} />);
+  const html = (codes?: (string | null)[]) => renderToStaticMarkup(<FreshnessNote catalog={tree} codes={codes} entries={records()} followsAddress={false} />);
   expect(html()).toBe("");
   expect(html([null, null])).toBe("");
   expect(html([code("1.0.0.5"), null])).toBe("");
@@ -59,7 +62,7 @@ test("says nothing without a plan from an older build: no codes, codes made on t
 });
 
 test("lists what changed for each set that was made on an older build, labelled as game file data", () => {
-  const doc = page(renderToStaticMarkup(<FreshnessNote catalog={tree} codes={[code("1.0.0.1"), code("1.0.0.3", { 11: { rank: 4 } })]} entries={records()} />));
+  const doc = page(renderToStaticMarkup(<FreshnessNote catalog={tree} codes={[code("1.0.0.1"), code("1.0.0.3", { 11: { rank: 4 } })]} entries={records()} followsAddress={false} />));
   const note = doc.querySelector(NOTE)!;
   const sets = [...note.querySelectorAll(":scope > div")];
   expect(sets.map((s) => s.querySelector("p")!.textContent)).toEqual([
@@ -78,15 +81,15 @@ test("lists what changed for each set that was made on an older build, labelled 
   expect(note.textContent).toContain("found in game files, unconfirmed");
 
   // One set: no set label.
-  const one = page(renderToStaticMarkup(<FreshnessNote catalog={tree} codes={[code("1.0.0.3", { 11: { rank: 4 } }), null]} entries={records()} />));
+  const one = page(renderToStaticMarkup(<FreshnessNote catalog={tree} codes={[code("1.0.0.3", { 11: { rank: 4 } }), null]} entries={records()} followsAddress={false} />));
   expect(one.querySelector(`${NOTE} p`)!.textContent).toBe("Made on game build 1.0.0.3; this tree is build 1.0.0.5.");
 });
 
 test("a spoiler build's changes are counted but not shown, unless the reader turned spoilers on", () => {
-  const hidden = page(renderToStaticMarkup(<FreshnessNote catalog={tree} codes={[code("1.0.0.1")]} entries={records(true)} />)).querySelector(NOTE)!;
+  const hidden = page(renderToStaticMarkup(<FreshnessNote catalog={tree} codes={[code("1.0.0.1")]} entries={records(true)} followsAddress={false} />)).querySelector(NOTE)!;
   expect(hidden.textContent).toContain("2 of this plan's talents changed in builds players cannot play yet (1.0.0.3, 1.0.0.5). Spoilers are not shown here.");
   expect(hidden.textContent).not.toMatch(/Talent 11|Talent 21|maximum rank|removed/);
-  const shown = page(renderToStaticMarkup(<FreshnessNote catalog={tree} codes={[code("1.0.0.1")]} entries={records(true)} spoilers />)).querySelector(NOTE)!;
+  const shown = page(renderToStaticMarkup(<FreshnessNote catalog={tree} codes={[code("1.0.0.1")]} entries={records(true)} spoilers followsAddress={false} />)).querySelector(NOTE)!;
   expect(shown.textContent).toContain("Talent 21: removed in build 1.0.0.3");
 });
 
@@ -95,7 +98,7 @@ test("with spoilers off, a talent a spoiler build renamed keeps the name its pub
     record("1.0.0.5", "1.0.0.3", { ranks: [at(11, { name: "Hidden Name", before: 4, after: 3 })] }, true),
     record("1.0.0.3", "1.0.0.1", { ranks: [at(11, { before: 5, after: 4 })] }),
   ];
-  const html = renderToStaticMarkup(<FreshnessNote catalog={tree} codes={[code("1.0.0.1", { 11: { rank: 5 } })]} entries={mixed} />);
+  const html = renderToStaticMarkup(<FreshnessNote catalog={tree} codes={[code("1.0.0.1", { 11: { rank: 5 } })]} entries={mixed} followsAddress={false} />);
   expect(html).not.toContain("Hidden Name");
   expect([...page(html).querySelectorAll(`${NOTE} li`)].map((li) => li.textContent)).toEqual([
     "Talent 11: its maximum rank went from 5 to 4 in build 1.0.0.3 (this plan spends 5 points in it).",
@@ -131,6 +134,44 @@ async function mounted(codes: (string | null)[], run: (shown: () => boolean, go:
   }
 }
 
+/** Says, at the first commit and before any passive effect has run, whether the note is in the document. */
+function FirstCommit({ seen }: { seen: (present: boolean) => void }) {
+  useLayoutEffect(() => {
+    seen(document.querySelector(NOTE) !== null);
+  }, [seen]);
+  return null;
+}
+
+test("the note waits for the address check: not in the server HTML or the first commit, then shown when the address holds no other plan", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const errors = vi.spyOn(console, "error");
+  const opened = code("1.0.0.1");
+  // A saved build's page does not follow the address, so its note is in the server HTML.
+  expect(renderToString(<FreshnessNote catalog={tree} codes={[opened, null]} entries={records()} followsAddress={false} />)).toContain("Game build changes");
+  for (const [hash, shown] of [["", true], [`#plan=${opened}`, true], [`#plan=${code("1.0.0.3", { 11: { rank: 4 } })}`, false]] as const) {
+    await setHash(hash);
+    const note = <FreshnessNote catalog={tree} codes={[opened, null]} entries={records()} />;
+    const html = renderToString(<div>{note}</div>);
+    expect(html, hash).not.toContain("Game build changes");
+    const container = document.createElement("div");
+    container.innerHTML = html;
+    document.body.append(container);
+    const firstCommit: boolean[] = [];
+    let root: Root | undefined;
+    try {
+      await act(async () => { root = hydrateRoot(container, <div>{note}<FirstCommit seen={(present) => firstCommit.push(present)} /></div>); });
+      expect(firstCommit, hash).toEqual([false]);
+      expect(container.querySelector(NOTE) !== null, hash).toBe(shown);
+    } finally {
+      await act(async () => root?.unmount());
+      container.remove();
+    }
+  }
+  await setHash("");
+  // The server HTML and the first client render agree: no hydration error.
+  expect(errors).not.toHaveBeenCalled();
+});
+
 test("a different plan already in the address when the page opens hides the note: the calculator shows that plan", async () => {
   const opened = code("1.0.0.1");
   await setHash(`#plan=${code("1.0.0.3", { 11: { rank: 4 } })}`);
@@ -164,7 +205,7 @@ test("a plan pasted into the address after the page opens hides the note; an anc
 
 // The real page at an address: the class view, its calculator and the note, with the published records. The tree status
 // says which plan the calculator shows: one point in a first-row talent, or two.
-async function onPage(url: string, props: Omit<Parameters<typeof TalentClassView>[0], "slug">, check: (shown: boolean, status: string) => void) {
+async function onPage(url: string, props: Omit<Parameters<typeof TalentClassView>[0], "slug">, check: (shown: boolean, status: string, container: HTMLElement) => void) {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.spyOn(window, "scrollBy").mockImplementation(() => {});
   window.history.replaceState(null, "", url);
@@ -174,7 +215,7 @@ async function onPage(url: string, props: Omit<Parameters<typeof TalentClassView
   try {
     const view = await TalentClassView({ slug: "mage", ...props });
     await act(async () => root.render(view));
-    check(container.querySelector(NOTE) !== null, container.querySelector("[data-tree-status]")!.textContent!);
+    check(container.querySelector(NOTE) !== null, container.querySelector("[data-tree-status]")!.textContent!, container);
   } finally {
     await act(async () => root.unmount());
     container.remove();
@@ -221,13 +262,13 @@ test("with the calculator: a saved build's page shows its own plan whatever the 
 });
 
 test("missing records make the change history unknown, never unchanged", () => {
-  const note = page(renderToStaticMarkup(<FreshnessNote catalog={tree} codes={[code("1.0.0.1")]} entries={[records()[0]]} />)).querySelector(NOTE)!;
+  const note = page(renderToStaticMarkup(<FreshnessNote catalog={tree} codes={[code("1.0.0.1")]} entries={[records()[0]]} followsAddress={false} />)).querySelector(NOTE)!;
   expect([...note.querySelectorAll("li")].map((li) => li.textContent)).toEqual([
     "Talent 11: its maximum rank went from 5 to 3 in build 1.0.0.5 (this plan spends 5 points in it).",
     "There is no change record for game build 1.0.0.3, so changes between 1.0.0.1 and 1.0.0.3 are unknown.",
     "Check each talent before you follow the plan.",
   ]);
-  const none = page(renderToStaticMarkup(<FreshnessNote catalog={tree} codes={[code("1.0.0.1")]} entries={[]} />)).querySelector(NOTE)!;
+  const none = page(renderToStaticMarkup(<FreshnessNote catalog={tree} codes={[code("1.0.0.1")]} entries={[]} followsAddress={false} />)).querySelector(NOTE)!;
   expect(none.textContent).toContain("There is no change record for game build 1.0.0.5, so changes between 1.0.0.1 and 1.0.0.5 are unknown.");
   expect(none.textContent).not.toMatch(/changed none/);
 });
@@ -241,7 +282,7 @@ test("rendering the warning never saves or restamps the plan: no storage, no net
   const codes = Object.freeze([original, null]);
   const entries = deepFreeze(records());
   const before = JSON.stringify(entries);
-  const html = renderToStaticMarkup(<FreshnessNote catalog={deepFreeze({ ...tree })} codes={codes} entries={entries} />);
+  const html = renderToStaticMarkup(<FreshnessNote catalog={deepFreeze({ ...tree })} codes={codes} entries={entries} followsAddress={false} />);
   expect(html).toContain("Made on game build 1.0.0.1; this tree is build 1.0.0.5.");
   expect(setItem).not.toHaveBeenCalled();
   expect(removeItem).not.toHaveBeenCalled();
@@ -252,19 +293,22 @@ test("rendering the warning never saves or restamps the plan: no storage, no net
   expect(html).not.toMatch(/EL1-|#plan=|href=|<button|<form/);
 });
 
-test("a build link made on an older game build shows the note under the calculator; the class page and a link on this tree's build show none", async () => {
+test("a build link made on an older game build gets the note under the calculator; the class page and a link on this tree's build get none", async () => {
   const catalog = await loadCatalog("mage");
   const node = catalog.nodes.find((n) => n.row === 1)!;
   const made = (build: string) => encodeBuild({ classSlug: "mage", specId: catalog.specId, build, ranks: { [node.id]: { rank: 1 } } });
-  const view = async (initialCodes?: (string | null)[], saved?: boolean) => page(renderToStaticMarkup(await TalentClassView({
+  const older = made("1.60.1.1");
+  const html = async (initialCodes?: (string | null)[], saved?: boolean) => page(renderToStaticMarkup(await TalentClassView({
     slug: "mage", initialCodes, ...(saved ? { saved: { name: "Saved plan", notes: null, meta: null, actions: null } } : {}),
   })));
 
-  expect((await view()).querySelector(NOTE)).toBeNull();
-  expect((await view([made(catalog.build), null])).querySelector(NOTE)).toBeNull();
+  expect((await html()).querySelector(NOTE)).toBeNull();
+  expect((await html([made(catalog.build), null])).querySelector(NOTE)).toBeNull();
+  // A build link's note waits for the browser to read the address; a saved build's page shows it at once.
+  expect((await html([older, null])).querySelector(NOTE)).toBeNull();
+  const saved = await html([older, null], true);
 
-  for (const saved of [false, true]) {
-    const doc = await view([made("1.60.1.1"), null], saved);
+  const expectNote = (doc: ParentNode) => {
     const note = doc.querySelector(NOTE)!;
     expect(note.querySelector("p")!.textContent).toBe(`Made on game build 1.60.1.1; this tree is build ${catalog.build}.`);
     // No record reaches back to 1.60.1.1, so the note cannot say the plan is unchanged.
@@ -274,5 +318,10 @@ test("a build link made on an older game build shows the note under the calculat
     const calculator = doc.querySelector("[data-calculator]")!;
     expect(calculator.contains(note)).toBe(false);
     expect(calculator.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  }
+  };
+  expectNote(saved);
+  await onPage(`/tools/talents/mage/b/${older}`, { initialCodes: [older, null] }, (shown, _status, container) => {
+    expect(shown).toBe(true);
+    expectNote(container);
+  });
 });
