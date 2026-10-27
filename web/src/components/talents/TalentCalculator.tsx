@@ -594,7 +594,9 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
           </div>
           <div className="order-last flex items-end gap-6 lg:order-none">
             <Stat label="Points left" value={left} />
-            <Stat label="Level needed" value={spent === 0 ? "–" : levelFor(catalog, spent)} />
+            {/* The level the set's last point comes at, so set 2's is never below the level it opens at, as its order says.
+                The level slider keeps its own meaning: the points a level gives. */}
+            <Stat label="Level needed" value={spent === 0 ? "–" : levelFor(schedule, spent)} />
             <label className="flex flex-col gap-0.5">
               <span className="text-xs text-muted">Level</span>
               <span className="flex items-center gap-3">

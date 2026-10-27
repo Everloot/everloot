@@ -163,6 +163,33 @@ test("set 2's points wait for the level the second set opens at: its first 31 po
   expect(shown(52)).toBe("1/1");
 });
 
+/** A figure in the build bar by its label: "Points left", "Level needed". */
+const stat = (label: string) => [...container.querySelectorAll("span")].find((s) => s.textContent === label)!.nextElementSibling!.textContent;
+
+test("the build bar's Level needed is the level the set's last point comes at, set 2's no sooner than it opens", async () => {
+  await render();
+  await spend(11, 11, 11, 11, 11);
+  expect(stat("Level needed")).toBe("14");
+  await click(button(/^Set 2$/));
+  expect(stat("Level needed")).toBe("–");
+  await spend(11, 11, 11, 11, 11);
+  expect(stat("Level needed")).toBe("40");
+  // The level slider keeps its own meaning, the points a level gives: it goes down to 20, which holds both sets' five
+  // points, and set 2 planned ahead still needs level 40.
+  const level = container.querySelector<HTMLInputElement>('input[aria-label="Character level"]')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(level, "20");
+    level.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  expect(level.value).toBe("20");
+  await click([...container.querySelectorAll("label")].find((l) => l.textContent!.startsWith("Plan set 2 now"))!.querySelector("input"));
+  await click(button(/^Set 2$/));
+  expect(stat("Points left")).toBe("6");
+  expect(stat("Level needed")).toBe("40");
+  await click(button(/^Set 1$/));
+  expect(stat("Level needed")).toBe("14");
+});
+
 test("a take-back in set 2 that reorders points gives the levels set 2's points come at", async () => {
   await render();
   await click(button(/^Set 2$/));
