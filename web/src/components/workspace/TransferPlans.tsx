@@ -29,13 +29,13 @@ import { useWorkspaceOwner } from "./LocalPlanSave";
 // transfer before its next write. Each plan goes with a key stored first (transferKey) and kept whatever the site
 // answers, so a retry, after a reload or from another tab, gets the build the site made rather than a second one, and
 // another account is refused it. A character made from an alt is looked for on the account first, by the label it would
-// have, and its label is stored before it is asked for, with when: a request no answer settled is looked for by that label
-// before anything else, and none other is asked for while it may still be made. The record of sends is read and written,
-// and each character
-// found or made, under the workspace lock, so two tabs never act on it at once; a browser without the lock is refused
-// the transfer. Each request gets ANSWER_WAIT_MS to answer, so no lock is held for long: one given up on may or may not
-// have done its work, and the next try finds out. What the site has is bound to that account on this device as it was
-// sent (bindTransferred); a copy changed meanwhile stays.
+// have, and its label is stored before it is asked for, with when: a request no answer settled is looked for by that
+// label before anything else, and none other is asked for while it may still be made. The record of sends is read and
+// written, and each character found or made, under the workspace lock, so two tabs never act on it at once; a browser
+// without the lock is refused the transfer. Each request gets ANSWER_WAIT_MS to answer, so no lock is held for long:
+// one given up on may or may not have done its work, and the next try finds out. What the site has is bound to that
+// account on this device as it was sent (bindTransferred), and a copy here leaves only when its content is exactly the
+// account's; a copy changed meanwhile stays.
 
 type AccountOwner = Extract<Owner, { kind: "account" }>;
 type Sharing = "" | "private" | "shared" | "shared-name";
