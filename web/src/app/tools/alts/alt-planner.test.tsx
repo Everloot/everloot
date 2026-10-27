@@ -517,6 +517,14 @@ test("a backup restores every alt detail after a preview that names the alts", a
   expect(stored(ANON)?.plans).toEqual([plan()]);
 });
 
+test("each file picker shows the site's focus ring while the hidden input inside it has focus", async () => {
+  await render();
+  for (const label of ["Choose Everloot.lua", "Choose a backup file"]) {
+    const control = container.querySelector(`input[type="file"][aria-label="${label}"]`)?.closest("label");
+    expect(control?.className.split(" "), label).toEqual(expect.arrayContaining(["focus-within:outline", "focus-within:outline-2", "focus-within:outline-offset-2", "focus-within:outline-accent"]));
+  }
+});
+
 test("the page is left out of search and is a protected page, so no ads or analytics load beside the alts", async () => {
   const { metadata } = await import("./page");
   expect(metadata.robots).toEqual({ index: false, follow: false });

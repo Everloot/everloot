@@ -138,7 +138,8 @@ export default function ReadSaveFile({ owner, onApplied }: {
       <SectionHeading id="alts-file" note="Adds your characters from the Everloot addon's file. The file is read in this browser and is not uploaded; only the details of the characters you add are kept.">
         Read your Everloot.lua
       </SectionHeading>
-      <label className="btn cursor-pointer text-sm">Choose Everloot.lua
+      {/* The input inside is hidden, so the label shows the site's focus ring while it has focus. */}
+      <label className="btn cursor-pointer text-sm focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent">Choose Everloot.lua
         <input aria-label="Choose Everloot.lua" type="file" accept=".lua" className="sr-only" disabled={reading}
           onChange={(e) => { const f = e.target.files?.[0]; if (f) void choose(f); e.target.value = ""; }} />
       </label>

@@ -420,7 +420,8 @@ function Backup({ owner, onRestored }: { owner: Owner; onRestored: (result: { ok
       <SectionHeading id="device-plans-backup" note="A backup holds the plans this page shows. It restores only here, never into another account's plans or the signed-out ones.">Back up and restore</SectionHeading>
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" className="btn text-sm" onClick={download}>Download backup</button>
-        <label className="btn cursor-pointer text-sm">Restore from a backup
+        {/* The input inside is hidden, so the label shows the site's focus ring while it has focus. */}
+        <label className="btn cursor-pointer text-sm focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent">Restore from a backup
           <input aria-label="Choose a backup file" type="file" accept=".json,application/json" className="sr-only" disabled={reading}
             onChange={(e) => { const f = e.target.files?.[0]; if (f) void choose(f); e.target.value = ""; }} />
         </label>

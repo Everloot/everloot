@@ -467,6 +467,12 @@ test("the restore preview names each alt it adds or replaces and what that chang
   expect(copy).toMatch(/Thrall.*notes|notes.*Thrall/i);
 });
 
+test("the backup picker shows the site's focus ring while the hidden input inside it has focus", async () => {
+  await render();
+  const control = container.querySelector('input[type="file"][aria-label="Choose a backup file"]')?.closest("label");
+  expect(control?.className.split(" ")).toEqual(expect.arrayContaining(["focus-within:outline", "focus-within:outline-2", "focus-within:outline-offset-2", "focus-within:outline-accent"]));
+});
+
 test("a backup from another account is refused at the preview, and nothing changes", async () => {
   seed(B, [plan({ id: id(3), name: "B's plan" })]);
   who = { id: B_ID, name: "Jaina#5678" };
