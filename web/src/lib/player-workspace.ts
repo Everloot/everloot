@@ -500,16 +500,15 @@ export function planGroups(workspace: PlayerWorkspace): PlanGroup[] {
 }
 
 /**
- * How a signed-out plan stands with the account a transfer is for. `saved`: the account has it, as this copy or a newer
- * one: its bucket here holds it bound to it with the copy here the same or older, or the site said it has this very
- * copy (its receipt, transferKey). Nothing is sent again, and the account's copy is the one kept. `changed`: the account
- * has it, and the copy here differs, so sending it again would not change what the account has. `elsewhere`: this
- * browser sent it, or holds it bound, to another account. `new`, with `sentBefore` when it was sent to this account and
- * the site never answered: sent again with the same key, the site answers with what it made, if it made it.
+ * How a signed-out plan stands with the account a transfer is for, by content alone, never by date. `saved`: the
+ * account has this very copy: its bucket here holds it bound to it with the same content, or the site said it saved
+ * this content (its receipt, transferKey). Nothing is sent again, and the account's copy is the one kept. `changed`: the
+ * account has the plan, and the copy here differs, whichever is newer: sending it again would not change what the
+ * account has. `elsewhere`: this browser sent it, or holds it bound, to another account. `new`, with `sentBefore` when it
+ * was sent to this account and the site did not say it saved it: sent again with the same key, the site answers with
+ * what it made, if it made it.
  */
 export type Standing = { kind: "new"; sentBefore?: boolean } | { kind: "saved" | "changed"; at: string } | { kind: "elsewhere" };
-
-const content = (plan: LocalPlan) => fields({ ...plan, boundTo: null }, PLAN_KEYS);
 
 /** A short fingerprint of what an account keeps of a plan: its name, notes, codes and orders. A build the site returns
  *  has the same fields, so the two compare. */
@@ -521,16 +520,14 @@ export function planContent(plan: { name: string; notes: string | null; code: st
 }
 
 export function transferStanding(plan: LocalPlan, account: PlayerWorkspace, elsewhere: Set<string>, transfers?: Transfers): Standing {
-  const theirs = account.plans.find((p) => p.id === plan.id && p.boundTo !== null);
-  if (theirs?.boundTo) {
-    const kept = content(plan) === content(theirs) || Date.parse(plan.updatedAt) <= Date.parse(theirs.updatedAt);
-    return { kind: kept ? "saved" : "changed", at: theirs.boundTo.at };
-  }
+  const userId = account.owner.kind === "account" ? account.owner.userId : null;
   const receipt = transfers?.receipts.find((r) => r.planId === plan.id);
-  if (receipt && account.owner.kind === "account" && receipt.userId === account.owner.userId) {
-    if (receipt.state === "sending") return { kind: "new", sentBefore: true };
-    return { kind: receipt.content === planContent(plan) ? "saved" : "changed", at: receipt.at };
-  }
+  const mine = receipt && receipt.userId === userId ? receipt : undefined;
+  const theirs = account.plans.find((p) => p.id === plan.id && p.boundTo !== null);
+  // What the account has of the plan: its copy here, bound to it, and what the site said it saved.
+  const has = [theirs ? planContent(theirs) : null, mine?.state === "saved" ? mine.content : null].filter((c): c is string => c !== null);
+  if (has.length > 0) return { kind: has.includes(planContent(plan)) ? "saved" : "changed", at: theirs?.boundTo?.at ?? mine!.at };
+  if (mine) return { kind: "new", sentBefore: true };
   return receipt || elsewhere.has(plan.id) ? { kind: "elsewhere" } : { kind: "new" };
 }
 
@@ -562,9 +559,9 @@ export function boundElsewhere(storage: DeviceStorage | null, owner: Owner, plan
 
 /**
  * The signed-out plans that are an account's now, for anyone else who reads this bucket: those an account's bucket here
- * holds bound to it, the copy here the same or older (transferStanding). No one but that account is shown them, neither
- * signed out nor under another account, and no backup holds them. A copy changed here after it was sent is not the
- * account's, and stays. Nothing for an account's own bucket, which holds its own plans only.
+ * holds bound to it with the same content (transferStanding). No one but that account is shown them, neither signed out
+ * nor under another account, and no backup holds them. A copy that differs from the account's is not the account's,
+ * whatever its date, and stays. Nothing for an account's own bucket, which holds its own plans only.
  */
 export function hiddenFrom(storage: DeviceStorage | null, viewer: Owner, workspace: PlayerWorkspace): Set<string> {
   if (workspace.owner.kind !== "anonymous") return new Set();
@@ -583,23 +580,23 @@ function withBound(account: PlayerWorkspace, plans: LocalPlan[], boundTo: Bindin
 }
 
 /**
- * Of the signed-out groups holding any of `ids`, those the account's bucket holds whole: each plan saved there
- * (transferStanding), and once `taken`, each alt and each watch on their plans there as well, as the account's bucket
- * took them, with no alt changed here since. What the account's bucket takes of them (an alt or watch it holds already
- * keeps the account's copy), and the signed-out bucket without them.
+ * Of the signed-out groups holding any of `ids`, those the account's bucket holds whole: each plan bound there and saved
+ * by content (transferStanding, never a date), and once `taken`, each alt and each watch on their plans there as well,
+ * the alts exactly as the account's bucket took them. What the account's bucket takes of them (an alt or watch it holds
+ * already keeps the account's copy), and the signed-out bucket without them.
  */
-function settle(signedOut: PlayerWorkspace, account: PlayerWorkspace, ids: Set<string>, taken = false) {
+function settle(signedOut: PlayerWorkspace, account: PlayerWorkspace, ids: Set<string>, taken = false, transfers?: Transfers) {
   const plans = new Map(signedOut.plans.map((p) => [p.id, p]));
   const alts = new Map(signedOut.alts.map((a) => [a.id, a]));
   const theirAlts = new Map(account.alts.map((a) => [a.id, a]));
   const watched = new Set(account.watches.map((w) => w.planId));
+  const held = new Set(account.plans.filter((p) => p.boundTo !== null).map((p) => p.id));
   const altGoes = (alt: LocalAlt) => {
     const theirs = theirAlts.get(alt.id);
-    if (!theirs) return !taken;
-    return whole(theirs) === whole(alt) || Date.parse(alt.updatedAt) <= Date.parse(theirs.updatedAt);
+    return theirs ? whole(theirs) === whole(alt) : !taken;
   };
   const going = planGroups(signedOut).filter((g) => g.planIds.some((id) => ids.has(id))
-    && g.planIds.every((id) => transferStanding(plans.get(id)!, account, new Set()).kind === "saved")
+    && g.planIds.every((id) => held.has(id) && transferStanding(plans.get(id)!, account, new Set(), transfers).kind === "saved")
     && g.altIds.every((id) => altGoes(alts.get(id)!))
     && (!taken || signedOut.watches.every((w) => !g.planIds.includes(w.planId) || watched.has(w.planId))));
   const planIds = new Set(going.flatMap((g) => g.planIds));
@@ -632,12 +629,14 @@ function moveSaved(storage: DeviceStorage | null, owner: Owner, ids: Set<string>
   if (!signedOut.ok) return failure(signedOut.error);
   const account = readWorkspace(storage, owner);
   if (!account.ok) return failure(account.error);
-  if (settle(signedOut.workspace, account.workspace, ids).moved === 0) return { ok: true, moved: 0 };
-  const first = update(storage, owner, (mine) => settle(signedOut.workspace, mine, ids).account);
+  const record = readTransfers(storage);
+  const transfers = record.ok ? record.transfers : undefined;
+  if (settle(signedOut.workspace, account.workspace, ids, false, transfers).moved === 0) return { ok: true, moved: 0 };
+  const first = update(storage, owner, (mine) => settle(signedOut.workspace, mine, ids, false, transfers).account);
   if (!first.ok) return first;
   let moved = 0;
   const second = update(storage, ANONYMOUS, (theirs) => {
-    const next = settle(theirs, first.workspace, ids, true);
+    const next = settle(theirs, first.workspace, ids, true, transfers);
     moved = next.moved;
     return next.signedOut;
   });
@@ -687,29 +686,46 @@ export function settleTransferred(storage: DeviceStorage | null, owner: Owner, p
 }
 
 // Where plans went: for each plan sent to an account from this browser, the account, by its stable id, and the key the
-// site knows that save by; and the characters made on an account from alts here. Kept under a key of their own, apart
-// from the buckets, so deleting a plan or restoring a backup never forgets where it went, and no backup holds them.
-// Only the newest TRANSFERS_KEPT of each are kept. They are no part of the buckets' format, which keeps its version.
+// site knows that save by; and the characters made, or being made, on an account from alts here. Kept under a key of
+// their own, apart from the buckets, so deleting a plan or restoring a backup never forgets where it went, and no backup
+// holds them. Nothing is ever dropped from it: a key once sent may have made a build, and a destination keeps a plan from
+// a second account. At most TRANSFERS_KEPT of each are kept, and past that a new one is refused. It is read and written
+// under the workspace lock only. It is no part of the buckets' format, which keeps its version.
 
 const TRANSFERS = "everloot:transfers";
 const TRANSFERS_FORMAT = "everloot.transfers";
-export const TRANSFERS_KEPT = 1000;
+export const TRANSFERS_KEPT = 10_000;
+const TRANSFERS_FULL = "This browser keeps a record of every plan it sends to an account, and the record is full, so no new plan can be sent from here. Plans sent before can still be tried again.";
 
-/** A plan sent to an account: `sending` until the site says it has it, then `saved`, with what it has (planContent). */
-export interface Receipt { planId: string; userId: string; key: string; state: "sending" | "saved"; content: string | null; at: string }
-/** A character made on an account from an alt here: later transfers file that alt's plans under it. */
-export interface MadeCharacter { altId: string; userId: string; characterId: string; at: string }
+/**
+ * A plan sent to an account, under its key. `sending` from the moment the key is stored until the site answers, and
+ * again for each retry; `saved` once the site says it has it, with what it has (planContent); `failed` when the site
+ * refused the last send before writing anything, with why (`reason`). The key is kept in every state: another tab may
+ * have sent the same key and been saved, so a retry always sends it again.
+ */
+export interface Receipt { planId: string; userId: string; key: string; state: "sending" | "failed" | "saved"; reason: string | null; content: string | null; at: string }
+/** A character on an account as a transfer means to make it from an alt here. */
+export interface CharacterLabel { name: string; classSlug: string; realm: string | null; note: string | null }
+/** A character made, or being made (`characterId` null until the site says), on an account from an alt here, with the
+ *  label it was meant to have: after an answer that never came, the account's characters are read again and the one
+ *  with that label is taken for it, never a second made. */
+export interface MadeCharacter { altId: string; userId: string; characterId: string | null; label: CharacterLabel; at: string }
 export interface Transfers { format: typeof TRANSFERS_FORMAT; version: 1; receipts: Receipt[]; characters: MadeCharacter[] }
 export type TransfersRead = { ok: true; transfers: Transfers; raw: string | null } | Failure;
 
 const TRANSFERS_UNREAD = "This browser's record of the plans it sent to accounts could not be read, so nothing is sent from here: a plan could be saved twice, or to a second account.";
 
-const isReceipt = (v: unknown): v is Receipt => isRecord(v) && hasKeys(v, ["planId", "userId", "key", "state", "content", "at"])
+const isReason = (v: unknown) => v === null || (typeof v === "string" && /^[a-z0-9_]{1,40}$/.test(v));
+const isReceipt = (v: unknown): v is Receipt => isRecord(v) && hasKeys(v, ["planId", "userId", "key", "state", "reason", "content", "at"])
   && validId(v.planId) && validId(v.userId) && typeof v.key === "string" && TRANSFER_KEY_PATTERN.test(v.key)
-  && (v.state === "sending" || v.state === "saved") && (v.content === null || (typeof v.content === "string" && /^[0-9a-f]{8}$/.test(v.content)))
-  && isDate(v.at);
-const isMadeCharacter = (v: unknown): v is MadeCharacter => isRecord(v) && hasKeys(v, ["altId", "userId", "characterId", "at"])
-  && validId(v.altId) && validId(v.userId) && validId(v.characterId) && isDate(v.at);
+  && (v.state === "sending" || v.state === "failed" || v.state === "saved") && isReason(v.reason)
+  && (v.content === null || (typeof v.content === "string" && /^[0-9a-f]{8}$/.test(v.content))) && isDate(v.at);
+const isText = (v: unknown, limit: number) => typeof v === "string" && Array.from(v).length <= limit;
+const isLabel = (v: unknown): v is CharacterLabel => isRecord(v) && hasKeys(v, ["name", "classSlug", "realm", "note"])
+  && isText(v.name, LIMITS.characterName) && (TALENT_CLASSES as readonly unknown[]).includes(v.classSlug)
+  && (v.realm === null || isText(v.realm, LIMITS.realm)) && (v.note === null || isText(v.note, LIMITS.note));
+const isMadeCharacter = (v: unknown): v is MadeCharacter => isRecord(v) && hasKeys(v, ["altId", "userId", "characterId", "label", "at"])
+  && validId(v.altId) && validId(v.userId) && (v.characterId === null || validId(v.characterId)) && isLabel(v.label) && isDate(v.at);
 
 export function readTransfers(storage: DeviceStorage | null): TransfersRead {
   let raw: string | null;
@@ -735,19 +751,24 @@ function changeTransfers(storage: DeviceStorage | null, change: (transfers: Tran
   const next = change(read.transfers);
   if ("error" in next) return next;
   if (next === read.transfers) return { ok: true, transfers: next };
+  // Nothing is stored that would make the record unreadable, and so stop every transfer from here.
+  if (!next.receipts.every(isReceipt) || !next.characters.every(isMadeCharacter)) return failure("invalid");
   try {
     if (!storage) throw new Error("No storage");
     if (storage.getItem(TRANSFERS) !== read.raw) return failure("conflict");
-    // A record left with nothing in it goes, so a transfer refused at once leaves this browser as it was.
-    if (next.receipts.length === 0 && next.characters.length === 0) storage.removeItem(TRANSFERS);
-    else storage.setItem(TRANSFERS, JSON.stringify(next));
+    storage.setItem(TRANSFERS, JSON.stringify(next));
     return { ok: true, transfers: next };
   } catch (error) {
     return failure(isQuota(error) ? "full" : "unavailable");
   }
 }
 
-const newestKept = <T,>(list: T[]) => list.slice(-TRANSFERS_KEPT);
+/** One entry replaced in place, or added at the end while there is room; never one dropped to make room. */
+function kept<T>(list: T[], same: (item: T) => boolean, item: T): T[] | Failure {
+  const at = list.findIndex(same);
+  if (at >= 0) return list.map((old, i) => (i === at ? item : old));
+  return list.length < TRANSFERS_KEPT ? [...list, item] : failure("over-limit", TRANSFERS_FULL);
+}
 
 /** 24 random bytes, base64url: 32 characters. */
 function newKey(): string {
@@ -756,58 +777,60 @@ function newKey(): string {
 }
 
 /**
- * The key to send a plan to `owner` with: the one it was first sent there with, or a new one (`fresh`), stored before
- * anything is sent. A retry after a failure, after a reload or from another tab sends the same key, and the site makes
- * one build. Refused when this browser sent the plan to another account.
+ * The key to send a plan to `owner` with, stored before anything is sent, and marked `sending`: the one it was first
+ * sent there with, in whatever state, or a new one. A retry after a failure, after a reload or from another tab sends
+ * the same key, and the site makes one build. Refused when this browser sent the plan to another account, and, for a
+ * plan never sent before, when the record is full.
  */
-export function transferKey(storage: DeviceStorage | null, owner: Owner, planId: string, now = new Date()): { ok: true; key: string; fresh: boolean } | Failure {
+export function transferKey(storage: DeviceStorage | null, owner: Owner, planId: string, now = new Date()): { ok: true; key: string } | Failure {
   if (owner.kind !== "account") return failure("other-owner");
   let key = "";
-  let fresh = false;
   const done = changeTransfers(storage, (transfers) => {
     const receipt = transfers.receipts.find((r) => r.planId === planId);
     if (receipt && receipt.userId !== owner.userId) return failure("other-owner", "That plan was sent to another account from this browser, so it is not sent to this one as well.");
-    if (receipt) { key = receipt.key; return transfers; }
-    key = newKey();
-    fresh = true;
-    return { ...transfers, receipts: newestKept([...transfers.receipts, { planId, userId: owner.userId, key, state: "sending", content: null, at: now.toISOString() }]) };
+    if (receipt?.state === "saved") { key = receipt.key; return transfers; }
+    key = receipt?.key ?? newKey();
+    const receipts = kept(transfers.receipts, (r) => r.planId === planId, { planId, userId: owner.userId, key, state: "sending", reason: null, content: null, at: now.toISOString() });
+    return "error" in receipts ? receipts : { ...transfers, receipts };
   });
-  return done.ok ? { ok: true, key, fresh } : done;
+  return done.ok ? { ok: true, key } : done;
 }
 
 /** The site has the plan, from this save or from the earlier one its key names: `content` is what it has. */
 export function receiptSaved(storage: DeviceStorage | null, owner: Owner, planId: string, key: string, content: string, now = new Date()): { ok: true } | Failure {
   if (owner.kind !== "account") return failure("other-owner");
-  const receipt: Receipt = { planId, userId: owner.userId, key, state: "saved", content, at: now.toISOString() };
-  const done = changeTransfers(storage, (transfers) => ({
-    ...transfers, receipts: newestKept([...transfers.receipts.filter((r) => r.planId !== planId), receipt]),
-  }));
-  return done.ok ? { ok: true } : done;
-}
-
-/** The site refused the plan before writing anything, under a key first used for this very save: the key is let go,
- *  so nothing records the plan as sent. A key used before is kept: that earlier save may have reached the site. */
-export function receiptDropped(storage: DeviceStorage | null, owner: Owner, planId: string, key: string): { ok: true } | Failure {
-  if (owner.kind !== "account") return failure("other-owner");
   const done = changeTransfers(storage, (transfers) => {
-    const kept = transfers.receipts.filter((r) => !(r.planId === planId && r.userId === owner.userId && r.key === key && r.state === "sending"));
-    return kept.length === transfers.receipts.length ? transfers : { ...transfers, receipts: kept };
+    const receipts = kept(transfers.receipts, (r) => r.planId === planId, { planId, userId: owner.userId, key, state: "saved", reason: null, content, at: now.toISOString() });
+    return "error" in receipts ? receipts : { ...transfers, receipts };
   });
   return done.ok ? { ok: true } : done;
 }
 
-/** A character made on `owner` from an alt here. */
-export function rememberCharacter(storage: DeviceStorage | null, owner: Owner, altId: string, characterId: string, now = new Date()): { ok: true } | Failure {
+/** The site refused this send before writing anything, for `reason`. The key stays, marked `failed`: another send of it
+ *  may have reached the site, so the retry sends it again, and the site makes the build or answers with the one it made.
+ *  A receipt the site has since said it saved stays saved. */
+export function receiptFailed(storage: DeviceStorage | null, owner: Owner, planId: string, key: string, reason: string, now = new Date()): { ok: true } | Failure {
   if (owner.kind !== "account") return failure("other-owner");
-  const made: MadeCharacter = { altId, userId: owner.userId, characterId, at: now.toISOString() };
-  const done = changeTransfers(storage, (transfers) => ({
-    ...transfers,
-    characters: newestKept([...transfers.characters.filter((c) => !(c.altId === altId && c.userId === owner.userId)), made]),
-  }));
+  const done = changeTransfers(storage, (transfers) => {
+    const receipt = transfers.receipts.find((r) => r.planId === planId && r.userId === owner.userId && r.key === key);
+    if (!receipt || receipt.state === "saved") return transfers;
+    return { ...transfers, receipts: transfers.receipts.map((r) => (r === receipt ? { ...r, state: "failed" as const, reason, at: now.toISOString() } : r)) };
+  });
   return done.ok ? { ok: true } : done;
 }
 
-/** The character made on `owner` from this alt, by its id, if one was. */
+/** A character on `owner` from an alt here: the label meant for it before it is asked for (`characterId` null), and its
+ *  id once the site says, or once the account's characters show one with that very label. */
+export function rememberCharacter(storage: DeviceStorage | null, owner: Owner, altId: string, label: CharacterLabel, characterId: string | null, now = new Date()): { ok: true } | Failure {
+  if (owner.kind !== "account") return failure("other-owner");
+  const done = changeTransfers(storage, (transfers) => {
+    const characters = kept(transfers.characters, (c) => c.altId === altId && c.userId === owner.userId, { altId, userId: owner.userId, characterId, label, at: now.toISOString() });
+    return "error" in characters ? characters : { ...transfers, characters };
+  });
+  return done.ok ? { ok: true } : done;
+}
+
+/** The character made on `owner` from this alt, by its id, once the site said it made it. */
 export const madeCharacter = (transfers: Transfers, owner: Owner, altId: string): string | null =>
   (owner.kind === "account" ? transfers.characters.find((c) => c.altId === altId && c.userId === owner.userId)?.characterId ?? null : null);
 

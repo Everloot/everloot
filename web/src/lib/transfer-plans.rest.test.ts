@@ -31,7 +31,7 @@ vi.mock("@/lib/supabase/server", async (importOriginal) => ({
 import { GET as listBuilds, POST as postBuild } from "@/app/api/me/builds/route";
 import { POST as postCharacter } from "@/app/api/me/characters/route";
 import TransferPlans from "@/components/workspace/TransferPlans";
-import { bucketKey, readTransfers, type LocalPlan, type Owner, type PlayerWorkspace } from "@/lib/player-workspace";
+import { bucketKey, readTransfers, type LocalAlt, type LocalPlan, type Owner, type PlayerWorkspace } from "@/lib/player-workspace";
 import { ORDERS_UNAVAILABLE, ORDERS_UNAVAILABLE_CODE } from "@/lib/saved-builds";
 import { ORDERS_RECHECK_MS } from "@/lib/saved-builds-store";
 
@@ -56,12 +56,12 @@ const plan = (n: number, name: string, over: Partial<LocalPlan> = {}): LocalPlan
   id: id(n), name, classSlug: "mage", code: MAGE, code2: null, order: "O1p-AAAAA", order2: null, notes: "",
   updatedAt: "2026-10-20T12:00:00.000Z", boundTo: null, ...over,
 });
-const seed = (plans: LocalPlan[]) => localStorage.setItem(bucketKey(ANON), JSON.stringify({
-  format: "everloot.player-workspace", version: 2, owner: ANON, plans, alts: [], watches: [],
+const seed = (plans: LocalPlan[], alts: LocalAlt[] = []) => localStorage.setItem(bucketKey(ANON), JSON.stringify({
+  format: "everloot.player-workspace", version: 2, owner: ANON, plans, alts, watches: [],
 } satisfies PlayerWorkspace));
 const stored = (owner: Owner) => JSON.parse(localStorage.getItem(bucketKey(owner)) ?? "null") as PlayerWorkspace | null;
-/** Everything this browser keeps, to show that nothing changed. */
-const device = () => Object.fromEntries(Object.keys(localStorage).map((k) => [k, localStorage.getItem(k)]));
+/** The plan buckets this browser keeps, to show that none changed. */
+const buckets = () => Object.fromEntries(Object.keys(localStorage).filter((k) => k.startsWith("everloot:workspace:")).map((k) => [k, localStorage.getItem(k)]));
 
 /** Web Locks as a browser gives them, which jsdom has not: one holder at a time, in the order asked. */
 function installLocks() {
@@ -84,6 +84,8 @@ describe.skipIf(!databaseUrl || !restUrl || !secret || !databaseUrl.endsWith(`/$
   let sent: Array<{ key: unknown; status: number }>;
   /** Set by a test: what happens to a build request's answer once the route has given it. */
   let onAnswer: ((response: Response) => Promise<Response>) | null;
+  /** Set by a test: what happens to a character request's answer once the route has given it. */
+  let onCharacter: ((response: Response) => Promise<Response>) | null;
   let container: HTMLDivElement;
   let root: Root;
   /** Every panel mounted in a test, the latest one being `container` and `root`. */
@@ -117,7 +119,10 @@ describe.skipIf(!databaseUrl || !restUrl || !secret || !databaseUrl.endsWith(`/$
     if (url === "/api/auth/me") return Response.json({ user: session.user && { ...session.user, entitlements: [] } });
     const headers = { ...(init?.headers as Record<string, string> | undefined), origin: SITE };
     const request = new Request(`${SITE}${url}`, { method: init?.method ?? "GET", headers, body: init?.body });
-    if (url === "/api/me/characters") return postCharacter(request);
+    if (url === "/api/me/characters") {
+      const response = await postCharacter(request);
+      return onCharacter ? onCharacter(response) : response;
+    }
     if (url !== "/api/me/builds") throw new Error(`Unexpected request: ${url}`);
     if ((init?.method ?? "GET") === "GET") return listBuilds(request);
     const response = await postBuild(request);
@@ -198,6 +203,7 @@ describe.skipIf(!databaseUrl || !restUrl || !secret || !databaseUrl.endsWith(`/$
     installLocks();
     sent = [];
     onAnswer = null;
+    onCharacter = null;
     mounted = [];
   });
 
@@ -216,16 +222,18 @@ describe.skipIf(!databaseUrl || !restUrl || !secret || !databaseUrl.endsWith(`/$
     await pool?.end();
   });
 
-  test("before the spend-order migration a transfer is refused with orders_unavailable, nothing is written, and the device is as it was", async () => {
+  test("before the spend-order migration a transfer is refused with orders_unavailable, nothing is written, the plans here are as they were and the key stays for the retry", async () => {
     seed([plan(1, "Frost")]);
-    const before = device();
+    const before = buckets();
     await mount();
     await transfer(["Frost"]);
     await until(() => text().includes("Saving spend orders isn't available yet"), "the refusal");
     expect(text()).toContain("Saving spend orders isn't available yet, so no plans were saved to your account. They stay on this device as they were, spend orders included.");
     expect(sent.map((s) => s.status)).toEqual([409]);
     expect(sent[0].key).toMatch(/^[A-Za-z0-9_-]{16,64}$/);
-    expect(device()).toEqual(before);
+    expect(buckets()).toEqual(before);
+    const kept = readTransfers(localStorage);
+    expect(kept.ok && kept.transfers.receipts).toEqual([{ planId: id(1), userId: owner, key: sent[0].key, state: "failed", reason: ORDERS_UNAVAILABLE_CODE, content: null, at: expect.any(String) }]);
     expect(await builds()).toBe(0);
     // The route's own answer to a save with a key: the code and the message, and still nothing written.
     const res = await postBuild(new Request(`${SITE}/api/me/builds`, {
@@ -324,5 +332,38 @@ describe.skipIf(!databaseUrl || !restUrl || !secret || !databaseUrl.endsWith(`/$
     expect(sent).toEqual([{ key: sent[0].key, status: 201 }, { key: sent[0].key, status: 200 }, { key: sent[2].key, status: 201 }]);
     expect(sent[2].key).not.toBe(sent[0].key);
     expect(stored(ANON)!.plans).toEqual([]);
+  });
+
+  test("a character whose answer is lost is found on the account by its label on the retry, and there is one character", async () => {
+    const jaina: LocalAlt = {
+      id: id(500), name: "Jaina", realm: null, classSlug: "mage", faction: null, level: null, professions: [], notes: "Frost for raids",
+      planIds: [id(7)], provenance: { source: "manual", fileRecordAt: null, fileDetails: [] }, updatedAt: "2026-10-20T12:00:00.000Z",
+    };
+    seed([plan(7, "Blizzard")], [jaina]);
+    await mount();
+    const characters = async () => (await pool.query("select id, name, class_slug, realm, note from public.build_characters where user_id = $1", [owner])).rows;
+    /** The panel opened, Blizzard chosen, private, under a new character from Jaina: then Save. */
+    async function send() {
+      await until(() => !!button(/^Choose plans to save to your account$/), "the offer");
+      await click(button(/^Choose plans to save to your account$/));
+      await until(() => !!field("Save Blizzard to your account"), "the account's builds");
+      await click(field("Save Blizzard to your account"));
+      await choose(field("Sharing for Blizzard") as HTMLSelectElement, "private");
+      await choose(field("Character for Blizzard") as HTMLSelectElement, `alt:${jaina.id}`);
+      await click(button(/^Save to your account$/));
+    }
+    // The route makes the character; its answer never reaches the panel.
+    onCharacter = async () => { onCharacter = null; throw new TypeError("The connection dropped after the character was made"); };
+    await send();
+    await until(() => text().includes("Your account could not be reached while the character Jaina was being made for Blizzard"), "the lost answer");
+    expect(sent).toEqual([]);
+    const made = await characters();
+    expect(made).toEqual([{ id: expect.any(String), name: "Jaina", class_slug: "mage", realm: null, note: "Frost for raids" }]);
+    await send();
+    await until(() => text().includes("Saved 1 plan to your account."), "the retry");
+    expect(await characters()).toEqual(made);
+    expect((await pool.query("select character_id from public.saved_builds where user_id = $1 and name = 'Blizzard'", [owner])).rows).toEqual([{ character_id: made[0].id }]);
+    const kept = readTransfers(localStorage);
+    expect(kept.ok && kept.transfers.characters).toEqual([{ altId: jaina.id, userId: owner, characterId: made[0].id, label: { name: "Jaina", classSlug: "mage", realm: null, note: "Frost for raids" }, at: expect.any(String) }]);
   });
 });

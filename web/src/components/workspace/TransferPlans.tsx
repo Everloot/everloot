@@ -7,9 +7,9 @@ import { Card, Field, SectionHeading } from "@/components/ui";
 import { detailValue, listOf } from "@/lib/alt-workspace";
 import {
   ANONYMOUS, WORKSPACE_LIMITS, bindTransferred, boundElsewhere, bucketKey, deviceStorage, emptyWorkspace, hiddenFrom, locksAvailable,
-  madeCharacter, orderState, planContent, planGroups, readTransfers, readWorkspace, receiptDropped, receiptSaved, rememberCharacter,
+  madeCharacter, orderState, planContent, planGroups, readTransfers, readWorkspace, receiptFailed, receiptSaved, rememberCharacter,
   settleTransferred, transferKey, transferRoom, transferStanding, withWorkspaceLock,
-  type Failure, type LocalAlt, type LocalPlan, type Owner, type PlayerWorkspace, type Standing, type TransfersRead,
+  type CharacterLabel, type Failure, type LocalAlt, type LocalPlan, type Owner, type PlayerWorkspace, type Standing, type TransfersRead,
 } from "@/lib/player-workspace";
 import {
   ACCOUNT_MISMATCH, BUILDS_PER_ACCOUNT, CHARACTERS_PER_ACCOUNT, EXPECTED_OWNER_HEADER, LIMITS, ORDERS_UNAVAILABLE, ORDERS_UNAVAILABLE_CODE,
@@ -25,9 +25,13 @@ import { useWorkspaceOwner } from "./LocalPlanSave";
 // picked. Plans an alt uses go together, and the alt goes with them, whole, to this account's side of this device; on
 // the account it can only be a character, and what does not fit one is shown and filled in by the player before
 // anything is sent, never cut. Every write names the account (EXPECTED_OWNER_HEADER), and an account change stops the
-// transfer before its next write. Each plan goes with a key stored first (transferKey), so a retry, after a reload or
-// from another tab, gets the build the site made rather than a second one, and another account is refused it. What the
-// site has is bound to that account on this device as it was sent (bindTransferred); a copy changed meanwhile stays.
+// transfer before its next write. Each plan goes with a key stored first (transferKey) and kept whatever the site
+// answers, so a retry, after a reload or from another tab, gets the build the site made rather than a second one, and
+// another account is refused it. A character made from an alt is looked for on the account first, by the label it would
+// have, and its label is stored before it is asked for. The record of sends is read and written, and each character
+// found or made, under the workspace lock, so two tabs never act on it at once; a browser without the lock is refused
+// the transfer. What the site has is bound to that account on this device as it was sent (bindTransferred); a copy
+// changed meanwhile stays.
 
 type AccountOwner = Extract<Owner, { kind: "account" }>;
 type Sharing = "" | "private" | "shared" | "shared-name";
@@ -92,7 +96,7 @@ function unreadableOrder(plan: LocalPlan): string | null {
 function standingLine(plan: LocalPlan, standing: Standing): string | null {
   switch (standing.kind) {
     case "saved": return `${plan.name} is in your account already (saved ${day(standing.at)}), so it is not sent again.`;
-    case "changed": return `${plan.name} is in your account already, saved ${day(standing.at)}, and was changed here after that. Saving it again would make a second build, so it is left as it is. To keep this version too, sign out, make a copy of it on this page and save the copy.`;
+    case "changed": return `${plan.name} is in your account already, saved ${day(standing.at)}, and the copy here differs from it. Saving it again would make a second build, so it is left as it is. To keep this version too, sign out, make a copy of it on this page and save the copy.`;
     case "elsewhere": return `${plan.name} was sent to another account from this browser, so it is not saved to this one as well. To have it here too, sign out, make a copy of it on this page and save the copy.`;
     default: return null;
   }
@@ -110,6 +114,18 @@ function startCharacter(alt: LocalAlt): NewCharacter {
     note: fits(alt.notes, LIMITS.note) ? alt.notes : "",
   };
 }
+
+/** The character an alt makes on the account, as the account would keep it, or why what is typed is refused. */
+function characterLabel(alt: LocalAlt, draft: NewCharacter): { ok: true; label: CharacterLabel } | { ok: false; error: string } {
+  const parsed = parseCharacterInput({ id: null, name: draft.name, classSlug: alt.classSlug, realm: draft.realm, note: draft.note });
+  if (!parsed.ok) return parsed;
+  const { name, classSlug, realm, note } = parsed.value;
+  return { ok: true, label: { name, classSlug, realm, note } };
+}
+
+/** Whether an account's character has this very label, as one a transfer means to make would. */
+const sameCharacter = (character: CharacterLabel, label: CharacterLabel) =>
+  character.name === label.name && character.classSlug === label.classSlug && character.realm === label.realm && character.note === label.note;
 
 /** An alt's details a character on the account has no place for. */
 const unkept = (alt: LocalAlt) =>
@@ -159,10 +175,11 @@ interface Choice { sharing: Sharing; character: string }
 const NO_CHOICE: Choice = { sharing: "", character: "" };
 const altOf = (character: string) => (character.startsWith("alt:") ? character.slice(4) : null);
 
-/** A write's answer: what the site sent back, or why it did not save, sorted by whether anything may have been written. */
+/** A request's answer: what the site sent back, or why it did not save, sorted by whether anything may have been
+ *  written, with the reason a refused save is recorded under. */
 type Answer = { ok: true; status: number; body: Record<string, unknown> }
-  | { ok: false; why: "stopped" | "changed" | "orders" | "signed-out" | "refused" | "server" | "unreachable"; message: string };
-/** Refused before anything was written: a key first used for such a save is let go. */
+  | { ok: false; why: "stopped" | "changed" | "orders" | "signed-out" | "refused" | "server" | "unreachable"; message: string; reason: string };
+/** Refused before anything was written. The key stays even so: another send of it may have reached the site. */
 const definite = (why: string) => why === "changed" || why === "orders" || why === "signed-out" || why === "refused";
 
 export default function TransferPlans() {
@@ -294,12 +311,14 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
   const rows = chosen.flatMap((g) => g.rows);
   const sending = rows.filter((r) => r.standing.kind === "new");
   const altIds = [...new Set(sending.map((r) => altOf(choiceOf(r.plan.id).character)).filter((id): id is string => id !== null))];
-  const characterErrors = new Map(altIds.map((id) => {
-    const alt = altsById.get(id)!;
-    const draft = characterOf(alt);
-    const parsed = parseCharacterInput({ id: null, name: draft.name, classSlug: alt.classSlug, realm: draft.realm, note: draft.note });
-    return [id, parsed.ok ? null : parsed.error];
-  }));
+  const labels = new Map(altIds.map((id) => [id, characterLabel(altsById.get(id)!, characterOf(altsById.get(id)!))]));
+  const characterErrors = new Map([...labels].map(([id, label]) => [id, label.ok ? null : label.error]));
+  /** The account's character with the label an alt's new one would have: its plans go under that one, not a second. */
+  const onAccount = (altId: string) => {
+    const label = labels.get(altId);
+    return label?.ok ? known.find((c) => sameCharacter(c, label.label)) : undefined;
+  };
+  const making = altIds.filter((id) => !onAccount(id));
 
   // What stops Save, said before anything is sent.
   const problems: string[] = [];
@@ -316,10 +335,10 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
         : `Your account has ${BUILDS_PER_ACCOUNT} builds, as many as it can have, and ${sending.length} ${are} chosen.`);
     }
     const room = CHARACTERS_PER_ACCOUNT - data.characters.length;
-    if (altIds.length > room) {
+    if (making.length > room) {
       problems.push(room > 0
-        ? `Your account has room for ${plural(room, "more character")}, and this would make ${altIds.length}.`
-        : `Your account has ${CHARACTERS_PER_ACCOUNT} characters, as many as it can have, and this would make ${altIds.length} more.`);
+        ? `Your account has room for ${plural(room, "more character")}, and this would make ${making.length}.`
+        : `Your account has ${CHARACTERS_PER_ACCOUNT} characters, as many as it can have, and this would make ${making.length} more.`);
     }
     const full = rows.length > 0 && device.account ? transferRoom(device.signedOut, device.account, rows.map((r) => r.plan.id)) : null;
     if (full) {
@@ -332,6 +351,8 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
   // What Save does, plan by plan, then the characters it makes and what moves on this device.
   function characterWords(character: string): string {
     const alt = altsById.get(altOf(character) ?? "");
+    const have = alt && onAccount(alt.id);
+    if (have) return `under ${have.name}, a character your account has already`;
     if (alt) return `under ${characterOf(alt).name.trim() || alt.name}, a new character`;
     const existing = known.find((c) => c.id === character);
     return existing ? `under ${existing.name}` : "with no character";
@@ -339,10 +360,10 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
   const lines = rows.map((r) => {
     if (r.standing.kind === "saved") return `${r.plan.name} is in your account already: saving finishes moving it here, without a second save.`;
     const choice = choiceOf(r.plan.id);
-    const before = r.standing.kind === "new" && r.standing.sentBefore ? " It was sent before without an answer: if your account has it from then, it keeps that one." : "";
+    const before = r.standing.kind === "new" && r.standing.sentBefore ? " It was sent before, and no save of it was confirmed: if your account has it from then, it keeps that one." : "";
     return `Saves ${r.plan.name} to your account ${choice.sharing ? SHARING[choice.sharing].words : "with its sharing not chosen yet"}, ${characterWords(choice.character)}.${before}`;
   });
-  for (const id of altIds) {
+  for (const id of making) {
     const alt = altsById.get(id)!;
     const name = characterOf(alt).name.trim();
     lines.push(name ? `Makes the character ${name} (${className(alt.classSlug!)}) on your account.` : `Makes a character from ${alt.name} on your account.`);
@@ -359,23 +380,26 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
     for (const key of [bucketKey(ANONYMOUS), bucketKey(owner)]) window.dispatchEvent(new StorageEvent("storage", { key }));
   }
 
-  /** One write, naming this account: the site refuses it if another account is signed in now. */
-  async function post(url: string, body: object): Promise<Answer> {
-    if (!live.current) return { ok: false, why: "stopped", message: "" };
+  /** One request naming this account, a write when it has a body: the site refuses it if another account is signed in now. */
+  async function request(url: string, body?: object): Promise<Answer> {
+    if (!live.current) return { ok: false, why: "stopped", message: "", reason: "" };
+    const named = { [EXPECTED_OWNER_HEADER]: owner.userId };
     let response: Response;
     try {
-      response = await fetch(url, { method: "POST", headers: { "content-type": "application/json", [EXPECTED_OWNER_HEADER]: owner.userId }, body: JSON.stringify(body) });
+      response = await fetch(url, body === undefined
+        ? { cache: "no-store", headers: named }
+        : { method: "POST", headers: { "content-type": "application/json", ...named }, body: JSON.stringify(body) });
     } catch {
-      return { ok: false, why: "unreachable", message: "" };
+      return { ok: false, why: "unreachable", message: "", reason: "" };
     }
     const result = await response.json().catch(() => ({})) as Record<string, unknown>;
     if (response.ok) return { ok: true, status: response.status, body: result };
-    if (response.status === 409 && result.code === ACCOUNT_MISMATCH) return { ok: false, why: "changed", message: "" };
+    if (response.status === 409 && result.code === ACCOUNT_MISMATCH) return { ok: false, why: "changed", message: "", reason: ACCOUNT_MISMATCH };
     // The site's code for it, or, from a site without one, its words.
-    if (response.status === 409 && (result.code === ORDERS_UNAVAILABLE_CODE || result.error === ORDERS_UNAVAILABLE)) return { ok: false, why: "orders", message: "" };
-    if (response.status === 401) return { ok: false, why: "signed-out", message: "" };
+    if (response.status === 409 && (result.code === ORDERS_UNAVAILABLE_CODE || result.error === ORDERS_UNAVAILABLE)) return { ok: false, why: "orders", message: "", reason: ORDERS_UNAVAILABLE_CODE };
+    if (response.status === 401) return { ok: false, why: "signed-out", message: "", reason: "signed_out" };
     const message = typeof result.error === "string" ? result.error : "That did not work.";
-    return { ok: false, why: response.status >= 500 ? "server" : "refused", message };
+    return { ok: false, why: response.status >= 500 ? "server" : "refused", message, reason: `http_${response.status}` };
   }
 
   async function send() {
@@ -383,9 +407,11 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
     // What was chosen, as the preview showed it: the work does not change if the page does while it runs.
     const work = chosen.map((g) => g.rows);
     const picked = { ...choices };
-    const drafts = new Map(altIds.map((id) => [id, characterOf(altsById.get(id)!)]));
-    /** The characters this transfer made from alts, so two plans of one alt share one, and whether any plan went under it. */
-    const made = new Map<string, { id: string; name: string; used: boolean }>();
+    const wanted = new Map([...labels].flatMap(([id, label]) => (label.ok ? [[id, label.label] as const] : [])));
+    /** The character each alt's plans go under on the account, once this transfer has found or made it. */
+    const filed = new Map<string, string>();
+    /** The characters this transfer made from alts, and whether any plan went under one. */
+    const made = new Map<string, { name: string; used: boolean }>();
     const saved: string[] = [];
     /** Saved, but changed here while it was on its way: the account has it as it was sent. */
     const changedAfter: string[] = [];
@@ -426,6 +452,71 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
     };
     const changedNote = (name: string) => `${savedFirst()}${name} changed on this device after the preview, so it was not sent. ${KEPT}${madeNote()}`;
 
+    type Step = { kind: "stop"; text: string | null } | { kind: "done" } | { kind: "send"; plan: LocalPlan; key: string | null };
+    /**
+     * The plan, the account's plans and the record of sends as stored now, read under the lock. One the account has
+     * already is bound to it here and not sent again (done). One changed or gone since the preview, or saved somewhere
+     * by another tab, stops the transfer. One still to send goes on, with its key, stored first, when `key` is asked for.
+     */
+    const step = (row: Row, key: boolean) => withWorkspaceLock((): Step => {
+      if (!live.current) return { kind: "stop", text: null };
+      const storage = deviceStorage();
+      const signedOut = readWorkspace(storage, ANONYMOUS);
+      const mine = readWorkspace(storage, owner);
+      if (!mine.ok) return { kind: "stop", text: `${savedFirst()}This account's plans on this device could not be read, so nothing more was sent. ${KEPT}${madeNote()}` };
+      const record = readTransfers(storage);
+      if (!record.ok) return { kind: "stop", text: `${savedFirst()}${record.message}${madeNote()}` };
+      const plan = signedOut.ok ? signedOut.workspace.plans.find((p) => p.id === row.plan.id) : undefined;
+      // Moved already with its group, once the group's last plan was saved: the account's bucket has it, bound to it.
+      if (!plan && mine.workspace.plans.some((p) => p.id === row.plan.id && p.boundTo !== null)) return { kind: "done" };
+      const same = plan !== undefined && JSON.stringify(plan) === JSON.stringify(row.plan);
+      const standing = plan ? transferStanding(plan, mine.workspace, boundElsewhere(storage, owner, [plan.id]), record.transfers) : null;
+      if (plan && same && standing?.kind === "saved") {
+        // The account has it, from this preview or from another tab since: bound here as it is, and not sent again.
+        const bound = bindTransferred(storage, { owner, planIds: [plan.id], plans: [plan] }, { ok: true, userId: owner.userId, planIds: [plan.id] });
+        return bound.ok ? { kind: "done" } : { kind: "stop", text: unrecorded(bound) };
+      }
+      // Changed or gone in another tab since the preview, or saved somewhere by one: not sent.
+      if (!plan || !same || standing?.kind !== "new" || row.standing.kind !== "new") return { kind: "stop", text: changedNote(row.plan.name) };
+      if (!key) return { kind: "send", plan, key: null };
+      const sent = transferKey(storage, owner, plan.id);
+      return sent.ok ? { kind: "send", plan, key: sent.key } : { kind: "stop", text: `${savedFirst()}${sent.message} ${KEPT}${madeNote()}` };
+    });
+    /**
+     * The character an alt's plans go under on the account, found or made under the lock, so two transfers in this
+     * browser never make two: the one made from this alt before, while the account has it, or one with this very label,
+     * as the account lists them now. Otherwise it is made, with its label stored first, so after an answer that never
+     * came the next try finds it on the account rather than make it again.
+     */
+    const characterFor = (altId: string, label: CharacterLabel, name: string) => withWorkspaceLock(async (): Promise<{ ok: true; id: string } | { ok: false; text: string | null }> => {
+      const listed = await request("/api/me/builds");
+      if (!listed.ok && (listed.why === "stopped" || listed.why === "changed" || listed.why === "signed-out")) return { ok: false, text: refusal(listed, name) };
+      const characters = listed.ok && Array.isArray(listed.body.characters) ? listed.body.characters as AccountBuilds["characters"] : null;
+      if (!characters) return { ok: false, text: `${savedFirst()}Your account's characters could not be read, so ${name} was not sent. ${KEPT}${madeNote()}` };
+      const record = readTransfers(deviceStorage());
+      if (!record.ok) return { ok: false, text: `${savedFirst()}${record.message}${madeNote()}` };
+      const before = madeCharacter(record.transfers, owner, altId);
+      const found = characters.find((c) => c.id === before) ?? characters.find((c) => sameCharacter(c, label));
+      if (found) {
+        if (found.id !== before) rememberCharacter(deviceStorage(), owner, altId, label, found.id);
+        return { ok: true, id: found.id };
+      }
+      const asked = rememberCharacter(deviceStorage(), owner, altId, label, null);
+      if (!asked.ok) return { ok: false, text: `${savedFirst()}${asked.message} ${KEPT}${madeNote()}` };
+      const answer = await request("/api/me/characters", label);
+      if (!answer.ok && (answer.why === "unreachable" || answer.why === "server")) {
+        const why = answer.why === "server"
+          ? `The character ${label.name} may not have been made for ${name}: ${answer.message}`
+          : `Your account could not be reached while the character ${label.name} was being made for ${name}, so it may or may not have been made.`;
+        return { ok: false, text: `${savedFirst()}${why} ${name} was not sent. Trying again files it under that character if your account has it, rather than make a second.${madeNote()}` };
+      }
+      if (!answer.ok) return { ok: false, text: refusal(answer, name) };
+      const id = String((answer.body.character as { id?: unknown } | undefined)?.id ?? "");
+      made.set(altId, { name: label.name, used: false });
+      rememberCharacter(deviceStorage(), owner, altId, label, id);
+      return { ok: true, id };
+    });
+
     setBusy(true);
     const stop = await (async (): Promise<string | null> => {
       // The account, checked again just before anything is sent: another one signed in here now gets nothing.
@@ -435,60 +526,32 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
       if (me.id !== owner.userId) { onStopped(NOTHING_SENT); recheck(); return null; }
       for (const group of work) {
         for (const row of group) {
-          if (!live.current) return null;
-          // The plan, the account's plans and the record of sends as stored now, not as the preview read them.
-          const storage = deviceStorage();
-          const signedOut = readWorkspace(storage, ANONYMOUS);
-          const mine = readWorkspace(storage, owner);
-          if (!mine.ok) return `${savedFirst()}This account's plans on this device could not be read, so nothing more was sent. ${KEPT}${madeNote()}`;
-          const record = readTransfers(storage);
-          if (!record.ok) return `${savedFirst()}${record.message}${madeNote()}`;
-          const plan = signedOut.ok ? signedOut.workspace.plans.find((p) => p.id === row.plan.id) : undefined;
-          // Moved already with its group, once the group's last plan was saved: the account's bucket has it, bound to it.
-          if (!plan && mine.workspace.plans.some((p) => p.id === row.plan.id && p.boundTo !== null)) { finished++; continue; }
-          const same = plan !== undefined && JSON.stringify(plan) === JSON.stringify(row.plan);
-          const standing = plan ? transferStanding(plan, mine.workspace, boundElsewhere(storage, owner, [plan.id]), record.transfers) : null;
-          if (plan && same && standing?.kind === "saved") {
-            // The account has it, from this preview or from another tab since: bound here as it is, and not sent again.
-            const bound = await withWorkspaceLock(() => bindTransferred(deviceStorage(), { owner, planIds: [plan.id], plans: [plan] }, { ok: true, userId: owner.userId, planIds: [plan.id] }));
-            tell();
-            if (!bound.ok) return unrecorded(bound);
-            finished++;
-            continue;
-          }
-          // Changed or gone in another tab since the preview, or saved somewhere by one: not sent.
-          if (!plan || !same || standing?.kind !== "new" || row.standing.kind !== "new") return changedNote(row.plan.name);
-          const choice = picked[plan.id] ?? NO_CHOICE;
+          const choice = picked[row.plan.id] ?? NO_CHOICE;
           const altId = altOf(choice.character);
-          let characterId: string | null = altId ? null : choice.character || null;
-          if (altId) {
-            characterId = made.get(altId)?.id ?? madeBefore(altId);
-            if (!characterId) {
-              const draft = drafts.get(altId)!;
-              const answer = await post("/api/me/characters", { name: draft.name, classSlug: altsById.get(altId)!.classSlug, realm: draft.realm, note: draft.note });
-              if (!answer.ok) return refusal(answer, plan.name);
-              characterId = String((answer.body.character as { id?: unknown } | undefined)?.id ?? "");
-              made.set(altId, { id: characterId, name: draft.name.trim(), used: false });
-              const id = characterId;
-              await withWorkspaceLock(() => rememberCharacter(deviceStorage(), owner, altId, id));
-              // The plan, checked again: one changed while its character was made is not sent as the preview had it.
-              const again = readWorkspace(deviceStorage(), ANONYMOUS);
-              const still = again.ok ? again.workspace.plans.find((p) => p.id === plan.id) : undefined;
-              if (!still || JSON.stringify(still) !== JSON.stringify(row.plan)) return changedNote(plan.name);
-            }
+          if (altId && !filed.has(altId)) {
+            // Checked first, so no character is made for a plan that is not sent.
+            const first = await step(row, false);
+            if (first.kind === "stop") return first.text;
+            if (first.kind === "done") { tell(); finished++; continue; }
+            const character = await characterFor(altId, wanted.get(altId)!, row.plan.name);
+            if (!character.ok) return character.text;
+            filed.set(altId, character.id);
           }
-          // The key, stored before the build is sent: a retry sends the same one.
-          const sent = await withWorkspaceLock(() => transferKey(deviceStorage(), owner, plan.id));
-          if (!sent.ok) return `${savedFirst()}${sent.message} ${KEPT}${madeNote()}`;
+          const characterId = altId ? filed.get(altId)! : choice.character || null;
+          // The plan checked again, and its key stored before the build is sent: a retry sends the same one.
+          const next = await step(row, true);
+          if (next.kind === "stop") return next.text;
+          if (next.kind === "done") { tell(); finished++; continue; }
+          const { plan, key } = next as { plan: LocalPlan; key: string };
           const { shared, showName } = SHARING[choice.sharing as Exclude<Sharing, "">];
-          const answer = await post("/api/me/builds", {
+          const answer = await request("/api/me/builds", {
             name: plan.name, notes: plan.notes, characterId, code: plan.code, code2: plan.code2, shared, showName, order: plan.order, order2: plan.order2,
-            transferKey: sent.key,
+            transferKey: key,
           });
           if (!answer.ok) {
-            // Refused before anything was written: a key first used for this save is let go. Any other failure may have
-            // reached the site, so the key stays for the retry.
-            if (definite(answer.why) && sent.fresh) await withWorkspaceLock(() => receiptDropped(deviceStorage(), owner, plan.id, sent.key));
+            // Refused before anything was written: marked so, with why, and the key kept, since another send of it may
+            // have reached the site. Any other failure may have reached it too: the key stays as it is for the retry.
+            if (definite(answer.why)) await withWorkspaceLock(() => receiptFailed(deviceStorage(), owner, plan.id, key, answer.reason));
             return refusal(answer, plan.name);
           }
           const build = (answer.body.build ?? {}) as { name?: string; notes?: string | null; code?: string; code2?: string | null; order?: string | null; order2?: string | null };
@@ -497,19 +560,18 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
           const theirs = answer.status === 200 || answer.body.replayed === true
             ? planContent({ name: build.name ?? "", notes: build.notes ?? "", code: build.code ?? "", code2: build.code2 ?? null, order: build.order, order2: build.order2 })
             : kept;
-          await withWorkspaceLock(() => receiptSaved(deviceStorage(), owner, plan.id, sent.key, theirs));
-          if (theirs !== kept) {
-            // The site had this plan from the same key, as it was then: the copy here differs, so it stays here, unsaved.
-            differs.push(plan.name);
-            continue;
-          }
-          saved.push(plan.name);
-          if (altId && made.has(altId)) made.get(altId)!.used = true;
           // The account has it as it was sent: bound to that account on this device at once, whoever is signed in here
-          // when it lands, and the copy here goes with it unless it changed meanwhile.
-          const bound = await withWorkspaceLock(() => bindTransferred(deviceStorage(), { owner, planIds: [plan.id], plans: [plan] }, { ok: true, userId: owner.userId, planIds: [plan.id] }));
+          // when it lands, and the copy here goes with it unless it changed meanwhile. A copy that differs from what the
+          // site had from the same key stays here, unsaved.
+          const bound = await withWorkspaceLock(() => {
+            receiptSaved(deviceStorage(), owner, plan.id, key, theirs);
+            return theirs === kept ? bindTransferred(deviceStorage(), { owner, planIds: [plan.id], plans: [plan] }, { ok: true, userId: owner.userId, planIds: [plan.id] }) : null;
+          });
+          if (!bound) { differs.push(plan.name); continue; }
           tell();
           if (!bound.ok) return unrecorded(bound);
+          saved.push(plan.name);
+          if (altId && made.has(altId)) made.get(altId)!.used = true;
           const after = readWorkspace(deviceStorage(), ANONYMOUS);
           const left = after.ok ? after.workspace.plans.find((p) => p.id === plan.id) : undefined;
           if (left && planContent(left) !== kept) changedAfter.push(plan.name);

@@ -52,6 +52,10 @@ const names = (owner: Owner) => (stored(owner)?.plans ?? []).map((p) => p.name);
 const bound = (p: LocalPlan, userId = A_ID) => ({ ...p, boundTo: { userId, at: expect.any(String) } });
 /** Everything this browser keeps, to show that nothing changed. */
 const device = () => Object.fromEntries(Object.keys(localStorage).map((k) => [k, localStorage.getItem(k)]));
+/** The plan buckets alone: what a refusal must leave as it was, while the record of sends may note the attempt. */
+const buckets = () => Object.fromEntries(Object.keys(localStorage).filter((k) => k.startsWith("everloot:workspace:")).map((k) => [k, localStorage.getItem(k)]));
+/** The record of sends, as stored. */
+const journal = () => JSON.parse(localStorage.getItem("everloot:transfers") ?? "null") as { receipts: Array<Record<string, unknown>>; characters: Array<Record<string, unknown>> } | null;
 
 /** Web Locks as a browser gives them: one holder at a time per name, in the order asked. */
 function installLocks() {
@@ -393,7 +397,9 @@ describe("saving", () => {
     await click(saveButton());
     // One character for both plans, then the builds filed under it.
     expect(posts.map((p) => p.url)).toEqual(["/api/me/characters", "/api/me/builds", "/api/me/builds"]);
-    expect(posts[0].body).toEqual({ name: "Jaina", classSlug: "mage", realm: "", note: "Frost for raids" });
+    // The character as the account keeps it, and as this browser recorded it before asking for it.
+    expect(posts[0].body).toEqual({ name: "Jaina", classSlug: "mage", realm: null, note: "Frost for raids" });
+    expect(journal()!.characters).toEqual([{ altId: jaina.id, userId: A_ID, characterId: serverId(1), label: posts[0].body, at: expect.any(String) }]);
     expect(posts[1].body.characterId).toBe(serverId(1));
     expect(posts[2].body.characterId).toBe(serverId(1));
     expect(posts.every((p) => p.owner === A_ID)).toBe(true);
@@ -464,7 +470,7 @@ describe("refusals and account changes", () => {
   test("without the spend-order migration the transfer says so and leaves every plan on this device as it was, orders and all", async () => {
     ordersMissing = true;
     seed(ANON, [FROST, FIRE]);
-    const before = device();
+    const before = buckets();
     await render();
     await open();
     await choose("Save Frost to your account", { Frost: "private" });
@@ -474,12 +480,14 @@ describe("refusals and account changes", () => {
     expect(posts).toHaveLength(1);
     expect(posts[0].body).toMatchObject({ order: PLANNED });
     expect(alerts()).toContain("Saving spend orders isn't available yet, so no plans were saved to your account. They stay on this device as they were, spend orders included.");
-    expect(device()).toEqual(before);
+    expect(buckets()).toEqual(before);
+    // The key was sent, so it is kept, marked refused and why: trying again sends the same one.
+    expect(journal()!.receipts).toEqual([{ planId: FROST.id, userId: A_ID, key: posts[0].body.transferKey, state: "failed", reason: "orders_unavailable", content: null, at: expect.any(String) }]);
   });
 
   test("a save the site refuses for another account stops the transfer, binds nothing and checks the account again", async () => {
     seed(ANON, [FROST, FIRE]);
-    const before = device();
+    const before = buckets();
     await render();
     await open();
     await choose("Save Frost to your account", { Frost: "private" });
@@ -494,7 +502,8 @@ describe("refusals and account changes", () => {
     expect(posts).toHaveLength(1);
     expect(posts[0]).toMatchObject({ as: B_ID, owner: A_ID });
     expect(accounts[B_ID].builds).toEqual([]);
-    expect(device()).toEqual(before);
+    expect(buckets()).toEqual(before);
+    expect(journal()!.receipts).toMatchObject([{ planId: FROST.id, key: posts[0].body.transferKey, state: "failed", reason: "account_mismatch" }]);
     expect(requests.filter((r) => r.request === "GET /api/auth/me").length).toBeGreaterThan(asked);
     expect(text()).toContain("The account signed in here changed, so the transfer stopped.");
   });
@@ -644,7 +653,7 @@ describe("trying again", () => {
     expect(names(ANON)).toEqual(["Frost"]);
   });
 
-  test("the account's own copy is kept: an older copy left here finishes moving without a second save, and one changed here since is refused with why", async () => {
+  test("the account's own copy is kept, and a copy here that differs from it is refused with why, whichever is newer", async () => {
     const accountFrost = { ...FROST, name: "Frost, renamed", updatedAt: "2026-10-22T12:00:00.000Z", boundTo: { userId: A_ID, at: AT } };
     const accountFire = { ...FIRE, boundTo: { userId: A_ID, at: AT } };
     const changedFire = { ...FIRE, notes: "Changed here later", updatedAt: "2026-10-23T12:00:00.000Z" };
@@ -652,14 +661,13 @@ describe("trying again", () => {
     seed(A, [accountFrost, accountFire]);
     await render();
     await open();
-    expect(text()).toContain("Frost is in your account already");
-    expect(text()).toContain("Fire is in your account already, saved Oct 21, 2026, and was changed here after that. Saving it again would make a second build, so it is left as it is.");
+    expect(text()).toContain("Frost is in your account already, saved Oct 21, 2026, and the copy here differs from it. Saving it again would make a second build, so it is left as it is.");
+    expect(text()).toContain("Fire is in your account already, saved Oct 21, 2026, and the copy here differs from it. Saving it again would make a second build, so it is left as it is.");
+    expect((field("Save Frost to your account") as HTMLInputElement).disabled).toBe(true);
     expect((field("Save Fire to your account") as HTMLInputElement).disabled).toBe(true);
-    await click(field("Save Frost to your account"));
-    await click(saveButton());
     expect(posts).toEqual([]);
     expect(stored(A)!.plans).toEqual([accountFrost, accountFire]);
-    expect(stored(ANON)!.plans).toEqual([changedFire]);
+    expect(stored(ANON)!.plans).toEqual([FROST, changedFire]);
   });
 });
 
@@ -668,13 +676,13 @@ describe("binding a transfer on this device", () => {
   const saved = (owner: Owner, ...plans: LocalPlan[]) => ({ ok: true as const, userId: owner.kind === "account" ? owner.userId : "", planIds: plans.map((p) => p.id) });
   const NOW = new Date("2026-10-27T12:00:00.000Z");
 
-  test("a plan the account's bucket already holds bound to it keeps the account's copy", () => {
+  test("a plan the account's bucket already holds bound to it keeps the account's copy, and a copy here that differs stays here", () => {
     const accountCopy = { ...FROST, name: "Renamed on the account side", updatedAt: "2026-10-22T12:00:00.000Z", boundTo: { userId: A_ID, at: AT } };
     seed(ANON, [FROST]);
     seed(A, [accountCopy]);
     expect(bindTransferred(localStorage, sent(A, FROST), saved(A, FROST), NOW)).toEqual({ ok: true, bound: 1 });
     expect(stored(A)!.plans).toEqual([accountCopy]);
-    expect(stored(ANON)!.plans).toEqual([]);
+    expect(stored(ANON)!.plans).toEqual([FROST]);
   });
 
   test("a plan an alt uses stays signed out as well until every plan of the alt is the account's; then the alt, its plans and their watches move whole", () => {
@@ -987,17 +995,11 @@ describe("one build per plan and account", () => {
     expect(text()).toContain("Frost was sent to another account from this browser, so it is not saved to this one as well.");
   });
 
-  test("the record of where plans went keeps the newest 1000, under its own key, and no backup holds it", async () => {
-    const { TRANSFERS_KEPT, exportBackup, readTransfers, readWorkspace, transferKey } = await import("@/lib/player-workspace");
-    const receipts = Array.from({ length: TRANSFERS_KEPT }, (_, i) => ({ planId: id(5000 + i), userId: A_ID, key: `k${String(i).padStart(20, "0")}`, state: "saved", content: "00000000", at: AT }));
-    localStorage.setItem("everloot:transfers", JSON.stringify({ format: "everloot.transfers", version: 1, receipts, characters: [] }));
+  test("the record of where plans went is kept under its own key, and no backup holds it", async () => {
+    const { exportBackup, readWorkspace, transferKey } = await import("@/lib/player-workspace");
     const next = transferKey(localStorage, A, FROST.id);
     if (!next.ok) throw new Error("A key should be stored");
-    const read = readTransfers(localStorage);
-    if (!read.ok) throw new Error("The record should read");
-    expect(read.transfers.receipts).toHaveLength(TRANSFERS_KEPT);
-    expect(read.transfers.receipts[0].planId).toBe(id(5001));
-    expect(read.transfers.receipts.at(-1)).toMatchObject({ planId: FROST.id, userId: A_ID, key: next.key, state: "sending" });
+    expect(journal()!.receipts).toMatchObject([{ planId: FROST.id, userId: A_ID, key: next.key, state: "sending" }]);
     seed(ANON, [FROST]);
     const bucket = readWorkspace(localStorage, ANON);
     const exported = bucket.ok ? exportBackup(bucket.workspace) : null;
@@ -1060,15 +1062,15 @@ describe("the missing spend-order migration", () => {
       ordersMessageOnly = messageOnly;
       localStorage.clear();
       seed(ANON, [FROST]);
-      const before = device();
+      const before = buckets();
       await act(async () => root.render(<></>));
       await render();
       await open();
       await choose("Save Frost to your account", { Frost: "private" });
       await click(saveButton());
       expect(alerts()).toContain("Saving spend orders isn't available yet, so no plans were saved to your account. They stay on this device as they were, spend orders included.");
-      // A refusal before anything was written lets its key go: nothing records the plan as sent.
-      expect(device()).toEqual(before);
+      expect(buckets()).toEqual(before);
+      expect(journal()!.receipts).toMatchObject([{ planId: FROST.id, state: "failed", reason: "orders_unavailable" }]);
     }
   });
 });
@@ -1219,5 +1221,223 @@ describe("one lock for every writer", () => {
     expect(stored(ANON)!.alts.map((a) => a.name)).toEqual(["Thrall"]);
     expect(lock.names).toEqual(["everloot:player-workspace", "everloot:player-workspace"]);
     expect(lock.overlapped()).toBe(false);
+  });
+});
+
+describe("records that are never dropped", () => {
+  const FULL = "This browser keeps a record of every plan it sends to an account, and the record is full, so no new plan can be sent from here. Plans sent before can still be tried again.";
+  /** Fills the record of sends up to its limit with saved plans of A's. */
+  async function fill(count: number) {
+    const record = journal() ?? { format: "everloot.transfers", version: 1, receipts: [] as Array<Record<string, unknown>>, characters: [] };
+    record.receipts.push(...Array.from({ length: count }, (_, i) => ({ planId: id(5000 + i), userId: A_ID, key: `k${String(i).padStart(20, "0")}`, state: "saved", reason: null, content: "00000000", at: AT })));
+    localStorage.setItem("everloot:transfers", JSON.stringify(record));
+  }
+
+  test("at capacity an unresolved key stays for its retry, and a new plan is refused rather than any record dropped", async () => {
+    const { TRANSFERS_KEPT, transferKey } = await import("@/lib/player-workspace");
+    const original = transferKey(localStorage, A, FROST.id);
+    if (!original.ok) throw new Error(original.message);
+    await fill(TRANSFERS_KEPT - 1);
+    expect(transferKey(localStorage, A, id(99999))).toMatchObject({ ok: false, message: FULL });
+    expect(transferKey(localStorage, A, FROST.id)).toMatchObject({ ok: true, key: original.key });
+    expect(journal()!.receipts).toHaveLength(TRANSFERS_KEPT);
+    expect(journal()!.receipts[0]).toMatchObject({ planId: FROST.id, key: original.key, state: "sending" });
+  });
+
+  test("at capacity a destination is kept after its copy here is deleted and a backup restored, and another account is refused it", async () => {
+    const { TRANSFERS_KEPT, planContent, receiptSaved, transferKey } = await import("@/lib/player-workspace");
+    const original = transferKey(localStorage, A, FROST.id);
+    if (!original.ok) throw new Error(original.message);
+    expect(receiptSaved(localStorage, A, FROST.id, original.key, planContent(FROST)).ok).toBe(true);
+    await fill(TRANSFERS_KEPT - 1);
+    expect(transferKey(localStorage, A, id(99999))).toMatchObject({ ok: false, message: FULL });
+    seed(ANON, [FROST]);
+    expect(transferKey(localStorage, B, FROST.id)).toMatchObject({ ok: false, error: "other-owner" });
+    expect(journal()!.receipts[0]).toMatchObject({ planId: FROST.id, userId: A_ID, state: "saved" });
+  });
+
+  test("at capacity the panel says why a new plan is not sent, and sends nothing", async () => {
+    const { TRANSFERS_KEPT } = await import("@/lib/player-workspace");
+    await fill(TRANSFERS_KEPT);
+    seed(ANON, [FROST]);
+    await render();
+    await open();
+    await choose("Save Frost to your account", { Frost: "private" });
+    await click(saveButton());
+    expect(alerts()).toContain(FULL);
+    expect(posts).toEqual([]);
+    expect(journal()!.receipts).toHaveLength(TRANSFERS_KEPT);
+  });
+
+  test("a definite refusal marks the key failed and keeps it, so the retry, or another sender, sends the same key", async () => {
+    const { receiptFailed, transferKey } = await import("@/lib/player-workspace");
+    const first = transferKey(localStorage, A, FROST.id);
+    const second = transferKey(localStorage, A, FROST.id);
+    if (!first.ok || !second.ok) throw new Error("Expected two allocated receipts");
+    expect(second.key).toBe(first.key);
+    // Sender 2 reached the server and lost its answer. Sender 1 gets an owner-mismatch 409.
+    expect(receiptFailed(localStorage, A, FROST.id, first.key, "account_mismatch").ok).toBe(true);
+    expect(journal()!.receipts).toEqual([{ planId: FROST.id, userId: A_ID, key: first.key, state: "failed", reason: "account_mismatch", content: null, at: expect.any(String) }]);
+    const retry = transferKey(localStorage, A, FROST.id);
+    expect(retry).toMatchObject({ ok: true, key: second.key });
+    expect(journal()!.receipts[0]).toMatchObject({ state: "sending", reason: null });
+  });
+
+  test("overlapping UI sends retain the key after the first sender's 409 and the second sender's lost success", async () => {
+    installLocks();
+    seed(ANON, [FROST]);
+    let releaseFirst = () => {};
+    const firstAnswer = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    const workingFetch = globalThis.fetch;
+    let buildAttempts = 0;
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === "/api/me/builds" && init?.method === "POST") {
+        buildAttempts++;
+        if (buildAttempts === 1) {
+          // Another tab switched to B just for this request, then back to A.
+          who = B_ID;
+          const response = await workingFetch(input, init);
+          who = A_ID;
+          await firstAnswer;
+          return response;
+        }
+        const response = await workingFetch(input, init);
+        if (buildAttempts === 2) throw new TypeError("Lost second sender's committed response");
+        return response;
+      }
+      return workingFetch(input, init);
+    });
+    await render();
+    await open();
+    await choose("Save Frost to your account", { Frost: "private" });
+    await click(saveButton());
+    const firstRoot = root;
+    const firstContainer = container;
+    const secondContainer = document.createElement("div");
+    document.body.append(secondContainer);
+    const secondRoot = createRoot(secondContainer);
+    try {
+      root = secondRoot;
+      container = secondContainer;
+      await render();
+      await open();
+      await choose("Save Frost to your account", { Frost: "private" });
+      await click(saveButton());
+      expect(accounts[A_ID].builds).toHaveLength(1);
+      expect(posts[0].body.transferKey).toBe(posts[1].body.transferKey);
+    } finally {
+      await act(async () => secondRoot.unmount());
+      secondContainer.remove();
+      root = firstRoot;
+      container = firstContainer;
+      releaseFirst();
+      await settle();
+    }
+    await act(async () => root.render(<></>));
+    await render();
+    await open();
+    await choose("Save Frost to your account", { Frost: "private" });
+    await click(saveButton());
+    expect(accounts[A_ID].builds).toHaveLength(1);
+  });
+});
+
+describe("content decides, never dates", () => {
+  test("a clock moving backwards cannot discard a changed source copy when binding the sent snapshot", async () => {
+    const { editPlan, hiddenFrom, readWorkspace } = await import("@/lib/player-workspace");
+    // A restored backup's plan dated Nov 1, edited here while the clock says Oct 27.
+    const sent = { ...FROST, updatedAt: "2026-11-01T12:00:00.000Z" };
+    seed(ANON, [sent]);
+    const edit = editPlan(localStorage, ANON, sent.id, { name: sent.name, notes: "Unsent edit on this device" }, new Date("2026-10-27T12:00:00.000Z"));
+    expect(edit.ok).toBe(true);
+    const result = bindTransferred(localStorage, { owner: A, planIds: [sent.id], plans: [sent] }, { ok: true, userId: A_ID, planIds: [sent.id] });
+    expect(result.ok).toBe(true);
+    expect(stored(ANON)?.plans[0]?.notes).toBe("Unsent edit on this device");
+    // Not the account's either: the edit is shown signed out, unsaved.
+    const read = readWorkspace(localStorage, ANON);
+    if (!read.ok) throw new Error(read.message);
+    expect(hiddenFrom(localStorage, ANON, read.workspace).has(sent.id)).toBe(false);
+  });
+});
+
+describe("one character per alt and account", () => {
+  test("a lost character response reuses the already-created character on retry", async () => {
+    const jaina = alt({ planIds: [FROST.id] });
+    seed(ANON, [FROST], [jaina]);
+    const workingFetch = globalThis.fetch;
+    let loseCharacter = true;
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      const response = await workingFetch(input, init);
+      if (String(input) === "/api/me/characters" && init?.method === "POST" && loseCharacter) {
+        loseCharacter = false;
+        throw new TypeError("Lost character response after commit");
+      }
+      return response;
+    });
+    await render();
+    await open();
+    await choose("Save Frost to your account", { Frost: "private" });
+    await set(field("Character for Frost"), `alt:${jaina.id}`);
+    await click(saveButton());
+    expect(accounts[A_ID].characters).toHaveLength(1);
+    await open();
+    await choose("Save Frost to your account", { Frost: "private" });
+    await set(field("Character for Frost"), `alt:${jaina.id}`);
+    await click(saveButton());
+    expect(accounts[A_ID].characters).toHaveLength(1);
+    expect(posts.at(-1)!.body).toMatchObject({ name: "Frost", characterId: accounts[A_ID].characters[0].id });
+  });
+
+  test("two previews of the same alt do not create two characters during overlapping sends", async () => {
+    installLocks();
+    const jaina = alt({ planIds: [FROST.id] });
+    seed(ANON, [FROST], [jaina]);
+    await render();
+    await open();
+    await choose("Save Frost to your account", { Frost: "private" });
+    await set(field("Character for Frost"), `alt:${jaina.id}`);
+    const firstRoot = root;
+    const firstContainer = container;
+    const secondContainer = document.createElement("div");
+    document.body.append(secondContainer);
+    const secondRoot = createRoot(secondContainer);
+    let release = () => {};
+    try {
+      root = secondRoot;
+      container = secondContainer;
+      await render();
+      await open();
+      await choose("Save Frost to your account", { Frost: "private" });
+      await set(field("Character for Frost"), `alt:${jaina.id}`);
+      root = firstRoot;
+      container = firstContainer;
+      release = hold("POST /api/me/characters");
+      await click(saveButton());
+      root = secondRoot;
+      container = secondContainer;
+      await click(saveButton());
+    } finally {
+      await act(async () => secondRoot.unmount());
+      secondContainer.remove();
+      root = firstRoot;
+      container = firstContainer;
+      release();
+      await settle();
+    }
+    expect(accounts[A_ID].characters).toHaveLength(1);
+  });
+
+  test("a character on the account that matches the one this transfer would make is used, not made again", async () => {
+    accounts[A_ID].characters = [{ id: serverId(80), name: "Jaina", classSlug: "mage", realm: null, note: null }];
+    const jaina = alt({ planIds: [FROST.id] });
+    seed(ANON, [FROST], [jaina]);
+    await render();
+    await open();
+    await choose("Save Frost to your account", { Frost: "private" });
+    await set(field("Character for Frost"), `alt:${jaina.id}`);
+    await click(saveButton());
+    expect(posts.map((p) => p.url)).toEqual(["/api/me/builds"]);
+    expect(posts[0].body.characterId).toBe(serverId(80));
+    expect(accounts[A_ID].characters).toHaveLength(1);
   });
 });
