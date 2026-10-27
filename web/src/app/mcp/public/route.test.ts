@@ -1,7 +1,8 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { MCP_TOOL_NAMES } from "@everloot/protocol";
+import { MCP_TOOL_NAMES, MCP_TOOLS } from "@everloot/protocol";
+import { z } from "zod";
 
 /** The keyless list with EVERLOOT_GUILDS off: the protocol's tools less the guild ladder's two. */
 const PUBLIC_NAMES = MCP_TOOL_NAMES.filter((name) => name !== "guild_search" && name !== "guild_rankings");
@@ -12,6 +13,8 @@ import { replaceSourceRows } from "../../../../../kb/src/entities";
 import { snapshot } from "../../../../../kb/src/snapshot";
 
 const deps = vi.hoisted(() => ({ mcp: vi.fn(), loadCorpus: vi.fn() }));
+const changeFixtures = vi.hoisted(() => ({ entries: [] as import("@/lib/changes").ChangeEntry[] }));
+vi.mock("@/lib/changes", () => ({ loadTimeline: async () => changeFixtures.entries }));
 vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { mcp: deps.mcp } }));
 vi.mock("@/lib/upload-store", () => ({ uploadStore: { loadCorpus: deps.loadCorpus } }));
 
@@ -30,6 +33,28 @@ beforeEach(() => {
   deps.loadCorpus.mockReset().mockResolvedValue({ uploads: 0, records: [], dataAsOf: "2026-10-10T06:30:00.000Z" });
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); });
+
+test.each([1, 25])("mounted recent_changes excludes manual entries before limit %i and preserves schema and Blizzard attribution", async (limit) => {
+  changeFixtures.entries = [
+    { id: "manual:new", type: "hotfix", game: "retail", source: "manual", title: "Private manual fixture", at: "2026-10-24T00:00:00Z", url: "https://example.test/manual" },
+    { id: "manual:forever", type: "hotfix", game: "forever", source: "manual", title: "Manual Forever fixture", at: "2026-10-24T00:00:00Z", url: "https://example.test/manual" },
+    { id: "forum:1", type: "hotfix", game: "forever", source: "forum", title: "Official fixture", author: "Kaivax", at: "2026-10-23T18:00:00Z", url: "https://us.forums.blizzard.com/en/wow/t/x/1" },
+  ];
+  const { POST } = await route({ KB_SNAPSHOT_PATH: release, EVERLOOT_MCP_PUBLIC: "1" });
+  const res = await POST(new Request("https://everloot.app/mcp/public", {
+    method: "POST", headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "recent_changes", arguments: { limit, filter: "hotfixes" } } }),
+  }));
+  const answer = (await res.json()).result;
+  expect(answer.isError).not.toBe(true);
+  expect(z.object(MCP_TOOLS.recent_changes.outputSchema).safeParse(answer.structuredContent).success).toBe(true);
+  expect(JSON.stringify(answer)).not.toContain("manual");
+  expect(answer.structuredContent.entries).toHaveLength(1);
+  expect(answer.structuredContent.entries[0]).toMatchObject({ id: "forum:1", game: "forever", author: "Kaivax" });
+  expect(answer.content[0].text).toContain("Kaivax");
+  expect(answer.content[0].text).not.toMatch(/By:\s*\n/);
+  changeFixtures.entries = [];
+});
 
 async function route(env: Record<string, string>) {
   for (const [k, v] of Object.entries(env)) vi.stubEnv(k, v);

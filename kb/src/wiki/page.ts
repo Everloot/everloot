@@ -5,6 +5,7 @@
  */
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
+import versions from "../../../web/src/data/build-versions.json" with { type: "json" };
 
 export const PAGE_TYPES = ["dungeon", "raid", "zone", "npc", "faction", "item-set", "event", "concept", "change", "race", "class"] as const;
 export type PageType = (typeof PAGE_TYPES)[number];
@@ -145,11 +146,24 @@ export const MARKDOWN_LINK = /\[([^\]\n]+)\]\((https:\/\/[^)\s]+|\/[^)\s]*)\)/g;
 /** The site's own origins, as URL gives them: the host in lower case and the default port left out. */
 const SITE_ORIGINS: ReadonlySet<string> = new Set(["https://everloot.app", "https://www.everloot.app"]);
 
+/** The prefixes a game version's pages also answer at, from the table the site's rewrites read: /beta/wiki/x is /wiki/x. */
+const VERSION_PREFIXES: readonly string[] = Object.values(versions.prefixes);
+
+/** A path without the version prefix it starts with: /beta/wiki/x is /wiki/x, and /beta is /. A path that only starts with
+ *  a prefix's letters, or with none, comes back as it is. The site's own copy is in web/src/lib/build-versions.ts. */
+export function withoutVersionPrefix(path: string): string {
+  for (const prefix of VERSION_PREFIXES) {
+    if (path === prefix || path.startsWith(`${prefix}/`)) return path.slice(prefix.length) || "/";
+  }
+  return path;
+}
+
 /**
  * The wiki page a link's address points at: "deadmines" for `/wiki/deadmines`, also with a trailing slash, a query or a
- * fragment, or written out in full on the site. The address is read as a browser reads it on the site, so the host's
- * case, a default port, a dot segment or a backslash changes nothing. Null for any other address, the hub included;
- * another port or host is another site. The page part is kept as the URL gives it, so any other spelling names no page.
+ * fragment, written out in full on the site, or through a game version's prefix (`/beta/wiki/deadmines`). The address is
+ * read as a browser reads it on the site, so the host's case, a default port, a dot segment or a backslash changes
+ * nothing. Null for any other address, the hub included; another port or host is another site. The page part is kept
+ * as the URL gives it, so any other spelling names no page.
  */
 export function wikiLinkTarget(href: string): string | null {
   let url: URL;
@@ -158,8 +172,9 @@ export function wikiLinkTarget(href: string): string | null {
   } catch {
     return null;
   }
-  if (!SITE_ORIGINS.has(url.origin) || !url.pathname.startsWith("/wiki/")) return null;
-  return url.pathname.slice("/wiki/".length).replace(/\/+$/, "") || null;
+  const path = withoutVersionPrefix(url.pathname);
+  if (!SITE_ORIGINS.has(url.origin) || !path.startsWith("/wiki/")) return null;
+  return path.slice("/wiki/".length).replace(/\/+$/, "") || null;
 }
 
 const LIST_ITEM = /^\s*(?:[-*+]|\d+\.)\s+/;

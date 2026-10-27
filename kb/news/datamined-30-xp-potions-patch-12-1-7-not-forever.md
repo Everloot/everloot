@@ -8,6 +8,11 @@ tags: [datamine, live, unconfirmed, retail-only]
 sources:
   - title: "Wowhead: New 30% Bonus Experience Potions Datamined on Patch 12.1.7 PTR"
     url: https://www.wowhead.com/news/new-30-bonus-experience-potions-datamined-on-patch-12-1-7-ptr-383566
+hero:
+  src: /news/heroes/datamined-30-xp-potions-patch-12-1-7-not-forever/datamined-30-xp-potions-patch-12-1-7-not-forever-clean.webp
+  alt: "Everloot illustration: grey XP potion bottles under a Retail chip, marking a retail datamine that is not about WoW: Forever"
+  thumb: /news/heroes/datamined-30-xp-potions-patch-12-1-7-not-forever/datamined-30-xp-potions-patch-12-1-7-not-forever-card.webp
+  share: /news/heroes/datamined-30-xp-potions-patch-12-1-7-not-forever/datamined-30-xp-potions-patch-12-1-7-not-forever-share.png
 status: published
 ---
 

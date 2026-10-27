@@ -16,6 +16,7 @@ vi.mock("@/lib/supabase/server", () => ({ getUser: auth.getUser, authQuery: auth
 
 import MyBuildsPage from "./page";
 import CharacterPage from "./characters/[id]/page";
+import { loadCatalog } from "@/lib/talents/catalogs";
 
 const USER = { id: "11111111-2222-4333-8444-555555555555", name: "Thrall#1" };
 const JAINA = "2b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e22";
@@ -93,6 +94,24 @@ test("a character's page lists its builds, the active mark and the quiet older-b
   expect(html).toContain('aria-label="Edit character"');
   // The class is fixed while builds are filed under it.
   expect(html).toMatch(/<select[^>]*disabled/);
+});
+
+test("the game build's marker says older only when it is older, newer when it is newer, and nothing for the tree's build or one that cannot be read", async () => {
+  const { build: tree } = await loadCatalog("mage");
+  const parts = tree.split(".");
+  const step = (by: number) => [...parts.slice(0, -1), String(Number(parts.at(-1)) + by)].join(".");
+  // 9999 comes before 70450 as a number, though not as text.
+  const games = [step(-1), "1.0.0.9999", step(1), tree, "", "latest", "1.60"];
+  builds = games.map((game_build, i) => build({ id: `${i}b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e0${i}`, slug: `Game${i}aaa`, name: `Build ${i}`, character_id: JAINA, game_build }));
+  const html = renderToStaticMarkup(await characterPage(JAINA));
+  expect(html.match(/made on an older game build/g)).toHaveLength(2);
+  expect(html.match(/made on a newer game build/g)).toHaveLength(1);
+  expect(html).toMatch(/data-badge="files" title="Made on a newer game build[^"]*"/);
+  // The phone line says the same, build by build.
+  expect(html).toContain(`· ${step(-1)} (older build) ·`);
+  expect(html).toContain("· 1.0.0.9999 (older build) ·");
+  expect(html).toContain(`· ${step(1)} (newer build) ·`);
+  for (const plain of [tree, "latest", "1.60"]) expect(html, plain).toContain(`· ${plain} ·`);
 });
 
 test("another player's character, or a malformed id, is a 404", async () => {

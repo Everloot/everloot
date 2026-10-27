@@ -5,8 +5,8 @@ import { className } from "@/components/builds/describe";
 import { Card, CopyButton, Field, SectionHeading } from "@/components/ui";
 import { restoreLines } from "@/lib/alt-workspace";
 import {
-  BACKUP_TOO_LARGE, WORKSPACE_LIMITS, applyImport, bucketKey, copyPlan, deletePlan, deviceStorage, editPlan, exportBackup, storedCounts,
-  orderState, previewImport, readPlanText, readWorkspace, sameOwner, savePlan,
+  BACKUP_TOO_LARGE, WORKSPACE_LIMITS, applyImport, bucketKey, copyPlan, deletePlan, deviceStorage, editPlan, exportBackup, hiddenFrom, storedCounts,
+  orderState, previewImport, readPlanText, readWorkspace, sameOwner, savePlan, sentPlans, withWorkspaceLock,
   type Failure, type ImportPreview, type LocalPlan, type Owner, type PlanText, type ReadResult,
 } from "@/lib/player-workspace";
 import { planHash, replacePlanHash } from "@/lib/talents/import";
@@ -15,7 +15,9 @@ import { useWorkspaceOwner } from "./LocalPlanSave";
 // /tools/builds: the plans kept in this browser (lib/player-workspace.ts) for whoever is signed in now, or for
 // the browser signed out. Named, opened, edited, copied, deleted, backed up and restored here, with nothing sent:
 // the page asks the network only who is signed in. The calculator's Save on this device opens it with the plan in
-// the address fragment, to be named and saved here.
+// the address fragment, to be named and saved here. Every change is made holding the workspace lock
+// (withWorkspaceLock), one tab at a time, as a transfer's are. A signed-out plan an account has now (a transfer saved
+// it there) is that account's: it is not shown here, or in a backup from here (hiddenFrom).
 
 const action = "inline-flex min-h-8 items-center px-1.5 text-cell text-fg-2 hover:text-accent disabled:opacity-60";
 const textarea = "w-full rounded-control border border-edge bg-canvas px-3 py-2 text-base text-fg";
@@ -100,12 +102,21 @@ export default function DevicePlans() {
 
 function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | null; onSentDone: () => void }) {
   const [read, setRead] = useState<ReadResult | null>(null);
-  const [message, setMessage] = useState<{ text: string; alert: boolean; inUse?: boolean } | null>(null);
-  const reload = useCallback(() => setRead(readWorkspace(deviceStorage(), owner)), [owner]);
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [message, setMessage] = useState<{ text: string; alert: boolean; inUse?: boolean; focus?: boolean } | null>(null);
+  // An alert that comes in place of the control pressed (a refused clear, its damaged text since repaired) takes the focus.
+  const alertRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => { if (message?.focus) alertRef.current?.focus(); }, [message]);
+  const reload = useCallback(() => {
+    const storage = deviceStorage();
+    const now = readWorkspace(storage, owner);
+    setRead(now);
+    setHidden(now.ok ? hiddenFrom(storage, owner, now.workspace) : new Set());
+  }, [owner]);
   useEffect(() => {
     reload();
-    // Another tab's change to this bucket shows here too.
-    const onStorage = (event: StorageEvent) => { if (event.key === null || event.key === bucketKey(owner)) reload(); };
+    // Another tab's change to this bucket shows here too. Signed out, so does one to an account's, which may take a plan.
+    const onStorage = (event: StorageEvent) => { if (event.key === null || event.key === bucketKey(owner) || owner.kind === "anonymous") reload(); };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, [owner, reload]);
@@ -118,7 +129,10 @@ function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | nu
         : "Plans saved on this device while signed in to this account. Signed out or under another account this page does not show them, but they are not encrypted: anyone using this browser can read its storage."}
     </p>
   );
-  if (!read.ok) return <div className="space-y-6">{intro}<StoredProblem read={read} owner={owner} onCleared={reload} /></div>;
+  if (!read.ok) {
+    const cleared = (refused: string | null) => { reload(); setMessage(refused ? { text: refused, alert: true, focus: true } : null); };
+    return <div className="space-y-6">{intro}<StoredProblem read={read} owner={owner} onCleared={cleared} /></div>;
+  }
 
   /** Shows what a change did; the list is read back from storage, so it never shows a save that did not happen. */
   const after = (result: { ok: true } | Failure, done: string) => {
@@ -126,21 +140,21 @@ function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | nu
     setMessage(result.ok ? { text: done, alert: false } : { text: result.message, alert: true, inUse: result.error === "referenced" });
     return result.ok;
   };
-  const storage = deviceStorage();
-  const plans = [...read.workspace.plans].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const shown = read.workspace.plans.filter((p) => !hidden.has(p.id));
+  const plans = [...shown].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
   return (
     <div className="space-y-8">
       {intro}
       {sent && (sent.ok
-        ? <SaveSent found={sent} plans={read.workspace.plans} owner={owner} onDone={(saved) => { onSentDone(); if (saved) after({ ok: true }, saved); }} />
+        ? <SaveSent found={sent} plans={shown} owner={owner} onDone={(saved) => { onSentDone(); if (saved) after({ ok: true }, saved); }} />
         : <SentProblem message={sent.message} onClose={onSentDone} />)}
       <SaveFromLink owner={owner} onSaved={(text) => after({ ok: true }, text)} />
       <section aria-labelledby="device-plans">
         <SectionHeading id="device-plans" note={`${plans.length} of ${WORKSPACE_LIMITS.plans}, newest first. ${UNCHECKED}`}>Your plans</SectionHeading>
         <p role="status" className="mb-3 text-sm text-fg-2 empty:hidden">{message && !message.alert ? message.text : ""}</p>
         {message?.alert && (
-          <p role="alert" className="mb-3 text-sm text-danger">
+          <p ref={alertRef} tabIndex={-1} role="alert" className="mb-3 text-sm text-danger">
             {message.text}
             {message.inUse && <> See <a href="/tools/alts" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Alts on this device</a> to let go of it there first.</>}
           </p>
@@ -159,15 +173,15 @@ function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | nu
               <PlanItem
                 key={plan.id}
                 plan={plan}
-                onEdit={(edit) => {
-                  const result = editPlan(storage, owner, plan.id, edit);
+                onEdit={async (edit) => {
+                  const result = await withWorkspaceLock(() => editPlan(deviceStorage(), owner, plan.id, edit));
                   if (result.ok) { after(result, `Saved "${result.plan.name}".`); return null; }
                   // A plan deleted in another tab leaves the list, and its form with it: say so above the list.
                   if (result.error === "missing") { after(result, ""); return null; }
                   return result.message;
                 }}
-                onCopy={() => { const result = copyPlan(storage, owner, plan.id); after(result, result.ok ? `Made "${result.plan.name}".` : ""); }}
-                onDelete={() => after(deletePlan(storage, owner, plan.id), `Deleted "${plan.name}" from this device.`)}
+                onCopy={async () => { const result = await withWorkspaceLock(() => copyPlan(deviceStorage(), owner, plan.id)); after(result, result.ok ? `Made "${result.plan.name}".` : ""); }}
+                onDelete={async () => after(await withWorkspaceLock(() => deletePlan(deviceStorage(), owner, plan.id)), `Deleted "${plan.name}" from this device.`)}
                 onCopied={(ok) => setMessage(ok
                   ? { text: "Link copied. It opens the plan in the talent calculator.", alert: false }
                   : { text: "Copy failed. Use Open, then copy the address.", alert: true })}
@@ -184,7 +198,7 @@ function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | nu
 function PlanItem({ plan, onEdit, onCopy, onDelete, onCopied }: {
   plan: LocalPlan;
   /** Null when it saved, else why not. */
-  onEdit: (edit: { name: string; notes: string }) => string | null;
+  onEdit: (edit: { name: string; notes: string }) => Promise<string | null>;
   onCopy: () => void;
   onDelete: () => void;
   onCopied: (ok: boolean) => void;
@@ -210,16 +224,16 @@ function PlanItem({ plan, onEdit, onCopy, onDelete, onCopied }: {
           <button type="button" className={action} onClick={() => setConfirming(true)}>Delete</button>
         )}
       </div>
-      {editing && <EditForm plan={plan} onSave={(edit) => { const error = onEdit(edit); if (!error) setEditing(false); return error; }} onCancel={() => setEditing(false)} />}
+      {editing && <EditForm plan={plan} onSave={async (edit) => { const error = await onEdit(edit); if (!error) setEditing(false); return error; }} onCancel={() => setEditing(false)} />}
     </li>
   );
 }
 
-function EditForm({ plan, onSave, onCancel }: { plan: LocalPlan; onSave: (edit: { name: string; notes: string }) => string | null; onCancel: () => void }) {
+function EditForm({ plan, onSave, onCancel }: { plan: LocalPlan; onSave: (edit: { name: string; notes: string }) => Promise<string | null>; onCancel: () => void }) {
   const [form, setForm] = useState({ name: plan.name, notes: plan.notes });
   const [error, setError] = useState<string | null>(null);
   return (
-    <form aria-label={`Edit ${plan.name}`} onSubmit={(e) => { e.preventDefault(); setError(onSave(form)); }}
+    <form aria-label={`Edit ${plan.name}`} onSubmit={async (e) => { e.preventDefault(); setError(await onSave(form)); }}
       className="grid gap-3 rounded-control border border-line bg-canvas p-3 sm:grid-cols-2">
       <Field label="Name" required maxLength={WORKSPACE_LIMITS.name} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
       <label className="block space-y-1 text-sm sm:col-span-2">
@@ -250,10 +264,11 @@ function SaveFromLink({ owner, onSaved }: { owner: Owner; onSaved: (text: string
     if (result.ok) setForm({ name: `${className(result.classSlug)} plan`, notes: "" });
   }
 
-  function save(event: FormEvent<HTMLFormElement>) {
+  async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!found) return;
-    const result = savePlan(deviceStorage(), owner, { ...form, classSlug: found.classSlug, codes: found.codes, orders: found.orders });
+    const input = { ...form, classSlug: found.classSlug, codes: found.codes, orders: found.orders };
+    const result = await withWorkspaceLock(() => savePlan(deviceStorage(), owner, input));
     if (!result.ok) { setError(result.message); return; }
     setFound(null);
     setText("");
@@ -306,9 +321,10 @@ function SaveSent({ found, plans, owner, onDone }: {
     setForm({ target: plan?.id ?? "", name: plan?.name ?? fresh, notes: plan?.notes ?? "" });
   }
 
-  function save(event: FormEvent<HTMLFormElement>) {
+  async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const result = savePlan(deviceStorage(), owner, { id: form.target || null, name: form.name, notes: form.notes, classSlug: found.classSlug, codes: found.codes, orders: found.orders });
+    const input = { id: form.target || null, name: form.name, notes: form.notes, classSlug: found.classSlug, codes: found.codes, orders: found.orders };
+    const result = await withWorkspaceLock(() => savePlan(deviceStorage(), owner, input));
     if (!result.ok) { setError(result.message); return; }
     onDone(`${form.target ? "Updated" : "Saved"} "${result.plan.name}" on this device.`);
   }
@@ -378,7 +394,7 @@ function Backup({ owner, onRestored }: { owner: Owner; onRestored: (result: { ok
   function download() {
     // This bucket as stored now, so a change another tab made is in the file too.
     const now = readWorkspace(deviceStorage(), owner);
-    const backup = now.ok ? exportBackup(now.workspace) : now;
+    const backup = now.ok ? exportBackup(now.workspace, new Date(), hiddenFrom(deviceStorage(), owner, now.workspace)) : now;
     if (!backup.ok) { setError(backup.message); return; }
     setError(null);
     saveFile(backup.text, backup.fileName);
@@ -401,17 +417,18 @@ function Backup({ owner, onRestored }: { owner: Owner; onRestored: (result: { ok
     // Previewed against the bucket as stored now, not as this page last showed it.
     const now = readWorkspace(deviceStorage(), owner);
     if (!now.ok) { setError(now.message); return; }
-    const result = previewImport(text, now.workspace);
+    const result = previewImport(text, now.workspace, sentPlans(deviceStorage()));
     if (!result.ok) { setError(result.message); return; }
     setPreview(result.preview);
     setAltLines(restoreLines(now.workspace, result.preview));
   }
 
-  function restore() {
+  async function restore() {
     if (!preview) return;
-    const result = applyImport(deviceStorage(), owner, preview);
+    const shown = preview;
     setPreview(null);
-    onRestored(result, `Restored the backup: ${plural(preview.added, "plan")} added and ${preview.updated.toLocaleString("en-US")} updated.`);
+    const result = await withWorkspaceLock(() => applyImport(deviceStorage(), owner, shown));
+    onRestored(result, `Restored the backup: ${plural(shown.added, "plan")} added and ${shown.updated.toLocaleString("en-US")} updated.`);
   }
 
   const changes = preview ? preview.added + preview.updated + preview.others : 0;
@@ -446,37 +463,63 @@ function Backup({ owner, onRestored }: { owner: Owner; onRestored: (result: { ok
   );
 }
 
+/** Said when the stored text changed between Clear being confirmed and done. */
+const NOT_CLEARED = "What is stored here changed in another tab, so nothing was cleared.";
+
 /** Stored plans that do not read: kept as they are, with their text to download. Damaged ones can be cleared,
- *  after saying everything that deletes and offering the download again; a newer version's are left for that
- *  version to open. */
-function StoredProblem({ read, owner, onCleared }: { read: Extract<ReadResult, { ok: false }>; owner: Owner; onCleared: () => void }) {
-  const [confirming, setConfirming] = useState(false);
+ *  after saying everything that deletes and offering the download again, and only as they were when that was said;
+ *  a newer version's are left for that version to open. `onCleared` is told why nothing was cleared, if it was not. */
+function StoredProblem({ read, owner, onCleared }: { read: Extract<ReadResult, { ok: false }>; owner: Owner; onCleared: (refused: string | null) => void }) {
+  /** The stored text the player is asked to clear, as shown: other text needs asking of its own. */
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [refused, setRefused] = useState(false);
   const raw = read.raw;
-  function clear() {
-    try { deviceStorage()?.removeItem(bucketKey(owner)); } catch { /* the read that follows says what is still there */ }
-    onCleared();
+  // A refused clear takes away the control pressed: the focus goes to Clear again, or, with none, to why.
+  const clearButton = useRef<HTMLButtonElement>(null);
+  const refusedLine = useRef<HTMLParagraphElement>(null);
+  const refocus = useRef(false);
+  useEffect(() => {
+    if (!refocus.current) return;
+    refocus.current = false;
+    (clearButton.current ?? refusedLine.current)?.focus();
+  });
+  async function clear(confirmed: string) {
+    // Under the lock, and only the text confirmed: text another tab changed, or repaired, while this waited stays.
+    const cleared = await withWorkspaceLock(() => {
+      try {
+        const storage = deviceStorage();
+        if (storage?.getItem(bucketKey(owner)) !== confirmed) return false;
+        storage.removeItem(bucketKey(owner));
+      } catch { /* the read that follows says what is still there */ }
+      return true;
+    });
+    refocus.current = !cleared;
+    setConfirming(null);
+    setRefused(!cleared);
+    onCleared(cleared ? null : NOT_CLEARED);
   }
   const download = (text: string) => saveFile(text, `everloot-plans-stored-${new Date().toISOString().slice(0, 10)}.txt`);
   return (
     <Card>
       <p role="alert" className="text-fg">{read.message}</p>
-      {raw !== null && !confirming && (
+      {refused && <p ref={refusedLine} tabIndex={-1} role="alert" className="mt-3 text-sm text-danger">{NOT_CLEARED}</p>}
+      {raw !== null && confirming !== raw && (
         <div className="mt-4 flex flex-wrap gap-2">
           <button type="button" className="btn text-sm" onClick={() => download(raw)}>Download what is stored</button>
-          {read.error === "corrupt" && <button type="button" className="btn text-sm" onClick={() => setConfirming(true)}>Clear stored plans</button>}
+          {read.error === "corrupt" && <button ref={clearButton} type="button" className="btn text-sm" onClick={() => { setRefused(false); setConfirming(raw); }}>Clear stored plans</button>}
         </div>
       )}
-      {raw !== null && read.error === "corrupt" && confirming && (
+      {raw !== null && read.error === "corrupt" && confirming === raw && (
         <div role="group" aria-label="Clear what is stored" className="mt-4 space-y-3 rounded-control border border-line bg-canvas p-3">
           <p className="text-sm text-fg">{clearingLine(raw, owner)}</p>
           <div className="flex flex-wrap gap-2">
             <button type="button" className="btn text-sm" onClick={() => download(raw)}>Download what is stored</button>
-            <button type="button" className="btn text-sm" onClick={clear}>Clear for good</button>
-            <button type="button" className="btn text-sm" onClick={() => setConfirming(false)}>Cancel</button>
+            <button type="button" className="btn text-sm" onClick={() => clear(raw)}>Clear for good</button>
+            <button type="button" className="btn text-sm" onClick={() => setConfirming(null)}>Cancel</button>
           </div>
         </div>
       )}
-      {read.error === "corrupt" && !confirming && <p className="mt-3 text-sm text-muted">Clearing removes it from this browser for good. Download it first to keep a copy.</p>}
+      {read.error === "corrupt" && confirming !== raw && <p className="mt-3 text-sm text-muted">Clearing removes it from this browser for good. Download it first to keep a copy.</p>}
     </Card>
   );
 }

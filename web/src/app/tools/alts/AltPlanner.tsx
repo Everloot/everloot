@@ -7,8 +7,8 @@ import {
   DETAIL_WORDS, FIELD_WORDS, altFailure, copyNumbers, deleteAlt, detailsLine, listOf, restoreLines, saveAlt, type AltField, type AltInput,
 } from "@/lib/alt-workspace";
 import {
-  ALT_PROFESSIONS, BACKUP_TOO_LARGE, WORKSPACE_LIMITS, applyImport, bucketKey, deviceStorage, exportBackup, newFormatOverflow, previewImport,
-  readWorkspace, type Failure, type ImportPreview, type LocalAlt, type LocalPlan, type Owner, type ReadResult,
+  ALT_PROFESSIONS, BACKUP_TOO_LARGE, WORKSPACE_LIMITS, applyImport, bucketKey, deviceStorage, exportBackup, hiddenFrom, newFormatOverflow, previewImport,
+  readWorkspace, sentPlans, withWorkspaceLock, type Failure, type ImportPreview, type LocalAlt, type LocalPlan, type Owner, type ReadResult,
 } from "@/lib/player-workspace";
 import { TALENT_CLASSES } from "@/lib/talents/catalogs";
 import { planHash } from "@/lib/talents/import";
@@ -18,6 +18,7 @@ import ReadSaveFile from "./ReadSaveFile";
 // as Plans on this device: for whoever is signed in now, or for the browser signed out. An alt is added by hand or
 // from the player's own Everloot.lua (ReadSaveFile), edited, deleted once a backup is offered, backed up and restored.
 // The page asks the network who is signed in and nothing else; what is typed here and what the file holds stay here.
+// Each change is written under the workspace lock (withWorkspaceLock), as every writer of these buckets is.
 
 const action = "inline-flex min-h-8 items-center px-1.5 text-cell text-fg-2 hover:text-accent disabled:opacity-60";
 const control = "min-h-11 w-full rounded-control border border-edge bg-canvas px-3 text-base text-fg";
@@ -70,8 +71,8 @@ function Bucket({ owner }: { owner: Owner }) {
   const reload = useCallback(() => setRead(readWorkspace(deviceStorage(), owner)), [owner]);
   useEffect(() => {
     reload();
-    // Another tab's change to this bucket shows here too.
-    const onStorage = (event: StorageEvent) => { if (event.key === null || event.key === bucketKey(owner)) reload(); };
+    // Another tab's change to this bucket shows here too. Signed out, so does one to an account's, which may take a plan.
+    const onStorage = (event: StorageEvent) => { if (event.key === null || event.key === bucketKey(owner) || owner.kind === "anonymous") reload(); };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, [owner, reload]);
@@ -94,13 +95,16 @@ function Bucket({ owner }: { owner: Owner }) {
   /** A backup of this bucket as stored now, so a change another tab made is in it too. Null when it downloaded. */
   const download = (): string | null => {
     const now = readWorkspace(deviceStorage(), owner);
-    const backup = now.ok ? exportBackup(now.workspace) : now;
+    const backup = now.ok ? exportBackup(now.workspace, new Date(), hiddenFrom(deviceStorage(), owner, now.workspace)) : now;
     if (!backup.ok) return altFailure(backup.error).message;
     saveFile(backup.text, backup.fileName);
     return null;
   };
   const storage = deviceStorage();
-  const { plans, alts } = read.workspace;
+  const { alts } = read.workspace;
+  // A signed-out plan an account has now is that account's: not offered or shown here (hiddenFrom). Its alt keeps it.
+  const hidden = hiddenFrom(storage, owner, read.workspace);
+  const plans = read.workspace.plans.filter((p) => !hidden.has(p.id));
   const copies = copyNumbers(alts);
   // Said before anything is tried: in the newer format the same alts take more room than this device has left.
   const overflow = newFormatOverflow(read.workspace);
@@ -118,8 +122,8 @@ function Bucket({ owner }: { owner: Owner }) {
       )}
       <Card as="section" aria-labelledby="alts-add">
         <SectionHeading id="alts-add" note="A name is all an alt needs. Leave out what you do not know: nothing is filled in for you.">Add an alt</SectionHeading>
-        <AltForm label="Add an alt" alt={null} plans={plans} submit="Add alt" onSave={(input) => {
-          const result = saveAlt(storage, owner, input);
+        <AltForm label="Add an alt" alt={null} plans={plans} submit="Add alt" onSave={async (input) => {
+          const result = await withWorkspaceLock(() => saveAlt(storage, owner, input));
           if (!result.ok) return { message: result.message };
           after(result, `Added "${result.alt.name}" to this device.`);
           return null;
@@ -140,8 +144,8 @@ function Bucket({ owner }: { owner: Owner }) {
                 alt={alt}
                 copy={copies.get(alt.id) ?? null}
                 plans={plans}
-                onSave={(input) => {
-                  const result = saveAlt(storage, owner, input);
+                onSave={async (input) => {
+                  const result = await withWorkspaceLock(() => saveAlt(storage, owner, input));
                   if (result.ok) { after(result, `Saved "${result.alt.name}".`); return null; }
                   // An alt deleted in another tab leaves the list, and its form with it: say so above the list.
                   if (result.error === "missing") { after(result, ""); return null; }
@@ -150,7 +154,7 @@ function Bucket({ owner }: { owner: Owner }) {
                   return { message: result.message, current: result.current, changed: result.changed };
                 }}
                 onBackup={() => { const problem = download(); setMessage(problem ? { text: problem, alert: true } : null); }}
-                onDelete={() => after(deleteAlt(storage, owner, alt.id), `Deleted "${alt.name}" from this device.`)}
+                onDelete={async () => after(await withWorkspaceLock(() => deleteAlt(storage, owner, alt.id)), `Deleted "${alt.name}" from this device.`)}
               />
             ))}
           </ul>
@@ -209,7 +213,7 @@ function AltForm({ label, alt, plans, submit, onSave, onCancel }: {
   alt: LocalAlt | null;
   plans: LocalPlan[];
   submit: string;
-  onSave: (input: AltInput) => SaveProblem;
+  onSave: (input: AltInput) => Promise<SaveProblem>;
   onCancel?: () => void;
 }) {
   const [form, setForm] = useState<FormState>(alt ? formOf(alt) : BLANK);
@@ -217,14 +221,18 @@ function AltForm({ label, alt, plans, submit, onSave, onCancel }: {
   // against it, so what another tab saved since is never written over unseen.
   const [base, setBase] = useState<LocalAlt | null>(alt);
   const [error, setError] = useState<string[] | null>(null);
+  /** A save waiting for the workspace lock: pressing save again meanwhile saves nothing more. */
+  const saving = useRef(false);
 
-  function save(event: FormEvent<HTMLFormElement>) {
+  async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (saving.current) return;
+    saving.current = true;
     const level = form.level.trim();
-    const problem = onSave({
+    const problem = await onSave({
       id: alt?.id ?? null, name: form.name, realm: form.realm, classSlug: form.classSlug || null, faction: form.faction || null,
       level: level === "" ? null : Number(level), professions: form.professions, notes: form.notes, planIds: form.planIds, base,
-    });
+    }).finally(() => { saving.current = false; });
     if (problem?.current && problem.changed && base) {
       const merged = reconcile(form, formOf(base), formOf(problem.current), problem.changed, plans);
       setForm(merged.form);
@@ -302,7 +310,7 @@ function AltItem({ alt, copy, plans, onSave, onBackup, onDelete }: {
   /** Its number among alts that read alike (copyNumbers), null when it reads like no other. */
   copy: number | null;
   plans: LocalPlan[];
-  onSave: (input: AltInput) => SaveProblem;
+  onSave: (input: AltInput) => Promise<SaveProblem>;
   onBackup: () => void;
   onDelete: () => void;
 }) {
@@ -339,7 +347,7 @@ function AltItem({ alt, copy, plans, onSave, onBackup, onDelete }: {
       )}
       {editing && (
         <AltForm label={`Edit ${alt.name}`} alt={alt} plans={plans} submit="Save" onCancel={() => setEditing(false)}
-          onSave={(input) => { const error = onSave(input); if (!error) setEditing(false); return error; }} />
+          onSave={async (input) => { const error = await onSave(input); if (!error) setEditing(false); return error; }} />
       )}
     </li>
   );
@@ -375,14 +383,14 @@ function Backup({ owner, download, onRestored }: {
     // Previewed against the bucket as stored now, not as this page last showed it.
     const now = readWorkspace(deviceStorage(), owner);
     if (!now.ok) { setError(altFailure(now.error).message); return; }
-    const result = previewImport(text, now.workspace);
+    const result = previewImport(text, now.workspace, sentPlans(deviceStorage()));
     if (!result.ok) { setError(result.message); return; }
     setPreview({ preview: result.preview, lines: restoreLines(now.workspace, result.preview) });
   }
 
-  function restore() {
+  async function restore() {
     if (!preview) return;
-    const result = applyImport(deviceStorage(), owner, preview.preview);
+    const result = await withWorkspaceLock(() => applyImport(deviceStorage(), owner, preview.preview));
     setPreview(null);
     onRestored(result.ok ? result : altFailure(result.error), "Restored the backup.");
   }

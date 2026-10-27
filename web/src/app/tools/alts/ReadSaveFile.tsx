@@ -7,7 +7,7 @@ import {
   type AltImportPreview, type DetailChange, type ImportRow, type RowChoice,
 } from "@/lib/alt-import";
 import { DETAIL_WORDS, altFailure, altKey, altLabel, copyNumbers, detailValue, detailsLine, listOf } from "@/lib/alt-workspace";
-import { WORKSPACE_LIMITS, deviceStorage, readWorkspace, type LocalAlt, type Owner } from "@/lib/player-workspace";
+import { WORKSPACE_LIMITS, deviceStorage, readWorkspace, withWorkspaceLock, type LocalAlt, type Owner } from "@/lib/player-workspace";
 
 // The player's Everloot.lua, read in this page (lib/alt-import.ts) and its characters added as alts after a preview.
 // The file's text goes from the file to the reader and no further: it is not uploaded or stored, and is not kept once
@@ -117,6 +117,7 @@ export default function ReadSaveFile({ owner, onApplied }: {
   // Gone with its bucket: a file still being read when the account changes is not previewed for the next one.
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  const applying = useRef(false);
 
   async function choose(file: File) {
     setError(null);
@@ -142,9 +143,12 @@ export default function ReadSaveFile({ owner, onApplied }: {
     setChoices(defaultChoices(next));
   }
 
-  function apply() {
-    if (!preview) return;
-    const result = applyAltImport(deviceStorage(), owner, preview.preview, choices);
+  async function apply() {
+    if (!preview || applying.current) return;
+    // Under the workspace lock every writer of these alts takes; pressing Add again while it waits adds nothing more.
+    applying.current = true;
+    const result = await withWorkspaceLock(() => applyAltImport(deviceStorage(), owner, preview.preview, choices))
+      .finally(() => { applying.current = false; });
     if (!result.ok) {
       setError(result.message);
       // A choice the device has no room for can be changed; anything else needs the file read again.

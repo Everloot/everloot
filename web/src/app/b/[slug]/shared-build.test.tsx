@@ -76,6 +76,24 @@ test("a signed-in visitor can save a copy, and the owner's name shows only when 
   expect(html).toContain('data-badge="files"');
 });
 
+test("the game build's badge says older only when it is older, newer when it is newer, and nothing when it is the tree's or unreadable", async () => {
+  const { build } = await loadCatalog("mage");
+  const parts = build.split(".");
+  const older = [...parts.slice(0, -1), String(Number(parts.at(-1)) - 1)].join(".");
+  const newer = [...parts.slice(0, -1), String(Number(parts.at(-1)) + 1)].join(".");
+  const badges = async (gameBuild: string) => {
+    auth.authQuery.mockResolvedValue(shared({ game_build: gameBuild }));
+    const html = renderToStaticMarkup(await SharedBuildPage(params()));
+    return [/made on an older game build/.test(html), /made on a newer game build/.test(html)];
+  };
+  expect(await badges(older)).toEqual([true, false]);
+  // 9999 comes before 70450 as a number, though not as text.
+  expect(await badges("1.0.0.9999")).toEqual([true, false]);
+  expect(await badges(newer)).toEqual([false, true]);
+  expect(await badges(build)).toEqual([false, false]);
+  for (const junk of ["", "1.60", "1.60.x.1", "latest"]) expect(await badges(junk), junk).toEqual([false, false]);
+});
+
 test("not indexed, canonical to the class page, with the saved build's own card", async () => {
   const meta = await generateMetadata(params());
   expect(meta.robots).toEqual({ index: false, follow: true });

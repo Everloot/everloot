@@ -5,6 +5,7 @@ import { expect, test } from "vitest";
 import { checkNews, MIN_POST_WORDS, type NewsCheckContext, type NewsFile } from "../src/news/check.js";
 import { publishedWikiSlugs, readNewsPosts } from "../src/news/data.js";
 import { loadPrivatePathPattern } from "../src/wiki/data.js";
+import { parsePost, PostFrontMatter } from "../src/news/post.js";
 
 const ctx: NewsCheckContext = { wikiPages: new Set(["deadmines"]), privatePaths: loadPrivatePathPattern(), today: "2026-10-25" };
 
@@ -24,6 +25,20 @@ status: published
 const file = (source: string, path = "news/launch-week.md"): NewsFile => ({ path, source });
 const messages = (files: NewsFile[], c = ctx) => checkNews(files, c).problems.map((p) => p.message);
 
+test("hero alt preserves the full weekly description and accepts up to 500 characters", () => {
+  const weekly = readNewsPosts().find((f) => f.path.includes("wow-weekly-forever-name-reservations"))!;
+  const data = PostFrontMatter.parse(parsePost(weekly.source).data);
+  const hero = data.hero!;
+  expect(hero.alt).toHaveLength(203);
+  expect(PostFrontMatter.parse(data).hero?.alt).toBe(hero.alt);
+  for (const length of [203, 499, 500]) {
+    expect(PostFrontMatter.safeParse({ ...data, hero: { ...hero, alt: "a".repeat(length) } }).success).toBe(true);
+  }
+  for (const alt of ["", " ", "a".repeat(501)]) {
+    expect(PostFrontMatter.safeParse({ ...data, hero: { ...hero, alt } }).success).toBe(false);
+  }
+});
+
 test("a well-formed published post passes", () => {
   const result = checkNews([file(`${FRONT}\n\n${PROSE}\n\nSee [[deadmines]] and {item:2589}.\n`)], ctx);
   expect(result.problems).toEqual([]);
@@ -37,6 +52,7 @@ test("the slug must match the file name and be unique", () => {
 
 test("a published post needs enough prose, a date not after today, and no # heading", () => {
   expect(messages([file(`${FRONT}\n\nShort.`)])).toContainEqual(expect.stringContaining(`at least ${MIN_POST_WORDS} words`));
+  expect(messages([file(`${FRONT}\n\n> ${PROSE}`)])).toContainEqual(expect.stringContaining("words of its own prose; this one has 0"));
   expect(messages([file(`${FRONT.replace("2026-10-24", "2026-11-01")}\n\n${PROSE}`)])).toContainEqual(expect.stringContaining("after today"));
   expect(messages([file(`${FRONT}\n\n# Title again\n\n${PROSE}`)])).toContainEqual(expect.stringContaining("no # heading"));
   // A draft may be dated ahead and may be short: it is not built.

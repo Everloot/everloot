@@ -4,16 +4,17 @@ import BuildActions from "./BuildActions";
 import type { BuildFacts } from "./describe";
 
 const OLDER = "Made on an older game build than the calculator's tree. Open it to see what changed.";
+const NEWER = "Made on a newer game build than the calculator's tree, which has not caught up with it yet.";
 
 /**
  * Saved builds in the site's dense table: name, how the build reads, the game build it was made on (with the
- * quiet marker when that is older than the tree), the short link and the actions. On a phone the name carries
- * the rest in one line.
+ * quiet marker when that is older or newer than the tree), the short link and the actions. On a phone the name
+ * carries the rest in one line.
  */
 export default function BuildsTable({ builds, facts, caption, onCharacterPage = false }: {
   builds: SavedBuild[]; facts: Map<string, BuildFacts>; caption: string; onCharacterPage?: boolean;
 }) {
-  const fact = (b: SavedBuild) => facts.get(b.id) ?? { title: b.classSlug, older: false };
+  const fact = (b: SavedBuild) => facts.get(b.id) ?? { title: b.classSlug, older: false, newer: false };
   const columns: Column<SavedBuild>[] = [
     {
       key: "name", header: "Name",
@@ -31,6 +32,7 @@ export default function BuildsTable({ builds, facts, caption, onCharacterPage = 
         <span className="inline-flex items-center gap-1.5 font-mono tabular-nums text-fg-2">
           {b.gameBuild}
           {fact(b).older && <Badge tone="files" title={OLDER}>made on an older game build</Badge>}
+          {fact(b).newer && <Badge tone="files" title={NEWER}>made on a newer game build</Badge>}
         </span>
       ),
     },
@@ -49,7 +51,7 @@ export default function BuildsTable({ builds, facts, caption, onCharacterPage = 
       rowKey={(b) => b.id}
       meta={(b) => (
         <span className="space-y-1">
-          <span className="block">{fact(b).title} · {b.gameBuild}{fact(b).older && " (older build)"} · {b.shared ? shortPath(b.slug) : "link off"}</span>
+          <span className="block">{fact(b).title} · {b.gameBuild}{fact(b).older && " (older build)"}{fact(b).newer && " (newer build)"} · {b.shared ? shortPath(b.slug) : "link off"}</span>
           <BuildActions build={b} canActivate={onCharacterPage} />
         </span>
       )}

@@ -10,7 +10,7 @@ import { levelFor, pointsAtLevel, pointsSpent } from "../../../web/src/lib/talen
 import { decodeBuild, decodeOrder, resolveBuild } from "../../../web/src/lib/talents/share";
 import type { TalentCatalog } from "../../../web/src/lib/talents/types";
 import { MIN_PROSE_WORDS, proseWords, type KnownData } from "../wiki/check.js";
-import { MARKDOWN_LINK, wikiLinkTarget, type Block, type Inline, type ParsedPage } from "../wiki/page.js";
+import { MARKDOWN_LINK, wikiLinkTarget, withoutVersionPrefix, type Block, type Inline, type ParsedPage } from "../wiki/page.js";
 import { GUIDE_SECTIONS, GUIDE_SETS, GuideFrontMatter, guideLinkTarget, parseGuide, sitePath } from "./guide.js";
 
 export interface GuideCheckContext {
@@ -210,8 +210,9 @@ function checkGuide(g: CheckedGuide, lineOf: LineOf, ctx: GuideCheckContext, byS
           for (const m of t.text.matchAll(MARKDOWN_LINK)) {
             const href = m[2]!;
             const wiki = wikiLinkTarget(href);
-            const guide = guideLinkTarget(href);
             const path = sitePath(href);
+            // A version's prefix shows the same guide (/beta/guides/x), as the guide's page reads it.
+            const guide = path === null ? null : guideLinkTarget(withoutVersionPrefix(path));
             if (wiki !== null) linkTo(wikiPage(wiki), m[0], block.line);
             else if (guide !== null) linkTo(bySlug.get(guide)?.fm, m[0], block.line);
             else if (path === null) {
