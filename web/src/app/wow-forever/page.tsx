@@ -135,8 +135,8 @@ export default async function WowForeverPage() {
 
       <div className="space-y-12">
         <p className="text-fg-2">
-          Everloot is a fan project and is not affiliated with or endorsed by Blizzard Entertainment, so anything official is
-          Blizzard&apos;s to say. This page points at what they have said.
+          Everloot is a fan project, so anything official about WoW: Forever is Blizzard&apos;s to say. This page points at what
+          they have said.
         </p>
 
         <section aria-labelledby="launch">

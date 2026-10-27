@@ -47,7 +47,7 @@ export function organizationJsonLd(): JsonLd {
     url: SITE_URL,
     logo: { "@type": "ImageObject", url: absoluteUrl(LOGO.path), width: LOGO.size, height: LOGO.size },
     email: CONTACT_EMAIL,
-    description: `${SITE_BLURB} ${NON_AFFILIATION}`,
+    description: SITE_BLURB,
     // The company the footer's copyright line and /about name.
     parentOrganization: { "@type": "Organization", name: OPERATOR },
     sameAs: [REPO_URL, DISCORD_INVITE, ...SOCIAL_PROFILES.map((profile) => profile.href)],

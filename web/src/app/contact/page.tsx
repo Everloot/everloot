@@ -40,11 +40,11 @@ export default function ContactPage() {
           </ul>
         </section>
 
-        <section aria-labelledby="blizzard">
-          <SectionHeading id="blizzard">Not affiliated with Blizzard</SectionHeading>
+        <section aria-labelledby="support">
+          <SectionHeading id="support">Game or account support</SectionHeading>
           <p className="text-fg-2">
-            Everloot is not affiliated with Blizzard Entertainment. Account or game
-            support questions belong with Blizzard.
+            For Battle.net login, billing, bans or in-game problems, contact{" "}
+            <a href="https://support.blizzard.com/" rel="noopener" className={link}>Blizzard Support</a>.
           </p>
         </section>
       </div>

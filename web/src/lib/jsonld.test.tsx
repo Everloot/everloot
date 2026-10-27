@@ -21,12 +21,12 @@ test("JsonLd renders nothing for null", () => {
   expect(renderToStaticMarkup(<JsonLd data={null} />)).toBe("");
 });
 
-test("Organization carries the repository, the email and the non-affiliation line, and WebSite describes its search as lore search", () => {
+test("Organization carries the repository, the email and the site blurb, and WebSite describes its search as lore search", () => {
   const org = organizationJsonLd() as Record<string, unknown> & { description: string };
   expect(org.sameAs).toEqual(["https://github.com/Everloot/everloot", "https://discord.gg/9CKsbHTRu3", "https://x.com/WowEverloot", "https://www.facebook.com/WowEverloot", "https://www.instagram.com/woweverloot/", "https://www.pinterest.com/woweverloot/"]);
   expect(org.email).toBe("hello@everloot.app");
   expect(org.publishingPrinciples).toBe("https://everloot.app/methodology");
-  expect(org.description).toContain("Not affiliated with or endorsed by Blizzard Entertainment.");
+  expect(org.description).toBe("The WoW: Forever database, written by its players.");
   // The operator the footer and /about name, and the square logo the listings use.
   expect(org.parentOrganization).toEqual({ "@type": "Organization", name: "R21 Media Group, LLC" });
   expect(org.logo).toEqual({ "@type": "ImageObject", url: "https://everloot.app/icon-512.png", width: 512, height: 512 });
