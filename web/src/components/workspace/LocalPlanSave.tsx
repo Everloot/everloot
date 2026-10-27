@@ -18,9 +18,10 @@ export type OwnerState = { status: "checking" } | { status: "ready"; owner: Owne
  * (another tab may have signed in, out or into another account), and at once after Sign out in this tab
  * (ACCOUNT_CHANGED_EVENT). Only the latest answer counts. A failed check after a good one keeps the owner it had,
  * but a sign-out is certain: it drops every answer already asked for, at once, and starts over as `retry` does,
- * with no one's plans until the next answer.
+ * with no one's plans until the next answer. `strict` (the account Save, which writes to the server) gives up the
+ * owner instead when a check fails: the session may have changed since the last good answer.
  */
-export function useWorkspaceOwner(): [OwnerState, () => void] {
+export function useWorkspaceOwner({ strict = false }: { strict?: boolean } = {}): [OwnerState, () => void] {
   const [state, setState] = useState<OwnerState>({ status: "checking" });
   const [attempt, setAttempt] = useState(0);
   // Show no one's plans and ask again; the answers asked for before are dropped when the check restarts.
@@ -33,7 +34,7 @@ export function useWorkspaceOwner(): [OwnerState, () => void] {
       const found = await lookupOwner();
       if (!active || ask !== asked) return;
       setState((now) => {
-        if (!found.ok) return now.status === "ready" ? now : { status: "unavailable" };
+        if (!found.ok) return now.status === "ready" && !strict ? now : { status: "unavailable" };
         return now.status === "ready" && sameOwner(now.owner, found.owner) ? now : { status: "ready", owner: found.owner };
       });
     }
@@ -54,7 +55,7 @@ export function useWorkspaceOwner(): [OwnerState, () => void] {
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener(ACCOUNT_CHANGED_EVENT, onChanged);
     };
-  }, [attempt, retry]);
+  }, [attempt, retry, strict]);
   return [state, retry];
 }
 

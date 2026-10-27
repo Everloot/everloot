@@ -631,18 +631,49 @@ test("a signed-out answer that lands after the tab finds an account signed in do
   expect(panel()).not.toBeNull();
 });
 
-test("when this tab cannot tell which account is signed in, it shows no builds and Save says so", async () => {
+const UNCHECKED = "Your account could not be checked, so Save is off for now. Reload the page to try again.";
+const bar = () => container.querySelector<HTMLElement>('section[aria-label="Build"]')!;
+
+test("when this tab cannot tell which account is signed in, it shows no builds and Save is off, saying why", async () => {
   api("in");
   authDown = true;
   await render();
-  expect(menu()).toBeNull();
   await click(node(11));
-  await click(saveButton());
-  expect(panel()).toBeNull();
-  expect(status()).toBe("Your account could not be checked. Reload the page and try again.");
+  expect(menu()).toBeNull();
+  expect(saveButton().disabled).toBe(true);
+  expect(bar().textContent).toContain(UNCHECKED);
+  expect(saveButton().getAttribute("aria-describedby")).toBe(bar().querySelector("p#save-build-unchecked")!.id);
   authDown = false;
   await comeBack();
   expect(menu()!.textContent).toContain("Fire");
+  expect(saveButton().disabled).toBe(false);
+  expect(bar().textContent).not.toContain(UNCHECKED);
+});
+
+test("a failed check after a good one drops the account's builds and the open panel, and Save stays off until a check works", async () => {
+  api("in");
+  window.history.replaceState(null, "", `/tools/talents/mage?saved=${ID}#plan=${CODE}`);
+  await render();
+  expect(menu()!.textContent).toContain("Fire");
+  await click(saveButton());
+  await type(panel()!.querySelector("textarea")!, "Raid night");
+  // Another tab signs in as B, and the check when this tab comes back fails: this tab can no longer say whose it is.
+  who = B;
+  accounts[B] = { characters: [], builds: [saved({ id: NEW_ID, name: "Their frost", slug: "TheirOne" })] };
+  authDown = true;
+  await comeBack();
+  expect(panel()).toBeNull();
+  expect(menu()).toBeNull();
+  expect(bar().textContent).not.toContain("Editing: Fire");
+  expect(container.textContent).not.toContain("Their frost");
+  expect(status()).toBe("Your account could not be checked, so nothing was saved and Save is off for now. Reload the page to try again.");
+  expect(saveButton().disabled).toBe(true);
+  expect(bar().textContent).toContain(UNCHECKED);
+  expect(posts).toEqual([]);
+  authDown = false;
+  await comeBack();
+  expect(menu()!.textContent).toContain("Their frost");
+  expect(saveButton().disabled).toBe(false);
 });
 
 test("read-only, the build shows as saved and points cannot change", async () => {

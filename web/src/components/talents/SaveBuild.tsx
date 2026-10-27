@@ -22,6 +22,8 @@ const CHANGED = "The account signed in here changed, so nothing was saved. Press
 const SWITCHED = "You are signed in to a different account now, so nothing was saved. Press Save again to save the build to this one.";
 const CHANGED_MID_SAVE = "The account signed in here changed before the save finished. Sign in to that account again to see whether the build was saved.";
 const REFUSED = "The account signed in here changed, so nothing was saved. What you typed stays with the account you started with.";
+const UNCHECKED = "Your account could not be checked, so Save is off for now. Reload the page to try again.";
+const UNCHECKED_CLOSED = "Your account could not be checked, so nothing was saved and Save is off for now. Reload the page to try again.";
 const NO_FORM = { name: "", characterId: "", newName: "", newRealm: "", notes: "", shared: true, showName: false };
 
 /** A write the site refused because another account is signed in here now (409 account_mismatch). */
@@ -63,7 +65,9 @@ function returnPath(classSlug: string): string {
   return `/tools/talents/${classSlug}?${validId(saved) ? `saved=${saved}&` : ""}save=1`;
 }
 
-type Account = { status: "loading" } | { status: "off" } | { status: "signed-out" } | { status: "error" } | { status: "ready"; data: AccountBuilds };
+/** `unchecked`: this tab cannot say which account is signed in, so it shows no one's builds and Save is off. */
+type Account = { status: "loading" } | { status: "off" } | { status: "signed-out" } | { status: "error" } | { status: "unchecked" }
+  | { status: "ready"; data: AccountBuilds };
 
 export default function SaveBuild({ classSlug, codes, defaultName, onMessage }: {
   classSlug: string;
@@ -72,7 +76,8 @@ export default function SaveBuild({ classSlug, codes, defaultName, onMessage }: 
   defaultName: string;
   onMessage: (text: string) => void;
 }) {
-  const [owner] = useWorkspaceOwner();
+  // Strict: a check that fails gives up the account it had, as the session may have changed since.
+  const [owner] = useWorkspaceOwner({ strict: true });
   // Whose builds may show: an account's id, "signed-out", or "checking" and "unavailable" while none is known.
   const ownerKey = owner.status === "ready" ? (owner.owner.kind === "account" ? owner.owner.userId : "signed-out") : owner.status;
   const [account, setAccount] = useState<Account>({ status: "loading" });
@@ -115,7 +120,7 @@ export default function SaveBuild({ classSlug, codes, defaultName, onMessage }: 
     shownFor.current = ownerKey;
     if (was.panel === "save") {
       if (validId(before)) drafts.current.set(before, { editing: was.editing, form: was.form });
-      onMessage(was.busy ? CHANGED_MID_SAVE : validId(ownerKey) ? SWITCHED : CHANGED);
+      onMessage(was.busy ? CHANGED_MID_SAVE : validId(ownerKey) ? SWITCHED : ownerKey === "unavailable" ? UNCHECKED_CLOSED : CHANGED);
     }
     setAccount({ status: "loading" });
     setEditing(null);
@@ -129,7 +134,8 @@ export default function SaveBuild({ classSlug, codes, defaultName, onMessage }: 
         if (response.status === 404) { setAccount({ status: "off" }); return; }
         if (response.status === 401) { setAccount({ status: "signed-out" }); return; }
         // Builds show only for an account this tab knows by its id, never for a guess.
-        if (!response.ok || !validId(ownerKey)) throw new Error("unavailable");
+        if (!validId(ownerKey)) { setAccount({ status: "unchecked" }); return; }
+        if (!response.ok) throw new Error("unavailable");
         const data = await response.json() as AccountBuilds;
         if (era.current !== ask) return;
         setAccount({ status: "ready", data });
@@ -274,9 +280,12 @@ export default function SaveBuild({ classSlug, codes, defaultName, onMessage }: 
 
   return (
     <>
-      <button ref={saveButton} type="button" className={button} onClick={onSave} disabled={!codes[0] || account.status === "loading"} aria-expanded={panel !== null}
+      <button ref={saveButton} type="button" className={button} onClick={onSave} aria-expanded={panel !== null}
+        disabled={!codes[0] || account.status === "loading" || account.status === "unchecked"}
+        aria-describedby={account.status === "unchecked" ? "save-build-unchecked" : undefined}
         onKeyDown={(e) => { if (e.key === "Escape" && panel) { e.stopPropagation(); setPanel(null); } }}
         title={codes[0] ? undefined : "Spend a point in set 1 to save"}>Save</button>
+      {account.status === "unchecked" && <p id="save-build-unchecked" className="text-sm text-fg-2">{UNCHECKED}</p>}
       {mine.length > 0 && (
         <details ref={menu} className="relative max-sm:open:basis-full" onKeyDown={onMenuKey}>
           <summary className={`${button} cursor-pointer list-none`}>My builds</summary>
