@@ -1,20 +1,20 @@
 {
   "schema": 1,
-  "refreshedAt": "2026-10-25T16:34:04.314Z",
+  "refreshedAt": "2026-10-27T12:25:40.759Z",
   "projects": {
     "everloot": {
       "status": "ok",
-      "fetchedAt": "2026-10-25T16:34:04.314Z",
+      "fetchedAt": "2026-10-27T12:25:40.760Z",
       "stars": 0,
       "archived": false,
       "license": "AGPL-3.0",
-      "lastCommit": "2026-10-25T14:45:21Z",
+      "lastCommit": "2026-10-27T09:17:47Z",
       "release": {
         "tag": "desktop-v0.1.7",
         "date": "2026-10-24T13:33:00Z",
         "url": "https://github.com/Everloot/everloot/releases/tag/desktop-v0.1.7"
       },
-      "commits4w": 1593,
+      "commits4w": 1625,
       "contributors": 2,
       "openIssues": 5,
       "closedIssues": 6,
@@ -26,8 +26,8 @@
     },
     "polestar": {
       "status": "ok",
-      "fetchedAt": "2026-10-25T16:34:11.722Z",
-      "stars": 159,
+      "fetchedAt": "2026-10-27T12:25:48.059Z",
+      "stars": 165,
       "archived": false,
       "license": null,
       "lastCommit": "2026-10-25T15:37:29Z",
@@ -38,28 +38,28 @@
       },
       "commits4w": 1926,
       "contributors": 30,
-      "openIssues": 49,
+      "openIssues": 57,
       "closedIssues": 221,
-      "medianFirstResponseHours": 0.9,
-      "responseSample": 3,
+      "medianFirstResponseHours": null,
+      "responseSample": 0,
       "interfaces": [
         16001
       ]
     },
     "olympus": {
       "status": "ok",
-      "fetchedAt": "2026-10-25T16:34:20.115Z",
+      "fetchedAt": "2026-10-27T12:25:55.554Z",
       "stars": 20,
       "archived": false,
       "license": "MIT",
-      "lastCommit": "2026-10-21T02:52:57Z",
+      "lastCommit": "2026-10-26T23:41:50Z",
       "release": {
-        "tag": "v1.3.2",
-        "date": "2026-10-21T02:53:34Z",
-        "url": "https://github.com/dnl-gentile/olympus-addon/releases/tag/v1.3.2"
+        "tag": "v1.3.3",
+        "date": "2026-10-26T23:42:08Z",
+        "url": "https://github.com/dnl-gentile/olympus-addon/releases/tag/v1.3.3"
       },
-      "commits4w": 756,
-      "contributors": 3,
+      "commits4w": 653,
+      "contributors": 4,
       "openIssues": 6,
       "closedIssues": 13,
       "medianFirstResponseHours": 90.2,
@@ -72,13 +72,13 @@
     },
     "forever-ref": {
       "status": "ok",
-      "fetchedAt": "2026-10-25T16:34:30.212Z",
+      "fetchedAt": "2026-10-27T12:26:05.261Z",
       "stars": 0,
       "archived": false,
       "license": null,
-      "lastCommit": "2026-10-23T11:40:41Z",
+      "lastCommit": "2026-10-27T12:13:21Z",
       "release": null,
-      "commits4w": 17,
+      "commits4w": 18,
       "contributors": 2,
       "openIssues": 0,
       "closedIssues": 1,
@@ -124,6 +124,14 @@
       {
         "at": "2026-10-25T16:34:04.314Z",
         "stars": 0
+      },
+      {
+        "at": "2026-10-26T22:46:07.205Z",
+        "stars": 0
+      },
+      {
+        "at": "2026-10-27T12:25:40.759Z",
+        "stars": 0
       }
     ],
     "polestar": [
@@ -162,6 +170,14 @@
       {
         "at": "2026-10-25T16:34:04.314Z",
         "stars": 159
+      },
+      {
+        "at": "2026-10-26T22:46:07.205Z",
+        "stars": 163
+      },
+      {
+        "at": "2026-10-27T12:25:40.759Z",
+        "stars": 165
       }
     ],
     "olympus": [
@@ -200,6 +216,14 @@
       {
         "at": "2026-10-25T16:34:04.314Z",
         "stars": 20
+      },
+      {
+        "at": "2026-10-26T22:46:07.205Z",
+        "stars": 20
+      },
+      {
+        "at": "2026-10-27T12:25:40.759Z",
+        "stars": 20
       }
     ],
     "forever-ref": [
@@ -237,6 +261,14 @@
       },
       {
         "at": "2026-10-25T16:34:04.314Z",
+        "stars": 0
+      },
+      {
+        "at": "2026-10-26T22:46:07.205Z",
+        "stars": 0
+      },
+      {
+        "at": "2026-10-27T12:25:40.759Z",
         "stars": 0
       }
     ]
