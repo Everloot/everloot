@@ -77,8 +77,10 @@ export default function PrivacyPage() {
               <li>
                 <strong>Our own counters:</strong> our servers keep a daily count of
                 calls to our API and to the public MCP endpoint, by endpoint or tool
-                name. These counts contain no IP address, install id, search text or
-                other detail about who made the call. Rate limiting separately keeps
+                name, and, for the lookup tools the chat uses, whether the lookup found
+                something or nothing. These counts contain no IP address, install id,
+                question or search text, looked-up name, account or other detail about
+                who made the call. Rate limiting separately keeps
                 a one-way hash of an address for a short time to enforce limits.
               </li>
               <li>
