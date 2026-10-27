@@ -214,11 +214,8 @@ const saveButton = () => button(/^Save to your account$/) as HTMLButtonElement |
 const comeBack = async () => { await act(async () => { window.dispatchEvent(new Event("focus")); }); await settle(); };
 const accountReads = () => requests.filter((r) => r.request !== "GET /api/auth/me");
 
-const OPENER = /^Choose plans to save to your account$/;
-/** Waits for the opener: a second root renders it a tick later than the first, which raced on CI. */
 async function open() {
-  await pump(() => Boolean(button(OPENER)), "the transfer opener");
-  await click(button(OPENER));
+  await click(button(/^Choose plans to save to your account$/));
 }
 /** Chooses a group of plans (its checkbox) and each plan's sharing. */
 async function choose(label: string, sharing: Record<string, "private" | "shared" | "shared-name">) {
