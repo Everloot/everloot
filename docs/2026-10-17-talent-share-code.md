@@ -84,6 +84,18 @@ A reader checks the token against the code it came with:
 | a node more often than its rank, or an index past the code's nodes | `extra-points` |
 | a node less often than its rank | `missing-points` |
 
+Whitespace before or after the token is ignored, and whitespace inside it makes the token
+`malformed`. Whitespace means exactly the code points that ECMAScript's `String.prototype.trim`
+removes (ECMA-262's WhiteSpace and LineTerminator, with the space separators of Unicode 18.0):
+U+0009 to U+000D, U+0020, U+00A0, U+1680, U+2000 to U+200A, U+2028, U+2029, U+202F, U+205F, U+3000
+and U+FEFF. A reader in another language trims this set rather than its own default, matching the
+UTF-8 forms if it reads bytes.
+
+A token with more than one of the problems in the table gets one error, the first that applies in
+this order: a version above 1 is `newer-version` whatever follows it; then a damaged shape is
+`malformed`, even with an unsupported mode or over the limit; then `unsupported-mode`, even over the
+limit; then `over-limit`; then `extra-points` before `missing-points`.
+
 Whatever the error, the talents load exactly as they would without the order, and the order is
 unknown. The web importer (`importCode`) also calls the order unknown when not every point of the
 code places on the tree on screen, because the order names points the build no longer holds.
@@ -104,6 +116,17 @@ The codes keep their places, and a reader that stops at `&` ignores the orders: 
 orders still reads both sets, and the addon still reads the one set it always read (the first set,
 or the second when the link carries only that one). An order is left out when its set has no code.
 A link without orders is the same address as before.
+
+Reading a link is literal: the site's `readPlanHash` returns each of the four keys it finds, so a
+hand-edited link such as `#plan2=...&order=...` gives a first set's order with no first set's code.
+That order has nothing to order; use an order only with its own set's code.
+
+### Test vectors
+
+[`fixtures/talent-order-v1.json`](fixtures/talent-order-v1.json) holds the cases above as data:
+tokens written for given ranks and orders, tokens read back with their order or error, and links read
+and written. A reader or writer of the token should pass all of them; the site runs them in
+`web/src/lib/talents/order-vectors.test.ts`.
 
 ## Not this format
 
