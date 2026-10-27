@@ -244,12 +244,37 @@ describe("taking a point back", () => {
     expect(movedLater(fixture, set, after)).toEqual([]);
   });
 
-  test("a point that could no longer be taken where it stands moves behind the points it needs, and the move is disclosed", () => {
+  test("a point that could no longer be taken where it stands waits behind the points it needs, and every point that changed places is disclosed", () => {
     const set = planned(...times(11, 5), 21, 51, 51, 12);
     const after = removePoint(fixture, set, 11);
     expect(after.order).toEqual([...times(11, 4), 51, 51, 12, 21]);
     expect(validateOrder(fixture, after.ranks, after.order!)).toEqual({ ok: true });
-    expect(movedLater(fixture, set, after)).toEqual([{ id: 21, rank: 1, from: 15, to: 17 }]);
+    // Talent 21 waited; the three points that went ahead of it are listed too, each with its real levels.
+    expect(movedLater(fixture, set, after)).toEqual([
+      { id: 21, rank: 1, from: 15, to: 17 },
+      { id: 51, rank: 1, from: 16, to: 14 },
+      { id: 51, rank: 2, from: 17, to: 15 },
+      { id: 12, rank: 1, from: 18, to: 16 },
+    ]);
+  });
+
+  test("a point that keeps its place number but now sits between other points is disclosed too", () => {
+    // Talent 3 needs 1 or 4 at full rank, and 4 opens once two other points are spent. With 1 gone,
+    // 3 waits for 4 and 4 waits for 5; 4 stays the third point but now comes after 5 and before 3.
+    const passing: TalentCatalog = {
+      ...fixture,
+      nodes: [talent(1, 1, 1, 1), talent(2, 1, 2, 1), { ...talent(3, 1, 3, 1), anyOf: [1, 4] }, talent(4, 1, 4, 1, { pointsTotal: 2 }), talent(5, 1, 5, 1)],
+    };
+    let set = emptySet();
+    for (const id of [1, 2, 3, 4, 5]) set = addPoint(passing, set, id, ALL);
+    expect(set.order).toEqual([1, 2, 3, 4, 5]);
+    const after = removePoint(passing, set, 1);
+    expect(after.order).toEqual([2, 5, 4, 3]);
+    expect(movedLater(passing, set, after)).toEqual([
+      { id: 3, rank: 1, from: 12, to: 13 },
+      { id: 4, rank: 1, from: 13, to: 12 },
+      { id: 5, rank: 1, from: 14, to: 11 },
+    ]);
   });
 
   test("a point the rules will not give back stays, and the reason is the rules' own", () => {
@@ -288,11 +313,20 @@ describe("resetting a tree", () => {
     expect(resetTree(fixture, left, 2)).toBe(left);
   });
 
-  test("a point that could no longer be taken where it stands moves behind the points it needs, and is disclosed", () => {
+  test("a point that could no longer be taken where it stands waits behind the points it needs, and every point that changed places is disclosed", () => {
     const set = planned(...times(11, 5), 12, 51, 52, ...times(51, 4), 53);
     const after = resetTree(fixture, set, 1);
     expect(after.order).toEqual([...times(51, 5), 53, 52]);
-    expect(movedLater(fixture, set, after)).toEqual([{ id: 52, rank: 1, from: 17, to: 16 }]);
+    // With six points gone, the one that waited still arrives a level earlier than it did. The first 51
+    // only comes sooner because points before it left, and is not listed.
+    expect(movedLater(fixture, set, after)).toEqual([
+      { id: 52, rank: 1, from: 17, to: 16 },
+      { id: 51, rank: 2, from: 18, to: 11 },
+      { id: 51, rank: 3, from: 19, to: 12 },
+      { id: 51, rank: 4, from: 20, to: 13 },
+      { id: 51, rank: 5, from: 21, to: 14 },
+      { id: 53, rank: 1, from: 22, to: 15 },
+    ]);
   });
 
   test("a reset that would leave no legal order is refused", () => {

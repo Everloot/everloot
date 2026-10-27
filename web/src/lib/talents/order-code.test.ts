@@ -93,4 +93,23 @@ describe("spend order token", () => {
     expect(encodeOrder({}, [], "planned")).toBeNull();
     expect(encodeOrder({ 11: { rank: 0 } }, [], "provisional")).toBeNull();
   });
+
+  test("spaces, tabs and line breaks around a token are ignored, and inside it they damage it", () => {
+    expect(decodeOrder(` O1g-${sequence} `, ranks)).toEqual({ ok: true, origin: "provisional", order });
+    expect(decodeOrder(`O1p-${sequence}\n`, ranks)).toEqual({ ok: true, origin: "planned", order });
+    expect(decodeOrder(`\tO1p-${sequence}\r\n`, ranks)).toEqual({ ok: true, origin: "planned", order });
+    expect(decodeOrder(" O1p-ABABA BABABCCD ", ranks)).toEqual({ ok: false, error: "malformed" });
+  });
+
+  test("a token with more than one problem gets the first error in the documented order", () => {
+    const over: Ranks = { 1: { rank: 50 }, 2: { rank: 15 } };
+    // A newer version, whatever follows; then a damaged shape; then the mode; then the limit; then the points.
+    expect(decodeOrder("O2p-AB.AB", ranks)).toEqual({ ok: false, error: "newer-version" });
+    expect(decodeOrder("O1x-AB.AB", ranks)).toEqual({ ok: false, error: "malformed" });
+    expect(decodeOrder(`O1p-${"A".repeat(64)}.`, ranks)).toEqual({ ok: false, error: "malformed" });
+    expect(decodeOrder(`O1x-${"A".repeat(65)}`, ranks)).toEqual({ ok: false, error: "unsupported-mode" });
+    expect(decodeOrder("O1x-A", over)).toEqual({ ok: false, error: "unsupported-mode" });
+    expect(decodeOrder(`O1p-${"A".repeat(65)}`, ranks)).toEqual({ ok: false, error: "over-limit" });
+    expect(decodeOrder("O1p-ABABABABABCDD", ranks)).toEqual({ ok: false, error: "extra-points" });
+  });
 });

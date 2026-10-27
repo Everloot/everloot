@@ -84,6 +84,12 @@ A reader checks the token against the code it came with:
 | a node more often than its rank, or an index past the code's nodes | `extra-points` |
 | a node less often than its rank | `missing-points` |
 
+Spaces, tabs and line breaks before or after the token are ignored. A token with more than one of
+these problems gets one error, the first that applies in this order: a version above 1 is
+`newer-version` whatever follows it; then a damaged shape is `malformed`, even with an unsupported
+mode or over the limit; then `unsupported-mode`, even over the limit; then `over-limit`; then
+`extra-points` before `missing-points`.
+
 Whatever the error, the talents load exactly as they would without the order, and the order is
 unknown. The web importer (`importCode`) also calls the order unknown when not every point of the
 code places on the tree on screen, because the order names points the build no longer holds.
@@ -104,6 +110,17 @@ The codes keep their places, and a reader that stops at `&` ignores the orders: 
 orders still reads both sets, and the addon still reads the one set it always read (the first set,
 or the second when the link carries only that one). An order is left out when its set has no code.
 A link without orders is the same address as before.
+
+Reading a link is literal: the site's `readPlanHash` returns each of the four keys it finds, so a
+hand-edited link such as `#plan2=...&order=...` gives a first set's order with no first set's code.
+That order has nothing to order; use an order only with its own set's code.
+
+### Test vectors
+
+[`fixtures/talent-order-v1.json`](fixtures/talent-order-v1.json) holds the cases above as data:
+tokens written for given ranks and orders, tokens read back with their order or error, and links read
+and written. A reader or writer of the token should pass all of them; the site runs them in
+`web/src/lib/talents/order-vectors.test.ts`.
 
 ## Not this format
 

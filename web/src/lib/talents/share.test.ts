@@ -209,6 +209,13 @@ describe("plan links", () => {
     expect(importCode(fixture, link)).toEqual(importCode(fixture, `${page}${planHash(first, second)}`));
   });
 
+  test("reading a link is literal: an order whose set has no code still comes back, and writing leaves it out", () => {
+    expect(readPlanHash(`${page}#plan2=${second}&order=${firstOrder}`)).toEqual({ first: null, second, firstOrder, secondOrder: null });
+    expect(readPlanHash(`${page}#plan=${first}&order2=${secondOrder}`)).toEqual({ first, second: null, firstOrder: null, secondOrder });
+    expect(planHash(null, second, firstOrder, null)).toBe(`#plan2=${second}`);
+    expect(planHash(first, null, null, secondOrder)).toBe(`#plan=${first}`);
+  });
+
   test("a build link's two sets survive the move from its /b/ path to the page's fragment", () => {
     const path = previewPath("mage", first, second)!;
     expect(path).toBe(`/tools/talents/mage/b/${first}/${second}`);

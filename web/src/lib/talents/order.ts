@@ -104,8 +104,9 @@ export function addPoint(catalog: TalentCatalog, set: PlanSet, id: number, avail
 }
 
 /** Take a point back: the node's latest point leaves the order. A later point that could then no longer
- *  be taken where it stands waits behind the points it needs (movedLater says which). The same set back
- *  when the rules refuse, or when what stays has no legal order (canRemovePoint says why). */
+ *  be taken where it stands waits behind the points it needs (movedLater lists every point that changed
+ *  places). The same set back when the rules refuse, or when what stays has no legal order (canRemovePoint
+ *  says why). */
 export function removePoint(catalog: TalentCatalog, set: PlanSet, id: number): PlanSet {
   if (!canRemove(catalog, set.ranks, id).ok) return set;
   return rest(catalog, set, remove(catalog, set.ranks, id), set.order && withoutLast(set.order, id));
@@ -195,24 +196,29 @@ export interface MovedPoint {
   id: number;
   /** Which of the node's points it is: the rank it reaches. */
   rank: number;
-  /** The level it arrived at before the change, and the level it arrives at now. */
+  /** The level it arrived at before the change, and the level it arrives at now: later, the same or earlier. */
   from: number;
   to: number;
 }
 
-/** The points a change put behind points that used to come after them: what a removal or a tree reset
- *  moved to keep the order legal, for the page to say. Empty when either order is unknown. */
+/** The points whose place among the points that stayed changed when a removal or a tree reset rearranged
+ *  the order to keep it legal: each point that waited behind points that used to come after it, and each
+ *  point that went ahead. A point that only comes sooner because points before it left is not listed.
+ *  Despite the name, a listed point can arrive at a later, the same or an earlier level, so the page says
+ *  where each one went rather than calling it later. Empty when either order is unknown. */
 export function movedLater(catalog: TalentCatalog, before: PlanSet, after: PlanSet): MovedPoint[] {
   const was = orderSteps(catalog, before);
   const now = orderSteps(catalog, after);
   if (!was || !now) return [];
+  // A point is its node and which of the node's points it is; points that left are not in `now`.
   const place = new Map(now.map((s, i) => [`${s.id}:${s.rank}`, i]));
   const kept = was.flatMap((step) => {
     const at = place.get(`${step.id}:${step.rank}`);
     return at === undefined ? [] : [{ step, at }];
   });
+  // Pair by pair, so a point that keeps its place number while others swap around it is listed too.
   return kept
-    .filter((p, i) => kept.slice(i + 1).some((q) => q.at < p.at))
+    .filter((p, i) => kept.some((q, j) => (j < i) !== (q.at < p.at)))
     .map(({ step, at }) => ({ id: step.id, rank: step.rank, from: step.level, to: now[at].level }));
 }
 
