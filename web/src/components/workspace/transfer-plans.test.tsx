@@ -183,6 +183,11 @@ afterEach(async () => {
 
 /** Lets the account lookup and the reads and writes that follow it finish. */
 const settle = () => act(async () => { for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0)); });
+/** Lets everything run that waits on no timer, with fake timers standing still, until `ready`. */
+async function pump(ready: () => boolean, what: string) {
+  for (let i = 0; i < 200 && !ready(); i++) await act(async () => { await new Promise((r) => setImmediate(r)); });
+  if (!ready()) throw new Error(`Timed out waiting for ${what}`);
+}
 async function render() {
   await act(async () => root.render(<TransferPlans />));
   await settle();
@@ -1194,7 +1199,7 @@ describe("one lock for every writer", () => {
   const WRITERS: Record<string, string[]> = {
     "@/lib/player-workspace": [
       "savePlan", "editPlan", "copyPlan", "deletePlan", "applyImport", "update", "bindTransferred", "settleTransferred",
-      "transferKey", "receiptSaved", "receiptFailed", "rememberCharacter",
+      "transferKey", "receiptSaved", "receiptFailed", "rememberCharacter", "characterRefused",
     ],
     "@/lib/alt-workspace": ["saveAlt", "deleteAlt", "changeAlts"],
     "@/lib/alt-import": ["applyAltImport"],
@@ -1616,11 +1621,6 @@ describe("focus with nothing to choose", () => {
 });
 
 describe("a request with no answer", () => {
-  /** Lets everything run that waits on no timer, the fake ones standing still, until `ready`. */
-  async function pump(ready: () => boolean, what: string) {
-    for (let i = 0; i < 200 && !ready(); i++) await act(async () => { await new Promise((r) => setImmediate(r)); });
-    if (!ready()) throw new Error(`Timed out waiting for ${what}`);
-  }
   /** The site, but the first request `which` picks reaches it and its answer never comes back: only giving up on it
    *  ends the wait. */
   function silence(which: (url: string, init?: RequestInit) => boolean) {
@@ -1845,5 +1845,139 @@ describe("content compared exactly", () => {
     expect(posts.map((p) => p.body.name)).toEqual(["Fire"]);
     expect(stored(ANON)).toMatchObject({ plans: [], alts: [] });
     expect(stored(A)).toMatchObject({ plans: [renamed, bound(FIRE)], alts: [jaina] });
+  });
+});
+
+describe("a character asked for and not heard back on", () => {
+  /** Frost chosen, private, under a new character from `jaina`. */
+  async function prepare(jaina: LocalAlt) {
+    await open();
+    await choose("Save Frost to your account", { Frost: "private" });
+    await set(field("Character for Frost"), `alt:${jaina.id}`);
+  }
+  /** The site, but the first character request is taken and never answered: `late` makes it on the site later. */
+  function unanswered() {
+    const site = globalThis.fetch;
+    const state = { asked: false, late: () => {} };
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (state.asked || String(input) !== "/api/me/characters" || init?.method !== "POST") return site(input, init);
+      state.asked = true;
+      state.late = () => { void site(input, init); };
+      return new Promise<Response>((_, reject) => init.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError"))));
+    });
+    return state;
+  }
+  /** Save pressed, and the character request given up on after its 20 seconds. */
+  async function giveUp(state: { asked: boolean }) {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    try {
+      await act(async () => { saveButton()!.click(); });
+      await pump(() => state.asked, "the character request");
+      await act(async () => { await vi.advanceTimersByTimeAsync(20_000); });
+      await pump(() => alerts().includes("may or may not have been made"), "giving up");
+    } finally {
+      vi.useRealTimers();
+    }
+  }
+
+  test("a retry looks for the character by the label the last try asked with, before any change made to it since", async () => {
+    const jaina = alt({ planIds: [FROST.id] });
+    seed(ANON, [FROST], [jaina]);
+    const site = globalThis.fetch;
+    let lose = true;
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      const response = await site(input, init);
+      if (String(input) === "/api/me/characters" && lose) { lose = false; throw new TypeError("Lost after the character was made"); }
+      return response;
+    });
+    await render();
+    await prepare(jaina);
+    await click(saveButton());
+    expect(accounts[A_ID].characters).toEqual([expect.objectContaining({ name: "Jaina", note: null })]);
+    await prepare(jaina);
+    expect(text()).toContain("Your last try asked your account for the character Jaina and did not hear back.");
+    await set(field("Note (optional)"), "Frost for raids");
+    await click(saveButton());
+    expect(accounts[A_ID].characters).toHaveLength(1);
+    expect(posts.at(-1)!.body).toMatchObject({ name: "Frost", characterId: accounts[A_ID].characters[0].id });
+    expect(text()).toContain("Frost was filed under Jaina, the character your last try made on your account, which stays as that try made it: the changes made here were not used.");
+    expect(journal()!.characters).toMatchObject([{ altId: jaina.id, characterId: accounts[A_ID].characters[0].id, label: { name: "Jaina", note: null } }]);
+  });
+
+  test("inside two minutes of a try that got no answer, a retry that does not find its character makes none; once the site makes it, it is used", async () => {
+    const jaina = alt({ planIds: [FROST.id] });
+    seed(ANON, [FROST], [jaina]);
+    const request = unanswered();
+    await render();
+    await prepare(jaina);
+    const asked = Date.now();
+    await giveUp(request);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(asked + 60_000);
+      await prepare(jaina);
+      await click(saveButton());
+      expect(alerts()).toContain("The character Jaina was asked for on your account for Frost and is not there yet. The last attempt may still finish; try again in a couple of minutes.");
+      expect(posts).toEqual([]);
+      // The site makes it after all, late.
+      request.late();
+      expect(accounts[A_ID].characters).toHaveLength(1);
+      await prepare(jaina);
+      await click(saveButton());
+      expect(accounts[A_ID].characters).toHaveLength(1);
+      expect(posts.map((p) => p.url)).toEqual(["/api/me/characters", "/api/me/builds"]);
+      expect(posts[1].body.characterId).toBe(accounts[A_ID].characters[0].id);
+      expect(text()).toContain("Saved 1 plan to your account.");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("past two minutes, a retry reads the account once more and makes the character only while it is still not there", async () => {
+    const jaina = alt({ planIds: [FROST.id] });
+    seed(ANON, [FROST], [jaina]);
+    // Taken and never made: the site never handles it.
+    const request = unanswered();
+    await render();
+    await prepare(jaina);
+    const asked = Date.now();
+    await giveUp(request);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(asked + 119_000);
+      await prepare(jaina);
+      await click(saveButton());
+      expect(alerts()).toContain("The last attempt may still finish; try again in a couple of minutes.");
+      expect(posts).toEqual([]);
+      vi.setSystemTime(asked + 121_000);
+      await prepare(jaina);
+      await click(saveButton());
+      expect(accounts[A_ID].characters).toHaveLength(1);
+      expect(posts.map((p) => p.url)).toEqual(["/api/me/characters", "/api/me/builds"]);
+      expect(text()).toContain("Saved 1 plan to your account.");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("a character request the site refused outright made nothing, so the next try asks again at once", async () => {
+    const jaina = alt({ planIds: [FROST.id] });
+    seed(ANON, [FROST], [jaina]);
+    const site = globalThis.fetch;
+    let refuse = true;
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (!refuse || String(input) !== "/api/me/characters" || init?.method !== "POST") return site(input, init);
+      refuse = false;
+      return Response.json({ error: "That character is not valid." }, { status: 400 });
+    });
+    await render();
+    await prepare(jaina);
+    await click(saveButton());
+    expect(alerts()).toContain("Frost was not saved: That character is not valid.");
+    expect(journal()!.characters).toEqual([]);
+    await prepare(jaina);
+    await click(saveButton());
+    expect(accounts[A_ID].characters).toHaveLength(1);
+    expect(text()).toContain("Saved 1 plan to your account.");
   });
 });

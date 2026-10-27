@@ -366,4 +366,85 @@ describe.skipIf(!databaseUrl || !restUrl || !secret || !databaseUrl.endsWith(`/$
     const kept = readTransfers(localStorage);
     expect(kept.ok && kept.transfers.characters).toEqual([{ altId: jaina.id, userId: owner, characterId: made[0].id, label: { name: "Jaina", classSlug: "mage", realm: null, note: "Frost for raids" }, at: expect.any(String) }]);
   });
+
+  /** A plan of `jaina`'s chosen, private, under a new character from her: the panel opened and ready to save. */
+  async function prepare(name: string, jaina: LocalAlt) {
+    await until(() => !!button(/^Choose plans to save to your account$/), "the offer");
+    await click(button(/^Choose plans to save to your account$/));
+    await until(() => !!field(`Save ${name} to your account`), "the preview");
+    await click(field(`Save ${name} to your account`));
+    await choose(field(`Sharing for ${name}`) as HTMLSelectElement, "private");
+    await choose(field(`Character for ${name}`) as HTMLSelectElement, `alt:${jaina.id}`);
+  }
+  const alt = (n: number, name: string, planId: string): LocalAlt => ({
+    id: id(n), name, realm: null, classSlug: "mage", faction: null, level: null, professions: [], notes: "",
+    planIds: [planId], provenance: { source: "manual", fileRecordAt: null, fileDetails: [] }, updatedAt: "2026-10-20T12:00:00.000Z",
+  });
+
+  test("a retry whose character the form changed finds the one the last try asked for, by that try's label, and makes no second", async () => {
+    const jaina = alt(501, "Jaina Review", id(8));
+    seed([plan(8, "Glacier")], [jaina]);
+    await mount();
+    // The route makes the character; its answer never reaches the panel.
+    onCharacter = async () => { onCharacter = null; throw new TypeError("The connection dropped after the character was made"); };
+    await prepare("Glacier", jaina);
+    await click(button(/^Save to your account$/));
+    await until(() => text().includes("may or may not have been made"), "the lost answer");
+    await prepare("Glacier", jaina);
+    const note = field("Note (optional)") as HTMLInputElement;
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    await act(async () => { setter.call(note, "For raids"); note.dispatchEvent(new Event("input", { bubbles: true })); });
+    await click(button(/^Save to your account$/));
+    await until(() => text().includes("Saved 1 plan to your account."), "the retry");
+    const made = (await pool.query("select id, note from public.build_characters where user_id = $1 and name = 'Jaina Review'", [owner])).rows;
+    expect(made).toEqual([{ id: expect.any(String), note: null }]);
+    expect((await pool.query("select character_id from public.saved_builds where user_id = $1 and name = 'Glacier'", [owner])).rows).toEqual([{ character_id: made[0].id }]);
+  });
+
+  test("a character request the route handles after the panel gave up is made once: a retry inside two minutes waits, and the next uses it", async () => {
+    const jaina = alt(502, "Jaina Late", id(9));
+    seed([plan(9, "Late")], [jaina]);
+    const fixture = globalThis.fetch;
+    let asked = 0;
+    let release = () => {};
+    let late: Promise<Response> | undefined;
+    vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) !== "/api/me/characters") return fixture(input, init);
+      asked++;
+      if (late) return fixture(input, init);
+      // The request reaches the site, which handles it only once released, after the panel has stopped waiting.
+      late = new Promise<void>((r) => { release = r; }).then(() => fixture(input, init));
+      return new Promise<Response>((resolve, reject) => {
+        late!.then(resolve, reject);
+        init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+      });
+    });
+    const characters = async () => (await pool.query("select id from public.build_characters where user_id = $1 and name = 'Jaina Late'", [owner])).rows;
+    await mount();
+    await prepare("Late", jaina);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      await click(button(/^Save to your account$/));
+      for (let i = 0; i < 250 && !late; i++) await act(async () => { await new Promise((r) => setImmediate(r)); });
+      expect(late).toBeDefined();
+      await act(async () => { await vi.advanceTimersByTimeAsync(20_000); });
+    } finally {
+      vi.useRealTimers();
+    }
+    await until(() => text().includes("may or may not have been made"), "giving up");
+    await prepare("Late", jaina);
+    await click(button(/^Save to your account$/));
+    await until(() => text().includes("The last attempt may still finish; try again in a couple of minutes."), "the wait");
+    expect(asked).toBe(1);
+    expect(await characters()).toEqual([]);
+    release();
+    expect((await late!).status).toBe(201);
+    await prepare("Late", jaina);
+    await click(button(/^Save to your account$/));
+    await until(() => text().includes("Saved 1 plan to your account."), "the retry");
+    expect(asked).toBe(1);
+    const made = await characters();
+    expect(made).toHaveLength(1);
+    expect((await pool.query("select character_id from public.saved_builds where user_id = $1 and name = 'Late'", [owner])).rows).toEqual([{ character_id: made[0].id }]);
+  });
 });

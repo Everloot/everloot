@@ -6,8 +6,9 @@ import { className } from "@/components/builds/describe";
 import { Card, Field, SectionHeading } from "@/components/ui";
 import { detailValue, listOf } from "@/lib/alt-workspace";
 import {
-  ANONYMOUS, WORKSPACE_LIMITS, bindTransferred, boundElsewhere, bucketKey, contentDigest, deviceStorage, emptyWorkspace, hiddenFrom,
-  locksAvailable, madeCharacter, orderState, planContent, planGroups, readTransfers, readWorkspace, receiptFailed, receiptSaved, rememberCharacter,
+  ANONYMOUS, WORKSPACE_LIMITS, bindTransferred, boundElsewhere, bucketKey, characterRefused, contentDigest, deviceStorage, emptyWorkspace,
+  hiddenFrom, locksAvailable, madeCharacter, orderState, pendingCharacter, planContent, planGroups, readTransfers, readWorkspace,
+  receiptFailed, receiptSaved, rememberCharacter,
   settleTransferred, transferKey, transferRoom, transferStanding, withWorkspaceLock,
   type CharacterLabel, type Failure, type LocalAlt, type LocalPlan, type Owner, type PlayerWorkspace, type Standing, type TransfersRead,
 } from "@/lib/player-workspace";
@@ -28,7 +29,9 @@ import { useWorkspaceOwner } from "./LocalPlanSave";
 // transfer before its next write. Each plan goes with a key stored first (transferKey) and kept whatever the site
 // answers, so a retry, after a reload or from another tab, gets the build the site made rather than a second one, and
 // another account is refused it. A character made from an alt is looked for on the account first, by the label it would
-// have, and its label is stored before it is asked for. The record of sends is read and written, and each character
+// have, and its label is stored before it is asked for, with when: a request no answer settled is looked for by that label
+// before anything else, and none other is asked for while it may still be made. The record of sends is read and written,
+// and each character
 // found or made, under the workspace lock, so two tabs never act on it at once; a browser without the lock is refused
 // the transfer. Each request gets ANSWER_WAIT_MS to answer, so no lock is held for long: one given up on may or may not
 // have done its work, and the next try finds out. What the site has is bound to that account on this device as it was
@@ -51,6 +54,9 @@ const NO_LOCKS = "This browser can't move plans safely; try a current browser.";
 /** How long each request of the transfer may go unanswered before it is given up on, its outcome unknown. */
 const ANSWER_WAIT_MS = 20_000;
 const waited = `did not answer within ${ANSWER_WAIT_MS / 1000} seconds`;
+/** How long after a character request no answer settled no other is asked for: it may still be made in that time. */
+const CHARACTER_WAIT_MS = 2 * 60_000;
+const MAY_STILL_FINISH = "The last attempt may still finish; try again in a couple of minutes.";
 const select = "min-h-11 w-full rounded-control border border-edge bg-canvas px-3 text-base text-fg";
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
@@ -332,10 +338,14 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
   const altIds = [...new Set(sending.map((r) => altOf(choiceOf(r.plan.id).character)).filter((id): id is string => id !== null))];
   const labels = new Map(altIds.map((id) => [id, characterLabel(altsById.get(id)!, characterOf(altsById.get(id)!))]));
   const characterErrors = new Map([...labels].map(([id, label]) => [id, label.ok ? null : label.error]));
-  /** The account's character with the label an alt's new one would have: its plans go under that one, not a second. */
+  /** The character an earlier transfer asked for from this alt that no answer settled, by the label it asked with. */
+  const pendingFor = (altId: string) => (transfers ? pendingCharacter(transfers, owner, altId)?.label ?? null : null);
+  /** The account's character an alt's plans go under rather than a new one: the one a request no answer settled may
+   *  have made, by its label, or one with the label the new one would have. */
   const onAccount = (altId: string) => {
+    const pending = pendingFor(altId);
     const label = labels.get(altId);
-    return label?.ok ? known.find((c) => sameCharacter(c, label.label)) : undefined;
+    return (pending ? known.find((c) => sameCharacter(c, pending)) : undefined) ?? (label?.ok ? known.find((c) => sameCharacter(c, label.label)) : undefined);
   };
   const making = altIds.filter((id) => !onAccount(id));
 
@@ -445,6 +455,8 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
     const changedAfter: string[] = [];
     /** Sent again, and the site had an earlier version of it from the same key. */
     const differs: string[] = [];
+    /** Filed under the character an earlier request made, as it made it, though the form here had changed it. */
+    const earlier: Array<{ plan: string; character: string }> = [];
     let finished = 0;
     const savedFirst = () => (saved.length > 0 ? `Saved ${listOf(saved)} to your account. ` : "");
     const madeNote = () => {
@@ -515,33 +527,55 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
     });
     /**
      * The character an alt's plans go under on the account, found or made under the lock, so two transfers in this
-     * browser never make two: the one made from this alt before, while the account has it, or one with this very label,
-     * as the account lists them now. Otherwise it is made, with its label stored first, so after an answer that never
-     * came the next try finds it on the account rather than make it again.
+     * browser never make two, as the account lists them now: the one made from this alt before, while the account has
+     * it; then one an earlier request asked for and no answer settled, by the label it asked with, whatever the form
+     * says now; then one with the form's label. While that earlier request may still be made, CHARACTER_WAIT_MS from
+     * when it was asked, nothing is asked for; past that, and still not there, the form's label is. A request is stored,
+     * with its label and when, before it is asked for, so after an answer that never came the next try finds it.
      */
     const characterFor = (altId: string, label: CharacterLabel, name: string) => withWorkspaceLock(async (): Promise<{ ok: true; id: string } | { ok: false; text: string | null }> => {
+      // Timed by Date.now, as the stored requests are, from when the account was asked.
+      const listedAt = Date.now();
       const listed = await request("/api/me/builds");
       if (!listed.ok && (listed.why === "stopped" || listed.why === "changed" || listed.why === "signed-out")) return { ok: false, text: refusal(listed, name) };
       const characters = listed.ok && Array.isArray(listed.body.characters) ? listed.body.characters as AccountBuilds["characters"] : null;
       if (!characters) return { ok: false, text: `${savedFirst()}Your account's characters could not be read, so ${name} was not sent. ${KEPT}${madeNote()}` };
       const record = readTransfers(deviceStorage());
       if (!record.ok) return { ok: false, text: `${savedFirst()}${record.message}${madeNote()}` };
-      const before = madeCharacter(record.transfers, owner, altId);
-      const found = characters.find((c) => c.id === before) ?? characters.find((c) => sameCharacter(c, label));
+      const before = characters.find((c) => c.id === madeCharacter(record.transfers, owner, altId));
+      if (before) return { ok: true, id: before.id };
+      const pending = pendingCharacter(record.transfers, owner, altId);
+      if (pending) {
+        const asked = characters.find((c) => sameCharacter(c, pending.label));
+        if (asked) {
+          rememberCharacter(deviceStorage(), owner, altId, pending.label, asked.id);
+          if (!sameCharacter(pending.label, label)) earlier.push({ plan: name, character: pending.label.name });
+          return { ok: true, id: asked.id };
+        }
+        if (Math.abs(listedAt - Date.parse(pending.at)) < CHARACTER_WAIT_MS) {
+          return { ok: false, text: `${savedFirst()}The character ${pending.label.name} was asked for on your account for ${name} and is not there yet. ${MAY_STILL_FINISH} ${name} was not sent.${madeNote()}` };
+        }
+      }
+      const found = characters.find((c) => sameCharacter(c, label));
       if (found) {
-        if (found.id !== before) rememberCharacter(deviceStorage(), owner, altId, label, found.id);
+        rememberCharacter(deviceStorage(), owner, altId, label, found.id);
         return { ok: true, id: found.id };
       }
-      const asked = rememberCharacter(deviceStorage(), owner, altId, label, null);
-      if (!asked.ok) return { ok: false, text: `${savedFirst()}${asked.message} ${KEPT}${madeNote()}` };
+      const at = new Date(Date.now());
+      const stored = rememberCharacter(deviceStorage(), owner, altId, label, null, at);
+      if (!stored.ok) return { ok: false, text: `${savedFirst()}${stored.message} ${KEPT}${madeNote()}` };
       const answer = await request("/api/me/characters", label);
       if (!answer.ok && (answer.why === "unreachable" || answer.why === "timeout" || answer.why === "server")) {
         const why = answer.why === "server"
           ? `The character ${label.name} may not have been made for ${name}: ${answer.message}`
           : `Your account ${answer.why === "timeout" ? waited : "could not be reached"} while the character ${label.name} was being made for ${name}, so it may or may not have been made.`;
-        return { ok: false, text: `${savedFirst()}${why} ${name} was not sent. Trying again files it under that character if your account has it, rather than make a second.${madeNote()}` };
+        return { ok: false, text: `${savedFirst()}${why} ${name} was not sent. Trying again uses that character once your account has it, and makes no other while this try may still finish.${madeNote()}` };
       }
-      if (!answer.ok) return { ok: false, text: refusal(answer, name) };
+      if (!answer.ok) {
+        // Refused outright: nothing was made, so the request is let go.
+        if (definite(answer.why)) characterRefused(deviceStorage(), owner, altId, at.toISOString());
+        return { ok: false, text: refusal(answer, name) };
+      }
       const id = String((answer.body.character as { id?: unknown } | undefined)?.id ?? "");
       made.set(altId, { name: label.name, used: false });
       rememberCharacter(deviceStorage(), owner, altId, label, id);
@@ -634,6 +668,7 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
         ? `${listOf(changedAfter)} changed here while ${changedAfter.length === 1 ? "it was" : "they were"} being sent: your account has ${changedAfter.length === 1 ? "it" : "them"} as ${changedAfter.length === 1 ? "it was" : "they were"} when you pressed Save, and the changed ${changedAfter.length === 1 ? "copy stays" : "copies stay"} here, signed out.`
         : "",
       ...differs.map((name) => `${name} was saved to your account before, and the copy here differs from it now, so the copy here stays, signed out.`),
+      ...earlier.map((e) => `${e.plan} was filed under ${e.character}, the character your last try made on your account, which stays as that try made it: the changes made here were not used.`),
     ].filter(Boolean);
     const done = saved.length > 0 ? `Saved ${plural(saved.length, "plan")} to your account.` : finished > 0 ? `Finished moving ${plural(finished, "plan")} your account had already.` : "";
     setOutcome(stop === ""
@@ -679,7 +714,7 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
           <ul ref={list} className="divide-y divide-line border-y border-line">
             {groups.map((group) => (
               <GroupItem key={group.key} group={group} included={included.has(group.key)} disabled={busy}
-                characters={account.data.characters} madeBefore={madeBefore} choiceOf={choiceOf} characterOf={characterOf} characterErrors={characterErrors}
+                characters={account.data.characters} madeBefore={madeBefore} pendingFor={pendingFor} choiceOf={choiceOf} characterOf={characterOf} characterErrors={characterErrors}
                 onInclude={(on) => setIncluded((now) => { const next = new Set(now); if (on) next.add(group.key); else next.delete(group.key); return next; })}
                 onChoice={(planId, choice) => setChoices((now) => ({ ...now, [planId]: choice }))}
                 onCharacter={(altId, draft) => setCharacters((now) => ({ ...now, [altId]: draft }))} />
@@ -703,13 +738,15 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
   );
 }
 
-function GroupItem({ group, included, disabled, characters, madeBefore, choiceOf, characterOf, characterErrors, onInclude, onChoice, onCharacter }: {
+function GroupItem({ group, included, disabled, characters, madeBefore, pendingFor, choiceOf, characterOf, characterErrors, onInclude, onChoice, onCharacter }: {
   group: Group;
   included: boolean;
   disabled: boolean;
   characters: AccountBuilds["characters"];
   /** The character an earlier transfer made from this alt, while the account has it: offered by its name, not again. */
   madeBefore: (altId: string) => string | null;
+  /** The character an earlier transfer asked for from this alt that no answer settled, by the label it asked with. */
+  pendingFor: (altId: string) => CharacterLabel | null;
   choiceOf: (planId: string) => Choice;
   characterOf: (alt: LocalAlt) => NewCharacter;
   characterErrors: Map<string, string | null>;
@@ -774,16 +811,17 @@ function GroupItem({ group, included, disabled, characters, madeBefore, choiceOf
         );
       })}
       {chosenAlts.map((alt) => (
-        <CharacterFields key={alt.id} alt={alt} draft={characterOf(alt)} error={characterErrors.get(alt.id) ?? null} disabled={disabled} onChange={(draft) => onCharacter(alt.id, draft)} />
+        <CharacterFields key={alt.id} alt={alt} draft={characterOf(alt)} pending={pendingFor(alt.id)} error={characterErrors.get(alt.id) ?? null} disabled={disabled} onChange={(draft) => onCharacter(alt.id, draft)} />
       ))}
     </li>
   );
 }
 
 /** A character for the account made from an alt: what fits is filled in, what does not is said, for the player to fill
- *  in, and what the account has no place for stays with the alt here. */
-function CharacterFields({ alt, draft, error, disabled, onChange }: {
-  alt: LocalAlt; draft: NewCharacter; error: string | null; disabled: boolean; onChange: (draft: NewCharacter) => void;
+ *  in, and what the account has no place for stays with the alt here. One an earlier try asked for and never heard back
+ *  on (`pending`) is said to come first. */
+function CharacterFields({ alt, draft, pending, error, disabled, onChange }: {
+  alt: LocalAlt; draft: NewCharacter; pending: CharacterLabel | null; error: string | null; disabled: boolean; onChange: (draft: NewCharacter) => void;
 }) {
   const nameLength = length(alt.name);
   const realmLength = alt.realm === null ? 0 : length(alt.realm);
@@ -794,6 +832,11 @@ function CharacterFields({ alt, draft, error, disabled, onChange }: {
     <fieldset className="grid gap-3 rounded-control border border-line bg-canvas p-3 sm:grid-cols-2">
       <legend className="px-1 text-sm text-fg">New character on your account, from your alt {alt.name}</legend>
       <p className="text-sm text-fg-2 sm:col-span-2">Class: {className(alt.classSlug!)}, as the alt&apos;s.</p>
+      {pending && (
+        <p className="text-sm text-fg-2 sm:col-span-2">
+          Your last try asked your account for the character {pending.name} and did not hear back. Saving looks for it there first and uses it as that try asked for it, if it was made; what is changed here is used only if it was not.
+        </p>
+      )}
       <div className="space-y-1">
         <Field label="Character name" required maxLength={LIMITS.characterName} value={draft.name} disabled={disabled} onChange={(e) => onChange({ ...draft, name: e.target.value })} />
         {nameLength > LIMITS.characterName && (

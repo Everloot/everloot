@@ -736,9 +736,10 @@ export function settleTransferred(storage: DeviceStorage | null, owner: Owner, p
 // Where plans went: for each plan sent to an account from this browser, the account, by its stable id, and the key the
 // site knows that save by; and the characters made, or being made, on an account from alts here. Kept under a key of
 // their own, apart from the buckets, so deleting a plan or restoring a backup never forgets where it went, and no backup
-// holds them. Nothing is ever dropped from it: a key once sent may have made a build, and a destination keeps a plan from
-// a second account. At most TRANSFERS_KEPT of each are kept, and past that a new one is refused. It is read and written
-// under the workspace lock only. It is no part of the buckets' format, which keeps its version.
+// holds them. Nothing is ever dropped from it, but a character request the site refused outright, which made nothing: a
+// key once sent may have made a build, and a destination keeps a plan from a second account. At most TRANSFERS_KEPT of
+// each are kept, and past that a new one is refused. It is read and written under the workspace lock only. It is no part
+// of the buckets' format, which keeps its version.
 
 const TRANSFERS = "everloot:transfers";
 const TRANSFERS_FORMAT = "everloot.transfers";
@@ -882,6 +883,22 @@ export function rememberCharacter(storage: DeviceStorage | null, owner: Owner, a
 /** The character made on `owner` from this alt, by its id, once the site said it made it. */
 export const madeCharacter = (transfers: Transfers, owner: Owner, altId: string): string | null =>
   (owner.kind === "account" ? transfers.characters.find((c) => c.altId === altId && c.userId === owner.userId)?.characterId ?? null : null);
+
+/** The character asked for on `owner` from this alt that no answer has settled yet: the label it was asked with, and
+ *  when (`at`). Until it is found on the account, or a wait has passed, no other is asked for. */
+export const pendingCharacter = (transfers: Transfers, owner: Owner, altId: string): MadeCharacter | null =>
+  (owner.kind === "account" ? transfers.characters.find((c) => c.altId === altId && c.userId === owner.userId && c.characterId === null) ?? null : null);
+
+/** The site refused outright the character asked for at `at`, so it made nothing: that request is let go, and the next
+ *  try may ask again at once. */
+export function characterRefused(storage: DeviceStorage | null, owner: Owner, altId: string, at: string): { ok: true } | Failure {
+  if (owner.kind !== "account") return failure("other-owner");
+  const done = changeTransfers(storage, (transfers) => {
+    const characters = transfers.characters.filter((c) => !(c.altId === altId && c.userId === owner.userId && c.characterId === null && c.at === at));
+    return characters.length === transfers.characters.length ? transfers : { ...transfers, characters };
+  });
+  return done.ok ? { ok: true } : done;
+}
 
 /** The plans this browser has sent to any account, for a restore to say so. */
 export function sentPlans(storage: DeviceStorage | null): Set<string> {
