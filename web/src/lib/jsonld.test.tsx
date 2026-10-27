@@ -4,10 +4,18 @@ import JsonLd from "@/components/JsonLd";
 import type { ChangeEntry } from "./changes";
 import {
   aboutPageJsonLd, breadcrumbJsonLd, changesJsonLd, datasetJsonLd, loreCollectionJsonLd, organizationJsonLd,
-  serializeJsonLd, softwareApplicationJsonLd, webApplicationJsonLd, websiteJsonLd,
+  newsArticleJsonLd, serializeJsonLd, softwareApplicationJsonLd, webApplicationJsonLd, websiteJsonLd,
 } from "./jsonld";
 
 const everything = JSON.stringify;
+
+test("news image is optional and site paths become absolute without changing author policy", () => {
+  const post = { title: "Title", description: "Summary", path: "/news/example", published: "2026-10-25", modified: "2026-10-26", author: "Visible author" };
+  expect(newsArticleJsonLd(post)).not.toHaveProperty("image");
+  expect(newsArticleJsonLd({ ...post, image: "/news/heroes/example/share.png" })).toMatchObject({
+    image: ["https://everloot.app/news/heroes/example/share.png"], author: { "@type": "Organization", name: "Everloot Team" },
+  });
+});
 
 test("a less-than sign in a value cannot close the script tag", () => {
   const text = serializeJsonLd({ name: "</script><b>x" });

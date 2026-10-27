@@ -10,6 +10,8 @@ const slug = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "lowercase letters a
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "a date as YYYY-MM-DD");
 const httpsUrl = z.url({ protocol: /^https$/ });
 
+const sitePathOrUrl = z.string().trim().regex(/^(\/[^\s]*|https:\/\/[^\s]+)$/, "a site path starting with / or an https URL");
+
 /** A published post's address is `/news/<slug>`; the file is `<slug>.md`. */
 export const PostFrontMatter = z.strictObject({
   slug,
@@ -26,6 +28,19 @@ export const PostFrontMatter = z.strictObject({
   tags: z.array(slug).max(6).default([]),
   /** Blizzard posts and other evidence, for review and the page's "Sources" list. */
   sources: z.array(z.strictObject({ title: z.string().trim().min(1), url: httpsUrl })).default([]),
+  /**
+   * The post's top image, optional: a site path (`/news/heroes/<slug>.webp`, under web/public) or an https URL,
+   * 16:9, and its alt text. Shown above the body and used as the share image; without it the page keeps the
+   * site's default share image and no top image.
+   */
+  hero: z.strictObject({
+    src: sitePathOrUrl,
+    alt: z.string().trim().min(1).max(500),
+    /** A smaller copy (about 800x450) for the /news cards and related cards; without it the cards use `src`. */
+    thumb: sitePathOrUrl.optional(),
+    /** The share image (og:image / twitter:image, 1200x675, title baked in); without it shares use `src`. */
+    share: sitePathOrUrl.optional(),
+  }).optional(),
   /** A draft is read but never built, previews included. */
   status: z.enum(["draft", "published"]),
 });

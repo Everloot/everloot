@@ -11,6 +11,11 @@ sources:
   - title: "Blizzard: WoW Weekly, October 23"
     url: https://worldofwarcraft.blizzard.com/news/24313106/dive-into-wow-forever-the-gods-of-zulaman-hallows-end-and-more-in-wow-weekly
 status: published
+hero:
+  src: /news/heroes/wow-forever-beta-ends-world-bosses-legendaries-scourge/wow-forever-beta-ends-world-bosses-legendaries-scourge-clean.webp
+  alt: "Everloot illustration: a glowing horned world boss pierced by a legendary sword above a 'Launch Nov 4' banner, with the WoW: Forever logo"
+  thumb: /news/heroes/wow-forever-beta-ends-world-bosses-legendaries-scourge/wow-forever-beta-ends-world-bosses-legendaries-scourge-card.webp
+  share: /news/heroes/wow-forever-beta-ends-world-bosses-legendaries-scourge/wow-forever-beta-ends-world-bosses-legendaries-scourge-share.png
 ---
 
 **TL;DR:** The WoW: Forever beta ended with a free-for-all: world bosses in the starting zones, legendaries like {item:19019} and {item:17182} off those bosses, Tier 1 sets from low-level mobs, and a Scourge invasion. None of it carries over. Live servers open November 4.

@@ -9,6 +9,11 @@ sources:
   - title: "Blizzard: WoW Weekly, October 23"
     url: https://worldofwarcraft.blizzard.com/news/24313106/dive-into-wow-forever-the-gods-of-zulaman-hallows-end-and-more-in-wow-weekly
 status: published
+hero:
+  src: /news/heroes/wow-weekly-forever-name-reservations-zulaman-hallows-end/wow-weekly-forever-name-reservations-zulaman-hallows-end-clean.webp
+  alt: "Everloot illustration: a WoW Weekly calendar with Oct 27 marked and a Hallow's End pumpkin, beside dates for name reservations (Oct 27), Hallow's End (Nov 2) and raids (Dec 9), with the WoW: Forever logo"
+  thumb: /news/heroes/wow-weekly-forever-name-reservations-zulaman-hallows-end/wow-weekly-forever-name-reservations-zulaman-hallows-end-card.webp
+  share: /news/heroes/wow-weekly-forever-name-reservations-zulaman-hallows-end/wow-weekly-forever-name-reservations-zulaman-hallows-end-share.png
 ---
 
 **TL;DR:** WoW: Forever name reservations run from October 27 to November 3. The first level 60 raids open December 9. Hallow's End runs through November 2. In Burning Crusade Classic Anniversary, the Gods of Zul'Aman update is live.

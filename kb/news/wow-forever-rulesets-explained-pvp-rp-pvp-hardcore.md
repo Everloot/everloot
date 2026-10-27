@@ -15,6 +15,11 @@ sources:
     url: https://us.forums.blizzard.com/en/wow/t/the-roleplay-pvp-ruleset-is-coming-to-wow-forever/2389502
   - title: "Massively OP: World of Warcraft Forever is getting RP-PvP as a ruleset after all"
     url: https://massivelyop.com/2026/10/23/world-of-warcraft-forever-is-getting-rp-pvp-as-a-ruleset-after-all/
+hero:
+  src: /news/heroes/wow-forever-rulesets-explained-pvp-rp-pvp-hardcore/wow-forever-rulesets-explained-pvp-rp-pvp-hardcore-clean.webp
+  alt: "Everloot illustration: a signpost pointing to the WoW: Forever rulesets Normal, PvP, RP, RP-PvP and Hardcore, with the WoW: Forever logo"
+  thumb: /news/heroes/wow-forever-rulesets-explained-pvp-rp-pvp-hardcore/wow-forever-rulesets-explained-pvp-rp-pvp-hardcore-card.webp
+  share: /news/heroes/wow-forever-rulesets-explained-pvp-rp-pvp-hardcore/wow-forever-rulesets-explained-pvp-rp-pvp-hardcore-share.png
 status: published
 ---
 

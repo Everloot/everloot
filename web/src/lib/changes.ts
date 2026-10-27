@@ -51,3 +51,15 @@ export function postPathForUrl(url: string, timeline: ChangeEntry[]): string | n
   const entry = timeline.find((e) => e.type !== "build" && [e, ...(e.copies ?? [])].some((c) => c.url !== null && sameAddress(c.url) === address));
   return entry ? postPath(entry) : null;
 }
+
+/** Where a stored Blizzard post lives: the WoW forums (any region) and Bluesky. */
+const BLUE_POST_HOST = /(?:^|\.)forums\.blizzard\.com$|^bsky\.app$/;
+
+/** Whether a link could be a Blizzard post the timeline stores, from its host alone, so a caller can skip loading the timeline. */
+export function couldBeBluePost(url: string): boolean {
+  try {
+    return BLUE_POST_HOST.test(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}

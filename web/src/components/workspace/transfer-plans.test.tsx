@@ -1631,6 +1631,11 @@ describe("one character per alt and account", () => {
     await choose("Save Frost to your account", { Frost: "private" });
     await set(field("Character for Frost"), `alt:${jaina.id}`);
     await click(saveButton());
+    // The retry reads a digest before saving; wait for its outcome, not five turns.
+    await vi.waitFor(async () => {
+      await settle();
+      expect(text()).toContain("Saved 1 plan to your account.");
+    }, { timeout: 5_000 });
     expect(accounts[A_ID].characters).toHaveLength(1);
     expect(posts.at(-1)!.body).toMatchObject({ name: "Frost", characterId: accounts[A_ID].characters[0].id });
   });
