@@ -272,7 +272,8 @@ end
 
 -- The Desktop App writes the player's saved builds from everloot.app into the EverlootBuilds slot addon,
 -- which sets EverlootBuildsData = { version, syncedAt, builds = { { name, character, realm, class, code,
--- code2, active, gameBuild } } }. Read only, at command time; nothing is saved or sent from here.
+-- code2, order, order2, active, gameBuild } } }. Orders are optional; version 1 ranks-only files still load.
+-- Read only, at command time; nothing is saved or sent from here.
 
 local function savedData()
   local data = EverlootBuildsData
@@ -678,7 +679,9 @@ function P.LoadSaved(n, set)
     return false
   end
   print("Everloot: loading saved build " .. n .. (set == 2 and " (second set)" or "") .. ", " .. plain(build.name) .. ".")
-  return P.Load(code)
+  local order
+  if set == 1 then order = build.order else order = build.order2 end
+  return P.Load(code, nil, order, set)
 end
 
 --- /everloot plan [code | number | show | hide | clear]
