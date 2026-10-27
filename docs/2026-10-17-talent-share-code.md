@@ -130,7 +130,9 @@ Opened, it moves to the class page address above.
 
 Reading a link is literal: the site's `readPlanHash` returns each of the four keys it finds, so a
 hand-edited link such as `#plan2=...&order=...` gives a first set's order with no first set's code.
-That order has nothing to order; use an order only with its own set's code.
+That order has nothing to order; use an order only with its own set's code. Each value is read whole,
+up to the next `&`: a code with anything after it is refused, and an order with anything after it
+leaves the order unknown. Neither is read as the valid part in front.
 
 ### Test vectors
 
