@@ -298,7 +298,7 @@ test("Remove access revokes with the list's own request, moves focus on and tell
   expect(calls).toEqual([{ url: `/api/keys?id=${KEY.id}`, method: "DELETE", body: null }]);
   expect(heard).toHaveBeenCalledTimes(1);
   expect(document.activeElement).toBe(target);
-  expect(Array.from(container.querySelectorAll('[role="status"]'), (s) => s.textContent)).toEqual(["Access removed for bot."]);
+  expect(Array.from(container.querySelectorAll('[role="status"]'), (s) => s.textContent)).toEqual(["Access removed for bot (evl_…beef)."]);
 });
 
 test("a refused Remove access says why, keeps the question open and announces nothing", async () => {
@@ -416,7 +416,7 @@ test("a 404 that is the route's own no-live-key answer reads the keys again and 
   await act(async () => root.render(card));
   await click("Remove access for bot");
   await click("Revoke key");
-  expect(said()).toBe("bot is no longer on this account's list.");
+  expect(said()).toBe("bot (evl_…beef) is no longer on this account's list.");
   expect(container.querySelector('[role="alert"]')).toBeNull();
   expect(router.refresh).toHaveBeenCalledTimes(1);
 });
@@ -464,7 +464,37 @@ test("a refused revoke lets go of its key, so a retry sends a new request and ca
   expect(deletes).toBe(2);
   expect(container.querySelector('[role="alert"]')).toBeNull();
   expect(router.refresh).toHaveBeenCalledTimes(1);
-  expect(said()).toBe("Access removed for bot.");
+  expect(said()).toBe("Access removed for bot (evl_…beef).");
+});
+
+test("removing a second key with the same name is said again: each line names the key by its last four characters", async () => {
+  const OTHER = "1b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e22";
+  const deletes: string[] = [];
+  vi.stubGlobal("fetch", async (url: string) => { deletes.push(url); return Response.json({ ok: true }); });
+  await act(async () => root.render(
+    <>
+      <RemoveAccess key="first" id={KEY.id} name="Desktop App key" hint="beef" focusAfter="after" />
+      <RemoveAccess key="second" id={OTHER} name="Desktop App key" hint="d00d" focusAfter="after" />
+      <KeysRefresh />
+    </>,
+  ));
+  const status = container.querySelector('[role="status"]')!;
+  await click("Remove access for Desktop App key");
+  await click("Revoke key");
+  expect(status.textContent).toBe("Access removed for Desktop App key (evl_…beef).");
+  const updates = vi.fn();
+  const observer = new MutationObserver(updates);
+  observer.observe(status, { childList: true, characterData: true, subtree: true });
+  try {
+    await click("Remove access for Desktop App key");
+    await click("Revoke key");
+    await Promise.resolve();
+    expect(deletes).toEqual([`/api/keys?id=${KEY.id}`, `/api/keys?id=${OTHER}`]);
+    expect(status.textContent).toBe("Access removed for Desktop App key (evl_…d00d).");
+    expect(updates).toHaveBeenCalled();
+  } finally {
+    observer.disconnect();
+  }
 });
 
 test("a shared revoke that fails is let go for both controls, and a later retry from the card succeeds", async () => {

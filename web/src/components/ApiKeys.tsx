@@ -453,8 +453,10 @@ export function RemoveAccess({ id, name, hint, focusAfter }: { id: string; name:
       const outcome = await revokeKey(id);
       if (focusFree(box.current)) document.getElementById(focusAfter)?.focus();
       setRemoved(true);
-      // "Access removed" only when this request revoked the key.
-      say(outcome === "revoked" ? `Access removed for ${name}.` : `${name} is no longer on this account's list.`);
+      // "Access removed" only when this request revoked the key. The key's last four characters tell two keys with one
+      // name apart, so the second removal changes the line and is heard too.
+      const key = `${name} (evl_…${hint})`;
+      say(outcome === "revoked" ? `Access removed for ${key}.` : `${key} is no longer on this account's list.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "That did not work. Try again.");
     } finally {

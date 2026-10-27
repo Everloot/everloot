@@ -72,12 +72,12 @@ test("the removal is said in a status line that is on the page before the click 
   expect(status?.closest("li")).toBeNull();
   await click("Remove access for Drop-rate script");
   await click("Revoke key");
-  expect(status!.textContent).toBe("Access removed for Drop-rate script.");
+  expect(status!.textContent).toBe("Access removed for Drop-rate script (evl_…c0de).");
   // What the refresh brings: the server renders Integrations again, without that key.
   await act(async () => root.render(<Integrations methods={["battlenet"]} name="Thrall#1234" overview={overview([LIVE[0]])} />));
   expect(buttonNamed("Remove access for Drop-rate script")).toBeUndefined();
   expect(container.querySelector('[role="status"]')).toBe(status);
-  expect(status!.textContent).toBe("Access removed for Drop-rate script.");
+  expect(status!.textContent).toBe("Access removed for Drop-rate script (evl_…c0de).");
 });
 
 test("at 390 px the lists are one column; the second column starts at the sm breakpoint", async () => {
