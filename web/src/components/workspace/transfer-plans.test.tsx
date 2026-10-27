@@ -11,6 +11,7 @@ import {
 } from "@/lib/player-workspace";
 import { ORDERS_UNAVAILABLE } from "@/lib/saved-builds";
 import TransferPlans from "./TransferPlans";
+import { V3_BUCKET_TEXT } from "@/lib/player-workspace.fixture";
 
 // Saving the plans this browser keeps signed out to the account signed in now, as a player meets it: this browser's
 // localStorage, and the site's /api/auth/me, /api/me/builds and /api/me/characters, answered for the session as it is
@@ -213,6 +214,63 @@ const summary = () => container.querySelector('[aria-label="What saving does"]')
 const saveButton = () => button(/^Save to your account$/) as HTMLButtonElement | undefined;
 const comeBack = async () => { await act(async () => { window.dispatchEvent(new Event("focus")); }); await settle(); };
 const accountReads = () => requests.filter((r) => r.request !== "GET /api/auth/me");
+
+test.each(["source", "destination"])("v3 %s stops before transfer registry access and account requests", async (side) => {
+  seed(ANON, [FROST]);
+  const owner = side === "source" ? ANON : A;
+  localStorage.setItem(bucketKey(owner), JSON.stringify({ ...JSON.parse(V3_BUCKET_TEXT), owner }));
+  const before = device();
+  const getItem = Storage.prototype.getItem;
+  const reads = vi.spyOn(Storage.prototype, "getItem").mockImplementation(function (this: Storage, key: string) {
+    if (key === "everloot:transfers") throw new Error("Registry must not be read");
+    return getItem.call(this, key);
+  });
+  await render();
+  expect(text()).toContain("This workspace uses version 3");
+  expect(button(/^Choose plans to save to your account$/)).toBeUndefined();
+  expect(accountReads()).toEqual([]);
+  expect(reads.mock.calls.some(([key]) => key === "everloot:transfers")).toBe(false);
+  expect(device()).toEqual(before);
+});
+
+test.each(["source", "destination"])("a %s changed to v3 while identity waits prevents account reads and registry access", async (side) => {
+  seed(ANON, [FROST]);
+  await render();
+  const release = hold("GET /api/auth/me");
+  await open();
+  const owner = side === "source" ? ANON : A;
+  localStorage.setItem(bucketKey(owner), JSON.stringify({ ...JSON.parse(V3_BUCKET_TEXT), owner }));
+  const before = device();
+  const getItem = Storage.prototype.getItem;
+  const reads = vi.spyOn(Storage.prototype, "getItem").mockImplementation(function (this: Storage, key: string) {
+    if (key === "everloot:transfers") throw new Error("Registry must not be read");
+    return getItem.call(this, key);
+  });
+  release();
+  await settle();
+  expect(alerts()).toContain("This workspace uses version 3");
+  expect(accountReads()).toEqual([]);
+  expect(reads.mock.calls.some(([key]) => key === "everloot:transfers")).toBe(false);
+  expect(device()).toEqual(before);
+});
+
+test.each(["source", "destination"])("a %s changed to v3 during a build response preserves cursors and pending receipts", async (side) => {
+  seed(ANON, [FROST]);
+  await render();
+  await open();
+  await choose("Save Frost to your account", { Frost: "private" });
+  const release = hold("POST /api/me/builds");
+  await click(saveButton());
+  expect(posts).toHaveLength(1);
+  const owner = side === "source" ? ANON : A;
+  localStorage.setItem(bucketKey(owner), JSON.stringify({ ...JSON.parse(V3_BUCKET_TEXT), owner }));
+  const before = device();
+  release();
+  await settle();
+  expect(text()).toContain("This workspace uses version 3");
+  expect(device()).toEqual(before);
+  expect(posts).toHaveLength(1);
+});
 
 async function open() {
   await click(button(/^Choose plans to save to your account$/));
