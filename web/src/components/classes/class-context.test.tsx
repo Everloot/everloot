@@ -23,6 +23,7 @@ const files = vi.hoisted(() => ({
   spells: null as { version: string; names: Map<number, string> } | null,
   professions: [] as { key: string; name: string; icon: string }[],
   withdrawn: false,
+  emptyCatalog: false,
 }));
 vi.mock("@/lib/game-assets", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/game-assets")>()),
@@ -35,7 +36,8 @@ vi.mock("@/lib/talents/catalogs", async (importOriginal) => {
     ...real,
     loadCatalog: async (slug: Parameters<typeof real.loadCatalog>[0]) => {
       if (files.withdrawn) throw new Error("withdrawn");
-      return real.loadCatalog(slug);
+      const catalog = await real.loadCatalog(slug);
+      return files.emptyCatalog ? { ...catalog, nodes: [] } : catalog;
     },
   };
 });
@@ -85,6 +87,7 @@ beforeEach(() => {
   files.spells = null;
   files.professions = [];
   files.withdrawn = false;
+  files.emptyCatalog = false;
 });
 afterEach(async () => {
   if (root) await act(async () => root!.unmount());
@@ -296,6 +299,21 @@ describe("the spell list", () => {
     expect(page).toContain(`href="/database/spells/${BANDAGE}"`);
     expect(visible(page)).toContain("The Mage talent catalog could not be read, so every spell is listed.");
     expect(visible(page)).not.toContain("not every Mage spell");
+  });
+
+  test("a talent catalog that reads but has no listed spell says so and lists no other spell", async () => {
+    await names();
+    files.emptyCatalog = true;
+    const empty = await spells({ class: "mage" });
+    expect(empty).not.toContain(`href="/database/spells/${BANDAGE}"`);
+    expect(visible(empty)).toContain("No spells from the Mage talent catalog are listed here.");
+    expect(visible(empty)).not.toContain("could not be read");
+    // A catalog whose spells the list does not name reads the same way.
+    files.emptyCatalog = false;
+    files.spells = { version: "1.60.1.70630", names: new Map([[BANDAGE, "Linen Bandage"]]) };
+    const unnamed = await spells({ class: "mage" });
+    expect(unnamed).not.toContain(`href="/database/spells/${BANDAGE}"`);
+    expect(visible(unnamed)).toContain("No spells from the Mage talent catalog are listed here.");
   });
 
   test("a class the page cannot read narrows nothing, says why, and is not a 404", async () => {

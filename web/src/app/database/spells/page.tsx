@@ -28,11 +28,10 @@ const href = (q: Partial<ListQuery<Sort>>, context: ClassContext | null = null) 
   ["q", q.q], ["sort", sortParam(q.sort)], ["page", q.page && q.page > 1 ? String(q.page) : undefined],
 ]), context);
 
-/** The spells a class's talent catalog names; null when the catalog cannot be read or names none. */
+/** The spells a class's talent catalog names, which may be none; null only when the catalog cannot be read. */
 async function talentCatalogSpells(slug: ClassSlug): Promise<Set<number> | null> {
   try {
-    const ids = (await loadCatalog(slug)).nodes.flatMap((n) => n.entries.map((e) => e.spellId)).filter((id): id is number => id !== null);
-    return ids.length ? new Set(ids) : null;
+    return new Set((await loadCatalog(slug)).nodes.flatMap((n) => n.entries.map((e) => e.spellId)).filter((id): id is number => id !== null));
   } catch {
     return null;
   }
@@ -78,6 +77,8 @@ export default async function SpellListPage(props: { searchParams?: Promise<Sear
   const chips = q.q ? [{ label: `Name: ${q.q}`, href: here({ q: undefined }) }] : [];
   const empty = !names ? <Unreadable />
     : q.q ? <NoMatches noun="spells" chips={chips} clearHref={clear} />
+    // The catalog was read: it names no spell, or none this list has.
+    : talents ? <p className="py-4 text-cell text-fg-2">{`No spells from the ${className} talent catalog are listed here.`}</p>
     : <NoObservations>No spell is listed yet.</NoObservations>;
 
   return (
