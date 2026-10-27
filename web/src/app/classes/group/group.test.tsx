@@ -246,6 +246,33 @@ describe("the group page", () => {
   });
 });
 
+describe("the status line", () => {
+  test("is there from the start, polite, and says what each change did and how many places are left", async () => {
+    const built = new DOMParser().parseFromString(renderToStaticMarkup(<GroupPage />), "text/html");
+    expect(built.querySelector('[role="status"][aria-live="polite"]')).not.toBeNull();
+
+    await open();
+    const status = container!.querySelector('[role="status"]')!;
+    expect(status.getAttribute("aria-live")).toBe("polite");
+    expect(status.textContent).toBe("");
+    const says = async (el: HTMLElement | null, line: string) => {
+      await press(el);
+      expect(container!.querySelector('[role="status"]'), "the same line, never remounted").toBe(status);
+      expect(status.textContent).toBe(line);
+    };
+    await says(button("Add Mage"), "Mage added to party 1. 1 of 5 places filled, 4 open.");
+    await says(button("Add Priest"), "Priest added to party 1. 2 of 5 places filled, 3 open.");
+    await says(button("Remove Mage from party 1, place 1"), "Mage removed from party 1. 1 of 5 places filled, 4 open.");
+    await says(size(10), "Group of 10 players. 1 of 10 places filled, 9 open.");
+    for (const c of ["Warrior", "Warrior", "Rogue", "Mage"]) await press(button(`Add ${c}`));
+    await says(button("Add Druid"), "Druid added to party 2. 6 of 10 places filled, 4 open.");
+    await says(button("Remove Druid from party 2, place 1"), "Druid removed from party 2. 5 of 10 places filled, 5 open.");
+    await says(size(5), "Group of 5 players. All 5 places are filled.");
+    await says(button("Add Druid"), "All 5 places are filled. Remove a class or choose a larger group to add another.");
+    await says(button("Clear"), "Group cleared. 0 of 5 places filled, 5 open.");
+  });
+});
+
 describe("keyboard focus", () => {
   /** The control with focus, which must be one a keyboard can still use. */
   const focused = () => {

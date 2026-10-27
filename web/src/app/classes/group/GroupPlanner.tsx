@@ -9,7 +9,7 @@ import { CURRENT_BUILD, TABLES } from "@/data/game-data/raid";
 import { classHubHref, classLabel, type ClassSlug } from "@/lib/class-context";
 import {
   EMPTY_GROUP, GROUP_SIZES, absentClasses, addClass, classCounts, groupCoverage, groupHash, groupHref, parseGroup, partiesOf, raidHref,
-  raidSizeFor, removeClass, withSize, type GroupPlan, type Talent,
+  raidSizeFor, removeClass, withSize, type GroupPlan, type GroupSize, type Talent,
 } from "@/lib/class-group";
 import { GROUP_SIZE } from "@/lib/raid";
 import type { GuideRole } from "../../../../../kb/src/guides/guide";
@@ -27,6 +27,12 @@ const list = (words: string[]) => (words.length > 1 ? `${words.slice(0, -1).join
 const article = (word: string) => (/^[aeiou]/i.test(word) ? "an" : "a");
 /** An effect's name, with the talent a class needs for it. */
 const withTalent = (label: string, talent: Talent) => (talent ? `${label} (${talent.tree ? `${talent.tree} talent` : "a talent, tree not known"})` : label);
+/** Why a full group takes no more: the note under the classes, and the status line when an Add is pressed anyway. */
+const fullNote = (size: GroupSize) => `All ${size} places are filled. Remove a class${size < LARGEST ? " or choose a larger group" : ""} to add another.`;
+/** The places a group has left, as the status line says them after a change. */
+const places = ({ size, classes }: GroupPlan) =>
+  classes.length < size ? `${classes.length} of ${size} places filled, ${size - classes.length} open.` : `All ${size} places are filled.`;
+const partyOf = (index: number) => Math.floor(index / GROUP_SIZE) + 1;
 
 /**
  * The group planner: a size, the classes in parties of five, and what they bring. The group lives in the address's
@@ -37,6 +43,8 @@ export default function GroupPlanner({ roles }: { roles: Record<ClassSlug, Guide
   const [plan, setPlan] = useState<GroupPlan>(EMPTY_GROUP);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  // What the last change did, for the status line; it is in the page from the start, so a screen reader hears each one.
+  const [said, setSaid] = useState("");
 
   useEffect(() => {
     // Read once the page is in the browser, and again when a link is pasted into the address bar of this tab.
@@ -44,6 +52,7 @@ export default function GroupPlanner({ roles }: { roles: Record<ClassSlug, Guide
       const opened = parseGroup(new URLSearchParams(location.hash.slice(1)));
       setPlan(opened.ok ? opened.plan : EMPTY_GROUP);
       setError(opened.ok ? null : opened.error);
+      setSaid("");
     };
     read();
     setReady(true);
@@ -74,9 +83,32 @@ export default function GroupPlanner({ roles }: { roles: Record<ClassSlug, Guide
     }
   }, [plan]);
 
+  const add = (c: ClassSlug) => {
+    const next = addClass(plan, c);
+    if (next === plan) return setSaid(fullNote(plan.size));
+    setSaid(`${classLabel(c)} added to party ${partyOf(plan.classes.length)}. ${places(next)}`);
+    edit(next);
+  };
+
   const remove = (index: number, hadFocus: boolean) => {
     if (hadFocus && index === plan.classes.length - 1) refocus.current = [`[data-place="${index - 1}"]`, `[data-add="${plan.classes[index]}"]`, SIZE_CONTROL];
-    edit(removeClass(plan, index));
+    const next = removeClass(plan, index);
+    setSaid(`${classLabel(plan.classes[index])} removed from party ${partyOf(index)}. ${places(next)}`);
+    edit(next);
+  };
+
+  const clear = () => {
+    if (!plan.classes.length) return;
+    const next = { ...plan, classes: [] };
+    setSaid(`Group cleared. ${places(next)}`);
+    edit(next);
+  };
+
+  const resize = (size: GroupSize) => {
+    const next = withSize(plan, size);
+    if (next === plan) return;
+    setSaid(`Group of ${size} players. ${places(next)}`);
+    edit(next);
   };
 
   const filled = plan.classes.length;
@@ -97,7 +129,7 @@ export default function GroupPlanner({ roles }: { roles: Record<ClassSlug, Guide
           <Segmented
             label="Group size"
             value={plan.size}
-            onChange={(s) => edit(withSize(plan, s))}
+            onChange={resize}
             options={GROUP_SIZES.map((s) => ({
               value: s,
               disabled: filled > s,
@@ -106,7 +138,7 @@ export default function GroupPlanner({ roles }: { roles: Record<ClassSlug, Guide
           />
           <p className="text-meta text-fg-2">{`${filled} of ${plan.size} places filled${open ? `, ${open} open` : ""}`}</p>
           <div className="flex flex-wrap gap-2 sm:ml-auto">
-            <button type="button" className="btn" aria-disabled={!filled} onClick={() => { if (filled) edit({ ...plan, classes: [] }); }}>Clear</button>
+            <button type="button" className="btn" aria-disabled={!filled} onClick={clear}>Clear</button>
             <CopyButton className="btn btn-primary" text={() => `${location.origin}${groupHref(plan)}`} label="Copy link" />
           </div>
         </div>
@@ -120,18 +152,15 @@ export default function GroupPlanner({ roles }: { roles: Record<ClassSlug, Guide
               aria-disabled={!open}
               aria-describedby={open ? undefined : FULL_NOTE}
               data-add={c}
-              onClick={() => edit(addClass(plan, c))}
+              onClick={() => add(c)}
               className={`flex h-9 min-w-0 items-center rounded-control border border-edge bg-canvas px-2 text-left text-control font-medium transition-colors hover:border-fg-2 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 ${CLASS_TEXT[c]}`}
             >
               <span className="min-w-0 truncate">{classLabel(c)}</span>
             </button>
           ))}
         </div>
-        {!open && (
-          <p id={FULL_NOTE} className="text-cell-2 text-muted">
-            {`All ${plan.size} places are filled. Remove a class${plan.size < LARGEST ? " or choose a larger group" : ""} to add another.`}
-          </p>
-        )}
+        {!open && <p id={FULL_NOTE} className="text-cell-2 text-muted">{fullNote(plan.size)}</p>}
+        <p role="status" aria-live="polite" className="min-h-5 text-meta text-fg-2">{said}</p>
 
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
           {partiesOf(plan).map((party, p) => (
