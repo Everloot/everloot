@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Card, SectionHeading } from "@/components/ui";
 import {
-  ADDON_FILE_LIMIT, ADDON_FILE_TOO_LARGE, applyAltImport, defaultChoices, previewAltImport, readAddonFile, rowChoices,
+  ADDON_FILE_LIMIT, ADDON_FILE_TOO_LARGE, applyAltImport, changesAlt, defaultChoices, previewAltImport, readAddonFile, rowChoices, takeAs,
   type AltImportPreview, type DetailChange, type ImportRow, type RowChoice,
 } from "@/lib/alt-import";
 import { DETAIL_WORDS, altFailure, altKey, altLabel, detailValue, detailsLine, listOf } from "@/lib/alt-workspace";
@@ -48,10 +48,28 @@ function unused(preview: AltImportPreview): string[] {
   ].filter(Boolean);
 }
 
-/** How a row reads: what the file says of the character, and what would happen to it. */
-function rowLines(row: ImportRow, alts: Map<string, LocalAlt>): string[] {
+const keptText = (k: DetailChange) => `Kept as you set it: ${DETAIL_WORDS[k.detail]} ${detailValue(k.detail, k.here)} (the file says ${detailValue(k.detail, k.file)}).`;
+
+/** The alt a choice names, if it names one. */
+const chosen = (choice: RowChoice, alts: Map<string, LocalAlt>) => (choice.startsWith("alt:") ? alts.get(choice.slice("alt:".length)) : undefined);
+
+/** What taking the character as the alt the player chose would do to it, said before anything is written. */
+function takeLines(row: ImportRow, alt: LocalAlt): string[] {
+  const { realm, newer, changes, kept } = takeAs(row.character, alt);
+  return [
+    realm ? `Its realm is set to ${realm}.` : "",
+    !newer ? "Its details already come from an Everloot.lua at least as new as this one, so this file changes none of them."
+      : changes.length > 0 ? `Newer details from the file: ${listOf(changes.map(changeText))}.`
+        : "None of its details change; it is noted as matched to this file's records.",
+    ...kept.map(keptText),
+  ].filter(Boolean);
+}
+
+/** How a row reads: what the file says of the character, and what would happen to it as the player has chosen. */
+function rowLines(row: ImportRow, alts: Map<string, LocalAlt>, choice: RowChoice): string[] {
   const unsure = row.altIds.flatMap((id) => alts.get(id) ?? []);
   const known = detailsLine(row.character);
+  const taken = chosen(choice, alts);
   return [
     known || "The file names this character in gold or money records only, so its class, level and faction are not in it.",
     row.status === "new" ? "Not here yet."
@@ -62,7 +80,7 @@ function rowLines(row: ImportRow, alts: Map<string, LocalAlt>): string[] {
           : unsure.length === 1
             ? `This may be your alt ${unsure[0].name}, whose realm is not set. It is skipped unless you say which it is.`
             : `This may be one of your alts ${listOf(unsure.map((a) => a.name))}, whose realms are not set. It is skipped unless you say which it is.`,
-    ...row.kept.map((k) => `Kept as you set it: ${DETAIL_WORDS[k.detail]} ${detailValue(k.detail, k.here)} (the file says ${detailValue(k.detail, k.file)}).`),
+    ...(taken ? takeLines(row, taken) : row.kept.map(keptText)),
   ];
 }
 
@@ -130,7 +148,11 @@ export default function ReadSaveFile({ owner, onApplied }: {
   }
 
   const adds = choices.filter((c) => c === "add").length;
-  const acts = choices.filter((c) => c !== "skip").length;
+  // An alt the player chose that the file would not change is no change to make.
+  const acts = choices.filter((c, i) => {
+    const alt = preview && chosen(c, preview.alts);
+    return c !== "skip" && (!alt || changesAlt(takeAs(preview.preview.rows[i].character, alt)));
+  }).length;
   const full = preview !== null && adds > preview.preview.room;
   const go = adds === acts ? "Add to this device" : adds === 0 ? "Update on this device" : "Add and update on this device";
   return (
@@ -162,7 +184,7 @@ export default function ReadSaveFile({ owner, onApplied }: {
             <ul className="divide-y divide-line">
               {preview.preview.rows.map((row, i) => {
                 const offered = rowChoices(row);
-                const [first, ...rest] = rowLines(row, preview.alts);
+                const [first, ...rest] = rowLines(row, preview.alts, choices[i]);
                 return (
                   <li key={altKey(row.character.name, row.character.realm)} className="space-y-1 py-3">
                     {offered.length > 1 ? (

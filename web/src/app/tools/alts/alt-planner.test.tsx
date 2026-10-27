@@ -324,6 +324,23 @@ test("a file character that is here as two alts says so, offers each copy told a
   expect(choice.value).toBe("skip");
 });
 
+test("choosing which copy a file character is shows what that copy would get before anything is written, and an older file gives nothing", async () => {
+  const fromFile = { source: "addon-file" as const, fileRecordAt: "2026-10-27T12:00:00.000Z", fileDetails: ["classSlug" as const, "level" as const, "faction" as const] };
+  seed(ANON, [], [alt({ level: 60, provenance: fromFile }), alt({ id: id(501), provenance: { ...fromFile, fileRecordAt: "2026-10-20T00:00:00.000Z" } })]);
+  await render();
+  await readSaveFile(`EverlootDB = { ["version"] = "0.3.12", ["installId"] = "install-fixture-0003", ["records"] = { ["character_link"] = {
+    { ["capturedAt"] = "2026-10-25T00:00:00Z", ["name"] = "Thrall", ["realm"] = "Moon Guard", ["class"] = "SHAMAN", ["level"] = 31, ["faction"] = "Horde" } } } }`);
+  const before = localStorage.getItem(bucketKey(ANON));
+  await type(field("Thrall (Moon Guard)", filePreview()!), `alt:${id(500)}`);
+  expect(filePreview()?.textContent).toContain("Its details already come from an Everloot.lua at least as new as this one, so this file changes none of them.");
+  expect(button(/^Update on this device$/, filePreview()!)).toBeUndefined();
+  await type(field("Thrall (Moon Guard)", filePreview()!), `alt:${id(501)}`);
+  expect(filePreview()?.textContent).toContain("Newer details from the file: level 24 → 31.");
+  expect(localStorage.getItem(bucketKey(ANON))).toBe(before);
+  await click(button(/^Update on this device$/, filePreview()!));
+  expect(stored(ANON)?.alts.map((a) => a.level)).toEqual([60, 31]);
+});
+
 test("a file over 20 MiB is not read, and a damaged, cut-off or foreign file says so; nothing changes", async () => {
   seed(ANON, [], [alt()]);
   const before = localStorage.getItem(bucketKey(ANON));

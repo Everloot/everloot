@@ -157,11 +157,30 @@ function compare(character: FileCharacter, alt: LocalAlt): { changes: DetailChan
   return { changes, kept };
 }
 
-function matched(character: FileCharacter, alt: LocalAlt): ImportRow {
+/** What taking a file's character as one alt would do. */
+export interface TakeAs {
+  /** The file's realm, for an alt whose realm is not set: it is on that realm from then on. */
+  realm: string | null;
+  /** Whether the file is newer than the last one read into the alt. Only a newer file sets details, and its time. */
+  newer: boolean;
+  changes: DetailChange[];
+  kept: DetailChange[];
+}
+
+/** What taking the file's character as `alt` would do, whether the file found the alt or the player chose it. A file no
+ *  newer than the last one read into the alt has nothing new for it, whatever the player changed since. */
+export function takeAs(character: FileCharacter, alt: LocalAlt): TakeAs {
+  const realm = alt.realm === null ? character.realm : null;
   const { fileRecordAt } = alt.provenance;
-  // A file no newer than the last one read into this alt has nothing new for it, whatever the player changed since.
-  if (fileRecordAt !== null && character.recordAt <= fileRecordAt) return { character, status: "same", altIds: [alt.id], changes: [], kept: [] };
-  const { changes, kept } = compare(character, alt);
+  if (fileRecordAt !== null && character.recordAt <= fileRecordAt) return { realm, newer: false, changes: [], kept: [] };
+  return { realm, newer: true, ...compare(character, alt) };
+}
+
+/** Whether taking the character as an alt changes it at all: a newer file, or a realm the alt did not have. */
+export const changesAlt = (take: TakeAs) => take.newer || take.realm !== null;
+
+function matched(character: FileCharacter, alt: LocalAlt): ImportRow {
+  const { changes, kept } = takeAs(character, alt);
   return { character, status: changes.length > 0 ? "update" : "same", altIds: [alt.id], changes, kept };
 }
 
@@ -217,17 +236,21 @@ export function applyAltImport(storage: DeviceStorage | null, owner: Owner, prev
         return;
       }
       const at = alts.findIndex((a) => a.id === (choice === "update" ? altIds[0] : choice.slice("alt:".length)));
-      // Taken as an alt whose realm was not set, it is on the file's realm from now on. A realm already set is kept as
-      // the player wrote it.
-      const alt = choice === "update" ? alts[at] : { ...alts[at], realm: alts[at].realm ?? character.realm };
-      const { changes } = compare(character, alt);
-      const next: LocalAlt = { ...alt, updatedAt: now.toISOString() };
-      for (const { detail, file } of changes) Object.assign(next, { [detail]: file });
-      const set = new Set(changes.map((c) => c.detail));
-      next.provenance = {
-        ...alt.provenance, fileRecordAt: character.recordAt,
-        fileDetails: FILE_DETAILS.filter((d) => set.has(d) || alt.provenance.fileDetails.includes(d)),
-      };
+      const alt = alts[at];
+      // Whichever alt it is taken as, the rules are a match's: an alt whose realm was not set is on the file's realm from
+      // now on, a realm already set is kept as the player wrote it, and only a file newer than the alt's last one sets
+      // details and its time.
+      const take = takeAs(character, alt);
+      if (!changesAlt(take)) return;
+      const next: LocalAlt = { ...alt, realm: take.realm ?? alt.realm, updatedAt: now.toISOString() };
+      for (const { detail, file } of take.changes) Object.assign(next, { [detail]: file });
+      if (take.newer) {
+        const set = new Set(take.changes.map((c) => c.detail));
+        next.provenance = {
+          ...alt.provenance, fileRecordAt: character.recordAt,
+          fileDetails: FILE_DETAILS.filter((d) => set.has(d) || alt.provenance.fileDetails.includes(d)),
+        };
+      }
       alts[at] = next;
       updated++;
     });

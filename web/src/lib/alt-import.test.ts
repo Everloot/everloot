@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
-  ADDON_FILE_LIMIT, applyAltImport, defaultChoices, previewAltImport, readAddonFile, rowChoices, type AddonFile, type RowChoice,
+  ADDON_FILE_LIMIT, applyAltImport, defaultChoices, previewAltImport, readAddonFile, rowChoices, takeAs, type AddonFile, type RowChoice,
 } from "./alt-import";
 import { saveAlt } from "./alt-workspace";
 import { bucketKey, readWorkspace, savePlan, type LocalAlt, type Owner, type PlayerWorkspace } from "./player-workspace";
@@ -302,6 +302,34 @@ describe("adding the file's characters", () => {
     const preview = previewAltImport(file, stored(storage, ANON));
     expect(applyAltImport(storage, ANON, preview, [`alt:${idOf(500)}`], LATER)).toMatchObject({ ok: true, updated: 1 });
     expect(stored(storage, ANON).alts.map((a) => a.realm)).toEqual(["Moon Guard", "Moon Guard"]);
+  });
+
+  test("a file older than a copy's own last file cannot lower its level or roll back its record time (reported case)", () => {
+    const storage = memory();
+    const fromFile = { source: "addon-file" as const, fileRecordAt: "2026-10-27T12:00:00.000Z", fileDetails: ["classSlug" as const, "faction" as const, "level" as const] };
+    const copy = alt({ realm: "Moon Guard", classSlug: "shaman", faction: "horde", level: 60, notes: "Keep", provenance: fromFile, updatedAt: "2026-10-27T12:00:00.000Z" });
+    seed(storage, ANON, [copy, { ...copy, id: idOf(501), level: 30 }]);
+    const before = stored(storage, ANON).alts;
+    const older = read(lua({ character_link: [link("Thrall", "Moon Guard", "2026-10-20T00:00:00Z", "SHAMAN", 24, "Horde")] }));
+    const preview = previewAltImport(older, stored(storage, ANON));
+    expect(takeAs(older.characters[0], copy)).toEqual({ realm: null, newer: false, changes: [], kept: [] });
+    expect(applyAltImport(storage, ANON, preview, [`alt:${idOf(500)}`], LATER)).toMatchObject({ ok: true, added: 0, updated: 0 });
+    expect(stored(storage, ANON).alts).toEqual(before);
+    // A newer file sets what it has newer on the copy it is taken as, as for an alt it matches by itself.
+    const newer = read(lua({ character_link: [link("Thrall", "Moon Guard", "2026-10-28T00:00:00Z", "SHAMAN", 31, "Horde")] }));
+    expect(applyAltImport(storage, ANON, previewAltImport(newer, stored(storage, ANON)), [`alt:${idOf(501)}`], LATER)).toMatchObject({ ok: true, updated: 1 });
+    expect(stored(storage, ANON).alts).toEqual([before[0], { ...before[1], level: 31, updatedAt: LATER.toISOString(),
+      provenance: { source: "addon-file", fileRecordAt: "2026-10-28T00:00:00.000Z", fileDetails: ["classSlug", "level", "faction"] } }]);
+  });
+
+  test("an alt whose realm is not set takes the file's realm when chosen, but a file older than its own last file sets no detail", () => {
+    const storage = memory();
+    const typed = alt({ level: 40, provenance: { source: "manual", fileRecordAt: "2026-10-25T00:00:00.000Z", fileDetails: [] } });
+    seed(storage, ANON, [typed]);
+    const older = read(lua({ character_link: [link("Thrall", "Moon Guard", "2026-10-20T00:00:00Z", "SHAMAN", 24, "Horde")] }));
+    expect(takeAs(older.characters[0], typed)).toEqual({ realm: "Moon Guard", newer: false, changes: [], kept: [] });
+    expect(applyAltImport(storage, ANON, previewAltImport(older, stored(storage, ANON)), [`alt:${typed.id}`], LATER)).toMatchObject({ ok: true, updated: 1 });
+    expect(stored(storage, ANON).alts).toEqual([{ ...typed, realm: "Moon Guard", updatedAt: LATER.toISOString() }]);
   });
 
   test("an ambiguous character can be added as a new alt instead", () => {
