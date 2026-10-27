@@ -390,14 +390,17 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
 
   // A browser brings a talent that takes focus into the window, but leaves it where it is if it is already in it, even
   // under the site header, the phone's stuck tree switch or the cookie banner (which sets the strip it covers as the
-  // page's bottom scroll padding while it is open). So a talent that takes keyboard focus there moves to 8 px clear of
-  // them. Not one focused by a press: moving it then would put the release on another talent.
+  // page's bottom scroll padding while it is open). So a talent, or the phone's Reset after the talents, that takes
+  // keyboard focus there moves to 8 px clear of them. Not one focused by a press: moving it then would put the release
+  // on another control. The switch counts where it sticks, under the header: the end of the trees can push it up, and
+  // it drops back there as soon as the page scrolls up. Where it does not stick, it scrolls with the trees above them.
   const treeSwitch = useRef<HTMLDivElement>(null);
   function keepClear(e: React.FocusEvent<HTMLElement>) {
     const bar = treeSwitch.current;
     const el = e.target as HTMLElement;
-    if (!bar || !el.hasAttribute("data-node") || !el.matches(":focus-visible")) return;
-    const top = Math.max(DATA_SIZE.header, bar.getClientRects().length > 0 ? bar.getBoundingClientRect().bottom : 0) + 8;
+    if (!bar || !el.matches("[data-node], [data-tree-reset]") || !el.matches(":focus-visible")) return;
+    const sticks = bar.getClientRects().length > 0 && getComputedStyle(bar).position === "sticky";
+    const top = DATA_SIZE.header + (sticks ? bar.offsetHeight : 0) + 8;
     const bottom = window.innerHeight - (parseFloat(getComputedStyle(document.documentElement).scrollPaddingBottom) || 0);
     const box = el.getBoundingClientRect();
     if (box.top < top) window.scrollBy(0, box.top - top);
@@ -426,8 +429,9 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
     // On a phone the set and tree switches are 44 px tall like the calculator's other buttons (the switch itself is 40).
     <div onKeyDown={onKeyDown} data-calculator className="max-md:[&_[data-segmented]_button]:min-h-11">
       {/* Clipped rather than hidden: a card with overflow hidden is a scroll container, and the phone's tree switch
-          below could not stick to the window from inside it. */}
-      <Card padding="none" className="overflow-clip">
+          below could not stick to the window from inside it. Marked important so it wins over the card's own
+          overflow-hidden whatever order the two utilities are written in. */}
+      <Card padding="none" className="!overflow-clip">
         {/* The build at a glance: which tree leads, the split, points left, the level it needs, and the link. */}
         <section aria-label="Build" className="flex flex-wrap items-center gap-x-8 gap-y-2 border-b border-line px-4 py-2 md:gap-y-3 md:py-3">
           {/* A phone puts the link beside the build and the figures under them; a wide screen keeps them on one line. */}
@@ -532,7 +536,7 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
                     };
                     return game ? <GameTree {...props} assets={assets} /> : <TalentTreeView {...props} assets={assets} />;
                   })()}
-                  {!readOnly && <button type="button" className="mt-2 min-h-11 px-1 text-sm text-muted hover:text-fg disabled:opacity-50 md:hidden" disabled={points === 0} aria-label={`Reset ${tree.name}`} onClick={() => resetTree(tree.id, tree.name)}>Reset {tree.name}</button>}
+                  {!readOnly && <button type="button" data-tree-reset className="mt-2 min-h-11 px-1 text-sm text-muted hover:text-fg disabled:opacity-50 md:hidden" disabled={points === 0} aria-label={`Reset ${tree.name}`} onClick={() => resetTree(tree.id, tree.name)}>Reset {tree.name}</button>}
                 </section>
               );
             })}

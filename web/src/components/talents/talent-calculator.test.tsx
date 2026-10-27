@@ -20,6 +20,8 @@ let root: Root;
 beforeEach(async () => {
   vi.mocked(track).mockClear();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  // jsdom has no scrollBy, and the calculator calls it whenever a talent takes keyboard focus out of place.
+  vi.spyOn(window, "scrollBy").mockImplementation(() => {});
   window.location.hash = "";
   container = document.createElement("div");
   document.body.append(container);
@@ -28,6 +30,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
+  vi.restoreAllMocks();
 });
 
 const render = () => act(async () => root.render(<TalentCalculator catalog={fixture} />));
@@ -325,7 +328,8 @@ test("on a tall enough phone the tree switch sticks under the site header, over 
   expect(switchBar().parentElement!.contains(trees)).toBe(true);
   expect(switchBar().parentElement!.querySelector('[aria-label="Share"]')).toBeNull();
   // A card that clips with overflow: hidden is a scroll container, and nothing inside it sticks to the window.
-  expect(container.querySelector("[data-card]")!.className.split(" ")).toContain("overflow-clip");
+  // Important, so it beats the card's own overflow-hidden whichever the stylesheet writes last.
+  expect(container.querySelector("[data-card]")!.className.split(" ")).toContain("!overflow-clip");
 });
 
 test("the tree switch stops sticking once it and the site header would take more than a quarter of the window", async () => {
@@ -347,57 +351,130 @@ test("the tree switch stops sticking once it and the site header would take more
 });
 
 /** Whether the browser counts an element's focus as keyboard focus; jsdom's own answer depends on earlier tests' clicks. */
+const elementMatches = Element.prototype.matches;
 const keyboardFocus = (el: Element, keyboard: boolean) => {
-  const matches = el.matches.bind(el);
-  vi.spyOn(el, "matches").mockImplementation((selector) => (selector === ":focus-visible" ? keyboard : matches(selector)));
+  vi.spyOn(el, "matches").mockImplementation((selector) => (selector === ":focus-visible" ? keyboard : elementMatches.call(el, selector)));
 };
+const box = (top: number, height: number) => ({ top, bottom: top + height, left: 0, right: 50, width: 50, height, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+const place = (el: Element, top: number, height: number) => vi.spyOn(el, "getBoundingClientRect").mockReturnValue(box(top, height));
+const refocus = (el: HTMLElement) => act(async () => { el.blur(); el.focus(); });
+/**
+ * The phone's tree switch as a browser would have it (jsdom has no CSS or layout): shown or not, sticky or scrolling
+ * with the trees, `height` px tall, and with its box now at `at`, which the end of the trees can push above where it
+ * sticks.
+ */
+const computedStyle = window.getComputedStyle.bind(window);
+function phoneSwitch({ shown = true, position = "sticky", height = 83, at = 44 }: { shown?: boolean; position?: string; height?: number; at?: number } = {}) {
+  const bar = switchBar();
+  vi.spyOn(window, "getComputedStyle").mockImplementation((el, pseudo) => (el === bar ? ({ position } as CSSStyleDeclaration) : computedStyle(el, pseudo)));
+  vi.spyOn(bar, "getClientRects").mockReturnValue((shown ? [box(at, height)] : []) as unknown as DOMRectList);
+  vi.spyOn(bar, "offsetHeight", "get").mockReturnValue(shown ? height : 0);
+  place(bar, at, height);
+}
 
 test("a talent that takes keyboard focus under the site header, the stuck tree switch or the cookie banner's strip is scrolled clear", async () => {
   await render();
-  const box = (top: number, height: number) => ({ top, bottom: top + height, left: 0, right: 50, width: 50, height, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
-  const scrollBy = vi.spyOn(window, "scrollBy").mockImplementation(() => {});
-  const place = (el: Element, top: number, height: number) => vi.spyOn(el, "getBoundingClientRect").mockReturnValue(box(top, height));
-  const focus = (el: HTMLElement) => act(async () => { el.blur(); el.focus(); });
+  const scrollBy = vi.mocked(window.scrollBy);
   keyboardFocus(node(12), true);
   try {
     // The switch stuck under the 44 px header, 83 px tall: a talent at 74 goes down to 8 px below it.
-    place(switchBar(), 44, 83);
-    vi.spyOn(switchBar(), "getClientRects").mockReturnValue([box(44, 83)] as unknown as DOMRectList);
+    phoneSwitch();
     place(node(12), 74, 88);
-    await focus(node(12));
+    await refocus(node(12));
     expect(scrollBy).toHaveBeenLastCalledWith(0, 74 - (127 + 8));
     // Clear of everything: left where it is.
     scrollBy.mockClear();
     place(node(12), 300, 88);
-    await focus(node(12));
+    await refocus(node(12));
     expect(scrollBy).not.toHaveBeenCalled();
     // The open banner covers the strip it sets as the page's bottom scroll padding: a talent whose foot is 49 px into
     // that strip comes up by 49 px.
     document.documentElement.style.scrollPaddingBottom = "161px";
     place(node(12), window.innerHeight - 200, 88);
-    await focus(node(12));
+    await refocus(node(12));
     expect(scrollBy).toHaveBeenLastCalledWith(0, 49);
     // Where the switch is not shown (a wide screen), only the site header counts.
     document.documentElement.style.scrollPaddingBottom = "";
-    vi.spyOn(switchBar(), "getClientRects").mockReturnValue([] as unknown as DOMRectList);
+    phoneSwitch({ shown: false });
     place(node(12), 20, 88);
-    await focus(node(12));
+    await refocus(node(12));
     expect(scrollBy).toHaveBeenLastCalledWith(0, 20 - (44 + 8));
-    // Only talents: a button in the switch itself is never moved.
+    // Only talents and the phone's tree Reset: a button in the switch itself is never moved.
     scrollBy.mockClear();
     const option = switchBar().querySelector<HTMLButtonElement>('[aria-label="Show tree"] button')!;
     keyboardFocus(option, true);
     place(option, 0, 40);
-    await focus(option);
+    await refocus(option);
     expect(scrollBy).not.toHaveBeenCalled();
     // A press that focuses a half-covered talent leaves it in place, so the release lands on the same talent.
     keyboardFocus(node(12), false);
-    await focus(node(12));
+    await refocus(node(12));
     expect(scrollBy).not.toHaveBeenCalled();
   } finally {
     document.documentElement.style.scrollPaddingBottom = "";
-    vi.restoreAllMocks();
   }
+});
+
+test("the end of the trees can push the switch up: a focused talent goes below where it will stick, not where it is", async () => {
+  await render();
+  keyboardFocus(node(12), true);
+  // Pushed to 5–88. Scrolling the talent at 20 only to 8 px below that would leave it under the switch once it drops
+  // back to 44–127.
+  phoneSwitch({ at: 5 });
+  place(node(12), 20, 88);
+  await refocus(node(12));
+  expect(vi.mocked(window.scrollBy)).toHaveBeenLastCalledWith(0, 20 - (44 + 83 + 8));
+});
+
+test("a talent whose foot is in the banner's strip, right under the switch in its own place, comes up out of the strip", async () => {
+  await render();
+  keyboardFocus(node(12), true);
+  document.documentElement.style.scrollPaddingBottom = "161px";
+  try {
+    // Measured from the switch's box (488–571), the top bound would sit on the talent at 579 and cancel the move.
+    phoneSwitch({ at: 488 });
+    place(node(12), window.innerHeight - 189, 88);
+    await refocus(node(12));
+    expect(vi.mocked(window.scrollBy)).toHaveBeenLastCalledWith(0, 88 - 189 + 161);
+  } finally {
+    document.documentElement.style.scrollPaddingBottom = "";
+  }
+});
+
+test("where the switch does not stick (a short window, or large text) only the site header counts", async () => {
+  await render();
+  keyboardFocus(node(12), true);
+  // It scrolls with the trees above them, here at 300–383, so it cannot cover a talent.
+  phoneSwitch({ position: "static", at: 300 });
+  place(node(12), 20, 88);
+  await refocus(node(12));
+  expect(vi.mocked(window.scrollBy)).toHaveBeenLastCalledWith(0, 20 - (44 + 8));
+});
+
+test("the phone's Reset after a tree's talents comes clear of the stuck switch on keyboard focus; the wide screen's does not move", async () => {
+  await render();
+  await click(node(11));
+  const scrollBy = vi.mocked(window.scrollBy);
+  const phoneReset = section("Left").querySelector<HTMLButtonElement>("[data-tree-reset]")!;
+  const headerReset = [...section("Left").querySelectorAll<HTMLButtonElement>('button[aria-label="Reset Left"]')].find((b) => !b.hasAttribute("data-tree-reset"))!;
+  expect(phoneReset.textContent).toBe("Reset Left");
+  expect(phoneReset.disabled).toBe(false);
+  // The end of the trees has pushed the switch to 17–100, over the Reset at 40–84.
+  phoneSwitch({ at: 17 });
+  place(phoneReset, 40, 44);
+  keyboardFocus(phoneReset, true);
+  await refocus(phoneReset);
+  expect(scrollBy).toHaveBeenLastCalledWith(0, 40 - (44 + 83 + 8));
+  // Focused by a press, it stays put.
+  scrollBy.mockClear();
+  keyboardFocus(phoneReset, false);
+  await refocus(phoneReset);
+  expect(scrollBy).not.toHaveBeenCalled();
+  // The wide screen's Reset in the tree's heading is not a phone control and is left to the browser.
+  place(headerReset, 40, 44);
+  keyboardFocus(headerReset, true);
+  await refocus(headerReset);
+  expect(scrollBy).not.toHaveBeenCalled();
 });
 
 test("the phone's tree switch names each tree with its points and shows one tree at a time, with its Reset after its talents", async () => {
@@ -468,16 +545,12 @@ test("with the game's art the switch's line and the talents' clearance work the 
     expect(treeStatus().textContent).toBe("50 left · Set 1");
     expect(liveRegions()).toHaveLength(1);
     // A game-art node under the stuck switch moves clear of it too.
-    const box = (top: number, height: number) => ({ top, bottom: top + height, left: 0, right: 50, width: 50, height, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
-    const scrollBy = vi.spyOn(window, "scrollBy").mockImplementation(() => {});
-    vi.spyOn(switchBar(), "getBoundingClientRect").mockReturnValue(box(44, 83));
-    vi.spyOn(switchBar(), "getClientRects").mockReturnValue([box(44, 83)] as unknown as DOMRectList);
-    vi.spyOn(node(12), "getBoundingClientRect").mockReturnValue(box(100, 50));
+    phoneSwitch();
+    place(node(12), 100, 50);
     keyboardFocus(node(12), true);
     await act(async () => { node(12).focus(); });
-    expect(scrollBy).toHaveBeenLastCalledWith(0, 100 - (127 + 8));
+    expect(vi.mocked(window.scrollBy)).toHaveBeenLastCalledWith(0, 100 - (127 + 8));
   } finally {
-    vi.restoreAllMocks();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
