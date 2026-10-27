@@ -103,7 +103,10 @@ export default function DevicePlans() {
 function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | null; onSentDone: () => void }) {
   const [read, setRead] = useState<ReadResult | null>(null);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
-  const [message, setMessage] = useState<{ text: string; alert: boolean; inUse?: boolean } | null>(null);
+  const [message, setMessage] = useState<{ text: string; alert: boolean; inUse?: boolean; focus?: boolean } | null>(null);
+  // An alert that comes in place of the control pressed (a refused clear, its damaged text since repaired) takes the focus.
+  const alertRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => { if (message?.focus) alertRef.current?.focus(); }, [message]);
   const reload = useCallback(() => {
     const storage = deviceStorage();
     const now = readWorkspace(storage, owner);
@@ -127,7 +130,7 @@ function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | nu
     </p>
   );
   if (!read.ok) {
-    const cleared = (refused: string | null) => { reload(); setMessage(refused ? { text: refused, alert: true } : null); };
+    const cleared = (refused: string | null) => { reload(); setMessage(refused ? { text: refused, alert: true, focus: true } : null); };
     return <div className="space-y-6">{intro}<StoredProblem read={read} owner={owner} onCleared={cleared} /></div>;
   }
 
@@ -151,7 +154,7 @@ function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | nu
         <SectionHeading id="device-plans" note={`${plans.length} of ${WORKSPACE_LIMITS.plans}, newest first. ${UNCHECKED}`}>Your plans</SectionHeading>
         <p role="status" className="mb-3 text-sm text-fg-2 empty:hidden">{message && !message.alert ? message.text : ""}</p>
         {message?.alert && (
-          <p role="alert" className="mb-3 text-sm text-danger">
+          <p ref={alertRef} tabIndex={-1} role="alert" className="mb-3 text-sm text-danger">
             {message.text}
             {message.inUse && <> See <a href="/tools/alts" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Alts on this device</a> to let go of it there first.</>}
           </p>
@@ -471,6 +474,15 @@ function StoredProblem({ read, owner, onCleared }: { read: Extract<ReadResult, {
   const [confirming, setConfirming] = useState<string | null>(null);
   const [refused, setRefused] = useState(false);
   const raw = read.raw;
+  // A refused clear takes away the control pressed: the focus goes to Clear again, or, with none, to why.
+  const clearButton = useRef<HTMLButtonElement>(null);
+  const refusedLine = useRef<HTMLParagraphElement>(null);
+  const refocus = useRef(false);
+  useEffect(() => {
+    if (!refocus.current) return;
+    refocus.current = false;
+    (clearButton.current ?? refusedLine.current)?.focus();
+  });
   async function clear(confirmed: string) {
     // Under the lock, and only the text confirmed: text another tab changed, or repaired, while this waited stays.
     const cleared = await withWorkspaceLock(() => {
@@ -481,6 +493,7 @@ function StoredProblem({ read, owner, onCleared }: { read: Extract<ReadResult, {
       } catch { /* the read that follows says what is still there */ }
       return true;
     });
+    refocus.current = !cleared;
     setConfirming(null);
     setRefused(!cleared);
     onCleared(cleared ? null : NOT_CLEARED);
@@ -489,11 +502,11 @@ function StoredProblem({ read, owner, onCleared }: { read: Extract<ReadResult, {
   return (
     <Card>
       <p role="alert" className="text-fg">{read.message}</p>
-      {refused && <p role="alert" className="mt-3 text-sm text-danger">{NOT_CLEARED}</p>}
+      {refused && <p ref={refusedLine} tabIndex={-1} role="alert" className="mt-3 text-sm text-danger">{NOT_CLEARED}</p>}
       {raw !== null && confirming !== raw && (
         <div className="mt-4 flex flex-wrap gap-2">
           <button type="button" className="btn text-sm" onClick={() => download(raw)}>Download what is stored</button>
-          {read.error === "corrupt" && <button type="button" className="btn text-sm" onClick={() => { setRefused(false); setConfirming(raw); }}>Clear stored plans</button>}
+          {read.error === "corrupt" && <button ref={clearButton} type="button" className="btn text-sm" onClick={() => { setRefused(false); setConfirming(raw); }}>Clear stored plans</button>}
         </div>
       )}
       {raw !== null && read.error === "corrupt" && confirming === raw && (
