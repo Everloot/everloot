@@ -1,6 +1,17 @@
-import { expect, test } from "vitest";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { MCP_TOOL_NAMES } from "@everloot/protocol";
+import { afterEach, beforeAll, expect, test, vi } from "vitest";
+import { openDb } from "../../../kb/src/db";
+import { replaceSourceRows } from "../../../kb/src/entities";
+import { snapshot } from "../../../kb/src/snapshot";
 import { safeReturnTo, signInPath } from "./auth/return-to";
-import { codeClass, editPath, LIMITS, parseBuildInput, parseCharacterInput, savedBuildsOn, toBuild, toCharacters, type BuildRow } from "./saved-builds";
+import { codeClass, editPath, LIMITS, MY_BUILDS, parseBuildInput, parseCharacterInput, savedBuildsOn, toBuild, toCharacters, type BuildRow } from "./saved-builds";
+
+// The public MCP endpoint, for the catalogue test at the end: its per-IP quota lets every request through.
+vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { mcp: async () => ({ allowed: true, retryAfter: 0 }) } }));
+vi.mock("@/lib/upload-store", () => ({ uploadStore: { loadCorpus: async () => ({ uploads: 0, records: [], dataAsOf: null }) } }));
 
 const MAGE = "EL1-mage-0-1.60.1.70450-MTE6NQ";
 const MAGE2 = "EL1-mage-1482-1.60.1.70450-MjE6MQ";
@@ -96,4 +107,62 @@ test("after sign-in the visitor returns only to a path on this site", () => {
   for (const bad of ["https://evil.example", "//evil.example", "/\\evil.example", "me", "/a\nb", 7, null, `/${"a".repeat(600)}`]) expect(safeReturnTo(bad)).toBeNull();
   expect(signInPath("/tools/talents/mage?save=1")).toBe("/sign-in?returnTo=%2Ftools%2Ftalents%2Fmage%3Fsave%3D1");
   expect(signInPath("//evil.example")).toBe("/sign-in");
+});
+
+test("sign-in can bring the visitor back to the saved build they were editing, with Save open again", () => {
+  const back = `/tools/talents/warlock?saved=${ID}&save=1`;
+  expect(safeReturnTo(back)).toBe(back);
+  expect(signInPath(back)).toBe(`/sign-in?returnTo=%2Ftools%2Ftalents%2Fwarlock%3Fsaved%3D${ID}%26save%3D1`);
+});
+
+// What the MCP directories copied when they listed Everloot is the keyless tools/list of /mcp/public: with the guild
+// ladder on, as in production, the protocol's 31 tools. Saved builds must not move it; my_builds is listed only for a
+// key that reads its owner's builds, after those 31.
+let release = "";
+beforeAll(async () => {
+  const dir = mkdtempSync(join(tmpdir(), "everloot-saved-builds-mcp-"));
+  const source = openDb(join(dir, "source.sqlite"));
+  await replaceSourceRows(source, "curated", ["lore_page"], [{ kind: "lore_page", extId: "1", name: "Thrall",
+    body: "Warchief of the Horde", gameVersion: "lore", sourceUrl: "https://example.test/thrall", retrievedAt: "2023-11-13" }]);
+  release = join(dir, "release", "release.sqlite");
+  snapshot(source, release, new Date("2026-10-10T00:00:00Z"));
+  source.close();
+});
+afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.resetModules(); });
+
+/** /mcp/public's tools/list as a directory syncs it, with EVERLOOT_SAVED_BUILDS as given and, if any, a key. */
+async function publicTools(savedBuilds: string, key?: string) {
+  vi.resetModules();
+  vi.unstubAllEnvs();
+  const env = { KB_SNAPSHOT_PATH: release, EVERLOOT_MCP_PUBLIC: "1", EVERLOOT_GUILDS: "1", EVERLOOT_DATA_GUARD: "1",
+    EVERLOOT_SAVED_BUILDS: savedBuilds, SUPABASE_URL: "https://db.example", SUPABASE_SERVICE_ROLE_KEY: "service" };
+  for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value);
+  // Supabase, for the key: live, within its allowance, and made with "Read my saved builds".
+  vi.stubGlobal("fetch", async (url: RequestInfo | URL) => {
+    const path = String(url);
+    if (path.includes("/rpc/consume_api_key")) return Response.json([{ allowed: true, retry_after: 0, key_ref: crypto.randomUUID() }]);
+    if (path.includes("/api_keys?")) return Response.json([{ scopes: ["read:public", "read:own"], expires_at: null }]);
+    throw new Error(`unexpected ${path}`);
+  });
+  const { POST } = await import("@/app/mcp/public/route");
+  const response = await POST(new Request("https://everloot.app/mcp/public", {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json, text/event-stream", ...(key ? { authorization: `Bearer ${key}` } : {}) },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
+  }));
+  expect(response.status).toBe(200);
+  return (await response.json()).result.tools as Array<{ name: string }>;
+}
+
+test("saved builds leave the public MCP catalogue as the directories copied it: the same 31 tools, my_builds only for a key", async () => {
+  const before = await publicTools("");
+  const after = await publicTools("1");
+  expect(after.map((tool) => tool.name)).toEqual(MCP_TOOL_NAMES);
+  expect(after).toHaveLength(31);
+  // Names, titles, descriptions, schemas and annotations: everything a directory keeps a copy of.
+  expect(after).toEqual(before);
+  expect(MCP_TOOL_NAMES).not.toContain(MY_BUILDS);
+  const keyed = await publicTools("1", `evl_${"a".repeat(64)}`);
+  expect(keyed.slice(0, 31)).toEqual(after);
+  expect(keyed.slice(31).map((tool) => tool.name)).toEqual([MY_BUILDS]);
 });

@@ -2,33 +2,86 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { ACCOUNT_CHANGED_EVENT } from "@/components/AccountControls";
 import { fixture } from "@/lib/talents/fixture";
+import { readPlanHash } from "@/lib/talents/import";
 import { encodeBuild } from "@/lib/talents/share";
 import TalentCalculator from "./TalentCalculator";
 
 let container: HTMLDivElement;
 let root: Root;
 const ID = "0b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e11";
+const NEW_ID = "9b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e99";
+const JAINA_ID = "2b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e22";
+// Two accounts as the session cookie names them: A is the player, B another account signed in on this browser later.
+const A = "7a000000-0000-4000-8000-00000000000a";
+const B = "7b000000-0000-4000-8000-00000000000b";
 const CODE = encodeBuild({ classSlug: "mage", specId: fixture.specId, build: fixture.build, ranks: { 11: { rank: 2 } } });
 const saved = (over: object = {}) => ({
   id: ID, slug: "AbCd1234", name: "Fire", notes: "For raids", classSlug: "mage", characterId: null, code: CODE, code2: null,
   gameBuild: fixture.build, shared: true, active: false, link: "https://everloot.app/b/AbCd1234", updatedAt: "2026-10-20T12:00:00.000Z", showName: false, ...over,
 });
-let posts: Array<{ url: string; body: Record<string, unknown> }> = [];
+type Build = ReturnType<typeof saved>;
+const jaina = { id: JAINA_ID, name: "Jaina", classSlug: "mage", realm: null, note: null };
 
-/** The site's API, as far as the calculator talks to it: signed in or out, with these builds. */
+/** The account the session cookie belongs to now (null: signed out). */
+let who: string | null;
+/** EVERLOOT_SAVED_BUILDS off: the builds API answers 404. */
+let off: boolean;
+/** /api/auth/me fails while set. */
+let authDown: boolean;
+/** Each account's characters and builds, as GET /api/me/builds lists them. */
+let accounts: Record<string, { characters: object[]; builds: Build[] }>;
+/** Every POST that reached the site, and the account it was sent as. */
+let posts: Array<{ url: string; body: Record<string, unknown>; as: string | null }> = [];
+/** Requests ("GET /api/me/builds") whose next answer waits until released. It is still the answer for when it was asked. */
+let held = new Map<string, Promise<void>>();
+
+function hold(request: string): () => void {
+  let release = () => {};
+  held.set(request, new Promise<void>((r) => { release = r; }));
+  return () => release();
+}
+
+/** The site's API, as far as the calculator talks to it, answered for the session as it is when asked. */
+function answer(url: string, init?: RequestInit): Response {
+  const method = init?.method ?? "GET";
+  if (url === "/api/auth/me") {
+    if (authDown) return Response.json({ error: "Authentication is temporarily unavailable" }, { status: 503 });
+    return Response.json({ user: who && { id: who, name: who === A ? "Thrall#1234" : "Jaina#5678", entitlements: [] } });
+  }
+  const body = method === "POST" ? JSON.parse(String(init!.body)) as Record<string, unknown> : {};
+  if (method === "POST") posts.push({ url, body, as: who });
+  if (off) return Response.json({ error: "Not found" }, { status: 404 });
+  if (!who) return Response.json({ error: "Sign in to save builds.", signIn: "/sign-in?returnTo=%2Fme" }, { status: 401 });
+  const mine = accounts[who] ??= { characters: [], builds: [] };
+  if (method === "GET") return Response.json(mine);
+  if (url === "/api/me/characters") {
+    const character = { ...jaina, name: String(body.name) };
+    mine.characters.push(character);
+    return Response.json({ character }, { status: 201 });
+  }
+  if (body.id && !mine.builds.some((b) => b.id === body.id)) return Response.json({ error: "No build or character with that id on this account." }, { status: 404 });
+  const shared = body.shared !== false;
+  const build = saved({ id: body.id ?? NEW_ID, name: body.name, slug: "NewSlug1", shared, link: shared ? "https://everloot.app/b/NewSlug1" : null });
+  mine.builds = [build, ...mine.builds.filter((b) => b.id !== build.id)];
+  return Response.json({ build }, { status: body.id ? 200 : 201 });
+}
+
+/** Signed in as A with these builds, signed out, or with the switch off. */
 function api(state: "in" | "out" | "off", builds = [saved()]) {
   posts = [];
+  held = new Map();
+  off = state === "off";
+  authDown = false;
+  who = state === "out" ? null : A;
+  accounts = { [A]: { characters: [jaina], builds } };
   vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
-    if (state === "off") return Response.json({ error: "Not found" }, { status: 404 });
-    if (state === "out") return Response.json({ error: "Sign in to save builds.", signIn: "/sign-in?returnTo=%2Fme" }, { status: 401 });
-    if (init?.method === "POST") {
-      const body = JSON.parse(String(init.body));
-      posts.push({ url, body });
-      if (url === "/api/me/characters") return Response.json({ character: { id: "2b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e22", name: body.name, classSlug: "mage", realm: null, note: null } }, { status: 201 });
-      return Response.json({ build: saved({ id: body.id ?? "9b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e99", name: body.name, slug: "NewSlug1", link: "https://everloot.app/b/NewSlug1" }) }, { status: body.id ? 200 : 201 });
-    }
-    return Response.json({ characters: [{ id: "2b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e22", name: "Jaina", classSlug: "mage", realm: null, note: null }], builds });
+    const response = answer(url, init);
+    const request = `${init?.method ?? "GET"} ${url}`;
+    const wait = held.get(request);
+    if (wait) { held.delete(request); await wait; }
+    return response;
   });
 }
 
@@ -46,10 +99,19 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-const render = (props: { savedBuilds?: boolean; readOnly?: boolean; initialCodes?: (string | null)[] } = { savedBuilds: true }) =>
-  act(async () => root.render(<TalentCalculator catalog={fixture} {...props} />));
-const button = (label: RegExp) => [...container.querySelectorAll("button")].find((b) => label.test(b.textContent ?? ""));
-const click = (el: Element) => act(async () => { el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })); });
+/** Lets the account check, the builds read and whatever they start finish. */
+const settle = async () => { for (let i = 0; i < 3; i++) await act(async () => { await new Promise((r) => setTimeout(r, 0)); }); };
+const render = async (props: { savedBuilds?: boolean; readOnly?: boolean; initialCodes?: (string | null)[] } = { savedBuilds: true }) => {
+  await act(async () => root.render(<TalentCalculator catalog={fixture} {...props} />));
+  await settle();
+};
+const button = (label: RegExp, scope: ParentNode = container) => [...scope.querySelectorAll("button")].find((b) => label.test(b.textContent ?? ""));
+const click = async (el: Element) => {
+  await act(async () => { el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })); });
+  await settle();
+};
+const press = (target: Element, key: string, init: KeyboardEventInit = {}) =>
+  act(async () => { target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...init })); });
 const status = () => container.querySelector('[role="status"]')!.textContent;
 const node = (id: number) => container.querySelector<HTMLButtonElement>(`#talent-${id}`)!;
 function type(field: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: string) {
@@ -57,6 +119,27 @@ function type(field: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
   return act(async () => { setter.call(field, value); field.dispatchEvent(new Event(field instanceof HTMLSelectElement ? "change" : "input", { bubbles: true })); });
 }
 const panel = () => container.querySelector<HTMLFormElement>('form[aria-label="Save build"]');
+const prompt = () => container.querySelector<HTMLElement>('section[aria-label="Sign in to save builds"]');
+const menu = () => container.querySelector<HTMLDetailsElement>("details");
+/** The build bar's Save: the first in the page, ahead of the panel's own submit button. */
+const saveButton = () => button(/^Save$/)!;
+/** Sign out in this tab's header: the session is gone, and the header says so with ACCOUNT_CHANGED_EVENT. */
+const signOutHere = () => act(async () => { who = null; window.dispatchEvent(new Event(ACCOUNT_CHANGED_EVENT)); });
+/** The tab comes back to the front. Another tab may have signed in, out or into another account meanwhile. */
+const comeBack = async () => { await act(async () => { window.dispatchEvent(new Event("focus")); }); await settle(); };
+
+/** Signs in from the prompt's link as a browser does: the click keeps the build, Battle.net's callback lands on the
+ *  link's returnTo with no #plan, and the calculator opens there afresh. */
+async function signInFrom(link: HTMLAnchorElement, account: string) {
+  link.addEventListener("click", (e) => e.preventDefault());
+  await click(link);
+  const returnTo = new URL(link.getAttribute("href")!, "https://everloot.app").searchParams.get("returnTo")!;
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  who = account;
+  window.history.replaceState(null, "", returnTo);
+  await render();
+}
 
 test("without the switch there is no Save button and no account lookup", async () => {
   const fetch = vi.fn();
@@ -97,6 +180,57 @@ test("back from sign-in, the build is restored and the save panel opens", async 
   expect(panel()).not.toBeNull();
   expect(window.location.search).toBe("");
   expect(localStorage.getItem("everloot:pending-save")).toBeNull();
+});
+
+test("signed out, Save, sign in and back: the same plan in both sets comes back, and it is what gets saved", async () => {
+  api("out", []);
+  await render();
+  await click(node(11));
+  await click(node(11));
+  await click(button(/^Set 2$/)!);
+  await click(node(51));
+  const plan = readPlanHash(window.location.hash);
+  expect(plan.first && plan.second).toBeTruthy();
+  await click(saveButton());
+  await signInFrom(prompt()!.querySelector("a")!, A);
+  expect(window.location.search).toBe("");
+  expect(readPlanHash(window.location.hash)).toEqual(plan);
+  expect(node(11).textContent).toContain("2/5");
+  expect(document.activeElement).toBe(panel()!.querySelector("input"));
+  await click(button(/^Save build$/)!);
+  expect(posts).toEqual([{ url: "/api/me/builds", as: A, body: expect.objectContaining({ code: plan.first, code2: plan.second }) }]);
+  expect(status()).toBe("Saved as a new build. Short link: https://everloot.app/b/NewSlug1");
+});
+
+test("signed out while editing a saved build, sign-in comes back to editing it, and Save updates that build", async () => {
+  api("out");
+  window.history.replaceState(null, "", `/tools/talents/mage?saved=${ID}#plan=${CODE}`);
+  await render();
+  await click(node(11));
+  const plan = readPlanHash(window.location.hash);
+  await click(saveButton());
+  const link = prompt()!.querySelector("a")!;
+  expect(link.getAttribute("href")).toBe(`/sign-in?returnTo=${encodeURIComponent(`/tools/talents/mage?saved=${ID}&save=1`)}`);
+  await signInFrom(link, A);
+  expect(container.textContent).toContain("Editing: Fire");
+  expect(window.location.search).toBe(`?saved=${ID}`);
+  expect(node(11).textContent).toContain("3/5");
+  expect(panel()!.querySelector("input")!.value).toBe("Fire");
+  await click(panel()!.querySelector('button[type="submit"]')!);
+  expect(posts.map((p) => [p.url, p.body.id, p.body.code])).toEqual([["/api/me/builds", ID, plan.first]]);
+  expect(status()).toBe("Saved. Short link: https://everloot.app/b/NewSlug1");
+});
+
+test("a session that ends while editing asks to sign in again, and the link comes back to the same build", async () => {
+  api("in");
+  window.history.replaceState(null, "", `/tools/talents/mage?saved=${ID}#plan=${CODE}`);
+  await render();
+  await click(saveButton());
+  who = null;
+  await click(panel()!.querySelector('button[type="submit"]')!);
+  const link = prompt()!.querySelector("a")!;
+  expect(link.getAttribute("href")).toBe(`/sign-in?returnTo=${encodeURIComponent(`/tools/talents/mage?saved=${ID}&save=1`)}`);
+  expect(document.activeElement).toBe(link);
 });
 
 test("a new build is saved with its name, character, notes and codes, and the page then edits it", async () => {
@@ -140,6 +274,32 @@ test("opened from a saved build, Save updates it in place and Save as new makes 
   expect(status()).toContain("Saved as a new build");
 });
 
+test("unsharing a saved build turns its short link off", async () => {
+  api("in");
+  window.history.replaceState(null, "", `/tools/talents/mage?saved=${ID}#plan=${CODE}`);
+  await render();
+  await click(saveButton());
+  const [share] = [...panel()!.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
+  expect(share.checked).toBe(true);
+  await act(async () => share.parentElement!.click());
+  await click(panel()!.querySelector('button[type="submit"]')!);
+  expect(posts[0].body).toMatchObject({ id: ID, shared: false });
+  expect(status()).toBe("Saved. Its short link is off.");
+});
+
+test("a build deleted in another tab: Save says so, keeps the panel, and Save as new keeps the plan", async () => {
+  api("in");
+  window.history.replaceState(null, "", `/tools/talents/mage?saved=${ID}#plan=${CODE}`);
+  await render();
+  accounts[A].builds = [];
+  await click(saveButton());
+  await click(panel()!.querySelector('button[type="submit"]')!);
+  expect(panel()!.querySelector('[role="alert"]')!.textContent).toBe("No build or character with that id on this account.");
+  await click(button(/^Save as new$/)!);
+  expect(posts.map((p) => p.body.id)).toEqual([ID, undefined]);
+  expect(status()).toContain("Saved as a new build");
+});
+
 test("a new character is kept even if the build fails to save, so trying again does not make a second one", async () => {
   api("in", []);
   const real = globalThis.fetch;
@@ -147,7 +307,7 @@ test("a new character is kept even if the build fails to save, so trying again d
   vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
     if (url === "/api/me/builds" && init?.method === "POST" && failOnce) {
       failOnce = false;
-      posts.push({ url, body: JSON.parse(String(init.body)) });
+      posts.push({ url, body: JSON.parse(String(init.body)), as: who });
       return Response.json({ error: "Saved builds are unavailable right now. Try again in a minute." }, { status: 503 });
     }
     return real(url, init);
@@ -200,6 +360,225 @@ test("My builds lists this class's saved builds", async () => {
   expect(menu.textContent).toContain("Fire");
   expect(menu.textContent).not.toContain("Warrior thing");
   expect(menu.querySelector("a")!.getAttribute("href")).toBe(`/tools/talents/mage?saved=${ID}#plan=${CODE}`);
+});
+
+test("Save moves the focus to the build's name; Escape closes the panel and gives the focus back to Save", async () => {
+  api("in", []);
+  await render();
+  await click(node(11));
+  await click(saveButton());
+  const name = panel()!.querySelector("input")!;
+  expect(document.activeElement).toBe(name);
+  await press(name, "Escape");
+  expect(panel()).toBeNull();
+  expect(document.activeElement).toBe(saveButton());
+  expect(saveButton().getAttribute("aria-expanded")).toBe("false");
+  // Escape on Save itself closes an open panel too.
+  await click(saveButton());
+  await press(saveButton(), "Escape");
+  expect(panel()).toBeNull();
+});
+
+test("Cancel, and a finished save, give the focus back to Save", async () => {
+  api("in", []);
+  await render();
+  await click(node(11));
+  await click(saveButton());
+  await click(button(/^Cancel$/)!);
+  expect(panel()).toBeNull();
+  expect(document.activeElement).toBe(saveButton());
+  await click(saveButton());
+  await click(button(/^Save build$/)!);
+  expect(panel()).toBeNull();
+  expect(document.activeElement).toBe(saveButton());
+});
+
+test("signed out, the sign-in prompt takes the focus and Escape closes it", async () => {
+  api("out");
+  await render();
+  await click(node(11));
+  await click(saveButton());
+  const link = prompt()!.querySelector("a")!;
+  expect(document.activeElement).toBe(link);
+  await press(link, "Escape");
+  expect(prompt()).toBeNull();
+  expect(document.activeElement).toBe(saveButton());
+});
+
+test("keys typed in the panel stay in it: Ctrl+Z in the notes leaves the talents alone", async () => {
+  api("in", []);
+  await render();
+  await click(node(11));
+  await click(saveButton());
+  await press(panel()!.querySelector("textarea")!, "z", { ctrlKey: true });
+  expect(node(11).textContent).toContain("1/5");
+  expect(panel()).not.toBeNull();
+});
+
+test("My builds closes on Escape, with the focus back on its button, and on a press anywhere else", async () => {
+  api("in");
+  await render();
+  const list = menu()!;
+  list.open = true;
+  const first = list.querySelector("a")!;
+  first.focus();
+  await press(first, "Escape");
+  expect(list.open).toBe(false);
+  expect(document.activeElement).toBe(list.querySelector("summary"));
+  list.open = true;
+  await act(async () => { first.dispatchEvent(new Event("pointerdown", { bubbles: true })); });
+  expect(list.open).toBe(true);
+  await act(async () => { document.body.dispatchEvent(new Event("pointerdown", { bubbles: true })); });
+  expect(list.open).toBe(false);
+});
+
+test("signed out here while the account's builds were still being read: they never show", async () => {
+  api("in");
+  const release = hold("GET /api/me/builds");
+  await render();
+  await signOutHere();
+  await act(async () => release());
+  await settle();
+  expect(menu()).toBeNull();
+  expect(container.textContent).not.toContain("Fire");
+  await click(node(11));
+  await click(saveButton());
+  expect(prompt()).not.toBeNull();
+});
+
+test("signing out here with the panel open closes it at once and leaves nothing of the account on screen", async () => {
+  api("in");
+  window.history.replaceState(null, "", `/tools/talents/mage?saved=${ID}#plan=${CODE}`);
+  await render();
+  await click(saveButton());
+  expect(panel()!.textContent).toContain("Jaina");
+  // Until this tab knows who is signed in now, it shows no one's builds.
+  const release = hold("GET /api/auth/me");
+  await signOutHere();
+  expect(panel()).toBeNull();
+  expect(menu()).toBeNull();
+  expect(container.textContent).not.toContain("Editing: Fire");
+  expect(container.textContent).not.toContain("Jaina");
+  expect(status()).toBe("The account signed in here changed, so nothing was saved. Press Save again.");
+  await act(async () => release());
+  await settle();
+  await click(saveButton());
+  expect(prompt()).not.toBeNull();
+  expect(posts).toEqual([]);
+});
+
+test("a save answered after signing out here is not shown, and the address is left as it was", async () => {
+  api("in");
+  await render();
+  await click(node(11));
+  await click(saveButton());
+  const release = hold("POST /api/me/builds");
+  await click(button(/^Save build$/)!);
+  await signOutHere();
+  expect(status()).toBe("The account signed in here changed before the save finished. Sign in to that account again to see whether the build was saved.");
+  await act(async () => release());
+  await settle();
+  expect(posts.map((p) => [p.url, p.as])).toEqual([["/api/me/builds", A]]);
+  expect(status()).not.toContain("Saved");
+  expect(window.location.search).toBe("");
+  expect(container.textContent).not.toContain("Editing:");
+  expect(menu()).toBeNull();
+  expect(panel()).toBeNull();
+});
+
+test("a save answered right after the sign-out, before this tab checks the account again, is dropped too", async () => {
+  api("in");
+  await render();
+  await click(node(11));
+  await click(saveButton());
+  const release = hold("POST /api/me/builds");
+  await click(button(/^Save build$/)!);
+  // The answer lands in the same moment as the header's sign-out, before React has run anything for it.
+  await act(async () => {
+    who = null;
+    window.dispatchEvent(new Event(ACCOUNT_CHANGED_EVENT));
+    release();
+    await new Promise((r) => setTimeout(r, 0));
+  });
+  await settle();
+  expect(status()).toBe("The account signed in here changed before the save finished. Sign in to that account again to see whether the build was saved.");
+  expect(window.location.search).toBe("");
+  expect(container.textContent).not.toContain("Editing:");
+});
+
+test("signing out here once the new character is made stops before the build is sent", async () => {
+  api("in");
+  await render();
+  await click(node(11));
+  await click(saveButton());
+  await type(panel()!.querySelector("select")!, "new");
+  await type(panel()!.querySelectorAll<HTMLInputElement>("input")[1], "Jaina");
+  const release = hold("POST /api/me/characters");
+  await click(button(/^Save build$/)!);
+  await signOutHere();
+  await act(async () => release());
+  await settle();
+  expect(posts.map((p) => p.url)).toEqual(["/api/me/characters"]);
+  expect(panel()).toBeNull();
+});
+
+test("another account found when the tab comes back closes the panel, saves nothing, and shows only that account's builds", async () => {
+  api("in");
+  accounts[B] = { characters: [], builds: [saved({ id: NEW_ID, name: "Their frost", slug: "TheirOne" })] };
+  window.history.replaceState(null, "", `/tools/talents/mage?saved=${ID}#plan=${CODE}`);
+  await render();
+  await click(saveButton());
+  who = B;
+  await comeBack();
+  expect(panel()).toBeNull();
+  expect(status()).toBe("You are signed in to a different account now, so nothing was saved. Press Save again to save the build to this one.");
+  expect(container.textContent).not.toContain("Editing: Fire");
+  expect(menu()!.textContent).toContain("Their frost");
+  expect(menu()!.textContent).not.toContain("Fire");
+  await click(saveButton());
+  expect(panel()!.textContent).not.toContain("Jaina");
+  expect(posts).toEqual([]);
+});
+
+test("the old account's builds, answered after another account is found, never replace that account's", async () => {
+  api("in");
+  accounts[B] = { characters: [], builds: [saved({ id: NEW_ID, name: "Their frost", slug: "TheirOne" })] };
+  const release = hold("GET /api/me/builds");
+  await render();
+  who = B;
+  await comeBack();
+  await act(async () => release());
+  await settle();
+  expect(menu()!.textContent).toContain("Their frost");
+  expect(menu()!.textContent).not.toContain("Fire");
+});
+
+test("a signed-out answer that lands after the tab finds an account signed in does not hide that account's builds", async () => {
+  api("out");
+  const release = hold("GET /api/me/builds");
+  await render();
+  who = A;
+  await comeBack();
+  await act(async () => release());
+  await settle();
+  expect(menu()!.textContent).toContain("Fire");
+  await click(node(11));
+  await click(saveButton());
+  expect(panel()).not.toBeNull();
+});
+
+test("when this tab cannot tell which account is signed in, it shows no builds and Save says so", async () => {
+  api("in");
+  authDown = true;
+  await render();
+  expect(menu()).toBeNull();
+  await click(node(11));
+  await click(saveButton());
+  expect(panel()).toBeNull();
+  expect(status()).toBe("Your account could not be checked. Reload the page and try again.");
+  authDown = false;
+  await comeBack();
+  expect(menu()!.textContent).toContain("Fire");
 });
 
 test("read-only, the build shows as saved and points cannot change", async () => {
