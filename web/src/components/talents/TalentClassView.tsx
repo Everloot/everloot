@@ -42,7 +42,7 @@ export default async function TalentClassView({ slug, initialCodes, saved }: {
         <PageHeader title={<span className={CLASS_TEXT[slug]}>{saved.name}</span>} meta={saved.meta} actions={saved.actions} />
         {saved.notes && <p className="-mt-2 mb-4 max-w-[75ch] whitespace-pre-line text-cell text-fg-2 [overflow-wrap:anywhere]">{saved.notes}</p>}
         <TalentCalculator catalog={catalog} treeIcons={treeIcons} classIcon={classIcon} initialCodes={initialCodes} readOnly />
-        <FreshnessNote catalog={catalog} codes={initialCodes} className="mt-4" />
+        <FreshnessNote catalog={catalog} codes={initialCodes} followsAddress={false} className="mt-4" />
         <AdSlot slot="belowTool" />
       </Container>
     );

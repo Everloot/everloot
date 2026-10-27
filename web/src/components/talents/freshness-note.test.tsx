@@ -162,6 +162,64 @@ test("a plan pasted into the address after the page opens hides the note; an anc
   });
 });
 
+// The real page at an address: the class view, its calculator and the note, with the published records. The tree status
+// says which plan the calculator shows: one point in a first-row talent, or two.
+async function onPage(url: string, props: Omit<Parameters<typeof TalentClassView>[0], "slug">, check: (shown: boolean, status: string) => void) {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.spyOn(window, "scrollBy").mockImplementation(() => {});
+  window.history.replaceState(null, "", url);
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  try {
+    const view = await TalentClassView({ slug: "mage", ...props });
+    await act(async () => root.render(view));
+    check(container.querySelector(NOTE) !== null, container.querySelector("[data-tree-status]")!.textContent!);
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    window.history.replaceState(null, "", "/");
+  }
+}
+
+async function mageCodes() {
+  const catalog = await loadCatalog("mage");
+  const node = catalog.nodes.find((n) => n.row === 1 && n.maxRanks >= 2)!;
+  const made = (build: string, rank: number) => encodeBuild({ classSlug: "mage", specId: catalog.specId, build, ranks: { [node.id]: { rank } } });
+  return { one: made("1.60.1.70450", 1), two: made("1.60.1.70532", 2) };
+}
+
+test("with the calculator: a build link opened with another fragment loads its own codes, and the note stays", async () => {
+  const { one } = await mageCodes();
+  for (const fragment of ["how-it-works", "order=O1p-A"]) {
+    await onPage(`/tools/talents/mage/b/${one}#${fragment}`, { initialCodes: [one, null] }, (shown, status) => {
+      // The calculator loads the link's codes, keeps the rest of the fragment, and then writes the plan it shows into
+      // the address as its own code, on this tree's build. It writes without a hashchange, so the note stays.
+      expect(window.location.pathname).toBe("/tools/talents/mage");
+      expect(window.location.hash).toMatch(/plan=EL1-mage-/);
+      expect(window.location.hash).toContain(fragment);
+      expect(status).toBe("50 left · Set 1");
+      expect(shown).toBe(true);
+    });
+  }
+});
+
+test("with the calculator: a build link opened with another plan in its address shows that plan, and not the link's note", async () => {
+  const { one, two } = await mageCodes();
+  await onPage(`/tools/talents/mage/b/${one}#plan=${two}`, { initialCodes: [one, null] }, (shown, status) => {
+    expect(status).toBe("49 left · Set 1");
+    expect(shown).toBe(false);
+  });
+});
+
+test("with the calculator: a saved build's page shows its own plan whatever the address holds, so its note stays", async () => {
+  const { one, two } = await mageCodes();
+  await onPage(`/b/saved-plan#plan=${two}`, { initialCodes: [one, null], saved: { name: "Saved plan", notes: null, meta: null, actions: null } }, (shown, status) => {
+    expect(status).toBe("50 left · Set 1");
+    expect(shown).toBe(true);
+  });
+});
+
 test("missing records make the change history unknown, never unchanged", () => {
   const note = page(renderToStaticMarkup(<FreshnessNote catalog={tree} codes={[code("1.0.0.1")]} entries={[records()[0]]} />)).querySelector(NOTE)!;
   expect([...note.querySelectorAll("li")].map((li) => li.textContent)).toEqual([
