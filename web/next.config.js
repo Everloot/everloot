@@ -161,6 +161,9 @@ const nextConfig = {
       // Zone and instance pages read no cookies either, and each one renders from the whole corpus on every request.
       { source: "/database/zones/:path*", headers: databaseItemsCdnHeaders },
       { source: "/database/instances/:path*", headers: databaseItemsCdnHeaders },
+      // The sitemaps read no cookies and rebuild from kb on every request (about 4s cold), so the CDN keeps them an hour.
+      ...["/sitemap.xml", "/database-sitemap.xml", "/database-sitemap/:n", "/auctions-sitemap.xml", "/auctions-sitemap/:n"]
+        .map((source) => ({ source, headers: databaseItemsCdnHeaders })),
       // The embeddable tooltip script other sites load: an hour in browsers and at the CDN, so a fix reaches them quickly.
       { source: "/tooltips.js", headers: [
         { key: "Cache-Control", value: "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400" },
