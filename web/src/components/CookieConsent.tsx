@@ -86,16 +86,17 @@ export default function CookieConsent({ adsenseClient, analytics = {} }: { adsen
 
   // The banner sits over the foot of the window. While it is open, scroll padding of its height makes the
   // browser bring a control that takes focus (a calculator's, say) into view above it rather than under it,
-  // and as much padding under the page gives the last controls on it the room to get there. The 8 px spare
-  // keeps the focus ring in sight too. It is measured from the visible page (clientHeight), which a desktop
-  // scrollbar along the bottom makes shorter than innerHeight.
+  // and as much padding under the page gives the last controls on it the room to get there. The strip is the
+  // banner's own height plus its computed bottom inset (1rem, so it follows the root font) plus 8 px for the
+  // focus ring. No window measure goes in: innerHeight and clientHeight disagree when a desktop scrollbar or a
+  // phone's toolbar takes part of the window, while the banner always covers its height and inset.
   useEffect(() => {
     const banner = panel.current;
     if (!visible || !banner) return;
     const root = document.documentElement;
     const before = [root.style.scrollPaddingBottom, document.body.style.paddingBottom];
     const fit = () => {
-      const covered = `${root.clientHeight - banner.getBoundingClientRect().top + 8}px`;
+      const covered = `${banner.getBoundingClientRect().height + parseFloat(getComputedStyle(banner).bottom) + 8}px`;
       root.style.scrollPaddingBottom = covered;
       document.body.style.paddingBottom = covered;
     };

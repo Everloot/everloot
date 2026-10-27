@@ -230,25 +230,54 @@ describe("compact consent", () => {
   it("keeps a focused control scrolled clear of the banner while it is open, then gives the page its padding back", async () => {
     document.documentElement.style.scrollPaddingBottom = "12px";
     document.body.style.paddingBottom = "4px";
-    // A desktop scrollbar along the bottom makes the visible page shorter than innerHeight.
-    const visible = window.innerHeight - 15;
-    Object.defineProperty(document.documentElement, "clientHeight", { configurable: true, value: visible });
     try {
       await act(async () => root.render(<CookieConsent analytics={{ gaId: GA }} />));
       const banner = container.querySelector("section")!;
-      banner.getBoundingClientRect = () => ({ top: visible - 130 }) as DOMRect;
+      // jsdom has no stylesheet, so bottom-4's inset and the banner's height are given by hand.
+      banner.style.bottom = "16px";
+      banner.getBoundingClientRect = () => ({ top: 600, height: 114 }) as DOMRect;
       resized!();
       expect(document.documentElement.style.scrollPaddingBottom).toBe("138px");
       // The last controls on the page need room below them to scroll clear of it too.
       expect(document.body.style.paddingBottom).toBe("138px");
-      banner.getBoundingClientRect = () => ({ top: visible - 300 }) as DOMRect;
+      banner.getBoundingClientRect = () => ({ top: 430, height: 284 }) as DOMRect;
       resized!();
       expect(document.documentElement.style.scrollPaddingBottom).toBe("308px");
       expect(document.body.style.paddingBottom).toBe("308px");
+      // A larger root font makes the 1rem inset larger, and the padding follows it.
+      banner.style.bottom = "32px";
+      resized!();
+      expect(document.documentElement.style.scrollPaddingBottom).toBe("324px");
       await act(async () => button("Reject optional cookies").click());
       expect(document.documentElement.style.scrollPaddingBottom).toBe("12px");
       expect(document.body.style.paddingBottom).toBe("4px");
     } finally {
+      document.body.style.paddingBottom = "";
+    }
+  });
+
+  it("covers the same strip whatever the window measures say: a desktop scrollbar, a phone toolbar shown or hidden", async () => {
+    await act(async () => root.render(<CookieConsent analytics={{ gaId: GA }} />));
+    const banner = container.querySelector("section")!;
+    banner.style.bottom = "16px";
+    const innerHeight = Object.getOwnPropertyDescriptor(window, "innerHeight");
+    // The banner sits 16 px above the bottom it follows and is 114 px tall in every case; only the window changes.
+    const windows = [
+      { case: "measures agree", inner: 768, client: 768, followedBottom: 768 },
+      { case: "desktop scrollbar along the bottom", inner: 768, client: 753, followedBottom: 753 },
+      { case: "phone toolbar hidden after layout", inner: 824, client: 768, followedBottom: 824 },
+    ];
+    try {
+      for (const w of windows) {
+        Object.defineProperty(window, "innerHeight", { configurable: true, value: w.inner });
+        Object.defineProperty(document.documentElement, "clientHeight", { configurable: true, value: w.client });
+        banner.getBoundingClientRect = () => ({ top: w.followedBottom - 16 - 114, height: 114 }) as DOMRect;
+        resized!();
+        expect(document.documentElement.style.scrollPaddingBottom, w.case).toBe("138px");
+        expect(document.body.style.paddingBottom, w.case).toBe("138px");
+      }
+    } finally {
+      if (innerHeight) Object.defineProperty(window, "innerHeight", innerHeight);
       delete (document.documentElement as unknown as { clientHeight?: number }).clientHeight;
       document.body.style.paddingBottom = "";
     }
