@@ -579,7 +579,9 @@ export function previewImport(text: string, current: PlayerWorkspace): PreviewRe
   const alts = merge(current.alts, backup.alts, whole, (a) => a.updatedAt);
   const watches = merge(current.watches, backup.watches, (w) => fields(w, WATCH_KEYS), (w) => w.addedAt);
   const result = { ...current, version, plans: plans.items, alts: alts.items, watches: watches.items };
-  const merged = validateWorkspace(result);
+  // Checked as it would be stored, a version 1 bucket in version 1's form and size (storedForm). The preview keeps
+  // the alts as this version reads them.
+  const merged = validateWorkspace(storedForm(result));
   if (!merged.ok) return refuse(merged.error);
   return {
     ok: true,

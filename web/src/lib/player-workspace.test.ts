@@ -259,8 +259,9 @@ describe("format version 2: alts with their details, and version 1 still read", 
     expect(storage.items.get(bucketKey(ANON))).toBe(JSON.stringify(versionOne(ANON, [one(), added], [oldAlt], [watch])));
   });
 
-  test("a version 1 bucket near 1 MiB keeps working: its backup is its own stored text, and a plan change is stored as version 1", () => {
-    const letters = (n: number) => "\u{1D538}".repeat(n);
+  const letters = (n: number) => "\u{1D538}".repeat(n);
+  /** A version 1 bucket's alts and plans, names and notes at their longest, with as many plans as 1 MiB holds. */
+  function nearFull() {
     const alts = Array.from({ length: 60 }, (_, i) => ({ ...oldAlt, id: idOf(500 + i), name: letters(60), planIds: [], notes: letters(1000) }));
     const plans: LocalPlan[] = [];
     for (let i = 0; ; i++) {
@@ -268,6 +269,11 @@ describe("format version 2: alts with their details, and version 1 still read", 
       if (bytes(JSON.stringify(versionOne(ANON, [...plans, next], alts))) > WORKSPACE_LIMITS.bytes) break;
       plans.push(next);
     }
+    return { plans, alts };
+  }
+
+  test("a version 1 bucket near 1 MiB keeps working: its backup is its own stored text, and a plan change is stored as version 1", () => {
+    const { plans, alts } = nearFull();
     const storage = memory();
     const text = JSON.stringify(versionOne(ANON, plans, alts));
     storage.items.set(bucketKey(ANON), text);
@@ -303,6 +309,24 @@ describe("format version 2: alts with their details, and version 1 still read", 
     const alts = Array.from({ length: 60 }, (_, i) => altOf({ id: idOf(500 + i), name: `Alt ${i}`, notes: "\u{1f600}".repeat(1000), planIds: plans.slice(0, 10).map((p) => p.id) }));
     expect(validateWorkspace(workspace(ANON, plans.map((p) => ({ ...p, notes: "" })), { alts })).ok).toBe(true);
     expect(validateWorkspace(workspace(ANON, plans, { alts }))).toEqual({ ok: false, error: "over-limit" });
+  });
+
+  test("a restore into a version 1 bucket is checked as it would be stored: in version 1, at version 1's size", () => {
+    const { plans, alts } = nearFull();
+    const storage = memory();
+    storage.items.set(bucketKey(ANON), JSON.stringify(versionOne(ANON, plans, alts)));
+    const read = readWorkspace(storage, ANON);
+    if (!read.ok) throw new Error(read.error);
+    // One plan more, as long as the rest, would take the stored bucket past 1 MiB: refused as over the limit.
+    const more = previewImport(JSON.stringify(versionOne(ANON, [plan({ id: idOf(499), name: "Plan 499", notes: letters(1000) })])), read.workspace);
+    expect(more).toMatchObject({ ok: false, error: "over-limit" });
+    // A backup of the same bucket, one plan's notes changed later: it fits in version 1, though not in version 2.
+    const changed = [{ ...plans[0], notes: "Shorter", updatedAt: LATER.toISOString() }, ...plans.slice(1)];
+    const preview = previewImport(JSON.stringify(versionOne(ANON, changed, alts)), read.workspace);
+    if (!preview.ok) throw new Error(preview.message);
+    expect(preview.preview).toMatchObject({ updated: 1, unchanged: plans.length - 1, others: 0 });
+    expect(applyImport(storage, ANON, preview.preview)).toMatchObject({ ok: true });
+    expect(storage.items.get(bucketKey(ANON))).toBe(JSON.stringify(versionOne(ANON, changed, alts)));
   });
 
   test("a version 1 backup restores into a version 2 device, its alts' new details unknown", () => {

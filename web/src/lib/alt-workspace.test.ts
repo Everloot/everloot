@@ -279,6 +279,23 @@ describe("which version a bucket is stored in", () => {
     expect(storedText(storage)).toMatchObject({ version: 2, alts: [{ id: thrall.id, realm: "Moon Guard", notes: "Bank alt", provenance: { source: "manual" } }] });
   });
 
+  test("the backup of an alt added by name to a version 1 bucket restores into a version 1 bucket, which stays version 1 (reported case)", () => {
+    const storage = memory();
+    storage.items.set(bucketKey(ANON), versionOne([]));
+    added(storage, ANON, { name: "Thrall", notes: "Private notes" });
+    const backup = exportBackup(stored(storage, ANON), NOW);
+    if (!backup.ok) throw new Error(backup.message);
+    expect(JSON.parse(backup.text).version).toBe(1);
+    const elsewhere = memory();
+    elsewhere.items.set(bucketKey(ANON), versionOne([]));
+    const preview = previewImport(backup.text, stored(elsewhere, ANON));
+    if (!preview.ok) throw new Error(preview.message);
+    // The page is shown the alt as this version reads it; what is stored is version 1, as the backup holds it.
+    expect(preview.preview.result).toMatchObject({ version: 1, alts: [{ name: "Thrall", realm: null, notes: "Private notes" }] });
+    expect(applyImport(elsewhere, ANON, preview.preview)).toMatchObject({ ok: true });
+    expect(elsewhere.items.get(bucketKey(ANON))).toBe(backup.text);
+  });
+
   test("an alt detail that would take a version 1 bucket past 1 MiB says the newer format needs the room, and stores nothing", () => {
     const letters = (n: number) => "\u{1D538}".repeat(n);
     const size = (s: string) => new TextEncoder().encode(s).length;
