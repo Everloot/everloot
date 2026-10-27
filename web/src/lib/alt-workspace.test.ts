@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import { applyAltImport, defaultChoices, previewAltImport, readAddonFile } from "./alt-import";
-import { altKey, deleteAlt, restoreLines, saveAlt, type AltInput } from "./alt-workspace";
+import { altKey, copyNumbers, deleteAlt, restoreLines, saveAlt, type AltInput } from "./alt-workspace";
 import { FIXTURE_ALT_ID, FIXTURE_PLAN_ID, V2_BUCKET_TEXT } from "./player-workspace.fixture";
 import { PROFESSIONS } from "./game-assets";
 import {
@@ -130,6 +130,16 @@ describe("adding and editing by hand", () => {
     added(storage, ANON, { name: "Thrall" });
     added(storage, ANON, { name: "Thrall" });
     expect(altNames(storage, ANON)).toEqual(["Thrall", "Thrall", "Thrall", "Thrall"]);
+  });
+
+  test("alts that read alike are numbered in the order they were added: copies of one character, or namesakes with no realm set", () => {
+    const thrall = alt({ id: idOf(500), realm: "Moon Guard" });
+    const alts = [
+      thrall, alt({ id: idOf(501), name: "Jaina", realm: "Moon Guard" }), alt({ id: idOf(502), name: "thrall", realm: "moon-guard" }),
+      alt({ id: idOf(503), name: "Thrall" }), alt({ id: idOf(504), name: "Thrall", realm: "Nightfall" }), alt({ id: idOf(505), name: "THRALL" }),
+    ];
+    expect(copyNumbers(alts)).toEqual(new Map([[idOf(500), 1], [idOf(502), 2], [idOf(503), 1], [idOf(505), 2]]));
+    expect(copyNumbers([thrall])).toEqual(new Map());
   });
 
   test("altKey matches a character however its name's case or its realm's spaces and hyphens are written", () => {

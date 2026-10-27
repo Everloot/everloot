@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { Card, Field, SectionHeading } from "@/components/ui";
 import { useWorkspaceOwner } from "@/components/workspace/LocalPlanSave";
 import {
-  DETAIL_WORDS, FIELD_WORDS, altFailure, deleteAlt, detailsLine, listOf, restoreLines, saveAlt, type AltField, type AltInput,
+  DETAIL_WORDS, FIELD_WORDS, altFailure, copyNumbers, deleteAlt, detailsLine, listOf, restoreLines, saveAlt, type AltField, type AltInput,
 } from "@/lib/alt-workspace";
 import {
   ALT_PROFESSIONS, BACKUP_TOO_LARGE, WORKSPACE_LIMITS, applyImport, bucketKey, deviceStorage, exportBackup, newFormatOverflow, previewImport,
@@ -101,6 +101,7 @@ function Bucket({ owner }: { owner: Owner }) {
   };
   const storage = deviceStorage();
   const { plans, alts } = read.workspace;
+  const copies = copyNumbers(alts);
   // Said before anything is tried: in the newer format the same alts take more room than this device has left.
   const overflow = newFormatOverflow(read.workspace);
 
@@ -137,6 +138,7 @@ function Bucket({ owner }: { owner: Owner }) {
               <AltItem
                 key={alt.id}
                 alt={alt}
+                copy={copies.get(alt.id) ?? null}
                 plans={plans}
                 onSave={(input) => {
                   const result = saveAlt(storage, owner, input);
@@ -295,8 +297,10 @@ function AltForm({ label, alt, plans, submit, onSave, onCancel }: {
   );
 }
 
-function AltItem({ alt, plans, onSave, onBackup, onDelete }: {
+function AltItem({ alt, copy, plans, onSave, onBackup, onDelete }: {
   alt: LocalAlt;
+  /** Its number among alts that read alike (copyNumbers), null when it reads like no other. */
+  copy: number | null;
   plans: LocalPlan[];
   onSave: (input: AltInput) => SaveProblem;
   onBackup: () => void;
@@ -309,7 +313,7 @@ function AltItem({ alt, plans, onSave, onBackup, onDelete }: {
     <li className="space-y-2 py-4">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h3 className="min-w-0 font-semibold text-fg [overflow-wrap:anywhere]">{alt.name}</h3>
-        <span className="text-meta text-muted [overflow-wrap:anywhere]">{[alt.realm ?? "Realm not set", detailsLine(alt)].filter(Boolean).join(" · ")}</span>
+        <span className="text-meta text-muted [overflow-wrap:anywhere]">{[copy === null ? "" : `Copy ${copy}`, alt.realm ?? "Realm not set", detailsLine(alt)].filter(Boolean).join(" · ")}</span>
       </div>
       {alt.professions.length > 0 && <p className="text-sm text-fg-2">Professions: {alt.professions.join(", ")}</p>}
       {alt.notes && <p className="whitespace-pre-line text-sm text-fg-2 [overflow-wrap:anywhere]">{alt.notes}</p>}

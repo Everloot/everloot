@@ -316,12 +316,33 @@ test("a file character that is here as two alts says so, offers each copy told a
   expect(filePreview()?.textContent).toContain("Thrall (Moon Guard) is here as more than one alt");
   expect(filePreview()?.textContent).not.toContain("realm is not set");
   const choice = field("Thrall (Moon Guard)", filePreview()!) as HTMLSelectElement;
+  const at = (iso: string) => new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
   expect([...choice.options].map((o) => o.textContent)).toEqual([
     "Skip it",
-    "It is your alt Thrall (Moon Guard): Shaman · Level 24 · Horde, updated Oct 20, 2026",
-    "It is your alt Thrall (Moon Guard): Shaman · Level 30 · Horde, updated Oct 22, 2026",
+    `It is your alt Thrall (Moon Guard), copy 1: Shaman · Level 24 · Horde, updated ${at("2026-10-20T12:00:00.000Z")}, no notes`,
+    `It is your alt Thrall (Moon Guard), copy 2: Shaman · Level 30 · Horde, updated ${at("2026-10-22T12:00:00.000Z")}, no notes`,
   ]);
   expect(choice.value).toBe("skip");
+});
+
+const listed = () => [...container.querySelectorAll('section[aria-labelledby="alts-list"] li')];
+
+test("copies of one character with the same details on the same day are told apart, by the copy number Your alts shows (reported case)", async () => {
+  const copy = alt({ notes: "Raid notes", updatedAt: "2026-10-27T10:00:00.000Z" });
+  seed(ANON, [], [copy, { ...copy, id: id(501), notes: "Bank notes", updatedAt: "2026-10-27T11:00:00.000Z" }]);
+  await render();
+  expect(listed().map((li) => li.querySelector("h3 + span")?.textContent)).toEqual([
+    "Copy 1 · Moon Guard · Shaman · Level 24 · Horde", "Copy 2 · Moon Guard · Shaman · Level 24 · Horde",
+  ]);
+  await readSaveFile(`EverlootDB = { ["version"] = "0.3.12", ["installId"] = "install-fixture-0003", ["records"] = { ["gold_snapshot"] = {
+    { ["capturedAt"] = "2026-10-27T12:00:00Z", ["character"] = "Thrall", ["realm"] = "Moon Guard", ["currentCopper"] = 10, ["peakCopper"] = 10 } } } }`);
+  const options = [...(field("Thrall (Moon Guard)", filePreview()!) as HTMLSelectElement).options].filter((o) => o.value.startsWith("alt:"));
+  expect(options.map((o) => o.value)).toEqual([`alt:${id(500)}`, `alt:${id(501)}`]);
+  expect(options[0].textContent).not.toBe(options[1].textContent);
+  expect(options[0].textContent).toContain("copy 1:");
+  expect(options[0].textContent).toContain("notes “Raid notes”");
+  expect(options[1].textContent).toContain("copy 2:");
+  expect(options[1].textContent).toContain("notes “Bank notes”");
 });
 
 test("choosing which copy a file character is shows what that copy would get before anything is written, and an older file gives nothing", async () => {

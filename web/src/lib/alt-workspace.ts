@@ -51,6 +51,21 @@ export const altKey = (name: string, realm: string) =>
 /** "Thrall (Moon Guard)", or "Thrall" while its realm is not set. */
 export const altLabel = (alt: { name: string; realm: string | null }) => (alt.realm ? `${alt.name} (${alt.realm})` : alt.name);
 
+/**
+ * Alts that read alike, numbered in the order they were added here (the order a bucket keeps them in): one character
+ * here more than once, as a restore can leave it, or alts of one name whose realm is not set. Your alts shows "Copy 1"
+ * where a choice of alts says "copy 1". An alt that reads like no other has no number.
+ */
+export function copyNumbers(alts: LocalAlt[]): Map<string, number> {
+  const alike = new Map<string, string[]>();
+  for (const alt of alts) {
+    // A name holds no line break, so a key without a realm is never another's with one.
+    const key = alt.realm === null ? nameKey(alt.name) : altKey(alt.name, alt.realm);
+    alike.set(key, [...(alike.get(key) ?? []), alt.id]);
+  }
+  return new Map([...alike.values()].filter((ids) => ids.length > 1).flatMap((ids) => ids.map((id, i): [string, number] => [id, i + 1])));
+}
+
 /** The details a file can give, as the pages name them. */
 export const DETAIL_WORDS: Record<FileDetail, string> = { classSlug: "class", level: "level", faction: "faction" };
 const FACTION_NAMES: Record<Faction, string> = { alliance: "Alliance", horde: "Horde" };

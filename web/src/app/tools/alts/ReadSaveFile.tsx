@@ -6,7 +6,7 @@ import {
   ADDON_FILE_LIMIT, ADDON_FILE_TOO_LARGE, applyAltImport, changesAlt, defaultChoices, previewAltImport, readAddonFile, rowChoices, takeAs,
   type AltImportPreview, type DetailChange, type ImportRow, type RowChoice,
 } from "@/lib/alt-import";
-import { DETAIL_WORDS, altFailure, altKey, altLabel, detailValue, detailsLine, listOf } from "@/lib/alt-workspace";
+import { DETAIL_WORDS, altFailure, altKey, altLabel, copyNumbers, detailValue, detailsLine, listOf } from "@/lib/alt-workspace";
 import { WORKSPACE_LIMITS, deviceStorage, readWorkspace, type LocalAlt, type Owner } from "@/lib/player-workspace";
 
 // The player's Everloot.lua, read in this page (lib/alt-import.ts) and its characters added as alts after a preview.
@@ -16,7 +16,15 @@ import { WORKSPACE_LIMITS, deviceStorage, readWorkspace, type LocalAlt, type Own
 const FILE_PATH = "World of Warcraft/<game version>/WTF/Account/<account>/SavedVariables/Everloot.lua";
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
-const day = (at: string) => new Date(at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+/** "Oct 27, 2026, 10:00 AM": to the minute, so copies changed on one day read apart. */
+const when = (at: string) => new Date(at).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+
+/** The start of an alt's notes, to tell its copies apart: notes “Raid notes”, or no notes. */
+function notesHint(notes: string): string {
+  if (!notes) return "no notes";
+  const line = Array.from(notes.split("\n")[0]);
+  return `notes “${line.length > 40 ? `${line.slice(0, 40).join("").trimEnd()}…` : line.join("")}”`;
+}
 
 /** "level 24 → 31", or "faction Horde, not set here". */
 const changeText = ({ detail, here, file }: DetailChange) =>
@@ -84,15 +92,17 @@ function rowLines(row: ImportRow, alts: Map<string, LocalAlt>, choice: RowChoice
   ];
 }
 
-function choiceText(choice: RowChoice, alts: Map<string, LocalAlt>, status: ImportRow["status"]): string {
+function choiceText(choice: RowChoice, alts: Map<string, LocalAlt>, copies: Map<string, number>, status: ImportRow["status"]): string {
   if (choice === "skip") return "Skip it";
   if (choice === "add") return status === "ambiguous" ? "Add it as a new alt" : "Add it";
   if (choice === "update") return "Update it";
   const alt = alts.get(choice.slice("alt:".length));
   if (!alt) return "It is that alt";
-  // Copies of one character are told apart by what each holds and when it last changed.
-  if (status === "twice") return `It is your alt ${altLabel(alt)}: ${detailsLine(alt) || "no details"}, updated ${day(alt.updatedAt)}`;
-  return `It is your alt ${altLabel(alt)}${alt.realm ? "" : " (realm not set)"}`;
+  const label = `It is your alt ${altLabel(alt)}${alt.realm ? "" : " (realm not set)"}`;
+  // Alts that read alike are told apart by the copy number Your alts shows them with, what each holds, when it last
+  // changed and how its notes begin.
+  const copy = copies.get(alt.id);
+  return copy === undefined ? label : `${label}, copy ${copy}: ${detailsLine(alt) || "no details"}, updated ${when(alt.updatedAt)}, ${notesHint(alt.notes)}`;
 }
 
 export default function ReadSaveFile({ owner, onApplied }: {
@@ -100,7 +110,7 @@ export default function ReadSaveFile({ owner, onApplied }: {
   /** What was added and updated, to say so. */
   onApplied: (done: string) => void;
 }) {
-  const [preview, setPreview] = useState<{ preview: AltImportPreview; alts: Map<string, LocalAlt> } | null>(null);
+  const [preview, setPreview] = useState<{ preview: AltImportPreview; alts: Map<string, LocalAlt>; copies: Map<string, number> } | null>(null);
   const [choices, setChoices] = useState<RowChoice[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
@@ -128,7 +138,7 @@ export default function ReadSaveFile({ owner, onApplied }: {
     const now = readWorkspace(deviceStorage(), owner);
     if (!now.ok) { setError(altFailure(now.error).message); return; }
     const next = previewAltImport(found, now.workspace);
-    setPreview({ preview: next, alts: new Map(now.workspace.alts.map((a) => [a.id, a])) });
+    setPreview({ preview: next, alts: new Map(now.workspace.alts.map((a) => [a.id, a])), copies: copyNumbers(now.workspace.alts) });
     setChoices(defaultChoices(next));
   }
 
@@ -192,7 +202,7 @@ export default function ReadSaveFile({ owner, onApplied }: {
                         <span className="block font-semibold text-fg">{altLabel(row.character)}</span>
                         <select value={choices[i]} onChange={(e) => setChoices(choices.map((c, j) => (j === i ? e.target.value as RowChoice : c)))}
                           className="min-h-11 w-full rounded-control border border-edge bg-canvas px-3 text-base text-fg">
-                          {offered.map((c) => <option key={c} value={c}>{choiceText(c, preview.alts, row.status)}</option>)}
+                          {offered.map((c) => <option key={c} value={c}>{choiceText(c, preview.alts, preview.copies, row.status)}</option>)}
                         </select>
                       </label>
                     ) : <p className="text-sm font-semibold text-fg">{altLabel(row.character)}</p>}
