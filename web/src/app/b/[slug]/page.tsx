@@ -83,8 +83,9 @@ export default async function SharedBuildPage({ params }: Params) {
       ),
       actions: (
         <>
-          <a href={`/tools/talents/${build.classSlug}${planHash(build.code, build.code2)}`} className="btn btn-primary min-h-10 px-4 text-sm">Open in the calculator</a>
-          {signedIn && <SaveCopy name={build.name} notes={build.notes} code={build.code} code2={build.code2} />}
+          {/* Both sets and their spend orders: the calculator opens the plan as it was saved. */}
+          <a href={`/tools/talents/${build.classSlug}${planHash(build.code, build.code2, build.order, build.order2)}`} className="btn btn-primary min-h-10 px-4 text-sm">Open in the calculator</a>
+          {signedIn && <SaveCopy name={build.name} notes={build.notes} code={build.code} code2={build.code2} order={build.order} order2={build.order2} />}
         </>
       ),
     },

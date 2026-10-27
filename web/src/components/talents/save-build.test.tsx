@@ -72,7 +72,9 @@ function answer(url: string, init?: RequestInit): Response {
   }
   if (body.id && !mine.builds.some((b) => b.id === body.id)) return Response.json({ error: "No build or character with that id on this account." }, { status: 404 });
   const shared = body.shared !== false;
-  const build = saved({ id: body.id ?? NEW_ID, name: body.name, slug: "NewSlug1", shared, link: shared ? "https://everloot.app/b/NewSlug1" : null });
+  // As saved: the codes and each set's spend order as sent.
+  const build = saved({ id: body.id ?? NEW_ID, name: body.name, slug: "NewSlug1", shared, link: shared ? "https://everloot.app/b/NewSlug1" : null,
+    code: body.code ?? CODE, code2: body.code2 ?? null, order: body.order ?? null, order2: body.order2 ?? null });
   mine.builds = [build, ...mine.builds.filter((b) => b.id !== build.id)];
   return Response.json({ build }, { status: body.id ? 200 : 201 });
 }
@@ -264,6 +266,7 @@ test("a new build is saved with its name, character, notes and codes, and the pa
   expect(posts[1].body).toEqual({
     name: "My frost", notes: "Raid night", characterId: "2b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e22",
     code: encodeBuild({ classSlug: "mage", specId: fixture.specId, build: fixture.build, ranks: { 11: { rank: 1 } } }), code2: null, shared: true, showName: false,
+    order: "O1p-A", order2: null,
   });
   expect(status()).toBe("Saved as a new build. Short link: https://everloot.app/b/NewSlug1");
   expect(new URLSearchParams(window.location.search).get("saved")).toBe("9b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e99");
@@ -286,6 +289,100 @@ test("opened from a saved build, Save updates it in place and Save as new makes 
   await click(button(/^Save as new$/)!);
   expect(posts[1].body.id).toBeUndefined();
   expect(status()).toContain("Saved as a new build");
+});
+
+// The fixture's points in spend order, as the calculator writes them in the address: one letter a point, A for the
+// lowest node with points, after p for a planned order or g for a generated one.
+const CODE2 = encodeBuild({ classSlug: "mage", specId: fixture.specId, build: fixture.build, ranks: { 51: { rank: 1 } } });
+
+test("Save sends each set's spend order with its codes, as the calculator keeps them, and Save as new does too", async () => {
+  api("in", []);
+  await render();
+  await click(node(11));
+  await click(node(11));
+  await click(button(/^Set 2$/)!);
+  await click(node(51));
+  const plan = readPlanHash(window.location.hash);
+  expect([plan.firstOrder, plan.secondOrder]).toEqual(["O1p-AA", "O1p-A"]);
+  await click(saveButton());
+  await click(button(/^Save build$/)!);
+  expect(posts[0].body).toMatchObject({ code: plan.first, code2: plan.second, order: "O1p-AA", order2: "O1p-A" });
+  await click(saveButton());
+  await click(button(/^Save as new$/)!);
+  expect(posts[1].body).toMatchObject({ code: plan.first, code2: plan.second, order: "O1p-AA", order2: "O1p-A" });
+  expect(posts[1].body.id).toBeUndefined();
+});
+
+test("a generated order keeps its letter: a plan opened as provisional is saved as provisional", async () => {
+  api("in", []);
+  window.history.replaceState(null, "", `/tools/talents/mage#plan=${CODE}&order=O1g-AA`);
+  await render();
+  await click(saveButton());
+  await click(button(/^Save build$/)!);
+  expect(posts[0].body).toMatchObject({ code: CODE, order: "O1g-AA", order2: null });
+});
+
+test.each([["a newer version's", "O2p-AA"], ["one that leaves a point out", "O1p-A"]])(
+  "%s order token, kept in the address as it came, is not saved as the build's: the set is saved with its order unknown", async (_kind, token) => {
+    api("in", []);
+    window.history.replaceState(null, "", `/tools/talents/mage#plan=${CODE}&order=${token}`);
+    await render();
+    expect(readPlanHash(window.location.hash).firstOrder).toBe(token);
+    await click(saveButton());
+    await click(button(/^Save build$/)!);
+    expect(posts[0].body).toMatchObject({ code: CODE, order: null, order2: null });
+  });
+
+test("an order beside another code in the address is never sent with this one", async () => {
+  api("in", []);
+  await render();
+  await click(node(11));
+  await click(saveButton());
+  // For a moment the address names another plan than the one on screen. Its order fits that plan, not this one.
+  const other = encodeBuild({ classSlug: "mage", specId: fixture.specId, build: fixture.build, ranks: { 12: { rank: 1 } } });
+  window.history.replaceState(null, "", `/tools/talents/mage#plan=${other}&order=O1p-A`);
+  await click(button(/^Save build$/)!);
+  expect(posts[0].body.code).not.toBe(other);
+  expect(posts[0].body).toMatchObject({ order: null, order2: null });
+});
+
+test("a point spent while a new character is being made does not cost the plan Save was pressed on its order", async () => {
+  api("in", []);
+  await render();
+  await click(node(11));
+  await click(node(11));
+  await click(saveButton());
+  await type(panel()!.querySelector("select")!, "new");
+  await type(panel()!.querySelectorAll<HTMLInputElement>("input")[1], "Jaina");
+  const pressed = readPlanHash(window.location.hash);
+  expect(pressed.firstOrder).toBe("O1p-AA");
+  const release = hold("POST /api/me/characters");
+  await click(button(/^Save build$/)!);
+  // The character is still being made when another point goes in, and the address moves on to that plan.
+  await click(node(12));
+  expect(readPlanHash(window.location.hash).first).not.toBe(pressed.first);
+  await act(async () => release());
+  await settle();
+  expect(posts.map((p) => p.url)).toEqual(["/api/me/characters", "/api/me/builds"]);
+  // The build sent is the one on screen when Save was pressed: its codes, and the order that went with them.
+  expect(posts[1].body).toMatchObject({ code: pressed.first, code2: null, order: "O1p-AA", order2: null });
+});
+
+test("reopened from My builds, the plan comes back with both sets' orders, and saving it again keeps them", async () => {
+  api("in", [saved({ code2: CODE2, order: "O1p-AA", order2: "O1g-A" })]);
+  await render();
+  const href = menu()!.querySelector("a")!.getAttribute("href")!;
+  expect(href).toBe(`/tools/talents/mage?saved=${ID}#plan=${CODE}&plan2=${CODE2}&order=O1p-AA&order2=O1g-A`);
+  // Opened as the link opens it: a fresh page at that address.
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  window.history.replaceState(null, "", href);
+  await render();
+  expect(container.textContent).toContain("Editing: Fire");
+  expect(readPlanHash(window.location.hash)).toEqual({ first: CODE, second: CODE2, firstOrder: "O1p-AA", secondOrder: "O1g-A" });
+  await click(saveButton());
+  await click(panel()!.querySelector('button[type="submit"]')!);
+  expect(posts[0].body).toMatchObject({ id: ID, code: CODE, code2: CODE2, order: "O1p-AA", order2: "O1g-A" });
 });
 
 test("unsharing a saved build turns its short link off", async () => {

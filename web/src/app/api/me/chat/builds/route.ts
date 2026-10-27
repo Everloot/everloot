@@ -1,4 +1,4 @@
-import { BUILDS_PER_ACCOUNT, SAVES_PER_DAY } from "@/lib/saved-builds";
+import { BUILDS_PER_ACCOUNT, ORDERS_UNAVAILABLE, ORDERS_UNAVAILABLE_CODE, SAVES_PER_DAY } from "@/lib/saved-builds";
 import { listOwn } from "@/lib/saved-builds-store";
 import { parseWorkspaceBuild, SaveUnconfirmed, saveWorkspaceBuild } from "@/lib/chat/workspace-builds";
 import { answer, fail, workspaceRead, workspaceWrite } from "@/lib/chat/workspace-store";
@@ -6,8 +6,9 @@ import { answer, fail, workspaceRead, workspaceWrite } from "@/lib/chat/workspac
 /**
  * The player's saved builds, for Chat projects. Opens with EVERLOOT_CHAT_WORKSPACE=1, whatever EVERLOOT_SAVED_BUILDS
  * says. Session only: no API key or MCP reaches it.
- * GET lists the account's builds and character labels. POST saves one: without an id a new private build, with one
- * an edit of the account's own build that keeps its sharing as it was.
+ * GET lists the account's builds and character labels, each set's spend order included. POST saves one: without an id
+ * a new private build, with one an edit of the account's own build that keeps its sharing as it was. Spend orders are
+ * saved with their codes in the same write.
  */
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ export async function POST(req: Request) {
     try {
       saved = await saveWorkspaceBuild(user.id, input.value);
     } catch (err) {
-      // Past save_build the shared "Nothing was saved" may be untrue; say what is known instead.
+      // Past save_build_plan the shared "Nothing was saved" may be untrue; say what is known instead.
       if (err instanceof SaveUnconfirmed) return fail(503, "We could not confirm the save. Check your builds before trying again.", "save_unconfirmed");
       throw err;
     }
@@ -33,6 +34,8 @@ export async function POST(req: Request) {
         case "class_mismatch": return fail(400, "That character is another class. Pick a character of the build's class.", "class_mismatch");
         case "build_limit": return fail(409, `You have ${BUILDS_PER_ACCOUNT} saved builds. Delete one to save another.`, "build_limit");
         case "daily_limit": return fail(429, `You saved ${SAVES_PER_DAY} times in the last day. Try again tomorrow.`, "daily_limit");
+        // Known not saved, so a 409 and not a 5xx, which Chat reads as a save it could not confirm.
+        case "orders_unavailable": return fail(409, ORDERS_UNAVAILABLE, ORDERS_UNAVAILABLE_CODE);
       }
     }
     return answer(user.id, { build: saved.build }, saved.created ? 201 : 200);
