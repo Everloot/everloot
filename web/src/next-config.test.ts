@@ -76,6 +76,20 @@ test("the build cache checks the protocol package's files, and trusts every othe
 });
 
 /** The headers a request for `path` gets: Next applies every matching entry in order, and a later entry's key wins. */
+test("the public pages rendered on every request are kept at the CDN; the changes and search pages briefly; signed-in pages never", async () => {
+  // Found live 10/27: /database, /map and /changes answered private, no-store, so every visit ran the server.
+  const hour = "max-age=3600, stale-while-revalidate=86400";
+  const brief = "max-age=300, stale-while-revalidate=3600";
+  for (const [path, value] of [["/database", hour], ["/map", hour], ["/map/kalimdor", hour], ["/changes", brief], ["/search", brief]] as const) {
+    const got = await headersFor(path);
+    expect(got["Vercel-CDN-Cache-Control"], path).toBe(value);
+    expect(got["CDN-Cache-Control"], path).toBe(value);
+  }
+  for (const path of ["/chat", "/account", "/settings", "/sign-in", "/api/tools/search_knowledge", "/changes/feed.xml"]) {
+    expect(await headersFor(path), path).not.toHaveProperty("Vercel-CDN-Cache-Control");
+  }
+});
+
 async function headersFor(path: string): Promise<Record<string, string>> {
   const out: Record<string, string> = {};
   for (const entry of await nextConfig.headers!()) {

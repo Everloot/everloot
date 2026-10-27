@@ -148,6 +148,10 @@ const nextConfig = {
       { key: "Vercel-CDN-Cache-Control", value: "max-age=3600, stale-while-revalidate=86400" },
       { key: "CDN-Cache-Control", value: "max-age=3600, stale-while-revalidate=86400" },
     ];
+    const briefCdnHeaders = [
+      { key: "Vercel-CDN-Cache-Control", value: "max-age=300, stale-while-revalidate=3600" },
+      { key: "CDN-Cache-Control", value: "max-age=300, stale-while-revalidate=3600" },
+    ];
     return [
       { source: "/:path*", headers: securityHeaders },
       // After the rule above: the later rule's value for the same header is the one sent.
@@ -161,6 +165,13 @@ const nextConfig = {
       // Zone and instance pages read no cookies either, and each one renders from the whole corpus on every request.
       { source: "/database/zones/:path*", headers: databaseItemsCdnHeaders },
       { source: "/database/instances/:path*", headers: databaseItemsCdnHeaders },
+      // The database index and the map read no cookies either, and render from the corpus and the build's map on every request.
+      { source: "/database", headers: databaseItemsCdnHeaders },
+      { source: "/map", headers: databaseItemsCdnHeaders },
+      { source: "/map/:path*", headers: databaseItemsCdnHeaders },
+      // Changes and search read no cookies, but new blue posts and newly agreed names should show within minutes.
+      { source: "/changes", headers: briefCdnHeaders },
+      { source: "/search", headers: briefCdnHeaders },
       // The embeddable tooltip script other sites load: an hour in browsers and at the CDN, so a fix reaches them quickly.
       { source: "/tooltips.js", headers: [
         { key: "Cache-Control", value: "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400" },
