@@ -18,7 +18,7 @@ export const REVIEW_AFTER_DAYS = 60;
 
 /**
  * - current: nothing to report.
- * - review-due: the last review is older than REVIEW_AFTER_DAYS, or a live build is newer than the one it was reviewed against.
+ * - review-due: the last review is old, a live build is newer, or change history since the review is incomplete.
  * - stale: the change records show a change to its plan's talents after the build it was reviewed against.
  * - broken: its plan no longer fits the talent tree.
  */
@@ -45,8 +45,8 @@ export interface GuideSet {
   changes: string[];
   /** A change the records show to the set's talents came after the build the guide was reviewed against. */
   stale: boolean;
-  /** When it is stale, those changes alone, with what the records cannot say about the builds since the review, in the
-   *  change engine's words; empty otherwise. A change at or before the reviewed build is one the review saw. */
+  /** Changes and gaps since the review, in the change engine's words; empty when neither is found.
+   *  Evidence at or before the reviewed build is one the review saw. Gaps alone do not prove stale. */
   sinceReview: string[];
 }
 
@@ -99,7 +99,7 @@ function readSet(set: 1 | 2, code: string, order: string | null, guide: GuidePla
   const since = afterReview(planFreshness(catalog, changes, from, opened.requested), review);
   const stale = since.touched.length > 0 || since.pointLevels.length > 0;
   // Without the engine's first line, which dates where it started: the note dates the review itself.
-  return { set, code, order, plan: opened.set, problems, changes: f ? freshnessLines(f) : [], stale, sinceReview: stale ? freshnessLines(since).slice(1) : [] };
+  return { set, code, order, plan: opened.set, problems, changes: f ? freshnessLines(f) : [], stale, sinceReview: stale || since.gaps.length > 0 ? freshnessLines(since).slice(1) : [] };
 }
 
 const DAY = 86_400_000;
@@ -123,10 +123,10 @@ export function guideFreshness(guide: GuidePlanFields, catalog: TalentCatalog, c
   if (guide.code2 !== undefined) sets.push(readSet(2, guide.code2, guide.order2 ?? null, guide, catalog, changes));
   const named = (s: GuideSet, line: string) => (sets.length > 1 ? `Set ${s.set}: ${line}` : line);
   const broken = sets.flatMap((s) => s.problems.map((p) => named(s, p)));
-  const stale = sets.flatMap((s) => s.sinceReview.map((l) => named(s, l)));
+  const evidence = sets.flatMap((s) => s.sinceReview.map((l) => named(s, l)));
   const due = dueReasons(guide.reviewed, changes, today);
-  const state: GuideState = broken.length ? "broken" : stale.length ? "stale" : due.length ? "review-due" : "current";
-  return { state, reasons: [...broken, ...stale, ...due], sets };
+  const state: GuideState = broken.length ? "broken" : sets.some((s) => s.stale) ? "stale" : evidence.length || due.length ? "review-due" : "current";
+  return { state, reasons: [...broken, ...evidence, ...due], sets };
 }
 
 /** Whether a guide is indexed, by the one rule its page's robots and the sitemap both use: published and reviewed, with

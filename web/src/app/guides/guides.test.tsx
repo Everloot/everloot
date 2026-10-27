@@ -370,6 +370,27 @@ describe("a guide's page", () => {
     expect(html).not.toContain("Talent 11: its spell changed");
   });
 
+  test.each([
+    ["missing records", [], "There is no change record for game build 1.0.0.5, so changes between 1.0.0.1 and 1.0.0.5 are unknown."],
+    ["missing spell comparisons", [{ ...record("1.0.0.5", "1.0.0.1"), warnings: ["no committed spell values to compare with, so spell number changes are not listed"] }], "The change record for game build 1.0.0.5 had no spell numbers to compare with, so changes to spell numbers in that build are unknown."],
+  ])("the page explains review-relative %s even when the code is on the current tree", async (_name, history, gap) => {
+    stubGuides([{ slug: "frost-leveling", built: "1.0.0.5" }]);
+    trees.build = "1.0.0.5";
+    records.push(...history);
+    const html = await page("frost-leveling");
+    const note = dom(html).querySelector('[data-guide-state="review-due"]');
+    expect(note).not.toBeNull();
+    expect(visible(note!.outerHTML)).toContain(gap);
+    expect(visible(note!.outerHTML)).toContain("Reviewed by Kai on 2026-10-20 against game build 1.0.0.1.");
+    expect(dom(html).querySelector('[data-guide-state="stale"], [data-guide-state="broken"]')).toBeNull();
+    // The gap is since the review, not since this code: no invented code history or restamped link.
+    expect(dom(html).querySelector("[data-guide-changes]")).toBeNull();
+    const stored = publishedGuide(loadGuides(), "frost-leveling")!;
+    const open = [...dom(html).querySelectorAll("a")].find((a) => a.textContent === "Open in the calculator")!;
+    expect(readPlanHash(open.getAttribute("href")!)).toMatchObject({ first: stored.code, firstOrder: stored.order });
+    expect((await metadata("frost-leveling")).robots).toEqual({ index: true, follow: true });
+  });
+
   test("a guide links only to published guides: a link to a draft or a missing one is drawn as its words alone", async () => {
     const links = "See [the fire draft](/guides/fire-draft), [the draft by its address](https://everloot.app/guides/fire-draft/), "
       + "[a missing guide](/guides/no-such-guide), [warrior tanking](/guides/warrior-tanking) and [every guide](/guides).";

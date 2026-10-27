@@ -75,7 +75,7 @@ describe("guideFreshness", () => {
     expect(guideFreshness(guide(), tree("1.0.0.1"), changes([]), "2027-03-01").reasons).toEqual(["Last reviewed 132 days ago, on 2026-10-20; a guide is due for another review after 60 days."]);
   });
 
-  test("a live build newer than the one the guide was reviewed against makes it due for review; one players cannot play yet, or a record that does not read, does not", () => {
+  test("a newer readable live build makes a guide due for review; a spoiler alone does not, and an unreadable record leaves history unknown", () => {
     const due = guideFreshness(guide(), tree("1.0.0.3"), changes([record("1.0.0.3", "1.0.0.1"), record("1.0.0.2", "1.0.0.1")]), TODAY);
     expect(due.state).toBe("review-due");
     // The newest one is named.
@@ -87,7 +87,11 @@ describe("guideFreshness", () => {
     const beta = guideFreshness(guide(), tree("1.0.0.3"), changes([record("1.0.0.3", "1.0.0.1", {}, { live: false, spoiler: true })]), TODAY);
     expect(beta).toMatchObject({ state: "current", reasons: [] });
     const unread = guideFreshness(guide(), tree("1.0.0.3"), changes([{ build: { version: "1.0.0.3" }, talents: "junk" }]), TODAY);
-    expect(unread).toMatchObject({ state: "current", reasons: [] });
+    expect(unread).toMatchObject({ state: "review-due", reasons: [
+      "The change record for game build 1.0.0.3 cannot be read, so changes between 1.0.0.1 and 1.0.0.3 are unknown.",
+      "Check each talent before you follow the plan.",
+    ] });
+    expect(unread.sets[0].stale).toBe(false);
     expect(unread.sets[0].changes).toContain("The change record for game build 1.0.0.3 cannot be read, so changes between 1.0.0.1 and 1.0.0.3 are unknown.");
   });
 
@@ -175,6 +179,23 @@ describe("guideFreshness", () => {
     ]);
   });
 
+  test.each([
+    ["missing records", [], "There is no change record for game build 1.0.0.5, so changes between 1.0.0.1 and 1.0.0.5 are unknown."],
+    ["missing spell comparisons", [record("1.0.0.5", "1.0.0.1", {}, { warnings: ["no committed spell values to compare with, so spell number changes are not listed"] })], "The change record for game build 1.0.0.5 had no spell numbers to compare with, so changes to spell numbers in that build are unknown."],
+  ])("review-relative %s remain review-due evidence when the code is on the current tree", (_name, records, gap) => {
+    const newer = deepFreeze(guide({ code: code(RANKS, "1.0.0.5") }));
+    const before = JSON.stringify(newer);
+    const f = guideFreshness(newer, tree("1.0.0.5"), changes(records), TODAY);
+    expect(f.state).toBe("review-due");
+    expect(f.sets[0]).toMatchObject({ stale: false, problems: [], changes: [], sinceReview: [gap, "Check each talent before you follow the plan."] });
+    expect(f.reasons).toContain(gap);
+    expect(JSON.stringify(newer)).toBe(before);
+    // Once the review covers that build, its uncertainty no longer asks for another review.
+    const covered = guideFreshness({ ...newer, reviewed: { ...REVIEWED, build: "1.0.0.5" } }, tree("1.0.0.5"), changes(records), TODAY);
+    expect(covered).toMatchObject({ state: "current", reasons: [] });
+    expect(covered.sets[0].sinceReview).toEqual([]);
+  });
+
   test("a change made before the build the guide was reviewed against is one the review saw: shown with the plan, not stale", () => {
     const records = [record("1.0.0.5", "1.0.0.3"), record("1.0.0.3", "1.0.0.1", { spellValues: [spellChange(12)] })];
     const reviewedLater = guide({ reviewed: { by: "Kai", on: "2026-10-20", build: "1.0.0.5" } });
@@ -190,15 +211,28 @@ describe("guideFreshness", () => {
 
   test("missing or incomplete records are never read as a change: the set says what is unknown and the guide is not stale", () => {
     const none = guideFreshness(guide(), tree("1.0.0.5"), changes([]), TODAY);
-    expect(none).toMatchObject({ state: "current", reasons: [] });
+    expect(none).toMatchObject({ state: "review-due", reasons: [
+      "There is no change record for game build 1.0.0.5, so changes between 1.0.0.1 and 1.0.0.5 are unknown.",
+      "Check each talent before you follow the plan.",
+    ] });
+    expect(none.sets[0].stale).toBe(false);
     expect(none.sets[0].changes).toEqual([
       "Made on game build 1.0.0.1; this tree is build 1.0.0.5.",
       "There is no change record for game build 1.0.0.5, so changes between 1.0.0.1 and 1.0.0.5 are unknown.",
       "Check each talent before you follow the plan.",
     ]);
     const limited = guideFreshness(guide(), tree("1.0.0.3"), changes([record("1.0.0.3", "1.0.0.1", {}, { live: false, spoiler: true, warnings: ["no committed spell values to compare with, so spell number changes are not listed"] })]), TODAY);
-    expect(limited).toMatchObject({ state: "current", reasons: [] });
+    expect(limited).toMatchObject({ state: "review-due", reasons: [
+      "The change record for game build 1.0.0.3 had no spell numbers to compare with, so changes to spell numbers in that build are unknown.",
+      "Check each talent before you follow the plan.",
+    ] });
+    expect(limited.sets[0].stale).toBe(false);
     expect(limited.sets[0].changes).toContain("The change record for game build 1.0.0.3 had no spell numbers to compare with, so changes to spell numbers in that build are unknown.");
+    // An older code keeps its history, but uncertainty at the reviewed build is already covered by that review.
+    const covered = guideFreshness(guide({ reviewed: { ...REVIEWED, build: "1.0.0.3" } }), tree("1.0.0.3"), changes([]), TODAY);
+    expect(covered).toMatchObject({ state: "current", reasons: [] });
+    expect(covered.sets[0].sinceReview).toEqual([]);
+    expect(covered.sets[0].changes).toContain("There is no change record for game build 1.0.0.3, so changes between 1.0.0.1 and 1.0.0.3 are unknown.");
   });
 
   test("a set that no longer fits the tree makes the guide broken, in the calculator's own words, ahead of stale and review-due", () => {
