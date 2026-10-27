@@ -197,7 +197,9 @@ describe("the group page", () => {
     expect(location.hash).toBe("#size=5&classes=mage,mage,priest");
     expect(text()).toContain("3 of 5 places filled, 2 open");
     for (const c of ["Warrior", "Rogue"]) await press(button(`Add ${c}`));
-    expect(button("Add Druid")?.disabled).toBe(true);
+    expect(button("Add Druid")?.getAttribute("aria-disabled")).toBe("true");
+    await press(button("Add Druid"));
+    expect(location.hash).toBe("#size=5&classes=mage,mage,priest,warrior,rogue");
     expect(text()).toContain("All 5 places are filled.");
     await press(button("Remove Mage from party 1, place 1"));
     expect(location.hash).toBe("#size=5&classes=mage,priest,warrior,rogue");
@@ -241,6 +243,58 @@ describe("the group page", () => {
     await act(async () => window.dispatchEvent(new HashChangeEvent("hashchange")));
     expect(members("Party 1")).toEqual(["druid", "druid"]);
     expect(text()).toContain("2 of 10 places filled, 8 open");
+  });
+});
+
+describe("keyboard focus", () => {
+  /** The control with focus, which must be one a keyboard can still use. */
+  const focused = () => {
+    const el = document.activeElement as HTMLButtonElement | null;
+    expect(el && el !== document.body && container!.contains(el), "focus fell out of the planner").toBe(true);
+    expect(el!.disabled, "focus is on a disabled control").toBe(false);
+    return el!;
+  };
+  const label = () => focused().getAttribute("aria-label");
+
+  test("filling the group from the keyboard keeps focus on the Add pressed, now unavailable and saying why", async () => {
+    await open("#size=5&classes=mage,mage,priest,warrior");
+    const add = button("Add Rogue")!;
+    add.focus();
+    await press(add);
+    expect(focused()).toBe(add);
+    expect(add.getAttribute("aria-disabled")).toBe("true");
+    expect(document.getElementById(add.getAttribute("aria-describedby") ?? "")?.textContent)
+      .toBe("All 5 places are filled. Remove a class or choose a larger group to add another.");
+    await press(add);
+    expect(focused()).toBe(add);
+    expect(location.hash).toBe("#size=5&classes=mage,mage,priest,warrior,rogue");
+  });
+
+  test("removing the last place filled moves focus to the Remove before it, and an emptied group to that class's Add", async () => {
+    await open("#size=10&classes=mage,priest,warrior,warrior,warrior,rogue");
+    button("Remove Rogue from party 2, place 1")!.focus();
+    await press(focused());
+    expect(label()).toBe("Remove Warrior from party 1, place 5");
+    // Any other place keeps focus where it was, on the Remove of the class that moved up into it.
+    button("Remove Mage from party 1, place 1")!.focus();
+    await press(focused());
+    expect(label()).toBe("Remove Priest from party 1, place 1");
+    button("Remove Warrior from party 1, place 4")!.focus();
+    for (const next of ["Remove Warrior from party 1, place 3", "Remove Warrior from party 1, place 2", "Remove Priest from party 1, place 1", "Add Priest"]) {
+      await press(focused());
+      expect(label()).toBe(next);
+    }
+    expect(location.hash).toBe("#size=10");
+  });
+
+  test("clearing from the keyboard keeps focus on Clear, now unavailable", async () => {
+    await open("#size=5&classes=mage,priest");
+    const clear = button("Clear")!;
+    clear.focus();
+    await press(clear);
+    expect(focused()).toBe(clear);
+    expect(clear.getAttribute("aria-disabled")).toBe("true");
+    expect(location.hash).toBe("");
   });
 });
 

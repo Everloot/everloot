@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CLASS_TEXT } from "@/components/talents/TalentTreeView";
 import { Card, CopyButton, SectionHeading, Segmented } from "@/components/ui";
 import { CLASSES } from "@/design/tokens";
@@ -16,6 +16,9 @@ import type { GuideRole } from "../../../../../kb/src/guides/guide";
 
 const table = TABLES[CURRENT_BUILD];
 const LARGEST = GROUP_SIZES[GROUP_SIZES.length - 1];
+/** The note that says why the Add buttons are unavailable; they point at it while the group is full. */
+const FULL_NOTE = "group-full";
+const SIZE_CONTROL = '[aria-label="Group size"] [aria-pressed="true"]';
 const LINK = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 const ROLE: Record<GuideRole, string> = { tank: "Tank", healer: "Healer", damage: "Damage" };
 
@@ -58,6 +61,24 @@ export default function GroupPlanner({ roles }: { roles: Record<ClassSlug, Guide
     setError(null);
   };
 
+  // An Add or Clear that goes unavailable stays focusable (aria-disabled), so focus stays where the player pressed.
+  // A Remove goes with the last place filled: focus then moves to the first of these that the next render has.
+  const root = useRef<HTMLDivElement>(null);
+  const refocus = useRef<string[] | null>(null);
+  useLayoutEffect(() => {
+    const targets = refocus.current;
+    refocus.current = null;
+    for (const target of targets ?? []) {
+      const el = root.current?.querySelector<HTMLElement>(target);
+      if (el) return el.focus();
+    }
+  }, [plan]);
+
+  const remove = (index: number, hadFocus: boolean) => {
+    if (hadFocus && index === plan.classes.length - 1) refocus.current = [`[data-place="${index - 1}"]`, `[data-add="${plan.classes[index]}"]`, SIZE_CONTROL];
+    edit(removeClass(plan, index));
+  };
+
   const filled = plan.classes.length;
   const open = plan.size - filled;
   const counts = classCounts(plan);
@@ -67,7 +88,7 @@ export default function GroupPlanner({ roles }: { roles: Record<ClassSlug, Guide
   const raidSize = raidSizeFor(plan.size);
 
   return (
-    <div className="space-y-8">
+    <div ref={root} className="space-y-8">
       {error && <p role="alert" className="text-sm text-warning">{error} This page opens an empty group instead.</p>}
 
       <section aria-labelledby="group" className="space-y-3">
@@ -85,7 +106,7 @@ export default function GroupPlanner({ roles }: { roles: Record<ClassSlug, Guide
           />
           <p className="text-meta text-fg-2">{`${filled} of ${plan.size} places filled${open ? `, ${open} open` : ""}`}</p>
           <div className="flex flex-wrap gap-2 sm:ml-auto">
-            <button type="button" className="btn" disabled={!filled} onClick={() => edit({ ...plan, classes: [] })}>Clear</button>
+            <button type="button" className="btn" aria-disabled={!filled} onClick={() => { if (filled) edit({ ...plan, classes: [] }); }}>Clear</button>
             <CopyButton className="btn btn-primary" text={() => `${location.origin}${groupHref(plan)}`} label="Copy link" />
           </div>
         </div>
@@ -96,16 +117,18 @@ export default function GroupPlanner({ roles }: { roles: Record<ClassSlug, Guide
               key={c}
               type="button"
               aria-label={`Add ${classLabel(c)}`}
-              disabled={!open}
+              aria-disabled={!open}
+              aria-describedby={open ? undefined : FULL_NOTE}
+              data-add={c}
               onClick={() => edit(addClass(plan, c))}
-              className={`flex h-9 min-w-0 items-center rounded-control border border-edge bg-canvas px-2 text-left text-control font-medium transition-colors hover:border-fg-2 disabled:cursor-not-allowed disabled:opacity-50 ${CLASS_TEXT[c]}`}
+              className={`flex h-9 min-w-0 items-center rounded-control border border-edge bg-canvas px-2 text-left text-control font-medium transition-colors hover:border-fg-2 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 ${CLASS_TEXT[c]}`}
             >
               <span className="min-w-0 truncate">{classLabel(c)}</span>
             </button>
           ))}
         </div>
         {!open && (
-          <p className="text-cell-2 text-muted">
+          <p id={FULL_NOTE} className="text-cell-2 text-muted">
             {`All ${plan.size} places are filled. Remove a class${plan.size < LARGEST ? " or choose a larger group" : ""} to add another.`}
           </p>
         )}
@@ -122,7 +145,8 @@ export default function GroupPlanner({ roles }: { roles: Record<ClassSlug, Guide
                       <button
                         type="button"
                         aria-label={`Remove ${classLabel(c)} from party ${p + 1}, place ${k + 1}`}
-                        onClick={() => edit(removeClass(plan, p * GROUP_SIZE + k))}
+                        data-place={p * GROUP_SIZE + k}
+                        onClick={(e) => remove(p * GROUP_SIZE + k, document.activeElement === e.currentTarget)}
                         className="flex h-full w-9 shrink-0 items-center justify-center text-fg-2 hover:text-fg"
                       >
                         <span aria-hidden="true">×</span>
