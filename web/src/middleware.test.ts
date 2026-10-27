@@ -45,3 +45,31 @@ test("with the switch off nothing is rewritten", () => {
     expect(rewrittenTo(middleware(request("everloot.session_token=abc.def")))).toBeNull();
   }
 });
+
+test("every PROFILES and SAVED_BUILDS combination: only PROFILES decides, for a legacy session as for Better Auth's", () => {
+  vi.stubEnv("EVERLOOT_AUTH_V2", "");
+  for (const profiles of ["", "0", "1"]) {
+    for (const savedBuilds of ["", "0", "1"]) {
+      vi.stubEnv("EVERLOOT_PROFILES", profiles);
+      vi.stubEnv("EVERLOOT_SAVED_BUILDS", savedBuilds);
+      for (const cookie of [`everloot_session=${"a".repeat(64)}`, "everloot.session_token=abc.def"]) {
+        expect(rewrittenTo(middleware(request(cookie))), `${profiles}/${savedBuilds}`).toBe(profiles === "1" ? "https://everloot.app/home" : null);
+      }
+      expect(rewrittenTo(middleware(request()))).toBeNull();
+    }
+  }
+});
+
+test("the rewrite caches nothing itself: a signed-in / carries no cache or cookie headers from here", () => {
+  // /home renders per request (force-dynamic, noindex), so the per-user page is never stored for the next visitor.
+  vi.stubEnv("EVERLOOT_PROFILES", "1");
+  const signedIn = middleware(request(`everloot_session=${"a".repeat(64)}`));
+  const visitor = middleware(request());
+  expect(rewrittenTo(signedIn)).toBe("https://everloot.app/home");
+  expect(rewrittenTo(visitor)).toBeNull();
+  for (const res of [signedIn, visitor]) {
+    for (const name of ["cache-control", "cdn-cache-control", "vercel-cdn-cache-control", "expires", "set-cookie", "vary"]) {
+      expect(res.headers.get(name), name).toBeNull();
+    }
+  }
+});

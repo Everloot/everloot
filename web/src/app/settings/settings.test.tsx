@@ -97,6 +97,30 @@ test("disabled saved builds leaves characters visible without links to unavailab
   expect(html).toContain('href="/account"');
 });
 
+test("every PROFILES and SAVED_BUILDS combination: a legacy Battle.net account edits its profile, status and main only while profiles are on", async () => {
+  for (const [profiles, savedBuilds] of [["0", "0"], ["0", "1"], ["1", "0"], ["1", "1"]]) {
+    vi.stubEnv("EVERLOOT_PROFILES", profiles);
+    vi.stubEnv("EVERLOOT_SAVED_BUILDS", savedBuilds);
+    auth.getUser.mockClear();
+    if (profiles === "0") {
+      await expect(SettingsPage()).rejects.toThrow("NEXT_NOT_FOUND");
+      expect(auth.getUser).not.toHaveBeenCalled();
+      continue;
+    }
+    const html = renderToStaticMarkup(await SettingsPage());
+    for (const field of ["handle", "displayName", "publicProfile", "showCharacters", "showBuilds", "showStatus", "emoji", "text", "clearAfter"]) {
+      expect(html, `${profiles}/${savedBuilds} ${field}`).toContain(`name="${field}"`);
+    }
+    expect(html).toContain('aria-label="Make Jaina your main"');
+    expect(html).toContain('aria-label="Unset Thrall as main"');
+    expect(/href="\/me(?:"|\/)/.test(html)).toBe(savedBuilds === "1");
+    // The BattleTag and the account id stay off the page; the placeholder is the name without its number.
+    expect(html).toMatch(/placeholder="Thrall"/);
+    expect(html).not.toContain("Thrall#1234");
+    expect(html).not.toContain(USER.id);
+  }
+});
+
 test("storage trouble says so instead of failing the page", async () => {
   auth.authQuery.mockRejectedValue(new Error("down"));
   expect(renderToStaticMarkup(await SettingsPage())).toContain("unavailable right now");
