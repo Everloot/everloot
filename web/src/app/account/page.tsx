@@ -35,7 +35,7 @@ const sections = (withProfile: boolean) => [
   ...(withProfile ? [{ id: "profile", label: "Profile" }] : []),
   { id: "integrations", label: "Integrations" },
   { id: "keys", label: "API keys" },
-  { id: "chat-keys", label: "Chat keys" },
+  { id: "chat-keys", label: "Assistant setup" },
   { id: "data", label: "Data and privacy" },
 ];
 
@@ -135,7 +135,7 @@ export default async function AccountPage() {
         </section>
 
         <section id="chat-keys" aria-labelledby="chat-keys-heading" className="scroll-mt-20 space-y-3">
-          <h2 id="chat-keys-heading" className={heading}>Chat keys</h2>
+          <h2 id="chat-keys-heading" className={heading}>Assistant setup</h2>
           <ChatKeys />
         </section>
 

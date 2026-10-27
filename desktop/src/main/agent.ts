@@ -2,6 +2,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { existsSync } from "node:fs";
+import { marketValueFrom, siteItemSearch } from "../../../companion/src/bridge/engine";
+import { answerMarketQuestion } from "../../../web/src/lib/chat/market-question";
 import { readJsonFile } from "./json-file";
 import type { LocalTool } from "./local-tools";
 import { DEFAULT_MODEL, readKey } from "./providers";
@@ -33,11 +35,22 @@ export function readProviderEntries(configPath: string): ProviderEntry[] {
   });
 }
 
-export async function withMcp<T>(target: McpTarget, run: (client: Client) => Promise<T>): Promise<T> {
+/**
+ * One connection to the MCP server for one piece of work. A stop reaches the handshake as well as the work, and
+ * whatever was opened is closed however it ends, so a server that never answers initialize holds nothing open.
+ */
+export async function withMcp<T>(target: McpTarget, run: (client: Client) => Promise<T>, signal?: AbortSignal): Promise<T> {
+  signal?.throwIfAborted();
   const client = new Client({ name: "everloot-desktop", version: "0.1.0" });
-  const transport = new StreamableHTTPClientTransport(new URL(target.url), target.token ? { requestInit: { headers: { Authorization: `Bearer ${target.token}` } } } : {});
-  await client.connect(transport);
-  try { return await run(client); } finally { await client.close(); }
+  const requestInit: RequestInit = { ...(target.token ? { headers: { Authorization: `Bearer ${target.token}` } } : {}), ...(signal ? { signal } : {}) };
+  const transport = new StreamableHTTPClientTransport(new URL(target.url), { requestInit });
+  try {
+    // The SDK ends a pending initialize only through the request's own signal (it sets its own on each fetch).
+    await client.connect(transport, { signal });
+    return await run(client);
+  } finally {
+    await client.close().catch(() => {});
+  }
 }
 
 const textOf = (result: unknown): string => {
@@ -72,7 +85,8 @@ const MAX_RESULT = 20_000;
 
 export interface AgentOptions {
   mcp: McpTarget;
-  entries: ProviderEntry[];
+  /** The provider entries, or a function that reads them: a price question is answered before they are, so a damaged config.json never blocks one. */
+  entries: ProviderEntry[] | (() => ProviderEntry[]);
   history: ChatMessage[];
   question: string;
   maxRounds?: number;
@@ -87,6 +101,10 @@ export interface AgentOptions {
   onProgress?: (progress: ChatProgress) => void;
   /** The Stop button: ends the provider's request and the tool loop; the reply keeps what was written so far. */
   signal?: AbortSignal;
+  /** The site whose item search turns an item name in a price question into an id (its `send` carries the request). */
+  site?: string;
+  /** Realms the player follows: suggested when a price question names none, never chosen for them. */
+  realms?: string[];
 }
 
 interface ToolDef { name: string; description: string; inputSchema: unknown }
@@ -100,9 +118,31 @@ async function listTools(mcp: Client, local: LocalTool[]): Promise<ToolDef[]> {
 
 export interface AgentReply { text: string; model: string | null; sources: string[]; steps: ChatStep[]; stopped?: boolean }
 
-/** The first provider in config.json answers; none means plain search. */
+/**
+ * A price question, answered from the market tool's recorded values with no provider and no personal tool; null
+ * when the question is not one. Item names resolve through the site's own item search.
+ */
+async function priceAnswer(o: AgentOptions): Promise<AgentReply | null> {
+  const reply = await answerMarketQuestion(o.question, {
+    resolveItem: siteItemSearch(o.site ?? "https://everloot.app", o.send),
+    lookup: (realm, itemId, signal) => (o.session ?? withMcp)(o.mcp, async (mcp) =>
+      marketValueFrom(await mcp.callTool({ name: "market_value", arguments: { realm, itemId } }, undefined, { signal })), signal),
+    realmChoices: o.realms,
+  }, { signal: o.signal });
+  if (!reply) return null;
+  const looked = reply.kind !== "clarify" && reply.itemId !== null;
+  return {
+    text: reply.text, model: null,
+    sources: looked && reply.source ? [reply.source] : [],
+    steps: looked ? [{ tool: "market_value", input: JSON.stringify({ realm: reply.realm, itemId: reply.itemId }), chars: reply.text.length }] : [],
+  };
+}
+
+/** A price question is the market's to answer; otherwise the first provider in config.json answers, and none means plain search. */
 export async function answer(options: AgentOptions): Promise<AgentReply> {
-  const entry = options.entries[0];
+  const priced = await priceAnswer(options);
+  if (priced) return priced;
+  const entry = (typeof options.entries === "function" ? options.entries() : options.entries)[0];
   if (!entry) return plain(options);
   if (entry.type === "anthropic") return anthropicLoop(options, entry);
   if (entry.type === "openai-compatible") return openAiLoop(options, entry);

@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { DATA_SIZE } from "@/design/tokens";
 import { deriveOrder, orderSteps, prefixRanks, type MovedPoint } from "@/lib/talents/order";
-import { entryAtRank, levelFor, nodeMap, pointsAtLevel, pointsByTree, pointsSpent } from "@/lib/talents/rules";
+import { entryAtRank, forSet, nodeMap, pointsAtLevel, pointsByTree, pointsSpent } from "@/lib/talents/rules";
 import type { PlanSet, Ranks, TalentCatalog, TalentNode } from "@/lib/talents/types";
 
 // The order a set's points are spent in, under the trees: whether it is planned, provisional or unknown, the points
@@ -24,15 +24,8 @@ const LABELS = {
   ],
 } as const;
 
-/** The catalog as one set's points see it. The second set opens at the level the rules give for it, so every point the
- *  levels before that give arrives there instead; the first set is the catalog as it is. The order engine reads its
- *  levels from this, so a step, a moved point or a refusal says the level that set's point comes at. */
-export function forSet(catalog: TalentCatalog, slot: 0 | 1): TalentCatalog {
-  if (slot === 0) return catalog;
-  const { rules } = catalog;
-  const pointLevels = Array.from({ length: pointsAtLevel(catalog, rules.maxLevel) }, (_, i) => Math.max(levelFor(catalog, i + 1), rules.dualSpecLevel));
-  return { ...catalog, rules: { ...rules, pointLevels } };
-}
+// The set's schedule lives with the point rules, so server code reads the same one; the calculator imports it here.
+export { forSet };
 
 /** The talent a node's `rank`-th point buys, with that rank: a choice node's chosen entry, a tiered node's entry at
  *  that rank. */

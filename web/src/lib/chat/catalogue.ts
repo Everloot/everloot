@@ -102,8 +102,9 @@ export const CATALOGUE: CatalogueProvider[] = [
     kind: "ollama", name: "Ollama", label: "Ollama on this computer", mark: "Ol", colour: "#F2F2F2",
     api: "openai", baseUrl: "http://localhost:11434/v1", list: "ollama", browser: true,
     key: null,
-    models: [],
-    dataNote: "Nothing leaves your computer. Pick a model you pulled that supports tool calling, such as qwen3 or llama3.1.",
+    // One small model that calls tools, so a player's first local model is light on their machine.
+    models: [{ id: "qwen3:4b", label: "Qwen3 4B", note: "2.5 GB download, light enough for most computers" }],
+    dataNote: "Runs on your computer: private and free, but slower than a cloud model, and it uses your computer's memory while it answers. Start with qwen3:4b (ollama pull qwen3:4b). If answers are slow, switch back to a free cloud model.",
     getKey: { href: "https://ollama.com/download", text: "Get Ollama at ollama.com" },
   },
   {

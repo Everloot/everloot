@@ -8,6 +8,15 @@ import { createOpenAICompatibleProvider } from "./openai-compatible";
  * Keys live in their own files (apiKeyFile); a key written into the config is refused.
  * No config file means no providers: answers stay plain search.
  */
+/**
+ * loadProviders, run when first asked for and kept once it works. A failure is not kept (a repaired config is read
+ * the next time) and is the caller's to report: it is only a question that needs a provider that has to fail on it.
+ */
+export function providersOnDemand(configPath: string): () => Provider[] {
+  let loaded: Provider[] | undefined;
+  return () => (loaded ??= loadProviders(configPath));
+}
+
 export function loadProviders(configPath: string): Provider[] {
   if (!existsSync(configPath)) return [];
   const config = JSON.parse(readFileSync(configPath, "utf8")) as { providers?: unknown };

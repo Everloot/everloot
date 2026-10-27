@@ -99,9 +99,9 @@ test("switches off: Profile has nothing to show, so it and its nav link go and i
   expect(html).toMatch(/<section id="overview"[^>]*>(?:(?!<\/section>).)*Only you see your account name\.<\/p><\/section>/);
 });
 
-test("Chat keys keeps its own section, the target of chat's key setup, and says keys stay in this tab", async () => {
+test("Assistant setup keeps the chat-keys section and anchor, the target of chat's setup link, and says keys stay in this tab", async () => {
   const html = await render();
-  expect(html).toMatch(/<section id="chat-keys"[^>]*><h2 id="chat-keys-heading"[^>]*>Chat keys<\/h2>/);
+  expect(html).toMatch(/<section id="chat-keys"[^>]*><h2 id="chat-keys-heading"[^>]*>Assistant setup<\/h2>/);
   expect(html).toContain("Everloot&#x27;s servers never receive them");
   expect(html).toContain("Chat keys stay in this tab until it closes.");
 });

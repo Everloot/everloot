@@ -1,9 +1,10 @@
 import { describe, expect, test, vi } from "vitest";
 import { MY_BUILDS_LINE, MY_BUILDS_REFUSAL } from "../saved-builds";
 import {
-  ACCOUNT_TOOL, answer, answerOrigin, callTool, CHAT_TOOLS, loadTools, MODEL_STOPPED, NO_SOURCED_ANSWER, pagesIn, readOpenAiStream, searchOnly, signedIn,
+  ACCOUNT_TOOL, answer, answerOrigin, callTool, CHAT_TOOLS, loadTools, marketReply, MODEL_STOPPED, NO_SOURCED_ANSWER, pagesIn, readOpenAiStream, searchOnly, signedIn,
   SMALL_TALK_REPLY, smallTalk, sourceLink, sourcesIn, SYSTEM, testKey, TOOL_POLICY, UNSOURCED, type ToolDef,
 } from "./agent";
+import { FIXTURE_ANSWER, FIXTURE_STRUCTURED, FIXTURE_URL } from "./market-fixture";
 import { chatProvider } from "./providers";
 
 const HIT = "[lore_page/lore] Leeroy Jenkins\nLeeroy Jenkins is a valiant human paladin.\nSource: https://warcraft.wiki.gg/wiki/Leeroy_Jenkins (CC-BY-SA-4.0, retrieved 2023-11-13)\n";
@@ -252,5 +253,64 @@ describe("testing a key", () => {
   test("a refused key names the provider and its reason", async () => {
     const bad = vi.fn(async () => new Response(JSON.stringify({ error: { message: "invalid x-api-key" } }), { status: 401 }));
     await expect(testKey(chatProvider("anthropic")!, "m", "sk-ant-x", bad as never)).rejects.toThrow("Anthropic: HTTP 401, invalid x-api-key");
+  });
+});
+
+
+describe("price questions", () => {
+  const LINEN = [{ type: "item", id: 2589, label: "Linen Cloth", href: "/database/items/2589", quality: 1 }];
+  /** The site: item search, then the market tool's HTTP answer. */
+  function market(calls: string[], tool: () => Response = () => Response.json({ tool: "market_value", answer: FIXTURE_STRUCTURED, text: "ignored long text" })) {
+    return vi.fn(async (url: string) => {
+      calls.push(url);
+      if (url.startsWith("/search/suggest?")) return Response.json({ results: LINEN });
+      if (url.startsWith("/api/tools/market_value?")) return tool();
+      throw new Error(`Unexpected request ${url}`);
+    }) as unknown as typeof fetch;
+  }
+
+  test("a priced item answers from market_value with no model and no knowledge search", async () => {
+    const calls: string[] = [];
+    const reply = await marketReply("What is the price of Linen Cloth on Forever?", { send: market(calls) });
+    expect(reply).toEqual({
+      text: FIXTURE_ANSWER, model: null, sources: [], pages: [FIXTURE_URL],
+      steps: [{ tool: "market_value", input: JSON.stringify({ realm: "Forever", itemId: 2589 }), chars: FIXTURE_ANSWER.length }],
+    });
+    expect(calls).toEqual(["/search/suggest?q=Linen+Cloth&in=item", "/api/tools/market_value?realm=Forever&itemId=2589"]);
+    expect(calls.some((u) => u.includes("search_knowledge"))).toBe(false);
+  });
+
+  test("an item id needs no name search", async () => {
+    const calls: string[] = [];
+    await marketReply("price 2589 on Forever", { send: market(calls) });
+    expect(calls).toEqual(["/api/tools/market_value?realm=Forever&itemId=2589"]);
+  });
+
+  test("a question that is not about a price is not handled: no request at all", async () => {
+    const calls: string[] = [];
+    expect(await marketReply("Where does Linen Cloth drop?", { send: market(calls) })).toBeNull();
+    expect(calls).toEqual([]);
+  });
+
+  test("no realm is a question back with no market request", async () => {
+    const calls: string[] = [];
+    const reply = await marketReply("price 2589", { send: market(calls) });
+    expect(reply?.text).toMatch(/which realm/i);
+    expect(reply).toMatchObject({ model: null, pages: [], sources: [] });
+    expect(calls).toEqual([]);
+  });
+
+  test("a market that cannot be read says so instead of failing the chat", async () => {
+    const reply = await marketReply("price 2589 on Forever", { send: market([], () => Response.json({ ok: false, error: "Knowledge release unavailable." }, { status: 503 })) });
+    expect(reply?.text).toMatch(/could not be read.*unrecorded, not zero/);
+    expect(reply?.pages).toEqual([FIXTURE_URL]);
+  });
+
+  test("a stop reaches the request and ends the answer", async () => {
+    const ctl = new AbortController();
+    const send = vi.fn((_url: string, init?: RequestInit) => new Promise<Response>((_, reject) => init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError"))))) as unknown as typeof fetch;
+    const pending = marketReply("price 2589 on Forever", { send, signal: ctl.signal });
+    ctl.abort();
+    await expect(pending).rejects.toThrow();
   });
 });

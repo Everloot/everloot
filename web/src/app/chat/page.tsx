@@ -6,12 +6,12 @@ import { savedBuildsOn } from "@/lib/saved-builds";
 import { pageMetadata } from "@/lib/seo";
 
 const TITLE = "Ask Everloot";
-const description = "Ask about WoW: Forever in plain words. Your own AI model looks it up in Everloot's data and names the sources. Your key lasts only in this tab.";
+const description = "Ask about WoW: Forever in plain words. Everloot's search finds the sources with no key. An optional AI model of your own reads them for you. Your key lasts only in this tab.";
 
 export const metadata: Metadata = pageMetadata({ title: TITLE, description, path: "/chat" });
 
 // No ad slot here: the page is a conversation. It fills the screen under the header (ChatClient is fixed there),
-// with no footer; keys are set up on /account#chat-keys. The workspace switch is read at build time, so the page
+// with no footer; the optional model is set up on /account#chat-keys. The workspace switch is read at build time, so the page
 // stays static; private projects and chats are fetched by the browser.
 export default function ChatPage() {
   return (

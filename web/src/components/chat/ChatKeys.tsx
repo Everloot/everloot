@@ -87,7 +87,7 @@ function ModelPicker({ preset, models, value, onPick, name }: { preset: ChatProv
         <div className="flex flex-wrap gap-2">
           <input id={models.length ? `${id}-other` : `${id}-model`} name={name ? `${name}Text` : undefined} spellCheck={false} value={text}
             aria-label={models.length ? `${label} id` : label} onChange={(e) => setText(e.target.value)}
-            className={`${field} min-w-0 flex-1`} placeholder={models.length ? "A model id from the provider" : "The model you pulled, like qwen3:8b"} />
+            className={`${field} min-w-0 flex-1`} placeholder={models.length ? "A model id from the provider" : "The model you pulled, like qwen3:4b"} />
           {onPick && <button type="button" className={small} onClick={() => onPick(text.trim())}>Use model</button>}
         </div>
       )}
@@ -240,9 +240,11 @@ export default function ChatKeys() {
   return (
     <div className="space-y-4 text-sm">
       <p className="text-fg-2">
-        Chat answers with your own model. Your keys are kept in this tab only and go from here straight to the
-        provider; Everloot&apos;s servers never receive them. Closing the tab forgets them. Another tab or device
-        needs its own key; conversation history stays in this browser.
+        Everloot search is free and needs no key. Add a model here only if you want AI-written answers: it runs on
+        your own provider account, so that provider&apos;s pricing and limits apply, and some models have a limited
+        free tier. A ChatGPT or Claude subscription is not an API key. Your keys are kept in this tab only and go
+        from here straight to the provider; Everloot&apos;s servers never receive them. Closing the tab forgets them.
+        Another tab, another device or the Desktop App needs its own setup; conversation history stays in this browser.
       </p>
 
       {providers.length > 0 && (

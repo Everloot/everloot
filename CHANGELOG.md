@@ -32,6 +32,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   in and out, this week, categories, receipts and gold history. The published ledgers stay below.
 
 ### Changed
+- Site and Desktop App: Ollama suggests one small model, `qwen3:4b` (2.5 GB, calls tools), instead of `qwen3:8b`, and
+  says what running a model on your own computer means: private and free, slower, and it uses your memory while it
+  answers. The free cloud models stay the first choice.
 - Knowledge base: `entities.name_norm` stores each name's words as the search re-rank reads them, with an index on
   `(name_norm, kind)`. The exact-name lookup reads it instead of scanning every row through `lower(replace(...))`,
   and now matches non-ASCII capitals and punctuation the SQL expression missed. A punctuated name with stopwords

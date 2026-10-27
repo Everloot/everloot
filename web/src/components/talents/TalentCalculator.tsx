@@ -10,6 +10,7 @@ import {
   startHistory, undo, levelFor, type History,
 } from "@/lib/talents/rules";
 import { hasNodeFrames, loadGameAssets, type GameAssets } from "@/lib/talents/assets";
+import { compareHash } from "@/lib/talents/compare";
 import { HOW_IT_WORKS_ID } from "@/lib/talents/facts";
 import { encodeBuild, encodeOrder } from "@/lib/talents/share";
 import { track } from "@/lib/analytics/track";
@@ -744,6 +745,18 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
               {codes[0]
                 ? "Opens Plans on this device with this plan, to name it there. Kept in this browser only; nothing is uploaded."
                 : "Spend a point in set 1 to save this plan on this device."}
+            </p>
+          </div>
+          {/* Both sets side by side on the compare page, as plans A and B with the orders the address carries. A plain
+              link: it changes nothing here, so it stays during the preview, and the fragment never reaches the server. */}
+          <div className="flex flex-wrap items-center gap-3 md:col-span-2">
+            {codes[0] && codes[1]
+              ? <a className="btn text-sm" href={`/tools/talents/${catalog.classSlug}/compare${compareHash({ code: codes[0], order: orders[0] }, { code: codes[1], order: orders[1] })}`}>Compare set 1 and set 2</a>
+              : <button type="button" className="btn text-sm" disabled>Compare set 1 and set 2</button>}
+            <p className="text-sm text-fg-2">
+              {codes[0] && codes[1]
+                ? "Opens both sets side by side: the talents that differ and, with both spend orders, each set by level."
+                : "Spend points in both sets to compare them."}
             </p>
           </div>
           <div className="min-w-0 space-y-1">

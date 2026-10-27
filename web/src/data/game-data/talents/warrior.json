@@ -3,11 +3,11 @@
  "label": "found in game files, unconfirmed",
  "build": {
   "product": "wowf",
-  "buildId": 70630,
-  "version": "1.60.1.70630",
-  "buildConfig": "644ffedb0d59bb0da2af9011b36f44db",
-  "definitions": "05e242b6acdc",
-  "extractedAt": "2026-10-27T06:57:32.302Z"
+  "buildId": 70634,
+  "version": "1.60.1.70634",
+  "buildConfig": "7d8ae4cd9c1f639a3ea04fd47e21c746",
+  "definitions": "50ce5d272897",
+  "extractedAt": "2026-10-27T18:15:44.450Z"
  },
  "classId": 1,
  "className": "Warrior",

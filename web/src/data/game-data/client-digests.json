@@ -1,4 +1,4 @@
-{"schema":"everloot.client-digests/1","label":"found in game files, unconfirmed","hashVersion":1,"build":{"product":"wowf","buildId":70630,"version":"1.60.1.70630","buildConfig":"644ffedb0d59bb0da2af9011b36f44db","definitions":"05e242b6acdc","extractedAt":"2026-10-27T06:57:32.302Z"},"tables":{
+{"schema":"everloot.client-digests/1","label":"found in game files, unconfirmed","hashVersion":1,"build":{"product":"wowf","buildId":70634,"version":"1.60.1.70634","buildConfig":"7d8ae4cd9c1f639a3ea04fd47e21c746","definitions":"50ce5d272897","extractedAt":"2026-10-27T18:15:44.450Z"},"tables":{
   "Achievement": {"rows":441,"hash":"a7a75bb3b475"},
   "Achievement_Category": {"rows":56,"hash":"6484849bef14"},
   "AnimKit": {"rows":806,"hash":"2877a70c34c9"},
@@ -318,9 +318,9 @@
   "UiMapArtTile": {"rows":1672,"hash":"4df6d0fb350b"},
   "UiMapAssignment": {"rows":61,"hash":"6dea66594639"},
   "UiMapXMapArt": {"rows":60,"hash":"009f4803aa5f"},
-  "UiTextureAtlas": {"rows":2826,"hash":"dac0373748d6"},
-  "UiTextureAtlasElement": {"rows":20816,"hash":"895733deb758"},
-  "UiTextureAtlasMember": {"rows":20684,"hash":"0cf148a275ac"},
+  "UiTextureAtlas": {"rows":2826,"hash":"2e2638d690c3"},
+  "UiTextureAtlasElement": {"rows":20817,"hash":"af7c3411fbd0"},
+  "UiTextureAtlasMember": {"rows":20685,"hash":"24548176557c"},
   "WMOAreaTable": {"rows":52737,"hash":"06be622dd4e3"},
   "WorldMapOverlay": {"rows":1081,"hash":"c507282d6864"},
   "WorldMapOverlayTile": {"rows":1739,"hash":"f177aa334c71"},

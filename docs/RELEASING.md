@@ -79,7 +79,8 @@ The nightly workflow runs daily at 06:17 UTC and on demand (Actions, Nightly, Ru
 - Assets: the addon zip and `SHA256SUMS`. A knowledge-base release is not attached: building one
   needs the 600 MB wiki dump, which is not cheap in CI.
 - The notes are GitHub's generated list since the previous nightly (or the last stable tag).
-- It keeps the newest 14 nightly pre-releases and deletes older ones with their tags.
+- It keeps the newest 5 nightly pre-releases and deletes older ones with their tags, so the stable addon
+  and desktop releases stay near the top of the releases page.
 
 A nightly is untested in the live client. Treat it as a way to try what is merged, and report problems
 with the version from `/everloot version`.

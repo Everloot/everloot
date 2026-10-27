@@ -1,8 +1,14 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { afterEach, expect, test, vi } from "vitest";
+import { z } from "zod";
 import { answer, readProviderEntries, sourcesIn } from "../src/main/agent";
+import { FIXTURE_ANSWER, FIXTURE_STRUCTURED, FIXTURE_URL } from "../../web/src/lib/chat/market-fixture";
+import { MARKET_QUERY_BUDGET_MS } from "../../web/src/lib/chat/market-question";
 
 const dirs: string[] = [];
 const dir = () => { const d = mkdtempSync(join(tmpdir(), "everloot-agent-")); dirs.push(d); return d; };
@@ -254,4 +260,194 @@ test("an empty stopped answer in the history is not sent to the model", async ()
   const history = [{ role: "user" as const, text: "first", at: "", model: null, sources: [], steps: [] }, { role: "assistant" as const, text: "", at: "", model: null, sources: [], steps: [], stopped: true }];
   await answer({ mcp: { url: "u", token: null }, entries: [entry], history, question: "again", session: fakeSession([]), send: send as never });
   expect(bodies[0].messages.map((m) => m.content)).toEqual([expect.any(String), "first", "again"]);
+});
+
+/** An MCP stand-in that answers market_value with its structured result and records every call. */
+const marketSession = (calls: { name: string; args: unknown }[], structured: unknown = FIXTURE_STRUCTURED) =>
+  (async (_t: unknown, run: (c: unknown) => Promise<unknown>) => run({
+    callTool: async (c: { name: string; arguments: unknown }) => { calls.push({ name: c.name, args: c.arguments }); return { content: [{ type: "text", text: "long tool text" }], structuredContent: structured }; },
+    listTools: async () => ({ tools: [] }),
+  })) as never;
+const LINEN = [{ type: "item", id: 2589, label: "Linen Cloth", href: "/database/items/2589", quality: 1 }];
+const site = (urls: string[]) => vi.fn(async (url: string) => { urls.push(url); return Response.json({ results: LINEN }); }) as never;
+
+test("a price question is answered from market_value with no provider and no knowledge search", async () => {
+  const calls: { name: string; args: unknown }[] = [];
+  const urls: string[] = [];
+  const r = await answer({ mcp: { url: "https://everloot.app/mcp/public", token: null }, entries: [], history: [], question: "What is the price of Linen Cloth on Forever?", session: marketSession(calls), send: site(urls), site: "https://everloot.app" });
+  expect(r).toEqual({ text: FIXTURE_ANSWER, model: null, sources: [FIXTURE_URL], steps: [{ tool: "market_value", input: JSON.stringify({ realm: "Forever", itemId: 2589 }), chars: FIXTURE_ANSWER.length }] });
+  expect(calls).toEqual([{ name: "market_value", args: { realm: "Forever", itemId: 2589 } }]);
+  expect(urls).toEqual(["https://everloot.app/search/suggest?q=Linen+Cloth&in=item"]);
+});
+
+test("with a provider the price is still the market's: no model request, no my_ tool, no tool list", async () => {
+  const calls: { name: string; args: unknown }[] = [];
+  const send = vi.fn(async () => new Response("{}", { status: 500 }));
+  const mine = { name: "my_characters", description: "d", inputSchema: {}, run: vi.fn(() => "gold") };
+  const entry = { type: "openai-compatible", baseUrl: "https://openrouter.ai/api/v1", model: "m" };
+  const r = await answer({ mcp: { url: "u", token: null }, entries: [entry], history: [], question: "price 2589 on Forever", session: marketSession(calls), send: send as never, local: [mine] });
+  expect(r.text.startsWith("Item 2589 on Forever, all houses: market 3s 10c")).toBe(true);
+  expect(r.model).toBeNull();
+  expect(send).not.toHaveBeenCalled();
+  expect(mine.run).not.toHaveBeenCalled();
+  expect(calls.map((c) => c.name)).toEqual(["market_value"]);
+});
+
+test("without a realm it asks, listing the followed realms but choosing none, and opens no connection", async () => {
+  const session = vi.fn(async () => { throw new Error("no connection should open"); });
+  const r = await answer({ mcp: { url: "u", token: null }, entries: [], history: [], question: "price 2589", session: session as never, realms: ["Forever", "Nightslayer"] });
+  expect(r.text).toMatch(/^Which realm\?/);
+  expect(r.text).toContain("Realms you follow: Forever, Nightslayer.");
+  expect(r.sources).toEqual([]);
+  expect(r.steps).toEqual([]);
+  expect(session).not.toHaveBeenCalled();
+});
+
+test("an unreadable market is said, not searched around or guessed", async () => {
+  const calls: { name: string; args: unknown }[] = [];
+  const r = await answer({ mcp: { url: "u", token: null }, entries: [], history: [], question: "price 2589 on Forever", session: marketSession(calls, { connected: false, dataAsOf: null, reason: "x" }) });
+  expect(r.text).toMatch(/unrecorded, not zero/);
+  expect(calls.map((c) => c.name)).toEqual(["market_value"]);
+});
+
+test("a stop during the price lookup ends the answer", async () => {
+  const stop = new AbortController();
+  stop.abort();
+  await expect(answer({ mcp: { url: "u", token: null }, entries: [], history: [], question: "price 2589 on Forever", session: marketSession([]), signal: stop.signal })).rejects.toThrow();
+});
+
+test.each([
+  "please tell me the price of Linen Cloth on Forever",
+  "show me the price of 2589 on Forever",
+  "can you tell me the price of 2589 on Forever",
+])("a polite price question (%s) is the market's too: no model request, no my_ tool", async (question) => {
+  const calls: { name: string; args: unknown }[] = [];
+  const send = vi.fn(async (url: string) => (String(url).includes("/search/suggest") ? Response.json({ results: LINEN }) : new Response("{}", { status: 500 }))) as never;
+  const mine = { name: "my_characters", description: "d", inputSchema: {}, run: vi.fn(() => "gold") };
+  const entry = { type: "openai-compatible", baseUrl: "https://openrouter.ai/api/v1", model: "m" };
+  const r = await answer({ mcp: { url: "u", token: null }, entries: [entry], history: [], question, session: marketSession(calls), send, local: [mine] });
+  expect(r.model).toBeNull();
+  expect(r.text).toContain("on Forever, all houses: market 3s 10c");
+  expect(calls.map((c) => c.name)).toEqual(["market_value"]);
+  expect(mine.run).not.toHaveBeenCalled();
+  expect(vi.mocked(send as never as (u: string) => Promise<Response>).mock.calls.some(([u]) => String(u).includes("openrouter"))).toBe(false);
+});
+
+test("a canonical item name that begins with an article is searched whole and keeps its id; a conversational article is retried without it", async () => {
+  const rows = [{ type: "item", id: 2589, label: "The Review Blade", href: "/database/items/2589", quality: 3 }, { type: "item", id: 2590, label: "Linen Cloth", href: "/database/items/2590", quality: 1 }];
+  const asked: string[] = [];
+  const send = vi.fn(async (url: string) => {
+    const q = new URL(url).searchParams.get("q")!;
+    asked.push(q);
+    return Response.json({ results: rows.filter((r) => r.label.toLowerCase().includes(q.toLowerCase())) });
+  }) as never;
+  const calls: { name: string; args: unknown }[] = [];
+  const base = { mcp: { url: "u", token: null }, entries: [], history: [], session: marketSession(calls), send, site: "https://example.test" };
+  const canonical = await answer({ ...base, question: "price The Review Blade on Forever" });
+  expect(asked).toEqual(["The Review Blade"]);
+  expect(canonical.text).toContain("The Review Blade (item 2589)");
+  expect(calls).toEqual([{ name: "market_value", args: { realm: "Forever", itemId: 2589 } }]);
+  asked.length = 0;
+  await answer({ ...base, question: "what is the price of the Linen Cloth on Forever" });
+  expect(asked).toEqual(["the Linen Cloth", "Linen Cloth"]);
+  expect(calls.at(-1)).toEqual({ name: "market_value", args: { realm: "Forever", itemId: 2590 } });
+});
+
+test("a link whose id is oversized is asked back: no connection, no lookup, no provider", async () => {
+  const session = vi.fn(async () => { throw new Error("no connection should open"); });
+  const send = vi.fn(async () => new Response("{}", { status: 500 }));
+  const r = await answer({ mcp: { url: "u", token: null }, entries: [{ type: "openai-compatible", baseUrl: "https://x/v1", model: "m" }], history: [], question: "price |Hitem:9007199254740993|h[Invalid]|h on Forever", session: session as never, send: send as never });
+  expect(r.text).toMatch(/item id is not valid/i);
+  expect(session).not.toHaveBeenCalled();
+  expect(send).not.toHaveBeenCalled();
+});
+
+test("a session that never connects ends at the price budget as the usual unavailable answer, with no provider and no personal tool", async () => {
+  vi.useFakeTimers();
+  try {
+    let seen: AbortSignal | undefined;
+    const session = vi.fn((_t: unknown, _run: unknown, signal?: AbortSignal) => { seen = signal; return new Promise(() => {}); });
+    const send = vi.fn(async () => new Response("{}", { status: 500 }));
+    const mine = { name: "my_characters", description: "d", inputSchema: {}, run: vi.fn(() => "gold") };
+    const pending = answer({ mcp: { url: "u", token: null }, entries: [{ type: "openai-compatible", baseUrl: "https://x/v1", model: "m" }], history: [], question: "price 2589 on Forever", session: session as never, send: send as never, local: [mine] });
+    await vi.advanceTimersByTimeAsync(MARKET_QUERY_BUDGET_MS);
+    const r = await pending;
+    expect(r.text).toMatch(/unrecorded, not zero/);
+    expect(r.model).toBeNull();
+    expect(r.sources).toEqual([FIXTURE_URL]);
+    expect(seen?.aborted).toBe(true);
+    expect(send).not.toHaveBeenCalled();
+    expect(mine.run).not.toHaveBeenCalled();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("Stop still ends the answer while a session is hanging, and is not turned into an unavailable reply", async () => {
+  const stop = new AbortController();
+  const session = vi.fn(() => new Promise(() => {}));
+  const pending = answer({ mcp: { url: "u", token: null }, entries: [], history: [], question: "price 2589 on Forever", session: session as never, signal: stop.signal });
+  const outcome = pending.then(() => "reply", (err) => (err as Error).name);
+  await vi.waitFor(() => expect(session).toHaveBeenCalled());
+  stop.abort();
+  expect(await outcome).toBe("AbortError");
+});
+
+/** A local server the real withMcp can talk to: it counts requests and the connections the client dropped. */
+async function hungServer() {
+  const seen = { requests: 0, closed: 0, onRequest: () => {} };
+  const server = createServer((_req, res) => { seen.requests++; res.on("close", () => { seen.closed++; }); seen.onRequest(); });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  return {
+    seen, url: `http://127.0.0.1:${(server.address() as { port: number }).port}/mcp`,
+    next: () => new Promise<void>((resolve) => { seen.onRequest = resolve; }),
+    stop: async () => { server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); },
+  };
+}
+
+test("the real MCP client: a server that never answers initialize is dropped at the price budget, and Stop drops it at once", async () => {
+  const local = await hungServer();
+  try {
+    // The budget.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const first = local.next();
+    const pending = answer({ mcp: { url: local.url, token: null }, entries: [], history: [], question: "price 2589 on Forever" });
+    await first;
+    await vi.advanceTimersByTimeAsync(MARKET_QUERY_BUDGET_MS);
+    expect((await pending).text).toMatch(/unrecorded, not zero/);
+    vi.useRealTimers();
+    await vi.waitFor(() => expect(local.seen.closed).toBe(1));
+    // Stop.
+    const stop = new AbortController();
+    const again = local.next();
+    const stopped = answer({ mcp: { url: local.url, token: null }, entries: [], history: [], question: "price 2589 on Forever", signal: stop.signal }).then(() => "reply", (err) => (err as Error).name);
+    await again;
+    stop.abort();
+    expect(await stopped).toBe("AbortError");
+    await vi.waitFor(() => expect(local.seen.closed).toBe(2));
+  } finally {
+    vi.useRealTimers();
+    await local.stop();
+  }
+});
+
+test("the real MCP client against a real local MCP server: market_value round trip", async () => {
+  const server = createServer(async (req, res) => {
+    const mcp = new McpServer({ name: "test-market", version: "0.0.0" });
+    mcp.registerTool("market_value", { inputSchema: { realm: z.string(), itemId: z.number() } }, async () => ({ content: [{ type: "text" as const, text: "long text" }], structuredContent: FIXTURE_STRUCTURED }));
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+    res.on("close", () => { void transport.close(); void mcp.close(); });
+    await mcp.connect(transport);
+    await transport.handleRequest(req, res);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const url = `http://127.0.0.1:${(server.address() as { port: number }).port}/mcp`;
+    const r = await answer({ mcp: { url, token: null }, entries: [], history: [], question: "price 2589 on Forever" });
+    expect(r.text).toBe(FIXTURE_ANSWER.replace("Linen Cloth (item 2589)", "Item 2589"));
+    expect(r.sources).toEqual([FIXTURE_URL]);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
 });
