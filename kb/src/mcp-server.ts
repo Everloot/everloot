@@ -41,7 +41,7 @@ import {
   changesUrl, collectionsUrl, ECOSYSTEM_URL, goldLedgerUrl, guildBoardUrl, guildPageUrl, guildsUrl, itemPageUrl, ITEMS_URL, loreUrls, mapSpotUrl, marketItemUrl,
   npcPageUrl, npcUrl, objectPageUrl, professionsUrl, questPageUrl, vendorPageUrl, withMore,
 } from "./page-urls.js";
-import { getByName, getDocument, getEntity, search, searchSomeWords, type SearchHit } from "./search.js";
+import { getByName, getDocument, getEntity, search, searchSomeWords, SOME_WORDS, type SearchHit } from "./search.js";
 
 export const SERVER_NAME = "everloot-knowledge";
 export const SERVER_VERSION = "0.8.0";
@@ -450,8 +450,7 @@ function formatHits(db: DB, hits: SearchHit[]): string {
   return withPages(db, hits).map((h) => withMore(`[${h.kind}/${h.gameVersion}] ${h.name}\n${h.snippet}\nSource: ${h.sourceUrl} (${h.licence}, retrieved ${h.retrievedAt})`, h.url)).join("\n\n");
 }
 
-/** The line a search answer starts with when the hits match only some of the asked words. */
-export const SOME_WORDS = "No page has every word you asked for. Pages with some of them:";
+export { SOME_WORDS };
 
 /** The hits for every asked word, or, when no page has them all, the pages with some of them. */
 function searchResult(db: DB, args: SearchArgs): { hits: SearchHit[]; some: boolean } {
@@ -610,7 +609,9 @@ export function createToolHandlers(db: DB, options: ToolOptions = {}): ToolHandl
     answer_sources: async (args) => {
       const read = await readTooledFacts<AnswerSourcesFacts>("answer_sources", options.corpus, recheck);
       const result = answerSources(db, args, read?.facts ?? null, read?.dataAsOf ?? null);
-      return { text: `${formatAnswerSources(result, read !== null)}\n${read ? answerFooter(read.dataAsOf) : MCP_CREDIT}`, structured: result };
+      // The fallback is said in the text; the structured answer keeps its published shape.
+      const { someWords: _someWords, ...structured } = result;
+      return { text: `${formatAnswerSources(result, read !== null)}\n${read ? answerFooter(read.dataAsOf) : MCP_CREDIT}`, structured };
     },
     profession_path: (args) => {
       // The same defaults the text handler applies: from 1, to the start when no end is given.

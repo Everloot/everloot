@@ -204,6 +204,9 @@ export function search(db: DB, query: string, limit = 10, opts: SearchOptions = 
   return [...head, ...merged.slice(RERANK)].slice(0, limit);
 }
 
+/** The line an answer starts with when its pages hold only some of the asked words. */
+export const SOME_WORDS = "No page has every word you asked for. Pages with some of them:";
+
 /**
  * For when no page has every asked word ("whats the best racial class for warlock on horde"): pages with
  * any of them, those with more of the asked words first, then bm25. Empty for a one-word query, where any
