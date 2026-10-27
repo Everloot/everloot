@@ -522,8 +522,8 @@ const segment = (s: string | undefined) => {
   try { return decodeURIComponent(s); } catch { return s; }
 };
 
-/** The plan in pasted text: the calculator's address (#plan= and the rest), a build link's /b/<code>/<code> path,
- *  or a bare share code. Orders come only with a #plan= address, each with its own set's code. */
+/** The plan in pasted text: the calculator's address (#plan= and the rest), a build link's /b/<code>/<code> path
+ *  with any orders in its fragment, or a bare share code. Each order goes with its own set's code, as it came. */
 export function readPlanText(text: string): PlanText {
   const trimmed = text.trim();
   if (!trimmed) return { ok: false, message: "Paste a talent link or a share code first." };
@@ -536,6 +536,9 @@ export function readPlanText(text: string): PlanText {
     orders = [hash.firstOrder ?? null, hash.secondOrder ?? null];
   } else if (path) {
     codes = [segment(path[1]), segment(path[2])];
+    const fragment = trimmed.indexOf("#");
+    const hash = readPlanHash(fragment < 0 ? "" : trimmed.slice(fragment));
+    orders = [hash.firstOrder ?? null, hash.secondOrder ?? null];
   }
   const [first, second] = codes;
   if (!first) return { ok: false, message: second ? "That link has no first talent set. Open it in the calculator, spend a point in set 1 and copy the link again." : NOT_A_PLAN };

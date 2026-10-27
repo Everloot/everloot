@@ -105,8 +105,9 @@ A known order only means the token's points match the talents that loaded. Wheth
 be spent at its place in the order (row gates, prerequisites, the level each point arrives at) is a
 separate check against the tree's rules, and reading the token does not make it. The calculator makes
 that check when it opens a plan (`importPlan`): an order that passes opens with its own label, and one
-that does not opens the talents with the order unknown and says where it broke. A token it cannot use
-stays in its links, as it came, until that set changes. New points join the order as planned; an
+that does not opens the talents with the order unknown and says where it broke. A token it cannot use,
+on a set whose points all placed as the code asked, stays in its links as it came until that set
+changes; when any point did not place, the token is dropped. New points join the order as planned; an
 order is generated, and labelled provisional, only when the player asks for one.
 
 ### Orders in a link
