@@ -63,6 +63,12 @@ export default function ClassContextChip({ read, here, inPlace = false, classNam
     onClick: (e: MouseEvent) => {
       if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       e.preventDefault();
+      // The link goes with the old address: focus moves to the page's title rather than falling to the page's end.
+      const title = document.querySelector<HTMLElement>("h1");
+      if (title) {
+        if (!title.hasAttribute("tabindex")) title.tabIndex = -1;
+        title.focus();
+      }
       window.history.pushState(null, "", `${href}${window.location.hash}`);
     },
   } : { href };

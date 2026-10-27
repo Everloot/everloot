@@ -7,12 +7,16 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 vi.mock("next/link", () => ({
   default: ({ href, children, ...rest }: { href: string; children: ReactNode }) => <a href={href} {...rest}>{children}</a>,
 }));
-// The app router reports the browser's own address.
-vi.mock("next/navigation", () => ({
-  notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
-  useSearchParams: () => new URLSearchParams(window.location.search),
-  usePathname: () => window.location.pathname,
-}));
+// The app router reports the browser's own address, and renders again when it changes (a popstate stands for that).
+vi.mock("next/navigation", async () => {
+  const { useSyncExternalStore } = await import("react");
+  const subscribe = (fn: () => void) => { window.addEventListener("popstate", fn); return () => window.removeEventListener("popstate", fn); };
+  return {
+    notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
+    useSearchParams: () => new URLSearchParams(useSyncExternalStore(subscribe, () => window.location.search, () => window.location.search)),
+    usePathname: () => window.location.pathname,
+  };
+});
 // The game files' spell names and profession icons, the class talent catalogs (withdrawn when a test says so), and an
 // upload store with no reports.
 const files = vi.hoisted(() => ({
@@ -169,6 +173,20 @@ describe("on the raid planner, a page built once", () => {
     expect(`${location.pathname}${location.search}${location.hash}`).toBe("/tools/raid#raid=ELR1-abc");
     await mount(<ClassContextChipFromAddress />);
     expect(container!.innerHTML).toBe("");
+  });
+
+  test("taking the context off in place moves focus to the page's title instead of dropping it", async () => {
+    history.replaceState(null, "", "/tools/raid?class=mage#raid=ELR1-abc");
+    const native = history.pushState.bind(history);
+    vi.spyOn(history, "pushState").mockImplementation((...args: Parameters<History["pushState"]>) => { native(...args); window.dispatchEvent(new PopStateEvent("popstate")); });
+    await mount(<><h1>WoW Forever Raid Buff Planner</h1><ClassContextChipFromAddress /><button type="button">Add</button></>);
+    const remove = anchor("Remove Mage")!;
+    remove.focus();
+    await act(async () => remove.click());
+    expect(container!.querySelector("[data-class-context]")).toBeNull();
+    const title = container!.querySelector("h1")!;
+    expect(document.activeElement).toBe(title);
+    expect(title.getAttribute("tabindex")).toBe("-1");
   });
 
   test("the chip's links follow the raid's #fragment as it changes, and a modified or middle click is left to the browser", async () => {
