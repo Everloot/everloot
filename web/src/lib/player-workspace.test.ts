@@ -1,11 +1,11 @@
 import { describe, expect, test } from "vitest";
 import { encodeBuild } from "./talents/share";
 import {
-  NEWEST_VERSION, WORKSPACE_LIMITS, applyImport, bindTransferred, bucketKey, copyPlan, deletePlan, editPlan, emptyWorkspace, exportBackup,
-  lookupOwner, orderState, previewImport, readPlanText, readWorkspace, savePlan, validateWorkspace,
-  type LocalPlan, type Owner, type PlanInput, type PlayerWorkspace,
+  NEWEST_VERSION, WORKSPACE_LIMITS, WORKSPACE_VERSION, applyImport, bindTransferred, bucketKey, copyPlan, deletePlan, editPlan,
+  emptyWorkspace, exportBackup, lookupOwner, orderState, previewImport, readPlanText, readWorkspace, savePlan, validateWorkspace,
+  type LocalAlt, type LocalPlan, type Owner, type PlanInput, type PlayerWorkspace,
 } from "./player-workspace";
-import { FIXTURE_ALT_ID, FIXTURE_PLAN_ID, V2_ALT_TEXT, V2_BUCKET_TEXT, V2_PLAN_TEXT } from "./player-workspace.fixture";
+import { FIXTURE_PLAN_ID, V2_ALT_TEXT, V2_BUCKET_TEXT } from "./player-workspace.fixture";
 
 // Codes and tokens from docs/2026-10-17-talent-share-code.md: MAGE is 90001:2, 90002:1:1, 90004:2, so its
 // nodes index as A, B and C, and O1p-AABCC is a player's order for its five points.
@@ -56,8 +56,17 @@ const plan = (over: Partial<LocalPlan> = {}): LocalPlan => ({
   notes: "", updatedAt: "2026-10-20T12:00:00.000Z", boundTo: null, ...over,
 });
 const workspace = (owner: Owner, plans: LocalPlan[], over: Partial<PlayerWorkspace> = {}): PlayerWorkspace => ({
-  format: "everloot.player-workspace", version: 1, owner, plans, alts: [], watches: [], ...over,
+  format: "everloot.player-workspace", version: 2, owner, plans, alts: [], watches: [], ...over,
 });
+/** A stored alt in the version 2 format, written by hand. */
+const altOf = (over: Partial<LocalAlt> = {}): LocalAlt => ({
+  id: "1a2b3c4d-0000-4000-8000-000000000500", name: "Thrall", realm: null, classSlug: null, faction: null, level: null,
+  professions: [], notes: "", planIds: [], provenance: { source: "manual", fileRecordAt: null, fileDetails: [] },
+  updatedAt: "2026-10-20T12:00:00.000Z", ...over,
+});
+/** A bucket as version 1 wrote it: its alts had a name, plans and notes only. */
+const versionOne = (owner: Owner, plans: LocalPlan[], alts: object[] = [], watches: object[] = []) =>
+  ({ format: "everloot.player-workspace", version: 1, owner, plans, alts, watches });
 const idOf = (n: number) => `1a2b3c4d-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const bytes = (text: string) => new TextEncoder().encode(text).length;
 
@@ -167,18 +176,11 @@ describe("storage that fails", () => {
   });
 });
 
-describe("version 2, written by the alt planner, is read and kept", () => {
+describe("version 2, as the alt planner writes it, is kept", () => {
   /** The bucket's stored alts, as text. */
   const altsText = (text: string) => /"alts":(\[.*\]),"watches"/.exec(text)?.[1];
 
-  test("this build writes version 1: a new bucket, and a version 1 bucket after a change", () => {
-    const storage = memory();
-    saved(storage, ANON);
-    expect(NEWEST_VERSION).toBe(2);
-    expect(JSON.parse(storage.items.get(bucketKey(ANON))!).version).toBe(1);
-  });
-
-  test("a plan edit on a version 2 bucket keeps it version 2, with every alt field it does not use kept byte for byte", () => {
+  test("a plan edit on a version 2 bucket keeps it version 2, with every alt field kept byte for byte", () => {
     const storage = memory();
     storage.items.set(bucketKey(ANON), V2_BUCKET_TEXT);
     const read = readWorkspace(storage, ANON);
@@ -201,20 +203,6 @@ describe("version 2, written by the alt planner, is read and kept", () => {
     expect(storage.items.get(bucketKey(ANON))).toBe(V2_BUCKET_TEXT);
   });
 
-  test("a version 2 alt is checked by the fields this build uses; its own other fields are left to it", () => {
-    const doc = (alt: object) => ({ ...JSON.parse(V2_BUCKET_TEXT), alts: [alt] });
-    const alt = JSON.parse(V2_ALT_TEXT);
-    expect(validateWorkspace(doc(alt)).ok).toBe(true);
-    const { planIds: _planIds, ...noPlans } = alt;
-    expect(validateWorkspace(doc(noPlans))).toMatchObject({ ok: false, error: "malformed" });
-    expect(validateWorkspace(doc({ ...alt, notes: "n".repeat(1001) }))).toMatchObject({ ok: false, error: "malformed" });
-    expect(validateWorkspace(doc({ ...alt, planIds: [idOf(99)] }))).toMatchObject({ ok: false, error: "bad-reference" });
-    // Version 1 is never extended in place: its alts have exactly version 1's fields.
-    const one = { format: "everloot.player-workspace", version: 1, owner: ANON, plans: [JSON.parse(V2_PLAN_TEXT)], watches: [] };
-    expect(validateWorkspace({ ...one, alts: [alt] })).toMatchObject({ ok: false, error: "malformed" });
-    expect(validateWorkspace({ ...one, alts: [{ id: FIXTURE_ALT_ID, name: "Thrall", planIds: [], notes: "", updatedAt: "2026-10-20T12:00:00.000Z" }] }).ok).toBe(true);
-  });
-
   test("a version 2 backup restores into a signed-out device that has no alts, which becomes version 2 with the alts as they were", () => {
     const storage = memory();
     saved(storage, ANON, { name: "Here" });
@@ -229,17 +217,6 @@ describe("version 2, written by the alt planner, is read and kept", () => {
     expect(names(storage, ANON)).toEqual(["Frost", "Here"]);
   });
 
-  test("a backup that would put version 1 alts with version 2 alts is refused, and nothing changes", () => {
-    const storage = memory();
-    const one = { format: "everloot.player-workspace", version: 1, owner: ANON, plans: [], watches: [],
-      alts: [{ id: idOf(501), name: "Jaina", planIds: [], notes: "", updatedAt: "2026-10-20T12:00:00.000Z" }] };
-    storage.items.set(bucketKey(ANON), JSON.stringify(one));
-    const read = readWorkspace(storage, ANON);
-    expect(read.ok).toBe(true);
-    expect(read.ok && previewImport(V2_BUCKET_TEXT, read.workspace)).toMatchObject({ ok: false, error: "mixed-versions" });
-    expect(previewImport(JSON.stringify(one), JSON.parse(V2_BUCKET_TEXT))).toMatchObject({ ok: false, error: "mixed-versions" });
-  });
-
   test("a backup of a version 2 bucket is its own text, and restoring it again changes nothing", () => {
     const storage = memory();
     storage.items.set(bucketKey(ANON), V2_BUCKET_TEXT);
@@ -248,6 +225,89 @@ describe("version 2, written by the alt planner, is read and kept", () => {
     expect(backup).toMatchObject({ ok: true, text: V2_BUCKET_TEXT });
     const again = read.ok ? previewImport(V2_BUCKET_TEXT, read.workspace) : null;
     expect(again).toMatchObject({ ok: true, preview: { added: 0, updated: 0, unchanged: 1, others: 0 } });
+  });
+});
+
+describe("format version 2: alts with their details, and version 1 still read", () => {
+  const oldAlt = { id: idOf(500), name: "Thrall", planIds: [idOf(1)], notes: "Bank alt", updatedAt: "2026-10-20T12:00:00.000Z" };
+  const watch = { id: idOf(700), planId: idOf(1), addedAt: "2026-10-20T12:00:00.000Z" };
+  /** oldAlt as version 2 reads it: what it had, and nothing known about the rest. */
+  const upgraded = altOf({ id: idOf(500), name: "Thrall", planIds: [idOf(1)], notes: "Bank alt" });
+  const one = () => plan({ id: idOf(1) });
+
+  test("a save stores version 2", () => {
+    const storage = memory();
+    saved(storage, ANON);
+    expect(WORKSPACE_VERSION).toBe(2);
+    expect(JSON.parse(storage.items.get(bucketKey(ANON))!).version).toBe(2);
+  });
+
+  test("a version 1 bucket reads as version 2 with every plan, alt and watch, and reading writes nothing", () => {
+    const storage = memory();
+    const text = JSON.stringify(versionOne(ANON, [one()], [oldAlt], [watch]));
+    storage.items.set(bucketKey(ANON), text);
+    const read = readWorkspace(storage, ANON);
+    expect(read).toMatchObject({ ok: true, raw: text });
+    expect(read.ok && read.workspace).toEqual(workspace(ANON, [one()], { alts: [upgraded], watches: [watch] }));
+    expect(storage.items.get(bucketKey(ANON))).toBe(text);
+  });
+
+  test("the first change to a version 1 bucket stores it as version 2, with everything it held", () => {
+    const storage = memory();
+    storage.items.set(bucketKey(ANON), JSON.stringify(versionOne(ANON, [one()], [oldAlt], [watch])));
+    const added = saved(storage, ANON, { name: "New" });
+    expect(JSON.parse(storage.items.get(bucketKey(ANON))!)).toEqual(workspace(ANON, [one(), added], { alts: [upgraded], watches: [watch] }));
+  });
+
+  test("a version 1 backup restores into a version 2 device, its alts' new details unknown", () => {
+    const preview = previewImport(JSON.stringify(versionOne(ANON, [one()], [oldAlt])), emptyWorkspace(ANON));
+    expect(preview).toMatchObject({ ok: true, preview: { added: 1, others: 1 } });
+    expect(preview.ok && preview.preview.result).toEqual(workspace(ANON, [one()], { alts: [upgraded] }));
+  });
+
+  test("version 1 is never extended in place: version 2's fields on a version 1 alt, or a version 2 alt without them, are refused", () => {
+    expect(validateWorkspace(versionOne(ANON, [one()], [{ ...oldAlt, realm: "Moon Guard" }]))).toMatchObject({ ok: false, error: "malformed" });
+    expect(validateWorkspace(versionOne(ANON, [one()], [upgraded]))).toMatchObject({ ok: false, error: "malformed" });
+    expect(validateWorkspace(workspace(ANON, [one()], { alts: [oldAlt as unknown as LocalAlt] }))).toMatchObject({ ok: false, error: "malformed" });
+  });
+
+  test("a version 1 bucket within 1 MiB stays readable when its upgrade passes 1 MiB; a change then says so and stores nothing", () => {
+    const letters = (n: number) => "\u{1D538}".repeat(n);
+    const alts = Array.from({ length: 60 }, (_, i) => ({ ...oldAlt, id: idOf(500 + i), name: letters(60), planIds: [], notes: letters(1000) }));
+    const plans: LocalPlan[] = [];
+    for (let i = 0; ; i++) {
+      const next = plan({ id: idOf(i), name: `Plan ${i}`, notes: letters(1000) });
+      if (bytes(JSON.stringify(versionOne(ANON, [...plans, next], alts))) > WORKSPACE_LIMITS.bytes) break;
+      plans.push(next);
+    }
+    const storage = memory();
+    const text = JSON.stringify(versionOne(ANON, plans, alts));
+    storage.items.set(bucketKey(ANON), text);
+    const read = readWorkspace(storage, ANON);
+    expect(read.ok).toBe(true);
+    expect(bytes(JSON.stringify(read.ok ? read.workspace : null))).toBeGreaterThan(WORKSPACE_LIMITS.bytes);
+    expect(savePlan(storage, ANON, input({ name: "One more" }), NOW)).toMatchObject({ ok: false, error: "over-limit" });
+    expect(storage.items.get(bucketKey(ANON))).toBe(text);
+  });
+
+  test("a version 2 alt's details are checked: realm, class, faction, level, professions and where they came from", () => {
+    const valid = (over: object) => validateWorkspace(workspace(ANON, [one()], { alts: [altOf(over as Partial<LocalAlt>)] })).ok;
+    const fromFile = { source: "addon-file", fileRecordAt: "2026-10-21T18:00:00.000Z", fileDetails: ["classSlug", "level", "faction"] };
+    expect(valid({ realm: "Moon Guard", classSlug: "shaman", faction: "horde", level: 60, professions: ["Alchemy", "First Aid"], provenance: fromFile })).toBe(true);
+    expect(valid({ provenance: { source: "manual", fileRecordAt: "2026-10-21T18:00:00.000Z", fileDetails: [] } })).toBe(true);
+    for (const bad of [
+      { realm: "" }, { realm: "r".repeat(61) }, { realm: "Moon\u0007Guard" }, { realm: " Moon Guard" },
+      { classSlug: "deathknight" }, { classSlug: "toString" }, { classSlug: "Mage" },
+      { faction: "Horde" }, { faction: "neutral" },
+      { level: 0 }, { level: 61 }, { level: 24.5 }, { level: "24" },
+      { professions: ["Jewelcrafting"] }, { professions: ["Alchemy", "Alchemy"] }, { professions: "Alchemy" },
+      { provenance: { source: "typed", fileRecordAt: null, fileDetails: [] } },
+      { provenance: { source: "addon-file", fileRecordAt: null, fileDetails: [] } },
+      { provenance: { source: "manual", fileRecordAt: null, fileDetails: ["level"] }, level: 24 },
+      { provenance: { ...fromFile, fileDetails: ["level"] } },
+      { provenance: { ...fromFile, fileDetails: ["realm"] }, realm: "Moon Guard" },
+      { provenance: { ...fromFile, extra: 1 } },
+    ]) expect(valid(bad), JSON.stringify(bad)).toBe(false);
   });
 });
 
@@ -292,7 +352,7 @@ describe("limits", () => {
 
   test("alts hold 60 at most, 10 plan references each, and every reference names a plan in the same bucket", () => {
     const plans = Array.from({ length: 11 }, (_, i) => plan({ id: idOf(i), name: `Plan ${i}` }));
-    const alt = (n: number, planIds: string[]) => ({ id: idOf(500 + n), name: `Alt ${n}`, planIds, notes: "", updatedAt: "2026-10-20T12:00:00.000Z" });
+    const alt = (n: number, planIds: string[]) => altOf({ id: idOf(500 + n), name: `Alt ${n}`, planIds });
     expect(validateWorkspace(workspace(ANON, plans, { alts: [alt(1, plans.slice(0, 10).map((p) => p.id))] })).ok).toBe(true);
     expect(validateWorkspace(workspace(ANON, plans, { alts: [alt(1, plans.map((p) => p.id))] }))).toMatchObject({ ok: false, error: "over-limit" });
     expect(validateWorkspace(workspace(ANON, plans, { alts: Array.from({ length: 61 }, (_, i) => alt(i, [])) }))).toMatchObject({ ok: false, error: "over-limit" });

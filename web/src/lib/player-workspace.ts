@@ -1,10 +1,12 @@
 import { LIMITS, codeClass, validId } from "./saved-builds";
+import { TALENT_CLASSES, type TalentClassSlug } from "./talents/catalogs";
 import { readPlanHash } from "./talents/import";
 import { decodeBuild, decodeOrder, type OrderError, type OrderOrigin } from "./talents/share";
 
 // The plans, alts and watches a player keeps in this browser, with no account and nothing uploaded: the
-// PlayerWorkspace. This version writes format version 1, and reads version 2 too: version 2 gives alts more fields,
-// which this version does not use and keeps exactly as they are. A bucket stays in the version it was stored in.
+// PlayerWorkspace, format version 2. Version 2 gave alts their details (realm, class, level and the rest). Version 1
+// is still read, as version 2 with those details unknown, and is stored as version 2 at the next change; a shape
+// change takes a new version number, so an older page reads newer data as newer and leaves it alone.
 //
 // One bucket per owner, each under its own localStorage key: the browser signed out, and each account by its
 // stable user id, never its name. A plan saved in one bucket is shown in no other, so signing in, out or into
@@ -19,16 +21,18 @@ import { decodeBuild, decodeOrder, type OrderError, type OrderOrigin } from "./t
 // account's bucket (bindTransferred).
 
 export const WORKSPACE_FORMAT = "everloot.player-workspace";
-/** The version a new bucket is stored in. */
-export const WORKSPACE_VERSION = 1;
+/** The version a new bucket is stored in, and any bucket after a change. */
+export const WORKSPACE_VERSION = 2;
 /** The newest version this version reads. A bucket in a newer one is left alone. */
 export const NEWEST_VERSION = 2;
 export type WorkspaceVersion = 1 | 2;
 
 /** What one bucket holds at most. Names, notes and codes have the account's own limits (saved-builds.ts), so a
- *  plan saved to an account later is never cut. Everything fits a backup of 1 MiB. */
+ *  plan saved to an account later is never cut. An alt's realm and level go as far as the addon's records do
+ *  (packages/protocol): a realm of 60 characters, level 60. Everything fits a backup of 1 MiB. */
 export const WORKSPACE_LIMITS = {
   plans: 200, alts: 60, altPlans: 10, name: LIMITS.name, notes: LIMITS.notes, code: LIMITS.code, bytes: 1024 * 1024,
+  realm: 60, level: 60,
 } as const;
 
 /** Whose plans a bucket holds: the browser signed out, or one account by its stable id. */
@@ -53,9 +57,38 @@ export interface LocalPlan {
   boundTo: Binding | null;
 }
 
-/** An alt and the plans it uses; the alt planner adds the rest. A version 2 alt has more fields, which this version
- *  does not use: they stay on the alt as they were stored. */
-export interface LocalAlt { id: string; name: string; planIds: string[]; notes: string; updatedAt: string }
+/** The professions an alt can list: the same list the profession pages name (PROFESSIONS), in the game's order. A
+ *  test keeps the two the same, so this module needs nothing from the modules that read the game's art. */
+export const ALT_PROFESSIONS = [
+  "Alchemy", "Blacksmithing", "Enchanting", "Engineering", "Herbalism", "Leatherworking", "Mining", "Skinning", "Tailoring",
+  "Cooking", "First Aid", "Fishing",
+] as const;
+
+export type Faction = "alliance" | "horde";
+
+/** The details of an alt that the player's own addon file can give. */
+export const FILE_DETAILS = ["classSlug", "level", "faction"] as const;
+export type FileDetail = (typeof FILE_DETAILS)[number];
+
+/** Where an alt's details came from: typed here or added from the player's own addon file, the newest record of
+ *  that file read into it (null if none ever was), and which details still hold the file's values, not the player's. */
+export interface AltProvenance { source: "manual" | "addon-file"; fileRecordAt: string | null; fileDetails: FileDetail[] }
+
+/** One of the player's characters and the plans it uses. A detail not known is null (no professions, an empty
+ *  list), never guessed. */
+export interface LocalAlt {
+  id: string;
+  name: string;
+  realm: string | null;
+  classSlug: TalentClassSlug | null;
+  faction: Faction | null;
+  level: number | null;
+  professions: string[];
+  notes: string;
+  planIds: string[];
+  provenance: AltProvenance;
+  updatedAt: string;
+}
 
 /** A plan the player asked to hear about. */
 export interface LocalWatch { id: string; planId: string; addedAt: string }
@@ -92,7 +125,10 @@ export type FormatError = "malformed" | "newer-version" | "over-limit" | "bad-re
 export type Validation = { ok: true; workspace: PlayerWorkspace } | { ok: false; error: FormatError };
 
 const PLAN_KEYS = ["id", "name", "classSlug", "code", "code2", "order", "order2", "notes", "updatedAt", "boundTo"] as const;
-const ALT_KEYS = ["id", "name", "planIds", "notes", "updatedAt"] as const;
+const ALT_KEYS = ["id", "name", "realm", "classSlug", "faction", "level", "professions", "notes", "planIds", "provenance", "updatedAt"] as const;
+/** An alt as version 1 kept it. */
+const V1_ALT_KEYS = ["id", "name", "planIds", "notes", "updatedAt"] as const;
+const PROVENANCE_KEYS = ["source", "fileRecordAt", "fileDetails"] as const;
 const WATCH_KEYS = ["id", "planId", "addedAt"] as const;
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 /** What a link carries after #plan= or &order=: an order token with anything else would break its plan's link. */
@@ -107,7 +143,7 @@ const isDate = (v: unknown) => typeof v === "string" && ISO.test(v) && Number.is
 const unique = (ids: string[]) => new Set(ids).size === ids.length;
 
 /** Plain text, as the account keeps it: control characters out (line breaks kept in notes), trimmed. */
-function clean(value: string, multiline: boolean): string {
+export function clean(value: string, multiline: boolean): string {
   const text = multiline ? value.replace(/\r\n?/g, "\n").replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, "") : value.replace(/[\u0000-\u001f\u007f]/g, "");
   return text.trim();
 }
@@ -134,35 +170,66 @@ function isPlan(v: unknown, owner: Owner): v is LocalPlan {
     && owner.kind === "account" && boundTo.userId === owner.userId;
 }
 
-/** An alt's fields this version uses. Version 1 alts have exactly these; version 2 alts have them and more, the
- *  rest kept as they are. */
-function isAlt(v: unknown, version: WorkspaceVersion): v is LocalAlt {
-  if (!isRecord(v) || !(version === 1 ? hasKeys(v, ALT_KEYS) : ALT_KEYS.every((k) => Object.hasOwn(v, k)))) return false;
-  return validId(v.id) && isName(v.name) && isNotes(v.notes) && isDate(v.updatedAt) && Array.isArray(v.planIds) && v.planIds.every(validId);
+const isRealm = (v: unknown) => v === null || (typeof v === "string" && v === clean(v, false) && length(v) >= 1 && length(v) <= WORKSPACE_LIMITS.realm);
+const isLevel = (v: unknown) => v === null || (typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= WORKSPACE_LIMITS.level);
+const isClass = (v: unknown) => v === null || (TALENT_CLASSES as readonly unknown[]).includes(v);
+const isProfessions = (v: unknown): v is string[] => Array.isArray(v) && v.every((p) => (ALT_PROFESSIONS as readonly unknown[]).includes(p)) && unique(v);
+
+/** How an alt came, and its file's details: a detail can hold a file's value only once a file was read into the alt,
+ *  and only while it has one. */
+function isProvenance(v: unknown, alt: Record<string, unknown>): boolean {
+  if (!isRecord(v) || !hasKeys(v, PROVENANCE_KEYS)) return false;
+  const { source, fileRecordAt, fileDetails } = v;
+  if ((source !== "manual" && source !== "addon-file") || (fileRecordAt !== null && !isDate(fileRecordAt))) return false;
+  if (!Array.isArray(fileDetails) || !fileDetails.every((d) => (FILE_DETAILS as readonly unknown[]).includes(d)) || !unique(fileDetails)) return false;
+  if ((source === "addon-file" || fileDetails.length > 0) && fileRecordAt === null) return false;
+  return fileDetails.every((d) => alt[d] !== null);
 }
+
+const isAlt = (v: unknown): v is LocalAlt => isRecord(v) && hasKeys(v, ALT_KEYS) && validId(v.id) && isName(v.name) && isRealm(v.realm)
+  && isClass(v.classSlug) && (v.faction === null || v.faction === "alliance" || v.faction === "horde") && isLevel(v.level)
+  && isProfessions(v.professions) && isNotes(v.notes) && Array.isArray(v.planIds) && v.planIds.every(validId)
+  && isProvenance(v.provenance, v) && isDate(v.updatedAt);
 const isWatch = (v: unknown): v is LocalWatch => isRecord(v) && hasKeys(v, WATCH_KEYS) && validId(v.id) && validId(v.planId) && isDate(v.addedAt);
 
-/** Is `value` a workspace this version reads (version 1 or 2) within the limits, every alt and watch naming a plan
- *  it holds? It comes back as it is, in its own version. */
+type V1Alt = Pick<LocalAlt, "id" | "name" | "planIds" | "notes" | "updatedAt">;
+const isV1Alt = (v: unknown): v is V1Alt => isRecord(v) && hasKeys(v, V1_ALT_KEYS) && validId(v.id) && isName(v.name) && isNotes(v.notes)
+  && isDate(v.updatedAt) && Array.isArray(v.planIds) && v.planIds.every(validId);
+
+/** A version 1 alt as version 2 keeps it: all it had, and the details version 2 added, not known. */
+const upgradeAlt = ({ id, name, planIds, notes, updatedAt }: V1Alt): LocalAlt => ({
+  id, name, realm: null, classSlug: null, faction: null, level: null, professions: [], notes, planIds,
+  provenance: { source: "manual", fileRecordAt: null, fileDetails: [] }, updatedAt,
+});
+
+/**
+ * Is `value` a workspace this version reads, within the limits, every alt and watch naming a plan it holds? That is
+ * version 2, or version 1, which comes back as version 2 (upgradeAlt). Each version's alts have exactly that
+ * version's fields, so a version 1 workspace never carries version 2's.
+ */
 export function validateWorkspace(value: unknown): Validation {
   const refuse = (error: FormatError): Validation => ({ ok: false, error });
   if (!isRecord(value) || value.format !== WORKSPACE_FORMAT) return refuse("malformed");
   // A newer version may change everything after its number; say so rather than guess.
   if (typeof value.version === "number" && Number.isInteger(value.version) && value.version > NEWEST_VERSION) return refuse("newer-version");
   const { version, owner, plans, alts, watches } = value;
-  if ((version !== 1 && version !== 2) || !hasKeys(value, ["format", "version", "owner", "plans", "alts", "watches"]) || !isOwner(owner)) return refuse("malformed");
+  if ((version !== 1 && version !== WORKSPACE_VERSION) || !hasKeys(value, ["format", "version", "owner", "plans", "alts", "watches"]) || !isOwner(owner)) return refuse("malformed");
   if (!Array.isArray(plans) || !Array.isArray(alts) || !Array.isArray(watches)) return refuse("malformed");
   // Counts before contents, so an overlong list is refused before each entry is checked.
   if (plans.length > WORKSPACE_LIMITS.plans || alts.length > WORKSPACE_LIMITS.alts) return refuse("over-limit");
-  if (!plans.every((p) => isPlan(p, owner)) || !alts.every((a) => isAlt(a, version)) || !watches.every(isWatch)) return refuse("malformed");
-  if (![plans, alts, watches].every((list) => unique(list.map((item) => item.id)))) return refuse("malformed");
-  if (alts.some((a) => a.planIds.length > WORKSPACE_LIMITS.altPlans)) return refuse("over-limit");
+  if (!plans.every((p) => isPlan(p, owner)) || !alts.every(version === 1 ? isV1Alt : isAlt) || !watches.every(isWatch)) return refuse("malformed");
+  const altList = alts as V1Alt[];
+  if (![plans, altList, watches].every((list) => unique(list.map((item) => item.id)))) return refuse("malformed");
+  if (altList.some((a) => a.planIds.length > WORKSPACE_LIMITS.altPlans)) return refuse("over-limit");
   const planIds = new Set(plans.map((p) => p.id));
   const named = (id: string) => planIds.has(id);
-  if (!alts.every((a) => unique(a.planIds) && a.planIds.every(named))) return refuse("bad-reference");
+  if (!altList.every((a) => unique(a.planIds) && a.planIds.every(named))) return refuse("bad-reference");
   if (!watches.every((w) => named(w.planId)) || !unique(watches.map((w) => w.planId))) return refuse("bad-reference");
+  // Measured as written, so version 1 within the limit stays readable after its upgrade adds a few bytes an alt;
+  // the next change is measured as version 2.
   if (bytes(JSON.stringify(value)) > WORKSPACE_LIMITS.bytes) return refuse("over-limit");
-  return { ok: true, workspace: value as unknown as PlayerWorkspace };
+  const workspace = version === 1 ? { ...value, version: WORKSPACE_VERSION, alts: altList.map(upgradeAlt) } : value;
+  return { ok: true, workspace: workspace as unknown as PlayerWorkspace };
 }
 
 // Reading and writing a bucket.
@@ -239,8 +306,9 @@ function store(storage: DeviceStorage | null, workspace: PlayerWorkspace): Write
   }
 }
 
-/** The owner's bucket as stored now, `change` made to it, then stored. Nothing is stored unless every step works. */
-function update(storage: DeviceStorage | null, owner: Owner, change: (workspace: PlayerWorkspace) => PlayerWorkspace | Failure): WriteResult {
+/** The owner's bucket as stored now, `change` made to it, then stored. Nothing is stored unless every step works.
+ *  The alt planner (lib/alt-workspace.ts, lib/alt-import.ts) changes alts through it too. */
+export function update(storage: DeviceStorage | null, owner: Owner, change: (workspace: PlayerWorkspace) => PlayerWorkspace | Failure): WriteResult {
   const read = readWorkspace(storage, owner);
   if (!read.ok) return failure(read.error);
   const next = change(read.workspace);
@@ -384,7 +452,7 @@ export function bindTransferred(storage: DeviceStorage | null, sent: TransferReq
 
 // Backups.
 
-export type ImportError = FormatError | "too-large" | "other-owner" | "mixed-versions";
+export type ImportError = FormatError | "too-large" | "other-owner";
 
 const IMPORT_MESSAGES: Record<ImportError, string> = {
   "too-large": "That file is over 1 MiB, larger than a backup of a device's plans can be. Nothing was changed.",
@@ -393,7 +461,6 @@ const IMPORT_MESSAGES: Record<ImportError, string> = {
   "over-limit": `Restoring that backup would pass what this device keeps: ${WORKSPACE_LIMITS.plans} plans and ${WORKSPACE_LIMITS.alts} alts, all within 1 MiB. Nothing was changed.`,
   "bad-reference": "That backup is damaged: something in it names a plan it does not hold. Nothing was changed.",
   "other-owner": "That backup belongs to a different account. Nothing was changed.",
-  "mixed-versions": "That backup and this device keep their alts in two different formats, which this version of Everloot cannot put together. Nothing was changed.",
 };
 
 /** For a page that checks a file's size before reading it. */
@@ -476,11 +543,9 @@ export function previewImport(text: string, current: PlayerWorkspace): PreviewRe
   if (!checked.ok) return refuse(checked.error);
   const backup = checked.workspace;
   if (!sameOwner(backup.owner, current.owner)) return refuse("other-owner", ownerRefusal(backup.owner, current.owner));
-  // The restored bucket is in the newer of the two versions, so no version 2 field is lost. This version cannot give
-  // a version 1 alt version 2's fields, so it does not put alts of the two versions together.
+  // The restored bucket is in the newer of the two versions, so no version 2 field is lost. Both were read as
+  // version 2 (a version 1 alt with its new details unknown), so their alts go together.
   const version = backup.version > current.version ? backup.version : current.version;
-  const older = current.version < version ? current : backup.version < version ? backup : null;
-  if (older && older.alts.length > 0) return refuse("mixed-versions");
   // A restore never takes a binding away: this device's binding stays on the copy the backup brings back.
   const plans = merge(current.plans, backup.plans, (p) => fields(p, PLAN_KEYS), (p) => p.updatedAt, (mine, theirs) => ({ ...theirs, boundTo: mine.boundTo ?? theirs.boundTo }));
   const alts = merge(current.alts, backup.alts, whole, (a) => a.updatedAt);

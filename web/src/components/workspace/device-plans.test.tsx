@@ -3,7 +3,7 @@ import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import AccountControls, { ACCOUNT_CHANGED_EVENT } from "@/components/AccountControls";
-import { NEWEST_VERSION, bucketKey, type LocalPlan, type Owner, type PlayerWorkspace } from "@/lib/player-workspace";
+import { NEWEST_VERSION, WORKSPACE_VERSION, bucketKey, type LocalPlan, type Owner, type PlayerWorkspace } from "@/lib/player-workspace";
 import { FIXTURE_PLAN_ID, V2_ALT_TEXT, V2_BUCKET_TEXT } from "@/lib/player-workspace.fixture";
 import DevicePlans from "./DevicePlans";
 import LocalPlanSave from "./LocalPlanSave";
@@ -70,7 +70,7 @@ const plan = (over: Partial<LocalPlan> = {}): LocalPlan => ({
   id: id(1), name: "Frost", classSlug: "mage", code: MAGE, code2: null, order: PLANNED, order2: null,
   notes: "", updatedAt: "2026-10-20T12:00:00.000Z", boundTo: null, ...over,
 });
-const doc = (owner: Owner, plans: LocalPlan[]): PlayerWorkspace => ({ format: "everloot.player-workspace", version: 1, owner, plans, alts: [], watches: [] });
+const doc = (owner: Owner, plans: LocalPlan[]): PlayerWorkspace => ({ format: "everloot.player-workspace", version: WORKSPACE_VERSION, owner, plans, alts: [], watches: [] });
 const seed = (owner: Owner, plans: LocalPlan[]) => localStorage.setItem(bucketKey(owner), JSON.stringify(doc(owner, plans)));
 const stored = (owner: Owner) => JSON.parse(localStorage.getItem(bucketKey(owner)) ?? "null") as PlayerWorkspace | null;
 
