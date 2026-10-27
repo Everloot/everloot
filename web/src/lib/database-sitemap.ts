@@ -82,7 +82,7 @@ export function instancePaths(seen: ZoneSightings & { unreachable?: boolean }): 
 }
 
 export function databaseUnavailable(): Response {
-  return Response.json({ error: "Database unavailable" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  return Response.json({ error: "Database unavailable" }, { status: 503, headers: { "Cache-Control": "no-store", "Vercel-CDN-Cache-Control": "no-store", "CDN-Cache-Control": "no-store" } });
 }
 
 /** Pages flip to indexed as uploads roll up; crawlers do not need the list fresher than hourly. */
