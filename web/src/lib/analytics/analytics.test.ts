@@ -75,7 +75,7 @@ describe("script loading", () => {
     expect(scripts).toHaveLength(1);
     expect(t).not.toHaveBeenCalled();
     scripts[0].dispatchEvent(new Event("load"));
-    expect(t).toHaveBeenCalledExactlyOnceWith({ hash: METRICOOL });
+    expect(t).toHaveBeenCalledExactlyOnceWith({ hash: METRICOOL, u: window.location.href });
   });
 
   it("does not send a visit if consent is withdrawn before Metricool finishes loading", () => {
@@ -277,5 +277,107 @@ describe("withdrawal cleanup", () => {
     } finally {
       removeItem.mockRestore();
     }
+  });
+});
+
+describe("a plan in the address never reaches an analytics tool", () => {
+  // The calculator keeps a plan in the page's fragment (#plan=…&plan2=…&order=…&order2=…), and a link from an alt opens
+  // it there: each tool gets the page's URL without it.
+  const CODE = "EL1-mage-1482-1.60.1.70450-OTAwMDE6Miw5MDAwMjoxOjEsOTAwMDQ6Mg";
+  const PLAN = `#plan=${CODE}&plan2=${CODE}&order=O1p-AABCC&order2=O1g-A`;
+  const at = (path: string) => window.history.replaceState(null, "", path);
+  const dataLayer = () => ((window as Window & { dataLayer?: ArrayLike<unknown>[] }).dataLayer ?? []).map((args) => Array.from(args));
+  afterEach(() => {
+    at("/");
+    delete (window as Window & { dataLayer?: unknown }).dataLayer;
+  });
+
+  it("PostHog: every URL an event carries loses its fragment, in its own properties and the person's, nested ones too", () => {
+    const page = `https://everloot.app/tools/talents/mage?q=x${PLAN}`;
+    const event = scrubEvent({
+      properties: {
+        $current_url: page, $initial_current_url: page, $session_entry_url: page, $referrer: page, $prev_pageview_url: page,
+        $session_entry_referrer: `https://example.com/x${PLAN}`, $initial_referrer_info: { $referrer: page }, $urls: [page],
+        $pathname: "/tools/talents/mage", title: "Mage talent calculator",
+      },
+      $set: { $current_url: page },
+      $set_once: { $initial_current_url: page, $initial_referrer: page },
+    }, "https://everloot.app");
+    const sent = JSON.stringify(event);
+    expect(sent).not.toContain(CODE);
+    expect(sent).not.toContain("#");
+    expect(event.properties.$current_url).toBe("https://everloot.app/tools/talents/mage");
+    expect(event.properties.$prev_pageview_url).toBe("https://everloot.app/tools/talents/mage?q=x");
+    expect(event.properties.$session_entry_referrer).toBe("https://example.com/x");
+    expect(event.properties.$pathname).toBe("/tools/talents/mage");
+    expect(event.properties.title).toBe("Mage talent calculator");
+  });
+
+  it("PostHog: that scrubber is the one before_send runs on every event", async () => {
+    loadConsented({ posthogKey: PH, posthogHost: "https://us.i.posthog.com" }, window, document);
+    await vi.waitFor(() => expect(posthogMock.init).toHaveBeenCalledOnce());
+    const before = posthogMock.init.mock.calls[0][1].before_send;
+    const event = before({ properties: { $current_url: `${window.location.origin}/tools/talents/mage${PLAN}` }, $set_once: { $initial_current_url: `${window.location.origin}/b${PLAN}` } });
+    expect(event.properties.$current_url).toBe(`${window.location.origin}/tools/talents/mage`);
+    expect(event.$set_once.$initial_current_url).toBe(`${window.location.origin}/b`);
+  });
+
+  // The production Google tag measures every event at the address it has then, and leaves the fragment out itself:
+  // run in Chrome with it, a page opened with a plan and a client move to one both sent no fragment.
+  it("Google Analytics: a page opened with a plan gives the tag nothing from its address, so no fragment", () => {
+    at(`/tools/talents/mage${PLAN}`);
+    loadConsented({ gaId: GA }, window, document);
+    expect(dataLayer().find((args) => args[0] === "config")).toEqual(["config", GA]);
+    expect(JSON.stringify(dataLayer())).not.toContain(CODE);
+  });
+
+  it("Google Analytics: entering with a fragment does not pin the page location, so later events count where they happen (reported case)", () => {
+    at("/start#chapter");
+    loadConsented({ gaId: GA }, window, document);
+    expect(dataLayer().filter((args) => args[0] === "config" || args[0] === "set")).toEqual([["config", GA]]);
+  });
+
+  /** What tracker.metricool.com/resources/be.js does: set `u` from the address bar and `ref` from the referrer, then
+   *  send every field it holds. */
+  function metricool(): Record<string, string>[] {
+    const sent: string[] = [];
+    (globalThis as { metricoolSent?: string[] }).metricoolSent = sent;
+    const t = new Function("a", "a.u = document.location.href; a.bw = 1280; document.referrer && (a.ref = document.referrer); var b = []; for (var c in a) if (a.hasOwnProperty(c)) b.push(encodeURIComponent(c) + '=' + encodeURIComponent(a[c])); globalThis.metricoolSent.push(b.join('&'));");
+    window.beTracker = { t: t as (options: { hash: string }) => void };
+    loadConsented({ metricoolHash: METRICOOL }, window, document);
+    document.querySelector('script[src="https://tracker.metricool.com/resources/be.js"]')!.dispatchEvent(new Event("load"));
+    delete (globalThis as { metricoolSent?: string[] }).metricoolSent;
+    return sent.map((query) => Object.fromEntries(new URLSearchParams(query)));
+  }
+
+  it("Metricool: its tracker reads the address bar itself, and still sends the page URL without the fragment or search terms", () => {
+    at(`/tools/talents/mage?q=thunderfury&tab=2${PLAN}`);
+    const [visit, ...more] = metricool();
+    expect(more).toEqual([]);
+    expect(visit.u).toBe(`${window.location.origin}/tools/talents/mage?tab=2`);
+    expect(JSON.stringify(visit)).not.toContain(CODE);
+    expect(JSON.stringify(visit)).not.toContain("thunderfury");
+  });
+
+  it("Metricool: a referrer on this site goes without its search terms; another site's is the tracker's own", () => {
+    at("/tools/talents/mage");
+    const referrer = (value: string) => Object.defineProperty(document, "referrer", { value, configurable: true });
+    try {
+      referrer(`${window.location.origin}/search?q=thunderfury&scope=items`);
+      expect(metricool()[0].ref).toBe(`${window.location.origin}/search?scope=items`);
+      document.head.innerHTML = "";
+      referrer("https://www.google.com/");
+      expect(metricool()[0].ref).toBe("https://www.google.com/");
+    } finally {
+      delete (document as { referrer?: string }).referrer;
+    }
+  });
+
+  it("Cloudflare: the beacon is given no page URL here (it reads the address itself, and drops fragments and queries)", () => {
+    at(`/tools/talents/mage${PLAN}`);
+    loadCookieless({ cfBeaconToken: CF }, {}, document);
+    const script = document.getElementById("everloot-cf-beacon")!;
+    expect(script.getAttribute("data-cf-beacon")).toBe(JSON.stringify({ token: CF }));
+    expect(script.outerHTML).not.toContain(CODE);
   });
 });

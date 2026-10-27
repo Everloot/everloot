@@ -125,3 +125,24 @@ test("Plans on this device loads no ads, analytics or consent banner, and a move
   const host = await mount(<OptionalScripts><span>scripts</span></OptionalScripts>);
   expect(host.textContent).toBe("");
 });
+
+test("Alts on this device loads no ads, analytics or consent banner, and a move to or from a public page reloads first", async () => {
+  for (const path of ["/tools/alts", "/beta/tools/alts"]) {
+    at(path, path);
+    const host = await mount(<OptionalScripts><span>scripts</span></OptionalScripts>);
+    expect(host.textContent, path).toBe("");
+    act(() => root?.unmount());
+  }
+  for (const [loadedAt, now] of [["/tools", "/tools/alts"], ["/tools/alts", "/tools/talents/mage"]] as const) {
+    at(loadedAt, now);
+    await mount(<DocumentBoundary><Page /></DocumentBoundary>);
+    act(() => root?.unmount());
+  }
+  expect(mounted).not.toHaveBeenCalled();
+  expect(reload).toHaveBeenCalledTimes(2);
+  // Between the two device pages there is no line to cross.
+  at("/tools/builds", "/tools/alts");
+  await mount(<DocumentBoundary><Page /></DocumentBoundary>);
+  expect(mounted).toHaveBeenCalledTimes(1);
+  expect(reload).toHaveBeenCalledTimes(2);
+});

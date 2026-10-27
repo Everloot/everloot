@@ -49,6 +49,14 @@ test("the sitemap lists /tools", async () => {
   expect((await sitemap()).map((e) => new URL(e.url).pathname)).toContain("/tools");
 });
 
+test("Alts on this device is listed on /tools with its line, and the sitemap leaves it out too", async () => {
+  const { default: ToolsPage } = await import("./page");
+  const html = renderToStaticMarkup(<ToolsPage />);
+  expect(html).toContain('href="/tools/alts"');
+  expect(html).toContain(TOOL_LINES["/tools/alts"]);
+  expect((await sitemap()).map((e) => new URL(e.url).pathname)).not.toContain("/tools/alts");
+});
+
 test("Plans on this device is listed on /tools, and the sitemap leaves the private list out", async () => {
   const { default: ToolsPage } = await import("./page");
   const html = renderToStaticMarkup(<ToolsPage />);

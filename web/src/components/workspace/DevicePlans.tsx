@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { className } from "@/components/builds/describe";
 import { Card, CopyButton, Field, SectionHeading } from "@/components/ui";
+import { restoreLines } from "@/lib/alt-workspace";
 import {
   BACKUP_TOO_LARGE, WORKSPACE_LIMITS, applyImport, bucketKey, copyPlan, deletePlan, deviceStorage, editPlan, exportBackup, storedCounts,
   orderState, previewImport, readPlanText, readWorkspace, sameOwner, savePlan,
-  type Failure, type ImportPreview, type LocalPlan, type Owner, type PlanText, type PlayerWorkspace, type ReadResult,
+  type Failure, type ImportPreview, type LocalPlan, type Owner, type PlanText, type ReadResult,
 } from "@/lib/player-workspace";
 import { planHash, replacePlanHash } from "@/lib/talents/import";
 import { useWorkspaceOwner } from "./LocalPlanSave";
@@ -99,7 +100,7 @@ export default function DevicePlans() {
 
 function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | null; onSentDone: () => void }) {
   const [read, setRead] = useState<ReadResult | null>(null);
-  const [message, setMessage] = useState<{ text: string; alert: boolean } | null>(null);
+  const [message, setMessage] = useState<{ text: string; alert: boolean; inUse?: boolean } | null>(null);
   const reload = useCallback(() => setRead(readWorkspace(deviceStorage(), owner)), [owner]);
   useEffect(() => {
     reload();
@@ -122,7 +123,7 @@ function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | nu
   /** Shows what a change did; the list is read back from storage, so it never shows a save that did not happen. */
   const after = (result: { ok: true } | Failure, done: string) => {
     reload();
-    setMessage(result.ok ? { text: done, alert: false } : { text: result.message, alert: true });
+    setMessage(result.ok ? { text: done, alert: false } : { text: result.message, alert: true, inUse: result.error === "referenced" });
     return result.ok;
   };
   const storage = deviceStorage();
@@ -138,7 +139,12 @@ function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | nu
       <section aria-labelledby="device-plans">
         <SectionHeading id="device-plans" note={`${plans.length} of ${WORKSPACE_LIMITS.plans}, newest first. ${UNCHECKED}`}>Your plans</SectionHeading>
         <p role="status" className="mb-3 text-sm text-fg-2 empty:hidden">{message && !message.alert ? message.text : ""}</p>
-        {message?.alert && <p role="alert" className="mb-3 text-sm text-danger">{message.text}</p>}
+        {message?.alert && (
+          <p role="alert" className="mb-3 text-sm text-danger">
+            {message.text}
+            {message.inUse && <> See <a href="/tools/alts" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Alts on this device</a> to let go of it there first.</>}
+          </p>
+        )}
         {plans.length === 0 ? (
           // EmptyState's meter counts agreeing installs, which a device's own plans have nothing to do with.
           <Card>
@@ -358,22 +364,10 @@ function previewLine(p: ImportPreview): string {
   return `Restoring ${said}.${kept}`;
 }
 
-/** Alt by alt, what a restore does to this device's alts, which a backup holds as well as the plans: each it adds,
- *  and each it replaces with the backup's newer copy, saying whether that changes its notes. */
-function restoreLines(current: PlayerWorkspace, preview: ImportPreview): string[] {
-  const here = new Map(current.alts.map((a) => [a.id, a]));
-  return preview.result.alts.flatMap((alt) => {
-    const mine = here.get(alt.id);
-    if (!mine) return [`Adds the alt ${alt.name}.`];
-    if (JSON.stringify(mine) === JSON.stringify(alt)) return [];
-    return [`Replaces the alt ${mine.name} with the backup's newer copy${mine.notes === alt.notes ? ". Its notes stay as they are." : ", which changes its notes."}`];
-  });
-}
-
 /** Download a backup of this bucket, or restore one after seeing what it would do. */
 function Backup({ owner, onRestored }: { owner: Owner; onRestored: (result: { ok: true } | Failure, done: string) => void }) {
   const [preview, setPreview] = useState<ImportPreview | null>(null);
-  // Alt by alt, what the restore adds or replaces: a backup holds the alts too, notes and all.
+  // Alt by alt, what the restore adds or replaces, as Alts on this device shows it: a backup holds the alts too.
   const [altLines, setAltLines] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
@@ -426,7 +420,8 @@ function Backup({ owner, onRestored }: { owner: Owner; onRestored: (result: { ok
       <SectionHeading id="device-plans-backup" note="A backup holds the plans this page shows. It restores only here, never into another account's plans or the signed-out ones.">Back up and restore</SectionHeading>
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" className="btn text-sm" onClick={download}>Download backup</button>
-        <label className="btn cursor-pointer text-sm">Restore from a backup
+        {/* The input inside is hidden, so the label shows the site's focus ring while it has focus. */}
+        <label className="btn cursor-pointer text-sm focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent">Restore from a backup
           <input aria-label="Choose a backup file" type="file" accept=".json,application/json" className="sr-only" disabled={reading}
             onChange={(e) => { const f = e.target.files?.[0]; if (f) void choose(f); e.target.value = ""; }} />
         </label>

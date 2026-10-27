@@ -3,7 +3,7 @@ import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import AccountControls, { ACCOUNT_CHANGED_EVENT } from "@/components/AccountControls";
-import { NEWEST_VERSION, bucketKey, type LocalPlan, type Owner, type PlayerWorkspace } from "@/lib/player-workspace";
+import { NEWEST_VERSION, WORKSPACE_VERSION, bucketKey, type LocalPlan, type Owner, type PlayerWorkspace } from "@/lib/player-workspace";
 import { FIXTURE_PLAN_ID, V2_ALT_TEXT, V2_BUCKET_TEXT } from "@/lib/player-workspace.fixture";
 import DevicePlans from "./DevicePlans";
 import LocalPlanSave from "./LocalPlanSave";
@@ -70,7 +70,7 @@ const plan = (over: Partial<LocalPlan> = {}): LocalPlan => ({
   id: id(1), name: "Frost", classSlug: "mage", code: MAGE, code2: null, order: PLANNED, order2: null,
   notes: "", updatedAt: "2026-10-20T12:00:00.000Z", boundTo: null, ...over,
 });
-const doc = (owner: Owner, plans: LocalPlan[]): PlayerWorkspace => ({ format: "everloot.player-workspace", version: 1, owner, plans, alts: [], watches: [] });
+const doc = (owner: Owner, plans: LocalPlan[]): PlayerWorkspace => ({ format: "everloot.player-workspace", version: WORKSPACE_VERSION, owner, plans, alts: [], watches: [] });
 const seed = (owner: Owner, plans: LocalPlan[]) => localStorage.setItem(bucketKey(owner), JSON.stringify(doc(owner, plans)));
 const stored = (owner: Owner) => JSON.parse(localStorage.getItem(bucketKey(owner)) ?? "null") as PlayerWorkspace | null;
 
@@ -425,13 +425,13 @@ test("a restore that replaces an alt's notes names the alt and says its notes ch
   backup.alts[0] = { ...backup.alts[0], notes: "Backup notes replace the local ones", updatedAt: "2026-10-27T12:00:00.000Z" };
   await render();
   await choose(new File([JSON.stringify(backup)], "backup.json", { type: "application/json" }));
-  expect(restoreGroup()?.textContent).toContain("Replaces the alt Thrall with the backup's newer copy, which changes its notes.");
+  expect(restoreGroup()?.textContent).toContain("Replaces Thrall (Moon Guard) with the backup's newer copy, which changes its notes.");
   expect(stored(ANON)?.alts[0].notes).toBe("Bank alt.\nTuesdays.");
   await click(button(/^Restore$/, restoreGroup()!));
   expect(stored(ANON)?.alts[0].notes).toBe("Backup notes replace the local ones");
 });
 
-test("the restore preview names each alt it adds, and says when an alt it replaces keeps its notes", async () => {
+test("the restore preview names each alt it adds, and what a replacement that keeps the notes changes", async () => {
   localStorage.setItem(bucketKey(ANON), V2_BUCKET_TEXT);
   const alt = JSON.parse(V2_ALT_TEXT);
   const backup = { ...JSON.parse(V2_BUCKET_TEXT), alts: [
@@ -441,11 +441,36 @@ test("the restore preview names each alt it adds, and says when an alt it replac
   await render();
   await choose(new File([JSON.stringify(backup)], "backup.json", { type: "application/json" }));
   const copy = restoreGroup()?.textContent;
-  expect(copy).toContain("Adds the alt Jaina.");
-  expect(copy).toContain("Replaces the alt Thrall with the backup's newer copy. Its notes stay as they are.");
+  expect(copy).toContain("Adds Jaina (Moon Guard).");
+  expect(copy).toContain("Replaces Thrall (Moon Guard) with the backup's newer copy, which changes its level.");
   // An alt the backup holds as it is here is not named.
   await choose(new File([V2_BUCKET_TEXT], "backup.json", { type: "application/json" }));
   expect(restoreGroup()?.textContent).not.toContain("Thrall");
+});
+
+test("the restore preview names each alt it adds or replaces and what that changes, notes included (reported case)", async () => {
+  localStorage.setItem(bucketKey(ANON), V2_BUCKET_TEXT);
+  const alt = JSON.parse(V2_ALT_TEXT);
+  const backup = { ...JSON.parse(V2_BUCKET_TEXT), alts: [
+    { ...alt, notes: "older backup private notes", updatedAt: "2026-10-27T12:00:00.000Z" },
+    { ...alt, id: id(501), name: "Jaina", realm: null, classSlug: null, faction: null, level: null, professions: [], planIds: [],
+      provenance: { source: "manual", fileRecordAt: null, fileDetails: [] } },
+  ] };
+  await render();
+  await choose(new File([JSON.stringify(backup)], "backup.json", { type: "application/json" }));
+  const preview = container.querySelector<HTMLElement>('[aria-label="What the restore would do"]')!;
+  const copy = preview.textContent;
+  expect(copy).toContain("Adds Jaina.");
+  expect(copy).toContain("Replaces Thrall (Moon Guard) with the backup's newer copy, which changes its notes.");
+  await click(button(/^Restore$/, preview));
+  expect(JSON.parse(localStorage.getItem(bucketKey(ANON))!).alts[0].notes).toBe("older backup private notes");
+  expect(copy).toMatch(/Thrall.*notes|notes.*Thrall/i);
+});
+
+test("the backup picker shows the site's focus ring while the hidden input inside it has focus", async () => {
+  await render();
+  const control = container.querySelector('input[type="file"][aria-label="Choose a backup file"]')?.closest("label");
+  expect(control?.className.split(" ")).toEqual(expect.arrayContaining(["focus-within:outline", "focus-within:outline-2", "focus-within:outline-offset-2", "focus-within:outline-accent"]));
 });
 
 test("a backup from another account is refused at the preview, and nothing changes", async () => {
@@ -489,6 +514,17 @@ test("damaged stored plans are kept: their text can be downloaded, nothing is sa
   await click(button(/^Clear for good$/));
   expect(localStorage.getItem(bucketKey(ANON))).toBeNull();
   expect(field("Talent link or share code")).not.toBeNull();
+});
+
+test("a plan an alt uses is not deleted, and the refusal links to the alts that use it", async () => {
+  localStorage.setItem(bucketKey(ANON), V2_BUCKET_TEXT);
+  await render();
+  await click(button(/^Delete$/, item("Frost")!));
+  await click(button(/^Delete for good$/, item("Frost")!));
+  expect(alerts()).toContain("An alt or a watch on this device uses that plan");
+  const link = [...container.querySelectorAll<HTMLAnchorElement>('[role="alert"] a')].find((a) => a.getAttribute("href") === "/tools/alts");
+  expect(link?.textContent).toBe("Alts on this device");
+  expect(localStorage.getItem(bucketKey(ANON))).toBe(V2_BUCKET_TEXT);
 });
 
 const clearGroup = () => container.querySelector<HTMLElement>('[role="group"][aria-label="Clear what is stored"]');
