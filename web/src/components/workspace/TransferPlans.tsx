@@ -12,7 +12,8 @@ import {
   type Failure, type LocalAlt, type LocalPlan, type Owner, type PlayerWorkspace, type Standing, type TransfersRead,
 } from "@/lib/player-workspace";
 import {
-  ACCOUNT_MISMATCH, BUILDS_PER_ACCOUNT, CHARACTERS_PER_ACCOUNT, EXPECTED_OWNER_HEADER, LIMITS, ORDERS_UNAVAILABLE, parseCharacterInput, validId,
+  ACCOUNT_MISMATCH, BUILDS_PER_ACCOUNT, CHARACTERS_PER_ACCOUNT, EXPECTED_OWNER_HEADER, LIMITS, ORDERS_UNAVAILABLE, ORDERS_UNAVAILABLE_CODE,
+  parseCharacterInput, validId,
   type AccountBuilds,
 } from "@/lib/saved-builds";
 import { useWorkspaceOwner } from "./LocalPlanSave";
@@ -158,7 +159,7 @@ const NO_CHOICE: Choice = { sharing: "", character: "" };
 const altOf = (character: string) => (character.startsWith("alt:") ? character.slice(4) : null);
 
 /** A write's answer: what the site sent back, or why it did not save, sorted by whether anything may have been written. */
-type Answer = { ok: true; body: Record<string, unknown> }
+type Answer = { ok: true; status: number; body: Record<string, unknown> }
   | { ok: false; why: "stopped" | "changed" | "orders" | "signed-out" | "refused" | "server" | "unreachable"; message: string };
 /** Refused before anything was written: a key first used for such a save is let go. */
 const definite = (why: string) => why === "changed" || why === "orders" || why === "signed-out" || why === "refused";
@@ -365,10 +366,10 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
       return { ok: false, why: "unreachable", message: "" };
     }
     const result = await response.json().catch(() => ({})) as Record<string, unknown>;
-    if (response.ok) return { ok: true, body: result };
+    if (response.ok) return { ok: true, status: response.status, body: result };
     if (response.status === 409 && result.code === ACCOUNT_MISMATCH) return { ok: false, why: "changed", message: "" };
     // The site's code for it, or, from a site without one, its words.
-    if (response.status === 409 && (result.code === "orders_unavailable" || result.error === ORDERS_UNAVAILABLE)) return { ok: false, why: "orders", message: "" };
+    if (response.status === 409 && (result.code === ORDERS_UNAVAILABLE_CODE || result.error === ORDERS_UNAVAILABLE)) return { ok: false, why: "orders", message: "" };
     if (response.status === 401) return { ok: false, why: "signed-out", message: "" };
     const message = typeof result.error === "string" ? result.error : "That did not work.";
     return { ok: false, why: response.status >= 500 ? "server" : "refused", message };
@@ -489,7 +490,8 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
           }
           const build = (answer.body.build ?? {}) as { name?: string; notes?: string | null; code?: string; code2?: string | null; order?: string | null; order2?: string | null };
           const kept = planContent(plan);
-          const theirs = answer.body.replayed === true
+          // The route answers a new build 201, and the same save sent again 200, with the build it made then.
+          const theirs = answer.status === 200 || answer.body.replayed === true
             ? planContent({ name: build.name ?? "", notes: build.notes ?? "", code: build.code ?? "", code2: build.code2 ?? null, order: build.order, order2: build.order2 })
             : kept;
           await withWorkspaceLock(() => receiptSaved(deviceStorage(), owner, plan.id, sent.key, theirs));

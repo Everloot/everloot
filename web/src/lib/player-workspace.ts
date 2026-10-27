@@ -1,4 +1,4 @@
-import { LIMITS, codeClass, validId } from "./saved-builds";
+import { LIMITS, TRANSFER_KEY_PATTERN, codeClass, validId } from "./saved-builds";
 import { TALENT_CLASSES, type TalentClassSlug } from "./talents/catalogs";
 import { readPlanHash } from "./talents/import";
 import { decodeBuild, decodeOrder, type OrderError, type OrderOrigin } from "./talents/share";
@@ -687,8 +687,6 @@ export function settleTransferred(storage: DeviceStorage | null, owner: Owner, p
 const TRANSFERS = "everloot:transfers";
 const TRANSFERS_FORMAT = "everloot.transfers";
 export const TRANSFERS_KEPT = 1000;
-/** A transfer key as the site takes it: opaque, 16 to 64 URL-safe characters. */
-const TRANSFER_KEY = /^[A-Za-z0-9_-]{16,64}$/;
 
 /** A plan sent to an account: `sending` until the site says it has it, then `saved`, with what it has (planContent). */
 export interface Receipt { planId: string; userId: string; key: string; state: "sending" | "saved"; content: string | null; at: string }
@@ -700,7 +698,7 @@ export type TransfersRead = { ok: true; transfers: Transfers; raw: string | null
 const TRANSFERS_UNREAD = "This browser's record of the plans it sent to accounts could not be read, so nothing is sent from here: a plan could be saved twice, or to a second account.";
 
 const isReceipt = (v: unknown): v is Receipt => isRecord(v) && hasKeys(v, ["planId", "userId", "key", "state", "content", "at"])
-  && validId(v.planId) && validId(v.userId) && typeof v.key === "string" && TRANSFER_KEY.test(v.key)
+  && validId(v.planId) && validId(v.userId) && typeof v.key === "string" && TRANSFER_KEY_PATTERN.test(v.key)
   && (v.state === "sending" || v.state === "saved") && (v.content === null || (typeof v.content === "string" && /^[0-9a-f]{8}$/.test(v.content)))
   && isDate(v.at);
 const isMadeCharacter = (v: unknown): v is MadeCharacter => isRecord(v) && hasKeys(v, ["altId", "userId", "characterId", "at"])

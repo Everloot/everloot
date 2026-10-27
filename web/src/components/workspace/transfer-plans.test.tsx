@@ -100,12 +100,13 @@ function answer(url: string, init?: RequestInit): Response {
     if (ordersMissing && ("order" in body || "order2" in body)) {
       return Response.json(ordersMessageOnly ? { error: ORDERS_UNAVAILABLE } : { error: ORDERS_UNAVAILABLE, code: "orders_unavailable" }, { status: 409 });
     }
-    // The transfer key, as the site takes it: on a new build only, and a key used before answers with what it made.
+    // The transfer key, as the route takes it: on a new build only, and a key used before is answered as an update is,
+    // a 200 with the build it made and nothing more.
     const key = body.transferKey;
     if (key !== undefined) {
       if (body.id !== undefined || typeof key !== "string" || !/^[A-Za-z0-9_-]{16,64}$/.test(key)) return Response.json({ error: "That transfer key is not valid." }, { status: 400 });
       const earlier = (keyed[who] ??= {})[key];
-      if (earlier) return Response.json({ build: earlier, replayed: true });
+      if (earlier) return Response.json({ build: earlier });
     }
     const refused = refuse[String(body.name)];
     if (refused) return refused;
