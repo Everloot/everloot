@@ -63,7 +63,7 @@ test("every route that reads the guides carries them in its bundle", () => {
   // The guide index reads kb/guides on each request, a guide page when it is rebuilt and the sitemap on each request.
   // The class hubs and the guide cards are drawn while the site builds, so they need no copy.
   const carries = (route: string) => Object.keys(includes).filter((key) => picomatch(key, { dot: true, contains: true })(route)).flatMap((key) => includes[key]);
-  for (const route of ["/guides/route", "/guides/[slug]/route", "/sitemap.xml/route"]) expect(carries(route), route).toContain("../kb/guides/*.md");
+  for (const route of ["/guides/route", "/guides/[slug]/route", "/guides/feed.xml/route", "/classes/[class]/feed.xml/route", "/sitemap.xml/route"]) expect(carries(route), route).toContain("../kb/guides/*.md");
 });
 
 test("the build cache checks the protocol package's files, and trusts every other package's version", () => {
