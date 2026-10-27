@@ -53,7 +53,13 @@ const fieldsOf = (d: GuideDraft): Fields => ({
   code: d.code ?? "", order: d.order ?? "", code2: d.code2 ?? "", order2: d.order2 ?? "", body: d.body,
 });
 
-export default function GuideEditor({ ownerId, guideId, draft, revision, waiting, author, options, limits }: GuideEditorProps) {
+/** The editor for one account. Given another account, it starts again from that account's draft, whatever key the page
+ *  gives it, so words typed for one account are never sent as another's. */
+export default function GuideEditor(props: GuideEditorProps) {
+  return <Editor key={props.ownerId} {...props} />;
+}
+
+function Editor({ ownerId, guideId, draft, revision, waiting, author, options, limits }: GuideEditorProps) {
   const router = useRouter();
   const [fields, setFields] = useState(() => fieldsOf(draft));
   const [sources, setSources] = useState<SourceRow[]>(() => draft.sources.map((s, key) => ({ ...s, key })));

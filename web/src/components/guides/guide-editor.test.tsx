@@ -197,6 +197,20 @@ test("a revision waiting for review can be withdrawn", async () => {
   expect(router.refresh).toHaveBeenCalled();
 });
 
+test("an editor kept across a change of account starts again for the new one, whatever key it is given", async () => {
+  const OTHER = "22222222-3333-4444-8555-666666666666";
+  const props: Props = {
+    ownerId: OWNER, guideId: null, draft: emptyDraft(), revision: 1, waiting: null,
+    author: { handle: "thrall", publicProfile: false }, options: guideEditorOptions(), limits: GUIDE_LIMITS,
+  };
+  act(() => root.render(<GuideEditor key="kept" {...props} />));
+  await type("Title", "Private words of the first account");
+  act(() => root.render(<GuideEditor key="kept" {...props} ownerId={OTHER} author={{ handle: "jaina", publicProfile: false }} />));
+  expect(field("Title").value).toBe("");
+  await click("Save draft");
+  expect(sent.map((s) => [s.owner, (s.body.draft as GuideDraft).title])).toEqual([[OTHER, ""]]);
+});
+
 test("text that looks like HTML stays text in every field: no element is made from it", () => {
   const html = '<img src=x onerror="alert(1)"><script>alert(1)</script><iframe src="https://evil.example"></iframe>';
   render({ guideId: GUIDE, draft: { ...SAVED, title: html, summary: html, body: html, sources: [{ ...SOURCE, title: html }] }, revision: 2 });

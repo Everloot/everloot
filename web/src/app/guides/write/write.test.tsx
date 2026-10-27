@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+// @vitest-environment jsdom
+import { act, type ReactNode } from "react";
+import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
@@ -146,6 +148,39 @@ test("the preview names the author by handle only, says what must change before 
   expect(nameless).toContain('href="/settings"');
   expect(nameless).not.toContain("By @");
   expect(nameless).not.toContain("Thrall");
+});
+
+test("a change of account without a full reload starts the editor again: one account's unsaved words never go out under another", async () => {
+  const JAINA = { id: "22222222-3333-4444-8555-666666666666", name: "Jaina#2002" };
+  const sent: Array<[string | null, string]> = [];
+  vi.stubGlobal("fetch", vi.fn(async (_url: RequestInfo | URL, init: RequestInit = {}) => {
+    sent.push([new Headers(init.headers).get("x-everloot-expected-owner"), JSON.parse(String(init.body)).draft.title]);
+    return new Response(JSON.stringify({ guideId: GUIDE, revision: 1, status: "draft" }), { status: 201, headers: { "content-type": "application/json" } });
+  }));
+  const host = document.body.appendChild(document.createElement("div"));
+  const root = createRoot(host);
+  const title = () => host.querySelector<HTMLInputElement>('[aria-label="Title"]')!;
+  try {
+    // The first account starts a new guide and types, without saving.
+    await act(async () => root.render(await WritePage({ searchParams: Promise.resolve({}) })));
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(title(), "Private words of the first account");
+      title().dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(title().value).toBe("Private words of the first account");
+    // Another account signs in in another tab, and this page is rendered again in place, as router.refresh() does.
+    auth.getUser.mockResolvedValue(JAINA);
+    profile = { handle: "jaina", public_profile: false };
+    summaries = [];
+    await act(async () => root.render(await WritePage({ searchParams: Promise.resolve({}) })));
+    expect(title().value).toBe("");
+    await act(async () => { host.querySelector<HTMLFormElement>('form[aria-label="Guide draft"]')!.requestSubmit(); });
+    expect(sent).toEqual([[JAINA.id, ""]]);
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
 });
 
 test("storage down: says so instead of an empty list", async () => {

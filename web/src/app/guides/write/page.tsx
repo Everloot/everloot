@@ -139,8 +139,9 @@ export default async function WriteGuidePage({ searchParams }: Props) {
           <p><Link href={WRITE_PATH} className={link}>Start a new guide</Link></p>
         </nav>
         <div className="min-w-0">
+          {/* A new editor for each account and guide: a refresh after an account change never keeps the words typed for another. */}
           <GuideEditor
-            key={open?.guide.id ?? "new"}
+            key={`${user.id}:${open?.guide.id ?? "new"}`}
             ownerId={user.id}
             guideId={open?.guide.id ?? null}
             draft={newest?.draft ?? emptyDraft()}
