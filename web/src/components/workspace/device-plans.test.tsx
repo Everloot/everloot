@@ -460,6 +460,54 @@ test("damaged stored plans are kept: their text can be downloaded, nothing is sa
   expect(field("Talent link or share code")).not.toBeNull();
 });
 
+const clearGroup = () => container.querySelector<HTMLElement>('[role="group"][aria-label="Clear what is stored"]');
+
+test("clearing damaged stored data names every plan, alt, watch and note it deletes, and offers the download first", async () => {
+  // Valid alts and a watch, with one damaged plan beside them: the whole bucket reads as damaged.
+  const stored = { format: "everloot.player-workspace", version: 2, owner: ANON,
+    plans: [plan({ notes: "Raid notes" }), plan({ id: id(2), name: "Broken", code: "damaged" })],
+    alts: [{ ...JSON.parse(V2_ALT_TEXT), planIds: [id(1)] }],
+    watches: [{ id: id(700), planId: id(1), addedAt: "2026-10-20T12:00:00.000Z" }] };
+  const raw = JSON.stringify(stored);
+  localStorage.setItem(bucketKey(ANON), raw);
+  await render();
+  expect(alerts()).toContain("could not be read");
+  await click(button(/^Clear stored plans$/));
+  const group = clearGroup()!;
+  expect(group.textContent).toContain("its plans, alts and watches, and their notes. Here that is 2 plans, 1 alt and 1 watch, with notes on 2 of them.");
+  expect(localStorage.getItem(bucketKey(ANON))).toBe(raw);
+  // The download is offered before Clear for good, in the same place.
+  const labels = [...group.querySelectorAll("button")].map((b) => b.textContent);
+  expect(labels).toEqual(["Download what is stored", "Clear for good", "Cancel"]);
+  const d = watchDownload();
+  await click(button(/^Download what is stored$/, group));
+  expect(await d.blobs[0].text()).toBe(raw);
+  await click(button(/^Clear for good$/, clearGroup()!));
+  expect(localStorage.getItem(bucketKey(ANON))).toBeNull();
+});
+
+test("the clearing of stored data that cannot be counted says what it may hold", async () => {
+  localStorage.setItem(bucketKey(ANON), "{not json");
+  await render();
+  await click(button(/^Clear stored plans$/));
+  expect(clearGroup()?.textContent).toContain("its plans, alts and watches, and their notes. It could not be read, so they cannot be counted.");
+  await click(button(/^Cancel$/, clearGroup()!));
+  expect(clearGroup()).toBeNull();
+  expect(localStorage.getItem(bucketKey(ANON))).toBe("{not json");
+});
+
+test("clearing stored plans says it also deletes alts and their notes (reported case)", async () => {
+  const alt = { ...JSON.parse(V2_ALT_TEXT), notes: "original notes", planIds: [] };
+  localStorage.setItem(bucketKey(ANON), JSON.stringify({ format: "everloot.player-workspace", version: 2, owner: ANON, alts: [alt],
+    plans: [plan({ code: "damaged" })], watches: [] }));
+  await render();
+  await click(button(/^Clear stored plans$/));
+  const copyBeforeClear = container.textContent;
+  await click(button(/^Clear for good$/));
+  expect(localStorage.getItem(bucketKey(ANON))).toBeNull();
+  expect(copyBeforeClear).toMatch(/alts/i);
+});
+
 test("a version 2 bucket's plans show and can be edited, and its alts are kept as they were", async () => {
   localStorage.setItem(bucketKey(ANON), V2_BUCKET_TEXT);
   await render();

@@ -211,6 +211,18 @@ export function readWorkspace(storage: DeviceStorage | null, owner: Owner): Read
   return sameOwner(checked.workspace.owner, owner) ? { ok: true, workspace: checked.workspace, raw } : refuse("corrupt");
 }
 
+/** What stored text that does not read holds, as far as it can be counted: its plans, alts and watches, and how many
+ *  of the plans and alts have notes. Null when it holds no list that can be counted. Nothing in it is checked. */
+export function storedCounts(raw: string): { plans: number; alts: number; watches: number; notes: number } | null {
+  let value: unknown;
+  try { value = JSON.parse(raw); } catch { return null; }
+  if (!isRecord(value) || ![value.plans, value.alts, value.watches].some(Array.isArray)) return null;
+  const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+  const [plans, alts, watches] = [list(value.plans), list(value.alts), list(value.watches)];
+  const notes = [...plans, ...alts].filter((item) => isRecord(item) && typeof item.notes === "string" && item.notes.trim() !== "").length;
+  return { plans: plans.length, alts: alts.length, watches: watches.length, notes };
+}
+
 const isQuota = (error: unknown) => error instanceof DOMException
   && (error.name === "QuotaExceededError" || error.name === "NS_ERROR_DOM_QUOTA_REACHED" || error.code === 22);
 

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { className } from "@/components/builds/describe";
 import { Card, CopyButton, Field, SectionHeading } from "@/components/ui";
 import {
-  BACKUP_TOO_LARGE, WORKSPACE_LIMITS, applyImport, bucketKey, copyPlan, deletePlan, deviceStorage, editPlan, exportBackup,
+  BACKUP_TOO_LARGE, WORKSPACE_LIMITS, applyImport, bucketKey, copyPlan, deletePlan, deviceStorage, editPlan, exportBackup, storedCounts,
   orderState, previewImport, readPlanText, readWorkspace, sameOwner, savePlan,
   type Failure, type ImportPreview, type LocalPlan, type Owner, type PlanText, type ReadResult,
 } from "@/lib/player-workspace";
@@ -435,7 +435,8 @@ function Backup({ owner, onRestored }: { owner: Owner; onRestored: (result: { ok
 }
 
 /** Stored plans that do not read: kept as they are, with their text to download. Damaged ones can be cleared,
- *  after asking; a newer version's are left for that version to open. */
+ *  after saying everything that deletes and offering the download again; a newer version's are left for that
+ *  version to open. */
 function StoredProblem({ read, owner, onCleared }: { read: Extract<ReadResult, { ok: false }>; owner: Owner; onCleared: () => void }) {
   const [confirming, setConfirming] = useState(false);
   const raw = read.raw;
@@ -443,18 +444,38 @@ function StoredProblem({ read, owner, onCleared }: { read: Extract<ReadResult, {
     try { deviceStorage()?.removeItem(bucketKey(owner)); } catch { /* the read that follows says what is still there */ }
     onCleared();
   }
+  const download = (text: string) => saveFile(text, `everloot-plans-stored-${new Date().toISOString().slice(0, 10)}.txt`);
   return (
     <Card>
       <p role="alert" className="text-fg">{read.message}</p>
-      {raw !== null && (
+      {raw !== null && !confirming && (
         <div className="mt-4 flex flex-wrap gap-2">
-          <button type="button" className="btn text-sm" onClick={() => saveFile(raw, `everloot-plans-stored-${new Date().toISOString().slice(0, 10)}.txt`)}>Download what is stored</button>
-          {read.error === "corrupt" && (confirming
-            ? <button type="button" className="btn text-sm" onClick={clear}>Clear for good</button>
-            : <button type="button" className="btn text-sm" onClick={() => setConfirming(true)}>Clear stored plans</button>)}
+          <button type="button" className="btn text-sm" onClick={() => download(raw)}>Download what is stored</button>
+          {read.error === "corrupt" && <button type="button" className="btn text-sm" onClick={() => setConfirming(true)}>Clear stored plans</button>}
         </div>
       )}
-      {read.error === "corrupt" && <p className="mt-3 text-sm text-muted">Clearing removes them from this browser for good. Download them first to keep a copy.</p>}
+      {raw !== null && read.error === "corrupt" && confirming && (
+        <div role="group" aria-label="Clear what is stored" className="mt-4 space-y-3 rounded-control border border-line bg-canvas p-3">
+          <p className="text-sm text-fg">{clearingLine(raw, owner)}</p>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn text-sm" onClick={() => download(raw)}>Download what is stored</button>
+            <button type="button" className="btn text-sm" onClick={clear}>Clear for good</button>
+            <button type="button" className="btn text-sm" onClick={() => setConfirming(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {read.error === "corrupt" && !confirming && <p className="mt-3 text-sm text-muted">Clearing removes it from this browser for good. Download it first to keep a copy.</p>}
     </Card>
   );
+}
+
+/** Everything clearing a damaged bucket deletes, counted where the stored text allows: the bucket holds alts and
+ *  watches as well as plans, so all of them are named. */
+function clearingLine(raw: string, owner: Owner): string {
+  const whose = owner.kind === "account" ? "this account" : "this browser while signed out";
+  const counts = storedCounts(raw);
+  const held = counts
+    ? `Here that is ${plural(counts.plans, "plan")}, ${plural(counts.alts, "alt")} and ${plural(counts.watches, "watch", "watches")}${counts.notes > 0 ? `, with notes on ${counts.notes.toLocaleString("en-US")} of them` : ""}.`
+    : "It could not be read, so they cannot be counted.";
+  return `Clearing deletes everything stored on this device for ${whose}: its plans, alts and watches, and their notes. ${held} This cannot be undone, so download it first to keep a copy.`;
 }
