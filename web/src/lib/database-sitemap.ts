@@ -88,7 +88,7 @@ export function databaseUnavailable(): Response {
 /** Pages flip to indexed as uploads roll up; crawlers do not need the list fresher than hourly. */
 export const DATABASE_SITEMAP_HEADERS = {
   "Content-Type": "application/xml; charset=utf-8",
-  "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+  "Cache-Control": "public, max-age=0, must-revalidate",
   // Next overwrites Cache-Control on dynamic routes, so the CDN reads these instead.
   "Vercel-CDN-Cache-Control": "max-age=3600, stale-while-revalidate=86400",
   "CDN-Cache-Control": "max-age=3600, stale-while-revalidate=86400",

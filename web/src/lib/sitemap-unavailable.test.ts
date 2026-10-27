@@ -49,6 +49,7 @@ test("successful XML indexes and chunks retain their CDN policy through Next's N
     expect(await response.clone().text(), path).toContain("<?xml");
     const out = await effectiveHeaders(path, response);
     expect(out.getHeader("Content-Type"), path).toBe("application/xml; charset=utf-8");
+    expect(out.getHeader("Cache-Control"), path).toBe("public, max-age=0, must-revalidate");
     for (const key of ["Vercel-CDN-Cache-Control", "CDN-Cache-Control"]) {
       expect(out.getHeader(key), path).toBe("max-age=3600, stale-while-revalidate=86400");
     }
