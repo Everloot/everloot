@@ -1,5 +1,8 @@
 """Run with: uv run --with lupa python addon/tests/plan_contract.py"""
 import base64
+import json
+import re
+import string
 from pathlib import Path
 from lupa.lua51 import LuaRuntime
 
@@ -14,9 +17,12 @@ def share_code(cls: str, spec: int, build: str, text: str) -> str:
     return f"EL1-{cls}-{spec}-{build}-{payload}"
 
 
-# Spend order: 90001 twice, then the choice node (second entry), then 90004.
+# 90001 at rank 2, the choice node at its second entry, 90004 at rank 2. Items are listed by node id, as
+# the site writes them; their order is not a spend order. The spend order is a token of its own.
 PLAN_TEXT = "90001:2,90002:1:1,90004:2"
 CODE = share_code("mage", 1482, "1.60.1.70450", PLAN_TEXT)
+CODE2 = "EL1-mage-0-1.60.1.70450-MToxLDI6MQ"
+VECTORS = json.loads((root.parent / "docs" / "fixtures" / "talent-order-v1.json").read_text(encoding="utf-8"))
 
 STUBS = """
 date = function() return '2026-10-17T00:00:00Z' end
@@ -163,7 +169,90 @@ assert(plan == nil and string.find(why, '{reason}', 1, true), '{code}: ' .. tost
 lua.execute(f"assert(Everloot.Plan.Decode('{CODE}==') ~= nil, 'trailing padding is ignored')")
 lua.execute("assert(Everloot.Plan.Decode(nil) == nil and Everloot.Plan.Decode(42) == nil)")
 
-# --- Comparing a plan with the client ---
+# --- Spend order token: the shared vectors every reader of the token passes ---
+lua.execute("""
+-- A plan from the vectors' ranks, { {node, rank, choice?}, ... }, rank 0 included as the vectors list it.
+function planOf(ranks)
+  local plan = { entries = {} }
+  for i, r in ipairs(ranks) do plan.entries[i] = { nodeId = r[1], rank = r[2], choice = r[3] } end
+  return plan
+end
+-- Each token read against the same ranks: 'origin:node node ...', or the error.
+function readAll(tokens, ranks)
+  local plan, out = planOf(ranks), {}
+  for i = 1, #tokens do
+    local order, why = Everloot.Plan.DecodeOrder(tokens[i], plan)
+    out[i] = order and (order.origin .. ':' .. table.concat(order.sequence, ' ')) or why
+  end
+  return table.concat(out, ',')
+end
+""")
+
+
+def read_orders(tokens, ranks):
+    """The reader's answer for each token (str, or bytes taken as they are) against one plan's ranks."""
+    out = lua.globals().readAll(lua.table_from(tokens), lua.table_from([lua.table_from(r) for r in ranks]))
+    return out.split(",")
+
+
+def known(origin, order):
+    return origin + ":" + " ".join(map(str, order))
+
+
+for v in VECTORS["decode"]:
+    want = v["error"] if "error" in v else known(v["origin"], v["order"])
+    assert read_orders([v["token"]], v["ranks"]) == [want], f'{v["name"]}: {read_orders([v["token"]], v["ranks"])}'
+# A token the site writes reads back as the order and origin it was written for. (The addon writes no
+# token of its own, so the vectors that expect none are the site's to pass.)
+for v in VECTORS["encode"]:
+    if v["token"] is not None:
+        assert read_orders([v["token"]], v["ranks"]) == [known(v["origin"], v["order"])], v["name"]
+# A token both naming an extra point and short of points is extra-points, the format's earlier error.
+assert read_orders(["O1p-AAA", "O1p-E", "O1p-CCC"], [[90001, 2], [90002, 1, 1], [90004, 2]]) == ["extra-points"] * 3
+lua.execute("""
+local order = Everloot.Plan.DecodeOrder(' O1g-AB\\r\\n', planOf({ { 1, 1 }, { 2, 1 } }))
+assert(order.token == 'O1g-AB', 'the token is kept whole, without the whitespace around it: ' .. tostring(order.token))
+local none, why = Everloot.Plan.DecodeOrder(nil, planOf({ { 1, 1 } }))
+assert(none == nil and why == 'malformed', 'no token at all reads as damaged, and never raises')
+""")
+
+# Whitespace around a token is exactly the code points the format doc lists, matched as UTF-8 at either
+# end, and nothing else: every other BMP code point, and a few beyond it, damages the token.
+DOC = (root.parent / "docs" / "2026-10-17-talent-share-code.md").read_text(encoding="utf-8")
+listed = DOC.split("Whitespace means exactly the code points", 1)[1].split("A reader in another language", 1)[0]
+SPACES = set()
+for start, end in re.findall(r"U\+([0-9A-F]{4})(?: to U\+([0-9A-F]{4}))?", listed):
+    SPACES.update(range(int(start, 16), int(end or start, 16) + 1))
+assert len(SPACES) == 25, sorted(f"U+{p:04X}" for p in SPACES)
+B64URL = string.ascii_uppercase + string.ascii_lowercase + string.digits + "-_"
+TWO = [[9, 1], [10, 1]]
+CHARS = [chr(p) for p in [*range(0xD800), *range(0xE000, 0x10000), 0x10000, 0x1F600, 0xE0020, 0x10FFFF]]
+for c, before, after in zip(CHARS, read_orders([c + "O1p-AB" for c in CHARS], TWO), read_orders(["O1p-AB" + c for c in CHARS], TWO)):
+    if ord(c) in SPACES:
+        assert before == after == "planned:9 10", f"U+{ord(c):04X} is whitespace: {before}, {after}"
+    else:
+        assert before == "malformed", f"U+{ord(c):04X} before a token is not whitespace: {before}"
+        assert after == ("extra-points" if c in B64URL else "malformed"), f"U+{ord(c):04X} after a token is not whitespace: {after}"
+# Named here because a reader's own idea of whitespace tends to include them: NEXT LINE, ZERO WIDTH SPACE,
+# MONGOLIAN VOWEL SEPARATOR and WORD JOINER are not in the list, and neither is a lone Latin-1 byte.
+for p in [0x85, 0x200B, 0x180E, 0x2060]:
+    assert read_orders([chr(p) + "O1p-AB", "O1p-AB" + chr(p)], TWO) == ["malformed", "malformed"], f"U+{p:04X}"
+for raw in [b"\x85", b"\xa0"]:
+    assert read_orders([raw + b"O1p-AB", b"O1p-AB" + raw], TWO) == ["malformed", "malformed"], raw
+
+# Links: each of the four keys read as it is, as the site reads them; one set written back under its own keys.
+read_link = lua.eval("function(link) local r = Everloot.Plan.ReadLink(link) return r.first, r.second, r.firstOrder, r.secondOrder end")
+for v in VECTORS["links"]["read"]:
+    assert read_link(v["link"]) == (v["first"], v["second"], v["firstOrder"], v["secondOrder"]), v["name"]
+assert read_link(f"https://everloot.app/tools/talents/mage#plan={CODE}&order=O1p-AABCC).") == (CODE, None, "O1p-AABCC", None), "a value stops where the site's does"
+fragment = lua.eval("Everloot.Plan.Fragment")
+for v in VECTORS["links"]["write"]:
+    if (v["first"] is None) == (v["second"] is None):
+        continue  # two sets, or none: the addon's link carries the one set it loaded
+    code, order, number = (v["first"], v["firstOrder"], 1) if v["first"] else (v["second"], v["secondOrder"], 2)
+    assert fragment(code, order, number) == v["fragment"], f'{v["name"]}: {fragment(code, order, number)}'
+
+# --- Comparing a plan with the client: a next point comes only from a known spend order ---
 lua.execute(f"""
 local P, T = Everloot.Plan, Everloot.Talents
 local plan = P.Decode('{CODE}')
@@ -173,24 +262,55 @@ local function state(nodes)
   return s
 end
 local function node(ranks, canBuy, choice) return {{ ranks = ranks, max = 3, canBuy = canBuy, choice = choice }} end
+local function ids(points) local out = {{}}; for i, p in ipairs(points) do out[i] = p.entry.nodeId end; return table.concat(out, ' ') end
 local base = {{ [90001] = node(1, true), [90002] = node(0, true), [90003] = node(0, false), [90004] = node(0, false) }}
 
+-- Without an order no point is next: item order and node ids are not a spend order.
 local r = P.Evaluate(plan, state(base))
 assert(r.total == 5 and r.done == 1 and #r.mismatches == 0, 'one of five points placed')
-assert(r.next.entry.nodeId == 90001 and r.next.blocked == false, 'next point follows the plan order')
+assert(r.next == nil and r.order == nil and r.missing == 3, 'no order, no next point')
+assert(ids(r.candidates) == '90001 90002' and #r.unsure == 0, 'the missing points the game lets you buy now, none ranked first: ' .. ids(r.candidates))
 
+-- With an order: the first point it lists that is not spent yet.
+plan.order = P.DecodeOrder('O1p-AABCC', plan)
+r = P.Evaluate(plan, state(base))
+assert(r.order == 'planned' and r.next.entry.nodeId == 90001 and r.next.blocked == false, 'next point follows the order')
+assert(#r.candidates == 0, 'an order names one next point, not a list')
 base[90001] = node(2, true)
 r = P.Evaluate(plan, state(base))
 assert(r.next.entry.nodeId == 90002, 'a finished node is skipped')
-
 base[90002] = node(0, false)
 base[90004] = node(0, true)
 r = P.Evaluate(plan, state(base))
-assert(r.next.entry.nodeId == 90004 and not r.next.blocked, 'a gated node is skipped for one that can be bought')
+assert(r.next.entry.nodeId == 90002 and r.next.blocked == true, 'a gated point stays next, marked blocked: the order is not reshuffled')
 
-base[90004] = node(0, false)
+-- Interleaved, 90001 90004 90001 90002 90004: the order decides, where node ids would say 90001.
+base = {{ [90001] = node(1, true), [90002] = node(0, true), [90003] = node(0, false), [90004] = node(0, false) }}
+plan.order = P.DecodeOrder('O1p-ACABC', plan)
 r = P.Evaluate(plan, state(base))
-assert(r.next.entry.nodeId == 90002 and r.next.blocked == true, 'nothing buyable: the first missing point, marked blocked')
+assert(r.next.entry.nodeId == 90004 and r.next.blocked == true, 'the order puts 90004 before the second point in 90001')
+base[90004] = node(1, true)
+r = P.Evaluate(plan, state(base))
+assert(r.next.entry.nodeId == 90001 and r.next.blocked == false, 'then the second point in 90001')
+base[90001] = node(2, true)
+r = P.Evaluate(plan, state(base))
+assert(r.next.entry.nodeId == 90002, 'then 90002, ahead of the last point in 90004')
+
+-- A generated order is followed too, and is reported as provisional.
+plan.order = P.DecodeOrder('O1g-AABCC', plan)
+r = P.Evaluate(plan, state(base))
+assert(r.order == 'provisional' and r.next.entry.nodeId == 90002)
+
+-- Without an order, a point the game says nothing about is listed apart, never as one you can buy.
+plan.order = nil
+base[90002] = node(0, nil)
+r = P.Evaluate(plan, state(base))
+assert(ids(r.candidates) == '90004' and ids(r.unsure) == '90002' and r.missing == 2, ids(r.candidates) .. ' / ' .. ids(r.unsure))
+base[90002] = node(0, false)
+base[90004] = node(1, false)
+r = P.Evaluate(plan, state(base))
+assert(#r.candidates == 0 and #r.unsure == 0 and r.missing == 2 and r.next == nil, 'nothing can be bought now')
+base[90004] = node(0, false)
 
 base[90003] = node(1, false)          -- spent outside the plan
 base[90001] = node(3, true)           -- more than planned
@@ -206,11 +326,23 @@ assert(#r.mismatches == 1 and r.mismatches[1].kind == 'choice' and r.mismatches[
 
 base[90002] = node(1, false, 1); base[90004] = node(2, false)
 r = P.Evaluate(plan, state(base))
-assert(r.done == 5 and r.next == nil and #r.mismatches == 0, 'a finished plan has no next point')
+assert(r.done == 5 and r.next == nil and r.missing == 0 and #r.mismatches == 0, 'a finished plan has no next point')
+plan.order = P.DecodeOrder('O1p-AABCC', plan)
+r = P.Evaluate(plan, state(base))
+assert(r.order == 'planned' and r.next == nil and r.missing == 0, 'nor with its order')
 
 local ghost = P.Decode('{share_code("mage", 0, "1.59.0.1", "99999:1")}')
 r = P.Evaluate(ghost, state(base))
 assert(r.mismatches[1].kind == 'unknown' and r.mismatches[1].nodeId == 99999, 'a node the tree does not have')
+
+-- An order naming a node this tree does not have no longer fits: it is not followed, and the points
+-- that can be bought are listed as for a plan without one.
+ghost = P.Decode('{share_code("mage", 0, "1.59.0.1", "90001:2,99999:1")}')
+ghost.order = P.DecodeOrder('O1p-ABA', ghost)
+base[90001] = node(1, true)
+r = P.Evaluate(ghost, state(base))
+assert(ghost.order and r.unplaced == true and r.order == nil and r.next == nil, 'the order is not followed')
+assert(ids(r.candidates) == '90001', 'the points you can buy are listed instead: ' .. ids(r.candidates))
 """)
 
 # --- /everloot plan: loads, shows, remembers, and never acts ---
@@ -218,11 +350,14 @@ lua = fresh()
 lua.execute(f"""
 SlashCmdList.EVERLOOT('plan {CODE}')
 assert(EverlootDB.plan == '{CODE}', 'the plan is kept in SavedVariables, case intact')
+assert(EverlootDB.planOrder == nil and EverlootDB.planSet == nil, 'a bare code brings no order')
 local p = panel()
 assert(p and p.shown, 'the panel opens')
 assert(string.find(p.body.text, 'MAGE plan, made on build 1.60.1.70450', 1, true), p.body.text)
 assert(string.find(p.body.text, '1 of 5 planned points match', 1, true), p.body.text)
-assert(string.find(p.body.text, 'Next point: Arcane Power (rank 2 of 2)', 1, true), p.body.text)
+assert(string.find(p.body.text, 'Spend order: unknown, so no point is named next.', 1, true), p.body.text)
+assert(not string.find(p.body.text, 'Next point', 1, true), 'no order, no next point: ' .. p.body.text)
+assert(string.find(p.body.text, 'You can add any of these now: Arcane Power (rank 2 of 2), Frost Nova (rank 1 of 1)', 1, true), p.body.text)
 assert(not string.find(p.body.text, 'node ids may have moved', 1, true), 'same build, no warning')
 """)
 lua.execute("""
@@ -230,7 +365,15 @@ NODES[90001].ranksPurchased = 2
 event('TRAIT_CONFIG_UPDATED')
 local p = panel()
 assert(string.find(p.body.text, '2 of 5 planned points match', 1, true), 'the panel follows spent points: ' .. p.body.text)
-assert(string.find(p.body.text, 'Next point: Frost Nova (rank 1 of 1)', 1, true), 'the choice node shows the planned option: ' .. p.body.text)
+assert(string.find(p.body.text, 'You can add any of these now: Frost Nova (rank 1 of 1)', 1, true), 'the choice node shows the planned option: ' .. p.body.text)
+NODES[90002].canPurchaseRank = false
+event('TRAIT_CONFIG_UPDATED')
+assert(string.find(p.body.text, 'None of the points the plan still needs can be added right now', 1, true), p.body.text)
+NODES[90002].canPurchaseRank = nil
+event('TRAIT_CONFIG_UPDATED')
+assert(string.find(p.body.text, 'The game does not say whether you can add these now: Frost Nova (rank 1 of 1)', 1, true), p.body.text)
+assert(not string.find(p.body.text, 'None of the points', 1, true), 'unknown is not the same as unavailable: ' .. p.body.text)
+NODES[90002].canPurchaseRank = true
 NODES[90003].ranksPurchased = 1
 event('TRAIT_CONFIG_UPDATED')
 assert(string.find(p.body.text, 'Differences from the plan (1):', 1, true) and string.find(p.body.text, 'you have 1, the plan has 0', 1, true), p.body.text)
@@ -246,6 +389,90 @@ assert(panel().shown and string.find(panel().body.text, 'MAGE plan', 1, true), '
 SlashCmdList.EVERLOOT('plan clear')
 assert(EverlootDB.plan == nil and string.find(panel().body.text, 'No plan loaded', 1, true))
 """)
+
+# --- A plan with its spend order: the order names the next point, and the token is kept whole ---
+lua = fresh()
+lua.execute(f"""
+local P = Everloot.Plan
+assert(P.Load('{CODE}', nil, 'O1p-ABACC') == true)
+assert(EverlootDB.plan == '{CODE}' and EverlootDB.planOrder == 'O1p-ABACC' and EverlootDB.planSet == nil, tostring(EverlootDB.planOrder))
+local p = panel()
+assert(string.find(p.body.text, 'Spend order: planned by a player.', 1, true), p.body.text)
+assert(string.find(p.body.text, 'Next point: Frost Nova (rank 1 of 1)', 1, true), 'the order puts 90002 before the second point in 90001: ' .. p.body.text)
+assert(not string.find(p.body.text, 'You can add any of these now', 1, true), 'an order names one point, not a list')
+NODES[90002].ranksPurchased = 1
+event('TRAIT_CONFIG_UPDATED')
+assert(string.find(p.body.text, 'Next point: Arcane Power (rank 2 of 2)', 1, true), p.body.text)
+NODES[90001].ranksPurchased = 2
+event('TRAIT_CONFIG_UPDATED')
+assert(string.find(p.body.text, 'Next point: x (rank 1 of 2) - not available yet (a gate or no point to spend)', 1, true), 'a gated next point says so: ' .. p.body.text)
+NODES[90004].canPurchaseRank = nil
+event('TRAIT_CONFIG_UPDATED')
+assert(string.find(p.body.text, 'Next point: x (rank 1 of 2) - the game does not say whether it can be bought now', 1, true), p.body.text)
+NODES[90004].canPurchaseRank = false
+assert(P.Link() == 'https://everloot.app/tools/talents/mage#plan={CODE}&order=O1p-ABACC', 'Copy plan link carries the order: ' .. tostring(P.Link()))
+EverlootDB.planOrder = 'O1p-AAB'
+assert(P.Link() == 'https://everloot.app/tools/talents/mage#plan={CODE}', 'the link checks the saved token, and leaves out one that does not fit')
+EverlootDB.planOrder = 'O1p-ABACC'
+
+-- A generated order is labelled wherever its next point shows.
+assert(P.Load('{CODE}', nil, ' O1g-AABCC\\n', 2) == true)
+assert(EverlootDB.planOrder == 'O1g-AABCC' and EverlootDB.planSet == 2, 'the validated token, trimmed, and its set')
+assert(string.find(p.body.text, 'Spend order: provisional, generated by a tool; not a recommendation or a record of play.', 1, true), p.body.text)
+assert(string.find(p.body.text, 'Next point (provisional order): x (rank 1 of 2)', 1, true), p.body.text)
+assert(P.Link() == 'https://everloot.app/tools/talents/mage#plan2={CODE}&order2=O1g-AABCC', 'the second set keeps its own keys: ' .. tostring(P.Link()))
+
+-- A later code without an order leaves no order behind; clearing forgets all of it.
+assert(P.Load('{CODE}', nil, nil))
+assert(EverlootDB.planOrder == nil and EverlootDB.planSet == nil and string.find(p.body.text, 'Spend order: unknown', 1, true))
+assert(P.Link() == 'https://everloot.app/tools/talents/mage#plan={CODE}', 'no order, none in the link: ' .. tostring(P.Link()))
+assert(P.Load('{CODE}', nil, 'O1p-ABACC', 2))
+SlashCmdList.EVERLOOT('plan clear')
+assert(EverlootDB.plan == nil and EverlootDB.planOrder == nil and EverlootDB.planSet == nil and P.Link() == nil)
+assert(calls.purchase == 0 and calls.select == 0 and calls.import == 0 and calls.commit == 0 and calls.view == 0, 'an order never spends either')
+""")
+
+# An order that does not fit leaves the talents loaded and says why; nothing of it is kept or linked.
+ORDER_PROBLEMS = {
+    "O2p-AABCC": "was made by a newer version of Everloot",
+    "O1p-AA BCC": "is damaged",
+    "\u200bO1p-AABCC": "is damaged",
+    "O1x-AABCC": "is of a kind this addon does not read",
+    "O1p-" + "A" * 65: "is for more than 64 points, the most an order carries",
+    "O1p-AABCCC": "lists points the plan does not have",
+    "O1p-AABC": "leaves out points the plan has",
+}
+for token, reason in ORDER_PROBLEMS.items():
+    lua = fresh()
+    lua.globals().TOKEN = token
+    lua.execute(f"""
+local P = Everloot.Plan
+assert(P.Load('{CODE}', nil, TOKEN) == true, 'the talents load whatever the order')
+assert(EverlootDB.plan == '{CODE}' and EverlootDB.planOrder == nil, 'the order is not kept')
+assert(string.find(table.concat(printed, '\\n'), "Everloot: the plan's spend order {reason}, so the order is unknown. The talents still loaded.", 1, true), table.concat(printed, '\\n'))
+local text = panel().body.text
+assert(string.find(text, 'Spend order: unknown, so no point is named next. The order that came with this plan {reason}.', 1, true), text)
+assert(not string.find(text, 'Next point', 1, true) and string.find(text, 'You can add any of these now', 1, true), text)
+assert(P.Link() == 'https://everloot.app/tools/talents/mage#plan={CODE}', tostring(P.Link()))
+""")
+
+# A reload reads the order back from SavedVariables. One that no longer fits is dropped with the reason,
+# and a set other than 2 is the first.
+lua = fresh(saved=f"{{ plan = '{CODE}', planOrder = 'O1g-ABACC', planSet = 2 }}")
+lua.execute(f"""
+SlashCmdList.EVERLOOT('plan')
+assert(string.find(panel().body.text, 'Next point (provisional order): Frost Nova (rank 1 of 1)', 1, true), panel().body.text)
+assert(Everloot.Plan.Link() == 'https://everloot.app/tools/talents/mage#plan2={CODE}&order2=O1g-ABACC')
+""")
+lua = fresh(saved=f"{{ plan = '{CODE}', planOrder = 'O1p-AAB', planSet = 7 }}")
+lua.execute(f"""
+assert(EverlootDB.plan == '{CODE}' and EverlootDB.planOrder == nil and EverlootDB.planSet == nil)
+SlashCmdList.EVERLOOT('plan')
+assert(string.find(panel().body.text, 'The order that came with this plan leaves out points the plan has.', 1, true), panel().body.text)
+assert(Everloot.Plan.Link() == 'https://everloot.app/tools/talents/mage#plan={CODE}')
+""")
+lua = fresh(saved="{ plan = 'EL1-mage-damaged', planOrder = 'O1p-AABCC', planSet = 2 }")
+lua.execute("assert(EverlootDB.plan == nil and EverlootDB.planOrder == nil and EverlootDB.planSet == nil, 'a damaged code takes its order with it')")
 
 # A different build warns; a different class and a bad code are refused.
 lua = fresh("GetBuildInfo = function() return '1.60.2', '70611', 'x', 1 end")
@@ -288,6 +515,10 @@ PlayerSpellsFrame = {
 lua.execute(f"""
 NODES[90003].ranksPurchased = 1
 SlashCmdList.EVERLOOT('plan {CODE}')
+local shown = {{}}
+for _, f in ipairs(frames) do if f.target and f.shown then shown[f.target.name] = true end end
+assert(not shown.b1 and shown.b3, 'without an order no talent is outlined as next; the extra point is still flagged')
+Everloot.Plan.Load('{CODE}', nil, 'O1p-AABCC')
 local marks = {{}}
 for _, f in ipairs(frames) do if f.target then marks[f.target.name] = f end end
 assert(marks.b1 and marks.b1.shown and marks.b1.mouse == false, 'the next point is outlined, click-through')
@@ -363,7 +594,7 @@ assert(not string.find(table.concat(printed, '\\n'), 'spec id', 1, true), 'spec 
 lua = fresh("CreateFrame = function(kind, name) if name == 'EverlootPlanFrame' then error('no frames') end return { RegisterEvent=function() end, SetScript=function(self, _, f) self.onEvent=f end, HookScript=function(self, _, f) self.hooks=self.hooks or {}; table.insert(self.hooks, f) end } end")
 lua.execute(f"""
 SlashCmdList.EVERLOOT('plan {CODE}')
-assert(string.find(table.concat(printed, '\\n'), 'Next point', 1, true), 'without a panel the plan prints to chat')
+assert(string.find(table.concat(printed, '\\n'), '1 of 5 planned points match', 1, true), 'without a panel the plan prints to chat')
 """)
 lua = fresh("C_Traits = nil")
 lua.execute(f"""
@@ -378,7 +609,6 @@ assert "EverlootBuilds" in toc.split("## OptionalDeps:")[1].splitlines()[0], "th
 BUILDS = (Path(__file__).parent / "fixtures" / "EverlootBuilds.lua").read_text(encoding="utf-8")
 TRICKY = 'Fire "burst" |T \\ v2\n]] --[[ end\r\x01'
 FROST = "EL1-mage-1482-1.59.0.69000-OTAwMDE6MQ"
-CODE2 = "EL1-mage-0-1.60.1.70450-MToxLDI6MQ"
 check = LuaRuntime()
 before = set(check.globals().keys())
 check.execute(BUILDS)
@@ -491,7 +721,7 @@ PlayerSpellsFrame = {
 """)
 lua.execute(f"""
 Everloot.Planner = {{tab='talents', frame={{IsShown=function() return true end}}}}
-assert(Everloot.Plan.Load('{CODE}', true))
+assert(Everloot.Plan.Load('{CODE}', true, 'O1p-AABCC'))
 assert(not panel(), 'workspace import does not create the legacy panel')
 local found = false
 for _, f in ipairs(frames) do if f.target == BUTTONS[90001] and f.shown then found = true end end
@@ -500,4 +730,5 @@ Everloot.Plan.HideMarks()
 for _, f in ipairs(frames) do if f.target then assert(not f.shown) end end
 """)
 
-print("Lua 5.1 plan: EL1 share code (independent base64url check), next point and mismatches, panel, display only, saved builds list")
+print("Lua 5.1 plan: EL1 share code (independent base64url check), spend order token (shared vectors, exact whitespace), "
+      "next point only from an order, mismatches, panel, display only, saved builds list")
