@@ -9,6 +9,7 @@ COPY kb/package.json kb/package-lock.json kb/.npmrc ./
 RUN npm ci
 COPY kb/src ./src
 COPY kb/tsconfig.json ./
+COPY kb/changes/builds.json ./changes/builds.json
 # The committed game-file layer kb/src/{client-layer,world-map}-file.ts import from the site.
 COPY web/src/data/game-data/map.json web/src/data/game-data/client-layer.json /app/web/src/data/game-data/
 COPY web/src/data/game-data/talents /app/web/src/data/game-data/talents
