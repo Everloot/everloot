@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
-import { ago, copyLabel, esc, gold, kb, msg, sparkline, statusText } from "../src/renderer/format";
+import type { EngineState, JobState, Settings } from "../src/shared/types";
+import { ago, companionStatus, copyLabel, esc, gold, kb, msg, sparkline, statusText } from "../src/renderer/format";
 
 test("gold reads as gold, silver and copper, with the dash for unknown", () => {
   expect(gold(null)).toBe("–");
@@ -53,4 +54,78 @@ test("the sparkline needs two points, escapes its dates and spans the box", () =
   expect(sparkline([{ at: "a", copper: 7 }, { at: "b", copper: 7 }])).toContain('d="M0.0,12.0 L95.0,12.0"');
   expect(sparkline([{ at: '<"x">', copper: 1 }, { at: "b", copper: 2 }])).not.toContain('<"x">');
   expect(esc("<a href='x'>&</a>")).toBe("&lt;a href=&#39;x&#39;&gt;&amp;&lt;/a&gt;");
+});
+
+const settings = (over: Partial<Settings> = {}): Settings => ({
+  gameFolder: "C:/Games/WoW/_classic_era_", endpoint: "https://everloot.app", upload: true, prices: true, census: true, players: false,
+  ask: { enabled: false, mcpUrl: "", tokenFile: null }, market: { realms: [] }, consentedAt: "2026-10-01T00:00:00Z", launchAtLogin: false, startInTray: false, ...over,
+});
+const engine = (jobs: Partial<Record<"upload" | "prices" | "ask", JobState>> = {}, over: Partial<EngineState> = {}): Pick<EngineState, "files" | "jobs" | "log" | "paused"> => {
+  const job = (state: JobState) => ({ state, message: state === "error" ? "boom" : "", at: null });
+  return { files: ["a/Everloot.lua"], log: [], paused: false, jobs: { upload: job(jobs.upload ?? "idle"), prices: job(jobs.prices ?? "idle"), ask: job(jobs.ask ?? "off") }, ...over };
+};
+
+test("the companion status never says ready before consent or a game folder", () => {
+  expect(companionStatus({ settings: settings({ consentedAt: null }), engine: engine() }).state).toBe("setup");
+  const noFolder = companionStatus({ settings: settings({ gameFolder: null }), engine: engine({}, { files: [] }) });
+  expect(noFolder.state).toBe("setup");
+  expect(noFolder.headline).toMatch(/game folder/i);
+  // A folder with no addon file yet is waiting for the game, not missing setup.
+  const noFile = companionStatus({ settings: settings(), engine: engine({}, { files: [] }) });
+  expect(noFile.state).toBe("idle");
+  expect(noFile.headline).toMatch(/first addon file/i);
+  expect(noFile.detail).toMatch(/log out/i);
+});
+
+test("paused outranks errors and running work, and does not claim a running job was stopped", () => {
+  const s = companionStatus({ settings: settings(), engine: engine({ upload: "running", prices: "error" }, { paused: true }) });
+  expect(s.state).toBe("paused");
+  expect(s.detail).toMatch(/Upload/);
+  expect(s.detail).toMatch(/Market prices/);
+  expect(s.detail).not.toMatch(/stopped|canceled/i);
+});
+
+test("an error is not hidden by another job running, and names only the failed jobs", () => {
+  const s = companionStatus({ settings: settings(), engine: engine({ upload: "running", prices: "error", ask: "error" }) });
+  expect(s.state).toBe("error");
+  expect(s.jobs).toEqual(["prices", "ask"]);
+  expect(s.detail).toContain("Market prices");
+  expect(s.detail).toContain("In-game /ask");
+  expect(s.detail).toMatch(/Upload/);
+});
+
+test("running names the jobs that are running, in upload, prices, ask order", () => {
+  const s = companionStatus({ settings: settings(), engine: engine({ prices: "running", upload: "running" }) });
+  expect(s.state).toBe("running");
+  expect(s.jobs).toEqual(["upload", "prices"]);
+  expect(s.detail).toBe("Upload and Market prices are running.");
+});
+
+test("all three jobs off says so; Ask off by default with the others waiting is just idle", () => {
+  expect(companionStatus({ settings: settings(), engine: engine({ upload: "off", prices: "off", ask: "off" }) }).state).toBe("off");
+  const idle = companionStatus({ settings: settings(), engine: engine() });
+  expect(idle.state).toBe("idle");
+  expect(idle.headline).toBe("Watching 1 account file");
+});
+
+test("a successful last run is idle, not proof that everything is healthy", () => {
+  const s = companionStatus({ settings: settings(), engine: engine({ upload: "ok", prices: "ok" }, { files: ["a", "b"] }) });
+  expect(s.state).toBe("idle");
+  expect(s.headline).toBe("Watching 2 account files");
+});
+
+test("idle never promises an upload that is turned off", () => {
+  const on = companionStatus({ settings: settings(), engine: engine() });
+  expect(on.detail).toMatch(/next upload/i);
+  const prices = companionStatus({ settings: settings({ upload: false }), engine: engine({ upload: "off", prices: "idle" }) });
+  expect(prices.state).toBe("idle");
+  expect(prices.headline).toBe("Watching 1 account file");
+  expect(prices.detail).not.toMatch(/next upload/i);
+  expect(prices.detail).toMatch(/Upload is off/);
+  expect(prices.detail).toContain("Market prices is waiting");
+  const askOnly = companionStatus({ settings: settings({ upload: false }), engine: engine({ upload: "off", prices: "off", ask: "idle" }) });
+  expect(askOnly.state).toBe("idle");
+  expect(askOnly.detail).not.toMatch(/next upload/i);
+  expect(askOnly.detail).toContain("In-game /ask is waiting");
+  expect(askOnly.detail).not.toContain("Market prices");
 });
