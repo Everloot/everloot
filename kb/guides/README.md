@@ -86,11 +86,12 @@ not know yet". `###` subsections, lists and `>` quotes work inside them. Inside 
 From `kb/`:
 
     npx vitest run test/guides.test.ts
+    npm run kb -- guide-check --previous <a copy of kb/guides from before your change>
 
-It runs the guide check on every committed guide, so a problem fails kb's tests and CI. Each problem names the file
-and the line. The rules under "Published versions stay as they were" compare a change with the guides before it, so
-they run only where the check is given that copy. The command and the CI step that give it are not added yet; until
-they are, CI does not enforce those rules, and review has to.
+The test runs the guide check on every committed guide, so a problem fails kb's tests and CI. Each problem names the
+file and the line. The rules under "Published versions stay as they were" compare a change with the guides before it,
+so they run only where the check is given that copy: CI's guide-check step gives it `kb/guides` as it was at the pull
+request's base.
 
 Every guide is reviewed like code: the check passes, and the person named in `reviewed` has read it before it merges
 as published.

@@ -546,6 +546,12 @@ to hold), but never a baseline name, id or row.
 
 **Facts we write ourselves**, in our own words, each with the page it came from and the date.
 
+**Guides.** A guide (`kb/guides/`, [contract](GUIDES.md)) cites only Blizzard's own posts, on
+worldofwarcraft.blizzard.com, news.blizzard.com and the US and EU forums, each linked where its claim is made with
+the day it was checked, and Everloot's own data through its pages on the site. It adds no source: other sites'
+guides are not sources, and the ledger's exceptions stay in the files and pages they are scoped to.
+`npm run kb -- guide-check` refuses any other link off the site.
+
 Game file data, and the icons, text and art shown on our pages, stay Blizzard's and are not under
 our licence. Everything else Everloot publishes is
 under CC BY-SA 4.0: anyone may reuse it with credit, and what they build from it must stay under the

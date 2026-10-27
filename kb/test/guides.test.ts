@@ -1,6 +1,8 @@
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 import { fixture } from "../../web/src/lib/talents/fixture";
 import { encodeBuild, encodeOrder } from "../../web/src/lib/talents/share";
@@ -445,5 +447,40 @@ describe("files", () => {
     expect(readGuideFiles(dir)).toEqual([{ path: PATH, source: GUIDE }]);
     const committed = checkGuides(readGuideFiles(), loadGuideCheckContext());
     expect(committed.problems).toEqual([]);
+  });
+});
+
+describe("guide-check", () => {
+  const KB = fileURLToPath(new URL("..", import.meta.url));
+  /** The real command, as CI runs it, on folders of its own. */
+  const guideCheck = (...args: string[]) => {
+    const run = spawnSync(process.execPath, [join(KB, "node_modules", "tsx", "dist", "cli.mjs"), join(KB, "src", "cli.ts"), "guide-check", ...args], { cwd: KB, encoding: "utf8" });
+    return { code: run.status, stdout: run.stdout, stderr: run.stderr };
+  };
+  const folder = (files: Record<string, string> = {}) => {
+    const dir = mkdtempSync(join(tmpdir(), "guide-check-"));
+    for (const [name, source] of Object.entries(files)) writeFileSync(join(dir, name), source);
+    return dir;
+  };
+
+  test("a --previous that is not a folder fails before anything is checked", { timeout: 60_000 }, () => {
+    const missing = join(folder(), "gone");
+    expect(guideCheck("--dir", folder(), "--previous", missing)).toMatchObject({ code: 1, stdout: "", stderr: expect.stringContaining(`--previous ${missing} is not a folder; nothing was checked`) });
+    expect(guideCheck("--dir", folder(), "--previous")).toMatchObject({ code: 1, stdout: "", stderr: expect.stringContaining("--previous needs a folder") });
+  });
+
+  test("published guides are held to the copy from before the change", { timeout: 60_000 }, () => {
+    expect(guideCheck("--dir", folder(), "--previous", folder({ "README.md": "# not a guide" }))).toMatchObject({ code: 0, stdout: expect.stringContaining("compared with 0 guides") });
+    const deleted = guideCheck("--dir", folder(), "--previous", folder({ "frost-leveling.md": GUIDE }));
+    expect(deleted).toMatchObject({ code: 1, stderr: expect.stringContaining(`${PATH}: guide 1 (frost-leveling) was published and is gone`) });
+    const unreadable = GUIDE.replace("author: Robin", "author: Robin\nrating: 5");
+    expect(guideCheck("--dir", folder(), "--previous", folder({ "frost-leveling.md": unreadable }))).toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining(`${PATH}:${lineOf(unreadable, "rating:")}: as it was before this change, the file does not read`),
+    });
+  });
+
+  test("without --previous it says the comparison was not made", { timeout: 60_000 }, () => {
+    expect(guideCheck("--dir", folder())).toMatchObject({ code: 0, stdout: expect.stringContaining("0 guides (0 published, 0 draft), 0 problems\nnot compared") });
   });
 });

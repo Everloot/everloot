@@ -48,8 +48,10 @@ the check also holds published versions to what they were:
 - A file in that copy that no longer reads (bad YAML, or front matter today's schema refuses) fails the check, with
   its line, so an edit or a deletion is never let through unchecked.
 
-No command or CI step passes the check that copy yet. Until one does, CI does not enforce these rules, and review
-has to.
+`npm run kb -- guide-check --previous <folder>` passes the check that copy. CI runs it on every pull request with
+`kb/guides` as it was at the base, and on a push to main with the folder as it was before the push. The base's files
+are read from git as data, never checked out or run. A base without the folder is compared with an empty one; a base
+that cannot be fetched or read fails the step, so the comparison is never skipped.
 
 ## Review
 
