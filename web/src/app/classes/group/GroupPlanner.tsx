@@ -39,7 +39,8 @@ const showInAddress = (plan: GroupPlan) => history.replaceState(null, "", `${loc
 /**
  * The group planner: a size, the classes in parties of five, and what they bring. The group lives in the address's
  * fragment, so the address is the link to share; it holds the size and the classes and nothing else, and the planner
- * makes no request. `roles` are the ones each class's reviewed guides are written for, read while the site builds.
+ * sends the player's choices nowhere. `roles` are the ones each class's reviewed guides are written for, read while the
+ * site builds.
  */
 export default function GroupPlanner({ roles }: { roles: Record<ClassSlug, GuideRole[]> }) {
   const [plan, setPlan] = useState<GroupPlan>(EMPTY_GROUP);
