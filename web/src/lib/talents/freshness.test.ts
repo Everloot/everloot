@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { describe, expect, test } from "vitest";
+import ts from "typescript";
 import { fixture } from "./fixture";
 import { compareGameBuilds, freshnessLines, planFreshness, type HistoryGap, type PlanFreshness } from "./freshness";
 import { PUBLISHED_CHANGES, classTalentChanges } from "./freshness-records";
@@ -395,7 +396,20 @@ test("the engine and the note only read: nothing in them can save a plan, restam
 // loads the change records and their Zod schemas for the server, so no browser code may import it, directly or through
 // a module of its own. Imports by relative path and by the "@/" alias are followed to any depth; a type-only import
 // loads nothing and is not followed.
-const CLIENT = /^(?:\s|\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)*["']use client["']/;
+function isClientSource(text: string): boolean {
+  const scanner = ts.createScanner(ts.ScriptTarget.Latest, true, ts.LanguageVariant.Standard, text);
+  return scanner.scan() === ts.SyntaxKind.StringLiteral && scanner.getTokenValue() === "use client";
+}
+
+test("the client directive scan skips comments without treating a comment or later string as a directive", () => {
+  for (const text of ['"use client";', "// header\n'use client';", '/* header */\n"use client";', '\ufeff /* header */ "use client";']) {
+    expect(isClientSource(text), text).toBe(true);
+  }
+  for (const text of ['// "use client"', '/* "use client" */ const server = true;', 'const text = "use client";', '/* unfinished']) {
+    expect(isClientSource(text), text).toBe(false);
+  }
+  expect(isClientSource(`/*${"*//*".repeat(10_000)}`)).toBe(false);
+});
 const IMPORTS = /^\s*(?:import|export)\s+(?!type\s)(?:[^'";]*?\sfrom\s*)?["']([^"']+)["']|\bimport\(\s*["']([^"']+)["']\s*\)/gm;
 const RECORDS = join(src, "lib/talents/freshness-records.ts");
 const rel = (file: string) => relative(src, file).replaceAll("\\", "/");
@@ -440,7 +454,7 @@ function importChain(file: string, target: string): string[] | null {
 }
 
 test("no browser code loads the change records: no \"use client\" file imports freshness-records, directly or through its imports", () => {
-  const clients = sourceFiles(src).filter((f) => CLIENT.test(readFileSync(f, "utf8")));
+  const clients = sourceFiles(src).filter((f) => isClientSource(readFileSync(f, "utf8")));
   expect(clients.map(rel)).toEqual(expect.arrayContaining(["components/talents/TalentCompare.tsx", "components/talents/TalentCalculator.tsx", "components/talents/WhilePlanShown.tsx"]));
   // The scan follows imports through other modules: a build link's page reaches the records through the note it renders.
   expect(importChain(join(src, "components/talents/TalentClassView.tsx"), RECORDS)?.map(rel)).toEqual([
