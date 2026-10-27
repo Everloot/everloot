@@ -51,7 +51,9 @@ test("the panel links each blue post to its page on Everloot, in blue, never to 
 test("the panel shows a post that arrived from two regions once", async () => {
   const start = html.indexOf('id="whats-new"');
   const panel = html.slice(start, html.indexOf("</section>", start));
-  const titles = [...panel.matchAll(/<a [^>]*>([^<]+)<\/a>/g)].map((m) => m[1]).filter((t) => !t.startsWith("Every change"));
+  // Every entry's title, linked (a post) or not (a game build): on a day with several new builds the panel
+  // can hold a single post, so counting links alone fails on the data, not the page.
+  const titles = [...panel.matchAll(/<li [^>]*>.*?<(?:a|span class="text-fg")[^>]*>([^<]+)<\/(?:a|span)>/g)].map((m) => m[1]);
   expect(titles.length).toBeGreaterThan(1);
   // No title is on two lines: the panel takes the folded timeline, where the regional copies are one entry.
   expect(new Set(titles).size).toBe(titles.length);
