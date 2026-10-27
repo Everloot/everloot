@@ -18,9 +18,10 @@ export default function ChangeList({ entries, types = false }: { entries: Change
               ? <Link href={page} className="text-blue-post hover:underline underline-offset-4 [overflow-wrap:anywhere]">{e.title}</Link>
               : <span className="text-fg [overflow-wrap:anywhere]">{e.title}</span>}
             <span className="block text-meta text-muted">
-              {types && <span className="font-mono text-xs">{TYPE_LABEL[e.type]} · </span>}
-              <time dateTime={e.at} className="whitespace-nowrap">{longDate(e.at.slice(0, 10))}</time>
+              {types && <span className="font-mono text-xs">{e.source === "manual" && e.type === "post" ? "Post" : TYPE_LABEL[e.type]} · </span>}
+              <time dateTime={e.source === "manual" ? e.at.slice(0, 10) : e.at} className="whitespace-nowrap">{longDate(e.at.slice(0, 10))}</time>
             </span>
+            {e.source === "manual" && <span className="block text-meta text-muted">Summary by Everloot. {e.summary} {e.url && <a href={e.url} className="text-fg underline underline-offset-4">Original source</a>}</span>}
           </li>
         );
       })}
