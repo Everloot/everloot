@@ -70,3 +70,33 @@ test("a successful next-page retry clears its earlier error", async () => {
   expect(host.textContent).toContain("Next result");
   expect(host.querySelector('[role="alert"]')).toBeNull();
 });
+
+
+test("a delayed rename cannot close the editor opened for another chat", async () => {
+  const saving = pending<WorkspaceConversationSummary>();
+  list.mockResolvedValue({ items: [row("Plan A"), row("Plan B")], nextCursor: null });
+  props.onPatch.mockReturnValue(saving.promise);
+  await act(async () => root.render(<ChatLibrary {...props} />));
+  const rowButton = (title: string) => [...host.querySelectorAll("li")].find((li) => li.textContent?.includes(title))!.querySelectorAll("button");
+  await act(async () => [...rowButton("Plan A")].find((b) => b.textContent === "Rename")!.click());
+  await act(async () => host.querySelector('input[aria-label="New title"]')!.closest("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+  await act(async () => [...rowButton("Plan B")].find((b) => b.textContent === "Rename")!.click());
+  const input = host.querySelector<HTMLInputElement>('input[aria-label="New title"]')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "Keep B draft");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => saving.resolve({ ...row("Plan A"), title: "Saved A" }));
+  expect(host.querySelector<HTMLInputElement>('input[aria-label="New title"]')?.value).toBe("Keep B draft");
+  expect(host.textContent).toContain("Saved A");
+});
+
+test("two immediate library page clicks request the cursor only once", async () => {
+  const next = pending<ReturnType<typeof page>>();
+  list.mockResolvedValueOnce(page("First", "next")).mockReturnValue(next.promise);
+  await act(async () => root.render(<ChatLibrary {...props} />));
+  await act(async () => { const b = button("Load more"); b.click(); b.click(); });
+  expect(list).toHaveBeenCalledTimes(2);
+  await act(async () => next.resolve(page("Second")));
+  expect(host.textContent?.match(/Second/g)).toHaveLength(1);
+});
