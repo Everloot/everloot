@@ -11,11 +11,14 @@ export async function auctionPaths(): Promise<string[] | null> {
 }
 
 export function auctionsUnavailable(): Response {
-  return Response.json({ error: "Market values unavailable" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  return Response.json({ error: "Market values unavailable" }, { status: 503, headers: { "Cache-Control": "no-store", "Vercel-CDN-Cache-Control": "no-store", "CDN-Cache-Control": "no-store" } });
 }
 
 /** The market rollup changes every ten minutes; crawlers do not need it fresher than hourly. */
 export const AUCTIONS_SITEMAP_HEADERS = {
   "Content-Type": "application/xml; charset=utf-8",
-  "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+  "Cache-Control": "public, max-age=0, must-revalidate",
+  // Next overwrites Cache-Control on dynamic routes, so the CDN reads these instead.
+  "Vercel-CDN-Cache-Control": "max-age=3600, stale-while-revalidate=86400",
+  "CDN-Cache-Control": "max-age=3600, stale-while-revalidate=86400",
 };

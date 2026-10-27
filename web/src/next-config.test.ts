@@ -138,3 +138,14 @@ test("Chat may ask for the microphone (dictation); every other page, the account
     expect(features((await headersFor(path))["Permissions-Policy"]!), path).toEqual(site);
   }
 });
+
+test("only the root sitemap gets static CDN caching; fallible sitemaps and private routes set their own policy", async () => {
+  const got = await headersFor("/sitemap.xml");
+  expect(got["Vercel-CDN-Cache-Control"]).toBe("max-age=3600, stale-while-revalidate=86400");
+  expect(got["CDN-Cache-Control"]).toBe("max-age=3600, stale-while-revalidate=86400");
+  for (const path of ["/", "/database-sitemap.xml", "/database-sitemap/3.xml", "/auctions-sitemap.xml", "/auctions-sitemap/0.xml", ...PROTECTED, "/sign-in", "/api/auth/session", "/api/me"]) {
+    const h = await headersFor(path);
+    expect(h["Vercel-CDN-Cache-Control"], path).toBeUndefined();
+    expect(h["CDN-Cache-Control"], path).toBeUndefined();
+  }
+});
