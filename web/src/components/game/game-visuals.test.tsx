@@ -198,13 +198,13 @@ test("raid builder: a raid's loading screen above the title, and a buff's toolti
   expect(html).not.toMatch(/data-game-credit|data-source-line/);
 });
 
-test("home: the hero shows the game's own logo and its name as text, on a phone too, with no credit line on the page", async () => {
+test("home: the hero keeps the game name and credited loading art without the game logo or repeated warning", async () => {
   vi.stubEnv("NEXT_PUBLIC_GAME_ASSETS_URL", BASE);
   vi.stubGlobal("fetch", bucket());
   const html = await render(() => Home());
   const start = html.indexOf("data-launch-banner");
   const banner = html.slice(start, html.indexOf("</section>", start));
-  expect(banner).toMatch(/<img[^>]*src="[^"]*logo\/logo-wow-forever-2x\.webp"[^>]*alt=""[^>]*aria-hidden="true"/);
+  expect(banner).not.toMatch(/<img[^>]*src="[^"]*logo\//);
   expect(banner).toMatch(/<img[^>]*src="[^"]*loading\/9249\.webp"[^>]*alt=""[^>]*aria-hidden="true"/);
   expect(banner).toContain(">World of Warcraft: Forever</p>");
   expect(banner).not.toMatch(/class="[^"]*hidden[^"]*">World of Warcraft: Forever/);
