@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { importPlan, planHash, readPlanHash, replacePlanHash, type ImportReport, type PlanImport } from "@/lib/talents/import";
-import { addPoint, emptySet, movedLater, removePoint, resetTree, type MovedPoint } from "@/lib/talents/order";
+import {
+  addPoint, canMovePoint, emptySet, movedLater, movePoint, orderRefusalText, prefixRanks, removePoint, resetTree, type MovedPoint,
+} from "@/lib/talents/order";
 import {
   canAdd, canRemove, commit, entryAtRank, isLegal, nodeMap, pointsAtLevel, pointsByTree, pointsSpent, redo, refusalText,
   startHistory, undo, levelFor, type History,
@@ -18,7 +20,7 @@ import type { PlanSet, Ranks, TalentCatalog } from "@/lib/talents/types";
 import GameIcon from "@/components/game/GameIcon";
 import { Card, CopyButton, Input, Segmented } from "@/components/ui";
 import GameTree from "./GameTree";
-import LevelingOrder from "./LevelingOrder";
+import LevelingOrder, { forSet, pointName } from "./LevelingOrder";
 import SaveBuild, { restorePendingSave } from "./SaveBuild";
 import TalentTooltip, { type TipContent } from "./TalentTooltip";
 import TalentTreeView, { assetOf, CLASS_TEXT, type TipMode } from "./TalentTreeView";
@@ -32,6 +34,13 @@ const LONG_PRESS_MS = 500;
 /** Every node at the same rank in both: the code's points all placed as it asked (a corrected choice aside). */
 const samePoints = (a: Ranks, b: Ranks) =>
   Object.keys(a).length === Object.keys(b).length && Object.entries(a).every(([id, r]) => b[Number(id)]?.rank === r.rank);
+
+/** The order with the point at `from` put at `to`: the order a refused move tried. */
+const reordered = (order: number[], from: number, to: number) => {
+  const next = [...order];
+  next.splice(to, 0, ...next.splice(from, 1));
+  return next;
+};
 
 /** " 3 points changed places …" after a take-back or tree reset that reordered points; nothing when none moved. */
 const movedNote = (moved: MovedPoint[]) =>
@@ -55,6 +64,10 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
   const [came] = useState(() => new WeakMap<PlanSet, string>());
   /** The points the last take-back or tree reset moved, shown while that set is on screen as it left it. */
   const [moves, setMoves] = useState<{ after: PlanSet; points: MovedPoint[] } | null>(null);
+  /** The spend order's preview: the trees show the set after its first `points` points, while that set is on screen. */
+  const [preview, setPreview] = useState<{ set: PlanSet; points: number } | null>(null);
+  /** The last move the order refused: the point's place and why, said again under its row while that set is on screen. */
+  const [refused, setRefused] = useState<{ set: PlanSet; at: number; text: string } | null>(null);
   const [active, setActive] = useState<0 | 1>(0);
   const [level, setLevel] = useState(rules.maxLevel);
   const [planAhead, setPlanAhead] = useState(false);
@@ -98,12 +111,39 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
     const n = nodes.get(id);
     return n ? (n.kind === "choice" ? n.entries.map((e) => e.name).join(" or ") : n.entries[0].name) : "";
   };
+  // The levels this set's points come at: the second set's wait for the level it opens at.
+  const schedule = useMemo(() => forSet(catalog, active), [catalog, active]);
+
+  // While the preview is on, the trees show the set as it stood after that many points of its order, at the level the
+  // last of them came: the ranks then, the points the character had then, and that last point's talent marked. The
+  // build bar keeps the whole set. A preview belongs to the set it was opened on and ends when another is on screen.
+  const previewing = preview?.set === set ? preview.points : null;
+  const prefix = previewing === null ? null : prefixRanks(set, previewing);
+  const shownRanks = prefix ?? ranks;
+  const shownAvailable = previewing === null ? available : pointsAtLevel(schedule, levelFor(schedule, previewing));
+  const shownPerTree = prefix ? pointsByTree(catalog, prefix) : perTree;
+  const highlighted = previewing === null ? null : set.order?.[previewing - 1] ?? null;
+  // A preview and a refused move's note belong to the set on screen: another set, an edit or an opened link ends both,
+  // and Undo back to that set does not bring them back.
+  useEffect(() => {
+    setPreview(null);
+    setRefused(null);
+  }, [set]);
+  /** The preview as the page last showed it, for a long press's timer, which runs from the render the press began in. */
+  const previewNow = useRef<number | null>(null);
+  useEffect(() => { previewNow.current = previewing; }, [previewing]);
 
   function setSets(next: Sets) {
     if (readOnly) return;
     setHistory((h) => commit(h, next));
   }
   const READ_ONLY = "This is a saved build. Open it in the calculator to change it.";
+  // Read only while the preview is on: every edit is refused, and says how to get back to changing points.
+  function previewOnly() {
+    if (previewing === null) return false;
+    setMessage("This is a preview. Turn it off to change points.");
+    return true;
+  }
   function setActiveSet(next: PlanSet) {
     const sets: Sets = [...history.present];
     sets[active] = next;
@@ -116,9 +156,11 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
     return result.set;
   }
 
-  // A failed import changes nothing: the sets, their orders and the undo steps stay as they were.
+  // A failed import changes nothing: the sets, their orders and the undo steps stay as they were. A broken order's line
+  // names the levels of the set it goes into.
   function load(text: string) {
-    const result = importPlan(catalog, text);
+    if (previewOnly()) return;
+    const result = importPlan(catalog, text, undefined, schedule);
     if (!result.ok) {
       setReport(null);
       setMessage(result.message);
@@ -140,8 +182,8 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
       // The first set rides after #plan= (the code the addon reads), the second after &plan2=, and each set's
       // spend order after &order= and &order2=. A link from before orders opens with the orders unknown.
       if (!codes.first && !codes.second) return;
-      const results = ([[codes.first, codes.firstOrder], [codes.second, codes.secondOrder]] as const)
-        .map(([c, token]) => (c ? importPlan(catalog, c, token ?? null) : null));
+      const results = ([[codes.first, codes.firstOrder, 0], [codes.second, codes.secondOrder, 1]] as const)
+        .map(([c, token, slot]) => (c ? importPlan(catalog, c, token ?? null, forSet(catalog, slot)) : null));
       for (const r of results) if (r && !r.ok) { setMessage(r.message); return; }
       const [one, two] = results as (Extract<PlanImport, { ok: true }> | null)[];
       const loaded = [one, two].filter((r) => r !== null);
@@ -183,7 +225,7 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
   // Undo and redo can bring back more points than the level now holds (spend 8, undo 3, lower the
   // level, redo 3). Raise the level to fit rather than show more points spent than allowed.
   function travel(step: (h: History<Sets>) => History<Sets>) {
-    if (readOnly) return;
+    if (readOnly || previewOnly()) return;
     const next = step(history);
     if (next === history) return;
     const needed = Math.max(...next.present.map((s) => levelFor(catalog, pointsSpent(s.ranks))));
@@ -196,6 +238,7 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
 
   function doAdd(id: number, choice?: number) {
     if (readOnly) { setMessage(READ_ONLY); return; }
+    if (previewOnly()) return;
     const node = nodes.get(id)!;
     // The point joins the end of the set's order.
     const next = addPoint(catalog, set, id, available, choice);
@@ -218,6 +261,7 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
   // legal order, the point stays and the page says why.
   function doRemove(id: number) {
     if (readOnly) { setMessage(READ_ONLY); return; }
+    if (previewOnly()) return;
     const node = nodes.get(id)!;
     const next = removePoint(catalog, set, id);
     if (next === set) {
@@ -228,9 +272,40 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
       return;
     }
     setActiveSet(next);
-    const moved = movedLater(catalog, set, next);
+    const moved = movedLater(schedule, set, next);
     setMoves({ after: next, points: moved });
     setMessage(`${nameOf(id)}: rank ${next.ranks[id]?.rank ?? 0} of ${node.maxRanks}.${movedNote(moved)}`);
+  }
+
+  // A point of the spend order moves one place earlier or later, through the order engine. A move that would take a
+  // point before the rules allow it is refused with the engine's own reason: the talent, the level and what it needs.
+  function doMove(from: number, to: number) {
+    if (previewOnly() || !set.order) return;
+    const order = set.order;
+    const id = order[from];
+    const what = pointName(nodes.get(id)!, ranks, order.slice(0, from + 1).filter((n) => n === id).length);
+    const next = movePoint(catalog, set, from, to);
+    if (next !== set) {
+      setActiveSet(next);
+      setMessage(`${what} is now point ${to + 1}, at level ${levelFor(schedule, to + 1)}.`);
+      return;
+    }
+    const verdict = canMovePoint(catalog, set, from, to);
+    const text = verdict && !verdict.ok ? `${what} stays at point ${from + 1}. ${orderRefusalText(schedule, ranks, reordered(order, from, to), verdict)}`
+      : to < 0 ? `${what} is already the first point.`
+      : to >= order.length ? `${what} is already the last point.`
+      : `${what} stays at point ${from + 1}: the point ${to < from ? "before" : "after"} it is on the same talent.`;
+    setMessage(text);
+    setRefused({ set, at: from, text });
+  }
+
+  // The preview changes only what the trees show, never the set. A phone shows the tree its point went to. A long press
+  // under way is cancelled, so it cannot take a point back once the preview is on.
+  function showPreview(points: number | null) {
+    endPress();
+    setPreview(points === null ? null : { set, points });
+    const tree = points === null ? undefined : nodes.get(set.order?.[points - 1] ?? -1)?.treeId;
+    if (tree !== undefined) setView(catalog.trees.findIndex((t) => t.id === tree));
   }
 
   function setLevelClamped(value: number) {
@@ -306,7 +381,9 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
     press.current = setTimeout(() => {
       suppressClick.current = true;
       if (assets) onTip(id, "press");
-      else doRemove(id);
+      // This runs half a second after the press, from the render it began in: only the ref knows whether the preview
+      // has come on since.
+      else if (previewNow.current === null) doRemove(id);
     }, LONG_PRESS_MS);
   }
   // Touch browsers also send a context menu event on a long press. Whichever arrives first takes
@@ -395,22 +472,22 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
 
   const selectedNode = selected === null ? null : nodes.get(selected) ?? null;
 
-  // The tooltip of the node under the pointer, focus or long press.
+  // The tooltip of the node under the pointer, focus or long press, as the trees show it.
   let tipContent: TipContent | null = null;
   let tipAnchor: string | null = null;
   const tipNode = tip ? nodes.get(tip.id) ?? null : null;
   if (assets && tipNode) {
-    const rank = ranks[tipNode.id]?.rank ?? 0;
+    const rank = shownRanks[tipNode.id]?.rank ?? 0;
     const choice = tipNode.kind === "choice";
     const entries = choice ? tipNode.entries : [entryAtRank(tipNode, rank)];
-    const verdict = canAdd(catalog, ranks, tipNode.id, available);
+    const verdict = canAdd(catalog, shownRanks, tipNode.id, shownAvailable);
     tipAnchor = choice ? `talent-${tipNode.id}-0` : `talent-${tipNode.id}`;
     tipContent = {
       title: entries.map((e) => e.name).join(" or "),
       rank: `Rank ${rank}/${tipNode.maxRanks}`,
       text: entries.map((e) => assetOf(assets, e)?.text).filter(Boolean).join("\n\n") || null,
       partial: entries.some((e) => assetOf(assets, e)?.partial),
-      lock: verdict.ok || verdict.reason === "max-rank" ? null : refusalText(verdict.reason!, tipNode, catalog, ranks),
+      lock: verdict.ok || verdict.reason === "max-rank" ? null : refusalText(verdict.reason!, tipNode, catalog, shownRanks),
       label: `${assets.label} · build ${assets.version}`,
     };
   }
@@ -424,6 +501,7 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
   // Take every point out of one tree. Refused when another tree's talents need those points, or when the points left
   // could not be spent in any legal order; either way the page says which.
   function onResetTree(treeId: number, name: string) {
+    if (previewOnly()) return;
     const next = resetTree(catalog, set, treeId);
     if (next === set) {
       const left: Ranks = {};
@@ -434,7 +512,7 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
       return;
     }
     setActiveSet(next);
-    const moved = movedLater(catalog, set, next);
+    const moved = movedLater(schedule, set, next);
     setMoves({ after: next, points: moved });
     setMessage(`${name} was reset. Undo brings it back.${movedNote(moved)}`);
   }
@@ -483,6 +561,19 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
     };
   }, []);
 
+  // A tree narrower than its talents scrolls sideways (three trees side by side on a tablet). The preview's talent and
+  // its mark come into their own tree's view, 16 px inside its edge; the page itself does not move.
+  const trees = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const node = trees.current?.querySelector<HTMLElement>("[data-highlighted]");
+    const box = node?.closest<HTMLElement>("[data-tree-scroll]");
+    if (!node || !box) return;
+    const edge = box.getBoundingClientRect();
+    const at = node.getBoundingClientRect();
+    if (at.left < edge.left + 16) box.scrollLeft -= edge.left + 16 - at.left;
+    else if (at.right > edge.right - 16) box.scrollLeft += at.right - (edge.right - 16);
+  }, [highlighted]);
+
   return (
     // On a phone the set and tree switches are 44 px tall like the calculator's other buttons (the switch itself is 40).
     <div onKeyDown={onKeyDown} data-calculator className="max-md:[&_[data-segmented]_button]:min-h-11">
@@ -504,7 +595,9 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
           </div>
           <div className="order-last flex items-end gap-6 lg:order-none">
             <Stat label="Points left" value={left} />
-            <Stat label="Level needed" value={spent === 0 ? "–" : levelFor(catalog, spent)} />
+            {/* The level the set's last point comes at, so set 2's is never below the level it opens at, as its order says.
+                The level slider keeps its own meaning: the points a level gives. */}
+            <Stat label="Level needed" value={spent === 0 ? "–" : levelFor(schedule, spent)} />
             <label className="flex flex-col gap-0.5">
               <span className="text-xs text-muted">Level</span>
               <span className="flex items-center gap-3">
@@ -538,9 +631,9 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
           />
           {!readOnly && (
             <>
-              <button type="button" className="btn px-3 text-sm sm:px-5" onClick={() => travel(undo)} disabled={history.past.length === 0}>Undo</button>
-              <button type="button" className="btn px-3 text-sm sm:px-5" onClick={() => travel(redo)} disabled={history.future.length === 0}>Redo</button>
-              <button type="button" className="btn px-3 text-sm sm:px-5" onClick={() => { setActiveSet(emptySet()); setMessage("This set was reset. Undo brings it back."); }} disabled={spent === 0}><span className="sm:hidden">Reset</span><span className="hidden sm:inline">Reset {setName}</span></button>
+              <button type="button" className="btn px-3 text-sm sm:px-5" onClick={() => travel(undo)} disabled={history.past.length === 0 || previewing !== null}>Undo</button>
+              <button type="button" className="btn px-3 text-sm sm:px-5" onClick={() => travel(redo)} disabled={history.future.length === 0 || previewing !== null}>Redo</button>
+              <button type="button" className="btn px-3 text-sm sm:px-5" onClick={() => { if (previewOnly()) return; setActiveSet(emptySet()); setMessage("This set was reset. Undo brings it back."); }} disabled={spent === 0 || previewing !== null}><span className="sm:hidden">Reset</span><span className="hidden sm:inline">Reset {setName}</span></button>
               <button type="button" className="btn px-3 text-sm sm:px-5" aria-pressed={removeMode} onClick={() => setRemoveMode(!removeMode)}>
                 <span className="sm:hidden">Take back: {removeMode ? "on" : "off"}</span><span className="hidden sm:inline">Take points back: {removeMode ? "on" : "off"}</span>
               </button>
@@ -564,14 +657,17 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
           <div ref={treeSwitch} className={`top-header z-10 border-b border-line bg-panel px-4 pb-2 pt-1 md:hidden ${switchSticks ? "[@media(min-height:37.5rem)]:sticky" : ""}`}>
             {/* A long tree name wraps inside its button, and a word too long for it is hyphenated, rather than running
                 into the next one. */}
-            <Segmented stretch label="Show tree" value={view} onChange={setView} options={catalog.trees.map((t, i) => ({ value: i, label: <span className="min-w-0 whitespace-normal text-center leading-tight [overflow-wrap:anywhere] hyphens-auto">{t.name} {perTree.get(t.id) ?? 0}</span> }))} />
-            {/* The status line already reads every change out; this copy is for the eye only. */}
-            <p aria-hidden="true" data-tree-status className="mt-1 text-xs text-fg-2">{left} left · Set {active + 1}</p>
+            <Segmented stretch label="Show tree" value={view} onChange={setView} options={catalog.trees.map((t, i) => ({ value: i, label: <span className="min-w-0 whitespace-normal text-center leading-tight [overflow-wrap:anywhere] hyphens-auto">{t.name} {shownPerTree.get(t.id) ?? 0}</span> }))} />
+            {/* The status line already reads every change out; this copy is for the eye only. During a preview it says which
+                point the trees show, since the preview's own controls are under the trees. */}
+            <p aria-hidden="true" data-tree-status className="mt-1 text-xs text-fg-2">
+              {previewing === null ? `${left} left · Set ${active + 1}` : `Set ${active + 1} preview · point ${previewing} of ${set.order?.length} · level ${levelFor(schedule, previewing)}`}
+            </p>
           </div>
 
-          <div className="grid gap-4 p-4 max-md:pt-2 md:grid-cols-3" onFocus={keepClear} onPointerDown={onPointerDown} onPointerUp={endPress} onPointerLeave={endPress} onPointerCancel={endPress} onClickCapture={onClickCapture} onContextMenu={onContextMenu}>
+          <div ref={trees} className="grid gap-4 p-4 max-md:pt-2 md:grid-cols-3" onFocus={keepClear} onPointerDown={onPointerDown} onPointerUp={endPress} onPointerLeave={endPress} onPointerCancel={endPress} onClickCapture={onClickCapture} onContextMenu={onContextMenu}>
             {catalog.trees.map((tree, i) => {
-              const points = perTree.get(tree.id) ?? 0;
+              const points = shownPerTree.get(tree.id) ?? 0;
               return (
                 <section key={tree.id} className={`min-w-0 ${i === view ? "" : "hidden md:block"}`} aria-label={tree.name}>
                   {/* On a phone the switch above carries the tree's name and points, and its Reset follows the talents; the
@@ -581,20 +677,21 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
                       {treeIcons?.[i] && <GameIcon src={treeIcons[i]!} size={24} className="max-md:hidden" />}
                       <h2 className={`min-w-0 truncate text-base font-semibold max-md:sr-only ${classText}`}>{tree.name}</h2>
                       <span className={`ml-auto font-mono text-xl tabular-nums max-md:hidden ${points === 0 ? "text-muted" : "text-fg"}`}>{points}</span>
-                      {!readOnly && <button type="button" className="min-h-11 px-1 text-sm text-muted hover:text-fg disabled:opacity-50 max-md:hidden" disabled={points === 0} aria-label={`Reset ${tree.name}`} onClick={() => onResetTree(tree.id, tree.name)}>Reset</button>}
+                      {!readOnly && <button type="button" className="min-h-11 px-1 text-sm text-muted hover:text-fg disabled:opacity-50 max-md:hidden" disabled={points === 0 || previewing !== null} aria-label={`Reset ${tree.name}`} onClick={() => onResetTree(tree.id, tree.name)}>Reset</button>}
                     </div>
                     <div className="h-1 overflow-hidden rounded-full bg-canvas max-md:hidden" aria-hidden="true">
-                      <div className={`h-full rounded-full bg-current ${classText}`} style={{ width: `${available ? Math.min(100, (points / available) * 100) : 0}%` }} />
+                      <div className={`h-full rounded-full bg-current ${classText}`} style={{ width: `${shownAvailable ? Math.min(100, (points / shownAvailable) * 100) : 0}%` }} />
                     </div>
                   </div>
                   {(() => {
                     const props = {
-                      catalog, tree, ranks, available, spent: points, selected, roving: rovingFor(tree.id), onAdd: doAdd, onTip,
+                      catalog, tree, ranks: shownRanks, available: shownAvailable, spent: points, selected, roving: rovingFor(tree.id), highlighted,
+                      onAdd: doAdd, onTip,
                       onSelect: (id: number) => { setSelected(id); setRovingByTree((r) => ({ ...r, [nodes.get(id)!.treeId]: id })); },
                     };
                     return game ? <GameTree {...props} assets={assets} /> : <TalentTreeView {...props} assets={assets} />;
                   })()}
-                  {!readOnly && <button type="button" data-tree-reset className="mt-2 min-h-11 px-1 text-sm text-muted hover:text-fg disabled:opacity-50 md:hidden" disabled={points === 0} aria-label={`Reset ${tree.name}`} onClick={() => onResetTree(tree.id, tree.name)}>Reset {tree.name}</button>}
+                  {!readOnly && <button type="button" data-tree-reset className="mt-2 min-h-11 px-1 text-sm text-muted hover:text-fg disabled:opacity-50 md:hidden" disabled={points === 0 || previewing !== null} aria-label={`Reset ${tree.name}`} onClick={() => onResetTree(tree.id, tree.name)}>Reset {tree.name}</button>}
                 </section>
               );
             })}
@@ -621,7 +718,8 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
 
         {/* The set's spend order, after the trees and outside the phone's sticky switch. */}
         {!readOnly && (
-          <LevelingOrder catalog={catalog} set={set} setName={setName} moved={moves?.after === set ? moves.points : []}
+          <LevelingOrder catalog={catalog} set={set} slot={active} setName={setName} moved={moves?.after === set ? moves.points : []}
+            preview={previewing} onPreview={showPreview} onMove={doMove} refused={refused?.set === set ? refused : null}
             onEdit={(next, text) => { setActiveSet(next); setMessage(text); }} onMessage={setMessage} />
         )}
 
@@ -659,7 +757,7 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
             <label className="block text-sm text-fg-2" htmlFor="talent-paste">Share code or link</label>
             <div className="flex gap-2">
               <Input id="talent-paste" mono value={pasted} onChange={(e) => setPasted(e.target.value)} placeholder="Paste a share code or link" className="flex-1 text-xs" />
-              <button type="submit" className="btn px-3 text-sm sm:px-5">Load into {setName}</button>
+              <button type="submit" className="btn px-3 text-sm sm:px-5" disabled={previewing !== null}>Load into {setName}</button>
             </div>
           </form>
           {report && (
