@@ -1,6 +1,6 @@
 import type { ShellCharacter } from "./account-shell-types";
 import { readProfile, toShell } from "./account-shell";
-import { keyLive, keySummary } from "./api-keys";
+import { keyLive, keySummary, type KeyRow } from "./api-keys";
 import { guardOn } from "./data-guard";
 import { DESKTOP_KEY_LABEL } from "./desktop-connect";
 import { profilesOn } from "./profiles";
@@ -17,8 +17,11 @@ export interface AccountOverview {
   characters: number | null;
   /** EVERLOOT_SAVED_BUILDS. */
   builds: number | null;
-  /** EVERLOOT_DATA_GUARD. `live`: keys not revoked or expired. `desktop`: a live key made by the Desktop App's connect page. */
-  keys: { live: number; requests: number; desktop: boolean } | null;
+  /**
+   * EVERLOOT_DATA_GUARD. `live`: keys not revoked or expired, and `liveKeys` those keys, newest first (Integrations).
+   * `desktop`: a live key made by the Desktop App's connect page.
+   */
+  keys: { live: number; requests: number; desktop: boolean; liveKeys: KeyRow[] } | null;
 }
 
 /** Every read is filtered by the signed-in user's id, with the service role, on the server. */
@@ -34,6 +37,7 @@ export async function loadOverview(user: AccountUser, env: Record<string, string
     guardOn(env) ? keySummary(user.id) : null,
   ]);
   const shell = profiles ? toShell(user, profileRow, characters ?? []) : null;
+  const liveKeys = keys ? keys.keys.filter((k) => keyLive(k)) : [];
   return {
     memberSince: created[0]?.created_at ?? null,
     profile: shell && {
@@ -45,9 +49,10 @@ export async function loadOverview(user: AccountUser, env: Record<string, string
     characters: characters && characters.length,
     builds: buildRows && buildRows.length,
     keys: keys && {
-      live: keys.keys.filter((k) => keyLive(k)).length,
+      live: liveKeys.length,
       requests: keys.requests,
-      desktop: keys.keys.some((k) => keyLive(k) && k.label === DESKTOP_KEY_LABEL),
+      desktop: liveKeys.some((k) => k.label === DESKTOP_KEY_LABEL),
+      liveKeys,
     },
   };
 }

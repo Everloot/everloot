@@ -15,6 +15,7 @@ import { profilesOn } from "@/lib/profiles";
 import { savedBuildsOn } from "@/lib/saved-builds";
 import { pageMetadata } from "@/lib/seo";
 import { getUser } from "@/lib/supabase/server";
+import Integrations from "./integrations";
 import OverviewRows from "./overview-rows";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +33,7 @@ const section = "scroll-mt-20 space-y-2";
 const sections = (withProfile: boolean) => [
   { id: "overview", label: "Overview" },
   ...(withProfile ? [{ id: "profile", label: "Profile" }] : []),
+  { id: "integrations", label: "Integrations" },
   { id: "keys", label: "API keys" },
   { id: "chat-keys", label: "Chat keys" },
   { id: "data", label: "Data and privacy" },
@@ -118,6 +120,11 @@ export default async function AccountPage() {
             </ul>
           </section>
         )}
+
+        <section id="integrations" aria-labelledby="integrations-heading" className="scroll-mt-20 space-y-4">
+          <h2 id="integrations-heading" className={heading}>Integrations</h2>
+          <Integrations methods={methods} name={user.name} overview={overview} />
+        </section>
 
         <section id="keys" aria-labelledby="keys-heading" className="scroll-mt-20 space-y-3">
           <h2 id="keys-heading" className={heading}>API keys</h2>

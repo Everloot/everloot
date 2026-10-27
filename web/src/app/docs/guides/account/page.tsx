@@ -49,7 +49,7 @@ export default function Page() {
 
       <H2 id="your-account">Your account page</H2>
       <P>
-        <Link href="/account" className={docLink}>Your account</Link> has five sections, with links to each at the top.
+        <Link href="/account" className={docLink}>Your account</Link> has six sections, with links to each at the top.
         Only you can open it.
       </P>
       <List>
@@ -63,6 +63,11 @@ export default function Page() {
         <li>
           <strong>Profile.</strong> {profiles ? <>Your display name, the</> : <>The</>} email on the account if it has one,
           and a link to change your password if you signed up with one.{profiles && <> Your handle, display name and status are edited on <Link href="/settings" className={docLink}>Settings</Link>.</>}
+        </li>
+        <li>
+          <strong>Integrations.</strong> What is connected to your account: Battle.net, if you sign in with it
+          {keys && <>, and each active API key, the Desktop App&apos;s included. <strong>Remove access</strong> on a key revokes it</>}.
+          Below that is what you can add: the addon, the Desktop App, Claude and ChatGPT, each with a link to its download or setup steps.
         </li>
         <li><strong>API keys.</strong> Your keys, described below.</li>
         <li>
