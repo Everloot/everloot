@@ -87,7 +87,7 @@ function ModelPicker({ preset, models, value, onPick, name }: { preset: ChatProv
         <div className="flex flex-wrap gap-2">
           <input id={models.length ? `${id}-other` : `${id}-model`} name={name ? `${name}Text` : undefined} spellCheck={false} value={text}
             aria-label={models.length ? `${label} id` : label} onChange={(e) => setText(e.target.value)}
-            className={`${field} min-w-0 flex-1`} placeholder={models.length ? "A model id from the provider" : "The model you pulled, like qwen3:8b"} />
+            className={`${field} min-w-0 flex-1`} placeholder={models.length ? "A model id from the provider" : "The model you pulled, like qwen3:4b"} />
           {onPick && <button type="button" className={small} onClick={() => onPick(text.trim())}>Use model</button>}
         </div>
       )}

@@ -114,13 +114,16 @@ test("an anthropic entry from before the marker, on the app's own key file, stil
   expect(existsSync(join(d, "anthropic.key"))).toBe(false);
 });
 
+test("a blank Ollama model takes the small recommended one, like every provider's first model", () => {
+  expect(setProvider(dir(), { kind: "ollama", model: "" }).model).toBe("qwen3:4b");
+});
+
 test("bad pastes are refused before anything is written", () => {
   const d = dir();
   expect(() => setProvider(d, { kind: "anthropic", key: "hunter2" })).toThrow(/sk-ant-/);
   expect(() => setProvider(d, { kind: "openrouter", key: ANT })).toThrow(/sk-or-/);
   expect(() => setProvider(d, { kind: "openrouter", key: "" })).toThrow(/Paste the key first.*sk-or-/);
   expect(() => setProvider(d, { kind: "opencode", key: "" })).toThrow(/Paste the key/);
-  expect(() => setProvider(d, { kind: "ollama", model: "" })).toThrow(/Pick or type a model/);
   expect(() => setProvider(d, { kind: "ollama", model: "not a model id" })).toThrow(/model id/);
   expect(() => setProvider(d, { kind: "nope" as never })).toThrow(/Unknown provider/);
   expect(existsSync(join(d, "config.json"))).toBe(false);
