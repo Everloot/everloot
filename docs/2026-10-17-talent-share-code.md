@@ -84,12 +84,13 @@ A reader checks the token against the code it came with:
 | a node more often than its rank, or an index past the code's nodes | `extra-points` |
 | a node less often than its rank | `missing-points` |
 
-Whitespace before or after the token is ignored, and whitespace inside it makes the token
-`malformed`. Whitespace means exactly the code points that ECMAScript's `String.prototype.trim`
-removes (ECMA-262's WhiteSpace and LineTerminator, with the space separators of Unicode 18.0):
-U+0009 to U+000D, U+0020, U+00A0, U+1680, U+2000 to U+200A, U+2028, U+2029, U+202F, U+205F, U+3000
-and U+FEFF. A reader in another language trims this set rather than its own default, matching the
-UTF-8 forms if it reads bytes.
+Whitespace before or after the token is ignored. Whitespace inside it damages its shape, so the
+token is `malformed`, unless it starts with a version above 1, which is `newer-version` whatever
+follows (see the order of errors below). Whitespace means exactly the code points that ECMAScript's
+`String.prototype.trim` removes (ECMA-262's WhiteSpace and LineTerminator, with the space separators
+of Unicode 18.0): U+0009 to U+000D, U+0020, U+00A0, U+1680, U+2000 to U+200A, U+2028, U+2029,
+U+202F, U+205F, U+3000 and U+FEFF. A reader in another language trims this set rather than its own
+default, matching the UTF-8 forms if it reads bytes.
 
 A token with more than one of the problems in the table gets one error, the first that applies in
 this order: a version above 1 is `newer-version` whatever follows it; then a damaged shape is
@@ -102,8 +103,11 @@ code places on the tree on screen, because the order names points the build no l
 
 A known order only means the token's points match the talents that loaded. Whether each point could
 be spent at its place in the order (row gates, prerequisites, the level each point arrives at) is a
-separate check against the tree's rules, and reading the token does not make it. The calculator does
-not read or keep orders yet.
+separate check against the tree's rules, and reading the token does not make it. The calculator makes
+that check when it opens a plan (`importPlan`): an order that passes opens with its own label, and one
+that does not opens the talents with the order unknown and says where it broke. A token it cannot use
+stays in its links, as it came, until that set changes. New points join the order as planned; an
+order is generated, and labelled provisional, only when the player asks for one.
 
 ### Orders in a link
 
@@ -116,6 +120,12 @@ The codes keep their places, and a reader that stops at `&` ignores the orders: 
 orders still reads both sets, and the addon still reads the one set it always read (the first set,
 or the second when the link carries only that one). An order is left out when its set has no code.
 A link without orders is the same address as before.
+
+The calculator's Copy for addon gives one set as a full class page link with only that set's own
+pair: `#plan=<code>&order=<token>` for the first set, `#plan2=<code>&order2=<token>` for the second.
+Its build link keeps the codes in the path, where a link preview can name the build, and carries
+their orders in the fragment: `/tools/talents/mage/b/EL1-.../EL1-...#order=O1p-...&order2=O1g-...`.
+Opened, it moves to the class page address above.
 
 Reading a link is literal: the site's `readPlanHash` returns each of the four keys it finds, so a
 hand-edited link such as `#plan2=...&order=...` gives a first set's order with no first set's code.

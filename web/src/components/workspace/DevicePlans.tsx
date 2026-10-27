@@ -5,15 +5,16 @@ import { className } from "@/components/builds/describe";
 import { Card, CopyButton, Field, SectionHeading } from "@/components/ui";
 import {
   BACKUP_TOO_LARGE, WORKSPACE_LIMITS, applyImport, bucketKey, copyPlan, deletePlan, deviceStorage, editPlan, exportBackup,
-  orderState, previewImport, readPlanText, readWorkspace, savePlan,
+  orderState, previewImport, readPlanText, readWorkspace, sameOwner, savePlan,
   type Failure, type ImportPreview, type LocalPlan, type Owner, type PlanText, type ReadResult,
 } from "@/lib/player-workspace";
-import { planHash } from "@/lib/talents/import";
+import { planHash, replacePlanHash } from "@/lib/talents/import";
 import { useWorkspaceOwner } from "./LocalPlanSave";
 
 // /tools/builds: the plans kept in this browser (lib/player-workspace.ts) for whoever is signed in now, or for
 // the browser signed out. Named, opened, edited, copied, deleted, backed up and restored here, with nothing sent:
-// the page asks the network only who is signed in.
+// the page asks the network only who is signed in. The calculator's Save on this device opens it with the plan in
+// the address fragment, to be named and saved here.
 
 const action = "inline-flex min-h-8 items-center px-1.5 text-cell text-fg-2 hover:text-accent disabled:opacity-60";
 const textarea = "w-full rounded-control border border-edge bg-canvas px-3 py-2 text-base text-fg";
@@ -50,8 +51,29 @@ function saveFile(text: string, fileName: string) {
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
+/** Takes the sent plan out of the address, leaving any other part there (a cookie choice) as it was. */
+function dropSent() {
+  const hash = replacePlanHash(window.location.hash, "");
+  if (hash !== window.location.hash) window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}${hash}`);
+}
+
 export default function DevicePlans() {
   const [state, retry] = useWorkspaceOwner();
+  const owner = state.status === "ready" ? state.owner : null;
+  // The plan the calculator sent, read from the address once, and the owner it was first shown to. It is offered to
+  // that owner only, after the check says who that is, and nothing is saved until Save is pressed. Another owner
+  // withdraws it: what was typed for one owner is never saved for the next.
+  const [sent, setSent] = useState<{ plan: PlanText; owner: Owner | null } | null>(null);
+  const [withdrawn, setWithdrawn] = useState(false);
+  useEffect(() => {
+    if (/[#&]plan2?=/.test(window.location.hash)) setSent({ plan: readPlanText(window.location.hash), owner: null });
+  }, []);
+  useEffect(() => {
+    if (!owner || !sent) return;
+    if (!sent.owner) setSent({ ...sent, owner });
+    else if (!sameOwner(sent.owner, owner)) { setSent(null); setWithdrawn(true); dropSent(); }
+  }, [owner, sent]);
+
   if (state.status === "checking") return <p role="status" className="text-sm text-muted">Checking who is signed in…</p>;
   if (state.status === "unavailable") {
     return (
@@ -61,11 +83,21 @@ export default function DevicePlans() {
       </Card>
     );
   }
+  const offered = sent && (!sent.owner || sameOwner(sent.owner, state.owner)) ? sent.plan : null;
   // One bucket at a time. Another owner remounts everything below, so nothing begun for one bucket ends in another.
-  return <Bucket key={bucketKey(state.owner)} owner={state.owner} />;
+  return (
+    <>
+      {withdrawn && (
+        <p role="status" className="mb-6 text-sm text-fg-2">
+          Who is signed in here changed, so the plan from the calculator was not saved. To keep it, go back to the calculator and press Save on this device again.
+        </p>
+      )}
+      <Bucket key={bucketKey(state.owner)} owner={state.owner} sent={offered} onSentDone={() => { setSent(null); dropSent(); }} />
+    </>
+  );
 }
 
-function Bucket({ owner }: { owner: Owner }) {
+function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | null; onSentDone: () => void }) {
   const [read, setRead] = useState<ReadResult | null>(null);
   const [message, setMessage] = useState<{ text: string; alert: boolean } | null>(null);
   const reload = useCallback(() => setRead(readWorkspace(deviceStorage(), owner)), [owner]);
@@ -99,6 +131,9 @@ function Bucket({ owner }: { owner: Owner }) {
   return (
     <div className="space-y-8">
       {intro}
+      {sent && (sent.ok
+        ? <SaveSent found={sent} plans={read.workspace.plans} owner={owner} onDone={(saved) => { onSentDone(); if (saved) after({ ok: true }, saved); }} />
+        : <SentProblem message={sent.message} onClose={onSentDone} />)}
       <SaveFromLink owner={owner} onSaved={(text) => after({ ok: true }, text)} />
       <section aria-labelledby="device-plans">
         <SectionHeading id="device-plans" note={`${plans.length} of ${WORKSPACE_LIMITS.plans}, newest first. ${UNCHECKED}`}>Your plans</SectionHeading>
@@ -242,6 +277,71 @@ function SaveFromLink({ owner, onSaved }: { owner: Owner; onSaved: (text: string
         </form>
       )}
       {error && <p role="alert" className="mt-3 text-sm text-danger">{error}</p>}
+    </Card>
+  );
+}
+
+/** The plan Save on this device sent from the calculator: saved here by name, as a new plan or in place of one of this
+ *  class's plans, only when Save is pressed. */
+function SaveSent({ found, plans, owner, onDone }: {
+  found: Extract<PlanText, { ok: true }>;
+  plans: LocalPlan[];
+  owner: Owner;
+  /** What was saved, to say so; null when the plan was let go unsaved. */
+  onDone: (saved: string | null) => void;
+}) {
+  const fresh = `${className(found.classSlug)} plan`;
+  const same = plans.filter((p) => p.classSlug === found.classSlug);
+  const [form, setForm] = useState({ target: "", name: fresh, notes: "" });
+  const [error, setError] = useState<string | null>(null);
+
+  function pick(target: string) {
+    const plan = same.find((p) => p.id === target);
+    setForm({ target: plan?.id ?? "", name: plan?.name ?? fresh, notes: plan?.notes ?? "" });
+  }
+
+  function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const result = savePlan(deviceStorage(), owner, { id: form.target || null, name: form.name, notes: form.notes, classSlug: found.classSlug, codes: found.codes, orders: found.orders });
+    if (!result.ok) { setError(result.message); return; }
+    onDone(`${form.target ? "Updated" : "Saved"} "${result.plan.name}" on this device.`);
+  }
+
+  return (
+    <Card as="section" aria-labelledby="device-plans-sent">
+      <SectionHeading id="device-plans-sent" note="Sent from the talent calculator. Nothing is saved until you press Save.">Save the plan from the calculator</SectionHeading>
+      <form aria-label="Save the plan from the calculator" onSubmit={save} className="grid gap-3 sm:grid-cols-2">
+        <p className="text-sm text-fg-2 sm:col-span-2">{className(found.classSlug)} · {setsLine(found.codes, found.orders)}</p>
+        <p className="text-sm text-muted sm:col-span-2">{UNCHECKED}</p>
+        <label className="block space-y-1 text-sm">
+          <span className="block text-muted">Save as</span>
+          <select value={form.target} onChange={(e) => pick(e.target.value)} className="min-h-11 w-full rounded-control border border-edge bg-canvas px-3 text-base text-fg">
+            <option value="">A new plan</option>
+            {same.map((p) => <option key={p.id} value={p.id}>Replace {p.name}</option>)}
+          </select>
+        </label>
+        <Field label="Name" required maxLength={WORKSPACE_LIMITS.name} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        <label className="block space-y-1 text-sm sm:col-span-2">
+          <span className="block text-muted">Notes (optional)</span>
+          <textarea maxLength={WORKSPACE_LIMITS.notes} rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={textarea} />
+        </label>
+        <div className="flex flex-wrap gap-2 sm:col-span-2">
+          <button type="submit" className="btn btn-primary text-sm">{form.target ? "Replace plan" : "Save plan"}</button>
+          <button type="button" className="btn text-sm" onClick={() => onDone(null)}>Cancel</button>
+        </div>
+        {error && <p role="alert" className="text-sm text-danger sm:col-span-2">{error}</p>}
+      </form>
+    </Card>
+  );
+}
+
+/** A plan the calculator sent that does not read: why, and nothing saved. */
+function SentProblem({ message, onClose }: { message: string; onClose: () => void }) {
+  return (
+    <Card as="section" aria-labelledby="device-plans-sent">
+      <SectionHeading id="device-plans-sent">Save the plan from the calculator</SectionHeading>
+      <p role="alert" className="text-sm text-danger">{message} Nothing was saved.</p>
+      <button type="button" className="btn mt-3 text-sm" onClick={onClose}>Close</button>
     </Card>
   );
 }

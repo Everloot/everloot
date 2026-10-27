@@ -1,9 +1,12 @@
+import { adoptOrder, orderRefusalText, validateOrder } from "./order";
 import { levelFor, pointsSpent } from "./rules";
 import { ORDER_LIMIT, decodeBuild, decodeOrder, resolveBuild, type DecodeError, type OrderError, type OrderOrigin } from "./share";
-import type { Ranks, TalentCatalog } from "./types";
+import type { PlanSet, Ranks, TalentCatalog } from "./types";
 
 // What the page does with text a visitor pastes or opens: a bare share code, or a whole link that
 // carries one after `#plan=`. Returns plain-English lines for everything that did not load as asked.
+// importCode reads the talents and the order token; importPlan, the calculator's, adds the tree's check
+// of the order (order.ts) and returns the set to put on screen.
 
 export interface ImportReport {
   /** The game build the code was made on, and the one on screen. */
@@ -71,6 +74,16 @@ export function planHash(first: string | null, second: string | null, firstOrder
   return parts.length ? `#${parts.join("&")}` : "";
 }
 
+const PLAN_PART = /^(?:plan|plan2|order|order2)=/;
+
+/** `hash` with its plan parts (plan, plan2, order, order2) swapped for those of `plan`, a planHash, which go
+ *  first. Every other part, such as a cookie choice kept in the address, stays after them as it was. */
+export function replacePlanHash(hash: string, plan: string): string {
+  const others = hash.replace(/^#/, "").split("&").filter((part) => part && !PLAN_PART.test(part));
+  const parts = [...(plan ? [plan.slice(1)] : []), ...others];
+  return parts.length ? `#${parts.join("&")}` : "";
+}
+
 export function extractCode(text: string): string {
   const fromLink = /[#&?]plan=([A-Za-z0-9_.-]+)/.exec(text);
   return fromLink ? fromLink[1] : text.trim();
@@ -120,4 +133,40 @@ function importedOrder(token: string, asked: Ranks, placed: Ranks): ImportedOrde
   if (!decoded.ok) return { known: false, reason: decoded.error };
   if (pointsSpent(placed) < pointsSpent(asked)) return { known: false, reason: "not-placed" };
   return { known: true, origin: decoded.origin, order: decoded.order };
+}
+
+/** A set as it loaded: its ranks, and its order only when the token reads and every point of it could be taken
+ *  where it stands on this tree. `requested` is what the code asked for, before the tree placed it; `token` is the
+ *  order token that came with the code, as it came. */
+export type PlanImport =
+  | { ok: true; set: PlanSet; requested: Ranks; token: string | null; minLevel: number; report: ImportReport }
+  | { ok: false; message: string };
+
+/** `text` is a share code, or a link whose fragment carries one set's code and order: the first set's after
+ *  #plan= and &order=, or the second's after #plan2= and &order2= when the link has only that one (Copy for
+ *  addon's set two). With `orderToken` given, even as null, `text` is a code and that is its order. Like
+ *  importCode, an order that cannot be used never stops the talents loading: the set's order is unknown. */
+export function importPlan(catalog: TalentCatalog, text: string, orderToken?: string | null): PlanImport {
+  const [code, token] = orderToken === undefined ? linkPair(text) : [text, orderToken];
+  const result = importCode(catalog, code, token);
+  if (!result.ok) return result;
+  const decoded = decodeBuild(extractCode(code));
+  const requested = decoded.ok ? decoded.build.ranks : result.ranks;
+  const known = result.order?.known ? result.order : null;
+  const set = adoptOrder(catalog, result.ranks, known && known.order, known && known.origin);
+  const problems = [...result.report.problems];
+  if (known && !set.order) {
+    const verdict = validateOrder(catalog, result.ranks, known.order);
+    const where = verdict.ok ? "" : ` ${orderRefusalText(catalog, result.ranks, known.order, verdict)}`;
+    problems.push(`The plan's spend order breaks this tree's rules, so the order is unknown.${where} The talents still loaded.`);
+  }
+  return { ok: true, set, requested, token, minLevel: result.minLevel, report: { ...result.report, problems } };
+}
+
+/** The code and order a pasted text names: one set's pair from a link's fragment, or the text as a code. */
+function linkPair(text: string): [string, string | null] {
+  if (!/[#&]plan2?=/.test(text)) return [text, null];
+  const hash = readPlanHash(text);
+  if (hash.first) return [hash.first, hash.firstOrder ?? null];
+  return [hash.second ?? text, hash.secondOrder ?? null];
 }

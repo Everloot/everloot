@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { fixture } from "@/lib/talents/fixture";
+import { readPlanHash } from "@/lib/talents/import";
 import { encodeBuild } from "@/lib/talents/share";
 import TalentCalculator from "./TalentCalculator";
 import TalentClassView from "./TalentClassView";
@@ -35,7 +36,7 @@ afterEach(async () => {
 
 const render = () => act(async () => root.render(<TalentCalculator catalog={fixture} />));
 
-test("copies only the active talent set for the addon and disables empty sets", async () => {
+test("copies only the active talent set for the addon, as a link with its order, and disables empty sets", async () => {
   await render();
   let copy = button(/^Copy for addon/);
   expect(copy).toBeDefined();
@@ -45,14 +46,15 @@ test("copies only the active talent set for the addon and disables empty sets", 
   Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
   copy = button(/^Copy for addon/);
   await click(copy);
-  expect(writeText).toHaveBeenCalledWith(encodeBuild({ classSlug: fixture.classSlug, specId: fixture.specId, build: fixture.build, ranks: { 11: { rank: 1 } } }));
+  const codeOf = (rank: number) => encodeBuild({ classSlug: fixture.classSlug, specId: fixture.specId, build: fixture.build, ranks: { 11: { rank } } });
+  expect(writeText).toHaveBeenCalledWith(`https://everloot.app/tools/talents/mage#plan=${codeOf(1)}&order=O1p-A`);
   expect(container.textContent).toContain("Talents tab");
   await click(button(/^Set 2$/));
   expect(button(/^Copy for addon/).disabled).toBe(true);
   await click(node(11));
   await click(node(11));
   await click(button(/^Copy for addon/));
-  expect(writeText).toHaveBeenLastCalledWith(encodeBuild({ classSlug: fixture.classSlug, specId: fixture.specId, build: fixture.build, ranks: { 11: { rank: 2 } } }));
+  expect(writeText).toHaveBeenLastCalledWith(`https://everloot.app/tools/talents/mage#plan2=${codeOf(2)}&order2=O1p-AA`);
 });
 
 test("counts actual build use once, ignoring refused clicks, and counts only successful shares", async () => {
@@ -150,10 +152,11 @@ test("the page address is the build as points are spent, and it carries both set
   expect(container.querySelector<HTMLInputElement>("#talent-link")!.value).toBe("");
   expect(button(/Copy link/).disabled).toBe(true);
   await click(node(11));
-  expect(window.location.hash).toMatch(/^#plan=EL1-mage-1482-1\.0\.0\.1-/);
-  // The link handed out is the build link, which a chat can preview; the address bar carries the same build.
-  const first = window.location.hash.slice("#plan=".length);
-  expect(container.querySelector<HTMLInputElement>("#talent-link")!.value).toBe(`${window.location.origin}/tools/talents/mage/b/${first}`);
+  expect(window.location.hash).toMatch(/^#plan=EL1-mage-1482-1\.0\.0\.1-[^&]+&order=O1p-A$/);
+  // The link handed out is the build link, which a chat can preview; the address bar carries the same build, and
+  // the link its spend order after #.
+  const first = readPlanHash(window.location.hash).first;
+  expect(container.querySelector<HTMLInputElement>("#talent-link")!.value).toBe(`${window.location.origin}/tools/talents/mage/b/${first}#order=O1p-A`);
   await click(button(/^Set 2$/));
   await click(node(11));
   await click(node(11));
@@ -524,10 +527,60 @@ test("a saved build's short link shows the build and its points without one edit
   expect(node(11).textContent).toContain("3/5");
   expect(stat("Points left")).toBe("48");
   expect(treeStatus().textContent).toBe("48 left · Set 1");
-  for (const label of [/^Undo$/, /^Redo$/, /^Reset/, /Take back/, /^Copy link/, /^Copy for addon/]) expect(button(label)).toBeUndefined();
+  for (const label of [/^Undo$/, /^Redo$/, /^Reset/, /Take back/, /^Copy link/, /^Copy for addon/, /^Save on this device$/, /^Create a provisional order$/]) {
+    expect(button(label)).toBeUndefined();
+  }
+  expect(container.querySelector('a[href^="/tools/builds"]')).toBeNull();
+  expect(container.querySelector("#spend-order")).toBeNull();
   await click(node(11));
   expect(status()).toBe("This is a saved build. Open it in the calculator to change it.");
   expect(node(11).textContent).toContain("3/5");
+});
+
+test("Save on this device hands both sets' exact codes and orders to Plans on this device in the fragment, and reads no saved plan here", async () => {
+  const read = vi.spyOn(Storage.prototype, "getItem");
+  const fetcher = vi.fn();
+  vi.stubGlobal("fetch", fetcher);
+  try {
+    await render();
+    const share = container.querySelector('[aria-label="Share"]')!;
+    expect(container.querySelector('a[href^="/tools/builds"]')).toBeNull();
+    expect(button(/^Save on this device$/).disabled).toBe(true);
+    expect(share.textContent).toContain("Spend a point in set 1 to save");
+    await click(node(11));
+    await click(node(11));
+    await click(button(/^Set 2$/));
+    await click(node(12));
+    const codeOf = (ranks: Record<number, { rank: number }>) => encodeBuild({ classSlug: "mage", specId: 1482, build: "1.0.0.1", ranks });
+    expect(container.querySelector('a[href^="/tools/builds"]')?.getAttribute("href"))
+      .toBe(`/tools/builds#plan=${codeOf({ 11: { rank: 2 } })}&plan2=${codeOf({ 12: { rank: 1 } })}&order=O1p-AA&order2=O1p-A`);
+    expect(container.querySelector('a[href^="/tools/builds"]')?.textContent).toBe("Save on this device");
+    // Names, notes and the device's saved plans are on the plans page only: nothing here reads them or asks who is signed in.
+    expect(read.mock.calls.filter(([key]) => String(key).startsWith("everloot:workspace"))).toEqual([]);
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(container.querySelector("textarea, select")).toBeNull();
+  } finally {
+    vi.unstubAllGlobals();
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  }
+});
+
+test("rewriting the plan in the address keeps the parts it does not own, such as a cookie choice", async () => {
+  window.history.replaceState(null, "", "#everloot-analytics-rejected");
+  await render();
+  await click(node(11));
+  const code = encodeBuild({ classSlug: "mage", specId: 1482, build: "1.0.0.1", ranks: { 11: { rank: 1 } } });
+  expect(window.location.hash).toBe(`#plan=${code}&order=O1p-A&everloot-analytics-rejected`);
+  await click(button(/Reset set 1$/));
+  expect(window.location.hash).toBe("#everloot-analytics-rejected");
+  // An opened link keeps it too.
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  window.history.replaceState(null, "", `#plan=${code}&everloot-cookie-rejected&order=O1p-A`);
+  await render();
+  await click(node(11));
+  const two = encodeBuild({ classSlug: "mage", specId: 1482, build: "1.0.0.1", ranks: { 11: { rank: 2 } } });
+  expect(window.location.hash).toBe(`#plan=${two}&order=O1p-AA&everloot-cookie-rejected`);
 });
 
 test("with the game's art the switch's line and the talents' clearance work the same", async () => {

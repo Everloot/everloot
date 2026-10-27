@@ -478,6 +478,145 @@ test("when the account cannot be checked, no plans show until Try again finds ou
   expect(item("Frost")).toBeDefined();
 });
 
+// Save on this device in the calculator sends its plan here in the address; it is named and saved on this page.
+
+const sentForm = () => container.querySelector<HTMLFormElement>('form[aria-label="Save the plan from the calculator"]');
+const sendFromCalculator = (fragment: string) => window.history.replaceState(null, "", `/tools/builds${fragment}`);
+const statusText = () => [...container.querySelectorAll('[role="status"]')].map((s) => s.textContent).join(" ");
+
+test("a plan sent from the calculator waits in a preview until Save, and then the address lets go of it", async () => {
+  sendFromCalculator(`#plan=${MAGE}&plan2=${MAGE_SMALL}&order=${PLANNED}&order2=O1g-A&everloot-analytics-rejected`);
+  await render();
+  expect(sentForm()?.textContent).toContain("Mage · Set 1: planned order · Set 2: provisional order");
+  expect(stored(ANON)).toBeNull();
+  await type(field("Name", sentForm()!), "Frost leveling");
+  await type(field("Notes", sentForm()!), "From the calculator");
+  await click(button(/^Save plan$/, sentForm()!));
+  expect(stored(ANON)?.plans).toEqual([expect.objectContaining({
+    name: "Frost leveling", notes: "From the calculator", classSlug: "mage", code: MAGE, code2: MAGE_SMALL, order: PLANNED, order2: "O1g-A", boundTo: null,
+  })]);
+  expect(sentForm()).toBeNull();
+  expect(statusText()).toContain('Saved "Frost leveling" on this device.');
+  expect(window.location.hash).toBe("#everloot-analytics-rejected");
+  expect(requests).toEqual(["GET /api/auth/me"]);
+});
+
+test("the preview can replace one of this class's plans, and offers no other class's", async () => {
+  seed(ANON, [plan({ name: "Frost", notes: "Old notes" }), plan({ id: id(2), name: "Bear", classSlug: "druid", code: DRUID, order: null })]);
+  sendFromCalculator(`#plan=${MAGE_SMALL}&order=O1p-A`);
+  await render();
+  expect([...sentForm()!.querySelectorAll("option")].map((o) => o.textContent)).toEqual(["A new plan", "Replace Frost"]);
+  await type(field("Save as", sentForm()!), id(1));
+  expect(field("Name", sentForm()!)?.value).toBe("Frost");
+  expect(field("Notes", sentForm()!)?.value).toBe("Old notes");
+  await click(button(/^Replace plan$/, sentForm()!));
+  expect(stored(ANON)?.plans).toEqual([
+    expect.objectContaining({ id: id(1), name: "Frost", notes: "Old notes", code: MAGE_SMALL, code2: null, order: "O1p-A", order2: null }),
+    expect.objectContaining({ id: id(2), name: "Bear", code: DRUID }),
+  ]);
+  expect(statusText()).toContain('Updated "Frost" on this device.');
+});
+
+test("the preview waits for the account check: none while it is out or failed, and it shows once the owner is known", async () => {
+  sendFromCalculator(`#plan=${MAGE}&order=${PLANNED}`);
+  let release = () => {};
+  gate = new Promise<void>((r) => { release = r; });
+  await render();
+  expect(text()).toContain("Checking who is signed in");
+  expect(sentForm()).toBeNull();
+  await act(async () => release());
+  await settle();
+  expect(sentForm()).not.toBeNull();
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  meFails = 1;
+  await render();
+  expect(alerts()).toContain("could not be checked");
+  expect(sentForm()).toBeNull();
+  await click(button(/^Try again$/));
+  expect(sentForm()).not.toBeNull();
+  expect(stored(ANON)).toBeNull();
+});
+
+test("another account while the preview is open withdraws it: nothing is saved, and the next owner is not offered it", async () => {
+  seed(A, [plan({ id: id(2), name: "A's plan" })]);
+  who = { id: A_ID, name: "Account A#1111" };
+  sendFromCalculator(`#plan=${MAGE}&order=${PLANNED}`);
+  await render();
+  expect(sentForm()?.textContent).toContain("Replace A's plan");
+  await type(field("Name", sentForm()!), "Typed for A");
+  who = { id: B_ID, name: "Account B#2222" };
+  // Not even for one render: every form the page adds while B's plans come in is recorded.
+  const added: Element[] = [];
+  const watch = new MutationObserver((records) => {
+    for (const r of records) for (const n of r.addedNodes) if (n instanceof Element) added.push(n);
+  });
+  watch.observe(container, { childList: true, subtree: true });
+  await comeBack();
+  for (const r of watch.takeRecords()) for (const n of r.addedNodes) if (n instanceof Element) added.push(n);
+  watch.disconnect();
+  expect(added.some((n) => n.matches('form[aria-label="Save the plan from the calculator"]') || n.querySelector('form[aria-label="Save the plan from the calculator"]'))).toBe(false);
+  expect(sentForm()).toBeNull();
+  expect(text()).not.toContain("A's plan");
+  expect(text()).not.toContain("Typed for A");
+  expect(statusText()).toContain("so the plan from the calculator was not saved");
+  expect(stored(A)?.plans.map((p) => p.name)).toEqual(["A's plan"]);
+  expect(stored(B)).toBeNull();
+  expect(window.location.hash).toBe("");
+  // Signed out after that, it is not offered either.
+  who = null;
+  await act(async () => { window.dispatchEvent(new Event(ACCOUNT_CHANGED_EVENT)); });
+  await settle();
+  expect(sentForm()).toBeNull();
+  expect(stored(ANON)).toBeNull();
+});
+
+test("a sign-out while the preview is open withdraws it, and the signed-out plans are not offered it", async () => {
+  who = { id: A_ID, name: "Account A#1111" };
+  sendFromCalculator(`#plan=${MAGE}&order=${PLANNED}`);
+  await render();
+  expect(sentForm()).not.toBeNull();
+  who = null;
+  await act(async () => { window.dispatchEvent(new Event(ACCOUNT_CHANGED_EVENT)); });
+  expect(sentForm()).toBeNull();
+  await settle();
+  expect(sentForm()).toBeNull();
+  expect(statusText()).toContain("so the plan from the calculator was not saved");
+  expect(stored(ANON)).toBeNull();
+  expect(stored(A)).toBeNull();
+});
+
+test("a sent plan the page cannot read says why and saves nothing, and Cancel leaves a readable one unsaved", async () => {
+  sendFromCalculator(`#plan2=${MAGE_SMALL}&order2=O1p-A`);
+  await render();
+  expect(alerts()).toContain("That link has no first talent set.");
+  expect(sentForm()).toBeNull();
+  await click(button(/^Close$/));
+  expect(alerts()).not.toContain("no first talent set");
+  expect(window.location.hash).toBe("");
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  sendFromCalculator(`#plan=${MAGE}&order=${PLANNED}`);
+  await render();
+  await click(button(/^Cancel$/, sentForm()!));
+  expect(sentForm()).toBeNull();
+  expect(stored(ANON)).toBeNull();
+  expect(window.location.hash).toBe("");
+});
+
+test("a full storage keeps the preview and what was typed, says so, and never says saved", async () => {
+  sendFromCalculator(`#plan=${MAGE}&order=${PLANNED}`);
+  await render();
+  await type(field("Notes", sentForm()!), "Keep this");
+  vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new DOMException("The quota has been exceeded.", "QuotaExceededError"); });
+  await click(button(/^Save plan$/, sentForm()!));
+  expect(sentForm()?.querySelector('[role="alert"]')?.textContent).toContain("storage is full, so nothing was saved");
+  expect(field("Notes", sentForm()!)?.value).toBe("Keep this");
+  expect(statusText()).not.toContain("Saved");
+  expect(stored(ANON)).toBeNull();
+  expect(window.location.hash).toBe(`#plan=${MAGE}&order=${PLANNED}`);
+});
+
 // The calculator's widget. The calculator passes its codes and orders in; the address bar is never read.
 
 const onMessage = vi.fn();
