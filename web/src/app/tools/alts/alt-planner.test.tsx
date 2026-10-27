@@ -3,6 +3,7 @@ import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import AccountControls from "@/components/AccountControls";
+import { scrubEvent } from "@/lib/analytics/load";
 import { isProtectedPath } from "@/lib/document-boundary";
 import { bucketKey, type LocalAlt, type LocalPlan, type Owner, type PlayerWorkspace } from "@/lib/player-workspace";
 import AltPlanner from "./AltPlanner";
@@ -161,6 +162,17 @@ test("with no file at all, an alt is added by hand with its details and plans, a
   expect(statusText()).toContain('Added "Jaina" to this device.');
   expect(field("Name", addForm()!)?.value).toBe("");
   expect(requests).toEqual(["GET /api/auth/me"]);
+});
+
+test("opening an alt's saved plan never leaves its code in an analytics pageview (reported case)", async () => {
+  const p = plan();
+  seed(ANON, [p], [alt({ planIds: [p.id] })]);
+  await render();
+  const a = container.querySelector<HTMLAnchorElement>('a[href^="/tools/talents/mage#plan="]')!;
+  expect(a).toBeTruthy();
+  const event = { properties: { $current_url: new URL(a.getAttribute("href")!, "https://everloot.app").href } };
+  const sent = scrubEvent(event, "https://everloot.app");
+  expect(sent.properties.$current_url).not.toContain(p.code);
 });
 
 test("a detail outside its rules is refused in the form with its reason, and nothing is stored", async () => {
