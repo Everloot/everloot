@@ -1441,3 +1441,19 @@ describe("one character per alt and account", () => {
     expect(accounts[A_ID].characters).toHaveLength(1);
   });
 });
+
+describe("focus with nothing to choose", () => {
+  test("an all-refused preview still gives keyboard focus somewhere in the panel, and each refusal describes its control", async () => {
+    seed(ANON, [{ ...FROST, notes: "Changed", updatedAt: "2026-10-27T12:00:00.000Z" }]);
+    seed(A, [{ ...FROST, boundTo: { userId: A_ID, at: AT } }]);
+    await render();
+    button(/^Choose plans to save to your account$/)!.focus();
+    await open();
+    const box = field("Save Frost to your account") as HTMLInputElement;
+    expect(box.disabled).toBe(true);
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toBe(button(/^Cancel$/));
+    const described = (box.getAttribute("aria-describedby") ?? "").split(" ").map((ref) => document.getElementById(ref)?.textContent ?? "").join(" ");
+    expect(described).toContain("Frost is in your account already, saved Oct 21, 2026, and the copy here differs from it.");
+  });
+});

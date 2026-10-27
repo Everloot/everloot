@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { ACCOUNT_CHANGED_EVENT } from "@/components/AccountControls";
 import { className } from "@/components/builds/describe";
 import { Card, Field, SectionHeading } from "@/components/ui";
@@ -235,12 +235,14 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<{ text: string; alert: boolean } | null>(null);
   const list = useRef<HTMLUListElement>(null);
+  const cancelButton = useRef<HTMLButtonElement>(null);
   const opener = useRef<HTMLButtonElement>(null);
   const said = useRef<HTMLParagraphElement>(null);
   /** Where the focus goes once the panel closes: back to its opener after Cancel, to what a transfer did after one. */
   const focusNext = useRef<"opener" | "outcome" | null>(null);
   useEffect(() => {
-    if (account.status === "open") list.current?.querySelector<HTMLInputElement>("input:not(:disabled)")?.focus();
+    // The first choice there is, or Cancel when every plan is refused: the focus never falls back to the page.
+    if (account.status === "open") (list.current?.querySelector<HTMLInputElement>("input:not(:disabled)") ?? cancelButton.current)?.focus();
   }, [account.status]);
   useEffect(() => {
     if (account.status !== "closed" || !focusNext.current) return;
@@ -660,7 +662,7 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
           {problems.length > 0 && <ul className="list-disc space-y-1 pl-5 text-sm text-fg-2">{problems.map((p) => <li key={p}>{p}</li>)}</ul>}
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" className="btn btn-primary text-sm" disabled={busy || rows.length === 0 || problems.length > 0} aria-busy={busy} onClick={send}>Save to your account</button>
-            <button type="button" className="btn text-sm" disabled={busy} onClick={cancel}>Cancel</button>
+            <button ref={cancelButton} type="button" className="btn text-sm" disabled={busy} onClick={cancel}>Cancel</button>
             {busy && <p role="status" className="text-sm text-muted">Saving to your account…</p>}
           </div>
         </div>
@@ -689,14 +691,17 @@ function GroupItem({ group, included, disabled, characters, madeBefore, choiceOf
   const single = group.alts.length === 1;
   // The alts some plan of this group is to be filed under, each made into a character once.
   const chosenAlts = group.alts.filter((a) => included && group.rows.some((r) => r.standing.kind === "new" && choiceOf(r.plan.id).character === `alt:${a.id}`));
+  // What is said of the group and of each plan in it, read with its checkbox: why it cannot be chosen, above all.
+  const said = useId();
+  const described = [group.alts.length > 0 ? `${said}-alts` : "", ...group.rows.map((r, i) => (r.line ? `${said}-${i}` : ""))].filter(Boolean).join(" ");
   return (
     <li className="space-y-3 py-4">
       <label className="flex min-h-11 items-center gap-3 font-semibold text-fg">
-        <input type="checkbox" className="size-5 shrink-0" checked={included && !group.refused} disabled={disabled || group.refused} onChange={(e) => onInclude(e.target.checked)} />
+        <input type="checkbox" className="size-5 shrink-0" checked={included && !group.refused} disabled={disabled || group.refused} aria-describedby={described || undefined} onChange={(e) => onInclude(e.target.checked)} />
         <span className="min-w-0 [overflow-wrap:anywhere]">Save {listOf(names)} to your account</span>
       </label>
       {group.alts.length > 0 && (
-        <p className="text-sm text-fg-2">
+        <p id={`${said}-alts`} className="text-sm text-fg-2">
           {group.another
             ? `${altNames} also ${single ? "uses" : "use"} a plan that is another account's now, so ${group.rows.length === 1 ? "this stays" : "these stay"} here.`
             : one
@@ -705,7 +710,7 @@ function GroupItem({ group, included, disabled, characters, madeBefore, choiceOf
           {group.refused && !group.another && !one && " None of them can be saved until each can."}
         </p>
       )}
-      {group.rows.map((row) => {
+      {group.rows.map((row, i) => {
         const choice = choiceOf(row.plan.id);
         return (
           <div key={row.plan.id} className="space-y-2">
@@ -713,7 +718,7 @@ function GroupItem({ group, included, disabled, characters, madeBefore, choiceOf
               <span className="font-semibold">{row.plan.name}</span>{" "}
               <span className="text-meta text-muted">{className(row.plan.classSlug)} · {ordersLine(row.plan)}</span>
             </p>
-            {row.line && <p className={`text-sm ${row.refused ? "text-danger" : "text-fg-2"}`}>{row.line}</p>}
+            {row.line && <p id={`${said}-${i}`} className={`text-sm ${row.refused ? "text-danger" : "text-fg-2"}`}>{row.line}</p>}
             {included && !group.refused && row.standing.kind === "new" && (
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block space-y-1 text-sm">
