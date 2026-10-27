@@ -392,7 +392,7 @@ function Backup({ owner, download, onRestored }: {
     if (!preview) return;
     const result = await withWorkspaceLock(() => applyImport(deviceStorage(), owner, preview.preview));
     setPreview(null);
-    onRestored(result.ok ? result : altFailure(result.error), "Restored the backup.");
+    onRestored(result.ok ? result : altFailure(result.error, result.error === "read-only" ? result.message : undefined), "Restored the backup.");
   }
 
   const p = preview?.preview;

@@ -50,6 +50,7 @@ const SHARING: Record<Exclude<Sharing, "">, { label: string; words: string; shar
 const CHANGED = "The account signed in here changed, so the transfer stopped.";
 const NOTHING_SENT = "The account signed in here changed, so nothing was sent.";
 const KEPT = "What was not saved is still on this device, as it was.";
+const READ_ONLY = "This workspace uses version 3. You can open plans and download a backup here, but transferring it is not available in this version. Local workspaces and pending transfer records are kept as they are. An account request already sent may still finish.";
 const NO_LOCKS = "This browser can't move plans safely; try a current browser.";
 /** How long each request of the transfer may go unanswered before it is given up on, its outcome unknown. */
 const ANSWER_WAIT_MS = 20_000;
@@ -349,7 +350,10 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
     <p ref={said} tabIndex={-1} role={outcome.alert ? "alert" : "status"} className={`mb-3 text-sm ${outcome.alert ? "text-danger" : "text-fg-2"}`}>{outcome.text}</p>
   );
   if (count === 0) return saidLine ? <div className="mb-8">{saidLine}</div> : null;
-  if (!device.transfers.ok && device.transfers.error === "read-only") return <p role="status" className="mb-8 text-sm text-fg-2">{device.transfers.message}</p>;
+  if (!device.transfers.ok && device.transfers.error === "read-only") return <div className="mb-8">
+    {saidLine}
+    <p role="status" className="text-sm text-fg-2">{READ_ONLY}</p>
+  </div>;
 
   const readable = device.account !== null;
   const accountBucket = device.account ?? emptyWorkspace(owner);
@@ -541,7 +545,7 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
       const mine = readWorkspace(storage, owner);
       if (!mine.ok) return { kind: "stop", text: `${savedFirst()}This account's plans on this device could not be read, so nothing more was sent. ${KEPT}${madeNote()}` };
       const refused = transferRefusal(storage, owner);
-      if (refused) return { kind: "stop", text: refused.message };
+      if (refused) return { kind: "stop", text: `${savedFirst()}${refused.error === "read-only" ? READ_ONLY : refused.message}${madeNote()}` };
       const record = readTransfers(storage);
       if (!record.ok) return { kind: "stop", text: `${savedFirst()}${record.message}${madeNote()}` };
       const plan = signedOut.ok ? signedOut.workspace.plans.find((p) => p.id === row.plan.id) : undefined;
