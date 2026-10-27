@@ -99,7 +99,7 @@ export default function DevicePlans() {
 
 function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | null; onSentDone: () => void }) {
   const [read, setRead] = useState<ReadResult | null>(null);
-  const [message, setMessage] = useState<{ text: string; alert: boolean } | null>(null);
+  const [message, setMessage] = useState<{ text: string; alert: boolean; inUse?: boolean } | null>(null);
   const reload = useCallback(() => setRead(readWorkspace(deviceStorage(), owner)), [owner]);
   useEffect(() => {
     reload();
@@ -122,7 +122,7 @@ function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | nu
   /** Shows what a change did; the list is read back from storage, so it never shows a save that did not happen. */
   const after = (result: { ok: true } | Failure, done: string) => {
     reload();
-    setMessage(result.ok ? { text: done, alert: false } : { text: result.message, alert: true });
+    setMessage(result.ok ? { text: done, alert: false } : { text: result.message, alert: true, inUse: result.error === "referenced" });
     return result.ok;
   };
   const storage = deviceStorage();
@@ -138,7 +138,12 @@ function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | nu
       <section aria-labelledby="device-plans">
         <SectionHeading id="device-plans" note={`${plans.length} of ${WORKSPACE_LIMITS.plans}, newest first. ${UNCHECKED}`}>Your plans</SectionHeading>
         <p role="status" className="mb-3 text-sm text-fg-2 empty:hidden">{message && !message.alert ? message.text : ""}</p>
-        {message?.alert && <p role="alert" className="mb-3 text-sm text-danger">{message.text}</p>}
+        {message?.alert && (
+          <p role="alert" className="mb-3 text-sm text-danger">
+            {message.text}
+            {message.inUse && <> See <a href="/tools/alts" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Alts on this device</a> to let go of it there first.</>}
+          </p>
+        )}
         {plans.length === 0 ? (
           // EmptyState's meter counts agreeing installs, which a device's own plans have nothing to do with.
           <Card>

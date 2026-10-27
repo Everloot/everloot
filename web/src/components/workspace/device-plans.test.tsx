@@ -491,6 +491,17 @@ test("damaged stored plans are kept: their text can be downloaded, nothing is sa
   expect(field("Talent link or share code")).not.toBeNull();
 });
 
+test("a plan an alt uses is not deleted, and the refusal links to the alts that use it", async () => {
+  localStorage.setItem(bucketKey(ANON), V2_BUCKET_TEXT);
+  await render();
+  await click(button(/^Delete$/, item("Frost")!));
+  await click(button(/^Delete for good$/, item("Frost")!));
+  expect(alerts()).toContain("An alt or a watch on this device uses that plan");
+  const link = [...container.querySelectorAll<HTMLAnchorElement>('[role="alert"] a')].find((a) => a.getAttribute("href") === "/tools/alts");
+  expect(link?.textContent).toBe("Alts on this device");
+  expect(localStorage.getItem(bucketKey(ANON))).toBe(V2_BUCKET_TEXT);
+});
+
 const clearGroup = () => container.querySelector<HTMLElement>('[role="group"][aria-label="Clear what is stored"]');
 
 test("clearing damaged stored data names every plan, alt, watch and note it deletes, and offers the download first", async () => {
