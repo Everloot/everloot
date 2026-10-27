@@ -4,7 +4,7 @@ const auth = vi.hoisted(() => ({ getUser: vi.fn(), authQuery: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ getUser: auth.getUser, authQuery: auth.authQuery, siteUrl: () => "https://everloot.app" }));
 
 import { DELETE, GET, POST } from "./route";
-import { cleanLabel, hashKey, KEY_PATTERN } from "@/lib/api-keys";
+import { cleanLabel, hashKey, KEY_PATTERN, NO_LIVE_KEY } from "@/lib/api-keys";
 import { DESKTOP_KEY_LABEL as DESKTOP } from "@/lib/desktop-connect";
 
 const USER = { id: "11111111-2222-4333-8444-555555555555", bnet_id: "1", battletag: "Thrall#1" };
@@ -142,6 +142,13 @@ test("revoking marks the key revoked for this account only; a key that is not th
   auth.authQuery.mockResolvedValueOnce([]);
   expect((await DELETE(call("DELETE", `?id=${KEY_ID}`))).status).toBe(404);
   expect((await DELETE(call("DELETE", "?id=not-a-uuid"))).status).toBe(400);
+});
+
+test("a revoke this account cannot make answers the exact 404 the keys list recognises as no longer on its list", async () => {
+  auth.authQuery.mockResolvedValueOnce([]);
+  const res = await DELETE(call("DELETE", `?id=${KEY_ID}`));
+  expect(res.status).toBe(404);
+  expect(await res.json()).toEqual({ ok: false, error: NO_LIVE_KEY });
 });
 
 const FORM = { label: " Drop rates ", purpose: " A sheet for my guild ", scopes: [] as string[], expiresInDays: 90 };

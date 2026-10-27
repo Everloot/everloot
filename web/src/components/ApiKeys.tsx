@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState, type FormEvent, type Ref } from "react";
 import CopyButton from "@/components/ui/CopyButton";
 import {
-  DEFAULT_EXPIRY_DAYS, EXPIRY_DAYS, KEY_SCOPES, MAX_EXPIRY_DAYS, PURPOSE_MAX, daysUntil, expiryFrom, keyExpired, type KeyRow,
+  DEFAULT_EXPIRY_DAYS, EXPIRY_DAYS, KEY_SCOPES, MAX_EXPIRY_DAYS, NO_LIVE_KEY, PURPOSE_MAX, daysUntil, expiryFrom, keyExpired, type KeyRow,
 } from "@/lib/api-key-policy";
 
 interface Ready { status: "ready"; keys: KeyRow[]; limit: number; ownScope: boolean; records: boolean; scopes: string[] }
@@ -29,11 +29,11 @@ function expiresText(k: KeyRow, now: number): string {
   return `${day(k.expires_at)}, in ${left} ${left === 1 ? "day" : "days"}`;
 }
 
-/** A refused request throws its message, with the HTTP status beside it. */
+/** A refused request throws its message, with the HTTP status and the parsed answer (`{}` when it was not JSON) beside it. */
 async function send(method: "POST" | "DELETE", url: string, body?: object) {
   const response = await fetch(url, { method, headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
   const result = await response.json().catch(() => ({}));
-  if (!response.ok) throw Object.assign(new Error(result.error ?? "That did not work. Try again."), { status: response.status });
+  if (!response.ok) throw Object.assign(new Error(result.error ?? "That did not work. Try again."), { status: response.status, body: result });
   return result;
 }
 
@@ -48,19 +48,29 @@ const changed = () => window.dispatchEvent(new Event(KEYS_CHANGED_EVENT));
 const KEYS_SAID_EVENT = "everloot:keys-said";
 const say = (text: string) => window.dispatchEvent(new CustomEvent(KEYS_SAID_EVENT, { detail: text }));
 
+/** How a revoke ended: this request revoked the key, or the route said it is no live key of this account. */
+type Revoked = "revoked" | "not-listed";
+
+/** The route's own 404 for a key that is no live key of this account. Any other 404 (a routing page, another answer) is not it. */
+function notListed(err: unknown): boolean {
+  const { status, body } = err as { status?: number; body?: { ok?: unknown; error?: unknown } };
+  return status === 404 && body?.ok === false && body.error === NO_LIVE_KEY;
+}
+
 /** Revokes in flight, by key id: the list and Remove access asking for the same key share one request. */
-const revoking = new Map<string, Promise<void>>();
+const revoking = new Map<string, Promise<Revoked>>();
 
 /**
- * Revokes a key once, however many controls ask, then tells the page its keys changed. A 404 means the key is already
- * revoked (or gone), so it counts as done: the page reads its keys again instead of offering a retry.
+ * Revokes a key once, however many controls ask, then tells the page its keys changed. When the route answers that the
+ * key is no live key of this account (already revoked, or another account's after a switch in another tab), that is
+ * not a removal: the page reads its keys again and the caller says so plainly. Any other failure is thrown.
  */
-function revokeKey(id: string): Promise<void> {
+function revokeKey(id: string): Promise<Revoked> {
   let pending = revoking.get(id);
   if (!pending) {
     pending = send("DELETE", `/api/keys?id=${encodeURIComponent(id)}`)
-      .catch((err: unknown) => { if ((err as { status?: number }).status !== 404) throw err; })
-      .then(() => { changed(); })
+      .then((): Revoked => "revoked", (err: unknown): Revoked => { if (notListed(err)) return "not-listed"; throw err; })
+      .then((outcome) => { changed(); return outcome; })
       .finally(() => revoking.delete(id));
     revoking.set(id, pending);
   }
@@ -440,10 +450,11 @@ export function RemoveAccess({ id, name, hint, focusAfter }: { id: string; name:
     setBusy(true);
     setError(null);
     try {
-      await revokeKey(id);
+      const outcome = await revokeKey(id);
       if (focusFree(box.current)) document.getElementById(focusAfter)?.focus();
       setRemoved(true);
-      say(`Access removed for ${name}.`);
+      // "Access removed" only when this request revoked the key.
+      say(outcome === "revoked" ? `Access removed for ${name}.` : `${name} is no longer on this account's list.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "That did not work. Try again.");
     } finally {
