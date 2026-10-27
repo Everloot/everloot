@@ -188,8 +188,8 @@ test("Integrations: Connected is what the server knows, the Battle.net sign-in a
   expect(connected).toContain("Drop-rate script");
   expect(connected).toContain("evl_…c0de</code> · Last used 2026-10-20");
   expect(connected.match(/<button[^>]*>Remove access<\/button>/g)).toEqual([
-    '<button type="button" class="btn min-h-11 px-3 text-sm" aria-label="Remove access for Desktop App key">Remove access</button>',
-    '<button type="button" class="btn min-h-11 px-3 text-sm" aria-label="Remove access for Drop-rate script">Remove access</button>',
+    '<button type="button" class="btn min-h-11 px-3 text-sm" aria-label="Remove access for Desktop App key (evl_…abcd)">Remove access</button>',
+    '<button type="button" class="btn min-h-11 px-3 text-sm" aria-label="Remove access for Drop-rate script (evl_…c0de)">Remove access</button>',
   ]);
   // A revoked or expired key no longer reaches the account, so it is not connected.
   expect(connected).not.toContain("evl_…ef01");
@@ -264,7 +264,7 @@ test("Integrations: a key with the Desktop App's name is called the Desktop App 
   withKeys(KEYS);
   const connected = list(await render(), "connected");
   expect(connected).toContain(">Desktop App key</p>");
-  expect(connected).toContain('aria-label="Remove access for Desktop App key"');
+  expect(connected).toContain('aria-label="Remove access for Desktop App key (evl_…abcd)"');
   expect(connected).not.toContain("Everloot Desktop App");
 });
 

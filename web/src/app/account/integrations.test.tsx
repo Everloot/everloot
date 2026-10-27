@@ -52,7 +52,7 @@ test("Remove access on a connected key revokes that key through the keys API, af
     return Response.json({ ok: true });
   });
   await act(async () => root.render(<Integrations methods={["battlenet"]} name="Thrall#1234" overview={overview(LIVE)} />));
-  await click("Remove access for Drop-rate script");
+  await click("Remove access for Drop-rate script (evl_…c0de)");
   expect(container.textContent).toContain("Revoke Drop-rate script? Anything using evl_…c0de stops working at once.");
   expect(document.activeElement).toBe(buttonNamed("Revoke key"));
   await click("Revoke key");
@@ -61,7 +61,7 @@ test("Remove access on a connected key revokes that key through the keys API, af
   // Its card leaves once the page is read again; focus waits on the list's heading meanwhile.
   expect(document.activeElement).toBe(document.getElementById("connected-heading"));
   // The other key was not touched.
-  expect(buttonNamed("Remove access for Desktop App key")).toBeDefined();
+  expect(buttonNamed("Remove access for Desktop App key (evl_…abcd)")).toBeDefined();
 });
 
 test("the removal is said in a status line that is on the page before the click and still says it after the card is gone", async () => {
@@ -70,12 +70,12 @@ test("the removal is said in a status line that is on the page before the click 
   const status = container.querySelector('[role="status"]');
   expect(status?.textContent).toBe("");
   expect(status?.closest("li")).toBeNull();
-  await click("Remove access for Drop-rate script");
+  await click("Remove access for Drop-rate script (evl_…c0de)");
   await click("Revoke key");
   expect(status!.textContent).toBe("Access removed for Drop-rate script (evl_…c0de).");
   // What the refresh brings: the server renders Integrations again, without that key.
   await act(async () => root.render(<Integrations methods={["battlenet"]} name="Thrall#1234" overview={overview([LIVE[0]])} />));
-  expect(buttonNamed("Remove access for Drop-rate script")).toBeUndefined();
+  expect(buttonNamed("Remove access for Drop-rate script (evl_…c0de)")).toBeUndefined();
   expect(container.querySelector('[role="status"]')).toBe(status);
   expect(status!.textContent).toBe("Access removed for Drop-rate script (evl_…c0de).");
 });
