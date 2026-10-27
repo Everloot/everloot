@@ -50,6 +50,9 @@ vi.mock("@/components/EmailCapture", () => ({ default: () => null }));
 import ClassContextChip, { ClassContextChipFromAddress } from "./ClassContextChip";
 import SpellListPage, { generateMetadata as spellMetadata } from "@/app/database/spells/page";
 import RaidPage from "@/app/tools/raid/page";
+import RaidLinkPage from "@/app/tools/raid/r/[code]/page";
+import { CURRENT_BUILD } from "@/data/game-data/raid";
+import { emptySlots, encodeRaid } from "@/lib/raid";
 import ProfessionsPage from "@/app/tools/professions/page";
 import { CLASS_CONTEXT_SLOT, type ClassContext, type ContextRead } from "@/lib/class-context";
 import { loadCatalog } from "@/lib/talents/catalogs";
@@ -162,10 +165,10 @@ describe("the class context chip", () => {
 });
 
 describe("on the raid planner, a page built once", () => {
-  test("the chip reads the address in the browser and takes the context off in place, keeping the raid in the address", async () => {
+  test("the chip reads the class from the address in the browser and takes it off in place, keeping the planner's raid", async () => {
     history.replaceState(null, "", "/tools/raid?class=mage&level=25#raid=ELR1-abc");
     const push = vi.spyOn(history, "pushState");
-    await mount(<ClassContextChipFromAddress />);
+    await mount(<ClassContextChipFromAddress fragment="#raid=ELR1-abc" />);
     expect(anchor("Mage, level 25")?.getAttribute("href")).toBe("/classes/mage?level=25");
     const remove = anchor("Remove Mage, level 25")!;
     // The real href holds the raid too, so a new tab or a copied link opens the same raid.
@@ -174,7 +177,7 @@ describe("on the raid planner, a page built once", () => {
     // The page is the same for every address, so nothing loads: the address changes, the raid's #fragment kept.
     expect(push).toHaveBeenCalledTimes(1);
     expect(`${location.pathname}${location.search}${location.hash}`).toBe("/tools/raid#raid=ELR1-abc");
-    await mount(<ClassContextChipFromAddress />);
+    await mount(<ClassContextChipFromAddress fragment="#raid=ELR1-abc" />);
     expect(container!.innerHTML).toBe("");
   });
 
@@ -182,7 +185,7 @@ describe("on the raid planner, a page built once", () => {
     history.replaceState(null, "", "/tools/raid?class=mage#raid=ELR1-abc");
     const native = history.pushState.bind(history);
     vi.spyOn(history, "pushState").mockImplementation((...args: Parameters<History["pushState"]>) => { native(...args); window.dispatchEvent(new PopStateEvent("popstate")); });
-    await mount(<><h1>WoW Forever Raid Buff Planner</h1><ClassContextChipFromAddress /><button type="button">Add</button></>);
+    await mount(<><h1>WoW Forever Raid Buff Planner</h1><ClassContextChipFromAddress fragment="#raid=ELR1-abc" /><button type="button">Add</button></>);
     const remove = anchor("Remove Mage")!;
     remove.focus();
     await act(async () => remove.click());
@@ -192,18 +195,18 @@ describe("on the raid planner, a page built once", () => {
     expect(title.getAttribute("tabindex")).toBe("-1");
   });
 
-  test("the chip's links follow the raid's #fragment as it changes, and a modified or middle click is left to the browser", async () => {
-    history.replaceState(null, "", "/tools/raid?class=mage&level=25#raid=ELR1-abc");
+  test("the chip's links hold the raid the planner hands it, never the address's, and a modified or middle click is the browser's", async () => {
+    history.replaceState(null, "", "/tools/raid?class=mage&level=25#raid=ELR1-old");
     const push = vi.spyOn(history, "pushState");
-    await mount(<ClassContextChipFromAddress />);
+    await mount(<ClassContextChipFromAddress fragment="#raid=ELR1-abc" />);
     const remove = anchor("Remove Mage, level 25")!;
-    // The planner rewrites the fragment without an event; the link catches up before it can be used.
-    history.replaceState(null, "", "/tools/raid?class=mage&level=25#raid=ELR1-xyz");
-    await act(async () => { remove.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true })); });
+    expect(remove.getAttribute("href")).toBe("/tools/raid#raid=ELR1-abc");
+    // The planner's next raid is the next render's href, with no event in between; an emptied raid has no fragment.
+    await act(async () => root!.render(<ClassContextChipFromAddress fragment="#raid=ELR1-xyz" />));
     expect(remove.getAttribute("href")).toBe("/tools/raid#raid=ELR1-xyz");
-    history.replaceState(null, "", "/tools/raid?class=mage&level=25#raid=ELR1-new");
-    await act(async () => { window.dispatchEvent(new HashChangeEvent("hashchange")); });
-    expect(remove.getAttribute("href")).toBe("/tools/raid#raid=ELR1-new");
+    await act(async () => root!.render(<ClassContextChipFromAddress fragment="" />));
+    expect(remove.getAttribute("href")).toBe("/tools/raid");
+    await act(async () => root!.render(<ClassContextChipFromAddress fragment="#raid=ELR1-xyz" />));
     // A new tab, a new window, a download or a middle click: the browser opens the real href, and this tab stays.
     const before = location.href;
     for (const init of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { altKey: true }, { button: 1 }]) {
@@ -226,6 +229,15 @@ describe("on the raid planner, a page built once", () => {
     const plain = renderToStaticMarkup(await RaidPage());
     expect(plain).not.toContain("data-class-context");
     expect(visible(page, "[data-class-context]")).toBe(visible(plain));
+  });
+
+  test("a raid link's page, the planner's other caller, shows no chip and still opens its raid", async () => {
+    history.replaceState(null, "", "/tools/raid?class=mage&level=25");
+    const slots = emptySlots(10);
+    slots[0] = { class: "warrior", tree: 3 };
+    const page = renderToStaticMarkup(await RaidLinkPage({ params: Promise.resolve({ code: encodeRaid({ size: 10, build: CURRENT_BUILD, slots }) }) }));
+    expect(page).toContain("WoW Forever Raid Buff Planner");
+    expect(page).not.toContain("data-class-context");
   });
 });
 

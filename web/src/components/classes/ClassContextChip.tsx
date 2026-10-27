@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useState, type MouseEvent, type ReactNode } from "react";
+import { Suspense, useEffect, useState, type MouseEvent, type ReactNode } from "react";
 import {
   classHubHref, contextLabel, contextLinks, parseClassContext, readClassContext, sameContext, switchClassContext, withoutClassContext,
   type ClassContext, type ClassSlug, type ContextDestination, type ContextRead,
@@ -22,56 +22,42 @@ function useRemembered(): ClassContext | null {
 }
 
 /**
- * The address's #fragment, on a page that changes its address in place (the raid planner keeps its raid there): read
- * after mount, on hashchange, and as a link is about to be used, since the planner rewrites it without an event.
- */
-function useFragment(on: boolean): [string, () => void] {
-  const [fragment, setFragment] = useState("");
-  const sync = useCallback(() => setFragment(window.location.hash), []);
-  useEffect(() => {
-    if (!on) return;
-    sync();
-    window.addEventListener("hashchange", sync);
-    return () => window.removeEventListener("hashchange", sync);
-  }, [on, sync]);
-  return [fragment, sync];
-}
-
-/**
  * On a page a class context leads to: the context its address carries, in a chip that opens the class's hub, with a
  * cross that takes the context off the address and keeps everything else (`here`). A context the page could not read
  * is named with its reason and left out. `children` say what the context does on the page, shown only with one. A
  * class this browser remembers is offered beside it, never put in its place. Nothing is sent anywhere.
  *
  * A page rendered per request reads its address on the server and passes `read` and `here`. A page built once has
- * one markup for every address, so there `inPlace` changes the address without loading anything, keeping its
- * #fragment (the raid planner's raid). `className` spaces it: under a list's filters by default, under a title else.
+ * one markup for every address, so there `inPlace` changes the address without loading anything, keeping the state
+ * the page holds in its #fragment: `inPlace.fragment`, handed in by the page as it is now (the raid planner's raid),
+ * never read back from the address. `className` spaces it: under a list's filters by default, under a title else.
  */
-export default function ClassContextChip({ read, here, inPlace = false, className = "mt-2", children }: { read: ContextRead; here: string; inPlace?: boolean; className?: string; children?: ReactNode }) {
+export default function ClassContextChip({ read, here, inPlace, className = "mt-2", children }: { read: ContextRead; here: string; inPlace?: { fragment: string }; className?: string; children?: ReactNode }) {
   const remembered = useRemembered();
-  const [fragment, sync] = useFragment(inPlace);
   const context = read.ok ? read.context : null;
   const offer = remembered && !(context && sameContext(remembered, context)) ? remembered : null;
   if (read.ok && !context && !offer) return null;
 
-  // In place, the real href keeps the #fragment, so a new tab or a copied link opens the same raid. Only a plain left
+  // In place, the real href keeps the fragment, so a new tab or a copied link opens the same raid. Only a plain left
   // click changes this tab's address; a modified or middle click is the browser's.
-  const to = (href: string) => inPlace ? {
-    href: `${href}${fragment}`,
-    onPointerDown: sync,
-    onFocus: sync,
-    onClick: (e: MouseEvent) => {
-      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-      e.preventDefault();
-      // The link goes with the old address: focus moves to the page's title rather than falling to the page's end.
-      const title = document.querySelector<HTMLElement>("h1");
-      if (title) {
-        if (!title.hasAttribute("tabindex")) title.tabIndex = -1;
-        title.focus();
-      }
-      window.history.pushState(null, "", `${href}${window.location.hash}`);
-    },
-  } : { href };
+  const to = (href: string) => {
+    if (!inPlace) return { href };
+    const target = `${href}${inPlace.fragment}`;
+    return {
+      href: target,
+      onClick: (e: MouseEvent) => {
+        if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        e.preventDefault();
+        // The link goes with the old address: focus moves to the page's title rather than falling to the page's end.
+        const title = document.querySelector<HTMLElement>("h1");
+        if (title) {
+          if (!title.hasAttribute("tabindex")) title.tabIndex = -1;
+          title.focus();
+        }
+        window.history.pushState(null, "", target);
+      },
+    };
+  };
 
   return (
     <div data-class-context className={`${className} flex flex-wrap items-center gap-x-3 gap-y-1 text-cell-2 text-fg-2`}>
@@ -98,15 +84,20 @@ export default function ClassContextChip({ read, here, inPlace = false, classNam
   );
 }
 
-function ChipFromAddress({ className }: { className?: string }) {
+type FromAddressProps = { className?: string; fragment?: string };
+
+function ChipFromAddress({ className, fragment = "" }: FromAddressProps) {
   const search = useSearchParams() ?? new URLSearchParams();
   const path = usePathname() ?? "/";
-  return <ClassContextChip read={parseClassContext(search)} here={withoutClassContext(path, search)} className={className} inPlace />;
+  return <ClassContextChip read={parseClassContext(search)} here={withoutClassContext(path, search)} className={className} inPlace={{ fragment }} />;
 }
 
-/** The chip on a page built once (the raid planner): the address is read here, in the browser; the built page holds none. */
-export function ClassContextChipFromAddress({ className }: { className?: string }) {
-  return <Suspense fallback={null}><ChipFromAddress className={className} /></Suspense>;
+/**
+ * The chip on a page built once (the raid planner): the class is read from the address here, in the browser, since
+ * the built page holds none. `fragment` is the page's own state for its #fragment, as it is now ("" for none).
+ */
+export function ClassContextChipFromAddress(props: FromAddressProps) {
+  return <Suspense fallback={null}><ChipFromAddress {...props} /></Suspense>;
 }
 
 type HubLinkProps = { classSlug: ClassSlug; to: Exclude<ContextDestination, "hub">; className?: string; children: ReactNode };
