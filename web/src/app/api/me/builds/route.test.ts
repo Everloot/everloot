@@ -57,6 +57,28 @@ test("another site cannot save or delete with the visitor's cookie", async () =>
   expect(auth.authQuery).not.toHaveBeenCalled();
 });
 
+test("a save or delete meant for another account than the session's is a private 409, before anything is read or written", async () => {
+  const other = { "x-everloot-expected-owner": "99999999-2222-4333-8444-555555555555" };
+  const saved = await POST(call("POST", { name: "a", code: MAGE }, other));
+  expect(saved.status).toBe(409);
+  expect(saved.headers.get("cache-control")).toBe("private, no-store");
+  expect(await saved.json()).toEqual({ error: "This was meant for another account than the one signed in now. Nothing was saved.", code: "account_mismatch" });
+  expect((await DELETE(call("DELETE", undefined, other, `/api/me/builds/${BUILD_ID}`), { params: Promise.resolve({ id: BUILD_ID }) })).status).toBe(409);
+  // Anything that is not the session's own id is another account, a malformed one too.
+  expect((await POST(call("POST", { name: "a", code: MAGE }, { "x-everloot-expected-owner": "" }))).status).toBe(409);
+  expect(auth.authQuery).not.toHaveBeenCalled();
+});
+
+test("naming the session's own account saves as before, and so does a save that names none", async () => {
+  auth.authQuery.mockImplementation(async (path: string) => path === "rpc/save_build"
+    ? [{ build_ref: BUILD_ID, build_slug: "AbCd1234", refusal: null }] : [row()]);
+  expect((await POST(call("POST", { name: "a", code: MAGE }, { "x-everloot-expected-owner": USER.id }))).status).toBe(201);
+  expect(rpcBody(0).p_user_id).toBe(USER.id);
+  expect((await POST(call("POST", { name: "a", code: MAGE }))).status).toBe(201);
+  // The header is only a check: the owner is always the session's account.
+  expect(rpcBody(2).p_user_id).toBe(USER.id);
+});
+
 test("the list is the account's own, in the agreed shape, newest first", async () => {
   auth.authQuery.mockImplementation(async (path: string) => path.startsWith("build_characters")
     ? [{ id: CHARACTER_ID, name: "Jaina", class_slug: "mage", realm: null, note: "alt" }]

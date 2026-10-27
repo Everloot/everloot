@@ -24,6 +24,14 @@ const ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 
 export const validId = (id: unknown): id is string => typeof id === "string" && ID_PATTERN.test(id);
 
+/**
+ * Sent with a write by a page that shows one account's builds (the calculator's Save): that account's id. The site
+ * refuses the write with a 409 (ACCOUNT_MISMATCH, the code Chat uses too) when the session is another account. It is
+ * only a check: the owner is always the session's account.
+ */
+export const EXPECTED_OWNER_HEADER = "x-everloot-expected-owner";
+export const ACCOUNT_MISMATCH = "account_mismatch";
+
 /** One saved build, as GET /api/me/builds returns it. `link` is the short link while sharing is on. */
 export interface SavedBuild {
   id: string;

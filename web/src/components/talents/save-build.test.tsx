@@ -32,8 +32,10 @@ let off: boolean;
 let authDown: boolean;
 /** Each account's characters and builds, as GET /api/me/builds lists them. */
 let accounts: Record<string, { characters: object[]; builds: Build[] }>;
-/** Every POST that reached the site, and the account it was sent as. */
-let posts: Array<{ url: string; body: Record<string, unknown>; as: string | null }> = [];
+/** Every POST that reached the site: the account it was sent as, and the one the page said it was for. */
+let posts: Array<{ url: string; body: Record<string, unknown>; as: string | null; owner: string | null }> = [];
+/** The account a write names, as the site reads it (x-everloot-expected-owner). */
+const expectedOwner = (init?: RequestInit) => new Headers(init?.headers).get("x-everloot-expected-owner");
 /** Requests ("GET /api/me/builds") whose next answer waits until released. It is still the answer for when it was asked. */
 let held = new Map<string, Promise<void>>();
 
@@ -51,9 +53,14 @@ function answer(url: string, init?: RequestInit): Response {
     return Response.json({ user: who && { id: who, name: who === A ? "Thrall#1234" : "Jaina#5678", entitlements: [] } });
   }
   const body = method === "POST" ? JSON.parse(String(init!.body)) as Record<string, unknown> : {};
-  if (method === "POST") posts.push({ url, body, as: who });
+  if (method === "POST") posts.push({ url, body, as: who, owner: expectedOwner(init) });
   if (off) return Response.json({ error: "Not found" }, { status: 404 });
   if (!who) return Response.json({ error: "Sign in to save builds.", signIn: "/sign-in?returnTo=%2Fme" }, { status: 401 });
+  // As the site does: a write that names another account than the session's is refused before anything is written.
+  const named = expectedOwner(init);
+  if (named !== null && named !== who) {
+    return Response.json({ error: "This was meant for another account than the one signed in now. Nothing was saved.", code: "account_mismatch" }, { status: 409 });
+  }
   const mine = accounts[who] ??= { characters: [], builds: [] };
   if (method === "GET") return Response.json(mine);
   if (url === "/api/me/characters") {
@@ -199,7 +206,7 @@ test("signed out, Save, sign in and back: the same plan in both sets comes back,
   expect(node(11).textContent).toContain("2/5");
   expect(document.activeElement).toBe(panel()!.querySelector("input"));
   await click(button(/^Save build$/)!);
-  expect(posts).toEqual([{ url: "/api/me/builds", as: A, body: expect.objectContaining({ code: plan.first, code2: plan.second }) }]);
+  expect(posts).toEqual([{ url: "/api/me/builds", as: A, owner: A, body: expect.objectContaining({ code: plan.first, code2: plan.second }) }]);
   expect(status()).toBe("Saved as a new build. Short link: https://everloot.app/b/NewSlug1");
 });
 
@@ -247,6 +254,8 @@ test("a new build is saved with its name, character, notes and codes, and the pa
   await type(form.querySelector("textarea")!, "Raid night");
   await click(button(/^Save build$/)!);
   expect(posts.map((p) => p.url)).toEqual(["/api/me/characters", "/api/me/builds"]);
+  // Both writes name the account the page shows, so neither can land in another one.
+  expect(posts.map((p) => p.owner)).toEqual([A, A]);
   expect(posts[0].body).toMatchObject({ name: "Jaina", classSlug: "mage" });
   expect(posts[1].body).toEqual({
     name: "My frost", notes: "Raid night", characterId: "2b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e22",
@@ -308,7 +317,7 @@ test("a new character is kept even if the build fails to save, so trying again d
   vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
     if (url === "/api/me/builds" && init?.method === "POST" && failOnce) {
       failOnce = false;
-      posts.push({ url, body: JSON.parse(String(init.body)), as: who });
+      posts.push({ url, body: JSON.parse(String(init.body)), as: who, owner: expectedOwner(init) });
       return Response.json({ error: "Saved builds are unavailable right now. Try again in a minute." }, { status: 503 });
     }
     return real(url, init);
@@ -551,6 +560,61 @@ test("the old account's builds, answered after another account is found, never r
   await settle();
   expect(menu()!.textContent).toContain("Their frost");
   expect(menu()!.textContent).not.toContain("Fire");
+});
+
+test("another tab signs in as B before this one checks again: Save is refused, nothing reaches B, and the draft stays with A", async () => {
+  api("in", []);
+  await render();
+  await click(node(11));
+  await click(saveButton());
+  await type(panel()!.querySelector("input")!, "My frost");
+  await type(panel()!.querySelector("textarea")!, "Raid night");
+  // Another tab signs in as B. This tab comes back, and Save is pressed while its check of who is signed in is still out.
+  who = B;
+  const release = hold("GET /api/auth/me");
+  await comeBack();
+  await click(button(/^Save build$/)!);
+  expect(posts).toEqual([{ url: "/api/me/builds", as: B, owner: A, body: expect.objectContaining({ name: "My frost" }) }]);
+  expect(accounts[B]).toBeUndefined();
+  const refusal = "The account signed in here changed, so nothing was saved. What you typed stays with the account you started with.";
+  expect(panel()!.querySelector('[role="alert"]')!.textContent).toBe(refusal);
+  expect(status()).toBe(refusal);
+  expect(panel()!.querySelector("input")!.value).toBe("My frost");
+  expect(panel()!.querySelector("textarea")!.value).toBe("Raid night");
+  // The check answers B: A's panel and builds go, and what was typed is not offered to B.
+  await act(async () => release());
+  await settle();
+  expect(panel()).toBeNull();
+  expect(status()).toBe("You are signed in to a different account now, so nothing was saved. Press Save again to save the build to this one.");
+  await click(saveButton());
+  expect(panel()!.querySelector("textarea")!.value).toBe("");
+  await click(button(/^Cancel$/)!);
+  // Signed in as A here again, Save opens with A's draft, and it saves to A.
+  who = A;
+  await comeBack();
+  await click(saveButton());
+  expect(panel()!.querySelector("input")!.value).toBe("My frost");
+  expect(panel()!.querySelector("textarea")!.value).toBe("Raid night");
+  await click(button(/^Save build$/)!);
+  expect(posts.at(-1)).toMatchObject({ url: "/api/me/builds", as: A, owner: A });
+  expect(accounts[A].builds.map((b) => b.name)).toEqual(["My frost"]);
+  expect(accounts[B]).toEqual({ characters: [], builds: [] });
+});
+
+test("a new character is not made under another account either, and no build follows the refusal", async () => {
+  api("in", []);
+  await render();
+  await click(node(11));
+  await click(saveButton());
+  await type(panel()!.querySelector("select")!, "new");
+  await type(panel()!.querySelectorAll<HTMLInputElement>("input")[1], "Jaina");
+  who = B;
+  hold("GET /api/auth/me");
+  await comeBack();
+  await click(button(/^Save build$/)!);
+  expect(posts.map((p) => [p.url, p.as, p.owner])).toEqual([["/api/me/characters", B, A]]);
+  expect(accounts[B]).toBeUndefined();
+  expect(panel()!.querySelectorAll<HTMLInputElement>("input")[1].value).toBe("Jaina");
 });
 
 test("a signed-out answer that lands after the tab finds an account signed in does not hide that account's builds", async () => {

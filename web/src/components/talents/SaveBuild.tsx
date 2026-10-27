@@ -4,14 +4,15 @@ import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 
 import { ACCOUNT_CHANGED_EVENT } from "@/components/AccountControls";
 import { useWorkspaceOwner } from "@/components/workspace/LocalPlanSave";
 import { signInPath } from "@/lib/auth/return-to";
-import { editPath, LIMITS, validId, type AccountBuilds, type SavedBuild } from "@/lib/saved-builds";
+import { ACCOUNT_MISMATCH, editPath, EXPECTED_OWNER_HEADER, LIMITS, validId, type AccountBuilds, type SavedBuild } from "@/lib/saved-builds";
 import { Input } from "@/components/ui";
 
 // Save in the talent calculator (docs/design/specs/2026-10-20-saved-builds-design.md). Signed out, Save offers
 // sign-in and brings the visitor back to the same build; signed in, it files the build under a name, a character
 // and notes. Opened from a saved build (?saved=<id>), Save updates that build and Save as new makes a copy.
 // What it shows belongs to the account this tab knows is signed in (useWorkspaceOwner). When that changes it is
-// dropped at once, and an answer asked for before is neither shown nor followed by another request.
+// dropped at once, and an answer asked for before is neither shown nor followed by another request. Every write
+// names that account (EXPECTED_OWNER_HEADER), so one sent before this tab notices a change is refused, not misfiled.
 
 const PENDING = "everloot:pending-save";
 /** A new account's confirmation link works for an hour; the waiting build is kept a little longer, then dropped. */
@@ -20,6 +21,11 @@ const button = "btn px-3 text-sm sm:px-5";
 const CHANGED = "The account signed in here changed, so nothing was saved. Press Save again.";
 const SWITCHED = "You are signed in to a different account now, so nothing was saved. Press Save again to save the build to this one.";
 const CHANGED_MID_SAVE = "The account signed in here changed before the save finished. Sign in to that account again to see whether the build was saved.";
+const REFUSED = "The account signed in here changed, so nothing was saved. What you typed stays with the account you started with.";
+const NO_FORM = { name: "", characterId: "", newName: "", newRealm: "", notes: "", shared: true, showName: false };
+
+/** A write the site refused because another account is signed in here now (409 account_mismatch). */
+class AccountChanged extends Error {}
 
 /**
  * Called by the calculator before it reads its address: after a sign-in (or a sign-up's confirmation link, which
@@ -74,16 +80,19 @@ export default function SaveBuild({ classSlug, codes, defaultName, onMessage }: 
   const [panel, setPanel] = useState<"save" | "sign-in" | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", characterId: "", newName: "", newRealm: "", notes: "", shared: true, showName: false });
+  const [form, setForm] = useState(NO_FORM);
   // The name the build bar shows now; the panel can open from the first render's effect, before the build loads.
   const nameNow = useRef(defaultName);
   nameNow.current = defaultName;
   /** Goes up whenever the account signed in here may have changed. A request keeps the count it started under; an
    *  answer that comes back under another changes nothing, and nothing more is sent after it. */
   const era = useRef(0);
-  // The panel as it is now, for the moment the account changes.
-  const shown = useRef({ panel, busy });
-  shown.current = { panel, busy };
+  // The panel as it is now, and the account it was for, for the moment the account changes.
+  const shown = useRef({ panel, busy, form, editing: editing?.id ?? null });
+  shown.current = { panel, busy, form, editing: editing?.id ?? null };
+  const shownFor = useRef(ownerKey);
+  /** What was typed when another account took over, by the account it was typed for. Only that account gets it back. */
+  const drafts = useRef(new Map<string, { editing: string | null; form: typeof NO_FORM }>());
   const saveButton = useRef<HTMLButtonElement>(null);
   const saveForm = useRef<HTMLFormElement>(null);
   const signInLink = useRef<HTMLAnchorElement>(null);
@@ -100,9 +109,14 @@ export default function SaveBuild({ classSlug, codes, defaultName, onMessage }: 
   useEffect(() => {
     const ask = ++era.current;
     // Nothing shown for one account outlives it: its builds, the one being edited and the panel go before the next
-    // account's are read.
+    // account's are read. What was typed in the panel is kept for its own account, out of sight.
     const was = shown.current;
-    if (was.panel === "save") onMessage(was.busy ? CHANGED_MID_SAVE : validId(ownerKey) ? SWITCHED : CHANGED);
+    const before = shownFor.current;
+    shownFor.current = ownerKey;
+    if (was.panel === "save") {
+      if (validId(before)) drafts.current.set(before, { editing: was.editing, form: was.form });
+      onMessage(was.busy ? CHANGED_MID_SAVE : validId(ownerKey) ? SWITCHED : CHANGED);
+    }
     setAccount({ status: "loading" });
     setEditing(null);
     setPanel(null);
@@ -152,7 +166,11 @@ export default function SaveBuild({ classSlug, codes, defaultName, onMessage }: 
 
   function openSave(from: SavedBuild | null) {
     setError(null);
-    setForm({
+    // A draft this account left when another one took over comes back, for the same build.
+    const draft = drafts.current.get(ownerKey);
+    const kept = draft && draft.editing === (from?.id ?? null) ? draft.form : null;
+    if (kept) drafts.current.delete(ownerKey);
+    setForm(kept ?? {
       name: from?.name ?? nameNow.current, characterId: from?.characterId ?? "", newName: "", newRealm: "",
       notes: from?.notes ?? "", shared: from?.shared ?? true, showName: from?.showName ?? false,
     });
@@ -194,27 +212,34 @@ export default function SaveBuild({ classSlug, codes, defaultName, onMessage }: 
     } catch {}
   }
 
-  /** One write. Null when the account changed while it was out: its answer is not for what is shown now. */
-  async function post<T>(url: string, body: object, ask: number): Promise<T | null> {
-    const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  /**
+   * One write, naming the account the panel was opened for: the site refuses it if another account is signed in now.
+   * Null when the account changed here while it was out: its answer is not for what is shown now.
+   */
+  async function post<T>(url: string, body: object, ask: number, owner: string): Promise<T | null> {
+    const response = await fetch(url, {
+      method: "POST", headers: { "content-type": "application/json", [EXPECTED_OWNER_HEADER]: owner }, body: JSON.stringify(body),
+    });
     const result = await response.json().catch(() => ({}));
     if (era.current !== ask) return null;
     if (response.status === 401) { setAccount({ status: "signed-out" }); setPanel("sign-in"); }
+    if (response.status === 409 && result.code === ACCOUNT_MISMATCH) throw new AccountChanged(REFUSED);
     if (!response.ok) throw new Error(result.error ?? "That did not work. Try again.");
     return result as T;
   }
 
   async function submit(event: FormEvent<HTMLFormElement>, asNew: boolean) {
     event.preventDefault();
-    if (account.status !== "ready" || !codes[0]) return;
+    if (account.status !== "ready" || !codes[0] || !validId(ownerKey)) return;
     const ask = era.current;
+    const owner = ownerKey;
     setBusy(true);
     setError(null);
     try {
       let data = account.data;
       let characterId: string | null = form.characterId || null;
       if (form.characterId === "new") {
-        const made = await post<{ character: AccountBuilds["characters"][number] }>("/api/me/characters", { name: form.newName, classSlug, realm: form.newRealm }, ask);
+        const made = await post<{ character: AccountBuilds["characters"][number] }>("/api/me/characters", { name: form.newName, classSlug, realm: form.newRealm }, ask, owner);
         if (!made) return;
         const { character } = made;
         data = { ...data, characters: [...data.characters, character] };
@@ -227,7 +252,7 @@ export default function SaveBuild({ classSlug, codes, defaultName, onMessage }: 
       const answer = await post<{ build: SavedBuild }>("/api/me/builds", {
         ...(update ? { id: editing.id } : {}),
         name: form.name, notes: form.notes, characterId, code: codes[0], code2: codes[1], shared: form.shared, showName: form.showName,
-      }, ask);
+      }, ask, owner);
       if (!answer) return;
       const { build } = answer;
       data = { ...data, builds: [build, ...data.builds.filter((b) => b.id !== build.id)] };
@@ -237,7 +262,11 @@ export default function SaveBuild({ classSlug, codes, defaultName, onMessage }: 
       rewriteSearch(build.id);
       onMessage(`${update ? "Saved" : "Saved as a new build"}. ${build.link ? `Short link: ${build.link}` : "Its short link is off."}`);
     } catch (err) {
-      if (era.current === ask) setError(err instanceof Error ? err.message : "That did not work. Try again.");
+      if (era.current === ask) {
+        // Refused for another account: the panel stays open with what was typed, and the bar says why too.
+        setError(err instanceof Error ? err.message : "That did not work. Try again.");
+        if (err instanceof AccountChanged) onMessage(err.message);
+      }
     } finally {
       if (era.current === ask) setBusy(false);
     }
