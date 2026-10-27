@@ -41,6 +41,10 @@ async function send(method: "POST" | "DELETE", url: string, body?: object) {
 export const KEYS_CHANGED_EVENT = "everloot:keys-changed";
 const changed = () => window.dispatchEvent(new Event(KEYS_CHANGED_EVENT));
 
+/** Dispatched on window with a sentence for the status line KeysRefresh keeps on /account. */
+const KEYS_SAID_EVENT = "everloot:keys-said";
+const say = (text: string) => window.dispatchEvent(new CustomEvent(KEYS_SAID_EVENT, { detail: text }));
+
 /** Revokes in flight, by key id: the list and Remove access asking for the same key share one request. */
 const revoking = new Map<string, Promise<void>>();
 
@@ -408,7 +412,7 @@ export default function ApiKeys() {
 /**
  * Remove access, on the Integrations of /account: one key's Revoke, asked with the list's own question and sent through
  * the list's own revoke, so both share one request. The key's card leaves once the page is read again, so focus that
- * was in it first moves to `focusAfter` (an id).
+ * was in it first moves to `focusAfter` (an id), and the removal is said in KeysRefresh's status line, which stays.
  */
 export function RemoveAccess({ id, name, hint, focusAfter }: { id: string; name: string; hint: string; focusAfter: string }) {
   const [asking, setAsking] = useState(false);
@@ -433,6 +437,7 @@ export function RemoveAccess({ id, name, hint, focusAfter }: { id: string; name:
       await revokeKey(id);
       if (focusFree(box.current)) document.getElementById(focusAfter)?.focus();
       setRemoved(true);
+      say(`Access removed for ${name}.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "That did not work. Try again.");
     } finally {
@@ -440,7 +445,7 @@ export function RemoveAccess({ id, name, hint, focusAfter }: { id: string; name:
     }
   }
 
-  if (removed) return <p role="status" className="text-sm text-fg-2">Access removed.</p>;
+  if (removed) return null;
   return (
     <div ref={box} className="space-y-2">
       {asking ? (
@@ -453,13 +458,23 @@ export function RemoveAccess({ id, name, hint, focusAfter }: { id: string; name:
   );
 }
 
-/** On /account: when the keys change, the parts the server renders (the overview's counts, Integrations) are read again. */
+/**
+ * On /account: when the keys change, the parts the server renders (the overview's counts, Integrations) are read again.
+ * It also keeps the status line Remove access speaks through. The line is on the page before any click and outside the
+ * cards, so a screen reader hears it, and it still says so after the refresh takes the card away.
+ */
 export function KeysRefresh() {
   const router = useRouter();
+  const [said, setSaid] = useState("");
   useEffect(() => {
     const refresh = () => router.refresh();
+    const hear = (event: Event) => setSaid((event as CustomEvent<string>).detail);
     window.addEventListener(KEYS_CHANGED_EVENT, refresh);
-    return () => window.removeEventListener(KEYS_CHANGED_EVENT, refresh);
+    window.addEventListener(KEYS_SAID_EVENT, hear);
+    return () => {
+      window.removeEventListener(KEYS_CHANGED_EVENT, refresh);
+      window.removeEventListener(KEYS_SAID_EVENT, hear);
+    };
   }, [router]);
-  return null;
+  return <p role="status" className="text-fg-2">{said}</p>;
 }

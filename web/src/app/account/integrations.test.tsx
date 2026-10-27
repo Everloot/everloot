@@ -64,6 +64,22 @@ test("Remove access on a connected key revokes that key through the keys API, af
   expect(buttonNamed("Remove access for Everloot Desktop App")).toBeDefined();
 });
 
+test("the removal is said in a status line that is on the page before the click and still says it after the card is gone", async () => {
+  vi.stubGlobal("fetch", async () => Response.json({ ok: true }));
+  await act(async () => root.render(<Integrations methods={["battlenet"]} name="Thrall#1234" overview={overview(LIVE)} />));
+  const status = container.querySelector('[role="status"]');
+  expect(status?.textContent).toBe("");
+  expect(status?.closest("li")).toBeNull();
+  await click("Remove access for Drop-rate script");
+  await click("Revoke key");
+  expect(status!.textContent).toBe("Access removed for Drop-rate script.");
+  // What the refresh brings: the server renders Integrations again, without that key.
+  await act(async () => root.render(<Integrations methods={["battlenet"]} name="Thrall#1234" overview={overview([LIVE[0]])} />));
+  expect(buttonNamed("Remove access for Drop-rate script")).toBeUndefined();
+  expect(container.querySelector('[role="status"]')).toBe(status);
+  expect(status!.textContent).toBe("Access removed for Drop-rate script.");
+});
+
 test("at 390 px the lists are one column; the second column starts at the sm breakpoint", async () => {
   await act(async () => root.render(<Integrations methods={["battlenet"]} name="Thrall#1234" overview={overview(LIVE)} />));
   for (const id of ["connected-heading", "available-heading"]) {

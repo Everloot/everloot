@@ -89,6 +89,7 @@ export default function Integrations({ methods, name, overview }: { methods: str
           </ul>
         ) : !unread && <p className="text-muted">Nothing is connected to your account.</p>}
         {unread && <p className="text-muted">Your keys could not be read right now, so apps that use one are not shown.</p>}
+        <KeysRefresh />
       </div>
 
       <div className="space-y-2 text-sm">
@@ -110,7 +111,6 @@ export default function Integrations({ methods, name, overview }: { methods: str
           </Entry>
         </ul>
       </div>
-      <KeysRefresh />
     </>
   );
 }

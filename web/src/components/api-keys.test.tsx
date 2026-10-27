@@ -31,6 +31,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
+  document.querySelectorAll("#after").forEach((target) => target.remove());
   window.removeEventListener(KEYS_CHANGED_EVENT, heard);
   vi.unstubAllGlobals();
 });
@@ -265,7 +266,7 @@ test("the list reads the keys again when something else on the page changes them
   expect(buttonNamed("Revoke bot")).toBeUndefined();
 });
 
-/** Where focus goes once Remove access has revoked the key and its card is about to leave the page. */
+/** Where focus goes once Remove access has revoked the key and its card is about to leave the page. afterEach removes it. */
 function focusTarget() {
   const target = document.createElement("h3");
   target.id = "after";
@@ -290,14 +291,13 @@ test("Remove access asks the list's own question first; Cancel sends nothing and
 test("Remove access revokes with the list's own request, moves focus on and tells the page its keys changed", async () => {
   const calls = api(ready());
   const target = focusTarget();
-  await act(async () => root.render(<RemoveAccess id={KEY.id} name="bot" hint="beef" focusAfter="after" />));
+  await act(async () => root.render(<><RemoveAccess id={KEY.id} name="bot" hint="beef" focusAfter="after" /><KeysRefresh /></>));
   await click("Remove access for bot");
   await click("Revoke key");
   expect(calls).toEqual([{ url: `/api/keys?id=${KEY.id}`, method: "DELETE", body: null }]);
   expect(heard).toHaveBeenCalledTimes(1);
   expect(document.activeElement).toBe(target);
-  expect(container.querySelector('[role="status"]')?.textContent).toBe("Access removed.");
-  target.remove();
+  expect(Array.from(container.querySelectorAll('[role="status"]'), (s) => s.textContent)).toEqual(["Access removed for bot."]);
 });
 
 test("a refused Remove access says why, keeps the question open and announces nothing", async () => {
@@ -341,7 +341,6 @@ test("a question left open in the list closes once Remove access revokes its key
   expect(deletes).toHaveLength(1);
   expect(container.querySelector('[role="alert"]')).toBeNull();
   expect(document.activeElement).toBe(target);
-  target.remove();
 });
 
 test("the list and Remove access revoking one key at the same time send one request, and neither asks to retry", async () => {
