@@ -5,6 +5,7 @@ import { describe, expect, test } from "vitest";
 import { stringify } from "yaml";
 import { checkWiki, MIN_PROSE_WORDS, typedNumber, type CheckContext, type KnownData, type WikiFile } from "../src/wiki/check.js";
 import { loadCategories, loadKnownData, loadPrivatePathPattern, parseCategories, readWikiPages } from "../src/wiki/data.js";
+import { PREP_SECTION } from "../src/wiki/page.js";
 
 const known: KnownData = {
   items: new Set([2589, 24999, 30000]),
@@ -76,6 +77,9 @@ function problemsOf(over: Record<string, unknown> = {}, body = DUNGEON_BODY): st
 }
 
 const withSection = (section: string, text: string) => DUNGEON_BODY.replace(`## ${section}\n\n`, `## ${section}\n\n${text}\n\n`);
+
+/** The first dungeon pages prepared for review. Each is published on its own, by the person who reviewed it. */
+const DUNGEON_PILOTS = ["ragefire-chasm", "deadmines", "wailing-caverns"];
 
 test("a good published page and its linked page pass", () => {
   const result = checkWiki([file(), westfall()], ctx);
@@ -387,8 +391,8 @@ describe("files", () => {
     const result = checkWiki(readWikiPages(), { categories: loadCategories(), known: loadKnownData(), privatePaths: loadPrivatePathPattern() });
     expect(result.problems).toEqual([]);
     expect(result.pages.length).toBeGreaterThan(0);
-    // Nothing publishes in this phase.
-    expect(result.pages.every((p) => p.fm.status === "draft")).toBe(true);
+    // Nothing publishes in this phase but the dungeon pilots, each in a change of its own after its review.
+    expect(result.pages.filter((p) => p.fm.status === "published" && !DUNGEON_PILOTS.includes(p.fm.slug)).map((p) => p.fm.slug)).toEqual([]);
   });
 
   test("the committed game data knows the fixture pages' bindings", () => {
@@ -397,5 +401,53 @@ describe("files", () => {
     expect(data.entrances.get("deadmines")).toEqual({ raid: false });
     expect(data.entrances.get("molten-core")).toEqual({ raid: true });
     expect(data.items.size).toBeGreaterThan(0);
+  });
+});
+
+// The dungeon pilots, prepared for their editor: facts from the game files, Blizzard's posts and Everloot's own pages,
+// advice proposed under an "Editor to confirm" label in Before you go, and a review only from the person who gave it.
+describe("the dungeon pilots", () => {
+  const LABEL = "### Editor to confirm";
+  const committed = (): CheckContext => ({ categories: loadCategories(), known: loadKnownData(), privatePaths: loadPrivatePathPattern() });
+  /** A pilot as its editor would publish it once each proposal is confirmed as written: the label out, and the review. */
+  const asPublished = (source: string) =>
+    source
+      .replace("status: draft", "status: published")
+      .replace("reviewed: null", "reviewed: { by: Editor, on: 2026-10-27 }")
+      .replace(/^### Editor to confirm\r?\n(?:\r?\n)?/gm, "")
+      .replace(/^- Proposed: /gm, "- ");
+
+  test("each is bound to its own entrance in the game files and passes the check, with no review until a person gives one", () => {
+    const result = checkWiki(readWikiPages(), committed());
+    const known = loadKnownData();
+    for (const slug of DUNGEON_PILOTS) {
+      const page = result.pages.find((p) => p.fm.slug === slug);
+      if (!page) throw new Error(`wiki/${slug}.md does not read`);
+      expect(result.problems.filter((p) => p.file === page.file), slug).toEqual([]);
+      expect(page.fm, slug).toMatchObject({ type: "dungeon", origin: "original", binds: { entrance: slug } });
+      expect(known.entrances.get(slug), slug).toEqual({ raid: false });
+      if (page.fm.status === "draft") expect(page.fm.reviewed, slug).toBeNull();
+    }
+  });
+
+  test("each can be published on its own: reviewed, it passes beside the other pages as they are and links to no draft", () => {
+    for (const slug of DUNGEON_PILOTS) {
+      const path = `wiki/${slug}.md`;
+      const files = readWikiPages().map((f) => (f.path === path ? { ...f, source: asPublished(f.source) } : f));
+      const result = checkWiki(files, committed());
+      expect(result.problems.filter((p) => p.file === path), slug).toEqual([]);
+      expect(result.pages.find((p) => p.file === path)?.fm.status, slug).toBe("published");
+    }
+  });
+
+  test("proposed advice stays off the site: a published page has no Editor to confirm label, and an unreviewed pilot labels its advice", () => {
+    const files = readWikiPages();
+    for (const p of checkWiki(files, committed()).pages) {
+      if (p.fm.status === "published") expect(files.find((f) => f.path === p.file)!.source, p.file).not.toContain(LABEL);
+      if (!DUNGEON_PILOTS.includes(p.fm.slug) || p.fm.reviewed) continue;
+      const prep = p.page.blocks.findIndex((b) => b.type === "heading" && b.level === 2 && b.text === PREP_SECTION);
+      expect(prep, p.file).toBeGreaterThan(-1);
+      expect(p.page.blocks.slice(prep + 1).some((b) => b.type === "heading" && b.level === 3 && b.text === "Editor to confirm"), p.file).toBe(true);
+    }
   });
 });

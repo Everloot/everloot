@@ -4,49 +4,53 @@ slug: deadmines
 title: The Deadmines
 type: dungeon
 binds: { entrance: deadmines, zone: 1436 }
-summary: The hidden base of the Defias Brotherhood, dug into old mines beneath Moonbrook in Westfall. Alliance players follow the Westfall militia's investigation there to confront Edwin VanCleef.
+summary: The hidden base of the Defias Brotherhood, in old gold mines under Westfall whose entrance is in Moonbrook. Deep inside, their leader Edwin VanCleef is building a ship.
 categories: [dungeons, eastern-kingdoms, westfall]
 origin: original
 adaptedFrom: []
 sources:
   - { title: "Explore the New Dungeons of World of Warcraft: Forever (Blizzard news)", url: "https://worldofwarcraft.blizzard.com/en-us/news/24301455", checkedOn: 2026-10-20 }
   - { title: "Explore the New Dungeons of World of Warcraft: Forever (forum post)", url: "https://us.forums.blizzard.com/en/wow/t/explore-the-new-dungeons-of-world-of-warcraft-forever/2387658", checkedOn: 2026-10-20 }
+  - { title: "Everloot map: dungeon entrances and flight points (game files, build 1.60.1.70634)", url: "https://everloot.app/map", checkedOn: 2026-10-27 }
+  - { title: "Deadmines (lore page, Warcraft Wiki)", url: "https://everloot.app/lore/416567-deadmines", checkedOn: 2026-10-27 }
+  - { title: "Edwin VanCleef (lore page, Warcraft Wiki)", url: "https://everloot.app/lore/24821-edwin-vancleef", checkedOn: 2026-10-27 }
 status: draft
 reviewed: null
 ---
 
 ## Overview
 
-The Deadmines are a set of worked-out mines under the ruined village of Moonbrook in Westfall. The Defias
-Brotherhood, the bandit gang that has overrun the zone's farms, uses them as its headquarters. Deep inside, in
-a cavern that opens onto the sea, the Defias are building a warship of their own, and their leader, Edwin
-VanCleef, waits on its deck.
+The Deadmines are old gold mines under Westfall. They were abandoned during the First War, and the Defias
+Brotherhood, a gang of former laborers turned bandits, later took them as its base. Deep inside, the Brotherhood's
+leader, Edwin VanCleef, is building a ship with the help of goblins.
 
-For Alliance players the dungeon is where a long story ends. Westfall's quests spend a good while asking who
-is behind the Defias, and the answer is down here. Horde players can make the trip too, but they have little
-reason to beyond the loot.
+The mines lie under a zone of farms that the Brotherhood has overrun.
 
 ## Getting there
 
-The entrance is in Moonbrook, in the south of {zone:1436}. The game files list Sentinel Hill as the zone's
-flight point, and the road south from there is short. The mine opening leads through Defias-held tunnels
-before the dungeon itself begins, so a group usually meets the Brotherhood before it reaches the portal. See
-[[westfall]] for the zone.
+The entrance is in Moonbrook, in the southwest of {zone:1436}. Sentinel Hill is the only flight point the game files
+place in the zone, and the entrance lies to its southwest.
 
 ## History
 
-VanCleef was a master stonemason. After the orcs sacked Stormwind, his guild rebuilt the city, and the nobles
-who had hired them then refused to pay. When the masons protested, the dispute turned violent and they were
-driven out. VanCleef led the men who stayed loyal to him into Westfall, where they turned to raiding and
-became the Defias Brotherhood. Their quarrel was always with Stormwind's nobility, and the farmers of
-Westfall paid for it.
+VanCleef led the Stonemasons' Guild, which rebuilt Stormwind City after the Horde sacked it. When the work was done,
+the House of Nobles would not pay the masons what they asked. The nobles disbanded the guild, the masons rioted, and
+VanCleef led them out of the city to hide in Westfall.
 
-The People's Militia at Sentinel Hill, led by Gryan Stoutmantle, sends players to find out who runs the
-Brotherhood, and the trail ends in the mines. A letter found on VanCleef sends Alliance players back to
-Stormwind, where the story carries on into [[stormwind-stockade]].
+There they drove farmers off their land, took over the mines and became the Defias Brotherhood. Their target was
+Stormwind's government, and the farmers of Westfall paid for the quarrel.
 
 ## In WoW: Forever
 
-Blizzard has not announced anything specific to the Deadmines for WoW: Forever yet. The entrance is in the
-current beta build's game files. The bosses, loot and quests on this page fill in from those files and from
-what players record once they play.
+Blizzard has not announced anything specific to the Deadmines for WoW: Forever yet. The entrance and the level in
+this page's facts come from the current build's game files and are not confirmed in the game. Its bosses are listed
+here once players report them.
+
+## Before you go
+
+### Editor to confirm
+
+- Proposed: check the level in this page's facts and go with a group around it. It is the level the game files
+  give, not yet confirmed in the game.
+- Proposed: fly to Sentinel Hill, the zone's flight point, and travel southwest to Moonbrook.
+- Proposed: expect to fight the Brotherhood all the way from the entrance to the ship, and rest when the group can.

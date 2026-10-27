@@ -5,11 +5,14 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 import { fixture } from "../../web/src/lib/talents/fixture";
-import { encodeBuild, encodeOrder } from "../../web/src/lib/talents/share";
+import { validateOrder } from "../../web/src/lib/talents/order";
+import { levelFor, pointsAtLevel, pointsSpent } from "../../web/src/lib/talents/rules";
+import { decodeBuild, decodeOrder, encodeBuild, encodeOrder, resolveBuild } from "../../web/src/lib/talents/share";
 import type { Ranks } from "../../web/src/lib/talents/types";
 import { checkGuides, type GuideCheckContext, type GuideFile, type Problem } from "../src/guides/check.js";
 import { loadGuideCheckContext, readGuideFiles } from "../src/guides/data.js";
 import { GUIDE_SECTIONS } from "../src/guides/guide.js";
+import { siteCatalog } from "../src/talents/site-catalogs.js";
 import { MIN_PROSE_WORDS } from "../src/wiki/check.js";
 import { loadPrivatePathPattern } from "../src/wiki/data.js";
 
@@ -491,5 +494,94 @@ describe("guide-check", () => {
 
   test("without --previous it says the comparison was not made", { timeout: 60_000 }, () => {
     expect(guideCheck("--dir", folder())).toMatchObject({ code: 0, stdout: expect.stringContaining("0 guides (0 published, 0 draft), 0 problems\nnot compared") });
+  });
+});
+
+// The first guide, prepared for its editor: its facts come from the game files and Blizzard's posts, its advice is
+// proposed under an "Editor to confirm" label, and it is published only by a person who reviewed it.
+describe("the Mage leveling pilot", () => {
+  const PILOT = "guides/mage-leveling.md";
+  const LABEL = "### Editor to confirm";
+  const mage = siteCatalog("mage");
+  const pilot = (): GuideFile => {
+    const f = readGuideFiles().find((g) => g.path === PILOT);
+    if (!f) throw new Error(`${PILOT} is not committed`);
+    return f;
+  };
+  const checked = () => {
+    const g = checkGuides(readGuideFiles(), loadGuideCheckContext()).guides.find((x) => x.file === PILOT);
+    if (!g) throw new Error(`${PILOT} does not read`);
+    return g;
+  };
+  /** The pilot as its editor would publish it once each proposal is confirmed as written: the labels out, the order
+   *  planned by a person, and the review with its history entry. */
+  const asPublished = (source: string, by = "Editor", on = "2026-10-27") =>
+    source
+      .replace("status: draft", "status: published")
+      .replace(/^order: O1g-/m, "order: O1p-")
+      .replace("reviewed: null", `reviewed: { by: ${by}, on: ${on}, build: ${mage.build} }`)
+      .replace("history: []", `history:\n  - { version: 1, on: ${on}, by: ${by}, build: ${mage.build}, note: "First published version." }`)
+      .replace(/^### Editor to confirm\r?\n(?:\r?\n)?/gm, "")
+      .replace(/^- Proposed: /gm, "- ");
+
+  test("its plan places exactly on the current Mage tree, spends every point the levels give and is legal point by point", () => {
+    const { fm } = checked();
+    const code = decodeBuild(fm.code);
+    if (!code.ok) throw new Error(code.error);
+    const placed = resolveBuild(mage, code.build);
+    if (!placed.ok) throw new Error(placed.error);
+    expect(placed.build).toMatchObject({ unknown: [], clamped: [], rejected: [] });
+    expect(placed.build.ranks).toEqual(code.build.ranks);
+    const spent = pointsSpent(placed.build.ranks);
+    expect(spent).toBe(pointsAtLevel(mage, fm.levels.to));
+    expect(levelFor(mage, spent)).toBeLessThanOrEqual(fm.levels.to);
+    expect(fm.order).toBeDefined();
+    const order = decodeOrder(fm.order!, code.build.ranks);
+    if (!order.ok) throw new Error(order.error);
+    expect(validateOrder(mage, placed.build.ranks, order.order)).toEqual({ ok: true });
+    // The same points backwards would open with a talent its tree has not opened yet: the check says so on the order's line.
+    const backwards = encodeOrder(placed.build.ranks, [...order.order].reverse(), order.origin)!;
+    expect(validateOrder(mage, placed.build.ranks, [...order.order].reverse())).toMatchObject({ ok: false, index: 0 });
+    const refused = checkGuides([{ path: PILOT, source: pilot().source.replace(fm.order!, backwards) }], loadGuideCheckContext()).problems;
+    expect(refused).toEqual([{ file: PILOT, line: lineOf(pilot().source, "order:"), message: expect.stringMatching(/^order: .+ at level 10: /) }]);
+  });
+
+  test("it carries no review until a person reviews it, and the check refuses to publish it as it stands", () => {
+    const { fm } = checked();
+    if (fm.history.length > 0) {
+      expect(fm.reviewed?.by).toBeTruthy();
+      return;
+    }
+    expect(fm).toMatchObject({ status: "draft", version: 1, reviewed: null, history: [] });
+    const asIs = checkGuides([{ path: PILOT, source: pilot().source.replace("status: draft", "status: published") }], loadGuideCheckContext());
+    expect(asIs.problems.map((p) => p.message)).toEqual(expect.arrayContaining([
+      expect.stringContaining("a published guide needs reviewed"),
+      expect.stringContaining("a published guide records version 1 in history"),
+      ...(fm.order?.startsWith("O1g-") ? [expect.stringContaining("is provisional (O1g)")] : []),
+    ]));
+  });
+
+  test("published by its editor, it passes and links to no page that is not published", () => {
+    const published = asPublished(pilot().source);
+    expect(published).not.toContain(LABEL);
+    const result = checkGuides([{ path: PILOT, source: published }], loadGuideCheckContext());
+    expect(result.problems).toEqual([]);
+    expect(result.guides[0].fm).toMatchObject({ status: "published", order: expect.stringMatching(/^O1p-/) });
+  });
+
+  test("proposed advice stays off the site: a published guide has no Editor to confirm label, and the unreviewed pilot labels its advice", () => {
+    for (const g of checkGuides(readGuideFiles(), loadGuideCheckContext()).guides) {
+      const source = readGuideFiles().find((f) => f.path === g.file)!.source;
+      if (g.fm.status === "published") expect(source, g.file).not.toContain(LABEL);
+    }
+    const { fm, page } = checked();
+    if (fm.reviewed) return;
+    const labelled = new Set<string>();
+    let section = "";
+    for (const b of page.blocks) {
+      if (b.type === "heading" && b.level === 2) section = b.text;
+      if (b.type === "heading" && b.level === 3 && b.text === "Editor to confirm") labelled.add(section);
+    }
+    expect([...labelled]).toEqual(expect.arrayContaining(["Who it is for", "Why this plan", "How to play it"]));
   });
 });
