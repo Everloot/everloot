@@ -95,7 +95,12 @@ test("a Markdown link into the wiki is drawn only to a published page; to a draf
   const html = await render("test-dungeon");
   expect(html).toContain('<a href="/wiki/test-zone#history">the zone page</a> is published');
   expect(html).toContain("while the draft, the draft in full and a page never written stay words.");
-  expect(html).not.toMatch(/href="[^"]*(?:test-draft|no-such-page)/);
+  expect(html).not.toMatch(/href="[^"]*(?:test-draft|no-such-page)/i);
+  // The site's own address, in any case and with its default port, is still the site.
+  for (const [href, words] of [["https://everloot.app/wiki/test-zone#history", "the zone in full"], ["https://EVERLOOT.APP/wiki/test-zone?from=here", "in capitals"], ["https://everloot.app:443/wiki/test-zone/", "on the default port"]]) {
+    expect(html).toContain(`<a href="${href}" rel="noopener">${words}</a>`);
+  }
+  expect(html).toContain("while the draft in capitals, the draft on the default port, a lost page in full, a lost page in capitals and a lost page on the default port stay words.");
   // Links that are not wiki pages are drawn as before.
   expect(html).toContain('<a href="https://worldofwarcraft.blizzard.com/en-us/news/1" rel="noopener">Blizzard&#x27;s post</a>');
   expect(html).toContain('<a href="/database/zones/1436-westfall">the zone&#x27;s database page</a>');

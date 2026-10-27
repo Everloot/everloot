@@ -47,6 +47,17 @@ describe("wikiLinkTarget", () => {
     }
   });
 
+  test("knows the site's own address as a browser does: the host in any case, the default port written or not", () => {
+    for (const href of ["https://EVERLOOT.APP/wiki/deadmines#history", "https://everloot.app:443/wiki/deadmines?from=westfall", "https://EVERLOOT.APP:443/wiki/deadmines/",
+      "https://WWW.Everloot.App:443/wiki/deadmines#history", "//EVERLOOT.APP:443/wiki/deadmines"]) {
+      expect(wikiLinkTarget(href)).toBe("deadmines");
+    }
+  });
+
+  test("reads the path as a browser does, so a dot segment or a backslash cannot hide the page", () => {
+    for (const href of ["/wiki/x/../deadmines", "/wiki\\deadmines", "https://EVERLOOT.APP/wiki/./deadmines"]) expect(wikiLinkTarget(href)).toBe("deadmines");
+  });
+
   test("keeps any other page part as written, so it names no page", () => {
     expect(wikiLinkTarget("/wiki/Deadmines")).toBe("Deadmines");
     expect(wikiLinkTarget("/wiki/deadmines/extra")).toBe("deadmines/extra");
@@ -55,7 +66,8 @@ describe("wikiLinkTarget", () => {
 
   test("is null for the hub, other paths on the site and other sites", () => {
     for (const href of ["/wiki", "/wiki/", "/wiki?q=dead", "/wiki#recent", "/wikis/deadmines", "/database/zones/1436-westfall",
-      "https://warcraft.wiki.gg/wiki/Deadmines", "https://worldofwarcraft.blizzard.com/en-us/news/1", "https://everloot.app.example.com/wiki/deadmines"]) {
+      "https://warcraft.wiki.gg/wiki/Deadmines", "https://worldofwarcraft.blizzard.com/en-us/news/1", "https://everloot.app.example.com/wiki/deadmines",
+      "https://everloot.app:8443/wiki/deadmines", "https://everloot-git-feat.vercel.app/wiki/deadmines"]) {
       expect(wikiLinkTarget(href)).toBeNull();
     }
   });

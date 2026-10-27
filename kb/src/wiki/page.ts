@@ -142,15 +142,24 @@ export function inlineText(inline: Inline[], tokenWord = "X"): string {
 /** A Markdown link in a text run that the site draws: `[text](https://…)` or `[text](/path)`. Other forms stay text. */
 export const MARKDOWN_LINK = /\[([^\]\n]+)\]\((https:\/\/[^)\s]+|\/[^)\s]*)\)/g;
 
-const WIKI_PAGE_ADDRESS = /^(?:(?:https:)?\/\/(?:www\.)?everloot\.app)?\/wiki\/([^?#]*)/;
+/** The site's own origins, as URL gives them: the host in lower case and the default port left out. */
+const SITE_ORIGINS: ReadonlySet<string> = new Set(["https://everloot.app", "https://www.everloot.app"]);
 
 /**
  * The wiki page a link's address points at: "deadmines" for `/wiki/deadmines`, also with a trailing slash, a query or a
- * fragment, or written out in full on everloot.app. Null for any other address, the hub included. The rest of the path
- * is kept as written, so an address in any other spelling names no page.
+ * fragment, or written out in full on the site. The address is read as a browser reads it on the site, so the host's
+ * case, a default port, a dot segment or a backslash changes nothing. Null for any other address, the hub included;
+ * another port or host is another site. The page part is kept as the URL gives it, so any other spelling names no page.
  */
 export function wikiLinkTarget(href: string): string | null {
-  return WIKI_PAGE_ADDRESS.exec(href)?.[1].replace(/\/+$/, "") || null;
+  let url: URL;
+  try {
+    url = new URL(href, "https://everloot.app");
+  } catch {
+    return null;
+  }
+  if (!SITE_ORIGINS.has(url.origin) || !url.pathname.startsWith("/wiki/")) return null;
+  return url.pathname.slice("/wiki/".length).replace(/\/+$/, "") || null;
 }
 
 const LIST_ITEM = /^\s*(?:[-*+]|\d+\.)\s+/;

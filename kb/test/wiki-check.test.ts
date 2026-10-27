@@ -190,7 +190,8 @@ describe("links", () => {
 
   describe("a Markdown link into the wiki follows the same rules", () => {
     const via = (href: string) => withSection("History", `See [the zone](${href}).`);
-    const FORMS = ["/wiki/westfall", "/wiki/westfall/", "/wiki/westfall#history", "/wiki/westfall?from=deadmines", "https://everloot.app/wiki/westfall"];
+    const FORMS = ["/wiki/westfall", "/wiki/westfall/", "/wiki/westfall#history", "/wiki/westfall?from=deadmines", "https://everloot.app/wiki/westfall",
+      "https://EVERLOOT.APP/wiki/westfall#history", "https://everloot.app:443/wiki/westfall?from=deadmines", "https://EVERLOOT.APP:443/wiki/westfall/"];
 
     test("to a published page it passes, in every written form", () => {
       for (const href of FORMS) expect(problemsOf({}, via(href))).toEqual([]);
@@ -205,7 +206,7 @@ describe("links", () => {
     });
 
     test("to a page that does not exist it fails, from a draft too and inside a quote", () => {
-      for (const href of ["/wiki/nowhere", "/wiki/Westfall", "/wiki/westfall/extra"]) {
+      for (const href of ["/wiki/nowhere", "/wiki/Westfall", "/wiki/westfall/extra", "https://everloot.app/wiki/nowhere?from=deadmines", "https://EVERLOOT.APP/wiki/nowhere#top", "https://EVERLOOT.APP:443/wiki/nowhere"]) {
         expect(problemsOf({}, via(href))).toEqual([`[the zone](${href}) links to a page that does not exist`]);
         expect(problemsOf({ status: "draft", reviewed: null }, via(href))).toEqual([`[the zone](${href}) links to a page that does not exist`]);
       }
@@ -213,7 +214,9 @@ describe("links", () => {
     });
 
     test("the hub, other paths on the site and other sites are not wiki pages", () => {
-      for (const href of ["/wiki", "/wiki/", "/database/zones/1436-westfall", "https://warcraft.wiki.gg/wiki/Westfall", "https://worldofwarcraft.blizzard.com/en-us/news/1"]) {
+      // Another port or a preview host is another site, even pointing at a page that does not exist.
+      for (const href of ["/wiki", "/wiki/", "/database/zones/1436-westfall", "https://warcraft.wiki.gg/wiki/Westfall", "https://worldofwarcraft.blizzard.com/en-us/news/1",
+        "https://everloot.app:8443/wiki/nowhere", "https://everloot-git-feat.vercel.app/wiki/nowhere"]) {
         expect(problemsOf({}, via(href))).toEqual([]);
       }
     });
