@@ -108,9 +108,8 @@ describe("review", () => {
     expect(problemsOf([file(unreviewed)])).toEqual([at(unreviewed, "reviewed:", "a published guide needs reviewed: { by, on, build }")]);
   });
 
-  test("the author cannot be the reviewer", () => {
-    const self = GUIDE.replace("author: Robin", "author: kai");
-    expect(problemsOf([file(self)])).toEqual([at(self, "reviewed:", "reviewed by someone other than its author")]);
+  test("the person who wrote a guide may be the one who reviewed it: reviewed names who actually did", () => {
+    expect(problemsOf([file(GUIDE.replace("author: Robin", "author: Kai"))])).toEqual([]);
   });
 
   test("a review or a source cannot be dated after today", () => {
@@ -230,6 +229,14 @@ describe("orders", () => {
     expect(problemsOf([file(g)])).toEqual([at(g, "At level 10", "carries a talent plan")]);
     expect(problemsOf([file(GUIDE.replace("[[deadmines]]", "[[deadmines]] ([the calculator](/tools/talents/mage))"))])).toEqual([]);
   });
+
+  test("build links open a plan too, so the body carries none of them either", () => {
+    // The calculator's Copy link, with one set or two, and a saved build's short link.
+    for (const link of [`[the plan](/tools/talents/mage/b/${CODE})`, `[both sets](https://everloot.app/tools/talents/mage/b/${CODE}/${CODE})`, "[a build](/b/abcd1234)"]) {
+      const g = GUIDE.replace("[[deadmines]]", `[[deadmines]] (${link})`);
+      expect(problemsOf([file(g)])).toEqual([at(g, "At level 10", `${link} carries a talent plan`)]);
+    }
+  });
 });
 
 describe("levels", () => {
@@ -307,6 +314,19 @@ describe("published revisions stay as they were", () => {
 
   test("withdrawing a published guide keeps it as it was, as a draft", () => {
     expect(problemsOf([file(GUIDE.replace("status: published", "status: draft"))], { ...ctx, previous: before })).toEqual([]);
+  });
+
+  test("a copy from before the change that does not read fails, so an edit or a deletion cannot slip past it", () => {
+    // As if the schema had moved: the copy before the change has a field today's schema does not know.
+    const unknown = GUIDE.replace("author: Robin", "author: Robin\nrating: 5");
+    const before = at(unknown, "rating:", 'as it was before this change, the file does not read, so its published versions cannot be checked: front matter: unknown field "rating"');
+    expect(problemsOf([file(edited)], { ...ctx, previous: [file(unknown)] })).toEqual([before]);
+    expect(problemsOf([], { ...ctx, previous: [file(unknown)] })).toEqual([before]);
+    // A copy whose YAML does not parse at all.
+    const twice = GUIDE.replace("author: Robin", "author: Robin\nauthor: Sam");
+    expect(problemsOf([file(edited)], { ...ctx, previous: [file(twice)] })).toEqual([
+      { file: PATH, line: lineOf(twice, "author: Sam"), message: expect.stringMatching(/^as it was before this change, the file does not read, so its published versions cannot be checked: .*unique/s) },
+    ]);
   });
 
   test("a draft that was never published may change or go", () => {

@@ -1,4 +1,4 @@
-﻿import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { GuideFrontMatter, parseGuide, type GuideActivity, type GuideRole } from "../../../kb/src/guides/guide";
 import type { Block } from "../../../kb/src/wiki/page";

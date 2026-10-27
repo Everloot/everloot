@@ -32,6 +32,10 @@ fails until a person acts, with a new reviewed version or with `status: draft` t
   was never published is version 1, with an empty history.
 - Versions count up from 1, one entry each, and their dates never go back.
 
+A file holds one version, and readers go by its status, so a draft is off the site either way. A revision merged to
+main as a draft takes the published version down until the revision is published. Keep a revision on its branch until
+it is reviewed and merge it as published; set a published guide to draft only to withdraw it.
+
 Given the guides as they were before a change (`previous`; for a pull request, a copy of `kb/guides` at its base),
 the check also holds published versions to what they were:
 
@@ -41,12 +45,17 @@ the check also holds published versions to what they were:
 - A guide that has been published keeps its slug, so its address stays, and its file stays. To withdraw it, set
   `status: draft`; its history stays with it.
 - A guide that was never published may change or go.
+- A file in that copy that no longer reads (bad YAML, or front matter today's schema refuses) fails the check, with
+  its line, so an edit or a deletion is never let through unchecked.
+
+No command or CI step passes the check that copy yet. Until one does, CI does not enforce these rules, and review
+has to.
 
 ## Review
 
 `reviewed` is `{ by, on, build }`: who reviewed the version the file holds, on which day, and the game build they
-checked it against. A published guide has one. The reviewer is someone other than the author, the date is not after
-today, and only a person who actually reviewed that version is named.
+checked it against. A published guide has one. The date is not after today, and only the person who actually reviewed
+that version is named.
 
 ## Plans and spend orders
 
@@ -61,8 +70,9 @@ the spend order tokens that ride with them. Against the class's talent tree, as 
 - A published guide carries only orders a player planned (`O1p-`). A provisional order a tool generated (`O1g-`)
   stays usable in personal plans and may sit in a draft, but is never published as a reviewed order.
 - A guide without an order is valid. Readers show its order as unknown and never derive one.
-- The plan lives in the front matter. A link in the body that carries `plan=`, `plan2=`, `order=` or `order2=` fails,
-  so every plan a guide shows is one the check has read.
+- The plan lives in the front matter. A link in the body that carries `plan=`, `plan2=`, `order=` or `order2=`, or
+  is a build link (`/tools/talents/<class>/b/…`, `/b/…`), fails, so every plan a guide shows is one the check has
+  read.
 
 ## Sections and words
 
@@ -80,7 +90,8 @@ reviewer checks each one against its evidence.
   Each is linked in the body where the claim it supports is made, and records the day it was checked. Every link off
   the site is a listed source.
 - Everything else a guide says comes from Everloot's own data, linked on the site: database tokens, wiki pages, tool
-  pages. Other sites' guides are not sources, and nothing is copied from them
+  pages, and the `/changes` page of a Blizzard post shown there. Other sites' guides are not sources, and nothing is
+  copied from them
   ([data policy](DATA_POLICY.md#what-we-refuse)). The narrow exceptions in the [source ledger](sources/LEDGER.md)
   stay where it scopes them.
 - `[[slug]]`, `/wiki/` and `/guides/` links name pages that exist, and a published guide links only to published

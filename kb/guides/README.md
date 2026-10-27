@@ -5,9 +5,9 @@ code: they are under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4
 rest of the repository. Game facts a guide names stay Blizzard's.
 
 A guide is Everloot's own advice on one talent plan for one class: who it is for, why it fits an activity, how to
-play it and what we do not know yet. One person writes it and someone else reviews it before it is published. The
-site's guide reader returns published guides only; a draft, or a file that breaks the rules below, is shown nowhere. The contract behind these rules, versions and history included, is in
-[docs/GUIDES.md](../../docs/GUIDES.md).
+play it and what we do not know yet. It is reviewed before it is published. The site's guide reader returns published
+guides only; a draft, or a file that breaks the rules below, is shown nowhere. The contract behind these rules,
+versions and history included, is in [docs/GUIDES.md](../../docs/GUIDES.md).
 
 ## A guide
 
@@ -51,9 +51,9 @@ not know yet". `###` subsections, lists and `>` quotes work inside them. Inside 
 
 ## Rules
 
-- **Our own words, reviewed by someone else.** A guide names its writer in `author`. A published guide records its
-  review in `reviewed`: who read this version, on which day, against which game build. The reviewer is a different
-  person from the author, and only someone who actually reviewed it is named there. No AI tool credits.
+- **Our own words, reviewed.** A guide names its writer in `author`. A published guide records its review in
+  `reviewed`: who read this version, on which day, against which game build. Only someone who actually reviewed it is
+  named there. No AI tool credits.
 - **The plan fits the tree.** Each code is the guide's class and places on the class's talent tree exactly as
   written: every talent is on the tree, every rank is within its maximum and the point rules allow every point. It
   spends no more points than the levels give, and its last point arrives by `levels.to`.
@@ -61,13 +61,14 @@ not know yet". `###` subsections, lists and `>` quotes work inside them. Inside 
   carries only an order a player planned in the calculator (`O1p-`). An order a tool generated (`O1g-`) may sit in a
   draft while it is written, but is never published. A guide without an order is valid, and readers show its order
   as unknown.
-- **The plan lives in the front matter.** A link in the body does not carry `plan=`, `plan2=`, `order=` or `order2=`:
-  a guide's plan is its code and order, which the check reads.
+- **The plan lives in the front matter.** A link in the body does not carry `plan=`, `plan2=`, `order=` or `order2=`,
+  and is not a build link (`/tools/talents/<class>/b/…`, `/b/…`): a guide's plan is its code and order, which the
+  check reads.
 - **Evidence next to the claim.** Sources are Blizzard's own posts (worldofwarcraft.blizzard.com,
   news.blizzard.com, the US and EU forums). Each one records the day it was checked and is linked in the body where
   the claim it supports is made. Every link off the site is a listed source. Everything else a guide says comes from
-  Everloot's own data, linked on the site; other sites' guides are not sources. Numbers in the text are fine, and the
-  reviewer checks each one.
+  Everloot's own data, linked on the site, such as a database page or the `/changes` page of a Blizzard post shown
+  there; other sites' guides are not sources. Numbers in the text are fine, and the reviewer checks each one.
 - **Each section says something.** On a published guide, every section has words of our own, not only a quote, and
   the guide has at least 150 words of its own prose in all. The 150 words are a floor, not a target.
 - **Links name real pages.** `[[slug]]`, `[text](/wiki/slug)` and `[text](/guides/slug)` name pages that exist, and a
@@ -75,6 +76,9 @@ not know yet". `###` subsections, lists and `>` quotes work inside them. Inside 
 - **Published versions stay as they were.** Any change to a published guide is a new version: raise `version`, add
   its entry to `history` with its review, and update `reviewed` to match. History only grows. To withdraw a guide,
   set `status: draft`; a guide that has been published is never deleted and keeps its slug.
+- **A draft on main is off the site.** A file holds one version, and readers go by its status. A revision merged as
+  `status: draft` takes the published version down until the revision is published, so keep a revision on its branch
+  until it is reviewed, then merge it as published. Set a published guide to draft only to withdraw it.
 - No private paths, internal names or workspace folders.
 
 ## Check a guide
@@ -84,5 +88,9 @@ From `kb/`:
     npx vitest run test/guides.test.ts
 
 It runs the guide check on every committed guide, so a problem fails kb's tests and CI. Each problem names the file
-and the line. Every guide is reviewed like code: the check passes, and someone other than the author reads and
-approves it before it merges as published.
+and the line. The rules under "Published versions stay as they were" compare a change with the guides before it, so
+they run only where the check is given that copy. The command and the CI step that give it are not added yet; until
+they are, CI does not enforce those rules, and review has to.
+
+Every guide is reviewed like code: the check passes, and the person named in `reviewed` has read it before it merges
+as published.

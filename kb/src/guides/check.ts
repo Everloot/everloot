@@ -4,6 +4,7 @@
  * a change (`previous`), it also holds every published version to what it was.
  */
 import { isMap, isNode, isScalar, isSeq, parseDocument } from "yaml";
+import type { ZodError } from "zod";
 import { orderRefusalText, validateOrder } from "../../../web/src/lib/talents/order";
 import { levelFor, pointsAtLevel, pointsSpent } from "../../../web/src/lib/talents/rules";
 import { decodeBuild, decodeOrder, resolveBuild } from "../../../web/src/lib/talents/share";
@@ -36,8 +37,10 @@ export interface GuideCheckResult { guides: CheckedGuide[]; problems: Problem[] 
  *  a guide says comes from Everloot's own data, linked on the site. */
 const SOURCE_HOST = /^(?:worldofwarcraft\.blizzard\.com|news\.blizzard\.com|(?:us|eu)\.forums\.blizzard\.com)$/;
 
-/** A site address that carries a talent set or its spend order, as the calculator's links do. */
+/** A site address that opens a talent plan: one that carries a set or its spend order, as the calculator's links do, or a
+ *  build link (`/tools/talents/<class>/b/<code>`, the calculator's Copy link, and a saved build's `/b/<slug>`). */
 const PLAN_IN_LINK = /[#?&](?:plan2?|order2?)=/;
+const PLAN_PATH = /^\/(?:tools\/talents\/[^/]+\/b|b)\//;
 
 const AI_CREDIT = new RegExp(
   String.raw`\b(?:generated|written|drafted|created|produced|authored)\s+(?:with|by|using)\s+(?:the\s+help\s+of\s+)?(?:an?\s+)?(?:ai|llm|claude|anthropic|chatgpt|gpt|openai|copilot|gemini|grok|codex|cursor|devin)\b` +
@@ -80,6 +83,14 @@ function fieldLines(source: string): LineOf {
 const errorLine = (e: unknown) => ((e as { linePos?: { line: number }[] }).linePos?.[0]?.line ?? 0) + 1;
 
 const where = (path: readonly PropertyKey[]) => (path.length ? ` ${path.join(".")}` : "");
+
+/** Each schema issue on the line of the field it is about, an unknown field on its own line. */
+function reportIssues(error: ZodError, lineOf: LineOf, report: Report): void {
+  for (const issue of error.issues) {
+    if (issue.code === "unrecognized_keys") for (const key of issue.keys) report(`front matter${where(issue.path)}: unknown field "${key}"`, lineOf([...issue.path, key]));
+    else report(issue.code === "custom" ? issue.message : `front matter${where(issue.path)}: ${issue.message}`, lineOf(issue.path));
+  }
+}
 const slugOf = (path: string) => path.replace(/\\/g, "/").split("/").pop()!.replace(/\.md$/, "");
 
 export function checkGuides(files: GuideFile[], ctx: GuideCheckContext): GuideCheckResult {
@@ -106,10 +117,7 @@ export function checkGuides(files: GuideFile[], ctx: GuideCheckContext): GuideCh
     const lineOf = fieldLines(f.source);
     const parsed = GuideFrontMatter.safeParse(page.data);
     if (!parsed.success) {
-      for (const issue of parsed.error.issues) {
-        if (issue.code === "unrecognized_keys") for (const key of issue.keys) report(`front matter${where(issue.path)}: unknown field "${key}"`, lineOf([...issue.path, key]));
-        else report(issue.code === "custom" ? issue.message : `front matter${where(issue.path)}: ${issue.message}`, lineOf(issue.path));
-      }
+      reportIssues(parsed.error, lineOf, report);
       continue;
     }
     const guide: CheckedGuide = { file: f.path, fm: parsed.data, page };
@@ -203,12 +211,13 @@ function checkGuide(g: CheckedGuide, lineOf: LineOf, ctx: GuideCheckContext, byS
             const href = m[2]!;
             const wiki = wikiLinkTarget(href);
             const guide = guideLinkTarget(href);
+            const path = sitePath(href);
             if (wiki !== null) linkTo(wikiPage(wiki), m[0], block.line);
             else if (guide !== null) linkTo(bySlug.get(guide)?.fm, m[0], block.line);
-            else if (sitePath(href) === null) {
+            else if (path === null) {
               cited.add(href);
               if (!fm.sources.some((s) => s.url === href)) report(`${href} is not in sources; list it there with the day it was checked`, block.line);
-            } else if (PLAN_IN_LINK.test(href)) {
+            } else if (PLAN_IN_LINK.test(href) || PLAN_PATH.test(path)) {
               report(`${m[0]} carries a talent plan; a guide's plan is its code and order, which the check reads`, block.line);
             }
           }
@@ -279,14 +288,20 @@ function tokenProblem(kind: string, id: number, known: GuideCheckContext["known"
 const contentOf = ({ fm, page }: { fm: GuideFrontMatter; page: ParsedPage }) =>
   JSON.stringify([{ ...fm, status: undefined }, page.blocks.map((b) => ({ ...b, line: undefined }))]);
 
-function readPrevious(f: GuideFile): { fm: GuideFrontMatter; page: ParsedPage } | null {
+/** A file as it was before the change, or null after saying why it does not read. Its published versions then cannot be
+ *  held to what they were, so the check fails rather than let an edit or a deletion through unchecked. */
+function readPrevious(f: GuideFile, report: Report): { fm: GuideFrontMatter; page: ParsedPage } | null {
+  let page: ParsedPage;
   try {
-    const page = parseGuide(f.source);
-    const fm = GuideFrontMatter.safeParse(page.data);
-    return fm.success ? { fm: fm.data, page } : null;
-  } catch {
+    page = parseGuide(f.source);
+  } catch (e) {
+    report((e as Error).message, errorLine(e));
     return null;
   }
+  const parsed = GuideFrontMatter.safeParse(page.data);
+  if (parsed.success) return { fm: parsed.data, page };
+  reportIssues(parsed.error, fieldLines(f.source), report);
+  return null;
 }
 
 /**
@@ -297,7 +312,9 @@ function readPrevious(f: GuideFile): { fm: GuideFrontMatter; page: ParsedPage } 
 function checkVersions(guides: CheckedGuide[], lines: ReadonlyMap<CheckedGuide, LineOf>, previous: GuideFile[], problems: Problem[]): void {
   const byId = new Map(guides.map((g) => [g.fm.id, g]));
   for (const f of previous) {
-    const was = readPrevious(f);
+    const before: Report = (message, line) =>
+      problems.push({ file: f.path, ...(line ? { line } : {}), message: `as it was before this change, the file does not read, so its published versions cannot be checked: ${message}` });
+    const was = readPrevious(f, before);
     if (!was) continue;
     const g = byId.get(was.fm.id);
     if (!g) {

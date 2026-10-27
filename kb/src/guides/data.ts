@@ -1,4 +1,4 @@
-﻿/**
+/**
  * What the guide check reads from disk: the guides under kb/guides, the wiki's pages, the talent trees the site ships,
  * the committed game data and the repository's private path pattern. Kept apart from check.ts so the rules stay
  * testable without files.

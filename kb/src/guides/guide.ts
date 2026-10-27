@@ -1,4 +1,4 @@
-﻿/**
+/**
  * The guides' content model: one Markdown file per guide under kb/guides/, YAML front matter on top, the wiki's body
  * syntax. A guide is Everloot's own advice on one talent plan: who it is for, why it fits an activity, how to play it
  * and what is not known yet, reviewed before it is published. Pure, with no file access, so the guide check, the site
@@ -70,8 +70,6 @@ const Fields = z.strictObject({
 export const GuideFrontMatter = Fields.superRefine((fm, ctx) => lifecycle(fm, (message, path) => ctx.addIssue({ code: "custom", message, path })));
 export type GuideFrontMatter = z.infer<typeof GuideFrontMatter>;
 
-const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
-
 function lifecycle(fm: z.output<typeof Fields>, issue: (message: string, path: PropertyKey[]) => void): void {
   const published = fm.status === "published";
 
@@ -112,9 +110,6 @@ function lifecycle(fm: z.output<typeof Fields>, issue: (message: string, path: P
     if (above && entry.on < above.on) issue(`history.${i} is dated ${entry.on}, before version ${above.version} (${above.on})`, ["history", i]);
   });
 
-  if (fm.reviewed && sameName(fm.reviewed.by, fm.author)) {
-    issue("a guide is reviewed by someone other than its author; reviewed.by names the author", ["reviewed"]);
-  }
   const last = fm.history.at(-1);
   const n = fm.history.length;
   if (published) {
