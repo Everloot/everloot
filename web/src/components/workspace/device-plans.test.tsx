@@ -417,6 +417,37 @@ test("a restore shows what it would do and changes nothing until Restore is pres
   expect(item("Future")?.textContent).toContain("Set 1: order from a newer version");
 });
 
+const restoreGroup = () => container.querySelector<HTMLElement>('[role="group"][aria-label="What the restore would do"]');
+
+test("a restore that replaces an alt's notes names the alt and says its notes change (reported case)", async () => {
+  localStorage.setItem(bucketKey(ANON), V2_BUCKET_TEXT);
+  const backup = JSON.parse(V2_BUCKET_TEXT);
+  backup.alts[0] = { ...backup.alts[0], notes: "Backup notes replace the local ones", updatedAt: "2026-10-27T12:00:00.000Z" };
+  await render();
+  await choose(new File([JSON.stringify(backup)], "backup.json", { type: "application/json" }));
+  expect(restoreGroup()?.textContent).toContain("Replaces the alt Thrall with the backup's newer copy, which changes its notes.");
+  expect(stored(ANON)?.alts[0].notes).toBe("Bank alt.\nTuesdays.");
+  await click(button(/^Restore$/, restoreGroup()!));
+  expect(stored(ANON)?.alts[0].notes).toBe("Backup notes replace the local ones");
+});
+
+test("the restore preview names each alt it adds, and says when an alt it replaces keeps its notes", async () => {
+  localStorage.setItem(bucketKey(ANON), V2_BUCKET_TEXT);
+  const alt = JSON.parse(V2_ALT_TEXT);
+  const backup = { ...JSON.parse(V2_BUCKET_TEXT), alts: [
+    { ...alt, level: 25, updatedAt: "2026-10-27T12:00:00.000Z" },
+    { ...alt, id: id(501), name: "Jaina", notes: "", planIds: [] },
+  ] };
+  await render();
+  await choose(new File([JSON.stringify(backup)], "backup.json", { type: "application/json" }));
+  const copy = restoreGroup()?.textContent;
+  expect(copy).toContain("Adds the alt Jaina.");
+  expect(copy).toContain("Replaces the alt Thrall with the backup's newer copy. Its notes stay as they are.");
+  // An alt the backup holds as it is here is not named.
+  await choose(new File([V2_BUCKET_TEXT], "backup.json", { type: "application/json" }));
+  expect(restoreGroup()?.textContent).not.toContain("Thrall");
+});
+
 test("a backup from another account is refused at the preview, and nothing changes", async () => {
   seed(B, [plan({ id: id(3), name: "B's plan" })]);
   who = { id: B_ID, name: "Jaina#5678" };

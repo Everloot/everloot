@@ -6,7 +6,7 @@ import { Card, CopyButton, Field, SectionHeading } from "@/components/ui";
 import {
   BACKUP_TOO_LARGE, WORKSPACE_LIMITS, applyImport, bucketKey, copyPlan, deletePlan, deviceStorage, editPlan, exportBackup, storedCounts,
   orderState, previewImport, readPlanText, readWorkspace, sameOwner, savePlan,
-  type Failure, type ImportPreview, type LocalPlan, type Owner, type PlanText, type ReadResult,
+  type Failure, type ImportPreview, type LocalPlan, type Owner, type PlanText, type PlayerWorkspace, type ReadResult,
 } from "@/lib/player-workspace";
 import { planHash, replacePlanHash } from "@/lib/talents/import";
 import { useWorkspaceOwner } from "./LocalPlanSave";
@@ -358,9 +358,23 @@ function previewLine(p: ImportPreview): string {
   return `Restoring ${said}.${kept}`;
 }
 
+/** Alt by alt, what a restore does to this device's alts, which a backup holds as well as the plans: each it adds,
+ *  and each it replaces with the backup's newer copy, saying whether that changes its notes. */
+function restoreLines(current: PlayerWorkspace, preview: ImportPreview): string[] {
+  const here = new Map(current.alts.map((a) => [a.id, a]));
+  return preview.result.alts.flatMap((alt) => {
+    const mine = here.get(alt.id);
+    if (!mine) return [`Adds the alt ${alt.name}.`];
+    if (JSON.stringify(mine) === JSON.stringify(alt)) return [];
+    return [`Replaces the alt ${mine.name} with the backup's newer copy${mine.notes === alt.notes ? ". Its notes stay as they are." : ", which changes its notes."}`];
+  });
+}
+
 /** Download a backup of this bucket, or restore one after seeing what it would do. */
 function Backup({ owner, onRestored }: { owner: Owner; onRestored: (result: { ok: true } | Failure, done: string) => void }) {
   const [preview, setPreview] = useState<ImportPreview | null>(null);
+  // Alt by alt, what the restore adds or replaces: a backup holds the alts too, notes and all.
+  const [altLines, setAltLines] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
   // Gone with its bucket: a file still being read when the account changes is not previewed for the next one.
@@ -396,6 +410,7 @@ function Backup({ owner, onRestored }: { owner: Owner; onRestored: (result: { ok
     const result = previewImport(text, now.workspace);
     if (!result.ok) { setError(result.message); return; }
     setPreview(result.preview);
+    setAltLines(restoreLines(now.workspace, result.preview));
   }
 
   function restore() {
@@ -421,6 +436,8 @@ function Backup({ owner, onRestored }: { owner: Owner; onRestored: (result: { ok
       {preview && (
         <div role="group" aria-label="What the restore would do" className="mt-4 space-y-3 rounded-control border border-line bg-canvas p-3">
           <p className="text-sm text-fg">{previewLine(preview)}</p>
+          {/* Two alts of one name read alike here, so a line is known by its place. */}
+          {altLines.map((line, i) => <p key={i} className="text-sm text-fg">{line}</p>)}
           {preview.warnings.length > 0 && (
             <ul className="list-disc space-y-1 pl-5 text-sm text-fg-2">{preview.warnings.map((w) => <li key={w}>{w}</li>)}</ul>
           )}
