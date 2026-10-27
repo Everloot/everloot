@@ -110,6 +110,39 @@ test("sorted by date, a day's date shows on its first row only; the rows under i
   expect(oldest).toMatch(/<time dateTime="2026-10-16T22:00:00.000Z"[^>]*class="sr-only">/);
 });
 
+test("the once-a-day date holds at a page break and a filtered start, either way round, and only for the date sort", async () => {
+  const SHOWN = "hidden font-mono tabular-nums text-fg-2 sm:inline";
+  const dateClasses = (html: string) => [...html.matchAll(/<time dateTime="[^"]+"[^>]*class="([^"]+)">/g)].map((m) => m[1]);
+  const phoneLines = (html: string) => [...html.matchAll(/<div class="text-cell-2 text-muted sm:hidden">(.*?)<\/div>/g)].map((m) => m[1]);
+  const firstTitle = (html: string) => /<div data-phone-title[^>]*><a [^>]*>([^<]+)<\/a>/.exec(html)![1];
+  // 120 posts on one day: every page after the first starts in the middle of that day.
+  timeline.entries = Array.from({ length: 120 }, (_, i) => ({ ...entries[1], id: `forum:${5000 + i}`, title: `Post ${i}`, at: new Date(Date.UTC(2026, 9, 1, 0, i)).toISOString() }));
+  for (const [params, first] of [[{}, "Post 119"], [{ page: "2" }, "Post 69"], [{ sort: "-date", page: "2" }, "Post 69"], [{ sort: "date" }, "Post 0"], [{ sort: "date", page: "2" }, "Post 50"]] as const) {
+    const html = await page(params);
+    expect(firstTitle(html)).toBe(first);
+    // The page's first row shows the day, in the date column and in the phone line; the other 49 keep it for screen readers.
+    expect(dateClasses(html)).toEqual([SHOWN, ...Array(49).fill("sr-only")]);
+    const lines = phoneLines(html);
+    expect(lines[0]).toBe("2026-10-01 · Blue post · Linxy · US forum");
+    expect(lines.slice(1).every((line) => line === "Blue post · Linxy · US forum")).toBe(true);
+  }
+  // A filter that starts the list on a day's second row: the hotfix follows the 22:00 post on October 16 unfiltered,
+  // and is the first row once filtered, so it shows the date.
+  timeline.entries = entries;
+  const filters: Record<string, string>[] = [{ show: "hotfixes" }, { author: "Kaivax" }, { show: "hotfixes", sort: "date" }];
+  for (const filter of filters) {
+    const html = await page(filter);
+    expect(dateClasses(html)).toEqual([SHOWN]);
+    expect(phoneLines(html)).toEqual(["2026-10-16 · Hotfix · Kaivax · EU forum"]);
+  }
+  // Any other sort, either way round, shows every row's date.
+  for (const sort of ["type", "-type", "title", "-title", "author", "-author", "source", "-source"]) {
+    const html = await page({ sort });
+    expect(dateClasses(html)).toEqual(Array(4).fill(SHOWN));
+    expect(phoneLines(html).every((line) => /^\d{4}-\d{2}-\d{2} · /.test(line))).toBe(true);
+  }
+});
+
 test("markup in a title is escaped, not rendered", async () => {
   const html = await page();
   expect(html).toContain("Synthetic beta notice &lt;b&gt;");
