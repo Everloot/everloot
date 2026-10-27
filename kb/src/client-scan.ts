@@ -56,7 +56,7 @@ export const DOMAINS: Domain[] = [
 /** Ordered: the first match wins, so a specific prefix (ZoneMusic) beats a broad one (Zone). */
 const DOMAIN_RULES: [Domain, RegExp][] = [
   ["audio", /^(Sound|Music|Audio|ZoneMusic)/],
-  ["talents", /^Trait/],
+  ["talents", /^(Trait|Talent|NumTalentsAtLevel|SpecSetMember|SpecializationSpells|MinorTalent)/],
   ["models", /^(CreatureModel|CreatureDisplay|CreatureAnim|Anim|Model|M2|Bone|Helmet|Camera|Liquid)/],
   ["items", /^(Item|Transmog)/],
   ["spells", /^Spell/],
@@ -68,13 +68,13 @@ const DOMAIN_RULES: [Domain, RegExp][] = [
   ["factions", /^(Faction|Reputation)/],
   ["collections", /^(Toy|BattlePet|Companion|Mount|Heirloom|Pet)/],
   ["professions", /^(SkillLine|Crafting|Recipe|TradeSkill|Profession)/],
-  ["achievements", /^Achievement/],
+  ["achievements", /^(Achievement|Criteria|ModifierTree)/],
   ["currencies", /^Currency/],
   ["holidays", /^Holiday/],
   ["pvp", /^(PvP|Arena|Battleground|Brawl|Rated)/],
-  ["group content", /^(LFG|Dungeon|Journal|Encounter|Instance|ChallengeMode|Keystone|Scenario)/],
+  ["group content", /^(LFG|Dungeon|Journal|Encounter|Instance|ChallengeMode|Keystone|Scenario|Difficulty)/],
   ["travel", /^(Taxi|FlightPath)/],
-  ["characters", /^(Chr|CharTitles|Character)/],
+  ["characters", /^(Chr|CharTitles|Character|PowerType|PowerDisplay)/],
   ["interface", /^(Ui|Chat|Font)/],
   ["other", /./],
 ];

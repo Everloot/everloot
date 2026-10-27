@@ -210,6 +210,19 @@ test("the W4 tables are read by the file data ids the WoWDBDefs manifest lists f
   });
 });
 
+test("the W5 tables are read by the file data ids the WoWDBDefs manifest lists for them", () => {
+  // manifest.json at WoWDBDefs 05e242b6acdc (verified against the live wowf 70630 build, rows for
+  // Criteria 3297, CriteriaTree 6771, ModifierTree 2845, Talent 432, TalentTab 27, NumTalentsAtLevel
+  // 80, Difficulty 22, PowerType 6; CriteriaTreeXEffect is present with 0 rows).
+  expect(CLIENT_TABLES).toMatchObject({
+    Criteria: 1263817, CriteriaTree: 1263818, CriteriaTreeXEffect: 1345969, ModifierTree: 1267645,
+    Talent: 1369062, TalentTab: 2178102, NumTalentsAtLevel: 1953326, MinorTalent: 1347274,
+    TalentTreePrimarySpells: 5581887, SpecSetMember: 2057624, SpecializationSpells: 1240335,
+    SpecializationSpellsDisplay: 2067238,
+    Difficulty: 1352127, PowerType: 1266022,
+  });
+});
+
 test("a table the build does not have is reported as missing, not invented", async () => {
   const { tables, missing } = await extractTables(fake({ [CLIENT_TABLES.Item]: { rows: [[1, { ID: 1 }]] } }));
   expect(tables.map((t) => t.table)).toEqual(["Item"]);

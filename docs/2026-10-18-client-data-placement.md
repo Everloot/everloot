@@ -16,6 +16,13 @@ first triage pass moved 216 dead-system and plumbing tables to the never-list (`
 read the live-support group (`3a1c007`), leaving **622 candidates**. Snapshot and scan stay local and
 gitignored; no generator reads the W4 tables yet, so nothing is published.
 
+**Status update 2026-10-27:** W5 executed on the launch product `wowf`, build **1.60.1.70630**
+(`644ffedb`) — Forever went live and the version service now carries retail builds faster than the
+beta bucket. The read set is **346 tables** (344 in this build; 332 before the wave, of 1,159) and
+**599 candidates** remain. Talents (35) and achievements (6) domains are now read in full. The
+committed site data was at 1.60.1.70532 when the wave ran; the scheduled build-watch opens its
+game-data pull request per new build on its own.
+
 ## What the scan measures
 
 - The WoWDBDefs manifest (pinned commit `b9a63096cdd9`) against the build's root listing, by file data id.
@@ -133,6 +140,7 @@ Extending `DOMAIN_RULES` in `kb/src/client-scan.ts` as tables are triaged keeps 
 | W2 | `d589242` | 69 | no failures; all coverage pins verified in-layout |
 | W3 | `ef82618` | 102 | `LiquidType` dropped (see below); one concurrent edit from origin (PR #73) rebased in first, adding `LoadingScreens` |
 | W4 | `3a1c007` | 45 | the live-support group; `ObjectEffectGroup` and `ObjectEffectPackage` are not in this build, and `ObjectEffectModifier`, `DeclinedWord` and `DeclinedWordCases` read empty; candidates 667 → 622 |
+| W5 | this change | 14 | achievement criteria (`Criteria` 3297, `CriteriaTree` 6771, `ModifierTree` 2845 rows; `CriteriaTreeXEffect` present, 0 rows), the classic talent family (`Talent` 432, `TalentTab` 27, `NumTalentsAtLevel` 80; `MinorTalent`, `SpecSetMember`, `SpecializationSpells`, `SpecializationSpellsDisplay`, `TalentTreePrimarySpells` present with 0 rows), and two live completes (`Difficulty` 22, `PowerType` 6). Talents and achievements domains now read in full; candidates 613 → 599 |
 
 Findings the waves surfaced while reading:
 
@@ -160,9 +168,12 @@ Findings the waves surfaced while reading:
    on push; none of the wave commits touch generated site data, so the pushes shipped no visible change.
 3. **"Other" triage appetite.** Draft below; a quick pass can move whole prefixes to a documented "never"
    list, the alternative is leaving them in the catch-all. Groups A and B applied; C ran as W4.
-4. **Next wave.** Nothing is queued: what remains is feature-tied (D with the spell work, E as a
-   reviewed pages-only pass, F with the sound feature, G on demand). The mining loop is at a natural
-   stop until one of those features is picked.
+4. **Next wave.** Praised D and the achievements criteria cluster both executed as W5 (2026-10-27). What
+   remains is feature-tied: E as a reviewed pages-only pass (`GossipNPCOption` 1577 rows, `BroadcastText`
+   12 rows — gossip text is mostly server-side), F with the sound feature, and the stragglers verified
+   against 70630: `RandPropPoints` + `ArmorLocation` for item stat math, `GossipNPCOptionDisplayInfo`
+   (50 rows) for NPC interaction icons. The mining loop is at a natural stop until one of those features
+   is picked.
 
 ## "Other"-bucket triage — first pass applied, rest drafted
 
@@ -197,11 +208,15 @@ These would land across characters, world and item domains.
 
 **D. Classic talent trees → talents domain, with the spell work.** `Talent`, `TalentTab`,
 `TalentTreePrimarySpells`, `SpecializationSpells*`, `SpecSetMember`, `MinorTalent`, `NumTalentsAtLevel`
-(≈8). The W2/W3 talent reads took the retail `Trait*` family; these are the classic trees `/tools/talents`
-would actually render.
+(≈8). ✅ Executed as W5 (2026-10-27): `Talent` 432, `TalentTab` 27 and `NumTalentsAtLevel` 80 carry
+rows; the retail specialization plumbing (`SpecializationSpells*`, `SpecSetMember`, `MinorTalent`,
+`TalentTreePrimarySpells`) is present with 0 rows in this build.
 
 **E. Text-bearing, pages-only.** `BroadcastText*`, `ConversationLine`, `GossipNPCOption*`, `SceneScript*`
 (≈20) — same rule as lore text: pages may show reviewed game text; API, MCP and bulk stay clean.
+Verified row counts on 70630: `GossipNPCOption` 1577, `GossipNPCOptionDisplayInfo` 50, `BroadcastText`
+only 12 — NPC dialogue text is mostly server-side, so the client side of this wave is option kinds and
+icons, not words.
 
 **F. Ambience and lighting → defer with the sound feature.** `Light*`, `LightData*`, `LightShaft*`,
 `SkyScene*`, `VolumeFog*`, `Weather*`, `WindSettings`, `Terrain*`, `WaterfallData`, `WorldShadow` (≈30).

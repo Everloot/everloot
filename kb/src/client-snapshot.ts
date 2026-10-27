@@ -162,6 +162,19 @@ export const CLIENT_TABLES = {
   ObjectEffectPackage: 1090574, ObjectEffectPackageElem: 1090578,
   ParticleColor: 1284820, DeclinedWord: 1279100, DeclinedWordCases: 1279099, NameGen: 1122117,
   Resistances: 1135072, RaceStat: 7722633,
+  // W5 (docs/2026-10-18-client-data-placement.md): achievement criteria the client carries by id —
+  // Criteria and ModifierTree define each criterion and its condition, CriteriaTree orders and names
+  // them — so achievement pages can show criteria from the files before players report them.
+  // Talent and TalentTab are the classic client's talent trees; NumTalentsAtLevel the points per
+  // level. The rest of the classic talent family reads empty today (Specialization* and SpecSetMember
+  // are retail specialization plumbing) but sits in the same topic, so the snapshot stops asking.
+  // Difficulty names the difficulty rows DungeonEncounter and MapDifficulty point at;
+  // PowerType names the power types classes and spells spend.
+  Criteria: 1263817, CriteriaTree: 1263818, CriteriaTreeXEffect: 1345969, ModifierTree: 1267645,
+  Talent: 1369062, TalentTab: 2178102, NumTalentsAtLevel: 1953326, MinorTalent: 1347274,
+  TalentTreePrimarySpells: 5581887, SpecSetMember: 2057624, SpecializationSpells: 1240335,
+  SpecializationSpellsDisplay: 2067238,
+  Difficulty: 1352127, PowerType: 1266022,
   // Partial on the client: most of what these describe (spawns, quest text) lives on the server.
   Creature: 841631, GameObjects: 841620, QuestV2: 1139443,
   // Loading screens (Map.LoadingScreenID names a row; the row names its picture files), for the page
