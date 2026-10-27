@@ -35,11 +35,22 @@ export function readProviderEntries(configPath: string): ProviderEntry[] {
   });
 }
 
-export async function withMcp<T>(target: McpTarget, run: (client: Client) => Promise<T>): Promise<T> {
+/**
+ * One connection to the MCP server for one piece of work. A stop reaches the handshake as well as the work, and
+ * whatever was opened is closed however it ends, so a server that never answers initialize holds nothing open.
+ */
+export async function withMcp<T>(target: McpTarget, run: (client: Client) => Promise<T>, signal?: AbortSignal): Promise<T> {
+  signal?.throwIfAborted();
   const client = new Client({ name: "everloot-desktop", version: "0.1.0" });
-  const transport = new StreamableHTTPClientTransport(new URL(target.url), target.token ? { requestInit: { headers: { Authorization: `Bearer ${target.token}` } } } : {});
-  await client.connect(transport);
-  try { return await run(client); } finally { await client.close(); }
+  const requestInit: RequestInit = { ...(target.token ? { headers: { Authorization: `Bearer ${target.token}` } } : {}), ...(signal ? { signal } : {}) };
+  const transport = new StreamableHTTPClientTransport(new URL(target.url), { requestInit });
+  try {
+    // The SDK ends a pending initialize only through the request's own signal (it sets its own on each fetch).
+    await client.connect(transport, { signal });
+    return await run(client);
+  } finally {
+    await client.close().catch(() => {});
+  }
 }
 
 const textOf = (result: unknown): string => {
@@ -74,7 +85,8 @@ const MAX_RESULT = 20_000;
 
 export interface AgentOptions {
   mcp: McpTarget;
-  entries: ProviderEntry[];
+  /** The provider entries, or a function that reads them: a price question is answered before they are, so a damaged config.json never blocks one. */
+  entries: ProviderEntry[] | (() => ProviderEntry[]);
   history: ChatMessage[];
   question: string;
   maxRounds?: number;
@@ -114,7 +126,7 @@ async function priceAnswer(o: AgentOptions): Promise<AgentReply | null> {
   const reply = await answerMarketQuestion(o.question, {
     resolveItem: siteItemSearch(o.site ?? "https://everloot.app", o.send),
     lookup: (realm, itemId, signal) => (o.session ?? withMcp)(o.mcp, async (mcp) =>
-      marketValueFrom(await mcp.callTool({ name: "market_value", arguments: { realm, itemId } }, undefined, { signal }))),
+      marketValueFrom(await mcp.callTool({ name: "market_value", arguments: { realm, itemId } }, undefined, { signal })), signal),
     realmChoices: o.realms,
   }, { signal: o.signal });
   if (!reply) return null;
@@ -130,7 +142,7 @@ async function priceAnswer(o: AgentOptions): Promise<AgentReply | null> {
 export async function answer(options: AgentOptions): Promise<AgentReply> {
   const priced = await priceAnswer(options);
   if (priced) return priced;
-  const entry = options.entries[0];
+  const entry = (typeof options.entries === "function" ? options.entries() : options.entries)[0];
   if (!entry) return plain(options);
   if (entry.type === "anthropic") return anthropicLoop(options, entry);
   if (entry.type === "openai-compatible") return openAiLoop(options, entry);

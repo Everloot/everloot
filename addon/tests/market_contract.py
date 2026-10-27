@@ -174,6 +174,7 @@ assert(Everloot:Status():find('auction_snapshot'), 'status counts the snapshot r
 lua.execute("""
 local own = tooltipFor(2589)
 assert(own:find('Your scan: min 1s 0c') and own:find('value 1s 10c') and own:find('100 up'), own)
+assert(not own:find('all houses'), 'an own scan is not an all-house price: ' .. own)
 assert(tooltipFor(424242) == '', 'no line for an item with no price')
 tripped = false
 os = { execute = function() tripped = true end }
@@ -185,8 +186,11 @@ Everloot:ResetPrices()
 local both = tooltipFor(2589)
 assert(both:find('Everloot market 2s 5c') and both:find('min 2s 0c') and both:find('historical 1s 90c'), both)
 assert(both:find('3 reporters'), both)
+assert(both:find('historical 1s 90c · all houses'), 'the community prices say they blend every auction house: ' .. both)
+assert(both:find('Your scan: min 1s 0c') and not both:find('Your scan[^\\n]*all houses'), 'the own scan keeps its own label: ' .. both)
 local herb = tooltipFor(765)
 assert(herb:find('market unrecorded'), 'a null market value is unrecorded, never zero: ' .. herb)
+assert(herb:find('all houses'), 'a thin or unrecorded row still says its scope: ' .. herb)
 
 EverlootPricesDB.realms.forever.sum = 1
 Everloot:ResetPrices()
@@ -316,6 +320,7 @@ local function ask(arg) printed = {}; SlashCmdList.EVERLOOT('price ' .. arg); dr
 local linen = ask(LINK)
 assert(linen:find('Everloot price: ' .. LINK:gsub('%p', '%%%0') .. ' on Forever'), linen)
 assert(linen:find('Everloot market 2s 5c') and linen:find('min 2s 0c') and linen:find('historical 1s 90c'), 'same numbers as the tooltip: ' .. linen)
+assert(linen:find('historical 1s 90c · all houses'), 'the command says the community prices are all-house too: ' .. linen)
 assert(linen:find('Your scan: min 1s 0c'), 'the player\\'s own scan too: ' .. linen)
 assert(linen:find('everloot.app/tools/auctions%?realm=Forever&item=2589'), 'the full history is on the site: ' .. linen)
 assert(ask('2589'):find('Everloot market 2s 5c'), 'an item id works')

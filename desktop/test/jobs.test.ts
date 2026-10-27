@@ -19,10 +19,11 @@ test.each(["https://other.test", "http://everloot.app", "https://everloot.app"])
   writeFileSync(join(d, ACCOUNT_KEY_FILE), key);
   writeKeyOrigin(d, "https://everloot.app");
   const file = join(d, "Everloot.lua");
-  writeFileSync(file, "EverlootDB = {}\n");
+  // A question that is not about a price, so it reaches the engine (the providers are read only then).
+  writeFileSync(file, `EverlootDB = {["version"] = "0.3.4", ["installId"] = "abcd-1234-ef56-7890", ["records"] = {}, ["asks"] = {{["id"] = "ask:1", ["question"] = "Thrall", ["askedAt"] = "2026-10-27T00:00:00Z"},}}\n`);
   const engine = vi.spyOn(bridge, "mcpEngine").mockReturnValue({ answer: async () => ({ answer: "ok", source: "test" }) });
   try {
-    await companionJobs(d, () => ({ ...defaultSettings(), endpoint })).deps.ask(file);
+    await companionJobs(d, () => ({ ...defaultSettings(), endpoint, gameFolder: d })).deps.ask(file);
     expect(engine.mock.calls[0][0].token).toBe(endpoint === "https://everloot.app" ? key : null);
   } finally { engine.mockRestore(); }
 });

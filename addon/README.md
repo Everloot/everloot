@@ -30,12 +30,28 @@ installed addons is off until `/everloot addons on`; it is sent only from the up
 its preview. `/everloot addons off` stops it and deletes every recorded addon row.
 
 A scan that gets no answer from the auction house in 30 seconds stops and gives the cooldown back.
-Tooltip prices show the date the companion last fetched them and flag them as stale after two days.
+Tooltip prices show the item's newest public observation day separately from when the price file was built,
+and warn when either is old. Community values combine all auction houses on the realm; they are recorded
+asking-price estimates, not live listings or guaranteed sale prices.
 Below the prices, the tooltip shows where the item drops when three installs looted the source: each rate as
 drops of loot windows, with its installs and the date of the uploads behind it, from the drop rates the Desktop
 App writes into the same `EverlootPrices` file. Once that file is in the game, a missing price or drop source is
 said in one grey line; nothing is written to your SavedVariables. `addon/tests/drops_contract.py` holds the rules.
 Nothing in the addon calls a buy, bid or post API; `addon/tests/market_contract.py` traps them.
+
+### Ask about an item's price
+
+- For an immediate answer from the files already in game, type `/everloot price` followed by a
+  shift-clicked item link or item id. This works away from the auction house too. Your own scan can
+  supply a value before the community has enough observations.
+- For an online recorded-market answer, type `/ask price` followed by an item link or id. New questions
+  include your current realm; you can name another explicitly, for example `/ask price 2589 on Nightslayer`.
+  An item name works when Everloot can resolve it uniquely. Otherwise, the answer asks for an item id.
+- Keep the Desktop App running with Ask enabled. `/reload` or log out to write the question; after the
+  app processes it, `/reload` again to load the answer. This is a file bridge, not live in-game internet access.
+- Price questions need no AI model key. Answers identify the realm, all-house scope, recorded values,
+  observation day and missing data. A missing local cache row does not prove the website lacks a price;
+  the local community file holds at most 2,000 items. Full history is on everloot.app/tools/auctions.
 
 Each scan records your faction (`faction`) and which house it read (`house`): Alliance or Horde from the
 auctioneer's faction, Neutral for a goblin house whose auctioneer has none, and nothing when the client

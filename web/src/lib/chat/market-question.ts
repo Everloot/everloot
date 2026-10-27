@@ -13,9 +13,20 @@
 export const MARKET_ANSWER_BUDGET = 600;
 /** The newest public day is called stale after this many days, as the game addon does. */
 export const STALE_DAYS = 2;
+/**
+ * The most one price question may take, item search and market lookup together. Past it the answer is the usual
+ * "unavailable", never a model's guess. 30 s is the lead's choice: a public lookup that has not come back by
+ * then is not coming back soon, and a bridge that answers asks one after another must not wait on it forever.
+ */
+export const MARKET_QUERY_BUDGET_MS = 30_000;
+/** A public day needs this many reporters (the server's AUCTION_AGREEMENT); a row claiming fewer is not a public price. */
+const MIN_REPORTERS = 3;
 
-/** What the question asks about: an item id (with the name the player gave it) or a name still to resolve. */
-export interface MarketIntent { item: { id: number; label?: string } | { name: string }; realm: string | null }
+/**
+ * What the question asks about: an item id (with the name the player gave it), a name still to resolve, or a
+ * reference that is not a usable item id (zero, too large, not a number): asked back, never shortened or guessed.
+ */
+export interface MarketIntent { item: { id: number; label?: string } | { name: string } | { invalid: string }; realm: string | null }
 
 /** What resolving an item name gives: its id, several candidates, or nothing. The site's item search (items.ts) returns this. */
 export type NameMatch = { id: number } | { query: string } | null;
@@ -74,7 +85,7 @@ const NOT_REALMS = new Set(["game", "the game", "wow", "ah", "the ah", "auction 
 const PERSONAL = /\b(?:my|mine|me|myself|our|ours|we|i|i'm|i've)\b/i;
 const VAGUE = new Set(["it", "this", "that", "them", "these", "those", "one"]);
 const AUX = /^(?:is|are|does|do|did|can|could|will|would|should|it|this|that|whether|if|how|why|when|where|who|which)\b/i;
-const LEAD = /^(?:(?:please|pls|hey|so|ok|okay|can you|could you|would you|tell me|show me|check|look up|lookup|find|do you know|what(?:'s| is| are| was)|whats)\s+)*/i;
+const LEAD = /^(?:(?:please|pls|hey|so|ok|okay|can you|could you|would you|tell me|show me|check|look up|lookup|find|do you know|what(?:'s| is| are| was)|whats),?\s+)*/i;
 
 /** The realm named at the end ("on Forever", "in Dawn's Reach"), and the question without it. */
 function takeRealm(text: string): { rest: string; realm: string | null } {
@@ -88,23 +99,34 @@ function takeRealm(text: string): { rest: string; realm: string | null } {
   return { rest: text.slice(0, at), realm: tail };
 }
 
-/** The item references in a question, each swapped for a mark; the first one's id and name. */
-function takeItemRefs(text: string): { text: string; refs: { id: number; label?: string }[] } {
-  const refs: { id: number; label?: string }[] = [];
-  const mark = (id: string, label?: string) => { refs.push({ id: Number(id), ...(label ? { label: label.trim() } : {}) }); return ITEM_MARK; };
+/** An item reference as written (its id text whole, not yet checked) and the name a shift-click link carried. */
+interface ItemRef { raw: string; label?: string }
+
+/** A written id as an item: a positive integer of at most ten digits (always a safe integer), or the text back as invalid. */
+function itemOf(raw: string, label?: string): MarketIntent["item"] {
+  return ID.test(raw) ? { id: Number(raw), ...(label ? { label } : {}) } : { invalid: raw };
+}
+
+/** The item references in a question, each swapped for a mark. The whole id is taken, so a long one is judged, never cut. */
+function takeItemRefs(text: string): { text: string; refs: ItemRef[] } {
+  const refs: ItemRef[] = [];
+  const mark = (raw: string, label?: string) => { refs.push({ raw, ...(label?.trim() ? { label: label.trim() } : {}) }); return ITEM_MARK; };
   const out = text
-    .replace(/(?:\|c[0-9a-f]{8})?\|Hitem:(\d{1,10})[^|]*(?:\|h\[([^\]|]{0,80})\]\|h)?(?:\|r)?/gi, (_m, id: string, label?: string) => mark(id, label))
-    .replace(/https?:\/\/(?:www\.)?everloot\.app\/database\/items\/(\d{1,10})\/?/gi, (_m, id: string) => mark(id))
-    .replace(/\bitem:(\d{1,10})\b/gi, (_m, id: string) => mark(id))
-    .replace(/\bitem\s+(?:id\s+)?#?(\d{1,10})\b/gi, (_m, id: string) => mark(id));
+    .replace(/(?:\|c[0-9a-f]{8})?\|Hitem:([^:|]*)(?::[^|]*)?(?:\|h\[([^\]|]{0,80})\]\|h)?(?:\|r)?/gi, (_m, id: string, label?: string) => mark(id, label))
+    .replace(/https?:\/\/(?:www\.)?everloot\.app\/database\/items\/(\d+)\/?/gi, (_m, id: string) => mark(id))
+    .replace(/\bitem:(\w+)/gi, (_m, id: string) => mark(id))
+    .replace(/\bitem\s+(?:id\s+)?#?(\d+)\b/gi, (_m, id: string) => mark(id));
   return { text: out, refs };
 }
 
-function subjectOf(raw: string, refs: { id: number; label?: string }[]): MarketIntent["item"] | null {
-  let s = raw.trim().replace(/^["“”\[]+|["“”\]]+$/g, "").trim().replace(/^(?:the|a|an|some|one)\s+/i, "").replace(/\s+item$/i, "").trim();
-  if (s === ITEM_MARK) return refs.length === 1 ? refs[0] : null;
-  if (!s || s.includes(ITEM_MARK) || s.length > MAX_SUBJECT || VAGUE.has(s.toLowerCase()) || AUX.test(s)) return null;
-  if (ID.test(s)) return { id: Number(s) };
+function subjectOf(raw: string, refs: ItemRef[]): MarketIntent["item"] | null {
+  // The name keeps a leading article: the item resolver tries the whole name first (a real item can be "The ...")
+  // and drops a conversational article itself only when no item has that name. `bare` only judges what was asked.
+  const s = raw.trim().replace(/^["“”\[]+|["“”\]]+$/g, "").trim().replace(/\s+item$/i, "").trim();
+  const bare = s.replace(/^(?:the|a|an|some|one)\s+/i, "");
+  if (bare === ITEM_MARK) return refs.length === 1 ? itemOf(refs[0].raw, refs[0].label) : null;
+  if (!bare || bare.includes(ITEM_MARK) || s.length > MAX_SUBJECT || VAGUE.has(bare.toLowerCase()) || AUX.test(bare)) return null;
+  if (/^\d+$/.test(bare)) return itemOf(bare);
   return /^[\p{L}\p{N}][\p{L}\p{N} '’,.:()-]*$/u.test(s) ? { name: s } : null;
 }
 
@@ -117,13 +139,15 @@ function subjectOf(raw: string, refs: { id: number; label?: string }[]): MarketI
 export function parseMarketQuestion(question: string): MarketIntent | null {
   if (typeof question !== "string" || question.length > 2000) return null;
   const taken = takeItemRefs(question.replace(/\s+/g, " ").trim().replace(/[?.!\s]+$/, ""));
-  if (taken.refs.length > 1 || PERSONAL.test(taken.text.replace(/\[[^\]]*\]/g, ""))) return null;
-  const { rest, realm } = takeRealm(taken.text);
-  const body = rest.trim().replace(LEAD, "");
+  // The polite lead goes first: the "me" in "tell me the price of X" is not the player's own goods.
+  const spoken = taken.text.replace(LEAD, "");
+  if (taken.refs.length > 1 || PERSONAL.test(spoken.replace(/\[[^\]]*\]/g, ""))) return null;
+  const { rest, realm } = takeRealm(spoken);
+  const body = rest.trim();
   const subject =
     new RegExp(`^(?:the\\s+)?(?:(?:current|average|going|recorded|latest|ah|auction(?: house)?|market)\\s+)*${MARKET_WORDS}\\s+(?:check\\s+)?(?:(?:of|for|on)\\s+)?(.+)$`, "i").exec(body)?.[1]
     ?? new RegExp(`^how much\\s+(?:(?:is|are|does|do|would|will|did|should)\\s+)?(.+?)\\s+${WORTH_WORDS}$`, "i").exec(body)?.[1]
-    ?? new RegExp(`^(?:the\\s+)?(.+?)\\s+${WORTH_WORDS}$`, "i").exec(body)?.[1];
+    ?? new RegExp(`^(.+?)\\s+${WORTH_WORDS}$`, "i").exec(body)?.[1];
   if (subject === undefined) return null;
   const item = subjectOf(subject, taken.refs);
   return item ? { item, realm } : null;
@@ -136,6 +160,16 @@ type Reading =
 
 const count = (n: unknown): n is number => typeof n === "number" && Number.isSafeInteger(n) && n >= 0;
 
+/** A day that is on the calendar (2026-02-30 and 2026-99-99 are not). Not compared with today: the server tolerates a clock a day ahead. */
+function calendarDay(text: unknown): text is string {
+  const m = typeof text === "string" ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(text) : null;
+  if (!m) return false;
+  const [year, month, day] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const length = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
+  return month >= 1 && month <= 12 && day >= 1 && day <= length;
+}
+
 function read(raw: unknown, realm: string, itemId: number): Reading | null {
   const r = raw as { connected?: unknown; url?: unknown; page?: { realm?: unknown; itemId?: unknown; value?: unknown } } | null;
   if (!r || typeof r !== "object" || r.connected !== true || !r.page || typeof r.page !== "object") return null;
@@ -146,7 +180,9 @@ function read(raw: unknown, realm: string, itemId: number): Reading | null {
   const v = page.value as Record<string, unknown> | undefined;
   if (!v || typeof v !== "object" || v.itemId !== itemId) return null;
   if (!(v.market === null || count(v.market)) || !count(v.min) || !count(v.historical) || !count(v.quantity) || !count(v.ageDays) || !count(v.reporters)
-    || typeof v.day !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v.day) || typeof v.thin !== "boolean") return null;
+    || !calendarDay(v.day) || typeof v.thin !== "boolean") return null;
+  // A public day has at least three reporters; a row that says fewer contradicts itself and is not shown as a public price.
+  if (v.reporters < MIN_REPORTERS) return null;
   return { kind: "value", realm: page.realm.trim(), url, value: { market: v.market, min: v.min, historical: v.historical, quantity: v.quantity, day: v.day, ageDays: v.ageDays, reporters: v.reporters, thin: v.thin } };
 }
 
@@ -179,10 +215,11 @@ function describe(name: string, realm: string, reading: Reading): { kind: Market
     const thin = v.thin ? "The newest day is thin, so it is not counted in the market value." : "";
     return { kind: stale ? "stale" : "connected", text: fitted(`${head}: market ${formatCopper(v.market)}, ${prices}. ${days}`, staleNote, thin, closing) };
   }
-  if (v.thin) {
-    return { kind: "thin", text: fitted(`${head}: market value unrecorded because the newest public day is thin (${v.quantity} listed); ${prices}. ${seen}.`, staleNote, "Unrecorded is not zero, and this is not a live auction quote.") };
-  }
-  return { kind: "stale", text: fitted(`${head}: market value unrecorded, with no solid public day in the last 14 days. Last public day ${v.day} (${ago(v.ageDays)} ago): ${prices}, ${plural(v.reporters, "reporter")}.`, "Stale data, not a live auction quote.") };
+  // No recent market value. The result does not say why (old days, thin days or an outlier can each cause it), so
+  // that is not claimed: the value is unrecorded, and the newest day's own state is described beside it.
+  const thin = v.thin ? `The newest public day is thin (${v.quantity} listed), so it is not counted in a market value.` : "";
+  const note = "Unrecorded is not zero, and this is not a live auction quote.";
+  return { kind: v.thin && !stale ? "thin" : "stale", text: fitted(`${head}: recent market value unrecorded; ${prices}. ${seen}, ${v.quantity} listed.`, thin, staleNote, note) };
 }
 
 const UNAVAILABLE = "Everloot's market data could not be read just now, so there is no price to show. That is unrecorded, not zero. Try again in a few minutes.";
@@ -192,13 +229,16 @@ const UNAVAILABLE = "Everloot's market data could not be read just now, so there
  * missing item or realm, or several matching items, is a question back, never a guess; a lookup that fails
  * or returns the wrong realm or item is unavailable. `options.realm` is the realm the caller knows from
  * context (the game's /ask carries the player's realm): it fills in a missing one and never overrides one
- * the question names. A stopped answer throws the abort.
+ * the question names. A stopped answer throws the abort. The item search and the lookup share one budget,
+ * MARKET_QUERY_BUDGET_MS: spent, the answer is "unavailable" (the deps are also told through their signal,
+ * and the budget holds even for a dep that ignores it).
  */
 export async function answerMarketQuestion(question: string, deps: MarketDeps, options: { realm?: string | null; signal?: AbortSignal } = {}): Promise<MarketReply | null> {
   const intent = parseMarketQuestion(question);
   if (!intent) return null;
   const { signal } = options;
   signal?.throwIfAborted();
+  if ("invalid" in intent.item) return clarify(`That item id is not valid. Use the id from the item's page or shift-click the item link, for example: ${EXAMPLE}.`);
   const named = intent.realm !== null;
   const wanted = named ? intent.realm! : (options.realm ?? "");
   const realm = validRealmName(wanted) ? wanted.trim() : null;
@@ -209,31 +249,48 @@ export async function answerMarketQuestion(question: string, deps: MarketDeps, o
     const lead = named ? `"${intent.realm}" is not a realm name.` : "Which realm?";
     return clarify(`${lead} Prices are per realm, so name one, for example: ${subject}.${choices.length ? ` Realms you follow: ${choices.join(", ")}.` : ""}`, known);
   }
-  let id: number;
-  let label: string | undefined;
-  if ("id" in intent.item) {
-    id = intent.item.id;
-    label = intent.item.label;
-  } else if (/^\d+$/.test(intent.item.name)) {
-    return clarify(`That item id is not valid. Use the id from the item's page or shift-click the item link, for example: ${EXAMPLE}.`);
-  } else {
-    const match = await deps.resolveItem(intent.item.name, signal);
-    signal?.throwIfAborted();
-    if (!match) return clarify(`I couldn't match "${intent.item.name}" to an item. Use its item id or shift-click the item link, for example: ${EXAMPLE}.`);
-    if (!("id" in match)) return clarify(`Several items match "${intent.item.name}". Use the item id or shift-click the item link to pick one, for example: ${EXAMPLE}.`);
-    id = match.id;
-    label = intent.item.name;
-  }
-  const page = marketPageUrl(realm, id);
-  let raw: unknown;
+  const item = intent.item;
+  let id: number | null = "id" in item ? item.id : null;
+  const budget = new AbortController();
+  let spent = false;
+  const timer = setTimeout(() => { spent = true; budget.abort(new DOMException("The price query ran out of time.", "TimeoutError")); }, MARKET_QUERY_BUDGET_MS);
+  const stop = () => budget.abort(signal!.reason);
+  signal?.addEventListener("abort", stop, { once: true });
+  // Rejects when the budget aborts, so a dep that ignores its signal still cannot hold the answer past it.
+  const ended = new Promise<never>((_resolve, reject) => budget.signal.addEventListener("abort", () => reject(budget.signal.reason), { once: true }));
+  const work = async (inner: AbortSignal): Promise<MarketReply> => {
+    let label: string | undefined = "label" in item ? item.label : undefined;
+    if ("name" in item) {
+      const match = await deps.resolveItem(item.name, inner);
+      inner.throwIfAborted();
+      if (!match) return clarify(`I couldn't match "${item.name}" to an item. Use its item id or shift-click the item link, for example: ${EXAMPLE}.`);
+      if (!("id" in match)) return clarify(`Several items match "${item.name}". Use the item id or shift-click the item link to pick one, for example: ${EXAMPLE}.`);
+      id = match.id;
+      label = item.name;
+    }
+    const found = id!;
+    const page = marketPageUrl(realm, found);
+    let raw: unknown;
+    try {
+      raw = await deps.lookup(realm, found, inner);
+    } catch (err) {
+      if (inner.aborted) throw err;
+      raw = null;
+    }
+    inner.throwIfAborted();
+    const reading = read(raw, realm, found);
+    if (!reading) return { kind: "unavailable", text: UNAVAILABLE, source: page, itemId: found, realm };
+    return { ...describe(who(found, label), reading.realm, reading), source: reading.url ?? page, itemId: found, realm: reading.realm };
+  };
+  const running = work(budget.signal);
+  running.catch(() => {});
   try {
-    raw = await deps.lookup(realm, id, signal);
+    return await Promise.race([running, ended]);
   } catch (err) {
-    if (signal?.aborted) throw err;
-    raw = null;
+    if (!spent || signal?.aborted) throw err;
+    return { kind: "unavailable", text: UNAVAILABLE, source: id === null ? null : marketPageUrl(realm, id), itemId: id, realm };
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", stop);
   }
-  signal?.throwIfAborted();
-  const reading = read(raw, realm, id);
-  if (!reading) return { kind: "unavailable", text: UNAVAILABLE, source: page, itemId: id, realm };
-  return { ...describe(who(id, label), reading.realm, reading), source: reading.url ?? page, itemId: id, realm: reading.realm };
 }

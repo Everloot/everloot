@@ -108,7 +108,7 @@ export default async function SettingsPage() {
           <ul className="space-y-1 text-sm">
             <li><Link href="/account" className={link}>Your account</Link> <span className="text-fg-2">overview, data and privacy</span></li>
             <li><Link href="/account#keys" className={link}>API keys</Link></li>
-            <li><Link href="/account#chat-keys" className={link}>Chat keys</Link></li>
+            <li><Link href="/account#chat-keys" className={link}>Assistant setup</Link></li>
             <li><Link href="/addon" className={link}>Desktop App and addon</Link></li>
           </ul>
         </section>

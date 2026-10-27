@@ -1,13 +1,18 @@
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { describe, expect, test, vi } from "vitest";
+import { z } from "zod";
 import { adler32, luaString } from "../src/bridge/lua";
 import { readAsks } from "../src/bridge/asks";
 import { renderAnswersAddon } from "../src/bridge/answers";
 import { answerPending, createAnswerStore } from "../src/bridge/run";
-import { answerFromSearch, marketValueFrom, mcpMarketValue, withMarket, type AnswerEngine } from "../src/bridge/engine";
+import { answerFromSearch, marketValueFrom, mcpMarketValue, siteItemSearch, withMarket, type AnswerEngine } from "../src/bridge/engine";
 import { FIXTURE_ANSWER, FIXTURE_STRUCTURED, FIXTURE_URL } from "../../web/src/lib/chat/market-fixture";
+import { MARKET_QUERY_BUDGET_MS } from "../../web/src/lib/chat/market-question";
 
 const FIXTURE = new URL("../../addon/tests/fixtures/EverlootAnswers.lua", import.meta.url);
 const HOSTILE = 'x"] = 1 } os.execute("calc") --[[\n]]\\\0\r\t';
@@ -132,12 +137,30 @@ function market(over: { lookup?: (realm: string, id: number) => Promise<unknown>
 const searchEngine = () => ({ answer: vi.fn(async () => ({ answer: "Warchief.", source: "wiki" })) }) satisfies AnswerEngine;
 
 describe("a price question in /ask", () => {
+  test("an item whose canonical name begins with an article resolves whole through the site's item search; a conversational article is retried without it", async () => {
+    const asked: string[] = [];
+    const rows = [{ type: "item", id: 2589, href: "/database/items/2589", label: "The Review Blade", quality: 3 }, { type: "item", id: 2590, href: "/database/items/2590", label: "Linen Cloth", quality: 1 }];
+    const fetcher = (async (url: string) => {
+      const q = new URL(url).searchParams.get("q")!;
+      asked.push(q);
+      return Response.json({ results: rows.filter((r) => r.label.toLowerCase().includes(q.toLowerCase())) });
+    }) as typeof fetch;
+    const m = { ...market(), resolveItem: siteItemSearch("https://example.test", fetcher) };
+    await withMarket(searchEngine(), m).answer("price The Review Blade on Forever");
+    expect(asked).toEqual(["The Review Blade"]);
+    expect(m.lookup).toHaveBeenLastCalledWith("Forever", 2589, expect.any(AbortSignal));
+    asked.length = 0;
+    await withMarket(searchEngine(), m).answer("what is the price of the Linen Cloth on Forever");
+    expect(asked).toEqual(["the Linen Cloth", "Linen Cloth"]);
+    expect(m.lookup).toHaveBeenLastCalledWith("Forever", 2590, expect.any(AbortSignal));
+  });
+
   test("is answered from the market with its page, and the search engine is never asked", async () => {
     const m = market();
     const next = searchEngine();
     const reply = await withMarket(next, m).answer("price of Linen Cloth on Forever");
     expect(reply).toEqual({ answer: FIXTURE_ANSWER, source: FIXTURE_URL });
-    expect(m.lookup).toHaveBeenCalledWith("Forever", 2589, undefined);
+    expect(m.lookup).toHaveBeenCalledWith("Forever", 2589, expect.any(AbortSignal));
     expect(next.answer).not.toHaveBeenCalled();
   });
 
@@ -145,9 +168,9 @@ describe("a price question in /ask", () => {
     const m = market();
     const engine = withMarket(searchEngine(), m);
     await engine.answer("price 2589", { realm: "Nightslayer" });
-    expect(m.lookup).toHaveBeenLastCalledWith("Nightslayer", 2589, undefined);
+    expect(m.lookup).toHaveBeenLastCalledWith("Nightslayer", 2589, expect.any(AbortSignal));
     await engine.answer("price 2589 on Forever", { realm: "Nightslayer" });
-    expect(m.lookup).toHaveBeenLastCalledWith("Forever", 2589, undefined);
+    expect(m.lookup).toHaveBeenLastCalledWith("Forever", 2589, expect.any(AbortSignal));
   });
 
   test("an old ask without a realm is asked for one, with no price from any realm", async () => {
@@ -208,7 +231,156 @@ describe("a price question in /ask", () => {
   });
 });
 
+describe("polite and malformed price questions in /ask", () => {
+  test.each([
+    "please tell me the price of Linen Cloth on Forever",
+    "show me the price of 2589 on Forever",
+    "can you tell me the price of 2589 on Forever",
+  ])("%s is answered from the market, never by the search engine", async (question) => {
+    const m = market();
+    const next = searchEngine();
+    const reply = await withMarket(next, m).answer(question);
+    expect(reply.answer.startsWith("Linen Cloth (item 2589) on Forever, all houses:") || reply.answer.startsWith("Item 2589 on Forever, all houses:")).toBe(true);
+    expect(m.lookup).toHaveBeenCalledTimes(1);
+    expect(next.answer).not.toHaveBeenCalled();
+  });
+
+  test("a link whose id is longer than a safe id is asked back: no lookup of a shorter, different item", async () => {
+    const m = market();
+    const next = searchEngine();
+    const reply = await withMarket(next, m).answer("price |Hitem:9007199254740993|h[Invalid]|h on Forever");
+    expect(reply.answer).toMatch(/item id is not valid/i);
+    expect(m.lookup).not.toHaveBeenCalled();
+    expect(m.resolveItem).not.toHaveBeenCalled();
+    expect(next.answer).not.toHaveBeenCalled();
+  });
+});
+
+/** A local HTTP server for the MCP client to talk to; `closed` counts connections the client dropped. */
+async function localServer(handler: (req: IncomingMessage, res: ServerResponse) => void | Promise<void>) {
+  const seen = { requests: 0, closed: 0, onRequest: () => {} };
+  const server = createServer((req, res) => {
+    seen.requests++;
+    res.on("close", () => { seen.closed++; });
+    seen.onRequest();
+    void handler(req, res);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const url = `http://127.0.0.1:${(server.address() as { port: number }).port}/mcp`;
+  return {
+    url, seen,
+    next: () => new Promise<void>((resolve) => { seen.onRequest = resolve; }),
+    stop: async () => { server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); },
+  };
+}
+const until = async (check: () => boolean, label: string) => {
+  const end = Date.now() + 5_000;
+  while (!check()) {
+    if (Date.now() > end) throw new Error(`timed out waiting for ${label}`);
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+};
+
+/** A real MCP server over HTTP with a market_value tool that answers with the shared fixture. */
+function marketServer() {
+  return localServer(async (req, res) => {
+    const server = new McpServer({ name: "test-market", version: "0.0.0" });
+    server.registerTool("market_value", { inputSchema: { realm: z.string(), itemId: z.number() } }, async () => ({
+      content: [{ type: "text" as const, text: "long text" }], structuredContent: FIXTURE_STRUCTURED,
+    }));
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+    res.on("close", () => { void transport.close(); void server.close(); });
+    await server.connect(transport);
+    await transport.handleRequest(req, res);
+  });
+}
+
 describe("market_value over MCP", () => {
+  test("a real round trip to a local MCP server returns the structured answer, and the game's answer from it", async () => {
+    const local = await marketServer();
+    try {
+      const structured = await mcpMarketValue({ url: local.url, token: null }, "Forever", 2589);
+      expect(structured).toEqual(FIXTURE_STRUCTURED);
+      const m = { resolveItem: vi.fn(async () => ({ id: 2589 })), lookup: (realm: string, id: number, signal?: AbortSignal) => mcpMarketValue({ url: local.url, token: null }, realm, id, signal) };
+      const next = searchEngine();
+      expect(await withMarket(next, m).answer("price of Linen Cloth on Forever")).toEqual({ answer: FIXTURE_ANSWER, source: FIXTURE_URL });
+      expect(next.answer).not.toHaveBeenCalled();
+    } finally {
+      await local.stop();
+    }
+  });
+
+  test("a connection that never answers its first request ends when the caller stops, and the half-open connection is closed", async () => {
+    const local = await localServer(() => {});
+    try {
+      const ctl = new AbortController();
+      const first = local.next();
+      const call = mcpMarketValue({ url: local.url, token: null }, "Forever", 2589, ctl.signal);
+      const outcome = call.then(() => "answered", () => "rejected");
+      await first;
+      ctl.abort();
+      expect(await outcome).toBe("rejected");
+      await until(() => local.seen.closed >= 1, "the client to drop the connection");
+    } finally {
+      await local.stop();
+    }
+  });
+
+  test("a signal already stopped makes no connection at all", async () => {
+    const local = await localServer(() => {});
+    try {
+      const ctl = new AbortController();
+      ctl.abort();
+      await expect(mcpMarketValue({ url: local.url, token: null }, "Forever", 2589, ctl.signal)).rejects.toThrow();
+      expect(local.seen.requests).toBe(0);
+    } finally {
+      await local.stop();
+    }
+  });
+
+  test("a stalled initialize ends at the price budget as the usual unavailable answer, with no search or model fallback, and the connection is dropped", async () => {
+    const local = await localServer(() => {});
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const next = searchEngine();
+      const m = { resolveItem: vi.fn(async () => ({ id: 2589 })), lookup: (realm: string, id: number, signal?: AbortSignal) => mcpMarketValue({ url: local.url, token: null }, realm, id, signal) };
+      const first = local.next();
+      const answer = withMarket(next, m).answer("price of Linen Cloth on Forever");
+      await first;
+      await vi.advanceTimersByTimeAsync(MARKET_QUERY_BUDGET_MS);
+      const reply = await answer;
+      expect(reply.answer).toMatch(/unrecorded, not zero/);
+      expect(reply.source).toBe(FIXTURE_URL);
+      expect(next.answer).not.toHaveBeenCalled();
+      await until(() => local.seen.closed >= 1, "the client to drop the half-open connection");
+    } finally {
+      vi.useRealTimers();
+      await local.stop();
+    }
+  });
+
+  test("a hung item search ends at the same budget, before any market lookup", async () => {
+    vi.useFakeTimers();
+    try {
+      const m = market({ resolve: () => new Promise(() => {}) });
+      const next = searchEngine();
+      const answer = withMarket(next, m).answer("price of Linen Cloth on Forever");
+      await vi.advanceTimersByTimeAsync(MARKET_QUERY_BUDGET_MS);
+      expect((await answer).answer).toMatch(/unrecorded, not zero/);
+      expect(m.lookup).not.toHaveBeenCalled();
+      expect(next.answer).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("the caller's signal reaches a custom session, not only callTool", async () => {
+    const ctl = new AbortController();
+    const session = vi.fn(async (_o: unknown, run: (client: never) => Promise<unknown>) => run({ callTool: async () => ({ structuredContent: FIXTURE_STRUCTURED }) } as never));
+    await mcpMarketValue({ url: "https://x/mcp/public", token: null }, "Forever", 2589, ctl.signal, session as never);
+    expect(session).toHaveBeenCalledWith({ url: "https://x/mcp/public", token: null }, expect.any(Function), ctl.signal);
+  });
+
   test("is called with the realm and item id, and its structured answer is the result", async () => {
     const callTool = vi.fn(async () => ({ content: [{ type: "text", text: "long text" }], structuredContent: FIXTURE_STRUCTURED }));
     const out = await mcpMarketValue({ url: "https://x/mcp/public", token: null }, "Forever", 2589, undefined, async (_o, run) => run({ callTool } as never));

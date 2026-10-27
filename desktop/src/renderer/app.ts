@@ -385,12 +385,12 @@ function providerForm(c: ChatInfo, note = ""): string {
   return `<form id="providerForm" class="panel" autocomplete="off" aria-label="Assistant setup">
     ${list}
     <div class="field"><label for="providerKind">Provider</label><div class="tile-row">${tile(preset.kind)}<select name="kind" id="providerKind">${kinds}</select></div>${getKey}</div>
-    ${preset.kind === "custom" ? `<div class="field"><label for="providerUrl">Server</label><input name="baseUrl" id="providerUrl" placeholder="https://host/v1" spellcheck="false"></div>` : ""}
+    ${preset.kind === "custom" ? `<div class="field"><label for="providerUrl">Server</label><input type="text" name="baseUrl" id="providerUrl" placeholder="https://host/v1" spellcheck="false"></div>` : ""}
     ${preset.keyFile ? `<div class="field"><label for="providerKey">Key</label><input type="password" name="key" id="providerKey" placeholder="${saved ? "saved; paste a new one to replace it" : preset.kind === "custom" ? "optional" : "paste the key"}" spellcheck="false"><span class="hint">${esc(preset.keyHint)}</span></div>` : ""}
     ${choices.length ? `<div class="field"><label for="providerModelPick">Model</label>${modelSelect(preset.kind, picked)}</div>` : ""}
-    <div class="field" id="providerModelField" ${manual ? "" : "hidden"}><label for="providerModel">${choices.length ? "Model id" : "Model"}</label><input name="modelText" id="providerModel" ${manual ? "" : "disabled"} placeholder="${choices.length ? "a model id from the provider" : preset.kind === "ollama" ? "the model you pulled, like qwen3:8b" : "model id"}" spellcheck="false"></div>
+    <div class="field" id="providerModelField" ${manual ? "" : "hidden"}><label for="providerModel">${choices.length ? "Model id" : "Model"}</label><input type="text" name="modelText" id="providerModel" ${manual ? "" : "disabled"} placeholder="${choices.length ? "a model id from the provider" : preset.kind === "ollama" ? "the model you pulled, like qwen3:8b" : "model id"}" spellcheck="false"></div>
     <p class="muted small">${esc(preset.dataNote)} The key is written to a file in your data folder and named from <code>config.json</code>; it goes to that provider only, with your questions and the tool results.</p>
-    <p class="muted small">Save and use makes this the model for Chat and puts it first for <code>/ask</code>. It does not test the key or send anything to the provider.</p>
+    <p class="muted small">Save and use makes this the model for Chat and puts it first for <code>/ask</code>. It may refresh the model list, but does not test the key with a completion or send your questions.</p>
     ${note}
     <div class="row"><button type="submit" class="btn btn-primary" id="providerSave" ${c.busy ? "disabled" : ""}>Save and use</button><button type="button" class="btn" id="cancelProvider">Cancel</button>${c.busy ? '<span class="muted small">Chat is answering; wait or press Stop.</span>' : ""}</div>
   </form>`;
@@ -407,13 +407,13 @@ function assistantSetup(c: ChatInfo | undefined, where: "chat" | "ask" | "settin
   const note = `<p id="assistantNote" role="status" class="${setupNote.startsWith("!") ? "error" : "ok"} small">${esc(setupNote.replace(/^!/, ""))}</p>`;
   const source = c ? assistantSource(c) : null;
   const chatLine = !c ? "Loading…"
-    : source === "search" ? "<b>Everloot search</b> answers Chat: no AI key or token file needed, the top sourced hits as they are. A model is optional and uses your own provider account, so its pricing applies."
-    : source === "app" ? `Chat is answered by <b>${esc(c.provider!.model)}</b>, which looks things up in Everloot's data first; with no source there, the answer says it is the model's own knowledge.`
-    : `Chat is answered by the first entry in <code>config.json</code>: <code>${esc(c.mode)}</code>. Setup keeps your hand-written entries as they are.`;
+    : source === "search" ? "Chat answers recorded item-price questions and shows <b>Everloot search</b> results: no AI key or token file needed. A model is optional and uses your own provider account, so its pricing applies."
+    : source === "app" ? `Recorded item-price questions use market data directly. Other Chat questions are answered by <b>${esc(c.provider!.model)}</b>, which looks things up in Everloot's data first; with no source there, the answer says it is the model's own knowledge.`
+    : `Recorded item-price questions use market data directly. Other Chat questions use the first entry in <code>config.json</code>: <code>${esc(c.mode)}</code>. Setup keeps your hand-written entries as they are.`;
   const askLine = !a ? "Loading…"
     : a.providerError ? `<span class="error">${esc(a.providerError)}</span>`
-    : a.providers.length ? `<b>Everloot search</b> finds the sources, then <b>${esc(a.providers.join(" > "))}</b> writes at most two sentences from the top three. If one fails in a way that allows it, the next one listed is tried; Chat uses only the first. With no source there is no answer.`
-    : "<b>Everloot search</b> answers <code>/ask</code>: the top sourced hit as written, no model and no key. With no source there is no answer.";
+    : a.providers.length ? `Recorded item-price questions use market data directly, without a model. For other questions, <b>Everloot search</b> finds the sources, then <b>${esc(a.providers.join(" > "))}</b> writes at most two sentences from the top three. If one fails in a way that allows it, the next one listed is tried; Chat uses only the first. No search sources means no model answer.`
+    : "<code>/ask</code> answers recorded item-price questions and shows the top <b>Everloot search</b> result: no model or key needed. If an item or realm is unclear, it asks you to specify it.";
   const rows = where === "settings" && c?.providers.length
     ? c.providers.map((p) => {
       const inUse = c.provider?.kind === p.kind;
@@ -808,7 +808,8 @@ function ask(s: AppState): string {
   return `<div class="page">
     <div class="head"><h1>Ask</h1><div class="row">${jobSwitch("ask", s)}${runBtn("ask", s, "Answer now")}</div></div>
     ${flash ? `<p role="status" class="${flash.startsWith("!") ? "error" : "ok"} small">${esc(flash.replace(/^!/, ""))}</p>` : ""}
-    <p class="fg2"><code>/ask</code> questions from the game are answered from everloot.app's public MCP server (with your account's limits when you are signed in, Settings > Account) and written into <code>EverlootAnswers</code>. The game reads that file at logout and on <code>/reload</code>, so an answer shows after <code>/reload</code>, not live. Every answer names its source; the time beside it is when the answer was written, not when that source was last updated. With no source there is no answer.</p>
+    <p class="fg2">Ask in game with <code>/ask</code>, then <code>/reload</code> to save your question. Keep this app running while it answers, then <code>/reload</code> again to read the answer. Answers arrive through saved files, not live.</p>
+    <p class="fg2 small">Item prices come from recorded scans, not live listings. Price and search results include their source. The time beside an answer is when it was written; price answers also show the observation day.</p>
     ${assistant(data.chat, "ask")}
     <details id="askAdvanced" class="panel adv" ${(advancedOpen ?? configured) ? "open" : ""}>
       <summary>Advanced: private MCP server${configured ? ' <span class="muted">· private configuration saved</span>' : ""}</summary>
@@ -1463,7 +1464,13 @@ async function onSubmit(ev: SubmitEvent): Promise<void> {
   const text = (k: string) => String(f.get(k) ?? "").trim();
   if (form.id === "providerForm") {
     const model = text("model") || text("modelText");
-    if (!model && f.has("model")) { flash = "!Type the model id, or pick one from the list"; render(); return; }
+    if (!model && f.has("model")) {
+      // In the panel, where a dirty Settings/Ask page still redraws; the empty box takes the focus so the fix is one keystroke away.
+      setupNote = "!Type the model id, or pick one from the list";
+      render();
+      main.querySelector<HTMLElement>("#providerModel")?.focus();
+      return;
+    }
     try {
       data.chat = await api.chatSetProvider({ kind: pickKind, key: text("key"), model, baseUrl: text("baseUrl") });
       // A new key may see other models: ask again.

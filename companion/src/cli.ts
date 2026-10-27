@@ -13,9 +13,9 @@ import { homedir } from "node:os";
 import { dirname, join, posix, win32 } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createAnswerStore, answerPending } from "./bridge/run";
-import { mcpEngine, mcpMarketValue, mcpSearch, siteItemSearch, withMarket } from "./bridge/engine";
+import { lazyEngine, mcpEngine, mcpMarketValue, mcpSearch, siteItemSearch, withMarket } from "./bridge/engine";
 import { llmEngine } from "./bridge/llm-engine";
-import { loadProviders } from "./providers/config";
+import { providersOnDemand } from "./providers/config";
 import { findEverlootFiles } from "./savedvariables";
 import { createSentState } from "./sent-state";
 import { refreshPrices } from "./prices";
@@ -78,14 +78,20 @@ async function main(argv: string[]): Promise<void> {
   if (files.length === 0) throw new Error(`No Everloot.lua under ${join(args.game ?? "", "WTF", "Account")}. Log out once so the game writes it.`);
   if (args.command === "bridge") {
     const mcp = { url: args.mcp!, token: readFileSync(args.tokenFile!, "utf8").trim() };
-    // Providers the user enabled in config.json beside the state file; none means plain search answers.
-    const providers = loadProviders(join(dirname(statePath), "config.json"));
+    // Providers the user enabled in config.json beside the state file; none means plain search answers. They are read
+    // when a question that is not a price one needs them, so a damaged config.json never blocks a price answer.
+    const providers = providersOnDemand(join(dirname(statePath), "config.json"));
     // A price question is answered from the recorded market first, with no model; the rest follows the providers.
     const engine = withMarket(
-      providers.length ? llmEngine({ search: (q) => mcpSearch(mcp, q, 3), providers }) : mcpEngine(mcp),
+      lazyEngine(() => providers().length ? llmEngine({ search: (q) => mcpSearch(mcp, q, 3), providers: providers() }) : mcpEngine(mcp)),
       { lookup: (realm, id, signal) => mcpMarketValue(mcp, realm, id, signal), resolveItem: siteItemSearch(args.endpoint) },
     );
-    console.log(providers.length ? `Answering with ${providers.map((p) => p.name).join(" > ")}.` : "Answering with plain search (no providers in config.json).");
+    try {
+      const enabled = providers();
+      console.log(enabled.length ? `Answering with ${enabled.map((p) => p.name).join(" > ")}.` : "Answering with plain search (no providers in config.json).");
+    } catch (err) {
+      console.log(`Model providers not loaded (config.json: ${err instanceof Error ? err.message : String(err)}); other questions will fail with that until it is fixed.`);
+    }
     console.log("Price questions are answered from the recorded market, without a model.");
     const store = createAnswerStore(join(dirname(statePath), "answers.json"));
     const addonsDir = join(args.game!, "Interface", "AddOns");
