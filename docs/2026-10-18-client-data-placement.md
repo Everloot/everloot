@@ -23,6 +23,19 @@ beta bucket. The read set is **346 tables** (344 in this build; 332 before the w
 committed site data was at 1.60.1.70532 when the wave ran; the scheduled build-watch opens its
 game-data pull request per new build on its own.
 
+**Status update 2026-10-27, W6:** the spell-math remainder plus the item stat scalars (`RandPropPoints`,
+`ArmorLocation`) ran as W6 on the same `wowf 1.60.1.70630` snapshot. 20 tables: 18 spell tables + the two
+item tables, leaving the spell tooltip math complete and items complete within its scalar rule. The read
+set is **366 tables** (364 in this build) and **579 candidates** remain. Dead in
+this build (recorded and left unread): `SpellPowerDifficulty`, `SpellScaling`, `SpellReagentsCurrency`,
+`SpellEffectAutoDescription`, `QuestObjective`, `QuestHub`, `QuestPackageItem`; `CreatureLabel` (1,657
+rows) and `NPCSounds` (196) were considered and dropped. Wave **W7** (the first integration commit) ships
+`kb/src/client-achievements.ts`, the committed `web/src/data/game-data/client-achievements.json`
+(441 achievements, 329 with criteria), the build-watch registration, and the map data's Difficulty join —
+game file text reaching the pages for the first time as pages-only, merged player-first with reports and
+labelled unconfirmed (docs/DATA_POLICY.md). The committed `map.json` stays at 1.60.1.70532: the
+Difficulty fields only appear when the build watch regenerates it on a new build, so no build mixes in.
+
 ## What the scan measures
 
 - The WoWDBDefs manifest (pinned commit `b9a63096cdd9`) against the build's root listing, by file data id.
@@ -130,6 +143,12 @@ Extending `DOMAIN_RULES` in `kb/src/client-scan.ts` as tables are triaged keeps 
 - **W4 (executed):** the live-support group from the "other" triage (banks, creation pieces, guild
   tabards, barber shop, progression, mail and auction house, emotes, world-object behaviour, creation
   helpers), 45 tables read plus two the build does not ship.
+- **W6 (executed 2026-10-27):** the spell math remainder (18 spell tables) plus the item stat scalars
+  `RandPropPoints` and `ArmorLocation`, per the D bullet's verified stragglers. Seven spell and quest
+  tables are dead in this build and stay on the record.
+- **W7 (executed 2026-10-27):** not a table wave — the first site integration: the achievements
+  generator, the build-watch registration for it, the Difficulty join in the map data, and the
+  achievements pages merging player reports with the files player-first. Pages-only by the data policy.
 
 ### Wave log (2026-10-18)
 
@@ -140,7 +159,9 @@ Extending `DOMAIN_RULES` in `kb/src/client-scan.ts` as tables are triaged keeps 
 | W2 | `d589242` | 69 | no failures; all coverage pins verified in-layout |
 | W3 | `ef82618` | 102 | `LiquidType` dropped (see below); one concurrent edit from origin (PR #73) rebased in first, adding `LoadingScreens` |
 | W4 | `3a1c007` | 45 | the live-support group; `ObjectEffectGroup` and `ObjectEffectPackage` are not in this build, and `ObjectEffectModifier`, `DeclinedWord` and `DeclinedWordCases` read empty; candidates 667 → 622 |
-| W5 | this change | 14 | achievement criteria (`Criteria` 3297, `CriteriaTree` 6771, `ModifierTree` 2845 rows; `CriteriaTreeXEffect` present, 0 rows), the classic talent family (`Talent` 432, `TalentTab` 27, `NumTalentsAtLevel` 80; `MinorTalent`, `SpecSetMember`, `SpecializationSpells`, `SpecializationSpellsDisplay`, `TalentTreePrimarySpells` present with 0 rows), and two live completes (`Difficulty` 22, `PowerType` 6). Talents and achievements domains now read in full; candidates 613 → 599 |
+| W5 | `c9f14c15` | 14 | achievement criteria (`Criteria` 3297, `CriteriaTree` 6771, `ModifierTree` 2845 rows; `CriteriaTreeXEffect` present, 0 rows), the classic talent family (`Talent` 432, `TalentTab` 27, `NumTalentsAtLevel` 80; `MinorTalent`, `SpecSetMember`, `SpecializationSpells`, `SpecializationSpellsDisplay`, `TalentTreePrimarySpells` present with 0 rows), and two live completes (`Difficulty` 22, `PowerType` 6). Talents and achievements domains now read in full; candidates 613 → 599 |
+| W6 | `2b7ea4fe` | 20 | the spell numbers and rules the tooltips compute from: `SpellPower` 3462, `SpellCategories` 10665, `SpellClassOptions` 6085, `SpellTargetRestrictions` 4454, `SpellInterrupts` 9895, `SpellShapeshift` 3457, `SpellLabel` 4654, `SpellProceduralEffect` 991, `SpellEquippedItems` 1886, `SpellFocusObject` 244, `SpellTotems` 1121, `SpellLearnSpell` 52, `SpellAuraNames` 650, `SpellShapeshiftForm` 32, `SpellMechanic` 36, `SpellDispelType` 11, `SpellDiminish` 11, `SpellProcsPerMinute` 11; plus the item scalars `RandPropPoints` 300 and `ArmorLocation` 23. Encrypted blocks are counted and skipped, never decrypted (several spell tables carry them); 7 spell/quest tables verified dead in this build stay unread. `CreatureLabel` (1,657 rows) and `NPCSounds` (196) considered and dropped; candidates 599 → 579. The items domain rule now also matches `RandPropPoints` and `ArmorLocation` |
+| W7 | this change | 0 (integration) | first generator to reach the pages: `kb/src/client-achievements.ts` walks `Achievement.Criteria_tree` through `CriteriaTree` into the committed `web/src/data/game-data/client-achievements.json` (441 achievements, 329 with criteria; pages-only per docs/DATA_POLICY.md), the build watch regenerates it, and `map.json` gains its `Difficulty` join (`difficulties` record plus per-entrance `difficultyIds`, applied when the build watch next regenerates it). The achievement pages merge player reports and the files player-first, marking the files' parts unconfirmed |
 
 Findings the waves surfaced while reading:
 
@@ -168,12 +189,13 @@ Findings the waves surfaced while reading:
    on push; none of the wave commits touch generated site data, so the pushes shipped no visible change.
 3. **"Other" triage appetite.** Draft below; a quick pass can move whole prefixes to a documented "never"
    list, the alternative is leaving them in the catch-all. Groups A and B applied; C ran as W4.
-4. **Next wave.** Praised D and the achievements criteria cluster both executed as W5 (2026-10-27). What
-   remains is feature-tied: E as a reviewed pages-only pass (`GossipNPCOption` 1577 rows, `BroadcastText`
-   12 rows — gossip text is mostly server-side), F with the sound feature, and the stragglers verified
-   against 70630: `RandPropPoints` + `ArmorLocation` for item stat math, `GossipNPCOptionDisplayInfo`
-   (50 rows) for NPC interaction icons. The mining loop is at a natural stop until one of those features
-   is picked.
+4. **Next wave.** Praised D and the achievements criteria cluster both executed as W5 (2026-10-27), the
+   spell math remainder plus the item scalars as W6 the same day, and the first site integration
+   (achievements player-first pages, the Difficulty join in the map data) as W7. What remains is
+   feature-tied: E as a reviewed pages-only pass (`GossipNPCOption` 1577 rows declare an NPC's option ids,
+   but the option-to-text binding is server-side, so the read yields declarations only) and F with the
+   sound feature. Further site-merge candidates exist (difficulty names into the instance pages');
+   the mining loop is at a natural stop until a feature is picked.
 
 ## "Other"-bucket triage — first pass applied, rest drafted
 

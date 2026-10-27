@@ -11,6 +11,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { writeClientAchievements } from "../client-achievements.js";
 import { writeCatalogs } from "../client-catalog.js";
 import { writeClientLayer } from "../client-layer.js";
 import { CASC_LIBRARY, extractTables, iconIds, NOT_IN_BUILD, openCdn, pinDefinitions, probeFiles } from "../client-extract.js";
@@ -66,6 +67,7 @@ export async function extractFromCdn(product: string, region: string, curatedPat
         web("build-raid-game-data.ts", run.dir, snapshot, root);
         writeFileSync(join(root, GAME_DATA_DIR, "map.json"), `${JSON.stringify(writeWorldMapData(snapshot), null, 2)}\n`);
         writeClientLayer(snapshot, join(root, GAME_DATA_DIR, "client-layer.json"));
+        writeClientAchievements(snapshot, join(root, GAME_DATA_DIR, "client-achievements.json"));
       },
       dispose: () => rmSync(work, { recursive: true, force: true }),
       encryptedTables: manifest.tables.map((t) => ({ table: t.table, blocks: t.encryptedBlocks })),

@@ -5,7 +5,7 @@ import type { EncounterRow, InstanceEntranceRow } from "../../../kb/src/instance
 // The loaders read storage; these tests hand the readers their facts directly.
 vi.mock("./rollup-compute", () => ({ loadInstanceFacts: vi.fn(), loadItemFacts: vi.fn() }));
 
-import { bossLine, compareInstances, difficultyLabel, entranceLinks, instanceHref, instanceRows, levelLabel, parseInstanceSegment } from "./instances";
+import { bossLine, compareInstances, difficultyLabel, difficultyLabelIn, entranceLinks, instanceHref, instanceRows, levelLabel, parseInstanceSegment } from "./instances";
 import { continentPinSet, continentTreasureCandidates } from "./world-map";
 import { zoneContents, type ZoneSightings } from "./zones";
 
@@ -24,6 +24,7 @@ const data: WorldMapData = {
   heldBackZones: [
     { uiMapId: 2482, name: "Synthetic Peak", continentId: 1, bounds: { top: 6000, bottom: 4000, left: -900, right: -4400 } },
   ],
+  difficulties: { 1: { name: "Synthetic Normal", minPlayers: 5, maxPlayers: 5 }, 12: { name: "Synthetic Twist", maxPlayers: 10 } },
   entrances: [
     { mapId: 34, name: "Synthetic Stockade", raid: false, continentId: 0, worldX: -8762.4, worldY: 848, minLevel: 17, maxLevel: 24 },
     { mapId: 389, name: "Synthetic Chasm", raid: false, continentId: 1, worldX: 1500, worldY: -4423.4 },
@@ -59,7 +60,7 @@ describe("instance rows", () => {
     const rows = instanceRows(seen, data);
     const stockade = rows.get(34)!;
     expect(stockade).toEqual({
-      instanceMapId: 34, name: "Synthetic Stockade", raid: false, difficulty: 1, level: { min: 17, max: 24 },
+      instanceMapId: 34, name: "Synthetic Stockade", raid: false, difficulty: 1, level: { min: 17, max: 24 }, difficulties: [],
       files: [{ mapId: 1429, zoneName: "Synthetic Forest", x: 19.8, y: 35.5 }],
       confirmed: [{ mapId: 1429, zoneName: "Synthetic Forest", x: 20, y: 36, installs: 3, lastSeen: "2026-10-19T10:00:00.000Z" }],
       reported: 0,
@@ -115,6 +116,20 @@ describe("instance rows", () => {
   test("a difficulty id prints by the game's name for it, and an id the list lacks as its number", () => {
     expect([1, 2, 9, 148, 174, 194].map(difficultyLabel)).toEqual(["Normal", "Heroic", "40 Player", "20 Player", "Heroic", "25 Player (Heroic)"]);
     expect(difficultyLabel(9999)).toBe("Difficulty 9999");
+  });
+
+  test("a name the build's Difficulty table carries wins; ids it lacks fall back to the wiki names or the number", () => {
+    const label = difficultyLabelIn(data);
+    expect(label(1)).toBe("Synthetic Normal");
+    expect(label(12)).toBe("Synthetic Twist");
+    expect(label(194)).toBe("25 Player (Heroic)");
+    expect(label(9999)).toBe("Difficulty 9999");
+  });
+
+  test("the files' difficulty ids for an instance's map reach its row", () => {
+    const withIds = { ...data, entrances: data.entrances.map((e) => (e.mapId === 34 ? { ...e, difficultyIds: [1, 12] } : e)) };
+    expect(instanceRows(seen, withIds).get(34)!.difficulties).toEqual([1, 12]);
+    expect(instanceRows(seen, data).get(389)!.difficulties).toEqual([]);
   });
 
   test("an instance's address is its id and a slug, and the id is what counts", () => {

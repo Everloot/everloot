@@ -102,14 +102,20 @@ export default async function InstancePage(props: Props) {
 
         <div className="space-y-6">
           <section aria-labelledby="facts">
-            <SectionHeading id="facts" note="The type is from the game files where they place the entrance, else as 3 installs agree. The level is from the game files, which give one level for most instances rather than a range. The difficulty is the id 3 installs agree on.">
+            <SectionHeading id="facts" note="The type is from the game files where they place the entrance, else as 3 installs agree. The level is from the game files, which give one level for most instances rather than a range. The difficulty is the id 3 installs agree on; the game files' own list of the instance's difficulties shows beside it when they give one.">
               Facts
             </SectionHeading>
             <Card as="div">
               <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm">
                 <dt className="text-muted">Type</dt><dd className="text-fg">{kindLabel(row.raid)}</dd>
                 <dt className="text-muted">Level</dt><dd className="text-fg">{levelLabel(row.level) ?? <span className="text-muted">–</span>}</dd>
-                <dt className="text-muted">Difficulty</dt><dd className="text-fg">{row.difficulty === null ? PLACEHOLDER : difficultyLabel(row.difficulty)}</dd>
+                <dt className="text-muted">Difficulty</dt>
+                <dd className="text-fg">
+                  {row.difficulty !== null ? difficultyLabel(row.difficulty) : PLACEHOLDER}
+                  {row.difficulties.length > 0 && (
+                    <span className="ml-2 inline-flex items-baseline gap-1.5 text-meta text-muted"><Badge tone="files" />in the files, {row.difficulties.map(difficultyLabel).join(", ")}</span>
+                  )}
+                </dd>
                 <dt className="text-muted">Bosses reported</dt><dd className="text-fg">{unreachable ? PLACEHOLDER : row.bosses.length}</dd>
               </dl>
             </Card>
