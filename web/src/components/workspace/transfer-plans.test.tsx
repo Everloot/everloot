@@ -1899,9 +1899,13 @@ describe("a character asked for and not heard back on", () => {
     expect(text()).toContain("Your last try asked your account for the character Jaina and did not hear back.");
     await set(field("Note (optional)"), "Frost for raids");
     await click(saveButton());
+    // The retry lists the account, reads a digest and then saves: wait for its outcome, not a fixed number of turns.
+    await vi.waitFor(async () => {
+      await settle();
+      expect(text()).toContain("Frost was filed under Jaina, the character your last try made on your account, which stays as that try made it: the changes made here were not used.");
+    }, { timeout: 5_000 });
     expect(accounts[A_ID].characters).toHaveLength(1);
     expect(posts.at(-1)!.body).toMatchObject({ name: "Frost", characterId: accounts[A_ID].characters[0].id });
-    expect(text()).toContain("Frost was filed under Jaina, the character your last try made on your account, which stays as that try made it: the changes made here were not used.");
     expect(journal()!.characters).toMatchObject([{ altId: jaina.id, characterId: accounts[A_ID].characters[0].id, label: { name: "Jaina", note: null } }]);
   });
 
