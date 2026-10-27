@@ -58,7 +58,7 @@ const DOMAIN_RULES: [Domain, RegExp][] = [
   ["audio", /^(Sound|Music|Audio|ZoneMusic)/],
   ["talents", /^(Trait|Talent|NumTalentsAtLevel|SpecSetMember|SpecializationSpells|MinorTalent)/],
   ["models", /^(CreatureModel|CreatureDisplay|CreatureAnim|Anim|Model|M2|Bone|Helmet|Camera|Liquid)/],
-  ["items", /^(Item|Transmog)/],
+  ["items", /^(Item|Transmog|RandPropPoints|ArmorLocation)/],
   ["spells", /^Spell/],
   ["creatures", /^Creature/],
   ["objects", /^GameObject/],

@@ -223,6 +223,25 @@ test("the W5 tables are read by the file data ids the WoWDBDefs manifest lists f
   });
 });
 
+test("the W6 tables are read by the file data ids the WoWDBDefs manifest lists for them", () => {
+  // manifest.json at WoWDBDefs 05e242b6acdc (verified against the live wowf 70630 build, rows for
+  // SpellPower 3462, SpellCategories 10665, SpellClassOptions 6085, SpellAuraNames 650,
+  // SpellDispelType 11, SpellMechanic 36, SpellDiminish 11, SpellEquippedItems 1886,
+  // SpellTargetRestrictions 4454, SpellInterrupts 9895, SpellFocusObject 244, SpellTotems 1121,
+  // SpellShapeshift 3457, SpellShapeshiftForm 32, SpellLearnSpell 52, SpellLabel 4654,
+  // SpellProcsPerMinute 11, SpellProceduralEffect 991, RandPropPoints 300, ArmorLocation 23;
+  // SpellPowerDifficulty, SpellScaling, SpellReagentsCurrency, SpellEffectAutoDescription stay unread).
+  expect(CLIENT_TABLES).toMatchObject({
+    SpellPower: 982806, SpellCategories: 1139939, SpellClassOptions: 979663, SpellAuraNames: 3055890,
+    SpellDispelType: 1137829, SpellMechanic: 1014438, SpellDiminish: 3055891, SpellEquippedItems: 1140011,
+    SpellTargetRestrictions: 1139993, SpellInterrupts: 1139906, SpellFocusObject: 1280620,
+    SpellTotems: 1002162, SpellShapeshift: 1139929, SpellShapeshiftForm: 1280618,
+    SpellLearnSpell: 1001907, SpellLabel: 1347275, SpellProcsPerMinute: 1133526,
+    SpellProceduralEffect: 1140477,
+    RandPropPoints: 1310245, ArmorLocation: 1284818,
+  });
+});
+
 test("a table the build does not have is reported as missing, not invented", async () => {
   const { tables, missing } = await extractTables(fake({ [CLIENT_TABLES.Item]: { rows: [[1, { ID: 1 }]] } }));
   expect(tables.map((t) => t.table)).toEqual(["Item"]);
