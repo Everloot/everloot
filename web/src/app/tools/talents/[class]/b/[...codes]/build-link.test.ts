@@ -36,6 +36,20 @@ test("a segment with a link's code inside it is a 404 with no preview, as any ba
   }
 });
 
+test("a segment that does not unescape gets the same: a 404 with no preview, and the class's own card", async () => {
+  await expect(TalentBuildPage(page(["%E0%A4%A"]))).rejects.toThrow("NEXT_NOT_FOUND");
+  expect(await generateMetadata(page(["%E0%A4%A"]))).toEqual({});
+  // The card's address as sent: the first query reads as "�%A", the second, a %E0 escaped once, as "%E0".
+  for (const query of ["a=%E0%A4%A", "a=%25E0"]) {
+    cards.renderBuildCard.mockClear();
+    cards.renderCard.mockClear();
+    const res = await card(new Request(`https://everloot.app/tools/talents/mage/card?${query}`), { params: Promise.resolve({ class: "mage" }) });
+    expect(res.status, query).toBe(200);
+    expect(cards.renderBuildCard, query).not.toHaveBeenCalled();
+    expect(cards.renderCard, query).toHaveBeenCalledOnce();
+  }
+});
+
 test("its card is the class's own picture, as any bad code's is, not the build's", async () => {
   await cardFor(code);
   expect(cards.renderBuildCard).toHaveBeenCalledOnce();
