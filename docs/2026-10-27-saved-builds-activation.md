@@ -26,6 +26,12 @@ saved build and character label, including the builds Chat entries point to, and
 - Builds made in Chat while the switch was off belong to their owners like any other: they show in My builds and on
   `/me`, still private.
 
+Save shows one account's builds: the one this tab last confirmed through `/api/auth/me`, asked again whenever the tab
+comes back. Each save sends that account's id in `x-everloot-expected-owner`, and the site answers a private 409
+`account_mismatch`, before anything is read or written, when another account is signed in now. So a save pressed
+just after another tab switched accounts is refused instead of landing in the new account. When a check of the
+account fails, Save shows no builds and stays off, with the reason beside it, until a check works again.
+
 A shared build's short link shows its name and notes, its class and split, the game build it was made on, and both
 talent sets in the calculator, read-only; a signed-in visitor can save a copy to their own account. The owner's name
 shows only when they chose it, and never for a Battle.net account, whose name can hold a BattleTag. The character
@@ -45,7 +51,7 @@ docker run -d --name saved-builds-legacy-test -e POSTGRES_HOST_AUTH_METHOD=trust
 docker exec saved-builds-legacy-test createdb -U postgres saved_builds_legacy_test
 cd web
 QUOTA_TEST_DATABASE_URL=postgres://postgres@127.0.0.1:54406/saved_builds_legacy_test node scripts/saved-builds-legacy.integration.mjs
-npx vitest run src/components/talents/save-build.test.tsx src/lib/saved-builds.test.ts src/app/api/me/builds/route.test.ts src/app/mcp/public/route.test.ts "src/app/b/[slug]/shared-build.test.tsx"
+npx vitest run src/components/talents/save-build.test.tsx src/lib/saved-builds.test.ts src/app/api/me/builds/route.test.ts src/app/api/me/characters/route.test.ts src/app/mcp/public/route.test.ts "src/app/b/[slug]/shared-build.test.tsx" src/components/workspace/device-plans.test.tsx
 docker rm -f saved-builds-legacy-test
 ```
 
@@ -62,7 +68,9 @@ and delete; another account refused everywhere; a refused or malformed save writ
 what the public read and the profile read leave out; and an account's deletion taking its builds. It also keeps
 #450's check that the saved-builds file applies twice on the legacy users table, in a transaction it rolls back.
 `scripts/saved-builds.integration.mjs` covers the same functions with every migration applied. The vitest files cover
-the calculator's Save, the routes, the MCP list and the short link page.
+the calculator's Save, including a save pressed while another tab has just switched accounts and a failed check of
+the account; the routes, including the owner check; the MCP list; the short link page; and Plans on this device,
+which keeps its own rule for a failed check.
 
 ## Preflight (read-only)
 
@@ -233,6 +241,11 @@ Then, without signing in:
 
 If any of these fails, unset the switch and redeploy (see Rollback).
 
+These checks run without an account. They show that the switch is on, the routes answer and the MCP list did not
+move, and nothing more: they prove none of the signed-in operations. Saving, updating, copying, reopening,
+unsharing and deleting, the owner check on every save, and the guards for an account change or a failed check are
+proven only by the signed-in acceptance below. Until it passes, record the rollout as on but not accepted.
+
 ## Production acceptance (signed in, same origin)
 
 A preview cannot do this part. Saving needs a session on the site's own address: `siteUrl()` is `NEXT_PUBLIC_SITE_URL`
@@ -242,32 +255,52 @@ origin check, copy a session cookie, or make a session to get past this.
 
 On `https://everloot.app`, use a disposable Battle.net test account, never a real player's or the owner's. Name every
 build and label so it is plainly a test. Without such an account the signed-in acceptance has not happened: record it
-as open, not passed. Do steps 1, 6 and 7 with the window 390 px wide (or on a phone).
+as open, not passed. Do steps 1, 6, 7 and 8 with the window 390 px wide (or on a phone).
 
 1. In a private window, signed out, open `/tools/talents/mage`, spend points in both sets and note the address's
    `#plan=`. Save shows "Sign in to save builds" with the focus on Sign in; Escape closes it and the focus is back on
    Save. Press Save again and sign in with the test account. You land back on the calculator with the same `#plan=`
    (both sets) and the save panel open, the focus in Name.
-2. Save it as a test build with Share link on: "Saved as a new build. Short link: https://everloot.app/b/<slug>". The
-   address gains `?saved=<id>` and the bar says Editing. With that session, `GET /api/me/builds` answers
-   `cache-control: private, no-store` (network tab).
+2. Save it with Share link on, under a test name of the full 60 characters (step 6 needs one that long): "Saved as a
+   new build. Short link: https://everloot.app/b/<slug>". The address gains `?saved=<id>` and the bar says Editing.
+   With that session, `GET /api/me/builds` answers `cache-control: private, no-store` (network tab).
 3. Open the short link in another private window: the build shows, read-only, with no "Shared by" line. Its page source
    holds no BattleTag, email or id.
 4. Update: change a point and Save. "Saved. Short link: …" with the same slug; the other window shows the change after
    a reload.
 5. Copy: press Save, then Save as new in the panel. A second build with its own slug; the first is unchanged.
-6. Reopen: open My builds. At 390 px its list opens across the bar under the button, every entry readable; Escape
+6. Reopen: open My builds. At 390 px its list opens across the bar under the button and stays inside the card: the
+   60-character name ends in an ellipsis, as does the Editing line, and the page does not scroll sideways. Escape
    closes it with the focus back on My builds. Open the first build: the calculator shows its plan with Editing.
-7. Account change: open the save panel and Sign out in the header. The panel closes at once with "The account signed
-   in here changed, so nothing was saved. Press Save again.", and My builds and Editing are gone. Press Save and sign
-   in again: you come back editing the same build.
-8. Unshare: untick Share link on and Save: "Saved. Its short link is off." The short link is a 404 at once in the other
-   window.
-9. Delete: on `/me`, Delete, then Delete for good, for both test builds, and remove any test label on its page. Their
-   short links are 404s, and after a reload the calculator has no My builds.
+7. Sign-out in this tab: open the save panel and Sign out in the header. The panel closes at once with "The account
+   signed in here changed, so nothing was saved. Press Save again.", and My builds and Editing are gone. Press Save and
+   sign in again: you come back editing the same build.
+8. A failed check: in DevTools, block requests to `/api/auth/me` (Network, request blocking), then click into another
+   window and back. My builds and Editing go, and Save is off with "Your account could not be checked, so Save is off
+   for now. Reload the page to try again." beside it. Unblock, click away and back: the builds return and Save is on.
+9. The site's owner check, with this one account: in this tab's DevTools console run
 
-Run the schema checks again, then check the test account only (counts, no content, no other player's rows). Every
-count must be 0:
+   ```js
+   fetch("/api/me/builds", { method: "POST", body: "{}", headers: { "content-type": "application/json",
+     "x-everloot-expected-owner": "00000000-0000-4000-8000-000000000000" } }).then((r) => r.status)
+   ```
+
+   It answers 409, and the network tab shows `cache-control: private, no-store` and `"code":"account_mismatch"`. With
+   the test account's own id (from `/api/auth/me`) in the header, the same call answers 400: the empty body is refused
+   only after the account check passes. Neither call writes anything.
+10. Another tab switches accounts. This needs a second disposable test account; without one, record this step as not
+    done (step 9 still shows the site refusing a save meant for another account). With the save panel open and a note
+    typed, sign out and sign in as the second account in another tab, then come back. The panel closes with "You are
+    signed in to a different account now, so nothing was saved. Press Save again to save the build to this one.",
+    Editing goes, and nothing of the first account's builds shows. Sign the first account back in from the other tab
+    and come back: Save opens with the note you typed.
+11. Unshare: untick Share link on and Save: "Saved. Its short link is off." The short link is a 404 at once in the
+    other window.
+12. Delete: on `/me`, Delete, then Delete for good, for both test builds, and remove any test label on its page. Their
+    short links are 404s, and after a reload the calculator has no My builds.
+
+Run the schema checks again, then check the test accounts only (counts, no content, no other player's rows): the
+first, and the second if step 10 ran. Every count must be 0:
 
 ```sql
 select (select count(*) from public.saved_builds where user_id = '<test user id>') as builds,
