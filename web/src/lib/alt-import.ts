@@ -108,9 +108,10 @@ export interface ImportRow {
   /**
    * new: no alt is this character. update: the alt that is, with details the file would set. same: that alt, with
    * nothing the file would set. ambiguous: alts of its name whose realm is not set, any or none of which it may be.
+   * twice: more than one alt is this character on its realm (a restore can leave that), so the player picks one.
    */
-  status: "new" | "update" | "same" | "ambiguous";
-  /** The alt it is (update, same), or the alts it may be (ambiguous). */
+  status: "new" | "update" | "same" | "ambiguous" | "twice";
+  /** The alt it is (update, same), or the alts it may be (ambiguous, twice). */
   altIds: string[];
   /** What it would set: a detail not known here, or one that still holds an older file's value. */
   changes: DetailChange[];
@@ -137,7 +138,8 @@ export function rowChoices(row: ImportRow): RowChoice[] {
   if (row.status === "new") return ["add", "skip"];
   if (row.status === "update") return ["update", "skip"];
   if (row.status === "same") return ["skip"];
-  return ["skip", "add", ...row.altIds.map((id) => `alt:${id}` as const)];
+  // A character already here twice is not added a third time.
+  return ["skip", ...(row.status === "ambiguous" ? ["add" as const] : []), ...row.altIds.map((id) => `alt:${id}` as const)];
 }
 
 export const defaultChoices = (preview: AltImportPreview): RowChoice[] => preview.rows.map((row) => rowChoices(row)[0]);
@@ -170,7 +172,8 @@ export function previewAltImport(file: Extract<AddonFile, { ok: true }>, current
     const placed = current.alts.filter((a) => a.realm !== null && altKey(a.name, a.realm) === key);
     if (placed.length === 1) return matched(character, placed[0]);
     // With no alt on its realm, an alt of its name with no realm set may be it, or may not: the player says which.
-    const unsure = placed.length > 1 ? placed : current.alts.filter((a) => a.realm === null && nameKey(a.name) === nameKey(character.name));
+    if (placed.length > 1) return { character, status: "twice", altIds: placed.map((a) => a.id), changes: [], kept: [] };
+    const unsure = current.alts.filter((a) => a.realm === null && nameKey(a.name) === nameKey(character.name));
     return { character, status: unsure.length > 0 ? "ambiguous" : "new", altIds: unsure.map((a) => a.id), changes: [], kept: [] };
   });
   return {
@@ -214,8 +217,9 @@ export function applyAltImport(storage: DeviceStorage | null, owner: Owner, prev
         return;
       }
       const at = alts.findIndex((a) => a.id === (choice === "update" ? altIds[0] : choice.slice("alt:".length)));
-      // Taken as an alt whose realm was not set, it is on the file's realm from now on.
-      const alt = choice === "update" ? alts[at] : { ...alts[at], realm: character.realm };
+      // Taken as an alt whose realm was not set, it is on the file's realm from now on. A realm already set is kept as
+      // the player wrote it.
+      const alt = choice === "update" ? alts[at] : { ...alts[at], realm: alts[at].realm ?? character.realm };
       const { changes } = compare(character, alt);
       const next: LocalAlt = { ...alt, updatedAt: now.toISOString() };
       for (const { detail, file } of changes) Object.assign(next, { [detail]: file });

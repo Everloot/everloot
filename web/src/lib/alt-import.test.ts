@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
-  ADDON_FILE_LIMIT, applyAltImport, defaultChoices, previewAltImport, readAddonFile, type AddonFile, type RowChoice,
+  ADDON_FILE_LIMIT, applyAltImport, defaultChoices, previewAltImport, readAddonFile, rowChoices, type AddonFile, type RowChoice,
 } from "./alt-import";
 import { saveAlt } from "./alt-workspace";
 import { bucketKey, readWorkspace, savePlan, type LocalAlt, type Owner, type PlayerWorkspace } from "./player-workspace";
@@ -284,6 +284,24 @@ describe("adding the file's characters", () => {
       provenance: { source: "manual", fileRecordAt: "2026-10-24T09:00:00.000Z", fileDetails: ["classSlug", "level", "faction"] },
     }]);
     expect(byName(storage, ANON, "thrall")).toEqual([other]);
+  });
+
+  test("a character here as two alts on its realm is told apart from one whose realm is not set, and is never added a third time", () => {
+    const storage = memory();
+    seed(storage, ANON, [alt({ realm: "Moon Guard" }), alt({ id: idOf(501), realm: "Moon Guard", notes: "The other copy" })]);
+    const preview = previewAltImport(read(SV), stored(storage, ANON));
+    const row = preview.rows.find((r) => r.character.name === "Thrall")!;
+    expect(row).toMatchObject({ status: "twice", altIds: [idOf(500), idOf(501)] });
+    expect(rowChoices(row)).toEqual(["skip", `alt:${idOf(500)}`, `alt:${idOf(501)}`]);
+  });
+
+  test("taking a file character as an alt whose realm is known never changes that realm's spelling (reported case)", () => {
+    const storage = memory();
+    seed(storage, ANON, [alt({ realm: "Moon Guard" }), alt({ id: idOf(501), realm: "Moon Guard" })]);
+    const file = read(lua({ gold_snapshot: [gold("Thrall", "Moon-Guard", "2026-10-27T00:00:00Z")] }));
+    const preview = previewAltImport(file, stored(storage, ANON));
+    expect(applyAltImport(storage, ANON, preview, [`alt:${idOf(500)}`], LATER)).toMatchObject({ ok: true, updated: 1 });
+    expect(stored(storage, ANON).alts.map((a) => a.realm)).toEqual(["Moon Guard", "Moon Guard"]);
   });
 
   test("an ambiguous character can be added as a new alt instead", () => {

@@ -16,6 +16,7 @@ import { WORKSPACE_LIMITS, deviceStorage, readWorkspace, type LocalAlt, type Own
 const FILE_PATH = "World of Warcraft/<game version>/WTF/Account/<account>/SavedVariables/Everloot.lua";
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
+const day = (at: string) => new Date(at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
 /** "level 24 → 31", or "faction Horde, not set here". */
 const changeText = ({ detail, here, file }: DetailChange) =>
@@ -31,6 +32,7 @@ function summary(preview: AltImportPreview): string {
     count("new") > 0 ? `${count("new")} not here yet` : "",
     count("update") > 0 ? `${count("update")} with newer details` : "",
     count("ambiguous") > 0 ? `${count("ambiguous")} that may be an alt whose realm is not set` : "",
+    count("twice") > 0 ? `${count("twice")} here as more than one alt` : "",
     count("same") > 0 ? `${count("same")} already here` : "",
   ].filter(Boolean);
   return `Found ${plural(rows.length, "of your characters", "of your characters")}: ${listOf(parts)}.`;
@@ -55,6 +57,8 @@ function rowLines(row: ImportRow, alts: Map<string, LocalAlt>): string[] {
     row.status === "new" ? "Not here yet."
       : row.status === "same" ? "Already here."
         : row.status === "update" ? `Newer details from the file: ${listOf(row.changes.map(changeText))}.`
+          : row.status === "twice"
+            ? `${altLabel(row.character)} is here as more than one alt. It is skipped unless you choose which of them gets the file's details.`
           : unsure.length === 1
             ? `This may be your alt ${unsure[0].name}, whose realm is not set. It is skipped unless you say which it is.`
             : `This may be one of your alts ${listOf(unsure.map((a) => a.name))}, whose realms are not set. It is skipped unless you say which it is.`,
@@ -67,7 +71,10 @@ function choiceText(choice: RowChoice, alts: Map<string, LocalAlt>, status: Impo
   if (choice === "add") return status === "ambiguous" ? "Add it as a new alt" : "Add it";
   if (choice === "update") return "Update it";
   const alt = alts.get(choice.slice("alt:".length));
-  return alt ? `It is your alt ${altLabel(alt)}${alt.realm ? "" : " (realm not set)"}` : "It is that alt";
+  if (!alt) return "It is that alt";
+  // Copies of one character are told apart by what each holds and when it last changed.
+  if (status === "twice") return `It is your alt ${altLabel(alt)}: ${detailsLine(alt) || "no details"}, updated ${day(alt.updatedAt)}`;
+  return `It is your alt ${altLabel(alt)}${alt.realm ? "" : " (realm not set)"}`;
 }
 
 export default function ReadSaveFile({ owner, onApplied }: {

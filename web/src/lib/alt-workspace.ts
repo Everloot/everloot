@@ -153,7 +153,10 @@ export function saveAlt(storage: DeviceStorage | null, owner: Owner, input: AltI
     if (!fields.planIds.every((id) => workspace.plans.some((p) => p.id === id))) {
       return invalid("A plan chosen for this alt is no longer on this device. It may have been deleted in another tab.");
     }
-    const twin = twinOf(workspace.alts, { id: old?.id, ...fields });
+    // An edit that keeps who the alt is (its name and its known realm) is not checked for a twin, so an alt a restore
+    // left here twice can still be edited; a new alt, or one that becomes another character, is.
+    const sameCharacter = old && old.realm !== null && fields.realm !== null && altKey(old.name, old.realm) === altKey(fields.name, fields.realm);
+    const twin = sameCharacter ? undefined : twinOf(workspace.alts, { id: old?.id, ...fields });
     if (twin) return invalid(`${altLabel(twin)} is already one of your alts here.`);
     const alt: LocalAlt = {
       id: old?.id ?? crypto.randomUUID(), ...fields,

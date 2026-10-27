@@ -309,6 +309,21 @@ test("an alt with no realm set and a file character of its name: the preview ask
   expect(stored(ANON)?.alts[0]).toMatchObject({ id: id(500), realm: "Moon Guard", classSlug: "shaman", level: 24, faction: "horde", notes: "Typed by hand" });
 });
 
+test("a file character that is here as two alts says so, offers each copy told apart, and changes neither realm", async () => {
+  seed(ANON, [], [alt({ updatedAt: "2026-10-20T12:00:00.000Z" }), alt({ id: id(501), level: 30, updatedAt: "2026-10-22T12:00:00.000Z" })]);
+  await render();
+  await readSaveFile();
+  expect(filePreview()?.textContent).toContain("Thrall (Moon Guard) is here as more than one alt");
+  expect(filePreview()?.textContent).not.toContain("realm is not set");
+  const choice = field("Thrall (Moon Guard)", filePreview()!) as HTMLSelectElement;
+  expect([...choice.options].map((o) => o.textContent)).toEqual([
+    "Skip it",
+    "It is your alt Thrall (Moon Guard): Shaman · Level 24 · Horde, updated Oct 20, 2026",
+    "It is your alt Thrall (Moon Guard): Shaman · Level 30 · Horde, updated Oct 22, 2026",
+  ]);
+  expect(choice.value).toBe("skip");
+});
+
 test("a file over 20 MiB is not read, and a damaged, cut-off or foreign file says so; nothing changes", async () => {
   seed(ANON, [], [alt()]);
   const before = localStorage.getItem(bucketKey(ANON));

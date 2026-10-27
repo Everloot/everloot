@@ -169,6 +169,17 @@ describe("adding and editing by hand", () => {
     expect(stored(storage, ANON).alts).toHaveLength(1);
   });
 
+  test("two alts of one character, as a restored backup can leave them, stay editable while the edit keeps who they are (reported case)", () => {
+    const storage = memory();
+    seed(storage, ANON, [alt({ realm: "Moon Guard", notes: "original notes" }), alt({ id: idOf(501), realm: "Moon Guard" })]);
+    const result = saveAlt(storage, ANON, input({ id: idOf(500), name: "Thrall", realm: "Moon Guard", notes: "edited notes" }), LATER);
+    expect(result).toMatchObject({ ok: true, alt: { id: idOf(500), notes: "edited notes" } });
+    // Renamed, or moved to another realm that is already here, it is still refused.
+    expect(saveAlt(storage, ANON, input({ id: idOf(501), name: "Thrall", realm: "moon-guard " }), LATER).ok).toBe(true);
+    seed(storage, ANON, [alt({ realm: "Moon Guard" }), alt({ id: idOf(501), name: "Jaina", realm: "Moon Guard" })]);
+    expect(saveAlt(storage, ANON, input({ id: idOf(501), name: "Thrall", realm: "Moon Guard" }), LATER)).toMatchObject({ ok: false, error: "invalid" });
+  });
+
   test("an edit of an alt that is gone says so, and an edit cannot take another alt's character", () => {
     const storage = memory();
     added(storage, ANON, { name: "Thrall", realm: "Moon Guard" });
