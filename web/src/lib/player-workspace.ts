@@ -156,7 +156,9 @@ export function validateWorkspace(value: unknown): Validation {
 // Reading and writing a bucket.
 
 export type ReadError = "unavailable" | "corrupt" | "newer-version";
-export type WriteError = ReadError | "full" | "over-limit" | "invalid" | "missing" | "referenced" | "changed" | "other-owner" | "not-transferred" | "partial";
+export type WriteError =
+  | ReadError | "full" | "over-limit" | "invalid" | "missing" | "referenced" | "changed" | "other-owner"
+  | "not-transferred" | "incomplete" | "left-signed-out";
 export type Failure = { ok: false; error: WriteError; message: string };
 export type ReadResult = { ok: true; workspace: PlayerWorkspace; raw: string | null } | (Failure & { error: ReadError; raw: string | null });
 export type WriteResult = { ok: true; workspace: PlayerWorkspace } | Failure;
@@ -173,7 +175,8 @@ const MESSAGES: Record<WriteError, string> = {
   changed: "The plans on this device changed since the preview. Choose the backup again to see what it would do now.",
   "other-owner": "Those plans belong to another account, so nothing was changed.",
   "not-transferred": "The transfer did not finish, so nothing on this device changed.",
-  partial: "The plans were saved to the account, but this browser could not take them out of its signed-out plans.",
+  incomplete: "The transfer did not confirm every plan it was sent, so none were moved. Nothing on this device changed.",
+  "left-signed-out": "The plans were saved to the account, but this browser could not take them out of its signed-out plans, so they show in both.",
 };
 
 const failure = (error: WriteError, message = MESSAGES[error]): Failure => ({ ok: false, error, message });
@@ -318,22 +321,30 @@ export function deletePlan(storage: DeviceStorage | null, owner: Owner, id: stri
   });
 }
 
-/** What a transfer to an account reports once it is over: the account the plans were saved to, and which ones. */
+/** A transfer of device plans to an account, as it was sent: the account, and which plans. */
+export interface TransferRequest { owner: Owner; planIds: string[] }
+
+/** What the transfer reports once it is over: the account the plans were saved to, and which ones. */
 export type TransferResult = { ok: true; userId: string; planIds: string[] } | { ok: false };
 
 /**
- * After a finished transfer, the plans it saved move from the signed-out bucket into that account's, bound to it,
- * and the rest stay signed out. Only a finished result binds, and only to the account the transfer started for:
- * an answer that arrives for another account binds nothing. A plan already there is not added twice.
+ * Once a transfer reports that it saved every plan it was sent, those plans move from the signed-out bucket into
+ * that account's, bound to it, and the rest stay signed out. Anything less binds nothing: a failed result, one that
+ * confirms only some of the plans or others than were sent, or an answer for another account than the transfer was
+ * sent for. A plan already moved there is not added to that bucket twice. This is the browser's own record: keeping
+ * a plan from being transferred again, into another account, is the transfer's job.
  */
-export function bindTransferred(storage: DeviceStorage | null, startedFor: Owner, result: TransferResult, now = new Date()): { ok: true; bound: number } | Failure {
+export function bindTransferred(storage: DeviceStorage | null, sent: TransferRequest, result: TransferResult, now = new Date()): { ok: true; bound: number } | Failure {
   if (!result.ok) return failure("not-transferred");
-  if (startedFor.kind !== "account" || startedFor.userId !== result.userId) return failure("other-owner");
+  const { owner } = sent;
+  if (owner.kind !== "account" || owner.userId !== result.userId) return failure("other-owner");
+  const ids = new Set(sent.planIds);
+  const confirmed = new Set(result.planIds);
+  if (confirmed.size !== ids.size || [...ids].some((id) => !confirmed.has(id))) return failure("incomplete");
   const signedOut = readWorkspace(storage, ANONYMOUS);
   if (!signedOut.ok) return failure(signedOut.error);
-  const account = readWorkspace(storage, startedFor);
+  const account = readWorkspace(storage, owner);
   if (!account.ok) return failure(account.error);
-  const ids = new Set(result.planIds);
   const moving = signedOut.workspace.plans.filter((p) => ids.has(p.id));
   if (moving.length === 0) return { ok: true, bound: 0 };
   const { alts, watches } = signedOut.workspace;
@@ -344,7 +355,7 @@ export function bindTransferred(storage: DeviceStorage | null, startedFor: Owner
   const first = store(storage, into);
   if (!first.ok) return first;
   const second = store(storage, { ...signedOut.workspace, plans: signedOut.workspace.plans.filter((p) => !ids.has(p.id)) });
-  return second.ok ? { ok: true, bound: moving.length } : failure("partial");
+  return second.ok ? { ok: true, bound: moving.length } : failure("left-signed-out");
 }
 
 // Backups.

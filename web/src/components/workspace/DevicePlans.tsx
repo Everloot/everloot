@@ -18,6 +18,9 @@ import { useWorkspaceOwner } from "./LocalPlanSave";
 const action = "inline-flex min-h-8 items-center px-1.5 text-cell text-fg-2 hover:text-accent disabled:opacity-60";
 const textarea = "w-full rounded-control border border-edge bg-canvas px-3 py-2 text-base text-fg";
 
+/** A saved order says who made it, not that it fits the tree: shown wherever orders are. */
+const UNCHECKED = "Spend orders show as they were saved. The calculator checks them against the talent tree only when a plan opens.";
+
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 const day = (at: string) => new Date(at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
@@ -98,7 +101,7 @@ function Bucket({ owner }: { owner: Owner }) {
       {intro}
       <SaveFromLink owner={owner} onSaved={(text) => after({ ok: true }, text)} />
       <section aria-labelledby="device-plans">
-        <SectionHeading id="device-plans" note={`${plans.length} of ${WORKSPACE_LIMITS.plans}, newest first. The calculator checks each spend order against the tree when a plan opens.`}>Your plans</SectionHeading>
+        <SectionHeading id="device-plans" note={`${plans.length} of ${WORKSPACE_LIMITS.plans}, newest first. ${UNCHECKED}`}>Your plans</SectionHeading>
         <p role="status" className="mb-3 text-sm text-fg-2 empty:hidden">{message && !message.alert ? message.text : ""}</p>
         {message?.alert && <p role="alert" className="mb-3 text-sm text-danger">{message.text}</p>}
         {plans.length === 0 ? (
@@ -229,6 +232,7 @@ function SaveFromLink({ owner, onSaved }: { owner: Owner; onSaved: (text: string
       {found && (
         <form aria-label="Name the plan" onSubmit={save} className="mt-4 grid gap-3 sm:grid-cols-2">
           <p className="text-sm text-fg-2 sm:col-span-2">{className(found.classSlug)} · {setsLine(found.codes, found.orders)}</p>
+          <p className="text-sm text-muted sm:col-span-2">{UNCHECKED}</p>
           <Field label="Name" required maxLength={WORKSPACE_LIMITS.name} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           <label className="block space-y-1 text-sm sm:col-span-2">
             <span className="block text-muted">Notes (optional)</span>

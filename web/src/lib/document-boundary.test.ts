@@ -1,4 +1,6 @@
+import { getPathMatch } from "next/dist/shared/lib/router/utils/path-match";
 import { describe, expect, test } from "vitest";
+import nextConfig from "../../next.config.js";
 import { crossesDocumentBoundary, documentPathname, isProtectedPath } from "./document-boundary";
 
 /** A window with the given address and, unless null, a navigation entry for the document. */
@@ -21,6 +23,13 @@ describe("isProtectedPath", () => {
 
   test("public pages, look-alike names and the other version's notice page are not", () => {
     for (const path of ["/", "/beta", "/database/items/2589", "/chatter", "/accounts", "/settings-help", "/ptr/chat", "/sign-in"]) {
+      expect(isProtectedPath(path), path).toBe(false);
+    }
+  });
+
+  test("Plans on this device is protected, under the served prefix too; the other tools and look-alikes are not", () => {
+    for (const path of ["/tools/builds", "/tools/builds/x", "/beta/tools/builds"]) expect(isProtectedPath(path), path).toBe(true);
+    for (const path of ["/tools", "/tools/talents", "/tools/talents/mage", "/tools/buildsx", "/tools/build", "/ptr/tools/builds"]) {
       expect(isProtectedPath(path), path).toBe(false);
     }
   });
@@ -59,5 +68,47 @@ describe("crossesDocumentBoundary", () => {
 
   test("on the server there is no document to compare, so nothing crosses", () => {
     expect(crossesDocumentBoundary("/chat", undefined)).toBe(false);
+  });
+
+  test("going from the calculator to Plans on this device crosses it, and so does opening a plan in the calculator", () => {
+    expect(crossesDocumentBoundary("/tools/builds", fakeWindow("/tools/builds", "https://everloot.app/tools/talents/mage"))).toBe(true);
+    expect(crossesDocumentBoundary("/tools/talents/mage", fakeWindow("/tools/talents/mage", "https://everloot.app/tools/builds"))).toBe(true);
+    expect(crossesDocumentBoundary("/tools/builds", fakeWindow("/tools/builds", "https://everloot.app/settings"))).toBe(false);
+  });
+});
+
+/** The headers a request for `path` gets: Next applies every matching entry in order, and a later entry's key wins. */
+async function headersFor(path: string): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  for (const entry of await nextConfig.headers!()) {
+    if (getPathMatch(entry.source)(path) === false) continue;
+    for (const { key, value } of entry.headers) out[key] = value;
+  }
+  return out;
+}
+
+describe("Plans on this device's document", () => {
+  test("gets the protected pages' policy: scripts from this site only, no frames, and no ad or analytics host to connect to", async () => {
+    const strict = (await headersFor("/chat"))["Content-Security-Policy"]!;
+    const site = await headersFor("/");
+    for (const path of ["/tools/builds", "/beta/tools/builds"]) {
+      const got = await headersFor(path);
+      expect(got["Content-Security-Policy"], path).toBe(strict);
+      // The microphone stays Chat's alone.
+      expect(got["Permissions-Policy"], path).toBe(site["Permissions-Policy"]);
+    }
+    const directives = Object.fromEntries(strict.split(/;\s*/).map((d) => { const [name, ...values] = d.trim().split(/\s+/); return [name, values]; }));
+    expect(directives["script-src"]).toEqual(["'self'", "'unsafe-inline'"]);
+    expect(directives["frame-src"]).toEqual(["'none'"]);
+    for (const host of ["googletagmanager", "google-analytics", "analytics.google", "posthog", "cloudflareinsights", "metricool", "googlesyndication", "doubleclick", "fundingchoices", "adtrafficquality"]) {
+      expect(strict, host).not.toContain(host);
+    }
+  });
+
+  test("leaves the public pages' policy as it was, the calculator a plan opens in included", async () => {
+    const site = (await headersFor("/"))["Content-Security-Policy"];
+    for (const path of ["/tools", "/tools/talents", "/tools/talents/mage", "/tools/buildsx"]) {
+      expect((await headersFor(path))["Content-Security-Policy"], path).toBe(site);
+    }
   });
 });

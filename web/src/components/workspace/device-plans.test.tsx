@@ -214,6 +214,22 @@ test("a pasted talent link is saved by name with both sets and both orders, and 
   expect(requests).toEqual(["GET /api/auth/me"]);
 });
 
+test("spend orders show as saved, and the page says they are checked against the tree only when a plan opens", async () => {
+  const unchecked = "Spend orders show as they were saved. The calculator checks them against the talent tree only when a plan opens.";
+  seed(ANON, [plan()]);
+  await render();
+  expect(item("Frost")?.textContent).toContain("Set 1: planned order");
+  expect(container.querySelector("#device-plans")?.parentElement?.parentElement?.textContent).toContain(unchecked);
+  await type(field("Talent link or share code"), `https://everloot.app/tools/talents/mage#plan=${MAGE}&order=${PLANNED}`);
+  await click(button(/^Read the link$/));
+  expect(container.querySelector('form[aria-label="Name the plan"]')?.textContent).toContain(unchecked);
+});
+
+test("the page is left out of search, as /me is", async () => {
+  const { metadata } = await import("@/app/tools/builds/page");
+  expect(metadata.robots).toEqual({ index: false, follow: false });
+});
+
 test("pasted text that is not a plan, or a plan of two classes, says why and saves nothing", async () => {
   await render();
   await type(field("Talent link or share code"), "https://everloot.app/b/AbCd1234");

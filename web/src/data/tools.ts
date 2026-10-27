@@ -144,6 +144,8 @@ export const TOOL_GROUPS: { title: string; links: { label: string; href: string 
     title: "Plan",
     links: [
       { label: "Talent calculator", href: "/tools/talents" },
+      // Not in the catalogue above, which also feeds the sitemap and search: the page is a private list.
+      { label: "Plans on this device", href: "/tools/builds" },
       { label: "Raid builder", href: "/tools/raid" },
       { label: "Professions", href: "/tools/professions" },
       { label: "Farming routes", href: "/tools/farming-routes" },
@@ -173,6 +175,7 @@ export const TOOL_GROUPS: { title: string; links: { label: string; href: string 
 /** One plain line per Tools menu link, for /tools and /about. Keyed by the menu's href (tools.test.ts). */
 export const TOOL_LINES: Record<string, string> = {
   "/tools/talents": "Plan a talent build for any class and share it with its game build attached.",
+  "/tools/builds": "Talent plans kept by name in this browser, with a backup to restore them. No account needed, and nothing is uploaded.",
   "/tools/raid": "Fill a 10, 20 or 40 player raid and see which buffs and debuffs it covers.",
   "/tools/professions": "Skill-up paths and recipe ranges for each profession, from recipes and prices players uploaded.",
   "/tools/farming-routes": "Farming areas by what you farm, filled in from what players upload.",

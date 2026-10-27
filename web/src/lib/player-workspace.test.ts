@@ -339,43 +339,57 @@ describe("edit, copy and delete", () => {
 });
 
 describe("binding after a transfer", () => {
+  /** A transfer of these plans, sent for `owner`. */
+  const sent = (owner: Owner, ...plans: LocalPlan[]) => ({ owner, planIds: plans.map((p) => p.id) });
+
   test("binding needs a finished transfer: a failed result binds nothing and changes nothing", () => {
     const storage = memory();
     const one = saved(storage, ANON);
     const before = new Map(storage.items);
-    expect(bindTransferred(storage, A, { ok: false }, LATER)).toMatchObject({ ok: false, error: "not-transferred" });
+    expect(bindTransferred(storage, sent(A, one), { ok: false }, LATER)).toMatchObject({ ok: false, error: "not-transferred" });
     expect(storage.items).toEqual(before);
     expect(names(storage, ANON)).toEqual([one.name]);
   });
 
-  test("a finished transfer moves exactly the plans it saved into that account, bound to it; the rest stay signed out", () => {
+  test("a transfer that confirms every plan sent moves exactly those into that account, bound to it; the rest stay signed out", () => {
     const storage = memory();
     const moved = saved(storage, ANON, { name: "Moved" });
     saved(storage, ANON, { name: "Stays" });
-    expect(bindTransferred(storage, A, { ok: true, userId: A_ID, planIds: [moved.id] }, LATER)).toEqual({ ok: true, bound: 1 });
+    expect(bindTransferred(storage, sent(A, moved), { ok: true, userId: A_ID, planIds: [moved.id] }, LATER)).toEqual({ ok: true, bound: 1 });
     expect(names(storage, ANON)).toEqual(["Stays"]);
     const account = readWorkspace(storage, A);
     expect(account.ok && account.workspace.plans).toEqual([{ ...moved, boundTo: { userId: A_ID, at: LATER.toISOString() } }]);
     expect(names(storage, B)).toEqual([]);
   });
 
-  test("a result for another account than the one the transfer started for binds nothing", () => {
+  test("a result that confirms only some of the plans sent, or one that was not sent, binds none of them", () => {
+    const storage = memory();
+    const one = saved(storage, ANON, { name: "One" });
+    const two = saved(storage, ANON, { name: "Two" });
+    const before = new Map(storage.items);
+    expect(bindTransferred(storage, sent(A, one, two), { ok: true, userId: A_ID, planIds: [one.id] }, LATER)).toMatchObject({ ok: false, error: "incomplete" });
+    expect(bindTransferred(storage, sent(A, one), { ok: true, userId: A_ID, planIds: [one.id, two.id] }, LATER)).toMatchObject({ ok: false, error: "incomplete" });
+    expect(storage.items).toEqual(before);
+    expect(names(storage, ANON)).toEqual(["One", "Two"]);
+  });
+
+  test("a result for another account than the one the transfer was sent for binds nothing", () => {
     const storage = memory();
     const one = saved(storage, ANON);
     const before = new Map(storage.items);
-    expect(bindTransferred(storage, A, { ok: true, userId: B_ID, planIds: [one.id] }, LATER)).toMatchObject({ ok: false, error: "other-owner" });
-    expect(bindTransferred(storage, ANON, { ok: true, userId: A_ID, planIds: [one.id] }, LATER)).toMatchObject({ ok: false, error: "other-owner" });
+    expect(bindTransferred(storage, sent(A, one), { ok: true, userId: B_ID, planIds: [one.id] }, LATER)).toMatchObject({ ok: false, error: "other-owner" });
+    expect(bindTransferred(storage, sent(ANON, one), { ok: true, userId: A_ID, planIds: [one.id] }, LATER)).toMatchObject({ ok: false, error: "other-owner" });
     expect(storage.items).toEqual(before);
   });
 
-  test("a retried transfer does not duplicate a plan already bound to that account", () => {
+  test("a retried transfer does not add a plan to the account's bucket twice", () => {
     const storage = memory();
     const one = saved(storage, ANON);
-    bindTransferred(storage, A, { ok: true, userId: A_ID, planIds: [one.id] }, LATER);
+    bindTransferred(storage, sent(A, one), { ok: true, userId: A_ID, planIds: [one.id] }, LATER);
     // An interrupted bind can leave the signed-out copy behind; the retry ends with one copy, in the account.
     storage.items.set(bucketKey(ANON), JSON.stringify(workspace(ANON, [one])));
-    expect(bindTransferred(storage, A, { ok: true, userId: A_ID, planIds: [one.id] }, LATER)).toEqual({ ok: true, bound: 1 });
-    expect(bindTransferred(storage, A, { ok: true, userId: A_ID, planIds: [one.id] }, LATER)).toEqual({ ok: true, bound: 0 });
+    expect(bindTransferred(storage, sent(A, one), { ok: true, userId: A_ID, planIds: [one.id] }, LATER)).toEqual({ ok: true, bound: 1 });
+    expect(bindTransferred(storage, sent(A, one), { ok: true, userId: A_ID, planIds: [one.id] }, LATER)).toEqual({ ok: true, bound: 0 });
     expect(names(storage, A)).toEqual([one.name]);
     expect(names(storage, ANON)).toEqual([]);
   });
@@ -385,8 +399,20 @@ describe("binding after a transfer", () => {
     storage.items.set(bucketKey(A), JSON.stringify(workspace(A, Array.from({ length: 200 }, (_, i) => plan({ id: idOf(i), name: `Plan ${i}` })))));
     const one = saved(storage, ANON);
     const before = new Map(storage.items);
-    expect(bindTransferred(storage, A, { ok: true, userId: A_ID, planIds: [one.id] }, LATER)).toMatchObject({ ok: false, error: "over-limit" });
+    expect(bindTransferred(storage, sent(A, one), { ok: true, userId: A_ID, planIds: [one.id] }, LATER)).toMatchObject({ ok: false, error: "over-limit" });
     expect(storage.items).toEqual(before);
+  });
+
+  test("when the signed-out copy cannot be taken out, the plan is in both buckets, never in neither, and the result says so", () => {
+    const storage = memory();
+    const one = saved(storage, ANON);
+    const stuck = { ...storage, setItem: (key: string, value: string) => {
+      if (key === bucketKey(ANON)) throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+      storage.setItem(key, value);
+    } };
+    expect(bindTransferred(stuck, sent(A, one), { ok: true, userId: A_ID, planIds: [one.id] }, LATER)).toMatchObject({ ok: false, error: "left-signed-out" });
+    expect(names(storage, A)).toEqual([one.name]);
+    expect(names(storage, ANON)).toEqual([one.name]);
   });
 });
 
