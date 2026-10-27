@@ -150,6 +150,31 @@ test("the preview names the author by handle only, says what must change before 
   expect(nameless).not.toContain("Thrall");
 });
 
+test("a revision that was sent previews under the handle it was sent with, after a rename or with no handle at all; a draft under today's", async () => {
+  const previewOf = async () => { const html = await page({ guide: GUIDE }); return html.slice(html.indexOf('id="preview"')); };
+  // Sent as @thrall; the profile is renamed since.
+  profile = { handle: "renamed", public_profile: false };
+  for (const status of ["submitted", "withdrawn"]) {
+    summaries = [summaryRow(2, status), summaryRow(1, "withdrawn")];
+    newest = { ...newest!, status, author_handle: "thrall", submitted_at: "2026-10-22T10:00:00+00:00", withdrawn_at: status === "withdrawn" ? "2026-10-23T10:00:00+00:00" : null };
+    const preview = await previewOf();
+    expect(preview, status).toContain("By @thrall");
+    expect(preview, status).not.toContain("@renamed");
+  }
+  // The handle removed since: still the name it was sent under, not "no name yet".
+  profile = { handle: null, public_profile: false };
+  let preview = await previewOf();
+  expect(preview).toContain("By @thrall");
+  expect(preview).not.toContain("No author name yet");
+  // A draft would be sent under today's handle, and says so.
+  profile = { handle: "renamed", public_profile: false };
+  summaries = [summaryRow(3, "draft"), summaryRow(2, "withdrawn")];
+  newest = { ...newest!, revision: 3, status: "draft", author_handle: null, submitted_at: null, withdrawn_at: null };
+  preview = await previewOf();
+  expect(preview).toContain("By @renamed");
+  expect(preview).not.toContain("@thrall");
+});
+
 test("a change of account without a full reload starts the editor again: one account's unsaved words never go out under another", async () => {
   const JAINA = { id: "22222222-3333-4444-8555-666666666666", name: "Jaina#2002" };
   const sent: Array<[string | null, string]> = [];

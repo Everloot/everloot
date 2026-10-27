@@ -61,6 +61,9 @@ async function load(asked: string | null): Promise<Loaded | "unknown" | null> {
 /** The saved words as a guide page would draw them, to their writer only: links only to this site or the draft's own sources. */
 function DraftPreview({ preview: { revision, blocks, ctx, problems }, author }: { preview: Preview; author: GuideAuthor }) {
   const { draft } = revision;
+  // A revision that was sent keeps the handle it was sent under, whatever the profile says now; a draft would go under
+  // today's handle.
+  const name = revision.status === "draft" ? author.handle : revision.author;
   return (
     <section aria-labelledby="preview" className="mt-12 max-w-3xl space-y-4 border-t border-line pt-8">
       <SectionHeading id="preview" note={`Revision ${revision.revision}, ${GUIDE_STATUS_LABEL[revision.status].toLowerCase()}, as a guide page draws it. Only you can see it.`}>
@@ -70,8 +73,8 @@ function DraftPreview({ preview: { revision, blocks, ctx, problems }, author }: 
         <h3 className="text-2xl font-semibold tracking-tight text-fg [overflow-wrap:anywhere]">{draft.title}</h3>
         {draft.summary && <p className="text-fg-2">{draft.summary}</p>}
         <p className="text-sm text-fg-2">
-          {author.handle
-            ? <>By @{author.handle}</>
+          {name
+            ? <>By @{name}</>
             : <>No author name yet: <Link href="/settings" className={link}>choose a handle</Link> to submit. A guide names its author by handle, never by BattleTag.</>}
         </p>
         <Prose>
