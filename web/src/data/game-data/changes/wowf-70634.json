@@ -1,0 +1,325 @@
+{
+  "schema": "everloot.game-changes/2",
+  "label": "found in game files, unconfirmed",
+  "id": "wowf-70634",
+  "product": "wowf",
+  "live": false,
+  "spoiler": true,
+  "detectedAt": "2026-10-27T18:15:59.776Z",
+  "build": {
+    "version": "1.60.1.70634",
+    "buildId": 70634,
+    "buildConfig": "7d8ae4cd9c1f639a3ea04fd47e21c746"
+  },
+  "previous": {
+    "version": "1.60.1.70630",
+    "buildId": 70630,
+    "buildConfig": "644ffedb0d59bb0da2af9011b36f44db"
+  },
+  "initial": false,
+  "encryptedBlocks": {
+    "total": 324,
+    "tables": [
+      {
+        "table": "Achievement",
+        "blocks": 1
+      },
+      {
+        "table": "AnimKit",
+        "blocks": 1
+      },
+      {
+        "table": "AnimKitSegment",
+        "blocks": 1
+      },
+      {
+        "table": "AreaTable",
+        "blocks": 3
+      },
+      {
+        "table": "BattlePetSpecies",
+        "blocks": 5
+      },
+      {
+        "table": "CharacterLoadout",
+        "blocks": 1
+      },
+      {
+        "table": "Creature",
+        "blocks": 6
+      },
+      {
+        "table": "CreatureDifficulty",
+        "blocks": 6
+      },
+      {
+        "table": "CreatureDisplayInfo",
+        "blocks": 10
+      },
+      {
+        "table": "CreatureDisplayInfoExtra",
+        "blocks": 1
+      },
+      {
+        "table": "CreatureDisplayInfoGeosetData",
+        "blocks": 1
+      },
+      {
+        "table": "CreatureDisplayInfoOption",
+        "blocks": 1
+      },
+      {
+        "table": "CreatureMovementInfo",
+        "blocks": 1
+      },
+      {
+        "table": "CreatureSoundData",
+        "blocks": 7
+      },
+      {
+        "table": "CreatureXDisplayInfo",
+        "blocks": 6
+      },
+      {
+        "table": "DungeonEncounter",
+        "blocks": 3
+      },
+      {
+        "table": "Emotes",
+        "blocks": 1
+      },
+      {
+        "table": "GameObjectDisplayInfo",
+        "blocks": 2
+      },
+      {
+        "table": "Item",
+        "blocks": 16
+      },
+      {
+        "table": "ItemAppearance",
+        "blocks": 7
+      },
+      {
+        "table": "ItemDisplayInfo",
+        "blocks": 7
+      },
+      {
+        "table": "ItemDisplayInfoMaterialRes",
+        "blocks": 3
+      },
+      {
+        "table": "ItemEffect",
+        "blocks": 12
+      },
+      {
+        "table": "ItemModifiedAppearance",
+        "blocks": 7
+      },
+      {
+        "table": "ItemNameDescription",
+        "blocks": 1
+      },
+      {
+        "table": "ItemSearchName",
+        "blocks": 7
+      },
+      {
+        "table": "ItemSparse",
+        "blocks": 31
+      },
+      {
+        "table": "ItemXItemEffect",
+        "blocks": 12
+      },
+      {
+        "table": "LFGDungeons",
+        "blocks": 1
+      },
+      {
+        "table": "LoadingScreens",
+        "blocks": 2
+      },
+      {
+        "table": "Lock",
+        "blocks": 1
+      },
+      {
+        "table": "Map",
+        "blocks": 3
+      },
+      {
+        "table": "MapDifficulty",
+        "blocks": 1
+      },
+      {
+        "table": "Mount",
+        "blocks": 3
+      },
+      {
+        "table": "MountXDisplay",
+        "blocks": 3
+      },
+      {
+        "table": "ObjectEffect",
+        "blocks": 2
+      },
+      {
+        "table": "ObjectEffectPackageElem",
+        "blocks": 2
+      },
+      {
+        "table": "QuestV2",
+        "blocks": 5
+      },
+      {
+        "table": "SkillLineAbility",
+        "blocks": 8
+      },
+      {
+        "table": "SoundEnvelope",
+        "blocks": 4
+      },
+      {
+        "table": "SoundKit",
+        "blocks": 7
+      },
+      {
+        "table": "SoundKitAdvanced",
+        "blocks": 7
+      },
+      {
+        "table": "SoundKitChild",
+        "blocks": 2
+      },
+      {
+        "table": "SoundKitEntry",
+        "blocks": 7
+      },
+      {
+        "table": "Spell",
+        "blocks": 29
+      },
+      {
+        "table": "SpellAuraOptions",
+        "blocks": 6
+      },
+      {
+        "table": "SpellCooldowns",
+        "blocks": 9
+      },
+      {
+        "table": "SpellEffect",
+        "blocks": 14
+      },
+      {
+        "table": "SpellItemEnchantment",
+        "blocks": 1
+      },
+      {
+        "table": "SpellLevels",
+        "blocks": 6
+      },
+      {
+        "table": "SpellMisc",
+        "blocks": 14
+      },
+      {
+        "table": "SpellName",
+        "blocks": 14
+      },
+      {
+        "table": "SpellReagents",
+        "blocks": 4
+      },
+      {
+        "table": "SummonProperties",
+        "blocks": 2
+      },
+      {
+        "table": "TotemCategory",
+        "blocks": 1
+      },
+      {
+        "table": "Toy",
+        "blocks": 1
+      },
+      {
+        "table": "TransmogSet",
+        "blocks": 2
+      },
+      {
+        "table": "TransmogSetItem",
+        "blocks": 2
+      },
+      {
+        "table": "ZoneLight",
+        "blocks": 1
+      }
+    ]
+  },
+  "source": {
+    "definitions": "50ce5d272897",
+    "library": "@rhyster/wow-casc-dbc@2.16.17",
+    "extractedAt": "2026-10-27T18:15:44.450Z"
+  },
+  "catalog": {
+    "classes": 9,
+    "nodes": 466
+  },
+  "talents": {
+    "classesAdded": [],
+    "classesRemoved": [],
+    "added": [],
+    "removed": [],
+    "moved": [],
+    "ranks": [],
+    "gates": [],
+    "prereqs": [],
+    "replaced": [],
+    "spellValues": [],
+    "pointLevels": []
+  },
+  "raidBuffs": {
+    "comparedTo": "1.60.1.70630",
+    "scopeChanges": [],
+    "spellChanges": []
+  },
+  "mapChanges": [],
+  "readSet": {
+    "tables": {
+      "before": 330,
+      "after": 330
+    },
+    "rows": {
+      "before": 1142254,
+      "after": 1142256
+    },
+    "addedTables": [],
+    "removedTables": [],
+    "changedTables": [
+      {
+        "table": "UiTextureAtlas",
+        "rowsBefore": 2826,
+        "rowsAfter": 2826,
+        "changed": true
+      },
+      {
+        "table": "UiTextureAtlasElement",
+        "rowsBefore": 20816,
+        "rowsAfter": 20817,
+        "changed": true
+      },
+      {
+        "table": "UiTextureAtlasMember",
+        "rowsBefore": 20684,
+        "rowsAfter": 20685,
+        "changed": true
+      }
+    ],
+    "layoutChanged": true
+  },
+  "warnings": [
+    "table definitions differ (WoWDBDefs 05e242b6acdc vs 50ce5d272897): a change may come from the layouts, not the game"
+  ]
+}
