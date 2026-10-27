@@ -5,8 +5,8 @@ import { className } from "@/components/builds/describe";
 import { Card, CopyButton, Field, SectionHeading } from "@/components/ui";
 import { restoreLines } from "@/lib/alt-workspace";
 import {
-  BACKUP_TOO_LARGE, WORKSPACE_LIMITS, applyImport, bucketKey, copyPlan, deletePlan, deviceStorage, editPlan, exportBackup, storedCounts,
-  orderState, previewImport, readPlanText, readWorkspace, sameOwner, savePlan, withWorkspaceLock,
+  BACKUP_TOO_LARGE, WORKSPACE_LIMITS, applyImport, bucketKey, copyPlan, deletePlan, deviceStorage, editPlan, exportBackup, hiddenFrom, storedCounts,
+  orderState, previewImport, readPlanText, readWorkspace, sameOwner, savePlan, sentPlans, withWorkspaceLock,
   type Failure, type ImportPreview, type LocalPlan, type Owner, type PlanText, type ReadResult,
 } from "@/lib/player-workspace";
 import { planHash, replacePlanHash } from "@/lib/talents/import";
@@ -16,7 +16,8 @@ import { useWorkspaceOwner } from "./LocalPlanSave";
 // the browser signed out. Named, opened, edited, copied, deleted, backed up and restored here, with nothing sent:
 // the page asks the network only who is signed in. The calculator's Save on this device opens it with the plan in
 // the address fragment, to be named and saved here. Every change is made holding the workspace lock
-// (withWorkspaceLock), one tab at a time, as a transfer's are.
+// (withWorkspaceLock), one tab at a time, as a transfer's are. A signed-out plan an account has now (a transfer saved
+// it there) is that account's: it is not shown here, or in a backup from here (hiddenFrom).
 
 const action = "inline-flex min-h-8 items-center px-1.5 text-cell text-fg-2 hover:text-accent disabled:opacity-60";
 const textarea = "w-full rounded-control border border-edge bg-canvas px-3 py-2 text-base text-fg";
@@ -101,12 +102,18 @@ export default function DevicePlans() {
 
 function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | null; onSentDone: () => void }) {
   const [read, setRead] = useState<ReadResult | null>(null);
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<{ text: string; alert: boolean; inUse?: boolean } | null>(null);
-  const reload = useCallback(() => setRead(readWorkspace(deviceStorage(), owner)), [owner]);
+  const reload = useCallback(() => {
+    const storage = deviceStorage();
+    const now = readWorkspace(storage, owner);
+    setRead(now);
+    setHidden(now.ok ? hiddenFrom(storage, owner, now.workspace) : new Set());
+  }, [owner]);
   useEffect(() => {
     reload();
-    // Another tab's change to this bucket shows here too.
-    const onStorage = (event: StorageEvent) => { if (event.key === null || event.key === bucketKey(owner)) reload(); };
+    // Another tab's change to this bucket shows here too. Signed out, so does one to an account's, which may take a plan.
+    const onStorage = (event: StorageEvent) => { if (event.key === null || event.key === bucketKey(owner) || owner.kind === "anonymous") reload(); };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, [owner, reload]);
@@ -127,13 +134,14 @@ function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | nu
     setMessage(result.ok ? { text: done, alert: false } : { text: result.message, alert: true, inUse: result.error === "referenced" });
     return result.ok;
   };
-  const plans = [...read.workspace.plans].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const shown = read.workspace.plans.filter((p) => !hidden.has(p.id));
+  const plans = [...shown].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
   return (
     <div className="space-y-8">
       {intro}
       {sent && (sent.ok
-        ? <SaveSent found={sent} plans={read.workspace.plans} owner={owner} onDone={(saved) => { onSentDone(); if (saved) after({ ok: true }, saved); }} />
+        ? <SaveSent found={sent} plans={shown} owner={owner} onDone={(saved) => { onSentDone(); if (saved) after({ ok: true }, saved); }} />
         : <SentProblem message={sent.message} onClose={onSentDone} />)}
       <SaveFromLink owner={owner} onSaved={(text) => after({ ok: true }, text)} />
       <section aria-labelledby="device-plans">
@@ -380,7 +388,7 @@ function Backup({ owner, onRestored }: { owner: Owner; onRestored: (result: { ok
   function download() {
     // This bucket as stored now, so a change another tab made is in the file too.
     const now = readWorkspace(deviceStorage(), owner);
-    const backup = now.ok ? exportBackup(now.workspace) : now;
+    const backup = now.ok ? exportBackup(now.workspace, new Date(), hiddenFrom(deviceStorage(), owner, now.workspace)) : now;
     if (!backup.ok) { setError(backup.message); return; }
     setError(null);
     saveFile(backup.text, backup.fileName);
@@ -403,7 +411,7 @@ function Backup({ owner, onRestored }: { owner: Owner; onRestored: (result: { ok
     // Previewed against the bucket as stored now, not as this page last showed it.
     const now = readWorkspace(deviceStorage(), owner);
     if (!now.ok) { setError(now.message); return; }
-    const result = previewImport(text, now.workspace);
+    const result = previewImport(text, now.workspace, sentPlans(deviceStorage()));
     if (!result.ok) { setError(result.message); return; }
     setPreview(result.preview);
     setAltLines(restoreLines(now.workspace, result.preview));

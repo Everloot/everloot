@@ -7,8 +7,8 @@ import {
   DETAIL_WORDS, FIELD_WORDS, altFailure, copyNumbers, deleteAlt, detailsLine, listOf, restoreLines, saveAlt, type AltField, type AltInput,
 } from "@/lib/alt-workspace";
 import {
-  ALT_PROFESSIONS, BACKUP_TOO_LARGE, WORKSPACE_LIMITS, applyImport, bucketKey, deviceStorage, exportBackup, newFormatOverflow, previewImport,
-  readWorkspace, type Failure, type ImportPreview, type LocalAlt, type LocalPlan, type Owner, type ReadResult,
+  ALT_PROFESSIONS, BACKUP_TOO_LARGE, WORKSPACE_LIMITS, applyImport, bucketKey, deviceStorage, exportBackup, hiddenFrom, newFormatOverflow, previewImport,
+  readWorkspace, sentPlans, type Failure, type ImportPreview, type LocalAlt, type LocalPlan, type Owner, type ReadResult,
 } from "@/lib/player-workspace";
 import { TALENT_CLASSES } from "@/lib/talents/catalogs";
 import { planHash } from "@/lib/talents/import";
@@ -70,8 +70,8 @@ function Bucket({ owner }: { owner: Owner }) {
   const reload = useCallback(() => setRead(readWorkspace(deviceStorage(), owner)), [owner]);
   useEffect(() => {
     reload();
-    // Another tab's change to this bucket shows here too.
-    const onStorage = (event: StorageEvent) => { if (event.key === null || event.key === bucketKey(owner)) reload(); };
+    // Another tab's change to this bucket shows here too. Signed out, so does one to an account's, which may take a plan.
+    const onStorage = (event: StorageEvent) => { if (event.key === null || event.key === bucketKey(owner) || owner.kind === "anonymous") reload(); };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, [owner, reload]);
@@ -94,13 +94,16 @@ function Bucket({ owner }: { owner: Owner }) {
   /** A backup of this bucket as stored now, so a change another tab made is in it too. Null when it downloaded. */
   const download = (): string | null => {
     const now = readWorkspace(deviceStorage(), owner);
-    const backup = now.ok ? exportBackup(now.workspace) : now;
+    const backup = now.ok ? exportBackup(now.workspace, new Date(), hiddenFrom(deviceStorage(), owner, now.workspace)) : now;
     if (!backup.ok) return altFailure(backup.error).message;
     saveFile(backup.text, backup.fileName);
     return null;
   };
   const storage = deviceStorage();
-  const { plans, alts } = read.workspace;
+  const { alts } = read.workspace;
+  // A signed-out plan an account has now is that account's: not offered or shown here (hiddenFrom). Its alt keeps it.
+  const hidden = hiddenFrom(storage, owner, read.workspace);
+  const plans = read.workspace.plans.filter((p) => !hidden.has(p.id));
   const copies = copyNumbers(alts);
   // Said before anything is tried: in the newer format the same alts take more room than this device has left.
   const overflow = newFormatOverflow(read.workspace);
@@ -375,7 +378,7 @@ function Backup({ owner, download, onRestored }: {
     // Previewed against the bucket as stored now, not as this page last showed it.
     const now = readWorkspace(deviceStorage(), owner);
     if (!now.ok) { setError(altFailure(now.error).message); return; }
-    const result = previewImport(text, now.workspace);
+    const result = previewImport(text, now.workspace, sentPlans(deviceStorage()));
     if (!result.ok) { setError(result.message); return; }
     setPreview({ preview: result.preview, lines: restoreLines(now.workspace, result.preview) });
   }

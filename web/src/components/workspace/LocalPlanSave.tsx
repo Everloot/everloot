@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { ACCOUNT_CHANGED_EVENT } from "@/components/AccountControls";
 import { Input } from "@/components/ui";
 import {
-  WORKSPACE_LIMITS, deviceStorage, lookupOwner, orderState, readWorkspace, sameOwner, savePlan, type LocalPlan, type Owner,
+  WORKSPACE_LIMITS, deviceStorage, hiddenFrom, lookupOwner, orderState, readWorkspace, sameOwner, savePlan, type LocalPlan, type Owner,
 } from "@/lib/player-workspace";
 
 // Save on this device, for the talent calculator beside its account Save: the plan is kept by name in this
@@ -111,7 +111,9 @@ export default function LocalPlanSave({ classSlug, codes, orders, defaultName, o
     if (!owner) { onMessage("Your account could not be checked, so nothing was saved. Reload the page and try again."); return; }
     const read = readWorkspace(deviceStorage(), owner);
     if (!read.ok) { onMessage(read.message); return; }
-    const mine = read.workspace.plans.filter((p) => p.classSlug === classSlug);
+    // A signed-out plan an account has now is that account's, and is not offered to replace (hiddenFrom).
+    const hidden = hiddenFrom(deviceStorage(), owner, read.workspace);
+    const mine = read.workspace.plans.filter((p) => p.classSlug === classSlug && !hidden.has(p.id));
     setPlans(mine);
     pick(lastSaved ?? "", mine);
     setError(null);
