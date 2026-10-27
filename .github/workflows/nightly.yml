@@ -119,13 +119,13 @@ jobs:
           args=(--repo "${REPO}" --target "${SHA}" --prerelease --generate-notes --title "Everloot Nightly ${VERSION} (${SHA:0:7})")
           if [ -n "${PREVIOUS}" ]; then args+=(--notes-start-tag "${PREVIOUS}"); fi
           gh release create "${TAG}" "${args[@]}" dist/*
-      - name: Keep the newest 14 nightlies
+      - name: Keep the newest 5 nightlies
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
           gh release list --repo "${REPO}" --limit 200 --json tagName,createdAt \
-            --jq '[.[] | select(.tagName | startswith("nightly-"))] | sort_by(.createdAt) | reverse | .[14:][].tagName' |
+            --jq '[.[] | select(.tagName | startswith("nightly-"))] | sort_by(.createdAt) | reverse | .[5:][].tagName' |
             while read -r old; do
               gh release delete "${old}" --repo "${REPO}" --yes --cleanup-tag
             done
