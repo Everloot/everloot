@@ -315,12 +315,15 @@ test.each(["source", "destination"])("a %s changed to v3 during a character resp
   expect(posts).toHaveLength(1);
 });
 
-async function open() {
+async function readyOpener() {
   await vi.waitFor(async () => {
     await settle();
     expect(button(/^Choose plans to save to your account$/)).toBeDefined();
   }, { timeout: 5_000 });
-  await click(button(/^Choose plans to save to your account$/));
+  return button(/^Choose plans to save to your account$/)!;
+}
+async function open() {
+  await click(await readyOpener());
 }
 /** Chooses a group of plans (its checkbox) and each plan's sharing. */
 async function choose(label: string, sharing: Record<string, "private" | "shared" | "shared-name">) {
@@ -1710,8 +1713,10 @@ describe("focus with nothing to choose", () => {
   test("a panel that cannot open keeps the focus on its Cancel, as its opener goes, whether or not it can be tried again", async () => {
     delete (navigator as { locks?: unknown }).locks;
     seed(ANON, [FROST]);
+    const releaseIdentity = hold("GET /api/auth/me");
     await render();
-    button(/^Choose plans to save to your account$/)!.focus();
+    queueMicrotask(releaseIdentity);
+    (await readyOpener()).focus();
     await open();
     expect(alerts()).toContain("This browser can't move plans safely; try a current browser.");
     expect(document.activeElement).toBe(button(/^Cancel$/));
@@ -1729,7 +1734,7 @@ describe("focus with nothing to choose", () => {
     seed(ANON, [{ ...FROST, notes: "Changed", updatedAt: "2026-10-27T12:00:00.000Z" }]);
     seed(A, [{ ...FROST, boundTo: { userId: A_ID, at: AT } }]);
     await render();
-    button(/^Choose plans to save to your account$/)!.focus();
+    (await readyOpener()).focus();
     await open();
     const box = field("Save Frost to your account") as HTMLInputElement;
     expect(box.disabled).toBe(true);
