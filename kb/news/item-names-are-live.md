@@ -11,6 +11,11 @@ sources:
   - title: Database sitemap
     url: https://everloot.app/database-sitemap.xml
 status: published
+hero:
+  src: /news/heroes/item-names-are-live/item-names-are-live-clean.webp
+  alt: "Everloot illustration: a database search panel listing items with quality-colored names and Game and Wiki tags, stamped 'Names live'"
+  thumb: /news/heroes/item-names-are-live/item-names-are-live-card.webp
+  share: /news/heroes/item-names-are-live/item-names-are-live-share.png
 ---
 
 Item pages can now show names from the current game's files or the Warcraft Wiki before players have uploaded matching observations. Open {item:2589}, or browse the [item database](/database/items), to see the names alongside the information available for each item.

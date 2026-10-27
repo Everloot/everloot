@@ -8,6 +8,11 @@ tags: [news-recap, forever, community, unconfirmed]
 sources:
   - title: "Blizzard: WoW: Forever Journey, Episode 1 (YouTube)"
     url: https://www.youtube.com/watch?v=Yi4pwfhVW7g
+hero:
+  src: /news/heroes/wow-forever-journey-episode-1-norway/wow-forever-journey-episode-1-norway-clean.webp
+  alt: "Everloot illustration: a moonlit Norwegian fjord with a small cabin and an Unconfirmed tie-in stamp, with the WoW: Forever logo"
+  thumb: /news/heroes/wow-forever-journey-episode-1-norway/wow-forever-journey-episode-1-norway-card.webp
+  share: /news/heroes/wow-forever-journey-episode-1-norway/wow-forever-journey-episode-1-norway-share.png
 status: published
 ---
 
