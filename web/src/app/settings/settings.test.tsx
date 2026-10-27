@@ -22,6 +22,7 @@ let profileRow: object | null;
 
 beforeEach(() => {
   vi.stubEnv("EVERLOOT_PROFILES", "1");
+  vi.stubEnv("EVERLOOT_SAVED_BUILDS", "1");
   profileRow = { handle: "thrall", display_name: null, status_emoji: "🔥", status_text: "Raiding", status_clears_at: "2099-01-01T00:00:00+00:00",
     public_profile: true, show_characters: true, show_builds: false, show_status: true, main_character_id: THRALL, active_character_id: null };
   auth.getUser.mockReset().mockResolvedValue(USER);
@@ -85,6 +86,15 @@ test("before anything is saved: the defaults, private and with no handle", async
   expect(html).not.toContain("Keep current");
   expect(html).toContain('<option value="never" selected="">Never</option>');
   expect(html).not.toContain('href="/u/');
+});
+
+test("disabled saved builds leaves characters visible without links to unavailable pages", async () => {
+  vi.stubEnv("EVERLOOT_SAVED_BUILDS", "0");
+  const html = renderToStaticMarkup(await SettingsPage());
+  expect(html).toContain("Jaina");
+  expect(html).toContain('aria-label="Make Jaina your main"');
+  expect(html).not.toMatch(/href="\/me(?:"|\/)/);
+  expect(html).toContain('href="/account"');
 });
 
 test("storage trouble says so instead of failing the page", async () => {

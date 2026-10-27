@@ -16,7 +16,7 @@ import { ADD_FROM_COOKIE } from "@/lib/auth/device-accounts";
 import { filterTimeline, loadTimeline, TYPE_LABEL } from "@/lib/changes";
 import { postPath } from "../../../../kb/src/blue-pages";
 import { HOME_REWRITE_HEADER, profilesOn } from "@/lib/profiles";
-import { editPath, type AccountBuilds } from "@/lib/saved-builds";
+import { editPath, savedBuildsOn, type AccountBuilds } from "@/lib/saved-builds";
 import { listOwn } from "@/lib/saved-builds-store";
 
 export const dynamic = "force-dynamic";
@@ -42,10 +42,11 @@ const railLink = "block truncate rounded-control px-2 py-1 text-cell text-fg-2 h
  */
 export default async function SignedInHome({ searchParams }: { searchParams?: Promise<{ added?: string | string[] }> }) {
   if (!profilesOn()) notFound();
+  const buildsEnabled = savedBuildsOn();
   let loaded: { shell: AccountShell | null; saved: AccountBuilds };
   try {
     const found = await loadAccountShell();
-    loaded = { shell: found, saved: found ? await listOwn(found.userId) : { characters: [], builds: [] } };
+    loaded = { shell: found, saved: found && buildsEnabled ? await listOwn(found.userId) : { characters: [], builds: [] } };
   } catch {
     // Storage trouble: `/` still answers with the landing page.
     return <Landing />;
@@ -56,7 +57,7 @@ export default async function SignedInHome({ searchParams }: { searchParams?: Pr
     redirect("/");
   }
 
-  const active = shell.characters.find((c) => c.id === shell.activeCharacterId) ?? null;
+  const active = buildsEnabled ? shell.characters.find((c) => c.id === shell.activeCharacterId) ?? null : null;
   const main = shell.characters.find((c) => c.id === shell.mainCharacterId) ?? null;
   const activeBuilds = active ? saved.builds.filter((b) => b.characterId === active.id) : [];
   const facts = await describeBuilds(activeBuilds);
@@ -79,7 +80,7 @@ export default async function SignedInHome({ searchParams }: { searchParams?: Pr
             {shell.status && <p className="truncate text-meta text-fg-2">{shell.status.emoji} {shell.status.text}</p>}
           </div>
         </div>
-        <div className="flex items-center justify-between gap-2">
+        {buildsEnabled && <div className="flex items-center justify-between gap-2">
           <p className="min-w-0 text-cell">
             <span className="block text-meta text-muted">Playing</span>
             {active
@@ -87,12 +88,12 @@ export default async function SignedInHome({ searchParams }: { searchParams?: Pr
               : <Link href="/me" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Add a character</Link>}
           </p>
           <CharacterSwitch characters={shell.characters} activeId={active?.id ?? null} />
-        </div>
+        </div>}
         <nav aria-label="Home">
           <Link href="/" aria-current="page" className={`${railLink} text-fg`}>Home</Link>
           <Link href="/changes" className={railLink}>Feed</Link>
         </nav>
-        <section aria-labelledby="your-characters" className="space-y-1">
+        {buildsEnabled && <section aria-labelledby="your-characters" className="space-y-1">
           <h2 id="your-characters" className={rail}>Your characters</h2>
           {shell.characters.length === 0
             ? <p className="text-cell text-muted">None yet. <Link href="/me" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Add one</Link></p>
@@ -108,8 +109,8 @@ export default async function SignedInHome({ searchParams }: { searchParams?: Pr
                 ))}
               </ul>
             )}
-        </section>
-        <section aria-labelledby="recent-builds" className="space-y-1">
+        </section>}
+        {buildsEnabled && <section aria-labelledby="recent-builds" className="space-y-1">
           <h2 id="recent-builds" className={rail}>Recent builds</h2>
           {saved.builds.length === 0
             ? <p className="text-cell text-muted">None yet. <Link href="/tools/talents" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Plan one</Link></p>
@@ -120,7 +121,7 @@ export default async function SignedInHome({ searchParams }: { searchParams?: Pr
                 ))}
               </ul>
             )}
-        </section>
+        </section>}
       </aside>
 
       <section aria-label="Start" className="order-first min-w-0 space-y-5 lg:order-none">
@@ -141,7 +142,7 @@ export default async function SignedInHome({ searchParams }: { searchParams?: Pr
         <ul aria-label="Quick actions" className="flex flex-wrap gap-2">
           {QUICK_ACTIONS.map((a) => <li key={a.href}><Link href={a.href} className="btn min-h-9 px-3 text-sm">{a.label}</Link></li>)}
         </ul>
-        <section aria-labelledby="active-builds" className="space-y-2">
+        {buildsEnabled && <section aria-labelledby="active-builds" className="space-y-2">
           <h2 id="active-builds" className="text-cell font-semibold text-fg">
             {active ? <>Builds for <span className={CLASS_TEXT[active.classSlug] ?? ""}>{active.name}</span></> : "Your builds"}
           </h2>
@@ -155,7 +156,7 @@ export default async function SignedInHome({ searchParams }: { searchParams?: Pr
           ) : (
             <BuildsTable builds={activeBuilds} facts={facts} caption={`Builds for ${active.name}`} onCharacterPage />
           )}
-        </section>
+        </section>}
       </section>
 
       <aside aria-label="Latest from Forever" className="space-y-5">

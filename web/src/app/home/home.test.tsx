@@ -42,6 +42,7 @@ let profileRow: object | null;
 
 beforeEach(() => {
   vi.stubEnv("EVERLOOT_PROFILES", "1");
+  vi.stubEnv("EVERLOOT_SAVED_BUILDS", "1");
   request.headers = new Headers();
   request.cookies = {};
   profileRow = { handle: "thrall", display_name: "Go'el", status_emoji: "🔥", status_text: "Raiding", status_clears_at: null, public_profile: false,
@@ -103,6 +104,19 @@ test("the three columns: the player, the Ask box and the active character's buil
   expect(html).not.toContain("Entry 6");
   // Never the BattleTag.
   expect(html).not.toContain("Thrall#1234");
+});
+
+test("disabled saved builds keeps Home useful without character or build navigation", async () => {
+  vi.stubEnv("EVERLOOT_SAVED_BUILDS", "0");
+  const html = renderToStaticMarkup(await SignedInHome({}));
+  expect(html).toContain("Hello, Go&#x27;el!");
+  expect(html).toContain('aria-label="Ask anything"');
+  expect(html).toContain("Latest from Forever");
+  expect(html).not.toMatch(/href="\/me(?:"|\/)/);
+  expect(html).not.toContain("Recent builds");
+  expect(html).not.toContain('id="active-builds"');
+  expect(html).not.toContain('name="character"');
+  expect(auth.authQuery.mock.calls.some(([path]) => path.startsWith("saved_builds"))).toBe(false);
 });
 
 test("the Ask box hands the question and the active character to Chat", async () => {
