@@ -12,6 +12,8 @@ import { dataAgeLabel } from "@/lib/data-age";
 import { classAndProfessionIcons, loadSiteAssets } from "@/lib/game-assets";
 import GameIcon from "@/components/game/GameIcon";
 import { trailFor } from "@/lib/breadcrumbs";
+import { classContextParams, parseClassContext, withClassContext, withoutClassContext } from "@/lib/class-context";
+import ClassContextChip from "@/components/classes/ClassContextChip";
 import { Card, Container, Contribute, Disclosure, EmptyState, Field, PageHeader, SectionHeading } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -36,10 +38,14 @@ function skill(value: string, fallback: number): number {
 
 export default async function ProfessionsPage(
   props: {
-    searchParams: Promise<{ profession?: string | string[]; from?: string | string[]; to?: string | string[] }>;
+    searchParams: Promise<{ profession?: string | string[]; from?: string | string[]; to?: string | string[]; class?: string | string[]; level?: string | string[]; role?: string | string[] }>;
   }
 ) {
   const searchParams = await props.searchParams;
+  // A class context from a class hub is navigation only: the chip leads back to the hub, the profession links and
+  // the form keep it, and nothing on the page changes with the class.
+  const read = parseClassContext(searchParams);
+  const context = read.ok ? read.context : null;
   const profession = one(searchParams.profession).trim() || "Alchemy";
   const fromSkill = skill(one(searchParams.from), 1);
   const toSkill = skill(one(searchParams.to), 75);
@@ -72,6 +78,7 @@ export default async function ProfessionsPage(
             <span>{dataAgeLabel(corpus.dataAsOf)}</span>
           </>}
       />
+      <ClassContextChip read={read} here={withoutClassContext("/tools/professions", searchParams)} className="-mt-2 mb-6" />
 
       <div className="space-y-8">
         <section aria-labelledby="prof-path" className="space-y-4">
@@ -83,7 +90,7 @@ export default async function ProfessionsPage(
                 return (
                   <Link
                     key={p.key}
-                    href={`/tools/professions?profession=${encodeURIComponent(p.key)}&from=${fromSkill}&to=${toSkill}`}
+                    href={withClassContext(`/tools/professions?profession=${encodeURIComponent(p.key)}&from=${fromSkill}&to=${toSkill}`, context)}
                     aria-current={current ? "page" : undefined}
                     className={`inline-flex min-h-11 items-center gap-2 rounded-control border px-3 text-sm ${current ? "border-accent text-fg" : "border-line text-fg-2 hover:border-accent hover:text-fg"}`}
                   >
@@ -96,6 +103,7 @@ export default async function ProfessionsPage(
           )}
           <Card>
             <form method="get" className="space-y-4">
+              {context && classContextParams(context).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
               <div className="grid gap-3 sm:grid-cols-3">
                 <Field label="Profession" name="profession" defaultValue={profession} />
                 <Field label="From skill" name="from" defaultValue={fromSkill} inputMode="numeric" mono />
