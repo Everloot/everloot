@@ -86,15 +86,18 @@ describe("the bridge command, started as a real process", () => {
   /** Runs `bridge` until the slot addon holds all three answers (or it exits), then stops it; returns what it said and wrote. */
   async function bridge(d: string, token: string) {
     const out = { stdout: "", stderr: "", code: null as number | null };
+    let didExit = false;
     const child = spawn(process.execPath, [join(root, "node_modules", "tsx", "dist", "cli.mjs"), join(root, "src", "cli.ts"), "bridge", "--game", d, "--mcp", `${site.endpoint}/mcp`, "--token-file", token, "--endpoint", site.endpoint, "--state", join(d, "sent.json")], { cwd: root });
     child.stdout.on("data", (b) => { out.stdout += b; });
     child.stderr.on("data", (b) => { out.stderr += b; });
-    const exited = new Promise<void>((resolve) => child.on("exit", (code) => { out.code = code; resolve(); }));
+    const exited = new Promise<void>((resolve) => child.on("exit", (code) => { didExit = true; out.code = code; resolve(); }));
     const answers = join(d, "Interface", "AddOns", "EverlootAnswers", "EverlootAnswers.lua");
     const deadline = Date.now() + 40_000;
-    while (out.code === null && Date.now() < deadline && !(existsSync(answers) && readFileSync(answers, "utf8").includes('["ask:3"]'))) await new Promise((r) => setTimeout(r, 100));
-    if (out.code === null) { child.kill(); await exited; }
-    return { ...out, lua: existsSync(answers) ? readFileSync(answers, "utf8") : "" };
+    while (!didExit && Date.now() < deadline && !(existsSync(answers) && readFileSync(answers, "utf8").includes('["ask:3"]'))) await new Promise((r) => setTimeout(r, 100));
+    // Capture liveness before our own cleanup: tsx reports SIGTERM differently across operating systems.
+    const running = !didExit;
+    if (running) { child.kill(); await exited; }
+    return { ...out, running, lua: existsSync(answers) ? readFileSync(answers, "utf8") : "" };
   }
   const tokenIn = (d: string) => { const t = join(d, "token.txt"); writeFileSync(t, "private-token\n"); return t; };
 
@@ -108,7 +111,7 @@ describe("the bridge command, started as a real process", () => {
     expect(site.since(from)).toContain("/mcp tools/call market_value");
     // The price is the market's alone, and it carries the private token the bridge was started with.
     expect(site.seen.slice(from).filter((s) => s.path === "/mcp").every((s) => s.auth === "Bearer private-token")).toBe(true);
-    expect(run.code).toBeNull();
+    expect(run.running).toBe(true);
   }, 60_000);
 
   test.each(configs.slice(1))("still names the provider problem, and does not search, for a question that needs a provider: %s", async (_name, config) => {
@@ -125,6 +128,7 @@ describe("the bridge command, started as a real process", () => {
     const d = game(null);
     const from = site.seen.length;
     const run = await bridge(d, join(d, "gone.txt"));
+    expect(run.running).toBe(false);
     expect(run.code).toBe(1);
     expect(run.stderr).toMatch(/ENOENT|gone\.txt/);
     expect(site.since(from)).toEqual([]);
