@@ -84,9 +84,22 @@ export interface AltInput {
   notes: string;
   /** Plans of this bucket the alt uses. */
   planIds: string[];
+  /** For an edit, the alt as the edit began: a change made to it since, in another tab, is not written over. */
+  base?: LocalAlt | null;
 }
 
-export type AltResult = { ok: true; workspace: PlayerWorkspace; alt: LocalAlt } | Failure;
+/** The fields of an alt that a change elsewhere can touch, in the order an alt holds them. */
+export const ALT_FIELDS = ["name", "realm", "classSlug", "faction", "level", "professions", "notes", "planIds", "provenance"] as const;
+export type AltField = (typeof ALT_FIELDS)[number];
+
+/** How the pages name an alt's fields. */
+export const FIELD_WORDS: Record<AltField, string> = {
+  name: "name", realm: "realm", classSlug: "class", faction: "faction", level: "level", professions: "professions",
+  notes: "notes", planIds: "plans", provenance: "record of where its details came from",
+};
+
+/** A refused edit of an alt changed elsewhere carries the alt as it is now and what changed. */
+export type AltResult = { ok: true; workspace: PlayerWorkspace; alt: LocalAlt } | (Failure & { current?: LocalAlt; changed?: AltField[] });
 
 const invalid = (message: string) => altFailure("invalid", message);
 
@@ -117,15 +130,25 @@ function details(input: AltInput): Omit<LocalAlt, "id" | "provenance" | "updated
 
 /**
  * A new alt, or with `input.id` that alt changed in place. It keeps how it came; a detail the player changes from
- * a file's value is the player's from then on, so a later file does not change it back.
+ * a file's value is the player's from then on, so a later file does not change it back. An edit made against an
+ * older copy (`input.base`) than the one stored now is refused whole, with what changed, so nothing set in another
+ * tab is written over.
  */
 export function saveAlt(storage: DeviceStorage | null, owner: Owner, input: AltInput, now = new Date()): AltResult {
   const fields = details(input);
   if ("error" in fields) return fields;
   let saved: LocalAlt | undefined;
+  let conflict: (Failure & { current: LocalAlt; changed: AltField[] }) | undefined;
   const result = changeAlts(storage, owner, (workspace) => {
     const old = input.id ? workspace.alts.find((a) => a.id === input.id) : undefined;
     if (input.id && !old) return altFailure("missing");
+    const base = input.base;
+    const changed = old && base ? ALT_FIELDS.filter((k) => JSON.stringify(old[k]) !== JSON.stringify(base[k])) : [];
+    if (old && changed.length > 0) {
+      const words = listOf(changed.map((k) => FIELD_WORDS[k]));
+      conflict = { ...altFailure("changed", `${old.name} was changed somewhere else while you were editing it (its ${words}), so nothing was saved.`), current: old, changed };
+      return conflict;
+    }
     if (!fields.planIds.every((id) => workspace.plans.some((p) => p.id === id))) {
       return invalid("A plan chosen for this alt is no longer on this device. It may have been deleted in another tab.");
     }
@@ -141,7 +164,7 @@ export function saveAlt(storage: DeviceStorage | null, owner: Owner, input: AltI
     saved = alt;
     return { ...workspace, alts: old ? workspace.alts.map((a) => (a.id === alt.id ? alt : a)) : [...workspace.alts, alt] };
   });
-  return result.ok ? { ...result, alt: saved! } : result;
+  return result.ok ? { ...result, alt: saved! } : conflict ?? result;
 }
 
 /** Deletes an alt. Its plans stay. */
@@ -153,12 +176,6 @@ export function deleteAlt(storage: DeviceStorage | null, owner: Owner, id: strin
 
 /** "a", "a and b", "a, b and c". */
 export const listOf = (items: string[]) => (items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`);
-
-/** What a restore's preview names of each alt that changes, in the order an alt holds them. */
-const RESTORED: Partial<Record<keyof LocalAlt, string>> = {
-  name: "name", realm: "realm", classSlug: "class", faction: "faction", level: "level", professions: "professions",
-  notes: "notes", planIds: "plans", provenance: "record of where its details came from",
-};
 
 /**
  * What restoring a backup (previewImport) does to this device's alts, alt by alt: each it adds, saying so when the
@@ -176,8 +193,8 @@ export function restoreLines(current: PlayerWorkspace, preview: ImportPreview): 
       adds.push(`Adds ${altLabel(alt)}.${twin ? ` ${altLabel(twin)} is already here as another alt, so it would be here twice.` : ""}`);
       continue;
     }
-    const changed = (Object.keys(RESTORED) as Array<keyof LocalAlt>).filter((k) => JSON.stringify(mine[k]) !== JSON.stringify(alt[k]));
-    if (changed.length > 0) replaces.push(`Replaces ${altLabel(mine)} with the backup's newer copy, which changes its ${listOf(changed.map((k) => RESTORED[k]!))}.`);
+    const changed = ALT_FIELDS.filter((k) => JSON.stringify(mine[k]) !== JSON.stringify(alt[k]));
+    if (changed.length > 0) replaces.push(`Replaces ${altLabel(mine)} with the backup's newer copy, which changes its ${listOf(changed.map((k) => FIELD_WORDS[k]))}.`);
   }
   return [...adds, ...replaces];
 }

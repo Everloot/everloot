@@ -177,6 +177,27 @@ describe("adding and editing by hand", () => {
     expect(saveAlt(storage, ANON, input({ id: jaina.id, name: "Jaina", realm: "Moon Guard", level: 12 }), LATER).ok).toBe(true);
   });
 
+  test("an edit begun before the alt changed elsewhere is refused, names what changed, and stores nothing", () => {
+    const storage = memory();
+    const base = added(storage, ANON, { name: "Thrall", realm: "Moon Guard", notes: "Original" });
+    // Another tab changes the notes while this edit is open.
+    expect(saveAlt(storage, ANON, input({ id: base.id, name: "Thrall", realm: "Moon Guard", notes: "From tab B" }), LATER).ok).toBe(true);
+    const before = storage.items.get(bucketKey(ANON));
+    const stale = saveAlt(storage, ANON, input({ id: base.id, name: "Thrall", realm: "Moon Guard", notes: "Original", level: 31, base }), LATER);
+    expect(stale).toMatchObject({ ok: false, error: "changed", changed: ["notes"], current: { id: base.id, notes: "From tab B", level: null } });
+    expect(!stale.ok && stale.message).toContain("notes");
+    expect(storage.items.get(bucketKey(ANON))).toBe(before);
+  });
+
+  test("an edit against the alt as stored now saves, and a change elsewhere to the time alone is not a conflict", () => {
+    const storage = memory();
+    const base = added(storage, ANON, { name: "Thrall", notes: "Original" });
+    const touched = saveAlt(storage, ANON, input({ id: base.id, name: "Thrall", notes: "Original" }), LATER);
+    expect(touched.ok && touched.alt.updatedAt).toBe(LATER.toISOString());
+    const edit = saveAlt(storage, ANON, input({ id: base.id, name: "Thrall", notes: "Original", level: 31, base }), LATER);
+    expect(edit).toMatchObject({ ok: true, alt: { level: 31, notes: "Original" } });
+  });
+
   test("deleting an alt removes only that alt; its plans stay, and are free to delete after", () => {
     const storage = memory();
     const frost = planIn(storage, ANON);

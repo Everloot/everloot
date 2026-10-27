@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Card, Field, SectionHeading } from "@/components/ui";
 import { useWorkspaceOwner } from "@/components/workspace/LocalPlanSave";
-import { DETAIL_WORDS, altFailure, deleteAlt, detailsLine, listOf, restoreLines, saveAlt, type AltInput } from "@/lib/alt-workspace";
+import {
+  DETAIL_WORDS, FIELD_WORDS, altFailure, deleteAlt, detailsLine, listOf, restoreLines, saveAlt, type AltField, type AltInput,
+} from "@/lib/alt-workspace";
 import {
   ALT_PROFESSIONS, BACKUP_TOO_LARGE, WORKSPACE_LIMITS, applyImport, bucketKey, deviceStorage, exportBackup, previewImport, readWorkspace,
   type Failure, type ImportPreview, type LocalAlt, type LocalPlan, type Owner, type ReadResult,
@@ -107,7 +109,7 @@ function Bucket({ owner }: { owner: Owner }) {
         <SectionHeading id="alts-add" note="A name is all an alt needs. Leave out what you do not know: nothing is filled in for you.">Add an alt</SectionHeading>
         <AltForm label="Add an alt" alt={null} plans={plans} submit="Add alt" onSave={(input) => {
           const result = saveAlt(storage, owner, input);
-          if (!result.ok) return result.message;
+          if (!result.ok) return { message: result.message };
           after(result, `Added "${result.alt.name}" to this device.`);
           return null;
         }} />
@@ -131,7 +133,9 @@ function Bucket({ owner }: { owner: Owner }) {
                   if (result.ok) { after(result, `Saved "${result.alt.name}".`); return null; }
                   // An alt deleted in another tab leaves the list, and its form with it: say so above the list.
                   if (result.error === "missing") { after(result, ""); return null; }
-                  return result.message;
+                  // Changed in another tab: the list shows it as it is now, and the form says what changed.
+                  if (result.current) reload();
+                  return { message: result.message, current: result.current, changed: result.changed };
                 }}
                 onBackup={() => { const problem = download(); setMessage(problem ? { text: problem, alert: true } : null); }}
                 onDelete={() => after(deleteAlt(storage, owner, alt.id), `Deleted "${alt.name}" from this device.`)}
@@ -152,6 +156,40 @@ const formOf = (alt: LocalAlt): FormState => ({
   level: alt.level === null ? "" : String(alt.level), professions: alt.professions, notes: alt.notes, planIds: alt.planIds,
 });
 const toggled = (list: string[], value: string, on: boolean) => (on ? [...list, value] : list.filter((v) => v !== value));
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+/** Why a save did not happen; for an alt changed in another tab, the alt as it is now and what changed. */
+type SaveProblem = { message: string; current?: LocalAlt; changed?: AltField[] } | null;
+
+/** A form field's value as the conflict lines show it. */
+function shownValue(field: keyof FormState, value: string | string[], plans: LocalPlan[]): string {
+  if (Array.isArray(value)) {
+    const names = field === "planIds" ? value.map((id) => plans.find((p) => p.id === id)?.name ?? "a plan no longer here") : value;
+    return names.length > 0 ? listOf(names) : "none";
+  }
+  if (value === "") return field === "notes" ? "empty" : "not set";
+  return field === "classSlug" || field === "faction" ? titleCase(value) : field === "level" ? value : `“${value}”`;
+}
+
+/**
+ * After a change elsewhere, the form with that change taken in wherever the player left the field as it was, and the
+ * player's value kept wherever they changed it too; and a line for each changed field saying which.
+ */
+function reconcile(form: FormState, was: FormState, now: FormState, changed: AltField[], plans: LocalPlan[]): { form: FormState; lines: string[] } {
+  const next = { ...form };
+  const lines: string[] = [];
+  for (const field of changed) {
+    const word = titleCase(FIELD_WORDS[field]);
+    if (field === "provenance") { lines.push(`${word}: updated, as the details it covers came in elsewhere.`); continue; }
+    if (same(form[field], was[field])) {
+      Object.assign(next, { [field]: now[field] });
+      lines.push(`${word}: now ${shownValue(field, now[field], plans)}.`);
+    } else {
+      lines.push(`${word}: you set ${shownValue(field, form[field], plans)} here; it is now ${shownValue(field, now[field], plans)}. Yours is kept in the form.`);
+    }
+  }
+  return { form: next, lines };
+}
 
 /** An alt's details as a form. The checks are the workspace's, said in the form, so a browser's own checks are off. */
 function AltForm({ label, alt, plans, submit, onSave, onCancel }: {
@@ -159,21 +197,30 @@ function AltForm({ label, alt, plans, submit, onSave, onCancel }: {
   alt: LocalAlt | null;
   plans: LocalPlan[];
   submit: string;
-  /** Null when it saved, else why not. */
-  onSave: (input: AltInput) => string | null;
+  onSave: (input: AltInput) => SaveProblem;
   onCancel?: () => void;
 }) {
   const [form, setForm] = useState<FormState>(alt ? formOf(alt) : BLANK);
-  const [error, setError] = useState<string | null>(null);
+  // The alt as this edit began, or as it was found when a save met a change from elsewhere: the next save is checked
+  // against it, so what another tab saved since is never written over unseen.
+  const [base, setBase] = useState<LocalAlt | null>(alt);
+  const [error, setError] = useState<string[] | null>(null);
 
   function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const level = form.level.trim();
     const problem = onSave({
       id: alt?.id ?? null, name: form.name, realm: form.realm, classSlug: form.classSlug || null, faction: form.faction || null,
-      level: level === "" ? null : Number(level), professions: form.professions, notes: form.notes, planIds: form.planIds,
+      level: level === "" ? null : Number(level), professions: form.professions, notes: form.notes, planIds: form.planIds, base,
     });
-    setError(problem);
+    if (problem?.current && problem.changed && base) {
+      const merged = reconcile(form, formOf(base), formOf(problem.current), problem.changed, plans);
+      setForm(merged.form);
+      setBase(problem.current);
+      setError([`${base.name} was changed somewhere else while you were editing it, so nothing was saved yet.`, ...merged.lines, "Check the form, then save again."]);
+      return;
+    }
+    setError(problem ? [problem.message] : null);
     if (!problem && !alt) setForm(BLANK);
   }
 
@@ -233,7 +280,7 @@ function AltForm({ label, alt, plans, submit, onSave, onCancel }: {
         <button type="submit" className="btn btn-primary text-sm">{submit}</button>
         {onCancel && <button type="button" className="btn text-sm" onClick={onCancel}>Cancel</button>}
       </div>
-      {error && <p role="alert" className="text-sm text-danger sm:col-span-2">{error}</p>}
+      {error && <div role="alert" className="space-y-1 text-sm text-danger sm:col-span-2">{error.map((line) => <p key={line}>{line}</p>)}</div>}
     </form>
   );
 }
@@ -241,7 +288,7 @@ function AltForm({ label, alt, plans, submit, onSave, onCancel }: {
 function AltItem({ alt, plans, onSave, onBackup, onDelete }: {
   alt: LocalAlt;
   plans: LocalPlan[];
-  onSave: (input: AltInput) => string | null;
+  onSave: (input: AltInput) => SaveProblem;
   onBackup: () => void;
   onDelete: () => void;
 }) {

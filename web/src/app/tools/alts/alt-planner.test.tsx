@@ -186,6 +186,60 @@ test("Edit changes an alt's details in place and keeps the rest", async () => {
   expect(item("Thrall")?.textContent).toContain("Level 31");
 });
 
+/** Another tab's change to the stored alts, and the storage event this tab hears for it. */
+async function changeInAnotherTab(change: (doc: PlayerWorkspace) => void) {
+  const doc = stored(ANON)!;
+  change(doc);
+  const text = JSON.stringify(doc);
+  localStorage.setItem(bucketKey(ANON), text);
+  await act(async () => { window.dispatchEvent(new StorageEvent("storage", { key: bucketKey(ANON), newValue: text, storageArea: localStorage })); });
+  await settle();
+}
+
+test("an edit left open while another tab changes the alt's notes does not write the old notes back (reported case)", async () => {
+  seed(ANON, [], [alt({ notes: "original notes" })]);
+  await render();
+  await click(button(/^Edit$/, item("Thrall")!));
+  const form = container.querySelector<HTMLFormElement>('form[aria-label="Edit Thrall"]')!;
+  await type(form.querySelector<HTMLInputElement>('input[type="number"]'), "31");
+  await changeInAnotherTab((doc) => { doc.alts[0].notes = "new notes saved in tab B"; doc.alts[0].updatedAt = "2026-10-27T12:00:00.000Z"; });
+  expect(text()).toContain("new notes saved in tab B");
+  await click(button(/^Save$/, form));
+  expect(stored(ANON)?.alts[0].notes).toBe("new notes saved in tab B");
+});
+
+test("that save is refused with what changed; the form keeps the player's change and takes the other, and saving again keeps both", async () => {
+  seed(ANON, [], [alt({ notes: "original notes" })]);
+  await render();
+  await click(button(/^Edit$/, item("Thrall")!));
+  const form = container.querySelector<HTMLFormElement>('form[aria-label="Edit Thrall"]')!;
+  await type(field("Level", form), "31");
+  await changeInAnotherTab((doc) => { doc.alts[0].notes = "new notes saved in tab B"; doc.alts[0].updatedAt = "2026-10-27T12:00:00.000Z"; });
+  await click(button(/^Save$/, form));
+  expect(stored(ANON)?.alts[0]).toMatchObject({ level: 24, notes: "new notes saved in tab B" });
+  expect(form.querySelector('[role="alert"]')?.textContent).toContain("changed somewhere else while you were editing it");
+  expect(form.querySelector('[role="alert"]')?.textContent).toContain("Notes: now “new notes saved in tab B”");
+  expect(field("Level", form)?.value).toBe("31");
+  expect(field("Notes", form)?.value).toBe("new notes saved in tab B");
+  await click(button(/^Save$/, form));
+  expect(stored(ANON)?.alts[0]).toMatchObject({ level: 31, notes: "new notes saved in tab B" });
+});
+
+test("when both tabs changed the same detail, the player's value stays in the form and the other one is named", async () => {
+  seed(ANON, [], [alt({ level: 24 })]);
+  await render();
+  await click(button(/^Edit$/, item("Thrall")!));
+  const form = container.querySelector<HTMLFormElement>('form[aria-label="Edit Thrall"]')!;
+  await type(field("Level", form), "31");
+  await changeInAnotherTab((doc) => { doc.alts[0].level = 30; });
+  await click(button(/^Save$/, form));
+  expect(stored(ANON)?.alts[0].level).toBe(30);
+  expect(form.querySelector('[role="alert"]')?.textContent).toContain("Level: you set 31 here; it is now 30");
+  expect(field("Level", form)?.value).toBe("31");
+  await click(button(/^Save$/, form));
+  expect(stored(ANON)?.alts[0].level).toBe(31);
+});
+
 test("Delete asks first and offers a backup holding the alt; Delete for good removes only that alt, and its plans stay", async () => {
   seed(ANON, [plan()], [alt({ planIds: [id(1)] }), alt({ id: id(501), name: "Jaina", classSlug: "mage" })]);
   await render();
