@@ -1,4 +1,4 @@
-import { add, canAdd, nodeMap, rankOf, refusalText } from "./rules";
+import { add, canAdd, nodeMap, pointsSpent, rankOf, refusalText } from "./rules";
 import type { Ranks, TalentCatalog } from "./types";
 
 // Share code, the same one the addon writes (feat/addon-talents, PR #24):
@@ -158,4 +158,75 @@ export function resolveBuild(catalog: TalentCatalog, shared: SharedBuild): Resol
 function whyRefused(catalog: TalentCatalog, ranks: Ranks, id: number): string {
   const node = nodeMap(catalog).get(id)!;
   return refusalText(canAdd(catalog, ranks, id, Infinity).reason ?? "gate", node, catalog, ranks);
+}
+
+// Spend order token. It travels next to a share code, never inside it, so an EL1 code stays byte for
+// byte what it was:
+//
+//   O1<mode>-<sequence>
+//
+//   mode      p when a player planned the order, g when a tool generated a provisional one. Only the
+//             token says which; where the token came from never does.
+//   sequence  one base64url character per point, in spend order. Each names a node by its place among
+//             the code's nodes in ascending id order: A the lowest id, B the next, _ the 64th.
+//
+// At most 64 points, which also keeps the nodes to 64: a limit of the transport, not of the game.
+
+export const ORDER_VERSION = 1;
+export const ORDER_LIMIT = 64;
+const ORDER_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+export type OrderOrigin = "player" | "generated";
+const MODE: Record<OrderOrigin, string> = { player: "p", generated: "g" };
+const ORIGIN: Record<string, OrderOrigin | undefined> = { p: "player", g: "generated" };
+
+export type OrderError = "malformed" | "newer-version" | "unsupported-mode" | "over-limit" | "extra-points" | "missing-points";
+
+/** `order` is node ids, one per point, in the order they are spent. */
+export type DecodedOrder = { ok: true; origin: OrderOrigin; order: number[] } | { ok: false; error: OrderError };
+
+/** The nodes a sequence indexes: those with points, by ascending id, as the site writes them. */
+const orderNodes = (ranks: Ranks) =>
+  Object.entries(ranks).filter(([, r]) => r.rank > 0).map(([id]) => Number(id)).sort((a, b) => a - b);
+
+/** The token for an order, or null unless it names every point of `ranks` exactly once, 64 at most. */
+export function encodeOrder(ranks: Ranks, order: number[], origin: OrderOrigin): string | null {
+  if (order.length === 0 || order.length > ORDER_LIMIT || order.length !== pointsSpent(ranks)) return null;
+  const nodes = orderNodes(ranks);
+  const left = new Map(nodes.map((id) => [id, ranks[id].rank]));
+  let sequence = "";
+  for (const id of order) {
+    const points = left.get(id);
+    if (!points) return null;
+    left.set(id, points - 1);
+    sequence += ORDER_ALPHABET[nodes.indexOf(id)];
+  }
+  return `O${ORDER_VERSION}${MODE[origin]}-${sequence}`;
+}
+
+/** Read a token against the ranks of the code it came with. A failure leaves the ranks as they are;
+ *  only the order is unknown. */
+export function decodeOrder(token: string, ranks: Ranks): DecodedOrder {
+  const trimmed = token.trim();
+  const version = /^O([1-9]\d*)/.exec(trimmed);
+  if (!version) return { ok: false, error: "malformed" };
+  // A newer token may change everything after its version; say so rather than guess.
+  if (Number(version[1]) > ORDER_VERSION) return { ok: false, error: "newer-version" };
+  const m = /^([a-z])-([A-Za-z0-9_-]+)$/.exec(trimmed.slice(version[0].length));
+  if (!m) return { ok: false, error: "malformed" };
+  const origin = ORIGIN[m[1]];
+  if (!origin) return { ok: false, error: "unsupported-mode" };
+  const total = pointsSpent(ranks);
+  if (m[2].length > ORDER_LIMIT || total > ORDER_LIMIT) return { ok: false, error: "over-limit" };
+  const nodes = orderNodes(ranks);
+  const left = new Map(nodes.map((id) => [id, ranks[id].rank]));
+  const order: number[] = [];
+  for (const char of m[2]) {
+    const id = nodes[ORDER_ALPHABET.indexOf(char)];
+    const points = left.get(id);
+    if (!points) return { ok: false, error: "extra-points" };
+    left.set(id, points - 1);
+    order.push(id);
+  }
+  return order.length < total ? { ok: false, error: "missing-points" } : { ok: true, origin, order };
 }

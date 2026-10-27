@@ -1,7 +1,8 @@
 import { describe, expect, test } from "vitest";
 import { fixture } from "./fixture";
-import { importCode } from "./import";
-import { SHARE_VERSION, decodeBuild, encodeBuild, resolveBuild } from "./share";
+import { extractCode, importCode, planHash, readPlanHash } from "./import";
+import { SHARE_VERSION, decodeBuild, encodeBuild, encodeOrder, resolveBuild } from "./share";
+import { previewPath, readPathCodes } from "./summary";
 import type { Ranks, TalentCatalog } from "./types";
 
 const ranks: Ranks = { 11: { rank: 5 }, 12: { rank: 5 }, 21: { rank: 2 }, 32: { rank: 1, choice: 1 } };
@@ -157,5 +158,118 @@ describe("importCode", () => {
     expect(importCode(fixture, "")).toEqual({ ok: false, message: "Paste a share code or a link first." });
     expect(importCode(fixture, "???")).toMatchObject({ ok: false, message: expect.stringContaining("not a share code") });
     expect(importCode(fixture, encodeBuild({ ...shared, classSlug: "druid" }))).toMatchObject({ ok: false, message: expect.stringContaining("different class") });
+  });
+});
+
+describe("plan links", () => {
+  // The addon's own examples (addon/tests/fixtures/EverlootBuilds.lua), and an order for each.
+  const first = "EL1-mage-1482-1.60.1.70450-OTAwMDE6Miw5MDAwMjoxOjEsOTAwMDQ6Mg";
+  const second = "EL1-mage-0-1.60.1.70450-MToxLDI6MQ";
+  const firstOrder = "O1p-AABCC";
+  const secondOrder = "O1g-AB";
+  const page = "https://everloot.app/tools/talents/mage";
+
+  test("a link made before spend orders reads as it always has, with no order", () => {
+    expect(readPlanHash(`#plan=${first}`)).toEqual({ first, second: null, firstOrder: null, secondOrder: null });
+    expect(readPlanHash(`#plan=${first}&plan2=${second}`)).toEqual({ first, second, firstOrder: null, secondOrder: null });
+    expect(readPlanHash(`#plan2=${second}`)).toEqual({ first: null, second, firstOrder: null, secondOrder: null });
+    expect(readPlanHash("")).toEqual({ first: null, second: null, firstOrder: null, secondOrder: null });
+  });
+
+  test("the address of one or both sets is byte-identical when no order rides with it", () => {
+    expect(planHash(first, second)).toBe(`#plan=${first}&plan2=${second}`);
+    expect(planHash(first, null)).toBe(`#plan=${first}`);
+    expect(planHash(null, second)).toBe(`#plan2=${second}`);
+    expect(planHash(null, null)).toBe("");
+    expect(planHash(first, second, null, null)).toBe(`#plan=${first}&plan2=${second}`);
+  });
+
+  test("each set's order rides after both codes, and both sets and both orders read back", () => {
+    const hash = planHash(first, second, firstOrder, secondOrder);
+    expect(hash).toBe(`#plan=${first}&plan2=${second}&order=${firstOrder}&order2=${secondOrder}`);
+    expect(readPlanHash(hash)).toEqual({ first, second, firstOrder, secondOrder });
+    expect(readPlanHash(planHash(first, second, null, secondOrder))).toEqual({ first, second, firstOrder: null, secondOrder });
+    // An order without its set has nothing to order.
+    expect(planHash(null, second, firstOrder, secondOrder)).toBe(`#plan2=${second}&order2=${secondOrder}`);
+    expect(planHash(first, null, firstOrder, secondOrder)).toBe(`#plan=${first}&order=${firstOrder}`);
+  });
+
+  test("old readers stop at & and ignore the order: the site's reader so far and the addon's", () => {
+    const link = `${page}#plan=${first}&plan2=${second}&order=${firstOrder}&order2=${secondOrder}`;
+    // The site's reader until now; the MCP server reads links with extractCode.
+    expect(/[#&]plan=([A-Za-z0-9_.-]+)/.exec(link)?.[1]).toBe(first);
+    expect(/[#&]plan2=([A-Za-z0-9_.-]+)/.exec(link)?.[1]).toBe(second);
+    expect(extractCode(link)).toBe(first);
+    // The addon's planner reads #plan=([^&]+), or #plan2=([^&]+) when the first set is empty.
+    expect(/^https?:\/\/[^/]+\/tools\/talents\/[A-Za-z]+[^#]*#plan=([^&]+)/.exec(link)?.[1]).toBe(first);
+    const secondOnly = `${page}#plan2=${second}&order2=${secondOrder}`;
+    expect(/^https?:\/\/[^/]+\/tools\/talents\/[A-Za-z]+[^#]*#plan2=([^&]+)/.exec(secondOnly)?.[1]).toBe(second);
+    // Pasted into the calculator, the new link loads what the old one did.
+    expect(importCode(fixture, link)).toEqual(importCode(fixture, `${page}${planHash(first, second)}`));
+  });
+
+  test("a build link's two sets survive the move from its /b/ path to the page's fragment", () => {
+    const path = previewPath("mage", first, second)!;
+    expect(path).toBe(`/tools/talents/mage/b/${first}/${second}`);
+    const read = readPathCodes(fixture, path.split("/b/")[1].split("/"))!;
+    expect(readPlanHash(planHash(read.first, read.second))).toEqual({ first, second, firstOrder: null, secondOrder: null });
+  });
+});
+
+describe("importCode with a spend order", () => {
+  const code = encodeBuild(shared);
+  const order = [11, 12, 11, 12, 11, 12, 11, 12, 11, 12, 21, 21, 32];
+  const plain = importCode(fixture, code);
+
+  test("without an order the answer is the one it was before orders", () => {
+    expect(plain).not.toHaveProperty("order");
+    expect(importCode(fixture, code, null)).toEqual(plain);
+  });
+
+  test("an order that matches the code loads with the talents and says who made it", () => {
+    const result = importCode(fixture, code, encodeOrder(ranks, order, "player"));
+    expect(result).toEqual({ ...plain, order: { known: true, origin: "player", order } });
+    expect(result.ok && result.report.problems).toEqual([]);
+  });
+
+  test("an unsupported, mismatched, newer or damaged order keeps the talents and reports the order unknown", () => {
+    const cases: [string, string, string][] = [
+      ["O1x-ABABABABABCCD", "unsupported-mode", "The plan's spend order is of a kind this tool does not read, so the order is unknown. The talents still loaded."],
+      ["O2p-ABABABABABCCD", "newer-version", "The plan's spend order was made by a newer version of this tool, so the order is unknown. Reload the page to read it. The talents still loaded."],
+      ["O1p-ABABABABABCCDD", "extra-points", "The plan's spend order lists points the code does not have, so the order is unknown. The talents still loaded."],
+      ["O1p-ABABABABABCD", "missing-points", "The plan's spend order leaves out points the code has, so the order is unknown. The talents still loaded."],
+      [`O1p-${"A".repeat(65)}`, "over-limit", "The plan's spend order is for more than 64 points, the most an order carries, so the order is unknown. The talents still loaded."],
+      ["O1p-", "malformed", "The plan's spend order is damaged, so the order is unknown. The talents still loaded."],
+    ];
+    if (!plain.ok) throw new Error("expected ok");
+    for (const [token, reason, message] of cases) {
+      const result = importCode(fixture, code, token);
+      if (!result.ok) throw new Error(`expected ok for ${token}`);
+      expect(result.ranks, token).toEqual(plain.ranks);
+      expect(result.minLevel, token).toBe(plain.minLevel);
+      expect(result.order, token).toEqual({ known: false, reason });
+      expect(result.report.problems, token).toEqual([message]);
+    }
+  });
+
+  test("an order for points that did not all place on this tree is unknown, after the talents' own problems", () => {
+    const more: Ranks = { ...ranks, 777: { rank: 1 } };
+    const result = importCode(fixture, encodeBuild({ ...shared, ranks: more }), encodeOrder(more, [...order, 777], "player"));
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.ranks).toEqual(ranks);
+    expect(result.order).toEqual({ known: false, reason: "not-placed" });
+    expect(result.report.problems).toEqual([
+      "1 talent in the code is not in this tree and was left out: node 777 (1 point).",
+      "Not every point in the code placed on this tree, so the plan's spend order is unknown.",
+    ]);
+  });
+
+  test("who made the order comes from the token, never from how it arrived", () => {
+    const generated = encodeOrder(ranks, order, "generated")!;
+    const link = `https://everloot.app/tools/talents/mage${planHash(code, null, generated)}`;
+    const fromLink = importCode(fixture, link, readPlanHash(link).firstOrder);
+    const pasted = importCode(fixture, code, ` ${generated} `);
+    expect(fromLink.ok && fromLink.order).toEqual({ known: true, origin: "generated", order });
+    expect(pasted.ok && pasted.order).toEqual({ known: true, origin: "generated", order });
   });
 });

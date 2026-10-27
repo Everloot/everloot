@@ -40,6 +40,57 @@ Example: `EL1-mage-1482-1.60.1.70450-OTAwMDE6Miw5MDAwMjoxOjEsOTAwMDQ6Mg` is
 Put the code in the fragment, for example `/tools/talents/mage#plan=EL1-...`. A fragment never
 reaches the server, so a shared build stays private, and it still opens in the browser.
 
+## Spend order (2026-10-26)
+
+A plan can carry the order its points are spent in. The order is a token of its own next to the
+code, never part of it, so every EL1 code, link and addon example stays byte for byte what it was.
+
+    O1<mode>-<sequence>
+
+- `O1`: order format version. Bump it for any change a version 1 reader would misread, a new mode
+  included. `O2` and later are newer than a version 1 reader; `O0` and `O01` are damaged.
+- `mode`: who made the order. It is read from the token only, never from how the plan arrived (a
+  link, a paste, a saved build or the addon).
+  - `p`: the player planned it.
+  - `g`: a tool generated it; provisional.
+
+  Version 1 has only these two. Any other letter is an unsupported mode.
+- `sequence`: one character per point, in spend order. Each character is a node's index among the
+  code's nodes that have points, sorted by ascending node id, written in the base64url alphabet of
+  RFC 4648 section 5 (`A` is 0, `_` is 63). The order of the payload's items never changes an
+  index. Each node appears exactly as many times as its rank in the code.
+- At most 64 points, and so at most 64 nodes: one character per point from a 64-character alphabet.
+  That is a limit of the token, not a game rule. A plan with more points gets no order token.
+
+Example: in the mage code above (`90001:2,90002:1:1,90004:2`), 90001 is `A`, 90002 is `B` and 90004
+is `C`. `O1p-AABCC` is the player's order: both points in 90001, then 90002, then 90004 twice.
+
+A reader checks the token against the code it came with:
+
+| Token | Error |
+|---|---|
+| not `O<version><mode>-<sequence>` in base64url | `malformed` |
+| a version above 1 | `newer-version` |
+| a mode other than `p` or `g` | `unsupported-mode` |
+| more than 64 characters, or a code with more than 64 points | `over-limit` |
+| a node more often than its rank, or an index past the code's nodes | `extra-points` |
+| a node less often than its rank | `missing-points` |
+
+Whatever the error, the talents load as the code has them and the order is unknown. The site also
+calls the order unknown when not every point of the code places on the tree on screen, because the
+order names points the build no longer holds.
+
+### Orders in a link
+
+Each set's order rides after both codes: the first set's after `&order=`, the second's after
+`&order2=`.
+
+    /tools/talents/mage#plan=EL1-...&plan2=EL1-...&order=O1p-...&order2=O1g-...
+
+The codes keep their places, so a reader that stops at `&` (the addon, and the site before orders)
+reads both sets as before and ignores the orders. An order is left out when its set has no code. A
+link without orders is the same address as before.
+
 ## Not this format
 
 Blizzard's loadout string (`C_Traits.GenerateImportString`) is a different thing: a bit-packed string
