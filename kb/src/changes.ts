@@ -93,6 +93,7 @@ export function sanitizePost(raw: unknown): BluePost | null {
 
 /** Which game each version-service product is. Anything not listed is not shown. */
 const PRODUCT_GAME: Record<string, BlueGame> = {
+  wowf: "forever",
   wow_classic_beta: "forever",
   wow_classic_era: "classic",
   wow_classic: "classic",

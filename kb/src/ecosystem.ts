@@ -266,12 +266,12 @@ export function interfaceFromVersion(version: string): number | null {
   return m ? Number(m[1]) * 10_000 + Number(m[2]) * 100 + Number(m[3]) : null;
 }
 
-/** The Forever product in the version service (see PRODUCT_GAME in changes.ts). */
-export const FOREVER_PRODUCT = "wow_classic_beta";
+/** The Forever products in the version service, WoW Forever's own and the beta (see PRODUCT_GAME in changes.ts). */
+export const FOREVER_PRODUCTS: ReadonlySet<string> = new Set(["wowf", "wow_classic_beta"]);
 
 /** The Interface number of the newest known Forever build, or null when none is known. */
 export function currentForeverInterface(builds: readonly { product: string; version: string; buildId: number }[]): ForeverInterface | null {
-  const newest = builds.filter((b) => b.product === FOREVER_PRODUCT && interfaceFromVersion(b.version) !== null)
+  const newest = builds.filter((b) => FOREVER_PRODUCTS.has(b.product) && interfaceFromVersion(b.version) !== null)
     .sort((a, b) => b.buildId - a.buildId)[0];
   if (!newest) return null;
   return { interface: interfaceFromVersion(newest.version)!, version: newest.version, build: newest.buildId, derivedFrom: "version" };

@@ -7,8 +7,8 @@ Blizzard's CDN serves every player. Encrypted blocks are skipped and counted, ne
 [DATA_POLICY](DATA_POLICY.md).
 
 ```
-npm run kb -- client-extract --product wow_classic_beta
-npm run kb -- client-catalog data/client/wow_classic_beta-<build>-<config>.sqlite
+npm run kb -- client-extract --product wowf
+npm run kb -- client-catalog data/client/wowf-<build>-<config>.sqlite
 npm run kb -- raid-buffs-diff <old>/raid-buffs.json <new>/raid-buffs.json
 ```
 
