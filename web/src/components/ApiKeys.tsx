@@ -26,10 +26,11 @@ function expiresText(k: KeyRow, now: number): string {
   return `${day(k.expires_at)}, in ${left} ${left === 1 ? "day" : "days"}`;
 }
 
+/** A refused request throws its message, with the HTTP status beside it. */
 async function send(method: "POST" | "DELETE", url: string, body?: object) {
   const response = await fetch(url, { method, headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
   const result = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(result.error ?? "That did not work. Try again.");
+  if (!response.ok) throw Object.assign(new Error(result.error ?? "That did not work. Try again."), { status: response.status });
   return result;
 }
 
@@ -39,6 +40,39 @@ async function send(method: "POST" | "DELETE", url: string, body?: object) {
  */
 export const KEYS_CHANGED_EVENT = "everloot:keys-changed";
 const changed = () => window.dispatchEvent(new Event(KEYS_CHANGED_EVENT));
+
+/** Revokes in flight, by key id: the list and Remove access asking for the same key share one request. */
+const revoking = new Map<string, Promise<void>>();
+
+/**
+ * Revokes a key once, however many controls ask, then tells the page its keys changed. A 404 means the key is already
+ * revoked (or gone), so it counts as done: the page reads its keys again instead of offering a retry.
+ */
+function revokeKey(id: string): Promise<void> {
+  let pending = revoking.get(id);
+  if (!pending) {
+    pending = send("DELETE", `/api/keys?id=${encodeURIComponent(id)}`)
+      .catch((err: unknown) => { if ((err as { status?: number }).status !== 404) throw err; })
+      .then(() => { changed(); })
+      .finally(() => revoking.delete(id));
+    revoking.set(id, pending);
+  }
+  return pending;
+}
+
+/** Whether a control may move focus: it is on nothing, on the page itself, or still inside `el`. */
+function focusFree(el: Element | null | undefined): boolean {
+  const at = document.activeElement;
+  return !at || at === document.body || !!el?.contains(at);
+}
+
+/** Whether a row still has the button its question was opened from: Revoke while the key is live, Roll until it is revoked. */
+const offers = (k: KeyRow | undefined, action: "revoke" | "roll", records: boolean, now = Date.now()) =>
+  !!k && !k.revoked_at && (action === "roll" ? records : !keyExpired(k, now));
+
+/** A key's row in the list. */
+const rowIn = (list: HTMLElement | null, id: string) =>
+  Array.from(list?.children ?? []).find((li) => (li as HTMLElement).dataset.key === id) as HTMLElement | undefined;
 
 /** The question before a key is revoked or rolled: what stops working, then the action or Cancel. */
 function Confirm({ action, name, hint, busy, confirmRef, onConfirm, onCancel }: {
@@ -228,11 +262,20 @@ export default function ApiKeys() {
   useEffect(() => { if (confirming) confirmButton.current?.focus(); }, [confirming]);
   useEffect(() => {
     if (!returnTo || confirming) return;
-    const row = Array.from(list.current?.children ?? []).find((li) => (li as HTMLElement).dataset.key === returnTo.id) as HTMLElement | undefined;
+    const row = rowIn(list.current, returnTo.id);
     const target = row?.querySelector<HTMLElement>(`[data-action="${returnTo.action}"]`) ?? row ?? list.current ?? createButton.current;
     target?.focus();
     setReturnTo(null);
   }, [returnTo, confirming, state]);
+
+  // A key can change under an open question (Remove access revoked it, or it expired). Once the list is read again, a
+  // question its row no longer offers closes, and focus that was in it goes to the row.
+  useEffect(() => {
+    if (!confirming || state.status !== "ready") return;
+    if (offers(state.keys.find((k) => k.id === confirming.id), confirming.action, state.records)) return;
+    if (focusFree(rowIn(list.current, confirming.id))) setReturnTo({ id: confirming.id, action: "row" });
+    setConfirming(null);
+  }, [confirming, state]);
 
   // Every change, this list's own included, comes back through the event, so the list reads its keys again.
   useEffect(() => {
@@ -271,12 +314,11 @@ export default function ApiKeys() {
     try { await run(); } catch (err) { setError(err instanceof Error ? err.message : "That did not work. Try again."); } finally { setBusy(false); }
   }
 
-  // The revoked key keeps its row (its Roll and Revoke buttons go), so focus lands on the row.
+  // The revoked key keeps its row (its Roll and Revoke buttons go), so focus lands on the row, unless it went elsewhere.
   const revoke = (k: KeyRow) => act(async () => {
-    await send("DELETE", `/api/keys?id=${encodeURIComponent(k.id)}`);
+    await revokeKey(k.id);
+    if (focusFree(rowIn(list.current, k.id))) setReturnTo({ id: k.id, action: "row" });
     setConfirming(null);
-    setReturnTo({ id: k.id, action: "row" });
-    changed();
   });
   const erase = (k: KeyRow) => act(async () => { await send("DELETE", `/api/keys?id=${encodeURIComponent(k.id)}&erase=1`); changed(); });
   const roll = (k: KeyRow) => act(async () => {
@@ -320,7 +362,7 @@ export default function ApiKeys() {
           {state.keys.map((k) => {
             const expired = !k.revoked_at && keyExpired(k, now);
             const status = k.revoked_at ? `Revoked ${day(k.revoked_at)}` : expired ? "Expired" : "Active";
-            const asking = confirming?.id === k.id ? confirming.action : null;
+            const asking = confirming?.id === k.id && offers(k, confirming.action, state.records, now) ? confirming.action : null;
             const name = k.label || "Unnamed key";
             return (
               <li key={k.id} data-key={k.id} tabIndex={-1} className="space-y-2 py-3">
@@ -364,14 +406,16 @@ export default function ApiKeys() {
 }
 
 /**
- * Remove access, on the Integrations of /account: one key's Revoke, asked with the list's own question and sent the
- * way the list sends it. The key's card leaves once the page is read again, so focus first moves to `focusAfter` (an id).
+ * Remove access, on the Integrations of /account: one key's Revoke, asked with the list's own question and sent through
+ * the list's own revoke, so both share one request. The key's card leaves once the page is read again, so focus that
+ * was in it first moves to `focusAfter` (an id).
  */
 export function RemoveAccess({ id, name, hint, focusAfter }: { id: string; name: string; hint: string; focusAfter: string }) {
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [removed, setRemoved] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLButtonElement>(null);
   const confirmButton = useRef<HTMLButtonElement>(null);
   const asked = useRef(false);
@@ -386,10 +430,9 @@ export function RemoveAccess({ id, name, hint, focusAfter }: { id: string; name:
     setBusy(true);
     setError(null);
     try {
-      await send("DELETE", `/api/keys?id=${encodeURIComponent(id)}`);
+      await revokeKey(id);
+      if (focusFree(box.current)) document.getElementById(focusAfter)?.focus();
       setRemoved(true);
-      document.getElementById(focusAfter)?.focus();
-      changed();
     } catch (err) {
       setError(err instanceof Error ? err.message : "That did not work. Try again.");
     } finally {
@@ -399,7 +442,7 @@ export function RemoveAccess({ id, name, hint, focusAfter }: { id: string; name:
 
   if (removed) return <p role="status" className="text-sm text-fg-2">Access removed.</p>;
   return (
-    <div className="space-y-2">
+    <div ref={box} className="space-y-2">
       {asking ? (
         <Confirm action="revoke" name={name} hint={hint} busy={busy} confirmRef={confirmButton} onConfirm={() => void revoke()} onCancel={() => setAsking(false)} />
       ) : (
