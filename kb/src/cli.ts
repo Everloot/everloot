@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { auditSources } from "./audit-sources.js";
 import { compareBaseline, readBaseline, writeBaselineReport } from "./baseline-report.js";
@@ -18,6 +18,8 @@ import { writeClientAchievements } from "./client-achievements.js";
 import { writeClientEncounters } from "./client-encounters.js";
 import { writeClientMounts } from "./client-mounts.js";
 import { writeClientLayer } from "./client-layer.js";
+import { buildQuestionBank, gameDataSubjects, parseQuestionBank, serializeQuestionBank, wikiSubjects } from "./question-bank.js";
+import { evaluateBank, formatEvalReport } from "./question-eval.js";
 import { diffSnapshots } from "./client-diff.js";
 import { parseRegistry } from "./ecosystem.js";
 import { loadSnapshotFile, refreshSnapshot, saveSnapshotFile } from "./ecosystem-fetch.js";
@@ -53,6 +55,7 @@ import { importWikiDump } from "./importers/wiki-dump.js";
 import { lootWindowsFromRecords, rollupDrops } from "./drop-rollup.js";
 import { startHttpBridge } from "./mcp-http.js";
 import { readCorpusRecords, serveStdio } from "./mcp-server.js";
+import { answerSourcesFactsFromRecords } from "./answer-sources.js";
 import { objectSpawnRowsFromRecords } from "./object-spawns.js";
 import { openPublicSnapshot } from "./public-snapshot.js";
 import { search } from "./search.js";
@@ -152,6 +155,13 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
     build, which the knowledge base already reads and which candidates remain, grouped by site domain.
     Root-listing lookups only, no file content and no keys. Writes <out>/<product>-<build>-<config>-scan.json
     and -scan.md; the report feeds the coverage backlog in docs/2026-10-18-database-taxonomy-research.md)
+  question-bank --db <public release> [--game-data ../web/src/data/game-data] [--per-kind 60] [--out data/question-bank/bank.jsonl]
+    (the questions players are likely to ask, generated from the game-data files, the release's page titles and a
+    hand-written long tail; one JSON line each. Nothing is fetched. See docs/design/specs/2026-10-27-question-bank-design.md)
+  question-eval <bank.jsonl> --db <public release> [--out docs/evals/question-eval-<date>.md] [--json <path>]
+    (runs every question through get_by_name, search and answer_sources with no model, and writes the markdown report:
+    what resolves, what has evidence, and the gap lists. Player observations join when EVERLOOT_PUBLIC_CORPUS_URL or
+    EVERLOOT_UPLOADS is set, else the observed layer reads as unrecorded)
   client-layer <snapshot.sqlite> [--out ../web/src/data/game-data/client-layer.json]
     (relation edges derived from the game files, one build-stamped file for the database pages. Game file data,
     labelled found in game files, unconfirmed. See docs/DATA_POLICY.md)
@@ -538,6 +548,38 @@ async function main(): Promise<number> {
       writeFileSync(join(outDir, `${base}-scan.md`), md);
       process.stdout.write(md);
       console.log(`${report.totals.present}/${report.totals.known} tables in build, ${report.candidates.length} unread candidates, ${report.totals.neverListed} never-list; -> ${outDir}`);
+      return 0;
+    }
+    case "question-bank": {
+      const release = openExistingReadOnlyDb(requireExistingDbPath(flags, "question-bank"));
+      const gameData = flags.get("game-data") || "../web/src/data/game-data";
+      const perKind = Number(flags.get("per-kind") || 60);
+      const out = flags.get("out") || "data/question-bank/bank.jsonl";
+      const subjects = [...gameDataSubjects(gameData), ...wikiSubjects(release, perKind)];
+      const bank = buildQuestionBank(subjects);
+      mkdirSync(dirname(out), { recursive: true });
+      writeFileSync(out, serializeQuestionBank(bank));
+      const kinds = new Map<string, number>();
+      for (const s of subjects) kinds.set(s.kind, (kinds.get(s.kind) ?? 0) + 1);
+      console.log(`${subjects.length} subjects (${[...kinds].map(([k, n]) => `${k} ${n}`).join(", ")}) -> ${bank.length} questions -> ${out}`);
+      return 0;
+    }
+    case "question-eval": {
+      if (!args[0]) break;
+      const releasePath = requireExistingDbPath(flags, "question-eval");
+      const release = openExistingReadOnlyDb(releasePath);
+      const bank = parseQuestionBank(readFileSync(args[0], "utf8"));
+      const corpus = await readCorpusRecords(["item_seen", "item_fact", "loot", "npc_sighting", "vendor", "quest", "object_sighting", "instance_entrance", "encounter"]);
+      const facts = corpus ? answerSourcesFactsFromRecords(corpus.records) : null;
+      const ranAt = new Date().toISOString();
+      const report = evaluateBank(release, bank, facts, { release: basename(releasePath), dataAsOf: corpus?.dataAsOf ?? null, ranAt });
+      const out = flags.get("out") || `../docs/evals/question-eval-${ranAt.slice(0, 10)}.md`;
+      mkdirSync(dirname(out), { recursive: true });
+      writeFileSync(out, formatEvalReport(report));
+      const json = flags.get("json");
+      if (json) { mkdirSync(dirname(json), { recursive: true }); writeFileSync(json, `${JSON.stringify(report, null, 1)}\n`); }
+      const t = report.totals;
+      console.log(`${t.questions} questions: ${t.exact} exact, ${t.search} by search, ${t.none} unresolved; ${t.withEvidence} with evidence, ${t.withObserved} with observed facts, ${t.withPage} with a page -> ${out}`);
       return 0;
     }
     case "client-layer": {
