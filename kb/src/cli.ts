@@ -86,7 +86,7 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
     run it against a public release you are serving)
   snapshot <out.sqlite> --db <source knowledge base>   (writes a filtered public release + manifest,
     outside the database's own folder, e.g. data/release/kb.sqlite)
-  builds-check [--product wow_classic_beta,wow_classic_era] [--registry data/builds.json]
+  builds-check [--product wowf,wow_classic_beta,wow_classic_era] [--registry data/builds.json]
     (asks Blizzard's public version service which builds exist; records new ones as queued.
     Reads build identifiers only, never game files)
   blue-check [--store <kb>/changes/blue-posts.json] [--accounts <kb>/curated/blue-accounts.json]
@@ -116,7 +116,7 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
     requests an hour and the first-reply time is skipped; with it, 5,000. Honours retry-after and the
     reset time, and stops instead of waiting more than 2 minutes. A project read less than 3 hours ago
     is skipped unless --force. A project that fails keeps its last answer)
-  client-extract [--product wow_classic_beta] [--registry data/builds.json] [--out data/client] [--refresh]
+  client-extract [--product wowf] [--registry data/builds.json] [--out data/client] [--refresh]
     (reads items, spells, talent (Trait) and spell effect tables of the product's current build from Blizzard's CDN into a snapshot
     <out>/<product>-<build>-<buildconfig, 8 chars>.sqlite + manifest, and marks the build processed.
     It also reads the terrain tiles under each dungeon entrance and taxi node and keeps each chunk's area id
@@ -142,7 +142,7 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
     (adds recheck scopes to kb/curated/recheck.json from a client-diff: changed QuestV2 rows put their quests to
     recheck, changed UiMap rows the pins on those maps; a scope already there is not added twice)
   client-coverage <snapshot.sqlite> [--out coverage.md]   (rows, encrypted blocks and needed fields per client table)
-  client-scan [--product wow_classic_beta] [--manifest <path|url>] [--out data/client-scan]
+  client-scan [--product wowf] [--manifest <path|url>] [--out data/client-scan]
     (measures the product's current CDN build against every table WoWDBDefs knows: which exist in the
     build, which the knowledge base already reads and which candidates remain, grouped by site domain.
     Root-listing lookups only, no file content and no keys. Writes <out>/<product>-<build>-<config>-scan.json
@@ -381,7 +381,7 @@ async function main(): Promise<number> {
       return problems.length === 0 ? 0 : 1;
     }
     case "builds-check": {
-      const products = (flags.get("product") || "wow_classic_beta,wow_classic_era").split(",").map((p) => p.trim()).filter(Boolean);
+      const products = (flags.get("product") || "wowf,wow_classic_beta,wow_classic_era").split(",").map((p) => p.trim()).filter(Boolean);
       const path = flags.get("registry") || "data/builds.json";
       const result = await checkBuilds(loadRegistry(path), products, async (product) => {
         const res = await fetch(versionsUrl(product), { signal: AbortSignal.timeout(15_000) });
@@ -459,7 +459,7 @@ async function main(): Promise<number> {
       return report.errors.length ? 1 : 0;
     }
     case "client-extract": {
-      const product = flags.get("product") || "wow_classic_beta";
+      const product = flags.get("product") || "wowf";
       const path = flags.get("registry") || "data/builds.json";
       const outDir = flags.get("out") || "data/client";
       const now = new Date();
@@ -503,7 +503,7 @@ async function main(): Promise<number> {
       return 0;
     }
     case "client-scan": {
-      const product = flags.get("product") || "wow_classic_beta";
+      const product = flags.get("product") || "wowf";
       const outDir = flags.get("out") || "data/client-scan";
       const { build, source } = await openCdn(product);
       if (!source.fileStatus) throw new Error("this source cannot look up file data ids");

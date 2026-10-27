@@ -31,6 +31,11 @@ test("a build is labelled as first seen by Everloot and carries an empty diff sl
   expect(timeline.find((e) => e.version === "1.15.9.70001")!.game).toBe("classic");
 });
 
+test("a build of WoW Forever's own product (wowf) is a WoW: Forever build", () => {
+  const build = { key: "wowf:eee", product: "wowf", buildId: 70630, version: "1.60.1.70630", firstSeen: "2026-10-27T05:12:02.000Z" };
+  expect(buildTimeline([], [build])).toMatchObject([{ id: "build:wowf:eee", type: "build", game: "forever", title: "WoW: Forever build 1.60.1.70630" }]);
+});
+
 test("filters: blue posts, hotfixes, builds, and a game", () => {
   expect(filterTimeline(timeline, "builds").every((e) => e.type === "build")).toBe(true);
   expect(filterTimeline(timeline, "builds")).toHaveLength(3);

@@ -3,7 +3,8 @@
 # (docs/DATA_POLICY.md). Product ids are Blizzard's; find one with `npm run kb -- builds-check`.
 region: us
 products:
-  - product: wow_classic_beta
-    label: WoW Forever beta
+  # WoW Forever's own product. It replaced the beta (wow_classic_beta), which is no longer followed.
+  # `live` turns true when players can play it, at launch (docs/LAUNCH_DAY.md).
+  - product: wowf
+    label: WoW Forever
     live: false
-  # Add the live product here, with `live: true`, when Blizzard's version service lists it.

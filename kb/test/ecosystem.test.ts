@@ -137,6 +137,14 @@ describe("Forever-ready", () => {
     expect(currentForeverInterface([builds[2]])).toBeNull();
     expect(currentForeverInterface([])).toBeNull();
   });
+  test("the newest build counts whether it is WoW Forever's own product (wowf) or the beta", () => {
+    const builds = [
+      { product: "wow_classic_beta", version: "1.60.1.70532", buildId: 70532 },
+      { product: "wowf", version: "1.60.1.70630", buildId: 70630 },
+      { product: "wow_classic_era", version: "1.15.9.70576", buildId: 70576 },
+    ];
+    expect(currentForeverInterface(builds)).toEqual({ interface: 16001, version: "1.60.1.70630", build: 70630, derivedFrom: "version" });
+  });
 });
 
 describe("badges and the maintenance score", () => {
