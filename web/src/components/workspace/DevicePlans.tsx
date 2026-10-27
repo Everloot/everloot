@@ -126,7 +126,10 @@ function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | nu
         : "Plans saved on this device while signed in to this account. Signed out or under another account this page does not show them, but they are not encrypted: anyone using this browser can read its storage."}
     </p>
   );
-  if (!read.ok) return <div className="space-y-6">{intro}<StoredProblem read={read} owner={owner} onCleared={reload} /></div>;
+  if (!read.ok) {
+    const cleared = (refused: string | null) => { reload(); setMessage(refused ? { text: refused, alert: true } : null); };
+    return <div className="space-y-6">{intro}<StoredProblem read={read} owner={owner} onCleared={cleared} /></div>;
+  }
 
   /** Shows what a change did; the list is read back from storage, so it never shows a save that did not happen. */
   const after = (result: { ok: true } | Failure, done: string) => {
@@ -457,39 +460,53 @@ function Backup({ owner, onRestored }: { owner: Owner; onRestored: (result: { ok
   );
 }
 
+/** Said when the stored text changed between Clear being confirmed and done. */
+const NOT_CLEARED = "What is stored here changed in another tab, so nothing was cleared.";
+
 /** Stored plans that do not read: kept as they are, with their text to download. Damaged ones can be cleared,
- *  after saying everything that deletes and offering the download again; a newer version's are left for that
- *  version to open. */
-function StoredProblem({ read, owner, onCleared }: { read: Extract<ReadResult, { ok: false }>; owner: Owner; onCleared: () => void }) {
-  const [confirming, setConfirming] = useState(false);
+ *  after saying everything that deletes and offering the download again, and only as they were when that was said;
+ *  a newer version's are left for that version to open. `onCleared` is told why nothing was cleared, if it was not. */
+function StoredProblem({ read, owner, onCleared }: { read: Extract<ReadResult, { ok: false }>; owner: Owner; onCleared: (refused: string | null) => void }) {
+  /** The stored text the player is asked to clear, as shown: other text needs asking of its own. */
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [refused, setRefused] = useState(false);
   const raw = read.raw;
-  async function clear() {
-    await withWorkspaceLock(() => {
-      try { deviceStorage()?.removeItem(bucketKey(owner)); } catch { /* the read that follows says what is still there */ }
+  async function clear(confirmed: string) {
+    // Under the lock, and only the text confirmed: text another tab changed, or repaired, while this waited stays.
+    const cleared = await withWorkspaceLock(() => {
+      try {
+        const storage = deviceStorage();
+        if (storage?.getItem(bucketKey(owner)) !== confirmed) return false;
+        storage.removeItem(bucketKey(owner));
+      } catch { /* the read that follows says what is still there */ }
+      return true;
     });
-    onCleared();
+    setConfirming(null);
+    setRefused(!cleared);
+    onCleared(cleared ? null : NOT_CLEARED);
   }
   const download = (text: string) => saveFile(text, `everloot-plans-stored-${new Date().toISOString().slice(0, 10)}.txt`);
   return (
     <Card>
       <p role="alert" className="text-fg">{read.message}</p>
-      {raw !== null && !confirming && (
+      {refused && <p role="alert" className="mt-3 text-sm text-danger">{NOT_CLEARED}</p>}
+      {raw !== null && confirming !== raw && (
         <div className="mt-4 flex flex-wrap gap-2">
           <button type="button" className="btn text-sm" onClick={() => download(raw)}>Download what is stored</button>
-          {read.error === "corrupt" && <button type="button" className="btn text-sm" onClick={() => setConfirming(true)}>Clear stored plans</button>}
+          {read.error === "corrupt" && <button type="button" className="btn text-sm" onClick={() => { setRefused(false); setConfirming(raw); }}>Clear stored plans</button>}
         </div>
       )}
-      {raw !== null && read.error === "corrupt" && confirming && (
+      {raw !== null && read.error === "corrupt" && confirming === raw && (
         <div role="group" aria-label="Clear what is stored" className="mt-4 space-y-3 rounded-control border border-line bg-canvas p-3">
           <p className="text-sm text-fg">{clearingLine(raw, owner)}</p>
           <div className="flex flex-wrap gap-2">
             <button type="button" className="btn text-sm" onClick={() => download(raw)}>Download what is stored</button>
-            <button type="button" className="btn text-sm" onClick={clear}>Clear for good</button>
-            <button type="button" className="btn text-sm" onClick={() => setConfirming(false)}>Cancel</button>
+            <button type="button" className="btn text-sm" onClick={() => clear(raw)}>Clear for good</button>
+            <button type="button" className="btn text-sm" onClick={() => setConfirming(null)}>Cancel</button>
           </div>
         </div>
       )}
-      {read.error === "corrupt" && !confirming && <p className="mt-3 text-sm text-muted">Clearing removes it from this browser for good. Download it first to keep a copy.</p>}
+      {read.error === "corrupt" && confirming !== raw && <p className="mt-3 text-sm text-muted">Clearing removes it from this browser for good. Download it first to keep a copy.</p>}
     </Card>
   );
 }
