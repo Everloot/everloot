@@ -113,6 +113,15 @@ describe("the class context chip", () => {
     expect(text()).not.toContain("This browser remembers");
   });
 
+  test("using a remembered class starts the list on its first page and keeps the search and sort; the cross keeps the page", async () => {
+    localStorage.setItem(CLASS_CONTEXT_SLOT, JSON.stringify(full));
+    await mount(<ClassContextChip read={read(null)} here="/database/spells?q=fire&sort=name&page=3" />);
+    expect(anchor("Use it")?.getAttribute("href")).toBe("/database/spells?q=fire&sort=name&class=mage&level=25&role=damage");
+    await mount(<ClassContextChip read={read({ classSlug: "warrior" })} here="/database/spells?q=fire&sort=name&page=3" />);
+    expect(anchor("Remove Warrior")?.getAttribute("href")).toBe("/database/spells?q=fire&sort=name&page=3");
+    expect(anchor("Use it")?.getAttribute("href")).toBe("/database/spells?q=fire&sort=name&class=mage&level=25&role=damage");
+  });
+
   test("with no context in the address, a remembered class is only offered", async () => {
     localStorage.setItem(CLASS_CONTEXT_SLOT, JSON.stringify({ classSlug: "druid", role: "healer" }));
     const chip = <ClassContextChip read={read(null)} here="/database/spells?q=moon">What it does here.</ClassContextChip>;
@@ -196,6 +205,16 @@ describe("the spell list", () => {
     const all = await spells();
     expect(all).toContain(`href="/database/spells/${BANDAGE}"`);
     expect(all).not.toContain("data-class-context");
+  });
+
+  test("a remembered class used from a later page opens the first page of its subset, not a page the subset lacks", async () => {
+    const catalog = [...new Set((await loadCatalog("mage")).nodes.flatMap((n) => n.entries.map((e) => e.spellId)).filter((id): id is number => id !== null))];
+    files.spells = { version: "1.60.1.70630", names: new Map([...catalog.map((id): [number, string] => [id, `Talent ${id}`]), ...Array.from({ length: 150 }, (_, n): [number, string] => [9_000_000 + n, `Other ${n}`])]) };
+    await spells({ sort: "name", page: "3" });
+    localStorage.setItem(CLASS_CONTEXT_SLOT, JSON.stringify(full));
+    await mount(<ClassContextChip read={read(null)} here="/database/spells?sort=name&page=3" />);
+    const target = new URL(anchor("Use it")!.getAttribute("href")!, "https://everloot.app");
+    expect(await spells(Object.fromEntries(target.searchParams))).toContain(`Spells in the Mage talent catalog: ${catalog.length}`);
   });
 
   test("the list's own links and name box keep the context; taking it off keeps the name search and the sort", async () => {

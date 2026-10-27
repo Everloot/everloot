@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState, type MouseEvent, type ReactNode } from "react";
 import {
-  classHubHref, contextLabel, contextLinks, parseClassContext, readClassContext, sameContext, withClassContext, withoutClassContext,
+  classHubHref, contextLabel, contextLinks, parseClassContext, readClassContext, sameContext, switchClassContext, withoutClassContext,
   type ClassContext, type ClassSlug, type ContextDestination, type ContextRead,
 } from "@/lib/class-context";
 
@@ -59,7 +59,7 @@ export default function ClassContextChip({ read, here, inPlace = false, classNam
       {offer && (
         <span>
           This browser remembers {contextLabel(offer)}.{" "}
-          <Link href={withClassContext(here, offer)} onClick={open(withClassContext(here, offer))} className={LINK}>Use it</Link>
+          <Link href={switchClassContext(here, offer)} onClick={open(switchClassContext(here, offer))} className={LINK}>Use it</Link>
         </span>
       )}
     </div>

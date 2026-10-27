@@ -115,6 +115,18 @@ export function withoutClassContext(path: string, search: Search): string {
   return rest ? `${path}?${rest}` : path;
 }
 
+/**
+ * An address without a context (withoutClassContext) with one put on it: back on its first page, since the list
+ * it narrows may be shorter, and every other parameter kept. Taking a context off keeps the page.
+ */
+export function switchClassContext(here: string, ctx: ClassContext): string {
+  const [path, query = ""] = here.split("?");
+  const rest = new URLSearchParams(query);
+  rest.delete("page");
+  const kept = rest.toString().replace(/%2C/g, ",");
+  return withClassContext(kept ? `${path}?${kept}` : path, ctx);
+}
+
 /** Whether an address gives a class, a level or a role, read or not: a page with one is not its plain list. */
 export const hasClassContext = (search: Search): boolean => entries(search).some(([k, v]) => CONTEXT_KEYS.includes(k) && v !== "");
 
