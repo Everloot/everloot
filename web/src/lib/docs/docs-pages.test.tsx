@@ -201,7 +201,7 @@ test("my_builds is documented only while saved builds are on: the key permission
   try {
     const on = decode(stripTags(await renderDocs()));
     for (const text of ["One more tool, my_builds", "It is not in the public list", "Read my saved builds", "With a build's slug",
-      "short link while sharing is on", `"${MY_BUILDS_REFUSAL}"`, "the same key adds a my_builds tool"]) expect(on).toContain(text);
+      "older or newer than the calculator's tree", "short link while sharing is on", `"${MY_BUILDS_REFUSAL}"`, "the same key adds a my_builds tool"]) expect(on).toContain(text);
   } finally { vi.unstubAllEnvs(); }
 });
 
