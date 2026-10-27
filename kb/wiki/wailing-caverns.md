@@ -4,7 +4,7 @@ slug: wailing-caverns
 title: Wailing Caverns
 type: dungeon
 binds: { entrance: wailing-caverns, zone: 1413 }
-summary: Caves under the Barrens where a night elf druid's dream turned into a nightmare, leaving his followers corrupted and the wildlife warped. The entrance lies southwest of the Crossroads.
+summary: Caves under the Barrens where the druid Naralex sleeps inside a nightmare that has corrupted his followers and twisted the animals. The entrance lies southwest of the Crossroads.
 categories: [dungeons, kalimdor, the-barrens]
 origin: original
 adaptedFrom: []
@@ -21,29 +21,29 @@ reviewed: null
 
 ## Overview
 
-The Wailing Caverns are a network of caves beneath the Barrens, named for the mournful sound the wind and steam make
-as they escape through cracks in the rock. Naralex, a night elf druid, came here meaning to reach the Emerald Dream
-through the caves' waters and make the dry plains above green again.
+Wind and steam escaping through the rock give these caves under the Barrens their moaning sound and their name.
+Naralex, a druid of the night elves, came down here hoping to reach the Emerald Dream through the caves' water and
+bring the dry plains above back to life.
 
-Instead the Emerald Nightmare overwhelmed him. Asleep and unable to wake, he became the way its power reached the
-caves, where it corrupted the waters, turned the animals into deviate creatures and drove most of his followers mad.
+It went wrong. The Emerald Nightmare took hold of him in his sleep, and he could not wake. Through him the Nightmare
+spread into the caves; the animals there turned deviate, and most of his followers lost their minds.
 
 ## Getting there
 
-The entrance lies in {zone:1413}, southwest of the Crossroads. The game files place three flight points in the zone,
-and the Crossroads one is the nearest.
+The entrance lies in {zone:1413}, southwest of the Crossroads. The Crossroads flight point is the nearest in the game
+files.
 
 ## History
 
-Naralex's followers were once a noble order of druids who meant to heal the Barrens with him. Corrupted along with
-their leader, they became the Druids of the Fang, and they now spread the corruption through the caves and keep
-anyone from waking him. The few druids who escaped it still try to set him free.
+His followers had been a respected circle of druids who shared his goal for the Barrens. Twisted with him, they took
+the name Druids of the Fang, carry the corruption further and guard his sleep against anyone who would wake him. A
+handful who escaped the taint are still trying to bring him back.
 
 ## In WoW: Forever
 
-Blizzard has not announced anything specific to the Wailing Caverns for WoW: Forever yet. The entrance and the level
-in this page's facts come from the current build's game files and are not confirmed in the game. Its bosses are
-listed here once players report them.
+Everloot's record of Blizzard's posts, through 2026-10-23, has nothing about the Wailing Caverns for WoW: Forever. The
+entrance and the level in this page's facts come from the current build's game files and are not confirmed in the
+game. Its bosses are listed here once players report them.
 
 ## Before you go
 
@@ -52,4 +52,4 @@ listed here once players report them.
 - Proposed: check the level in this page's facts and go with a group around it. It is the level the game files
   give, not yet confirmed in the game.
 - Proposed: fly to the Crossroads and head southwest to the entrance.
-- Proposed: the tunnels loop and double back, so agree on a route through them before the first pull.
+- Proposed: agree on a route through the caves before the first pull.

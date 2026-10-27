@@ -4,7 +4,7 @@ slug: ragefire-chasm
 title: Ragefire Chasm
 type: dungeon
 binds: { entrance: ragefire-chasm, zone: 1454 }
-summary: A network of volcanic caves beneath Orgrimmar, where troggs and a cult of the Shadow Council have dug in under the Horde's capital. Its entrance is inside the city.
+summary: Volcanic caves under Orgrimmar, the Horde's capital, where troggs and a Shadow Council cult have made their home. Its entrance is inside the city.
 categories: [dungeons, kalimdor, orgrimmar]
 origin: original
 adaptedFrom: []
@@ -22,9 +22,9 @@ reviewed: null
 
 ## Overview
 
-Ragefire Chasm is a network of volcanic caves beneath Orgrimmar, the capital of the Horde. Troggs have come up into
-it from deep below the lava-filled tunnels, and a cult called the Searing Blade hides there: a sect of the Shadow
-Council and a sister group of the Burning Blade clan, working to bring down what the Horde has built above it.
+Ragefire Chasm is a set of volcanic caves under Orgrimmar, the capital of the Horde. Troggs have climbed into them
+from far underground. The Searing Blade, a Shadow Council cult related to the Burning Blade clan, hides there as well
+and plots against the Horde.
 
 Its entrance is inside Orgrimmar, so an Alliance group has to get through a Horde city to reach it. Of all the
 dungeon entrances in the game files, this one has the lowest level; this page's facts show it.
@@ -32,22 +32,21 @@ dungeon entrances in the game files, this one has the lowest level; this page's 
 ## Getting there
 
 The entrance is inside {zone:1454}, in the district called the Cleft of Shadow. Orgrimmar's own flight point is the
-nearest one in the game files.
+nearest in the game files.
 
 ## History
 
-The Burning Blade began as an orc clan. Part of it stayed loyal to the demons of the Burning Legion and turned into a
-cult that worships them. The Searing Blade formed in Durotar to undermine the new Horde, and took the chasm as its
-hiding place, out of sight beneath the capital.
+The Burning Blade was an orc clan before it was a cult. A faction of it never gave up the demons of the Burning Legion
+and came to worship them. The Searing Blade grew up in Durotar as an enemy of the new Horde and moved into the chasm,
+where it could work unseen beneath the capital.
 
-The troggs climbed into the chasm from the tunnels far below. When the Horde tried to make peace with them, they
-answered with hostility.
+When the Horde tried to talk peace with the troggs, they would have none of it.
 
 ## In WoW: Forever
 
-Blizzard has not announced anything specific to Ragefire Chasm for WoW: Forever yet. The entrance and the level in
-this page's facts come from the current build's game files and are not confirmed in the game. Its bosses are listed
-here once players report them.
+Everloot's record of Blizzard's posts, through 2026-10-23, has nothing about Ragefire Chasm for WoW: Forever. The
+entrance and the level in this page's facts come from the current build's game files and are not confirmed in the
+game. Its bosses are listed here once players report them.
 
 ## Before you go
 

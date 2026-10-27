@@ -1,11 +1,11 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { stringify } from "yaml";
-import { checkWiki, MIN_PROSE_WORDS, typedNumber, type CheckContext, type KnownData, type WikiFile } from "../src/wiki/check.js";
+import { checkWiki, MIN_PROSE_WORDS, typedNumber, type CheckContext, type CheckedPage, type KnownData, type WikiFile } from "../src/wiki/check.js";
 import { loadCategories, loadKnownData, loadPrivatePathPattern, parseCategories, readWikiPages } from "../src/wiki/data.js";
-import { PREP_SECTION } from "../src/wiki/page.js";
+import { inlineText, PREP_SECTION } from "../src/wiki/page.js";
 
 const known: KnownData = {
   items: new Set([2589, 24999, 30000]),
@@ -437,6 +437,39 @@ describe("the dungeon pilots", () => {
       const result = checkWiki(files, committed());
       expect(result.problems.filter((p) => p.file === path), slug).toEqual([]);
       expect(result.pages.find((p) => p.file === path)?.fm.status, slug).toBe("published");
+    }
+  });
+
+  /** A pilot's own prose as the page check reads it: the summary, then paragraphs and list items, tokens as words, no
+   *  headings and no quotes. */
+  const proseOf = (p: CheckedPage): string[] => [
+    p.fm.summary,
+    ...p.page.blocks.flatMap((b) => (b.type === "paragraph" ? [inlineText(b.inline)] : b.type === "list" ? b.items.map((i) => inlineText(i)) : [])),
+  ];
+  const pilots = () => checkWiki(readWikiPages(), committed()).pages.filter((p) => DUNGEON_PILOTS.includes(p.fm.slug));
+
+  test("a pilot types no count by hand, in words either: counts come from the page's data", () => {
+    const COUNT = /\b(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty|forty|fifty|sixty|hundred|dozen)\b/i;
+    for (const p of pilots()) for (const text of proseOf(p)) expect(COUNT.exec(text)?.[0], `${p.file}: ${text}`).toBeUndefined();
+  });
+
+  test("what a pilot says of Blizzard's posts is Everloot's record up to a date, and the record bears it out", () => {
+    const { posts } = JSON.parse(readFileSync(new URL("../changes/blue-posts.json", import.meta.url), "utf8")) as {
+      posts: { game: string; postedAt: string; title: string; excerpt?: string }[];
+    };
+    const newest = posts.map((x) => x.postedAt.slice(0, 10)).sort().at(-1)!;
+    const SAID = /Everloot's record of Blizzard's posts, through (\d{4}-\d{2}-\d{2}), has nothing about (.+?) for WoW: Forever/;
+    for (const p of pilots()) {
+      const text = proseOf(p).join("\n");
+      // Not the whole of what Blizzard has said: only what the record holds, and up to when.
+      expect(text, p.file).not.toMatch(/Blizzard has (?:not|never) (?:announced|said)/i);
+      const said = SAID.exec(text);
+      if (!said) continue;
+      const [, through, what] = said;
+      expect(through <= newest, `${p.file}: the record runs to ${newest}`).toBe(true);
+      const name = new RegExp(what.replace(/^the /i, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      const naming = posts.filter((x) => x.game === "forever" && x.postedAt.slice(0, 10) <= through && name.test(`${x.title} ${x.excerpt ?? ""}`));
+      expect(naming.map((x) => x.title), p.file).toEqual([]);
     }
   });
 

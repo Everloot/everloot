@@ -25,10 +25,16 @@ it. Delete this checklist once the four are published or dropped.
 - **Blizzard**: the [Mage deep dive](https://worldofwarcraft.blizzard.com/en-us/news/24302097), read 2026-10-27, and
   the 1,314 Blizzard posts the tracker stores in [`blue-posts.json`](../kb/changes/blue-posts.json) (the latest of
   2026-10-23). None of them names these three dungeons for WoW: Forever; the two that name the Deadmines are Classic
-  Era and Cataclysm Classic hotfix notes.
+  Era and Cataclysm Classic hotfix notes. The pages say so as Everloot's record through that date, not as all that
+  Blizzard has said.
 - **Lore**: Everloot's lore pages (`/lore/<id>`, the Warcraft Wiki dump the [ledger](sources/LEDGER.md) lists as
-  published data), read 2026-10-27. Each page id is the same in the 2026-10-16 and 2026-10-24 knowledge releases. The
-  source audit does not cover lore: to keep wiki lore to Blizzard's posts instead, cut the lines marked *lore* below.
+  published data), read 2026-10-27; each page id is the same in the 2026-10-16 and 2026-10-24 knowledge releases. The
+  pages put their facts in plain words of their own and quote nothing, so they stay `origin: original`, with no
+  `adaptedFrom`. Compared word by word with each lore page they cite, in the 2026-10-24 release, they share no run of
+  four or more words beyond a name and the word next to it, such as *the House of Nobles* or *in the First War*. A
+  line that quotes a lore page or follows it closely needs `adaptedFrom` and its credit line, and an adapted page has
+  no Before you go and is not published until the overlap check exists. The source audit does not cover lore: to keep
+  wiki lore to Blizzard's posts instead, cut the lines marked *lore* below.
 - **Not used**: the game files' boss names (the instance pages show them as the files' names; a wiki page's facts
   list only the bosses three installs report), quest data (blocked in the files, per the audit), and any other site.
 
@@ -116,15 +122,15 @@ Improved Frost Nova, a talent the catalog carries and whose text hash matches 70
 
 | Claim | Source |
 |---|---|
-| Volcanic caves beneath Orgrimmar; troggs came up from below and met peace with hostility | *Lore*: Ragefire Chasm |
+| Volcanic caves under Orgrimmar; troggs climbed in from far underground and would not make peace with the Horde | *Lore*: Ragefire Chasm |
 | Orgrimmar is the Horde's capital | *Lore*: Orgrimmar |
-| The Searing Blade hides there: a Shadow Council sect, sister group of the Burning Blade clan, formed in Durotar to undermine the new Horde | *Lore*: Ragefire Chasm, Searing Blade |
-| The Burning Blade began as an orc clan; part stayed loyal to the Burning Legion and became a cult | *Lore*: Burning Blade clan |
-| The entrance is inside Orgrimmar, so Alliance groups cross a Horde city | Map layer (zone 1454), with the line above |
+| The Searing Blade, a Shadow Council cult related to the Burning Blade clan, grew up in Durotar against the new Horde and hides in the chasm | *Lore*: Ragefire Chasm, Searing Blade |
+| The Burning Blade was an orc clan before it was a cult; a faction of it kept to the Burning Legion's demons and worships them | *Lore*: Burning Blade clan |
+| The entrance is inside Orgrimmar, so Alliance groups cross a Horde city | Map layer (zone 1454), with the Orgrimmar line |
 | Its level is the lowest of any dungeon entrance in the files | Map layer (13; the Deadmines next at 16) |
 | The entrance is in the Cleft of Shadow | *Lore*: Ragefire Chasm (not in the committed game data) |
 | Orgrimmar's own flight point is the nearest | Map layer |
-| Blizzard has announced nothing specific for WoW: Forever; the page's entrance and level are the files', and its bosses are listed once players report them | Tracked posts, as above; the page's facts ([`dungeon-facts.tsx`](../web/src/app/wiki/dungeon-facts.tsx)) |
+| Everloot's record of Blizzard's posts, through 2026-10-23, has nothing about it for WoW: Forever; the page's entrance and level are the files', and its bosses are listed once players report them | `blue-posts.json`, held to that date by a test; the page's facts ([`dungeon-facts.tsx`](../web/src/app/wiki/dungeon-facts.tsx)) |
 
 Proposed: (1) go with a group around the level the facts give; (2) Alliance groups plan their way through Orgrimmar;
 (3) bring someone to hold the enemies' attention and a healer.
@@ -132,45 +138,49 @@ Proposed: (1) go with a group around the level the facts give; (2) Alliance grou
 Taken out: the quest givers in the summary and History (quests are blocked in the files); the demon waiting at the
 bottom (a boss; its identity waits on three installs); the warlock and rogue trainers, "a short one" and the walk in
 through the main gate (no source); "the cult belongs to the Burning Blade" (the lore page makes them sister groups);
-"the current beta build" (the current build is WoW: Forever's own).
+"the current beta build" (the current build is WoW: Forever's own); "Blizzard has not announced anything" (more than
+the record shows, so the page now gives the record and its date).
 
 ## The Deadmines
 
 | Claim | Source |
 |---|---|
-| Old gold mines under Westfall, abandoned in the First War, taken by the Defias Brotherhood, former laborers turned bandits | *Lore*: Deadmines |
+| Gold mines under Westfall that emptied out in the First War and later became the stronghold of the Defias Brotherhood, unpaid builders turned outlaws | *Lore*: Deadmines, Edwin VanCleef |
 | The entrance is in Moonbrook, in the southwest of Westfall | *Lore*: Deadmines; map layer (the entrance sits in the zone's southwest) |
-| VanCleef is building a ship deep inside, with goblins | *Lore*: Deadmines, Edwin VanCleef |
+| VanCleef has goblins helping him build a ship far inside | *Lore*: Deadmines |
 | The Brotherhood overran the zone's farms | *Lore*: Edwin VanCleef |
-| Sentinel Hill is the zone's only flight point in the files, with the entrance to its southwest | Map layer |
-| The Stonemasons rebuilt Stormwind, went unpaid, were disbanded, rioted and fled to Westfall with VanCleef, where they became the Brotherhood, set against Stormwind's government | *Lore*: Edwin VanCleef |
-| Blizzard has announced nothing specific for WoW: Forever; the page's entrance and level are the files', and its bosses are listed once players report them | Tracked posts, as above; the page's facts ([`dungeon-facts.tsx`](../web/src/app/wiki/dungeon-facts.tsx)) |
+| Sentinel Hill's flight point is the nearest in the files, with the entrance to its southwest | Map layer |
+| VanCleef headed the Stonemasons' Guild that rebuilt Stormwind; the House of Nobles would not pay, broke up the guild, the masons rioted and hid in Westfall with him, ran off farmers, seized the mines and became the Brotherhood, set against Stormwind's government | *Lore*: Edwin VanCleef |
+| Everloot's record of Blizzard's posts, through 2026-10-23, has nothing about it for WoW: Forever; the page's entrance and level are the files', and its bosses are listed once players report them | `blue-posts.json`, held to that date by a test; the page's facts ([`dungeon-facts.tsx`](../web/src/app/wiki/dungeon-facts.tsx)) |
 
-Proposed: (1) go with a group around the level the facts give; (2) fly to Sentinel Hill and travel southwest to
-Moonbrook; (3) expect to fight the Brotherhood from the entrance to the ship, and rest when the group can.
+Proposed: (1) go with a group around the level the facts give; (2) fly to Sentinel Hill, the nearest flight point,
+and travel southwest to Moonbrook; (3) expect Defias fighters throughout, and rest between pulls when the group can
+(the Deadmines lore page has the mines held by the Brotherhood).
 
 Taken out: the militia's investigation, Gryan Stoutmantle and the letter that leads to the Stockade (quests); the
 Horde's reasons to go (opinion); the Defias-held tunnels before the portal (no source checked); the links to
-`westfall` and `stormwind-stockade`, both drafts, which a published page cannot link. The zone token still links
-Westfall's database page.
+`westfall` and `stormwind-stockade`, both drafts, which a published page cannot link (the zone token still links
+Westfall's database page); Sentinel Hill as the zone's *only* flight point (a count, which comes from data); the
+fight "from the entrance to the ship" (more than the lore page says); "Blizzard has not announced anything".
 
 ## Wailing Caverns
 
 | Claim | Source |
 |---|---|
-| Caves beneath the Barrens, named for the sound of wind and steam through the rock | *Lore*: Wailing Caverns |
-| Naralex, a night elf druid, meant to reach the Emerald Dream through the waters and green the plains | *Lore*: Wailing Caverns, Naralex |
-| The Emerald Nightmare overwhelmed him and, through him, corrupted the waters, the animals and most of his followers | *Lore*: Wailing Caverns |
-| His followers, once a noble order, became the Druids of the Fang, spread the corruption and keep him asleep; a few still try to free him | *Lore*: Druids of the Fang |
-| The entrance is in the Barrens, southwest of the Crossroads, whose flight point is the nearest of the zone's three | Map layer |
-| Blizzard has announced nothing specific for WoW: Forever; the page's entrance and level are the files', and its bosses are listed once players report them | Tracked posts, as above; the page's facts ([`dungeon-facts.tsx`](../web/src/app/wiki/dungeon-facts.tsx)) |
+| Caves under the Barrens whose moaning sound, and name, come from wind and steam escaping through the rock | *Lore*: Wailing Caverns |
+| Naralex, a night elf druid, came to reach the Emerald Dream through the caves' water and bring the plains back to life | *Lore*: Wailing Caverns, Naralex |
+| The Emerald Nightmare took hold of him in his sleep; through him it spread into the caves, the animals turned deviate and most of his followers lost their minds | *Lore*: Wailing Caverns |
+| His followers, once a respected circle of druids, became the Druids of the Fang, carry the corruption and guard his sleep; a handful escaped it and try to bring him back | *Lore*: Druids of the Fang |
+| The entrance is in the Barrens, southwest of the Crossroads, whose flight point is the nearest in the files | Map layer |
+| Everloot's record of Blizzard's posts, through 2026-10-23, has nothing about it for WoW: Forever; the page's entrance and level are the files', and its bosses are listed once players report them | `blue-posts.json`, held to that date by a test; the page's facts ([`dungeon-facts.tsx`](../web/src/app/wiki/dungeon-facts.tsx)) |
 
-Proposed: (1) go with a group around the level the facts give; (2) fly to the Crossroads and head southwest; (3) the
-tunnels loop and double back, so agree on a route before the first pull (no source checked for the layout).
+Proposed: (1) go with a group around the level the facts give; (2) fly to the Crossroads and head southwest; (3)
+agree on a route through the caves before the first pull.
 
 Taken out: the quest givers in the summary and History and the people at the cave mouth (quests and NPCs); the four
 Fanglords, Mutanus and the disciple who wakes Naralex (bosses and an encounter; the page's facts list bosses once
-three installs report them); "the first real dungeon in Kalimdor" (opinion).
+three installs report them); "the first real dungeon in Kalimdor" (opinion); "three flight points" in the zone (a
+count, which comes from data); "the tunnels loop and double back" (no source); "Blizzard has not announced anything".
 
 ## To publish a dungeon page (one pull request each)
 
@@ -178,7 +188,8 @@ three installs report them); "the first real dungeon in Kalimdor" (opinion).
    With no advice left, take out Before you go too.
 2. In the front matter: `status: published` and `reviewed: { by: <your name>, on: <YYYY-MM-DD> }`.
 3. From `kb/`: `npm run kb -- wiki-check` and `npx vitest run test/wiki-check.test.ts`. The test that kept every page a
-   draft now lets these three be published, and still fails for any other page.
+   draft now lets these three be published, and still fails for any other page. Two more keep a count out of the
+   prose, in words as well as digits, and hold the record line to its date and to the stored posts.
 
 Publishing the dungeon pages before the guide changes nothing for it: the guide links their database pages, which are
 always published, not the wiki pages.

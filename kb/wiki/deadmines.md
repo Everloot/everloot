@@ -20,31 +20,31 @@ reviewed: null
 
 ## Overview
 
-The Deadmines are old gold mines under Westfall. They were abandoned during the First War, and the Defias
-Brotherhood, a gang of former laborers turned bandits, later took them as its base. Deep inside, the Brotherhood's
-leader, Edwin VanCleef, is building a ship with the help of goblins.
+The Deadmines are worked gold mines under Westfall that emptied out in the First War. Much later the Defias
+Brotherhood, a band of unpaid builders who turned outlaw, made them its stronghold. Far inside, its leader, Edwin
+VanCleef, has goblins helping him build a ship.
 
 The mines lie under a zone of farms that the Brotherhood has overrun.
 
 ## Getting there
 
-The entrance is in Moonbrook, in the southwest of {zone:1436}. Sentinel Hill is the only flight point the game files
-place in the zone, and the entrance lies to its southwest.
+The entrance is in Moonbrook, in the southwest of {zone:1436}. Sentinel Hill's flight point is the nearest in the
+game files, and the entrance lies to its southwest.
 
 ## History
 
-VanCleef led the Stonemasons' Guild, which rebuilt Stormwind City after the Horde sacked it. When the work was done,
-the House of Nobles would not pay the masons what they asked. The nobles disbanded the guild, the masons rioted, and
-VanCleef led them out of the city to hide in Westfall.
+VanCleef was the head of the Stonemasons' Guild, the builders who put Stormwind back together after the Horde wrecked
+it. Once the city stood again, the House of Nobles would not pay what the masons wanted. The nobles broke up the
+guild, the masons took to the streets, and VanCleef led them away to hide in Westfall.
 
-There they drove farmers off their land, took over the mines and became the Defias Brotherhood. Their target was
-Stormwind's government, and the farmers of Westfall paid for the quarrel.
+There they ran farmers off their land, seized the mines and became the Defias Brotherhood. Their fight was with
+Stormwind's government, and the farmers of Westfall paid for it.
 
 ## In WoW: Forever
 
-Blizzard has not announced anything specific to the Deadmines for WoW: Forever yet. The entrance and the level in
-this page's facts come from the current build's game files and are not confirmed in the game. Its bosses are listed
-here once players report them.
+Everloot's record of Blizzard's posts, through 2026-10-23, has nothing about the Deadmines for WoW: Forever. The
+entrance and the level in this page's facts come from the current build's game files and are not confirmed in the
+game. Its bosses are listed here once players report them.
 
 ## Before you go
 
@@ -52,5 +52,5 @@ here once players report them.
 
 - Proposed: check the level in this page's facts and go with a group around it. It is the level the game files
   give, not yet confirmed in the game.
-- Proposed: fly to Sentinel Hill, the zone's flight point, and travel southwest to Moonbrook.
-- Proposed: expect to fight the Brotherhood all the way from the entrance to the ship, and rest when the group can.
+- Proposed: fly to Sentinel Hill, the nearest flight point, and travel southwest to Moonbrook.
+- Proposed: expect Defias fighters throughout, and rest between pulls when the group can.
