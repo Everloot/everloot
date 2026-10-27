@@ -48,3 +48,11 @@ test("/about names the tools as the menu does and no longer uses the old names",
 test("the sitemap lists /tools", async () => {
   expect((await sitemap()).map((e) => new URL(e.url).pathname)).toContain("/tools");
 });
+
+test("Plans on this device is listed on /tools, and the sitemap leaves the private list out", async () => {
+  const { default: ToolsPage } = await import("./page");
+  const html = renderToStaticMarkup(<ToolsPage />);
+  expect(html).toContain('href="/tools/builds"');
+  expect(html).toContain(TOOL_LINES["/tools/builds"]);
+  expect((await sitemap()).map((e) => new URL(e.url).pathname)).not.toContain("/tools/builds");
+});

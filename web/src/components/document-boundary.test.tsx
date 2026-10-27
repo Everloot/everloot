@@ -103,3 +103,25 @@ test("ads and analytics load on public pages only", async () => {
   expect(await shown("/chat", "/")).toBe(false);
   expect(await shown("/", null)).toBe(false);
 });
+
+test("Plans on this device loads no ads, analytics or consent banner, and a move to or from it reloads first", async () => {
+  for (const path of ["/tools/builds", "/beta/tools/builds"]) {
+    at(path, path);
+    const host = await mount(<OptionalScripts><span>scripts</span></OptionalScripts>);
+    expect(host.textContent, path).toBe("");
+    act(() => root?.unmount());
+  }
+  // From the calculator to the plans, and from the plans back to a plan in the calculator: neither page mounts in
+  // the other's document.
+  for (const [loadedAt, now] of [["/tools/talents/mage", "/tools/builds"], ["/tools/builds", "/tools/talents/mage"]] as const) {
+    at(loadedAt, now);
+    await mount(<DocumentBoundary><Page /></DocumentBoundary>);
+    act(() => root?.unmount());
+  }
+  expect(mounted).not.toHaveBeenCalled();
+  expect(reload).toHaveBeenCalledTimes(2);
+  // The scripts stay out of the plans' document on its way to the calculator, too.
+  at("/tools/builds", "/tools/talents/mage");
+  const host = await mount(<OptionalScripts><span>scripts</span></OptionalScripts>);
+  expect(host.textContent).toBe("");
+});

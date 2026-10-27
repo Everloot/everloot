@@ -2,6 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ACCOUNT_CHANGED_EVENT } from "./AccountControls";
 import Header from "./Header";
 
 const { refresh } = vi.hoisted(() => ({ refresh: vi.fn() }));
@@ -108,6 +109,52 @@ describe("header account controls", () => {
     expect(container.querySelector('[role="alert"]')?.textContent).toMatch(/sign out.*failed/i);
     await act(async () => button("Sign out").click());
     expect(signInLink()).toBeDefined();
+  });
+
+  it("says the account changed once a sign-out leaves no one signed in, and not when the sign-out fails", async () => {
+    const heard = vi.fn();
+    window.addEventListener(ACCOUNT_CHANGED_EVENT, heard);
+    let attempts = 0;
+    vi.stubGlobal("fetch", async (url: string) => {
+      if (url === "/api/auth/me") return Response.json({ user });
+      if (url === "/api/auth/logout") return ++attempts === 1
+        ? Response.json({ error: "Logout is temporarily unavailable" }, { status: 503 })
+        : Response.json({ ok: true, next: false });
+      throw new Error("Unexpected request");
+    });
+    try {
+      await act(async () => root.render(<Header />));
+      await act(async () => button("Sign out").click());
+      expect(heard).not.toHaveBeenCalled();
+      await act(async () => button("Sign out").click());
+      expect(heard).toHaveBeenCalledTimes(1);
+      expect(refresh).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener(ACCOUNT_CHANGED_EVENT, heard);
+    }
+  });
+
+  it("still reloads, and says nothing, when the sign-out hands the page to another account on this browser", async () => {
+    const heard = vi.fn();
+    const reload = vi.fn();
+    const realLocation = window.location;
+    Object.defineProperty(window, "location", { configurable: true, value: { ...realLocation, reload } });
+    window.addEventListener(ACCOUNT_CHANGED_EVENT, heard);
+    vi.stubGlobal("fetch", async (url: string) => {
+      if (url === "/api/auth/me") return Response.json({ user });
+      if (url === "/api/auth/logout") return Response.json({ ok: true, next: true });
+      throw new Error("Unexpected request");
+    });
+    try {
+      await act(async () => root.render(<Header />));
+      await act(async () => button("Sign out").click());
+      expect(reload).toHaveBeenCalledTimes(1);
+      expect(heard).not.toHaveBeenCalled();
+      expect(refresh).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener(ACCOUNT_CHANGED_EVENT, heard);
+      Object.defineProperty(window, "location", { configurable: true, value: realLocation });
+    }
   });
 
   it("announces pending logout and prevents duplicate submissions", async () => {
