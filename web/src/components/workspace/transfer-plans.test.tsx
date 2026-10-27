@@ -1596,3 +1596,152 @@ describe("focus with nothing to choose", () => {
     expect(described).toContain("Frost is in your account already, saved Oct 21, 2026, and the copy here differs from it.");
   });
 });
+
+describe("a request with no answer", () => {
+  /** Lets everything run that waits on no timer, the fake ones standing still, until `ready`. */
+  async function pump(ready: () => boolean, what: string) {
+    for (let i = 0; i < 200 && !ready(); i++) await act(async () => { await new Promise((r) => setImmediate(r)); });
+    if (!ready()) throw new Error(`Timed out waiting for ${what}`);
+  }
+  /** The site, but the first request `which` picks reaches it and its answer never comes back: only giving up on it
+   *  ends the wait. */
+  function silence(which: (url: string, init?: RequestInit) => boolean) {
+    const site = globalThis.fetch;
+    let silent = true;
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (silent && which(String(input), init)) {
+        silent = false;
+        await site(input, init);
+        return new Promise<Response>((_, reject) => init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError"))));
+      }
+      return site(input, init);
+    });
+  }
+
+  test("a build save with no answer in 20 seconds may or may not have landed: its key stays, and trying again saves it once", async () => {
+    seed(ANON, [FROST]);
+    silence((url, init) => url === "/api/me/builds" && init?.method === "POST");
+    await render();
+    await open();
+    await choose("Save Frost to your account", { Frost: "private" });
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      await act(async () => { saveButton()!.click(); });
+      await pump(() => posts.length === 1, "the save");
+      await act(async () => { await vi.advanceTimersByTimeAsync(19_999); });
+      expect(saveButton()!.getAttribute("aria-busy")).toBe("true");
+      expect(alerts()).not.toContain("did not answer");
+      await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+      await pump(() => alerts().includes("did not answer"), "giving up");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(alerts()).toContain("Your account did not answer within 20 seconds while Frost was being saved, so it may or may not be in your account. Trying again does not save it twice.");
+    // Neither a success nor a refusal: the key stays as it was sent, and the plan stays here.
+    expect(journal()!.receipts).toMatchObject([{ planId: FROST.id, key: posts[0].body.transferKey, state: "sending" }]);
+    expect(stored(ANON)!.plans).toEqual([FROST]);
+    expect(stored(A)).toBeNull();
+    // The site made it: trying again sends the same key, and the site answers with that build.
+    await open();
+    await choose("Save Frost to your account", { Frost: "private" });
+    await click(saveButton());
+    expect(posts.map((p) => p.body.transferKey)).toEqual([posts[0].body.transferKey, posts[0].body.transferKey]);
+    expect(accounts[A_ID].builds).toHaveLength(1);
+    expect(text()).toContain("Saved 1 plan to your account.");
+  });
+
+  test("an answer that stops coming part way is no answer either: past 20 seconds the save is never taken as made", async () => {
+    seed(ANON, [FROST]);
+    const site = globalThis.fetch;
+    let stall = true;
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      const response = await site(input, init);
+      if (!stall || String(input) !== "/api/me/builds" || init?.method !== "POST") return response;
+      stall = false;
+      // The site made the build and its answer began, a 201, but the rest of it never comes.
+      const body = new ReadableStream({ start(stream) { init.signal?.addEventListener("abort", () => stream.error(new DOMException("Aborted", "AbortError"))); } });
+      return new Response(body, { status: response.status, headers: { "content-type": "application/json" } });
+    });
+    await render();
+    await open();
+    await choose("Save Frost to your account", { Frost: "private" });
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      await act(async () => { saveButton()!.click(); });
+      await pump(() => posts.length === 1, "the save");
+      await act(async () => { await vi.advanceTimersByTimeAsync(20_000); });
+      await pump(() => alerts().includes("did not answer"), "giving up");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(alerts()).toContain("Your account did not answer within 20 seconds while Frost was being saved, so it may or may not be in your account.");
+    expect(journal()!.receipts).toMatchObject([{ planId: FROST.id, key: posts[0].body.transferKey, state: "sending" }]);
+    expect(stored(ANON)!.plans).toEqual([FROST]);
+    expect(stored(A)).toBeNull();
+  });
+
+  test("a character request with no answer in 20 seconds gives the lock back, may or may not have made it, and the next try finds it", async () => {
+    const { withWorkspaceLock } = await import("@/lib/player-workspace");
+    const jaina = alt({ planIds: [FROST.id] });
+    seed(ANON, [FROST], [jaina]);
+    silence((url, init) => url === "/api/me/characters" && init?.method === "POST");
+    await render();
+    await open();
+    await choose("Save Frost to your account", { Frost: "private" });
+    await set(field("Character for Frost"), `alt:${jaina.id}`);
+    let after = false;
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      await act(async () => { saveButton()!.click(); });
+      await pump(() => posts.length === 1, "the character request");
+      // Another change to the plans here waits for the lock the request holds, and gets it once the request is given up.
+      const next = withWorkspaceLock(() => { after = true; });
+      await act(async () => { await vi.advanceTimersByTimeAsync(19_999); });
+      expect(after).toBe(false);
+      await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+      await pump(() => after, "the lock");
+      await next;
+      await pump(() => alerts().includes("did not answer"), "giving up");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(alerts()).toContain("Your account did not answer within 20 seconds while the character Jaina was being made for Frost, so it may or may not have been made. Frost was not sent.");
+    expect(accounts[A_ID].characters).toHaveLength(1);
+    expect(journal()!.characters).toMatchObject([{ altId: jaina.id, userId: A_ID, characterId: null, label: { name: "Jaina" } }]);
+    // The next try reads the account's characters again, finds Jaina by its label, and files Frost under it.
+    await open();
+    await choose("Save Frost to your account", { Frost: "private" });
+    await set(field("Character for Frost"), `alt:${jaina.id}`);
+    await click(saveButton());
+    expect(accounts[A_ID].characters).toHaveLength(1);
+    expect(posts.map((p) => p.url)).toEqual(["/api/me/characters", "/api/me/builds"]);
+    expect(posts[1].body.characterId).toBe(accounts[A_ID].characters[0].id);
+  });
+
+  test("a read of the account's characters with no answer in 20 seconds gives the lock back, and nothing is made or sent", async () => {
+    const { withWorkspaceLock } = await import("@/lib/player-workspace");
+    const jaina = alt({ planIds: [FROST.id] });
+    seed(ANON, [FROST], [jaina]);
+    let reads = 0;
+    // The panel's own read as it opens is answered; the transfer's read of the characters is not.
+    silence((url, init) => url === "/api/me/builds" && (init?.method ?? "GET") === "GET" && ++reads === 2);
+    await render();
+    await open();
+    await choose("Save Frost to your account", { Frost: "private" });
+    await set(field("Character for Frost"), `alt:${jaina.id}`);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      await act(async () => { saveButton()!.click(); });
+      await pump(() => reads === 2, "the read");
+      await act(async () => { await vi.advanceTimersByTimeAsync(20_000); });
+      await pump(() => alerts().includes("could not be read"), "giving up");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(alerts()).toContain("Your account's characters could not be read, so Frost was not sent.");
+    expect(posts).toEqual([]);
+    expect(accounts[A_ID].characters).toEqual([]);
+    expect(journal()).toBeNull();
+    await expect(withWorkspaceLock(() => "free")).resolves.toBe("free");
+  });
+});

@@ -30,8 +30,9 @@ import { useWorkspaceOwner } from "./LocalPlanSave";
 // another account is refused it. A character made from an alt is looked for on the account first, by the label it would
 // have, and its label is stored before it is asked for. The record of sends is read and written, and each character
 // found or made, under the workspace lock, so two tabs never act on it at once; a browser without the lock is refused
-// the transfer. What the site has is bound to that account on this device as it was sent (bindTransferred); a copy
-// changed meanwhile stays.
+// the transfer. Each request gets ANSWER_WAIT_MS to answer, so no lock is held for long: one given up on may or may not
+// have done its work, and the next try finds out. What the site has is bound to that account on this device as it was
+// sent (bindTransferred); a copy changed meanwhile stays.
 
 type AccountOwner = Extract<Owner, { kind: "account" }>;
 type Sharing = "" | "private" | "shared" | "shared-name";
@@ -47,6 +48,9 @@ const CHANGED = "The account signed in here changed, so the transfer stopped.";
 const NOTHING_SENT = "The account signed in here changed, so nothing was sent.";
 const KEPT = "What was not saved is still on this device, as it was.";
 const NO_LOCKS = "This browser can't move plans safely; try a current browser.";
+/** How long each request of the transfer may go unanswered before it is given up on, its outcome unknown. */
+const ANSWER_WAIT_MS = 20_000;
+const waited = `did not answer within ${ANSWER_WAIT_MS / 1000} seconds`;
 const select = "min-h-11 w-full rounded-control border border-edge bg-canvas px-3 text-base text-fg";
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
@@ -178,7 +182,7 @@ const altOf = (character: string) => (character.startsWith("alt:") ? character.s
 /** A request's answer: what the site sent back, or why it did not save, sorted by whether anything may have been
  *  written, with the reason a refused save is recorded under. */
 type Answer = { ok: true; status: number; body: Record<string, unknown> }
-  | { ok: false; why: "stopped" | "changed" | "orders" | "signed-out" | "refused" | "server" | "unreachable"; message: string; reason: string };
+  | { ok: false; why: "stopped" | "changed" | "orders" | "signed-out" | "refused" | "server" | "unreachable" | "timeout"; message: string; reason: string };
 /** Refused before anything was written. The key stays even so: another send of it may have reached the site. */
 const definite = (why: string) => why === "changed" || why === "orders" || why === "signed-out" || why === "refused";
 
@@ -386,15 +390,22 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
   async function request(url: string, body?: object): Promise<Answer> {
     if (!live.current) return { ok: false, why: "stopped", message: "", reason: "" };
     const named = { [EXPECTED_OWNER_HEADER]: owner.userId };
+    // Given up on once ANSWER_WAIT_MS pass without the whole answer: neither a success nor a refusal, whatever came first.
+    const wait = new AbortController();
+    const timer = setTimeout(() => wait.abort(), ANSWER_WAIT_MS);
     let response: Response;
+    let result: Record<string, unknown>;
     try {
       response = await fetch(url, body === undefined
-        ? { cache: "no-store", headers: named }
-        : { method: "POST", headers: { "content-type": "application/json", ...named }, body: JSON.stringify(body) });
+        ? { cache: "no-store", headers: named, signal: wait.signal }
+        : { method: "POST", headers: { "content-type": "application/json", ...named }, body: JSON.stringify(body), signal: wait.signal });
+      result = await response.json().catch(() => ({})) as Record<string, unknown>;
     } catch {
-      return { ok: false, why: "unreachable", message: "", reason: "" };
+      return { ok: false, why: wait.signal.aborted ? "timeout" : "unreachable", message: "", reason: "" };
+    } finally {
+      clearTimeout(timer);
     }
-    const result = await response.json().catch(() => ({})) as Record<string, unknown>;
+    if (wait.signal.aborted) return { ok: false, why: "timeout", message: "", reason: "" };
     if (response.ok) return { ok: true, status: response.status, body: result };
     if (response.status === 409 && result.code === ACCOUNT_MISMATCH) return { ok: false, why: "changed", message: "", reason: ACCOUNT_MISMATCH };
     // The site's code for it, or, from a site without one, its words.
@@ -445,7 +456,8 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
             ? "Saving spend orders isn't available yet, so no plans were saved to your account. They stay on this device as they were, spend orders included."
             : `${savedFirst()}Saving spend orders isn't available yet, so ${name} and the plans after it were not saved. They stay on this device as they were, spend orders included.`) + madeNote();
         case "unreachable":
-          return `${savedFirst()}Your account could not be reached while ${name} was being saved, so it may or may not be in your account. Trying again does not save it${saved.length > 0 ? `, or ${listOf(saved)},` : ""} twice.${madeNote()}`;
+        case "timeout":
+          return `${savedFirst()}Your account ${answer.why === "timeout" ? waited : "could not be reached"} while ${name} was being saved, so it may or may not be in your account. Trying again does not save it${saved.length > 0 ? `, or ${listOf(saved)},` : ""} twice.${madeNote()}`;
         case "server":
           return `${savedFirst()}${name} may not have been saved: ${answer.message} ${KEPT} Trying again does not save ${listOf([...saved, name])} twice.${madeNote()}`;
         default:
@@ -506,10 +518,10 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
       const asked = rememberCharacter(deviceStorage(), owner, altId, label, null);
       if (!asked.ok) return { ok: false, text: `${savedFirst()}${asked.message} ${KEPT}${madeNote()}` };
       const answer = await request("/api/me/characters", label);
-      if (!answer.ok && (answer.why === "unreachable" || answer.why === "server")) {
+      if (!answer.ok && (answer.why === "unreachable" || answer.why === "timeout" || answer.why === "server")) {
         const why = answer.why === "server"
           ? `The character ${label.name} may not have been made for ${name}: ${answer.message}`
-          : `Your account could not be reached while the character ${label.name} was being made for ${name}, so it may or may not have been made.`;
+          : `Your account ${answer.why === "timeout" ? waited : "could not be reached"} while the character ${label.name} was being made for ${name}, so it may or may not have been made.`;
         return { ok: false, text: `${savedFirst()}${why} ${name} was not sent. Trying again files it under that character if your account has it, rather than make a second.${madeNote()}` };
       }
       if (!answer.ok) return { ok: false, text: refusal(answer, name) };
