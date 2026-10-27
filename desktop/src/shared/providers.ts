@@ -1,3 +1,4 @@
+import type { ChatInfo } from "./types";
 import { CATALOGUE, type CatalogueKind, type CatalogueModel, type CatalogueProvider } from "../../../web/src/lib/chat/catalogue";
 
 /**
@@ -34,6 +35,8 @@ export interface ProviderPreset {
   models: ModelChoice[];
   /** What the player should know before sending questions there. */
   dataNote: string;
+  /** Where the provider hands out keys (or Ollama's download), straight from the catalogue; a custom server has none. */
+  getKey: CatalogueProvider["getKey"] | null;
 }
 
 const fromCatalogue = (p: CatalogueProvider): ProviderPreset => ({
@@ -45,6 +48,7 @@ const fromCatalogue = (p: CatalogueProvider): ProviderPreset => ({
   list: p.list,
   models: p.models,
   dataNote: p.kind === "openrouter" ? `${p.dataNote} Another model id must support tool calling (openrouter.ai/models?supported_parameters=tools).` : p.dataNote,
+  getKey: p.getKey,
 });
 
 export const PROVIDER_PRESETS: ProviderPreset[] = [
@@ -62,6 +66,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     list: "openai",
     models: [],
     dataNote: "Read that server's data policy before sending questions to it.",
+    getKey: null,
   },
 ];
 
@@ -79,6 +84,29 @@ export interface ProviderChoice {
 
 /** The provider the app wrote to config.json, without the key, for the page to show. */
 export interface ProviderInUse { kind: ProviderKind; model: string; baseUrl: string | null }
+
+/**
+ * The model the provider form selects after its list changes. A listed pick that is still there stays; the empty string
+ * is the player's "Another model id" choice and stays; anything else, or no pick yet, takes the first model.
+ */
+export const keptModelPick = (models: ModelChoice[], picked?: string): string =>
+  !models.length ? "" : picked === "" || models.some((m) => m.id === picked) ? picked! : models[0].id;
+
+/** The typed model id is asked for only when the player chose "Another model id" or the provider has no list to pick from. */
+export const manualModelShown = (models: ModelChoice[], picked?: string): boolean => keptModelPick(models, picked) === "";
+
+/** Who is answering, from what config.json actually says: no entry at all, the app's own first entry, or one written by hand. */
+export function assistantSource(c: Pick<ChatInfo, "mode" | "provider">): "search" | "app" | "config" {
+  return c.mode === "plain search" ? "search" : c.provider ? "app" : "config";
+}
+
+/** The note after a provider is removed, naming the mode the removal left (another saved or hand-written entry may now be first). */
+export function removalNotice(c: Pick<ChatInfo, "mode" | "provider">): string {
+  const source = assistantSource(c);
+  if (source === "search") return "Removed. No model is set, so Chat and /ask use Everloot search only.";
+  if (source === "app") return `Removed. Chat now runs ${c.mode}; /ask tries it first.`;
+  return `Removed. The first entry in config.json is now in use: ${c.mode}.`;
+}
 
 /** Model ids are provider/model names with the odd colon or dot; anything else is a paste of the wrong thing. */
 export const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,120}$/;

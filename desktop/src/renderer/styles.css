@@ -306,6 +306,17 @@ ul.plain li { margin: 4px 0; }
 .set-row > .tile { margin-right: 4px; }
 .chat #providerForm { flex-direction: column; align-items: stretch; margin: 0; }
 .chat #providerForm select, .chat #providerForm input { max-width: 36rem; }
+/* Assistant setup: one panel on Chat, Ask and Settings; the provider form sits inside it as a section, not a second box. */
+.field[hidden] { display: none; }
+.assistant > .row { align-items: center; }
+.assistant #providerForm, .set-body #providerForm { background: none; border: 0; border-top: 1px solid rgb(var(--line)); border-radius: 0; padding: 14px 0 0; }
+#assistantNote:empty { margin: 0; }
+/* Ask's native Advanced disclosure for the private server: the same plus/minus as Settings, never hidden by the setup above. */
+details.adv > summary { cursor: pointer; list-style: none; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-height: 36px; font-weight: 600; }
+details.adv > summary::-webkit-details-marker { display: none; }
+details.adv > summary::after { content: "+"; margin-left: auto; color: rgb(var(--muted)); font-size: var(--fs-lg); }
+details.adv[open] > summary::after { content: "\2212"; }
+details.adv[open] > summary { margin-bottom: 12px; }
 .chat textarea { flex: 1; min-height: 64px; max-height: 160px; resize: vertical; padding: 10px 12px; line-height: 1.5; }
 .spark { display: block; margin-left: auto; margin-top: 2px; color: rgb(var(--fg-2)); }
 

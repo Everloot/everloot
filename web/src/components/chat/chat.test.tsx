@@ -107,13 +107,17 @@ describe("the chat page", () => {
     expect(sessionStorage.getItem(PROVIDERS)).toContain(KEY);
     expect(text()).toContain("Keys last only in this tab. Closing it forgets them.");
   });
-  test("no key, signed in: one composer that asks to finish key setup on /account, the account label and four suggestions", async () => {
+  test("no key, signed in: search is ready, optional Assistant setup links to /account, the account label and four suggestions", async () => {
     api();
     await render(<ChatClient profiles />);
     expect(container.querySelectorAll("textarea")).toHaveLength(1);
     expect(container.querySelector('input[type="password"]')).toBeNull();
-    const setup = Array.from(container.querySelectorAll("a")).find((a) => a.textContent === "Finish your key setup");
+    const setup = Array.from(container.querySelectorAll("a")).find((a) => a.textContent === "Assistant setup");
     expect(setup?.getAttribute("href")).toBe("/account#chat-keys");
+    // Search is presented as working and the model as optional, with its cost the player's own account.
+    expect(text()).toContain("Everloot search is ready");
+    expect(text()).toContain("optional AI model");
+    expect(text()).not.toContain("Finish your key setup");
     expect(text()).toContain("Game data through your Everloot account");
     expect(container.querySelector('select[aria-label="Model"]')).toBeNull();
     for (const s of SUGGESTIONS) expect(button(s)).toBeTruthy();
@@ -123,7 +127,7 @@ describe("the chat page", () => {
   test("signed out: setup goes through sign-in, and lookups say they use the public limits", async () => {
     api({ signed: false });
     await render(<ChatClient profiles />);
-    const setup = Array.from(container.querySelectorAll("a")).find((a) => a.textContent === "Finish your key setup");
+    const setup = Array.from(container.querySelectorAll("a")).find((a) => a.textContent === "Assistant setup");
     expect(setup?.getAttribute("href")).toBe("/sign-in?returnTo=%2Faccount%23chat-keys");
     expect(text()).toContain("Signed out: lookups use the public limits");
     expect(text()).not.toContain("Game data through your Everloot account");
@@ -132,7 +136,7 @@ describe("the chat page", () => {
   test("with profiles off, setup still links to /account, and the page has no key field of its own", async () => {
     api();
     await render(<ChatClient />);
-    const setup = Array.from(container.querySelectorAll("a")).find((a) => a.textContent === "Finish your key setup");
+    const setup = Array.from(container.querySelectorAll("a")).find((a) => a.textContent === "Assistant setup");
     expect(setup?.getAttribute("href")).toBe("/account#chat-keys");
     expect(container.querySelector("dialog")).toBeNull();
     expect(container.querySelector('input[name="key"]')).toBeNull();
@@ -246,6 +250,11 @@ describe("the Chat keys section", () => {
     expect(text().match(/Everloot's servers never receive them/g)).toHaveLength(1);
     expect(text()).not.toContain("Default provider for Chat");
     expect(container.querySelectorAll("select")).toHaveLength(0);
+    // Optional AI: search is free, the model's cost is the provider account's, and a consumer subscription is no key.
+    expect(text()).toContain("Everloot search is free");
+    expect(text()).toContain("pricing and limits apply");
+    expect(text()).toContain("not an API key");
+    expect(text()).toContain("Desktop App needs its own setup");
   });
 
   test("a key is added in its card, kept in this tab only, shown masked, tested with its provider alone and removable", async () => {
