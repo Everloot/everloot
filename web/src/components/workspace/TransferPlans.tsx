@@ -245,8 +245,10 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
   /** Where the focus goes once the panel closes: back to its opener after Cancel, to what a transfer did after one. */
   const focusNext = useRef<"opener" | "outcome" | null>(null);
   useEffect(() => {
-    // The first choice there is, or Cancel when every plan is refused: the focus never falls back to the page.
+    // The first choice there is, or Cancel when every plan is refused or the panel could not open: the focus never falls
+    // back to the page as the opener goes.
     if (account.status === "open") (list.current?.querySelector<HTMLInputElement>("input:not(:disabled)") ?? cancelButton.current)?.focus();
+    else if (account.status === "failed") cancelButton.current?.focus();
   }, [account.status]);
   useEffect(() => {
     if (account.status !== "closed" || !focusNext.current) return;
@@ -638,7 +640,7 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
           <p role="alert" className="text-sm text-fg">{account.message}</p>
           <div className="flex flex-wrap gap-2">
             {account.retry && <button type="button" className="btn text-sm" onClick={open}>Try again</button>}
-            <button type="button" className="btn text-sm" onClick={cancel}>Cancel</button>
+            <button ref={cancelButton} type="button" className="btn text-sm" onClick={cancel}>Cancel</button>
           </div>
         </div>
       )}

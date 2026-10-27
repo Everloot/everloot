@@ -1582,6 +1582,24 @@ describe("one character per alt and account", () => {
 });
 
 describe("focus with nothing to choose", () => {
+  test("a panel that cannot open keeps the focus on its Cancel, as its opener goes, whether or not it can be tried again", async () => {
+    delete (navigator as { locks?: unknown }).locks;
+    seed(ANON, [FROST]);
+    await render();
+    button(/^Choose plans to save to your account$/)!.focus();
+    await open();
+    expect(alerts()).toContain("This browser can't move plans safely; try a current browser.");
+    expect(document.activeElement).toBe(button(/^Cancel$/));
+    // Cancel gives it back to the opener; an account that cannot be read takes it to Cancel again.
+    await click(button(/^Cancel$/));
+    expect(document.activeElement).toBe(button(/^Choose plans to save to your account$/));
+    installLocks();
+    readAnswer = Response.json({ error: "Unavailable" }, { status: 503 });
+    await open();
+    expect(alerts()).toContain("Your account could not be read, so nothing was sent.");
+    expect(document.activeElement).toBe(button(/^Cancel$/));
+  });
+
   test("an all-refused preview still gives keyboard focus somewhere in the panel, and each refusal describes its control", async () => {
     seed(ANON, [{ ...FROST, notes: "Changed", updatedAt: "2026-10-27T12:00:00.000Z" }]);
     seed(A, [{ ...FROST, boundTo: { userId: A_ID, at: AT } }]);
