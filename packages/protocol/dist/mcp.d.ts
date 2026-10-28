@@ -1115,6 +1115,7 @@ export declare const evidence: z.ZodObject<{
     claim: z.ZodString;
     kind: z.ZodEnum<{
         curated: "curated";
+        files: "files";
         lore: "lore";
         observed: "observed";
     }>;
@@ -1364,6 +1365,7 @@ export declare const MCP_TOOLS: {
                 claim: z.ZodString;
                 kind: z.ZodEnum<{
                     curated: "curated";
+                    files: "files";
                     lore: "lore";
                     observed: "observed";
                 }>;
@@ -3040,6 +3042,7 @@ export declare const MCP_TOOL_LIST: ({
             claim: z.ZodString;
             kind: z.ZodEnum<{
                 curated: "curated";
+                files: "files";
                 lore: "lore";
                 observed: "observed";
             }>;

@@ -21,6 +21,7 @@ import { writeClientLayer } from "./client-layer.js";
 import { writeRaceTable } from "./client-races.js";
 import { buildQuestionBank, gameDataSubjects, parseQuestionBank, serializeQuestionBank, wikiSubjects } from "./question-bank.js";
 import { evaluateBank, formatEvalReport } from "./question-eval.js";
+import { readFilesIndex } from "./files-evidence.js";
 import { diffSnapshots } from "./client-diff.js";
 import { parseRegistry } from "./ecosystem.js";
 import { loadSnapshotFile, refreshSnapshot, saveSnapshotFile } from "./ecosystem-fetch.js";
@@ -159,7 +160,7 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
   question-bank --db <public release> [--game-data ../web/src/data/game-data] [--per-kind 60] [--out data/question-bank/bank.jsonl]
     (the questions players are likely to ask, generated from the game-data files, the release's page titles and a
     hand-written long tail; one JSON line each. Nothing is fetched. See docs/design/specs/2026-10-27-question-bank-design.md)
-  question-eval <bank.jsonl> --db <public release> [--out docs/evals/question-eval-<date>.md] [--json <path>]
+  question-eval <bank.jsonl> --db <public release> [--game-data ../web/src/data/game-data] [--out docs/evals/question-eval-<date>.md] [--json <path>]
     (runs every question through get_by_name, search and answer_sources with no model, and writes the markdown report:
     what resolves, what has evidence, and the gap lists. Player observations join when EVERLOOT_PUBLIC_CORPUS_URL or
     EVERLOOT_UPLOADS is set, else the observed layer reads as unrecorded)
@@ -577,14 +578,15 @@ async function main(): Promise<number> {
       const corpus = await readCorpusRecords(["item_seen", "item_fact", "loot", "npc_sighting", "vendor", "quest", "object_sighting", "instance_entrance", "encounter"]);
       const facts = corpus ? answerSourcesFactsFromRecords(corpus.records) : null;
       const ranAt = new Date().toISOString();
-      const report = evaluateBank(release, bank, facts, { release: basename(releasePath), dataAsOf: corpus?.dataAsOf ?? null, ranAt });
+      const files = readFilesIndex(flags.get("game-data") || "../web/src/data/game-data");
+      const report = evaluateBank(release, bank, facts, { release: basename(releasePath), dataAsOf: corpus?.dataAsOf ?? null, ranAt, files: files.facts.length ? files : null });
       const out = flags.get("out") || `../docs/evals/question-eval-${ranAt.slice(0, 10)}.md`;
       mkdirSync(dirname(out), { recursive: true });
       writeFileSync(out, formatEvalReport(report));
       const json = flags.get("json");
       if (json) { mkdirSync(dirname(json), { recursive: true }); writeFileSync(json, `${JSON.stringify(report, null, 1)}\n`); }
       const t = report.totals;
-      console.log(`${t.questions} questions: ${t.exact} exact, ${t.search} by search, ${t.none} unresolved; ${t.withEvidence} with evidence, ${t.withObserved} with observed facts, ${t.withPage} with a page -> ${out}`);
+      console.log(`${t.questions} questions: ${t.exact} exact, ${t.search} by search, ${t.none} unresolved; ${t.withEvidence} with evidence, ${t.withObserved} with observed facts, ${t.withFiles} with the files' facts, ${t.withPage} with a page -> ${out}`);
       return 0;
     }
     case "client-layer": {

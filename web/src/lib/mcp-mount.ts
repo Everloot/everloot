@@ -5,6 +5,7 @@ import { loadCoverage } from "./coverage-compute";
 import { loadCompletion } from "./completion-store";
 import { attributionHeaders } from "./data-guard";
 import { loadEcosystem } from "./ecosystem";
+import { filesIndex } from "./files-index";
 import { guildReader, guildsOn } from "./guilds";
 import { accountMcpTools } from "./my-builds-tool";
 import { getRelease } from "./release";
@@ -43,6 +44,8 @@ export function toolLoaders(): ToolOptions {
     changes: async () => (await loadTimeline()).filter((e) => e.source !== "manual").map(({ copies: _copies, ...e }) => e),
     // The registry and GitHub snapshot bundled with the site, joined with the same install counts as /addons/popular.
     ecosystem: () => loadEcosystem(),
+    // The committed game-data files' facts, for answer_sources: ids and facts only, labelled unconfirmed.
+    gameData: () => filesIndex(),
     // Same deployment as the store: read the public records in process, no HTTP self-fetch or byte ceiling.
     corpus: async () => {
       const loaded = await uploadStore.loadCorpus();

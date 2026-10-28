@@ -495,7 +495,7 @@ export const changeEntry = z.object({
 /** One piece of evidence from answer_sources. */
 export const evidence = z.object({
     claim: z.string().describe("One short statement. Observed facts are in Everloot's words; lore is the source's own excerpt."),
-    kind: z.enum(["observed", "curated", "lore"]).describe("observed: players' uploads, public after three installs agree. curated: Everloot's own facts. lore: the 2023 Warcraft Wiki, which may differ in WoW: Forever."),
+    kind: z.enum(["observed", "curated", "files", "lore"]).describe("observed: players' uploads, public after three installs agree. curated: Everloot's own facts. files: the WoW: Forever game files, ids and facts only, found in game files and unconfirmed, with the build. lore: the 2023 Warcraft Wiki, which may differ in WoW: Forever."),
     source: z.object({ title: z.string(), url: z.string() }),
     licence: z.string(),
     asOf: z.string().nullable().describe("When the source was read, or when the observations were current."),

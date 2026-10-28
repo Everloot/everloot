@@ -6,6 +6,7 @@ import { loreUrls, moreLine } from "./page-urls.js";
 import { search, searchSomeWords, SOME_WORDS, type SearchHit } from "./search.js";
 import { agreedNpcNames, npcPage, WORLD_AGREEMENT, worldFactsFromRecords, type WorldFacts } from "./world-pages.js";
 import type { RecheckScope } from "./coverage.js";
+import { filesEvidence, type FilesIndex } from "./files-evidence.js";
 
 /**
  * answer_sources: the evidence behind a question, every piece with its source, licence and date, so
@@ -15,7 +16,7 @@ import type { RecheckScope } from "./coverage.js";
  * search URLs built from the names in the question.
  */
 
-export type EvidenceKind = "observed" | "curated" | "lore";
+export type EvidenceKind = "observed" | "curated" | "files" | "lore";
 
 export interface Evidence {
   /** One short statement, in Everloot's words for observed facts; the source's own excerpt for lore. */
@@ -171,7 +172,7 @@ function knowledgeHits(db: DB, question: string, limit: number): { hits: SearchH
  * the text says the observed layer is unrecorded, not empty.
  */
 export function answerSources(
-  db: DB, args: { question: string; limit: number }, facts: AnswerSourcesFacts | null, dataAsOf: string | null,
+  db: DB, args: { question: string; limit: number }, facts: AnswerSourcesFacts | null, dataAsOf: string | null, files: FilesIndex | null = null,
 ): AnswerSources {
   const question = args.question.trim();
   const observed = facts ? observedEvidence(question, facts, dataAsOf) : [];
@@ -180,12 +181,16 @@ export function answerSources(
   const hits = found.map((hit) => loreEvidence(hit, pages.get(hit.id)));
   const curated = hits.filter((e) => e.kind === "curated");
   const lore = hits.filter((e) => e.kind === "lore");
-  const evidence = [...observed, ...curated, ...lore].slice(0, Math.max(args.limit, observed.length));
-  // Observed facts answer the question's own names, so only an answer of fallback pages alone is marked.
-  return { evidence, furtherReading: furtherReading(question), dataAsOf, ...(some && observed.length === 0 ? { someWords: true as const } : {}) };
+  // What the game-data files say about the things the question names: ids and facts, labelled unconfirmed.
+  // Observed facts first, then Everloot's own, then the files (current build), then the 2023 wiki.
+  const fromFiles: Evidence[] = filesEvidence(question, files, args.limit);
+  const named = observed.length + fromFiles.length;
+  const evidence = [...observed, ...curated, ...fromFiles, ...lore].slice(0, Math.max(args.limit, named));
+  // Observed and files facts answer the question's own names, so only an answer of fallback pages alone is marked.
+  return { evidence, furtherReading: furtherReading(question), dataAsOf, ...(some && named === 0 ? { someWords: true as const } : {}) };
 }
 
-const KIND_LABEL: Record<EvidenceKind, string> = { observed: "observed in play", curated: "curated", lore: "lore (Warcraft Wiki 2023, may differ in WoW: Forever)" };
+const KIND_LABEL: Record<EvidenceKind, string> = { observed: "observed in play", curated: "curated", files: "game files, found in game files and unconfirmed", lore: "lore (Warcraft Wiki 2023, may differ in WoW: Forever)" };
 
 export function formatAnswerSources(result: AnswerSources, corpusConnected: boolean): string {
   const lines: string[] = [];

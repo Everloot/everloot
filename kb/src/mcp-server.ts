@@ -5,6 +5,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { CREDIT_LINE, GAME_DATA_CREDIT, LICENCE, MCP_CREDIT, SITE, type EntityKind } from "@everloot/protocol";
 import { answerSources, answerSourcesFactsFromRecords, formatAnswerSources, type AnswerSourcesFacts } from "./answer-sources.js";
 import type { RecheckScope } from "./coverage.js";
+import type { FilesIndex } from "./files-evidence.js";
 import { auctionHistory, auctionSightingsFromRecords, handleAuctionHistory } from "./auction-history.js";
 import { handlePlan, planStructured } from "./bridge-plan.js";
 import { handleRecentChanges, recentChangesStructured, type ChangeEntry } from "./changes.js";
@@ -498,6 +499,9 @@ export function handleGetByName(db: DB, args: { name: string; kind?: (typeof KNO
   return formatHits(db, hits);
 }
 
+/** The game-data files' facts for answer_sources (files-evidence.ts). Null means the host carries none. */
+export type GameDataLoader = () => FilesIndex | null | Promise<FilesIndex | null>;
+
 /** The merged blue-post and build timeline. Null means it is not connected, which is not the same as empty. */
 export type ChangesLoader = () => ChangeEntry[] | null | Promise<ChangeEntry[] | null>;
 
@@ -562,7 +566,7 @@ function professionArg(profession: string): string {
 }
 
 /** The readers a host lends the tools: the site's store in process, or nothing for a standalone server. */
-export interface ToolOptions { corpus?: CorpusLoader; market?: MarketLoader; completion?: CompletionLoader; changes?: ChangesLoader; ecosystem?: EcosystemLoader; census?: CensusLoader; coverage?: CoverageLoader; settledSummary?: SettledSummaryLoader; guilds?: GuildReader; recheck?: readonly RecheckScope[] }
+export interface ToolOptions { corpus?: CorpusLoader; market?: MarketLoader; gameData?: GameDataLoader; completion?: CompletionLoader; changes?: ChangesLoader; ecosystem?: EcosystemLoader; census?: CensusLoader; coverage?: CoverageLoader; settledSummary?: SettledSummaryLoader; guilds?: GuildReader; recheck?: readonly RecheckScope[] }
 
 /** The guild ladder's tools: registered only when the host lends a guild reader (EVERLOOT_GUILDS on the site). */
 export const GUILD_TOOLS: readonly McpToolName[] = ["guild_search", "guild_rankings"];
@@ -610,7 +614,8 @@ export function createToolHandlers(db: DB, options: ToolOptions = {}): ToolHandl
     },
     answer_sources: async (args) => {
       const read = await readTooledFacts<AnswerSourcesFacts>("answer_sources", options.corpus, recheck);
-      const result = answerSources(db, args, read?.facts ?? null, read?.dataAsOf ?? null);
+      const files = options.gameData ? await options.gameData() : null;
+      const result = answerSources(db, args, read?.facts ?? null, read?.dataAsOf ?? null, files);
       // The fallback is said in the text; the structured answer keeps its published shape.
       const { someWords: _someWords, ...structured } = result;
       return { text: `${formatAnswerSources(result, read !== null)}\n${read ? answerFooter(read.dataAsOf) : MCP_CREDIT}`, structured };

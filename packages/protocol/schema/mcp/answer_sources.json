@@ -46,9 +46,10 @@
               "enum": [
                 "observed",
                 "curated",
+                "files",
                 "lore"
               ],
-              "description": "observed: players' uploads, public after three installs agree. curated: Everloot's own facts. lore: the 2023 Warcraft Wiki, which may differ in WoW: Forever."
+              "description": "observed: players' uploads, public after three installs agree. curated: Everloot's own facts. files: the WoW: Forever game files, ids and facts only, found in game files and unconfirmed, with the build. lore: the 2023 Warcraft Wiki, which may differ in WoW: Forever."
             },
             "source": {
               "type": "object",

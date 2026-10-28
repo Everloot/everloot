@@ -6,6 +6,7 @@
  */
 import { answerSources, type AnswerSourcesFacts, type EvidenceKind } from "./answer-sources.js";
 import type { DB } from "./db.js";
+import type { FilesIndex } from "./files-evidence.js";
 import type { Question, SubjectKind } from "./question-bank.js";
 import { sameTitle } from "./name-aliases.js";
 import { getByName, search, searchSomeWords } from "./search.js";
@@ -25,7 +26,7 @@ export interface QuestionResult {
   page: boolean;
 }
 
-export interface EvalRow { label: string; questions: number; exact: number; search: number; none: number; withEvidence: number; withObserved: number; withPage: number }
+export interface EvalRow { label: string; questions: number; exact: number; search: number; none: number; withEvidence: number; withObserved: number; withFiles: number; withPage: number }
 
 export interface EvalReport {
   schema: "everloot.question-eval/1";
@@ -59,8 +60,8 @@ export function resolve(db: DB, q: Question): Resolution {
   return (hits.length ? hits : searchSomeWords(db, q.text, 5)).some((h) => sameName(h.name, q.subject.name)) ? "search" : "none";
 }
 
-export function evaluateQuestion(db: DB, q: Question, facts: AnswerSourcesFacts | null, dataAsOf: string | null): QuestionResult {
-  const result = answerSources(db, { question: q.text, limit: 8 }, facts, dataAsOf);
+export function evaluateQuestion(db: DB, q: Question, facts: AnswerSourcesFacts | null, dataAsOf: string | null, files: FilesIndex | null = null): QuestionResult {
+  const result = answerSources(db, { question: q.text, limit: 8 }, facts, dataAsOf, files);
   const kinds = [...new Set(result.evidence.map((e) => e.kind))];
   return {
     id: q.id, template: q.template, kind: q.subject.kind,
@@ -78,6 +79,7 @@ function fold(label: string, rows: readonly QuestionResult[]): EvalRow {
     none: rows.filter((r) => r.resolution === "none").length,
     withEvidence: rows.filter((r) => r.evidence > 0).length,
     withObserved: rows.filter((r) => r.evidenceKinds.includes("observed")).length,
+    withFiles: rows.filter((r) => r.evidenceKinds.includes("files")).length,
     withPage: rows.filter((r) => r.page).length,
   };
 }
@@ -90,9 +92,9 @@ function groupBy<K extends string>(rows: readonly QuestionResult[], key: (r: Que
 
 export function evaluateBank(
   db: DB, bank: readonly Question[], facts: AnswerSourcesFacts | null,
-  meta: { release: string; dataAsOf: string | null; ranAt?: string; sampleNames?: number },
+  meta: { release: string; dataAsOf: string | null; ranAt?: string; sampleNames?: number; files?: FilesIndex | null },
 ): EvalReport {
-  const results = bank.map((q) => evaluateQuestion(db, q, facts, meta.dataAsOf));
+  const results = bank.map((q) => evaluateQuestion(db, q, facts, meta.dataAsOf, meta.files ?? null));
   const byId = new Map(bank.map((q) => [q.id, q]));
   const sample = meta.sampleNames ?? 12;
   const unresolved = [...groupBy(results.filter((r) => r.resolution === "none"), (r) => r.kind)]
@@ -114,17 +116,17 @@ export function evaluateBank(
 const pct = (n: number, of: number) => (of === 0 ? "–" : `${Math.round((100 * n) / of)}%`);
 const rowLine = (r: EvalRow) => {
   const resolvable = r.exact + r.search + r.none; // the rows that expected a resolution
-  return `| ${r.label} | ${r.questions} | ${pct(r.exact, resolvable)} | ${pct(r.search, resolvable)} | ${pct(r.none, resolvable)} | ${pct(r.withEvidence, r.questions)} | ${pct(r.withObserved, r.questions)} | ${pct(r.withPage, r.questions)} |`;
+  return `| ${r.label} | ${r.questions} | ${pct(r.exact, resolvable)} | ${pct(r.search, resolvable)} | ${pct(r.none, resolvable)} | ${pct(r.withEvidence, r.questions)} | ${pct(r.withObserved, r.questions)} | ${pct(r.withFiles, r.questions)} | ${pct(r.withPage, r.questions)} |`;
 };
 
 /** The report as the markdown the eval commits: totals, per template, per kind, then the gap lists. */
 export function formatEvalReport(report: EvalReport): string {
-  const head = "| | questions | exact | by search | unresolved | with evidence | with observed | with page |\n|---|---|---|---|---|---|---|---|";
+  const head = "| | questions | exact | by search | unresolved | with evidence | with observed | with files | with page |\n|---|---|---|---|---|---|---|---|---|";
   const lines = [
     `# Question eval, ${report.ranAt.slice(0, 10)}`,
     "",
     `Release \`${report.release}\`. Player observations ${report.corpusConnected ? `connected (data as of ${report.dataAsOf ?? "unrecorded"})` : "not connected: the observed layer is unrecorded, not empty"}.`,
-    "Resolution: the subject's name met a record exactly, or through search on the question, or not at all. Evidence: what `answer_sources` returned. Percentages of resolution are over the questions that expect one.",
+    "Resolution: the subject's name met a record exactly, or through search on the question, or not at all. Evidence: what `answer_sources` returned; \"with files\" counts the game files' own facts (ids and facts, unconfirmed). Percentages of resolution are over the questions that expect one.",
     "",
     "## Totals",
     "",
