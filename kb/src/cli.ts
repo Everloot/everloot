@@ -118,7 +118,8 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
     staff posts of every topic that has one. Prints request counts by kind)
   blue-writeups [--dir <kb>/curated/blue-writeups] [--out <kb>/curated/blue-writeups.json]
     (checks the hand-written write-ups of blue posts, one Markdown file per post, and writes the JSON the
-    site bundles. Fails on a file that breaks a rule or names a post the store does not hold)
+    site bundles; a draft (draft: true) is checked but left out. Fails on a file that breaks a rule or names a
+    post the store does not hold)
   ecosystem-check [--registry <kb>/curated/ecosystem.json] [--snapshot <kb>/changes/ecosystem.json]
     [--min-hours 3] [--force]
     (the ecosystem tracker: reads GitHub's public REST API for every project in the registry, one request at

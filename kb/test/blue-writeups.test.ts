@@ -50,6 +50,16 @@ test("a write-up file: front matter, our words, named by its page id", () => {
   expect(() => compileWriteups([{ name: "us-70000001.md", text: fixture }], new Set(["forum:1"]))).toThrow("no stored post forum:70000001");
 });
 
+test("a draft is checked like a write-up but never bundled, so its page shows none of it", () => {
+  const draft = fixture.replace(/reviewed:\r?\n {2}by: Test Maintainer\r?\n {2}on: 2026-10-21/, "draft: true");
+  expect(parseWriteupFile("us-70000001.md", draft)).toEqual({ postId: "forum:70000001", draft: true, body: expect.stringMatching(/^The beta realms go down/) });
+  expect(compileWriteups([{ name: "us-70000001.md", text: draft }], new Set(["forum:70000001"]))).toEqual([]);
+  expect(() => compileWriteups([{ name: "us-70000001.md", text: draft }], new Set(["forum:1"]))).toThrow("no stored post forum:70000001");
+  expect(() => parseWriteupFile("us-70000001.md", draft.replace("Nothing to prepare.", "<b>x</b>"))).toThrow("HTML");
+  expect(() => parseWriteupFile("us-70000001.md", draft.replace("draft: true", "draft: yes"))).toThrow('draft is "true" or left out');
+  expect(() => parseWriteupFile("us-70000001.md", fixture.replace("postId: forum:70000001", "postId: forum:70000001\ndraft: true"))).toThrow("a draft has no reviewed block");
+});
+
 test("the bundled store is re-checked on the way in", () => {
   const good = parseWriteupFile("us-70000001.md", fixture);
   expect(sanitizeWriteup(good)).toEqual(good);
