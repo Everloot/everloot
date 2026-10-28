@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
-import type { RecordKind } from "@everloot/protocol";
+import { UPLOAD_LIMITS, type RecordKind } from "@everloot/protocol";
 import { parseEverlootLua } from "../../web/src/lib/sv-parse";
-import { prepareUpload, sendBatches } from "../../web/src/lib/upload-batches";
+import { prepareUpload, sendBatches, type BatchReceipt } from "../../web/src/lib/upload-batches";
 import { settledSkip, type SettledList } from "../../kb/src/settled-list";
 import { receiptKeyForSite, type SentState } from "./sent-state";
 
@@ -19,6 +19,8 @@ export interface UploadOptions {
    * whose fact is settled are left out and marked handled; without a list, or for another build, nothing is skipped.
    */
   settled?: SettledList | null | ((build: string | undefined) => Promise<SettledList | null>);
+  /** How long one batch may take, its answer included, before it counts as failed. One minute by default. */
+  timeoutMs?: number;
 }
 
 /** Installed addon lists go only from the upload page, after its preview; the companion never sends them. */
@@ -33,7 +35,117 @@ const CENSUS = new Set<string>(["census_self", "census_seen"]);
 /** Named player rows go only from the upload page too, which says what they are first. */
 const PLAYERS: RecordKind = "player_seen";
 
-export interface UploadResult { sent: number; batches: number; skipped: number; heldNamed: number; heldLegacy: number; heldAddons: number; heldCensus: number; heldPlayers: number; invalid: number }
+/** An answer past the largest request the intake takes is not a receipt. */
+const MAX_ANSWER_BYTES = UPLOAD_LIMITS.maxBodyBytes;
+const KEEP = "Nothing more was marked sent; keep your file and retry.";
+
+/** Milliseconds a Retry-After header asks for, in seconds or as a date; null when it says nothing usable. */
+function retryAfterMs(value: string | null): number | null {
+  if (!value) return null;
+  const ms = Number.isFinite(Number(value)) ? Number(value) * 1000 : Date.parse(value) - Date.now();
+  return Number.isFinite(ms) && ms > 0 ? ms : null;
+}
+
+/** The site answered 429. `retryAfterMs` is its Retry-After, or null when the header said nothing usable. */
+export class RateLimited extends Error {
+  constructor(message: string, readonly retryAfterMs: number | null) { super(message); }
+}
+
+/** Reads the whole answer, or null when it runs past `MAX_ANSWER_BYTES`. */
+async function readAnswer(reader: ReadableStreamDefaultReader<Uint8Array> | undefined): Promise<string | null> {
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (reader) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_ANSWER_BYTES) { void reader.cancel().catch(() => {}); return null; }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+/**
+ * Turns an answer `sendBatches` could not use into an error that says what happened: a refusal by its status and the
+ * site's own short reason, a rate limit with its wait, a page that is no receipt. The page itself is never repeated.
+ */
+function refusal(response: Response, text: string | null, site: string): Error | null {
+  let body: unknown;
+  try { body = text === null ? undefined : JSON.parse(text); } catch { body = undefined; }
+  const error = (body as { error?: unknown } | undefined)?.error;
+  const said = typeof error === "string" ? error.replace(/\s+/g, " ").trim().slice(0, 300) : "";
+  if (response.status === 429) {
+    const wait = retryAfterMs(response.headers.get("retry-after"));
+    return new RateLimited(`${said || `${site} rate limited this upload. Keep your file.`}${wait ? ` Try again in ${Math.max(1, Math.round(wait / 60_000))} min.` : ""}`, wait);
+  }
+  if (!response.ok) {
+    if (said) return new Error(`${said} (HTTP ${response.status})`);
+    return new Error(response.status >= 500
+      ? `${site} had a server error (HTTP ${response.status}). ${KEEP}`
+      : `${site} refused the upload (HTTP ${response.status}). ${KEEP}`);
+  }
+  if (!body || typeof body !== "object") return new Error(`${site} answered with something that is not an Everloot receipt (HTTP ${response.status}). Check the site address and any network sign-in page. ${KEEP}`);
+  return null;
+}
+
+/** The site read every row of a batch and kept none. Its rows stay unsent; the upload goes on with the next batch. */
+class EveryRowRejected extends Error {
+  constructor(readonly receipt: BatchReceipt) { super("The site turned away every row of a batch."); }
+}
+
+/**
+ * The receipt of a 422 that turns away every row of `batch` by its own index, once each, with nothing accepted, no
+ * claim of storage and no error of its own. Anything less exact is a refusal of the whole request, and stops the run.
+ */
+function everyRowRejected(response: Response, text: string | null, batch: unknown): BatchReceipt | null {
+  if (response.status !== 422 || text === null || typeof batch !== "string") return null;
+  let receipt: Record<string, unknown> | null, rows: unknown;
+  try { receipt = JSON.parse(text); rows = JSON.parse(batch).records; } catch { return null; }
+  if (!receipt || typeof receipt !== "object" || receipt.ok !== false || "error" in receipt || "persisted" in receipt || "uploadId" in receipt) return null;
+  const { accepted, rejected } = receipt;
+  if (!Array.isArray(rows) || !Array.isArray(accepted) || accepted.length || !Array.isArray(rejected) || rejected.length !== rows.length) return null;
+  const indices = new Set(rejected.map((r) => (r as { index?: unknown } | null)?.index));
+  if (indices.size !== rows.length || ![...indices].every((i) => Number.isInteger(i) && (i as number) >= 0 && (i as number) < rows.length)) return null;
+  return receipt as unknown as BatchReceipt;
+}
+
+/**
+ * `send` with a time limit on each request, its answer included, and plain errors for what `sendBatches` could not
+ * read. A usable answer goes on unchanged: `sendBatches` still checks the receipt before anything is marked sent.
+ */
+function bounded(send: typeof fetch, site: string, timeoutMs: number): typeof fetch {
+  return async (url, init) => {
+    const controller = new AbortController();
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // Aborting stops a real fetch and its body; cancelling the reader stops a body that ignores the signal.
+    const late = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        reject(new Error(`${site} did not answer within ${Math.round(timeoutMs / 1000)} s. ${KEEP}`));
+        controller.abort();
+        void reader?.cancel().catch(() => {});
+      }, timeoutMs);
+    });
+    try {
+      const response = await Promise.race([send(url, { ...init, signal: controller.signal }).catch((err: unknown) => {
+        const code = (err as { cause?: { code?: unknown } } | null)?.cause?.code;
+        throw new Error(`Could not reach ${site}${typeof code === "string" ? ` (${code})` : ""}. ${KEEP}`);
+      }), late]);
+      reader = response.body?.getReader();
+      const text = await Promise.race([readAnswer(reader), late]);
+      const rejected = everyRowRejected(response, text, init?.body);
+      if (rejected) throw new EveryRowRejected(rejected);
+      const error = refusal(response, text, site);
+      if (error) throw error;
+      return new Response(text, { status: response.status, statusText: response.statusText, headers: response.headers });
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+}
+
+/** `rejected` counts the rows the site did not accept this run: they stay unsent and go again next run. */
+export interface UploadResult { sent: number; batches: number; skipped: number; heldNamed: number; heldLegacy: number; heldAddons: number; heldCensus: number; heldPlayers: number; invalid: number; rejected: number }
 
 /**
  * Send one SavedVariables file's unsent events, the same way the upload page does: named categories
@@ -55,12 +167,34 @@ export async function uploadFile(file: string, options: UploadOptions): Promise<
   // A settled row is handled: it is not weighed again next time, whether or not the rest is sent.
   if (session.skipped.length) options.state.add(receiptKey, session.skipped);
   const result = { sent: 0, batches: session.batches.length, skipped: session.skipped.length, heldNamed: session.held.named, heldLegacy: session.held.legacy,
-    heldAddons: unsent.length - records.length - heldCensus - heldPlayers, heldCensus, heldPlayers, invalid: session.held.invalid };
+    heldAddons: unsent.length - records.length - heldCensus - heldPlayers, heldCensus, heldPlayers, invalid: session.held.invalid, rejected: 0 };
   if (session.batches.length === 0) return result;
-  await sendBatches(session, options.fetch ?? fetch, () => {
-    const confirmed = JSON.parse(session.batches[session.next - 1]).records as { eventId: string }[];
-    options.state.add(receiptKey, confirmed.map((r) => r.eventId));
-    result.sent += confirmed.length;
-  }, new URL("/api/intake", options.endpoint).href);
+  const send = bounded(options.fetch ?? fetch, new URL(options.endpoint).host, options.timeoutMs ?? 60_000);
+  const progress = () => {
+    // Only the rows the receipt names as accepted are sent. A rejected row, or an index that names no row, stays
+    // unsent and goes again next run: a stored batch can still turn rows away for now (a store that was down).
+    const rows = JSON.parse(session.batches[session.next - 1]).records as { eventId: string }[];
+    if (session.receipts[session.next - 1].rejected != null && !Array.isArray(session.receipts[session.next - 1].rejected)) {
+      throw new Error("The site returned an invalid receipt. Keep your file and retry.");
+    }
+    const rejected = new Set((session.receipts[session.next - 1].rejected ?? [])
+      .map((r) => (r as { index?: unknown } | null)?.index));
+    const indices = new Set((session.receipts[session.next - 1].accepted ?? [])
+      .map((a) => (a as { index?: unknown } | null)?.index)
+      .filter((i): i is number => Number.isInteger(i) && (i as number) >= 0 && (i as number) < rows.length && !rejected.has(i)));
+    options.state.add(receiptKey, [...indices].map((i) => rows[i].eventId));
+    result.sent += indices.size;
+    result.rejected += rows.length - indices.size;
+  };
+  const intake = new URL("/api/intake", options.endpoint).href;
+  // A batch the site turned away whole is passed over with its own receipt, so each receipt stays with its batch; one
+  // pass at most per batch. Any other failure stops the run.
+  for (;;) {
+    try { await sendBatches(session, send, progress, intake); break; } catch (err) {
+      if (!(err instanceof EveryRowRejected)) throw err;
+      session.receipts.push(err.receipt); session.next++;
+      result.rejected += err.receipt.rejected!.length;
+    }
+  }
   return result;
 }

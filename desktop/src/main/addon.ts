@@ -70,13 +70,18 @@ export function safeAddonEntries(entries: Record<string, Uint8Array>): [string, 
 /**
  * Writes the addon from a zip into Interface/AddOns in one swap: the files go to `Everloot.new`,
  * the old folder becomes `Everloot.old`, the new one takes its place, the old one is removed.
- * The game folder never sees a half-written addon.
+ * The game folder never sees a half-written addon. If the new folder cannot take its place (a file
+ * locked by an antivirus or the game), the old one is put back; if that fails too, both stay on disk
+ * and the error names them.
  */
 export function extractAddon(zip: Uint8Array, addonsDir: string): number {
   const entries = safeAddonEntries(unzipSync(zip));
   if (entries.length === 0) throw new Error("the zip holds no Everloot/ files");
   if (!entries.some(([name]) => name === `${ADDON_FOLDER}/${ADDON_FOLDER}.toc`)) throw new Error("the zip has no Everloot.toc");
   const target = join(addonsDir, ADDON_FOLDER), fresh = `${target}.new`, old = `${target}.old`;
+  if (!existsSync(target) && existsSync(old)) {
+    throw new Error(`A previous addon install needs recovery. Rename ${old} to ${target} before trying again; the saved copies have been kept.`);
+  }
   rmSync(fresh, { recursive: true, force: true });
   rmSync(old, { recursive: true, force: true });
   for (const [name, data] of entries) {
@@ -84,8 +89,17 @@ export function extractAddon(zip: Uint8Array, addonsDir: string): number {
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, data);
   }
-  if (existsSync(target)) renameSync(target, old);
-  renameSync(fresh, target);
+  const hadOld = existsSync(target);
+  if (hadOld) renameSync(target, old);
+  try {
+    renameSync(fresh, target);
+  } catch (err) {
+    if (!hadOld) throw err;
+    const why = err instanceof Error ? err.message : String(err);
+    try { renameSync(old, target); }
+    catch { throw new Error(`${why}; the old addon could not be put back: it is in ${old}, the new one in ${fresh}. Rename ${old} to ${target} before trying again.`); }
+    throw err;
+  }
   rmSync(old, { recursive: true, force: true });
   return entries.length;
 }

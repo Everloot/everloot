@@ -149,6 +149,31 @@ test("the ask job refuses a token file it cannot read or that is empty", async (
   await expect(run(empty)).rejects.toThrow(/is empty/);
 });
 
+test("an upload the site turned away says how many rows stay unsent", async () => {
+  const d = dir();
+  const file = join(d, "Everloot.lua");
+  writeFileSync(file, `EverlootDB = {
+["version"] = "0.2.2",
+["installId"] = "abcd-1234-ef56-7890",
+["records"] = {
+["loot"] = {
+{["eventId"] = "epoch:1", ["capturedAt"] = "2026-10-09T00:00:00Z", ["sourceNpcId"] = 42, ["sourceEvidence"] = "loot-api", ["items"] = {{["itemId"] = 5, ["count"] = 1}}},
+},
+},
+}
+`);
+  vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+    if (String(input).includes("/api/coverage/settled")) return new Response(null, { status: 404 });
+    return Response.json({ ok: false, accepted: [], rejected: [{ index: 0, reason: "Not collected yet." }] }, { status: 422 });
+  }));
+  try {
+    const { deps } = companionJobs(join(d, "data"), () => ({ ...defaultSettings(), endpoint: "https://everloot.app" }));
+    expect(await deps.upload(file)).toMatch(/^sent 0 new events in 1 batch\(es\); the site turned away 1 row, which stays unsent and goes again next run; skipped 0 /);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 test("an upload leaves out settled rows, keeps the list in the data folder, and says how many it skipped", async () => {
   const d = dir();
   const build = "1.60.1.70450";

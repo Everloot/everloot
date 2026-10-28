@@ -1,4 +1,4 @@
-import { BrowserWindow, Notification, app, clipboard, dialog, ipcMain, screen, shell } from "electron";
+import { BrowserWindow, Notification, app, clipboard, dialog, ipcMain, powerMonitor, screen, shell } from "electron";
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -255,7 +255,7 @@ if (!app.requestSingleInstanceLock()) {
     updateProgress = { stage: "downloading", percent: 0, error: null };
     broadcast();
     try {
-      const path = await downloadUpdate({ url: u.downloadUrl, sumsUrl: u.sumsUrl, dir: join(data, "updates"), onProgress: (percent) => { updateProgress = { stage: "downloading", percent, error: null }; broadcast(); } });
+      const path = await downloadUpdate({ url: u.downloadUrl, sumsUrl: u.sumsUrl, version: u.latest ?? undefined, dir: join(data, "updates"), onProgress: (percent) => { updateProgress = { stage: "downloading", percent, error: null }; broadcast(); } });
       downloaded = { path, version: u.latest! };
       updateProgress = { stage: "ready", percent: 100, error: null };
     } catch (err) {
@@ -282,7 +282,15 @@ if (!app.requestSingleInstanceLock()) {
     });
     if (answer.response !== 0) return false;
     for (let i = 0; i < 120 && JOBS.some((j) => engine.snapshot().jobs[j].state === "running"); i++) await new Promise((r) => setTimeout(r, 500));
-    runInstaller(downloaded.path);
+    // The app quits only once the installer has started; if it cannot start, the app stays open and says so.
+    try {
+      await runInstaller(downloaded.path);
+    } catch (err) {
+      downloaded = null;
+      updateProgress = { stage: "failed", percent: 0, error: `the installer did not start (${err instanceof Error ? err.message : String(err)})` };
+      broadcast();
+      return false;
+    }
     quitting = true;
     app.quit();
     return true;
@@ -446,6 +454,8 @@ if (!app.requestSingleInstanceLock()) {
     });
     applyLoginItem();
     engine.start(settings);
+    // A laptop that slept through the last retry would otherwise wait for the next logout.
+    powerMonitor.on("resume", () => engine.recover());
     // Windows passes the login item's args; macOS does not, but says whether this launch came from login.
     const hidden = process.argv.includes("--hidden") || (process.platform === "darwin" && app.getLoginItemSettings().wasOpenedAtLogin);
     if (!settings.consentedAt || !(hidden && settings.startInTray)) createWindow();

@@ -85,7 +85,7 @@ export default async function RealmItemPage(props: Props) {
         icon={tip?.icon ? <GameIcon src={tip.icon} size={40} /> : undefined}
         title={label}
         quality={quality}
-        lede={`Auction House price on ${realm} in WoW: Forever.`}
+        lede={`Auction House price on ${realm} in WoW: Forever, all houses blended.`}
         meta={v && (
           <Facts items={[
             row.updatedAt !== null ? <>Updated <TimeAgo key="t" at={row.updatedAt} renderedAt={now.getTime()} /></> : `Newest public day ${v.day}`,

@@ -103,6 +103,12 @@ function deps(over: Partial<MarketDeps> = {}): MarketDeps & { resolveItem: Retur
 }
 
 describe("answerMarketQuestion", () => {
+  test("a sells-for question distinguishes listing prices from completed sales", async () => {
+    const reply = await answerMarketQuestion("how much does Linen Cloth sell for on Forever", deps());
+    expect(reply?.text).toContain("asking prices, not completed sales");
+    expect(reply!.text.length).toBeLessThanOrEqual(MARKET_ANSWER_BUDGET);
+  });
+
   test("a question that is not about a price is left alone: no lookup, no item search", async () => {
     const d = deps();
     expect(await answerMarketQuestion("Where does Linen Cloth drop?", d)).toBeNull();

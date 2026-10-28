@@ -27,13 +27,13 @@ function T.StatusLines()
   local realm = realmName()
   local own = realm and E:OwnScan(realm)
   if not own then
-    lines[2] = "No scan of this house yet."
+    lines[2] = "No scan on this realm yet."
     return lines
   end
   local items = 0
   for _ in pairs(own.items) do items = items + 1 end
   local minutes = math.floor((time() - own.at) / 60)
-  lines[2] = string.format("Last scan: %d items, %s.", items,
+  lines[2] = string.format("Last scan on this realm: %d items, %s.", items,
     minutes < 1 and "just now" or minutes < 60 and (minutes .. " min ago") or (math.floor(minutes / 60) .. " h ago"))
   lines[3] = own.at < sessionStart and "Saved in your file: the Desktop App sends it."
     or "Not saved yet: Share now, or log out, and the Desktop App sends it."

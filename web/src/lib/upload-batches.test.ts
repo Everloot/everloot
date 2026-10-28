@@ -2,6 +2,107 @@ import { recordSchemas } from "@everloot/protocol";
 import { expect, test, vi } from "vitest";
 import { censusCharacters, censusSummary, prepareUpload, sendBatches } from "./upload-batches";
 const row = (i: number) => ({ kind: "loot", installId: "install-batches", eventId: `epoch:${i}`, capturedAt: "2026-10-07T00:00:00Z", sourceNpcId: 1, items: [] });
+
+const refused = (count: number) => ({ ok: false, accepted: [], rejected: Array.from({ length: count }, (_, index) => ({ index, reason: "Try again later" })) });
+const stored = (count: number) => ({ ok: true, persisted: true, uploadId: "stored", accepted: Array.from({ length: count }, (_, index) => ({ index, kind: "loot" })), rejected: [] });
+
+for (const rejectedBatch of [0, 1]) test(`a fully rejected batch at position ${rejectedBatch} does not block later batches or claim storage`, async () => {
+  const session = prepareUpload({ addonVersion: "0.2.0", records: Array.from({ length: 4001 }, (_, i) => row(i)) }, {}, []);
+  const original = [...session.batches];
+  const receipts = original.map((body, index) => index === rejectedBatch ? refused(JSON.parse(body).records.length) : stored(JSON.parse(body).records.length));
+  let next = 0;
+  const send = vi.fn(async () => {
+    const index = next++;
+    return Response.json(receipts[index], { status: index === rejectedBatch ? 422 : 200 });
+  });
+  const progress = vi.fn();
+  await sendBatches(session, send, progress);
+  expect(session.next).toBe(3);
+  expect(session.receipts).toEqual(receipts);
+  expect(session.receipts[rejectedBatch]).not.toHaveProperty("persisted");
+  expect(session.receipts[rejectedBatch]).not.toHaveProperty("uploadId");
+  expect(session.receipts.reduce((n, r) => n + r.accepted!.length, 0)).toBe(2001);
+  expect(progress).toHaveBeenCalledTimes(3);
+  expect(session.batches).toEqual(original);
+});
+
+test("after a rejected batch and confirmed progress, a failure retries only the unchanged unresolved batch", async () => {
+  const session = prepareUpload({ addonVersion: "0.2.0", records: Array.from({ length: 4001 }, (_, i) => row(i)) }, {}, []);
+  const send = vi.fn().mockResolvedValueOnce(Response.json(refused(2000), { status: 422 }))
+    .mockResolvedValueOnce(Response.json(stored(2000)))
+    .mockRejectedValueOnce(new Error("offline"));
+  await expect(sendBatches(session, send)).rejects.toThrow("offline");
+  expect(session.next).toBe(2);
+  expect(session.receipts).toHaveLength(2);
+  send.mockResolvedValueOnce(Response.json(stored(1)));
+  await sendBatches(session, send);
+  expect(send.mock.calls.map((call) => call[1].body)).toEqual([...session.batches, session.batches[2]]);
+  expect(session.next).toBe(3);
+});
+
+test("a single fully rejected batch finishes with zero saved rows and its original refusal", async () => {
+  const session = prepareUpload({ addonVersion: "0.2.0", records: [row(1)] }, {}, []);
+  const receipt = refused(1);
+  await sendBatches(session, vi.fn(async () => Response.json(receipt, { status: 422 })));
+  expect(session.next).toBe(1);
+  expect(session.receipts).toEqual([receipt]);
+});
+
+test("a one-row envelope refusal cannot be mistaken for rejection of that row", async () => {
+  const session = prepareUpload({ addonVersion: "0.2.0", records: [row(1), { ...row(2), installId: "other-install" }] }, {}, []);
+  const send = vi.fn(async () => Response.json({ ok: false, accepted: [], rejected: [{ index: -1, reason: "Envelope refused" }] }, { status: 422 }));
+  await expect(sendBatches(session, send)).rejects.toThrow(/confirmed/i);
+  expect(send).toHaveBeenCalledTimes(1);
+  expect(session.next).toBe(0);
+  expect(session.receipts).toEqual([]);
+});
+
+test("a durable partial receipt keeps accepted and rejected rows distinct", async () => {
+  const session = prepareUpload({ addonVersion: "0.2.0", records: [row(1), row(2)] }, {}, []);
+  const receipt = { ...stored(1), rejected: [{ index: 1, reason: "Try again later" }] };
+  await sendBatches(session, vi.fn(async () => Response.json(receipt)));
+  expect(session.next).toBe(1);
+  expect(session.receipts).toEqual([receipt]);
+  expect(session.receipts[0].accepted).toHaveLength(1);
+  expect(session.receipts[0].rejected).toHaveLength(1);
+});
+
+for (const status of [429, 503]) test(`a ${status} after a rejected batch stops and preserves its receipt`, async () => {
+  const session = prepareUpload({ addonVersion: "0.2.0", records: [row(1), { ...row(2), installId: "other-install" }] }, {}, []);
+  const receipt = refused(1);
+  const send = vi.fn().mockResolvedValueOnce(Response.json(receipt, { status: 422 }))
+    .mockResolvedValueOnce(Response.json({ error: "Try later" }, { status }));
+  await expect(sendBatches(session, send)).rejects.toThrow("Try later");
+  expect(session.next).toBe(1);
+  expect(session.receipts).toEqual([receipt]);
+  expect(send).toHaveBeenCalledTimes(2);
+});
+
+for (const [label, status, receipt] of [
+  ["request error", 422, { ...refused(2), error: "Refused envelope" }],
+  ["null error", 422, { ...refused(2), error: null }],
+  ["persistence claim", 422, { ...refused(2), persisted: false }],
+  ["upload id", 422, { ...refused(2), uploadId: "" }],
+  ["accepted rows", 422, { ...refused(2), accepted: [{ index: 0, kind: "loot" }] }],
+  ["envelope rejection", 422, { ...refused(2), rejected: [{ index: -1, reason: "Envelope" }] }],
+  ["duplicate index", 422, { ...refused(2), rejected: [{ index: 0, reason: "A" }, { index: 0, reason: "B" }] }],
+  ["missing index", 422, refused(1)],
+  ["out of range", 422, { ...refused(2), rejected: [{ index: 0, reason: "A" }, { index: 2, reason: "B" }] }],
+  ["fractional index", 422, { ...refused(2), rejected: [{ index: 0, reason: "A" }, { index: 0.5, reason: "B" }] }],
+  ["string index", 422, { ...refused(2), rejected: [{ index: 0, reason: "A" }, { index: "1", reason: "B" }] }],
+  ["null entry", 422, { ...refused(2), rejected: [null, { index: 1, reason: "B" }] }],
+  ["bad reason", 422, { ...refused(2), rejected: [{ index: 0, reason: {} }, { index: 1, reason: "B" }] }],
+  ["rate limit", 429, refused(2)],
+  ["server failure", 503, refused(2)],
+  ["bad request", 400, refused(2)],
+] as const) test(`${label} still stops without advancing or sending later batches`, async () => {
+  const session = prepareUpload({ addonVersion: "0.2.0", records: [row(1), row(2), { ...row(3), installId: "other-install" }] }, {}, []);
+  const send = vi.fn(async () => Response.json(receipt, { status }));
+  await expect(sendBatches(session, send)).rejects.toThrow();
+  expect(send).toHaveBeenCalledTimes(1);
+  expect(session.next).toBe(0);
+  expect(session.receipts).toEqual([]);
+});
 test("splits a full file by records and bytes, withholds legacy and unselected names", () => {
   const legacy = { ...row(9999), eventId: undefined };
   const gold = { kind: "gold_snapshot", installId: "install-batches", eventId: "epoch:gold", capturedAt: row(1).capturedAt, character: "Thrall", realm: "Moon Guard", currentCopper: 1, peakCopper: 1 };

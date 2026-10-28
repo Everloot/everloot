@@ -34,5 +34,7 @@ export async function POST(req: Request) {
   }
   revalidateTag(PLAYER_SEARCH_TAG);
   revalidatePath(playerPath({ ruleset: rulesetOf(realm), realm, name }));
+  // Aliases normalize to the same character but have separate ISR entries.
+  revalidatePath("/players/[ruleset]/[realm]/[name]", "page");
   return back(req, "done=1");
 }

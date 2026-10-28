@@ -86,15 +86,30 @@ export function prepareUpload(payload: unknown, sharing: SharingChoices, grantTo
   if (chunk.length) batches.push(prefix + chunk.join(",") + suffix);
   return { batches, next: 0, receipts: [], counts, held, addons: [...addons.values()].sort(), census: censusCharacters(census), skipped };
 }
-/** Advance only after a confirmed durable receipt; retries send the identical batch. */
+/** A per-row refusal, not a request failure or a claim that anything was stored. */
+function everyRowRejected(receipt: BatchReceipt, count: number): boolean {
+  if (!receipt || typeof receipt !== "object" || receipt.ok !== false || "error" in receipt || "persisted" in receipt || "uploadId" in receipt) return false;
+  const { accepted, rejected } = receipt;
+  if (!Array.isArray(accepted) || accepted.length || !Array.isArray(rejected) || rejected.length !== count) return false;
+  const indices = new Set<number>();
+  for (const row of rejected) {
+    if (!row || !Number.isInteger(row.index) || row.index < 0 || row.index >= count || indices.has(row.index) || typeof row.reason !== "string") return false;
+    indices.add(row.index);
+  }
+  return true;
+}
+
+/** Process durable receipts or exact all-row refusals; retries send the identical unresolved batch. */
 export async function sendBatches(session: UploadSession, send: typeof fetch = fetch, onProgress: () => void = () => {}, url = "/api/intake") {
   while (session.next < session.batches.length) {
     const body = session.batches[session.next];
     const response = await send(url, { method: "POST", headers: { "Content-Type": "application/json" }, body });
     const receipt = await response.json() as BatchReceipt;
-    if (!response.ok || !receipt.ok || receipt.persisted !== true || !receipt.uploadId || !Array.isArray(receipt.accepted) ||
-      receipt.accepted.length + (receipt.rejected?.length ?? 0) !== JSON.parse(body).records.length) {
-      throw new Error(receipt.error ?? "Storage was not confirmed. Keep your file and retry.");
+    const count = JSON.parse(body).records.length;
+    const rejected = response.status === 422 && everyRowRejected(receipt, count);
+    if (!rejected && (!response.ok || !receipt?.ok || receipt.persisted !== true || !receipt.uploadId || !Array.isArray(receipt.accepted) ||
+      receipt.accepted.length + (receipt.rejected?.length ?? 0) !== count)) {
+      throw new Error(receipt?.error ?? "Storage was not confirmed. Keep your file and retry.");
     }
     session.receipts.push(receipt); session.next++; onProgress();
   }

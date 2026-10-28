@@ -51,6 +51,8 @@ test("builds are joined with their labels' name and realm, newest first; a build
 
 /** The golden file the addon's plan test loads in Lua 5.1 (addon/tests/plan_contract.py). */
 const FIXTURE = new URL("../../addon/tests/fixtures/EverlootBuilds.lua", import.meta.url);
+/** The collector addon's interface number: the slot's TOC has to match it, or the client marks one "out of date". */
+const ADDON_INTERFACE = /^## Interface: *(\d+)\r?$/m.exec(readFileSync(new URL("../../addon/Everloot.toc", import.meta.url), "utf8"))![1];
 test("account response to Lua carries each set's own order and only game fields", async () => {
   const builds = await fetchBuilds("https://everloot.app", KEY, (async () => json(200, {
     accountId: "private-owner", email: "private-email", transferKey: "private-transfer",
@@ -111,7 +113,7 @@ const FIXTURE_BUILDS: GameBuild[] = [
 
 test("the slot addon: a TOC like the other two and one data file, every string escaped", () => {
   const { toc, lua } = renderBuildsAddon(FIXTURE_BUILDS, "2026-10-20T12:00:00.000Z");
-  expect(toc).toContain("## Interface: 16001\n");
+  expect(toc).toContain(`## Interface: ${ADDON_INTERFACE}\n`);
   expect(toc).toContain("## Title: Everloot Builds\n");
   expect(toc.trimEnd().endsWith("\ndata.lua")).toBe(true);
   expect(lua).toContain('EverlootBuildsData = {\n  version = 1,\n  syncedAt = "2026-10-20T12:00:00.000Z",');
@@ -131,6 +133,7 @@ test("written through a temp file, and not written again when the builds are the
   const folder = join(addons, "EverlootBuilds");
   expect(writeBuildsAddon(addons, renderBuildsAddon(FIXTURE_BUILDS, "2026-10-20T12:00:00.000Z"))).toBe(true);
   expect(readdirSync(folder).sort()).toEqual(["EverlootBuilds.toc", "data.lua"]);
+  expect(readFileSync(join(folder, "EverlootBuilds.toc"), "utf8")).toContain(`## Interface: ${ADDON_INTERFACE}\n`);
   const before = statSync(join(folder, "data.lua")).mtimeMs;
   writeFileSync(join(folder, "data.lua.tmp"), "stale");
   // A later sync with the same builds: nothing is written, the sync time in the file stays the earlier one.

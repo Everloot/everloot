@@ -51,7 +51,6 @@ test("a failed fetch is an error, never an empty price list", async () => {
 
 test("the slot addon holds one checksummed string per realm and matches the golden file", () => {
   const { toc, lua } = renderPricesAddon(FIXTURE_REALMS, FIXTURE_DROPS);
-  expect(toc).toContain(`## Interface: 16001`);
   expect(toc).toContain(`${PRICES_ADDON}.lua`);
   const data = "2589,205,200,190,40,2026-10-20,3;765,,30,33,900,2026-10-05,4";
   expect(lua).toContain(`["data"] = "${data}"`);

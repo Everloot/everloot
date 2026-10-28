@@ -4,7 +4,10 @@ import { JOBS } from "../shared/types";
 /** The work the engine schedules. Injected so tests run it with no files and no network. */
 export interface EngineDeps {
   findFiles(gameFolder: string): string[];
-  /** Uploads one account file; the returned line goes to the log. */
+  /**
+   * Uploads one account file; the returned line goes to the log. A rejection with a `retryAfterMs` field is the site's
+   * 429 (the uploader's `RateLimited`): its wait in ms, or null when the site gave none the uploader could use.
+   */
   upload(file: string): Promise<string>;
   prices(files: string[]): Promise<string>;
   ask(file: string): Promise<string>;
@@ -28,7 +31,10 @@ export interface EngineOptions {
 export interface Engine {
   start(settings: Settings): void;
   stop(): void;
+  /** Upload now and friends: a failure here gets the full round of retries again, a 429's wait still first. */
   runNow(job: Job): Promise<void>;
+  /** The system woke, and the network usually with it: a job that ran out of retries gets one more round. */
+  recover(): void;
   setPaused(paused: boolean): void;
   snapshot(): EngineState;
   /** A line on the Log page from outside the jobs (the app's own errors). */
@@ -45,6 +51,16 @@ export const accountOf = (file: string): string => {
 
 const enabled = (s: Settings, job: Job) => (job === "upload" ? s.upload : job === "prices" ? s.prices : s.ask.enabled);
 
+/** setTimeout runs a longer delay at once. A longer wait comes back to the check in `run` and is set again. */
+const MAX_TIMER_MS = 2 ** 31 - 1;
+
+/** A rate limit's wait: a positive finite number of ms, or null; undefined when `err` is no rate limit. */
+const rateLimitWait = (err: unknown): number | null | undefined => {
+  if (!err || typeof err !== "object" || !("retryAfterMs" in err)) return undefined;
+  const ms = err.retryAfterMs;
+  return typeof ms === "number" && Number.isFinite(ms) && ms > 0 ? ms : null;
+};
+
 export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Engine {
   const settle: Record<Job, number> = { upload: options.uploadSettleMs ?? 5000, ask: options.askSettleMs ?? 2000, prices: 0 };
   const pricesEvery = options.pricesEveryMs ?? 60 * 60 * 1000;
@@ -52,6 +68,7 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
   const retryAfter = options.retryMs ?? [60_000, 5 * 60_000, 15 * 60_000];
   const maxLog = options.logLines ?? 200;
   const now = () => (deps.now ? deps.now() : new Date()).toISOString();
+  const clock = () => (deps.now ? deps.now() : new Date()).getTime();
 
   const off = (): JobStatus => ({ state: "off", message: "", at: null });
   const state: EngineState = { files: [], jobs: { upload: off(), prices: off(), ask: off() }, log: [], paused: false };
@@ -66,6 +83,17 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
   const retries = new Map<Job, number>();
   const running = new Set<Job>();
   const again = new Set<Job>();
+  const renew = new Set<Job>();
+  /**
+   * Per job, the time a site's 429 asked us to wait until. No run of the job starts before it for that site, Upload
+   * now included: the run is set for then instead. It outlives stop() and start(), so a restart cannot skip it.
+   */
+  const waits = new Map<string, number>();
+  const waitKey = (job: Job, endpoint: string) => {
+    try { return `${job}:${new URL(endpoint).origin}`; }
+    catch { return `${job}:${endpoint}`; } // Invalid settings still reach the job's normal error handling.
+  };
+  const waitLine = (job: Job, ms: number) => `${job}: the site asked to wait; trying again in ${Math.max(1, Math.round(ms / 60_000))} min`;
 
   const snapshot = (): EngineState => ({ files: [...state.files], jobs: { upload: { ...state.jobs.upload }, prices: { ...state.jobs.prices }, ask: { ...state.jobs.ask } }, log: [...state.log], paused: state.paused });
   const emit = () => { const s = snapshot(); for (const l of listeners) l(s); };
@@ -75,11 +103,17 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
   };
   const set = (job: Job, patch: Partial<JobStatus>) => { state.jobs[job] = { ...state.jobs[job], ...patch }; };
 
-  async function run(job: Job): Promise<void> {
+  /** `fresh` starts the job's retries over, as a run the user asked for does. */
+  async function run(job: Job, fresh = false): Promise<void> {
     const s = settings;
     if (!s || !enabled(s, job)) return;
     if (state.paused) { log("info", `${job}: paused, skipped`); emit(); return; }
-    if (running.has(job)) { again.add(job); return; }
+    if (fresh && !running.has(job)) retries.delete(job);
+    const key = waitKey(job, s.endpoint);
+    const left = (waits.get(key) ?? 0) - clock();
+    if (left > 0) { log("info", waitLine(job, left)); schedule(job, left); emit(); return; }
+    waits.delete(key);
+    if (running.has(job)) { again.add(job); if (fresh) renew.add(job); return; }
     if (state.files.length === 0) { set(job, { state: "idle", message: "No Everloot.lua to read", at: now() }); emit(); return; }
     const started = session;
     const files = [...state.files];
@@ -88,17 +122,26 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
     emit();
     const failures: string[] = [];
     const lines: string[] = [];
+    // A 429 holds the account files after it too: they go to the same site.
+    let limited = undefined as { ms: number | null } | undefined;
     const attempt = async (label: string, work: () => Promise<string>) => {
       if (started !== session) return;
       try { const line = await work(); if (started !== session) return; lines.push(line); log("info", `${label}: ${line}`); }
-      catch (err) { if (started !== session) return; const m = err instanceof Error ? err.message : String(err); failures.push(m); log("error", `${label}: ${m}`); }
+      catch (err) {
+        const ms = rateLimitWait(err);
+        if (ms !== undefined) limited = { ms };
+        if (started !== session) return;
+        const m = err instanceof Error ? err.message : String(err); failures.push(m); log("error", `${label}: ${m}`);
+      }
     };
-    if (job === "upload") for (const file of files) await attempt(`upload ${accountOf(file)}`, () => deps.upload(file));
+    if (job === "upload") for (const file of files) { if (limited) break; await attempt(`upload ${accountOf(file)}`, () => deps.upload(file)); }
     else if (job === "ask") for (const file of files) await attempt(`ask ${accountOf(file)}`, () => deps.ask(file));
     else await attempt("prices", () => deps.prices(files));
     running.delete(job);
     if (started !== session) {
-      if (again.delete(job)) void run(job);
+      // The old request's wait still applies to its site, without updating the new session's job status.
+      if (limited) waits.set(waitKey(job, s.endpoint), clock() + (limited.ms ?? retryAfter[0] ?? 0));
+      if (again.delete(job)) void run(job, renew.delete(job));
       return;
     }
     set(job, failures.length
@@ -109,22 +152,28 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
     if (failures.length === 0) retries.delete(job);
     else if (job !== "prices" && settings === s) {
       const n = retries.get(job) ?? 0;
+      // A 429 waits the site's own time, or the usual retry's when it gave none; the retry is queued and the check in
+      // `run` sets it for then. Past the last retry the wait still holds, and the next write after it tries again.
+      if (limited) waits.set(waitKey(job, s.endpoint), clock() + (limited.ms ?? retryAfter[Math.min(n, retryAfter.length - 1)] ?? 0));
       if (n < retryAfter.length) {
         retries.set(job, n + 1);
-        log("info", `${job}: trying again in ${Math.round(retryAfter[n] / 60_000)} min`);
-        schedule(job, retryAfter[n]);
+        if (limited) again.add(job);
+        else {
+          log("info", `${job}: trying again in ${Math.round(retryAfter[n] / 60_000)} min`);
+          schedule(job, retryAfter[n]);
+        }
       }
     }
     emit();
     // Prices follow every upload, as `watch --game` does on the command line.
     if (job === "upload" && failures.length === 0 && s.prices) void run("prices");
-    if (again.delete(job)) void run(job);
+    if (again.delete(job)) void run(job, renew.delete(job));
   }
 
   function schedule(job: Job, delay = settle[job]): void {
     const t = timers.get(job);
     if (t) clearTimeout(t);
-    timers.set(job, setTimeout(() => { timers.delete(job); void run(job); }, delay));
+    timers.set(job, setTimeout(() => { timers.delete(job); void run(job); }, Math.min(delay, MAX_TIMER_MS)));
   }
 
   /** An account file written after start (the first logout, a second account) restarts the engine with it. */
@@ -147,6 +196,7 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
     if (rescanTimer) { clearInterval(rescanTimer); rescanTimer = null; }
     retries.clear();
     again.clear();
+    renew.clear();
     settings = null;
     state.files = [];
     for (const job of JOBS) state.jobs[job] = off();
@@ -182,7 +232,16 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
   return {
     start,
     stop,
-    runNow: (job) => run(job),
+    runNow: (job) => run(job, true),
+    recover: () => {
+      // Only a job whose last round failed to the end and has nothing set: a second wake mid-round, a running job or
+      // a write already waiting to settle is left as it is. Prices have their hourly timer.
+      for (const job of JOBS) {
+        if (job === "prices" || state.jobs[job].state !== "error" || timers.has(job)) continue;
+        if ((retries.get(job) ?? 0) < retryAfter.length) continue;
+        void run(job, true);
+      }
+    },
     setPaused: (paused) => {
       const resumed = state.paused && !paused;
       state.paused = paused;
