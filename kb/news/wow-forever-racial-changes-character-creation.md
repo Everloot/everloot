@@ -4,6 +4,7 @@ title: "WoW: Forever Racial Changes: Dwarves Get Hit, Tauren Run Faster"
 summary: "Blizzard's final racial pass for WoW: Forever lands as character creation opens Oct 27. Humans lose crit, Dwarves gain 1% hit, Orcs get Command back, Tauren Plainsrunning doubles, Skyborne get reworked."
 author: Everloot Team
 published: 2026-10-27
+updated: 2026-10-28
 tags: [blue-post, forever]
 sources:
   - title: "Blizzard forums: WoW Forever Beta Development Notes – Updated 26 October (racial pass)"
