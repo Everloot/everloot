@@ -333,6 +333,13 @@ describe("receipts that keep some rows", () => {
     expect(retry.bodies[0].records.map((r) => r.eventId)).toEqual(["epoch:2", "epoch:3"]);
   });
 
+  test("a malformed rejected list gives a recovery message without marking rows sent", async () => {
+    const { file, state } = workspace(luaFile([loot(1), loot(2)]));
+    const api = answering(() => ({ accepted: [{ index: 0 }, { index: 1 }], rejected: {} }));
+    await expect(uploadFile(file, { endpoint: "https://everloot.example", fetch: api.send, state })).rejects.toThrow(/receipt.*keep your file and retry/i);
+    expect(state.has(ID, "epoch:1") || state.has(ID, "epoch:2")).toBe(false);
+  });
+
   test("a refusal that stored nothing marks nothing sent", async () => {
     const { file, state } = workspace(luaFile([loot(1), loot(2)]));
     const send = (async () => Response.json({ ok: false, error: "No records were accepted.", accepted: [], rejected: [{ index: 0, reason: "x" }, { index: 1, reason: "x" }] }, { status: 422 })) as typeof fetch;
