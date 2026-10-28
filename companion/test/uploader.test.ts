@@ -290,6 +290,65 @@ describe("answers that are not a receipt", () => {
   });
 });
 
+describe("receipts that keep some rows", () => {
+  const ID = "https://everloot.example|abcd-1234-ef56-7890";
+  /** A fake intake that stores the batch but answers with `receipt` built from its rows. */
+  function answering(receipt: (records: { eventId: string; kind: string }[]) => Record<string, unknown>) {
+    const bodies: { records: { eventId: string; kind: string }[] }[] = [];
+    const send = (async (_url: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body));
+      bodies.push(body);
+      return Response.json({ ok: true, persisted: true, uploadId: `u-${bodies.length}`, ...receipt(body.records) });
+    }) as typeof fetch;
+    return { send, bodies };
+  }
+
+  test("a row the site turned away for now is not marked sent, and the next run sends only it", async () => {
+    const { file, state } = workspace(luaFile([loot(1), loot(2)]));
+    const api = answering((records) => ({ accepted: [{ index: 0, kind: records[0].kind }], rejected: [{ index: 1, reason: "Census rows are not collected yet." }] }));
+    expect(await uploadFile(file, { endpoint: "https://everloot.example", fetch: api.send, state })).toMatchObject({ sent: 1, batches: 1 });
+    expect(state.has(ID, "epoch:1")).toBe(true);
+    expect(state.has(ID, "epoch:2")).toBe(false);
+    const retry = intake();
+    expect(await uploadFile(file, { endpoint: "https://everloot.example", fetch: retry.send, state })).toMatchObject({ sent: 1, batches: 1 });
+    expect(retry.bodies[0].records.map((r) => r.eventId)).toEqual(["epoch:2"]);
+    expect(await uploadFile(file, { endpoint: "https://everloot.example", fetch: retry.send, state })).toMatchObject({ sent: 0, batches: 0 });
+  });
+
+  test("a stored receipt that kept nothing marks nothing sent", async () => {
+    const { file, state } = workspace(luaFile([loot(1), loot(2)]));
+    const api = answering((records) => ({ accepted: [], rejected: records.map((_, index) => ({ index, reason: "Storage unavailable." })) }));
+    expect(await uploadFile(file, { endpoint: "https://everloot.example", fetch: api.send, state })).toMatchObject({ sent: 0, batches: 1 });
+    expect(state.has(ID, "epoch:1") || state.has(ID, "epoch:2")).toBe(false);
+  });
+
+  test("a refusal that stored nothing marks nothing sent", async () => {
+    const { file, state } = workspace(luaFile([loot(1), loot(2)]));
+    const send = (async () => Response.json({ ok: false, error: "No records were accepted.", accepted: [], rejected: [{ index: 0, reason: "x" }, { index: 1, reason: "x" }] }, { status: 422 })) as typeof fetch;
+    await expect(uploadFile(file, { endpoint: "https://everloot.example", fetch: send, state })).rejects.toThrow(/No records were accepted/);
+    expect(state.has(ID, "epoch:1") || state.has(ID, "epoch:2")).toBe(false);
+  });
+
+  test("only well-formed, in-range accepted indices count, each once", async () => {
+    const { file, state } = workspace(luaFile([loot(1), loot(2), loot(3), loot(4), loot(5), loot(6)]));
+    // Six entries for six rows, so the receipt passes the count check, but only index 2 names a row properly.
+    const api = answering(() => ({ accepted: [{ index: 2 }, { index: 2 }, { index: 6 }, { index: -1 }, { index: 1.5 }, { index: "0" }], rejected: [] }));
+    expect(await uploadFile(file, { endpoint: "https://everloot.example", fetch: api.send, state })).toMatchObject({ sent: 1 });
+    expect([1, 2, 3, 4, 5, 6].filter((n) => state.has(ID, `epoch:${n}`))).toEqual([3]);
+    const retry = intake();
+    await uploadFile(file, { endpoint: "https://everloot.example", fetch: retry.send, state });
+    expect(retry.bodies[0].records.map((r) => r.eventId)).toEqual(["epoch:1", "epoch:2", "epoch:4", "epoch:5", "epoch:6"]);
+  });
+
+  test("an accepted entry that is not an object does not stop the run", async () => {
+    const { file, state } = workspace(luaFile([loot(1), loot(2)]));
+    const api = answering(() => ({ accepted: [null, { index: 1 }], rejected: [] }));
+    expect(await uploadFile(file, { endpoint: "https://everloot.example", fetch: api.send, state })).toMatchObject({ sent: 1 });
+    expect(state.has(ID, "epoch:1")).toBe(false);
+    expect(state.has(ID, "epoch:2")).toBe(true);
+  });
+});
+
 describe("settled facts", () => {
   const BUILD = "1.60.1.70450";
   const withBuild = (text: string) => text.replace('["installId"]', `["clientBuild"] = "${BUILD}",

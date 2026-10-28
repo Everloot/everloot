@@ -142,9 +142,14 @@ export async function uploadFile(file: string, options: UploadOptions): Promise<
   if (session.batches.length === 0) return result;
   const send = bounded(options.fetch ?? fetch, new URL(options.endpoint).host, options.timeoutMs ?? 60_000);
   await sendBatches(session, send, () => {
-    const confirmed = JSON.parse(session.batches[session.next - 1]).records as { eventId: string }[];
-    options.state.add(receiptKey, confirmed.map((r) => r.eventId));
-    result.sent += confirmed.length;
+    // Only the rows the receipt names as accepted are sent. A rejected row, or an index that names no row, stays
+    // unsent and goes again next run: a stored batch can still turn rows away for now (a store that was down).
+    const rows = JSON.parse(session.batches[session.next - 1]).records as { eventId: string }[];
+    const indices = new Set((session.receipts[session.next - 1].accepted ?? [])
+      .map((a) => (a as { index?: unknown } | null)?.index)
+      .filter((i): i is number => Number.isInteger(i) && (i as number) >= 0 && (i as number) < rows.length));
+    options.state.add(receiptKey, [...indices].map((i) => rows[i].eventId));
+    result.sent += indices.size;
   }, new URL("/api/intake", options.endpoint).href);
   return result;
 }
