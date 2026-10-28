@@ -34,6 +34,8 @@ test("a valid request hides the character, clears the caches and sends the perso
   expect(mocks.suppress).toHaveBeenCalledWith("Forever Pioneer", "Thrallina");
   expect(mocks.revalidateTag).toHaveBeenCalledWith("players");
   expect(mocks.revalidatePath).toHaveBeenCalledWith("/players/forever/forever-pioneer/thrallina");
+  // Realm normalization and case-insensitive lookup let aliases have separate ISR entries.
+  expect(mocks.revalidatePath).toHaveBeenCalledWith("/players/[ruleset]/[realm]/[name]", "page");
 });
 
 test("a name or realm that is not one is refused before anything is recorded", async () => {
@@ -52,4 +54,5 @@ test("the same limits as every other write apply, and a storage failure says so"
   vi.spyOn(console, "error").mockImplementation(() => {});
   expect(where(await POST(form({ name: "Thrallina", realm: "Forever Pioneer" })))).toContain("error=storage");
   expect(mocks.revalidateTag).not.toHaveBeenCalled();
+  expect(mocks.revalidatePath).not.toHaveBeenCalled();
 });
