@@ -259,7 +259,7 @@ test("the wait outlives a restart for the same site, not a switch to another sit
   expect(deps.upload).toHaveBeenCalledTimes(3);
 });
 
-test("a 429 that lands after a restart belongs to the old session: no wait, no timer", async () => {
+test("a late rate limit leaves the restarted disabled job off without logging or rerunning it", async () => {
   const { deps, settings, engine, flush } = harness(["A/Everloot.lua"]);
   let refuse!: () => void;
   deps.upload.mockImplementationOnce(() => new Promise<string>((_resolve, fail) => { refuse = () => fail(limited(120_000)); }));
@@ -290,6 +290,34 @@ test("switching between two rate-limited sites preserves each site's wait, inclu
   expect(deps.upload).toHaveBeenCalledTimes(2);
   await vi.advanceTimersByTimeAsync(1);
   expect(deps.upload).toHaveBeenCalledTimes(3);
+  engine.stop();
+});
+
+test("a rate limit arriving during a restart holds the queued upload until the old site's deadline", async () => {
+  const { deps, settings, engine, flush } = harness(["A/Everloot.lua"]);
+  let refuse!: () => void;
+  deps.upload.mockImplementationOnce(() => new Promise<string>((_resolve, reject) => { refuse = () => reject(limited(120_000)); }));
+  const s = { ...settings, prices: false };
+  engine.start(s);
+  await flush();
+  engine.start({ ...s, census: !s.census });
+  refuse();
+  await flush();
+  expect(deps.upload).toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(119_999);
+  expect(deps.upload).toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(deps.upload).toHaveBeenCalledTimes(2);
+  engine.stop();
+});
+
+test("an invalid site address reaches the normal job error path instead of rejecting the scheduler", async () => {
+  const { deps, settings, engine, flush } = harness(["A/Everloot.lua"]);
+  deps.upload.mockRejectedValue(new TypeError("Invalid URL"));
+  engine.start({ ...settings, prices: false, endpoint: "http://[" });
+  await flush();
+  expect(deps.upload).toHaveBeenCalledTimes(1);
+  expect(engine.snapshot().jobs.upload).toMatchObject({ state: "error", message: "Invalid URL" });
   engine.stop();
 });
 

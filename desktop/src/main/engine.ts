@@ -85,7 +85,10 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
    * now included: the run is set for then instead. It outlives stop() and start(), so a restart cannot skip it.
    */
   const waits = new Map<string, number>();
-  const waitKey = (job: Job, endpoint: string) => `${job}:${new URL(endpoint).origin}`;
+  const waitKey = (job: Job, endpoint: string) => {
+    try { return `${job}:${new URL(endpoint).origin}`; }
+    catch { return `${job}:${endpoint}`; } // Invalid settings still reach the job's normal error handling.
+  };
   const waitLine = (job: Job, ms: number) => `${job}: the site asked to wait; trying again in ${Math.max(1, Math.round(ms / 60_000))} min`;
 
   const snapshot = (): EngineState => ({ files: [...state.files], jobs: { upload: { ...state.jobs.upload }, prices: { ...state.jobs.prices }, ask: { ...state.jobs.ask } }, log: [...state.log], paused: state.paused });
@@ -119,10 +122,10 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
       if (started !== session) return;
       try { const line = await work(); if (started !== session) return; lines.push(line); log("info", `${label}: ${line}`); }
       catch (err) {
-        if (started !== session) return;
-        const m = err instanceof Error ? err.message : String(err); failures.push(m); log("error", `${label}: ${m}`);
         const ms = rateLimitWait(err);
         if (ms !== undefined) limited = { ms };
+        if (started !== session) return;
+        const m = err instanceof Error ? err.message : String(err); failures.push(m); log("error", `${label}: ${m}`);
       }
     };
     if (job === "upload") for (const file of files) { if (limited) break; await attempt(`upload ${accountOf(file)}`, () => deps.upload(file)); }
@@ -130,6 +133,8 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
     else await attempt("prices", () => deps.prices(files));
     running.delete(job);
     if (started !== session) {
+      // The old request's wait still applies to its site, without updating the new session's job status.
+      if (limited) waits.set(waitKey(job, s.endpoint), clock() + (limited.ms ?? retryAfter[0] ?? 0));
       if (again.delete(job)) void run(job);
       return;
     }
