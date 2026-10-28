@@ -168,7 +168,7 @@ test("an upload the site turned away says how many rows stay unsent", async () =
   }));
   try {
     const { deps } = companionJobs(join(d, "data"), () => ({ ...defaultSettings(), endpoint: "https://everloot.app" }));
-    expect(await deps.upload(file)).toMatch(/^sent 0 new events in 1 batch\(es\); the site turned away 1 rows, which stay unsent and go again next run; skipped 0 /);
+    expect(await deps.upload(file)).toMatch(/^sent 0 new events in 1 batch\(es\); the site turned away 1 row, which stays unsent and goes again next run; skipped 0 /);
   } finally {
     vi.unstubAllGlobals();
   }

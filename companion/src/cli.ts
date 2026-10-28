@@ -58,7 +58,7 @@ export function defaultStatePath(os: { platform: string; env: Record<string, str
 
 /** What one file's upload sent, what the site turned away, and what stayed on this machine. */
 export function uploadSummary(file: string, r: UploadResult): string {
-  const rejected = r.rejected ? ` the site turned away ${r.rejected} rows, which stay unsent and go again next run;` : "";
+  const rejected = r.rejected ? ` the site turned away ${r.rejected} ${r.rejected === 1 ? "row, which stays unsent and goes" : "rows, which stay unsent and go"} again next run;` : "";
   return `${file}: sent ${r.sent} new events in ${r.batches} batch(es);${rejected} kept ${r.heldNamed} named, ${r.heldAddons} installed-addon, ${r.heldCensus} census, ${r.heldPlayers} player and ${r.heldLegacy} legacy rows here.`;
 }
 

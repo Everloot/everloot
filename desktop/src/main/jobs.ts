@@ -36,7 +36,7 @@ export function companionJobs(dataFolder: string, current: () => Settings): { de
       // The settled list is kept beside sent.json and refreshed once a day.
       const settled = (build: string | undefined) => appSettledList({ folder: dataFolder, endpoint, build });
       const r = await uploadFile(file, { endpoint, state, census: current().census, players: current().players, settled });
-      const rejected = r.rejected ? `; the site turned away ${r.rejected} rows, which stay unsent and go again next run` : "";
+      const rejected = r.rejected ? `; the site turned away ${r.rejected} ${r.rejected === 1 ? "row, which stays unsent and goes" : "rows, which stay unsent and go"} again next run` : "";
       return `sent ${r.sent} new events in ${r.batches} batch(es)${rejected}; skipped ${r.skipped} already settled; kept ${r.heldNamed} named, ${r.heldAddons} installed-addon, ${r.heldCensus} census and ${r.heldLegacy} legacy rows here${backup}`;
     },
     async prices(files) {
