@@ -1,6 +1,7 @@
 """Write kb/guides as it was at a base commit into a new or empty folder, for `npm run kb -- guide-check --previous`.
 The base is read from git as data: it is fetched, never checked out, and nothing from it runs. Only the folder's
-top-level Markdown files are written. A base without kb/guides gives an empty folder, on purpose; a commit id that
+top-level Markdown and YAML files are written: the guides, and the class chooser's files, which the check holds to
+their review. A base without kb/guides gives an empty folder, on purpose; a commit id that
 does not fetch, or a folder that does not list or read, fails, so the comparison is never skipped by accident.
 Run from the repository root: python scripts/export_base_guides.py <base-commit-id> <folder>"""
 import re
@@ -34,7 +35,7 @@ def export_guides(sha: str, out: Path, cwd: str | Path | None = None) -> int:
         for item in filter(None, git("ls-tree", "-z", f"{sha}:{GUIDES}").split(b"\0")):
             meta, name = item.split(b"\t", 1)
             mode, kind, oid = meta.decode().split(" ")
-            if not name.endswith(b".md") or kind == "tree":
+            if not name.endswith((b".md", b".yaml")) or kind == "tree":
                 continue
             if kind != "blob" or mode not in ("100644", "100755"):
                 raise ValueError(f"{GUIDES}/{name.decode()} at {sha} is not a regular file")
@@ -58,7 +59,7 @@ def main() -> int:
     except subprocess.CalledProcessError as e:
         print(f"export_base_guides: git {' '.join(e.cmd[1:])} failed: {e.stderr.decode(errors='replace').strip()}", file=sys.stderr)
         return 1
-    print(f"{n} files from {GUIDES} at {sha} -> {out}" if n else f"{GUIDES} has no Markdown files at {sha}; comparing with none")
+    print(f"{n} files from {GUIDES} at {sha} -> {out}" if n else f"{GUIDES} has no Markdown or YAML files at {sha}; comparing with none")
     return 0
 
 

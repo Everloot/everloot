@@ -74,11 +74,11 @@ jobs:
       - name: News posts pass the post check
         run: npm run kb -- news-check
         working-directory: kb
-      # Published guides stay as they were, so the check compares with kb/guides at the base: a pull request's base,
-      # the commit a push to main replaced, or a manual run's parent. The base's Markdown is read from git as data;
-      # nothing from it is checked out or run. A base without the folder compares with an empty one; a base that does
-      # not fetch, list or read fails the step.
-      - name: Guides pass the guide check, published versions as at the base
+      # Published guides stay as they were, and so do the class chooser's reviewed files, so the check compares with
+      # kb/guides at the base: a pull request's base, the commit a push to main replaced, or a manual run's parent. The
+      # base's Markdown and YAML files are read from git as data; nothing from them is checked out or run. A base
+      # without the folder compares with an empty one; a base that does not fetch, list or read fails the step.
+      - name: Guides pass the guide check, published versions and reviewed chooser files as at the base
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |

@@ -188,33 +188,78 @@ function reported(error: ZodError, lineOf: LineOf, file: string): Problem[] {
     : [{ file, line: lineOf(issue.path), message: issue.code === "custom" ? issue.message : `${where(issue.path)}${issue.message}` }]);
 }
 
-/** One file read against its schema: the value, or its problems, each with its line. */
-function readFile<T>(file: ChooserFile, schema: z.ZodType<T>): { value: T | null; problems: Problem[]; lineOf: LineOf } {
+/** A YAML error as a problem on its line. */
+const yamlProblem = (file: string, doc: Document, before = ""): Problem => {
+  const [e] = doc.errors;
+  return { file, line: e.linePos?.[0]?.line ?? 1, message: `${before}${e.message.split("\n")[0]}` };
+};
+
+/** One file read against its schema: the value, or its problems, each with its line; and the data as written. */
+function readFile<T>(file: ChooserFile, schema: z.ZodType<T>): { value: T | null; raw: unknown; problems: Problem[]; lineOf: LineOf } {
   const text = normal(file.source);
   const doc = parseDocument(text);
   const lineOf = fieldLines(text, doc);
-  if (doc.errors.length) {
-    const [e] = doc.errors;
-    return { value: null, problems: [{ file: file.path, line: e.linePos?.[0]?.line ?? 1, message: e.message.split("\n")[0] }], lineOf };
+  if (doc.errors.length) return { value: null, raw: null, problems: [yamlProblem(file.path, doc)], lineOf };
+  const raw = doc.toJS();
+  const parsed = schema.safeParse(raw);
+  return parsed.success ? { value: parsed.data, raw, problems: [], lineOf } : { value: null, raw, problems: reported(parsed.error, lineOf, file.path), lineOf };
+}
+
+/** The fields that record a file's review; a review vouches for everything else in the file. */
+const REVIEW_FIELDS = ["status", "version", "reviewer", "reviewedOn"];
+
+/** What a review vouches for, as text to compare: the data without its review fields, keys in order wherever they are written. */
+function vouchedFor(data: unknown): string {
+  const rest = Object.fromEntries(Object.entries((data ?? {}) as Record<string, unknown>).filter(([key]) => !REVIEW_FIELDS.includes(key)));
+  return JSON.stringify(rest, (_, value) => (value && typeof value === "object" && !Array.isArray(value)
+    ? Object.fromEntries(Object.entries(value as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+    : value));
+}
+
+type Review = { status: "draft" | "reviewed"; version: number; reviewer: string; reviewedOn: string | null };
+
+/**
+ * A file held to its review before the change, as the guides hold a published version: once reviewed, any change to
+ * it is a new version, which carries a review of its own or goes back to draft until it has one. A new review of the
+ * same content is a new version too, and versions never go down. A file that was a draft, or was not there, is free.
+ */
+function heldToReview(name: string, path: string, now: { value: Review; raw: unknown }, lineOf: LineOf, before: ChooserFile): Problem[] {
+  const doc = parseDocument(normal(before.source));
+  if (doc.errors.length) return [yamlProblem(path, doc, "as it was before this change, the file does not read, so the change cannot be held to its review: ")];
+  const then = doc.toJS() as Partial<Review> | null;
+  if (then?.status !== "reviewed") return [];
+  const v = then.version;
+  const problem = (field: string, message: string): Problem[] => [{ file: path, line: lineOf([field]), message }];
+  if (typeof v === "number" && now.value.version < v) return problem("version", `version ${now.value.version} is below version ${v}, reviewed before this change: versions never go down`);
+  const sameReview = now.value.reviewer === then.reviewer && now.value.reviewedOn === then.reviewedOn;
+  if (vouchedFor(now.raw) !== vouchedFor(then)) {
+    if (now.value.version === v) return problem("version", `${name} was reviewed as version ${v} and has changed since: a change is a new version, so raise version above ${v}`);
+    if (now.value.status === "reviewed" && sameReview) {
+      return problem("reviewedOn", `version ${now.value.version} carries version ${v}'s review (${then.reviewer}, ${then.reviewedOn}); a new version needs its own review, or status: draft until it has one`);
+    }
+  } else if (now.value.version === v && now.value.status === "reviewed" && !sameReview) {
+    return problem("version", `${name} version ${v} was reviewed by ${then.reviewer} on ${then.reviewedOn}; a new review is a new version, so raise version above ${v}`);
   }
-  const parsed = schema.safeParse(doc.toJS());
-  return parsed.success ? { value: parsed.data, problems: [], lineOf } : { value: null, problems: reported(parsed.error, lineOf, file.path), lineOf };
+  return [];
 }
 
 /**
  * Every rule the two files keep, each problem with its file and line. `today`: a review is never dated after it. The
- * files are read together, so one without the other is a problem.
+ * files are read together, so one without the other is a problem. Given the files as they were before the change
+ * (`previous`), a reviewed file is held to that review.
  */
-export function checkClassChooser(files: ChooserFiles, today: string): { data: ClassChooserData | null; problems: Problem[] } {
+export function checkClassChooser(files: ChooserFiles, today: string, previous?: ChooserFiles): { data: ClassChooserData | null; problems: Problem[] } {
   const problems: Problem[] = [];
-  const read = <T>(key: keyof ChooserFiles, schema: z.ZodType<T>): { value: T | null; lineOf: LineOf } | null => {
+  const read = <T extends Review>(key: keyof ChooserFiles, schema: z.ZodType<T>): { value: T | null; lineOf: LineOf } | null => {
     const file = files[key];
     if (!file) {
       problems.push({ file: `guides/${CHOOSER_FILES[key]}`, message: `guides/${CHOOSER_FILES[key]} is missing: the class chooser reads ${CHOOSER_FILES.roles} and ${CHOOSER_FILES.chooser} together` });
       return null;
     }
-    const { value, problems: found, lineOf } = readFile(file, schema);
+    const { value, raw, problems: found, lineOf } = readFile(file, schema);
     problems.push(...found);
+    const before = previous?.[key];
+    if (value && before) problems.push(...heldToReview(CHOOSER_FILES[key], file.path, { value, raw }, lineOf, before));
     const on = (value as { reviewedOn?: string | null } | null)?.reviewedOn;
     if (on && on > today) problems.push({ file: file.path, line: lineOf(["reviewedOn"]), message: `reviewedOn ${on} is after today (${today})` });
     return { value, lineOf };

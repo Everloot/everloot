@@ -33,8 +33,10 @@ with tempfile.TemporaryDirectory() as tmp:
     (guides / "notes").mkdir(parents=True)
     (guides / "README.md").write_text("# how to write one\n", encoding="utf-8")
     (guides / "frost-leveling.md").write_bytes(b"---\nid: 1\n---\r\n\xc3\xa9\n")
+    (guides / "class-chooser.yaml").write_bytes(b"status: reviewed\r\nversion: 1\n")
     (guides / "run.sh").write_text("echo never run\n", encoding="utf-8")
     (guides / "notes" / "inner.md").write_text("not a guide\n", encoding="utf-8")
+    (guides / "notes" / "inner.yaml").write_text("not the chooser's\n", encoding="utf-8")
     git(origin, "add", "-A")
     git(origin, "commit", "-q", "-m", "guides")
     with_guides = git(origin, "rev-parse", "HEAD")
@@ -44,11 +46,13 @@ with tempfile.TemporaryDirectory() as tmp:
     # The checkout CI has: the newest commit only, so each base must be fetched.
     subprocess.run(["git", "clone", "-q", "--depth=1", origin.as_uri(), str(clone)], check=True)
 
-    # The base's top-level Markdown files, byte for byte; not its other files, not its subfolders.
+    # The base's top-level Markdown and YAML files (the guides, and the class chooser's files the check holds to their
+    # review), byte for byte; not its other files, not its subfolders.
     out = root / "with"
-    assert export_guides(with_guides, out, cwd=clone) == 2
-    assert sorted(p.name for p in out.iterdir()) == ["README.md", "frost-leveling.md"]
+    assert export_guides(with_guides, out, cwd=clone) == 3
+    assert sorted(p.name for p in out.iterdir()) == ["README.md", "class-chooser.yaml", "frost-leveling.md"]
     assert (out / "frost-leveling.md").read_bytes() == b"---\nid: 1\n---\r\n\xc3\xa9\n"
+    assert (out / "class-chooser.yaml").read_bytes() == b"status: reviewed\r\nversion: 1\n"
 
     # A base without the folder compares with an empty folder, made on purpose.
     out = root / "without"
@@ -60,7 +64,7 @@ with tempfile.TemporaryDirectory() as tmp:
     subprocess.run(["git", "clone", "-q", origin.as_uri(), str(full)], check=True)
     assert git(full, "rev-parse", "--is-shallow-repository") == "false"
     out = root / "from-full"
-    assert export_guides(with_guides, out, cwd=full) == 2
+    assert export_guides(with_guides, out, cwd=full) == 3
     assert (out / "frost-leveling.md").read_bytes() == b"---\nid: 1\n---\r\n\xc3\xa9\n"
     assert git(full, "rev-parse", "--is-shallow-repository") == "false"
 
@@ -88,4 +92,4 @@ with tempfile.TemporaryDirectory() as tmp:
     git(origin, "commit", "-q", "-m", "a link")
     assert "not a regular file" in refused(git(origin, "rev-parse", "HEAD"), root / "g", clone)
 
-print("export_base_guides: 12 cases pass")
+print("export_base_guides: 13 cases pass")

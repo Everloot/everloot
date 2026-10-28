@@ -121,9 +121,11 @@ reviewedOn: null   # the day they did, YYYY-MM-DD; null while the file is a draf
 ```
 
 The check refuses a file marked reviewed that names no reviewer or no date, a draft that names either, and a review
-dated after today. Only the person who reviewed a version is named there. A change to a reviewed file is a new
-version: raise `version` and set it back to draft until it is reviewed again. While either file is a draft, the page
-says so first and stays out of search, and no other page on the site links to it.
+dated after today. Only the person who reviewed a version is named there. A reviewed version stays as it was: any
+change to it, a new review included, is a new version, so raise `version` and either have the new version reviewed
+or set it back to draft until it is. A new version never carries the old review, and versions never go down. While
+either file is a draft, the page says so first and stays out of search, and no other page on the site links to it.
 
-From `kb/`, `npx vitest run test/class-chooser.test.ts` checks the committed files, and `npm run kb -- guide-check`
-checks them with the guides.
+From `kb/`, `npx vitest run test/class-chooser.test.ts` checks the committed files, and `npm run kb -- guide-check
+--previous <a copy of kb/guides from before your change>` checks them with the guides and holds a reviewed file to
+its copy. CI's guide-check step gives it `kb/guides` as it was at the pull request's base, these files included.

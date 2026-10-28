@@ -246,8 +246,9 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
     trees, sections, sources, links and tokens. --previous is a copy of kb/guides from before the change, such
     as a pull request's base: published versions are then held to it. A --previous that is not a folder fails;
     an empty one means there were no guides. The class chooser's two files in the folder, class-roles.yaml and
-    class-chooser.yaml, are checked too: their fields, and that a file marked reviewed names its reviewer and
-    the day. Exits 1 on any problem. See ../docs/GUIDES.md and guides/README.md)
+    class-chooser.yaml, are checked too: their fields, that a file marked reviewed names its reviewer and the
+    day, and with --previous, that a reviewed file changes only as a new version with a new review. Exits 1 on
+    any problem. See ../docs/GUIDES.md and guides/README.md)
 
   A source database and a public release are different artifacts. The serve commands accept only a
   release: an existing file plus its <release>.manifest.json, opened read-only and checked against
@@ -904,15 +905,20 @@ async function main(): Promise<number> {
       const previous = previousDir === undefined ? undefined : readGuideFiles(previousDir);
       const context = loadGuideCheckContext();
       const result = checkGuides(readGuideFiles(dir), { ...context, ...(previous ? { previous } : {}) });
-      // The class chooser's two files sit in the same folder and are checked with the guides.
+      // The class chooser's two files sit in the same folder and are checked with the guides; a reviewed one is held to
+      // its copy in --previous the way a published guide is.
       const chooserFiles = readClassChooserFiles(dir);
-      const chooser = chooserFiles.roles || chooserFiles.chooser ? checkClassChooser(chooserFiles, context.today) : null;
+      const previousChooser = previousDir === undefined ? undefined : readClassChooserFiles(previousDir);
+      const chooser = chooserFiles.roles || chooserFiles.chooser ? checkClassChooser(chooserFiles, context.today, previousChooser) : null;
       for (const p of [...result.problems, ...(chooser?.problems ?? [])]) console.error(`${p.file}${p.line ? `:${p.line}` : ""}: ${p.message}`);
       const published = result.guides.filter((g) => g.fm.status === "published").length;
       console.log(`${result.guides.length} guides (${published} published, ${result.guides.length - published} draft), ${result.problems.length} problems`);
       console.log(previous ? `compared with ${previous.length} guides from before the change` : "not compared with the guides from before the change; pass --previous for that");
       const versions = chooser?.data ? `${CHOOSER_FILES.roles} ${chooser.data.roles.status} version ${chooser.data.roles.version}, ${CHOOSER_FILES.chooser} ${chooser.data.chooser.status} version ${chooser.data.chooser.version}, ` : "";
-      console.log(chooser ? `class chooser: ${versions}${chooser.problems.length} problems` : "class chooser: no files in this folder");
+      const compared = previousChooser
+        ? `; compared with ${[previousChooser.roles, previousChooser.chooser].filter(Boolean).length} of its files from before the change`
+        : "; not compared with its files from before the change";
+      console.log(chooser ? `class chooser: ${versions}${chooser.problems.length} problems${compared}` : "class chooser: no files in this folder");
       return result.problems.length || chooser?.problems.length ? 1 : 0;
     }
     case "snapshot":
