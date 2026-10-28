@@ -63,7 +63,8 @@ import { search } from "./search.js";
 import { snapshot } from "./snapshot.js";
 import { validate } from "./validate.js";
 import { checkGuides } from "./guides/check.js";
-import { GUIDES_DIR, loadGuideCheckContext, readGuideFiles } from "./guides/data.js";
+import { CHOOSER_FILES, checkClassChooser } from "./guides/class-chooser.js";
+import { GUIDES_DIR, loadGuideCheckContext, readClassChooserFiles, readGuideFiles } from "./guides/data.js";
 import { checkNews } from "./news/check.js";
 import { NEWS_DIR, publishedWikiSlugs, readNewsPosts } from "./news/data.js";
 import { checkWiki } from "./wiki/check.js";
@@ -244,7 +245,10 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
     (the guides' check: front matter, review and history, codes and spend orders against the site's talent
     trees, sections, sources, links and tokens. --previous is a copy of kb/guides from before the change, such
     as a pull request's base: published versions are then held to it. A --previous that is not a folder fails;
-    an empty one means there were no guides. Exits 1 on any problem. See ../docs/GUIDES.md)
+    an empty one means there were no guides. The class chooser's two files in the folder, class-roles.yaml and
+    class-chooser.yaml, are checked too: their fields, that a file marked reviewed names its reviewer and the
+    day, and with --previous, that a reviewed file changes only as a new version with a new review. Exits 1 on
+    any problem. See ../docs/GUIDES.md and guides/README.md)
 
   A source database and a public release are different artifacts. The serve commands accept only a
   release: an existing file plus its <release>.manifest.json, opened read-only and checked against
@@ -899,12 +903,27 @@ async function main(): Promise<number> {
         throw new Error(`guide-check: --previous ${previousDir ? `${previousDir} is not a folder` : "needs a folder"}; nothing was checked`);
       }
       const previous = previousDir === undefined ? undefined : readGuideFiles(previousDir);
-      const result = checkGuides(readGuideFiles(dir), { ...loadGuideCheckContext(), ...(previous ? { previous } : {}) });
-      for (const p of result.problems) console.error(`${p.file}${p.line ? `:${p.line}` : ""}: ${p.message}`);
+      const context = loadGuideCheckContext();
+      const result = checkGuides(readGuideFiles(dir), { ...context, ...(previous ? { previous } : {}) });
+      // The class chooser's two files sit in the same folder and are checked with the guides; a reviewed one is held to
+      // its copy in --previous the way a published guide is.
+      const chooserFiles = readClassChooserFiles(dir);
+      const previousChooser = previousDir === undefined ? undefined : readClassChooserFiles(previousDir);
+      // Run when either side has them, so deleting or renaming both files is checked against the copy from before too.
+      const present = Boolean(chooserFiles.roles || chooserFiles.chooser);
+      const chooser = present || previousChooser?.roles || previousChooser?.chooser ? checkClassChooser(chooserFiles, context.today, previousChooser) : null;
+      for (const p of [...result.problems, ...(chooser?.problems ?? [])]) console.error(`${p.file}${p.line ? `:${p.line}` : ""}: ${p.message}`);
       const published = result.guides.filter((g) => g.fm.status === "published").length;
       console.log(`${result.guides.length} guides (${published} published, ${result.guides.length - published} draft), ${result.problems.length} problems`);
       console.log(previous ? `compared with ${previous.length} guides from before the change` : "not compared with the guides from before the change; pass --previous for that");
-      return result.problems.length ? 1 : 0;
+      const versions = chooser?.data
+        ? `${CHOOSER_FILES.roles} ${chooser.data.roles.status} version ${chooser.data.roles.version}, ${CHOOSER_FILES.chooser} ${chooser.data.chooser.status} version ${chooser.data.chooser.version}, `
+        : present ? "" : "no files in this folder, ";
+      const compared = previousChooser
+        ? `; compared with ${[previousChooser.roles, previousChooser.chooser].filter(Boolean).length} of its files from before the change`
+        : "; not compared with its files from before the change";
+      console.log(chooser ? `class chooser: ${versions}${chooser.problems.length} problems${compared}` : "class chooser: no files in this folder");
+      return result.problems.length || chooser?.problems.length ? 1 : 0;
     }
     case "snapshot":
       if (!args[0]) break;

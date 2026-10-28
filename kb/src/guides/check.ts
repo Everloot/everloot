@@ -35,7 +35,7 @@ export interface GuideCheckResult { guides: CheckedGuide[]; problems: Problem[] 
 
 /** Where a guide's sources may be: Blizzard's own posts, on its WoW news sites and the US and EU forums. Everything else
  *  a guide says comes from Everloot's own data, linked on the site. */
-const SOURCE_HOST = /^(?:worldofwarcraft\.blizzard\.com|news\.blizzard\.com|(?:us|eu)\.forums\.blizzard\.com)$/;
+export const SOURCE_HOST = /^(?:worldofwarcraft\.blizzard\.com|news\.blizzard\.com|(?:us|eu)\.forums\.blizzard\.com)$/;
 
 /** A site address that opens a talent plan: one that carries a set or its spend order, as the calculator's links do, or a
  *  build link (`/tools/talents/<class>/b/<code>`, the calculator's Copy link, and a saved build's `/b/<slug>`). */

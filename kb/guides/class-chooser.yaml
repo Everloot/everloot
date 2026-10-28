@@ -1,0 +1,100 @@
+# The class chooser's (/classes/choose) questions and the weight each answer gives a class: Everloot's own editorial
+# choices, a draft until someone reviews them. The facts they lean on are in class-roles.yaml. Rules and the review:
+# README.md in this folder.
+#
+# A weight is 1, 2 or 3: how far an answer leans toward a class, not a measure of it. Nothing here says a class is
+# stronger than another or the best at anything. The race question is asked from class-roles.yaml: it keeps the
+# classes the race can be and adds no weight.
+#
+# Where each weight comes from:
+# - role: each class class-roles.yaml gives the role gets the weight, with what Blizzard's article says as the reason.
+#   A reading weighs a class the article describes without naming the role, by Everloot's reading of that
+#   description; the page labels it "Everloot's reading of Blizzard's description, not a role Blizzard names".
+# - theme and companion: the class Blizzard's article describes that way, in its own terms.
+# - group: the raid builder's table, read from the game files. A class gets 2 for four or more effects of the kind
+#   that need no talent, and 1 for two or three. Most classes bring at least one; one alone adds no weight.
+status: draft
+version: 1
+reviewer: ""
+reviewedOn: null
+questions:
+  - id: role
+    text: What would you like to do in a group?
+    options:
+      - { id: heal, text: Heal my allies, role: healer, weight: 2 }
+      - id: damage
+        text: Deal damage
+        role: damage
+        weight: 2
+        readings:
+          - { class: warrior, weight: 2, why: "Blizzard's article says warriors strive for perfection in armed combat." }
+          - { class: rogue, weight: 2, why: "Blizzard's article says rogues are hired to eliminate designated targets." }
+      - { id: protect, text: Protect my group, role: tank, weight: 2 }
+  - id: theme
+    text: Which of these draws you in?
+    options:
+      - id: weapons
+        text: Weapons and armed combat
+        classes:
+          - { class: warrior, weight: 2, why: "Blizzard's article says warriors train constantly, and calls a typical warrior strong and tough." }
+          - { class: paladin, weight: 1, why: "Blizzard's article calls paladins powerful warriors in their own right." }
+      - id: the-light
+        text: The Light, to heal, shield and smite
+        classes:
+          - { class: paladin, weight: 2, why: "Blizzard's article says paladins call upon the Light to heal wounds, create shields of force and incinerate evil creatures." }
+      - id: faith
+        text: Faith and the mind, to heal or to harm
+        classes:
+          - { class: priest, weight: 2, why: "Blizzard's article says priests channel the forces underlying faith and can heal or harm." }
+      - id: frost-and-flame
+        text: Frost and flame, from a distance
+        classes:
+          - { class: mage, weight: 2, why: "Blizzard's article says mages rarely fight in melee and attack from a distance with bolts of frost and flame." }
+      - id: demons
+        text: Demons and dark magic
+        classes:
+          - { class: warlock, weight: 2, why: "Blizzard's article says warlocks are empowered by demonic blood and drain vitality from their victims." }
+      - id: nature
+        text: Nature, and changing shape
+        classes:
+          - { class: druid, weight: 2, why: "Blizzard's article calls druids natural shapeshifters, bound to the plant and animal kingdoms." }
+      - id: elements
+        text: The elements, and totems
+        classes:
+          - { class: shaman, weight: 2, why: "Blizzard's article says shaman commune with the elements and fight with totems and spells." }
+      - id: the-wild
+        text: Taming beasts and tracking
+        classes:
+          - { class: hunter, weight: 2, why: "Blizzard's article says hunters tame wild animals as pets and become master trackers." }
+      - id: stealth
+        text: Stealth and poisons
+        classes:
+          - { class: rogue, weight: 2, why: "Blizzard's article says rogues rely on stealth and are fond of poisons." }
+  - id: companion
+    text: Would you like a companion that fights beside you?
+    options:
+      - id: animal
+        text: An animal I tame
+        classes:
+          - { class: hunter, weight: 2, why: "Blizzard's article says hunters tame wild animals as pets." }
+      - id: demon
+        text: A demon I summon
+        classes:
+          - { class: warlock, weight: 2, why: "Blizzard's article says warlocks summon and control demonic entities." }
+  - id: group
+    text: What would you like to bring to a group, beside your role?
+    options:
+      - id: buffs
+        text: Effects that strengthen my group
+        classes:
+          - { class: paladin, weight: 2, why: "Blessings and auras, such as Blessing of Kings and Devotion Aura, in the raid builder's table." }
+          - { class: shaman, weight: 2, why: "Totems such as Strength of Earth Totem and Mana Spring Totem, in the raid builder's table." }
+          - { class: priest, weight: 1, why: "Power Word: Fortitude, Divine Spirit and Shadow Protection, in the raid builder's table." }
+          - { class: druid, weight: 1, why: "Mark of the Wild and Thorns, in the raid builder's table." }
+      - id: debuffs
+        text: Effects that weaken our enemies
+        classes:
+          - { class: warlock, weight: 2, why: "Curses such as Curse of the Elements and Curse of Recklessness, in the raid builder's table." }
+          - { class: warrior, weight: 1, why: "Sunder Armor, Thunder Clap and Demoralizing Shout, in the raid builder's table." }
+          - { class: paladin, weight: 1, why: "Judgement of Wisdom and Judgement of Light, in the raid builder's table." }
+          - { class: druid, weight: 1, why: "Faerie Fire and Demoralizing Roar, in the raid builder's table." }
