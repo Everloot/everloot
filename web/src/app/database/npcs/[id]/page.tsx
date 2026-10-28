@@ -108,7 +108,7 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
   const assets = dropped.length > 0 || zone ? await loadSiteAssets() : null;
   const tips = await loadItemTips(assets, dropped.map((row) => row.itemId));
   const art = zone ? assets?.maps.find((m) => m.kind === "zone" && m.uiMapId === zone.mapId && !m.heldBack) : undefined;
-  const lore = !unreachable && page.name ? loreForEntity("npc", page.name) : null;
+  const lore = !unreachable && page.name ? await loreForEntity("npc", page.name) : null;
   // The loot table with each number's windows, installs and dates; its public rows are the rates above.
   const loot = await loadLootTables();
   const lootTable = npcLootTable(loot.tables, npcId);

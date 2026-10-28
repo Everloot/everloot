@@ -27,7 +27,7 @@ test("re-running replaces instead of duplicating", async () => {
   await replaceSourceRows(db, "curated", ["lore_page"], [row("1", "Thrall")]);
   const { n } = db.prepare("SELECT count(*) AS n FROM entities").get() as { n: number };
   expect(n).toBe(1);
-  expect(search(db, "jaina")).toHaveLength(0);
+  expect(await search(db, "jaina")).toHaveLength(0);
 });
 
 test("a failed import rolls back and keeps the previous rows", async () => {
@@ -38,7 +38,7 @@ test("a failed import rolls back and keeps the previous rows", async () => {
     throw new Error("boom");
   }
   await expect(replaceSourceRows(db, "curated", ["lore_page"], broken())).rejects.toThrow("boom");
-  expect(search(db, "thrall")).toHaveLength(1);
+  expect(await search(db, "thrall")).toHaveLength(1);
 });
 
 test("rows of a kind outside the declared kinds are rejected", async () => {
@@ -54,7 +54,7 @@ test("refuses to replace existing rows with an empty import", async () => {
   await expect(replaceSourceRows(db, "curated", ["lore_page"], [])).rejects.toThrow(
     "refusing to replace 1 curated row(s) with an empty import",
   );
-  expect(search(db, "thrall")).toHaveLength(1);
+  expect(await search(db, "thrall")).toHaveLength(1);
 });
 
 test("an empty import into an empty source is fine", async () => {
@@ -65,7 +65,7 @@ test("an empty import into an empty source is fine", async () => {
 test("search finds by name and body and returns provenance", async () => {
   const db = openDb(":memory:");
   await replaceSourceRows(db, "curated", ["lore_page"], [row("1", "Thrall", "Warchief of the Horde")]);
-  const hits = search(db, "warchief");
+  const hits = await search(db, "warchief");
   expect(hits[0]).toMatchObject({ name: "Thrall", sourceUrl: "https://example.test/1", licence: "CC-BY-SA-4.0" });
 });
 

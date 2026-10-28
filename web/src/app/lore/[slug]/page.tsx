@@ -35,14 +35,14 @@ function label(page: Lore): string {
   return page.sourceId === "warcraft-wiki-2023" ? "Lore archive · Warcraft Wiki, 2023 dump" : `Lore archive · ${page.sourceId} · ${page.gameVersion}`;
 }
 
-function lookup(slug: string): Lore | null | typeof UNAVAILABLE {
+async function lookup(slug: string): Promise<Lore | null | typeof UNAVAILABLE> {
   const parsed = parseLoreSlug(slug);
   return parsed ? loreByExtId(parsed.extId) : null;
 }
 
 export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await props.params;
-  const page = lookup(slug);
+  const page = await lookup(slug);
   if (page === UNAVAILABLE) return { title: UNAVAILABLE_TITLE, robots: { index: false, follow: true } };
   if (!page) return { robots: { index: false, follow: true } };
   const description = firstSentence(page.body);
@@ -63,7 +63,7 @@ export default async function LorePage(props: { params: Promise<{ slug: string }
   const { slug } = await props.params;
   const parsed = parseLoreSlug(slug);
   if (!parsed) notFound();
-  const page = loreByExtId(parsed.extId);
+  const page = await loreByExtId(parsed.extId);
   if (page === UNAVAILABLE) throw new Error(`${UNAVAILABLE_TITLE}: ${UNAVAILABLE_COPY}`);
   if (!page) notFound();
   if (slug !== loreSlug(page)) permanentRedirect(`/lore/${loreSlug(page)}`);

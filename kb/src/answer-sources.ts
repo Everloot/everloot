@@ -1,8 +1,8 @@
 import { CREDIT_LINE, LICENCE, SITE } from "@everloot/protocol";
-import type { DB } from "./db.js";
 import { itemFactsFromRecords } from "./drop-rollup.js";
 import { itemPage, ITEM_AGREEMENT, type ItemFacts } from "./item-page.js";
 import { loreUrls, moreLine } from "./page-urls.js";
+import type { ReleaseSource } from "./release-db.js";
 import { search, searchSomeWords, SOME_WORDS, type SearchHit } from "./search.js";
 import { agreedNpcNames, npcPage, WORLD_AGREEMENT, worldFactsFromRecords, type WorldFacts } from "./world-pages.js";
 import type { RecheckScope } from "./coverage.js";
@@ -155,15 +155,15 @@ export function furtherReading(question: string): FurtherReading[] {
  * question that names two things ("Peacebloom and Thrall") still finds both pages. Deduplicated by id.
  * When neither finds a page, the pages with some of the question's words, marked `some`.
  */
-function knowledgeHits(db: DB, question: string, limit: number): { hits: SearchHit[]; some: boolean } {
+async function knowledgeHits(db: ReleaseSource, question: string, limit: number): Promise<{ hits: SearchHit[]; some: boolean }> {
   const seen = new Set<number>();
   const out: SearchHit[] = [];
   const add = (hits: SearchHit[]) => { for (const hit of hits) if (!seen.has(hit.id) && out.length < limit) { seen.add(hit.id); out.push(hit); } };
-  add(search(db, question, limit));
+  add(await search(db, question, limit));
   const names = question.match(/\p{Lu}[\p{L}'-]+(?:\s+\p{Lu}[\p{L}'-]+)*/gu) ?? [];
-  for (const name of names) if (name.length >= 3) add(search(db, name, 3));
+  for (const name of names) if (name.length >= 3) add(await search(db, name, 3));
   if (out.length) return { hits: out, some: false };
-  add(searchSomeWords(db, question, limit));
+  add(await searchSomeWords(db, question, limit));
   return { hits: out, some: out.length > 0 };
 }
 
@@ -171,13 +171,13 @@ function knowledgeHits(db: DB, question: string, limit: number): { hits: SearchH
  * The evidence for a question. `facts` null means the corpus is not connected: lore still answers, and
  * the text says the observed layer is unrecorded, not empty.
  */
-export function answerSources(
-  db: DB, args: { question: string; limit: number }, facts: AnswerSourcesFacts | null, dataAsOf: string | null, files: FilesIndex | null = null,
-): AnswerSources {
+export async function answerSources(
+  db: ReleaseSource, args: { question: string; limit: number }, facts: AnswerSourcesFacts | null, dataAsOf: string | null, files: FilesIndex | null = null,
+): Promise<AnswerSources> {
   const question = args.question.trim();
   const observed = facts ? observedEvidence(question, facts, dataAsOf) : [];
-  const { hits: found, some } = knowledgeHits(db, question, args.limit);
-  const pages = loreUrls(db, found);
+  const { hits: found, some } = await knowledgeHits(db, question, args.limit);
+  const pages = await loreUrls(db, found);
   const hits = found.map((hit) => loreEvidence(hit, pages.get(hit.id)));
   const curated = hits.filter((e) => e.kind === "curated");
   const lore = hits.filter((e) => e.kind === "lore");

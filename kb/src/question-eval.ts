@@ -5,10 +5,10 @@
  * check for retrieval changes (docs/design/specs/2026-10-27-question-bank-design.md).
  */
 import { answerSources, type AnswerSourcesFacts, type EvidenceKind } from "./answer-sources.js";
-import type { DB } from "./db.js";
 import type { FilesIndex } from "./files-evidence.js";
 import type { Question, SubjectKind } from "./question-bank.js";
 import { sameTitle } from "./name-aliases.js";
+import type { ReleaseSource } from "./release-db.js";
 import { getByName, search, searchSomeWords } from "./search.js";
 
 /** How the subject's name met a record: by its exact title, through search on the question, or not at all. */
@@ -52,20 +52,20 @@ const sameName = sameTitle;
  * An alias is scored on its text alone: the question is whether "MC" leads to Molten Core, not whether Molten
  * Core has a page.
  */
-export function resolve(db: DB, q: Question): Resolution {
+export async function resolve(db: ReleaseSource, q: Question): Promise<Resolution> {
   if (!q.expects.resolve) return "n/a";
-  if (q.template !== "alias" && getByName(db, q.subject.name).length > 0) return "exact";
+  if (q.template !== "alias" && (await getByName(db, q.subject.name)).length > 0) return "exact";
   // The same two steps search_knowledge takes: pages with every asked word, else pages with some of them.
-  const hits = search(db, q.text, 5);
-  return (hits.length ? hits : searchSomeWords(db, q.text, 5)).some((h) => sameName(h.name, q.subject.name)) ? "search" : "none";
+  const hits = await search(db, q.text, 5);
+  return (hits.length ? hits : await searchSomeWords(db, q.text, 5)).some((h) => sameName(h.name, q.subject.name)) ? "search" : "none";
 }
 
-export function evaluateQuestion(db: DB, q: Question, facts: AnswerSourcesFacts | null, dataAsOf: string | null, files: FilesIndex | null = null): QuestionResult {
-  const result = answerSources(db, { question: q.text, limit: 8 }, facts, dataAsOf, files);
+export async function evaluateQuestion(db: ReleaseSource, q: Question, facts: AnswerSourcesFacts | null, dataAsOf: string | null, files: FilesIndex | null = null): Promise<QuestionResult> {
+  const result = await answerSources(db, { question: q.text, limit: 8 }, facts, dataAsOf, files);
   const kinds = [...new Set(result.evidence.map((e) => e.kind))];
   return {
     id: q.id, template: q.template, kind: q.subject.kind,
-    resolution: resolve(db, q),
+    resolution: await resolve(db, q),
     evidence: result.evidence.length, evidenceKinds: kinds,
     page: result.evidence.some((e) => Boolean(e.url)),
   };
@@ -90,11 +90,12 @@ function groupBy<K extends string>(rows: readonly QuestionResult[], key: (r: Que
   return out;
 }
 
-export function evaluateBank(
-  db: DB, bank: readonly Question[], facts: AnswerSourcesFacts | null,
+export async function evaluateBank(
+  db: ReleaseSource, bank: readonly Question[], facts: AnswerSourcesFacts | null,
   meta: { release: string; dataAsOf: string | null; ranAt?: string; sampleNames?: number; files?: FilesIndex | null },
-): EvalReport {
-  const results = bank.map((q) => evaluateQuestion(db, q, facts, meta.dataAsOf, meta.files ?? null));
+): Promise<EvalReport> {
+  const results: QuestionResult[] = [];
+  for (const q of bank) results.push(await evaluateQuestion(db, q, facts, meta.dataAsOf, meta.files ?? null));
   const byId = new Map(bank.map((q) => [q.id, q]));
   const sample = meta.sampleNames ?? 12;
   const unresolved = [...groupBy(results.filter((r) => r.resolution === "none"), (r) => r.kind)]

@@ -1,8 +1,8 @@
 import { SITE, type ChangeFilter, type TalentClass } from "@everloot/protocol";
 import { previewPath } from "../../web/src/lib/talents/summary";
-import type { DB } from "./db.js";
 import { guildSlug } from "./guilds.js";
 import { INDEXABLE_MIN_BODY, lorePath } from "./lore-slug.js";
+import { releaseDb, type ReleaseSource } from "./release-db.js";
 import { SOURCES } from "./sources.js";
 
 /**
@@ -142,17 +142,24 @@ export function talentBuildUrl(classSlug: string, code: string): string {
 }
 
 const PUBLISHABLE = Object.values(SOURCES).filter((s) => s.publishable).map((s) => s.id);
+const LORE_BATCH = 90;
 
 /**
  * The lore page of each record that has a full one on the site, by record id: a lore page from a
  * publishable source with enough text, not a redirect stub. Other records get none.
  */
-export function loreUrls(db: DB, rows: readonly { id: number; extId: string; name: string; kind: string }[]): Map<number, string> {
+export async function loreUrls(source: ReleaseSource, rows: readonly { id: number; extId: string; name: string; kind: string }[]): Promise<Map<number, string>> {
   const lore = rows.filter((r) => r.kind === "lore_page");
   if (lore.length === 0) return new Map();
-  const ids = new Set((db.prepare(
-    `SELECT id FROM entities WHERE id IN (${lore.map(() => "?").join(",")}) AND kind = 'lore_page'
-       AND source_id IN (${PUBLISHABLE.map(() => "?").join(",")}) AND length(body) >= ? AND instr(body, 'REDIRECT') = 0`,
-  ).all(...lore.map((r) => r.id), ...PUBLISHABLE, INDEXABLE_MIN_BODY) as { id: number }[]).map((r) => r.id));
+  // D1 binds at most 100 parameters per statement, so the ids go in batches that leave room for the rest.
+  const ids = new Set<number>();
+  for (let at = 0; at < lore.length; at += LORE_BATCH) {
+    const batch = lore.slice(at, at + LORE_BATCH);
+    for (const r of await releaseDb(source).all<{ id: number }>(
+      `SELECT id FROM entities WHERE id IN (${batch.map(() => "?").join(",")}) AND kind = 'lore_page'
+         AND source_id IN (${PUBLISHABLE.map(() => "?").join(",")}) AND length(body) >= ? AND instr(body, 'REDIRECT') = 0`,
+      ...batch.map((r) => r.id), ...PUBLISHABLE, INDEXABLE_MIN_BODY,
+    )) ids.add(r.id);
+  }
   return new Map(lore.filter((r) => ids.has(r.id)).map((r) => [r.id, abs(lorePath(r))]));
 }

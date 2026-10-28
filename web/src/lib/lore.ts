@@ -155,16 +155,15 @@ interface LoreRow {
   licence: string; retrievedAt: string; gameVersion: string;
 }
 
-export function loreByExtId(extId: string): LorePage | null | Unavailable {
-  const release = getRelease();
+export async function loreByExtId(extId: string): Promise<LorePage | null | Unavailable> {
+  const release = await getRelease();
   if (!release) return UNAVAILABLE;
-  const row = release.db
-    .prepare(
-      `SELECT ext_id AS extId, name, body, data, source_url AS sourceUrl, source_id AS sourceId, licence,
-         retrieved_at AS retrievedAt, game_version AS gameVersion
-       FROM entities WHERE kind = 'lore_page' AND source_id IN (${SOURCE_MARKS}) AND ext_id = ? LIMIT 1`,
-    )
-    .get(...PUBLISHABLE, extId) as LoreRow | undefined;
+  const row = await release.db.get<LoreRow>(
+    `SELECT ext_id AS extId, name, body, data, source_url AS sourceUrl, source_id AS sourceId, licence,
+       retrieved_at AS retrievedAt, game_version AS gameVersion
+     FROM entities WHERE kind = 'lore_page' AND source_id IN (${SOURCE_MARKS}) AND ext_id = ? LIMIT 1`,
+    ...PUBLISHABLE, extId,
+  );
   if (!row) return null;
   let data: Record<string, unknown> = {};
   try { data = JSON.parse(row.data) as Record<string, unknown>; } catch { /* a row without usable data still renders */ }
@@ -197,8 +196,8 @@ const MATCHES = new WeakMap<object, Map<string, LoreMatch | null>>();
  * names would scan the whole file; the name lookup uses the (type, name) index. Answers are kept per opened
  * release, so a page never asks twice for the same name.
  */
-export function loreForEntity(type: "npc" | "item" | "quest" | "zone", name: string): LoreMatch | null | Unavailable {
-  const release = getRelease();
+export async function loreForEntity(type: "npc" | "item" | "quest" | "zone", name: string): Promise<LoreMatch | null | Unavailable> {
+  const release = await getRelease();
   if (!release) return UNAVAILABLE;
   const clean = name.trim();
   if (!clean) return null;
@@ -206,12 +205,11 @@ export function loreForEntity(type: "npc" | "item" | "quest" | "zone", name: str
   if (!cache) { cache = new Map(); MATCHES.set(release.db, cache); }
   const key = `${type}|${clean.toLowerCase()}`;
   if (cache.has(key)) return cache.get(key) ?? null;
-  const rows = release.db
-    .prepare(
-      `SELECT ext_id AS extId, name, body FROM entities
-       WHERE ${LORE_SQL} AND json_extract(data, '$.type') = ? AND name = ? COLLATE NOCASE LIMIT 3`,
-    )
-    .all(...PUBLISHABLE, type, clean) as { extId: string; name: string; body: string }[];
+  const rows = await release.db.all<{ extId: string; name: string; body: string }>(
+    `SELECT ext_id AS extId, name, body FROM entities
+     WHERE ${LORE_SQL} AND json_extract(data, '$.type') = ? AND name = ? COLLATE NOCASE LIMIT 3`,
+    ...PUBLISHABLE, type, clean,
+  );
   const usable = rows.filter((r) => !r.body.includes("REDIRECT"));
   const intro = usable.length === 1 ? firstParagraph(usable[0].body) : "";
   const match = intro ? { extId: usable[0].extId, name: usable[0].name, intro } : null;
@@ -220,19 +218,19 @@ export function loreForEntity(type: "npc" | "item" | "quest" | "zone", name: str
   return match;
 }
 
-export function searchLore(q: string, page: number, type?: LoreType): { hits: SearchHit[]; hasNext: boolean } | Unavailable {
-  const release = getRelease();
+export async function searchLore(q: string, page: number, type?: LoreType): Promise<{ hits: SearchHit[]; hasNext: boolean } | Unavailable> {
+  const release = await getRelease();
   if (!release) return UNAVAILABLE;
   const p = Number.isFinite(page) && page >= 1 ? Math.floor(page) : 1;
   if (p > MAX_PAGE) return { hits: [], hasNext: false };
   const types = type ? [type] : undefined;
-  const results = search(release.db, q.slice(0, MAX_QUERY), p * PAGE_SIZE + 1, { kinds: ["lore_page"], types });
+  const results = await search(release.db, q.slice(0, MAX_QUERY), p * PAGE_SIZE + 1, { kinds: ["lore_page"], types });
   return { hits: results.slice((p - 1) * PAGE_SIZE, p * PAGE_SIZE), hasNext: results.length > p * PAGE_SIZE };
 }
 
 /** For a question no lore page answers in full: the pages with the most of its words, best first. */
-export function searchLoreSomeWords(q: string, limit: number): SearchHit[] | Unavailable {
-  const release = getRelease();
+export async function searchLoreSomeWords(q: string, limit: number): Promise<SearchHit[] | Unavailable> {
+  const release = await getRelease();
   if (!release) return UNAVAILABLE;
   return searchSomeWords(release.db, q.slice(0, MAX_QUERY), limit, { kinds: ["lore_page"] });
 }
@@ -240,12 +238,12 @@ export function searchLoreSomeWords(q: string, limit: number): SearchHit[] | Una
 /** The count scans every body (seconds on the real file); a read-only release cannot change, so count once per open. */
 const COUNTS = new WeakMap<object, number>();
 
-export function indexableCount(): number | Unavailable {
-  const release = getRelease();
+export async function indexableCount(): Promise<number | Unavailable> {
+  const release = await getRelease();
   if (!release) return UNAVAILABLE;
   const known = COUNTS.get(release.db);
   if (known !== undefined) return known;
-  const row = release.db.prepare(`SELECT count(*) AS n FROM entities WHERE ${INDEXABLE_SQL}`).get(...PUBLISHABLE) as { n: number };
+  const row = (await release.db.get<{ n: number }>(`SELECT count(*) AS n FROM entities WHERE ${INDEXABLE_SQL}`, ...PUBLISHABLE))!;
   COUNTS.set(release.db, row.n);
   return row.n;
 }
@@ -253,14 +251,14 @@ export function indexableCount(): number | Unavailable {
 // ---- Types, facets and browsing ---------------------------------------------------------------
 
 /** The manifest says whether this release was built with type data. */
-export function hasTypes(): boolean | Unavailable {
-  const release = getRelease();
+export async function hasTypes(): Promise<boolean | Unavailable> {
+  const release = await getRelease();
   if (!release) return UNAVAILABLE;
   return release.manifest.types !== undefined;
 }
 
-export function typeCounts(): Record<string, number> | null | Unavailable {
-  const release = getRelease();
+export async function typeCounts(): Promise<Record<string, number> | null | Unavailable> {
+  const release = await getRelease();
   if (!release) return UNAVAILABLE;
   return release.manifest.types ?? null;
 }
@@ -277,21 +275,21 @@ function letterClause(letter: string | null): { sql: string; params: unknown[] }
 }
 
 /** The letters (and "#") this type actually has pages under, so empty letters stay out of the sitemap. */
-export function lettersWithRows(type: LoreType): string[] | Unavailable {
-  const release = getRelease();
+export async function lettersWithRows(type: LoreType): Promise<string[] | Unavailable> {
+  const release = await getRelease();
   if (!release) return UNAVAILABLE;
   // A typed release without the letter lists is refused at open; an untyped release has none.
   return release.manifest.letters?.[type] ?? [];
 }
 
 /** Pages of one type whose name starts with `letter`, filtered by exact facet values, ordered by name. */
-export function browse(
+export async function browse(
   type: LoreType,
   letter: string | null,
   filters: Partial<Record<FacetKey, string>>,
   page: number,
-): { rows: { extId: string; name: string }[]; hasNext: boolean } | Unavailable {
-  const release = getRelease();
+): Promise<{ rows: { extId: string; name: string }[]; hasNext: boolean } | Unavailable> {
+  const release = await getRelease();
   if (!release) return UNAVAILABLE;
   const p = Number.isFinite(page) && page >= 1 ? Math.floor(page) : 1;
   if (p > BROWSE_MAX_PAGE) return { rows: [], hasNext: false };
@@ -306,17 +304,18 @@ export function browse(
     conds.push(`EXISTS (SELECT 1 FROM json_each(json_extract(data, '$.facets.${key}')) WHERE value = ?)`);
     params.push(value);
   }
-  const rows = release.db
-    .prepare(`SELECT ext_id AS extId, name FROM entities WHERE ${conds.join(" AND ")} ORDER BY name COLLATE NOCASE, id LIMIT ? OFFSET ?`)
-    .all(...params, BROWSE_PAGE_SIZE + 1, (p - 1) * BROWSE_PAGE_SIZE) as { extId: string; name: string }[];
+  const rows = await release.db.all<{ extId: string; name: string }>(
+    `SELECT ext_id AS extId, name FROM entities WHERE ${conds.join(" AND ")} ORDER BY name COLLATE NOCASE, id LIMIT ? OFFSET ?`,
+    ...params, BROWSE_PAGE_SIZE + 1, (p - 1) * BROWSE_PAGE_SIZE,
+  );
   return { rows: rows.slice(0, BROWSE_PAGE_SIZE), hasNext: rows.length > BROWSE_PAGE_SIZE && p < BROWSE_MAX_PAGE };
 }
 
 const FACET_VALUES = new WeakMap<object, Map<string, Record<FacetKey, string[]>>>();
 
 /** Distinct facet values present for one type, computed once per opened release. */
-export function facetValues(type: LoreType): Record<FacetKey, string[]> | Unavailable {
-  const release = getRelease();
+export async function facetValues(type: LoreType): Promise<Record<FacetKey, string[]> | Unavailable> {
+  const release = await getRelease();
   if (!release) return UNAVAILABLE;
   let perType = FACET_VALUES.get(release.db);
   if (!perType) { perType = new Map(); FACET_VALUES.set(release.db, perType); }
@@ -350,14 +349,14 @@ export function openingSentence(body: string): string {
 const START = new WeakMap<object, LoreLink[]>();
 
 /** The "Start here" pages this release has, in list order, each with its own opening sentence. */
-export function startHere(): LoreLink[] | Unavailable {
-  const release = getRelease();
+export async function startHere(): Promise<LoreLink[] | Unavailable> {
+  const release = await getRelease();
   if (!release) return UNAVAILABLE;
   const known = START.get(release.db);
   if (known) return known;
   const out: LoreLink[] = [];
   for (const extId of START_HERE) {
-    const page = loreByExtId(extId);
+    const page = await loreByExtId(extId);
     if (!page || page === UNAVAILABLE || page.body.includes("REDIRECT")) continue;
     out.push({ extId: page.extId, name: page.name, sentence: openingSentence(page.body) });
   }
@@ -372,18 +371,17 @@ const ZONES = new WeakMap<object, { extId: string; name: string }[]>();
  * for too few of them to group by, so the list is alphabetical. A "<name> (Classic)" page is left out when
  * "<name>" is in the list too. Empty for a release without type data.
  */
-export function zonePages(): { extId: string; name: string }[] | Unavailable {
-  const release = getRelease();
+export async function zonePages(): Promise<{ extId: string; name: string }[] | Unavailable> {
+  const release = await getRelease();
   if (!release) return UNAVAILABLE;
   const known = ZONES.get(release.db);
   if (known) return known;
-  const rows = release.db
-    .prepare(
-      `SELECT ext_id AS extId, name FROM entities
-       WHERE ${INDEXABLE_SQL} AND json_extract(data, '$.type') = 'zone' AND json_extract(data, '$.infobox.template') = 'infobox zone'
-       ORDER BY name COLLATE NOCASE, id`,
-    )
-    .all(...PUBLISHABLE) as { extId: string; name: string }[];
+  const rows = await release.db.all<{ extId: string; name: string }>(
+    `SELECT ext_id AS extId, name FROM entities
+     WHERE ${INDEXABLE_SQL} AND json_extract(data, '$.type') = 'zone' AND json_extract(data, '$.infobox.template') = 'infobox zone'
+     ORDER BY name COLLATE NOCASE, id`,
+    ...PUBLISHABLE,
+  );
   const names = new Set(rows.map((r) => r.name));
   const out = rows.filter((r) => !(r.name.endsWith(" (Classic)") && names.has(r.name.slice(0, -" (Classic)".length))));
   ZONES.set(release.db, out);
@@ -401,12 +399,12 @@ export interface Coverage {
 const COVERAGE = new WeakMap<object, Coverage>();
 
 /** What the release covers: counts by type and facet, indexable pages, damage, release date. */
-export function coverage(): Coverage | Unavailable {
-  const release = getRelease();
+export async function coverage(): Promise<Coverage | Unavailable> {
+  const release = await getRelease();
   if (!release) return UNAVAILABLE;
   const known = COVERAGE.get(release.db);
   if (known) return known;
-  const indexable = indexableCount();
+  const indexable = await indexableCount();
   if (indexable === UNAVAILABLE) return UNAVAILABLE;
   const facets = {} as Record<FacetKey, { value: string; n: number }[]>;
   // The manifest carries the top ten per key (a typed release without them is refused at open);

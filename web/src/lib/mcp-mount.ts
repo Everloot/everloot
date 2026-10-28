@@ -76,7 +76,7 @@ export function createMount(options: { path: string; bearer: boolean }) {
     if (corpus && corpus !== APPROVED_CORPUS) return unavailable("MCP is not configured");
     if (!handler) {
       // Opened once per instance and shared with the lore pages; a failed open is retried on the next request.
-      const release = getRelease();
+      const release = await getRelease();
       if (!release) return unavailable("Knowledge release unavailable");
       try {
         handler = createMcpHttpHandler({

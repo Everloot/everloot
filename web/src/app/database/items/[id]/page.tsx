@@ -108,7 +108,7 @@ export default async function ItemPage(props: Props) {
   const quality = category?.quality && category.quality.id <= 5 ? qualityOf(category.quality.id) : undefined;
   const names = await loadNames();
   const nameFor = nameOf(names);
-  const lore = seen && page.name ? loreForEntity("item", page.name) : null;
+  const lore = seen && page.name ? await loreForEntity("item", page.name) : null;
 
   const all = edgesFrom([...edges.observed, ...edges.client], "item", itemId);
   const rel = (r: Rel) => all.filter((e) => e.rel === r);

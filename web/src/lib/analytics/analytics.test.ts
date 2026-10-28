@@ -56,6 +56,9 @@ describe("analyticsConfig", () => {
     expect(analyticsConfig({ NEXT_PUBLIC_POSTHOG_KEY: PH }).posthogKey).toBeUndefined();
     expect(analyticsConfig({ NEXT_PUBLIC_POSTHOG_KEY: PH, VERCEL_ENV: "preview" }).posthogKey).toBeUndefined();
     expect(analyticsConfig({ NEXT_PUBLIC_POSTHOG_KEY: PH, VERCEL_ENV: "production" }).posthogKey).toBe(PH);
+    // The Cloudflare Worker names its environment EVERLOOT_DEPLOY_ENV.
+    expect(analyticsConfig({ NEXT_PUBLIC_POSTHOG_KEY: PH, EVERLOOT_DEPLOY_ENV: "production" }).posthogKey).toBe(PH);
+    expect(analyticsConfig({ NEXT_PUBLIC_POSTHOG_KEY: PH, EVERLOOT_DEPLOY_ENV: "preview" }).posthogKey).toBeUndefined();
   });
 
   it("accepts well-formed values", () => {

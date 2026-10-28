@@ -66,7 +66,7 @@ export default async function ZonePage(props: Props) {
   const [facts, seen] = await Promise.all([loadWorldFacts(), loadSightings()]);
   // Entrances come from the game files, so they show even when storage is down; player reports do not.
   const here = zoneContents(facts.unreachable ? { npcs: [], quests: [], vendors: [] } : facts, undefined, facts.unreachable ? {} : seen).get(zone.mapId);
-  const lore = zoneLore(zone.name);
+  const lore = await zoneLore(zone.name);
   const shape = WORLD_MAP.zones.find((z) => z.uiMapId === zone.mapId)!;
   const assets = await loadSiteAssets();
   const art = assets?.maps.find((m) => m.kind === "zone" && m.uiMapId === zone.mapId && !m.heldBack) ?? null;

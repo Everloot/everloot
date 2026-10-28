@@ -27,12 +27,13 @@ const formatter = new Intl.NumberFormat("en-US");
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 export default async function LoreLanding() {
-  const release = getRelease();
+  const release = await getRelease();
   if (!release) noStore();
   // The wiki count only: curated Forever rows are not part of the 2023 wiki.
   const pages = release ? release.manifest.counts["warcraft-wiki-2023"] ?? null : null;
-  const start = release ? startHere() : [];
-  const zones = release && hasTypes() === true ? zonePages() : [];
+  const typed = release ? (await hasTypes()) === true : false;
+  const start = release ? await startHere() : [];
+  const zones = typed ? await zonePages() : [];
 
   // The section's banner: a loading screen with the title on it, only when the asset URL is set and the upload has it.
   const assets = await loadSiteAssets();
@@ -65,7 +66,7 @@ export default async function LoreLanding() {
                 </ul>
               </Card>
             )}
-            {hasTypes() === true && (
+            {typed && (
               <nav aria-labelledby="browse">
                 <SectionHeading id="browse">Browse by type</SectionHeading>
                 <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3">

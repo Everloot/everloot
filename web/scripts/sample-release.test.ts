@@ -24,5 +24,5 @@ test("the site opens it as a typed release", async () => {
   const { envLine } = await sampleRelease(mkdtempSync(join(tmpdir(), "everloot-sample-")));
   vi.stubEnv("KB_SNAPSHOT_PATH", envLine.slice("KB_SNAPSHOT_PATH=".length));
   const { hasTypes } = await import("../src/lib/lore");
-  expect(hasTypes()).toBe(true);
+  expect(await hasTypes()).toBe(true);
 });

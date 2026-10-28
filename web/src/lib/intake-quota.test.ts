@@ -18,6 +18,15 @@ test("uses only the platform IP and sends namespaced hashes to the server-only R
   expect(init.cache).toBe("no-store");
 });
 
+test("on the Cloudflare Worker the bucket is keyed on cf-connecting-ip, and a forged Vercel header is refused", async () => {
+  const fetch = vi.fn().mockImplementation(async () => new Response(JSON.stringify([{ allowed: true, retry_after: 0 }])));
+  const cf = { NODE_ENV: "production", EVERLOOT_PLATFORM: "cloudflare", SUPABASE_URL: env.SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY: env.SUPABASE_SERVICE_ROLE_KEY };
+  const quota = createIntakeQuota({ env: cf, fetch });
+  const at = (headers: Record<string, string>) => new Request("https://everloot.app/mcp/public", { headers });
+  expect(await quota.mcp(at({ "cf-connecting-ip": "198.51.100.9" }))).toEqual({ allowed: true, retryAfter: 0 });
+  await expect(quota.mcp(at({ "x-vercel-forwarded-for": "203.0.113.5" }))).rejects.toThrow();
+});
+
 test("public MCP calls get their own per-IP bucket, never the upload one, and trust the same platform IP", async () => {
   const fetch = vi.fn().mockImplementation(async () => new Response(JSON.stringify([{ allowed: true, retry_after: 0 }])));
   const quota = createIntakeQuota({ env, fetch });
