@@ -37,11 +37,12 @@ test("the home page says what is new, with the kind and the date of each entry",
   expect(html).toMatch(/(Blue post|Hotfix|Build)<\/span>/);
   expect(text).toMatch(/· (January|February|March|April|May|June|July|August|September|October|November|December) \d+, \d{4}/);
 });
-test("the panel links each blue post to its page on Everloot, in blue, never to Blizzard's site", () => {
+test("the panel links each blue post to its page on Everloot, in blue, never to Blizzard's site", async () => {
   const start = html.indexOf('id="whats-new"');
   const panel = html.slice(start, html.indexOf("</section>", start));
   const posts = [...panel.matchAll(/<a href="([^"]+)" class="([^"]+)">/g)].filter((m) => m[1] !== "/changes");
-  expect(posts.length).toBeGreaterThan(0);
+  // A day with several new builds can fill the four lines with builds alone, so the count comes from the data.
+  expect(posts.length).toBe((await loadTimeline()).slice(0, 4).filter((e) => e.type !== "build").length);
   for (const [, href, cls] of posts) {
     expect(href).toMatch(/^\/changes\/(?:us|eu|bsky)-[A-Za-z0-9]+-[a-z0-9-]+$/);
     expect(cls).toContain("text-blue-post");
