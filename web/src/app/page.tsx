@@ -164,7 +164,8 @@ export default async function Home() {
       {/* Tools: one feature and the same grouped list as the header's Tools menu. */}
       <section id="tools" aria-labelledby="tools-title" className="scroll-mt-20">
         <SectionHeading id="tools-title">Tools</SectionHeading>
-        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+        {/* The calculator across the top and the three tool lists side by side under it, so neither column ends in a gap. */}
+        <div className="grid gap-6">
           <Card className="space-y-6">
             <div>
               <SectionHeading as="h3" note="All nine classes, two talent sets, and a share link that names the game build.">
@@ -183,7 +184,7 @@ export default async function Home() {
             </div>
             <Link href="/tools/talents" className="btn">Plan a build</Link>
           </Card>
-          <Card padding="none" className="divide-y divide-line">
+          <Card padding="none" className="grid divide-y divide-line xl:grid-cols-3 xl:divide-x xl:divide-y-0">
             {groups.map((group) => (
               <div key={group.title} className="px-6 py-4">
                 <p className="font-mono text-xs text-muted">{group.title}</p>
