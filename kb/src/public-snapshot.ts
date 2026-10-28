@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { openExistingReadOnlyDb, type DB } from "./db.js";
+import { d1ReleaseDb, type D1Like, type ReleaseDb } from "./release-db.js";
 import {
   checkPublishedDb,
   NOTICE,
@@ -66,13 +67,18 @@ function lettersLookValid(l: unknown): l is Record<string, string[]> {
 function readManifest(dbPath: string): Manifest {
   const manifestPath = `${dbPath}.manifest.json`;
   if (!existsSync(manifestPath)) throw new Error(`public snapshot has no manifest: ${manifestPath}`);
+  return parseManifest(readFileSync(manifestPath, "utf8"), manifestPath);
+}
+
+/** Shape-check a manifest's text; `where` names it in errors (the file, or D1's release_meta). */
+function parseManifest(text: string, where: string): Manifest {
   let raw: unknown;
   try {
-    raw = JSON.parse(readFileSync(manifestPath, "utf8"));
+    raw = JSON.parse(text);
   } catch {
-    throw new Error(`public snapshot manifest is not valid JSON: ${manifestPath}`);
+    throw new Error(`public snapshot manifest is not valid JSON: ${where}`);
   }
-  if (typeof raw !== "object" || raw === null) throw new Error(`public snapshot manifest is not an object: ${manifestPath}`);
+  if (typeof raw !== "object" || raw === null) throw new Error(`public snapshot manifest is not an object: ${where}`);
   const m = raw as Record<string, unknown>;
   if (m.licence !== PUBLISHED_LICENCE) {
     throw new Error(`public snapshot manifest licence is ${String(m.licence)}, expected ${PUBLISHED_LICENCE}`);
@@ -159,4 +165,41 @@ export function openPublicSnapshot(dbPath: string): PublicSnapshot {
     db.close();
     throw err;
   }
+}
+
+/** A release imported into D1, ready to read. */
+export interface D1Release {
+  db: ReleaseDb;
+  manifest: Manifest;
+}
+
+/**
+ * Open a release imported into D1 by web/scripts/cf-release-d1.mjs. The import writes the release_meta row
+ * last, and only when every row, the body text and the search index arrived, so a row means a whole
+ * release. It must carry a manifest that passes the same checks as a file's and the sha256 this build
+ * was configured to serve (`expectedSha256`); anything else throws, and the caller answers "unavailable".
+ */
+export async function openD1Release(d1: D1Like, expectedSha256: string): Promise<D1Release> {
+  const expected = expectedSha256.trim();
+  if (!/^[0-9a-f]{64}$/.test(expected)) throw new Error("no release sha256 configured for the D1 release (KNOWLEDGE_RELEASE_SHA256)");
+  const db = d1ReleaseDb(d1);
+  let meta: { sha256: string; manifest: string } | undefined;
+  try {
+    meta = await db.get<{ sha256: string; manifest: string }>("SELECT sha256, manifest FROM release_meta WHERE id = 1");
+  } catch (err) {
+    throw new Error(`D1 release has no release_meta table: not an imported release (${err instanceof Error ? err.message : String(err)})`);
+  }
+  if (!meta) throw new Error("D1 release has no release_meta row: the import did not finish");
+  const manifest = parseManifest(meta.manifest, "D1 release_meta");
+  if (meta.sha256 !== manifest.sha256) {
+    throw new Error(`D1 release_meta sha256 does not match its manifest: ${meta.sha256} != ${manifest.sha256}`);
+  }
+  if (manifest.sha256 !== expected) {
+    throw new Error(`D1 release is ${manifest.sha256}, this build expects ${expected}`);
+  }
+  const rows = Object.values(manifest.counts).reduce((a, b) => a + b, 0);
+  if (rows === 0 || !(await db.get("SELECT id FROM entities LIMIT 1"))) {
+    throw new Error("D1 release has no entities: refusing to serve an empty knowledge base");
+  }
+  return { db, manifest };
 }

@@ -39,6 +39,7 @@ import { handleClassRaces } from "./class-races-tool.js";
 import { categoryOf, handleItemCategories, itemCategoriesStructured } from "./item-taxonomy.js";
 import { entityRelationsStructured, handleEntityRelations, observedEdgesFromRecords, type Edge } from "./edges.js";
 import type { DB } from "./db.js";
+import type { ReleaseSource } from "./release-db.js";
 import { recordUrl } from "./lore-slug.js";
 import {
   changesUrl, collectionsUrl, ECOSYSTEM_URL, goldLedgerUrl, guildBoardUrl, guildPageUrl, guildsUrl, itemPageUrl, ITEMS_URL, loreUrls, mapSpotUrl, marketItemUrl,
@@ -443,34 +444,34 @@ function dataAgeLine(dataAsOf: unknown): string {
 type SearchArgs = McpToolArgs<"search_knowledge">;
 
 /** The hits, each with its page on the site when it has one the site indexes. */
-function withPages(db: DB, hits: SearchHit[]): (SearchHit & { url?: string })[] {
-  const urls = loreUrls(db, hits);
+async function withPages(db: ReleaseSource, hits: SearchHit[]): Promise<(SearchHit & { url?: string })[]> {
+  const urls = await loreUrls(db, hits);
   return hits.map((h) => (urls.has(h.id) ? { ...h, url: urls.get(h.id)! } : h));
 }
 
 /** The hits as text, each with its page on the site when it has one. */
-function formatHits(db: DB, hits: SearchHit[]): string {
-  return withPages(db, hits).map((h) => withMore(`[${h.kind}/${h.gameVersion}] ${h.name}\n${h.snippet}\nSource: ${h.sourceUrl} (${h.licence}, retrieved ${h.retrievedAt})`, h.url)).join("\n\n");
+async function formatHits(db: ReleaseSource, hits: SearchHit[]): Promise<string> {
+  return (await withPages(db, hits)).map((h) => withMore(`[${h.kind}/${h.gameVersion}] ${h.name}\n${h.snippet}\nSource: ${h.sourceUrl} (${h.licence}, retrieved ${h.retrievedAt})`, h.url)).join("\n\n");
 }
 
 export { SOME_WORDS };
 
 /** The hits for every asked word, or, when no page has them all, the pages with some of them. */
-function searchResult(db: DB, args: SearchArgs): { hits: SearchHit[]; some: boolean } {
+async function searchResult(db: ReleaseSource, args: SearchArgs): Promise<{ hits: SearchHit[]; some: boolean }> {
   const opts = { kinds: args.kind ? [args.kind] : undefined, versions: args.version ? [args.version] : undefined };
-  const hits = search(db, args.query, args.limit, opts);
-  return hits.length ? { hits, some: false } : { hits: searchSomeWords(db, args.query, args.limit, opts), some: true };
+  const hits = await search(db, args.query, args.limit, opts);
+  return hits.length ? { hits, some: false } : { hits: await searchSomeWords(db, args.query, args.limit, opts), some: true };
 }
 
 /** Pure handlers — tested directly; the MCP registration below is a thin wrapper. */
-export function searchHits(db: DB, args: SearchArgs): SearchHit[] {
-  return searchResult(db, args).hits;
+export async function searchHits(db: ReleaseSource, args: SearchArgs): Promise<SearchHit[]> {
+  return (await searchResult(db, args)).hits;
 }
 
-export function handleSearch(db: DB, args: SearchArgs): string {
-  const { hits, some } = searchResult(db, args);
+export async function handleSearch(db: ReleaseSource, args: SearchArgs): Promise<string> {
+  const { hits, some } = await searchResult(db, args);
   if (hits.length === 0) return "No matches. Try fewer or different words.";
-  return some ? `${SOME_WORDS}\n\n${formatHits(db, hits)}` : formatHits(db, hits);
+  return some ? `${SOME_WORDS}\n\n${await formatHits(db, hits)}` : formatHits(db, hits);
 }
 
 /** A tool answer: the text every client gets, plus structured content for tools with an output schema. */
@@ -488,13 +489,13 @@ function jsonAnswer(structured: object): StructuredAnswer {
   return { text: JSON.stringify(structured), structured };
 }
 
-export function handleGetEntity(db: DB, args: { id: number }): string {
-  const hit = getEntity(db, args.id);
+export async function handleGetEntity(db: ReleaseSource, args: { id: number }): Promise<string> {
+  const hit = await getEntity(db, args.id);
   return hit ? formatHits(db, [hit]) : `No record with id ${args.id}.`;
 }
 
-export function handleGetByName(db: DB, args: { name: string; kind?: (typeof KNOWLEDGE_KINDS)[number] }): string {
-  const hits = getByName(db, args.name, args.kind);
+export async function handleGetByName(db: ReleaseSource, args: { name: string; kind?: (typeof KNOWLEDGE_KINDS)[number] }): Promise<string> {
+  const hits = await getByName(db, args.name, args.kind);
   if (hits.length === 0) return `No record named exactly "${args.name}". Try search_knowledge for close matches.`;
   return formatHits(db, hits);
 }
@@ -589,23 +590,23 @@ export type ToolHandlers = { [K in McpToolName]: (args: McpToolArgs<K>) => ToolA
  * createKnowledgeServer and the site's GET /api/tools/{tool} are both thin wrappers over these, so
  * a tool answers the same over MCP and over plain HTTP.
  */
-export function createToolHandlers(db: DB, options: ToolOptions = {}): ToolHandlers {
+export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {}): ToolHandlers {
   const recheck = options.recheck ?? [];
   const readPageIn = <T>(tool: ToolName, page: (facts: T, dataAsOf: string | null) => { text: string; page: object; url?: string }) =>
     readPage<T>(tool, options.corpus, page, recheck);
   const readFacts = <T>(tool: ToolName, render: (facts: T) => string) => fromTooledUploads(tool, render, options.corpus, recheck);
   const handlers: ToolHandlers = {
-    search_knowledge: (args) => ({ text: handleSearch(db, args), structured: { hits: withPages(db, searchHits(db, args)) } }),
-    get_entity: (args) => {
-      const hit = getEntity(db, args.id);
-      return { text: handleGetEntity(db, args), structured: { hit: hit ? withPages(db, [hit])[0]! : null } };
+    search_knowledge: async (args) => ({ text: await handleSearch(db, args), structured: { hits: await withPages(db, await searchHits(db, args)) } }),
+    get_entity: async (args) => {
+      const hit = await getEntity(db, args.id);
+      return { text: await handleGetEntity(db, args), structured: { hit: hit ? (await withPages(db, [hit]))[0]! : null } };
     },
-    get_by_name: (args) => ({ text: handleGetByName(db, args), structured: { hits: withPages(db, getByName(db, args.name, args.kind)) } }),
-    search: (args) => jsonAnswer({
-      results: searchHits(db, { query: args.query, limit: 10 }).map((h) => ({ id: String(h.id), title: h.name, url: recordUrl(h, SITE) })),
+    get_by_name: async (args) => ({ text: await handleGetByName(db, args), structured: { hits: await withPages(db, await getByName(db, args.name, args.kind)) } }),
+    search: async (args) => jsonAnswer({
+      results: (await searchHits(db, { query: args.query, limit: 10 })).map((h) => ({ id: String(h.id), title: h.name, url: recordUrl(h, SITE) })),
     }),
-    fetch: (args) => {
-      const doc = /^\d{1,15}$/.test(args.id) ? getDocument(db, Number(args.id)) : undefined;
+    fetch: async (args) => {
+      const doc = /^\d{1,15}$/.test(args.id) ? await getDocument(db, Number(args.id)) : undefined;
       if (!doc) throw new Error(`No record with id "${args.id}". Ids come from search results.`);
       return jsonAnswer({
         id: String(doc.id), title: doc.name, text: doc.body, url: recordUrl(doc, SITE),
@@ -615,7 +616,7 @@ export function createToolHandlers(db: DB, options: ToolOptions = {}): ToolHandl
     answer_sources: async (args) => {
       const read = await readTooledFacts<AnswerSourcesFacts>("answer_sources", options.corpus, recheck);
       const files = options.gameData ? await options.gameData() : null;
-      const result = answerSources(db, args, read?.facts ?? null, read?.dataAsOf ?? null, files);
+      const result = await answerSources(db, args, read?.facts ?? null, read?.dataAsOf ?? null, files);
       // The fallback is said in the text; the structured answer keeps its published shape.
       const { someWords: _someWords, ...structured } = result;
       return { text: `${formatAnswerSources(result, read !== null)}\n${read ? answerFooter(read.dataAsOf) : MCP_CREDIT}`, structured };
@@ -800,7 +801,7 @@ export function createToolHandlers(db: DB, options: ToolOptions = {}): ToolHandl
  */
 export interface ExtraTool { name: string; def: McpToolDef; handler: (args: unknown) => ToolAnswer | Promise<ToolAnswer> }
 
-export function createKnowledgeServer(db: DB, options: ToolOptions = {}, extraTools: readonly ExtraTool[] = []): McpServer {
+export function createKnowledgeServer(db: ReleaseSource, options: ToolOptions = {}, extraTools: readonly ExtraTool[] = []): McpServer {
   const server = new McpServer(
     { name: SERVER_NAME, title: "Everloot", version: SERVER_VERSION, description: SERVER_DESCRIPTION, websiteUrl: SOURCE_URL, icons: SERVER_ICONS },
     { instructions: SERVER_INSTRUCTIONS },

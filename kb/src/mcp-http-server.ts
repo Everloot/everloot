@@ -1,13 +1,13 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import type { DB } from "./db.js";
+import type { ReleaseSource } from "./release-db.js";
 import { createKnowledgeServer, type ChangesLoader, type CompletionLoader, type CorpusLoader, type EcosystemLoader, type ExtraTool, type MarketLoader } from "./mcp-server.js";
 import type { GuildReader } from "./guilds.js";
 import type { CensusLoader } from "./population.js";
 import type { RecheckScope } from "./coverage.js";
 
 export interface PublicMcpConfig {
-  db: DB;
+  db: ReleaseSource;
   /** Null means a public, read-only mount: no bearer, rate-limited by the caller before this handler. */
   bearerToken: string | null;
   /** The path this mount answers; anything else is 404. */
@@ -39,7 +39,7 @@ export interface PublicMcpConfig {
 }
 
 export function createPublicMcpServer(
-  config: { db: DB; corpus?: CorpusLoader; market?: MarketLoader; completion?: CompletionLoader; changes?: ChangesLoader; ecosystem?: EcosystemLoader; census?: CensusLoader; guilds?: GuildReader; recheck?: readonly RecheckScope[] },
+  config: { db: ReleaseSource; corpus?: CorpusLoader; market?: MarketLoader; completion?: CompletionLoader; changes?: ChangesLoader; ecosystem?: EcosystemLoader; census?: CensusLoader; guilds?: GuildReader; recheck?: readonly RecheckScope[] },
   extraTools: readonly ExtraTool[] = [],
 ) {
   const server = createKnowledgeServer(config.db, { corpus: config.corpus, market: config.market, completion: config.completion, changes: config.changes, ecosystem: config.ecosystem, census: config.census, guilds: config.guilds, recheck: config.recheck }, extraTools);

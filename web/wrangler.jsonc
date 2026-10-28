@@ -29,7 +29,11 @@
     { "tag": "v1", "new_sqlite_classes": ["DOQueueHandler"] }
   ],
   "d1_databases": [
-    { "binding": "NEXT_TAG_CACHE_D1", "database_name": "everloot-next-tags", "database_id": "807622c4-4651-476c-b86a-d2cfd41ad59c" }
+    { "binding": "NEXT_TAG_CACHE_D1", "database_name": "everloot-next-tags", "database_id": "807622c4-4651-476c-b86a-d2cfd41ad59c" },
+    // The knowledge release (lore pages, search, /api/tools, /mcp), one database per release, imported from the SQL
+    // files scripts/cf-release-d1.mjs writes. Placeholder id until the database is created; set
+    // KNOWLEDGE_RELEASE_SHA256 below to the same release.
+    { "binding": "KNOWLEDGE_D1", "database_name": "everloot-knowledge-2026-10-24", "database_id": "00000000-0000-0000-0000-000000000000" }
   ],
   // Repository files the pages read at run time (news, guides, wiki pages), copied into .open-next/repo by
   // scripts/cf-bundle-files.mjs and uploaded as text modules, so node:fs finds them under /bundle/repo.
@@ -54,7 +58,10 @@
     "NEWS_DIR": "/bundle/repo/kb/news",
     "GUIDES_DIR": "/bundle/repo/kb/guides",
     "WIKI_DIR": "/bundle/repo/kb/wiki",
-    "PROTOCOL_SCHEMA_DIR": "/bundle/repo/protocol-schema"
+    "PROTOCOL_SCHEMA_DIR": "/bundle/repo/protocol-schema",
+    // web/src/lib/release.ts serves KNOWLEDGE_D1 only when its release_meta row names this sha256 (the release's
+    // manifest), so a database from another release, or a half-finished import, answers "unavailable".
+    "KNOWLEDGE_RELEASE_SHA256": "1da67976a3a28f39db8bded69d6eb210d97cc56cc2ba1242dcb75283a061b6c7"
   },
   "observability": {
     "enabled": true,

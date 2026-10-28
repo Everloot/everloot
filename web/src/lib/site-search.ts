@@ -143,10 +143,10 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, names
       .map((slug) => ({ label: classLabel(slug), href: `/classes/${slug}`, note: "Guides, talents and who can play it", exact: q.replace(/s$/, "") === slug }));
     found.set("class", { results: classes, total: classes.length });
 
-    const lore = searchLore(text, 1);
+    const lore = await searchLore(text, 1);
     if (lore !== UNAVAILABLE) {
       const loreHit = (h: SearchHit) => ({ label: h.name, href: `/lore/${loreSlug(h)}`, note: h.snippet, exact: h.name.toLowerCase() === q });
-      const some = lore.hits.length ? [] : searchLoreSomeWords(text, LORE_LIMIT);
+      const some = lore.hits.length ? [] : await searchLoreSomeWords(text, LORE_LIMIT);
       if (lore.hits.length || some === UNAVAILABLE) {
         const hits = lore.hits.map(loreHit);
         found.set("lore", { results: hits.slice(0, LORE_LIMIT), total: hits.length });

@@ -86,17 +86,17 @@ test("wikiSubjects: page titles by their categories, the first rule wins, disamb
 test("resolve: exact title first, then a search hit carrying the name, else none; topics are not scored", async () => {
   const db = await seed();
   const bank = buildQuestionBank([{ kind: "instance", name: "Synthetic Stockade", id: 34 }, { kind: "boss", name: "Nobody Here", id: "34:9" }]);
-  expect(resolve(db, bank.find((q) => q.id === "where-is:instance:synthetic-stockade")!)).toBe("exact");
-  expect(resolve(db, bank.find((q) => q.id === "drops:boss:nobody-here")!)).toBe("none");
-  expect(resolve(db, bank.find((q) => q.template === "topic")!)).toBe("n/a");
+  expect(await resolve(db, bank.find((q) => q.id === "where-is:instance:synthetic-stockade")!)).toBe("exact");
+  expect(await resolve(db, bank.find((q) => q.id === "drops:boss:nobody-here")!)).toBe("none");
+  expect(await resolve(db, bank.find((q) => q.template === "topic")!)).toBe("n/a");
   // An alias resolves only when search on the alias text finds the instance: "VC level" does not say Stockade.
-  expect(resolve(db, { id: "x", text: "stockade under the keep", template: "alias", subject: { kind: "alias", name: "Synthetic Stockade" }, expects: { resolve: true, evidence: true } })).toBe("search");
+  expect(await resolve(db, { id: "x", text: "stockade under the keep", template: "alias", subject: { kind: "alias", name: "Synthetic Stockade" }, expects: { resolve: true, evidence: true } })).toBe("search");
 });
 
 test("evaluateBank: totals, per-template and per-kind rows, the unresolved names and the questions with no evidence; the report reads as markdown", async () => {
   const db = await seed();
   const bank = buildQuestionBank([{ kind: "instance", name: "Synthetic Stockade", id: 34 }, { kind: "boss", name: "Nobody Here", id: "34:9" }]).filter((q) => q.template !== "alias" && q.template !== "topic");
-  const report = evaluateBank(db, bank, null, { release: "test.sqlite", dataAsOf: null, ranAt: "2026-10-27T12:00:00.000Z", sampleNames: 3 });
+  const report = await evaluateBank(db, bank, null, { release: "test.sqlite", dataAsOf: null, ranAt: "2026-10-27T12:00:00.000Z", sampleNames: 3 });
   expect(report.corpusConnected).toBe(false);
   expect(report.totals.questions).toBe(bank.length);
   expect(report.totals.exact).toBe(bank.filter((q) => q.subject.name === "Synthetic Stockade").length);

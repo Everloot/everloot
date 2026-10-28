@@ -49,7 +49,7 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
   const q = (first(params.q) ?? "").trim().slice(0, MAX_QUERY);
   // `in=lore` is the full lore list (with its type chips and pages) behind the lore group of the overview;
   // the links this page gave out before it searched the whole site (`page=`, `type=`) still open it.
-  if (first(params.in) === "lore" || params.page !== undefined || params.type !== undefined) return <LoreResults q={q} params={params} />;
+  if (first(params.in) === "lore" || params.page !== undefined || params.type !== undefined) return LoreResults({ q, params });
   const scope = isScope(first(params.in)) ? (first(params.in) as Scope) : undefined;
 
   // Reuse item facts only within this render; the next request rechecks publication.
@@ -139,11 +139,11 @@ function ResultTable({ group, q, scoped, icons }: { group: SearchGroup; q: strin
   );
 }
 
-function LoreResults({ q, params }: { q: string; params: Params }) {
+async function LoreResults({ q, params }: { q: string; params: Params }) {
   const page = pageNumber(first(params.page));
-  const typed = hasTypes() === true;
+  const typed = (await hasTypes()) === true;
   const type = typed ? typeOf(first(params.type)) : undefined;
-  const result = q ? searchLore(q, page, type) : null;
+  const result = q ? await searchLore(q, page, type) : null;
   const base = `/search?q=${encodeURIComponent(q)}&in=lore`;
   const typeQuery = type ? `&type=${type}` : "";
   const chips = typed && q

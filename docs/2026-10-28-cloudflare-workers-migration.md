@@ -54,9 +54,45 @@ Seen failing: `/news` (`readdir '/kb/news'`), guides (`readdir '/kb/guides'`).
 
 `/lore/[slug]`, `/lore/browse/[type]`, `/search`, `/api/tools`, `/mcp`, `/mcp/public` and the sitemaps read the
 approved release (`web/.release/*.sqlite`, ~500 MB) in process through `better-sqlite3` (`kb/src/db.ts`). A Worker
-cannot load a native module or ship that file. Import the release into a D1 database per release (D1 is SQLite:
-same schema, same queries) and give the read layer an async D1 path. The `prebuild` download
-(`scripts/fetch-release.mjs`) becomes a release step that imports into D1 and records its hash.
+cannot load a native module or ship that file, so on the Worker the release is a D1 database, one per release
+(D1 is SQLite: same schema, same queries, FTS5 included).
+
+**How it reads.** Every release read goes through `ReleaseDb` (`kb/src/release-db.ts`: `all`/`get`, positional
+parameters, promises), over `better-sqlite3` on Node and Vercel or over a D1 binding on the Worker. `getRelease()`
+(`web/src/lib/release.ts`) uses D1 when the Worker has the binding `KNOWLEDGE_D1`, the file otherwise. On D1 it
+serves only when the `release_meta` row exists, its manifest passes the same checks as a file's manifest, and its
+sha256 is `KNOWLEDGE_RELEASE_SHA256` from `wrangler.jsonc`; anything else is "unavailable", as a bad file is today.
+
+**Importing a release.** From `web/`, with the approved release and its manifest on disk:
+
+1. `node scripts/cf-release-d1.mjs <release>.sqlite` checks the manifest hash against the file and writes
+   `.release/d1/<release>/0001.sql` … in 50 MB parts (`--part-mb` to change): the tables, the rows as INSERTs
+   under D1's 100 KB statement limit (a longer body is inserted in part and the rest appended; the 2026-10-24
+   release has 58 such bodies, the longest 486 KB, under D1's 2 MB row limit), the indexes, the FTS5 table filled
+   from `entities` in id ranges of about 4 MB of text (one `'rebuild'` would be a single statement over 330 MB, at
+   the mercy of D1's per-statement time limit), the triggers, and last the `release_meta` row. That row's `CHECK`
+   fails, and the import stops with an error, unless the rows per source, the total body length and the FTS index
+   all match the release. The files hold no `BEGIN`/`COMMIT`, which D1 refuses.
+2. `npx wrangler d1 create everloot-knowledge-<date>`; put its id in the `KNOWLEDGE_D1` entry of `wrangler.jsonc`
+   and the release's manifest sha256 in `KNOWLEDGE_RELEASE_SHA256` (the script prints it).
+3. Each part in order: `npx wrangler d1 execute KNOWLEDGE_D1 --remote --file .release/d1/<release>/0001.sql`, and so
+   on. Stop at the first error and start again with a new, empty database.
+4. Check: `npx wrangler d1 execute KNOWLEDGE_D1 --remote --command "SELECT sha256 FROM release_meta"` names the release.
+5. Deploy. A new release is a new database, id and sha256 in one deploy; delete the old database after.
+
+Local (`wrangler dev`) is the same with `--local`. The 2026-10-24 release (516 MB file, 260,600 rows) gives
+330 MB of SQL in 7 parts, written in 5 s. The local import (`--local`, 2026-10-28, Windows) took 198 s, 19 to 28 s
+per part and 58 s for the last; the slowest single statements were an FTS range (3.0 s) and the `release_meta`
+checks, which read every body once (7.3 s). With that local D1, `npm run cf:build` then `wrangler dev` served
+`/lore/481380-alliance`, `/search?q=thrall`, `/lore/zones`, `/api/tools/search_knowledge` and the `/mcp` tools from
+D1; with another `KNOWLEDGE_RELEASE_SHA256` they answered "unavailable". `/mcp/public` needs the per-IP quota
+storage (Supabase) before it reaches the release, so locally it answers 503 without it.
+
+**Still open.** The remote import time and the database size on D1 are not measured yet. `indexableCount`
+(the coverage page) reads every body once per isolate, about 260,600 rows read each time on D1. D1 binds at most
+100 parameters per statement; `loreUrls` binds one per lore hit (at most 25 from a search, a handful from
+`get_by_name` on the current release). The `prebuild` download (`scripts/fetch-release.mjs`) is still the Vercel
+path; on the Worker the import above replaces it.
 
 ### 4. Secrets and settings
 

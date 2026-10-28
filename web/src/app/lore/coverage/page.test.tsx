@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeAll, expect, test, vi } from "vitest";
 import { buildLoreRelease } from "@/test/lore-release";
+import { spyOnQueries } from "@/test/release-queries";
 
 vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => (
@@ -57,7 +58,7 @@ test("metadata is indexed with its canonical, and noindex when the release is un
 test("an untyped release runs no facet scans", async () => {
   vi.stubEnv("KB_SNAPSHOT_PATH", await buildLoreRelease({ typed: false }));
   const { getRelease } = await import("@/lib/release");
-  const spy = vi.spyOn(getRelease()!.db, "prepare");
+  const spy = spyOnQueries((await getRelease())!.db);
   const { default: CoveragePage } = await import("./page");
   renderToStaticMarkup(await CoveragePage());
   expect(spy.mock.calls.filter(([sql]) => /json_each/.test(String(sql)))).toHaveLength(0);

@@ -105,7 +105,7 @@ test("a release carries name_norm and its index, and the exact-name search reads
   const release = openPublicSnapshot(dbPath);
   expect(release.db.prepare("SELECT name_norm AS norm FROM entities").all()).toEqual([{ norm: "thrall" }]);
   expect(release.db.prepare("SELECT name FROM sqlite_master WHERE name = 'entities_name_norm'").get()).toEqual({ name: "entities_name_norm" });
-  expect(search(release.db, "thrall", 1)[0].name).toBe("Thrall");
+  expect((await search(release.db, "thrall", 1))[0].name).toBe("Thrall");
   release.db.close();
 });
 
@@ -115,9 +115,9 @@ test("a release built before name_norm still opens and searches through the fall
   });
   const release = openPublicSnapshot(dbPath);
   expect(release.db.prepare("SELECT name FROM pragma_table_info('entities') WHERE name = 'name_norm'").all()).toEqual([]);
-  expect(search(release.db, "thrall", 1)[0].name).toBe("Thrall");
+  expect((await search(release.db, "thrall", 1))[0].name).toBe("Thrall");
   // The lookup that runs when the pool misses: no exact row in the pool, so the fallback expression is read.
-  expect(search(release.db, "warchief", 1)[0].name).toBe("Thrall");
+  expect((await search(release.db, "warchief", 1))[0].name).toBe("Thrall");
   release.db.close();
 });
 

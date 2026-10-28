@@ -46,7 +46,7 @@ export async function GET(req: Request, context: { params: Promise<{ tool: strin
     const issues = parsed.error.issues.map((i) => `${i.path.join(".") || "arguments"}: ${i.message}`).join("; ");
     return refuse(400, `${issues}. The parameters are described at ${SITE}/schema/mcp/${name}.json.`);
   }
-  const release = getRelease();
+  const release = await getRelease();
   if (!release) return refuse(503, "Knowledge release unavailable. The answer is unrecorded, not zero.");
   // Built again when the switch changes, so the guild tools never answer from a reader the switch has withdrawn.
   if (!handlers || handlersGuilds !== Boolean(loaders.guilds)) {
