@@ -44,6 +44,12 @@ This set is committed locally, not pushed, installed, packaged or released.
 | REL-08 | Updater URL/path/size/launch safety | Existing updater | Hostile filename/URL, oversize, checksum failure and launch error preserve recoverability |
 | REL-09 | Publisher verification design and packaged acceptance | REL-08 | Trust and key rotation documented; package upgrade/rollback/uninstall tested separately |
 
+REL-06A is implemented locally and independently accepted at `119ad0a6`: structured rate-limit metadata,
+per-job/site-origin deadlines, stopped/restarted-session protection, timer-overflow guard and invalid-address
+recovery. Parent companion 117 and Desktop 240 tests, both typechecks and Desktop bundle pass; reviewer
+engine 22/22 pass. No public delivery or app-restart persistence is claimed. REL-06B (network-return and
+exhausted-retry recovery) remains open; it is not closed by the Retry-After fix.
+
 ## Identity, character hub and completion
 
 | ID | Gap / deliverable | Depends on | Acceptance |
