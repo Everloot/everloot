@@ -4,6 +4,11 @@ Date: 2026-10-28. Status: **proposed**. This ADR needs owner acceptance before H
 HIST-01 implementation. It changes no code, SQL or configuration. Feature flags and applied database
 migrations are not verified here; read the current environment back before activating anything below.
 
+Owner decision, 2026-10-28: competing character claims freeze both links and hide their linked dashboards,
+including each account's own authenticated private progress, until support resolves the dispute. This accepts
+the freeze policy in D0 and private-read behavior in D2, not the remaining ADR or activation requirements.
+No data is shared between accounts. The owner list still shows the frozen state so each account can seek support.
+
 Parent documents: [unified player platform](2026-10-28-unified-player-platform.md),
 [gap register](../../2026-10-28-platform-gap-register.md) and
 [readiness plan](../../superpowers/plans/2026-10-28-platform-readiness.md).
@@ -51,10 +56,12 @@ Consequences that this ADR makes binding:
 3. Class, race, faction, level, realm, name and GUID are publicly observable. They are never ownership proof and
    never resolve a dispute on their own.
 4. Freezing stays: a forged claim can freeze a real link (denial of display), but cannot take it over. This
-   tradeoff is proposed for owner review; no policy acceptance is implied by this ADR. No independently
+   tradeoff was accepted by the owner on 2026-10-28: both links and their linked dashboards are frozen pending
+   support review, including otherwise authenticated private data. No independently
    trusted proof of game-character control is established by the current file bridge.
    The frozen result also tells a claimant that another account linked this character; the existing code quota
-   bounds claims to ten per account per day. D0 and a minimum dispute contact/response policy gate activation.
+   bounds claims to ten per account per day. The disclosure wording and minimum D8 dispute contact/response
+   policy still require review before activation.
 
 ## Decision
 
@@ -164,7 +171,7 @@ is deferred until its separate public-profile contract. `public_character` reads
 | Source revoked (owner removes a machine) | Facts from that source drop out of reads at once; deletion of its raw rows follows D3 |
 | Account deletion | Existing `on delete cascade` removes links, visibility, codes and (proposed) sources and consent |
 | Hide request (suppression) | Existing behavior: cannot link or show. Proposed: an existing link to a newly suppressed character becomes private-only and is excluded from any public surface |
-| Frozen | Owner list shows the frozen state; private reads excluded under proposed D2; operator resolution must use `unlink_character` or a reviewed operation with the same deletion/purge effects, not a raw DELETE |
+| Frozen | Owner list shows the frozen state; linked dashboards and private reads excluded under accepted D2 until support resolves the dispute; operator resolution must use `unlink_character` or a reviewed operation with the same deletion/purge effects, not a raw DELETE |
 
 Append-only ingestion is not irrevocable storage. Any history store (HIST-03) must support these deletions and
 replay without leaving revoked events behind.
@@ -261,12 +268,14 @@ Acceptance tests (each must fail before the change where the path is new):
 
 ## Remaining decisions (for the owner, not blocking Step 1 unless noted)
 
-- **D0 (blocks enabling Step 1):** accept freeze-on-second-claim and the account-link-existence disclosure.
-  Step 1 code can be prepared behind its flag, but activation needs D0 plus the minimum D8 support policy.
+- **D0 (freeze policy accepted 2026-10-28; activation details outstanding):** freeze both links and linked
+  dashboards pending support review. Review account-link-existence disclosure wording and establish the
+  minimum D8 support policy before enabling Step 1. Code can be prepared behind its flag.
 - **D1 (blocks Step 2):** accept the proposed source/consent tables and separate `sync:own` write scope.
   Do not repurpose the existing `read:own` scope for writes.
-- **D2 (blocks Step 2):** whether a frozen link's owner keeps private reads of data from their own active sources.
-  Recommended default: excluded, matching the gap register; revisit if forged freezes become a support burden.
+- **D2 (accepted 2026-10-28):** a frozen link's owner cannot view its linked dashboard or private progress,
+  even from their own authenticated active sources, until support resolves the dispute. The freeze never
+  grants either account access to the other's data. D1 and D9 still gate Step 2.
 - **D3 (blocks HIST-01):** retention of raw source rows after unlink/consent/source revocation: delete at once,
   or a fixed grace period for relinking. Until a different policy is accepted, Step 2 deletes its new private
   raw and derived rows immediately on those revocations; retained anonymous/publication data follows its existing policy.
