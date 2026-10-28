@@ -162,6 +162,27 @@ observed-at, optional game-reported date, before/after value, schema/client buil
 - [ ] Add recent-milestone and reputation-gains views; use first-recorded wording unless the game supplied the date.
 - [ ] Run focused suites, review, and measure memory/query work; do not add a whole-world JSON response.
 
+## Team operations work package: SaaS maintenance
+
+**IDs:** OPS-01..04. **Owner:** platform operations; people assigned only after the owner confirms participation.
+
+Owner direction added 2026-10-28. Begin with a read-only audit of existing staff authentication, permission
+checks, support entry points and project tracking. Then propose a role/action matrix and case lifecycle for
+support and character disputes, including D8 contact and response wording. Keep prospective collaborator
+names and assignments in private project control. This package does not enable staff access or change flags.
+
+- [ ] OPS-01: document support/maintenance/admin actions and private-data boundaries; specify denied-access
+  and maintainer-revocation checks before implementation.
+- [ ] OPS-02: define case ownership, status, private timeline, next action and resolution; apply the accepted
+  freeze-both-links-and-dashboards policy pending review. Do not invent a response-time commitment.
+- [ ] OPS-03: after workflow acceptance, build one authenticated operator case list/detail slice and audit
+  sensitive actions; verify cross-role denial and ensure secrets/raw player evidence are absent from logs.
+- [ ] OPS-04: connect work ownership and acceptance to the existing tracker; write onboarding/offboarding,
+  incident, backup/restore and release/rollback runbooks. Add operational metadata only where needed.
+
+No new billing, organization tenancy, paid service or staff impersonation feature is implied. Review proposed
+schema/runtime work against the active Cloudflare lane before assigning implementation files.
+
 ## Task 5: Capability evidence and economy correctness
 
 **IDs:** PROBE-01, ECON-E01..03, ITEM-I01, COL-C04.

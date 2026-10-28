@@ -102,6 +102,31 @@ paged store contracts and bounded work; select storage after a measured represen
 - Follow the existing decision: production cutover after November 4 and only after parity acceptance.
 - Workers Paid is approved; new paid products or changed spending require a separately named decision.
 
+## Team operations and SaaS structure
+
+Owner direction, 2026-10-28: prepare Everloot to be maintained by a small team, with clear follow-up across
+support, engineering and service operations. Collaborators are prospective; no membership, access or duty
+assignment is implied. This adds operational requirements, not a decision to introduce paid subscriptions.
+
+- Each maintainer uses an individual account. Define scoped roles for support, maintenance and administration
+  before granting access; avoid shared credentials. Team access is separate from player accounts and character links.
+- Track support cases, including character disputes, with an id, category, status, assigned maintainer,
+  timestamps, next action and resolution. Keep a private timeline of decisions and minimal necessary evidence.
+  Decide contact channel and response wording before promising support review (identity ADR D8).
+- Record sensitive operator actions with actor, time, target, reason and outcome. Freeze/unfreeze, unlink,
+  deletion, permission changes and release operations need attributable records; exclude secrets and raw player files.
+- Support access does not automatically expose private dashboards, grant exports or permit dispute resolution.
+  Define and test authorization per action; revoke access when a maintainer leaves.
+- Maintain one work queue with owners, dependencies, acceptance criteria and links to issues/changes. Document
+  onboarding, incident handling, backup/restore, deployment/rollback and maintainer offboarding.
+- Provide an operational view of sync failures, service health and release versions using minimal metadata.
+  Player support cases and private evidence must remain separate from public status information.
+
+The first slice is a permissions matrix and support workflow, followed by a narrow authenticated operator
+case list and case detail view. Reuse existing authentication and project tracking where suitable; choose any
+new tooling, schema or vendor only after reviewing current capabilities. Organization tenancy, billing,
+subscriptions and unrestricted staff impersonation are outside this requirement.
+
 ## Delivery gates
 
 1. Plan and coverage register: files, dependencies, owners, acceptance and uncertainty recorded.

@@ -93,6 +93,19 @@ PvP is already requested product scope. API availability, participant disclosure
 scope approval is not an excuse to fabricate support. Combat parsing requires a real supported sample,
 but a format-neutral bounded file reader and test harness can be implemented beforehand.
 
+## Team operations and SaaS readiness
+
+Owner direction accepted 2026-10-28: support a small maintenance team with accountable follow-up. These are
+new requirements, not implemented capabilities or authorization to grant access. Named collaborators and
+assignments belong in private project control, not public product documentation.
+
+| ID | Task | Depends on | Acceptance |
+|---|---|---|---|
+| OPS-01 | Maintainer roles and action permissions | Existing auth/access audit | Individual accounts; explicit support/maintenance/admin permissions; private-data access separate; denied actions and revocation specified; no shared credentials |
+| OPS-02 | Support and character-dispute workflow | OPS-01, identity ADR D8 | Case id, owner, state, private timeline, next action, resolution and contact wording; accepted freeze policy honored; no other-account disclosure or dashboard access by default |
+| OPS-03 | Operator case views and action audit | OPS-01..02 | Authorized case list/detail; actor/time/target/reason/outcome on sensitive actions; cross-role denial tests; no secrets or raw player files in audit records |
+| OPS-04 | Maintainer onboarding and service runbooks | OPS-01, existing release/backup workflows | Named ownership in private tracker; onboarding/offboarding, incident triage, restore and rollback instructions; service/sync metadata separated from private evidence |
+
 ## Coverage outside the first implementation waves
 
 Keep these audited items visible rather than calling this an exhaustive code audit: addon guild-departure
