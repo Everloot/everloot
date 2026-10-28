@@ -1,8 +1,8 @@
 # Moving the site from Vercel to Cloudflare Workers
 
 Decided 2026-10-28: the site moves to Cloudflare Workers (Workers Paid, $5 a month per account), and
-`everloot.app` switches after the 11/04 launch, once the Workers build serves everything the Vercel one does.
-Until then production stays on Vercel and nothing here touches its DNS.
+`everloot.app` switches before the 11/04 launch, as soon as the Workers build serves everything the Vercel one
+does. Until the switch, production stays on Vercel and nothing here touches its DNS.
 
 ## Why
 
@@ -117,10 +117,10 @@ Set on the Worker (10/28): `R2_*` and `GAME_DATA_*` through two new bucket-scope
 production. Plus the real `BNET_CLIENT_ID`, `BNET_REDIRECT_URI`, `EVERLOOT_CHAT_WORKSPACE`, `EVERLOOT_GUILDS`,
 `EVERLOOT_PROFILES`.
 
-Still needed, and each must equal production's value: **`EVERLOOT_CHARACTER_KEY`** (census keys; a different one
-splits every character), **`BNET_CLIENT_SECRET`** (Battle.net sign-in), `BETTER_AUTH_SECRET` (only when
-`EVERLOOT_AUTH_V2` turns on) and `INDEXNOW_KEY` (only for the IndexNow cron). They come from the owner, not from
-Vercel.
+Also set: `EVERLOOT_CHARACTER_KEY` (a new key, set on Vercel production and the Worker together on 10/28 while
+the character tables were empty; the owner keeps a recovery copy), `BNET_CLIENT_SECRET` (read, not regenerated,
+from the Battle.net developer portal) and `INDEXNOW_KEY` (public by design, served at `/indexnow.txt`). Not set:
+`BETTER_AUTH_SECRET`, needed only when `EVERLOOT_AUTH_V2` turns on.
 
 The host-specific reads go through `web/src/lib/platform.ts`: the client address (`x-vercel-forwarded-for` on
 Vercel, `cf-connecting-ip` on the Worker, never the other host's header), the environment for analytics
@@ -166,6 +166,22 @@ browser reports as status 0 (not a difference).
 Build and deploy from GitHub Actions on merge to `main` (a scoped deploy token), or Workers Builds. Check that
 `desktop`, `addon` and `kb` steps stay where they are.
 
+### 7. Edge cache, static headers and monitoring (switch audit, 10/28)
+
+- **Edge cache.** Vercel's CDN keeps `/database*`, `/map*`, `/changes`, `/search` and `/sitemap.xml` for the
+  `CDN-Cache-Control` lifetime `next.config.js` sets; a Worker's own responses skip Cloudflare's cache. The Worker
+  entry (`web/scripts/cf-entry.mjs`) keeps exactly those responses in the Cache API (`web/src/lib/cf-edge-cache.ts`):
+  GET without credentials, 200, no `Set-Cookie`, `CDN-Cache-Control: max-age`. Browsers get the page's own
+  `Cache-Control`; the key carries `EVERLOOT_COMMIT_SHA`, so a deploy starts with an empty cache. The Cache API
+  works on the zone's routes, not on workers.dev.
+- **Static files.** The static-assets binding serves `public/` without running Next, so `next.config.js` headers
+  never reach those files. `scripts/cf-bundle-files.mjs` writes an assets `_headers` file (security headers,
+  `/tooltips.js` CORS and lifetime, `/_next/static/*` immutable) and copies `public/.well-known`, which the asset
+  copy skips.
+- **Monitoring.** A failed cron throws, so the Worker's cron history shows it; `.github/workflows/site-health.yml`
+  asks `/api/health` every 15 minutes and opens one `site-down` issue on failure, closing it when healthy.
+  Logs stay sampled at 10%.
+
 ## Coordination with the platform plan
 
 The platform readiness plan (desktop terminal, `docs/superpowers/plans/2026-10-28-platform-readiness.md` on its
@@ -200,24 +216,40 @@ DNS today (zone `everloot.app`, this account, Free plan): apex `A 76.76.21.21` a
 Google, Bing and Pinterest verification records. Only the apex A and the `www` CNAME change. The site uses no
 `next/image`, so nothing depends on Vercel's image optimizer.
 
-Before: D1 imported and the route check all green; `wrangler.jsonc` `EVERLOOT_DEPLOY_ENV` = `production` and
-`triggers.crons` added on the release commit, built and uploaded but not yet routed.
+No record is deleted (switch audit, 10/28): deleting first leaves a window in which resolvers can cache "no such
+record" for the zone's negative TTL, 1800 s. Instead the Worker gets routes on the zone, and the two existing
+records turn proxied. Resolvers that still hold the old answer reach Vercel for up to the record TTL (300 s), and
+Vercel keeps serving until then; no CAA record limits Cloudflare's certificate. `www` → apex is already a 301 in
+`next.config.js`, so no redirect rule is needed.
 
-1. Worker → Access: scope to **Previews only** (or remove), so `everloot.app` does not ask for a sign-in.
-2. Vercel project → Settings → Cron Jobs: **disable**. In the same minute, deploy the Worker version with
-   `triggers.crons` (one writer at a time).
-3. DNS: delete the apex A record and the `www` CNAME, then Worker → Domains & Routes → add Custom Domains
-   `everloot.app` and `www.everloot.app` (Cloudflare creates the records and certificates).
-4. Rules → Redirect Rules: `www.everloot.app/*` → `https://everloot.app/$1` (301), as Vercel does today.
-5. Check: the route check against `https://everloot.app` (no sign-in now), `/api/health` fresh, one MCP call,
-   one upload from the addon or desktop app, Battle.net sign-in end to end, the footer shows the release commit.
-6. Deploys: GitHub → repository variable `WORKER_DEPLOY` = `1` (`.github/workflows/deploy-worker.yml` then deploys
-   the Worker on every merge to `main`; it needs the `CLOUDFLARE_API_TOKEN` secret and the `CLOUDFLARE_ACCOUNT_ID`
-   and `NEXT_PUBLIC_*` variables, set beforehand). Vercel project → Settings → Git: disconnect, so merges stop
-   building on Vercel.
-7. Bots: Security → bots / AI crawl control, decide on `meta-externalagent` (40% of function calls on 10/28,
+The switch commit (on #546, deployed in step 3): `wrangler.jsonc` gets `"routes"` for `everloot.app/*` and
+`www.everloot.app/*` (zone `everloot.app`), `"triggers": { "crons": ["*/10 * * * *", "23 * * * *"] }`,
+`"workers_dev": false` (the workers.dev host would otherwise serve production publicly once Access is relaxed), and
+`EVERLOOT_DEPLOY_ENV` = `production`.
+
+1. Worker → Access: scope to **Previews only**, so `everloot.app` does not ask for a sign-in.
+2. Vercel project → Settings → Cron Jobs: **disable**.
+3. Deploy the switch commit (`npm run cf:deploy`): the Worker's crons start, the routes attach. Only one writer
+   runs the crons at any moment.
+4. DNS: edit the apex `A 76.76.21.21` and `www CNAME cname.vercel-dns.com` to **Proxied**, content unchanged.
+   Requests reach the Worker through the routes within the record TTL.
+5. SSL/TLS → Edge Certificates → **Always Use HTTPS**: on (Vercel answers `http://` with a 308 today).
+6. Check: the route check against `https://everloot.app`, headers included (security headers, `tooltips.js` CORS);
+   `/.well-known/*` and `/indexnow.txt` 200; `/api/health` fresh; an MCP call on `/mcp/public`; one upload from
+   the addon or desktop app; Battle.net sign-in end to end; the footer shows the switch commit; the next cron run
+   in the Worker's cron history.
+7. Vercel project → Settings → Git: disconnect, so merges stop building there. Then GitHub → repository variable
+   `WORKER_DEPLOY` = `1` and merge #546: from then on every merge to `main` deploys the Worker
+   (`deploy-worker.yml`), and `site-health.yml` checks `/api/health` every 15 minutes.
+8. Bots: Security → bots / AI crawl control, decide on `meta-externalagent` (40% of function calls on 10/28,
    ignores robots.txt). Carlos's call.
 
-Rollback: Vercel → Cron Jobs enable, Git reconnect; GitHub → `WORKER_DEPLOY` unset; Worker → remove the two custom domains; DNS → re-add `A @ 76.76.21.21` and
-`CNAME www cname.vercel-dns.com` (DNS only); Worker → Cron Triggers remove. Vercel's last production deployment
-serves again within the DNS TTL.
+Rollback, in this order (no gap, one cron writer):
+
+1. Worker → Settings → Trigger events: delete the cron triggers.
+2. Vercel → Cron Jobs: enable; Settings → Git: reconnect.
+3. DNS: the apex A and the `www` CNAME back to **DNS only**. Vercel serves again as resolvers expire the record
+   (300 s); the Worker's routes answer whatever still arrives until then.
+4. After 5 minutes, Worker → Domains & Routes: remove the two routes.
+5. GitHub: unset `WORKER_DEPLOY`, and revert the switch commit on `main`, or the next deploy brings the routes and
+   crons back. Vercel's last deployment predates later merges: check the Supabase migrations made since.
