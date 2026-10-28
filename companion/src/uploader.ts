@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { UPLOAD_LIMITS, type RecordKind } from "@everloot/protocol";
 import { parseEverlootLua } from "../../web/src/lib/sv-parse";
-import { prepareUpload, sendBatches } from "../../web/src/lib/upload-batches";
+import { prepareUpload, sendBatches, type BatchReceipt } from "../../web/src/lib/upload-batches";
 import { settledSkip, type SettledList } from "../../kb/src/settled-list";
 import { receiptKeyForSite, type SentState } from "./sent-state";
 
@@ -83,6 +83,27 @@ function refusal(response: Response, text: string | null, site: string): Error |
   return null;
 }
 
+/** The site read every row of a batch and kept none. Its rows stay unsent; the upload goes on with the next batch. */
+class EveryRowRejected extends Error {
+  constructor(readonly receipt: BatchReceipt) { super("The site turned away every row of a batch."); }
+}
+
+/**
+ * The receipt of a 422 that turns away every row of `batch` by its own index, once each, with nothing accepted, no
+ * claim of storage and no error of its own. Anything less exact is a refusal of the whole request, and stops the run.
+ */
+function everyRowRejected(response: Response, text: string | null, batch: unknown): BatchReceipt | null {
+  if (response.status !== 422 || text === null || typeof batch !== "string") return null;
+  let receipt: Record<string, unknown> | null, rows: unknown;
+  try { receipt = JSON.parse(text); rows = JSON.parse(batch).records; } catch { return null; }
+  if (!receipt || typeof receipt !== "object" || receipt.ok !== false || "error" in receipt || "persisted" in receipt || "uploadId" in receipt) return null;
+  const { accepted, rejected } = receipt;
+  if (!Array.isArray(rows) || !Array.isArray(accepted) || accepted.length || !Array.isArray(rejected) || rejected.length !== rows.length) return null;
+  const indices = new Set(rejected.map((r) => (r as { index?: unknown } | null)?.index));
+  if (indices.size !== rows.length || ![...indices].every((i) => Number.isInteger(i) && (i as number) >= 0 && (i as number) < rows.length)) return null;
+  return receipt as unknown as BatchReceipt;
+}
+
 /**
  * `send` with a time limit on each request, its answer included, and plain errors for what `sendBatches` could not
  * read. A usable answer goes on unchanged: `sendBatches` still checks the receipt before anything is marked sent.
@@ -107,6 +128,8 @@ function bounded(send: typeof fetch, site: string, timeoutMs: number): typeof fe
       }), late]);
       reader = response.body?.getReader();
       const text = await Promise.race([readAnswer(reader), late]);
+      const rejected = everyRowRejected(response, text, init?.body);
+      if (rejected) throw new EveryRowRejected(rejected);
       const error = refusal(response, text, site);
       if (error) throw error;
       return new Response(text, { status: response.status, statusText: response.statusText, headers: response.headers });
@@ -116,7 +139,8 @@ function bounded(send: typeof fetch, site: string, timeoutMs: number): typeof fe
   };
 }
 
-export interface UploadResult { sent: number; batches: number; skipped: number; heldNamed: number; heldLegacy: number; heldAddons: number; heldCensus: number; heldPlayers: number; invalid: number }
+/** `rejected` counts the rows the site did not accept this run: they stay unsent and go again next run. */
+export interface UploadResult { sent: number; batches: number; skipped: number; heldNamed: number; heldLegacy: number; heldAddons: number; heldCensus: number; heldPlayers: number; invalid: number; rejected: number }
 
 /**
  * Send one SavedVariables file's unsent events, the same way the upload page does: named categories
@@ -138,10 +162,10 @@ export async function uploadFile(file: string, options: UploadOptions): Promise<
   // A settled row is handled: it is not weighed again next time, whether or not the rest is sent.
   if (session.skipped.length) options.state.add(receiptKey, session.skipped);
   const result = { sent: 0, batches: session.batches.length, skipped: session.skipped.length, heldNamed: session.held.named, heldLegacy: session.held.legacy,
-    heldAddons: unsent.length - records.length - heldCensus - heldPlayers, heldCensus, heldPlayers, invalid: session.held.invalid };
+    heldAddons: unsent.length - records.length - heldCensus - heldPlayers, heldCensus, heldPlayers, invalid: session.held.invalid, rejected: 0 };
   if (session.batches.length === 0) return result;
   const send = bounded(options.fetch ?? fetch, new URL(options.endpoint).host, options.timeoutMs ?? 60_000);
-  await sendBatches(session, send, () => {
+  const progress = () => {
     // Only the rows the receipt names as accepted are sent. A rejected row, or an index that names no row, stays
     // unsent and goes again next run: a stored batch can still turn rows away for now (a store that was down).
     const rows = JSON.parse(session.batches[session.next - 1]).records as { eventId: string }[];
@@ -155,6 +179,17 @@ export async function uploadFile(file: string, options: UploadOptions): Promise<
       .filter((i): i is number => Number.isInteger(i) && (i as number) >= 0 && (i as number) < rows.length && !rejected.has(i)));
     options.state.add(receiptKey, [...indices].map((i) => rows[i].eventId));
     result.sent += indices.size;
-  }, new URL("/api/intake", options.endpoint).href);
+    result.rejected += rows.length - indices.size;
+  };
+  const intake = new URL("/api/intake", options.endpoint).href;
+  // A batch the site turned away whole is passed over with its own receipt, so each receipt stays with its batch; one
+  // pass at most per batch. Any other failure stops the run.
+  for (;;) {
+    try { await sendBatches(session, send, progress, intake); break; } catch (err) {
+      if (!(err instanceof EveryRowRejected)) throw err;
+      session.receipts.push(err.receipt); session.next++;
+      result.rejected += err.receipt.rejected!.length;
+    }
+  }
   return result;
 }

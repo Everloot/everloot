@@ -19,7 +19,7 @@ import { providersOnDemand } from "./providers/config";
 import { findEverlootFiles } from "./savedvariables";
 import { createSentState } from "./sent-state";
 import { refreshPrices } from "./prices";
-import { uploadFile } from "./uploader";
+import { uploadFile, type UploadResult } from "./uploader";
 
 export interface CliArgs {
   command: "upload" | "watch" | "bridge" | "prices"; file?: string; game?: string; endpoint: string; state?: string;
@@ -54,6 +54,12 @@ export function defaultStatePath(os: { platform: string; env: Record<string, str
   if (os.platform === "win32") return win32.join(os.env.APPDATA ?? win32.join(os.home, "AppData", "Roaming"), "Everloot", "sent.json");
   if (os.platform === "darwin") return posix.join(os.home, "Library", "Application Support", "Everloot", "sent.json");
   return posix.join(os.env.XDG_CONFIG_HOME ?? posix.join(os.home, ".config"), "everloot", "sent.json");
+}
+
+/** What one file's upload sent, what the site turned away, and what stayed on this machine. */
+export function uploadSummary(file: string, r: UploadResult): string {
+  const rejected = r.rejected ? ` the site turned away ${r.rejected} rows, which stay unsent and go again next run;` : "";
+  return `${file}: sent ${r.sent} new events in ${r.batches} batch(es);${rejected} kept ${r.heldNamed} named, ${r.heldAddons} installed-addon, ${r.heldCensus} census, ${r.heldPlayers} player and ${r.heldLegacy} legacy rows here.`;
 }
 
 export function debounce(run: () => void, ms: number): () => void {
@@ -123,8 +129,7 @@ async function main(argv: string[]): Promise<void> {
   if (args.command === "prices") return prices();
   const send = async (file: string) => {
     try {
-      const r = await uploadFile(file, { endpoint: args.endpoint, state });
-      console.log(`${file}: sent ${r.sent} new events in ${r.batches} batch(es); kept ${r.heldNamed} named, ${r.heldAddons} installed-addon, ${r.heldCensus} census, ${r.heldPlayers} player and ${r.heldLegacy} legacy rows here.`);
+      console.log(uploadSummary(file, await uploadFile(file, { endpoint: args.endpoint, state })));
       if (args.command === "watch") await prices();
     } catch (err) {
       console.error(`${file}: ${err instanceof Error ? err.message : String(err)}`);

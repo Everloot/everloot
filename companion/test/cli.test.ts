@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
-import { debounce, defaultStatePath, parseArgs, uploadNotice } from "../src/cli";
+import { debounce, defaultStatePath, parseArgs, uploadNotice, uploadSummary } from "../src/cli";
 import { loopbackSite } from "./loopback-mcp";
 
 test("arguments name a command, a file or a game folder, and an endpoint", () => {
@@ -49,6 +49,12 @@ test("before sending, the companion says how uploads are licensed and where the 
   const notice = uploadNotice();
   expect(notice).toContain("Uploaded observations are published under CC BY-SA 4.0, credited to Everloot contributors.");
   expect(notice).toContain("Source: https://github.com/Everloot/everloot");
+});
+
+test("an upload's line says how many rows the site turned away, and only when it turned some away", () => {
+  const r = { sent: 500, batches: 2, skipped: 0, heldNamed: 1, heldLegacy: 0, heldAddons: 0, heldCensus: 0, heldPlayers: 0, invalid: 0, rejected: 2000 };
+  expect(uploadSummary("Everloot.lua", r)).toBe("Everloot.lua: sent 500 new events in 2 batch(es); the site turned away 2000 rows, which stay unsent and go again next run; kept 1 named, 0 installed-addon, 0 census, 0 player and 0 legacy rows here.");
+  expect(uploadSummary("Everloot.lua", { ...r, rejected: 0 })).toBe("Everloot.lua: sent 500 new events in 2 batch(es); kept 1 named, 0 installed-addon, 0 census, 0 player and 0 legacy rows here.");
 });
 
 test("prices needs the game folder, because it writes the slot addon there", () => {
