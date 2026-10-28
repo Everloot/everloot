@@ -207,6 +207,36 @@ test("Upload now after the retries ran out starts a fresh round of them", async 
   expect(deps.upload).toHaveBeenCalledTimes(8);
 });
 
+for (const wait of [null, 120_000]) test(`Upload now queued during an upload gets its own full retry round (${wait ?? "network failure"})`, async () => {
+  const { deps, engine } = await exhausted();
+  let reject!: (error: Error) => void;
+  deps.upload.mockImplementationOnce(() => new Promise<string>((_resolve, fail) => { reject = fail; }));
+  const active = engine.runNow("upload");
+  await engine.runNow("upload");
+  await engine.runNow("upload");
+  expect(deps.upload).toHaveBeenCalledTimes(5);
+  reject(wait === null ? new Error("fetch failed") : limited(wait));
+  await active;
+  await vi.advanceTimersByTimeAsync(0);
+  if (wait !== null) {
+    expect(deps.upload).toHaveBeenCalledTimes(5);
+    await vi.advanceTimersByTimeAsync(wait - 1);
+    expect(deps.upload).toHaveBeenCalledTimes(5);
+    await vi.advanceTimersByTimeAsync(1);
+  }
+  expect(deps.upload).toHaveBeenCalledTimes(6);
+  await vi.advanceTimersByTimeAsync(59_999);
+  expect(deps.upload).toHaveBeenCalledTimes(6);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(deps.upload).toHaveBeenCalledTimes(7);
+  await vi.advanceTimersByTimeAsync(5 * 60_000);
+  expect(deps.upload).toHaveBeenCalledTimes(8);
+  await vi.advanceTimersByTimeAsync(15 * 60_000);
+  expect(deps.upload).toHaveBeenCalledTimes(9);
+  await vi.advanceTimersByTimeAsync(60 * 60_000);
+  expect(deps.upload).toHaveBeenCalledTimes(9);
+});
+
 test("Upload now after the retries ran out still waits out the site's 429, then retries", async () => {
   const { deps, engine } = await exhausted();
   deps.upload.mockRejectedValueOnce(limited(120_000));

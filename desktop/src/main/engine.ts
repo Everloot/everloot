@@ -83,6 +83,7 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
   const retries = new Map<Job, number>();
   const running = new Set<Job>();
   const again = new Set<Job>();
+  const renew = new Set<Job>();
   /**
    * Per job, the time a site's 429 asked us to wait until. No run of the job starts before it for that site, Upload
    * now included: the run is set for then instead. It outlives stop() and start(), so a restart cannot skip it.
@@ -107,12 +108,12 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
     const s = settings;
     if (!s || !enabled(s, job)) return;
     if (state.paused) { log("info", `${job}: paused, skipped`); emit(); return; }
-    if (fresh) retries.delete(job);
+    if (fresh && !running.has(job)) retries.delete(job);
     const key = waitKey(job, s.endpoint);
     const left = (waits.get(key) ?? 0) - clock();
     if (left > 0) { log("info", waitLine(job, left)); schedule(job, left); emit(); return; }
     waits.delete(key);
-    if (running.has(job)) { again.add(job); return; }
+    if (running.has(job)) { again.add(job); if (fresh) renew.add(job); return; }
     if (state.files.length === 0) { set(job, { state: "idle", message: "No Everloot.lua to read", at: now() }); emit(); return; }
     const started = session;
     const files = [...state.files];
@@ -140,7 +141,7 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
     if (started !== session) {
       // The old request's wait still applies to its site, without updating the new session's job status.
       if (limited) waits.set(waitKey(job, s.endpoint), clock() + (limited.ms ?? retryAfter[0] ?? 0));
-      if (again.delete(job)) void run(job);
+      if (again.delete(job)) void run(job, renew.delete(job));
       return;
     }
     set(job, failures.length
@@ -166,7 +167,7 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
     emit();
     // Prices follow every upload, as `watch --game` does on the command line.
     if (job === "upload" && failures.length === 0 && s.prices) void run("prices");
-    if (again.delete(job)) void run(job);
+    if (again.delete(job)) void run(job, renew.delete(job));
   }
 
   function schedule(job: Job, delay = settle[job]): void {
@@ -195,6 +196,7 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
     if (rescanTimer) { clearInterval(rescanTimer); rescanTimer = null; }
     retries.clear();
     again.clear();
+    renew.clear();
     settings = null;
     state.files = [];
     for (const job of JOBS) state.jobs[job] = off();

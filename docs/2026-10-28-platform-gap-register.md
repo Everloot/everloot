@@ -47,8 +47,14 @@ This set is committed locally, not pushed, installed, packaged or released.
 REL-06A is implemented locally and independently accepted at `119ad0a6`: structured rate-limit metadata,
 per-job/site-origin deadlines, stopped/restarted-session protection, timer-overflow guard and invalid-address
 recovery. Parent companion 117 and Desktop 240 tests, both typechecks and Desktop bundle pass; reviewer
-engine 22/22 pass. No public delivery or app-restart persistence is claimed. REL-06B (network-return and
-exhausted-retry recovery) remains open; it is not closed by the Retry-After fix.
+engine 22/22 pass. No public delivery or app-restart persistence is claimed.
+
+REL-06B manual and system-wake recovery is implemented locally: explicit manual runs renew the bounded
+retry cycle; wake recovers exhausted failed jobs without an active timer. A queued manual run carries its
+own fresh budget rather than resetting the in-flight attempt. Parent reproduced two failing races before
+the correction, then 44 related engine/job tests and Desktop typecheck passed. Review was source-only due
+to low memory; its queued-budget finding was corrected locally. Actual native wake behavior, network
+return without wake and fresh retries after pause-resume remain open. This is not full REL-06 completion.
 
 ## Identity, character hub and completion
 
