@@ -180,6 +180,129 @@ test("a failed upload is tried again a few times, then waits for the next write"
 /** The uploader's 429: its message, and the Retry-After it read (null when the header said nothing usable). */
 const limited = (retryAfterMs: number | null) => Object.assign(new Error("Upload rate limited. Keep your file and retry later."), { retryAfterMs });
 
+/** One account whose uploads fail until the 1, 5 and 15 min retries are spent: four tries in all. */
+async function exhausted() {
+  const h = harness(["A/Everloot.lua"]);
+  h.deps.upload.mockRejectedValue(new Error("fetch failed"));
+  h.engine.start({ ...h.settings, prices: false });
+  await h.flush();
+  await vi.advanceTimersByTimeAsync(21 * 60_000);
+  expect(h.deps.upload).toHaveBeenCalledTimes(4);
+  await vi.advanceTimersByTimeAsync(60 * 60_000);
+  expect(h.deps.upload).toHaveBeenCalledTimes(4);
+  return h;
+}
+
+test("Upload now after the retries ran out starts a fresh round of them", async () => {
+  const { deps, engine } = await exhausted();
+  await engine.runNow("upload");
+  expect(deps.upload).toHaveBeenCalledTimes(5);
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(deps.upload).toHaveBeenCalledTimes(6);
+  await vi.advanceTimersByTimeAsync(5 * 60_000);
+  expect(deps.upload).toHaveBeenCalledTimes(7);
+  await vi.advanceTimersByTimeAsync(15 * 60_000);
+  expect(deps.upload).toHaveBeenCalledTimes(8);
+  await vi.advanceTimersByTimeAsync(60 * 60_000);
+  expect(deps.upload).toHaveBeenCalledTimes(8);
+});
+
+test("Upload now after the retries ran out still waits out the site's 429, then retries", async () => {
+  const { deps, engine } = await exhausted();
+  deps.upload.mockRejectedValueOnce(limited(120_000));
+  await engine.runNow("upload");
+  await vi.advanceTimersByTimeAsync(0);
+  expect(deps.upload).toHaveBeenCalledTimes(5);
+  expect(engine.snapshot().log.at(-1)?.text).toBe("upload: the site asked to wait; trying again in 2 min");
+  await vi.advanceTimersByTimeAsync(119_999);
+  expect(deps.upload).toHaveBeenCalledTimes(5);
+  deps.upload.mockResolvedValueOnce("sent 3");
+  await vi.advanceTimersByTimeAsync(1);
+  expect(deps.upload).toHaveBeenCalledTimes(6);
+  expect(engine.snapshot().jobs.upload.state).toBe("ok");
+});
+
+test("a wake from sleep gives a job that ran out of retries one more round, however often it fires", async () => {
+  const { deps, engine } = await exhausted();
+  engine.recover(); engine.recover(); engine.recover();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(deps.upload).toHaveBeenCalledTimes(5);
+  // Mid-round, another wake leaves the pending retry alone.
+  engine.recover();
+  await vi.advanceTimersByTimeAsync(59_999);
+  expect(deps.upload).toHaveBeenCalledTimes(5);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(deps.upload).toHaveBeenCalledTimes(6);
+  await vi.advanceTimersByTimeAsync(20 * 60_000);
+  expect(deps.upload).toHaveBeenCalledTimes(8);
+  await vi.advanceTimersByTimeAsync(60 * 60_000);
+  expect(deps.upload).toHaveBeenCalledTimes(8);
+  // A success clears the count: the next failure gets its retries from the start.
+  deps.upload.mockResolvedValueOnce("sent 3").mockRejectedValueOnce(new Error("fetch failed"));
+  engine.recover();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(engine.snapshot().jobs.upload.state).toBe("ok");
+  await engine.runNow("upload");
+  expect(deps.upload).toHaveBeenCalledTimes(10);
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(deps.upload).toHaveBeenCalledTimes(11);
+});
+
+test("a wake from sleep waits out a 429 that is still running", async () => {
+  const { deps, engine } = await exhausted();
+  deps.upload.mockRejectedValueOnce(limited(120_000));
+  engine.recover();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(deps.upload).toHaveBeenCalledTimes(5);
+  engine.recover();
+  await vi.advanceTimersByTimeAsync(119_999);
+  expect(deps.upload).toHaveBeenCalledTimes(5);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(deps.upload).toHaveBeenCalledTimes(6);
+});
+
+test("a wake from sleep runs nothing for a job that is fine, paused, switched off or stopped", async () => {
+  const fine = harness(["A/Everloot.lua"]);
+  fine.engine.start({ ...fine.settings, prices: false });
+  await fine.flush();
+  fine.engine.recover();
+  await fine.flush();
+  expect(fine.deps.upload).toHaveBeenCalledTimes(1);
+
+  const { deps, settings, engine } = await exhausted();
+  engine.setPaused(true);
+  engine.recover();
+  await engine.runNow("upload");
+  await vi.advanceTimersByTimeAsync(0);
+  expect(deps.upload).toHaveBeenCalledTimes(4);
+  engine.setPaused(false);
+  await vi.advanceTimersByTimeAsync(0);
+  expect(deps.upload).toHaveBeenCalledTimes(5); // the usual catch-up on resume, not a recovery
+  engine.start({ ...settings, prices: false, upload: false });
+  engine.recover();
+  await vi.advanceTimersByTimeAsync(60 * 60_000);
+  expect(deps.upload).toHaveBeenCalledTimes(5);
+  engine.stop();
+  engine.recover();
+  await vi.advanceTimersByTimeAsync(60 * 60_000);
+  expect(deps.upload).toHaveBeenCalledTimes(5);
+});
+
+test("a wake from sleep during an old session's upload runs nothing more", async () => {
+  const { deps, settings, engine } = await exhausted();
+  let reject!: (error: Error) => void;
+  deps.upload.mockImplementationOnce(() => new Promise<string>((_resolve, fail) => { reject = fail; }));
+  void engine.runNow("upload");
+  await vi.advanceTimersByTimeAsync(0);
+  expect(deps.upload).toHaveBeenCalledTimes(5);
+  engine.start({ ...settings, prices: false, upload: false });
+  engine.recover();
+  reject(new Error("old failure"));
+  await vi.advanceTimersByTimeAsync(60 * 60_000);
+  expect(deps.upload).toHaveBeenCalledTimes(5);
+  expect(engine.snapshot().jobs.upload.state).toBe("off");
+});
+
 test("a 429 waits the site's own time: no other account, write, queued run or Upload now goes before it", async () => {
   const { deps, settings, engine, changes, flush } = harness();
   let refuse!: () => void;

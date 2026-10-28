@@ -31,7 +31,10 @@ export interface EngineOptions {
 export interface Engine {
   start(settings: Settings): void;
   stop(): void;
+  /** Upload now and friends: a failure here gets the full round of retries again, a 429's wait still first. */
   runNow(job: Job): Promise<void>;
+  /** The system woke, and the network usually with it: a job that ran out of retries gets one more round. */
+  recover(): void;
   setPaused(paused: boolean): void;
   snapshot(): EngineState;
   /** A line on the Log page from outside the jobs (the app's own errors). */
@@ -99,10 +102,12 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
   };
   const set = (job: Job, patch: Partial<JobStatus>) => { state.jobs[job] = { ...state.jobs[job], ...patch }; };
 
-  async function run(job: Job): Promise<void> {
+  /** `fresh` starts the job's retries over, as a run the user asked for does. */
+  async function run(job: Job, fresh = false): Promise<void> {
     const s = settings;
     if (!s || !enabled(s, job)) return;
     if (state.paused) { log("info", `${job}: paused, skipped`); emit(); return; }
+    if (fresh) retries.delete(job);
     const key = waitKey(job, s.endpoint);
     const left = (waits.get(key) ?? 0) - clock();
     if (left > 0) { log("info", waitLine(job, left)); schedule(job, left); emit(); return; }
@@ -225,7 +230,16 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
   return {
     start,
     stop,
-    runNow: (job) => run(job),
+    runNow: (job) => run(job, true),
+    recover: () => {
+      // Only a job whose last round failed to the end and has nothing set: a second wake mid-round, a running job or
+      // a write already waiting to settle is left as it is. Prices have their hourly timer.
+      for (const job of JOBS) {
+        if (job === "prices" || state.jobs[job].state !== "error" || timers.has(job)) continue;
+        if ((retries.get(job) ?? 0) < retryAfter.length) continue;
+        void run(job, true);
+      }
+    },
     setPaused: (paused) => {
       const resumed = state.paused && !paused;
       state.paused = paused;

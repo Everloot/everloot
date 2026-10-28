@@ -1,4 +1,4 @@
-import { BrowserWindow, Notification, app, clipboard, dialog, ipcMain, screen, shell } from "electron";
+import { BrowserWindow, Notification, app, clipboard, dialog, ipcMain, powerMonitor, screen, shell } from "electron";
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -446,6 +446,8 @@ if (!app.requestSingleInstanceLock()) {
     });
     applyLoginItem();
     engine.start(settings);
+    // A laptop that slept through the last retry would otherwise wait for the next logout.
+    powerMonitor.on("resume", () => engine.recover());
     // Windows passes the login item's args; macOS does not, but says whether this launch came from login.
     const hidden = process.argv.includes("--hidden") || (process.platform === "darwin" && app.getLoginItemSettings().wasOpenedAtLogin);
     if (!settings.consentedAt || !(hidden && settings.startInTray)) createWindow();
