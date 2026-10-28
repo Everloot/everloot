@@ -79,6 +79,15 @@ aliases say whether short forms map at all. Each fix is a normal pull request, a
   and achievements the merged game-data files added to the bank: 4,434 questions now, 65% resolving, with the
   achievements (13%) and mounts (44%) as the next gap).
 
+- **The files as an evidence kind (same day).** `kb/src/files-evidence.ts`: the committed game-data files' facts
+  about the instances, bosses, zones, flight masters, mounts, achievements and talents a question names, as ids and
+  facts with a page link, labelled found in game files and unconfirmed with the build; never the files' text.
+  `answer_sources` returns them after curated and before lore (protocol 1.21.0 adds `files` to the evidence kinds),
+  the site lends the index to the MCP mounts and GET /api/tools, and the eval gains a "with files" column.
+  `docs/evals/question-eval-2026-10-27-files.md`: files facts on 75% of all questions, 100% of achievement,
+  mount, talent and instance questions, pages on 97%; questions with no evidence 25 → 20, nineteen of them bosses
+  of instances the map keeps behind the spoiler switch.
+
 ## Phase 2 (design only): a model in the loop
 
 Run the bank, or a sample of it, through the chat's own planner (`web/src/lib/chat/agent.ts`) with a fixture

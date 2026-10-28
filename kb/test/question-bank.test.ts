@@ -108,4 +108,5 @@ test("evaluateBank: totals, per-template and per-kind rows, the unresolved names
   expect(md).toContain("not connected: the observed layer is unrecorded, not empty");
   expect(md).toContain("- **boss** (1): Nobody Here");
   expect(md).toMatch(/\| all \| \d+ \| \d+% \| \d+% \| \d+% \|/);
+  expect(md).toContain("| with files |");
 });
