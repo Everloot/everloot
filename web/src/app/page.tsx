@@ -184,7 +184,7 @@ export default async function Home() {
             </div>
             <Link href="/tools/talents" className="btn">Plan a build</Link>
           </Card>
-          <Card padding="none" className="grid divide-y divide-line lg:grid-cols-3 lg:divide-x lg:divide-y-0">
+          <Card padding="none" className="grid divide-y divide-line xl:grid-cols-3 xl:divide-x xl:divide-y-0">
             {groups.map((group) => (
               <div key={group.title} className="px-6 py-4">
                 <p className="font-mono text-xs text-muted">{group.title}</p>
