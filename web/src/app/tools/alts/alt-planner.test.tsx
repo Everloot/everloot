@@ -7,6 +7,7 @@ import { scrubEvent } from "@/lib/analytics/load";
 import { isProtectedPath } from "@/lib/document-boundary";
 import { bucketKey, type LocalAlt, type LocalPlan, type Owner, type PlayerWorkspace } from "@/lib/player-workspace";
 import AltPlanner from "./AltPlanner";
+import { V3_BUCKET_TEXT } from "@/lib/player-workspace.fixture";
 
 // /tools/alts as a player meets it: this browser's localStorage, the player's own Everloot.lua read in the page, and
 // /api/auth/me as the only thing the page asks the network.
@@ -553,6 +554,35 @@ test("a backup restores every alt detail after a preview that names the alts", a
   await click(button(/^Restore$/, preview));
   expect(stored(ANON)?.alts).toEqual(original);
   expect(stored(ANON)?.plans).toEqual([plan()]);
+});
+
+test("a queued restore explains a v3 insertion and preserves its exact bytes", async () => {
+  await render();
+  await chooseFile("Choose a backup file", new File([JSON.stringify(doc(ANON, [plan()], [alt()]))], "backup.json", { type: "application/json" }));
+  const preview = container.querySelector('[aria-label="What the restore would do"]')!;
+  expect(preview.textContent).toContain("Adds Thrall");
+  let release = () => {};
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  let queued = false;
+  Object.defineProperty(navigator, "locks", { configurable: true, value: { request: async (_: string, task: () => unknown) => {
+    queued = true;
+    await held;
+    return task();
+  } } });
+  try {
+    await click(button(/^Restore$/, preview));
+    expect(queued).toBe(true);
+    localStorage.setItem(bucketKey(ANON), V3_BUCKET_TEXT);
+    await act(async () => release());
+    await vi.waitFor(() => expect(alerts()).toContain("This workspace uses version 3"));
+    expect(alerts()).toContain("editing, restoring and transferring it are not available in this version");
+    expect(text()).not.toContain("That alt is not valid");
+    expect(statusText()).not.toContain("Restored the backup");
+    expect(localStorage.getItem(bucketKey(ANON))).toBe(V3_BUCKET_TEXT);
+  } finally {
+    release();
+    delete (navigator as { locks?: unknown }).locks;
+  }
 });
 
 test("the file reader says up front what today's addon files give, before a file is chosen", async () => {

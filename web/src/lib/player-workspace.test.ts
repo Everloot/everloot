@@ -5,7 +5,10 @@ import {
   emptyWorkspace, exportBackup, lookupOwner, orderState, previewImport, readPlanText, readWorkspace, savePlan, validateWorkspace,
   type LocalAlt, type LocalPlan, type Owner, type PlanInput, type PlayerWorkspace,
 } from "./player-workspace";
-import { FIXTURE_PLAN_ID, V2_ALT_TEXT, V2_BUCKET_TEXT } from "./player-workspace.fixture";
+import { FIXTURE_PLAN_ID, V2_ALT_TEXT, V2_BUCKET_TEXT, V3_BUCKET_TEXT } from "./player-workspace.fixture";
+import { storedForm, update, transferRoom, transferKey, settleTransferred, receiptSaved, receiptFailed, rememberCharacter, characterRefused } from "./player-workspace";
+import { deleteAlt, saveAlt } from "./alt-workspace";
+import { applyAltImport, previewAltImport } from "./alt-import";
 
 // Codes and tokens from docs/2026-10-17-talent-share-code.md: MAGE is 90001:2, 90002:1:1, 90004:2, so its
 // nodes index as A, B and C, and O1p-AABCC is a player's order for its five points.
@@ -69,6 +72,126 @@ const versionOne = (owner: Owner, plans: LocalPlan[], alts: object[] = [], watch
   ({ format: "everloot.player-workspace", version: 1, owner, plans, alts, watches });
 const idOf = (n: number) => `1a2b3c4d-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const bytes = (text: string) => new TextEncoder().encode(text).length;
+
+describe("v3 reader-only compatibility", () => {
+  const v3 = () => JSON.parse(V3_BUCKET_TEXT) as PlayerWorkspace;
+  test("reads and exports all three watch variants without rewriting bytes or downstamping", () => {
+    const storage = memory();
+    storage.items.set(bucketKey(ANON), V3_BUCKET_TEXT);
+    storage.setItem = () => { throw new Error("Read must not write"); };
+    storage.removeItem = () => { throw new Error("Read must not erase"); };
+    expect(readWorkspace(storage, ANON)).toMatchObject({ ok: true, raw: V3_BUCKET_TEXT, workspace: v3() });
+    expect(storedForm(v3())).toEqual(v3());
+    const backup = exportBackup(v3(), NOW);
+    expect(backup.ok && JSON.parse(backup.text)).toEqual(v3());
+    expect(storage.items.get(bucketKey(ANON))).toBe(V3_BUCKET_TEXT);
+    expect(emptyWorkspace(ANON).version).toBe(2);
+  });
+  test("exports guides while omitting hidden plans, their watches and alt references", () => {
+    const result = exportBackup(v3(), NOW, new Set([FIXTURE_PLAN_ID]));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const doc = JSON.parse(result.text);
+    expect(doc.watches).toEqual(v3().watches.slice(1));
+    expect(doc.alts[0].planIds).toEqual([]);
+    expect(validateWorkspace(doc).ok).toBe(true);
+  });
+  test("strict variants, references, UUID and target uniqueness; v2 rejects typed keys", () => {
+    expect(validateWorkspace(v3()).ok).toBe(true);
+    const change = (mutate: (doc: { version: number; watches: Record<string, unknown>[] }) => void) => {
+      const doc = JSON.parse(V3_BUCKET_TEXT);
+      mutate(doc);
+      expect(validateWorkspace(doc).ok).toBe(false);
+    };
+    for (const bad of [0, -1, 1.5, "7", null]) change((d) => { d.watches[2].guideId = bad; });
+    for (const bad of [0, -1, 1.5, "2"]) change((d) => { d.watches[2].seenVersion = bad; });
+    for (const bad of ["", "1", "1..2", "a.2", 123]) change((d) => { d.watches[1].seenBuild = bad; });
+    for (const key of ["notes", "name", "snapshot", "visitedAt", "planId"]) change((d) => { d.watches[2][key] = "extra"; });
+    change((d) => { delete d.watches[2].seenVersion; });
+    change((d) => { d.watches[1].planId = idOf(999); });
+    change((d) => { d.watches[1].planId = FIXTURE_PLAN_ID; });
+    change((d) => { d.watches[1].id = d.watches[0].id; });
+    change((d) => { d.watches.push({ ...d.watches[2], id: idOf(799) }); });
+    change((d) => { d.version = 2; });
+    change((d) => { d.watches[0].seenBuild = null; });
+    change((d) => { d.watches[1].seenVersion = null; });
+    change((d) => { d.watches[2].kind = "unknown"; });
+    const unknown = v3(); unknown.watches = [unknown.watches[1], unknown.watches[2]];
+    Object.assign(unknown.watches[0], { seenBuild: null });
+    Object.assign(unknown.watches[1], { seenVersion: 2 });
+    expect(validateWorkspace(unknown).ok).toBe(true);
+  });
+  test("v3 retains whole-document UTF-8, collection, field and reference limits", () => {
+    const capped = v3();
+    capped.plans = Array.from({ length: 200 }, (_, i) => plan({ id: idOf(i + 1), name: "x".repeat(60), notes: "😀".repeat(1000) }));
+    capped.alts = Array.from({ length: 60 }, (_, i) => altOf({ id: idOf(i + 500), notes: "😀".repeat(1000) }));
+    capped.watches = [];
+    expect(bytes(JSON.stringify(capped))).toBeGreaterThan(WORKSPACE_LIMITS.bytes);
+    expect(validateWorkspace(capped)).toMatchObject({ ok: false, error: "over-limit" });
+    capped.plans = capped.plans.map((p) => ({ ...p, notes: "" }));
+    expect(validateWorkspace(capped).ok).toBe(true);
+    expect(validateWorkspace({ ...capped, plans: [...capped.plans, plan({ id: idOf(400) })] })).toMatchObject({ ok: false, error: "over-limit" });
+    expect(validateWorkspace({ ...capped, alts: [...capped.alts, altOf({ id: idOf(900) })] })).toMatchObject({ ok: false, error: "over-limit" });
+    capped.alts[0].planIds = capped.plans.slice(0, 11).map((p) => p.id);
+    expect(validateWorkspace(capped)).toMatchObject({ ok: false, error: "over-limit" });
+    capped.alts[0].planIds.pop();
+    expect(validateWorkspace(capped).ok).toBe(true);
+    capped.alts[0].realm = "x".repeat(61);
+    expect(validateWorkspace(capped).ok).toBe(false);
+  });
+  test("every local mutator and restore refuses before writing, including a legacy restore into v3", () => {
+    const storage = memory();
+    storage.items.set(bucketKey(ANON), V3_BUCKET_TEXT);
+    let called = false;
+    for (const result of [
+      update(storage, ANON, (w) => { called = true; return w; }),
+      savePlan(storage, ANON, input()), editPlan(storage, ANON, FIXTURE_PLAN_ID, { name: "Changed", notes: "" }),
+      copyPlan(storage, ANON, FIXTURE_PLAN_ID), deletePlan(storage, ANON, FIXTURE_PLAN_ID),
+      applyImport(storage, ANON, { base: JSON.stringify(v3()), result: workspace(ANON, []), added: 0, updated: 0, kept: 0, unchanged: 0, others: 0, warnings: [] }),
+    ]) expect(result).toMatchObject({ ok: false, error: "read-only" });
+    expect(called).toBe(false);
+    expect(previewImport(V3_BUCKET_TEXT, emptyWorkspace(ANON))).toMatchObject({ ok: false, error: "read-only" });
+    expect(previewImport(V2_BUCKET_TEXT, v3())).toMatchObject({ ok: false, error: "read-only" });
+    const legacy = previewImport(V2_BUCKET_TEXT, emptyWorkspace(ANON));
+    expect(legacy.ok).toBe(true);
+    if (legacy.ok) expect(applyImport(storage, ANON, legacy.preview).ok).toBe(false);
+    expect(storage.items.get(bucketKey(ANON))).toBe(V3_BUCKET_TEXT);
+    const empty = memory();
+    expect(update(empty, ANON, () => v3())).toMatchObject({ ok: false, error: "read-only" });
+    expect(applyImport(empty, ANON, { base: JSON.stringify(emptyWorkspace(ANON)), result: v3(), added: 0, updated: 0, kept: 0, unchanged: 0, others: 0, warnings: [] })).toMatchObject({ ok: false, error: "read-only" });
+    expect(empty.items.size).toBe(0);
+  });
+  test("alt saves, deletion and addon-file apply reach the central v3 refusal", () => {
+    const storage = memory();
+    storage.items.set(bucketKey(ANON), V3_BUCKET_TEXT);
+    const preview = previewAltImport({ ok: true, characters: [{ name: "Jaina", realm: "Moon Guard", classSlug: "mage", faction: "alliance", level: 24, recordAt: NOW.toISOString() }], skipped: { noRealm: 0, unreadable: 0 }, others: 0 }, v3());
+    for (const result of [
+      saveAlt(storage, ANON, { name: "Jaina", realm: "", classSlug: null, faction: null, level: null, professions: [], notes: "", planIds: [] }),
+      deleteAlt(storage, ANON, v3().alts[0].id), applyAltImport(storage, ANON, preview, ["add"]),
+    ]) expect(result).toMatchObject({ ok: false, error: "read-only" });
+    expect(storage.items.get(bucketKey(ANON))).toBe(V3_BUCKET_TEXT);
+  });
+  test.each(["source", "destination"])("v3 %s refuses transfers before registry access or movement", (side) => {
+    const storage = memory();
+    const source = side === "source" ? v3() : workspace(ANON, [plan()]);
+    const target = { ...(side === "destination" ? v3() : emptyWorkspace(A)), owner: A };
+    storage.items.set(bucketKey(ANON), JSON.stringify(source));
+    storage.items.set(bucketKey(A), JSON.stringify(target));
+    const before = [...storage.items];
+    const getItem = storage.getItem;
+    storage.getItem = (key) => { if (key === "everloot:transfers") throw new Error("Registry must not be read"); return getItem(key); };
+    const label = { name: "Jaina", classSlug: "mage", realm: null, note: null };
+    for (const result of [
+      transferRoom(source, target, [FIXTURE_PLAN_ID]), transferKey(storage, A, FIXTURE_PLAN_ID),
+      bindTransferred(storage, { owner: A, planIds: [FIXTURE_PLAN_ID] }, { ok: true, userId: A_ID, planIds: [FIXTURE_PLAN_ID] }),
+      settleTransferred(storage, A, [FIXTURE_PLAN_ID]),
+      receiptSaved(storage, A, FIXTURE_PLAN_ID, "a".repeat(16), "content"),
+      receiptFailed(storage, A, FIXTURE_PLAN_ID, "a".repeat(16), "failed"),
+      rememberCharacter(storage, A, idOf(500), label, null), characterRefused(storage, A, idOf(500), NOW.toISOString()),
+    ]) expect(result).toMatchObject({ ok: false, error: "read-only" });
+    expect([...storage.items]).toEqual(before);
+  });
+});
 
 describe("buckets", () => {
   test("an empty device reads as an empty workspace for every owner, and reading writes nothing", () => {

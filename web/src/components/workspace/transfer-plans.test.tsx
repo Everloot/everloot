@@ -12,6 +12,7 @@ import {
 } from "@/lib/player-workspace";
 import { ORDERS_UNAVAILABLE } from "@/lib/saved-builds";
 import TransferPlans from "./TransferPlans";
+import { V3_BUCKET_TEXT } from "@/lib/player-workspace.fixture";
 
 // Keep the host timer captured before fake timers replace Node's live module exports.
 const hostDelay = ioDelay;
@@ -219,12 +220,110 @@ const saveButton = () => button(/^Save to your account$/) as HTMLButtonElement |
 const comeBack = async () => { await act(async () => { window.dispatchEvent(new Event("focus")); }); await settle(); };
 const accountReads = () => requests.filter((r) => r.request !== "GET /api/auth/me");
 
-async function open() {
+test.each(["source", "destination"])("v3 %s stops before transfer registry access and account requests", async (side) => {
+  seed(ANON, [FROST]);
+  const owner = side === "source" ? ANON : A;
+  localStorage.setItem(bucketKey(owner), JSON.stringify({ ...JSON.parse(V3_BUCKET_TEXT), owner }));
+  const before = device();
+  const getItem = Storage.prototype.getItem;
+  const reads = vi.spyOn(Storage.prototype, "getItem").mockImplementation(function (this: Storage, key: string) {
+    if (key === "everloot:transfers") throw new Error("Registry must not be read");
+    return getItem.call(this, key);
+  });
+  await render();
+  expect(text()).toContain("This workspace uses version 3");
+  expect(button(/^Choose plans to save to your account$/)).toBeUndefined();
+  expect(accountReads()).toEqual([]);
+  expect(reads.mock.calls.some(([key]) => key === "everloot:transfers")).toBe(false);
+  expect(device()).toEqual(before);
+});
+
+test.each(["source", "destination"])("a %s changed to v3 while identity waits prevents account reads and registry access", async (side) => {
+  seed(ANON, [FROST]);
+  await render();
+  const release = hold("GET /api/auth/me");
+  await open();
+  const owner = side === "source" ? ANON : A;
+  localStorage.setItem(bucketKey(owner), JSON.stringify({ ...JSON.parse(V3_BUCKET_TEXT), owner }));
+  const before = device();
+  const getItem = Storage.prototype.getItem;
+  const reads = vi.spyOn(Storage.prototype, "getItem").mockImplementation(function (this: Storage, key: string) {
+    if (key === "everloot:transfers") throw new Error("Registry must not be read");
+    return getItem.call(this, key);
+  });
+  release();
+  await settle();
+  expect(alerts()).toContain("This workspace uses version 3");
+  expect(accountReads()).toEqual([]);
+  expect(reads.mock.calls.some(([key]) => key === "everloot:transfers")).toBe(false);
+  expect(device()).toEqual(before);
+});
+
+test.each(["source", "destination"])("a %s changed to v3 during a build response preserves cursors and pending receipts", async (side) => {
+  seed(ANON, [FROST]);
+  await render();
+  await open();
+  await choose("Save Frost to your account", { Frost: "private" });
+  const release = hold("POST /api/me/builds");
+  await click(saveButton());
+  await vi.waitFor(() => expect(posts).toHaveLength(1));
+  expect(posts).toHaveLength(1);
+  const key = posts[0].body.transferKey;
+  expect(key).toEqual(KEY);
+  expect(journal()?.receipts).toEqual([expect.objectContaining({ key, state: "sending" })]);
+  const owner = side === "source" ? ANON : A;
+  localStorage.setItem(bucketKey(owner), JSON.stringify({ ...JSON.parse(V3_BUCKET_TEXT), owner }));
+  const before = device();
+  await act(async () => { window.dispatchEvent(new StorageEvent("storage", { key: bucketKey(owner) })); });
+  release();
+  await vi.waitFor(() => expect(alerts()).toContain("this browser could not record that"));
+  expect(alerts()).toContain("a plan your account has may still show here signed out");
+  expect(document.activeElement?.textContent).toContain("this browser could not record that");
+  expect(text()).toContain("This workspace uses version 3");
+  expect(text()).not.toContain("Nothing was changed");
+  expect(accounts[A_ID].builds).toHaveLength(1);
+  expect(journal()?.receipts).toEqual([expect.objectContaining({ key, state: "sending" })]);
+  expect(device()).toEqual(before);
+  expect(posts).toHaveLength(1);
+});
+
+test.each(["source", "destination"])("a %s changed to v3 during a character response keeps the created-character outcome visible", async (side) => {
+  const jaina = alt({ planIds: [FROST.id] });
+  seed(ANON, [FROST], [jaina]);
+  await render();
+  await open();
+  await choose("Save Frost to your account", { Frost: "private" });
+  await set(field("Character for Frost"), `alt:${jaina.id}`);
+  const release = hold("POST /api/me/characters");
+  await click(saveButton());
+  await vi.waitFor(() => expect(posts).toHaveLength(1));
+  expect(posts[0].url).toBe("/api/me/characters");
+  expect(journal()?.characters).toEqual([expect.objectContaining({ altId: jaina.id, characterId: null })]);
+  const owner = side === "source" ? ANON : A;
+  localStorage.setItem(bucketKey(owner), JSON.stringify({ ...JSON.parse(V3_BUCKET_TEXT), owner }));
+  const before = device();
+  await act(async () => { window.dispatchEvent(new StorageEvent("storage", { key: bucketKey(owner) })); });
+  release();
+  await vi.waitFor(() => expect(alerts()).toContain("Made the character Jaina on your account first, with no builds yet"));
+  expect(alerts()).toContain("trying again files plans under it, not under a new one");
+  expect(document.activeElement?.textContent).toContain("Made the character Jaina");
+  expect(text()).toContain("This workspace uses version 3");
+  expect(text()).not.toContain("Nothing was changed");
+  expect(accounts[A_ID].characters).toHaveLength(1);
+  expect(accounts[A_ID].builds).toHaveLength(0);
+  expect(device()).toEqual(before);
+  expect(posts).toHaveLength(1);
+});
+
+async function readyOpener() {
   await vi.waitFor(async () => {
     await settle();
     expect(button(/^Choose plans to save to your account$/)).toBeDefined();
   }, { timeout: 5_000 });
-  await click(button(/^Choose plans to save to your account$/));
+  return button(/^Choose plans to save to your account$/)!;
+}
+async function open() {
+  await click(await readyOpener());
 }
 /** Chooses a group of plans (its checkbox) and each plan's sharing. */
 async function choose(label: string, sharing: Record<string, "private" | "shared" | "shared-name">) {
@@ -1614,8 +1713,10 @@ describe("focus with nothing to choose", () => {
   test("a panel that cannot open keeps the focus on its Cancel, as its opener goes, whether or not it can be tried again", async () => {
     delete (navigator as { locks?: unknown }).locks;
     seed(ANON, [FROST]);
+    const releaseIdentity = hold("GET /api/auth/me");
     await render();
-    button(/^Choose plans to save to your account$/)!.focus();
+    queueMicrotask(releaseIdentity);
+    (await readyOpener()).focus();
     await open();
     expect(alerts()).toContain("This browser can't move plans safely; try a current browser.");
     expect(document.activeElement).toBe(button(/^Cancel$/));
@@ -1633,7 +1734,7 @@ describe("focus with nothing to choose", () => {
     seed(ANON, [{ ...FROST, notes: "Changed", updatedAt: "2026-10-27T12:00:00.000Z" }]);
     seed(A, [{ ...FROST, boundTo: { userId: A_ID, at: AT } }]);
     await render();
-    button(/^Choose plans to save to your account$/)!.focus();
+    (await readyOpener()).focus();
     await open();
     const box = field("Save Frost to your account") as HTMLInputElement;
     expect(box.disabled).toBe(true);

@@ -4,7 +4,9 @@ import { readPlanHash } from "./talents/import";
 import { decodeBuild, decodeOrder, type OrderError, type OrderOrigin } from "./talents/share";
 
 // The plans, alts and watches a player keeps in this browser, with no account and nothing uploaded: the
-// PlayerWorkspace, format version 2. Version 2 gave alts their details (realm, class, level and the rest). Version 1
+// PlayerWorkspace. Version 3 adds typed watch targets and cursors; this release only reads and exports it, refusing
+// its mutations until a capable writer ships. New buckets still use version 2. Version 2 gave alts their details.
+// Version 1
 // is still read, its alts with those details unknown, and a version 1 bucket stays version 1 until an alt holds one of
 // them (storedForm): pages that read only version 1 keep reading it, and its size and backup stay as they were. A
 // shape change takes a new version number, so an older page reads newer data as newer and leaves it alone.
@@ -25,8 +27,8 @@ export const WORKSPACE_FORMAT = "everloot.player-workspace";
 /** The version a new bucket is stored in, and a version 1 bucket once an alt has version 2's details. */
 export const WORKSPACE_VERSION = 2;
 /** The newest version this version reads. A bucket in a newer one is left alone. */
-export const NEWEST_VERSION = 2;
-export type WorkspaceVersion = 1 | 2;
+export const NEWEST_VERSION = 3;
+export type WorkspaceVersion = 1 | 2 | 3;
 
 /** What one bucket holds at most. Names, notes and codes have the account's own limits (saved-builds.ts), so a
  *  plan saved to an account later is never cut. An alt's realm and level go as far as the addon's records do
@@ -91,8 +93,14 @@ export interface LocalAlt {
   updatedAt: string;
 }
 
-/** A plan the player asked to hear about. */
-export interface LocalWatch { id: string; planId: string; addedAt: string }
+/** A target the player asked to hear about. Legacy plan watches have an unknown acknowledgement baseline. */
+export type LocalWatch =
+  | { id: string; planId: string; addedAt: string }
+  | { id: string; kind: "guide"; guideId: number; seenVersion: number | null; addedAt: string }
+  | { id: string; kind: "plan"; planId: string; seenBuild: string | null; addedAt: string };
+
+/** Guide watches never participate in plan references, hiding or movement. */
+export const isPlanWatch = (watch: LocalWatch): watch is Extract<LocalWatch, { planId: string }> => "planId" in watch;
 
 export interface PlayerWorkspace {
   format: typeof WORKSPACE_FORMAT;
@@ -193,6 +201,15 @@ const isAlt = (v: unknown): v is LocalAlt => isRecord(v) && hasKeys(v, ALT_KEYS)
   && isProfessions(v.professions) && isNotes(v.notes) && Array.isArray(v.planIds) && v.planIds.every(validId)
   && isProvenance(v.provenance, v) && isDate(v.updatedAt);
 const isWatch = (v: unknown): v is LocalWatch => isRecord(v) && hasKeys(v, WATCH_KEYS) && validId(v.id) && validId(v.planId) && isDate(v.addedAt);
+const positiveInteger = (v: unknown) => typeof v === "number" && Number.isSafeInteger(v) && v > 0;
+const isV3Watch = (v: unknown): v is LocalWatch => {
+  if (isWatch(v)) return true;
+  if (!isRecord(v) || !validId(v.id) || !isDate(v.addedAt)) return false;
+  if (v.kind === "guide") return hasKeys(v, ["id", "kind", "guideId", "seenVersion", "addedAt"])
+    && positiveInteger(v.guideId) && (v.seenVersion === null || positiveInteger(v.seenVersion));
+  return v.kind === "plan" && hasKeys(v, ["id", "kind", "planId", "seenBuild", "addedAt"]) && validId(v.planId)
+    && (v.seenBuild === null || (typeof v.seenBuild === "string" && /^\d+(?:\.\d+)+$/.test(v.seenBuild)));
+};
 
 type V1Alt = Pick<LocalAlt, "id" | "name" | "planIds" | "notes" | "updatedAt">;
 const isV1Alt = (v: unknown): v is V1Alt => isRecord(v) && hasKeys(v, V1_ALT_KEYS) && validId(v.id) && isName(v.name) && isNotes(v.notes)
@@ -206,8 +223,8 @@ const upgradeAlt = ({ id, name, planIds, notes, updatedAt }: V1Alt): LocalAlt =>
 
 /**
  * Is `value` a workspace this version reads, within the limits, every alt and watch naming a plan it holds? That is
- * version 2, or version 1, which comes back as version 2 (upgradeAlt). Each version's alts have exactly that
- * version's fields, so a version 1 workspace never carries version 2's.
+ * version 1, 2 or 3. Version 1's alts come back with their newer details unknown (upgradeAlt), retaining version 1.
+ * Each stored version has exactly its own fields; typed watches are accepted only in version 3.
  */
 export function validateWorkspace(value: unknown): Validation {
   const refuse = (error: FormatError): Validation => ({ ok: false, error });
@@ -215,18 +232,20 @@ export function validateWorkspace(value: unknown): Validation {
   // A newer version may change everything after its number; say so rather than guess.
   if (typeof value.version === "number" && Number.isInteger(value.version) && value.version > NEWEST_VERSION) return refuse("newer-version");
   const { version, owner, plans, alts, watches } = value;
-  if ((version !== 1 && version !== WORKSPACE_VERSION) || !hasKeys(value, ["format", "version", "owner", "plans", "alts", "watches"]) || !isOwner(owner)) return refuse("malformed");
+  if ((version !== 1 && version !== 2 && version !== 3) || !hasKeys(value, ["format", "version", "owner", "plans", "alts", "watches"]) || !isOwner(owner)) return refuse("malformed");
   if (!Array.isArray(plans) || !Array.isArray(alts) || !Array.isArray(watches)) return refuse("malformed");
   // Counts before contents, so an overlong list is refused before each entry is checked.
   if (plans.length > WORKSPACE_LIMITS.plans || alts.length > WORKSPACE_LIMITS.alts) return refuse("over-limit");
-  if (!plans.every((p) => isPlan(p, owner)) || !alts.every(version === 1 ? isV1Alt : isAlt) || !watches.every(isWatch)) return refuse("malformed");
+  if (!plans.every((p) => isPlan(p, owner)) || !alts.every(version === 1 ? isV1Alt : isAlt) || !watches.every(version === 3 ? isV3Watch : isWatch)) return refuse("malformed");
   const altList = alts as V1Alt[];
   if (![plans, altList, watches].every((list) => unique(list.map((item) => item.id)))) return refuse("malformed");
   if (altList.some((a) => a.planIds.length > WORKSPACE_LIMITS.altPlans)) return refuse("over-limit");
   const planIds = new Set(plans.map((p) => p.id));
   const named = (id: string) => planIds.has(id);
   if (!altList.every((a) => unique(a.planIds) && a.planIds.every(named))) return refuse("bad-reference");
-  if (!watches.every((w) => named(w.planId)) || !unique(watches.map((w) => w.planId))) return refuse("bad-reference");
+  const watchList = watches as LocalWatch[];
+  if (!watchList.every((w) => !isPlanWatch(w) || named(w.planId))
+    || !unique(watchList.map((w) => isPlanWatch(w) ? `plan:${w.planId}` : `guide:${w.guideId}`))) return refuse("bad-reference");
   if (bytes(JSON.stringify(value)) > WORKSPACE_LIMITS.bytes) return refuse("over-limit");
   // A version 1 bucket stays version 1 (see storedForm): only its alts are read as version 2's, their new details unknown.
   const workspace = version === 1 ? { ...value, alts: altList.map(upgradeAlt) } : value;
@@ -238,12 +257,13 @@ export function validateWorkspace(value: unknown): Validation {
 export type ReadError = "unavailable" | "corrupt" | "newer-version";
 export type WriteError =
   | ReadError | "full" | "over-limit" | "invalid" | "missing" | "referenced" | "changed" | "other-owner"
-  | "not-transferred" | "incomplete" | "left-signed-out" | "format-room" | "conflict";
+  | "not-transferred" | "incomplete" | "left-signed-out" | "format-room" | "conflict" | "read-only";
 export type Failure = { ok: false; error: WriteError; message: string };
 export type ReadResult = { ok: true; workspace: PlayerWorkspace; raw: string | null } | (Failure & { error: ReadError; raw: string | null });
 export type WriteResult = { ok: true; workspace: PlayerWorkspace } | Failure;
 
 const MESSAGES: Record<WriteError, string> = {
+  "read-only": "This workspace uses version 3. You can open plans and download a backup here, but editing, restoring and transferring it are not available in this version. Nothing was changed.",
   unavailable: "This browser is not letting Everloot keep anything on this device (private browsing or blocked site data), so plans cannot be saved here. Links and share codes still work.",
   corrupt: "The plans stored on this device could not be read. They are kept as they are, and nothing is saved over them.",
   "newer-version": "The plans on this device were saved by a newer version of Everloot. Reload the page to open them. Nothing here changes them.",
@@ -307,6 +327,7 @@ const plainAlt = (a: LocalAlt) => a.realm === null && a.classSlug === null && a.
  * moves to version 2 once an alt holds a version 2 detail, and a version 2 bucket stays version 2.
  */
 export function storedForm(workspace: PlayerWorkspace): PlayerWorkspace | (Omit<PlayerWorkspace, "alts"> & { alts: V1Alt[] }) {
+  if (workspace.version === 3) return workspace;
   if (workspace.version === 1 && workspace.alts.every(plainAlt)) {
     return { ...workspace, alts: workspace.alts.map(({ id, name, planIds, notes, updatedAt }) => ({ id, name, planIds, notes, updatedAt })) };
   }
@@ -334,6 +355,7 @@ function storable(workspace: PlayerWorkspace): { ok: true; doc: ReturnType<typeo
 /** Stores one bucket whole. `expected` is the bucket's stored text as the change read it (null for none yet): when the
  *  bucket holds anything else now, another tab changed it in between, and nothing is written over that. */
 function store(storage: DeviceStorage | null, workspace: PlayerWorkspace, expected?: string | null): WriteResult {
+  if (workspace.version === 3) return failure("read-only");
   const checked = storable(workspace);
   if (!checked.ok) return checked;
   try {
@@ -352,6 +374,7 @@ function store(storage: DeviceStorage | null, workspace: PlayerWorkspace, expect
 export function update(storage: DeviceStorage | null, owner: Owner, change: (workspace: PlayerWorkspace) => PlayerWorkspace | Failure): WriteResult {
   const read = readWorkspace(storage, owner);
   if (!read.ok) return failure(read.error);
+  if (read.workspace.version === 3) return failure("read-only");
   const next = change(read.workspace);
   return "error" in next ? next : store(storage, next, read.raw);
 }
@@ -482,7 +505,7 @@ export function copyPlan(storage: DeviceStorage | null, owner: Owner, id: string
 export function deletePlan(storage: DeviceStorage | null, owner: Owner, id: string): WriteResult {
   return update(storage, owner, (workspace) => {
     if (!workspace.plans.some((p) => p.id === id)) return failure("missing");
-    if (workspace.alts.some((a) => a.planIds.includes(id)) || workspace.watches.some((w) => w.planId === id)) return failure("referenced");
+    if (workspace.alts.some((a) => a.planIds.includes(id)) || workspace.watches.some((w) => isPlanWatch(w) && w.planId === id)) return failure("referenced");
     return { ...workspace, plans: workspace.plans.filter((p) => p.id !== id) };
   });
 }
@@ -634,7 +657,7 @@ function settle(signedOut: PlayerWorkspace, account: PlayerWorkspace, ids: Set<s
   const plans = new Map(signedOut.plans.map((p) => [p.id, p]));
   const alts = new Map(signedOut.alts.map((a) => [a.id, a]));
   const theirAlts = new Map(account.alts.map((a) => [a.id, a]));
-  const watched = new Set(account.watches.map((w) => w.planId));
+  const watched = new Set(account.watches.filter(isPlanWatch).map((w) => w.planId));
   const held = new Set(account.plans.filter((p) => p.boundTo !== null).map((p) => p.id));
   const planGoes = (plan: LocalPlan) => held.has(plan.id)
     && (sent?.get(plan.id) === planContent(plan) || transferStanding(plan, account, new Set()).kind === "saved");
@@ -645,7 +668,7 @@ function settle(signedOut: PlayerWorkspace, account: PlayerWorkspace, ids: Set<s
   const going = planGroups(signedOut).filter((g) => g.planIds.some((id) => ids.has(id))
     && g.planIds.every((id) => planGoes(plans.get(id)!))
     && g.altIds.every((id) => altGoes(alts.get(id)!))
-    && (!taken || signedOut.watches.every((w) => !g.planIds.includes(w.planId) || watched.has(w.planId))));
+    && (!taken || signedOut.watches.every((w) => !isPlanWatch(w) || !g.planIds.includes(w.planId) || watched.has(w.planId))));
   const planIds = new Set(going.flatMap((g) => g.planIds));
   const altIds = new Set(going.flatMap((g) => g.altIds));
   return {
@@ -653,13 +676,13 @@ function settle(signedOut: PlayerWorkspace, account: PlayerWorkspace, ids: Set<s
     account: {
       ...account,
       alts: [...account.alts, ...signedOut.alts.filter((a) => altIds.has(a.id) && !theirAlts.has(a.id))],
-      watches: [...account.watches, ...signedOut.watches.filter((w) => planIds.has(w.planId) && !watched.has(w.planId))],
+      watches: [...account.watches, ...signedOut.watches.filter((w) => isPlanWatch(w) && planIds.has(w.planId) && !watched.has(w.planId))],
     },
     signedOut: {
       ...signedOut,
       plans: signedOut.plans.filter((p) => !planIds.has(p.id)),
       alts: signedOut.alts.filter((a) => !altIds.has(a.id)),
-      watches: signedOut.watches.filter((w) => !planIds.has(w.planId)),
+      watches: signedOut.watches.filter((w) => !isPlanWatch(w) || !planIds.has(w.planId)),
     },
   };
 }
@@ -673,6 +696,8 @@ function settle(signedOut: PlayerWorkspace, account: PlayerWorkspace, ids: Set<s
  * still exactly the same.
  */
 function moveSaved(storage: DeviceStorage | null, owner: Owner, ids: Set<string>, sent?: Map<string, string>): { ok: true; moved: number } | Failure {
+  const refused = transferRefusal(storage, owner);
+  if (refused) return refused;
   const signedOut = readWorkspace(storage, ANONYMOUS);
   if (!signedOut.ok) return failure(signedOut.error);
   const account = readWorkspace(storage, owner);
@@ -711,6 +736,8 @@ export function bindTransferred(storage: DeviceStorage | null, sent: TransferReq
   if (!result.ok) return failure("not-transferred");
   const { owner } = sent;
   if (owner.kind !== "account" || owner.userId !== result.userId) return failure("other-owner");
+  const refused = transferRefusal(storage, owner);
+  if (refused) return refused;
   const ids = new Set(sent.planIds);
   const confirmed = new Set(result.planIds);
   if (confirmed.size !== ids.size || [...ids].some((id) => !confirmed.has(id))) return failure("incomplete");
@@ -834,6 +861,8 @@ function newKey(): string {
  */
 export function transferKey(storage: DeviceStorage | null, owner: Owner, planId: string, now = new Date()): { ok: true; key: string } | Failure {
   if (owner.kind !== "account") return failure("other-owner");
+  const refused = transferRefusal(storage, owner);
+  if (refused) return refused;
   let key = "";
   const done = changeTransfers(storage, (transfers) => {
     const receipt = transfers.receipts.find((r) => r.planId === planId);
@@ -849,6 +878,8 @@ export function transferKey(storage: DeviceStorage | null, owner: Owner, planId:
 /** The site has the plan, from this save or from the earlier one its key names: `content` is what it has. */
 export function receiptSaved(storage: DeviceStorage | null, owner: Owner, planId: string, key: string, content: string, now = new Date()): { ok: true } | Failure {
   if (owner.kind !== "account") return failure("other-owner");
+  const refused = transferRefusal(storage, owner);
+  if (refused) return refused;
   const done = changeTransfers(storage, (transfers) => {
     const receipts = kept(transfers.receipts, (r) => r.planId === planId, { planId, userId: owner.userId, key, state: "saved", reason: null, content, at: now.toISOString() });
     return "error" in receipts ? receipts : { ...transfers, receipts };
@@ -861,6 +892,8 @@ export function receiptSaved(storage: DeviceStorage | null, owner: Owner, planId
  *  A receipt the site has since said it saved stays saved. */
 export function receiptFailed(storage: DeviceStorage | null, owner: Owner, planId: string, key: string, reason: string, now = new Date()): { ok: true } | Failure {
   if (owner.kind !== "account") return failure("other-owner");
+  const refused = transferRefusal(storage, owner);
+  if (refused) return refused;
   const done = changeTransfers(storage, (transfers) => {
     const receipt = transfers.receipts.find((r) => r.planId === planId && r.userId === owner.userId && r.key === key);
     if (!receipt || receipt.state === "saved") return transfers;
@@ -873,6 +906,8 @@ export function receiptFailed(storage: DeviceStorage | null, owner: Owner, planI
  *  id once the site says, or once the account's characters show one with that very label. */
 export function rememberCharacter(storage: DeviceStorage | null, owner: Owner, altId: string, label: CharacterLabel, characterId: string | null, now = new Date()): { ok: true } | Failure {
   if (owner.kind !== "account") return failure("other-owner");
+  const refused = transferRefusal(storage, owner);
+  if (refused) return refused;
   const done = changeTransfers(storage, (transfers) => {
     const characters = kept(transfers.characters, (c) => c.altId === altId && c.userId === owner.userId, { altId, userId: owner.userId, characterId, label, at: now.toISOString() });
     return "error" in characters ? characters : { ...transfers, characters };
@@ -893,6 +928,8 @@ export const pendingCharacter = (transfers: Transfers, owner: Owner, altId: stri
  *  try may ask again at once. */
 export function characterRefused(storage: DeviceStorage | null, owner: Owner, altId: string, at: string): { ok: true } | Failure {
   if (owner.kind !== "account") return failure("other-owner");
+  const refused = transferRefusal(storage, owner);
+  if (refused) return refused;
   const done = changeTransfers(storage, (transfers) => {
     const characters = transfers.characters.filter((c) => !(c.altId === altId && c.userId === owner.userId && c.characterId === null && c.at === at));
     return characters.length === transfers.characters.length ? transfers : { ...transfers, characters };
@@ -909,6 +946,7 @@ export function sentPlans(storage: DeviceStorage | null): Set<string> {
 /** Why the account's bucket could not take these signed-out plans and what goes with them once the account has them,
  *  or null when it can: its limits and its size, as it would be stored. */
 export function transferRoom(signedOut: PlayerWorkspace, account: PlayerWorkspace, planIds: string[]): Failure | null {
+  if (signedOut.version === 3 || account.version === 3) return failure("read-only");
   if (account.owner.kind !== "account") return failure("other-owner");
   const ids = new Set(planIds);
   const into = withBound(account, signedOut.plans.filter((p) => ids.has(p.id)), { userId: account.owner.userId, at: new Date().toISOString() });
@@ -916,11 +954,23 @@ export function transferRoom(signedOut: PlayerWorkspace, account: PlayerWorkspac
   return checked.ok ? null : checked;
 }
 
+/** Read-only v3 on either side stops a transfer before registry access, network or plan movement. Recheck at each
+ *  effect boundary: another tab can replace a bucket while an account answer is on its way. */
+export function transferRefusal(storage: DeviceStorage | null, owner: Owner): Failure | null {
+  for (const from of [ANONYMOUS, owner]) {
+    const read = readWorkspace(storage, from);
+    if (!read.ok) return failure(read.error);
+    if (read.workspace.version === 3) return failure("read-only");
+  }
+  return null;
+}
+
 // Backups.
 
-export type ImportError = FormatError | "too-large" | "other-owner";
+export type ImportError = FormatError | "too-large" | "other-owner" | "read-only";
 
 const IMPORT_MESSAGES: Record<ImportError, string> = {
+  "read-only": MESSAGES["read-only"],
   "too-large": "That file is over 1 MiB, larger than a backup of a device's plans can be. Nothing was changed.",
   malformed: "That file is not a backup of plans from this site, or it is damaged. Nothing was changed.",
   "newer-version": "That backup was made by a newer version of Everloot. Reload the page and try again. Nothing was changed.",
@@ -1009,6 +1059,7 @@ export function previewImport(text: string, current: PlayerWorkspace, sent: Set<
   if (!checked.ok) return refuse(checked.error);
   const backup = checked.workspace;
   if (!sameOwner(backup.owner, current.owner)) return refuse("other-owner", ownerRefusal(backup.owner, current.owner));
+  if (backup.version === 3 || current.version === 3) return refuse("read-only");
   // The restored bucket is in the newer of the two versions, so no version 2 field is lost. Both were read as
   // version 2 (a version 1 alt with its new details unknown), so their alts go together.
   const version = backup.version > current.version ? backup.version : current.version;
@@ -1042,6 +1093,7 @@ export function applyImport(storage: DeviceStorage | null, owner: Owner, preview
   if (!sameOwner(preview.result.owner, owner)) return failure("other-owner");
   const read = readWorkspace(storage, owner);
   if (!read.ok) return failure(read.error);
+  if (read.workspace.version === 3 || preview.result.version === 3) return failure("read-only");
   if (JSON.stringify(read.workspace) !== preview.base) return failure("changed");
   return store(storage, preview.result, read.raw);
 }
@@ -1054,7 +1106,7 @@ export function exportBackup(workspace: PlayerWorkspace, now = new Date(), hidde
     ...workspace,
     plans: workspace.plans.filter((p) => !hidden.has(p.id)),
     alts: workspace.alts.map((a) => ({ ...a, planIds: a.planIds.filter((id) => !hidden.has(id)) })),
-    watches: workspace.watches.filter((w) => !hidden.has(w.planId)),
+    watches: workspace.watches.filter((w) => !isPlanWatch(w) || !hidden.has(w.planId)),
   };
   const text = JSON.stringify(storedForm(kept));
   if (bytes(text) > WORKSPACE_LIMITS.bytes) return failure("over-limit");

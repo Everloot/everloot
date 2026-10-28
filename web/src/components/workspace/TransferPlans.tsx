@@ -7,9 +7,9 @@ import { Card, Field, SectionHeading } from "@/components/ui";
 import { detailValue, listOf } from "@/lib/alt-workspace";
 import {
   ANONYMOUS, WORKSPACE_LIMITS, bindTransferred, boundElsewhere, bucketKey, characterRefused, contentDigest, deviceStorage, emptyWorkspace,
-  hiddenFrom, locksAvailable, madeCharacter, orderState, pendingCharacter, planContent, planGroups, readTransfers, readWorkspace,
+  hiddenFrom, isPlanWatch, locksAvailable, madeCharacter, orderState, pendingCharacter, planContent, planGroups, readTransfers, readWorkspace,
   receiptFailed, receiptSaved, rememberCharacter,
-  settleTransferred, transferKey, transferRoom, transferStanding, withWorkspaceLock,
+  settleTransferred, transferKey, transferRefusal, transferRoom, transferStanding, withWorkspaceLock,
   type CharacterLabel, type Failure, type LocalAlt, type LocalPlan, type Owner, type PlayerWorkspace, type Standing, type TransfersRead,
 } from "@/lib/player-workspace";
 import {
@@ -50,6 +50,7 @@ const SHARING: Record<Exclude<Sharing, "">, { label: string; words: string; shar
 const CHANGED = "The account signed in here changed, so the transfer stopped.";
 const NOTHING_SENT = "The account signed in here changed, so nothing was sent.";
 const KEPT = "What was not saved is still on this device, as it was.";
+const READ_ONLY = "This workspace uses version 3. You can open plans and download a backup here, but transferring it is not available in this version. Local workspaces and pending transfer records are kept as they are. An account request already sent may still finish.";
 const NO_LOCKS = "This browser can't move plans safely; try a current browser.";
 /** How long each request of the transfer may go unanswered before it is given up on, its outcome unknown. */
 const ANSWER_WAIT_MS = 20_000;
@@ -201,7 +202,7 @@ function groupsOf(signedOut: PlayerWorkspace, account: PlayerWorkspace, elsewher
       };
     });
     return [{
-      key: shown[0], rows, alts: groupAlts, watches: signedOut.watches.filter((w) => planIds.includes(w.planId)).length,
+      key: shown[0], rows, alts: groupAlts, watches: signedOut.watches.filter((w) => isPlanWatch(w) && planIds.includes(w.planId)).length,
       refused: another || rows.some((r) => r.refused), another,
     }];
   });
@@ -248,7 +249,7 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
     setDevice({
       signedOut: signedOut.workspace, account: account.ok ? account.workspace : null,
       elsewhere: boundElsewhere(storage, owner, signedOut.workspace.plans.map((p) => p.id)),
-      hidden: hiddenFrom(storage, owner, signedOut.workspace), transfers: readTransfers(storage),
+      hidden: hiddenFrom(storage, owner, signedOut.workspace), transfers: transferRefusal(storage, owner) ?? readTransfers(storage),
     });
   }, [owner]);
   useEffect(() => {
@@ -306,6 +307,8 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
     setOutcome(null);
     // Without the lock another tab could write between the transfer's reads and writes: nothing is read or sent.
     if (!locksAvailable()) { setAccount({ status: "failed", message: NO_LOCKS, retry: false }); return; }
+    const refused = transferRefusal(deviceStorage(), owner);
+    if (refused) { setAccount({ status: "failed", message: refused.message, retry: false }); return; }
     setAccount({ status: "loading" });
     try {
       // Who /api/auth/me says is signed in: the name shown, for the same id every request names.
@@ -313,6 +316,8 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
       if (!live.current) return;
       if (!me.ok) throw new Error("unchecked");
       if (me.id !== owner.userId) { onStopped(NOTHING_SENT); recheck(); return; }
+      const refused = transferRefusal(deviceStorage(), owner);
+      if (refused) { setAccount({ status: "failed", message: refused.message, retry: false }); return; }
       const response = await fetch("/api/me/builds", { cache: "no-store", headers: { [EXPECTED_OWNER_HEADER]: owner.userId } });
       const body = await response.json().catch(() => ({}));
       if (!live.current) return;
@@ -345,6 +350,10 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
     <p ref={said} tabIndex={-1} role={outcome.alert ? "alert" : "status"} className={`mb-3 text-sm ${outcome.alert ? "text-danger" : "text-fg-2"}`}>{outcome.text}</p>
   );
   if (count === 0) return saidLine ? <div className="mb-8">{saidLine}</div> : null;
+  if (!device.transfers.ok && device.transfers.error === "read-only") return <div className="mb-8">
+    {saidLine}
+    <p role="status" className="text-sm text-fg-2">{READ_ONLY}</p>
+  </div>;
 
   const readable = device.account !== null;
   const accountBucket = device.account ?? emptyWorkspace(owner);
@@ -439,6 +448,8 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
   /** One request naming this account, a write when it has a body: the site refuses it if another account is signed in now. */
   async function request(url: string, body?: object): Promise<Answer> {
     if (!live.current) return { ok: false, why: "stopped", message: "", reason: "" };
+    const refused = transferRefusal(deviceStorage(), owner);
+    if (refused) return { ok: false, why: "server", message: refused.message, reason: "" };
     const named = { [EXPECTED_OWNER_HEADER]: owner.userId };
     // Given up on once ANSWER_WAIT_MS pass without the whole answer: neither a success nor a refusal, whatever came first.
     const wait = new AbortController();
@@ -533,6 +544,8 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
       const signedOut = readWorkspace(storage, ANONYMOUS);
       const mine = readWorkspace(storage, owner);
       if (!mine.ok) return { kind: "stop", text: `${savedFirst()}This account's plans on this device could not be read, so nothing more was sent. ${KEPT}${madeNote()}` };
+      const refused = transferRefusal(storage, owner);
+      if (refused) return { kind: "stop", text: `${savedFirst()}${refused.error === "read-only" ? READ_ONLY : refused.message}${madeNote()}` };
       const record = readTransfers(storage);
       if (!record.ok) return { kind: "stop", text: `${savedFirst()}${record.message}${madeNote()}` };
       const plan = signedOut.ok ? signedOut.workspace.plans.find((p) => p.id === row.plan.id) : undefined;
@@ -568,6 +581,8 @@ function Transfer({ owner, recheck, onStopped }: { owner: AccountOwner; recheck:
       if (!listed.ok && (listed.why === "stopped" || listed.why === "changed" || listed.why === "signed-out")) return { ok: false, text: refusal(listed, name) };
       const characters = listed.ok && Array.isArray(listed.body.characters) ? listed.body.characters as AccountBuilds["characters"] : null;
       if (!characters) return { ok: false, text: `${savedFirst()}Your account's characters could not be read, so ${name} was not sent. ${KEPT}${madeNote()}` };
+      const refused = transferRefusal(deviceStorage(), owner);
+      if (refused) return { ok: false, text: refused.message };
       const record = readTransfers(deviceStorage());
       if (!record.ok) return { ok: false, text: `${savedFirst()}${record.message}${madeNote()}` };
       const before = characters.find((c) => c.id === madeCharacter(record.transfers, owner, altId));

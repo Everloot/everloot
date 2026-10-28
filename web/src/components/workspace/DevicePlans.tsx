@@ -146,6 +146,7 @@ function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | nu
   return (
     <div className="space-y-8">
       {intro}
+      {read.workspace.version === 3 && <p role="status" className="text-sm text-fg-2">This workspace uses version 3. You can open plans and download a backup here, but editing, restoring and transferring it are not available in this version. Nothing was changed.</p>}
       {sent && (sent.ok
         ? <SaveSent found={sent} plans={shown} owner={owner} onDone={(saved) => { onSentDone(); if (saved) after({ ok: true }, saved); }} />
         : <SentProblem message={sent.message} onClose={onSentDone} />)}

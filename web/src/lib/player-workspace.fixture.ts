@@ -17,3 +17,14 @@ export const V2_ALT_TEXT = `{"id":"${FIXTURE_ALT_ID}","name":"Thrall","realm":"M
 /** The signed-out bucket's stored text. */
 export const V2_BUCKET_TEXT = `{"format":"everloot.player-workspace","version":2,"owner":{"kind":"anonymous"},`
   + `"plans":[${V2_PLAN_TEXT}],"alts":[${V2_ALT_TEXT}],"watches":[]}`;
+
+/** A reader-only v3 fixture: legacy and typed plan targets, plus a guide unrelated to any plan id. */
+export const V3_BUCKET_TEXT = JSON.stringify({
+  ...JSON.parse(V2_BUCKET_TEXT), version: 3,
+  plans: [JSON.parse(V2_PLAN_TEXT), { ...JSON.parse(V2_PLAN_TEXT), id: "1a2b3c4d-0000-4000-8000-000000000002", order: "O9p-opaque", code2: JSON.parse(V2_PLAN_TEXT).code, order2: "O8g-opaque" }],
+  watches: [
+    { id: "1a2b3c4d-0000-4000-8000-000000000701", planId: FIXTURE_PLAN_ID, addedAt: "2026-10-20T12:00:00.000Z" },
+    { id: "1a2b3c4d-0000-4000-8000-000000000702", kind: "plan", planId: "1a2b3c4d-0000-4000-8000-000000000002", seenBuild: "1.60.1.70450", addedAt: "2026-10-20T12:00:00.000Z" },
+    { id: "1a2b3c4d-0000-4000-8000-000000000703", kind: "guide", guideId: 7, seenVersion: null, addedAt: "2026-10-20T12:00:00.000Z" },
+  ],
+});
