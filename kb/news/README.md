@@ -21,7 +21,7 @@ never code.
 slug: item-names-are-live        # the file name and the address, /news/item-names-are-live
 title: Item names are live
 summary: "One or two sentences in our own words, shown on the hub and as the search snippet."
-author: Everloot Team            # who wrote it, as the page names them
+author: Everloot team            # who wrote it, as the page names them
 published: 2026-10-25            # the post's date; a published post cannot be dated after today
 updated: 2026-10-26              # optional, the day it last changed
 tags: [site, database]           # optional, up to six short lowercase labels

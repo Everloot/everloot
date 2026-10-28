@@ -2,7 +2,7 @@
 slug: item-names-are-live
 title: Item names are live on the database pages
 summary: "Browse named items from the current WoW: Forever build, with names from the game files or the Warcraft Wiki kept separate from player reports."
-author: Everloot Team
+author: Everloot team
 published: 2026-10-24
 tags: [site, database]
 sources:
