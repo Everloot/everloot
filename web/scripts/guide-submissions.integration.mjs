@@ -3,10 +3,10 @@ import { readFile } from "node:fs/promises";
 import pg from "pg";
 
 // Community guide drafts on the schema production runs: Battle.net users without the accounts v2 columns, the production
-// chain and the profiles file, then 20261027140000_guide_submissions.sql, once with Supabase's old default grants and once
+// chain and the profiles file, then the preflight, apply, postflight, reviewer, backup and rollback in
+// docs/2026-10-27-guide-submissions-activation.md exactly as written, once with Supabase's old default grants and once
 // with none (its default from 2026-10-30). Ownership, grants, limits, revisions kept as they were sent, data kept to what
-// the owner typed, applying twice, and the rollback the file's last lines give. Disposable local Postgres only: this
-// fixture drops the public schema.
+// the owner typed, and applying twice. Disposable local Postgres only: this fixture drops the public schema.
 // docker run -d --name guide-submissions-test -e POSTGRES_HOST_AUTH_METHOD=trust -p 127.0.0.1:54421:5432 postgres:17
 // docker exec guide-submissions-test createdb -h 127.0.0.1 -U postgres guide_submissions_test
 // QUOTA_TEST_DATABASE_URL=postgres://postgres@127.0.0.1:54421/guide_submissions_test node scripts/guide-submissions.integration.mjs
@@ -36,10 +36,28 @@ const migration = (await read("20261027140000_guide_submissions.sql")).replace(/
 const TABLES = ["guide_moderators", "guide_submission_revisions", "guide_submissions"];
 const SITE_FUNCTIONS = ["save_guide_draft", "submit_guide", "withdraw_guide"];
 const FUNCTIONS = [...SITE_FUNCTIONS, "guide_draft_row", "guide_revision_is_kept", "take_guide_count"].sort();
-// The rollback as the file writes it: the indented statements after its "-- Rollback" line.
-const ROLLBACK = migration.slice(migration.indexOf("\n-- Rollback")).split("\n")
-  .filter((l) => l.startsWith("--   ")).map((l) => l.slice(5)).join("\n");
-assert.match(ROLLBACK, /^drop function if exists public\.withdraw_guide/);
+
+// The runbook's SQL, run as written.
+const doc = (await readFile(new URL("../../docs/2026-10-27-guide-submissions-activation.md", import.meta.url), "utf8")).replace(/\r\n/g, "\n");
+const block = (name) => {
+  const found = doc.match(new RegExp("```sql\\n(-- " + name + "\\n[\\s\\S]*?)```"));
+  assert.ok(found, `No ${name} block in the runbook`);
+  return found[1];
+};
+const PASTE = /^-- paste supabase\/migrations\/20261027140000_guide_submissions\.sql here, unchanged$/m;
+assert.match(block("apply"), PASTE);
+// A function, not a string: the file's $$ would read as a replacement pattern.
+const APPLY = block("apply").replace(PASTE, () => migration);
+const [PREFLIGHT, POSTFLIGHT, BACKUP, ROLLBACK, MODERATOR] = ["preflight", "postflight", "backup", "rollback", "moderator"].map(block);
+const ACCOUNT = /'<the verified account id>'/g;
+assert.match(MODERATOR, ACCOUNT);
+// The file's closing comment gives the same rollback, for anyone who reads the migration alone.
+const statements = (sql) => sql.split("\n").filter((l) => l && !l.startsWith("--") && !/^(begin|commit);$/.test(l) && !l.startsWith("set local "));
+const commented = migration.slice(migration.indexOf("\n-- Rollback")).split("\n").filter((l) => l.startsWith("--   ")).map((l) => l.slice(5));
+assert.deepEqual(statements(ROLLBACK), commented, "the runbook's rollback is the one the file's comment gives");
+
+/** The names of the rows that are not `t`. */
+const failing = async (sql, db = pool) => (await db.query(sql)).rows.filter((r) => r.ok !== true).map((r) => r.check_name);
 
 const MAGE = "EL1-mage-0-1.60.1.70450-MTE6NQ";
 const WARRIOR = "EL1-warrior-0-1.60.1.70450-MTE6NQ";
@@ -53,11 +71,13 @@ const DRAFT = {
   sources: [SOURCE], body: "## Who it is for\n\nPlayers who level alone.",
 };
 
-/** A script on one connection, as the SQL editor runs it; a failure leaves no transaction open. */
+/** A script on one connection, as the SQL editor runs it; a failure leaves no transaction open. Its last result's rows. */
 async function run(sql) {
   const client = await pool.connect();
-  try { await client.query(sql); }
-  catch (error) { await client.query("ROLLBACK"); throw error; }
+  try {
+    const results = [await client.query(sql)].flat();
+    return results.filter((r) => r.command === "SELECT").at(-1)?.rows ?? [];
+  } catch (error) { await client.query("ROLLBACK"); throw error; }
   finally { client.release(); }
 }
 
@@ -164,6 +184,60 @@ async function needsProfilesFirst() {
     await db.query("drop table public.user_profiles cascade");
     await assert.rejects(db.query(migration), /Apply 20261021170000_account_profiles\.sql first/);
   });
+}
+
+async function preflightCatchesEachCondition() {
+  const only = async (setup) => rolledBack(async (db) => { await db.query(setup); return failing(PREFLIGHT, db); });
+  assert.deepEqual(await only("drop table public.user_profiles cascade"),
+    ["user_profiles is there, with the handle a guide names its author by", "service_role reads users, sessions and user_profiles"]);
+  assert.deepEqual(await only("insert into public.intake_quota_buckets values ('guide_saves:00000000-0000-4000-8000-000000000000', 1, now())"),
+    ["no guide counters from an earlier attempt"]);
+  assert.deepEqual(await only("create table public.guide_moderators (user_id uuid)"), ["none of the three tables exists yet"]);
+  assert.deepEqual(await only("revoke select on public.sessions from service_role"), ["service_role reads users, sessions and user_profiles"]);
+  const reordered = "alter table public.intake_quota_buckets rename to intake_quota_buckets_kept; "
+    + "create table public.intake_quota_buckets (bucket text primary key, reset_at timestamptz not null, count integer not null)";
+  assert.deepEqual(await only(reordered), ["intake_quota_buckets is bucket, count, reset_at in that order, keyed by bucket"]);
+
+  // Another function by one of the names: the migration applies beside it and PostgREST sees two.
+  const collision = "create function public.submit_guide(p_text text) returns void language sql as ''";
+  assert.deepEqual(await only(collision), ["no function has any of the six names"]);
+  assert.deepEqual(await rolledBack(async (db) => { await db.query(collision); await db.query(migration); return failing(POSTFLIGHT, db); }), [
+    "the six functions, one signature each", "each runs as its owner with an empty search_path and a lock timeout",
+    "only service_role may call the three site functions",
+  ]);
+  // Each other postflight row on its own, after the migration as it is.
+  const after = async (change) => rolledBack(async (db) => {
+    await db.query(migration);
+    assert.deepEqual(await failing(POSTFLIGHT, db), []);
+    await db.query(change);
+    return failing(POSTFLIGHT, db);
+  });
+  // A definer function with no settings left: its proconfig is NULL, which an aggregate would skip.
+  assert.deepEqual(await after("alter function public.withdraw_guide(uuid, uuid, integer) reset all"),
+    ["each runs as its owner with an empty search_path and a lock timeout"]);
+  assert.deepEqual(await after("grant select on public.guide_submission_revisions to anon"), ["anon and authenticated have nothing on the three"]);
+  assert.deepEqual(await after("grant execute on function public.guide_draft_row(jsonb) to service_role"), ["nobody may call the other three directly"]);
+  assert.deepEqual(await after("alter table public.guide_submission_revisions disable trigger guide_submission_revisions_kept"),
+    ["a sent revision is kept as it was: the trigger is on, before update or delete"]);
+  assert.deepEqual(await after("drop index public.guide_moderators_one"), ["guide_moderators holds one account at most"]);
+  assert.deepEqual(await after("alter table public.guide_moderators disable row level security"), ["row level security is on for the three, with no policies"]);
+}
+
+async function heldLockChangesNothing() {
+  // A sign-in in progress holds a row-exclusive lock on users until it commits; the new foreign keys need to wait for
+  // it. The apply gives up after its lock timeout and leaves nothing behind.
+  const signIn = await pool.connect();
+  try {
+    await signIn.query("BEGIN");
+    await signIn.query("update public.users set updated_at = updated_at where false");
+    const started = Date.now();
+    await assert.rejects(run(APPLY), (error) => error.code === "55P03");
+    assert.ok(Date.now() - started < 20_000, "the wait is bounded");
+  } finally {
+    await signIn.query("ROLLBACK");
+    signIn.release();
+  }
+  assert.deepEqual(await failing(PREFLIGHT), [], "a failed apply changes nothing");
 }
 
 async function browserRolesAndDirectWritesAreRefused(user) {
@@ -343,11 +417,26 @@ async function onlyWhatTheOwnerTyped(owner) {
 }
 
 async function carlosAloneUntilHeNamesOthers(owner, other) {
-  // Applied, the table is empty: nobody can review until the operator adds Carlos's account by hand.
+  // Applied, the table is empty: nobody can review until the operator adds Carlos's account by hand, with the runbook's
+  // block. Unedited, the block stops at its placeholder; an id that is no account adds nobody.
   assert.equal(await count("select count(*)::int as n from public.guide_moderators"), 0);
-  await pool.query("insert into public.guide_moderators (user_id, note) values ($1, 'The owner')", [owner]);
-  await assert.rejects(pool.query("insert into public.guide_moderators (user_id) values ($1)", [other]), /guide_moderators_one/);
-  assert.deepEqual((await service("select user_id, note from public.guide_moderators")), [{ user_id: owner, note: "The owner" }]);
+  await assert.rejects(run(MODERATOR), /invalid input syntax for type uuid/);
+  const reviewer = (id) => run(MODERATOR.replace(ACCOUNT, `'${id}'`));
+  assert.deepEqual(await reviewer("00000000-0000-4000-8000-000000000000"), [{ one_moderator: false, that_account: null }]);
+  assert.deepEqual(await reviewer(owner), [{ one_moderator: true, that_account: true }]);
+  // A second account is refused while Carlos is the only reviewer, and the first stays.
+  await assert.rejects(reviewer(other), /guide_moderators_one/);
+  assert.deepEqual(await service("select user_id, note from public.guide_moderators"), [{ user_id: owner, note: "Carlos, the owner" }]);
+  assert.deepEqual(await failing(POSTFLIGHT), []);
+}
+
+async function backupHoldsEveryRow() {
+  const [{ backup }] = await run(BACKUP);
+  for (const [key, table] of [["guides", "guide_submissions"], ["revisions", "guide_submission_revisions"], ["moderators", "guide_moderators"]]) {
+    const n = await count(`select count(*)::int as n from public.${table}`);
+    assert.ok(n > 0, table);
+    assert.equal(backup[key].length, n, key);
+  }
 }
 
 async function deletionsCascade(owner, other, guide) {
@@ -370,9 +459,16 @@ try {
   for (const defaults of ["supabase", "none"]) {
     await legacySchema(defaults);
     const before = await others();
-    if (defaults === "supabase") await needsProfilesFirst();
+    assert.deepEqual(await failing(PREFLIGHT), []);
+    if (defaults === "supabase") {
+      await needsProfilesFirst();
+      await preflightCatchesEachCondition();
+      await heldLockChangesNothing();
+    }
+    assert.deepEqual(await others(), before);
 
-    await run(migration);
+    await run(APPLY);
+    assert.deepEqual(await failing(POSTFLIGHT), []);
     await postflight();
     assert.deepEqual(await others(), before, "the migration alters nothing it does not own");
     const user = async (bnet, tag) => (await pool.query("insert into public.users (bnet_id, battletag) values ($1, $2) returning id", [bnet, tag])).rows[0].id;
@@ -385,17 +481,21 @@ try {
     await limitsAreTheDatabases(owner, guide, next);
     await carlosAloneUntilHeNamesOthers(owner, other);
     await onlyWhatTheOwnerTyped(owner);
+    await backupHoldsEveryRow();
 
-    // Applied a second time, it keeps every draft and revision.
+    // Applied a second time, it keeps every draft and revision, and the reviewer.
     const kept = await count("select count(*)::int as n from public.guide_submission_revisions");
-    await run(migration);
+    await run(APPLY);
+    assert.deepEqual(await failing(POSTFLIGHT), []);
     await postflight();
     assert.equal(await count("select count(*)::int as n from public.guide_submission_revisions"), kept);
+    assert.equal(await count("select count(*)::int as n from public.guide_moderators"), 1);
     await deletionsCascade(owner, other, guide);
 
     assert.ok(await count("select count(*)::int as n from public.intake_quota_buckets where bucket like 'guide\\_%'") >= 3);
     await run(ROLLBACK);
-    assert.deepEqual(await others(), before, "the rollback returns to the schema before the apply");
+    assert.deepEqual(await failing(PREFLIGHT), [], "the rollback returns to the schema before the apply");
+    assert.deepEqual(await others(), before);
     assert.equal(await count("select count(*)::int as n from pg_class where relnamespace = 'public'::regnamespace and relname = any ($1::text[])", [TABLES]), 0);
     assert.equal(await count("select count(*)::int as n from pg_proc where pronamespace = 'public'::regnamespace and proname = any ($1::text[])", [FUNCTIONS]), 0);
     assert.equal(await count("select count(*)::int as n from public.intake_quota_buckets where bucket like 'guide\\_%'"), 0);
