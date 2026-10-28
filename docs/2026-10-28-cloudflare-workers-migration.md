@@ -119,7 +119,7 @@ split it into resumable chunks.
 
 ## Route check (10/28)
 
-99 routes (every static page and one real sample per dynamic page, `D:/R21-Brain/tmp/everloot-route-*.mjs`)
+99 routes (every static page and one real sample per dynamic page, scripted outside the repository)
 requested from production and from the Worker: 90 identical in status, title and size; median 266 ms on the
 Worker vs 288 ms on Vercel. Differences: the lore routes and the lore part of `sitemap.xml` (D1, section 3),
 `/schema/*` (fixed after the run, matches), `/docs/api/keys` (switches at build time; fixed, 134 KB vs 139 KB, and the footer reads the deployed commit), and two redirects the
@@ -175,9 +175,13 @@ Before: D1 imported and the route check all green; `wrangler.jsonc` `EVERLOOT_DE
 4. Rules → Redirect Rules: `www.everloot.app/*` → `https://everloot.app/$1` (301), as Vercel does today.
 5. Check: the route check against `https://everloot.app` (no sign-in now), `/api/health` fresh, one MCP call,
    one upload from the addon or desktop app, Battle.net sign-in end to end, the footer shows the release commit.
-6. Bots: Security → bots / AI crawl control, decide on `meta-externalagent` (40% of function calls on 10/28,
+6. Deploys: GitHub → repository variable `WORKER_DEPLOY` = `1` (`.github/workflows/deploy-worker.yml` then deploys
+   the Worker on every merge to `main`; it needs the `CLOUDFLARE_API_TOKEN` secret and the `CLOUDFLARE_ACCOUNT_ID`
+   and `NEXT_PUBLIC_*` variables, set beforehand). Vercel project → Settings → Git: disconnect, so merges stop
+   building on Vercel.
+7. Bots: Security → bots / AI crawl control, decide on `meta-externalagent` (40% of function calls on 10/28,
    ignores robots.txt). Carlos's call.
 
-Rollback: Vercel → Cron Jobs enable; Worker → remove the two custom domains; DNS → re-add `A @ 76.76.21.21` and
+Rollback: Vercel → Cron Jobs enable, Git reconnect; GitHub → `WORKER_DEPLOY` unset; Worker → remove the two custom domains; DNS → re-add `A @ 76.76.21.21` and
 `CNAME www cname.vercel-dns.com` (DNS only); Worker → Cron Triggers remove. Vercel's last production deployment
 serves again within the DNS TTL.
