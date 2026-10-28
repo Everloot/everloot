@@ -6,6 +6,9 @@ const config = JSON.parse(readFileSync(join(__dirname, "..", "vercel.json"), "ut
 
 // vercel.json's ignoreCommand replaces the dashboard's "Ignored Build Step"; exit 0 skips the build, 1 builds.
 describe("vercel.json ignoreCommand", () => {
+  // Deliberate and unchanged from the dashboard command: an ordinary PR branch (feat/*, fix/*) gets NO Vercel preview
+  // build. Only main and preview/* build. To get a preview for a PR, push it to (or also as) a preview/* branch.
+  // CI still runs the checks on every PR.
   it("builds only main and preview/* branches", () => {
     expect(config.ignoreCommand).toMatch(/^case "\$VERCEL_GIT_COMMIT_REF" in main\|preview\/\*\) ;; \*\) exit 0;; esac;/);
   });
