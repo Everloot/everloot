@@ -51,8 +51,8 @@ Consequences that this ADR makes binding:
 3. Class, race, faction, level, realm, name and GUID are publicly observable. They are never ownership proof and
    never resolve a dispute on their own.
 4. Freezing stays: a forged claim can freeze a real link (denial of display), but cannot take it over. This
-   tradeoff is accepted until a stronger assurance exists. Cryptographic proof of control is not available from
-   the client and is not proposed.
+   tradeoff is proposed for owner review; no policy acceptance is implied by this ADR. No independently
+   trusted proof of game-character control is established by the current file bridge.
 
 ## Decision
 
@@ -70,7 +70,9 @@ Options considered:
 | C. Use `(ruleset, realm_key, name_key)` as root | Simple joins with public sightings | Names are reusable after rename/deletion; would merge different people; contradicts the freeze model |
 
 Game identity within one secret version is `link_key`. Display identity is `(ruleset, realm_key, name_key)`
-normalized by `link_realm_key`/`linkRealmKey`. Ruleset is part of every key. While `rulesetOf()` returns one
+normalized by `link_realm_key`/`linkRealmKey`. Display identities include ruleset; the existing GUID-derived
+`link_key` and completion hashes do not include it. The ADR must define future namespace compatibility before
+enabling another ruleset, rather than silently changing existing hashes. While `rulesetOf()` returns one
 value, realms of different rulesets with the same normalized name would collide; a second ruleset must not be
 enabled until ruleset comes from a realm list (decision D4).
 
@@ -148,7 +150,8 @@ public display is designed, it reuses `set_visibility` and `public_character`, a
 | Unlink (`unlink_character`) | Link, visibility, source mapping for that link and consent are deleted (cascade). Private derived history keyed by `link_id` is deleted. Build labels keep their builds; `link_id` becomes null. Private caches and any future public page/search entries are purged. Public sightings are unaffected; those follow the suppression policy |
 | Relink after unlink | New `link_id`, empty history. Re-deriving history from retained raw source data is decision D3 |
 | Consent revoked for a category | Stop accepting that category for the link; derived private data for that category is deleted; raw source rows follow D3 |
-| Source revoked (key revoked or owner removes a machine) | Facts from that source drop out of reads at once; deletion of its raw rows follows D3 |
+| Sync API key revoked | Stop future sync through that credential immediately. Other valid credentials and source consent are not implicitly revoked; explicit source removal is separate |
+| Source revoked (owner removes a machine) | Facts from that source drop out of reads at once; deletion of its raw rows follows D3 |
 | Account deletion | Existing `on delete cascade` removes links, visibility, codes and (proposed) sources and consent |
 | Hide request (suppression) | Existing behavior: cannot link or show. Proposed: an existing link to a newly suppressed character becomes private-only and is excluded from any public surface |
 | Frozen | Owner list shows the frozen state; private reads excluded (D2); operator resolution deletes losing links, which runs the unlink effects for those accounts |
@@ -215,7 +218,7 @@ Step 2 (COL-C00, COL-C01, needs accepted schema for sources/consent and `sync:ow
 
 File boundaries:
 
-- New: `addon/modules/link.lua`; listed in `addon/Everloot.toc` and generated slot TOCs.
+- New: `addon/modules/link.lua`; listed in `addon/Everloot.toc` only. Answers/Prices/Builds slot TOCs do not load collector modules.
 - Addon tests for the link command and row shape.
 - Companion: dedicated link sender module and its tests; uploader keeps excluding `character_link` from intake.
 - Desktop: wiring the sender into the existing job with a `link:own` key; renderer status text.
