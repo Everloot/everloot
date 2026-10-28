@@ -56,6 +56,15 @@ the correction, then 44 related engine/job tests and Desktop typecheck passed. R
 to low memory; its queued-budget finding was corrected locally. Actual native wake behavior, network
 return without wake and fresh retries after pause-resume remain open. This is not full REL-06 completion.
 
+REL-07 source implementation `821582ce` has independent SPEC/QUALITY PASS. Exact all-row 422 refusals
+no longer block later batches; their unchanged receipts never claim storage. Browser progress distinguishes
+processed batches, saved rows and rejections, and retries retain earlier progress. Parent web 38 and companion
+41 focused tests plus web typecheck passed. Review was source-only; its optional wording and one-row negative
+index coverage notes were addressed afterwards. Ordinary accepted-receipt index hardening, retrying rejected
+rows within the same session, and analytics outcome distinctions are separate follow-ups. The two affected
+browser/shared suites passed 34 tests after the follow-up. This closes the
+source/fixture slice only: no deployed browser or Cloudflare upload acceptance, push or release is claimed.
+
 ## Identity, character hub and completion
 
 | ID | Gap / deliverable | Depends on | Acceptance |

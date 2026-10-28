@@ -48,6 +48,15 @@ test("a single fully rejected batch finishes with zero saved rows and its origin
   expect(session.receipts).toEqual([receipt]);
 });
 
+test("a one-row envelope refusal cannot be mistaken for rejection of that row", async () => {
+  const session = prepareUpload({ addonVersion: "0.2.0", records: [row(1), { ...row(2), installId: "other-install" }] }, {}, []);
+  const send = vi.fn(async () => Response.json({ ok: false, accepted: [], rejected: [{ index: -1, reason: "Envelope refused" }] }, { status: 422 }));
+  await expect(sendBatches(session, send)).rejects.toThrow(/confirmed/i);
+  expect(send).toHaveBeenCalledTimes(1);
+  expect(session.next).toBe(0);
+  expect(session.receipts).toEqual([]);
+});
+
 test("a durable partial receipt keeps accepted and rejected rows distinct", async () => {
   const session = prepareUpload({ addonVersion: "0.2.0", records: [row(1), row(2)] }, {}, []);
   const receipt = { ...stored(1), rejected: [{ index: 1, reason: "Try again later" }] };

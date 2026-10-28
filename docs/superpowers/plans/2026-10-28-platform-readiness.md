@@ -290,8 +290,10 @@ tests (REL-08); existing release workflow and native acceptance checklist (REL-0
 
 - [ ] REL-06: reproduce a Retry-After/scheduler disagreement and exhausted retries; test no overlapping jobs,
   respected server wait and explicit manual/reconnect recovery. Preserve partial accepted-row receipts.
-- [ ] REL-07: port rejected-batch behavior through an agreed shared contract, test browser interruption/retry
-  and permanent-refusal visibility; never fabricate durable receipts or silently widen sharing.
+- [x] REL-07 source/fixture slice: port exact rejected-batch behavior through the shared sender, test client
+  interruption/retry and refusal visibility; never fabricate durable receipts or widen sharing. `821582ce`
+  independently reviewed SPEC/QUALITY PASS; parent web38/companion41 and web typecheck PASS. Review wording
+  and one-row negative-index test follow-ups are addressed. Deployed browser/Cloudflare acceptance remains open.
 - [ ] REL-08: add failing regressions for hostile URLs/filenames, oversized bodies, checksum failure and installer
   launch errors; implement minimal recovery-safe guards without adding an unapproved signing service.
 - [ ] REL-09: prepare the publisher-trust/key-rotation decision and isolated install/upgrade/uninstall checklist.
