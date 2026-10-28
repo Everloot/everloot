@@ -194,15 +194,23 @@ const yamlProblem = (file: string, doc: Document, before = ""): Problem => {
   return { file, line: e.linePos?.[0]?.line ?? 1, message: `${before}${e.message.split("\n")[0]}` };
 };
 
-/** One file read against its schema: the value, or its problems, each with its line; and the data as written. */
-function readFile<T>(file: ChooserFile, schema: z.ZodType<T>): { value: T | null; raw: unknown; problems: Problem[]; lineOf: LineOf } {
+type Review = { status: "draft" | "reviewed"; version: number; reviewer: string; reviewedOn: string | null };
+
+/**
+ * One file read against its schema: the value, or its problems, each with its line; and the data as written. The check
+ * and the site both read a file here, so they refuse the same files, a review dated after `today` included.
+ */
+function readFile<T extends Review>(file: ChooserFile, schema: z.ZodType<T>, today: string): { value: T | null; raw: unknown; problems: Problem[]; lineOf: LineOf } {
   const text = normal(file.source);
   const doc = parseDocument(text);
   const lineOf = fieldLines(text, doc);
   if (doc.errors.length) return { value: null, raw: null, problems: [yamlProblem(file.path, doc)], lineOf };
   const raw = doc.toJS();
   const parsed = schema.safeParse(raw);
-  return parsed.success ? { value: parsed.data, raw, problems: [], lineOf } : { value: null, raw, problems: reported(parsed.error, lineOf, file.path), lineOf };
+  if (!parsed.success) return { value: null, raw, problems: reported(parsed.error, lineOf, file.path), lineOf };
+  const on = parsed.data.reviewedOn;
+  if (on && on > today) return { value: null, raw, problems: [{ file: file.path, line: lineOf(["reviewedOn"]), message: `reviewedOn ${on} is after today (${today})` }], lineOf };
+  return { value: parsed.data, raw, problems: [], lineOf };
 }
 
 /** The fields that record a file's review; a review vouches for everything else in the file. */
@@ -215,8 +223,6 @@ function vouchedFor(data: unknown): string {
     ? Object.fromEntries(Object.entries(value as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
     : value));
 }
-
-type Review = { status: "draft" | "reviewed"; version: number; reviewer: string; reviewedOn: string | null };
 
 /**
  * A file held to its review before the change, as the guides hold a published version: once reviewed, any change to
@@ -256,12 +262,10 @@ export function checkClassChooser(files: ChooserFiles, today: string, previous?:
       problems.push({ file: `guides/${CHOOSER_FILES[key]}`, message: `guides/${CHOOSER_FILES[key]} is missing: the class chooser reads ${CHOOSER_FILES.roles} and ${CHOOSER_FILES.chooser} together` });
       return null;
     }
-    const { value, raw, problems: found, lineOf } = readFile(file, schema);
+    const { value, raw, problems: found, lineOf } = readFile(file, schema, today);
     problems.push(...found);
     const before = previous?.[key];
     if (value && before) problems.push(...heldToReview(CHOOSER_FILES[key], file.path, { value, raw }, lineOf, before));
-    const on = (value as { reviewedOn?: string | null } | null)?.reviewedOn;
-    if (on && on > today) problems.push({ file: file.path, line: lineOf(["reviewedOn"]), message: `reviewedOn ${on} is after today (${today})` });
     return { value, lineOf };
   };
   const roles = read("roles", ClassRolesFile);
@@ -272,9 +276,12 @@ export function checkClassChooser(files: ChooserFiles, today: string, previous?:
   return { data: roles?.value && chooser?.value && !problems.length ? { roles: roles.value, chooser: chooser.value } : null, problems };
 }
 
-/** The two files as the site reads them: their data, or null when either breaks a rule of its schema or of the two together. */
-export function parseClassChooser(roles: string, chooser: string): ClassChooserData | null {
-  const r = readFile({ path: CHOOSER_FILES.roles, source: roles }, ClassRolesFile).value;
-  const c = readFile({ path: CHOOSER_FILES.chooser, source: chooser }, ClassChooserFile).value;
+/**
+ * The two files as the site reads them: their data, or null when either breaks a rule of its own or of the two
+ * together, a review dated after `today` included, as the check refuses them.
+ */
+export function parseClassChooser(roles: string, chooser: string, today = new Date().toISOString().slice(0, 10)): ClassChooserData | null {
+  const r = readFile({ path: CHOOSER_FILES.roles, source: roles }, ClassRolesFile, today).value;
+  const c = readFile({ path: CHOOSER_FILES.chooser, source: chooser }, ClassChooserFile, today).value;
   return r && c && !crossIssues({ roles: r, chooser: c }).length ? { roles: r, chooser: c } : null;
 }

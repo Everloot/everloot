@@ -137,7 +137,11 @@ describe("the chooser page", () => {
   });
 
   test("files that break a rule, or are missing, show no chooser and stay out of search", async () => {
-    const broken: Record<string, string>[] = [{ "class-roles.yaml": ROLES.replace("status: draft", "status: reviewed"), "class-chooser.yaml": CHOOSER }, { "class-roles.yaml": ROLES }];
+    const broken: Record<string, string>[] = [
+      { "class-roles.yaml": ROLES.replace("status: draft", "status: reviewed"), "class-chooser.yaml": CHOOSER },
+      { "class-roles.yaml": ROLES },
+      { "class-roles.yaml": reviewed(ROLES), "class-chooser.yaml": reviewed(CHOOSER).replace("reviewedOn: 2026-10-26", "reviewedOn: 2099-01-01") },
+    ];
     for (const files of broken) {
       stubFiles(files);
       expect((await route.generateMetadata()).robots).toEqual({ index: false, follow: true });

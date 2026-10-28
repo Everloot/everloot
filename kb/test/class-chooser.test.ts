@@ -109,6 +109,17 @@ describe("review", () => {
     expect(problemsOf(ROLES, ahead)).toEqual([at(CHOOSER_PATH, ahead, "reviewedOn:", "2026-10-28 is after today (2026-10-27)")]);
   });
 
+  test("the site reader refuses a review dated after today, as the check does, for either file", () => {
+    const ahead = reviewed(CHOOSER, "Kai", "2099-01-01");
+    expect(problemsOf(reviewed(ROLES), ahead)).toEqual([at(CHOOSER_PATH, ahead, "reviewedOn:", "2099-01-01 is after today (2026-10-27)")]);
+    expect(parseClassChooser(reviewed(ROLES), ahead, TODAY)).toBeNull();
+    expect(parseClassChooser(reviewed(ROLES), ahead)).toBeNull();
+    expect(parseClassChooser(reviewed(ROLES, "Kai", "2099-01-01"), reviewed(CHOOSER))).toBeNull();
+    const onTheDay = reviewed(CHOOSER, "Kai", TODAY);
+    expect(problemsOf(reviewed(ROLES), onTheDay)).toEqual([]);
+    expect(parseClassChooser(reviewed(ROLES), onTheDay, TODAY)).not.toBeNull();
+  });
+
   test("a version is a whole number from 1", () => {
     const zero = CHOOSER.replace("version: 1", "version: 0");
     expect(problemsOf(ROLES, zero)).toEqual([at(CHOOSER_PATH, zero, "version:", "version")]);
