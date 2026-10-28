@@ -7,12 +7,12 @@ export interface ZoneLore { name: string; text: string; href: string; sourceUrl:
  * none or the archive cannot be opened. Exact name only, and only a page typed as a zone: "Durotar" the
  * zone, never a search hit for something with the word in it.
  */
-export function zoneLore(name: string): ZoneLore | null {
-  const found = searchLore(name, 1, "zone");
+export async function zoneLore(name: string): Promise<ZoneLore | null> {
+  const found = await searchLore(name, 1, "zone");
   if (found === UNAVAILABLE) return null;
   const hit = found.hits.find((h) => h.name.trim().toLowerCase() === name.trim().toLowerCase());
   if (!hit) return null;
-  const page = loreByExtId(hit.extId);
+  const page = await loreByExtId(hit.extId);
   if (!page || page === UNAVAILABLE || page.type !== "zone") return null;
   const first = renderBody(page.body)[0];
   const text = first?.type === "p" ? first.text.replace(/\s+/g, " ").trim() : firstSentence(page.body, 400);

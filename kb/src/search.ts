@@ -1,7 +1,7 @@
-import type { DB } from "./db.js";
 import type { GameVersion, Kind } from "./entities.js";
 import type { LoreType } from "./importers/wiki-classify.js";
 import { expandAliases, NAME_ALIASES, withoutArticle } from "./name-aliases.js";
+import { releaseDb, type ReleaseDb, type ReleaseSource } from "./release-db.js";
 
 export interface SearchHit {
   id: number;
@@ -125,11 +125,11 @@ function normExpr(col: string): string {
 const NORM_SQL = normExpr("e.name");
 
 /** Whether each open database has `entities.name_norm`; checked once per handle. */
-const hasNameNorm = new WeakMap<DB, boolean>();
-function nameNormSql(db: DB): string {
+const hasNameNorm = new WeakMap<ReleaseDb, boolean>();
+async function nameNormSql(db: ReleaseDb): Promise<string> {
   let has = hasNameNorm.get(db);
   if (has === undefined) {
-    const cols = db.prepare("SELECT name FROM pragma_table_info('entities')").all() as { name: string }[];
+    const cols = await db.all<{ name: string }>("SELECT name FROM pragma_table_info('entities')");
     has = cols.some((c) => c.name === "name_norm");
     hasNameNorm.set(db, has);
   }
@@ -152,7 +152,8 @@ function pushOptionFilters(conds: string[], params: unknown[], opts: SearchOptio
   }
 }
 
-export function search(db: DB, query: string, limit = 10, opts: SearchOptions = {}): SearchHit[] {
+export async function search(source: ReleaseSource, query: string, limit = 10, opts: SearchOptions = {}): Promise<SearchHit[]> {
+  const db = releaseDb(source);
   // "where is MC" asks about Molten Core: the short forms players type become the names the pages carry.
   const { text: raw, expanded } = expandAliases(query.trim());
   if (!raw) return [];
@@ -167,16 +168,15 @@ export function search(db: DB, query: string, limit = 10, opts: SearchOptions = 
   // The SQL boost matches the raw query or its meaningful words, so a long exact page enters the pool.
   const wanted = contentTerms(raw).join(" ");
   params.push(raw, wanted, Math.max(limit, 50));
-  const pool = db
-    .prepare(
-      `SELECT ${ROW}
-       FROM entities_fts JOIN entities e ON e.id = entities_fts.rowid
-       WHERE ${conds.join(" AND ")}
-       ORDER BY CASE WHEN e.name = ? COLLATE NOCASE OR e.name = ? COLLATE NOCASE THEN 0 ELSE 1 END,
-         bm25(entities_fts, 10.0, 1.0), e.id
-       LIMIT ?`,
-    )
-    .all(...params) as SearchHit[];
+  const pool = await db.all<SearchHit>(
+    `SELECT ${ROW}
+     FROM entities_fts JOIN entities e ON e.id = entities_fts.rowid
+     WHERE ${conds.join(" AND ")}
+     ORDER BY CASE WHEN e.name = ? COLLATE NOCASE OR e.name = ? COLLATE NOCASE THEN 0 ELSE 1 END,
+       bm25(entities_fts, 10.0, 1.0), e.id
+     LIMIT ?`,
+    ...params,
+  );
   // The page being asked about: first a name made of exactly the asked words ("Thrall"), then a name
   // that matches only once its stopwords are dropped ("Find Thrall!"), then everything else.
   // Names that match only after punctuation is stripped ("Kel'Thuzad" for "kel thuzad") get no SQL
@@ -187,18 +187,16 @@ export function search(db: DB, query: string, limit = 10, opts: SearchOptions = 
   const asked = allTerms(raw);
   const exact: SearchHit[] = pool.some((h) => allTerms(h.name) === wanted)
     ? []
-    : (() => {
-        const exactConds = [`${nameNormSql(db)} IN (?, ?)`];
+    : await (async () => {
+        const exactConds = [`${await nameNormSql(db)} IN (?, ?)`];
         const exactParams: unknown[] = [wanted, asked];
         pushOptionFilters(exactConds, exactParams, opts);
-        return db
-          .prepare(`SELECT ${ROW_EXACT} FROM entities e WHERE ${exactConds.join(" AND ")} LIMIT 10`)
-          .all(...exactParams) as SearchHit[];
+        return db.all<SearchHit>(`SELECT ${ROW_EXACT} FROM entities e WHERE ${exactConds.join(" AND ")} LIMIT 10`, ...exactParams);
       })();
   const seen = new Set(pool.map((h) => h.id));
   // A short form names its page outright: "BRD entrance" is about Blackrock Depths before any page that
   // mentions the words. The expanded names' own pages lead, whatever the body text ranks.
-  const named = expanded.length ? pagesNamed(db, expanded, opts) : [];
+  const named = expanded.length ? await pagesNamed(db, expanded, opts) : [];
   for (const h of named) seen.add(h.id);
   const merged = [...named, ...exact.filter((h) => !seen.has(h.id) && [wanted, asked].includes(allTerms(h.name))), ...pool.filter((h) => !named.some((n) => n.id === h.id))];
   const rank = (hit: SearchHit) => (allTerms(hit.name) === wanted ? 0 : contentTerms(hit.name).join(" ") === wanted ? 1 : 2);
@@ -211,13 +209,13 @@ export function search(db: DB, query: string, limit = 10, opts: SearchOptions = 
 }
 
 /** The pages whose title is one of `names` (by normalized name), in the names' order; at most 2 per name. */
-function pagesNamed(db: DB, names: readonly string[], opts: SearchOptions): SearchHit[] {
+async function pagesNamed(db: ReleaseDb, names: readonly string[], opts: SearchOptions): Promise<SearchHit[]> {
   const out: SearchHit[] = [];
   for (const name of names) {
-    const conds = [`${nameNormSql(db)} = ?`];
+    const conds = [`${await nameNormSql(db)} = ?`];
     const params: unknown[] = [allTerms(name)];
     pushOptionFilters(conds, params, opts);
-    out.push(...(db.prepare(`SELECT ${ROW_EXACT} FROM entities e WHERE ${conds.join(" AND ")} ORDER BY e.id LIMIT 2`).all(...params) as SearchHit[]));
+    out.push(...(await db.all<SearchHit>(`SELECT ${ROW_EXACT} FROM entities e WHERE ${conds.join(" AND ")} ORDER BY e.id LIMIT 2`, ...params)));
   }
   return out;
 }
@@ -230,7 +228,7 @@ export const SOME_WORDS = "No page has every word you asked for. Pages with some
  * any of them, those with more of the asked words first, then bm25. Empty for a one-word query, where any
  * word is every word, so `search` has already said all there is. Pick words ("best") are left out.
  */
-export function searchSomeWords(db: DB, query: string, limit = 10, opts: SearchOptions = {}): SearchHit[] {
+export async function searchSomeWords(source: ReleaseSource, query: string, limit = 10, opts: SearchOptions = {}): Promise<SearchHit[]> {
   const asked = [...new Set(contentTerms(expandAliases(query.trim()).text))];
   const terms = asked.filter((t) => !PICK_WORDS.has(t));
   // One word is a new search only when a pick word was dropped from beside it ("best gnome").
@@ -239,15 +237,14 @@ export function searchSomeWords(db: DB, query: string, limit = 10, opts: SearchO
   const params: unknown[] = [terms.map((t) => `"${t}"`).join(" OR ")];
   pushOptionFilters(conds, params, opts);
   params.push(Math.max(limit, RERANK));
-  const pool = db
-    .prepare(
-      `SELECT ${ROW}, e.name || ' ' || e.body AS words
-       FROM entities_fts JOIN entities e ON e.id = entities_fts.rowid
-       WHERE ${conds.join(" AND ")}
-       ORDER BY bm25(entities_fts, 10.0, 1.0), e.id
-       LIMIT ?`,
-    )
-    .all(...params) as (SearchHit & { words: string })[];
+  const pool = await releaseDb(source).all<SearchHit & { words: string }>(
+    `SELECT ${ROW}, e.name || ' ' || e.body AS words
+     FROM entities_fts JOIN entities e ON e.id = entities_fts.rowid
+     WHERE ${conds.join(" AND ")}
+     ORDER BY bm25(entities_fts, 10.0, 1.0), e.id
+     LIMIT ?`,
+    ...params,
+  );
   const count = (words: string) => {
     const has = new Set(allTerms(words).split(" "));
     return terms.filter((t) => has.has(t)).length;
@@ -292,34 +289,33 @@ function toHit(r: EntityRow): SearchHit {
 }
 
 /** One row by id, for page rendering and the MCP server. Unknown id gives undefined. */
-export function getEntity(db: DB, id: number): SearchHit | undefined {
-  const r = db.prepare(`SELECT ${ROW_BY_ID} FROM entities WHERE id = ?`).get(id) as EntityRow | undefined;
+export async function getEntity(source: ReleaseSource, id: number): Promise<SearchHit | undefined> {
+  const r = await releaseDb(source).get<EntityRow>(`SELECT ${ROW_BY_ID} FROM entities WHERE id = ?`, id);
   return r ? toHit(r) : undefined;
 }
 
 /** One row by id with its whole body, for the fetch tool. Unknown id gives undefined. */
-export function getDocument(db: DB, id: number): (SearchHit & { body: string }) | undefined {
-  const r = db.prepare(`SELECT ${ROW_BY_ID} FROM entities WHERE id = ?`).get(id) as EntityRow | undefined;
+export async function getDocument(source: ReleaseSource, id: number): Promise<(SearchHit & { body: string }) | undefined> {
+  const r = await releaseDb(source).get<EntityRow>(`SELECT ${ROW_BY_ID} FROM entities WHERE id = ?`, id);
   return r ? { ...toHit(r), body: r.body } : undefined;
 }
 
 /** Exact full-name match (case-insensitive), optionally narrowed to one kind. */
-export function getByName(db: DB, name: string, kind?: Kind): SearchHit[] {
+export async function getByName(source: ReleaseSource, name: string, kind?: Kind): Promise<SearchHit[]> {
+  const db = releaseDb(source);
   const cond = kind ? "AND kind = ?" : "";
-  const exact = (n: string) => {
+  const exact = async (n: string) => {
     const params = kind ? [n, kind] : [n];
-    const rows = db
-      .prepare(`SELECT ${ROW_BY_ID} FROM entities WHERE name = ? COLLATE NOCASE ${cond} ORDER BY id`)
-      .all(...params) as EntityRow[];
+    const rows = await db.all<EntityRow>(`SELECT ${ROW_BY_ID} FROM entities WHERE name = ? COLLATE NOCASE ${cond} ORDER BY id`, ...params);
     return rows.map(toHit);
   };
   const asked = name.trim();
-  const hits = exact(asked);
+  const hits = await exact(asked);
   if (hits.length || !asked) return hits;
   // The name as players shorten it ("MC"), then with its article the other way round ("The Barrens" / "Barrens").
   const alias = NAME_ALIASES[asked.toLowerCase()];
-  if (alias) { const found = exact(alias); if (found.length) return found; }
+  if (alias) { const found = await exact(alias); if (found.length) return found; }
   const bare = withoutArticle(asked);
-  for (const variant of bare === asked ? [`The ${asked}`] : [bare]) { const found = exact(variant); if (found.length) return found; }
+  for (const variant of bare === asked ? [`The ${asked}`] : [bare]) { const found = await exact(variant); if (found.length) return found; }
   return [];
 }

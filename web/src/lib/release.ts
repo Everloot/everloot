@@ -1,5 +1,7 @@
 import { join } from "node:path";
-import { openPublicSnapshot, type PublicSnapshot } from "../../../kb/src/public-snapshot";
+import { openPublicSnapshot } from "../../../kb/src/public-snapshot";
+import { sqliteReleaseDb, type ReleaseDb } from "../../../kb/src/release-db";
+import type { Manifest } from "../../../kb/src/snapshot";
 
 /**
  * The approved knowledge release, opened once per instance and shared by the MCP mounts and the
@@ -11,16 +13,22 @@ export function releasePath(): string {
   return process.env.KB_SNAPSHOT_PATH?.trim() || join(process.cwd(), ".release", "2026-10-05-everloot-public.sqlite");
 }
 
-let handle: PublicSnapshot | null = null;
+export interface Release {
+  db: ReleaseDb;
+  manifest: Manifest;
+}
+
+let handle: Release | null = null;
 let failedAt = 0;
 /** After a failed open (which hashes the whole file), wait this long before trying again. */
 export const RETRY_AFTER_MS = 60_000;
 
-export function getRelease(): PublicSnapshot | null {
+export async function getRelease(): Promise<Release | null> {
   if (handle) return handle;
   if (failedAt && Date.now() - failedAt < RETRY_AFTER_MS) return null;
   try {
-    handle = openPublicSnapshot(releasePath());
+    const file = openPublicSnapshot(releasePath());
+    handle = { db: sqliteReleaseDb(file.db), manifest: file.manifest };
     failedAt = 0;
   } catch (err) {
     failedAt = Date.now();

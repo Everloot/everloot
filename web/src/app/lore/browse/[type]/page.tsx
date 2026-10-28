@@ -60,9 +60,9 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   const slug = slugOf(type);
   const letter = letterOf(query);
   if (!slug || letter === undefined) return { robots: { index: false, follow: true } };
-  const typed = hasTypes();
+  const typed = await hasTypes();
   const clean = Object.keys(filtersOf(query)).length === 0 && !query.page;
-  const letters = typed === true && letter !== null ? lettersWithRows(BROWSE_TYPES[slug]) : null;
+  const letters = typed === true && letter !== null ? await lettersWithRows(BROWSE_TYPES[slug]) : null;
   const emptyLetter = letter !== null && letters !== null && letters !== UNAVAILABLE && !letters.includes(letter);
   return {
     ...pageMetadata({
@@ -83,7 +83,7 @@ export default async function BrowsePage(props: Props) {
   if (letter === undefined) notFound();
   const heading = BROWSE_HEADINGS[slug];
   const trail = trailFor(`/lore/${slug}`)!;
-  const typed = hasTypes();
+  const typed = await hasTypes();
 
   if (typed === UNAVAILABLE) {
     return (
@@ -115,8 +115,8 @@ export default async function BrowsePage(props: Props) {
   const storedType = BROWSE_TYPES[slug];
   const filters = filtersOf(query);
   const page = pageNumber(query.page);
-  const result = browse(storedType, letter, filters, page);
-  const values = facetValues(storedType);
+  const result = await browse(storedType, letter, filters, page);
+  const values = await facetValues(storedType);
   if (result === UNAVAILABLE || values === UNAVAILABLE) {
     return (
       <Container width="reading">

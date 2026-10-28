@@ -45,37 +45,37 @@ async function seed() {
 }
 
 test("search handler answers questions and shows provenance", async () => {
-  const text = handleSearch(await seed(), { query: "where is Thunderfury", limit: 8 });
+  const text = await handleSearch(await seed(), { query: "where is Thunderfury", limit: 8 });
   expect(text).toContain("Thunderfury");
   expect(text).toContain("https://example.test/1");
   expect(text).toContain("CC-BY-SA-4.0");
 });
 
 test("search handler says so when nothing matches", async () => {
-  expect(handleSearch(await seed(), { query: "xyznothinghere", limit: 8 })).toContain("No matches");
+  expect(await handleSearch(await seed(), { query: "xyznothinghere", limit: 8 })).toContain("No matches");
 });
 
 test("search handler falls back to pages with some of the words, and says so first", async () => {
   // Found live: "whats the best racial class for warlock on horde" matched no page, so the chat had nothing.
   const db = await seed();
-  const text = handleSearch(db, { query: "best sword Thunderfury", limit: 8 });
+  const text = await handleSearch(db, { query: "best sword Thunderfury", limit: 8 });
   expect(text.startsWith(SOME_WORDS)).toBe(true);
   expect(text).toContain("Thunderfury, Blessed Blade");
-  expect(searchHits(db, { query: "best sword Thunderfury", limit: 8 }).map((h) => h.name)[0]).toBe("Thunderfury, Blessed Blade");
-  expect(handleSearch(db, { query: "Thunderfury", limit: 8 })).not.toContain(SOME_WORDS);
+  expect((await searchHits(db, { query: "best sword Thunderfury", limit: 8 })).map((h) => h.name)[0]).toBe("Thunderfury, Blessed Blade");
+  expect(await handleSearch(db, { query: "Thunderfury", limit: 8 })).not.toContain(SOME_WORDS);
 });
 
 test("get_entity handler returns the row or names the missing id", async () => {
   const db = await seed();
-  const [first] = (await import("../src/search.js")).search(db, "Thunderfury");
-  expect(handleGetEntity(db, { id: first.id })).toContain("Thunderfury");
-  expect(handleGetEntity(db, { id: -1 })).toContain("-1");
+  const [first] = await (await import("../src/search.js")).search(db, "Thunderfury");
+  expect(await handleGetEntity(db, { id: first.id })).toContain("Thunderfury");
+  expect(await handleGetEntity(db, { id: -1 })).toContain("-1");
 });
 
 test("get_by_name handler matches exactly and suggests search otherwise", async () => {
   const db = await seed();
-  expect(handleGetByName(db, { name: "thunderfury" })).toContain("[lore_page/lore] Thunderfury");
-  expect(handleGetByName(db, { name: "Thunderfury", kind: "npc" })).toContain("search_knowledge");
+  expect(await handleGetByName(db, { name: "thunderfury" })).toContain("[lore_page/lore] Thunderfury");
+  expect(await handleGetByName(db, { name: "Thunderfury", kind: "npc" })).toContain("search_knowledge");
 });
 
 test("unset uploads are not an empty corpus", () => {

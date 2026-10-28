@@ -37,7 +37,7 @@ function facts(): AnswerSourcesFacts {
 }
 
 test("observed facts come first with install counts, then lore; every piece has a source URL and a licence", async () => {
-  const result = answerSources(await seed(), { question: "Where does Peacebloom drop, and who is Thrall?", limit: 8 }, facts(), "2026-10-18T10:00:00Z");
+  const result = await answerSources(await seed(), { question: "Where does Peacebloom drop, and who is Thrall?", limit: 8 }, facts(), "2026-10-18T10:00:00Z");
   const kinds = result.evidence.map((e) => e.kind);
   expect(kinds.indexOf("observed")).toBe(0);
   expect(kinds).toContain("curated");
@@ -59,7 +59,7 @@ test("observed facts come first with install counts, then lore; every piece has 
 });
 
 test("a known NPC name gives its agreed position; a name that only part of a word matches is left alone", async () => {
-  const result = answerSources(await seed(), { question: "Where is the Forest Spider? Not the Spiderling.", limit: 5 }, facts(), null);
+  const result = await answerSources(await seed(), { question: "Where is the Forest Spider? Not the Spiderling.", limit: 5 }, facts(), null);
   const pin = result.evidence.find((e) => e.claim.startsWith("Forest Spider was seen"))!;
   expect(pin).toMatchObject({ kind: "observed", support: 3, source: { url: "https://everloot.app/database/npcs/456" } });
   expect(pin.claim).toContain("map 141 at 41, 61");
@@ -67,21 +67,21 @@ test("a known NPC name gives its agreed position; a name that only part of a wor
 });
 
 test("nothing found is said plainly, never invented; without the corpus, lore still answers and the text says observations are unrecorded", async () => {
-  const empty = answerSources(await seed(), { question: "xyzzy plugh", limit: 8 }, facts(), null);
+  const empty = await answerSources(await seed(), { question: "xyzzy plugh", limit: 8 }, facts(), null);
   expect(empty.evidence).toEqual([]);
   expect(formatAnswerSources(empty, true)).toContain("No evidence found");
-  const loreOnly = answerSources(await seed(), { question: "Who is Thrall?", limit: 8 }, null, null);
+  const loreOnly = await answerSources(await seed(), { question: "Who is Thrall?", limit: 8 }, null, null);
   expect(loreOnly.evidence.map((e) => e.kind)).toEqual(["curated", "lore"]);
   expect(formatAnswerSources(loreOnly, false)).toContain("not connected here, so the observed layer is unrecorded, not empty");
 });
 
 test("a question no page answers in full gets the pages with some of its words, and the text says so first", async () => {
   // Found live: "whats the best racial class for warlock on horde" gave "No evidence found".
-  const some = answerSources(await seed(), { question: "whats the best warchief for horde mains", limit: 8 }, null, null);
+  const some = await answerSources(await seed(), { question: "whats the best warchief for horde mains", limit: 8 }, null, null);
   expect(some.someWords).toBe(true);
   expect(some.evidence.map((e) => e.source.url)).toContain("https://example.test/thrall");
   expect(formatAnswerSources(some, false).startsWith(SOME_WORDS)).toBe(true);
-  const full = answerSources(await seed(), { question: "Who is Thrall?", limit: 8 }, null, null);
+  const full = await answerSources(await seed(), { question: "Who is Thrall?", limit: 8 }, null, null);
   expect(full.someWords).toBeUndefined();
   expect(formatAnswerSources(full, false)).not.toContain(SOME_WORDS);
 });

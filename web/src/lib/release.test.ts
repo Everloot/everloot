@@ -33,8 +33,8 @@ async function load(path: string) {
 
 test("getRelease returns the same open handle twice", async () => {
   const { getRelease } = await load(release);
-  const a = getRelease();
-  const b = getRelease();
+  const a = await getRelease();
+  const b = await getRelease();
   expect(a).not.toBeNull();
   expect(a).toBe(b);
   expect(a?.manifest.counts.curated).toBe(1);
@@ -43,8 +43,8 @@ test("getRelease returns the same open handle twice", async () => {
 test("a missing release is null and logged once", async () => {
   const error = vi.spyOn(console, "error").mockImplementation(() => {});
   const { getRelease } = await load(join(tmpdir(), "no-such-release.sqlite"));
-  expect(getRelease()).toBeNull();
-  expect(getRelease()).toBeNull();
+  expect(await getRelease()).toBeNull();
+  expect(await getRelease()).toBeNull();
   expect(error).toHaveBeenCalledTimes(1);
   expect(error.mock.calls[0][0]).toBe("[release] knowledge release unavailable");
 });
@@ -54,11 +54,11 @@ test("after a failed open the release is not re-hashed for 60 seconds", async ()
   vi.setSystemTime(new Date("2026-10-15T12:00:00Z"));
   const error = vi.spyOn(console, "error").mockImplementation(() => {});
   const { getRelease } = await load(join(tmpdir(), "no-such-release.sqlite"));
-  expect(getRelease()).toBeNull();
-  expect(getRelease()).toBeNull();
+  expect(await getRelease()).toBeNull();
+  expect(await getRelease()).toBeNull();
   expect(error).toHaveBeenCalledTimes(1);
   vi.setSystemTime(new Date("2026-10-15T12:01:01Z"));
-  expect(getRelease()).toBeNull();
+  expect(await getRelease()).toBeNull();
   expect(error).toHaveBeenCalledTimes(2);
   vi.useRealTimers();
 });
@@ -67,3 +67,4 @@ test("releasePath falls back to the bundled release when the env var is blank", 
   const { releasePath } = await load("  ");
   expect(releasePath()).toBe(join(process.cwd(), ".release", "2026-10-05-everloot-public.sqlite"));
 });
+

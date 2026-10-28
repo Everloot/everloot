@@ -81,16 +81,16 @@ test("world_map_near drops entrance confirmations the scope withholds", () => {
   if (unscoped.ok) expect(unscoped.entrances[0]?.confirmed).toBe(3);
 });
 
-const answer = (recheck?: readonly RecheckScope[]) => answerSources(
+const answer = async (recheck?: readonly RecheckScope[]) => (await answerSources(
   { prepare: () => ({ all: () => [] }) } as unknown as DB,
   { question: "Where is Hogger?", limit: 5 },
   answerSourcesFactsFromRecords(rows, recheck ?? []),
   capturedAt,
-).evidence;
+)).evidence;
 
-test("answer_sources does not cite an NPC name the scope withholds", () => {
-  expect(answer([{ since: "2026-09-15T00:00:00.000Z", source: "blue-post test", ids: [42] }]).some((e) => e.claim.includes("Hogger"))).toBe(false);
-  expect(answer().some((e) => e.claim.includes("Hogger"))).toBe(true);
+test("answer_sources does not cite an NPC name the scope withholds", async () => {
+  expect((await answer([{ since: "2026-09-15T00:00:00.000Z", source: "blue-post test", ids: [42] }])).some((e) => e.claim.includes("Hogger"))).toBe(false);
+  expect((await answer()).some((e) => e.claim.includes("Hogger"))).toBe(true);
 });
 
 const callRelations = (recheck?: readonly RecheckScope[]) => createToolHandlers({} as DB, {
