@@ -111,6 +111,11 @@ test("when the old addon cannot be put back either, both copies stay on disk and
   expect(readFileSync(join(`${target}.old`, "core.lua"), "utf8")).toBe("-- old core");
   expect(readFileSync(join(`${target}.new`, "core.lua"), "utf8")).toBe("-- core");
   expect(readFileSync(save, "utf8")).toBe("EverlootDB = {}\n");
+  // A later click must not remove the only recoverable old installation.
+  vi.mocked(renameSync).mockImplementation(realRename);
+  expect(() => extractAddon(goodZip("0.3.4"), addons)).toThrow(/Everloot\.old/);
+  expect(readFileSync(join(`${target}.old`, "core.lua"), "utf8")).toBe("-- old core");
+  expect(readFileSync(join(`${target}.new`, "Everloot.toc"), "utf8")).toContain("0.3.3");
 });
 
 test("a first install that cannot move the new folder into place fails and leaves no addon folder behind", () => {

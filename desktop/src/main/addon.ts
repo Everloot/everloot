@@ -79,6 +79,9 @@ export function extractAddon(zip: Uint8Array, addonsDir: string): number {
   if (entries.length === 0) throw new Error("the zip holds no Everloot/ files");
   if (!entries.some(([name]) => name === `${ADDON_FOLDER}/${ADDON_FOLDER}.toc`)) throw new Error("the zip has no Everloot.toc");
   const target = join(addonsDir, ADDON_FOLDER), fresh = `${target}.new`, old = `${target}.old`;
+  if (!existsSync(target) && existsSync(old)) {
+    throw new Error(`A previous addon install needs recovery. Rename ${old} to ${target} before trying again; the saved copies have been kept.`);
+  }
   rmSync(fresh, { recursive: true, force: true });
   rmSync(old, { recursive: true, force: true });
   for (const [name, data] of entries) {
@@ -94,7 +97,7 @@ export function extractAddon(zip: Uint8Array, addonsDir: string): number {
     if (!hadOld) throw err;
     const why = err instanceof Error ? err.message : String(err);
     try { renameSync(old, target); }
-    catch { throw new Error(`${why}; the old addon could not be put back: it is in ${old}, the new one in ${fresh}. Rename one of them to ${ADDON_FOLDER}.`); }
+    catch { throw new Error(`${why}; the old addon could not be put back: it is in ${old}, the new one in ${fresh}. Rename ${old} to ${target} before trying again.`); }
     throw err;
   }
   rmSync(old, { recursive: true, force: true });
