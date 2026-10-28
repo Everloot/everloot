@@ -446,7 +446,17 @@ describe("saving", () => {
     await open();
     await choose("Save Frost to your account", { Frost: "private" });
     await choose("Save Fire to your account", { Fire: "shared" });
+    // Digest completion is host I/O, not a fixed number of browser timer ticks.
+    const digest = crypto.subtle.digest.bind(crypto.subtle);
+    let releaseDigest!: () => void;
+    const pendingDigest = new Promise<void>((resolve) => { releaseDigest = resolve; });
+    vi.spyOn(crypto.subtle, "digest").mockImplementationOnce(async (algorithm, data) => {
+      await pendingDigest;
+      return digest(algorithm, data);
+    });
     await click(saveButton());
+    releaseDigest();
+    await pump(() => text().includes("Saved 2 plans to your account."), "both chosen plans to finish saving");
     expect(posts.map((p) => [p.url, p.owner, p.as])).toEqual([["/api/me/builds", A_ID, A_ID], ["/api/me/builds", A_ID, A_ID]]);
     // Only the plan's own fields, its orders as they were kept here, and the sharing the player chose: no addon file,
     // no alt details, nothing that names this browser's plans.
