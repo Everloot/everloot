@@ -1,0 +1,57 @@
+name: Site health
+# Every 15 minutes, asks https://everloot.app/api/health (the snapshot cron's freshness and the corpus store). A
+# failure opens one issue labelled site-down, or comments on the open one; the next good check closes it. It is the
+# outside check the host's own dashboards do not give, whichever host serves the site.
+on:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: site-health
+  cancel-in-progress: false
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ask the site
+        id: health
+        run: |
+          set +e
+          body=$(curl -sS --max-time 30 -w '\n%{http_code}' https://everloot.app/api/health)
+          code=$(printf '%s' "$body" | tail -n1)
+          printf 'status %s\n%s\n' "$code" "$(printf '%s' "$body" | head -n -1 | head -c 500)"
+          {
+            echo "code=$code"
+            echo "body<<EOF"
+            printf '%s' "$body" | head -n -1 | head -c 500
+            echo
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+      - name: Open or update the site-down issue
+        if: steps.health.outputs.code != '200'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CODE: ${{ steps.health.outputs.code }}
+          BODY: ${{ steps.health.outputs.body }}
+        run: |
+          gh label create site-down --repo "$GITHUB_REPOSITORY" --color B60205 --description "everloot.app failed its health check" 2>/dev/null || true
+          open=$(gh issue list --repo "$GITHUB_REPOSITORY" --label site-down --state open --json number --jq '.[0].number')
+          note=$(printf 'Health check at %s: HTTP %s\n\n```\n%s\n```\n\nRun: %s/%s/actions/runs/%s' "$(date -u +%FT%TZ)" "$CODE" "$BODY" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --repo "$GITHUB_REPOSITORY" --body "$note"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --label site-down --title "everloot.app health check failing (HTTP $CODE)" --body "$note"
+          fi
+          exit 1
+      - name: Close the site-down issue once healthy
+        if: steps.health.outputs.code == '200'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for n in $(gh issue list --repo "$GITHUB_REPOSITORY" --label site-down --state open --json number --jq '.[].number'); do
+            gh issue close "$n" --repo "$GITHUB_REPOSITORY" --comment "Healthy again at $(date -u +%FT%TZ)."
+          done

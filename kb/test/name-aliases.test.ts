@@ -51,18 +51,18 @@ async function seed() {
 
 test("search: a question with a short form finds the page the long name has; the eval's alias questions resolve", async () => {
   const db = await seed();
-  expect(search(db, "where is MC", 3)[0]?.name).toBe("Molten Core");
-  expect(search(db, "where is STV", 3)[0]?.name).toBe("Stranglethorn Vale");
+  expect((await search(db, "where is MC", 3))[0]?.name).toBe("Molten Core");
+  expect((await search(db, "where is STV", 3))[0]?.name).toBe("Stranglethorn Vale");
   // A lower-case word that is also a real word is left alone in a longer question.
-  expect(search(db, "the stockade under the keep", 3)).toEqual([]);
+  expect(await search(db, "the stockade under the keep", 3)).toEqual([]);
   // The long form still works exactly as before.
-  expect(search(db, "where is Molten Core", 3)[0]?.name).toBe("Molten Core");
+  expect((await search(db, "where is Molten Core", 3))[0]?.name).toBe("Molten Core");
 });
 
 test("getByName: the exact name first, then the short form's name, then the name with or without its article", async () => {
   const db = await seed();
-  expect(getByName(db, "Molten Core").map((h) => h.name)).toEqual(["Molten Core"]);
-  expect(getByName(db, "MC").map((h) => h.name)).toEqual(["Molten Core"]);
-  expect(getByName(db, "The Barrens").map((h) => h.name)).toEqual(["Barrens"]);
-  expect(getByName(db, "Nowhere").map((h) => h.name)).toEqual([]);
+  expect((await getByName(db, "Molten Core")).map((h) => h.name)).toEqual(["Molten Core"]);
+  expect((await getByName(db, "MC")).map((h) => h.name)).toEqual(["Molten Core"]);
+  expect((await getByName(db, "The Barrens")).map((h) => h.name)).toEqual(["Barrens"]);
+  expect((await getByName(db, "Nowhere")).map((h) => h.name)).toEqual([]);
 });

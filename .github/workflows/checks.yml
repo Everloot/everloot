@@ -33,6 +33,17 @@ jobs:
         run: python scripts/test_check_changes_files.py
       - name: The Discord bridge maps posts, issues and feeds correctly
         run: python scripts/test_discord_bridge.py
+      # Game data for a new build blanks every item name until that build's asset folder is uploaded, so a pull
+      # request that changes the client layer waits for the folder. Other pull requests skip the network call.
+      - name: New game data has its asset folder uploaded
+        if: github.event_name == 'pull_request'
+        run: |
+          python scripts/test_check_asset_folder.py
+          if git diff --quiet "origin/${{ github.base_ref }}" HEAD -- web/src/data/game-data/client-layer.json; then
+            echo "The client layer is unchanged."
+          else
+            python scripts/check_asset_folder.py
+          fi
       - name: Every commit is signed off (DCO)
         if: github.event_name == 'pull_request'
         run: python scripts/test_check_dco.py && python scripts/check_dco.py "origin/${{ github.base_ref }}" HEAD

@@ -13,7 +13,7 @@ import LoreSource from "@/components/LoreSource";
 export const revalidate = 86400;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const available = getRelease() !== null;
+  const available = (await getRelease()) !== null;
   return {
     ...pageMetadata({
       title: available ? "Lore archive coverage" : "Lore archive unavailable",
@@ -34,8 +34,8 @@ const link = "text-fg underline decoration-edge underline-offset-4 hover:decorat
 type TypeRow = { key: string; heading: string; href?: string; n: number };
 
 export default async function CoveragePage() {
-  const release = getRelease();
-  const summary = coverage();
+  const release = await getRelease();
+  const summary = await coverage();
   const trail = trailFor("/lore/coverage")!;
   if (!release || summary === UNAVAILABLE) {
     noStore();

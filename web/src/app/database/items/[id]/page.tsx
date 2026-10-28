@@ -17,6 +17,7 @@ import { categoryOf } from "../../../../../../kb/src/item-taxonomy";
 import { edgesFrom, evidenceLabel, type Edge, type Rel } from "../../../../../../kb/src/edges";
 import { CLIENT_LAYER, CLIENT_TAXONOMY, itemsHref, shownItemName, subclassLabel as labelOf } from "@/lib/items";
 import { FACT_WORD, tipLines, withReported } from "@/lib/item-names";
+import { PLACEHOLDER, splitWhy } from "@/lib/placeholder";
 import type { Crumb } from "@/lib/jsonld";
 import { loadNames, nameOf } from "@/lib/names";
 import { loreForEntity } from "@/lib/lore";
@@ -107,7 +108,7 @@ export default async function ItemPage(props: Props) {
   const quality = category?.quality && category.quality.id <= 5 ? qualityOf(category.quality.id) : undefined;
   const names = await loadNames();
   const nameFor = nameOf(names);
-  const lore = seen && page.name ? loreForEntity("item", page.name) : null;
+  const lore = seen && page.name ? await loreForEntity("item", page.name) : null;
 
   const all = edgesFrom([...edges.observed, ...edges.client], "item", itemId);
   const rel = (r: Rel) => all.filter((e) => e.rel === r);
@@ -215,6 +216,10 @@ export default async function ItemPage(props: Props) {
   const tooltipLines = tip
     ? tipLines(tip)
     : [category?.subclass?.name ?? category?.class?.label, category?.slot?.name].filter((l): l is string => Boolean(l));
+  // As the hover card shows it: the reasons for a [?] go under the box, not inside the game's tooltip.
+  const tipWhy = tip ? splitWhy(tip.why) : { reasons: [], evidence: [] };
+  const boxLines = tip ? [...tip.lines, ...tipWhy.evidence] : tooltipLines;
+  const boxNotes = tip && tip.lines.some((line) => line.includes(PLACEHOLDER)) ? tipWhy.reasons : [];
   // The quality colour only where the name is shown from players or the wiki: an id nobody reported stays plain.
   const shownQuality = name ? quality : undefined;
   // As the lists label it: no "(OBSOLETE)" suffix and no "Subclass 0".
@@ -243,7 +248,7 @@ export default async function ItemPage(props: Props) {
     ...(category ? [
       { label: "Class", value: category.class ? <Link href={itemsHref(category.class.slug)} className={LINK}>{category.class.label}</Link> : known(null) },
       { label: "Subclass", value: category.class && category.subclass ? <Link href={itemsHref(category.class.slug, category.subclass.slug)} className={LINK}>{subclassLabel}</Link> : known(null) },
-      { label: "Slot", value: category.slot?.name ?? "None" },
+      { label: "Slot", value: category.slot?.name ?? "—" },
       { label: "Quality", value: category.quality ? <span className={shownQuality ? QUALITY_TEXT[shownQuality] : undefined}>{category.quality.name}</span> : known(null) },
     ] : [{ label: "Game files", value: "Not found" }]),
     ...(facts.unreachable ? [] : [
@@ -269,9 +274,16 @@ export default async function ItemPage(props: Props) {
         )}
         <EntityTop
           box={
-            <TooltipFrame name={tip?.name ?? title} quality={tip ? quality : undefined} label={`${tip?.name ?? title}, from the game files`}>
-              {tooltipLines.map((line, i) => <p key={i}>{line}</p>)}
-            </TooltipFrame>
+            <>
+              <TooltipFrame name={tip?.name ?? title} quality={tip ? quality : undefined} label={`${tip?.name ?? title}, from the game files`}>
+                {boxLines.map((line, i) => <p key={i}>{line}</p>)}
+              </TooltipFrame>
+              {boxNotes.length > 0 && (
+                <div data-card-notes className="mt-1 space-y-0.5 rounded-[4px] border border-line bg-panel px-2 py-1 text-xs text-muted">
+                  {boxNotes.map((note) => <p key={note}>{note}</p>)}
+                </div>
+              )}
+            </>
           }
           facts={<Facts layout="list" label={`${title}: quick facts`} items={quickFacts} />}
         />

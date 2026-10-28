@@ -376,7 +376,7 @@ async function main(): Promise<number> {
       return 0;
     }
     case "search":
-      for (const h of search(openExistingReadOnlyDb(requireDbPath(flags, "search")), args.join(" ")))
+      for (const h of await search(openExistingReadOnlyDb(requireDbPath(flags, "search")), args.join(" ")))
         console.log(`${h.kind}  ${h.name}\n  ${h.snippet}\n  ${h.sourceUrl} (${h.licence})`);
       return 0;
     case "serve-mcp": {
@@ -584,7 +584,7 @@ async function main(): Promise<number> {
       const facts = corpus ? answerSourcesFactsFromRecords(corpus.records) : null;
       const ranAt = new Date().toISOString();
       const files = readFilesIndex(flags.get("game-data") || "../web/src/data/game-data");
-      const report = evaluateBank(release, bank, facts, { release: basename(releasePath), dataAsOf: corpus?.dataAsOf ?? null, ranAt, files: files.facts.length ? files : null });
+      const report = await evaluateBank(release, bank, facts, { release: basename(releasePath), dataAsOf: corpus?.dataAsOf ?? null, ranAt, files: files.facts.length ? files : null });
       const out = flags.get("out") || `../docs/evals/question-eval-${ranAt.slice(0, 10)}.md`;
       mkdirSync(dirname(out), { recursive: true });
       writeFileSync(out, formatEvalReport(report));

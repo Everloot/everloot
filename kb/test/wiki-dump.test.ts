@@ -25,13 +25,13 @@ test("imports only main-namespace, non-redirect pages as lore_page rows", async 
     licence: "CC-BY-SA-4.0",
   });
   expect(JSON.parse(r.data).categories).toContain("Legendary items");
-  expect(search(db, "legendary sword")).toHaveLength(1);
+  expect(await search(db, "legendary sword")).toHaveLength(1);
 });
 
 test("reads a zstd-compressed dump the same way", async () => {
   const db = openDb(":memory:");
   expect(await importWikiDump(db, zstFixture)).toMatchObject({ stored: 1, skipped: 0 });
-  expect(search(db, "blessed blade")).toHaveLength(1);
+  expect(await search(db, "blessed blade")).toHaveLength(1);
 });
 
 test("re-import does not duplicate", async () => {

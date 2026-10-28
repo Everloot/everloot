@@ -82,12 +82,12 @@ test("answerSources: the files' facts come after curated and before lore, and a 
   const db = openDb(":memory:");
   await replaceSourceRows(db, "warcraft-wiki-2023", ["lore_page"], [row("stockade", "Synthetic Stockade", "The Synthetic Stockade is a dungeon under the keep.")]);
   const index = buildFilesIndex(files);
-  const result = answerSources(db, { question: "where is the Synthetic Stockade entrance", limit: 8 }, null, null, index);
+  const result = await answerSources(db, { question: "where is the Synthetic Stockade entrance", limit: 8 }, null, null, index);
   expect(result.evidence.map((e) => e.kind)).toEqual(["files", "files", "lore"]);
   // An achievement only the files know.
-  const only = answerSources(db, { question: "how do I get Storm the Chasm", limit: 8 }, null, null, index);
+  const only = await answerSources(db, { question: "how do I get Storm the Chasm", limit: 8 }, null, null, index);
   expect(only.evidence.map((e) => e.kind)).toEqual(["files"]);
   expect(only.evidence[0]!.url).toBe("https://everloot.app/database/achievements/49-storm-the-chasm");
   // Without an index nothing changes.
-  expect(answerSources(db, { question: "how do I get Storm the Chasm", limit: 8 }, null, null).evidence).toEqual([]);
+  expect((await answerSources(db, { question: "how do I get Storm the Chasm", limit: 8 }, null, null)).evidence).toEqual([]);
 });

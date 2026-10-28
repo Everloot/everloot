@@ -104,8 +104,9 @@ export function createAuth(options: {
       useSecureCookies: env.NODE_ENV === "production",
       database: { generateId: "uuid" },
       // Vercel sets x-vercel-forwarded-for to the one client address; x-forwarded-for is a fallback
-      // (Better Auth ignores it when it holds a chain).
-      ipAddress: { ipAddressHeaders: ["x-vercel-forwarded-for", "x-forwarded-for"] },
+      // (Better Auth ignores it when it holds a chain). On the Cloudflare Worker only cf-connecting-ip is
+      // read, so a caller cannot send a Vercel header in its place.
+      ipAddress: { ipAddressHeaders: env.EVERLOOT_PLATFORM === "cloudflare" ? ["cf-connecting-ip"] : ["x-vercel-forwarded-for", "x-forwarded-for"] },
     },
     rateLimit: {
       enabled: true,

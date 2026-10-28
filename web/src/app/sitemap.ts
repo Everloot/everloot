@@ -22,6 +22,11 @@ import { hasContent, publicZones, zoneContents, zoneHref } from "@/lib/zones";
 import { loadNews, newsSitemapPaths } from "@/lib/news";
 import { wikiSitemapPaths } from "@/lib/wiki";
 
+// Rendered per request, as the database and auctions sitemaps are: built ahead of time it reflects only what the
+// build could read (the Cloudflare build has no storage keys, so item names, zones and dungeons were missing).
+// next.config.js gives it an hour at the CDN, which the Worker's edge cache keeps too.
+export const dynamic = "force-dynamic";
+
 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://everloot.app";
 
 /**

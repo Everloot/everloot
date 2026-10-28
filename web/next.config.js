@@ -175,6 +175,10 @@ const nextConfig = {
       // The sitemap reads no cookies and rebuilds from kb on every request (about 4s cold), so the CDN keeps it an hour.
       // The database and auctions sitemaps set these on their own successful responses, so their 503s stay uncached.
       { source: "/sitemap.xml", headers: databaseItemsCdnHeaders },
+      // Two public API routes are prerendered, and Vercel adds `*` to prerendered responses on its own; the
+      // Cloudflare Worker does not, so it is set here for them, the same value on both hosts.
+      { source: "/api/items/categories", headers: [{ key: "Access-Control-Allow-Origin", value: "*" }] },
+      { source: "/api/edges/client-layer", headers: [{ key: "Access-Control-Allow-Origin", value: "*" }] },
       // The embeddable tooltip script other sites load: an hour in browsers and at the CDN, so a fix reaches them quickly.
       { source: "/tooltips.js", headers: [
         { key: "Cache-Control", value: "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400" },
