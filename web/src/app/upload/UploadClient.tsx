@@ -174,16 +174,17 @@ export default function UploadClient({ playerPages = false }: { playerPages?: bo
           Skipped {prepared.value.skipped.length.toLocaleString("en-US")} already settled: {prepared.value.skipped.length === 1 ? "this row repeats a fact" : "these rows repeat facts"} at least five installs agree on, with no other report for 14 days, so Everloot does not need {prepared.value.skipped.length === 1 ? "it" : "them"} again. {prepared.value.skipped.length === 1 ? "It stays" : "They stay"} in your file.
         </p>}
         <p className="mt-3 text-sm text-fg-2">{prepared.value.held.legacy} legacy records without event IDs, {prepared.value.held.named} unchecked named records, and {prepared.value.held.invalid} invalid records stay out of this upload. Keep your original file.</p>
-        <p className="mt-2 text-sm text-fg-2">{prepared.value.batches.length} batches. Only a confirmed storage receipt advances progress. Named choices are checked against the grant on the server.</p>
+        <p className="mt-2 text-sm text-fg-2">{prepared.value.batches.length} batches. A storage receipt confirms saved records. A batch rejected row by row is processed without saving its records, so later batches can continue. Named choices are checked against the grant on the server.</p>
         <button disabled={busy || !prepared.value.batches.length || complete} onClick={() => void send()} className={outlineButton + " mt-4"}>
-          {sending ? "Sending…" : complete ? "Upload complete" : session?.next ? "Resume upload" : "Send upload"}
+          {sending ? "Sending…" : complete ? rejected ? "Upload processed" : "Upload complete" : session?.next ? "Resume upload" : "Send upload"}
         </button>
       </Card>}
       {session && <div role="status"><Card className="text-sm text-fg-2">
-        <p className={complete ? "text-q-uncommon font-semibold" : "font-semibold"}>{complete ? "Upload processed — thank you." : error ? "Upload paused — keep your file." : "Uploading…"}</p>
-        <p className="mt-2">{session.next} of {session.batches.length} batches confirmed; {accepted} records saved{rejected ? `, ${rejected} records rejected` : ""}.</p>
-        <progress aria-label="Confirmed upload batches" value={session.next} max={session.batches.length} className="mt-3 w-full" />
-        {error && <p className="mt-2">Retry resumes at the first unconfirmed batch. Previously confirmed batches are retained.</p>}
+        <p className={complete && !rejected ? "text-q-uncommon font-semibold" : "font-semibold"}>{complete ? rejected ? "Upload processed with rejections — keep your file." : "Upload processed — thank you." : error ? "Upload paused — keep your file." : "Uploading…"}</p>
+        <p className="mt-2">{session.next} of {session.batches.length} batches processed; {accepted} records saved{rejected ? `, ${rejected} records rejected` : ""}.</p>
+        <progress aria-label="Processed upload batches" value={session.next} max={session.batches.length} className="mt-3 w-full" />
+        {error && <p className="mt-2">Retry resumes at the first unresolved batch. Previously processed batches are retained.</p>}
+        {!!rejected && <p className="mt-2">Rejected records were not saved. Keep your original file and check the reasons below before uploading them again.</p>}
         {!!rejected && <ul className="mt-2">{session.receipts.flatMap((receipt, batch) => (receipt.rejected ?? []).map((item) =>
           <li key={`${batch}-${item.index}`}>Batch {batch + 1}, record {item.index}: {item.reason}</li>))}</ul>}
       </Card></div>}
