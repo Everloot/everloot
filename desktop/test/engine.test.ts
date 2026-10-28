@@ -177,6 +177,103 @@ test("a failed upload is tried again a few times, then waits for the next write"
   expect(deps.upload).toHaveBeenCalledTimes(7);
 });
 
+/** The uploader's 429: its message, and the Retry-After it read (null when the header said nothing usable). */
+const limited = (retryAfterMs: number | null) => Object.assign(new Error("Upload rate limited. Keep your file and retry later."), { retryAfterMs });
+
+test("a 429 waits the site's own time: no other account, write, queued run or Upload now goes before it", async () => {
+  const { deps, settings, engine, changes, flush } = harness();
+  let refuse!: () => void;
+  deps.upload.mockImplementationOnce(() => new Promise<string>((_resolve, fail) => { refuse = () => fail(limited(120_000)); }));
+  engine.start({ ...settings, prices: false });
+  await flush();
+  void engine.runNow("upload"); // queued behind the run the site refuses
+  refuse();
+  await flush();
+  expect(deps.upload.mock.calls.map((c) => c[0])).toEqual(["A/Everloot.lua"]);
+  expect(engine.snapshot().jobs.upload).toMatchObject({ state: "error", message: expect.stringMatching(/rate limited/) });
+  expect(engine.snapshot().log.map((l) => l.text)).toContain("upload: the site asked to wait; trying again in 2 min");
+  changes.get("B/Everloot.lua")!();
+  await vi.advanceTimersByTimeAsync(5000);
+  await engine.runNow("upload");
+  expect(engine.snapshot().log.at(-1)?.text).toMatch(/^upload: the site asked to wait; trying again in 2 min$/);
+  await vi.advanceTimersByTimeAsync(114_999);
+  expect(deps.upload).toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(deps.upload.mock.calls.map((c) => c[0])).toEqual(["A/Everloot.lua", "A/Everloot.lua", "B/Everloot.lua"]);
+  expect(engine.snapshot().jobs.upload.state).toBe("ok");
+});
+
+test("a Retry-After past setTimeout's limit is still waited out, not run at once", async () => {
+  const { deps, settings, engine, changes, flush } = harness(["A/Everloot.lua"]);
+  deps.upload.mockRejectedValueOnce(limited(10 * 365 * 24 * 60 * 60_000));
+  engine.start({ ...settings, prices: false });
+  await flush();
+  changes.get("A/Everloot.lua")!();
+  await vi.advanceTimersByTimeAsync(2 ** 31 + 60_000);
+  expect(deps.upload).toHaveBeenCalledTimes(1);
+});
+
+test("a 429 with no usable wait falls back to the first retry and holds writes until then", async () => {
+  const { deps, settings, engine, changes, flush } = harness();
+  deps.upload.mockRejectedValueOnce(limited(null));
+  engine.start({ ...settings, prices: false });
+  await flush();
+  expect(deps.upload).toHaveBeenCalledTimes(1);
+  changes.get("A/Everloot.lua")!();
+  await vi.advanceTimersByTimeAsync(59_999);
+  expect(deps.upload).toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(deps.upload).toHaveBeenCalledTimes(3);
+});
+
+test("any other failure keeps the usual retries, tries every account and does not hold the next write", async () => {
+  const { deps, settings, engine, changes, flush } = harness();
+  deps.upload.mockRejectedValueOnce(new Error("Could not reach everloot.app. Keep your file and retry."));
+  engine.start({ ...settings, prices: false });
+  await flush();
+  expect(deps.upload).toHaveBeenCalledTimes(2);
+  expect(engine.snapshot().log.map((l) => l.text)).toContain("upload: trying again in 1 min");
+  changes.get("A/Everloot.lua")!();
+  await vi.advanceTimersByTimeAsync(5000);
+  expect(deps.upload).toHaveBeenCalledTimes(4);
+});
+
+test("the wait outlives a restart for the same site, not a switch to another site, and stop leaves no timer", async () => {
+  const { deps, settings, engine, flush } = harness(["A/Everloot.lua"]);
+  const s = { ...settings, prices: false };
+  deps.upload.mockRejectedValueOnce(limited(120_000));
+  engine.start(s);
+  await flush();
+  engine.start({ ...s, census: !s.census }); // a settings change, or a new account file found by the rescan
+  await flush();
+  expect(deps.upload).toHaveBeenCalledTimes(1);
+  engine.stop();
+  await vi.advanceTimersByTimeAsync(10 * 60_000);
+  expect(deps.upload).toHaveBeenCalledTimes(1);
+  deps.upload.mockRejectedValueOnce(limited(120_000));
+  engine.start(s);
+  await flush();
+  expect(deps.upload).toHaveBeenCalledTimes(2);
+  engine.start({ ...s, endpoint: "https://other.example" });
+  await flush();
+  expect(deps.upload).toHaveBeenCalledTimes(3);
+});
+
+test("a 429 that lands after a restart belongs to the old session: no wait, no timer", async () => {
+  const { deps, settings, engine, flush } = harness(["A/Everloot.lua"]);
+  let refuse!: () => void;
+  deps.upload.mockImplementationOnce(() => new Promise<string>((_resolve, fail) => { refuse = () => fail(limited(120_000)); }));
+  engine.start({ ...settings, prices: false });
+  await flush();
+  engine.start({ ...settings, prices: false, upload: false });
+  refuse();
+  await flush();
+  await vi.advanceTimersByTimeAsync(120_000);
+  expect(deps.upload).toHaveBeenCalledTimes(1);
+  expect(engine.snapshot().jobs.upload.state).toBe("off");
+  expect(engine.snapshot().log.some((l) => l.text.includes("asked to wait"))).toBe(false);
+});
+
 test("stopping during an upload leaves jobs off and does not upload the next account", async () => {
   const { deps, settings, engine, flush } = harness();
   let release!: () => void;

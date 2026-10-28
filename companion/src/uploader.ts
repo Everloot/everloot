@@ -39,11 +39,16 @@ const PLAYERS: RecordKind = "player_seen";
 const MAX_ANSWER_BYTES = UPLOAD_LIMITS.maxBodyBytes;
 const KEEP = "Nothing more was marked sent; keep your file and retry.";
 
-/** Milliseconds a Retry-After header asks for, in seconds or as a date; 0 when it says nothing usable. */
-function retryAfterMs(value: string | null): number {
-  if (!value) return 0;
+/** Milliseconds a Retry-After header asks for, in seconds or as a date; null when it says nothing usable. */
+function retryAfterMs(value: string | null): number | null {
+  if (!value) return null;
   const ms = Number.isFinite(Number(value)) ? Number(value) * 1000 : Date.parse(value) - Date.now();
-  return ms > 0 ? ms : 0;
+  return Number.isFinite(ms) && ms > 0 ? ms : null;
+}
+
+/** The site answered 429. `retryAfterMs` is its Retry-After, or null when the header said nothing usable. */
+export class RateLimited extends Error {
+  constructor(message: string, readonly retryAfterMs: number | null) { super(message); }
 }
 
 /** Reads the whole answer, or null when it runs past `MAX_ANSWER_BYTES`. */
@@ -71,7 +76,7 @@ function refusal(response: Response, text: string | null, site: string): Error |
   const said = typeof error === "string" ? error.replace(/\s+/g, " ").trim().slice(0, 300) : "";
   if (response.status === 429) {
     const wait = retryAfterMs(response.headers.get("retry-after"));
-    return new Error(`${said || `${site} rate limited this upload. Keep your file.`}${wait ? ` Try again in ${Math.max(1, Math.round(wait / 60_000))} min.` : ""}`);
+    return new RateLimited(`${said || `${site} rate limited this upload. Keep your file.`}${wait ? ` Try again in ${Math.max(1, Math.round(wait / 60_000))} min.` : ""}`, wait);
   }
   if (!response.ok) {
     if (said) return new Error(`${said} (HTTP ${response.status})`);

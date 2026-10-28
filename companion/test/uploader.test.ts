@@ -4,7 +4,7 @@ import { join, relative } from "node:path";
 import { describe, expect, test, vi } from "vitest";
 import { findEverlootFiles } from "../src/savedvariables";
 import { createSentState } from "../src/sent-state";
-import { uploadFile } from "../src/uploader";
+import { RateLimited, uploadFile } from "../src/uploader";
 import { emptySettledList, encodeIds } from "../../kb/src/settled-list";
 
 /** A SavedVariables file in the exact shape the addon writes. */
@@ -191,6 +191,36 @@ describe("uploading", () => {
     const api = intake(() => Response.json({ ok: false, error: "Upload rate limited. Keep your file and retry later." },
       { status: 429, headers: { "retry-after": "120" } }));
     await expect(uploadFile(file, { endpoint: "https://everloot.example", fetch: api.send, state })).rejects.toThrow(/rate limited/i);
+  });
+
+  test("a rate limit carries the site's wait as a number, and keeps the batches stored before it", async () => {
+    const rows = Array.from({ length: 2500 }, (_, i) => loot(i + 1));
+    const { file, state } = workspace(luaFile(rows));
+    const api = intake((call) => (call === 1 ? Response.json({ ok: false, error: "Upload rate limited. Keep your file and retry later." },
+      { status: 429, headers: { "retry-after": "120" } }) : undefined));
+    const error = await uploadFile(file, { endpoint: "https://everloot.example", fetch: api.send, state }).then(() => null, (e: unknown) => e);
+    expect(error).toBeInstanceOf(RateLimited);
+    expect(error).toMatchObject({ retryAfterMs: 120_000, message: expect.stringMatching(/2 min/) });
+    expect(state.has("https://everloot.example|abcd-1234-ef56-7890", "epoch:1")).toBe(true);
+    expect(state.has("https://everloot.example|abcd-1234-ef56-7890", "epoch:2500")).toBe(false);
+  });
+
+  test("a Retry-After date is read as the time until it; a wait it cannot use is null, never zero or endless", async () => {
+    const limited = async (value?: string) => {
+      const { file, state } = workspace(luaFile([loot(1)]));
+      const api = intake(() => new Response("{}", { status: 429, headers: value === undefined ? {} : { "retry-after": value } }));
+      return uploadFile(file, { endpoint: "https://everloot.example", fetch: api.send, state }).then(() => null, (e: unknown) => e as RateLimited);
+    };
+    const dated = await limited(new Date(Date.now() + 90_000).toUTCString());
+    expect(dated).toBeInstanceOf(RateLimited);
+    expect(dated!.retryAfterMs).toBeGreaterThan(85_000);
+    expect(dated!.retryAfterMs).toBeLessThanOrEqual(90_000);
+    for (const value of [undefined, "", "0", "-30", "soon", "Infinity", "1e400", new Date(Date.now() - 60_000).toUTCString()]) {
+      const e = await limited(value);
+      expect(e, String(value)).toBeInstanceOf(RateLimited);
+      expect(e!.retryAfterMs, String(value)).toBeNull();
+      expect(e!.message, String(value)).not.toMatch(/Try again in/);
+    }
   });
 });
 
