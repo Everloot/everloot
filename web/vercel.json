@@ -2,9 +2,19 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "installCommand": "rm -rf node_modules/@everloot && npm install",
+  "ignoreCommand": "case \"$VERCEL_GIT_COMMIT_REF\" in main|preview/*) ;; *) exit 0;; esac; git cat-file -e \"$VERCEL_GIT_PREVIOUS_SHA^{commit}\" 2>/dev/null || exit 1; git diff --quiet \"$VERCEL_GIT_PREVIOUS_SHA\" HEAD -- . ../kb ../packages ':(top,exclude,glob)**/*.test.ts' ':(top,exclude,glob)**/*.test.tsx' ':(top,exclude)web/README.md' ':(top,exclude)web/NEXT_STEPS.md'",
   "crons": [
-    { "path": "/api/cron/snapshot", "schedule": "*/10 * * * *" },
-    { "path": "/api/cron/blue", "schedule": "*/10 * * * *" },
-    { "path": "/api/cron/indexnow", "schedule": "23 * * * *" }
+    {
+      "path": "/api/cron/snapshot",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/blue",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/indexnow",
+      "schedule": "23 * * * *"
+    }
   ]
 }
