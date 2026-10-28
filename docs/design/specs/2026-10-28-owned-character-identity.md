@@ -13,10 +13,10 @@ Parent documents: [unified player platform](2026-10-28-unified-player-platform.m
 | Identity | Where it lives | Key | What it proves |
 |---|---|---|---|
 | Character link | `character_links` (Supabase), `20261021190000_character_links.sql` | `link_key` = HMAC(secret, `link:` + GUID); scoped by `user_id`, `(ruleset, realm_key, name_key)` | The account holder also held an addon file in which this character typed a live code |
-| Completion key | Addon `C.Identity()`; completion rollup keyed by install id then character key | 8-hex Adler-32 of `installId:GUID`; kept server-side only as `completion_ref` = HMAC(secret, `completion:installId:key`) | Nothing about ownership. The install id is a random addon-file value and travels with copies of the file |
+| Completion key | Addon `C.Identity()`; completion rollup keyed by install id then character key | 8-hex Adler-32 of `installId:GUID`; link rows keep only `completion_ref` = HMAC(secret, `completion:installId:key`), while the anonymous completion rollup retains raw install id and key | Nothing about ownership. The install id is a random addon-file value and travels with copies of the file |
 | Build label | `build_characters` (saved builds); `user_profiles.main_character_id` / `active_character_id` point at it | Row id; free-typed name, class, optional realm | Nothing. The label is typed and never checked against the game |
 | Local alt | Browser workspace (`LocalAlt`), optionally imported from the player's own Everloot.lua | Device-local id; name/realm match during import | Nothing outside the device. Never uploaded |
-| Public sighting | `players` table, `public_character` | `(ruleset, realm_key, name_key)` | That some install observed this name with this race/class/level/guild |
+| Public sighting | `players` table | `(ruleset, realm_key, name_key)` | That some install observed this name with this race/class/level/guild |
 
 Relevant behavior of the existing link store, which this ADR keeps:
 
@@ -53,6 +53,8 @@ Consequences that this ADR makes binding:
 4. Freezing stays: a forged claim can freeze a real link (denial of display), but cannot take it over. This
    tradeoff is proposed for owner review; no policy acceptance is implied by this ADR. No independently
    trusted proof of game-character control is established by the current file bridge.
+   The frozen result also tells a claimant that another account linked this character; the existing code quota
+   bounds claims to ten per account per day. D0 and a minimum dispute contact/response policy gate activation.
 
 ## Decision
 
@@ -65,7 +67,7 @@ Options considered:
 
 | Option | Benefit | Cost |
 |---|---|---|
-| **A. Reuse `character_links.id` (recommended)** | No new root; existing freeze, suppression, unlink and visibility functions already key on it | Unlink deletes the root, so history keyed on it ends with it (intended, see section 6) |
+| **A. Reuse `character_links.id` (recommended)** | No new root; existing freeze, suppression, unlink and visibility functions already operate on these rows | Unlink deletes the root, so history keyed on it ends with it (intended, see section 6) |
 | B. New `owned_characters` table with links as one alias kind | Root survives relinking | Duplicates the freeze/unlink rules; two places to keep consistent; no product need yet |
 | C. Use `(ruleset, realm_key, name_key)` as root | Simple joins with public sightings | Names are reusable after rename/deletion; would merge different people; contradicts the freeze model |
 
@@ -82,7 +84,7 @@ Aliases attach other identifiers to a root. Each records its kind, source and ti
 
 | Alias kind | Stored where | Created by | Assurance | Notes |
 |---|---|---|---|---|
-| `completion_ref` | Server, proposed `character_link_sources` (new) | `redeem_link` with the row's install id and completion key | Same as the link | Today one column holds one ref, so linking from a second machine **replaces** the first machine's ref. The new table keeps one row per install (see section 4) |
+| `completion_ref` | Server, proposed `character_link_sources` (new) | Authenticated private sync presents the install id and completion key for an already consented link | Weaker than the link: install id and key are supplied in the row, not attested | Today one column holds one ref, so linking from a second machine **replaces** the first machine's ref. Proposed authenticated sources are separate; legacy refs do not create them |
 | Build label | Server, proposed nullable `build_characters.link_id` | Owner explicitly attaches a label to a link | Owner's own statement | Never inferred from matching names. Deleting the label never unlinks; unlinking sets `link_id` to null and keeps the label, its builds and profile references |
 | Local alt | Device only, optional `LocalAlt.linkId` | Owner confirms a suggested match | Owner's own statement | Never uploaded. A name/realm match is a suggestion, not an automatic join |
 | Public sighting | Not stored as an alias | — | None | Shown only through the existing public policy. A link never adds data to a sighting page, and a sighting never adds data to a private dashboard |
@@ -94,8 +96,9 @@ The local name/key map (COL-C03) stays in the addon file and on the device. It n
 | Case | Behavior (existing unless marked proposed) |
 |---|---|
 | Same account links the same character again | Same `link_key`: the row refreshes name, level, `completion_ref` (proposed: adds a source row instead of replacing) |
-| Rename in game, same GUID | Same `link_key`: name/realm keys update. Old name is no longer linked |
-| Realm transfer or anything that changes the GUID | Treated as a new character. The old link remains until the owner unlinks it; `name_linked` refuses a second link of the same name on the same account |
+| Rename in game, same GUID | On the next relink with a new code, same `link_key` refreshes name/realm keys. No automatic rename discovery is promised |
+| Realm transfer with a changed GUID and different realm | New link added; old link remains until explicitly unlinked. No automatic history merge |
+| New GUID but the same normalized name and realm | `name_linked` refuses another link on that account until the old link is unlinked |
 | Another account claims the same GUID or name/realm | Both frozen; both owners see "frozen"; nobody sees the other account. Operator decides |
 | Reinstall (new install id, same GUID) | New completion key and new `completion_ref`. Relinking with a new code attaches the new source; the old source remains listed until removed |
 | Second machine, same account | Two install sources on one link. Owner progress is the union of sources the account owns (section 4) |
@@ -115,11 +118,16 @@ Proposed model:
   (`active`, `contested`, `revoked`). A source is created only by an authenticated sender, never by anonymous intake.
 - **Consent**: per link, the categories the owner chose to sync privately (first slice: completion only), with
   `granted_at` and `revoked_at`. Consent is separate from `character_visibility` and from publication grants.
+- **Consent authority**: granting/revoking consent, removing a source and resolving contested sources require
+  a signed-in session and this site's Origin. A `sync:own` key sends facts only for already consented links;
+  it cannot grant consent, create publication grants, change visibility or list sources.
 - **Credential**: a new API-key scope, proposed `sync:own`, separate from `link:own` and `read:own`. A key with
   only `link:own` may send link rows and nothing else.
 - **Private read rule**: the owner sees a fact only when the link is `linked` (not frozen), the link has consent
   for that category, the fact came from a source the same account owns with status `active`, and the fact's
-  completion key maps to that link's `completion_ref` for that source.
+  completion key maps to that link's `completion_ref` for that source. The fact itself must have arrived through
+  authenticated `sync:own` private sync with provenance recorded per fact. Anonymous intake and the public
+  completion rollup never satisfy this rule, even when their install id/key hash matches a link's ref.
 - Publication grants (`kb/src/publication.ts`) stay the only path to public display of owned progress. A private
   consent never creates or implies a publication grant, and a publication grant never authorizes a private read
   for an account.
@@ -134,7 +142,7 @@ Session writes require this site's Origin; API keys are checked by scope through
 |---|---|---|
 | `POST /api/me/characters/link-codes` (exists) | Session only | New code, shown once |
 | `POST /api/me/characters/links` (exists) | Session or `link:own` key | Per-row linked/frozen/refused/retry |
-| `GET /api/me/characters/links` (new) | Session; `read:own` key optional (decision D7) | The account's own links: id, name, realm, class, race, faction, level, status, linked_at, last_upload_at. Never `link_key`, `completion_ref`, other accounts or a reason for a freeze beyond "another account also linked it" |
+| `GET /api/me/characters/links` (new) | Session only by default; a dedicated session resolver, not `linkAccount(req, true)` | The account's own links: id, name, realm, class, race, faction, level, status, linked_at, last_upload_at. Never `link_key`, `completion_ref`, other accounts or a reason for a freeze beyond "another account also linked it" |
 | `DELETE /api/me/characters/links/<id>` (new) | Session only, Origin checked | Calls `unlink_character`; 404 for another account's id (no existence leak) |
 | Visibility change | Not exposed in the first slice | `set_visibility` stays unused until a public profile contract exists |
 | Owner completion read (COL-C01) | Session | Section 4 read rule; frozen, contested, revoked and other-account data excluded; unknown is shown as unknown, never zero |
@@ -142,6 +150,8 @@ Session writes require this site's Origin; API keys are checked by scope through
 `character_visibility`: `page_public`, `show_*`, `ranked_*` and `indexable` remain false and unwired. Each needs
 its own accepted contract (public profile, rankings, search indexing) before any route sets or reads it. When
 public display is designed, it reuses `set_visibility` and `public_character`, and frozen links stay private.
+This explicitly narrows HUB-P03 in the master register: owner list/unlink is Step 1; a visibility endpoint
+is deferred until its separate public-profile contract. `public_character` reads links, not sightings.
 
 ### 6. Unlink, revocation, deletion and history
 
@@ -154,21 +164,23 @@ public display is designed, it reuses `set_visibility` and `public_character`, a
 | Source revoked (owner removes a machine) | Facts from that source drop out of reads at once; deletion of its raw rows follows D3 |
 | Account deletion | Existing `on delete cascade` removes links, visibility, codes and (proposed) sources and consent |
 | Hide request (suppression) | Existing behavior: cannot link or show. Proposed: an existing link to a newly suppressed character becomes private-only and is excluded from any public surface |
-| Frozen | Owner list shows the frozen state; private reads excluded (D2); operator resolution deletes losing links, which runs the unlink effects for those accounts |
+| Frozen | Owner list shows the frozen state; private reads excluded under proposed D2; operator resolution must use `unlink_character` or a reviewed operation with the same deletion/purge effects, not a raw DELETE |
 
 Append-only ingestion is not irrevocable storage. Any history store (HIST-03) must support these deletions and
 replay without leaving revoked events behind.
 
 ### 7. Secret domain, versioning and rotation
 
-`EVERLOOT_CHARACTER_KEY` is used for three different keyed hashes: census character keys (no prefix), link keys
-(`link:`), and completion refs (`completion:`). Rotating it today would:
+`EVERLOOT_CHARACTER_KEY` is used for census character keys (no prefix), link keys (`link:`), and completion
+refs (`completion:`). It also backs public install pseudonyms (`public-install:`) when a separate
+`EVERLOOT_PUBLIC_INSTALL_KEY` is absent. Rotating it today would:
 
 - Make every stored `link_key` unmatched. A same-account relink would hit `name_linked` (the old row still holds
   the name), so the owner would be forced to unlink first. Cross-account freezes by game id would stop matching;
   freezes by name/realm would still work.
 - Make every stored `completion_ref` unmatched, so private joins break silently.
 - Break census agreement for existing census rows.
+- Change published install pseudonyms when the public-install key falls back to this secret.
 
 Proposed:
 
@@ -191,9 +203,10 @@ No signature, attestation or client-held secret is proposed. The addon cannot ke
 2. Main/active character keep pointing at `build_characters`. HUB-P04 may later add link-based main/active; until
    then a label attached to a link is the bridge.
 3. No automatic attachment, even when names match. The account UI may suggest a match; the owner confirms.
-4. `completion_ref` single column: keep it for compatibility; add `character_link_sources` rows and backfill one
-   row per existing link from the current `completion_ref`. The column becomes "most recent source" until removed
-   in a later reviewed migration.
+4. Keep `completion_ref` for compatibility. Do not backfill active sources, source ownership or consent from
+   old refs: they cannot reveal the install id and do not prove authenticated provenance. A source becomes active
+   only after a `sync:own` sender presents the install id, the server recomputes a matching ref for that link,
+   and the link has session-granted consent. Old anonymous facts remain outside owner-private views.
 
 All schema changes are proposals. Each needs its own reviewed migration, applied by the database owner, with a
 written rollback, before its flag is enabled.
@@ -233,8 +246,8 @@ Acceptance tests (each must fail before the change where the path is new):
   privately and returns no private data in later reads; a second legitimate claim freezes both.
 - Dispute: owner list shows `frozen` for both accounts and discloses no other account detail; unlinking one does
   not unfreeze the other.
-- Copied install id: two accounts sending link rows from the same install id get separate links; no data is shared
-  (Step 2 adds the `contested` source test).
+- Copied install id: different characters on two accounts may have separate links but share no private data;
+  a claim to the same character GUID freezes both (Step 2 adds the `contested` source test).
 - Two accounts, one character name: second account freezes both; `public_character` returns nothing.
 - Reinstall: new install id, same GUID, same account refreshes the same link id and keeps one link.
 - Second machine: link from install B on the same account keeps the same link id (Step 2: two sources).
@@ -248,19 +261,24 @@ Acceptance tests (each must fail before the change where the path is new):
 
 ## Remaining decisions (for the owner, not blocking Step 1 unless noted)
 
-- **D1 (blocks Step 2):** accept the source/consent tables and a separate `sync:own` scope, or extend `read:own`.
+- **D0 (blocks enabling Step 1):** accept freeze-on-second-claim and the account-link-existence disclosure.
+  Step 1 code can be prepared behind its flag, but activation needs D0 plus the minimum D8 support policy.
+- **D1 (blocks Step 2):** accept the proposed source/consent tables and separate `sync:own` write scope.
+  Do not repurpose the existing `read:own` scope for writes.
 - **D2 (blocks Step 2):** whether a frozen link's owner keeps private reads of data from their own active sources.
   Recommended default: excluded, matching the gap register; revisit if forged freezes become a support burden.
 - **D3 (blocks HIST-01):** retention of raw source rows after unlink/consent/source revocation: delete at once,
-  or a fixed grace period for relinking. Recommended: delete derived data at once; raw rows within a short,
-  stated window that the privacy notice names.
+  or a fixed grace period for relinking. Until a different policy is accepted, Step 2 deletes its new private
+  raw and derived rows immediately on those revocations; retained anonymous/publication data follows its existing policy.
 - **D4:** ruleset source of truth before a second ruleset is enabled.
 - **D5:** secret rotation runbook: domain split now or at first rotation; how long old versions are kept.
 - **D6:** no public ownership badge. Any future public label must say "linked from addon file" and needs its own
   contract.
-- **D7:** whether `read:own` API keys may list links (Desktop status) or session only.
-- **D8:** operator dispute process: evidence accepted, response time and what each party is told.
-- **D9:** contested install-id source policy and how an owner clears it.
+- **D7:** session-only link listing is the technical default. API-key listing needs a separately accepted read contract.
+- **D8 (minimum blocks enabling Step 1):** operator dispute contact and response wording must exist before a route
+  promises review. Accepted evidence and response-time targets remain part of that activation checklist.
+- **D9 (blocks Step 2):** contested install-id source policy and how an owner clears it. A copied file can make a
+  legitimate source contested, another denial-of-display tradeoff that needs an explicit product decision.
 
 ## Out of scope
 
