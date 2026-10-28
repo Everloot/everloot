@@ -128,11 +128,11 @@ export default function McpOverview() {
           <List>
             <li>
               With no argument it lists your builds, newest first: name, slug, class and points, character, the active mark, the
-              game build (and whether it is older than the calculator&apos;s tree) and a link.
+              game build (and whether it is older or newer than the calculator&apos;s tree) and a link.
             </li>
             <li>
-              With a build&apos;s <C>slug</C> it returns that build: points per tree, the talents taken in each set, your notes and
-              anything that no longer fits today&apos;s tree.
+              With a build&apos;s <C>slug</C> it returns that build: points per tree, the talents taken in each set, your notes,
+              whether its game build is older or newer than the tree, and anything that no longer fits today&apos;s tree.
             </li>
             <li>
               The link is the build&apos;s short link while sharing is on, and otherwise a calculator link with the build&apos;s
