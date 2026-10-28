@@ -84,7 +84,8 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
    * Per job, the time a site's 429 asked us to wait until. No run of the job starts before it for that site, Upload
    * now included: the run is set for then instead. It outlives stop() and start(), so a restart cannot skip it.
    */
-  const waits = new Map<Job, { endpoint: string; until: number }>();
+  const waits = new Map<string, number>();
+  const waitKey = (job: Job, endpoint: string) => `${job}:${new URL(endpoint).origin}`;
   const waitLine = (job: Job, ms: number) => `${job}: the site asked to wait; trying again in ${Math.max(1, Math.round(ms / 60_000))} min`;
 
   const snapshot = (): EngineState => ({ files: [...state.files], jobs: { upload: { ...state.jobs.upload }, prices: { ...state.jobs.prices }, ask: { ...state.jobs.ask } }, log: [...state.log], paused: state.paused });
@@ -99,9 +100,10 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
     const s = settings;
     if (!s || !enabled(s, job)) return;
     if (state.paused) { log("info", `${job}: paused, skipped`); emit(); return; }
-    const wait = waits.get(job);
-    const left = wait && wait.endpoint === s.endpoint ? wait.until - clock() : 0;
+    const key = waitKey(job, s.endpoint);
+    const left = (waits.get(key) ?? 0) - clock();
     if (left > 0) { log("info", waitLine(job, left)); schedule(job, left); emit(); return; }
+    waits.delete(key);
     if (running.has(job)) { again.add(job); return; }
     if (state.files.length === 0) { set(job, { state: "idle", message: "No Everloot.lua to read", at: now() }); emit(); return; }
     const started = session;
@@ -141,7 +143,7 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
       const n = retries.get(job) ?? 0;
       // A 429 waits the site's own time, or the usual retry's when it gave none; the retry is queued and the check in
       // `run` sets it for then. Past the last retry the wait still holds, and the next write after it tries again.
-      if (limited) waits.set(job, { endpoint: s.endpoint, until: clock() + (limited.ms ?? retryAfter[Math.min(n, retryAfter.length - 1)] ?? 0) });
+      if (limited) waits.set(waitKey(job, s.endpoint), clock() + (limited.ms ?? retryAfter[Math.min(n, retryAfter.length - 1)] ?? 0));
       if (n < retryAfter.length) {
         retries.set(job, n + 1);
         if (limited) again.add(job);

@@ -274,6 +274,25 @@ test("a 429 that lands after a restart belongs to the old session: no wait, no t
   expect(engine.snapshot().log.some((l) => l.text.includes("asked to wait"))).toBe(false);
 });
 
+test("switching between two rate-limited sites preserves each site's wait, including URL aliases", async () => {
+  const { deps, settings, engine, flush } = harness(["A/Everloot.lua"]);
+  const s = { ...settings, prices: false };
+  deps.upload.mockRejectedValueOnce(limited(120_000)).mockRejectedValueOnce(limited(60_000));
+  engine.start(s);
+  await flush();
+  engine.start({ ...s, endpoint: "https://other.example" });
+  await flush();
+  expect(deps.upload).toHaveBeenCalledTimes(2);
+  engine.start({ ...s, endpoint: `${s.endpoint}/other-path` });
+  await flush();
+  expect(deps.upload).toHaveBeenCalledTimes(2);
+  await vi.advanceTimersByTimeAsync(119_999);
+  expect(deps.upload).toHaveBeenCalledTimes(2);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(deps.upload).toHaveBeenCalledTimes(3);
+  engine.stop();
+});
+
 test("stopping during an upload leaves jobs off and does not upload the next account", async () => {
   const { deps, settings, engine, flush } = harness();
   let release!: () => void;
