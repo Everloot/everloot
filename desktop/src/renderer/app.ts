@@ -1033,7 +1033,7 @@ function updatePopover(u: NonNullable<AppState["update"]>, p: AppState["updatePr
   const more = u.notes.length > NOTES_SHOWN ? `${u.notes.length - NOTES_SHOWN} more changes on GitHub ↗` : "Release notes on GitHub ↗";
   return `<div class="pop-head"><h2 id="updTitle">Update available</h2><div class="muted small">${esc(u.latest ?? "")} · you run ${esc(u.current)}${u.publishedAt ? ` · released ${when(u.publishedAt)}` : ""}</div></div>
     <div class="pop-body"><h3>What's changed</h3>${notes ? `<ul>${notes}</ul>` : '<p class="muted small">This release lists no changes.</p>'}${u.url ? ext(u.url, more) : ""}</div>
-    ${p.stage === "failed" ? `<p class="error small">The download failed: ${esc(p.error ?? "")}</p>` : ""}
+    ${p.stage === "failed" ? `<p class="error small">The update failed: ${esc(p.error ?? "")}</p>` : ""}
     <div class="pop-foot">${updatePrimary(u, p)}<button type="button" class="btn" id="updateLater">Later</button></div>
     <p class="muted small">${u.installable
       ? "The update is checked against the release's published checksum before it installs. Your settings and data folder stay."
