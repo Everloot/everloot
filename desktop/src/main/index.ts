@@ -255,7 +255,7 @@ if (!app.requestSingleInstanceLock()) {
     updateProgress = { stage: "downloading", percent: 0, error: null };
     broadcast();
     try {
-      const path = await downloadUpdate({ url: u.downloadUrl, sumsUrl: u.sumsUrl, dir: join(data, "updates"), onProgress: (percent) => { updateProgress = { stage: "downloading", percent, error: null }; broadcast(); } });
+      const path = await downloadUpdate({ url: u.downloadUrl, sumsUrl: u.sumsUrl, version: u.latest ?? undefined, dir: join(data, "updates"), onProgress: (percent) => { updateProgress = { stage: "downloading", percent, error: null }; broadcast(); } });
       downloaded = { path, version: u.latest! };
       updateProgress = { stage: "ready", percent: 100, error: null };
     } catch (err) {
@@ -282,7 +282,14 @@ if (!app.requestSingleInstanceLock()) {
     });
     if (answer.response !== 0) return false;
     for (let i = 0; i < 120 && JOBS.some((j) => engine.snapshot().jobs[j].state === "running"); i++) await new Promise((r) => setTimeout(r, 500));
-    runInstaller(downloaded.path);
+    // The app quits only once the installer has started; if it cannot start, the app stays open and says so.
+    try {
+      await runInstaller(downloaded.path);
+    } catch (err) {
+      updateProgress = { stage: "failed", percent: 0, error: `the installer did not start (${err instanceof Error ? err.message : String(err)})` };
+      broadcast();
+      return false;
+    }
     quitting = true;
     app.quit();
     return true;
