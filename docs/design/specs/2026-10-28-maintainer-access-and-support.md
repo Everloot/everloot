@@ -19,7 +19,7 @@ Accepted inputs this document honors, not re-decides:
 
 ## 1. Audit: what exists today
 
-Code baseline: this branch's `main` ancestor. Evidence is code and documentation, not a read-back of production
+Code baseline: `5e5fd33d`, with web and database sources inherited from `7ae6c787`. Evidence is code and documentation, not a read-back of production
 flags, grants or data.
 
 ### Authentication and authorization
@@ -27,7 +27,7 @@ flags, grants or data.
 | Area | Exists | Evidence | Gap for OPS |
 |---|---|---|---|
 | Player sessions | Opaque cookie, SHA-256 hash in private `sessions`; or better-auth when auth v2 is on | `web/src/lib/supabase/server.ts` (`getUser`, `requireAuth`), `web/src/lib/auth/auth.ts` (plugins `genericOAuth`, `multiSession` only) | No role, staff flag or admin plugin. `AccountUser` is `{ id, name }` only |
-| Server data access | Every route reads/writes with the service role through PostgREST; browser roles have no table or function grants | `authQuery` in `web/src/lib/supabase/server.ts`; `supabase/tests/character_links.sql`, `players.sql`, `guilds.sql` assert `anon`/`authenticated` denial | Good base: staff checks belong in server code and security-definer functions, not RLS for browser roles |
+| Server data access | Relevant link/player/guild routes use service-role PostgREST; their browser roles have no table or function grants | `authQuery` in `web/src/lib/supabase/server.ts`; `supabase/tests/character_links.sql`, `players.sql`, `guilds.sql` assert `anon`/`authenticated` denial | Good base: staff checks belong in server code and security-definer functions, not browser-role access |
 | API keys | Per-account keys with scopes `read:public`, `read:own`, `link:own`; expiry, revoke, roll, delete | `web/src/lib/api-keys.ts`, `web/src/lib/api-key-policy.ts`, `supabase/migrations/20261019120000_data_guard.sql` | Player scopes only. No staff scope, and none should be added (staff actions are session-only, section 3) |
 | Route guard pattern | Flag off → 404; session write needs this site's Origin (missing Origin → 403); signed out → 401; wrong key scope → 403; `private, no-store` | `linkAccount` in `web/src/lib/character-links-store.ts` | Reusable shape for an `opsAccount(req, permission)` guard |
 | Moderator precedent | `guide_moderators`: one-row table written only by the database operator by hand; service role may only select; nothing in a request names a reviewer | `supabase/migrations/20261027140000_guide_submissions.sql` (lines 82–93), `web/src/lib/guide-submissions.ts` header | Single-purpose, single-person, no grant history, no revocation record, no audit. Review flow itself not built |
@@ -36,7 +36,7 @@ flags, grants or data.
 
 | Action | How today | Evidence | Attributable record? |
 |---|---|---|---|
-| Settle a frozen character link | Hand-written SQL: delete losing links, `update ... set status = 'linked'` | Comments at end of `supabase/migrations/20261021190000_character_links.sql` | No. A raw DELETE also bypasses `unlink_character`'s visibility cleanup; the identity ADR already forbids raw DELETE for resolution |
+| Settle a frozen character link | Hand-written SQL: delete losing links, `update ... set status = 'linked'` | Comments at end of `supabase/migrations/20261021190000_character_links.sql` | No. Visibility already cascades on link deletion; raw SQL still lacks the proposed atomic audit and future private-source purge contract. The identity ADR requires a reviewed resolution operation |
 | List frozen links | Hand-written SQL | Same file | No |
 | Issue/revoke a publication grant | Private CLI; evidence verified out of band; grant row stores `verifiedBy` and `evidence` | `scripts/issue-publication-grant.ts`, `web/src/lib/sharing-store.ts` | Partial: `verifiedBy` is free text, not an account id; no reason/outcome log |
 | Undo a character or guild hide | "The owner's tool": by hand, after an email | `supabase/migrations/20261022160000_players_realm_key.sql` (section 4), `20261025120000_guilds.sql` (section 3); `web/src/app/players/opt-out/page.tsx`, `web/src/app/guilds/hide/page.tsx` | No |
@@ -75,7 +75,7 @@ These are defaults an implementer can apply without further owner input. Section
 
 1. **Staff is a grant on a normal account.** One individual Everloot account per person. No shared login,
    no shared API key, no service-role key on a maintainer's machine for routine support.
-2. **Session only.** Staff actions require a signed-in session and this site's Origin. No API-key scope can
+2. **Session only.** Staff actions require a signed-in session; writes also require this site's Origin. No API-key scope can
    perform or read staff actions.
 3. **Permissions, not a single admin bit.** Each action checks one named permission, re-read from the database
    on every request (no role cached in the session or cookie), so revocation applies on the next request.
@@ -144,7 +144,9 @@ The first `staff.manage` holder is written by the database owner by hand, as `gu
 | `created_at`, `updated_at`, `closed_at` | |
 
 A dispute involves two or more accounts. Proposed: **one case per account**, each linked internally to a shared
-`dispute_group` id. Each requester only ever sees their own case; staff see the group. This keeps "never share
+`dispute_group` id. A requester's `subject_link_ids` contains only their own links; group membership never
+adds another account's link to a requester response. Each requester only ever sees their own case; authorized
+staff see the group. This keeps "never share
 between accounts" structural rather than a display rule.
 
 ### States
@@ -164,7 +166,8 @@ new → triage → in_review ⇄ waiting_on_requester
 
 ### Private timeline and audit
 
-Timeline events are append-only rows: `case_id`, `at`, `actor_user_id` (null for the requester or system),
+Timeline events are append-only rows: `case_id`, `at`, `actor_user_id` (the authenticated requester or staff id;
+null only for a system or unauthenticated external action, with explicit actor kind),
 `kind` (`created`, `assigned`, `state_changed`, `note`, `next_action`, `resolution`, `export`), `reason`, `outcome`.
 Notes are minimal: what was checked and decided, not pasted files or chat logs.
 
@@ -205,7 +208,8 @@ and how often is an owner decision kept outside this repository.
 - Owner list, frozen link: "Another Everloot account also linked this character, so it is paused on both
   accounts. Its dashboard is hidden until we review it. We never show either account the other's data."
   Action: "Ask for a review". Secondary: "Questions: hello@everloot.app".
-- After asking: "Review requested. Your reference is {ref}. We will reply by email or on this page. Do not
+- After asking: "Review requested. Your reference is {ref}. Check this page for updates, or contact
+  hello@everloot.app with your reference. Do not
   send your Everloot.lua file, link codes or API keys."
 - Resolved, kept: "Review finished. This character is linked to your account again."
 - Resolved, removed: "Review finished. This character is no longer linked to your account. Your saved builds
@@ -222,7 +226,7 @@ Slice OPS-03a: permission check and denial tests, behind a flag, no UI and no pl
 |---|---|---|
 | `web/src/lib/ops/permissions.ts` | web | Permission names, role bundles, pure `can(grants, permission)`; `private.read` not in any bundle |
 | `web/src/lib/ops/permissions.test.ts` | web | Matrix tests for every row in section 3 |
-| `web/src/lib/ops/access.ts` | web | `opsAccount(req, permission)` modeled on `linkAccount`: flag off 404, non-staff 404, missing Origin 403, permission missing 403, key presented 403, `NO_STORE` |
+| `web/src/lib/ops/access.ts` | web | Dedicated session-only `opsAccount(req, permission)`: flag off 404, non-staff 404, writes with missing/foreign Origin 403, permission missing 403, key presented 403, `NO_STORE`; do not copy the existing write-only guard's Origin requirement onto page reads |
 | `web/src/lib/ops/access.test.ts` | web | Denied-access and revocation tests below |
 | `web/src/lib/ops/staff-store.ts` | web | Reads live grants through one security-definer RPC via `authQuery` |
 | `supabase/migrations/<timestamp>_ops_staff.sql` | database owner | `staff_grants` (user, permission, granted_by, granted_at, revoked_at, reason), `ops_audit`, grant/revoke functions; RLS on, no `anon`/`authenticated` grants, service role execute only, written rollback |

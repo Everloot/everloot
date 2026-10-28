@@ -171,6 +171,10 @@ checks, support entry points and project tracking. Then propose a role/action ma
 support and character disputes, including D8 contact and response wording. Keep prospective collaborator
 names and assignments in private project control. This package does not enable staff access or change flags.
 
+The [access and support proposal](../../design/specs/2026-10-28-maintainer-access-and-support.md) contains
+the completed source audit, proposed matrix, case lifecycle and denied-access acceptance. OPS-01/02 design
+is prepared, not accepted or implemented; its unresolved decisions remain listed explicitly.
+
 - [ ] OPS-01: document support/maintenance/admin actions and private-data boundaries; specify denied-access
   and maintainer-revocation checks before implementation.
 - [ ] OPS-02: define case ownership, status, private timeline, next action and resolution; apply the accepted
