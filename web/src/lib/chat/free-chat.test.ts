@@ -224,6 +224,14 @@ describe("failover to the next free provider", () => {
 });
 
 describe("POST /api/chat/free/chat/completions", () => {
+  test("on the Cloudflare Worker it counts the caller by cf-connecting-ip and refuses a forged Vercel header", async () => {
+    const cf = { EVERLOOT_FREE_CHAT_KEY: KEY, EVERLOOT_PLATFORM: "cloudflare", NODE_ENV: "production" };
+    expect((await setup(cf).chat.POST(ask(question(), { "cf-connecting-ip": "198.51.100.9" }))).status).toBe(200);
+    const forged = setup(cf);
+    expect((await forged.chat.POST(ask(question()))).status).not.toBe(200);
+    expect(forged.send).not.toHaveBeenCalled();
+  });
+
   test("is a 404 while the key is unset, and calls nobody", async () => {
     const { chat, send } = setup({ VERCEL: "1", NODE_ENV: "production" });
     const res = await chat.POST(ask(question()));

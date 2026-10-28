@@ -1,3 +1,5 @@
+import { deployEnv } from "../platform";
+
 /**
  * Which analytics tools are switched on. Every tool is off unless its environment variable is set.
  * NEXT_PUBLIC_* values are read in the root layout (a server component) and passed down as props, so
@@ -25,8 +27,9 @@ const POSTHOG_HOSTS = ["https://us.i.posthog.com", "https://eu.i.posthog.com"];
 export function analyticsConfig(env: Record<string, string | undefined> = process.env): AnalyticsConfig {
   const gaId = clean(env.NEXT_PUBLIC_GA_ID);
   // PostHog only runs on the Production deployment, so Preview and local builds never send events.
-  // VERCEL_ENV is read here on the server (root layout) and passed down with the rest of the config.
-  const posthogKey = env.VERCEL_ENV === "production" ? clean(env.NEXT_PUBLIC_POSTHOG_KEY) : undefined;
+  // The host's environment (VERCEL_ENV, or EVERLOOT_DEPLOY_ENV on the Worker) is read here on the server
+  // (root layout) and passed down with the rest of the config.
+  const posthogKey = deployEnv(env) === "production" ? clean(env.NEXT_PUBLIC_POSTHOG_KEY) : undefined;
   const host = clean(env.NEXT_PUBLIC_POSTHOG_HOST)?.replace(/\/$/, "");
   const cf = clean(env.NEXT_PUBLIC_CF_BEACON_TOKEN);
   const metricool = clean(env.NEXT_PUBLIC_METRICOOL_HASH);

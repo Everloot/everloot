@@ -49,7 +49,7 @@ export async function GET(req: Request) {
 // limiter, and it keys on the caller's address, so that header travels with the request.
 async function startBetterAuthSignIn(req: Request, callbackURL: string) {
   const headers = new Headers({ "content-type": "application/json", origin: siteUrl() });
-  for (const name of ["x-vercel-forwarded-for", "x-forwarded-for", "x-real-ip", "cookie"]) {
+  for (const name of ["x-vercel-forwarded-for", "cf-connecting-ip", "x-forwarded-for", "x-real-ip", "cookie"]) {
     const value = req.headers.get(name);
     if (value) headers.set(name, value);
   }

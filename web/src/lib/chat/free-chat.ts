@@ -2,6 +2,7 @@ import { createHmac } from "node:crypto";
 import { isIP } from "node:net";
 import type { RateLimitStore } from "../auth/db";
 import { ipv6Subscriber } from "../intake-quota";
+import { edgeClientIp, onTrustedEdge } from "../platform";
 import { FREE_BUDGET, FREE_TOOLS, SYSTEM } from "./agent";
 import { CATALOGUE } from "./catalogue";
 
@@ -148,10 +149,10 @@ function readTools(raw: unknown): unknown[] | null {
   return out;
 }
 
-/** The caller's address as Vercel saw it (an IPv6 one by its /64), or "local" in development; null when it cannot be trusted. */
+/** The caller's address as the host's edge saw it (an IPv6 one by its /64), or "local" in development; null when it cannot be trusted. */
 function clientAddress(req: Request, env: Record<string, string | undefined>): string | null {
-  if (env.VERCEL !== "1") return env.NODE_ENV === "production" ? null : "local";
-  const ip = req.headers.get("x-vercel-forwarded-for")?.trim() ?? "";
+  if (!onTrustedEdge(env)) return env.NODE_ENV === "production" ? null : "local";
+  const ip = edgeClientIp(req, env) ?? "";
   if (!isIP(ip)) return null;
   return isIP(ip) === 6 ? ipv6Subscriber(ip) : ip;
 }

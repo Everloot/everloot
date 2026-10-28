@@ -36,6 +36,10 @@
     { "type": "Text", "globs": ["repo/**/*.md", "repo/**/*.yaml", "repo/**/*.yml", "repo/**/*.json"], "fallthrough": true }
   ],
   "vars": {
+    // web/src/lib/platform.ts: trust cf-connecting-ip, and name the environment for analytics. "preview" keeps
+    // PostHog off until everloot.app moves here; set "production" in the cutover deploy.
+    "EVERLOOT_PLATFORM": "cloudflare",
+    "EVERLOOT_DEPLOY_ENV": "preview",
     "NEWS_DIR": "/bundle/repo/kb/news",
     "GUIDES_DIR": "/bundle/repo/kb/guides",
     "WIKI_DIR": "/bundle/repo/kb/wiki"

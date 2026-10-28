@@ -69,6 +69,32 @@ Server names the code reads (values never in git): `R2_ACCOUNT_ID`, `R2_ACCESS_K
 Many R2 reads can become R2 bindings instead of S3 keys. Postgres (`pg`) goes through Hyperdrive or a direct
 connection over `nodejs_compat` sockets.
 
+🔑 **Vercel never exports a variable marked Sensitive**: `vercel env pull` writes a placeholder for each (38 of
+Everloot's 72 on 10/28). Values come from their source, not from Vercel. The `POSTGRES_*`, `SUPABASE_ANON_KEY`,
+`SUPABASE_JWT_SECRET`, `SUPABASE_PUBLISHABLE_KEY` and `SUPABASE_SECRET_KEY` variables are left by Vercel's
+Supabase integration and no code reads them.
+
+Set on the Worker (10/28): `R2_*` and `GAME_DATA_*` through two new bucket-scoped R2 tokens
+(`everloot-web worker uploads (rw)`, `everloot-web worker game-data (read)`), `SUPABASE_URL` and the legacy
+`service_role` key from the Supabase dashboard, `EVERLOOT_MCP_TOKEN`, `CRON_SECRET` (new), `BETTER_AUTH_URL`, and
+`EVERLOOT_MCP_PUBLIC`, `EVERLOOT_PLAYER_PAGES`, `EVERLOOT_SAVED_BUILDS`, `EVERLOOT_DATA_GUARD` = `1`, as in
+production. Plus the real `BNET_CLIENT_ID`, `BNET_REDIRECT_URI`, `EVERLOOT_CHAT_WORKSPACE`, `EVERLOOT_GUILDS`,
+`EVERLOOT_PROFILES`.
+
+Still needed, and each must equal production's value: **`EVERLOOT_CHARACTER_KEY`** (census keys; a different one
+splits every character), **`BNET_CLIENT_SECRET`** (Battle.net sign-in), `BETTER_AUTH_SECRET` (only when
+`EVERLOOT_AUTH_V2` turns on) and `INDEXNOW_KEY` (only for the IndexNow cron). They come from the owner, not from
+Vercel.
+
+The host-specific reads go through `web/src/lib/platform.ts`: the client address (`x-vercel-forwarded-for` on
+Vercel, `cf-connecting-ip` on the Worker, never the other host's header), the environment for analytics
+(`EVERLOOT_DEPLOY_ENV`, `preview` until the cutover) and the deployed commit (`EVERLOOT_COMMIT_SHA`, stamped by
+`scripts/cf-deploy.mjs`).
+
+🔴 **The Supabase project was created through the Vercel Marketplace** (organization `vercel_icfg_…`). Before
+the Vercel project or team is retired, move the Supabase organization to direct Supabase billing, or the database
+goes with the integration.
+
 ### 5. Crons
 
 `vercel.json` runs `/api/cron/snapshot` and `/api/cron/blue` every 10 minutes and `/api/cron/indexnow` hourly.

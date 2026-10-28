@@ -1,5 +1,6 @@
 import { createHmac } from "node:crypto";
 import { isIP } from "node:net";
+import { edgeClientIp, onTrustedEdge } from "./platform";
 
 export interface QuotaResult { allowed: boolean; retryAfter: number }
 
@@ -73,9 +74,8 @@ export function createIntakeQuota(opts: {
   }
 
   function clientIp(req: Request): string {
-    if (!production && env.VERCEL !== "1") return "local";
-    if (env.VERCEL !== "1") throw new Error("Trusted client IP is unavailable");
-    const ip = req.headers.get("x-vercel-forwarded-for")?.trim() ?? "";
+    if (!production && !onTrustedEdge(env)) return "local";
+    const ip = edgeClientIp(req, env) ?? "";
     if (!isIP(ip)) throw new Error("Trusted client IP is unavailable");
     return isIP(ip) === 6 ? ipv6Subscriber(ip) : ip;
   }

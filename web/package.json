@@ -16,7 +16,7 @@
     "export-bulk": "tsx scripts/export-bulk.ts",
     "cf:build": "opennextjs-cloudflare build && node scripts/cf-bundle-files.mjs",
     "cf:preview": "npm run cf:build && opennextjs-cloudflare preview",
-    "cf:deploy": "npm run cf:build && opennextjs-cloudflare deploy"
+    "cf:deploy": "node scripts/cf-deploy.mjs"
   },
   "dependencies": {
     "@everloot/protocol": "file:../packages/protocol",
