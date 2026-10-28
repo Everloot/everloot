@@ -194,6 +194,102 @@ describe("uploading", () => {
   });
 });
 
+describe("answers that are not a receipt", () => {
+  const SECRET = "sk-live-do-not-echo";
+  const html = (status: number, headers: Record<string, string> = {}) =>
+    new Response(`<!doctype html><html><body>Bad gateway ${SECRET}</body></html>`, { status, headers: { "content-type": "text/html", ...headers } });
+  /** Runs one upload of one row against `answer` and returns the error it failed with, and whether the row was marked sent. */
+  async function failure(answer: (signal: AbortSignal | undefined) => Response | Promise<Response>, timeoutMs?: number) {
+    const { file, state } = workspace(luaFile([loot(1)]));
+    const send = (async (_url: string | URL | Request, init?: RequestInit) => answer(init?.signal ?? undefined)) as typeof fetch;
+    const error = await uploadFile(file, { endpoint: "https://everloot.example", fetch: send, state, timeoutMs }).then(() => null, (e: unknown) => e as Error);
+    return { error, sent: state.has("https://everloot.example|abcd-1234-ef56-7890", "epoch:1") };
+  }
+  const plain = (e: Error | null) => {
+    expect(e).toBeInstanceOf(Error);
+    expect(e!.message).not.toMatch(/JSON|Unexpected token|<|doctype/i);
+    expect(e!.message).not.toContain(SECRET);
+  };
+
+  test("a request that never answers stops at the time limit, and nothing is marked sent", async () => {
+    let aborted = false;
+    const r = await failure((signal) => new Promise(() => { signal?.addEventListener("abort", () => { aborted = true; }); }), 50);
+    plain(r.error);
+    expect(r.error!.message).toMatch(/everloot\.example did not answer/);
+    expect(aborted).toBe(true);
+    expect(r.sent).toBe(false);
+  }, 2000);
+
+  test("an answer whose body never ends stops at the time limit too", async () => {
+    let cancelled = false;
+    const r = await failure(() => new Response(new ReadableStream({ cancel() { cancelled = true; } }), { status: 200 }), 50);
+    plain(r.error);
+    expect(r.error!.message).toMatch(/did not answer/);
+    expect(cancelled).toBe(true);
+    expect(r.sent).toBe(false);
+  }, 2000);
+
+  test("an HTML error page says the status, not the page", async () => {
+    const r = await failure(() => html(502));
+    plain(r.error);
+    expect(r.error!.message).toMatch(/502/);
+    expect(r.error!.message).toMatch(/keep your file/i);
+    expect(r.sent).toBe(false);
+  });
+
+  test("an HTML 429 still reads as a rate limit and says when to retry", async () => {
+    const r = await failure(() => html(429, { "retry-after": "120" }));
+    plain(r.error);
+    expect(r.error!.message).toMatch(/rate limited/i);
+    expect(r.error!.message).toMatch(/2 min/);
+    expect(r.sent).toBe(false);
+  });
+
+  test("a JSON 429 keeps the site's words and adds the wait", async () => {
+    const r = await failure(() => Response.json({ ok: false, error: "Upload rate limited. Keep your file and retry later." }, { status: 429, headers: { "retry-after": "600" } }));
+    expect(r.error!.message).toMatch(/^Upload rate limited\. Keep your file and retry later\./);
+    expect(r.error!.message).toMatch(/10 min/);
+    expect(r.sent).toBe(false);
+  });
+
+  test("a JSON refusal gives the site's reason with its status", async () => {
+    const r = await failure(() => Response.json({ ok: false, error: "Upload batch exceeds 1 MB. Split the file and retry." }, { status: 413 }));
+    expect(r.error!.message).toMatch(/Upload batch exceeds 1 MB\. Split the file and retry\./);
+    expect(r.error!.message).toMatch(/413/);
+    expect(r.sent).toBe(false);
+  });
+
+  test("a 200 that is not a receipt (a captive portal, a proxy page) is a failure, not a parse error", async () => {
+    const r = await failure(() => html(200));
+    plain(r.error);
+    expect(r.error!.message).toMatch(/not an Everloot receipt/);
+    expect(r.sent).toBe(false);
+  });
+
+  test("a network error says the site could not be reached", async () => {
+    const r = await failure(() => { throw new TypeError("fetch failed"); });
+    expect(r.error!.message).toMatch(/could not reach everloot\.example/i);
+    expect(r.sent).toBe(false);
+  });
+
+  test("after a 502 on the second batch, the first stays sent and a retry sends only the rest, once", async () => {
+    const rows = Array.from({ length: 2500 }, (_, i) => loot(i + 1));
+    const { file, dir } = workspace(luaFile(rows));
+    const statePath = join(dir, "state", "sent.json");
+    const api = intake((call) => (call === 1 ? html(502) : undefined));
+    const error = await uploadFile(file, { endpoint: "https://everloot.example", fetch: api.send, state: createSentState(statePath) }).then(() => null, (e: Error) => e);
+    plain(error);
+    expect(error!.message).toMatch(/502/);
+    const retry = intake();
+    expect(await uploadFile(file, { endpoint: "https://everloot.example", fetch: retry.send, state: createSentState(statePath) })).toMatchObject({ sent: 500, batches: 1 });
+    const first = new Set(api.bodies[0].records.map((r) => r.eventId));
+    expect(retry.bodies[0].records.some((r) => first.has(r.eventId))).toBe(false);
+    // The other site's progress is its own: the same file to another endpoint sends everything.
+    const other = intake();
+    expect(await uploadFile(file, { endpoint: "https://other.example", fetch: other.send, state: createSentState(statePath) })).toMatchObject({ sent: 2500 });
+  });
+});
+
 describe("settled facts", () => {
   const BUILD = "1.60.1.70450";
   const withBuild = (text: string) => text.replace('["installId"]', `["clientBuild"] = "${BUILD}",
