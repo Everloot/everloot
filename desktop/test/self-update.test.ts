@@ -97,6 +97,18 @@ test("an encoded path separator in the file name cannot write outside the update
   expect(existsSync(join(root, "data", "escaped.exe"))).toBe(false);
 });
 
+test("requests use canonical HTTPS release URLs built from the validated tag and filename", async () => {
+  const send = vi.fn(async (url: string) => new URL(url).pathname.endsWith("/SHA256SUMS")
+    ? new Response(`${sha(installer)}  Everloot-DesktopApp-0.2.0-win-x64-setup.exe\n`)
+    : new Response(installer));
+  await downloadUpdate({
+    url: URL_EXE.replace("github.com", "github.com:443"),
+    sumsUrl: URL_SUMS.replace("github.com", "GITHUB.COM"),
+    dir: dir(), send: send as unknown as typeof fetch,
+  });
+  expect(send.mock.calls.map(([url]) => url)).toEqual([URL_SUMS, URL_EXE]);
+});
+
 test("GitHub's redirect to its download host is followed, but not one off HTTPS", async () => {
   const signed = "https://release-assets.githubusercontent.com/github-production-release-asset/1/abc?sp=r&sig=x";
   const redirected = (to: string) => vi.fn(async (url: string) => {

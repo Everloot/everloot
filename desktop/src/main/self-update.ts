@@ -92,15 +92,16 @@ export async function downloadUpdate(options: {
     throw new Error("the update is not an Everloot Desktop App release download; nothing was downloaded");
   }
   const file = asset.name;
+  const release = `https://github.com/Everloot/everloot/releases/download/desktop-v${asset.version}/`;
 
-  const sumsRes = await send(options.sumsUrl, { signal: AbortSignal.timeout(15_000) });
+  const sumsRes = await send(`${release}SHA256SUMS`, { signal: AbortSignal.timeout(15_000) });
   await checkResponse(sumsRes, "release checksums");
   const sumsChunks: Uint8Array[] = [];
   for await (const chunk of bounded(sumsRes, SUMS_LIMIT, "release checksums")) sumsChunks.push(chunk);
   const expected = checksumFor(Buffer.concat(sumsChunks).toString("utf8"), file);
   if (!expected) throw new Error(`${file} is not listed in the release checksums`);
 
-  const res = await send(options.url, { signal: AbortSignal.timeout(15 * 60_000) });
+  const res = await send(`${release}${file}`, { signal: AbortSignal.timeout(15 * 60_000) });
   await checkResponse(res, "download");
   const total = Number(res.headers.get("content-length")) || 0;
   const target = join(options.dir, file);
