@@ -42,7 +42,8 @@
     "EVERLOOT_DEPLOY_ENV": "preview",
     "NEWS_DIR": "/bundle/repo/kb/news",
     "GUIDES_DIR": "/bundle/repo/kb/guides",
-    "WIKI_DIR": "/bundle/repo/kb/wiki"
+    "WIKI_DIR": "/bundle/repo/kb/wiki",
+    "PROTOCOL_SCHEMA_DIR": "/bundle/repo/protocol-schema"
   },
   "observability": {
     "enabled": true,

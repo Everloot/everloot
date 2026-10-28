@@ -16,4 +16,6 @@ if (!existsSync(".open-next")) {
 }
 rmSync(OUT, { recursive: true, force: true });
 for (const dir of DIRS) cpSync(join("..", dir), join(OUT, dir), { recursive: true });
-console.log(`Copied ${DIRS.join(", ")} into ${OUT}`);
+// The protocol's JSON Schema files, served by /schema/<file>.json (PROTOCOL_SCHEMA_DIR).
+cpSync(join("node_modules", "@everloot", "protocol", "schema"), join(OUT, "protocol-schema"), { recursive: true });
+console.log(`Copied ${DIRS.join(", ")} and the protocol schemas into ${OUT}`);

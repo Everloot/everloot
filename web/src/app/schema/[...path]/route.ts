@@ -13,7 +13,8 @@ export const dynamic = "force-static";
 const SAFE = /^(?:[a-z_]+|records\/[a-z_]+|api\/[a-zA-Z]+|mcp\/[a-z_]+)\.json$/;
 
 // Resolved from the working directory, as the other file reads do: the bundler would turn an import.meta.url into a module id.
-const schemaDir = join(process.cwd(), "node_modules", "@everloot", "protocol", "schema");
+// PROTOCOL_SCHEMA_DIR points elsewhere on the Cloudflare Worker, where the files ship as text modules (wrangler.jsonc).
+const schemaDir = () => process.env.PROTOCOL_SCHEMA_DIR?.trim() || join(process.cwd(), "node_modules", "@everloot", "protocol", "schema");
 
 export async function GET(_req: Request, context: { params: Promise<{ path: string[] }> }) {
   const { path } = await context.params;
@@ -21,7 +22,7 @@ export async function GET(_req: Request, context: { params: Promise<{ path: stri
   if (!SAFE.test(file)) return NextResponse.json({ ok: false, error: "No such schema file." }, { status: 404, headers: { "Cache-Control": "no-store" } });
   let body: string;
   try {
-    body = await readFile(join(schemaDir, file), "utf8");
+    body = await readFile(join(schemaDir(), file), "utf8");
   } catch {
     return NextResponse.json({ ok: false, error: "No such schema file." }, { status: 404, headers: { "Cache-Control": "no-store" } });
   }
