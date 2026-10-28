@@ -42,6 +42,15 @@
     // PostHog off until everloot.app moves here; set "production" in the cutover deploy.
     "EVERLOOT_PLATFORM": "cloudflare",
     "EVERLOOT_DEPLOY_ENV": "preview",
+    // Feature switches, as in production. Pages built ahead of time read them during the build too, so
+    // scripts/cf-deploy.mjs passes every var except the *_DIR paths to the build.
+    "EVERLOOT_DATA_GUARD": "1",
+    "EVERLOOT_MCP_PUBLIC": "1",
+    "EVERLOOT_PLAYER_PAGES": "1",
+    "EVERLOOT_SAVED_BUILDS": "1",
+    "EVERLOOT_GUILDS": "1",
+    "EVERLOOT_PROFILES": "1",
+    "EVERLOOT_CHAT_WORKSPACE": "1",
     "NEWS_DIR": "/bundle/repo/kb/news",
     "GUIDES_DIR": "/bundle/repo/kb/guides",
     "WIKI_DIR": "/bundle/repo/kb/wiki",
