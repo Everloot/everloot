@@ -33,7 +33,7 @@
     // The knowledge release (lore pages, search, /api/tools, /mcp), one database per release, imported from the SQL
     // files scripts/cf-release-d1.mjs writes. Placeholder id until the database is created; set
     // KNOWLEDGE_RELEASE_SHA256 below to the same release.
-    { "binding": "KNOWLEDGE_D1", "database_name": "everloot-knowledge-2026-10-24", "database_id": "00000000-0000-0000-0000-000000000000" }
+    { "binding": "KNOWLEDGE_D1", "database_name": "everloot-knowledge-2026-10-24", "database_id": "03c6966a-d028-467f-a7e3-fdf550a956f1" }
   ],
   // Repository files the pages read at run time (news, guides, wiki pages), copied into .open-next/repo by
   // scripts/cf-bundle-files.mjs and uploaded as text modules, so node:fs finds them under /bundle/repo.
