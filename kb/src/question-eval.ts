@@ -7,7 +7,8 @@
 import { answerSources, type AnswerSourcesFacts, type EvidenceKind } from "./answer-sources.js";
 import type { DB } from "./db.js";
 import type { Question, SubjectKind } from "./question-bank.js";
-import { getByName, search } from "./search.js";
+import { sameTitle } from "./name-aliases.js";
+import { getByName, search, searchSomeWords } from "./search.js";
 
 /** How the subject's name met a record: by its exact title, through search on the question, or not at all. */
 export type Resolution = "exact" | "search" | "none" | "n/a";
@@ -42,7 +43,8 @@ export interface EvalReport {
   results: QuestionResult[];
 }
 
-const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+/** The same title with or without its article: "The Barrens" asked, "Barrens" on the page. */
+const sameName = sameTitle;
 
 /**
  * The subject's name resolved exactly, or a search on the question text returns a record carrying that name.
@@ -52,7 +54,9 @@ const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().t
 export function resolve(db: DB, q: Question): Resolution {
   if (!q.expects.resolve) return "n/a";
   if (q.template !== "alias" && getByName(db, q.subject.name).length > 0) return "exact";
-  return search(db, q.text, 5).some((h) => sameName(h.name, q.subject.name)) ? "search" : "none";
+  // The same two steps search_knowledge takes: pages with every asked word, else pages with some of them.
+  const hits = search(db, q.text, 5);
+  return (hits.length ? hits : searchSomeWords(db, q.text, 5)).some((h) => sameName(h.name, q.subject.name)) ? "search" : "none";
 }
 
 export function evaluateQuestion(db: DB, q: Question, facts: AnswerSourcesFacts | null, dataAsOf: string | null): QuestionResult {

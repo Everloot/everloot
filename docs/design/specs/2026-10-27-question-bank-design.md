@@ -68,6 +68,17 @@ knowledge release needs that kind as an entity with a page link, ids and facts o
 page. A template with no evidence (riding skill, criteria, worth) says a tool or an evidence kind is missing. The
 aliases say whether short forms map at all. Each fix is a normal pull request, and the next report proves it.
 
+## Fixes the eval has proven
+
+- **Name aliases (same day).** `kb/src/name-aliases.ts`: the short forms players type (MC, BRD, BWL, ZG, AQ20,
+  AQ40, SM, DM, VC, WC, RFC, SFK, ST, UBRS, Strat, Scholo, Mara, Ony, Naxx, Uld, the cities, STV, EPL, WPL, the
+  battlegrounds, AH, DMF) mapped to the titles the release carries. `search` expands them before reading the words
+  and puts the expanded names' own pages first; `get_by_name` falls back to the alias and to the title with or
+  without its article ("The Barrens" / "Barrens"). The eval's alias row went from 0 of 20 resolved to 20 of 20,
+  zones from 96% to 100% (`docs/evals/question-eval-2026-10-27-aliases.md`, which also carries the bosses, mounts
+  and achievements the merged game-data files added to the bank: 4,434 questions now, 65% resolving, with the
+  achievements (13%) and mounts (44%) as the next gap).
+
 ## Phase 2 (design only): a model in the loop
 
 Run the bank, or a sample of it, through the chat's own planner (`web/src/lib/chat/agent.ts`) with a fixture
