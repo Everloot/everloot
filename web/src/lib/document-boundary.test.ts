@@ -38,6 +38,13 @@ describe("isProtectedPath", () => {
     for (const path of ["/tools/alts", "/tools/alts/x", "/beta/tools/alts"]) expect(isProtectedPath(path), path).toBe(true);
     for (const path of ["/tools/altsx", "/tools/alt", "/ptr/tools/alts"]) expect(isProtectedPath(path), path).toBe(false);
   });
+
+  test("writing a guide is protected, under the served prefix too; the guide pages and look-alikes are not", () => {
+    for (const path of ["/guides/write", "/guides/write/x", "/beta/guides/write"]) expect(isProtectedPath(path), path).toBe(true);
+    for (const path of ["/guides", "/guides/frost-leveling", "/guides/feed.xml", "/guides/writer", "/guides/writ", "/ptr/guides/write"]) {
+      expect(isProtectedPath(path), path).toBe(false);
+    }
+  });
 });
 
 describe("documentPathname", () => {
@@ -86,6 +93,13 @@ describe("crossesDocumentBoundary", () => {
     expect(crossesDocumentBoundary("/tools/talents/mage", fakeWindow("/tools/talents/mage", "https://everloot.app/tools/alts"))).toBe(true);
     expect(crossesDocumentBoundary("/tools/alts", fakeWindow("/tools/alts", "https://everloot.app/tools/builds"))).toBe(false);
   });
+
+  test("going from the guides to writing one crosses it, and so does a link from the draft's preview to a guide; settings does not", () => {
+    expect(crossesDocumentBoundary("/guides/write", fakeWindow("/guides/write", "https://everloot.app/guides"))).toBe(true);
+    expect(crossesDocumentBoundary("/guides/frost-leveling", fakeWindow("/guides/frost-leveling", "https://everloot.app/guides/write?guide=1"))).toBe(true);
+    // Settings, where a handle is chosen, is on the same side.
+    expect(crossesDocumentBoundary("/guides/write", fakeWindow("/guides/write", "https://everloot.app/settings"))).toBe(false);
+  });
 });
 
 /** The headers a request for `path` gets: Next applies every matching entry in order, and a later entry's key wins. */
@@ -121,6 +135,22 @@ describe("Plans on this device's document", () => {
     const site = (await headersFor("/"))["Content-Security-Policy"];
     for (const path of ["/tools", "/tools/talents", "/tools/talents/mage", "/tools/buildsx"]) {
       expect((await headersFor(path))["Content-Security-Policy"], path).toBe(site);
+    }
+  });
+});
+
+describe("the guide writer's document", () => {
+  test("gets the protected pages' policy for a player's private drafts, and the published guides keep the public one", async () => {
+    const strict = (await headersFor("/chat"))["Content-Security-Policy"]!;
+    const site = await headersFor("/");
+    for (const path of ["/guides/write", "/beta/guides/write"]) {
+      const got = await headersFor(path);
+      expect(got["Content-Security-Policy"], path).toBe(strict);
+      // The microphone stays Chat's alone.
+      expect(got["Permissions-Policy"], path).toBe(site["Permissions-Policy"]);
+    }
+    for (const path of ["/guides", "/guides/frost-leveling", "/guides/feed.xml", "/guides/writer"]) {
+      expect((await headersFor(path))["Content-Security-Policy"], path).toBe(site["Content-Security-Policy"]);
     }
   });
 });
