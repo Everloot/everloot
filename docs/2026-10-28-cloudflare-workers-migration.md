@@ -182,6 +182,29 @@ Build and deploy from GitHub Actions on merge to `main` (a scoped deploy token),
   asks `/api/health` every 15 minutes and opens one `site-down` issue on failure, closing it when healthy.
   Logs stay sampled at 10%.
 
+### 8. Runtime audit (10/28)
+
+Fixed before the switch: `NODE_ENV=production` in the Worker vars (Workers sets none, and code reading it through a
+variable took the development path: insecure cookies, memory stores); each cron job runs as its own request through
+`WORKER_SELF_REFERENCE`, with its own CPU, memory and subrequest budget; the page cache keeps a regional copy for up
+to a minute (`withRegionalCache`, `short-lived`, so opt-outs still clear everywhere within a minute);
+`/api/items/categories` and `/api/edges/client-layer` set `Access-Control-Allow-Origin: *` themselves (Vercel added
+it to prerendered responses). Env parity: Vercel production sets no variable the Worker lacks except
+`EVERLOOT_KB_RELEASE_KEY`, which D1 replaces.
+
+Follow-ups, none on the switch path:
+
+- **Before `EVERLOOT_AUTH_V2` or the free chat turn on:** `web/src/lib/auth/db.ts` keeps a module-level `pg` Pool,
+  and a Worker refuses I/O on a socket another request opened; use Hyperdrive and a client per request, which also
+  avoids pg's custom-CA TLS path.
+- **Memory:** `snapshots/corpus.json`, `market.json` and `completion.json` are about 0.1 MB each today (10/28) and
+  are parsed whole into a 128 MB isolate (the snapshot cron holds two). Watch their size after launch; split or
+  stream before ~30 MB.
+- **D1 round trips:** count queries per lore page and per MCP call once traffic arrives; batch where a page asks
+  many.
+- **Skew:** tabs open across a deploy may ask for script chunks the new build no longer has (OpenNext skew
+  protection is off).
+
 ## Coordination with the platform plan
 
 The platform readiness plan (desktop terminal, `docs/superpowers/plans/2026-10-28-platform-readiness.md` on its

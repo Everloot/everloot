@@ -44,6 +44,9 @@
   "vars": {
     // web/src/lib/platform.ts: trust cf-connecting-ip, and name the environment for analytics. "preview" keeps
     // PostHog off until everloot.app moves here; set "production" in the cutover deploy.
+    // Workers sets no NODE_ENV, and code that reads it through a variable (secure cookies, the stores' production
+    // checks) would take the development path (runtime audit, 10/28).
+    "NODE_ENV": "production",
     "EVERLOOT_PLATFORM": "cloudflare",
     "EVERLOOT_DEPLOY_ENV": "preview",
     // Feature switches, as in production. Pages built ahead of time read them during the build too, so

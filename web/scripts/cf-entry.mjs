@@ -20,13 +20,15 @@ export default {
     return res;
   },
 
-  // A failed job throws, so Cloudflare's cron history shows it (logs are sampled; this is not).
+  // Each job runs as its own request through the Worker's self-binding, so each gets its own CPU budget, memory and
+  // subrequest count rather than sharing the trigger's. A failed job throws, so Cloudflare's cron history shows it
+  // (logs are sampled; this is not).
   async scheduled(controller, env, ctx) {
     const secret = env.CRON_SECRET;
     if (!secret) throw new Error("[cron] CRON_SECRET is not set; nothing ran");
     const failures = [];
     await Promise.all(cronPaths(controller.cron).map(async (path) => {
-      const res = await handler.fetch(cronRequest(path, secret), env, ctx);
+      const res = await env.WORKER_SELF_REFERENCE.fetch(cronRequest(path, secret));
       if (!res.ok) failures.push(`${path} answered ${res.status}: ${(await res.text()).slice(0, 300)}`);
     }));
     if (failures.length) throw new Error(`[cron] ${failures.join("; ")}`);
