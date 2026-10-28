@@ -18,6 +18,7 @@
   "dependencies": {
     "@everloot/protocol": "file:../packages/protocol",
     "@modelcontextprotocol/sdk": "1.32.1",
+    "@opennextjs/cloudflare": "^1.20.14",
     "aws4fetch": "^1.0.20",
     "better-auth": "1.7.12",
     "better-sqlite3": "13.0.3",
@@ -49,7 +50,8 @@
     "tailwindcss": "^3.4.13",
     "tsx": "4.23.15",
     "typescript": "^5.6.3",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "wrangler": "^4.154.0"
   },
   "overrides": {
     "postcss": "$postcss",

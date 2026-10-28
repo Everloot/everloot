@@ -1,0 +1,20 @@
+// The site on Cloudflare Workers through OpenNext (decision 2026-10-28: move off Vercel after launch).
+// A spike for now: it deploys to everloot-web.<account>.workers.dev, not to everloot.app.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "everloot-web",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    { "binding": "WORKER_SELF_REFERENCE", "service": "everloot-web" }
+  ],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.1
+  }
+}

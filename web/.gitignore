@@ -42,3 +42,8 @@ next-env.d.ts
 
 # approved knowledge release copied for the /mcp route (never committed; see docs/2026-10-09-public-mcp-hosting-options.md)
 /.release/
+
+# Cloudflare Workers (OpenNext) build output and local secrets
+/.open-next/
+/.wrangler/
+.dev.vars
