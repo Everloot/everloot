@@ -201,7 +201,7 @@ function describe(name: string, realm: string, reading: Reading): { kind: Market
   }
   const v = reading.value;
   const stale = v.ageDays > STALE_DAYS;
-  const closing = "A recorded community blend, not a live auction quote.";
+  const closing = "Recorded asking prices, not completed sales or a live quote.";
   const staleNote = stale ? `Stale: the newest public day is ${ago(v.ageDays)} old.` : "";
   const fitted = (essential: string, ...notes: string[]) => {
     let text = essential;
@@ -218,7 +218,7 @@ function describe(name: string, realm: string, reading: Reading): { kind: Market
   // No recent market value. The result does not say why (old days, thin days or an outlier can each cause it), so
   // that is not claimed: the value is unrecorded, and the newest day's own state is described beside it.
   const thin = v.thin ? `The newest public day is thin (${v.quantity} listed), so it is not counted in a market value.` : "";
-  const note = "Unrecorded is not zero, and this is not a live auction quote.";
+  const note = "Unrecorded is not zero; these are asking prices, not sales or a live quote.";
   return { kind: v.thin && !stale ? "thin" : "stale", text: fitted(`${head}: recent market value unrecorded; ${prices}. ${seen}, ${v.quantity} listed.`, thin, staleNote, note) };
 }
 

@@ -27,4 +27,4 @@ export const FIXTURE_STRUCTURED = {
 /** The deterministic answer every surface gives for that result, with the item's name known. */
 export const FIXTURE_ANSWER =
   "Linen Cloth (item 2589) on Forever, all houses: market 3s 10c, minimum 3s 0c, historical 3s 10c each. " +
-  "Newest public day 2026-10-20, 3 reporters, 100 listed. A recorded community blend, not a live auction quote.";
+  "Newest public day 2026-10-20, 3 reporters, 100 listed. Recorded asking prices, not completed sales or a live quote.";

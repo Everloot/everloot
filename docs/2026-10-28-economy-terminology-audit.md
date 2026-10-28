@@ -4,6 +4,18 @@ Date: 2026-10-28. Read-only audit for [ECON-E01](2026-10-28-platform-gap-registe
 `3608a4a9`. No code, schema, rollup, version or migration changed. Nothing here was run against a service,
 the game or production; every claim below is read from the repository.
 
+## Follow-up delivery, 2026-10-28
+
+F4, F6 and F7 are corrected locally: shared chat answers distinguish asking prices from sales, addon prices
+state their per-unit basis, Desktop and the realm page name the all-house blend, and own-scan status names
+its actual realm scope. The sells-for regression failed before the change; afterwards web market/chat 145,
+Desktop agent 29 and companion bridge 29 tests passed. Updated market and auction-tab Lua contracts pass.
+These are source/fixture checks, not live-game or packaged-release acceptance.
+
+F1, F2, F3 and F5 remain open. They touch shared KB/protocol paths while the Cloudflare lane converts the
+knowledge read layer. Coordinate file ownership before changing those sources; generated protocol output
+and changelog must stay consistent when protocol descriptions change. No market calculation changed here.
+
 ## What the data is
 
 - **Market rows are asking prices.** A full scan reads each listing's buyout and divides it by the stack size

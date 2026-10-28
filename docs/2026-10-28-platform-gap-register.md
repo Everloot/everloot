@@ -99,6 +99,10 @@ PvP is already requested product scope. API availability, participant disclosure
 scope approval is not an excuse to fabricate support. Combat parsing requires a real supported sample,
 but a format-neutral bounded file reader and test harness can be implemented beforehand.
 
+ECON-E01 progress: [terminology audit](2026-10-28-economy-terminology-audit.md) F4/F6/F7 corrected locally
+with shared-answer parity and Lua contracts passing. F1/F2/F3/F5 remain for coordinated KB/protocol changes;
+the terminology task is not complete and no market calculation or data coverage changed.
+
 ## Team operations and SaaS readiness
 
 Owner direction accepted 2026-10-28: support a small maintenance team with accountable follow-up. These are

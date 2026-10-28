@@ -137,7 +137,7 @@ local function priceLines(realm, itemId)
     local market = row.market and E.Coins(row.market)
       or (row.quantity <= E.THIN_UNITS and "unrecorded (thin)" or "unrecorded")
     -- The website can show one auction house; this file blends every house on the realm, so say so beside the numbers.
-    add(string.format("Everloot market %s · min %s · historical %s · all houses",
+    add(string.format("Everloot market %s · min %s · historical %s · per unit · all houses",
       market, E.Coins(row.min), E.Coins(row.historical)), 0.9, 0.8, 0.5)
     add(string.format("  %d up · %d reporters · %s", row.quantity, row.reporters, row.day), 0.6, 0.6, 0.6)
     -- Two separate facts. The item's newest public day says how old its prices are; the file's build time says
@@ -162,7 +162,7 @@ local function priceLines(realm, itemId)
   local item = own and own.items[itemId]
   if item then
     local hours = math.floor((time() - own.at) / 3600)
-    add(string.format("Your scan: min %s · value %s · %d up · %s", E.Coins(item[4]), E.Coins(item[5]), item[3],
+    add(string.format("Your scan: min %s · value %s · per unit · %d up · %s", E.Coins(item[4]), E.Coins(item[5]), item[3],
       hours < 1 and "under 1 h ago" or (hours .. " h ago")), 0.6, 0.8, 1)
   end
   return out, entry

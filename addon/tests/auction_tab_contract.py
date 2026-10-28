@@ -98,7 +98,7 @@ assert(replicateCalls == 0, 'opening the house never scans')
 -- The panel: status, a scan on click, the cooldown, and the saved state.
 T.tab.scripts.OnClick()
 assert(T.panel.shown, 'the tab shows the panel')
-assert(string.find(T.panel.status.text, 'Ready to scan.', 1, true) and string.find(T.panel.status.text, 'No scan of this house yet.', 1, true), T.panel.status.text)
+assert(string.find(T.panel.status.text, 'Ready to scan.', 1, true) and string.find(T.panel.status.text, 'No scan on this realm yet.', 1, true), T.panel.status.text)
 T.panel.scanButton.scripts.OnClick()
 assert(replicateCalls == 1, 'Scan this house starts one scan')
 assert(string.find(T.panel.status.text, 'Scanning', 1, true), T.panel.status.text)
@@ -108,7 +108,7 @@ now = now + 125
 T.Refresh()
 local status = T.panel.status.text
 assert(string.find(status, 'Next scan in 12:55.', 1, true), status)
-assert(string.find(status, 'Last scan: 2 items, 2 min ago.', 1, true), status)
+assert(string.find(status, 'Last scan on this realm: 2 items, 2 min ago.', 1, true), status)
 assert(string.find(status, 'Not saved yet', 1, true), 'a scan from this session is not in the saved file yet')
 T.panel.scanButton.scripts.OnClick()
 assert(replicateCalls == 1, 'no second scan inside the cooldown')
