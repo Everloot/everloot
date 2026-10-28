@@ -1,0 +1,1005 @@
+{
+  "schema": "everloot.legacy-perks/1",
+  "label": "found in game files, unconfirmed",
+  "credit": "Game data © Blizzard Entertainment, Inc., read from the public client; not under Everloot's licence. Column names from WoWDBDefs (https://github.com/wowdev/WoWDBDefs), CC BY-SA 4.0.",
+  "build": {
+    "product": "wowf",
+    "buildId": 70634,
+    "version": "1.60.1.70634",
+    "buildConfig": "7d8ae4cd9c1f639a3ea04fd47e21c746",
+    "definitions": "50ce5d272897",
+    "extractedAt": "2026-10-27T21:56:28.341Z"
+  },
+  "traitSystemId": 45,
+  "currencies": [
+    {
+      "id": 4225,
+      "cap": {
+        "value": 16,
+        "confidence": "inferred",
+        "from": "TraitCurrency.SourcedMax"
+      }
+    }
+  ],
+  "trees": [
+    {
+      "id": 1187,
+      "currencyId": 4225,
+      "cost": {
+        "value": 1,
+        "confidence": "inferred",
+        "from": "TraitTreeXTraitCost, TraitCost.Amount",
+        "traitCostId": 4843,
+        "currencyId": 4225
+      },
+      "nodes": [
+        {
+          "id": 110284,
+          "x": 4200,
+          "y": 1750,
+          "kind": "single",
+          "flags": 8,
+          "ranks": {
+            "value": 1,
+            "confidence": "stored",
+            "from": "TraitNodeEntry.MaxRanks"
+          },
+          "entries": [
+            {
+              "id": 136844,
+              "definitionId": 141607,
+              "spellId": 1225469,
+              "name": "Dedicated Study",
+              "maxRanks": 1
+            }
+          ],
+          "prereqs": [
+            {
+              "nodeId": 110286,
+              "rule": "any",
+              "confidence": "stored"
+            }
+          ]
+        },
+        {
+          "id": 110286,
+          "x": 3300,
+          "y": 1750,
+          "kind": "single",
+          "flags": 8,
+          "ranks": {
+            "value": 2,
+            "confidence": "stored",
+            "from": "TraitNodeEntry.MaxRanks"
+          },
+          "entries": [
+            {
+              "id": 136843,
+              "definitionId": 141606,
+              "spellId": 1225459,
+              "name": "Bartering",
+              "maxRanks": 2
+            }
+          ],
+          "prereqs": []
+        },
+        {
+          "id": 110289,
+          "x": 3300,
+          "y": 850,
+          "kind": "single",
+          "flags": 8,
+          "ranks": {
+            "value": 5,
+            "confidence": "stored",
+            "from": "TraitNodeEntry.MaxRanks"
+          },
+          "entries": [
+            {
+              "id": 136850,
+              "definitionId": 141613,
+              "spellId": 1225457,
+              "name": "Master Chef",
+              "maxRanks": 5
+            }
+          ],
+          "prereqs": []
+        },
+        {
+          "id": 110290,
+          "x": 2400,
+          "y": 1750,
+          "kind": "single",
+          "flags": 8,
+          "ranks": {
+            "value": 5,
+            "confidence": "stored",
+            "from": "TraitNodeEntry.MaxRanks"
+          },
+          "entries": [
+            {
+              "id": 136841,
+              "definitionId": 141604,
+              "spellId": 1225451,
+              "name": "Working Overtime",
+              "maxRanks": 5
+            }
+          ],
+          "prereqs": []
+        },
+        {
+          "id": 110291,
+          "x": 2400,
+          "y": 2650,
+          "kind": "single",
+          "flags": 8,
+          "ranks": {
+            "value": 5,
+            "confidence": "stored",
+            "from": "TraitNodeEntry.MaxRanks"
+          },
+          "entries": [
+            {
+              "id": 136848,
+              "definitionId": 141611,
+              "spellId": 1225435,
+              "name": "Bountiful Harvest",
+              "maxRanks": 5
+            }
+          ],
+          "prereqs": []
+        },
+        {
+          "id": 110292,
+          "x": 3300,
+          "y": 2650,
+          "kind": "single",
+          "flags": 8,
+          "ranks": {
+            "value": 3,
+            "confidence": "stored",
+            "from": "TraitNodeEntry.MaxRanks"
+          },
+          "entries": [
+            {
+              "id": 136842,
+              "definitionId": 141605,
+              "spellId": 1225456,
+              "name": "Performance Bonus",
+              "maxRanks": 3
+            }
+          ],
+          "prereqs": [
+            {
+              "nodeId": 110291,
+              "rule": "any",
+              "confidence": "stored"
+            }
+          ]
+        },
+        {
+          "id": 110293,
+          "x": 3300,
+          "y": 3550,
+          "kind": "single",
+          "flags": 8,
+          "ranks": {
+            "value": 2,
+            "confidence": "stored",
+            "from": "TraitNodeEntry.MaxRanks"
+          },
+          "entries": [
+            {
+              "id": 136849,
+              "definitionId": 141612,
+              "spellId": 1225455,
+              "name": "Luremaster",
+              "maxRanks": 2
+            }
+          ],
+          "prereqs": []
+        },
+        {
+          "id": 113506,
+          "x": 5100,
+          "y": 2650,
+          "kind": "single",
+          "flags": 10,
+          "ranks": {
+            "value": 1,
+            "confidence": "stored",
+            "from": "TraitNodeEntry.MaxRanks"
+          },
+          "entries": [
+            {
+              "id": 140812,
+              "definitionId": 145485,
+              "spellId": 1317256,
+              "name": "Unknown",
+              "maxRanks": 1
+            }
+          ],
+          "prereqs": [
+            {
+              "nodeId": 113508,
+              "rule": "any",
+              "confidence": "stored"
+            }
+          ]
+        },
+        {
+          "id": 113508,
+          "x": 4200,
+          "y": 2650,
+          "kind": "single",
+          "flags": 10,
+          "ranks": {
+            "value": 1,
+            "confidence": "stored",
+            "from": "TraitNodeEntry.MaxRanks"
+          },
+          "entries": [
+            {
+              "id": 140814,
+              "definitionId": 145487,
+              "spellId": 1317256,
+              "name": "Unknown",
+              "maxRanks": 1
+            }
+          ],
+          "prereqs": []
+        }
+      ],
+      "gates": [
+        {
+          "condId": 49251,
+          "amount": 10,
+          "currencyId": 4225,
+          "guardedGroupId": 12442,
+          "guards": [
+            110284
+          ],
+          "countedGroupId": 12440,
+          "counted": [
+            110284,
+            110286,
+            110289,
+            110290,
+            110291,
+            110292,
+            110293
+          ],
+          "confidence": "inferred",
+          "from": "TraitCond.TraitNodeGroupID"
+        },
+        {
+          "condId": 49252,
+          "amount": 5,
+          "currencyId": 4225,
+          "guardedGroupId": 12441,
+          "guards": [
+            110286,
+            110289,
+            110292,
+            110293
+          ],
+          "countedGroupId": 12440,
+          "counted": [
+            110284,
+            110286,
+            110289,
+            110290,
+            110291,
+            110292,
+            110293
+          ],
+          "confidence": "inferred",
+          "from": "TraitCond.TraitNodeGroupID"
+        }
+      ]
+    },
+    {
+      "id": 1188,
+      "currencyId": 4225,
+      "cost": {
+        "value": 1,
+        "confidence": "inferred",
+        "from": "TraitTreeXTraitCost, TraitCost.Amount",
+        "traitCostId": 4844,
+        "currencyId": 4225
+      },
+      "nodes": [
+        {
+          "id": 110296,
+          "x": 2400,
+          "y": 2650,
+          "kind": "single",
+          "flags": 8,
+          "ranks": {
+            "value": 5,
+            "confidence": "stored",
+            "from": "TraitNodeEntry.MaxRanks"
+          },
+          "entries": [
+            {
+              "id": 136864,
+              "definitionId": 141627,
+              "spellId": 1225472,
+              "name": "Thrill of Adventure",
+              "maxRanks": 5
+            }
+          ],
+          "prereqs": []
+        },
+        {
+          "id": 110298,
+          "x": 3300,
+          "y": 1750,
+          "kind": "tiered",
+          "flags": 8,
+          "ranks": {
+            "value": 5,
+            "confidence": "stored",
+            "from": "TraitNodeEntry.MaxRanks"
+          },
+          "entries": [
+            {
+              "id": 136852,
+              "definitionId": 141615,
+              "spellId": 1225474,
+              "name": "Talented",
+              "maxRanks": 1
+            },
+            {
+              "id": 137374,
+              "definitionId": 142134,
+              "spellId": 1225474,
+              "name": "Talented",
+              "maxRanks": 1
+            },
+            {
+              "id": 137373,
+              "definitionId": 142133,
+              "spellId": 1225474,
+              "name": "Talented",
+              "maxRanks": 1
+            },
+            {
+              "id": 137372,
+              "definitionId": 142132,
+              "spellId": 1225474,
+              "name": "Talented",
+              "maxRanks": 1
+            },
+            {
+              "id": 137371,
+              "definitionId": 142131,
+              "spellId": 1225474,
+              "name": "Talented",
+              "maxRanks": 1
+            }
+          ],
+          "prereqs": [
+            {
+              "nodeId": 110301,
+              "rule": "any",
+              "confidence": "stored"
+            }
+          ]
+        },
+        {
+          "id": 110300,
+          "x": 4200,
+          "y": 2650,
+          "kind": "single",
+          "flags": 8,
+          "ranks": {
+            "value": 1,
+            "confidence": "stored",
+            "from": "TraitNodeEntry.MaxRanks"
+          },
+          "entries": [
+            {
+              "id": 136853,
+              "definitionId": 141616,
+              "spellId": 1225490,
+              "name": "Frequent Flier",
+              "maxRanks": 1
+            }
+          ],
+          "prereqs": [
+            {
+              "nodeId": 110304,
+              "rule": "any",
+              "confidence": "stored"
+            }
+          ]
+        },
+        {
+          "id": 110301,
+          "x": 2400,
+          "y": 1750,
+          "kind": "single",
+          "flags": 8,
+          "ranks": {
+            "value": 5,
+            "confidence": "stored",
+            "from": "TraitNodeEntry.MaxRanks"
+          },
+          "entries": [
+            {
+              "id": 136855,
+              "definitionId": 141618,
+              "spellId": 1225478,
+              "name": "Well Rested",
+              "maxRanks": 5
+            }
+          ],
+          "prereqs": []
+        },
+        {
+          "id": 110303,
+          "x": 3300,
+          "y": 3550,
+          "kind": "single",
+          "flags": 8,
+          "ranks": {
+            "value": 2,
+            "confidence": "stored",
+            "from": "TraitNodeEntry.MaxRanks"
+          },
+          "entries": [
+            {
+              "id": 136858,
+              "definitionId": 141621,
+              "spellId": 1225475,
+              "name": "Field Medicine",
+              "maxRanks": 2
+            }
+          ],
+          "prereqs": []
+        },
+        {
+          "id": 110304,
+          "x": 3300,
+          "y": 2650,
+          "kind": "single",
+          "flags": 8,
+          "ranks": {
+            "value": 3,
+            "confidence": "stored",
+            "from": "TraitNodeEntry.MaxRanks"
+          },
+          "entries": [
+            {
+              "id": 136856,
+              "definitionId": 141619,
+              "spellId": 1225479,
+              "name": "Field Guide",
+              "maxRanks": 3
+            }
+          ],
+          "prereqs": []
+        },
+        {
+          "id": 110305,
+          "x": 3300,
+          "y": 850,
+          "kind": "single",
+          "flags": 8,
+          "ranks": {
+            "value": 2,
+            "confidence": "stored",
+            "from": "TraitNodeEntry.MaxRanks"
+          },
+          "entries": [
+            {
+              "id": 136861,
+              "definitionId": 141624,
+              "spellId": 1225477,
+              "name": "High Alert",
+              "maxRanks": 2
+            }
+          ],
+          "prereqs": []
+        },
+        {
+          "id": 113510,
+          "x": 5100,
+          "y": 1750,
+          "kind": "single",
+          "flags": 10,
+          "ranks": {
+            "value": 1,
+            "confidence": "stored",
+            "from": "TraitNodeEntry.MaxRanks"
+          },
+          "entries": [
+            {
+              "id": 140816,
+              "definitionId": 145489,
+              "spellId": 1317256,
+              "name": "Unknown",
+              "maxRanks": 1
+            }
+          ],
+          "prereqs": [
+            {
+              "nodeId": 113511,
+              "rule": "any",
+              "confidence": "stored"
+            }
+          ]
+        },
+        {
+          "id": 113511,
+          "x": 4200,
+          "y": 1750,
+          "kind": "single",
+          "flags": 10,
+          "ranks": {
+            "value": 1,
+            "confidence": "stored",
+            "from": "TraitNodeEntry.MaxRanks"
+          },
+          "entries": [
+            {
+              "id": 140817,
+              "definitionId": 145490,
+              "spellId": 1317256,
+              "name": "Unknown",
+              "maxRanks": 1
+            }
+          ],
+          "prereqs": []
+        }
+      ],
+      "gates": [
+        {
+          "condId": 49259,
+          "amount": 10,
+          "currencyId": 4225,
+          "guardedGroupId": 12446,
+          "guards": [
+            110300
+          ],
+          "countedGroupId": 12449,
+          "counted": [
+            110296,
+            110298,
+            110300,
+            110301,
+            110303,
+            110304,
+            110305
+          ],
+          "confidence": "inferred",
+          "from": "TraitCond.TraitNodeGroupID"
+        },
+        {
+          "condId": 49260,
+          "amount": 5,
+          "currencyId": 4225,
+          "guardedGroupId": 12445,
+          "guards": [
+            110298,
+            110303,
+            110304,
+            110305
+          ],
+          "countedGroupId": 12449,
+          "counted": [
+            110296,
+            110298,
+            110300,
+            110301,
+            110303,
+            110304,
+            110305
+          ],
+          "confidence": "inferred",
+          "from": "TraitCond.TraitNodeGroupID"
+        }
+      ]
+    },
+    {
+      "id": 1189,
+      "currencyId": 4225,
+      "cost": {
+        "value": 1,
+        "confidence": "inferred",
+        "from": "TraitTreeXTraitCost, TraitCost.Amount",
+        "traitCostId": 4846,
+        "currencyId": 4225
+      },
+      "nodes": [
+        {
+          "id": 110309,
+          "x": 4200,
+          "y": 2650,
+          "kind": "single",
+          "flags": 8,
+          "ranks": {
+            "value": 1,
+            "confidence": "stored",
+            "from": "TraitNodeEntry.MaxRanks"
+          },
+          "entries": [
+            {
+              "id": 136871,
+              "definitionId": 141634,
+              "spellId": 1225503,
+              "name": "Reagent Economy",
+              "maxRanks": 1
+            }
+          ],
+          "prereqs": [
+            {
+              "nodeId": 110315,
+              "rule": "any",
+              "confidence": "stored"
+            }
+          ]
+        },
+        {
+          "id": 110313,
+          "x": 2400,
+          "y": 1750,
+          "kind": "single",
+          "flags": 8,
+          "ranks": {
+            "value": 3,
+            "confidence": "stored",
+            "from": "TraitNodeEntry.MaxRanks"
+          },
+          "entries": [
+            {
+              "id": 136867,
+              "definitionId": 141630,
+              "spellId": 1225499,
+              "name": "Gourmand",
+              "maxRanks": 3
+            }
+          ],
+          "prereqs": []
+        },
+        {
+          "id": 110314,
+          "x": 3300,
+          "y": 3550,
+          "kind": "single",
+          "flags": 8,
+          "ranks": {
+            "value": 5,
+            "confidence": "stored",
+            "from": "TraitNodeEntry.MaxRanks"
+          },
+          "entries": [
+            {
+              "id": 136868,
+              "definitionId": 141631,
+              "spellId": 1225485,
+              "name": "Diplomat",
+              "maxRanks": 5
+            }
+          ],
+          "prereqs": []
+        },
+        {
+          "id": 110315,
+          "x": 2400,
+          "y": 2650,
+          "kind": "single",
+          "flags": 8,
+          "ranks": {
+            "value": 2,
+            "confidence": "stored",
+            "from": "TraitNodeEntry.MaxRanks"
+          },
+          "entries": [
+            {
+              "id": 136866,
+              "definitionId": 141629,
+              "spellId": 1225500,
+              "name": "The Quick and the Dead",
+              "maxRanks": 2
+            }
+          ],
+          "prereqs": []
+        },
+        {
+          "id": 110316,
+          "x": 3300,
+          "y": 1750,
+          "kind": "single",
+          "flags": 8,
+          "ranks": {
+            "value": 2,
+            "confidence": "stored",
+            "from": "TraitNodeEntry.MaxRanks"
+          },
+          "entries": [
+            {
+              "id": 136870,
+              "definitionId": 141633,
+              "spellId": 1225502,
+              "name": "Permanence",
+              "maxRanks": 2
+            }
+          ],
+          "prereqs": [
+            {
+              "nodeId": 110313,
+              "rule": "any",
+              "confidence": "stored"
+            }
+          ]
+        },
+        {
+          "id": 110318,
+          "x": 2400,
+          "y": 3550,
+          "kind": "single",
+          "flags": 8,
+          "ranks": {
+            "value": 5,
+            "confidence": "stored",
+            "from": "TraitNodeEntry.MaxRanks"
+          },
+          "entries": [
+            {
+              "id": 136865,
+              "definitionId": 141628,
+              "spellId": 1225497,
+              "name": "Reinforce",
+              "maxRanks": 5
+            }
+          ],
+          "prereqs": []
+        },
+        {
+          "id": 110319,
+          "x": 3300,
+          "y": 850,
+          "kind": "single",
+          "flags": 8,
+          "ranks": {
+            "value": 5,
+            "confidence": "stored",
+            "from": "TraitNodeEntry.MaxRanks"
+          },
+          "entries": [
+            {
+              "id": 136869,
+              "definitionId": 141632,
+              "spellId": 1225501,
+              "name": "For Great Honor",
+              "maxRanks": 5
+            }
+          ],
+          "prereqs": []
+        },
+        {
+          "id": 113512,
+          "x": 5100,
+          "y": 1750,
+          "kind": "single",
+          "flags": 10,
+          "ranks": {
+            "value": 1,
+            "confidence": "stored",
+            "from": "TraitNodeEntry.MaxRanks"
+          },
+          "entries": [
+            {
+              "id": 140818,
+              "definitionId": 145491,
+              "spellId": 1317256,
+              "name": "Unknown",
+              "maxRanks": 1
+            }
+          ],
+          "prereqs": [
+            {
+              "nodeId": 113513,
+              "rule": "any",
+              "confidence": "stored"
+            }
+          ]
+        },
+        {
+          "id": 113513,
+          "x": 4200,
+          "y": 1750,
+          "kind": "single",
+          "flags": 10,
+          "ranks": {
+            "value": 1,
+            "confidence": "stored",
+            "from": "TraitNodeEntry.MaxRanks"
+          },
+          "entries": [
+            {
+              "id": 140819,
+              "definitionId": 145492,
+              "spellId": 1317256,
+              "name": "Unknown",
+              "maxRanks": 1
+            }
+          ],
+          "prereqs": []
+        }
+      ],
+      "gates": [
+        {
+          "condId": 49263,
+          "amount": 10,
+          "currencyId": 4225,
+          "guardedGroupId": 12451,
+          "guards": [
+            110309
+          ],
+          "countedGroupId": 12450,
+          "counted": [
+            110309,
+            110313,
+            110314,
+            110315,
+            110316,
+            110318,
+            110319
+          ],
+          "confidence": "inferred",
+          "from": "TraitCond.TraitNodeGroupID"
+        },
+        {
+          "condId": 49264,
+          "amount": 5,
+          "currencyId": 4225,
+          "guardedGroupId": 12453,
+          "guards": [
+            110314,
+            110316,
+            110319
+          ],
+          "countedGroupId": 12450,
+          "counted": [
+            110309,
+            110313,
+            110314,
+            110315,
+            110316,
+            110318,
+            110319
+          ],
+          "confidence": "inferred",
+          "from": "TraitCond.TraitNodeGroupID"
+        }
+      ]
+    }
+  ],
+  "emptyTreeIds": [
+    1118
+  ],
+  "withdrawn": [],
+  "tables": [
+    {
+      "table": "SpellName",
+      "rows": 31948,
+      "hash": "755d96b020cb",
+      "encryptedBlocks": 14
+    },
+    {
+      "table": "TraitCond",
+      "rows": 172,
+      "hash": "4c6d3b4f7a63",
+      "encryptedBlocks": 0
+    },
+    {
+      "table": "TraitCost",
+      "rows": 11,
+      "hash": "d0ea4bfcb7d6",
+      "encryptedBlocks": 0
+    },
+    {
+      "table": "TraitCurrency",
+      "rows": 2,
+      "hash": "2f2b620a5d9f",
+      "encryptedBlocks": 0
+    },
+    {
+      "table": "TraitDefinition",
+      "rows": 659,
+      "hash": "3cd3b8bd49e5",
+      "encryptedBlocks": 0
+    },
+    {
+      "table": "TraitEdge",
+      "rows": 99,
+      "hash": "7ae86fb7976a",
+      "encryptedBlocks": 0
+    },
+    {
+      "table": "TraitNode",
+      "rows": 557,
+      "hash": "ef2669c38e78",
+      "encryptedBlocks": 0
+    },
+    {
+      "table": "TraitNodeEntry",
+      "rows": 659,
+      "hash": "420826e3f973",
+      "encryptedBlocks": 0
+    },
+    {
+      "table": "TraitNodeEntryXTraitCond",
+      "rows": 0,
+      "hash": "e3b0c44298fc",
+      "encryptedBlocks": 0
+    },
+    {
+      "table": "TraitNodeEntryXTraitCost",
+      "rows": 0,
+      "hash": "e3b0c44298fc",
+      "encryptedBlocks": 0
+    },
+    {
+      "table": "TraitNodeGroupXTraitCond",
+      "rows": 171,
+      "hash": "6eeb4ced0b04",
+      "encryptedBlocks": 0
+    },
+    {
+      "table": "TraitNodeGroupXTraitCost",
+      "rows": 0,
+      "hash": "e3b0c44298fc",
+      "encryptedBlocks": 0
+    },
+    {
+      "table": "TraitNodeGroupXTraitNode",
+      "rows": 2152,
+      "hash": "bfe5ff002423",
+      "encryptedBlocks": 0
+    },
+    {
+      "table": "TraitNodeXTraitCond",
+      "rows": 1,
+      "hash": "392ac8a057b6",
+      "encryptedBlocks": 0
+    },
+    {
+      "table": "TraitNodeXTraitCost",
+      "rows": 0,
+      "hash": "e3b0c44298fc",
+      "encryptedBlocks": 0
+    },
+    {
+      "table": "TraitNodeXTraitNodeEntry",
+      "rows": 560,
+      "hash": "0a040d1eb7eb",
+      "encryptedBlocks": 0
+    },
+    {
+      "table": "TraitTree",
+      "rows": 17,
+      "hash": "992163bec5ab",
+      "encryptedBlocks": 0
+    },
+    {
+      "table": "TraitTreeXTraitCost",
+      "rows": 13,
+      "hash": "cba55014ebf6",
+      "encryptedBlocks": 0
+    },
+    {
+      "table": "TraitTreeXTraitCurrency",
+      "rows": 13,
+      "hash": "38257cc75b38",
+      "encryptedBlocks": 0
+    }
+  ],
+  "warnings": [
+    "TraitNode.Flags differs between Legacy nodes: 8 on 21 nodes, 10 on 6 (113506, 113508, 113510, 113511, 113512, 113513). WoWDBDefs names only bit 1 (ShowMultipleIcons), so what the difference means is not known",
+    "nodes 113506, 113508, 113510, 113511, 113512, 113513 carry the same spell (1317256) and are all kept"
+  ]
+}
