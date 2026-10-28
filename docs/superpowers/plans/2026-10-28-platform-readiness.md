@@ -173,8 +173,9 @@ observed-at, optional game-reported date, before/after value, schema/client buil
 **Interface:** a versioned capability result is `supported`, `unavailable`, `error` or `unverified`,
 with client build, probe date and evidence location. It is not a public observation or telemetry upload.
 
-- [ ] Prepare a private local evidence checklist before servers reopen: actual calls, expected non-sensitive
-  shapes, failure handling and corresponding collector/test. Never dump names, GUIDs or raw party logs into a PR.
+- [x] Prepare a private local evidence checklist before servers reopen: actual calls, expected non-sensitive
+  shapes, failure handling and corresponding collector/test. See the [PROBE-01 kit](../../2026-10-28-live-client-capability-checklist.md).
+  Prepared only; live results remain unverified. Never dump names, GUIDs or raw party logs into a PR.
 - [ ] Audit wording and fixtures across all market surfaces: asking prices, completed personal transactions,
   units, realm/house, stale/partial/unrecorded values. Add a failing assertion only where actual wording is wrong.
 - [ ] Correct proven copy/semantics gaps without changing rollup thresholds or interpreting disappeared listings as sales.

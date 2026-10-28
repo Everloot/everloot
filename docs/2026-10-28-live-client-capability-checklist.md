@@ -1,6 +1,6 @@
 # PROBE-01: live client capability checklist
 
-Date: 2026-10-28. Status: prepared, not run. No Forever server was reachable while it was written, so every
+Date: 2026-10-28. Status: prepared, not run. No live-client probes were run while it was written, so every
 capability below is `UNVERIFIED` until an operator runs it in the client.
 
 This is the evidence kit for PROBE-01 in the [gap register](2026-10-28-platform-gap-register.md), Task 5 of the
@@ -12,10 +12,12 @@ Scope boundaries for the session:
 
 - Character links and private progress are not part of this run. The identity policy
   ([owned-character identity](design/specs/2026-10-28-owned-character-identity.md), HUB-P01) is still open: do not
-  redeem a link code, sign the Desktop App in for builds, or tick the collection choice on the upload page.
+  redeem a link code or enable new private progress sync. Existing saved-build sync has a separate contract;
+  testing it is outside this checklist, not blocked by the identity proposal. Keep collection uploads off here.
 - No new commands are typed into the game other than the ones listed here. Each is either an Everloot command
   handled in [`addon/core.lua`](../addon/core.lua) or a Blizzard slash command from the Forever UI source below.
-  `/dump` only reads and prints a value; nothing in this list calls a function that changes the game.
+  The `/dump` probes only read and print values. Other commands intentionally change addon state, reload the
+  UI or toggle logging as described below.
 - The addon does not register combat log events, and this checklist adds no code that does. Combat logging is
   probed only through Blizzard's own `/combatlog` command and by looking at files on disk.
 - The Cloudflare migration terminal owns web/kb runtime, config, resources, secrets and deploy. Nothing here
@@ -27,14 +29,14 @@ Record which gate a result comes from. A higher gate never inherits a lower one'
 
 | Gate | What it shows | What it cannot show |
 |---|---|---|
-| Source | The repository's code and tests, and Blizzard's published UI source for Forever | That the running client has the call, returns data for a Forever character, or fires the event |
+| Source | The repository's code and tests, and the referenced mirror of Blizzard UI source for Forever | That the running client has the call, returns data for a Forever character, or fires the event |
 | Native/package | The installed addon zip and Desktop App build on this machine: versions, files written, watcher, backups | What the game server sends |
 | Live | The running Forever client on a live realm | Anything about other builds, realms or characters than the one recorded |
 
 Source references used below, read 2026-10-28:
 
 - This repository at `119ad0a6` (addon 0.3.12, `## Interface: 16001`; Desktop package 0.1.7; protocol package 1.21.0).
-- Blizzard UI source, [`Gethe/wow-ui-source`](https://github.com/Gethe/wow-ui-source) branch `forever`, head
+- Mirror of Blizzard UI source, [`Gethe/wow-ui-source`](https://github.com/Gethe/wow-ui-source) branch `forever`, head
   `ca8368f2f2` "1.60.1 (70532)". Paths below are under `Interface/AddOns/`. A call present in the generated
   documentation can still return nothing for a Forever character; a documented event can still never fire.
 
@@ -47,7 +49,7 @@ Each probe ends with one record. The plan's interface names the same states in l
 |---|---|
 | `UNVERIFIED` | Not run yet, or run without a usable result. The default. |
 | `AVAILABLE` | Observed working in the live client on the recorded build. |
-| `UNAVAILABLE` | Observed absent: the call or namespace is nil, the event never fired during the scenario, or the game has no such feature. Never shown as zero. |
+| `UNAVAILABLE` | The call or namespace is absent, or the feature is explicitly unsupported on this build. Never shown as zero. An event not observed in one attempt remains `UNVERIFIED`; record the scenario and repeat before drawing conclusions. |
 | `ERROR` | The call exists but raised a Lua error, returned an unexpected shape, or the client misbehaved. |
 
 Record fields, one per probe:
@@ -85,7 +87,8 @@ a worktree, `docs/fixtures/` or `addon/tests/fixtures/`.
 - `/eventtrace` and combat log files show other players' names and GUIDs. Never paste them; summarize event
   names and argument positions/types only.
 - Never add a captured file, or anything derived from one, to a public test fixture or the public corpus. A
-  future sanitized parser fixture (LOG-L02) needs its own review and consent from everyone it names.
+  future sanitized parser fixture (LOG-L02) needs anonymization and review. Identifiable participant data
+  requires a separate privacy decision before publication.
 
 ## 0. Baseline and safety (before logging in)
 
@@ -107,12 +110,13 @@ Gap IDs: REL-01, REL-04, REL-05, PROBE-01.
    `~/Library/Application Support/Everloot` or `~/.config/everloot`, per [`desktop/README.md`](../desktop/README.md)).
    A source run of the app must set `EVERLOOT_DATA_DIR` to a scratch folder so it never touches the real
    `sent.json` and settings. Do not run a source build against the real data folder during this probe.
-6. **Toggles.** Note, do not change, the current toggles from `/everloot status` once in game. Leave `players`
-   off: it reads other players' names. Changing `census` or `completion` to off deletes their rows
+6. **Toggles.** Record the current toggles from `/everloot status` once in game. Do not enable `players`
+   for this probe: it reads other players' names. Preserve existing settings unless a step below explicitly
+   calls for a change. Changing `census` or `completion` to off deletes their rows
    ([`addon/core.lua`](../addon/core.lua)); do not run an `off` command on the real file during this probe.
 
-Recovery: if anything in the session corrupts or loses a file, close the game, copy the baseline file back over
-the live one, and keep the damaged copy in `<private-evidence-root>/damaged/` for the REL follow-up. From the
+Recovery: if anything in the session corrupts or loses a file, close the game, preserve any current file in
+`<private-evidence-root>/damaged/` first, then restore the baseline to its original location. From the
 Desktop App, restore only while logged out; it backs up the replaced file first.
 
 ## 1. Client, addon and slot addons
@@ -155,8 +159,8 @@ Gap IDs: COL-C02, COL-C04 (catalog side), HIST-02 (input), PROBE-01. Calls and t
 [`addon/modules/completion.lua`](../addon/modules/completion.lua).
 
 If completion is already on in the file, use it as is. If it is off: `/everloot completion on`, then `/reload`.
-This keeps rows local; they leave the computer only from the upload page with the collection choice, which stays
-unticked here.
+This keeps rows local while Desktop uploads remain paused and website uploads are not used. Do not resume
+either upload path until reviewing its collection consent and filtering settings.
 
 | Probe | Steps | Expected | If not |
 |---|---|---|---|
@@ -225,10 +229,10 @@ the same session.
 
 | Probe | Steps | Expected | If not |
 |---|---|---|---|
-| P-ENC-1 | In a dungeon, `/eventtrace`, pull the first boss and kill it | `ENCOUNTER_START` at the pull, `ENCOUNTER_END` with success 1 at the kill. Record argument count and types; whether a 6th argument arrives | Either event missing: `UNAVAILABLE` for that event |
+| P-ENC-1 | In a dungeon, `/eventtrace`, pull the first boss and kill it | `ENCOUNTER_START` at the pull, `ENCOUNTER_END` with success 1 at the kill. Record argument count and types; whether a 6th argument arrives | Either event not observed: `UNVERIFIED`; record trace coverage and scenario |
 | P-ENC-2 | Wipe on a boss, if the group agrees | `ENCOUNTER_END` with success 0 | |
-| P-ENC-3 | `/reload` during a boss fight, then finish it | Record whether `ENCOUNTER_START` is seen again after the reload; this is the "missing START" case | |
-| P-ENC-4 | Leave the instance mid-fight or release | Record whether `ENCOUNTER_END` fires at all | An unmatched START is unknown, never a guessed result |
+| P-ENC-3 | In a controlled test agreed with the group, `/reload` during a boss fight, then finish it; otherwise skip | Record whether `ENCOUNTER_START` is seen again after the reload; this is the "missing START" case | |
+| P-ENC-4 | In a controlled test agreed with the group, leave the instance mid-fight or release; otherwise skip | Record whether `ENCOUNTER_END` fires at all | An unmatched START is unknown, never a guessed result |
 
 Existing anonymous `encounter` rows are not attributed to a character, now or retroactively.
 
@@ -258,18 +262,20 @@ Gap IDs: LOG-L02, LOG-L03, COMBAT-D01, PROBE-01. `/combatlog` is Blizzard's slas
 disabled message. The same branch documents `C_CombatLog.IsCombatLogRestricted` and marks `COMBAT_LOG_EVENT` and
 `COMBAT_LOG_EVENT_UNFILTERED` as restricted. Everloot does not register them and must not.
 
+Record the initial logging state. `/combatlog` toggles rather than always enabling: if the first toggle reports
+disabled, logging was initially enabled; toggle again to start the probe. Restore the initial state afterwards.
 Only if the client accepts the command:
 
 | Probe | Steps | Expected | If not |
 |---|---|---|---|
 | P-LOG-1 | `/dump C_CombatLog and C_CombatLog.IsCombatLogRestricted()` outdoors and inside an instance | `false` or `true`; record both | nil: record it |
-| P-LOG-2 | Note files in the game's product folder (beside `WTF`) and any `Logs` folder in it. `/combatlog` once | The chat message says logging is enabled | Unknown command or no message: `UNAVAILABLE`, stop here |
-| P-LOG-3 | Fight one creature. `/combatlog` again to disable | A new or growing file. Record folder, file name pattern (not the full name if it contains a character name), size and that it is text | No file: `UNAVAILABLE` even though the command answered |
+| P-LOG-2 | Note files in the game's product folder (beside `WTF`) and any `Logs` folder in it. Use `/combatlog`, following the initial-state rule above | The chat message confirms logging is enabled | Unknown command: `UNAVAILABLE`; no message: `UNVERIFIED`. Stop here |
+| P-LOG-3 | Fight one creature. `/combatlog` again to disable | A new or growing file. Record folder, file name pattern (not the full name if it contains a character name), size and that it is text | No file found: `UNVERIFIED`; record locations checked and whether the client was closed to flush writes |
 | P-LOG-4 | Copy the file to the private folder. Read the first lines privately: record whether there is a header with a version or build, the timestamp format, the field separator, and which event names appear | Shape only in the record | Unreadable or binary: `ERROR` |
 | P-LOG-5 | Enable, `/reload`, fight, disable; then enable, log out and back in, fight, disable | Record whether logging survives a reload or relog, and whether it appends to one file or starts a new one | |
 | P-LOG-6 | A boss kill with logging on (combine with P-ENC-1) | Record whether the file contains encounter start/end lines and their names | |
 
-Disable logging at the end of the session and confirm the disabled message. Combat log files name every
+Restore the initial logging state at the end and confirm its message. Combat log files name every
 participant in range: never upload, commit or paste them. Rotation, truncation and growth limits are LOG-L01 tests
 on synthetic files, not live measurements.
 
@@ -277,8 +283,8 @@ on synthetic files, not live measurements.
 
 1. Log out, close the game, then compare each `Everloot.lua` with its baseline copy. Probe rows are real local
    observations; keep the file unless something went wrong.
-2. If a restore is needed: game closed, copy the baseline back, keep the replaced file in
-   `<private-evidence-root>/damaged/`. Never copy one account's file into another account's folder.
+2. If a restore is needed: game closed, preserve the current file in `<private-evidence-root>/damaged/`
+   first, then copy the baseline back. Never copy one account's file into another account's folder.
 3. Unpause the Desktop App only after deciding whether this session's file is sent. A probe session is not a
    reason to upload, and a synthetic file never is.
 4. If `completion` was turned on only for this probe, leave it on until the file is kept or restored; turning it

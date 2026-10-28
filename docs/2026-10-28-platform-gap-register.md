@@ -73,7 +73,7 @@ exhausted-retry recovery) remains open; it is not closed by the Retry-After fix.
 
 | ID | Gap / deliverable | Depends on | Acceptance |
 |---|---|---|---|
-| PROBE-01 | Forever capability evidence kit | Live servers for observed results | Record supported/missing/error for reputation, learned recipes, inventory, encounter start/end, combat file/logging toggle, honor/BG/ratings/season; build and API provenance; no unsupported metric shown as zero |
+| PROBE-01 | Forever capability evidence kit: [prepared checklist](2026-10-28-live-client-capability-checklist.md), not executed | Live servers for observed results | Record supported/missing/error for reputation, learned recipes, inventory, encounter start/end, combat file/logging toggle, honor/BG/ratings/season; build and API provenance; no unsupported metric shown as zero |
 | ECON-E01 | Asking-price/source/freshness/scope audit | Existing market | Site, MCP, Desktop and tooltips never describe listings as completed sales; correct unit/realm/house; missing/stale/partial scans explicit |
 | ECON-E02 | Auction full-scan completeness and cooldown | PROBE-01 | Real API throttle, unloaded/retry rows, interrupted scans, realm/house partitions and large-house frame work observed; no assumed Retail cooldown validation |
 | ECON-E03 | Personal transaction attribution gaps | COL-C00, PROBE-01 | Separate bids, deposits, repairs, trade/mail where evidence exists; unattributed difference stays unrecorded; own sales do not become market volume |
