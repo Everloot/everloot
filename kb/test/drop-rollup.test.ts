@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { itemFactsFromRecords, rollupDrops } from "../src/drop-rollup.js";
+import { itemFactsFromRecords, lootWindowsFromRecords, rollupDrops } from "../src/drop-rollup.js";
 import { handleItemPage } from "../src/item-page.js";
 
 test("loot and item_seen records become the same item page the site renders", () => {
@@ -55,4 +55,20 @@ test("loot from an object (a chest, a node) is a kill too", () => {
   const facts = itemFactsFromRecords([open("a"), open("b"), open("c")]);
   expect(facts.rates).toHaveLength(1);
   expect(facts.rates[0]).toMatchObject({ sourceObjectId: 900, itemId: 77, kills: 3, drops: 3, reporters: 3, public: true });
+});
+
+test("typed windows: pick-pocket, skinning, disenchant and container windows stay out of the kill table", () => {
+  const win = (installId: string, extra: Record<string, unknown>) => ({ kind: "loot", sourceEvidence: "loot-api", installId, items: [{ itemId: 77, count: 1 }], ...extra });
+  const records = [
+    win("a", { sourceNpcId: 5 }),
+    win("b", { sourceNpcId: 5, lootType: "kill" }),
+    win("c", { sourceNpcId: 5, lootType: "pickpocket", copper: 40 }),
+    win("c", { sourceNpcId: 5, lootType: "skinning" }),
+    win("c", { sourceItemId: 2455, lootType: "disenchant" }),
+    win("c", { sourceItemId: 6, lootType: "container" }),
+    win("c", { sourceObjectId: 900, lootType: "gather" }),
+  ];
+  expect(lootWindowsFromRecords(records)).toHaveLength(3);
+  const facts = itemFactsFromRecords(records);
+  expect(facts.rates.find((r) => r.sourceNpcId === 5)).toMatchObject({ kills: 2, drops: 2 });
 });

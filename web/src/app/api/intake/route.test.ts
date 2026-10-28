@@ -20,8 +20,11 @@ vi.mock("@/lib/upload-store", () => ({
   },
 }));
 
-const players = vi.hoisted(() => ({ upsert: vi.fn() }));
-vi.mock("@/lib/player-store", () => ({ playerStore: () => ({ upsert: players.upsert }) }));
+const players = vi.hoisted(() => ({ upsert: vi.fn(), hiddenGuilds: vi.fn() }));
+vi.mock("@/lib/player-store", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/player-store")>()),
+  playerStore: () => ({ upsert: players.upsert, hiddenGuilds: players.hiddenGuilds }),
+}));
 
 const capturedAt = "2026-10-05T00:00:00.000Z";
 const loot = (installId: string) => ({
@@ -65,6 +68,7 @@ beforeEach(() => {
   store.lookup.mockReset();
   store.lookup.mockResolvedValue(null);
   players.upsert.mockReset().mockResolvedValue(undefined);
+  players.hiddenGuilds.mockReset().mockResolvedValue(new Set());
 });
 
 describe("POST /api/intake", () => {
@@ -93,6 +97,22 @@ describe("POST /api/intake", () => {
       clientBuild: "1.60.1.70450",
       records: [canonicalLoot],
     }, []);
+  });
+
+  test("a disenchant window with the item it came from is accepted and stored whole", async () => {
+    const POST = await freshPost();
+    const disenchant = {
+      kind: "loot", installId: "install-1234", capturedAt, sourceEvidence: "loot-api",
+      sourceItemId: 2455, lootType: "disenchant", copper: 12, items: [{ itemId: 10940, count: 2 }],
+    };
+    const response = await POST(request({ addonVersion: "0.3.11", records: [disenchant, { ...disenchant, lootType: "mining" }] }));
+
+    expect(response.status).toBe(200);
+    expect(store.putUpload).toHaveBeenCalledWith(expect.any(String), "install-1234", {
+      addonVersion: "0.3.11",
+      records: [disenchant],
+    }, []);
+    expect(await response.json()).toMatchObject({ ok: true, persisted: true, accepted: [{ index: 0, kind: "loot" }] });
   });
 
   test("two accepted install ids reject the whole submission and write nothing", async () => {
@@ -477,6 +497,45 @@ describe("census rows in an upload", () => {
     expect(logged.length).toBeGreaterThan(0);
     expectNoGuid(logged);
     expectNoGuid(await response.json());
+  });
+});
+
+describe("guild kill rows in an upload", () => {
+  const kill = (guildName: string, extra: object = {}) => ({
+    kind: "guild_kill", installId: "install-1234", eventId: `guild_kill:${guildName.replace(/\s/g, "-")}`, capturedAt,
+    guildName, realm: "Forever Pioneer", faction: "horde", encounterId: 663, name: "Lucifron", instanceMapId: 409, difficulty: 9, size: 40, ...extra,
+  });
+  afterEach(() => { vi.unstubAllEnvs(); });
+
+  test("with the switch off they are dropped, the rest is kept and the hide list is never read", async () => {
+    const POST = await freshPost();
+    const body = await (await POST(request({ addonVersion: "0.4.0", records: [kill("Night Watch"), canonicalLoot] }))).json();
+    expect(body.accepted.map((a: { kind: string }) => a.kind)).toEqual(["loot"]);
+    expect(body.rejected[0].reason).toBe("Guild kills are not collected yet.");
+    expect(players.hiddenGuilds).not.toHaveBeenCalled();
+    expect(store.putUpload.mock.calls[0]![2].records.map((r: { kind: string }) => r.kind)).toEqual(["loot"]);
+  });
+
+  test("with the switch on they are stored in the upload; a hidden guild's are dropped; the list is read once", async () => {
+    vi.stubEnv("EVERLOOT_GUILDS", "1");
+    const { guildHideKey } = await import("@/lib/player-store");
+    players.hiddenGuilds.mockResolvedValue(new Set([guildHideKey("forever-pioneer", "night watch")]));
+    const POST = await freshPost();
+    const body = await (await POST(request({ addonVersion: "0.4.0", records: [kill("Night Watch"), kill("Ember"), kill("Ember", { eventId: "guild_kill:2", encounterId: 664 })] }))).json();
+    expect(body.accepted.map((a: { kind: string }) => a.kind)).toEqual(["guild_kill", "guild_kill"]);
+    expect(body.rejected).toEqual([{ index: 0, reason: "This guild asked to be hidden; its kills are not kept." }]);
+    expect(players.hiddenGuilds).toHaveBeenCalledOnce();
+    const stored = store.putUpload.mock.calls[0]![2].records;
+    expect(stored.map((r: { guildName: string }) => r.guildName)).toEqual(["Ember", "Ember"]);
+  });
+
+  test("when the hide list cannot be read the kills are not kept unchecked", async () => {
+    vi.stubEnv("EVERLOOT_GUILDS", "1");
+    players.hiddenGuilds.mockRejectedValue(new Error("down"));
+    const POST = await freshPost();
+    const body = await (await POST(request({ addonVersion: "0.4.0", records: [kill("Ember"), canonicalLoot] }))).json();
+    expect(body.accepted.map((a: { kind: string }) => a.kind)).toEqual(["loot"]);
+    expect(body.rejected[0].reason).toMatch(/could not be checked/);
   });
 });
 

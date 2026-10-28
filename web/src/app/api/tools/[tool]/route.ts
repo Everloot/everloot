@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
-import { MCP_TOOL_NAMES, MCP_TOOLS, SITE, type McpToolName } from "@everloot/protocol";
+import { MCP_TOOLS, SITE, type McpToolName } from "@everloot/protocol";
 import { z } from "zod";
-import { createToolHandlers, type ToolHandlers } from "../../../../../../kb/src/mcp-server";
+import { createToolHandlers, registeredToolNames, type ToolHandlers } from "../../../../../../kb/src/mcp-server";
 import { admit, attributionHeaders } from "@/lib/data-guard";
 import { toolLoaders } from "@/lib/mcp-mount";
 import { myBuildsRoute } from "@/lib/my-builds-tool";
 import { getRelease } from "@/lib/release";
 import { MY_BUILDS, savedBuildsOn } from "@/lib/saved-builds";
 import { argumentsFromQuery } from "@/lib/tool-query";
+import { ledgerMetrics } from "@/lib/question-ledger";
 import { recordUsage } from "@/lib/usage-metrics";
 
 /**
@@ -26,12 +27,16 @@ function refuse(status: number, error: string): Response {
 }
 
 let handlers: ToolHandlers | null = null;
+let handlersGuilds = false;
 
 export async function GET(req: Request, context: { params: Promise<{ tool: string }> }) {
   const { tool } = await context.params;
   // The player's own builds: read with their session or key, not the public quota. Unknown while the switch is off.
   if (tool === MY_BUILDS && savedBuildsOn()) return myBuildsRoute(req);
-  if (!(MCP_TOOL_NAMES as string[]).includes(tool)) return refuse(404, `No tool named ${tool}. Tools: ${MCP_TOOL_NAMES.join(", ")}.`);
+  // The tools this deployment answers: the guild ladder's two only while EVERLOOT_GUILDS is on.
+  const loaders = toolLoaders();
+  const names = registeredToolNames(loaders);
+  if (!(names as string[]).includes(tool)) return refuse(404, `No tool named ${tool}. Tools: ${names.join(", ")}.`);
   const name = tool as McpToolName;
   // The same key surface and per-IP quota as the other per-row JSON endpoints (/api/edges, /api/items).
   const admitted = await admit(req, "drops");
@@ -43,7 +48,11 @@ export async function GET(req: Request, context: { params: Promise<{ tool: strin
   }
   const release = getRelease();
   if (!release) return refuse(503, "Knowledge release unavailable. The answer is unrecorded, not zero.");
-  if (!handlers) handlers = createToolHandlers(release.db, toolLoaders());
+  // Built again when the switch changes, so the guild tools never answer from a reader the switch has withdrawn.
+  if (!handlers || handlersGuilds !== Boolean(loaders.guilds)) {
+    handlers = createToolHandlers(release.db, loaders);
+    handlersGuilds = Boolean(loaders.guilds);
+  }
   recordUsage("api.tools");
   let answer;
   try {
@@ -53,6 +62,8 @@ export async function GET(req: Request, context: { params: Promise<{ tool: strin
   }
   const text = typeof answer === "string" ? answer : answer.text;
   const structured = typeof answer === "string" ? { text } : answer.structured;
+  // The question ledger: whether a lookup found anything, as a counter named by the tool alone.
+  recordUsage(ledgerMetrics(name, structured));
   return NextResponse.json(
     { tool: name, arguments: parsed.data, answer: structured, text, schema: `${SITE}/schema/mcp/${name}.json` },
     { headers: { ...NO_STORE, ...attributionHeaders() } },

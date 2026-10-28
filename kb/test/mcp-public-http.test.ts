@@ -1,9 +1,11 @@
 import { MCP_TOOL_NAMES, MCP_TOOLS } from "@everloot/protocol";
 import { afterEach, expect, test } from "vitest";
 import { z } from "zod";
+import { encodeBuild } from "../../web/src/lib/talents/share";
 import { openDb, type DB } from "../src/db.js";
 import { replaceSourceRows } from "../src/entities.js";
 import { createMcpHttpHandler } from "../src/mcp-http-server.js";
+import { siteCatalog } from "../src/talents/site-catalogs.js";
 
 const databases: DB[] = [];
 afterEach(() => { for (const db of databases.splice(0)) db.close(); });
@@ -52,6 +54,19 @@ test("independent clients initialize and receive sourced knowledge plus the trac
   expect((await plan.json()).result.isError).not.toBe(true);
 });
 
+test("talent_plan refuses a link's value that is not a whole code, escaped or raw, even with a code inside it", async () => {
+  const handle = await handler();
+  const warrior = siteCatalog("warrior");
+  const node = warrior.nodes.find((n) => !n.unlock && n.prereqs.length === 0 && !n.anyOf)!;
+  const code = encodeBuild({ classSlug: "warrior", specId: warrior.specId, build: warrior.build, ranks: { [node.id]: { rank: 1 } } });
+  for (const link of [`https://everloot.app/tools/talents/warrior#plan=junk%23plan%3D${code}`, `https://everloot.app/tools/talents/warrior#plan=junk#plan=${code}`]) {
+    const answer = await (await handle(request("tools/call", { name: "talent_plan", arguments: { code: link } }))).json();
+    expect(answer.result.isError, link).not.toBe(true);
+    expect(z.object(MCP_TOOLS.talent_plan.outputSchema).parse(answer.result.structuredContent), link)
+      .toMatchObject({ ok: false, message: "That share code is damaged or cut short." });
+  }
+});
+
 test("rejects an untrusted Origin even with valid authorization", async () => {
   const handle = await handler();
   expect((await handle(request("tools/list", {}, { origin: "https://evil.test" }))).status).toBe(403);
@@ -97,8 +112,9 @@ test("a host's extra tool is listed and answers only for the requests it is give
   };
   const handle = await handler({ extraTools: (req: Request, body: string) => (req.headers.get("x-test") === "yes" && body.includes("tools/") ? [extra] : []) });
   const names = async (headers = {}) => ((await (await handle(request("tools/list", {}, headers))).json()).result.tools as { name: string }[]).map((t) => t.name);
-  expect(await names()).toEqual(MCP_TOOL_NAMES);
-  expect(await names({ "x-test": "yes" })).toEqual([...MCP_TOOL_NAMES, "my_test_tool"]);
+  const listed = MCP_TOOL_NAMES.filter((name) => name !== "guild_search" && name !== "guild_rankings");
+  expect(await names()).toEqual(listed);
+  expect(await names({ "x-test": "yes" })).toEqual([...listed, "my_test_tool"]);
   const called = await (await handle(request("tools/call", { name: "my_test_tool", arguments: { slug: "a" } }, { "x-test": "yes" }))).json();
   expect(called.result.content[0].text).toBe('got {"slug":"a"}');
   const refused = await (await handle(request("tools/call", { name: "my_test_tool", arguments: {} }))).json();

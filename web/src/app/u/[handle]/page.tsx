@@ -5,7 +5,7 @@ import { CLASS_TEXT } from "@/components/talents/TalentTreeView";
 import { Badge, Container, DataTable, DataTitle, type Column } from "@/components/ui";
 import { publicProfile, type PublicProfile } from "@/lib/account-shell";
 import { profilesOn } from "@/lib/profiles";
-import { shortPath } from "@/lib/saved-builds";
+import { savedBuildsOn, shortPath } from "@/lib/saved-builds";
 import { pageMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +36,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function PublicProfilePage({ params }: Props) {
   const profile = await load((await params).handle);
   if (!profile) notFound();
-  const { characters, builds, status } = profile;
+  const { characters, status } = profile;
+  // A shared build opens at /b/<slug>, which is a 404 while EVERLOOT_SAVED_BUILDS is off.
+  const builds = savedBuildsOn() ? profile.builds : null;
 
   const characterColumns: Column<Character>[] = [
     {

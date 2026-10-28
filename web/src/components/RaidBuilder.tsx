@@ -1,4 +1,5 @@
 "use client";
+import { track } from "@/lib/analytics/track";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { CLASSES } from "@/design/tokens";
@@ -10,6 +11,7 @@ import {
   type ClassName, type DragSource, type DropTarget, type FamilyCoverage, type Size, type Slot, type Slots, type State,
 } from "@/lib/raid";
 import type { RaidArt } from "@/lib/game-assets";
+import { ClassContextChipFromAddress } from "@/components/classes/ClassContextChip";
 import GameIcon from "@/components/game/GameIcon";
 import SpellTip from "@/components/game/SpellTip";
 import { Badge, Card, CopyButton, DataTable, Input, SectionHeading, Segmented, type Column } from "@/components/ui";
@@ -80,8 +82,11 @@ interface Drag { source: DragSource; over: DropTarget | null }
  * without the asset URL. The icons sit beside the names, which stay; without them the builder is the
  * text it always was.
  */
-/** `initialCode` is the raid from a raid link (/tools/raid/r/<code>), opened when the address has no #raid=. */
-export default function RaidBuilder({ art = null, initialCode }: { art?: RaidArt | null; initialCode?: string } = {}) {
+/**
+ * `initialCode` is the raid from a raid link (/tools/raid/r/<code>), opened when the address has no #raid=.
+ * `classContext` shows a class hub's context chip on top (the planner's own page), with the raid as it is now.
+ */
+export default function RaidBuilder({ art = null, initialCode, classContext = false }: { art?: RaidArt | null; initialCode?: string; classContext?: boolean } = {}) {
   const classIcon = (c: ClassName, size = 20, gap = "mr-2") => {
     const src = art?.classes[c];
     return src ? <GameIcon src={src} size={size} className={gap} /> : null;
@@ -174,12 +179,13 @@ export default function RaidBuilder({ art = null, initialCode }: { art?: RaidArt
   const empty = slots.every((s) => !s);
   // The link handed out is the raid link: same raid, and its preview in a chat names the roster.
   const link = typeof window === "undefined" ? "" : `${location.origin}/tools/raid/r/${code}`;
+  // The raid in the address, as it is now: written there below and handed to the class context chip, whose links keep it.
+  const fragment = empty ? "" : `#raid=${code}`;
 
   useEffect(() => {
     if (!ready) return;
-    const hash = empty ? "" : `#raid=${code}`;
-    history.replaceState(null, "", `${location.pathname}${location.search}${hash}`);
-  }, [ready, code, empty]);
+    history.replaceState(null, "", `${location.pathname}${location.search}${fragment}`);
+  }, [ready, fragment]);
 
   useEffect(() => {
     if (selected !== null) pickerRef.current?.focus();
@@ -380,7 +386,10 @@ export default function RaidBuilder({ art = null, initialCode }: { art?: RaidArt
     setSelected(selected === index ? null : index);
   };
 
-  const onCopied = (ok: boolean) => setMessage(ok ? "Link copied." : "Select the link and copy it.");
+  const onCopied = (ok: boolean) => {
+    setMessage(ok ? "Link copied." : "Select the link and copy it.");
+    if (ok) track("raid_comp_shared", { via: "copy" });
+  };
 
   // The effect's name, with the game's tooltip on hover and keyboard focus when the page has it, and how far it reaches.
   const effectCell = (f: FamilyCoverage) => (
@@ -421,6 +430,7 @@ export default function RaidBuilder({ art = null, initialCode }: { art?: RaidArt
 
   return (
     <div className="space-y-8">
+      {classContext && <ClassContextChipFromAddress className="-mt-2" fragment={fragment} />}
       {linkBuild && (
         <p role="status" className="text-sm text-warning">
           This link was made for build <span className="font-mono">{linkBuild}</span>. This page has rules for build{" "}
@@ -699,6 +709,11 @@ export default function RaidBuilder({ art = null, initialCode }: { art?: RaidArt
 
       <section aria-labelledby="raid-share" className="space-y-2">
         <SectionHeading id="raid-share" note="Anyone with the link sees the same raid.">Share</SectionHeading>
+        <div className="flex flex-wrap items-center gap-3 rounded-control border border-line bg-canvas p-3">
+          <CopyButton className={`btn shrink-0 ${compact}`} text={code} label="Copy for addon" disabled={!slots.some(Boolean)}
+            onResult={(ok) => setMessage(ok ? "Raid code copied. Open /everloot, choose the Raid tab, then Import." : "Copy failed. Copy the share link instead; the addon accepts it too.")} />
+          <p className="text-sm text-fg-2">In the addon: <code>/everloot</code> → Raid tab → paste → Import. Compare classes by group; arrange players yourself.</p>
+        </div>
         <div className="grid gap-2 lg:grid-cols-2">
           <div className="flex gap-2">
             <label className="sr-only" htmlFor="raid-link">Share link</label>

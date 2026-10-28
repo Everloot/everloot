@@ -4,47 +4,56 @@ slug: ragefire-chasm
 title: Ragefire Chasm
 type: dungeon
 binds: { entrance: ragefire-chasm, zone: 1454 }
-summary: A cave of lava and stone under Orgrimmar, where a fire cult and troggs have dug in beneath the Horde's capital. Most players who go there are Horde, sent by quest givers in the city above.
+summary: Volcanic caves under Orgrimmar, the Horde's capital, where troggs and a Shadow Council cult have made their home. Its entrance is inside the city.
 categories: [dungeons, kalimdor, orgrimmar]
 origin: original
 adaptedFrom: []
 sources:
   - { title: "Explore the New Dungeons of World of Warcraft: Forever (Blizzard news)", url: "https://worldofwarcraft.blizzard.com/en-us/news/24301455", checkedOn: 2026-10-20 }
   - { title: "Explore the New Dungeons of World of Warcraft: Forever (forum post)", url: "https://us.forums.blizzard.com/en/wow/t/explore-the-new-dungeons-of-world-of-warcraft-forever/2387658", checkedOn: 2026-10-20 }
+  - { title: "Everloot map: dungeon entrances and flight points (game files, build 1.60.1.70634)", url: "https://everloot.app/map", checkedOn: 2026-10-27 }
+  - { title: "Ragefire Chasm (lore page, Warcraft Wiki)", url: "https://everloot.app/lore/518947-ragefire-chasm", checkedOn: 2026-10-27 }
+  - { title: "Searing Blade (lore page, Warcraft Wiki)", url: "https://everloot.app/lore/269935-searing-blade", checkedOn: 2026-10-27 }
+  - { title: "Burning Blade clan (lore page, Warcraft Wiki)", url: "https://everloot.app/lore/539948-burning-blade-clan", checkedOn: 2026-10-27 }
+  - { title: "Orgrimmar (lore page, Warcraft Wiki)", url: "https://everloot.app/lore/279316-orgrimmar", checkedOn: 2026-10-27 }
 status: draft
 reviewed: null
 ---
 
 ## Overview
 
-Ragefire Chasm is a volcanic cave system that runs underneath Orgrimmar. Troggs have pushed up into it from
-the deep tunnels, and a cult called the Searing Blade uses it as a hiding place. The cult belongs to the
-Burning Blade, the demon-worshipping order the Horde has been trying to root out since it settled in
-Durotar. Enemies of that kind living directly under the capital are reason enough for the city to want the
-place cleared.
+Ragefire Chasm is a set of volcanic caves under Orgrimmar, the capital of the Horde. Troggs have climbed into them
+from far underground. The Searing Blade, a Shadow Council cult related to the Burning Blade clan, hides there as well
+and plots against the Horde.
 
-For most Horde characters it is the first dungeon they set foot in, and it is a short one. Alliance players
-can reach it, but only by getting through Orgrimmar first, so in practice it belongs to the Horde.
+Its entrance is inside Orgrimmar, so an Alliance group has to get through a Horde city to reach it. Of all the
+dungeon entrances in the game files, this one has the lowest level; this page's facts show it.
 
 ## Getting there
 
-The entrance is inside {zone:1454}, in the Cleft of Shadow, the dim lower district where the city's warlock
-and rogue trainers keep their quarters. The game files put Orgrimmar's own flight master closest to it.
-Horde characters coming from Durotar or the Barrens can simply walk in through the main gate and head down.
+The entrance is inside {zone:1454}, in the district called the Cleft of Shadow. Orgrimmar's own flight point is the
+nearest in the game files.
 
 ## History
 
-The Burning Blade is older than Orgrimmar. Its members kept faith with the demons who once drove the orcs to
-war, and they carried that faith with them into Kalimdor. The Searing Blade is their cell under the city,
-working in the dark while the Horde builds above them. The troggs who share the caves are a separate problem:
-tunnel dwellers who broke through the rock and stayed.
+The Burning Blade was an orc clan before it was a cult. A faction of it never gave up the demons of the Burning Legion
+and came to worship them. The Searing Blade grew up in Durotar as an enemy of the new Horde and moved into the chasm,
+where it could work unseen beneath the capital.
 
-Quest givers in Orgrimmar send new adventurers down to deal with both and to learn what the cultists were
-planning. At the bottom of the chasm the cult's leaders have a demon of
-their own waiting, which tells the Horde how far the plot had gone.
+When the Horde tried to talk peace with the troggs, they would have none of it.
 
 ## In WoW: Forever
 
-Blizzard has not announced anything specific to Ragefire Chasm for WoW: Forever yet. The entrance is in the
-current beta build's game files. The bosses, loot and quests on this page fill in from those files and from
-what players record once they play.
+Everloot's record of Blizzard's posts, through 2026-10-23, has nothing about Ragefire Chasm for WoW: Forever. The
+entrance and the level in this page's facts come from the current build's game files and are not confirmed in the
+game. Its bosses are listed here once players report them.
+
+## Before you go
+
+### Editor to confirm
+
+- Proposed: check the level in this page's facts and go with a group around it. It is the level the game files
+  give, not yet confirmed in the game.
+- Proposed: an Alliance group should plan its way through Orgrimmar before it forms, since the entrance is inside the
+  city.
+- Proposed: bring someone who can hold the enemies' attention and someone who can heal.

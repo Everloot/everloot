@@ -4,7 +4,7 @@ import { ANOTHER_CHARACTER_NOTE, COMPLETION_AGREEMENT, completionEmptyState, dro
 
 const pct = (done: number, total: number) => (total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0);
 
-function Bar({ done, total, label }: { done: number; total: number; label: string }) {
+export function Bar({ done, total, label }: { done: number; total: number; label: string }) {
   return (
     <div
       role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={total} aria-valuenow={Math.min(done, total)}
@@ -50,6 +50,14 @@ function Character({ c }: { c: CharacterProgress }) {
         <Stat title="Titles" done={c.titles.known} total={c.titles.total} unit="known" />
         <Stat title="Quest chains" done={c.quests.chainsDone} total={c.quests.chainsTotal} unit="finished" note={`${c.quests.completed} quests completed in all`} />
       </div>
+      <CharacterClosest c={c} />
+    </Card>
+  );
+}
+
+/** What is closest to done for one character: achievements by share, reputations by what the next standing needs, chains by quests left. */
+export function CharacterClosest({ c }: { c: CharacterProgress }) {
+  return (
       <div className="grid gap-6 sm:grid-cols-3">
         <Closest title="Achievements closest to done" empty="None started that the list covers.">
           {c.achievements.closest.map((a) => (
@@ -72,7 +80,6 @@ function Character({ c }: { c: CharacterProgress }) {
           ))}
         </Closest>
       </div>
-    </Card>
   );
 }
 

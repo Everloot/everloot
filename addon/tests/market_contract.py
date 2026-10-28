@@ -174,6 +174,7 @@ assert(Everloot:Status():find('auction_snapshot'), 'status counts the snapshot r
 lua.execute("""
 local own = tooltipFor(2589)
 assert(own:find('Your scan: min 1s 0c') and own:find('value 1s 10c') and own:find('100 up'), own)
+assert(not own:find('all houses'), 'an own scan is not an all-house price: ' .. own)
 assert(tooltipFor(424242) == '', 'no line for an item with no price')
 tripped = false
 os = { execute = function() tripped = true end }
@@ -185,8 +186,11 @@ Everloot:ResetPrices()
 local both = tooltipFor(2589)
 assert(both:find('Everloot market 2s 5c') and both:find('min 2s 0c') and both:find('historical 1s 90c'), both)
 assert(both:find('3 reporters'), both)
+assert(both:find('historical 1s 90c · all houses'), 'the community prices say they blend every auction house: ' .. both)
+assert(both:find('Your scan: min 1s 0c') and not both:find('Your scan[^\\n]*all houses'), 'the own scan keeps its own label: ' .. both)
 local herb = tooltipFor(765)
 assert(herb:find('market unrecorded'), 'a null market value is unrecorded, never zero: ' .. herb)
+assert(herb:find('all houses'), 'a thin or unrecorded row still says its scope: ' .. herb)
 
 EverlootPricesDB.realms.forever.sum = 1
 Everloot:ResetPrices()
@@ -221,6 +225,7 @@ drain()
 assert(EverlootDB.lastScans.Forever.at == now, 'the second scan finished and was recorded')
 """)
 
+
 # Community prices: a stale file is marked, thin items say so, and a large file is checked a slice per frame.
 lua.execute((Path(__file__).parent / "fixtures" / "EverlootPrices.lua").read_text(encoding="utf-8"))
 lua.execute("""
@@ -230,7 +235,8 @@ local stale = tooltipFor(2589)
 assert(stale:find('STALE') and stale:find('2026%-10%-20'), 'prices ten days old are marked stale: ' .. stale)
 date = function() return '2026-10-21T10:00:00Z' end
 local fresh = tooltipFor(2589)
-assert(fresh:find('prices fetched 2026%-10%-20') and not fresh:find('STALE'), 'prices from yesterday are not stale: ' .. fresh)
+assert(fresh:find('price file built 2026%-10%-20') and not fresh:find('STALE'), 'prices from yesterday are not stale: ' .. fresh)
+assert(not fresh:find('fetched'), 'the file date is when the file was built, not when it was fetched: ' .. fresh)
 date = function() return '2026-10-20T10:00:00Z' end
 assert(Everloot.DayNumber('1970-01-01') == 0 and Everloot.DayNumber('2000-03-01') == 11017 and Everloot.DayNumber('2026-10-20') - Everloot.DayNumber('2026-10-19') == 1)
 assert(Everloot.DayNumber('nope') == nil)
@@ -252,7 +258,8 @@ assert(frames == math.ceil(#data / 20000) - 1, 'one slice per frame: ' .. frames
 local ready = tooltipFor(7)
 assert(ready:find('Everloot market 5s 0c') and ready:find('50 up'), ready)
 local absent = tooltipFor(3001)
-assert(not absent:find('Everloot market') and absent:find('no price on Bigrealm yet'), 'an id that is not in the file has no price, and 7 does not match 70 or 17: ' .. absent)
+assert(not absent:find('Everloot market') and absent:find('not in the local price file'), 'an id that is not in a full file is not in the file, and 7 does not match 70 or 17: ' .. absent)
+assert(not absent:find('no price on'), 'a full file cannot say the item has no public price: ' .. absent)
 local thin = tooltipFor(2)
 assert(thin:find('unrecorded %(thin%)'), thin)
 
@@ -265,6 +272,40 @@ local refused = tooltipFor(7)
 assert(said('checksum') and not refused:find('Everloot market') and refused:find('community prices failed their checksum'), 'a large file with a bad checksum is refused, and says so: ' .. refused)
 GetRealmName = function() return 'Forever' end
 Everloot:ResetPrices()
+-- A file below the cap that lacks the item has no public price for it: the usual short line.
+assert(tooltipFor(424242):find('no price on Forever yet'), 'a small file that lacks the item has no price for it')
+""")
+
+# The file's build time and the item's own newest day are different facts: a freshly built file can hold an
+# old item, and an old file a current one. Each is judged on its own, against today's UTC date.
+lua.execute("""
+local function priceFile(asOf, day)
+  local data = '2589,205,200,190,40,' .. day .. ',3'
+  EverlootPricesDB = { realms = { forever = { dataAsOf = asOf, data = data, sum = Everloot.Adler32(data) } } }
+  Everloot:ResetPrices()
+  return tooltipFor(2589)
+end
+date = function() return '2026-10-30T10:00:00Z' end
+local oldItem = priceFile('2026-10-30T09:50:00.000Z', '2026-10-20')
+assert(oldItem:find('STALE') and oldItem:find('2026%-10%-20') and oldItem:find('10 days'), 'a new file does not freshen an old item: ' .. oldItem)
+assert(oldItem:find('price file built 2026%-10%-30') and not oldItem:find('OLD FILE'), 'the file itself is new: ' .. oldItem)
+assert(oldItem:find('Everloot market 2s 5c'), 'a stale item keeps its numbers: ' .. oldItem)
+local oldFile = priceFile('2026-10-20T06:30:00.000Z', '2026-10-30')
+assert(oldFile:find('OLD FILE') and oldFile:find('2026%-10%-20'), 'an old file is called old: ' .. oldFile)
+assert(not oldFile:find('STALE'), 'a current item day is not stale because the file is old: ' .. oldFile)
+assert(not priceFile('2026-10-30T09:50:00.000Z', '2026-10-28'):find('STALE'), 'two days is not stale')
+assert(priceFile('2026-10-30T09:50:00.000Z', '2026-10-27'):find('STALE'), 'three days is stale')
+assert(not priceFile('2026-10-30T09:50:00.000Z', '2026-10-31'):find('STALE'), 'a day ahead is client drift, not stale')
+assert(priceFile('garbage', '2026-10-30'):find('price file age unknown'), 'an unreadable build time is unknown, not fresh')
+date = function() return '2026-10-31T00:00:01Z' end
+local midnight = priceFile('2026-10-30T23:50:00.000Z', '2026-10-30')
+assert(not midnight:find('STALE') and not midnight:find('OLD FILE'), 'across UTC midnight yesterday is current: ' .. midnight)
+date = function() return '2026-10-20T10:00:00Z' end
+""")
+lua.execute((Path(__file__).parent / "fixtures" / "EverlootPrices.lua").read_text(encoding="utf-8"))
+lua.execute("""
+Everloot:ResetPrices()
+GetRealmName = function() return 'Forever' end
 """)
 
 # /everloot price <item>: the tooltip's lines in chat, anywhere, from the files already in the game.
@@ -279,6 +320,7 @@ local function ask(arg) printed = {}; SlashCmdList.EVERLOOT('price ' .. arg); dr
 local linen = ask(LINK)
 assert(linen:find('Everloot price: ' .. LINK:gsub('%p', '%%%0') .. ' on Forever'), linen)
 assert(linen:find('Everloot market 2s 5c') and linen:find('min 2s 0c') and linen:find('historical 1s 90c'), 'same numbers as the tooltip: ' .. linen)
+assert(linen:find('historical 1s 90c · all houses'), 'the command says the community prices are all-house too: ' .. linen)
 assert(linen:find('Your scan: min 1s 0c'), 'the player\\'s own scan too: ' .. linen)
 assert(linen:find('everloot.app/tools/auctions%?realm=Forever&item=2589'), 'the full history is on the site: ' .. linen)
 assert(ask('2589'):find('Everloot market 2s 5c'), 'an item id works')
@@ -290,7 +332,26 @@ assert(ask('424242'):find('No price for this item on this realm yet'), 'an item 
 
 GetRealmName = function() return 'Nowhere' end
 Everloot:ResetPrices()
-assert(ask('2589'):find('No community prices in the game for this realm yet'), 'a realm with no file says where prices come from')
+local noRealm = ask('2589')
+assert(noRealm:find('has no data for Nowhere') and noRealm:find('/reload'), 'a file without this realm says so: ' .. noRealm)
+assert(not noRealm:find('failed') and not noRealm:find('No price for this item'), noRealm)
+local savedPrices = EverlootPricesDB
+EverlootPricesDB = nil
+Everloot:ResetPrices()
+local noFile = ask('2589')
+assert(noFile:find('No Everloot price file in the game') and noFile:find('Desktop App') and noFile:find('/reload'), 'no file says where prices come from: ' .. noFile)
+EverlootPricesDB = savedPrices
+
+-- A failed checksum is said so, and is not a missing price.
+GetRealmName = function() return 'Forever' end
+EverlootPricesDB.realms.forever.sum = 1
+Everloot:ResetPrices()
+printed = {}
+local refused = ask('2589')
+assert(refused:find('failed their checksum') and refused:find('not used'), 'a command says the checksum failed: ' .. refused)
+assert(not refused:find('No price for this item'), 'a failed file is not a missing price: ' .. refused)
+EverlootPricesDB.realms.forever.sum = 1634601863
+Everloot:ResetPrices()
 
 -- A large file still being checked: the answer waits for the checksum, then prints.
 local big = {}
@@ -304,6 +365,15 @@ SlashCmdList.EVERLOOT('price 7')
 assert(not said('Everloot price'), 'nothing is printed before the checksum has passed')
 drain()
 assert(said('Everloot market 5s 0c'), 'once checked, the price prints')
+
+-- The file keeps only the 2,000 items with the most units listed: an item it lacks may still be public.
+printed = {}
+SlashCmdList.EVERLOOT('price 3001')
+drain()
+local capped = table.concat(printed, '\\n')
+assert(capped:find('keeps only the 2,000 items') and capped:find('website'), 'a full file says it is capped: ' .. capped)
+assert(not capped:find('no public day') and not capped:find('No price for this item'), 'a full file cannot say nothing is public: ' .. capped)
+assert(capped:find('everloot.app/tools/auctions%?realm=Bigrealm&item=3001'), 'and links the page that can tell: ' .. capped)
 GetRealmName = function() return 'Forever' end
 Everloot:ResetPrices()
 """)
@@ -328,4 +398,151 @@ for source in sorted(root.rglob("*.lua")):
 # Every row the addon wrote is a record the site would accept (packages/protocol/schema).
 from protocol_schema import check_all  # noqa: E402
 check_all(lua)
+# The retry for rows whose item data had not loaded is read in chunks of the same size as the first pass, so a
+# large house with slow item data does not read thousands of rows in one frame. Every chunk checks the scan
+# is still the one that started it, so closing the house (or starting another scan) stops the old retry.
+lua.execute("""
+local savedRows = rows
+local savedInfo = C_AuctionHouse.GetReplicateItemInfo
+reads = 0
+loadedLater = false
+rows = {}
+for i = 1, 2501 do
+  -- Every row's item data is missing on the first read; four in five are there on the retry.
+  rows[i] = { hasAllInfo = false, late = i % 5 ~= 0, count = 1, buyout = 0 }
+end
+C_AuctionHouse.GetReplicateItemInfo = function(i)
+  reads = reads + 1
+  local r = rows[i]
+  if r.late and loadedLater then return 'Silk', 1, 2, 1, true, 1, 0, 0, 0, 900, 0, false, nil, nil, nil, 0, 4306, true end
+  return nil, 1, r.count, 1, true, 1, 0, 0, 0, r.buyout, 0, false, nil, nil, nil, 0, nil, false
+end
+-- Runs the pending timers one at a time, returning the most reads any one callback made. The retry's data
+-- becomes available when its timer is reached, as it does in the game.
+function biggestStep()
+  local biggest = 0
+  while #timers > 0 do
+    local t = table.remove(timers, 1)
+    if t.seconds == 2 then loadedLater = true end
+    local before = reads
+    t.f()
+    biggest = math.max(biggest, reads - before)
+  end
+  return biggest
+end
+
+now = now + 901
+fire('AUCTION_HOUSE_SHOW')
+timers = {}; printed = {}
+SlashCmdList.EVERLOOT('scan')
+fire('REPLICATE_ITEM_LIST_UPDATE')
+assert(reads <= Everloot.SCAN_CHUNK, 'the first pass reads one chunk a frame; got ' .. reads)
+local biggest = math.max(reads, biggestStep())
+assert(biggest <= Everloot.SCAN_CHUNK, 'no callback, including the retry, reads more than one chunk; got ' .. biggest)
+assert(reads == 2501 + 2501, 'every incomplete row is read once more on the retry; got ' .. reads)
+assert(not Everloot:Scanning(), 'the scan finished')
+local last = EverlootDB.records.auction_snapshot[#EverlootDB.records.auction_snapshot]
+assert(#last.items == 1 and last.items[1][1] == 4306, 'the retried rows that loaded are kept')
+assert(last.items[1][2] == 2001 and last.items[1][3] == 4002 and last.items[1][4] == 450, 'with their listings, quantity and per-unit price; got ' .. table.concat(last.items[1], ','))
+assert(said('500 not loaded'), 'rows that still had no item data are counted, not lost')
+
+-- Closing the house between retry chunks stops the retry: no more reads and nothing stored.
+timers = {}; printed = {}; reads = 0; loadedLater = false
+now = now + 901
+fire('AUCTION_HOUSE_SHOW')
+local storedBefore = #EverlootDB.records.auction_snapshot
+SlashCmdList.EVERLOOT('scan')
+fire('REPLICATE_ITEM_LIST_UPDATE')
+local retryTimer
+repeat
+  local t = table.remove(timers, 1)
+  if t.seconds == 2 then loadedLater = true; retryTimer = t end
+  if not retryTimer then t.f() end
+until retryTimer or #timers == 0
+assert(retryTimer, 'the first pass leaves a retry')
+local before = reads
+retryTimer.f()
+assert(reads - before == Everloot.SCAN_CHUNK and Everloot:Scanning(), 'the first retry chunk reads one chunk and the scan carries on')
+assert(#timers >= 1 and timers[#timers].seconds == 0, 'the next retry chunk waits for the next frame')
+fire('AUCTION_HOUSE_CLOSED')
+assert(not Everloot:Scanning() and said('auction house closed'))
+before = reads
+while #timers > 0 do table.remove(timers, 1).f() end
+assert(reads == before, 'a stopped scan reads no more retry rows; read ' .. (reads - before))
+assert(#EverlootDB.records.auction_snapshot == storedBefore, 'and stores nothing')
+
+-- A retry left behind by a closed house does not touch the next scan.
+timers = {}; printed = {}; reads = 0; loadedLater = false
+now = now + 901
+fire('AUCTION_HOUSE_SHOW')
+SlashCmdList.EVERLOOT('scan')
+fire('REPLICATE_ITEM_LIST_UPDATE')
+local stale
+repeat
+  local t = table.remove(timers, 1)
+  if t.seconds == 2 then stale = t else t.f() end
+until stale or #timers == 0
+assert(stale, 'a retry is waiting')
+fire('AUCTION_HOUSE_CLOSED')
+now = now + 901
+fire('AUCTION_HOUSE_SHOW')
+SlashCmdList.EVERLOOT('scan')
+assert(Everloot:Scanning(), 'a new scan is waiting for the house')
+printed = {}
+reads = 0
+stale.f()
+assert(reads == 0 and #timers == 1, 'the old retry reads no rows and schedules no more; read ' .. reads)
+assert(Everloot:Scanning() and not said('no buyouts'), 'the old retry leaves the new scan alone')
+timers = {}; fire('AUCTION_HOUSE_CLOSED')
+
+-- A first-pass step left behind by a closed house does not touch the next scan either: it reads nothing, schedules
+-- nothing, stores nothing, and the new scan keeps waiting for its own list update and then finishes normally.
+timers = {}; printed = {}; reads = 0; loadedLater = false
+now = now + 901
+fire('AUCTION_HOUSE_SHOW')
+SlashCmdList.EVERLOOT('scan')
+fire('REPLICATE_ITEM_LIST_UPDATE')
+local staleStep
+for k, t in ipairs(timers) do if t.seconds == 0 then staleStep = table.remove(timers, k); break end end
+assert(staleStep, 'the first pass leaves its next chunk for the next frame')
+fire('AUCTION_HOUSE_CLOSED')
+timers = {}
+now = now + 901
+fire('AUCTION_HOUSE_SHOW')
+local storedBeforeStep = #EverlootDB.records.auction_snapshot
+SlashCmdList.EVERLOOT('scan')
+assert(Everloot:Scanning(), 'a new scan is waiting for the house')
+local timersBefore = #timers
+printed = {}
+reads = 0
+staleStep.f()
+assert(reads == 0, 'the old first-pass step reads no rows; read ' .. reads)
+assert(#timers == timersBefore, 'and schedules nothing')
+assert(Everloot:Scanning() and not said('no buyouts'), 'the old step leaves the new scan waiting')
+assert(#EverlootDB.records.auction_snapshot == storedBeforeStep, 'and stores nothing')
+fire('REPLICATE_ITEM_LIST_UPDATE')
+assert(reads <= Everloot.SCAN_CHUNK and reads > 0, 'the new scan still reads its own first chunk when the house answers; read ' .. reads)
+assert(biggestStep() <= Everloot.SCAN_CHUNK, 'the new scan carries on one chunk a frame')
+assert(not Everloot:Scanning(), 'and finishes')
+local fresh = EverlootDB.records.auction_snapshot[#EverlootDB.records.auction_snapshot]
+assert(fresh.items[1][1] == 4306 and EverlootDB.lastScans.Forever.scanId == fresh.scanId, 'with its own result stored as the latest scan')
+assert(said('500 not loaded'), 'and its own counts reported')
+
+-- Closing the house between first-pass chunks stops the pass: later steps read nothing and store nothing.
+timers = {}; printed = {}; reads = 0; loadedLater = false
+now = now + 901
+fire('AUCTION_HOUSE_SHOW')
+storedBeforeStep = #EverlootDB.records.auction_snapshot
+SlashCmdList.EVERLOOT('scan')
+fire('REPLICATE_ITEM_LIST_UPDATE')
+fire('AUCTION_HOUSE_CLOSED')
+assert(not Everloot:Scanning())
+reads = 0
+while #timers > 0 do table.remove(timers, 1).f() end
+assert(reads == 0 and #EverlootDB.records.auction_snapshot == storedBeforeStep, 'a stopped first pass reads and stores nothing; read ' .. reads)
+
+rows = savedRows
+C_AuctionHouse.GetReplicateItemInfo = savedInfo
+loadedLater = false
+""")
 print("Lua 5.1 market: clicked full scan, chunked reads, retry, parts, cooldown, 3 scans kept, scan timeout, tooltips with sliced checksums, stale and thin labels, /everloot price in chat, no buy or post call")

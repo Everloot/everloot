@@ -1,10 +1,11 @@
 const path = require("node:path");
 const versions = require("./src/data/build-versions.json");
+const protectedPaths = require("./src/data/protected-paths.json");
 
 const reportOnlyCsp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com https://www.googletagmanager.com https://eu.i.posthog.com https://us.i.posthog.com https://eu-assets.i.posthog.com https://us-assets.i.posthog.com https://pagead2.googlesyndication.com https://fundingchoicesmessages.google.com https://*.adtrafficquality.google",
-  "connect-src 'self' https://assets.everloot.app https://cloudflareinsights.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://eu.i.posthog.com https://us.i.posthog.com https://pagead2.googlesyndication.com https://fundingchoicesmessages.google.com https://*.adtrafficquality.google https://googleads.g.doubleclick.net https://api.anthropic.com https://openrouter.ai http://localhost:11434",
+  "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com https://tracker.metricool.com https://www.googletagmanager.com https://eu.i.posthog.com https://us.i.posthog.com https://eu-assets.i.posthog.com https://us-assets.i.posthog.com https://pagead2.googlesyndication.com https://fundingchoicesmessages.google.com https://*.adtrafficquality.google",
+  "connect-src 'self' https://assets.everloot.app https://cloudflareinsights.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://eu.i.posthog.com https://us.i.posthog.com https://pagead2.googlesyndication.com https://fundingchoicesmessages.google.com https://*.adtrafficquality.google https://googleads.g.doubleclick.net https://api.anthropic.com https://openrouter.ai https://api.deepseek.com https://api.moonshot.ai https://dashscope-intl.aliyuncs.com https://api.minimax.io https://api.siliconflow.com https://qianfan.baidubce.com https://api.xiaomimimo.com https://api.groq.com https://generativelanguage.googleapis.com https://api.mistral.ai http://localhost:11434",
   "img-src 'self' data: blob: https:",
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
@@ -18,11 +19,44 @@ const reportOnlyCsp = [
 // CSP only (support.google.com/adsense/answer/16283098), so script, connect and frame sources stay report-only.
 const enforcedCsp = ["object-src 'none'", "base-uri 'self'", "frame-ancestors 'self'"].join("; ");
 
+// Enforced on the pages that hold chat keys or the account (data/protected-paths.json, also under the served
+// version's prefix, whose rewrite shows the same pages). They load no ads or analytics (OptionalScripts), so
+// scripts come from this site alone and connections go only to it, its assets and the chat providers the browser
+// calls (lib/chat/catalogue.ts, held to this list by next-config.test.ts). 'unsafe-inline' stays in script-src:
+// Next's inline bootstrap scripts need it without a nonce, and a nonce would make every page dynamic. So an
+// injected inline script is not blocked here; the policy only keeps out other hosts' scripts and connections.
+// This is document protection, not storage isolation: same-origin scripts can still read tab keys after a
+// visit to a public page in that tab. Session storage narrows lifetime and cross-tab access, not script trust.
+// `next dev` runs its scripts through eval. A CSP lasts as long as its document, so DocumentBoundary reloads on
+// any move between these pages and the rest of the site.
+const protectedCsp = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""}`,
+  "connect-src 'self' https://assets.everloot.app https://openrouter.ai https://api.anthropic.com http://localhost:11434 https://api.deepseek.com https://api.moonshot.ai https://dashscope-intl.aliyuncs.com https://api.minimax.io https://api.siliconflow.com https://qianfan.baidubce.com https://api.xiaomimimo.com https://api.groq.com https://generativelanguage.googleapis.com https://api.mistral.ai",
+  "img-src 'self' data: blob: https://assets.everloot.app",
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self' data:",
+  "frame-src 'none'",
+  "frame-ancestors 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+].join("; ");
+const servedPrefix = versions.prefixes[versions.served] ?? "";
+// `/chat/:path*` matches /chat itself too.
+const servedSources = (p) => [`${p}/:path*`, ...(servedPrefix ? [`${servedPrefix}${p}/:path*`] : [])];
+const protectedSources = protectedPaths.flatMap(servedSources);
+
+const permissionsPolicy = (microphone) => `camera=(), microphone=${microphone}, geolocation=(), payment=(), usb=(), browsing-topics=()`;
+// Chat's dictation (components/chat/Dictation.tsx) uses the browser's speech recognition, which needs the
+// microphone. This lets Chat's own document ask the player; it grants nothing by itself. Every other page,
+// /account and /settings included, keeps it blocked.
+const microphoneSources = servedSources("/chat");
+
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()" },
+  { key: "Permissions-Policy", value: permissionsPolicy("()") },
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
   { key: "Content-Security-Policy", value: enforcedCsp },
   { key: "Content-Security-Policy-Report-Only", value: reportOnlyCsp },
@@ -51,9 +85,16 @@ const nextConfig = {
     "/search": ["./.release/*.sqlite", "./.release/*.manifest.json"],
     // The wiki's pages are read from kb/wiki when a page is rebuilt (the key covers /wiki and /wiki/[slug]).
     "/wiki": ["../kb/wiki/*.md", "../kb/wiki/categories.yaml"],
-    // The sitemap lists the wiki pages too, so it reads them from kb/wiki on every request. Without the
-    // folder in its own bundle the route answers 500 and the site has no sitemap at all.
-    "/sitemap.xml": ["../kb/wiki/*.md", "../kb/wiki/categories.yaml"],
+    // The news posts are read from kb/news the same way (the key covers /news, /news/[slug] and /news/feed.xml);
+    // a post's [[links]] read the wiki pages too.
+    "/news": ["../kb/news/*.md", "../kb/wiki/*.md", "../kb/wiki/categories.yaml"],
+    // The guides are read from kb/guides on each request for the guide index and when a guide page is rebuilt (the
+    // key covers /guides and /guides/[slug]); a guide's [[links]] read the wiki pages too.
+    "/guides": ["../kb/guides/*.md", "../kb/wiki/*.md", "../kb/wiki/categories.yaml"],
+    "/classes/\\[class\\]/feed.xml": ["../kb/guides/*.md"],
+    // The sitemap lists the wiki pages, the news posts and the guides too, so it reads them from kb on every request.
+    // Without the folders in its own bundle the route answers 500 and the site has no sitemap at all.
+    "/sitemap.xml": ["../kb/wiki/*.md", "../kb/wiki/categories.yaml", "../kb/news/*.md", "../kb/guides/*.md"],
     "/lore/browse/[type]": ["./.release/*.sqlite", "./.release/*.manifest.json"],
     "/lore/coverage": ["./.release/*.sqlite", "./.release/*.manifest.json"],
     // The build-link previews draw their card on each request, so they read the Geist fonts at run time.
@@ -107,8 +148,16 @@ const nextConfig = {
       { key: "Vercel-CDN-Cache-Control", value: "max-age=3600, stale-while-revalidate=86400" },
       { key: "CDN-Cache-Control", value: "max-age=3600, stale-while-revalidate=86400" },
     ];
+    const briefCdnHeaders = [
+      { key: "Vercel-CDN-Cache-Control", value: "max-age=300, stale-while-revalidate=3600" },
+      { key: "CDN-Cache-Control", value: "max-age=300, stale-while-revalidate=3600" },
+    ];
     return [
       { source: "/:path*", headers: securityHeaders },
+      // After the rule above: the later rule's value for the same header is the one sent.
+      ...protectedSources.map((source) => ({ source, headers: [{ key: "Content-Security-Policy", value: protectedCsp }] })),
+      // The same key's spelling, so it replaces the site's value rather than adding a second header.
+      ...microphoneSources.map((source) => ({ source, headers: [{ key: "Permissions-Policy", value: permissionsPolicy("(self)") }] })),
       // These pages read no cookies, so the CDN can serve them. Next overwrites Cache-Control on
       // dynamic pages, so the CDN-specific headers are used.
       { source: "/database/items", headers: databaseItemsCdnHeaders },
@@ -116,6 +165,16 @@ const nextConfig = {
       // Zone and instance pages read no cookies either, and each one renders from the whole corpus on every request.
       { source: "/database/zones/:path*", headers: databaseItemsCdnHeaders },
       { source: "/database/instances/:path*", headers: databaseItemsCdnHeaders },
+      // The database index and the map read no cookies either, and render from the corpus and the build's map on every request.
+      { source: "/database", headers: databaseItemsCdnHeaders },
+      { source: "/map", headers: databaseItemsCdnHeaders },
+      { source: "/map/:path*", headers: databaseItemsCdnHeaders },
+      // Changes and search read no cookies, but new blue posts and newly agreed names should show within minutes.
+      { source: "/changes", headers: briefCdnHeaders },
+      { source: "/search", headers: briefCdnHeaders },
+      // The sitemap reads no cookies and rebuilds from kb on every request (about 4s cold), so the CDN keeps it an hour.
+      // The database and auctions sitemaps set these on their own successful responses, so their 503s stay uncached.
+      { source: "/sitemap.xml", headers: databaseItemsCdnHeaders },
       // The embeddable tooltip script other sites load: an hour in browsers and at the CDN, so a fix reaches them quickly.
       { source: "/tooltips.js", headers: [
         { key: "Cache-Control", value: "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400" },

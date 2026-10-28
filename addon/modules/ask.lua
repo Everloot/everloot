@@ -5,6 +5,16 @@
 local E = Everloot
 local MAX_QUESTION, MAX_PENDING = 500, 20
 
+--- The realm the player is on, sent with the question so a price question needs no realm in its words. Only a
+--- plain name goes: anything else is left out and the companion asks which realm.
+local function currentRealm()
+  local realm = GetRealmName and GetRealmName()
+  if type(realm) ~= "string" then return nil end
+  realm = realm:gsub("^%s+", ""):gsub("%s+$", "")
+  if #realm < 2 or #realm > 40 or realm:find("[%c|]") then return nil end
+  return realm
+end
+
 function E:Ask(text)
   local question = type(text) == "string" and (text:gsub("^%s+", ""):gsub("%s+$", "")) or ""
   if question == "" then
@@ -16,13 +26,19 @@ function E:Ask(text)
     return
   end
   EverlootDB.asks = EverlootDB.asks or {}
+  -- A waiting question is only removed by its answer, so a full queue turns the new question away: dropping
+  -- the oldest would lose a question whose answer the companion may be about to write.
+  if #EverlootDB.asks >= MAX_PENDING then
+    print(string.format("Everloot: %d questions are already waiting for answers, so this one was not added. Keep the companion running and /reload to read the answers, then ask again.", MAX_PENDING))
+    return
+  end
   EverlootDB.askCounter = (EverlootDB.askCounter or 0) + 1
   table.insert(EverlootDB.asks, {
     id = "ask:" .. EverlootDB.installId .. ":" .. EverlootDB.askCounter,
     question = question,
     askedAt = date("!%Y-%m-%dT%H:%M:%SZ"),
+    realm = currentRealm(),
   })
-  while #EverlootDB.asks > MAX_PENDING do table.remove(EverlootDB.asks, 1) end
   print("Everloot: question saved. Keep the companion running, then /reload to read the answer.")
 end
 

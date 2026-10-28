@@ -137,12 +137,22 @@ export function rollupDrops(windows: LootRow[]): RollupResult {
   return { rates, measuredZeros, rejected };
 }
 
+/**
+ * The windows that make the kill and gathering tables: those with no type (older addons) and the three that
+ * open on the source itself. Pick-pocket, skinning, disenchant and container windows wait for their own tables
+ * (loot tables spec, section 4), so they never count in a kill's denominator.
+ */
+export function countsAsKillOrGather(lootType: unknown): boolean {
+  return lootType === undefined || lootType === "kill" || lootType === "gather" || lootType === "fishing";
+}
+
 export function lootWindowsFromRecords(records: unknown[]): LootRow[] {
   const windows: LootRow[] = [];
   for (const raw of records) {
     if (!raw || typeof raw !== "object") continue;
     const row = raw as Record<string, unknown>;
     if (row.kind !== "loot" || row.sourceEvidence !== "loot-api" || typeof row.installId !== "string" || !Array.isArray(row.items)) continue;
+    if (!countsAsKillOrGather(row.lootType)) continue;
     windows.push({
       installId: row.installId,
       ...(typeof row.sourceNpcId === "number" ? { sourceNpcId: row.sourceNpcId } : {}),

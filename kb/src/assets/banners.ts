@@ -48,6 +48,23 @@ export const FACTION_ELEMENTS: Record<string, string> = { alliance: "AllianceEmb
  */
 export const LOGO_ELEMENTS = ["logo-wow-forever-2x", "logo-wow-forever"] as const;
 
+/**
+ * The game's own minimap icons for the world map's legend and pins, by the site's legend category id
+ * (web/src/lib/map-view.ts, CATEGORY_IDS): the interface atlas elements to try, first found wins. These are the
+ * pieces the game draws on its own map and minimap (Interface/Minimap/ObjectIconsAtlas). Vendors and other NPCs
+ * have no piece of their own there, and herbs and ore are tracked with spell icons, so those categories keep the
+ * site's glyph. Which elements a build has is checked, not assumed.
+ */
+export const POI_ELEMENTS: Record<string, readonly string[]> = {
+  flight: ["TaxiNode_Neutral"],
+  dungeon: ["Dungeon"],
+  raid: ["Raid"],
+  service: ["Innkeeper"],
+  trainer: ["Profession"],
+  quest: ["QuestNormal"],
+  chest: ["VignetteLoot"],
+};
+
 export interface LoadingTarget {
   mapId: number;
   name: string;

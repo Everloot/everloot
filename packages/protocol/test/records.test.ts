@@ -1,11 +1,12 @@
 import { describe, expect, test } from "vitest";
-import { ALL_RECORD_KINDS, parseRecords, parseUpload, PUBLIC_RECORD_KINDS, validateUpload } from "../src/index.js";
+import { ALL_RECORD_KINDS, GUILD_KILL_KINDS, parseRecords, parseUpload, PUBLIC_RECORD_KINDS, sharingCategory, validateUpload } from "../src/index.js";
 
 const base = { installId: "test-install-1234", capturedAt: "2026-09-29T12:00:00.000Z", eventId: "evt-1" };
 
 describe("intake contract", () => {
   test("all record kinds exist", () => {
-    expect(ALL_RECORD_KINDS).toHaveLength(39);
+    expect(ALL_RECORD_KINDS).toHaveLength(40);
+    expect(ALL_RECORD_KINDS).toContain("guild_kill");
     expect(ALL_RECORD_KINDS).toContain("item_fact");
     expect(ALL_RECORD_KINDS).toContain("census_self");
     expect(ALL_RECORD_KINDS).toContain("census_seen");
@@ -54,7 +55,7 @@ describe("intake contract", () => {
     expect(r.accepted).toHaveLength(0);
     expect(r.rejected.map((x) => x.reason)).toEqual([
       "unknown kind: flying_mounts",
-      "loot needs a source: npc or object",
+      "loot needs a source: npc, object or item",
       expect.stringContaining(">0"),
     ]);
   });
@@ -227,6 +228,36 @@ describe("intake contract", () => {
     expect(PUBLIC_RECORD_KINDS).toContain("item_fact");
   });
 
+  test("a guild kill names a guild, a realm, a faction and a boss; a person never survives parsing; the kind is never served raw", () => {
+    const kill = { ...base, kind: "guild_kill", guildName: "Night Watch", realm: "Forever", faction: "horde", encounterId: 1144, name: "Edwin VanCleef", instanceMapId: 36 };
+    const result = parseRecords([
+      kill,
+      { ...kill, difficulty: 1, size: 5 },
+      // The schema has no field for a character, so one sent along is dropped, not stored.
+      { ...kill, character: "Thrallina", playerName: "Thrallina" },
+      { ...kill, faction: "Horde" },
+      { ...kill, faction: undefined },
+      { ...kill, guildName: "N" },
+      { ...kill, guildName: "Night<Watch>" },
+      { ...kill, realm: "" },
+      { ...kill, encounterId: 0 },
+      { ...kill, name: "" },
+      { ...kill, instanceMapId: undefined },
+      { ...kill, size: 41 },
+    ]);
+    expect(result.records.map((r) => r.kind)).toEqual(["guild_kill", "guild_kill", "guild_kill"]);
+    expect(result.receipt.rejected.map((r) => r.index)).toEqual([3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    expect(result.records[2]).not.toHaveProperty("character");
+    expect(result.records[2]).not.toHaveProperty("playerName");
+    expect(result.records[1]).toMatchObject({ difficulty: 1, size: 5 });
+    // Not on the public corpus allowlist: single-install and hidden-guild rows must not leave through the raw feed.
+    expect(PUBLIC_RECORD_KINDS).not.toContain("guild_kill");
+    expect(GUILD_KILL_KINDS).toEqual(["guild_kill"]);
+    // No sharing choice or grant: members agreeing is the bar, not an officer's grant.
+    expect(sharingCategory(result.records[0]!)).toBeNull();
+    expect(sharingCategory({ ...base, kind: "raid_lockout", guildName: "Night Watch", realm: "Forever", instance: "Molten Core", difficulty: "40", bossesKilled: [], resetAt: "2026-10-14T00:00:00Z" } as never)).toBe("guild");
+  });
+
   test("the envelope may say its rows came from a Polestar Recorder file, and nothing else", () => {
     const records = [{ ...base, kind: "npc_sighting", npcId: 197, name: "Marshal McBride", mapId: 1429, x: 48, y: 42 }];
     const recorder = parseUpload({ addonVersion: "polestar-recorder", source: "polestar_recorder", records });
@@ -256,6 +287,27 @@ describe("intake contract", () => {
     expect(result.receipt.rejected[0]!.reason).toBe("a loot position needs mapId, x and y together");
   });
 
+  test("a loot window may carry its type, the item it came from and its coin, and old windows stay valid", () => {
+    const kill = { ...base, kind: "loot", sourceEvidence: "loot-api", sourceNpcId: 1234, items: [{ itemId: 2589, count: 1 }] };
+    const disenchant = { ...base, kind: "loot", sourceEvidence: "loot-api", sourceItemId: 2455, lootType: "disenchant", items: [{ itemId: 10940, count: 2 }] };
+    const result = parseRecords([
+      kill,
+      { ...kill, lootType: "pickpocket", copper: 154 },
+      disenchant,
+      { ...disenchant, sourceItemId: undefined },
+      { ...kill, lootType: "mining" },
+      { ...kill, copper: 0 },
+      { ...kill, sourceItemId: 0 },
+    ]);
+    expect(result.records).toEqual([
+      expect.not.objectContaining({ lootType: expect.anything() }),
+      expect.objectContaining({ sourceNpcId: 1234, lootType: "pickpocket", copper: 154 }),
+      expect.objectContaining({ sourceItemId: 2455, lootType: "disenchant" }),
+    ]);
+    expect(result.receipt.rejected.map((r) => r.index)).toEqual([3, 4, 5, 6]);
+    expect(result.receipt.rejected[0]!.reason).toBe("loot needs a source: npc, object or item");
+  });
+
   test("a trainer row may name the trainer", () => {
     const row = { ...base, kind: "trainer_seen", profession: "Alchemy", recipe: "Lesser Healing Potion", requiredRank: 55 };
     const result = parseRecords([{ ...row, trainerNpcId: 3347 }, row, { ...row, trainerNpcId: 0 }]);
@@ -275,7 +327,7 @@ describe("intake contract", () => {
       records: [{ ...base, kind: "loot", items: [] }],
     });
     expect(bare.accepted).toHaveLength(0);
-    expect(bare.rejected.map((row) => row.reason)).toContain("loot needs a source: npc or object");
+    expect(bare.rejected.map((row) => row.reason)).toContain("loot needs a source: npc, object or item");
   });
 
   test("accepts a gold snapshot and a loot money event", () => {

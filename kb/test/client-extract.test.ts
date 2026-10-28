@@ -89,6 +89,11 @@ test("the coverage tables are read by the file data ids the WoWDBDefs manifest l
   });
 });
 
+test("the instance level range table is read by the file data id the WoWDBDefs manifest lists for it", () => {
+  // manifest.json at WoWDBDefs b9a63096cdd9, field db2FileDataID.
+  expect(CLIENT_TABLES).toMatchObject({ ContentTuning: 1962930 });
+});
+
 test("the W0 tables are read by the file data ids the WoWDBDefs manifest lists for them", () => {
   // manifest.json at WoWDBDefs b9a63096cdd9, field db2FileDataID.
   expect(CLIENT_TABLES).toMatchObject({
@@ -202,6 +207,50 @@ test("the W4 tables are read by the file data ids the WoWDBDefs manifest lists f
     ObjectEffectPackage: 1090574, ObjectEffectPackageElem: 1090578,
     ParticleColor: 1284820, DeclinedWord: 1279100, DeclinedWordCases: 1279099, NameGen: 1122117,
     Resistances: 1135072, RaceStat: 7722633,
+  });
+});
+
+test("the W5 tables are read by the file data ids the WoWDBDefs manifest lists for them", () => {
+  // manifest.json at WoWDBDefs 05e242b6acdc (verified against the live wowf 70630 build, rows for
+  // Criteria 3297, CriteriaTree 6771, ModifierTree 2845, Talent 432, TalentTab 27, NumTalentsAtLevel
+  // 80, Difficulty 22, PowerType 6; CriteriaTreeXEffect is present with 0 rows).
+  expect(CLIENT_TABLES).toMatchObject({
+    Criteria: 1263817, CriteriaTree: 1263818, CriteriaTreeXEffect: 1345969, ModifierTree: 1267645,
+    Talent: 1369062, TalentTab: 2178102, NumTalentsAtLevel: 1953326, MinorTalent: 1347274,
+    TalentTreePrimarySpells: 5581887, SpecSetMember: 2057624, SpecializationSpells: 1240335,
+    SpecializationSpellsDisplay: 2067238,
+    Difficulty: 1352127, PowerType: 1266022,
+  });
+});
+
+test("the W6 tables are read by the file data ids the WoWDBDefs manifest lists for them", () => {
+  // manifest.json at WoWDBDefs 05e242b6acdc (verified against the live wowf 70630 build, rows for
+  // SpellPower 3462, SpellCategories 10665, SpellClassOptions 6085, SpellAuraNames 650,
+  // SpellDispelType 11, SpellMechanic 36, SpellDiminish 11, SpellEquippedItems 1886,
+  // SpellTargetRestrictions 4454, SpellInterrupts 9895, SpellFocusObject 244, SpellTotems 1121,
+  // SpellShapeshift 3457, SpellShapeshiftForm 32, SpellLearnSpell 52, SpellLabel 4654,
+  // SpellProcsPerMinute 11, SpellProceduralEffect 991, RandPropPoints 300, ArmorLocation 23;
+  // SpellPowerDifficulty, SpellScaling, SpellReagentsCurrency, SpellEffectAutoDescription stay unread).
+  expect(CLIENT_TABLES).toMatchObject({
+    SpellPower: 982806, SpellCategories: 1139939, SpellClassOptions: 979663, SpellAuraNames: 3055890,
+    SpellDispelType: 1137829, SpellMechanic: 1014438, SpellDiminish: 3055891, SpellEquippedItems: 1140011,
+    SpellTargetRestrictions: 1139993, SpellInterrupts: 1139906, SpellFocusObject: 1280620,
+    SpellTotems: 1002162, SpellShapeshift: 1139929, SpellShapeshiftForm: 1280618,
+    SpellLearnSpell: 1001907, SpellLabel: 1347275, SpellProcsPerMinute: 1133526,
+    SpellProceduralEffect: 1140477,
+    RandPropPoints: 1310245, ArmorLocation: 1284818,
+  });
+});
+
+test("the E tables (text-bearing, pages-only) are read by the file data ids the WoWDBDefs manifest lists for them", () => {
+  // manifest.json at WoWDBDefs 05e242b6acdc (verified against the live wowf 70630 scan: GossipNPCOption 1577,
+  // GossipNPCOptionDisplayInfo 50, BroadcastText 12 rows; GossipXGarrTalentTrees is garrison plumbing and stays never).
+  expect(CLIENT_TABLES).toMatchObject({
+    GossipNPCOption: 4278503, GossipNPCOptionDisplayInfo: 4335720, GossipXUIDisplayInfo: 3622253,
+    GossipOptionXUIWidgetSet: 5746391, GossipUIDisplayInfoCondition: 5902977,
+    BroadcastText: 841604, BroadcastTextDuration: 2166900, ConversationLine: 1260801,
+    SceneScript: 801754, SceneScriptGlobalText: 1758036, SceneScriptPackage: 801755,
+    SceneScriptPackageMember: 801756, SceneScriptText: 1758037,
   });
 });
 

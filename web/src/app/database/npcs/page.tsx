@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { LAUNCH, LAUNCH_AT, longDate } from "@/data/wow-forever";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { NPC_CREATURE_TYPES, NPC_RANKS, type NpcRank, type NpcReaction } from "../../../../../kb/src/world-pages";
@@ -148,19 +149,20 @@ export default async function NpcListPage(props: { searchParams?: Promise<Search
         <NoMatches noun="NPCs" chips={chips} clearHref="/database/npcs" />
         {id !== null && <p className="pb-4 text-cell"><Link href={`/database/npcs/${id}`} className={LINK}>Open NPC {id}</Link></p>}
       </>
-    : <NoObservations>No NPC has an agreed name or position yet; each shows here once 3 installs report it.</NoObservations>;
+    : <NoObservations>{`NPCs are listed once players report them. ${Date.now() < Date.parse(LAUNCH_AT) ? `The addon starts recording when the game launches on ${longDate(LAUNCH.date)}, and an` : "An"} NPC shows here once 3 installs agree on it.`}</NoObservations>;
 
   return (
     <Container width="data">
       <article>
         <DataTitle title="NPCs" aside={strip} />
-        <FilterBar
+        {/* With no NPC to filter, a row of controls over one line says nothing. */}
+        {all.length > 0 && <FilterBar
           label="NPC filters"
           search={{ action: "/database/npcs", value: q.q, placeholder: "Name or id", label: "Filter by name or id", keep }}
           controls={controls}
           active={filters(q)}
           clearHref="/database/npcs"
-        />
+        />}
         {/* With nothing to list at all, the one line says so without a row of column headers over it. */}
         <div className="mt-2">{all.length === 0 ? empty : (
           <DataTable

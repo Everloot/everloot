@@ -1,9 +1,10 @@
 import { describe, expect, test, vi } from "vitest";
 import { MY_BUILDS_LINE, MY_BUILDS_REFUSAL } from "../saved-builds";
 import {
-  ACCOUNT_TOOL, answer, answerOrigin, callTool, CHAT_TOOLS, loadTools, NO_SOURCED_ANSWER, pagesIn, readOpenAiStream, searchOnly, signedIn, sourceLink,
-  sourcesIn, SYSTEM, testKey, TOOL_POLICY, UNSOURCED, type ToolDef,
+  ACCOUNT_TOOL, answer, answerFree, answerOrigin, callTool, CHAT_TOOLS, FREE_BUDGET, FREE_FALLBACK, FREE_PROVIDER, FREE_TOOLS, loadTools, marketReply, MODEL_STOPPED, NO_SOURCED_ANSWER, pagesIn, readOpenAiStream, searchOnly, signedIn,
+  SMALL_TALK_REPLY, smallTalk, asksForRanking, RANKING_NOTE, sourceLink, sourcesIn, SYSTEM, testKey, TOOL_POLICY, UNSOURCED, type ToolDef,
 } from "./agent";
+import { FIXTURE_ANSWER, FIXTURE_STRUCTURED, FIXTURE_URL } from "./market-fixture";
 import { chatProvider } from "./providers";
 
 const HIT = "[lore_page/lore] Leeroy Jenkins\nLeeroy Jenkins is a valiant human paladin.\nSource: https://warcraft.wiki.gg/wiki/Leeroy_Jenkins (CC-BY-SA-4.0, retrieved 2023-11-13)\n";
@@ -83,6 +84,17 @@ test("without a key the answer is the search hits, or no sourced answer", async 
   expect((await searchOnly("whos is leroy jenkins", none as never)).text).toBe(NO_SOURCED_ANSWER);
 });
 
+test("without a key, a question asking for the best gets the facts to compare and says it is not a pick", async () => {
+  const r = await searchOnly("whats the best racial for warlock on horde", site([]));
+  expect(r.text.startsWith(`${RANKING_NOTE}\n\n`)).toBe(true);
+  expect(r.sources).toEqual([expect.stringContaining("Leeroy_Jenkins")]);
+  expect((await searchOnly("Leeroy Jenkins", site([]))).text).not.toContain(RANKING_NOTE);
+  const none = vi.fn(async () => new Response(JSON.stringify({ text: "No results." }), { status: 200 }));
+  expect((await searchOnly("which race should i pick", none as never)).text).toBe(NO_SOURCED_ANSWER);
+  for (const q of ["is orc better than undead", "strongest warlock race", "what do you recommend for a warlock"]) expect(asksForRanking(q)).toBe(true);
+  for (const q of ["Leeroy Jenkins", "where does Linen Cloth drop", "Bested by the Bog"]) expect(asksForRanking(q)).toBe(false);
+});
+
 test("OpenRouter: the streamed tool call is rebuilt, run on this site, and the answer streams with its sources", async () => {
   const calls: string[] = [];
   const bodies: { stream?: boolean; tools: unknown[]; messages: { role: string }[] }[] = [];
@@ -149,6 +161,45 @@ test("provider errors name the provider and the message, in a body or inside the
     .rejects.toThrow("openrouter.ai: Rate limit exceeded");
 });
 
+test("small talk without a key gets the page's own line and no lookup; a real question still searches", async () => {
+  const calls: string[] = [];
+  for (const q of ["hi", "Hello!", "thank you", "ok cool", "testing"]) {
+    expect(smallTalk(q)).toBe(true);
+    expect((await searchOnly(q, site(calls))).text).toBe(SMALL_TALK_REPLY);
+  }
+  expect(calls).toEqual([]);
+  for (const q of ["hi where is Leeroy", "Linen Cloth", "what drops the hi-tech supergun"]) expect(smallTalk(q)).toBe(false);
+  await searchOnly("Linen Cloth", site(calls));
+  expect(calls).toHaveLength(1);
+});
+
+test("a provider that fails after the tools answered gives what they found, not nothing", async () => {
+  const calls: string[] = [];
+  let turns = 0;
+  const send = vi.fn(async () => turns++ === 0
+    ? sse([{ choices: [{ delta: { tool_calls: [{ index: 0, id: "c1", type: "function", function: { name: "search_knowledge", arguments: "{\"query\":\"Leeroy\"}" } }] } }] }])
+    : new Response(JSON.stringify({ error: { message: "upstream relay failed" } }), { status: 502 }));
+  const r = await answer({ provider: chatProvider("openrouter")!, model: "m", key: "k", history: [], question: "who is leeroy", tools: TOOLS, send: send as never, site: site(calls) });
+  // The 502 was asked once more before it counted, then the tool output came back as the reply.
+  expect(send).toHaveBeenCalledTimes(3);
+  expect(r.model).toBeNull();
+  expect(r.text).toContain(`${MODEL_STOPPED} (openrouter.ai: HTTP 502, upstream relay failed)`);
+  expect(r.text).toContain("Leeroy Jenkins is a valiant human paladin.");
+  expect(r).toMatchObject({ steps: [{ tool: "search_knowledge" }], sources: [expect.stringContaining("Leeroy_Jenkins")] });
+  expect(answerOrigin(r)).toEqual({ everloot: true, model: false });
+});
+
+test("a failure before any lookup is still thrown, and a 5xx is retried once only", async () => {
+  const http = vi.fn(async () => new Response(JSON.stringify({ error: { message: "overloaded" } }), { status: 503 }));
+  await expect(answer({ provider: chatProvider("openrouter")!, model: "m", key: "k", history: [], question: "q", tools: TOOLS, send: http as never, site: site([]) }))
+    .rejects.toThrow("openrouter.ai: HTTP 503, overloaded");
+  expect(http).toHaveBeenCalledTimes(2);
+  const auth = vi.fn(async () => new Response(JSON.stringify({ error: { message: "bad key" } }), { status: 401 }));
+  await expect(answer({ provider: chatProvider("openrouter")!, model: "m", key: "k", history: [], question: "q", tools: TOOLS, send: auth as never, site: site([]) }))
+    .rejects.toThrow("HTTP 401");
+  expect(auth).toHaveBeenCalledTimes(1);
+});
+
 test("an Ollama that cannot be reached says how to let the page in", async () => {
   const down = vi.fn(async () => { throw new TypeError("Failed to fetch"); });
   await expect(answer({ provider: chatProvider("ollama")!, model: "qwen3", key: "", history: [], question: "q", tools: TOOLS, send: down as never, site: site([]) }))
@@ -172,6 +223,11 @@ describe("Everloot first", () => {
     expect(SYSTEM.indexOf("your own knowledge")).toBeGreaterThan(at.at(-1)!);
     expect(SYSTEM.indexOf("Everloot's data comes first")).toBeLessThan(at[0]);
     expect(SYSTEM).toContain(UNSOURCED);
+  });
+
+  test("which race to pick for a class is a builds question: class_races sits with the talent trees", () => {
+    expect(CHAT_TOOLS).toContain("class_races");
+    expect(TOOL_POLICY.find((g) => g.label === "builds and talents")?.tools).toEqual(["talent_tree", "class_races", "my_builds"]);
   });
 
   test("an answer's Everloot pages come from the tools' More lines; sources lose their licence note", async () => {
@@ -213,5 +269,155 @@ describe("testing a key", () => {
   test("a refused key names the provider and its reason", async () => {
     const bad = vi.fn(async () => new Response(JSON.stringify({ error: { message: "invalid x-api-key" } }), { status: 401 }));
     await expect(testKey(chatProvider("anthropic")!, "m", "sk-ant-x", bad as never)).rejects.toThrow("Anthropic: HTTP 401, invalid x-api-key");
+  });
+});
+
+
+describe("price questions", () => {
+  const LINEN = [{ type: "item", id: 2589, label: "Linen Cloth", href: "/database/items/2589", quality: 1 }];
+  /** The site: item search, then the market tool's HTTP answer. */
+  function market(calls: string[], tool: () => Response = () => Response.json({ tool: "market_value", answer: FIXTURE_STRUCTURED, text: "ignored long text" })) {
+    return vi.fn(async (url: string) => {
+      calls.push(url);
+      if (url.startsWith("/search/suggest?")) return Response.json({ results: LINEN });
+      if (url.startsWith("/api/tools/market_value?")) return tool();
+      throw new Error(`Unexpected request ${url}`);
+    }) as unknown as typeof fetch;
+  }
+
+  test("a priced item answers from market_value with no model and no knowledge search", async () => {
+    const calls: string[] = [];
+    const reply = await marketReply("What is the price of Linen Cloth on Forever?", { send: market(calls) });
+    expect(reply).toEqual({
+      text: FIXTURE_ANSWER, model: null, sources: [], pages: [FIXTURE_URL],
+      steps: [{ tool: "market_value", input: JSON.stringify({ realm: "Forever", itemId: 2589 }), chars: FIXTURE_ANSWER.length }],
+    });
+    expect(calls).toEqual(["/search/suggest?q=Linen+Cloth&in=item", "/api/tools/market_value?realm=Forever&itemId=2589"]);
+    expect(calls.some((u) => u.includes("search_knowledge"))).toBe(false);
+  });
+
+  test("an item id needs no name search", async () => {
+    const calls: string[] = [];
+    await marketReply("price 2589 on Forever", { send: market(calls) });
+    expect(calls).toEqual(["/api/tools/market_value?realm=Forever&itemId=2589"]);
+  });
+
+  test("a question that is not about a price is not handled: no request at all", async () => {
+    const calls: string[] = [];
+    expect(await marketReply("Where does Linen Cloth drop?", { send: market(calls) })).toBeNull();
+    expect(calls).toEqual([]);
+  });
+
+  test("no realm is a question back with no market request", async () => {
+    const calls: string[] = [];
+    const reply = await marketReply("price 2589", { send: market(calls) });
+    expect(reply?.text).toMatch(/which realm/i);
+    expect(reply).toMatchObject({ model: null, pages: [], sources: [] });
+    expect(calls).toEqual([]);
+  });
+
+  test("a market that cannot be read says so instead of failing the chat", async () => {
+    const reply = await marketReply("price 2589 on Forever", { send: market([], () => Response.json({ ok: false, error: "Knowledge release unavailable." }, { status: 503 })) });
+    expect(reply?.text).toMatch(/could not be read.*unrecorded, not zero/);
+    expect(reply?.pages).toEqual([FIXTURE_URL]);
+  });
+
+  test("a stop reaches the request and ends the answer", async () => {
+    const ctl = new AbortController();
+    const send = vi.fn((_url: string, init?: RequestInit) => new Promise<Response>((_, reject) => init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError"))))) as unknown as typeof fetch;
+    const pending = marketReply("price 2589 on Forever", { send, signal: ctl.signal });
+    ctl.abort();
+    await expect(pending).rejects.toThrow();
+  });
+});
+
+describe("the free model (Everloot free)", () => {
+  const FREE_URL = "/api/chat/free/chat/completions";
+  const many = (n: number, chars: number) => Array.from({ length: n }, (_, i) => ({ role: (i % 2 ? "assistant" : "user") as "user" | "assistant", text: `${i}`.padEnd(chars, "x") }));
+
+  test("runs the same loop through this site's proxy: no key, no extra headers, the free budget and only the tools it is given", async () => {
+    const calls: string[] = [];
+    const bodies: { model: string; max_tokens: number; tools: { function: { name: string } }[]; messages: { role: string; content: string | null }[] }[] = [];
+    const headers: Record<string, string>[] = [];
+    const send = vi.fn(async (_url: string, init: { body: string; headers: Record<string, string> }) => {
+      bodies.push(JSON.parse(init.body)); headers.push(init.headers);
+      return bodies.length === 1
+        ? sse([{ model: "openai/gpt-oss-120b", choices: [{ delta: { tool_calls: [{ index: 0, id: "c1", type: "function", function: { name: "search_knowledge", arguments: "{\"query\":\"Leeroy\"}" } }] } }] }])
+        : sse([{ choices: [{ delta: { content: "A paladin." } }] }]);
+    });
+    const big = vi.fn(async (url: string) => { calls.push(url); return new Response(JSON.stringify({ text: HIT + "y".repeat(10_000) }), { status: 200 }); }) as unknown as typeof fetch;
+    const r = await answerFree({ history: many(10, 9000), question: "who is leeroy\n\nMy note", tools: TOOLS, send: send as never, site: big }, "who is leeroy");
+    expect(send.mock.calls[0][0]).toBe(FREE_URL);
+    expect(headers[0]).toEqual({ "content-type": "application/json" });
+    expect(bodies[0].max_tokens).toBe(FREE_BUDGET.maxTokens);
+    expect(bodies[0].tools.map((t) => t.function.name)).toEqual(["search_knowledge"]);
+    // The earlier turns: the last few, each cut to the budget, then the question as asked.
+    const sent = bodies[0].messages;
+    expect(sent.slice(1, -1)).toHaveLength(FREE_BUDGET.turns);
+    for (const m of sent.slice(1, -1)) expect(m.content!.length).toBeLessThanOrEqual(FREE_BUDGET.chars);
+    expect(sent.at(-1)).toEqual({ role: "user", content: "who is leeroy\n\nMy note" });
+    // A tool's output goes back to the model cut to the budget too.
+    expect(bodies[1].messages.at(-1)!.content!.length).toBe(FREE_BUDGET.chars);
+    expect(r).toMatchObject({ text: "A paladin.", model: "openai/gpt-oss-120b", sources: [expect.stringContaining("Leeroy_Jenkins")] });
+  });
+
+  test("the free tools are Everloot chat tools, fewer than all of them, and never the account's own", () => {
+    for (const t of FREE_TOOLS) expect(CHAT_TOOLS as readonly string[]).toContain(t);
+    expect(FREE_TOOLS.length).toBeLessThan(CHAT_TOOLS.length);
+    expect(FREE_TOOLS as readonly string[]).not.toContain("my_builds");
+    // "Which race for a Horde warlock?" is answered by class_races; the free model must have it.
+    expect(FREE_TOOLS as readonly string[]).toContain("class_races");
+  });
+
+  test("loadTools can load just the free tools", async () => {
+    const send = vi.fn(async (_url: string) => new Response(JSON.stringify({ title: "T", inputSchema: { type: "object", properties: {} } }), { status: 200 }));
+    expect((await loadTools(send as never, false, FREE_TOOLS)).map((t) => t.name)).toEqual([...FREE_TOOLS]);
+    expect(send).toHaveBeenCalledTimes(FREE_TOOLS.length);
+  });
+
+  test("at its limit (429) the answer is Everloot search, with one line saying why", async () => {
+    const calls: string[] = [];
+    const limited = vi.fn(async () => new Response(JSON.stringify({ error: { message: "The free model has reached its limit for now.", code: "free_chat_limit" } }), { status: 429 }));
+    const r = await answerFree({ history: [], question: "who is leeroy\n\nMy note", tools: TOOLS, send: limited as never, site: site(calls) }, "who is leeroy");
+    expect(limited).toHaveBeenCalledTimes(1);
+    expect(calls).toEqual(["/api/tools/search_knowledge?query=who+is+leeroy&limit=3"]);
+    expect(r.model).toBeNull();
+    expect(r.text.split("\n")[0]).toBe(FREE_FALLBACK);
+    expect(r.text).toContain("Leeroy Jenkins is a valiant human paladin.");
+    expect(r.sources).toHaveLength(1);
+  });
+
+  test("an unavailable or failing proxy falls back the same way; a stop by the player does not", async () => {
+    for (const status of [404, 502, 503]) {
+      const down = vi.fn(async () => new Response(JSON.stringify({ error: { message: "x" } }), { status }));
+      const r = await answerFree({ history: [], question: "who is leeroy", tools: TOOLS, send: down as never, site: site([]) }, "who is leeroy");
+      expect(r.text.startsWith(FREE_FALLBACK)).toBe(true);
+    }
+    const ctl = new AbortController();
+    const hang = vi.fn((_url: string, init?: RequestInit) => new Promise<Response>((_, reject) => init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")))));
+    const pending = answerFree({ history: [], question: "q", tools: TOOLS, send: hang as never, site: site([]), signal: ctl.signal }, "q");
+    ctl.abort();
+    await expect(pending).rejects.toThrow();
+  });
+
+  test("the reply names the provider that wrote it, from the proxy's header; another provider's header is ignored", async () => {
+    let n = 0;
+    const send = vi.fn(async () => {
+      const res = n++ === 0
+        ? sse([{ model: "openai/gpt-oss-120b", choices: [{ delta: { tool_calls: [{ index: 0, id: "c1", type: "function", function: { name: "search_knowledge", arguments: "{\"query\":\"Leeroy\"}" } }] } }] }])
+        : sse([{ model: "@cf/openai/gpt-oss-20b", choices: [{ delta: { content: "A paladin." } }] }]);
+      res.headers.set("x-everloot-provider", n === 1 ? "Groq" : "Cloudflare");
+      return res;
+    });
+    const r = await answerFree({ history: [], question: "who is leeroy", tools: TOOLS, send: send as never, site: site([]) }, "who is leeroy");
+    expect(r.model).toBe("@cf/openai/gpt-oss-20b (Cloudflare)");
+    const own = vi.fn(async () => { const res = sse([{ model: "m1", choices: [{ delta: { content: "Hi." } }] }]); res.headers.set("x-everloot-provider", "Spoofed"); return res; });
+    expect((await answer({ provider: chatProvider("openrouter")!, model: "m", key: "k", history: [], question: "q", tools: TOOLS, send: own as never, site: site([]) })).model).toBe("m1");
+  });
+
+  test("errors from the proxy are labelled with its name, since it has no host of its own", async () => {
+    const http = vi.fn(async () => new Response(JSON.stringify({ error: { message: "nope" } }), { status: 401 }));
+    await expect(answer({ provider: FREE_PROVIDER, model: "m", key: "", history: [], question: "q", tools: TOOLS, send: http as never, site: site([]) }))
+      .rejects.toThrow("Everloot (free): HTTP 401, nope");
   });
 });

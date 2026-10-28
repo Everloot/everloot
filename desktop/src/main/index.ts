@@ -6,6 +6,7 @@ import { readAsks } from "../../../companion/src/bridge/asks";
 import { loadProviders } from "../../../companion/src/providers/config";
 import type { AddonInfo, AppState, AskInfo, Job, MarketInfo, PriceLookup, Settings } from "../shared/types";
 import { JOBS } from "../shared/types";
+import { reportDiagnostics } from "../shared/diagnostics";
 import { presetFor, type ProviderKind } from "../shared/providers";
 import { accountInfo, signIn, signOut } from "./account";
 import { listBackups, restoreBackup } from "./backups";
@@ -60,6 +61,7 @@ if (!app.requestSingleInstanceLock()) {
   const loaded = loadSettings(settingsPath);
   let settings: Settings = loaded.settings;
   const jobs = companionJobs(data, () => settings);
+  loaded.error = [loaded.error, ...jobs.notices].filter(Boolean).join("\n") || null;
   const engine = createEngine(jobs.deps);
   let win: BrowserWindow | null = null;
   let tray: ReturnType<typeof createTray> | null = null;
@@ -287,7 +289,7 @@ if (!app.requestSingleInstanceLock()) {
   });
   // The bug report opens GitHub's form with the version and the page's diagnostics filled in, or copies them.
   ipcMain.handle("reportBug", async (_e, diag: unknown) => {
-    const text = typeof diag === "string" ? diag.slice(-4000) : "";
+    const text = typeof diag === "string" ? reportDiagnostics(diag) : "";
     const answer = await messageBox({
       type: "info",
       buttons: ["Open the report on GitHub", "Copy diagnostics", "Cancel"],
@@ -342,7 +344,7 @@ if (!app.requestSingleInstanceLock()) {
     return check;
   });
 
-  ipcMain.handle("uploadInfo", () => summarizeFiles(engine.snapshot().files, join(data, "sent.json")));
+  ipcMain.handle("uploadInfo", () => summarizeFiles(engine.snapshot().files, join(data, "sent.json"), settings.endpoint));
   ipcMain.handle("backups", () => listBackups(data));
   ipcMain.handle("openBackupsFolder", () => { const dir = join(data, "backups"); return existsSync(dir) ? shell.openPath(dir).then(() => undefined) : undefined; });
   ipcMain.handle("restoreBackup", async (_e, file: unknown) => {
@@ -379,7 +381,7 @@ if (!app.requestSingleInstanceLock()) {
     const file = dir ? readPricesFile(dir) : null;
     if (!file) return { itemId, rows: [], note: "No prices file in the game yet. Turn on Market prices and press Refresh now." };
     const rows = priceRows(file, itemId).map(({ realm, dataAsOf, market, min, historical, quantity, day, reporters }) => ({ realm, dataAsOf, market, min, historical, quantity, day, reporters }));
-    return { itemId, rows, note: rows.length ? null : "No public price for this item on the realms in the game file. A day is public once three reporters scanned it." };
+    return { itemId, rows, note: rows.length ? null : "This item is not in the game's price file. Each realm's file keeps the 2,000 items with the most units listed, so a public price may still be on the website; a day is public once three reporters scanned it." };
   });
   ipcMain.handle("askInfo", (): AskInfo => {
     const pending = engine.snapshot().files.map((file) => {

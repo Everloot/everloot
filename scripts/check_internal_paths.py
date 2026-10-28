@@ -12,6 +12,10 @@ PATTERN = re.compile(
 SKIP = {"scripts/check_internal_paths.py", "scripts/test_check_internal_paths.py"}
 
 
+def skipped(path: str) -> bool:
+    return not path or path in SKIP
+
+
 def offending_lines(text: str) -> list[int]:
     return [n for n, line in enumerate(text.splitlines(), 1) if PATTERN.search(line)]
 
@@ -20,7 +24,7 @@ def main() -> int:
     files = subprocess.run(["git", "ls-files", "-z"], capture_output=True, text=True, check=True).stdout.split("\0")
     found = 0
     for path in files:
-        if not path or path in SKIP or path.endswith("package-lock.json"):
+        if skipped(path):
             continue
         try:
             with open(path, encoding="utf-8") as f:

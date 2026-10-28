@@ -1,7 +1,7 @@
 import { loadQuestNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";
 import { loadNames, type Names } from "@/lib/names";
-import { loadShownNames } from "@/lib/shown-item-names";
+import { loadShownNames, type ShownNames } from "@/lib/shown-item-names";
 
 // The names the database pages show, for the site's own search: /search and the type-ahead under the
 // header and hub search boxes (/search/suggest). Server only, and pages only: /api/suggest, the MCP server
@@ -32,8 +32,8 @@ function mergedOnce<T extends { name: string }>(agreed: Map<number, string>, rul
  * Item names, NPC names, object names and quest titles as the pages print them: the name 3 installs agree on, else the
  * game files and Warcraft Wiki match for items, and the wiki title for quests. NPCs and objects have agreed names only.
  */
-export async function loadShownSearchNames(): Promise<Names> {
-  const [agreed, shown, quests] = await Promise.all([loadNames(), loadShownNames(), loadQuestNames(CLIENT_LAYER.build.version)]);
+export async function loadShownSearchNames(shownRead: Promise<ShownNames> = loadShownNames()): Promise<Names> {
+  const [agreed, shown, quests] = await Promise.all([loadNames(shownRead.then((shown) => shown.facts)), shownRead, loadQuestNames(CLIENT_LAYER.build.version)]);
   return {
     items: mergedOnce(agreed.items, shown.matched?.names),
     npcs: agreed.npcs,

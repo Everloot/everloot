@@ -3,12 +3,12 @@
  "label": "Found in game files, unconfirmed",
  "credit": "Game data © Blizzard Entertainment, Inc., read from the public client; not under Everloot's licence. Column names from WoWDBDefs (https://github.com/wowdev/WoWDBDefs), CC BY-SA 4.0.",
  "build": {
-  "product": "wow_classic_beta",
-  "buildId": 70532,
-  "version": "1.60.1.70532",
-  "buildConfig": "ad1802f4455e427ed8b7769aab25b0c0",
-  "definitions": "d8b2f0bdd362",
-  "extractedAt": "2026-10-22T22:42:27.998Z"
+  "product": "wowf",
+  "buildId": 70634,
+  "version": "1.60.1.70634",
+  "buildConfig": "7d8ae4cd9c1f639a3ea04fd47e21c746",
+  "definitions": "50ce5d272897",
+  "extractedAt": "2026-10-27T18:15:44.450Z"
  },
  "counts": {
   "created_by": 3335,
@@ -47739,7 +47739,7 @@
  "classes": [
   {"id":0,"name":"Consumable","label":"Consumables","slug":"consumables","items":2465},
   {"id":1,"name":"Container","label":"Containers","slug":"containers","items":156},
-  {"id":2,"name":"Weapon","label":"Weapons","slug":"weapons","items":3845},
+  {"id":2,"name":"Weapon","label":"Weapons","slug":"weapons","items":3846},
   {"id":3,"name":"Jewelry(OBSOLETE)","label":"Jewelry","slug":"jewelry","items":0},
   {"id":4,"name":"Armor","label":"Armor","slug":"armor","items":15104},
   {"id":5,"name":"Reagent","label":"Reagents","slug":"reagents","items":50},
@@ -47789,7 +47789,7 @@
   {"classId":2,"id":7,"name":"One-Handed Swords","slug":"one-handed-swords","items":475},
   {"classId":2,"id":8,"name":"Two-Handed Swords","slug":"two-handed-swords","items":280},
   {"classId":2,"id":9,"name":"Warglaives","slug":"warglaives","items":2},
-  {"classId":2,"id":10,"name":"Staves","slug":"staves","items":415},
+  {"classId":2,"id":10,"name":"Staves","slug":"staves","items":416},
   {"classId":2,"id":11,"name":"One-Handed Exotics","slug":"one-handed-exotics","items":2},
   {"classId":2,"id":12,"name":"Two-Handed Exotics","slug":"two-handed-exotics","items":0},
   {"classId":2,"id":13,"name":"Fist Weapons","slug":"fist-weapons","items":98},
@@ -77783,9 +77783,9 @@
   [277278,12,0,0,1],
   [277279,12,0,0,1],
   [277284,12,0,0,1],
-  [277286,2,1,17,3],
-  [277288,2,0,21,3],
-  [277289,4,1,16,3],
+  [277286,2,1,17,2],
+  [277288,2,0,21,2],
+  [277289,4,1,16,2],
   [277313,0,5,0,null],
   [277329,12,0,0,1],
   [277331,12,0,0,1],
@@ -79722,6 +79722,7 @@
   [288340,0,8,0,1],
   [288358,2,1,17,null],
   [288506,4,2,8,null],
-  [288619,2,16,25,null]
+  [288619,2,16,25,null],
+  [288998,2,10,17,null]
  ]
 }

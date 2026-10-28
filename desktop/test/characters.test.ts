@@ -15,7 +15,7 @@ const SV = `EverlootDB = { ["version"] = "0.3.3", ["installId"] = "x", ["records
 test("named characters get the latest gold, the peak, the latest gear snapshot and money by category", () => {
   const info = summarizeCharacters(SV);
   expect(info.characters).toHaveLength(1);
-  expect(info.characters[0]).toMatchObject({ character: "Arthas", realm: "Nightslayer", gold: 1700000, peakGold: 2000000, gearSlots: 3, itemLevel: 70, spent: { vendor: 500 }, earned: { loot: 1000 } });
+  expect(info.characters[0]).toMatchObject({ character: "Arthas", realm: "Nightslayer", gold: 1700000, peakGold: 2000000, gearSlots: 3, itemLevel: 70, spent: {}, earned: { loot: 1000, vendor: 500 } });
   expect(info.characters[0].equipped).toEqual([
     { slot: "HeadSlot", itemLevel: 70 },
     { slot: "ChestSlot", itemLevel: 80 },
@@ -35,7 +35,7 @@ test("gold history is the dated snapshots in order, and the week counts only mon
   const now = Date.parse("2026-10-18T12:00:00Z");
   const [c] = summarizeCharacters(SV, now).characters;
   expect(c.history).toEqual([{ at: "2026-10-17T10:00:00Z", copper: 1500000 }, { at: "2026-10-18T10:00:00Z", copper: 1700000 }]);
-  expect(c.week).toEqual({ earned: 900, spent: 500 });
+  expect(c.week).toEqual({ earned: 1400, spent: 0 });
 });
 
 test("thirty UTC days of money are zero-filled, oldest first, and the latest events are kept as receipts", () => {
@@ -43,10 +43,10 @@ test("thirty UTC days of money are zero-filled, oldest first, and the latest eve
   const [c] = summarizeCharacters(SV, now).characters;
   expect(c.days).toHaveLength(30);
   expect(c.days[0]).toEqual({ date: "2026-09-19", earned: 0, spent: 0 });
-  expect(c.days[c.days.length - 1]).toEqual({ date: "2026-10-18", earned: 900, spent: 500 });
+  expect(c.days[c.days.length - 1]).toEqual({ date: "2026-10-18", earned: 1400, spent: 0 });
   expect(c.receipts).toEqual([
     { at: "2026-10-18T09:30:00Z", category: "loot", copper: 900, direction: "in" },
-    { at: "2026-10-18T09:00:00Z", category: "vendor", copper: 500, direction: "out" },
+    { at: "2026-10-18T09:00:00Z", category: "vendor", copper: 500, direction: "in" },
   ]);
 });
 

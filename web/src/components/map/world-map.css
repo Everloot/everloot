@@ -46,27 +46,39 @@
 }
 
 .wm-map {
-  background: rgb(var(--panel));
   font: inherit;
   outline-offset: -2px;
 }
 
-/* Zone outlines: shapes with names. They stay whether or not the game's pictures are under them. */
+/* Leaflet's stylesheet loads after this one and sets #ddd on .leaflet-container; the second class wins over it. */
+.wm-map.leaflet-container {
+  background: rgb(var(--panel));
+}
+
+/* Zone bounds are hit targets, not geographic borders. Names identify the zones. */
 .wm-map .wm-zone {
-  fill: rgb(var(--fg) / 0.05);
-  stroke: rgb(var(--edge));
+  fill: transparent;
+  stroke: transparent;
   cursor: pointer;
   transition: fill var(--dur-fade) var(--ease-color), stroke var(--dur-fade) var(--ease-color);
-}
-.wm-map .wm-zone:hover {
-  fill: rgb(var(--accent) / 0.18);
-  stroke: rgb(var(--accent));
 }
 /* Dashed is the site's mark for "from the game files, unconfirmed". */
 .wm-map .wm-zone-held {
   fill: rgb(var(--warning) / 0.1);
   stroke: rgb(var(--warning));
   stroke-dasharray: 5 3;
+}
+/* The alpha asset softens mismatched picture edges into the continent art underneath. */
+.wm-map .wm-zone-art {
+  mask-image: url("/map-zone-mask.png");
+  mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+}
+.wm-map .leaflet-map-pane:not(.leaflet-zoom-anim) .wm-zone-art {
+  transition: opacity var(--dur-fade) var(--ease-color);
+}
+@media (prefers-reduced-motion: reduce) {
+  .wm-map .wm-zone-art { transition: none; }
 }
 .wm-map .wm-flight-line {
   stroke: rgb(var(--fg-2));
@@ -119,6 +131,43 @@
   border-bottom: 11px solid rgb(var(--fg));
   background: none;
 }
+/* A pin with the game's own icon: the icon at 20 px in the same 26 px target. The game draws these pieces with
+   their own dark edge, so they read over any picture without an effect (the site uses none). The glyph rules
+   above do not apply to it; the selected one gets the same ring as a glyph. */
+.wm-pin.wm-pin-img > img {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  transition: transform var(--dur-fade) var(--ease-out);
+}
+.wm-pin.wm-pin-img.wm-selected > img {
+  transform: scale(1.4);
+  outline: 2px solid rgb(var(--fg));
+  outline-offset: 1px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .wm-pin.wm-pin-img:hover > img { transform: scale(1.4); }
+}
+/* The name a pin shows on hover, in the site's panel. Leaflet's own tooltip look (its white box and effects) is
+   unset as a whole and only what the site uses is set back, so none of it leaks through. */
+.wm-map .leaflet-tooltip.wm-tooltip {
+  all: unset;
+  position: absolute;
+  margin-top: -6px;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  background: rgb(var(--panel));
+  color: rgb(var(--fg));
+  border: 1px solid rgb(var(--edge));
+  border-radius: 6px;
+  padding: 3px 8px;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.3;
+}
+.wm-map .leaflet-tooltip-top.wm-tooltip::before { border-top-color: rgb(var(--edge)); }
 .wm-pin-spot { pointer-events: none; }
 .wm-pin-spot > span {
   width: 28px;

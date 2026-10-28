@@ -32,6 +32,10 @@ the owner can do. Written after the 2026-10-17 audit.
   read. A plain list's later pages (`?page=2`) are their own canonical; filters, sorts and name searches stay
   noindex. An item category page is indexed once half the rows it shows have a name; named rows come first.
 - **Unknown ids** under /database (no client-layer row and no upload mentions them) are a 404, not an empty page.
+- **Guides** (`/guides/<slug>`) are indexed, and listed in the sitemap dated by their review, only while published,
+  reviewed, with 150 words of their own and neither stale nor broken (`guideIndexable` in
+  `web/src/lib/guide-freshness.ts`, the rule the page's robots use too). A filtered list on /guides is noindex. A
+  class hub is indexed, and listed, once it lists a published guide.
 - **Lore archive.** The Warcraft Wiki copies stay readable, linked to their originals, but say `noindex, follow`
   and are in no sitemap (owner decision, 2026-10-20). /lore, its browse pages and /lore/coverage stay indexed.
 - **www.** `www.everloot.app` answers 301 to the same path and query on `everloot.app` (`web/next.config.js`).

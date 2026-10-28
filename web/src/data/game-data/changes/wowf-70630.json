@@ -1,0 +1,1101 @@
+{
+  "schema": "everloot.game-changes/2",
+  "label": "found in game files, unconfirmed",
+  "id": "wowf-70630",
+  "product": "wowf",
+  "live": false,
+  "spoiler": true,
+  "detectedAt": "2026-10-27T06:57:47.053Z",
+  "build": {
+    "version": "1.60.1.70630",
+    "buildId": 70630,
+    "buildConfig": "644ffedb0d59bb0da2af9011b36f44db"
+  },
+  "previous": {
+    "version": "1.60.1.70532",
+    "buildId": 70532,
+    "buildConfig": "ad1802f4455e427ed8b7769aab25b0c0"
+  },
+  "initial": false,
+  "encryptedBlocks": {
+    "total": 324,
+    "tables": [
+      {
+        "table": "Achievement",
+        "blocks": 1
+      },
+      {
+        "table": "AnimKit",
+        "blocks": 1
+      },
+      {
+        "table": "AnimKitSegment",
+        "blocks": 1
+      },
+      {
+        "table": "AreaTable",
+        "blocks": 3
+      },
+      {
+        "table": "BattlePetSpecies",
+        "blocks": 5
+      },
+      {
+        "table": "CharacterLoadout",
+        "blocks": 1
+      },
+      {
+        "table": "Creature",
+        "blocks": 6
+      },
+      {
+        "table": "CreatureDifficulty",
+        "blocks": 6
+      },
+      {
+        "table": "CreatureDisplayInfo",
+        "blocks": 10
+      },
+      {
+        "table": "CreatureDisplayInfoExtra",
+        "blocks": 1
+      },
+      {
+        "table": "CreatureDisplayInfoGeosetData",
+        "blocks": 1
+      },
+      {
+        "table": "CreatureDisplayInfoOption",
+        "blocks": 1
+      },
+      {
+        "table": "CreatureMovementInfo",
+        "blocks": 1
+      },
+      {
+        "table": "CreatureSoundData",
+        "blocks": 7
+      },
+      {
+        "table": "CreatureXDisplayInfo",
+        "blocks": 6
+      },
+      {
+        "table": "DungeonEncounter",
+        "blocks": 3
+      },
+      {
+        "table": "Emotes",
+        "blocks": 1
+      },
+      {
+        "table": "GameObjectDisplayInfo",
+        "blocks": 2
+      },
+      {
+        "table": "Item",
+        "blocks": 16
+      },
+      {
+        "table": "ItemAppearance",
+        "blocks": 7
+      },
+      {
+        "table": "ItemDisplayInfo",
+        "blocks": 7
+      },
+      {
+        "table": "ItemDisplayInfoMaterialRes",
+        "blocks": 3
+      },
+      {
+        "table": "ItemEffect",
+        "blocks": 12
+      },
+      {
+        "table": "ItemModifiedAppearance",
+        "blocks": 7
+      },
+      {
+        "table": "ItemNameDescription",
+        "blocks": 1
+      },
+      {
+        "table": "ItemSearchName",
+        "blocks": 7
+      },
+      {
+        "table": "ItemSparse",
+        "blocks": 31
+      },
+      {
+        "table": "ItemXItemEffect",
+        "blocks": 12
+      },
+      {
+        "table": "LFGDungeons",
+        "blocks": 1
+      },
+      {
+        "table": "LoadingScreens",
+        "blocks": 2
+      },
+      {
+        "table": "Lock",
+        "blocks": 1
+      },
+      {
+        "table": "Map",
+        "blocks": 3
+      },
+      {
+        "table": "MapDifficulty",
+        "blocks": 1
+      },
+      {
+        "table": "Mount",
+        "blocks": 3
+      },
+      {
+        "table": "MountXDisplay",
+        "blocks": 3
+      },
+      {
+        "table": "ObjectEffect",
+        "blocks": 2
+      },
+      {
+        "table": "ObjectEffectPackageElem",
+        "blocks": 2
+      },
+      {
+        "table": "QuestV2",
+        "blocks": 5
+      },
+      {
+        "table": "SkillLineAbility",
+        "blocks": 8
+      },
+      {
+        "table": "SoundEnvelope",
+        "blocks": 4
+      },
+      {
+        "table": "SoundKit",
+        "blocks": 7
+      },
+      {
+        "table": "SoundKitAdvanced",
+        "blocks": 7
+      },
+      {
+        "table": "SoundKitChild",
+        "blocks": 2
+      },
+      {
+        "table": "SoundKitEntry",
+        "blocks": 7
+      },
+      {
+        "table": "Spell",
+        "blocks": 29
+      },
+      {
+        "table": "SpellAuraOptions",
+        "blocks": 6
+      },
+      {
+        "table": "SpellCooldowns",
+        "blocks": 9
+      },
+      {
+        "table": "SpellEffect",
+        "blocks": 14
+      },
+      {
+        "table": "SpellItemEnchantment",
+        "blocks": 1
+      },
+      {
+        "table": "SpellLevels",
+        "blocks": 6
+      },
+      {
+        "table": "SpellMisc",
+        "blocks": 14
+      },
+      {
+        "table": "SpellName",
+        "blocks": 14
+      },
+      {
+        "table": "SpellReagents",
+        "blocks": 4
+      },
+      {
+        "table": "SummonProperties",
+        "blocks": 2
+      },
+      {
+        "table": "TotemCategory",
+        "blocks": 1
+      },
+      {
+        "table": "Toy",
+        "blocks": 1
+      },
+      {
+        "table": "TransmogSet",
+        "blocks": 2
+      },
+      {
+        "table": "TransmogSetItem",
+        "blocks": 2
+      },
+      {
+        "table": "ZoneLight",
+        "blocks": 1
+      }
+    ]
+  },
+  "source": {
+    "definitions": "05e242b6acdc",
+    "library": "@rhyster/wow-casc-dbc@2.16.17",
+    "extractedAt": "2026-10-27T06:57:32.302Z"
+  },
+  "catalog": {
+    "classes": 9,
+    "nodes": 466
+  },
+  "talents": {
+    "classesAdded": [],
+    "classesRemoved": [],
+    "added": [
+      {
+        "classId": 8,
+        "className": "Mage",
+        "tree": "Arcane",
+        "nodeId": 113627,
+        "name": "Arcane Wrath",
+        "spoiler": true,
+        "kind": "single",
+        "maxRanks": 1
+      }
+    ],
+    "removed": [
+      {
+        "classId": 8,
+        "className": "Mage",
+        "tree": "Frost",
+        "nodeId": 105773,
+        "name": "Piercing Ice",
+        "spoiler": true,
+        "maxRanks": 3
+      }
+    ],
+    "moved": [
+      {
+        "classId": 8,
+        "className": "Mage",
+        "tree": "Frost",
+        "nodeId": 105771,
+        "name": "Improved Blizzard",
+        "spoiler": true,
+        "from": {
+          "tree": "Frost",
+          "x": 10880,
+          "y": 3330,
+          "row": 2,
+          "col": 3
+        },
+        "to": {
+          "tree": "Frost",
+          "x": 9680,
+          "y": 3330,
+          "row": 2,
+          "col": 1
+        }
+      },
+      {
+        "classId": 8,
+        "className": "Mage",
+        "tree": "Frost",
+        "nodeId": 105772,
+        "name": "Frost Channeling",
+        "spoiler": true,
+        "from": {
+          "tree": "Frost",
+          "x": 9680,
+          "y": 3330,
+          "row": 2,
+          "col": 1
+        },
+        "to": {
+          "tree": "Frost",
+          "x": 9080,
+          "y": 3330,
+          "row": 2,
+          "col": 0
+        }
+      },
+      {
+        "classId": 8,
+        "className": "Mage",
+        "tree": "Frost",
+        "nodeId": 105774,
+        "name": "Frostbite",
+        "spoiler": true,
+        "from": {
+          "tree": "Frost",
+          "x": 10880,
+          "y": 2730,
+          "row": 1,
+          "col": 3
+        },
+        "to": {
+          "tree": "Frost",
+          "x": 9680,
+          "y": 2730,
+          "row": 1,
+          "col": 1
+        }
+      },
+      {
+        "classId": 8,
+        "className": "Mage",
+        "tree": "Frost",
+        "nodeId": 105776,
+        "name": "Permafrost",
+        "spoiler": true,
+        "from": {
+          "tree": "Frost",
+          "x": 9680,
+          "y": 2730,
+          "row": 1,
+          "col": 1
+        },
+        "to": {
+          "tree": "Frost",
+          "x": 10880,
+          "y": 2730,
+          "row": 1,
+          "col": 3
+        }
+      }
+    ],
+    "ranks": [
+      {
+        "classId": 8,
+        "className": "Mage",
+        "tree": "Frost",
+        "nodeId": 105778,
+        "name": "Elemental Precision",
+        "spoiler": true,
+        "before": 5,
+        "after": 3
+      }
+    ],
+    "gates": [
+      {
+        "classId": 5,
+        "className": "Priest",
+        "tree": "Discipline",
+        "nodeId": 105838,
+        "name": "Improved Mana Burn",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 15,
+            "scope": "unconfirmed",
+            "gateGroupId": 11605,
+            "currencyId": 3820,
+            "traitTreeId": 1114
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 15,
+            "scope": "tree",
+            "gateGroupId": 11605,
+            "currencyId": 3820,
+            "traitTreeId": 1114,
+            "companionGroupId": 12762
+          }
+        }
+      },
+      {
+        "classId": 5,
+        "className": "Priest",
+        "tree": "Discipline",
+        "nodeId": 105839,
+        "name": "Soul Warding",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 15,
+            "scope": "unconfirmed",
+            "gateGroupId": 11605,
+            "currencyId": 3820,
+            "traitTreeId": 1114
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 15,
+            "scope": "tree",
+            "gateGroupId": 11605,
+            "currencyId": 3820,
+            "traitTreeId": 1114,
+            "companionGroupId": 12762
+          }
+        }
+      },
+      {
+        "classId": 5,
+        "className": "Priest",
+        "tree": "Discipline",
+        "nodeId": 105841,
+        "name": "Improved Inner Fire",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 15,
+            "scope": "unconfirmed",
+            "gateGroupId": 11605,
+            "currencyId": 3820,
+            "traitTreeId": 1114
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 15,
+            "scope": "tree",
+            "gateGroupId": 11605,
+            "currencyId": 3820,
+            "traitTreeId": 1114,
+            "companionGroupId": 12762
+          }
+        }
+      }
+    ],
+    "prereqs": [],
+    "replaced": [],
+    "spellValues": [
+      {
+        "classId": 5,
+        "className": "Priest",
+        "tree": "Holy",
+        "nodeId": 105867,
+        "name": "Twilight Focus",
+        "spoiler": true,
+        "spellId": 14913,
+        "spellName": "Twilight Focus",
+        "changes": [
+          {
+            "field": "text",
+            "before": "a0a37d2672a3",
+            "after": "df4cf76d983b"
+          }
+        ]
+      },
+      {
+        "classId": 7,
+        "className": "Shaman",
+        "tree": "Restoration",
+        "nodeId": 104733,
+        "name": "Healing Focus",
+        "spoiler": true,
+        "spellId": 16181,
+        "spellName": "Healing Focus",
+        "changes": [
+          {
+            "field": "text",
+            "before": "551a01489f9e",
+            "after": "5239fe92acb3"
+          }
+        ]
+      },
+      {
+        "classId": 7,
+        "className": "Shaman",
+        "tree": "Elemental Combat",
+        "nodeId": 104763,
+        "name": "Eye of the Storm",
+        "spoiler": true,
+        "spellId": 29062,
+        "spellName": "Eye of the Storm",
+        "changes": [
+          {
+            "field": "text",
+            "before": "6f4f92b80555",
+            "after": "839bc583242a"
+          }
+        ]
+      },
+      {
+        "classId": 7,
+        "className": "Shaman",
+        "tree": "Elemental Combat",
+        "nodeId": 104768,
+        "name": "Elemental Focus",
+        "spoiler": true,
+        "spellId": 16164,
+        "spellName": "Elemental Focus",
+        "changes": [
+          {
+            "field": "text",
+            "before": "68324ac6b716",
+            "after": "df0911f1570c"
+          },
+          {
+            "field": "effect 1 basePoints",
+            "before": 0,
+            "after": 10
+          }
+        ]
+      },
+      {
+        "classId": 8,
+        "className": "Mage",
+        "tree": "Frost",
+        "nodeId": 105762,
+        "name": "Ice Barrier",
+        "spoiler": true,
+        "spellId": 11426,
+        "spellName": "Ice Barrier",
+        "changes": [
+          {
+            "field": "text",
+            "before": "6cbdb32ff9b8",
+            "after": "1ac3defcb8d1"
+          },
+          {
+            "field": "effect 2 basePoints",
+            "before": null,
+            "after": 3
+          },
+          {
+            "field": "effect 2 dieSides",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 2 periodMs",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 2 chainTargets",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 2 miscValue",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 3 basePoints",
+            "before": null,
+            "after": 3
+          },
+          {
+            "field": "effect 3 dieSides",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 3 periodMs",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 3 chainTargets",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 3 miscValue",
+            "before": null,
+            "after": 0
+          }
+        ]
+      },
+      {
+        "classId": 8,
+        "className": "Mage",
+        "tree": "Frost",
+        "nodeId": 105763,
+        "name": "Winter's Chill",
+        "spoiler": true,
+        "spellId": 11180,
+        "spellName": "Winter's Chill",
+        "changes": [
+          {
+            "field": "text",
+            "before": "cce945e04b52",
+            "after": "7c5f4ea241b4"
+          },
+          {
+            "field": "effect 3 basePoints",
+            "before": null,
+            "after": 7
+          },
+          {
+            "field": "effect 3 dieSides",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 3 periodMs",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 3 chainTargets",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 3 miscValue",
+            "before": null,
+            "after": 0
+          }
+        ]
+      },
+      {
+        "classId": 8,
+        "className": "Mage",
+        "tree": "Frost",
+        "nodeId": 105780,
+        "name": "Frost Warding",
+        "spoiler": true,
+        "spellId": 11189,
+        "spellName": "Frost Warding",
+        "changes": [
+          {
+            "field": "text",
+            "before": "4f95c1cac1d3",
+            "after": "9d4c8a3f3b5b"
+          },
+          {
+            "field": "effect 2 basePoints",
+            "before": 10,
+            "after": 0
+          },
+          {
+            "field": "effect 3 basePoints",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 3 dieSides",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 3 periodMs",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 3 chainTargets",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 3 miscValue",
+            "before": null,
+            "after": 0
+          }
+        ]
+      },
+      {
+        "classId": 8,
+        "className": "Mage",
+        "tree": "Arcane",
+        "nodeId": 105802,
+        "name": "Missile Barrage",
+        "spoiler": true,
+        "spellId": 400588,
+        "spellName": "Missile Barrage",
+        "changes": [
+          {
+            "field": "text",
+            "before": "25b8d98d5c99",
+            "after": "c08d66eb2320"
+          }
+        ]
+      },
+      {
+        "classId": 8,
+        "className": "Mage",
+        "tree": "Arcane",
+        "nodeId": 105813,
+        "name": "Improved Channeling",
+        "spoiler": true,
+        "spellId": 11237,
+        "spellName": "Improved Channeling",
+        "changes": [
+          {
+            "field": "text",
+            "before": "6eb5f42f18c7",
+            "after": "6fdafd0aaf0f"
+          }
+        ]
+      },
+      {
+        "classId": 9,
+        "className": "Warlock",
+        "tree": "Destruction",
+        "nodeId": 105882,
+        "name": "Intensity",
+        "spoiler": true,
+        "spellId": 18135,
+        "spellName": "Intensity",
+        "changes": [
+          {
+            "field": "text",
+            "before": "40ef0c04d1d2",
+            "after": "9e8426ca19e3"
+          }
+        ]
+      },
+      {
+        "classId": 9,
+        "className": "Warlock",
+        "tree": "Affliction",
+        "nodeId": 105913,
+        "name": "Curse of Exhaustion",
+        "spoiler": true,
+        "spellId": 18223,
+        "spellName": "Curse of Exhaustion",
+        "changes": [
+          {
+            "field": "text",
+            "before": "9ca75ef98f70",
+            "after": "ca6a5e5f5eb6"
+          }
+        ]
+      },
+      {
+        "classId": 9,
+        "className": "Warlock",
+        "tree": "Affliction",
+        "nodeId": 105916,
+        "name": "Amplify Curse",
+        "spoiler": true,
+        "spellId": 18288,
+        "spellName": "Amplify Curse",
+        "changes": [
+          {
+            "field": "effect 2 basePoints",
+            "before": null,
+            "after": -20
+          },
+          {
+            "field": "effect 2 dieSides",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 2 periodMs",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 2 chainTargets",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 2 miscValue",
+            "before": null,
+            "after": 0
+          }
+        ]
+      },
+      {
+        "classId": 9,
+        "className": "Warlock",
+        "tree": "Affliction",
+        "nodeId": 105918,
+        "name": "Fel Concentration",
+        "spoiler": true,
+        "spellId": 17783,
+        "spellName": "Fel Concentration",
+        "changes": [
+          {
+            "field": "text",
+            "before": "d308e44a9535",
+            "after": "efd3e6b7aa18"
+          }
+        ]
+      },
+      {
+        "classId": 11,
+        "className": "Druid",
+        "tree": "Restoration",
+        "nodeId": 104957,
+        "name": "Nature's Focus",
+        "spoiler": true,
+        "spellId": 17063,
+        "spellName": "Nature's Focus",
+        "changes": [
+          {
+            "field": "text",
+            "before": "4da0ebbe4f02",
+            "after": "0d5edd1ccec6"
+          }
+        ]
+      }
+    ],
+    "pointLevels": []
+  },
+  "raidBuffs": {
+    "comparedTo": "1.60.1.70532",
+    "scopeChanges": [],
+    "spellChanges": []
+  },
+  "mapChanges": [],
+  "readSet": {
+    "tables": {
+      "before": 329,
+      "after": 330
+    },
+    "rows": {
+      "before": 1141983,
+      "after": 1142254
+    },
+    "addedTables": [
+      {
+        "table": "ContentTuning",
+        "fileDataID": 1962930,
+        "rows": 100
+      }
+    ],
+    "removedTables": [],
+    "changedTables": [
+      {
+        "table": "AnimKit",
+        "rowsBefore": 805,
+        "rowsAfter": 806,
+        "changed": true
+      },
+      {
+        "table": "AnimKitSegment",
+        "rowsBefore": 1078,
+        "rowsAfter": 1079,
+        "changed": true
+      },
+      {
+        "table": "AreaTable",
+        "rowsBefore": 1375,
+        "rowsAfter": 1375,
+        "changed": true
+      },
+      {
+        "table": "CreatureDisplayInfoOption",
+        "rowsBefore": 87919,
+        "rowsAfter": 87919,
+        "changed": true
+      },
+      {
+        "table": "DungeonEncounter",
+        "rowsBefore": 342,
+        "rowsAfter": 342,
+        "changed": true
+      },
+      {
+        "table": "GameObjectArtKit",
+        "rowsBefore": 15,
+        "rowsAfter": 16,
+        "changed": true
+      },
+      {
+        "table": "GameObjectDisplayInfo",
+        "rowsBefore": 3243,
+        "rowsAfter": 3245,
+        "changed": true
+      },
+      {
+        "table": "Item",
+        "rowsBefore": 31849,
+        "rowsAfter": 31850,
+        "changed": true
+      },
+      {
+        "table": "ItemBonus",
+        "rowsBefore": 1124,
+        "rowsAfter": 1126,
+        "changed": true
+      },
+      {
+        "table": "ItemDisplayInfo",
+        "rowsBefore": 42524,
+        "rowsAfter": 42525,
+        "changed": true
+      },
+      {
+        "table": "ItemEffect",
+        "rowsBefore": 12634,
+        "rowsAfter": 12635,
+        "changed": true
+      },
+      {
+        "table": "ItemModifiedAppearance",
+        "rowsBefore": 16790,
+        "rowsAfter": 16791,
+        "changed": true
+      },
+      {
+        "table": "ItemSearchName",
+        "rowsBefore": 6625,
+        "rowsAfter": 6625,
+        "changed": true
+      },
+      {
+        "table": "ItemSparse",
+        "rowsBefore": 19231,
+        "rowsAfter": 19231,
+        "changed": true
+      },
+      {
+        "table": "ItemXItemEffect",
+        "rowsBefore": 12626,
+        "rowsAfter": 12627,
+        "changed": true
+      },
+      {
+        "table": "Lock",
+        "rowsBefore": 311,
+        "rowsAfter": 312,
+        "changed": true
+      },
+      {
+        "table": "ModelProperties",
+        "rowsBefore": 1517,
+        "rowsAfter": 1517,
+        "changed": true
+      },
+      {
+        "table": "SkillLineAbility",
+        "rowsBefore": 7846,
+        "rowsAfter": 7846,
+        "changed": true
+      },
+      {
+        "table": "Spell",
+        "rowsBefore": 31939,
+        "rowsAfter": 31948,
+        "changed": true
+      },
+      {
+        "table": "SpellAuraOptions",
+        "rowsBefore": 12793,
+        "rowsAfter": 12789,
+        "changed": true
+      },
+      {
+        "table": "SpellCooldowns",
+        "rowsBefore": 4491,
+        "rowsAfter": 4494,
+        "changed": true
+      },
+      {
+        "table": "SpellDuration",
+        "rowsBefore": 134,
+        "rowsAfter": 134,
+        "changed": true
+      },
+      {
+        "table": "SpellEffect",
+        "rowsBefore": 42697,
+        "rowsAfter": 42725,
+        "changed": true
+      },
+      {
+        "table": "SpellLevels",
+        "rowsBefore": 12947,
+        "rowsAfter": 12950,
+        "changed": true
+      },
+      {
+        "table": "SpellMisc",
+        "rowsBefore": 31919,
+        "rowsAfter": 31928,
+        "changed": true
+      },
+      {
+        "table": "SpellName",
+        "rowsBefore": 31939,
+        "rowsAfter": 31948,
+        "changed": true
+      },
+      {
+        "table": "SummonProperties",
+        "rowsBefore": 126,
+        "rowsAfter": 127,
+        "changed": true
+      },
+      {
+        "table": "TaxiNodes",
+        "rowsBefore": 100,
+        "rowsAfter": 101,
+        "changed": true
+      },
+      {
+        "table": "TaxiPath",
+        "rowsBefore": 328,
+        "rowsAfter": 329,
+        "changed": true
+      },
+      {
+        "table": "TaxiPathNode",
+        "rowsBefore": 10778,
+        "rowsAfter": 10782,
+        "changed": true
+      },
+      {
+        "table": "TraitDefinitionEffectPoints",
+        "rowsBefore": 644,
+        "rowsAfter": 645,
+        "changed": true
+      },
+      {
+        "table": "TraitNode",
+        "rowsBefore": 558,
+        "rowsAfter": 557,
+        "changed": true
+      },
+      {
+        "table": "TraitNodeEntry",
+        "rowsBefore": 659,
+        "rowsAfter": 659,
+        "changed": true
+      },
+      {
+        "table": "TraitNodeGroupXTraitNode",
+        "rowsBefore": 2151,
+        "rowsAfter": 2152,
+        "changed": true
+      },
+      {
+        "table": "TraitNodeXTraitNodeEntry",
+        "rowsBefore": 561,
+        "rowsAfter": 560,
+        "changed": true
+      },
+      {
+        "table": "WMOAreaTable",
+        "rowsBefore": 52643,
+        "rowsAfter": 52737,
+        "changed": true
+      }
+    ],
+    "layoutChanged": true
+  },
+  "warnings": [
+    "table definitions differ (WoWDBDefs d8b2f0bdd362 vs 05e242b6acdc): a change may come from the layouts, not the game"
+  ]
+}

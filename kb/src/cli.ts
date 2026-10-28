@@ -1,6 +1,6 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { auditSources } from "./audit-sources.js";
 import { compareBaseline, readBaseline, writeBaselineReport } from "./baseline-report.js";
@@ -14,7 +14,13 @@ import { buildTimeline } from "./changes.js";
 import { checkBuilds, loadRegistry, recordBuilds, saveRegistry, versionsUrl } from "./builds.js";
 import { clientCoverage, formatCoverage } from "./client-coverage.js";
 import { formatScanReport, loadManifest, scanBuild } from "./client-scan.js";
+import { writeClientAchievements } from "./client-achievements.js";
+import { writeClientEncounters } from "./client-encounters.js";
+import { writeClientMounts } from "./client-mounts.js";
 import { writeClientLayer } from "./client-layer.js";
+import { writeRaceTable } from "./client-races.js";
+import { buildQuestionBank, gameDataSubjects, parseQuestionBank, serializeQuestionBank, wikiSubjects } from "./question-bank.js";
+import { evaluateBank, formatEvalReport } from "./question-eval.js";
 import { diffSnapshots } from "./client-diff.js";
 import { parseRegistry } from "./ecosystem.js";
 import { loadSnapshotFile, refreshSnapshot, saveSnapshotFile } from "./ecosystem-fetch.js";
@@ -50,11 +56,16 @@ import { importWikiDump } from "./importers/wiki-dump.js";
 import { lootWindowsFromRecords, rollupDrops } from "./drop-rollup.js";
 import { startHttpBridge } from "./mcp-http.js";
 import { readCorpusRecords, serveStdio } from "./mcp-server.js";
+import { answerSourcesFactsFromRecords } from "./answer-sources.js";
 import { objectSpawnRowsFromRecords } from "./object-spawns.js";
 import { openPublicSnapshot } from "./public-snapshot.js";
 import { search } from "./search.js";
 import { snapshot } from "./snapshot.js";
 import { validate } from "./validate.js";
+import { checkGuides } from "./guides/check.js";
+import { GUIDES_DIR, loadGuideCheckContext, readGuideFiles } from "./guides/data.js";
+import { checkNews } from "./news/check.js";
+import { NEWS_DIR, publishedWikiSlugs, readNewsPosts } from "./news/data.js";
 import { checkWiki } from "./wiki/check.js";
 import { loadCategories, loadKnownData, loadPrivatePathPattern, readWikiPages, WIKI_DIR } from "./wiki/data.js";
 
@@ -84,7 +95,7 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
     run it against a public release you are serving)
   snapshot <out.sqlite> --db <source knowledge base>   (writes a filtered public release + manifest,
     outside the database's own folder, e.g. data/release/kb.sqlite)
-  builds-check [--product wow_classic_beta,wow_classic_era] [--registry data/builds.json]
+  builds-check [--product wowf,wow_classic_beta,wow_classic_era] [--registry data/builds.json]
     (asks Blizzard's public version service which builds exist; records new ones as queued.
     Reads build identifiers only, never game files)
   blue-check [--store <kb>/changes/blue-posts.json] [--accounts <kb>/curated/blue-accounts.json]
@@ -115,7 +126,7 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
     requests an hour and the first-reply time is skipped; with it, 5,000. Honours retry-after and the
     reset time, and stops instead of waiting more than 2 minutes. A project read less than 3 hours ago
     is skipped unless --force. A project that fails keeps its last answer)
-  client-extract [--product wow_classic_beta] [--registry data/builds.json] [--out data/client] [--refresh]
+  client-extract [--product wowf] [--registry data/builds.json] [--out data/client] [--refresh]
     (reads items, spells, talent (Trait) and spell effect tables of the product's current build from Blizzard's CDN into a snapshot
     <out>/<product>-<build>-<buildconfig, 8 chars>.sqlite + manifest, and marks the build processed.
     It also reads the terrain tiles under each dungeon entrance and taxi node and keeps each chunk's area id
@@ -141,14 +152,34 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
     (adds recheck scopes to kb/curated/recheck.json from a client-diff: changed QuestV2 rows put their quests to
     recheck, changed UiMap rows the pins on those maps; a scope already there is not added twice)
   client-coverage <snapshot.sqlite> [--out coverage.md]   (rows, encrypted blocks and needed fields per client table)
-  client-scan [--product wow_classic_beta] [--manifest <path|url>] [--out data/client-scan]
+  client-scan [--product wowf] [--manifest <path|url>] [--out data/client-scan]
     (measures the product's current CDN build against every table WoWDBDefs knows: which exist in the
     build, which the knowledge base already reads and which candidates remain, grouped by site domain.
     Root-listing lookups only, no file content and no keys. Writes <out>/<product>-<build>-<config>-scan.json
     and -scan.md; the report feeds the coverage backlog in docs/2026-10-18-database-taxonomy-research.md)
+  question-bank --db <public release> [--game-data ../web/src/data/game-data] [--per-kind 60] [--out data/question-bank/bank.jsonl]
+    (the questions players are likely to ask, generated from the game-data files, the release's page titles and a
+    hand-written long tail; one JSON line each. Nothing is fetched. See docs/design/specs/2026-10-27-question-bank-design.md)
+  question-eval <bank.jsonl> --db <public release> [--out docs/evals/question-eval-<date>.md] [--json <path>]
+    (runs every question through get_by_name, search and answer_sources with no model, and writes the markdown report:
+    what resolves, what has evidence, and the gap lists. Player observations join when EVERLOOT_PUBLIC_CORPUS_URL or
+    EVERLOOT_UPLOADS is set, else the observed layer reads as unrecorded)
   client-layer <snapshot.sqlite> [--out ../web/src/data/game-data/client-layer.json]
     (relation edges derived from the game files, one build-stamped file for the database pages. Game file data,
     labelled found in game files, unconfirmed. See docs/DATA_POLICY.md)
+  client-races <snapshot.sqlite> [--out ../web/src/data/game-data/races.json]
+    (each playable race with its faction, the classes it can be and its racial traits, one build-stamped file
+    for the class pages and the class_races tool. Game file data, labelled found in game files, unconfirmed;
+    trait descriptions are for pages only. See docs/DATA_POLICY.md)
+  client-achievements <snapshot.sqlite> [--out ../web/src/data/game-data/client-achievements.json]
+    (every achievement the game files carry with its criteria walked from CriteriaTree, one build-stamped file the
+    achievement pages merge with player reports player-first. Pages only: the API, MCP and bulk exports stay clean. See docs/DATA_POLICY.md)
+  client-encounters <snapshot.sqlite> [--out ../web/src/data/game-data/client-encounters.json]
+    (every boss encounter the game files list per instance, from DungeonEncounter, one build-stamped file the
+    instance pages merge with player reports player-first. Pages only, as above)
+  client-mounts <snapshot.sqlite> [--out ../web/src/data/game-data/client-mounts.json]
+    (every mount the game files list with its spell and riding skill, one build-stamped file the collections tool
+    shows beside player uploads player-first. Pages only, as above)
   item-names <snapshot.sqlite> --wiki <knowledge base or release .sqlite> [--ledger data/item-names/ledger.json] [--out data/assets]
     (adds the snapshot's item names and the Warcraft Wiki dump's item names to the name ledger, which only
     grows, and writes the name the site shows for every item a source names (the game files' first, with the wiki
@@ -207,6 +238,14 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
     (the wiki's page check: front matter, ids and slugs, categories, bindings and tokens against the committed
     game data and the shown id ranges, [[links]], hand-typed gameplay numbers, section order, credit fields,
     the index bar for published pages, private paths and AI credits. Exits 1 on any problem. See wiki/README.md)
+  news-check [--dir <kb>/news]
+    (the news posts' check: front matter, slugs, dates, [[links]] against the published wiki pages, tokens, the
+    prose bar for published posts, private paths and AI credits. Exits 1 on any problem. See news/README.md)
+  guide-check [--dir <kb>/guides] [--previous <folder>]
+    (the guides' check: front matter, review and history, codes and spend orders against the site's talent
+    trees, sections, sources, links and tokens. --previous is a copy of kb/guides from before the change, such
+    as a pull request's base: published versions are then held to it. A --previous that is not a folder fails;
+    an empty one means there were no guides. Exits 1 on any problem. See ../docs/GUIDES.md)
 
   A source database and a public release are different artifacts. The serve commands accept only a
   release: an existing file plus its <release>.manifest.json, opened read-only and checked against
@@ -377,7 +416,7 @@ async function main(): Promise<number> {
       return problems.length === 0 ? 0 : 1;
     }
     case "builds-check": {
-      const products = (flags.get("product") || "wow_classic_beta,wow_classic_era").split(",").map((p) => p.trim()).filter(Boolean);
+      const products = (flags.get("product") || "wowf,wow_classic_beta,wow_classic_era").split(",").map((p) => p.trim()).filter(Boolean);
       const path = flags.get("registry") || "data/builds.json";
       const result = await checkBuilds(loadRegistry(path), products, async (product) => {
         const res = await fetch(versionsUrl(product), { signal: AbortSignal.timeout(15_000) });
@@ -455,7 +494,7 @@ async function main(): Promise<number> {
       return report.errors.length ? 1 : 0;
     }
     case "client-extract": {
-      const product = flags.get("product") || "wow_classic_beta";
+      const product = flags.get("product") || "wowf";
       const path = flags.get("registry") || "data/builds.json";
       const outDir = flags.get("out") || "data/client";
       const now = new Date();
@@ -499,7 +538,7 @@ async function main(): Promise<number> {
       return 0;
     }
     case "client-scan": {
-      const product = flags.get("product") || "wow_classic_beta";
+      const product = flags.get("product") || "wowf";
       const outDir = flags.get("out") || "data/client-scan";
       const { build, source } = await openCdn(product);
       if (!source.fileStatus) throw new Error("this source cannot look up file data ids");
@@ -517,12 +556,77 @@ async function main(): Promise<number> {
       console.log(`${report.totals.present}/${report.totals.known} tables in build, ${report.candidates.length} unread candidates, ${report.totals.neverListed} never-list; -> ${outDir}`);
       return 0;
     }
+    case "question-bank": {
+      const release = openExistingReadOnlyDb(requireExistingDbPath(flags, "question-bank"));
+      const gameData = flags.get("game-data") || "../web/src/data/game-data";
+      const perKind = Number(flags.get("per-kind") || 60);
+      const out = flags.get("out") || "data/question-bank/bank.jsonl";
+      const subjects = [...gameDataSubjects(gameData), ...wikiSubjects(release, perKind)];
+      const bank = buildQuestionBank(subjects);
+      mkdirSync(dirname(out), { recursive: true });
+      writeFileSync(out, serializeQuestionBank(bank));
+      const kinds = new Map<string, number>();
+      for (const s of subjects) kinds.set(s.kind, (kinds.get(s.kind) ?? 0) + 1);
+      console.log(`${subjects.length} subjects (${[...kinds].map(([k, n]) => `${k} ${n}`).join(", ")}) -> ${bank.length} questions -> ${out}`);
+      return 0;
+    }
+    case "question-eval": {
+      if (!args[0]) break;
+      const releasePath = requireExistingDbPath(flags, "question-eval");
+      const release = openExistingReadOnlyDb(releasePath);
+      const bank = parseQuestionBank(readFileSync(args[0], "utf8"));
+      const corpus = await readCorpusRecords(["item_seen", "item_fact", "loot", "npc_sighting", "vendor", "quest", "object_sighting", "instance_entrance", "encounter"]);
+      const facts = corpus ? answerSourcesFactsFromRecords(corpus.records) : null;
+      const ranAt = new Date().toISOString();
+      const report = evaluateBank(release, bank, facts, { release: basename(releasePath), dataAsOf: corpus?.dataAsOf ?? null, ranAt });
+      const out = flags.get("out") || `../docs/evals/question-eval-${ranAt.slice(0, 10)}.md`;
+      mkdirSync(dirname(out), { recursive: true });
+      writeFileSync(out, formatEvalReport(report));
+      const json = flags.get("json");
+      if (json) { mkdirSync(dirname(json), { recursive: true }); writeFileSync(json, `${JSON.stringify(report, null, 1)}\n`); }
+      const t = report.totals;
+      console.log(`${t.questions} questions: ${t.exact} exact, ${t.search} by search, ${t.none} unresolved; ${t.withEvidence} with evidence, ${t.withObserved} with observed facts, ${t.withPage} with a page -> ${out}`);
+      return 0;
+    }
     case "client-layer": {
       if (!args[0]) break;
       const path = flags.get("out") || "../web/src/data/game-data/client-layer.json";
       const layer = writeClientLayer(args[0], path);
       for (const [rel, n] of Object.entries(layer.counts)) console.log(`${rel}: ${n} edges`);
       console.log(`-> ${path}`);
+      return 0;
+    }
+    case "client-races": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/races.json";
+      const table = writeRaceTable(args[0], path);
+      for (const r of table.races) console.log(`${r.faction} ${r.name}: ${r.classes.length} classes, ${r.traits.length} traits`);
+      console.log(`-> ${path}`);
+      return 0;
+    }
+    case "client-achievements": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-achievements.json";
+      const table = writeClientAchievements(args[0], path);
+      const listed = Object.keys(table.achievements).length;
+      const withCriteria = Object.values(table.achievements).filter((a) => a.criteria.length > 0).length;
+      console.log(`${table.build.product} ${table.build.version}: ${listed} achievements, ${withCriteria} with criteria -> ${path}`);
+      return 0;
+    }
+    case "client-encounters": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-encounters.json";
+      const table = writeClientEncounters(args[0], path);
+      const instances = Object.keys(table.instances).length;
+      const encounters = Object.values(table.instances).reduce((n, list) => n + list.length, 0);
+      console.log(`${table.build.product} ${table.build.version}: ${encounters} encounters in ${instances} instances -> ${path}`);
+      return 0;
+    }
+    case "client-mounts": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-mounts.json";
+      const table = writeClientMounts(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${Object.keys(table.mounts).length} mounts -> ${path}`);
       return 0;
     }
     case "client-diff": {
@@ -778,6 +882,29 @@ async function main(): Promise<number> {
       const published = result.pages.filter((p) => p.fm.status === "published").length;
       console.log(`${result.pages.length} pages (${published} published, ${result.pages.length - published} draft), ${result.problems.length} problems`);
       console.log("checked against the game files: items, zones, entrances, item sets, /changes entries; npc, quest, faction, race, class, event and LFG dungeon ids by shape and shown range only");
+      return result.problems.length ? 1 : 0;
+    }
+    case "news-check": {
+      const dir = flags.get("dir") || NEWS_DIR;
+      const result = checkNews(readNewsPosts(dir), { wikiPages: publishedWikiSlugs(), privatePaths: loadPrivatePathPattern(), today: new Date().toISOString().slice(0, 10) });
+      for (const p of result.problems) console.error(`${p.file}${p.line ? `:${p.line}` : ""}: ${p.message}`);
+      const published = result.posts.filter((p) => p.fm.status === "published").length;
+      console.log(`${result.posts.length} posts (${published} published, ${result.posts.length - published} draft), ${result.problems.length} problems`);
+      return result.problems.length ? 1 : 0;
+    }
+    case "guide-check": {
+      const dir = flags.get("dir") || GUIDES_DIR;
+      const previousDir = flags.get("previous");
+      // Comparing with a folder that is not there would let any change to a published guide through.
+      if (previousDir !== undefined && !(previousDir && statSync(previousDir, { throwIfNoEntry: false })?.isDirectory())) {
+        throw new Error(`guide-check: --previous ${previousDir ? `${previousDir} is not a folder` : "needs a folder"}; nothing was checked`);
+      }
+      const previous = previousDir === undefined ? undefined : readGuideFiles(previousDir);
+      const result = checkGuides(readGuideFiles(dir), { ...loadGuideCheckContext(), ...(previous ? { previous } : {}) });
+      for (const p of result.problems) console.error(`${p.file}${p.line ? `:${p.line}` : ""}: ${p.message}`);
+      const published = result.guides.filter((g) => g.fm.status === "published").length;
+      console.log(`${result.guides.length} guides (${published} published, ${result.guides.length - published} draft), ${result.problems.length} problems`);
+      console.log(previous ? `compared with ${previous.length} guides from before the change` : "not compared with the guides from before the change; pass --previous for that");
       return result.problems.length ? 1 : 0;
     }
     case "snapshot":

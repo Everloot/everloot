@@ -6,15 +6,26 @@ import { z } from "zod";
 import { expect, test } from "vitest";
 import { exampleUrl, requestSamples, sample, TOOL_ARGS, toolSamples } from "./examples";
 import { articleMarkdown } from "./markdown";
-import { allDocsPages, DOCS_TABS, endpointHref, endpointSlug, legacyAnchors, neighbours, tabFor, toolHref } from "./nav";
+import { allDocsPages, DOCS_TABS, endpointHref, endpointSlug, legacyAnchors, neighbours, tabFor, toolFromSlug, toolHref } from "./nav";
+import { liveToolNames } from "@/lib/guild-switch";
 
 const app = join(__dirname, "../../app");
 
 test("every public endpoint and every MCP tool has exactly one docs page in the sidebar", () => {
   const hrefs = DOCS_TABS.flatMap((tab) => tab.groups.flatMap((group) => group.pages.map((page) => page.href)));
   for (const route of API_ROUTES) expect(hrefs.filter((h) => h === endpointHref(route)), route.path).toHaveLength(1);
-  for (const name of MCP_TOOL_NAMES) expect(hrefs.filter((h) => h === toolHref(name)), name).toHaveLength(1);
+  for (const name of liveToolNames()) expect(hrefs.filter((h) => h === toolHref(name)), name).toHaveLength(1);
   expect(new Set(API_ROUTES.map(endpointSlug)).size).toBe(API_ROUTES.length);
+});
+
+test("with EVERLOOT_GUILDS off the guild ladder's two tools have no docs page and their addresses name no tool", () => {
+  const hrefs = DOCS_TABS.flatMap((tab) => tab.groups.flatMap((group) => group.pages.map((page) => page.href)));
+  for (const name of ["guild_search", "guild_rankings"] as const) {
+    expect(hrefs).not.toContain(toolHref(name));
+    expect(toolFromSlug(name.replaceAll("_", "-"))).toBeUndefined();
+    expect(legacyAnchors()).not.toHaveProperty(`tool-${name}`);
+  }
+  expect(toolFromSlug("guild-board")).toBe("guild_board");
 });
 
 test("every page in the table of contents has a page file, and appears once", () => {

@@ -50,6 +50,13 @@ test("the addon release is the one matching the served version, not the newest",
   expect(addonReleaseFor(list, "0.9.9")).toBeNull();
 });
 
+test("the exact served addon Alpha has release notes and checksums without promoting desktop previews", () => {
+  const alpha = release("addon-v0.3.11", [asset("addon-v0.3.11", "SHA256SUMS")], { prerelease: true });
+  expect(addonReleaseFor([alpha], "0.3.11")?.tag).toBe("addon-v0.3.11");
+  expect(addonReleaseFor([{ ...alpha, draft: true }], "0.3.11")).toBeNull();
+  expect(newestDesktopRelease([release("desktop-v9.0.0", [], { prerelease: true })])).toBeNull();
+});
+
 test("no list, no releases", () => {
   expect(newestDesktopRelease(null)).toBeNull();
   expect(addonReleaseFor(null, "0.3.3")).toBeNull();

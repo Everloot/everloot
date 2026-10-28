@@ -6,7 +6,7 @@
  * how many windows from how many installs it has, and no item is tied to a source. Recorder windows never enter
  * here; `pending-loot.ts` counts them apart.
  */
-import { INDEPENDENT_INSTALLS } from "./drop-rollup.js";
+import { countsAsKillOrGather, INDEPENDENT_INSTALLS } from "./drop-rollup.js";
 
 /** A source's windows: how many, from how many installs, and the first and last capture day (UTC). */
 export interface WindowSpan { windows: number; installs: number; first: string | null; last: string | null }
@@ -67,6 +67,7 @@ export function lootTablesFromRecords(records: readonly unknown[], asOf: Date | 
     if (!raw || typeof raw !== "object") continue;
     const row = raw as Record<string, unknown>;
     if (row.kind !== "loot" || row.sourceEvidence !== "loot-api" || !Array.isArray(row.items)) continue;
+    if (!countsAsKillOrGather(row.lootType)) continue;
     const installId = typeof row.installId === "string" ? row.installId.trim() : "";
     const key = positive(row.sourceNpcId) ? `npc:${row.sourceNpcId}` : positive(row.sourceObjectId) ? `obj:${row.sourceObjectId}` : null;
     if (!installId || !key) {

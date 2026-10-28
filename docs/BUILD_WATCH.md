@@ -40,6 +40,13 @@ also states the encrypted block count. No decryption keys are loaded; encrypted 
 Never auto-merge: the workflow has no merge step. Web tests that hard-code the build number in sample
 raid codes may need a matching edit in the same pull request; CI shows it.
 
+Upload before merging. The site reads item, quest, item set and spell names only from the asset folder of the
+client layer's build (`loadItemNames` in `web/src/lib/game-assets.ts`), so merging a new build first leaves
+production with "Item 25" instead of names and an empty item sitemap until the upload. Before merging, a
+maintainer with the upload key runs `kb client-assets`, `item-names` and `game-names` for the new build,
+uploads with `web/scripts/upload-game-assets.mjs` and `upload-item-names.mjs`, and points
+`NEXT_PUBLIC_GAME_ASSETS_URL` at the new folder, so the merge's production build picks up both.
+
 Hotfixes that change no build are not in the game files and never show up here. The blue tracker covers
 them.
 
@@ -77,7 +84,8 @@ next successful scheduled run closes it.
   do not start other workflows, so the release checks would not run on them.
 - The first run opens a baseline pull request (no comparison). Merge game data only once PR #29 (which
   allows build changes, beta included, the talent catalog and the raid buff table in git) is merged.
-- When Blizzard lists the live product, add it to `kb/lists/build-watch.yaml` with `live: true`.
+- `kb/lists/build-watch.yaml` follows `wowf`, WoW Forever's own product, with `live: false`. Set `live: true`
+  once players can play it, at launch ([LAUNCH_DAY](LAUNCH_DAY.md)).
 
 ## Running it locally
 

@@ -105,6 +105,13 @@ test("a recheck scope takes a fact out until it settles again after the scope's 
   expect(settledKeys(computeSettled(input(again, { asOf: day(40), recheck: [scope, { ...scope, type: "pins" as const }] }))).has("npc:1@1429")).toBe(true);
 });
 
+test("a recheck scope matches an NPC on the map the score counts it in, not on every map it was seen on", () => {
+  const seen = [...npcs(5, 1), ...npcs(3, 1, { mapId: 1411, from: 10 }), ...npcs(1, 1, { mapId: 1412, from: 20 })];
+  const scope = { since: day(10), source: "test", type: "npcs" as const, zones: [1411] };
+  expect(settledKeys(computeSettled(input(seen, { recheck: [scope] }))).has("npc:1@1429")).toBe(true);
+  expect(settledKeys(computeSettled(input(seen, { recheck: [{ ...scope, zones: [1429] }] }))).has("npc:1@1429")).toBe(false);
+});
+
 test("the uploaders skip a row only for the list's own build, by NPC and map together", () => {
   const list = listOf(computeSettled(input(npcs(5, 1))));
   const skip = settledSkip(list, BUILD)!;

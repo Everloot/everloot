@@ -69,11 +69,29 @@ test("the page shows the name and notes over the calculator, read-only, with a w
 
 test("a signed-in visitor can save a copy, and the owner's name shows only when they chose it", async () => {
   auth.getUser.mockResolvedValue({ id: "11111111-2222-4333-8444-555555555555", name: "Thrall#1" });
-  auth.authQuery.mockResolvedValue(shared({ owner_name: "Thrall#1", game_build: "1.0.0.1" }));
+  auth.authQuery.mockResolvedValue(shared({ owner_name: "Email owner", game_build: "1.0.0.1" }));
   const html = renderToStaticMarkup(await SharedBuildPage(params()));
   expect(html).toContain("Save a copy");
-  expect(html).toContain("Shared by Thrall#1");
+  expect(html).toContain("Shared by Email owner");
   expect(html).toContain('data-badge="files"');
+});
+
+test("the game build's badge says older only when it is older, newer when it is newer, and nothing when it is the tree's or unreadable", async () => {
+  const { build } = await loadCatalog("mage");
+  const parts = build.split(".");
+  const older = [...parts.slice(0, -1), String(Number(parts.at(-1)) - 1)].join(".");
+  const newer = [...parts.slice(0, -1), String(Number(parts.at(-1)) + 1)].join(".");
+  const badges = async (gameBuild: string) => {
+    auth.authQuery.mockResolvedValue(shared({ game_build: gameBuild }));
+    const html = renderToStaticMarkup(await SharedBuildPage(params()));
+    return [/made on an older game build/.test(html), /made on a newer game build/.test(html)];
+  };
+  expect(await badges(older)).toEqual([true, false]);
+  // 9999 comes before 70450 as a number, though not as text.
+  expect(await badges("1.0.0.9999")).toEqual([true, false]);
+  expect(await badges(newer)).toEqual([false, true]);
+  expect(await badges(build)).toEqual([false, false]);
+  for (const junk of ["", "1.60", "1.60.x.1", "latest"]) expect(await badges(junk), junk).toEqual([false, false]);
 });
 
 test("not indexed, canonical to the class page, with the saved build's own card", async () => {

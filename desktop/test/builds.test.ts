@@ -41,7 +41,7 @@ const answer = {
 test("builds are joined with their labels' name and realm, newest first; a build the addon could not load is left out", () => {
   const builds = gameBuilds(answer);
   expect(builds.map((b) => b.name)).toEqual([TRICKY, "Leveling", "No label", "Priest"]);
-  expect(builds[0]).toEqual({ name: TRICKY, character: "Ærîn", realm: "Nightslayer", class: "mage", code: CODE, code2: CODE2, active: true, gameBuild: "1.60.1.70450" });
+  expect(builds[0]).toEqual({ name: TRICKY, character: "Ærîn", realm: "Nightslayer", class: "mage", code: CODE, code2: CODE2, order: null, order2: null, active: true, gameBuild: "1.60.1.70450" });
   expect(builds[2]).toMatchObject({ character: null, realm: null, code2: null });
   // A second set for another class is dropped, the build stays.
   expect(builds[3]).toMatchObject({ character: 'Quote"Bank', realm: null, class: "priest", code: PRIEST, code2: null });
@@ -51,10 +51,60 @@ test("builds are joined with their labels' name and realm, newest first; a build
 
 /** The golden file the addon's plan test loads in Lua 5.1 (addon/tests/plan_contract.py). */
 const FIXTURE = new URL("../../addon/tests/fixtures/EverlootBuilds.lua", import.meta.url);
+test("account response to Lua carries each set's own order and only game fields", async () => {
+  const builds = await fetchBuilds("https://everloot.app", KEY, (async () => json(200, {
+    accountId: "private-owner", email: "private-email", transferKey: "private-transfer",
+    characters: answer.characters,
+    builds: [row("b", { characterId: "c1", code2: CODE2, order: "O1p-ABACC", order2: "O1g-BA", notes: "private-notes", transferKey: "private-transfer" })],
+  })) as typeof fetch);
+  expect(builds[0]).toMatchObject({ code: CODE, code2: CODE2, order: "O1p-ABACC", order2: "O1g-BA" });
+  const { lua } = renderBuildsAddon(builds, "2026-10-20T12:00:00.000Z");
+  expect(lua).toContain('order = "O1p-ABACC", order2 = "O1g-BA"');
+  expect(lua).not.toContain("private-");
+  expect(Object.keys(builds[0]).sort()).toEqual(["active", "character", "class", "code", "code2", "gameBuild", "name", "order", "order2", "realm"]);
+});
+
+test("bad, missing and newer metadata never drops ranks or borrows another set's order", () => {
+  for (const order of [undefined, null, 42, "O1p-AB", "O2p-ABACC", "O1p-" + "A".repeat(65), 'O1p-ABACC\" --']) {
+    const [build] = gameBuilds({ builds: [row("b", { code2: CODE2, order, order2: "O1g-BA" })] });
+    expect(build).toMatchObject({ code: CODE, code2: CODE2, order: null, order2: "O1g-BA" });
+  }
+  expect(gameBuilds({ builds: [row("b", { code2: "broken", order: "O1p-ABACC", order2: "O1g-BA" })] })[0])
+    .toMatchObject({ code: CODE, code2: null, order: "O1p-ABACC", order2: null });
+});
+
+test("slot size caps count whole characters and tokens never extend the rank code", () => {
+  const builds = gameBuilds({
+    characters: [{ id: "c", name: "\u{1f409}".repeat(25), realm: "\u{1f409}".repeat(33) }],
+    builds: Array.from({ length: 201 }, (_, i) => row(String(i), {
+      name: "\u{1f409}".repeat(61), characterId: "c", code2: CODE2, order: "O1p-ABACC", order2: "O1g-BA",
+    })),
+  });
+  expect(builds).toHaveLength(200);
+  expect(builds[0]).toMatchObject({ name: "\u{1f409}".repeat(60), character: "\u{1f409}".repeat(24), realm: "\u{1f409}".repeat(32),
+    code: CODE, code2: CODE2, order: "O1p-ABACC", order2: "O1g-BA" });
+  const over = "EL1-mage-0-1.60-" + "A".repeat(400);
+  expect(gameBuilds({ builds: [row("b", { code: over, order: "O1p-A" })] })).toEqual([]);
+  expect(gameBuilds({ builds: [row("b", { code2: over, order2: "O1p-A" })] })[0]).toMatchObject({ code: CODE, code2: null, order2: null });
+});
+
+test("Desktop order adapter agrees with the language-neutral decode vectors", () => {
+  const vectors = JSON.parse(readFileSync(new URL("../../docs/fixtures/talent-order-v1.json", import.meta.url), "utf8"));
+  for (const v of vectors.decode) {
+    const payload = v.ranks.filter(([, rank]: number[]) => rank > 0)
+      .map(([id, rank, choice]: number[]) => `${id}:${rank}${choice === undefined ? "" : `:${choice}`}`).join(",");
+    const code = `EL1-mage-0-1.60.1-${Buffer.from(payload).toString("base64url")}`;
+    // Empty plans and codes over 400 characters cannot be represented by this slot's rank contract.
+    if (!payload || code.length > 400) continue;
+    const [build] = gameBuilds({ builds: [row("b", { code, order: v.token })] });
+    expect(build.order, v.name).toBe(v.error ? null : v.token.trim());
+    expect(build.code, v.name).toBe(code);
+  }
+});
 const FIXTURE_BUILDS: GameBuild[] = [
   { name: "Frost AoE", character: null, realm: null, class: "mage", code: "EL1-mage-1482-1.59.0.69000-OTAwMDE6MQ", code2: null, active: false, gameBuild: "1.59.0.69000" },
   { name: "Arcane leveling", character: "Aerin", realm: "nightslayer", class: "mage", code: CODE, code2: null, active: false, gameBuild: "1.60.1.70450" },
-  { name: TRICKY, character: "aERIN", realm: null, class: "mage", code: CODE, code2: CODE2, active: true, gameBuild: "1.60.1.70450" },
+  { name: TRICKY, character: "aERIN", realm: null, class: "mage", code: CODE, code2: CODE2, order: "O1p-ABACC", order2: "O1g-BA", active: true, gameBuild: "1.60.1.70450" },
   { name: "Healer", character: "Aerin", realm: null, class: "priest", code: PRIEST, code2: null, active: false, gameBuild: "1.60.1.70450" },
   { name: "Alt's build", character: "Ærîn", realm: "Doomhowl", class: "mage", code: CODE, code2: null, active: false, gameBuild: "1.60.1.70450" },
 ];

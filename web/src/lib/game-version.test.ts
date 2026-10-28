@@ -23,7 +23,7 @@ describe("game versions", () => {
 
   test("the label is the short build", () => {
     expect(shortBuild("1.60.1.70450")).toBe("1.60.1");
-    expect(versionLabel()).toBe(`Beta · ${shortBuild(CURRENT_VERSION.build!)}`);
+    expect(versionLabel()).toBe(`Build ${shortBuild(CURRENT_VERSION.build!)}`);
   });
 
   // A build bump regenerates the layers; one left behind would show the old build under the new label.

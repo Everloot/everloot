@@ -46,7 +46,7 @@ export default async function MyBuildsPage() {
       <DataTitle
         title="My builds"
         meta={`${plural(builds.length, "build", "builds")} · ${plural(characters.length, "character", "characters")}`}
-        aside={<Link href="/tools/talents" className="text-meta text-accent hover:underline underline-offset-4">Open the talent calculator</Link>}
+        aside={<Link href="/tools/talents" className="text-meta text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Open the talent calculator</Link>}
       />
 
       {builds.length === 0 && characters.length === 0 ? (

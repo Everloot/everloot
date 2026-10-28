@@ -4,7 +4,7 @@ import { Facts, type Fact } from "@/components/ui";
 import type { AccountOverview } from "@/lib/account-overview";
 import { KEYS_PER_ACCOUNT } from "@/lib/api-keys";
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 const methodNames: Record<string, string> = { battlenet: "Battle.net", credential: "Email and password" };
 const count = (n: number) => n.toLocaleString("en-US");
 const day = (iso: string) => new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });

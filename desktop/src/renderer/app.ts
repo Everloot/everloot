@@ -1,8 +1,8 @@
 import { accountOf as account } from "../main/engine";
 import { diagnostics } from "../shared/diagnostics";
-import { ago, clock, copyLabel, esc, gold, kb, msg, sparkline, statusText, when } from "./format";
+import { ago, clock, companionStatus, copyLabel, esc, gold, kb, msg, JOB_NAMES, sparkline, statusText, when, type CompanionState } from "./format";
 import { NO_SOURCED_ANSWER, type AddonInfo, type AppState, type AskInfo, type BackupInfo, type ChangeItem, type CharacterRow, type CharactersInfo, type ChatInfo, type ChatProgress, type EverlootApi, type PriceLookup, type FileSummary, type GameFolderCandidate, type Job, type JobStatus, type MarketInfo, type MoneyDay } from "../shared/types";
-import { PROVIDER_PRESETS, presetFor, type ModelChoice, type ProviderKind } from "../shared/providers";
+import { PROVIDER_PRESETS, assistantSource, keptModelPick, manualModelShown, presetFor, removalNotice, type ModelChoice, type ProviderKind } from "../shared/providers";
 import { inkOn } from "../../../web/src/lib/chat/catalogue";
 import { WEBSITE_LINKS, websiteUrl } from "../shared/website";
 
@@ -41,9 +41,25 @@ let flash = "";
 /** The provider picked in the Chat page's form before it is saved; the form re-renders around it. */
 let pickKind: ProviderKind = "anthropic";
 let pickOpen = false;
+/** What was typed in the open provider form, kept in memory only (never saved or logged) so a redraw does not eat it. Same provider only. */
+let providerDraft: { kind: ProviderKind; key: string; baseUrl: string; model: string | null; modelText: string } | null = null;
+/** The control the provider form was opened from, so Cancel and Save hand the focus back to it. */
+let setupOpener = "#assistantOpen";
+/** What the last setup action did, shown inside the Assistant panel so it is seen even while another form on the page is unsaved. "!" starts an error. */
+let setupNote = "";
+/** Ask's Advanced disclosure: null until the player opens or closes it, so a saved private configuration starts open and a choice then holds across redraws. */
+let advancedOpen: boolean | null = null;
+/** The Assistant panel's markup as last drawn; a background update that would draw the same leaves an unsaved page's DOM alone. */
+let assistantDrawn = "";
 /** Each provider's models as the provider listed them, once asked (api.chatModels); the catalogue's until then. */
 const liveModels: Partial<Record<ProviderKind, ModelChoice[]>> = {};
 const askedModels = new Set<ProviderKind>();
+/** The Chat page's own scrolling regions; a background redraw puts them back where they were, as it does the page's own scroll. */
+const CHAT_SCROLLERS = [".page.chat", ".chat-top"] as const;
+/** Set when the player navigates or opens the provider form, so the next redraw does not keep the scroll positions. */
+let freshScroll = false;
+/** Bumped by navigation, each lookup and typing in the price box; a finished lookup clears the box only if none of these happened meanwhile. */
+let priceEdits = 0;
 /** The answer being written while a chat question is out; null otherwise. */
 let live: ChatProgress | null = null;
 /** The Copy button just pressed and how it went, kept for its 1.5 s across a redraw of the thread. */
@@ -66,7 +82,26 @@ const ext = (url: string, text: string) => `<button type="button" class="link" d
 const dot = (j: JobStatus) => `<span class="dot dot-${j.state}" aria-hidden="true"></span>`;
 const onOff = (job: Job, s: AppState) => (job === "ask" ? s.settings.ask.enabled : s.settings[job]);
 const jobSwitch = (job: Job, s: AppState) => `<label class="switch"><input type="checkbox" data-toggle="${job}" ${onOff(job, s) ? "checked" : ""}><span>${onOff(job, s) ? "On" : "Off"}</span></label>`;
-const runBtn = (job: Job, s: AppState, label = "Run now") => `<button type="button" class="btn" data-run="${job}" ${onOff(job, s) && s.engine.files.length && !s.engine.paused && s.engine.jobs[job].state !== "running" ? "" : "disabled"}>${label}</button>`;
+/** The inline icon set: one 24-unit grid and one stroke, painted by `.ico`. Always decorative; the label beside it names the control. */
+const ICONS: Record<string, string> = {
+  overview: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  chat: '<path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-9l-5 3v-3a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/>',
+  characters: '<circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/>',
+  upload: '<path d="M12 15V3m-5 5 5-5 5 5M4 15v6h16v-6"/>',
+  market: '<path d="M4 20V10m8 10V4m8 16v-7M2 21h20"/>',
+  ask: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 8 3 4-3 4m6 0h4"/>',
+  addon: '<path d="m12 3 9 5v9l-9 5-9-5V8l9-5Zm0 10L3 8m9 5 9-5m-9 5v9"/>',
+  changes: '<path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/>',
+  log: '<path d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h6M9 17h6"/>',
+  settings: '<path d="M10.3 3h3.4l.5 2.4 1.7.9 2.3-.8 1.7 2.9-1.8 1.7v1.8l1.8 1.7-1.7 2.9-2.3-.8-1.7.9-.5 2.4h-3.4l-.5-2.4-1.7-.9-2.3.8-1.7-2.9 1.8-1.7v-1.8L4.1 8.4l1.7-2.9 2.3.8 1.7-.9Z"/><circle cx="12" cy="12" r="2.6"/>',
+  account: '<circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="10" r="3.2"/><path d="M6.4 18.6a6.5 6.5 0 0 1 11.2 0"/>',
+  bug: '<rect x="7" y="8" width="10" height="12" rx="5"/><path d="M9 8V7a3 3 0 0 1 6 0v1M12 12v8M3 13h4M17 13h4M4 7l3 2M20 7l-3 2M4 19l3-2M20 19l-3-2"/>',
+  external: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+  alert: '<path d="M12 9v4m0 3.5v.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/>',
+};
+const icon = (name: string, cls = "ico") => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] ?? ""}</svg>`;
+
+const runBtn = (job: Job, s: AppState, label = "Run now", primary = false) => `<button type="button" class="btn${primary ? " btn-primary" : ""}" data-run="${job}" ${onOff(job, s) && s.engine.files.length && !s.engine.paused && s.engine.jobs[job].state !== "running" ? "" : "disabled"}>${label}</button>`;
 /** A button that opens Chat with a question ready; the click handler sends it. */
 const askChip = (question: string, label = question) => `<button type="button" class="chip ask" data-ask="${esc(question)}">${esc(label)}</button>`;
 /** The question to put to the chat about a job that failed. */
@@ -107,7 +142,7 @@ function welcome(): string {
       <ul class="plain fg2">
         <li>Anonymous observations from <code>Everloot.lua</code>: drops, vendors, recipes, spawns, auction scans. No character or account name.</li>
         <li><label class="switch"><input type="checkbox" id="censusConsent" ${censusChoice ? "checked" : ""}> Census: the race, class, level and faction of your characters and of players the addon sees. Never names, guilds, gear or places; the site shows only totals.</label></li>
-        <li>Nothing else. Named data (guild, gear, gold, collection) and your installed addon list stay here; share those on the website if you want to.</li>
+        <li>The uploader keeps guild, gear, gold, collection and installed-addon rows here. If you configure a model for Chat, it receives your questions and any local character details it uses to answer.</li>
       </ul>
       <p class="small fg2">Uploaded observations are published under CC BY-SA 4.0, credited to Everloot contributors. Source: ${ext("https://github.com/Everloot/everloot", "github.com/Everloot/everloot")} · Rules: ${ext("https://everloot.app/privacy", "everloot.app/privacy")}</p>
     </section>
@@ -121,53 +156,86 @@ function welcome(): string {
   </div>`;
 }
 
+const STATE_LABEL: Record<CompanionState, string> = { setup: "Setup", paused: "Paused", error: "Error", running: "Running", off: "Off", idle: "Waiting" };
+/** The hero's diamond, with a glyph for the state; decorative, the headline beside it says the same in words. */
+const HERO_GLYPH: Record<CompanionState, string> = {
+  idle: "", running: '<path d="M16 22a8 8 0 0 1 13-5m3 7a8 8 0 0 1-13 5M30 13v4h-4M18 31v-4h4"/>', paused: '<path d="M18 17v14M30 17v14"/>',
+  error: '<path d="M24 16v9m0 5v.01"/>', off: '<path d="M18 24h12"/>', setup: '<path d="M24 17v14M17 24h14"/>',
+};
+const heroMark = (state: CompanionState) => `<div class="hero-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M24 3 45 24 24 45 3 24Z"/><path d="M24 11 37 24 24 37 11 24Z" opacity="0.45"/>${HERO_GLYPH[state]}</svg></div>`;
+
 function overview(s: AppState): string {
   const e = s.engine;
   const up = e.jobs.upload, pr = e.jobs.prices, ask = e.jobs.ask;
   const addon = data.addon;
+  const status = companionStatus(s);
   const addonLine = !addon ? "…" : addon.installed
     ? (addon.newer && addon.latest ? `${addon.installed} <span class="warn">→ ${addon.latest.version} available</span>` : `${addon.installed}${addon.latest ? ' <span class="ok">up to date</span>' : ""}`)
     : '<span class="warn">not installed</span>';
   const changes = (data.changes ?? []).slice(0, 5);
+  // The first action fits the state; Upload now and Refresh prices follow whenever the jobs can run at all.
+  const lead = status.state === "setup" ? `<button type="button" class="btn btn-primary" data-page="settings">Open Settings</button>`
+    : status.state === "off" ? `<button type="button" class="btn btn-primary" data-page="settings">Choose what runs</button>`
+    : status.state === "paused" ? `<button type="button" class="btn btn-primary" id="pause">Resume</button>`
+    : status.state === "error" ? `<button type="button" class="btn btn-primary" data-page="log">Open the log</button>` : "";
+  const runs = status.state === "setup" || status.state === "off" ? "" : `${runBtn("upload", s, "Upload now", !lead)}${runBtn("prices", s, "Refresh prices")}`;
+  const failed = status.state === "error" ? status.jobs.map((j) => `<p class="hero-failed small"><b>${esc(JOB_NAMES[j])}:</b> ${esc(statusText(e.jobs[j]))}</p>`).join("") : "";
+  const job = (ico: string, name: string, dotHtml: string, state: string, sub: string) => `<div class="job"><span class="job-ico">${icon(ico)}</span><div class="grow"><div class="job-name">${name}</div><div class="muted small">${sub}</div></div><div class="job-state">${dotHtml}<span>${state}</span></div></div>`;
+  const last = (j: JobStatus) => (j.at ? `last run ${ago(j.at)}` : "not run yet");
   return `<div class="page">
     <div class="head"><h1>Overview</h1><span class="sub">${e.files.length ? `Watching ${e.files.length} account file(s)` : "Not watching a game folder"}${e.paused ? " · paused" : ""}</span></div>
-    ${s.notice ? `<p class="error">${esc(s.notice)}</p>` : ""}
-    ${s.update?.newer && s.update.url ? `<p class="fg2">Everloot Desktop App ${esc(s.update.latest ?? "")} is out; you run ${esc(s.version)}. ${ext(s.update.url, "Download it")} and install over this one; your settings stay.</p>` : ""}
-    ${!e.files.length && s.settings.gameFolder ? `<p class="fg2">No <code>Everloot.lua</code> under <span class="mono">${esc(s.settings.gameFolder)}</span> yet. Log out once in the game so it writes the file.</p>` : ""}
-    <div class="stats">
-      <div class="stat"><div class="k">Upload</div><div class="v">${dot(up)} ${up.state === "ok" ? "OK" : up.state === "error" ? "Failed" : up.state === "off" ? "Off" : "Waiting"}</div><div class="s">${up.at ? ago(up.at) : "never"}${askWhy("upload", s)}</div></div>
-      <div class="stat"><div class="k">Market prices</div><div class="v">${dot(pr)} ${data.market ? `${data.market.last.length} realm(s)` : pr.state === "off" ? "Off" : "Waiting"}</div><div class="s">${data.market?.scans[0] ? `your last scan ${ago(data.market.scans[0].at)}` : pr.at ? ago(pr.at) : "never"}${askWhy("prices", s)}</div></div>
-      <div class="stat"><div class="k">/ask</div><div class="v">${dot(ask)} ${ask.state === "off" ? "Off" : ask.state === "error" ? "Failed" : "On"}</div><div class="s">${ask.at ? ago(ask.at) : s.settings.ask.enabled ? "waiting" : "turn on in Ask"}${askWhy("ask", s)}</div></div>
-      <div class="stat"><div class="k">Addon</div><div class="v">${addonLine}</div><div class="s">${addon?.slots.prices ? "prices file in game" : "no prices file yet"}${addon && (!addon.installed || addon.newer) ? ` · <button type="button" class="link" data-page="addon">${addon.installed ? "update" : "install"}</button>` : ""}</div></div>
-    </div>
-    <div class="grid2">
-      <section class="panel"><div class="row between"><h2>Recent activity</h2><div class="row">${runBtn("upload", s, "Upload now")}${runBtn("prices", s, "Refresh prices")}</div></div><div class="log">${logLines(s, 8)}</div></section>
-      <section class="panel"><div class="row between"><h2>Latest changes</h2><button type="button" class="link" data-page="changes">all</button></div>
-        <div class="list">${changes.length ? changes.map((c) => `<div class="item"><div class="t">${c.link ? ext(c.link, c.title) : esc(c.title)}</div><div class="muted small">${when(c.date)}</div></div>`).join("") : `<span class="muted">${data.changesError ? esc(data.changesError) : "Loading…"}</span>`}</div></section>
+    ${s.notice ? `<p class="callout error">${icon("alert")}<span>${esc(s.notice)}</span></p>` : ""}
+    ${s.update?.newer && s.update.url ? `<p class="callout fg2">${icon("upload")}<span>Everloot Desktop App ${esc(s.update.latest ?? "")} is out; you run ${esc(s.version)}. ${ext(s.update.url, "Download it")} and install over this one; your settings stay.</span></p>` : ""}
+    ${!e.files.length && s.settings.gameFolder ? `<p class="callout fg2">${icon("log")}<span>No <code>Everloot.lua</code> under <span class="mono">${esc(s.settings.gameFolder)}</span> yet. Log out once in the game so it writes the file.</span></p>` : ""}
+    <section class="hero" data-state="${status.state}" aria-labelledby="heroTitle">
+      <div class="hero-body">
+        <span class="pill"><span class="dot" aria-hidden="true"></span>${STATE_LABEL[status.state]}</span>
+        <h2 class="hero-title" id="heroTitle">${esc(status.headline)}</h2>
+        <p class="hero-detail">${esc(status.detail)}</p>
+        ${failed}
+        <div class="hero-actions">${lead}${runs}</div>
+      </div>
+      ${heroMark(status.state)}
+    </section>
+    <div class="overview-grid">
+      <div>
+        <div class="sec-head"><h2>Jobs</h2></div>
+        <div class="jobs">
+          ${job("upload", "Upload", dot(up), up.state === "ok" ? "OK" : up.state === "error" ? "Failed" : up.state === "off" ? "Off" : up.state === "running" ? "Running" : "Waiting", `${last(up)}${askWhy("upload", s)}`)}
+          ${job("market", "Market prices", dot(pr), data.market ? `${data.market.last.length} realm(s)` : pr.state === "off" ? "Off" : pr.state === "running" ? "Running" : "Waiting", `${data.market?.scans[0] ? `your last scan ${ago(data.market.scans[0].at)}` : last(pr)}${askWhy("prices", s)}`)}
+          ${job("ask", "/ask", dot(ask), ask.state === "off" ? "Off" : ask.state === "error" ? "Failed" : ask.state === "running" ? "Running" : "On", `${ask.at ? last(ask) : s.settings.ask.enabled ? "waiting" : "turn on in Ask"}${askWhy("ask", s)}`)}
+          ${job("addon", "Addon", "", addonLine, `${addon?.slots.prices ? "prices file in game" : "no prices file yet"}${addon && (!addon.installed || addon.newer) ? ` · <button type="button" class="link" data-page="addon">${addon.installed ? "update" : "install"}</button>` : ""}`)}
+        </div>
+      </div>
+      <div>
+        <div class="sec-head"><h2>Recent activity</h2><button type="button" class="link" data-page="log">open the log</button></div>
+        <div class="log feed">${logLines(s, 6)}</div>
+        <div class="sec-head"><h2>Latest changes</h2><button type="button" class="link" data-page="changes">all</button></div>
+        <div class="list">${changes.length ? changes.map((c) => `<div class="item"><div class="t">${c.link ? ext(c.link, c.title) : esc(c.title)}</div><div class="muted small">${when(c.date)}</div></div>`).join("") : `<span class="muted">${data.changesError ? esc(data.changesError) : "Loading…"}</span>`}</div>
+      </div>
     </div>
   </div>`;
 }
-
 function chat(): string {
   const c = data.chat;
   const thread = (c?.messages ?? []).map((m, i) => {
     // Search alone found nothing and no model is set up: say what would answer it.
     const nudge = !m.model && m.text === NO_SOURCED_ANSWER && !c?.providers.length && c?.mode === "plain search"
-      ? `<br>Search alone only matches names in Everloot's data. A model reads the question, fixes the spelling and looks it up for you. <button type="button" class="link" data-addmodel>Add a key or a free model</button>`
+      ? `<br>Search alone only matches names in Everloot's data. A model reads the question, fixes the spelling and looks it up for you. <button type="button" class="link" data-addmodel>Assistant setup</button> is optional.`
       : "";
     const meta = m.role === "assistant"
       ? `<div class="meta"><button type="button" class="link copy" data-copy="${i}">${esc(copyLabel(i, copied))}</button>${m.model ? `<b>${esc(m.model)}</b>` : m.stopped ? "" : "<b>search only</b>"}${m.stopped ? `${m.model ? " · " : ""}Stopped` : ""}${m.steps.length ? ` · ${m.steps.length} tool call(s): ${esc(m.steps.map((st) => st.tool).join(", "))}` : ""}${m.sources.length ? `<br>Sources: ${m.sources.map((x) => esc(x)).join(" · ")}` : m.model && !m.stopped && m.text !== NO_SOURCED_ANSWER ? "<br>No source in Everloot's data; the model's own knowledge" : ""}${nudge}</div>`
       : `<div class="meta">${clock(m.at)}</div>`;
     return `<div class="msg msg-${m.role}">${esc(m.text)}${meta}</div>`;
   }).join("");
-  return `<div class="page chat">
-    <div class="head"><h1>Chat</h1><span class="sub">${c ? `${esc(c.mode)} · ${c.withToken ? "your MCP token" : state?.account.signedIn ? "public MCP, your account's limits" : "public MCP, rate limited"}` : ""} <button type="button" class="link" id="chatClear" ${c?.busy ? "disabled" : ""}>clear</button></span></div>
-    <p class="muted small">Ask anything about the game. The model looks it up in Everloot's own MCP tools first and names the sources; when they have nothing it says the answer is its own knowledge. Private: the transcript stays in your data folder.</p>
-    ${c && c.mode === "plain search" && !pickOpen ? `<p class="muted small">No model yet, so you get Everloot's search hits as they are. <button type="button" class="link" data-addmodel>Add your own key or a free model</button></p>` : ""}
-    ${c && pickOpen ? providerForm(c) : ""}
+  return `<div class="page chat"><div class="chat-top">
+    <div class="head"><h1>Chat</h1><span class="sub">${c ? `${esc(c.mode)} · ${c.withToken ? "your MCP token" : c.withAccountKey ? "public MCP, your account's limits" : "public MCP, rate limited"}` : ""} <button type="button" class="link" id="chatClear" ${c?.busy ? "disabled" : ""}>clear</button></span></div>
+    <p class="muted small">Ask anything about the game. The model looks it up in Everloot's own MCP tools first and names the sources; when they have nothing it says the answer is its own knowledge. The transcript is saved in your data folder. Your selected model provider receives your questions, conversation history and any local character details the model uses, including names, gold, gear and progress.</p>
+    ${assistant(c, "chat")}
     ${flash ? `<p class="${flash.startsWith("!") ? "error" : "ok"} small">${esc(flash.replace(/^!/, ""))}</p>` : ""}
-    <div class="thread" id="thread">${thread || `<span class="muted">Ask anything about WoW: Forever: a drop, a vendor, a recipe, a price, a quest.</span><div class="chips">${starters(c).map((q) => askChip(q)).join("")}</div>`}${c?.busy ? `<div class="msg msg-assistant" id="chatLive">${liveAnswer()}</div>` : ""}${c?.error ? `<div class="msg msg-assistant error">${esc(c.error)}</div>` : ""}</div>
-    <form id="chatForm"><textarea id="chatText" rows="2" aria-label="Your question" placeholder="Ask about Forever. Enter sends, Shift+Enter is a new line." ${c?.busy ? "disabled" : ""}></textarea>
+    </div>
+    <div class="thread" id="thread">${thread || `<div class="chat-empty"><svg class="mark-lg" viewBox="0 0 40 40" aria-hidden="true"><path d="M20 6 34 20 20 34 6 20Z"/></svg><p class="empty-lead">Ask anything about WoW: Forever: a drop, a vendor, a recipe, a price, a quest.</p><div class="chips">${starters(c).map((q) => askChip(q)).join("")}</div></div>`}${c?.busy ? `<div class="msg msg-assistant" id="chatLive">${liveAnswer()}</div>` : ""}${c?.error ? `<div class="msg msg-assistant error">${esc(c.error)}</div>` : ""}</div>
+    <form id="chatForm" class="composer"><textarea id="chatText" rows="2" aria-label="Your question" placeholder="Ask about Forever. Enter sends, Shift+Enter is a new line." ${c?.busy ? "disabled" : ""}></textarea>
       <div class="composer-bar">${c ? modelMenu(c) : ""}${c?.busy ? `<button type="button" class="btn" id="chatStop">Stop</button>` : ""}<button type="submit" class="btn btn-primary" ${c?.busy ? "disabled" : ""}>Send</button></div></form>
   </div>`;
 }
@@ -186,7 +254,7 @@ function modelMenu(c: ChatInfo): string {
     return `<optgroup label="${esc(preset?.name ?? p.kind)}">${models.map((m) => `<option value="${esc(`${p.kind}|${m.id}`)}" ${on(m.id) ? "selected" : ""}>${esc(m.label)}</option>`).join("")}</optgroup>`;
   }).join("");
   const current = c.provider ? "" : `<option value="" selected>${c.mode === "plain search" ? "Search only, no model" : esc(`config.json: ${c.mode}`)}</option>`;
-  return `<select id="modelPick" class="model-pick" aria-label="Model" ${c.busy ? "disabled" : ""}>${current}${groups}<option value="add">Add a provider key…</option>${c.providers.length ? `<option value="manage">Manage saved keys…</option>` : ""}</select>`;
+  return `<select id="modelPick" class="model-pick" aria-label="Model" ${c.busy ? "disabled" : ""}>${current}${groups}<option value="add">Assistant setup…</option>${c.providers.length ? `<option value="manage">Assistant setup: saved providers…</option>` : ""}</select>`;
 }
 
 /** The answer so far, and what the model is doing while there is no text or it is running a tool. */
@@ -203,17 +271,30 @@ function tile(kind: ProviderKind, small = false): string {
 
 const modelsOf = (kind: ProviderKind): ModelChoice[] => liveModels[kind] ?? presetFor(kind)?.models ?? [];
 
-/** The provider form's model list, the pick kept when the new list still has it. */
-function modelSelect(kind: ProviderKind, picked = ""): string {
+/** The provider form's model list, the pick kept when the new list still has it. An empty `picked` is the player's "Another model id…" choice and stays; leaving it out takes the first model. */
+function modelSelect(kind: ProviderKind, picked?: string): string {
   const models = modelsOf(kind);
   if (!models.length) return "";
-  const on = models.some((m) => m.id === picked) ? picked : models[0].id;
-  return `<select name="model" class="grow">${models.map((m) => `<option value="${esc(m.id)}" ${m.id === on ? "selected" : ""}>${esc(m.label)}${m.note ? ` · ${esc(m.note)}` : ""}</option>`).join("")}<option value="">Another model id…</option></select>`;
+  const on = keptModelPick(models, picked);
+  return `<select name="model" id="providerModelPick" class="grow">${models.map((m) => `<option value="${esc(m.id)}" ${m.id === on ? "selected" : ""}>${esc(m.label)}${m.note ? ` · ${esc(m.note)}` : ""}</option>`).join("")}<option value="" ${on === "" ? "selected" : ""}>Another model id…</option></select>`;
+}
+
+/** Shows the typed model id only when "Another model id…" is picked or the provider has no list, and never leaves the focus in a box that was just hidden. */
+function syncManualModel(): void {
+  const form = main.querySelector<HTMLFormElement>("#providerForm");
+  const box = form?.querySelector<HTMLElement>("#providerModelField");
+  const input = form?.elements.namedItem("modelText") as HTMLInputElement | null;
+  if (!form || !box || !input) return;
+  const pick = form.elements.namedItem("model") as HTMLSelectElement | null;
+  const show = !pick || pick.value === "";
+  box.hidden = !show;
+  input.disabled = !show;
+  if (!show && document.activeElement === input) pick?.focus({ preventScroll: true });
 }
 
 /**
  * Asks the provider, through the main side, which models it serves now, once per provider; the open form's list and
- * the model menu are swapped in place when it answers, so nothing typed in the form is lost.
+ * the model menu are swapped in when it answers, with what was typed in the form kept.
  */
 function loadModels(kind: ProviderKind, again = false): void {
   if (askedModels.has(kind) && !again) return;
@@ -221,8 +302,7 @@ function loadModels(kind: ProviderKind, again = false): void {
   void api.chatModels(kind).then((models) => {
     if (!models) return;
     liveModels[kind] = models;
-    const select = main.querySelector<HTMLSelectElement>('#providerForm select[name="model"]');
-    if (select && pickOpen && pickKind === kind) select.outerHTML = modelSelect(kind, select.value);
+    if (pickOpen && pickKind === kind) renderAssistant();
     const menu = main.querySelector<HTMLSelectElement>("#modelPick");
     if (menu && data.chat && !data.chat.busy && document.activeElement !== menu) menu.outerHTML = modelMenu(data.chat);
   }).catch(() => { askedModels.delete(kind); });
@@ -232,11 +312,53 @@ function loadModels(kind: ProviderKind, again = false): void {
 function openProviderForm(kind: ProviderKind | null): void {
   const saved = new Set(data.chat?.providers.map((p) => p.kind));
   const order: ProviderKind[] = ["openrouter", "anthropic", "opencode", "ollama", "custom"];
-  pickKind = kind ?? order.find((k) => !saved.has(k)) ?? "openrouter";
-  pickOpen = true; flash = "";
+  const next = kind ?? order.find((k) => !saved.has(k)) ?? "openrouter";
+  if (next !== pickKind) dropProviderDraft();
+  setupOpener = document.activeElement?.id === "modelPick" ? "#modelPick" : "#assistantOpen";
+  pickKind = next;
+  pickOpen = true; setupNote = ""; freshScroll = true;
   loadModels(pickKind);
   render();
   main.querySelector<HTMLElement>("#providerKind")?.focus();
+}
+
+/** Closes the provider form and puts the focus back on what opened it, which is drawn again by then. */
+function closeProviderForm(): void {
+  pickOpen = false;
+  dropProviderDraft();
+  render();
+  (main.querySelector<HTMLElement>(setupOpener) ?? main.querySelector<HTMLElement>("#assistantOpen"))?.focus();
+}
+
+/** Forgets the typed provider fields, and blanks the form so the next redraw cannot read them back (a provider change, Cancel or a save). */
+function dropProviderDraft(): void {
+  providerDraft = null;
+  main.querySelector<HTMLFormElement>("#providerForm")?.reset();
+}
+
+/** Called before the page is rebuilt: keeps the open form's fields for the provider being edited. */
+function holdProviderDraft(): void {
+  const form = main.querySelector<HTMLFormElement>("#providerForm");
+  if (!form || !pickOpen) return;
+  const field = (name: string) => (form.elements.namedItem(name) as HTMLInputElement | HTMLSelectElement | null)?.value ?? "";
+  // No model list yet is not a pick: when one arrives it starts on its default, unless an id was already typed, which is "Another model id…".
+  const model = form.elements.namedItem("model") ? field("model") : field("modelText").trim() ? "" : null;
+  providerDraft = { kind: pickKind, key: field("key"), baseUrl: field("baseUrl"), model, modelText: field("modelText") };
+}
+
+/** Puts the held fields back into a rebuilt form when it is for the same provider. */
+function restoreProviderDraft(): void {
+  const form = main.querySelector<HTMLFormElement>("#providerForm");
+  if (!form || !providerDraft || providerDraft.kind !== pickKind) return;
+  for (const name of ["key", "baseUrl", "model", "modelText"] as const) {
+    const el = form.elements.namedItem(name) as HTMLInputElement | HTMLSelectElement | null;
+    const held = providerDraft[name];
+    if (!el || held === null) continue;
+    // A model list that no longer has the pick keeps the new default.
+    if (el instanceof HTMLSelectElement && ![...el.options].some((o) => o.value === held)) continue;
+    el.value = held;
+  }
+  syncManualModel();
 }
 
 /** Questions to start with: about the game always; about the player's own data when a model can call the local tools. */
@@ -246,25 +368,102 @@ function starters(c: ChatInfo | null | undefined): string[] {
   return ["How much gold do my characters have?", "When did I last scan my realms?", "Is my data uploading?", ...game];
 }
 
-/** The provider picker: one preset, its key, a model from the list or typed, and a custom server address; and the keys already saved. */
-function providerForm(c: ChatInfo): string {
+/** The provider picker: one preset, its get-key page, its key, a model from the list or typed, and a custom server address; and the keys already saved. */
+function providerForm(c: ChatInfo, note = ""): string {
   const preset = presetFor(pickKind) ?? PROVIDER_PRESETS[0];
   const saved = c.providers.some((p) => p.kind === preset.kind);
   const kinds = PROVIDER_PRESETS.map((p) => `<option value="${p.kind}" ${p.kind === preset.kind ? "selected" : ""}>${esc(p.label)}${c.providers.some((s) => s.kind === p.kind) ? " · saved" : ""}</option>`).join("");
   const name = (kind: ProviderKind) => esc(presetFor(kind)?.name ?? kind);
   const list = c.providers.length
-    ? `<div class="saved-keys"><span class="muted small">Saved here:</span>${c.providers.map((p) => `<span class="chip chip-key">${tile(p.kind, true)}${name(p.kind)} <button type="button" class="link" data-removekind="${p.kind}" aria-label="Remove ${name(p.kind)}">remove</button></span>`).join("")}</div>`
+    ? `<div class="saved-keys"><span class="muted small">Saved here:</span>${c.providers.map((p) => `<span class="chip chip-key">${tile(p.kind, true)}${name(p.kind)} <button type="button" class="link" data-removekind="${p.kind}" aria-label="Remove ${name(p.kind)}" ${c.busy ? "disabled" : ""}>remove</button></span>`).join("")}</div>`
     : "";
-  const models = modelSelect(preset.kind);
-  return `<form id="providerForm" class="panel" autocomplete="off">
+  // The pick is read from the held draft, so a redraw shows the manual box exactly when the player chose it.
+  const picked = providerDraft?.kind === preset.kind ? providerDraft.model ?? undefined : undefined;
+  const choices = modelsOf(preset.kind);
+  const manual = manualModelShown(choices, picked);
+  const getKey = preset.getKey ? `<p class="small">${ext(preset.getKey.href, preset.getKey.text)} <span class="muted">· opens your browser</span></p>` : "";
+  return `<form id="providerForm" class="panel" autocomplete="off" aria-label="Assistant setup">
     ${list}
-    <div class="field"><label for="providerKind">Provider</label><div class="tile-row">${tile(preset.kind)}<select name="kind" id="providerKind">${kinds}</select></div></div>
-    ${preset.kind === "custom" ? `<div class="field"><label for="providerUrl">Server</label><input name="baseUrl" id="providerUrl" placeholder="https://host/v1" spellcheck="false"></div>` : ""}
+    <div class="field"><label for="providerKind">Provider</label><div class="tile-row">${tile(preset.kind)}<select name="kind" id="providerKind">${kinds}</select></div>${getKey}</div>
+    ${preset.kind === "custom" ? `<div class="field"><label for="providerUrl">Server</label><input type="text" name="baseUrl" id="providerUrl" placeholder="https://host/v1" spellcheck="false"></div>` : ""}
     ${preset.keyFile ? `<div class="field"><label for="providerKey">Key</label><input type="password" name="key" id="providerKey" placeholder="${saved ? "saved; paste a new one to replace it" : preset.kind === "custom" ? "optional" : "paste the key"}" spellcheck="false"><span class="hint">${esc(preset.keyHint)}</span></div>` : ""}
-    <div class="field"><label for="providerModel">Model</label>${models}<input name="modelText" id="providerModel" placeholder="${modelsOf(preset.kind).length ? "only if you picked Another model id" : preset.kind === "ollama" ? "the model you pulled, like qwen3:8b" : "model id"}" spellcheck="false"></div>
+    ${choices.length ? `<div class="field"><label for="providerModelPick">Model</label>${modelSelect(preset.kind, picked)}</div>` : ""}
+    <div class="field" id="providerModelField" ${manual ? "" : "hidden"}><label for="providerModel">${choices.length ? "Model id" : "Model"}</label><input type="text" name="modelText" id="providerModel" ${manual ? "" : "disabled"} placeholder="${choices.length ? "a model id from the provider" : preset.kind === "ollama" ? "the model you pulled, like qwen3:4b" : "model id"}" spellcheck="false"></div>
     <p class="muted small">${esc(preset.dataNote)} The key is written to a file in your data folder and named from <code>config.json</code>; it goes to that provider only, with your questions and the tool results.</p>
-    <div class="row"><button type="submit" class="btn btn-primary">Save</button><button type="button" class="btn" id="cancelProvider">Cancel</button></div>
+    <p class="muted small">Save and use makes this the model for Chat and puts it first for <code>/ask</code>. It may refresh the model list, but does not test the key with a completion or send your questions.</p>
+    ${note}
+    <div class="row"><button type="submit" class="btn btn-primary" id="providerSave" ${c.busy ? "disabled" : ""}>Save and use</button><button type="button" class="btn" id="cancelProvider">Cancel</button>${c.busy ? '<span class="muted small">Chat is answering; wait or press Stop.</span>' : ""}</div>
   </form>`;
+}
+
+const ASSISTANT_COST = "Everloot search is free. A model you add uses your own provider account, so that provider's pricing and limits apply; some have a limited free tier. A ChatGPT or Claude subscription is not an API key. The website keeps its own keys in your browser tab; setting one up there does not set up this app.";
+
+/**
+ * Assistant setup, the same panel on Chat, Ask and Settings: what answers now, the saved providers, and the one provider
+ * form. Search needs no key; a model is optional and its cost is the player's own provider account.
+ */
+function assistantSetup(c: ChatInfo | undefined, where: "chat" | "ask" | "settings"): string {
+  const a = data.ask;
+  const note = `<p id="assistantNote" role="status" class="${setupNote.startsWith("!") ? "error" : "ok"} small">${esc(setupNote.replace(/^!/, ""))}</p>`;
+  const source = c ? assistantSource(c) : null;
+  const chatLine = !c ? "Loading…"
+    : source === "search" ? "Chat answers recorded item-price questions and shows <b>Everloot search</b> results: no AI key or token file needed. A model is optional and uses your own provider account, so its pricing applies."
+    : source === "app" ? `Recorded item-price questions use market data directly. Other Chat questions are answered by <b>${esc(c.provider!.model)}</b>, which looks things up in Everloot's data first; with no source there, the answer says it is the model's own knowledge.`
+    : `Recorded item-price questions use market data directly. Other Chat questions use the first entry in <code>config.json</code>: <code>${esc(c.mode)}</code>. Setup keeps your hand-written entries as they are.`;
+  const askLine = !a ? "Loading…"
+    : a.providerError ? `<span class="error">${esc(a.providerError)}</span>`
+    : a.providers.length ? `Recorded item-price questions use market data directly, without a model. For other questions, <b>Everloot search</b> finds the sources, then <b>${esc(a.providers.join(" > "))}</b> writes at most two sentences from the top three. If one fails in a way that allows it, the next one listed is tried; Chat uses only the first. No search sources means no model answer.`
+    : "<code>/ask</code> answers recorded item-price questions and shows the top <b>Everloot search</b> result: no model or key needed. If an item or realm is unclear, it asks you to specify it.";
+  const rows = where === "settings" && c?.providers.length
+    ? c.providers.map((p) => {
+      const inUse = c.provider?.kind === p.kind;
+      return `<div class="set-row">${tile(p.kind)}<div class="grow"><b>${esc(presetFor(p.kind)?.name ?? p.kind)}</b><div class="muted small">${esc(p.model)}${inUse ? ' · <span class="ok">in use</span>' : ""}</div></div>
+        ${inUse ? "" : `<button type="button" class="btn" data-usekind="${p.kind}" data-usemodel="${esc(p.model)}" ${c.busy ? "disabled" : ""}>Use</button>`}<button type="button" class="btn" data-removekind="${p.kind}" ${c.busy ? "disabled" : ""}>Remove</button></div>`;
+    }).join("")
+    : "";
+  const opener = pickOpen ? "" : `<button type="button" class="btn" id="assistantOpen" data-addmodel ${c ? "" : "disabled"}>Assistant setup</button>`;
+  const jobLine = state ? `<p class="${state.engine.jobs.ask.state === "error" ? "error" : "fg2"} small">${esc(statusText(state.engine.jobs.ask))}</p>` : "";
+  const body = `${where === "ask" ? `<p>${askLine}</p>${jobLine}` : `<p>${chatLine}</p>`}
+    ${rows}
+    ${where === "settings" ? `<p class="muted small">Chat uses the first model only; the in-game <code>/ask</code> goes down the list. The private server and token file are under <button type="button" class="link" data-advanced>Advanced on the Ask page</button>.</p>` : ""}
+    ${where === "chat" ? "" : `<p class="muted small">${ASSISTANT_COST}</p>`}
+    ${c && pickOpen ? providerForm(c, note) : note}`;
+  return where === "settings"
+    ? `<section class="panel set-sec" id="assistant" aria-labelledby="assistantTitle"><div class="set-lead"><h2 id="assistantTitle">Assistant</h2>${opener}</div><div class="set-body">${body}</div></section>`
+    : `<section class="panel assistant" id="assistant" aria-labelledby="assistantTitle"><div class="row between"><h2 id="assistantTitle">Assistant</h2>${opener}</div>${body}</section>`;
+}
+
+/** The panel as the page being built shows it; what it drew is kept so a later background update can tell whether anything changed. */
+const assistant = (c: ChatInfo | undefined, where: "chat" | "ask" | "settings"): string => (assistantDrawn = assistantSetup(c, where));
+
+/**
+ * Redraws only the Assistant panel, with its typed fields, focus and the page's scroll kept. A Settings or Ask page
+ * with unsaved fields is not rebuilt (render() returns early), so the panel is the one part that still moves: a form
+ * opening, a late model list, a saved or refused provider.
+ */
+function renderAssistant(): void {
+  const host = main.querySelector<HTMLElement>("#assistant");
+  const keepScroll = !freshScroll;
+  freshScroll = false;
+  if (!host) return;
+  holdProviderDraft();
+  const html = assistantSetup(data.chat, page === "ask" ? "ask" : page === "settings" ? "settings" : "chat");
+  if (html === assistantDrawn) return;
+  const pageTop = keepScroll ? main.scrollTop : null;
+  const scrolls = page === "chat" && keepScroll ? CHAT_SCROLLERS.map((sel) => [sel, main.querySelector(sel)?.scrollTop ?? 0] as const) : [];
+  const refocus = keepFocus();
+  host.outerHTML = html;
+  assistantDrawn = html;
+  paintTiles();
+  restoreProviderDraft();
+  refocus();
+  if (pageTop !== null) main.scrollTop = pageTop;
+  for (const [sel, top] of scrolls) { const el = main.querySelector(sel); if (el) el.scrollTop = top; }
+}
+
+/** Paints each provider tile its colour and ink; the page's CSP allows no inline styles. */
+function paintTiles(): void {
+  for (const el of main.querySelectorAll<HTMLElement>("[data-tile]")) { el.style.background = el.dataset.tile!; el.style.color = inkOn(el.dataset.tile!); }
 }
 
 const SLOT_ORDER = ["HeadSlot", "NeckSlot", "ShoulderSlot", "BackSlot", "ChestSlot", "WristSlot", "HandsSlot", "WaistSlot", "LegsSlot", "FeetSlot", "Finger0Slot", "Finger1Slot", "Trinket0Slot", "Trinket1Slot", "MainHandSlot", "SecondaryHandSlot"];
@@ -356,15 +555,15 @@ function characters(): string {
         <div class="mono muted small">${selected ? `${esc(selected.realm.toUpperCase())} · from the addon's save file` : "from the addon's save file"}</div>
         <h1 class="${selected ? "char-name" : ""}">${selected ? esc(selected.character) : "Characters"}</h1>
       </div>
-      <div class="row"><span class="sub">never uploaded from here</span>${named.length && data.chat?.mode !== "plain search" ? askChip(`How is ${selected?.character ?? "my main"} doing: gold this week, gear and progress?`, "Ask the assistant") : ""}</div>
+      <div class="row"><span class="sub">Stored locally. Asking the assistant may send character details to your selected model provider.</span>${named.length && data.chat?.mode !== "plain search" ? askChip(`How is ${selected?.character ?? "my main"} doing: gold this week, gear and progress?`, "Ask the assistant") : ""}</div>
     </div>
     <p class="fg2">What the addon recorded about your own characters. Gold and gear carry the name; progress rows carry an opaque key the addon derives per character, so they are listed apart. Sharing any of this with the site is a choice you make on the upload page with a verified grant, never here.</p>
     ${named.length ? `${hero}
     <section class="panel"><div class="row between"><h2>Roster</h2><span class="muted small">click a character, or press Enter, for the details</span></div>
-      <table class="roster"><thead><tr><th>Character</th><th class="num">Gold</th><th class="num">7 days</th><th class="num">Item level</th><th class="num">Last seen</th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="tablewrap"><table class="roster"><thead><tr><th>Character</th><th class="num">Gold</th><th class="num">7 days</th><th class="num">Item level</th><th class="num">Last seen</th></tr></thead><tbody>${rows}</tbody></table></div>
     </section>` : `<section class="panel"><p class="muted">${c ? "No gold or gear snapshot yet. The addon records them while you play." : "Loading…"}</p></section>`}
     <section class="panel" id="keyed" tabindex="-1"><h2>Progress · keyed</h2>
-      ${prog ? `<table><thead><tr><th>Key</th><th>Class</th><th class="num">Achievements</th><th class="num">Reputations</th><th class="num">Titles</th><th class="num">Quests done</th></tr></thead><tbody>${prog}</tbody></table>` : `<p class="muted">${c ? "Nothing yet. The completion tracker is off until <code>/everloot completion on</code> in game." : "Loading…"}</p>`}
+      ${prog ? `<div class="tablewrap"><table><thead><tr><th>Key</th><th>Class</th><th class="num">Achievements</th><th class="num">Reputations</th><th class="num">Titles</th><th class="num">Quests done</th></tr></thead><tbody>${prog}</tbody></table></div>` : `<p class="muted">${c ? "Nothing yet. The completion tracker is off until <code>/everloot completion on</code> in game." : "Loading…"}</p>`}
       ${c?.talents.length ? `<p class="muted small">Active talent builds: ${c.talents.map((x) => `${esc(x.class.toLowerCase())} ${x.level} (${x.points} points)`).join(", ")}. Not linked to a name.</p>` : ""}
     </section>
   </div>
@@ -435,8 +634,8 @@ function drawerShare(c: CharacterRow): string {
   const activeDays = c.days.filter((d) => d.earned || d.spent).length;
   return `
     <section class="dw-sec"><div class="row between"><h3>Sharing stays on the website</h3><span class="muted small">off by default</span></div>
-      <p class="fg2">This app never uploads <b>${esc(c.character)}</b>'s gold, gear or progress. On everloot.app/upload you choose, per character, to include gear or gold; a verified grant authorizes it, and the same page revokes the grant or opts the character out at any time.</p>
-      <p class="muted small">Progress rows carry an opaque key, never a name, so they cannot be included. Nothing here leaves this computer until you make that choice on the site.</p>
+      <p class="fg2">The automatic uploader keeps <b>${esc(c.character)}</b>'s gold, gear and progress on this computer. On everloot.app/upload you choose, per character, to include gear or gold; a verified grant authorizes it, and the same page revokes the grant or opts the character out at any time.</p>
+      <p class="muted small">Progress rows carry an opaque key, never a name, so they cannot be included in that upload. Separately, Chat may send character names, gold, gear and progress to your selected model provider when it uses local tools to answer.</p>
       <button type="button" class="btn btn-primary" data-open="https://everloot.app/upload">Open the upload page</button>
     </section>
     <section class="dw-sec"><h3>What is on this machine</h3>
@@ -465,6 +664,8 @@ function openDrawer(c: CharacterRow, opener: HTMLElement | null, tab = "overview
   renderDrawerTab(tab);
   layer.hidden = false;
   layer.setAttribute("aria-hidden", "false");
+  // Only a drawer the player just opened slides in; a background rebuild reopens it in place.
+  layer.querySelector(".drawer")?.classList.toggle("enter", focus);
   if (focus) main.querySelector<HTMLElement>(".drawer-close")?.focus();
 }
 
@@ -481,11 +682,19 @@ function reopenDrawer(tab: string): void {
 function keepFocus(): () => void {
   const el = document.activeElement as HTMLElement | null;
   if (!el || !main.contains(el)) return () => {};
-  const attrs = ["data-page", "data-run", "data-char", "data-dwtab", "data-copy", "data-toggle", "data-realm", "data-unfollow", "data-restore", "data-open", "data-ask"];
+  const attrs = ["data-page", "data-run", "data-char", "data-dwtab", "data-copy", "data-toggle", "data-realm", "data-unfollow", "data-restore", "data-open", "data-ask", "data-addmodel", "data-removekind", "data-usekind", "data-advanced"];
   const sel = el.id ? `#${CSS.escape(el.id)}`
     : attrs.filter((a) => el.hasAttribute(a)).map((a) => `[${a}="${CSS.escape(el.getAttribute(a)!)}"]`)[0]
       ?? (el.classList.contains("drawer-close") ? ".drawer-close" : null);
-  return () => { if (sel && document.activeElement !== main.querySelector(sel)) main.querySelector<HTMLElement>(sel)?.focus({ preventScroll: true }); };
+  // A text box also keeps its caret or selection; the value must be back in the box before this runs.
+  const text = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement ? el : null;
+  const range = text && text.selectionStart !== null && text.selectionEnd !== null ? { start: text.selectionStart, end: text.selectionEnd, dir: text.selectionDirection ?? "none" } : null;
+  return () => {
+    const next = sel ? main.querySelector<HTMLElement>(sel) : null;
+    if (!sel || !next || document.activeElement === next) return;
+    next.focus({ preventScroll: true });
+    if (range && (next instanceof HTMLInputElement || next instanceof HTMLTextAreaElement) && next.type !== "checkbox" && next.value.length >= range.end) next.setSelectionRange(range.start, range.end, range.dir);
+  };
 }
 
 function closeDrawer(): void {
@@ -527,11 +736,11 @@ function upload(s: AppState): string {
     <p class="fg2">After every logout or <code>/reload</code> the game rewrites <code>Everloot.lua</code>; once the write settles, the events the site has not confirmed are sent. Named data (guild, gear, gold, collection) and your installed addon list stay here.</p>
     <section class="panel"><div class="row between"><h2>Last run</h2><span class="muted small">${j.at ? when(j.at) : ""}</span></div><p class="${j.state === "error" ? "error" : "fg2"}">${esc(statusText(j))}</p></section>
     <section class="panel"><h2>Account files</h2>
-      ${files.length ? `<table><thead><tr><th>Account</th><th>Written</th><th>Addon</th><th class="num">Records</th><th class="num">Confirmed</th><th>What it holds</th></tr></thead><tbody>${rows}</tbody></table>` : '<p class="muted">No account file yet.</p>'}
+      ${files.length ? `<div class="tablewrap"><table><thead><tr><th>Account</th><th>Written</th><th>Addon</th><th class="num">Records</th><th class="num">Confirmed</th><th>What it holds</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="muted">No account file yet.</p>'}
       <p class="muted small">Records are what the addon has on disk; confirmed is how many of them the site has accepted from this install. The site states a fact once three installs agree.</p>
     </section>
     <section class="panel"><div class="row between"><h2>Backups</h2><button type="button" class="btn" id="openBackups" ${(data.backups ?? []).length ? "" : "disabled"}>Open folder</button></div>
-      ${backups.length ? `<table><thead><tr><th>Account</th><th>Taken</th><th class="num">Size</th><th></th></tr></thead><tbody>${backups}</tbody></table>` : '<p class="muted">No backup yet. One is kept after each upload.</p>'}
+      ${backups.length ? `<div class="tablewrap"><table><thead><tr><th>Account</th><th>Taken</th><th class="num">Size</th><th></th></tr></thead><tbody>${backups}</tbody></table></div>` : '<p class="muted">No backup yet. One is kept after each upload.</p>'}
       <p class="muted small">A copy of <code>Everloot.lua</code> as it was uploaded, the newest ten per account. Restore while logged out; the file you replace is backed up first.</p>
       ${flash ? `<p class="${flash.startsWith("!") ? "error" : "ok"} small">${esc(flash.replace(/^!/, ""))}</p>` : ""}
     </section>
@@ -566,13 +775,13 @@ function market(s: AppState): string {
       <p class="muted small">At most 20 realms in one prices file; your scans come first. The full tables and 60-day charts are on the Auction prices tool in the sidebar.</p>
     </section>
     <section class="panel"><h2>Your scans</h2>
-      ${scans ? `<table><thead><tr><th>Realm</th><th>Last full scan</th><th>Status</th></tr></thead><tbody>${scans}</tbody></table>` : '<p class="muted">No full scan yet. At the auction house, press the <b>Everloot scan</b> button or type <code>/everloot scan</code>; the scan uploads after your next logout.</p>'}
+      ${scans ? `<div class="tablewrap"><table><thead><tr><th>Realm</th><th>Last full scan</th><th>Status</th></tr></thead><tbody>${scans}</tbody></table></div>` : '<p class="muted">No full scan yet. At the auction house, press the <b>Everloot scan</b> button or type <code>/everloot scan</code>; the scan uploads after your next logout.</p>'}
       <p class="muted small">Every scan you upload is one of the three reporters a day needs before a price is published. A realm is only as fresh as its last scans.</p>
     </section>
     <section class="panel"><div class="row between"><h2>Written into the game</h2><span class="muted small">${j.at ? when(j.at) : ""}</span></div>
       ${j.state === "error" ? `<p class="error">${esc(j.message)}</p>` : ""}
-      ${last.length ? `<table><thead><tr><th>Realm</th><th class="num">Items</th><th>Data as of</th><th>Why</th></tr></thead><tbody>${last.map((r) => `<tr><td>${esc(r.realm)}</td><td class="num">${r.items}</td><td>${r.dataAsOf ? when(r.dataAsOf) : "–"}</td><td class="muted">${r.source === "scan" ? "your scans" : "followed"}</td></tr>`).join("")}</tbody></table>`
-        : m?.inGame?.length ? `<table><thead><tr><th>Realm</th><th class="num">Items</th><th>Data as of</th></tr></thead><tbody>${m.inGame.map((r) => `<tr><td>${esc(r.realm)}</td><td class="num">${r.items}</td><td>${r.dataAsOf ? when(r.dataAsOf) : "–"}</td></tr>`).join("")}</tbody></table><p class="muted small">The file in the game now; not refreshed yet this session.</p>`
+      ${last.length ? `<div class="tablewrap"><table><thead><tr><th>Realm</th><th class="num">Items</th><th>Data as of</th><th>Why</th></tr></thead><tbody>${last.map((r) => `<tr><td>${esc(r.realm)}</td><td class="num">${r.items}</td><td>${r.dataAsOf ? when(r.dataAsOf) : "–"}</td><td class="muted">${r.source === "scan" ? "your scans" : "followed"}</td></tr>`).join("")}</tbody></table></div>`
+        : m?.inGame?.length ? `<div class="tablewrap"><table><thead><tr><th>Realm</th><th class="num">Items</th><th>Data as of</th></tr></thead><tbody>${m.inGame.map((r) => `<tr><td>${esc(r.realm)}</td><td class="num">${r.items}</td><td>${r.dataAsOf ? when(r.dataAsOf) : "–"}</td></tr>`).join("")}</tbody></table></div><p class="muted small">The file in the game now; not refreshed yet this session.</p>`
         : '<p class="muted">Nothing written yet.</p>'}
     </section>
   </div>`;
@@ -584,39 +793,42 @@ function priceResult(s: AppState): string {
   if (!p) return "";
   if (!p.rows.length) return `<p class="muted">${esc(p.note ?? "Nothing found.")}</p>`;
   const site = (realm: string) => websiteUrl(s.settings.endpoint, `/tools/auctions?realm=${encodeURIComponent(realm)}&item=${p.itemId}`);
-  return `<table><thead><tr><th>Realm</th><th class="num">Market</th><th class="num">Min</th><th class="num">Historical</th><th class="num">Up</th><th class="num">Reporters</th><th>Day</th><th></th></tr></thead><tbody>${p.rows.map((r) =>
-    `<tr><td>${esc(r.realm)}</td><td class="num">${r.market === null ? '<span class="muted">unrecorded</span>' : gold(r.market)}</td><td class="num">${gold(r.min)}</td><td class="num">${gold(r.historical)}</td><td class="num">${r.quantity}</td><td class="num">${r.reporters}</td><td>${esc(r.day)}</td><td>${ext(site(r.realm), "history ↗")}</td></tr>`).join("")}</tbody></table>
+  return `<div class="tablewrap"><table><thead><tr><th>Realm</th><th class="num">Market</th><th class="num">Min</th><th class="num">Historical</th><th class="num">Up</th><th class="num">Reporters</th><th>Day</th><th></th></tr></thead><tbody>${p.rows.map((r) =>
+    `<tr><td>${esc(r.realm)}</td><td class="num">${r.market === null ? '<span class="muted">unrecorded</span>' : gold(r.market)}</td><td class="num">${gold(r.min)}</td><td class="num">${gold(r.historical)}</td><td class="num">${r.quantity}</td><td class="num">${r.reporters}</td><td>${esc(r.day)}</td><td>${ext(site(r.realm), "history ↗")}</td></tr>`).join("")}</tbody></table></div>
     <p class="muted small">Item ${p.itemId}. Market weighs the last 14 public days, historical is the 60-day median, min is the lowest buyout.</p>`;
 }
 
 function ask(s: AppState): string {
-  const j = s.engine.jobs.ask;
   const a = data.ask;
   const st = s.settings.ask;
   const pending = (a?.pending ?? []).flatMap((p) => p.asks.map((q) => ({ ...q, account: account(p.file) })));
+  // A saved token file or a private address starts the disclosure open; once the player toggles it their choice holds.
+  const usualUrl = st.mcpUrl === `${s.settings.endpoint}/mcp` || st.mcpUrl === "https://everloot.app/mcp";
+  const configured = Boolean(st.tokenFile) || !usualUrl;
   return `<div class="page">
     <div class="head"><h1>Ask</h1><div class="row">${jobSwitch("ask", s)}${runBtn("ask", s, "Answer now")}</div></div>
-    <p class="fg2"><code>/ask</code> questions from the game are answered from everloot.app's public MCP server (with your account's limits when you are signed in, Settings > Account) and written into <code>EverlootAnswers</code>; they show after <code>/reload</code>. Every answer names its source; with no source there is no answer. The same setup serves the Chat page.</p>
-    <form id="askForm" class="panel" autocomplete="off">
-      <div class="grid2">
-        <div class="field"><label for="mcpUrl">Private MCP server <span class="hint">used only with a token file</span></label><input type="url" id="mcpUrl" name="mcpUrl" value="${esc(st.mcpUrl)}"></div>
-        <div class="field"><label for="tokenFile">Token file <span class="hint">for a private Everloot server; leave empty to use the public one. The token is never typed here</span></label>
-          <div class="row"><input class="grow" type="text" id="tokenFile" name="tokenFile" value="${esc(st.tokenFile ?? "")}"><button type="button" class="btn" id="pickToken">Choose…</button></div></div>
-      </div>
-      <div class="row"><button type="submit" class="btn btn-primary">Save</button><span class="muted" id="saved"></span></div>
-    </form>
-    <div class="grid2">
-      <section class="panel"><h2>Who answers</h2>
-        ${a?.providerError ? `<p class="error">${esc(a.providerError)}</p>` : a?.providers.length ? `<p>Model: <b>${esc(a.providers.join(" > "))}</b>, writing at most two sentences from the top three sourced hits.</p>` : "<p>Plain search: the top sourced hit, no model.</p>"}
-        <p class="muted small">An Anthropic key pasted on the <button type="button" class="link" data-page="chat">Chat page</button> answers here too. Other providers go in <code>config.json</code> in the data folder (any OpenAI-compatible server, keys from a file). <button type="button" class="link" id="openConfig">Open config.json</button></p>
-        <p class="${j.state === "error" ? "error" : "fg2"} small">${esc(statusText(j))}</p>
-      </section>
-      <section class="panel"><h2>Pending in game</h2>
-        ${pending.length ? `<div class="list">${pending.map((q) => `<div class="item"><div class="t">${esc(q.question)}</div><div class="muted small">${esc(q.account)} · ${when(q.askedAt)}</div></div>`).join("")}</div>` : '<p class="muted">No question waiting.</p>'}
-      </section>
-    </div>
+    ${flash ? `<p role="status" class="${flash.startsWith("!") ? "error" : "ok"} small">${esc(flash.replace(/^!/, ""))}</p>` : ""}
+    <p class="fg2">Ask in game with <code>/ask</code>, then <code>/reload</code> to save your question. Keep this app running while it answers, then <code>/reload</code> again to read the answer. Answers arrive through saved files, not live.</p>
+    <p class="fg2 small">Item prices come from recorded scans, not live listings. Price and search results include their source. The time beside an answer is when it was written; price answers also show the observation day.</p>
+    ${assistant(data.chat, "ask")}
+    <details id="askAdvanced" class="panel adv" ${(advancedOpen ?? configured) ? "open" : ""}>
+      <summary>Advanced: private MCP server${configured ? ' <span class="muted">· private configuration saved</span>' : ""}</summary>
+      <form id="askForm" autocomplete="off">
+        <div class="grid2">
+          <div class="field"><label for="mcpUrl">Private MCP server <span class="hint">used only with a token file</span></label><input type="url" id="mcpUrl" name="mcpUrl" value="${esc(st.mcpUrl)}"></div>
+          <div class="field"><label for="tokenFile">Token file <span class="hint">for a private Everloot server; leave empty to use the public one. The token is never typed here</span></label>
+            <div class="row"><input class="grow" type="text" id="tokenFile" name="tokenFile" value="${esc(st.tokenFile ?? "")}"><button type="button" class="btn" id="pickToken">Choose…</button></div></div>
+        </div>
+        ${!usualUrl && !st.tokenFile ? '<p class="muted small">This address is saved but not used: with no token file, /ask and Chat go to the public server.</p>' : ""}
+        <div class="row"><button type="submit" class="btn btn-primary">Save</button><span class="muted" id="saved"></span></div>
+      </form>
+      <p class="muted small">Models are in Assistant setup above; <code>config.json</code> in the data folder is only for what that form cannot say (any OpenAI-compatible server, keys from a file). <button type="button" class="link" id="openConfig">Open config.json</button></p>
+    </details>
+    <section class="panel"><h2>Pending in game</h2>
+      ${pending.length ? `<div class="list">${pending.map((q) => `<div class="item"><div class="t">${esc(q.question)}</div><div class="muted small">${esc(q.account)} · ${when(q.askedAt)}</div></div>`).join("")}</div>` : '<p class="muted">No question waiting.</p>'}
+    </section>
     <section class="panel"><h2>Recent answers</h2>
-      ${a?.answers.length ? `<div class="list">${a.answers.slice(0, 20).map((x) => `<div class="item"><div>${esc(x.answer)}</div><div class="muted small">${esc(x.source)} · ${when(x.answeredAt)}</div></div>`).join("")}</div>` : '<p class="muted">Nothing answered yet.</p>'}
+      ${a?.answers.length ? `<div class="list">${a.answers.slice(0, 20).map((x) => `<div class="item"><div>${esc(x.answer)}</div><div class="muted small">${esc(x.source)} · answered ${when(x.answeredAt)}</div></div>`).join("")}</div>` : '<p class="muted">Nothing answered yet.</p>'}
     </section>
   </div>`;
 }
@@ -707,94 +919,97 @@ function accountPanel(s: AppState): string {
   const keys = websiteUrl(s.settings.endpoint, "/docs/api/keys#your-keys");
   const what = "Chat and the in-game /ask send it to everloot.app's public server, which then counts their requests against your account instead of this internet address, with a higher limit. A key with the \"Read my saved builds\" permission also brings your saved talent builds into the game. Uploads never carry it.";
   return s.account.signedIn
-    ? `<section class="panel" id="account" tabindex="-1"><h2>Account</h2>
+    ? `<section class="panel set-sec" id="account" tabindex="-1"><div class="set-lead"><h2>Account</h2></div><div class="set-body">
       <p class="fg2">Signed in to everloot.app with the key ending <b class="mono">…${esc(s.account.hint ?? "")}</b>.</p>
       <p class="muted small">${what}</p>
       <div class="row"><button type="button" class="btn" data-open="${esc(keys)}">Manage keys on everloot.app ↗</button><button type="button" class="btn" id="accountSignOut">Sign out</button></div>
-    </section>`
-    : `<section class="panel" id="account" tabindex="-1"><h2>Account</h2>
+    </div></section>`
+    : `<section class="panel set-sec" id="account" tabindex="-1"><div class="set-lead"><h2>Account</h2></div><div class="set-body">
       <p class="fg2">Sign in through your browser: everloot.app opens, you sign in with Battle.net and press Connect, and the app gets its own key. It never sees your password.</p>
       <div class="row">${connecting ? `<button type="button" class="btn" id="connect">Open the browser again</button><button type="button" class="btn" id="connectCancel">Cancel</button><span class="muted small">Waiting for the browser…</span>` : `<button type="button" class="btn btn-primary" id="connect">Sign in with everloot.app</button>`}</div>
       <p class="muted small">${what} The key is kept in a file in your data folder and goes only to everloot.app.</p>
       <p class="muted small">Or make a key on ${ext(keys, "everloot.app")} and paste it:</p>
       <form id="accountForm" class="row" autocomplete="off"><input class="grow mono" type="password" name="key" placeholder="evl_…" aria-label="Everloot key" spellcheck="false"><button type="submit" class="btn btn-primary">Sign in</button></form>
-    </section>`;
+    </div></section>`;
 }
 
-/** Everything the app can be set to, on one page: what runs, the AI model, the game folder, startup, the app itself. */
+/** Everything the app can be set to, on one page: what runs, the Assistant, the game folder, startup, the app itself. */
 function settings(s: AppState): string {
   const st = s.settings;
   const c = data.chat;
   const jobs = JOB_ROWS.map((r) => `<div class="set-row"><div class="grow"><b>${r.label}</b><div class="muted small">${esc(r.what)} · <button type="button" class="link" data-page="${r.job}">details</button></div></div>${jobSwitch(r.job, s)}</div>`).join("");
-  const keys = c?.providers.length
-    ? c.providers.map((p) => {
-      const inUse = c.provider?.kind === p.kind;
-      return `<div class="set-row">${tile(p.kind)}<div class="grow"><b>${esc(presetFor(p.kind)?.name ?? p.kind)}</b><div class="muted small">${esc(p.model)}${inUse ? ' · <span class="ok">in use</span>' : ""}</div></div>
-        ${inUse ? "" : `<button type="button" class="btn" data-usekind="${p.kind}" data-usemodel="${esc(p.model)}">Use</button>`}<button type="button" class="btn" data-removekind="${p.kind}">Remove</button></div>`;
-    }).join("")
-    : `<p class="muted small">${c && c.mode !== "plain search" ? `In use: ${esc(c.mode)}, from config.json written by hand.` : "No model yet: Chat and /ask answer with Everloot's top search hits as they are."}</p>`;
-  return `<div class="page">
+  return `<div class="page settings">
     <div class="head"><h1>Settings</h1></div>
     ${flash ? `<p role="status" class="${flash.startsWith("!") ? "error" : "ok"} small">${esc(flash.replace(/^!/, ""))}</p>` : ""}
     ${accountPanel(s)}
-    <section class="panel"><h2>What runs</h2>${jobs}</section>
-    <section class="panel"><div class="row between"><h2>AI model</h2>${pickOpen ? "" : `<button type="button" class="btn" data-addmodel>Add a provider key</button>`}</div>
-      <p class="muted small">Your own key answers Chat and the in-game /ask. Each key is kept in a file in your data folder and goes only to its provider. Switch models from the menu under the Chat box too.</p>
-      ${c ? keys : '<p class="muted small">Loading…</p>'}
-      ${c && pickOpen ? providerForm(c) : ""}
-    </section>
+    <section class="panel set-sec"><div class="set-lead"><h2>What runs</h2></div><div class="set-body">${jobs}</div></section>
+    ${assistant(c, "settings")}
     <form id="settings" autocomplete="off">
-      <section class="panel"><h2>Game</h2>
+      <section class="panel set-sec"><div class="set-lead"><h2>Game</h2></div><div class="set-body">
         <div class="field"><label for="gameFolder">Game folder <span class="hint">the product folder that holds <code>WTF</code>, like <code>World of Warcraft\\_classic_era_</code></span></label>
           <div class="row"><input class="grow" type="text" id="gameFolder" name="gameFolder" value="${esc(st.gameFolder ?? "")}"><button type="button" class="btn" id="browse">Browse…</button></div></div>
-      </section>
-      <section class="panel"><h2>Startup</h2>
+      </div></section>
+      <section class="panel set-sec"><div class="set-lead"><h2>Startup</h2></div><div class="set-body">
         ${s.platform === "linux" ? "" : `<label class="switch"><input type="checkbox" name="launchAtLogin" ${st.launchAtLogin ? "checked" : ""}> Start when I sign in</label>`}
         <label class="switch"><input type="checkbox" name="startInTray" ${st.startInTray ? "checked" : ""}> Start in the tray without a window</label>
-      </section>
-      <section class="panel"><h2>Census</h2>
+      </div></section>
+      <section class="panel set-sec"><div class="set-lead"><h2>Census</h2></div><div class="set-body">
         <label class="switch"><input type="checkbox" name="census" ${st.census ? "checked" : ""}> Send census counts with the uploads</label>
         <p class="muted small">The race, class, level and faction of your characters and of players the addon sees. Never names, guilds, gear or places; the site shows only totals. Off keeps them in <code>Everloot.lua</code>; <code>/everloot census off</code> in the game stops recording and deletes them.</p>
-      </section>
-      <section class="panel"><h2>Player pages</h2>
+      </div></section>
+      <section class="panel set-sec"><div class="set-lead"><h2>Player pages</h2></div><div class="set-body">
         <label class="switch"><input type="checkbox" name="players" ${st.players ? "checked" : ""}> Send the player pages with the uploads</label>
         <p class="muted small">The name, realm, race, class, level and guild of the players the addon saw, so a page can be found by name. Off keeps them in <code>Everloot.lua</code>; <code>/everloot players off</code> in the game stops recording and deletes them.</p>
-      </section>
-      <details class="panel"><summary><h2>Advanced</h2></summary>
+      </div></section>
+      <details class="panel set-sec"><summary><h2>Advanced</h2></summary>
         <div class="field"><label for="endpoint">Site <span class="hint">change only to test against another deployment</span></label><input type="url" id="endpoint" name="endpoint" value="${esc(st.endpoint)}"></div>
       </details>
-      <div class="row"><button type="submit" class="btn btn-primary">Save</button><span class="muted" id="saved"></span></div>
+      <div class="row set-save"><button type="submit" class="btn btn-primary">Save</button><span class="muted" id="saved"></span></div>
     </form>
-    <section class="panel"><h2>This app</h2>
+    <section class="panel set-sec"><div class="set-lead"><h2>This app</h2></div><div class="set-body">
       <p class="fg2">Everloot Desktop App ${esc(s.version)} · AGPL-3.0-only · ${ext("https://github.com/Everloot/everloot/tree/main/desktop", "source")} · ${ext("https://discord.gg/9CKsbHTRu3", "Discord")}</p>
       <p class="muted small">Data folder: <span class="mono">${esc(s.dataFolder)}</span> <button type="button" class="link" id="openData">open</button></p>
       <div class="row"><button type="button" class="btn" id="updates">Check for updates</button></div>
-    </section>
+    </div></section>
   </div>`;
 }
 
 // ---------- render and data ----------
 
-const GEAR = `<svg class="gear" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M10.3 3h3.4l.5 2.4 1.7.9 2.3-.8 1.7 2.9-1.8 1.7v1.8l1.8 1.7-1.7 2.9-2.3-.8-1.7.9-.5 2.4h-3.4l-.5-2.4-1.7-.9-2.3.8-1.7-2.9 1.8-1.7v-1.8L4.1 8.4l1.7-2.9 2.3.8 1.7-.9Z"/><circle cx="12" cy="12" r="2.6" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>`;
+const GEAR = icon("settings");
 
 function renderSide(s: AppState): void {
-  const item = (id: string, label: string, job?: Job) => `<button type="button" data-page="${id}" ${id === page ? 'aria-current="page"' : ""}>${esc(label)}${job ? dot(s.engine.jobs[job]) : ""}</button>`;
+  // The rail is rebuilt on every state update; the focused control comes back by its id or destination.
+  const was = document.activeElement as HTMLElement | null;
+  const refocus = was && side.contains(was)
+    ? (was.id ? `#${CSS.escape(was.id)}` : was.dataset.page ? `[data-page="${CSS.escape(was.dataset.page)}"]` : was.dataset.open ? `[data-open="${CSS.escape(was.dataset.open)}"]` : null)
+    : null;
+  const item = (id: string, label: string, job?: Job) => {
+    const j = job ? s.engine.jobs[job] : null;
+    // A coloured dot alone says nothing to a screen reader; failures and running work are said in words.
+    const said = j && (j.state === "error" || j.state === "running") ? `<span class="sr-only"> (${j.state === "error" ? "failed" : "running"})</span>` : "";
+    return `<button type="button" data-page="${id}" ${id === page ? 'aria-current="page"' : ""}>${icon(id)}<span class="grow">${esc(label)}${said}</span>${j ? dot(j) : ""}</button>`;
+  };
   // The site's tools open in the browser; the app does not carry them.
-  const web = WEBSITE_LINKS.map((l) => `<button type="button" class="out" data-open="${esc(websiteUrl(s.settings.endpoint, l.path))}">${esc(l.label)}<span class="ext" aria-hidden="true">↗</span><span class="sr-only"> (opens in your browser)</span></button>`).join("");
-  nav.innerHTML = PAGES.filter((p) => p.id !== "settings").map((p) => item(p.id, p.label, p.job)).join("")
-    + `<div class="section">On everloot.app</div>${web}`;
+  const web = WEBSITE_LINKS.map((l) => `<button type="button" class="out" data-open="${esc(websiteUrl(s.settings.endpoint, l.path))}"><span class="grow">${esc(l.label)}<span class="sr-only"> (opens in your browser)</span></span>${icon("external", "ico ext")}</button>`).join("");
+  const group = (id: string, label: string | null, body: string) => `<div class="nav-group" role="group" ${label ? `aria-labelledby="ng-${id}"` : `aria-label="Main"`}>${label ? `<div class="section" id="ng-${id}">${label}</div>` : ""}${body}</div>`;
+  const pages = (ids: Page[]) => ids.map((id) => PAGES.find((p) => p.id === id)!).map((p) => item(p.id, p.label, p.job)).join("");
+  nav.innerHTML = group("main", null, pages(["overview", "chat", "characters"]))
+    + group("companion", "Companion", pages(["upload", "market", "ask", "addon", "changes", "log"]))
+    + group("web", "On everloot.app", web);
   const e = s.engine;
   // Ready to install: Restart gets its own row, the clearest thing in the footer.
   const ready = s.update?.newer && s.updateProgress.stage === "ready";
   const acct = s.account.signedIn
-    ? `<button type="button" class="account-btn" id="accountBtn" title="Signed in to everloot.app">${PERSON}<span class="grow">Signed in</span><span class="muted small">key …${esc(s.account.hint ?? "")}</span></button>`
-    : `<button type="button" class="account-btn" id="accountBtn">${PERSON}<span class="grow">Sign in</span><span class="muted small">everloot.app</span></button>`;
-  sideFoot.innerHTML = `<div class="nav">${acct}</div>${ready ? `<div class="nav"><button type="button" class="restart-btn" id="updateRestart" title="Restart to install ${esc(s.update!.latest ?? "")}">${ARROW}Restart to update</button></div>` : ""}<div class="nav foot-row"><button type="button" data-page="settings" ${page === "settings" ? 'aria-current="page"' : ""}>${GEAR}Settings</button><button type="button" class="foot-icon" id="reportBug" aria-label="Report a bug" title="Report a bug">${BUG}</button>${updateButton(s)}</div>
+    ? `<button type="button" class="account-btn" id="accountBtn" title="Signed in to everloot.app">${PERSON}<span class="acct-text"><b>Signed in</b><span>key …${esc(s.account.hint ?? "")}</span></span></button>`
+    : `<button type="button" class="account-btn" id="accountBtn">${PERSON}<span class="acct-text"><b>Sign in</b><span>everloot.app</span></span></button>`;
+  sideFoot.innerHTML = `${acct}${ready ? `<button type="button" class="restart-btn" id="updateRestart" title="Restart to install ${esc(s.update!.latest ?? "")}">${ARROW}Restart to update</button>` : ""}<div class="foot-row"><button type="button" data-page="settings" ${page === "settings" ? 'aria-current="page"' : ""}>${GEAR}Settings</button><button type="button" class="foot-icon" id="reportBug" aria-label="Report a bug" title="Report a bug">${BUG}</button>${updateButton(s)}</div>
     <div class="foot-line"><span>${e.files.length ? `Watching ${e.files.length} file(s)` : "Not watching"}${e.paused ? " · paused" : ""}</span><span>v${esc(s.version)}</span></div>`;
+  if (refocus) side.querySelector<HTMLElement>(refocus)?.focus({ preventScroll: true });
 }
 
-const PERSON = `<svg class="gear" viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="10" r="3.2"/><path d="M6.4 18.6a6.5 6.5 0 0 1 11.2 0"/></g></svg>`;
-const BUG = `<svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="8" width="10" height="12" rx="5"/><path d="M9 8V7a3 3 0 0 1 6 0v1M12 12v8M3 13h4M17 13h4M4 7l3 2M20 7l-3 2M4 19l3-2M20 19l-3-2"/></g></svg>`;
+const PERSON = icon("account");
+const BUG = icon("bug");
 
 /**
  * The footer's update button: an arrow while an update is out, the percentage while it downloads,
@@ -859,28 +1074,43 @@ function render(): void {
   if (setup) { main.innerHTML = welcome(); return; }
   renderSide(state);
   renderUpdate(state);
-  if ((page === "settings" || page === "ask") && draftDirty) return;
+  // Unsaved fields on Settings or Ask are not rebuilt; the Assistant panel beside them still moves.
+  if ((page === "settings" || page === "ask") && draftDirty) { renderAssistant(); return; }
   const s = state;
   const draft = page === "chat" ? (main.querySelector("#chatText") as HTMLTextAreaElement | null)?.value : undefined;
   const realmDraft = (main.querySelector("#realmAdd") as HTMLInputElement | null)?.value;
+  const priceDraft = (main.querySelector("#priceItem") as HTMLInputElement | null)?.value;
+  holdProviderDraft();
+  // The page scroll is put back too: the browser's scroll anchoring otherwise walks a scrolled Settings form down a little at every redraw.
+  const keepScroll = !freshScroll;
+  freshScroll = false;
+  const pageTop = keepScroll ? main.scrollTop : null;
+  const scrolls = page === "chat" && keepScroll ? CHAT_SCROLLERS.map((sel) => [sel, main.querySelector(sel)?.scrollTop ?? 0] as const) : [];
   const drawerTab = drawerChar ? main.querySelector<HTMLElement>('[data-dwtab][aria-selected="true"]')?.dataset.dwtab ?? "overview" : null;
   const refocus = keepFocus();
   main.innerHTML = page === "overview" ? overview(s) : page === "chat" ? chat() : page === "characters" ? characters() : page === "upload" ? upload(s) : page === "market" ? market(s) : page === "ask" ? ask(s)
     : page === "addon" ? addon(s) : page === "changes" ? changes() : page === "log" ? log(s) : settings(s);
   // The page's CSP allows no inline style attributes; bar heights go through the DOM instead.
   for (const el of main.querySelectorAll<HTMLElement>("[data-h]")) el.style.height = `${el.dataset.h}%`;
-  for (const el of main.querySelectorAll<HTMLElement>("[data-tile]")) { el.style.background = el.dataset.tile!; el.style.color = inkOn(el.dataset.tile!); }
+  paintTiles();
   const realmBox = main.querySelector("#realmAdd") as HTMLInputElement | null;
   if (realmBox && realmDraft) realmBox.value = realmDraft;
+  const priceBox = main.querySelector("#priceItem") as HTMLInputElement | null;
+  if (priceBox && priceDraft) priceBox.value = priceDraft;
+  restoreProviderDraft();
+  const chatBox = main.querySelector("#chatText") as HTMLTextAreaElement | null;
+  if (chatBox && draft) chatBox.value = draft;
   if (page === "characters" && drawerTab) reopenDrawer(drawerTab);
+  // Values first, so the caret goes back into the text that is already there.
   refocus();
+  if (pageTop !== null) main.scrollTop = pageTop;
+  for (const [sel, top] of scrolls) { const el = main.querySelector(sel); if (el) el.scrollTop = top; }
   // The drawer is modal: focus stays inside it.
   if (drawerChar && !main.querySelector("#drawerLayer")?.contains(document.activeElement)) main.querySelector<HTMLElement>(".drawer-close")?.focus();
   if (page === "chat") {
-    const box = main.querySelector("#chatText") as HTMLTextAreaElement | null;
-    if (box && draft) box.value = draft;
     const thread = main.querySelector("#thread");
-    if (thread) thread.scrollTop = thread.scrollHeight;
+    // An empty thread shows its starters from the top; a transcript is read from its end.
+    if (thread && !thread.querySelector(".chat-empty")) thread.scrollTop = thread.scrollHeight;
   }
 }
 
@@ -888,10 +1118,10 @@ async function load(p: Page): Promise<void> {
   try {
     if (p === "overview") { [data.addon, data.changes] = await Promise.all([api.addonInfo(), api.changes().catch((e) => { data.changesError = msg(e); return undefined; })]); data.market = await api.marketInfo(); }
     else if (p === "chat" || p === "settings") { data.chat = await api.chatInfo(); for (const own of data.chat.providers) loadModels(own.kind); }
+    else if (p === "ask") { [data.ask, data.chat] = await Promise.all([api.askInfo(), api.chatInfo()]); for (const own of data.chat.providers) loadModels(own.kind); }
     else if (p === "characters") data.characters = await api.charactersInfo();
     else if (p === "upload") [data.upload, data.backups] = await Promise.all([api.uploadInfo(), api.backups()]);
     else if (p === "market") data.market = await api.marketInfo();
-    else if (p === "ask") data.ask = await api.askInfo();
     else if (p === "addon") data.addon = await api.addonInfo();
     else if (p === "changes") { try { data.changes = await api.changes(); data.changesError = undefined; } catch (e) { data.changesError = msg(e); } }
   } catch (e) { flash = `!${msg(e)}`; }
@@ -917,8 +1147,13 @@ async function detect(): Promise<void> {
   render();
 }
 
+/** After a provider changes while Ask is open, its summary is read again so the old chain or error does not linger. */
+async function refreshAsk(): Promise<void> {
+  if (page === "ask") data.ask = await api.askInfo().catch(() => data.ask);
+}
+
 async function go(p: Page): Promise<void> {
-  page = p; draftDirty = false; flash = ""; drawerChar = null; drawerOpener = null;
+  page = p; draftDirty = false; flash = ""; setupNote = ""; drawerChar = null; drawerOpener = null; freshScroll = true; priceEdits++;
   render();
   void load(p);
 }
@@ -926,7 +1161,7 @@ async function go(p: Page): Promise<void> {
 /** Shows the question in the thread at once, then the answer when it comes. */
 async function sendChat(question: string): Promise<void> {
   if (!question || data.chat?.busy) return;
-  data.chat = { ...(data.chat ?? { messages: [], mode: "", mcpUrl: "", withToken: false, provider: null, providers: [], error: null }), busy: true, messages: [...(data.chat?.messages ?? []), { role: "user", text: question, at: new Date().toISOString(), model: null, sources: [], steps: [] }] };
+  data.chat = { ...(data.chat ?? { messages: [], mode: "", mcpUrl: "", withToken: false, withAccountKey: false, provider: null, providers: [], error: null }), busy: true, messages: [...(data.chat?.messages ?? []), { role: "user", text: question, at: new Date().toISOString(), model: null, sources: [], steps: [] }] };
   live = null;
   render();
   try { data.chat = await api.chatSend(question); } finally { live = null; }
@@ -1033,6 +1268,8 @@ async function onClick(ev: MouseEvent): Promise<void> {
     if (keyed) { keyed.focus(); keyed.scrollIntoView({ block: "start" }); }
     return;
   }
+  const adv = el.closest<HTMLElement>("#askAdvanced > summary");
+  if (adv) { advancedOpen = !(adv.parentElement as HTMLDetailsElement).open; return; }
   const t = el.closest<HTMLElement>("button");
   if (!t) return;
   if (t.dataset.page) { void go(t.dataset.page as Page); return; }
@@ -1059,7 +1296,13 @@ async function onClick(ev: MouseEvent): Promise<void> {
     copiedTimer = setTimeout(() => { copied = null; paintCopy(); announcer.textContent = ""; }, 1500);
     return;
   }
-  if (t.dataset.open) { void api.openExternal(t.dataset.open); return; }
+  if (t.dataset.open) {
+    const url = t.dataset.open;
+    if (await api.openExternal(url)) return;
+    const refused = `!Your browser could not be opened from here. Copy this address into it: ${url}`;
+    if (t.closest("#assistant")) { setupNote = refused; render(); } else failed(new Error(refused.slice(1)));
+    return;
+  }
   if (t.dataset.run) { void api.runNow(t.dataset.run as Job); return; }
   if (t.dataset.unfollow) { const gone = t.dataset.unfollow.toLowerCase(); state = await api.saveSettings({ market: { realms: state!.settings.market.realms.filter((r) => r.toLowerCase() !== gone) } }); void load("market"); return; }
   if (t.id === "pause") { await api.setPaused(!state!.engine.paused); return; }
@@ -1100,19 +1343,27 @@ async function onClick(ev: MouseEvent): Promise<void> {
   if (t.dataset.removekind) {
     try {
       data.chat = await api.chatRemoveProvider(t.dataset.removekind as ProviderKind);
-      flash = data.chat.provider ? `Key removed. Chat now runs ${data.chat.mode}.` : "Key removed. Chat is back to search only.";
-    } catch (e) { flash = `!${msg(e)}`; }
+      setupNote = removalNotice(data.chat);
+      await refreshAsk();
+    } catch (e) { setupNote = `!${msg(e)}`; }
     render();
     return;
   }
   if (t.hasAttribute("data-addmodel")) { openProviderForm(null); return; }
+  if (t.hasAttribute("data-advanced")) {
+    advancedOpen = true;
+    await go("ask");
+    main.querySelector<HTMLElement>("#askAdvanced > summary")?.focus();
+    return;
+  }
   if (t.dataset.usekind && t.dataset.usemodel) {
     data.chat = await api.chatUseModel(t.dataset.usekind as ProviderKind, t.dataset.usemodel);
-    flash = `Chat and /ask now use ${data.chat.provider?.model ?? t.dataset.usemodel}.`;
+    setupNote = `Chat now uses ${data.chat.provider?.model ?? t.dataset.usemodel}, and /ask tries it first.`;
+    await refreshAsk();
     render();
     return;
   }
-  if (t.id === "cancelProvider") { pickOpen = false; render(); return; }
+  if (t.id === "cancelProvider") { setupNote = ""; closeProviderForm(); return; }
   if (t.id === "copyDiag" && state) {
     try { await navigator.clipboard.writeText(diagnostics(state)); flash = "Copied. Paste it into the bug report."; }
     catch (e) { flash = `!Could not copy: ${msg(e)}`; }
@@ -1142,7 +1393,12 @@ async function onChange(ev: Event): Promise<void> {
   const el = ev.target as HTMLInputElement;
   if (el.id === "censusConsent") { censusChoice = el.checked; return; }
   if (el.id === "agree") { agreed = el.checked; render(); return; }
-  if (el.id === "providerKind") { pickKind = el.value as ProviderKind; loadModels(pickKind); render(); return; }
+  if (el.id === "providerModelPick") {
+    syncManualModel();
+    if (el.value === "") main.querySelector<HTMLElement>("#providerModel")?.focus();
+    return;
+  }
+  if (el.id === "providerKind") { const kind = el.value as ProviderKind; dropProviderDraft(); pickKind = kind; loadModels(pickKind); render(); return; }
   if (el.id === "modelPick") {
     const v = el.value;
     if (v === "add") { openProviderForm(null); return; }
@@ -1170,7 +1426,11 @@ async function onChange(ev: Event): Promise<void> {
   if (el.name === "folder") { chosenFolder = el.value; render(); return; }
   if (el.form && el.form.id !== "chatForm" && el.form.id !== "providerForm") draftDirty = true;
 }
-main.addEventListener("input", (ev) => { const f = (ev.target as HTMLElement).closest("form"); if (f && f.id !== "chatForm" && f.id !== "providerForm") draftDirty = true; });
+main.addEventListener("input", (ev) => {
+  const f = (ev.target as HTMLElement).closest("form");
+  if (f && f.id !== "chatForm" && f.id !== "providerForm") draftDirty = true;
+  if (f?.id === "priceForm") priceEdits++;
+});
 // Escape closes the update popover from anywhere.
 document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && updateOpen) { ev.preventDefault(); toggleUpdate(false); } });
 main.addEventListener("keydown", (ev) => {
@@ -1204,14 +1464,21 @@ async function onSubmit(ev: SubmitEvent): Promise<void> {
   const text = (k: string) => String(f.get(k) ?? "").trim();
   if (form.id === "providerForm") {
     const model = text("model") || text("modelText");
-    if (!model && f.has("model")) { flash = "!Type the model id, or pick one from the list"; render(); return; }
+    if (!model && f.has("model")) {
+      // In the panel, where a dirty Settings/Ask page still redraws; the empty box takes the focus so the fix is one keystroke away.
+      setupNote = "!Type the model id, or pick one from the list";
+      render();
+      main.querySelector<HTMLElement>("#providerModel")?.focus();
+      return;
+    }
     try {
       data.chat = await api.chatSetProvider({ kind: pickKind, key: text("key"), model, baseUrl: text("baseUrl") });
       // A new key may see other models: ask again.
       loadModels(pickKind, true);
-      pickOpen = false; flash = `Saved. Chat now runs ${data.chat.mode}.`;
-    } catch (e) { flash = `!${msg(e)}`; }
-    render();
+      setupNote = `Saved and selected: Chat now runs ${data.chat.mode}, and /ask tries it first. Nothing was sent to the provider to test it.`;
+      await refreshAsk();
+      closeProviderForm();
+    } catch (e) { setupNote = `!${msg(e)}`; render(); }
     return;
   }
   if (form.id === "accountForm") {
@@ -1222,7 +1489,12 @@ async function onSubmit(ev: SubmitEvent): Promise<void> {
     return;
   }
   if (form.id === "priceForm") {
-    priceLookup = await api.marketLookup(text("priceItem") || String(f.get("priceItem") ?? ""));
+    const query = text("priceItem") || String(f.get("priceItem") ?? "");
+    const edits = ++priceEdits;
+    priceLookup = await api.marketLookup(query);
+    // A redraw may have replaced the submitted form: clear the live box, and only while it still holds this query.
+    const box = main.querySelector<HTMLInputElement>("#priceItem");
+    if (box && edits === priceEdits && box.value.trim() === query.trim()) box.value = "";
     render();
     return;
   }

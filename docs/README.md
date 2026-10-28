@@ -11,6 +11,7 @@ architecture map.
 | [`2026-10-08-beta-client-checklist.md`](2026-10-08-beta-client-checklist.md) | What gets checked in the live client before an addon release |
 | [`2026-10-18-addon-0.3.2-beta-checklist.md`](2026-10-18-addon-0.3.2-beta-checklist.md), [`2026-10-19-addon-0.3.3-beta-checklist.md`](2026-10-19-addon-0.3.3-beta-checklist.md) | The in-client checks for the 0.3.2 profession and auction reads and the 0.3.3 completion tracker |
 | [`2026-10-08-release-checklist.md`](2026-10-08-release-checklist.md) | What gets checked before a site release |
+| [`LAUNCH_DAY.md`](LAUNCH_DAY.md) | The launch-day sequence for 2026-11-04: the `/beta` to Live switch, the build upload, the smoke list, who does each step |
 | [`BUILD_WATCH.md`](BUILD_WATCH.md) | How a new game build becomes a reviewed data pull request |
 | [`TRACKER.md`](TRACKER.md) | The build list, generated from `kb/src/bridge-plan.ts` (a test keeps it in sync) |
 | [`ASSETS.md`](ASSETS.md) | How Blizzard's icons, tooltip text and interface art get onto the site, and the rules for them |
@@ -24,6 +25,7 @@ architecture map.
 | [`DATA_POLICY.md`](DATA_POLICY.md) | What we publish, what we refuse, and why |
 | [`LEGACY_DATA_POLICY.md`](LEGACY_DATA_POLICY.md) | How older uploads are handled |
 | [`TALENT_CATALOG.md`](TALENT_CATALOG.md) | The talent catalog read from the game files |
+| [`GUIDES.md`](GUIDES.md) | The contract every guide meets: review, versions and history, plans, sources |
 
 ## Architecture
 

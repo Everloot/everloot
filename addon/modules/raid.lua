@@ -27,6 +27,108 @@ local CLASS_DIGIT = {
 }
 
 local B64URL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+local CLASSES = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN", "MAGE", "WARLOCK", "DRUID" }
+
+--- Read the website's ELR1 code. Bound input before decoding; never evaluate pasted text.
+function R.Decode(input)
+  if type(input) ~= "string" or #input > 2048 then return nil, "paste an Everloot raid code or link" end
+  local code = input:match("^%s*(.-)%s*$")
+  code = code:match("^https?://[^/]+/tools/raid/?[^#]*#raid=([^&]+)")
+    or code:match("^https?://[^/]+/tools/raid/r/([^/?#]+)") or code
+  code = code:gsub("=+$", "")
+  local version, size, build, payload = code:match("^ELR(%d+)%-(%d+)%-([%d%.]+)%-([%w_%-]*)$")
+  if not version then return nil, "that is not an Everloot raid code" end
+  if tonumber(version) ~= VERSION then return nil, "this addon reads raid code version 1" end
+  size = tonumber(size)
+  if size ~= 10 and size ~= 20 and size ~= 40 then return nil, "raid size must be 10, 20 or 40" end
+  if not build:match("^%d+%.[%d%.]*%d$") or build:find("%.%.") then return nil, "the plan build is damaged" end
+  if #payload % 4 == 1 then return nil, "the raid slots are damaged" end
+  local bytes = {}
+  for i = 1, #payload, 4 do
+    local n, count = 0, math.min(4, #payload - i + 1)
+    for k = i, i + count - 1 do
+      local index = B64URL:find(payload:sub(k, k), 1, true)
+      if not index then return nil, "the raid slots are damaged" end
+      n = n * 64 + index - 1
+    end
+    n = n * 64 ^ (4 - count)
+    local part = { math.floor(n / 65536) % 256, math.floor(n / 256) % 256, n % 256 }
+    for k = 1, count - 1 do bytes[#bytes + 1] = string.char(part[k]) end
+  end
+  local text = table.concat(bytes)
+  if #text % 2 ~= 0 or #text > size * 2 or text:find("%D") then return nil, "the raid slots are damaged" end
+  local slots = {}
+  for i = 1, size do
+    local class, tree = tonumber(text:sub(i * 2 - 1, i * 2 - 1)), tonumber(text:sub(i * 2, i * 2))
+    if not class or (class == 0 and tree == 0) then
+      slots[i] = false
+    elseif not CLASSES[class] or tree > 3 then
+      return nil, "the raid slots are damaged"
+    else
+      slots[i] = { class = CLASSES[class], tree = tree }
+    end
+  end
+  return { size = size, build = build, slots = slots }, nil, code
+end
+
+function R.Load(input)
+  local plan, reason, code = R.Decode(input)
+  if not plan then return false, reason end
+  EverlootDB.raidPlan = code
+  return true
+end
+
+function R.ClearPlan() EverlootDB.raidPlan = nil end
+
+--- Count classes per group; codes carry neither player names nor identities.
+function R.Compare(plan, members)
+  local groups = {}
+  local count = plan.size / GROUP_SIZE
+  for _, m in ipairs(members) do count = math.max(count, math.min(8, m.group or 1)) end
+  for g = 1, count do
+    local planned, actual = {}, {}
+    local row = { group = g, planned = 0, actual = 0, matched = 0, differences = {} }
+    for i = (g - 1) * GROUP_SIZE + 1, math.min(g * GROUP_SIZE, plan.size) do
+      local slot = plan.slots[i]
+      if slot then planned[slot.class] = (planned[slot.class] or 0) + 1; row.planned = row.planned + 1 end
+    end
+    for _, m in ipairs(members) do
+      if (m.group or 1) == g then
+        row.actual = row.actual + 1
+        if m.class then actual[m.class] = (actual[m.class] or 0) + 1 end
+      end
+    end
+    for _, class in ipairs(CLASSES) do
+      local want, have = planned[class] or 0, actual[class] or 0
+      row.matched = row.matched + math.min(want, have)
+      if want ~= have then
+        row.differences[#row.differences + 1] = { class = class, need = math.max(0, want - have), extra = math.max(0, have - want) }
+      end
+    end
+    groups[#groups + 1] = row
+  end
+  return groups
+end
+
+function R.PlanLines(members)
+  local plan, reason = R.Decode(EverlootDB and EverlootDB.raidPlan)
+  if not plan then return { EverlootDB and EverlootDB.raidPlan and ("Saved plan could not load: " .. reason)
+    or "No raid plan loaded. Build a roster on everloot.app/tools/raid, then copy it for the addon." } end
+  local out = { string.format("%d-slot plan / build %s", plan.size, plan.build) }
+  if EverlootDB.clientBuild and EverlootDB.clientBuild ~= plan.build then
+    out[#out + 1] = "Your client is on a different build. Check the plan's rules before using it."
+  end
+  out[#out + 1] = "Class counts by group; player identities and talent choices cannot be verified."
+  for _, row in ipairs(R.Compare(plan, members or {})) do
+    local needs = {}
+    for _, d in ipairs(row.differences) do
+      needs[#needs + 1] = (d.need > 0 and ("need " .. d.need) or ("extra " .. d.extra)) .. " " .. d.class:lower()
+    end
+    out[#out + 1] = string.format("Group %d / %d planned, %d present, %d match%s", row.group, row.planned, row.actual,
+      row.matched, #needs > 0 and (": " .. table.concat(needs, ", ")) or "")
+  end
+  return out
+end
 
 local function encode64(text)
   local out = {}
@@ -188,6 +290,7 @@ local function report(members, data)
   lines[#lines + 1] = "  /everloot raid code gives a link that opens this raid on everloot.app/tools/raid."
   return table.concat(lines, "\n")
 end
+R.Report = report
 
 local function showCode(url)
   -- A window with the link selected for copying. Any missing frame function falls back to chat.

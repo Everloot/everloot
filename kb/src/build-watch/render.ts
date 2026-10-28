@@ -112,6 +112,7 @@ export function prBody(entry: ChangeEntry, ctx: BodyContext): string {
     "- [ ] `client-digests.json` is the next build's baseline; it is written, not edited by hand.",
     "- [ ] The web tests still pass: some hard-code the build number in sample raid codes.",
     "- [ ] Spoiler flags are right for a build players cannot play yet.",
+    "- [ ] Before merging: this build's asset folder and name files are uploaded and the site's asset URL setting points at it. The site reads item, quest, set and spell names only for the client layer's build, so merging first leaves production without names (see `docs/BUILD_WATCH.md`).",
     "",
     "Hotfixes that change no build never show up here, because the game files do not change. The blue tracker covers those.",
     "",

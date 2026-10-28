@@ -3,7 +3,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { GAME_DATA_CREDIT, MCP_TOOLS, TALENT_CLASSES } from "@everloot/protocol";
 import { afterEach, expect, test } from "vitest";
 import { z } from "zod";
-import { encodeBuild } from "../../web/src/lib/talents/share";
+import { encodeBuild, encodeOrder } from "../../web/src/lib/talents/share";
 import { openDb, type DB } from "../src/db.js";
 import { createKnowledgeServer } from "../src/mcp-server.js";
 import { handleTalentPlan, handleTalentTree } from "../src/talent-tools.js";
@@ -108,6 +108,44 @@ test("talent_plan refuses what it cannot read, in the calculator's words", () =>
   const other = handleTalentPlan({ code: "EL1-monk-0-1.60.1.70450-" });
   expect(other.text).toContain("without a talent catalog: monk");
   expect(handleTalentPlan({ code: "   " }).text).toContain("Paste a share code");
+});
+
+test("talent_plan refuses a link's value that is not a whole code, escaped or raw, even with a code inside it", () => {
+  // A warrior code: a value that did not decode fell back to the first class's trees, which loaded the code inside it.
+  const warrior = siteCatalog("warrior");
+  const node = warrior.nodes.find((n) => !n.unlock && n.prereqs.length === 0 && !n.anyOf)!;
+  const code = encodeBuild({ classSlug: "warrior", specId: warrior.specId, build: warrior.build, ranks: { [node.id]: { rank: 1 } } });
+  expect(planOut.parse(handleTalentPlan({ code }).structured)).toMatchObject({ ok: true, pointsSpent: 1 });
+  for (const link of [`https://everloot.app/tools/talents/warrior#plan=junk%23plan%3D${code}`, `https://everloot.app/tools/talents/warrior#plan=junk#plan=${code}`]) {
+    const { text, structured } = handleTalentPlan({ code: link });
+    expect(planOut.parse(structured), link).toMatchObject({ ok: false, message: "That share code is damaged or cut short." });
+    expect(structured, link).not.toHaveProperty("url");
+    expect(text, link).toBe(`That share code is damaged or cut short.\n${GAME_DATA_CREDIT}`);
+  }
+});
+
+test("talent_plan answers a link that carries spend orders exactly as it answers the same link without them", () => {
+  const code = legalCode();
+  const node = firstNode();
+  const order = encodeOrder({ [node.id]: { rank: node.maxRanks } }, Array<number>(node.maxRanks).fill(node.id), "planned");
+  expect(order).toMatch(/^O1p-A+$/);
+  const old = `https://everloot.app/tools/talents/mage#plan=${code}&plan2=${code}`;
+  expect(handleTalentPlan({ code: `${old}&order=${order}&order2=O1g-A` })).toEqual(handleTalentPlan({ code: old }));
+  expect(handleTalentPlan({ code: `${old}&order=O2p-A&order2=O1x-A` })).toEqual(handleTalentPlan({ code: old }));
+  expect(handleTalentPlan({ code: old })).toEqual(handleTalentPlan({ code }));
+});
+
+test("talent_plan keeps the answer it gave before spend orders: the same fields, and links that carry the code alone", () => {
+  const example = "EL1-mage-1482-1.60.1.70450-OTAwMDE6Miw5MDAwMjoxOjEsOTAwMDQ6Mg";
+  const { text, structured } = handleTalentPlan({ code: `https://everloot.app/tools/talents/mage#plan=${example}&order=O1p-AABCC` });
+  expect(Object.keys(structured).sort()).toEqual(["byTree", "class", "className", "codeBuild", "credit", "label", "link", "minLevel", "ok", "pointsSpent", "problems", "talents", "treeBuild", "url"]);
+  expect(planOut.parse(structured)).toMatchObject({
+    ok: true, class: "mage", codeBuild: "1.60.1.70450", treeBuild: mage.build, pointsSpent: 0, talents: [],
+    link: `https://everloot.app/tools/talents/mage#plan=${example}`,
+    url: `https://everloot.app/tools/talents/mage/b/${example}`,
+  });
+  expect(text).toContain("Problem: 3 talents in the code are not in this tree and were left out: node 90001 (2 points), 90002 (1 point), 90004 (2 points).");
+  expect(text).not.toMatch(/&order=|O1p-/);
 });
 
 const databases: DB[] = [];

@@ -30,12 +30,28 @@ installed addons is off until `/everloot addons on`; it is sent only from the up
 its preview. `/everloot addons off` stops it and deletes every recorded addon row.
 
 A scan that gets no answer from the auction house in 30 seconds stops and gives the cooldown back.
-Tooltip prices show the date the companion last fetched them and flag them as stale after two days.
+Tooltip prices show the item's newest public observation day separately from when the price file was built,
+and warn when either is old. Community values combine all auction houses on the realm; they are recorded
+asking-price estimates, not live listings or guaranteed sale prices.
 Below the prices, the tooltip shows where the item drops when three installs looted the source: each rate as
 drops of loot windows, with its installs and the date of the uploads behind it, from the drop rates the Desktop
 App writes into the same `EverlootPrices` file. Once that file is in the game, a missing price or drop source is
 said in one grey line; nothing is written to your SavedVariables. `addon/tests/drops_contract.py` holds the rules.
 Nothing in the addon calls a buy, bid or post API; `addon/tests/market_contract.py` traps them.
+
+### Ask about an item's price
+
+- For an immediate answer from the files already in game, type `/everloot price` followed by a
+  shift-clicked item link or item id. This works away from the auction house too. Your own scan can
+  supply a value before the community has enough observations.
+- For an online recorded-market answer, type `/ask price` followed by an item link or id. New questions
+  include your current realm; you can name another explicitly, for example `/ask price 2589 on Nightslayer`.
+  An item name works when Everloot can resolve it uniquely. Otherwise, the answer asks for an item id.
+- Keep the Desktop App running with Ask enabled. `/reload` or log out to write the question; after the
+  app processes it, `/reload` again to load the answer. This is a file bridge, not live in-game internet access.
+- Price questions need no AI model key. Answers identify the realm, all-house scope, recorded values,
+  observation day and missing data. A missing local cache row does not prove the website lacks a price;
+  the local community file holds at most 2,000 items. Full history is on everloot.app/tools/auctions.
 
 Each scan records your faction (`faction`) and which house it read (`house`): Alliance or Horde from the
 auctioneer's faction, Neutral for a goblin house whose auctioneer has none, and nothing when the client
@@ -179,6 +195,11 @@ whether it is on and how many characters it holds; `/everloot players off` stops
 - **What a row holds** (`player_seen`): name (`UnitName`), realm (`GetRealmName`), race and class tokens
   (`UnitRace`, `UnitClass`), level (`UnitLevel`) and the guild name when the game shows one (`GetGuildInfo`).
   The date is the row's `capturedAt`; the site keeps the day, not the time.
+- **A second row** (`guild_kill`): when `ENCOUNTER_END` reports a kill inside a dungeon or raid and the game
+  shows your character in a guild, the guild name, realm, your faction (`UnitFactionGroup`), the encounter, the
+  instance map id and difficulty (`GetInstanceInfo`) and the time. No character name. At most 60 a UTC day; written
+  only while the module is on, and `/everloot players off` deletes these rows with the others. The guild page
+  counts a kill once two installs report it.
 - **Whom it reads**: your own characters at login and at each level-up, and players you target, mouse over or
   group with (`PLAYER_TARGET_CHANGED`, `UPDATE_MOUSEOVER_UNIT`, `GROUP_ROSTER_UPDATE`). Not nameplates, not the
   guild roster, not the who list, not inspection. Players from another realm are skipped.
@@ -193,6 +214,35 @@ whether it is on and how many characters it holds; `/everloot players off` stops
 
 ## Talents, selftest and the plan panel
 
+### Bring a website plan into the game
+
+Open `/everloot` or left-click its minimap button for the **Talents / Raid** workspace.
+Right-click the minimap button, or use `/everloot options`, for collection settings.
+`/everloot status` still prints the collector status.
+
+1. Make a build on everloot.app's talent calculator or raid planner and choose **Copy for addon**.
+2. Open the matching tab in the addon, paste the link or code, and click **Import** (or press Enter).
+3. Talents shows your progress, and the next point when the plan carries a spend order (see
+   [Spend order](#spend-order)). Raid compares class counts per group and checks buffs on the current
+   roster. Apply points and arrange players yourself.
+
+Talent export copies the selected set only. Talent links with two sets import the first; a second-set-only
+link imports that set. A link carries each set's spend order beside its code, `#plan=<code>&order=<order>`
+for the first set and `#plan2=<code>&order2=<order>` for the second, and the set that loads takes its own
+order only. Paste links into this Import box: `/everloot plan` takes a bare share code, not a link. For
+saved short links, open the website and use **Copy for addon** to choose the set.
+Raid codes preserve planned talent trees for the website. The addon cannot verify another player's talent
+choices or identify players from a class-only code.
+Differences in game build remain visible. Imports stay in your local SavedVariables file; roster names
+are never saved by this workspace. **Copy plan link** returns the loaded set to the website under the same
+keys, with the order it came with when the addon could read it; an order it could not read is left out,
+never made up. **Copy current raid** opens your actual roster there. Use Ctrl+C in the selected field.
+
+The window is created when opened, refreshes on relevant character/group changes while visible, and
+uses no polling loop. Escape closes it. This workspace still needs a live-client layout and behavior
+check; a passing Lua contract is not an in-game test.
+Drag its header beside the game's talent window to keep the next-point highlights visible.
+
 - **Talents** (on by default). Reads your build through `C_Traits` and `C_ClassTalents`: the active spec
   group and, once dual spec is unlocked at level 40, the second one. Each build is one
   `talent_snapshot` record: class, level, spec group, config id, tree id, every spent node with its ranks
@@ -206,13 +256,19 @@ whether it is on and how many characters it holds; `/everloot players off` stops
   Run it once with the talent window closed and once open. It also prints your race token (`INFO player
   race`), the value the census stores.
 - **Plan panel (display only).** `/everloot plan <share code>` loads an Everloot talent plan and shows,
-  beside the talent window, the next point to spend and where your build differs. `/everloot plan` reopens
-  it (it also has a paste box), `plan hide` closes it, `plan clear` forgets it. When the talent window is
-  open it also puts a green overlay on the next talent and red ones on mismatches. It never spends a
-  point, clicks, imports a loadout or acts for you. The plan is kept in your SavedVariables file.
+  beside the talent window, where your build differs and, for a plan with a spend order, the next point to
+  spend. A pasted code has no order; a link brings its own through the workspace's Import box.
+  `/everloot plan` reopens it (it also has a paste box), `plan hide` closes it, `plan clear` forgets it.
+  When the talent window is open it also puts a green overlay on the next talent, when there is one, and
+  red ones on mismatches. It never spends a point, clicks, imports a loadout or acts for you. The plan and
+  its order are kept in your SavedVariables file.
 - **Saved builds.** When the Desktop App has synced your everloot.app builds into the `EverlootBuilds`
   slot addon, `/everloot plan` also lists them in chat, this character's first (the label's name, and its realm when it has one), then the rest of your class,
-  and `/everloot plan <number>` loads one as if you pasted its code (`/everloot plan <number> 2` loads its second talent set, marked `[2 sets]` in the list). Nothing is saved or uploaded for it.
+  and `/everloot plan <number>` loads one (`/everloot plan <number> 2` loads its second talent set, marked `[2 sets]` in the list).
+  Each set keeps its own planned or provisional spend order when available; its code, validated order and set
+  are kept in SavedVariables and in Copy plan link. Missing or unusable metadata leaves ranks readable with
+  unknown order. Older version 1 slot files still load. Addon 0.3.12 ignores the new order fields and keeps
+  ranks only; update the addon to follow spend order. Nothing is uploaded by selecting a build.
 
 ### Share code, version 1
 
@@ -229,10 +285,30 @@ same format (see `docs/2026-10-17-talent-share-code.md`):
 | `build` | Client build the plan was made on, e.g. `1.60.1.70450`. A different build shows a warning because node ids can move. |
 | `payload` | base64url (RFC 4648 section 5, no `=` padding) of the ASCII text `node:rank,node:rank:choice,...`. |
 
-Payload items are in spend order: `node` is the client's trait node id, `rank` is the target rank (1 to
-50), and an optional third number is the zero-based entry of a choice node. A node absent from the list is
-planned at zero. Example: `EL1-mage-1482-1.60.1.70450-OTAwMDE6Miw5MDAwMjoxOjEsOTAwMDQ6Mg` carries
-`90001:2,90002:1:1,90004:2`.
+`node` is the client's trait node id, `rank` is the target rank (1 to 50), and an optional third number is
+the zero-based entry of a choice node. A node absent from the list is planned at zero. The site lists the
+items by node id, and their order is not a spend order. Example:
+`EL1-mage-1482-1.60.1.70450-OTAwMDE6Miw5MDAwMjoxOjEsOTAwMDQ6Mg` carries `90001:2,90002:1:1,90004:2`.
+
+### Spend order
+
+A plan can carry the order its points are spent in, as a token of its own beside the code:
+`O1p-<sequence>` when a player planned it, `O1g-<sequence>` when a tool generated it. The format, its
+64-point limit and its test vectors are in `docs/2026-10-17-talent-share-code.md` under "Spend order".
+For the example code above, `O1p-AABCC` is both points in 90001, then 90002, then 90004 twice.
+
+- With an order, Talents names the next point: the first point in the order you have not spent, even
+  when the game says it cannot be bought yet. A generated order is labelled provisional, which is neither
+  a recommendation nor a record of anyone's play. The addon does not check that each point could be spent
+  at its place in the order; the game says whether the next one can be bought now.
+- Without one, the order is unknown and no point is named next. Talents lists the missing points the
+  game says you can add now, none of them first, and apart from them any the game says nothing about.
+  Item order and node ids are never used as an order.
+- An order the addon cannot read (damaged, made by a newer version, of a kind it does not know, over 64
+  points, or not matching the code's points) leaves the talents loaded, and Talents says why the order is
+  unknown. An order that names a talent your tree does not have is not followed either.
+- Addon 0.3.12 loads the talents from these links but not their order: it stops at `&`, and still names
+  a next point from the code's item order.
 
 ## Test it
 
@@ -261,6 +337,7 @@ The contract tests run the Lua in real Lua 5.1 through `lupa`:
     python addon/tests/completion_contract.py
     python addon/tests/census_contract.py
     python addon/tests/players_contract.py
+    python addon/tests/conveniences_contract.py
 
 Run them from the repository root. CI also rebuilds the zip. For a version that is not released yet it
 fails if the zip differs from the one committed in `web/public/downloads/`, so commit the rebuilt zip
@@ -294,7 +371,8 @@ addon/
 │   ├── raid.lua        /everloot raid: buffs missing per group, and a raid share code; display only
 │   ├── prices.lua      item tooltips: your latest scan and the companion's community prices
 │   ├── drops.lua       item tooltips: where an item drops, from the public rates in the same file
-│   └── gph.lua         gold per hour sessions, kept in your file only
+│   ├── gph.lua         gold per hour sessions, kept in your file only
+│   └── conveniences.lua  sell greys and repair at a merchant, Collect all at the mailbox; each off until enabled, no records
 └── tests/              Lua 5.1 contract tests and their fixtures
 ```
 

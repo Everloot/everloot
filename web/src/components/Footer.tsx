@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { CONTACT_EMAIL, DISCORD_INVITE, NON_AFFILIATION, OPERATOR, SITE_BLURB, TRADEMARK_LINE } from "@/lib/jsonld";
+import { SOCIAL_PROFILES } from "@/lib/social";
+import { CONTACT_EMAIL, DISCORD_INVITE, OPERATOR, SITE_BLURB } from "@/lib/jsonld";
 import { deployedSha, REPO_URL, sourceUrl } from "@/lib/source";
 import { BETA, LAUNCH, longDate } from "@/data/wow-forever";
 import { CookiePreferencesButton } from "./CookieConsent";
@@ -15,6 +16,7 @@ const GROUPS: { title: string; items: Item[] }[] = [
       { label: "Database", href: "/database" },
       { label: "World map", href: "/map" },
       { label: "Changes", href: "/changes" },
+      { label: "News", href: "/news" },
       { label: "Lore archive", href: "/lore" },
       { label: "Addons", href: "/addons" },
     ],
@@ -28,6 +30,7 @@ const GROUPS: { title: string; items: Item[] }[] = [
       { label: "How we count", href: "/methodology" },
       { label: "Data policy", href: `${REPO_URL}/blob/main/docs/DATA_POLICY.md`, external: true },
       { label: "Changes feed (RSS)", href: "/changes/feed.xml", plain: true },
+      { label: "News feed (RSS)", href: "/news/feed.xml", plain: true },
     ],
   },
   {
@@ -37,6 +40,7 @@ const GROUPS: { title: string; items: Item[] }[] = [
       { label: "Contact", href: "/contact" },
       { label: "Discord", href: DISCORD_INVITE, external: true },
       { label: "GitHub", href: REPO_URL, external: true },
+      ...SOCIAL_PROFILES.map((profile) => ({ ...profile, external: true })),
       { label: "Contributing", href: `${REPO_URL}/blob/main/CONTRIBUTING.md`, external: true },
       { label: "Security", href: "/security" },
     ],
@@ -70,10 +74,13 @@ function FooterLink({ item, className = itemClass }: { item: Item; className?: s
  * The site footer: two slim rows. The first has the wordmark (Glint perched on the footer's edge above it), the
  * tagline, the link groups and the Discord and GitHub icons; on a phone each group folds into a small disclosure.
  * The second, small and muted, has the legal links, the cookie choices, the one site-wide credit line, the operator,
- * licence and build, and the trademark notice.
+ * licence and build. The full trademark notice and credits are a link away, on /terms#trademarks and /methodology#credits.
  */
 export default function Footer() {
-  const year = new Date().getFullYear();
+  const now = new Date();
+  const year = now.getFullYear();
+  // Once the beta's last day has passed (UTC), the sentence says so; the launch sentence stays until it happens.
+  const betaOver = now.toISOString().slice(0, 10) > BETA.endsOn;
   const sha = deployedSha();
   return (
     <footer className="mt-24 border-t border-line">
@@ -132,14 +139,13 @@ export default function Footer() {
         <div className="space-y-0.5 pb-3 text-xs leading-relaxed text-muted">
           {/* The site's own clock: the beta the data comes from, and the launch it is for. */}
           <p data-site-dates>
-            The beta runs until {longDate(BETA.endsOn)}, and the game launches {longDate(LAUNCH.date)}.
+            The beta {betaOver ? "ran" : "runs"} until {longDate(BETA.endsOn)}, and the game launches {longDate(LAUNCH.date)}.
           </p>
           <SiteCredit />
           <p>
             &copy; {year} {OPERATOR}. Code AGPL-3.0.
             {sha && <> Build <a href={sourceUrl()} rel="noopener" className="font-mono hover:text-accent transition-colors">{sha.slice(0, 7)}</a>.</>}
             {" "}Contact: <a href={`mailto:${CONTACT_EMAIL}`} className="hover:text-accent transition-colors">{CONTACT_EMAIL}</a>
-            {" "}· {NON_AFFILIATION} {TRADEMARK_LINE}
           </p>
         </div>
       </div>

@@ -322,7 +322,7 @@ function settledAt(rows: readonly Placed[], asOf: string | null, since: string |
 }
 
 /** The latest date of a recheck scope that covers a fact of these types, on these maps, with these ids (recheck-scopes.ts). */
-function scopeSince(scopes: readonly RecheckScope[], types: readonly CoverageType[], maps: readonly number[], refs: readonly number[]): string | null {
+function scopeSince(scopes: readonly RecheckScope[], types: readonly CoverageType[], maps: readonly (number | null)[], refs: readonly number[]): string | null {
   return matchScope(scopes, { types, zones: maps, ids: refs });
 }
 
@@ -358,9 +358,9 @@ export function computeSettled(input: SettledInput): SettledFile {
 
   // NPCs: name and traits settled, then each map whose pin is settled.
   for (const [npcId, rows] of groupBy(npcs.filter((r) => r.installId.trim()), (r) => r.npcId)) {
-    const maps = [...new Set(rows.map((r) => r.mapId))];
     const rare = rows.some((r) => r.rank === "rare" || r.rank === "rare_elite");
-    const s = scopeSince(scopes, rare ? ["npcs", "rares"] : ["npcs"], maps, [npcId]);
+    // Matched on the zone the score counts the NPC in (the busiest map), not on every map it was seen on.
+    const s = scopeSince(scopes, rare ? ["npcs", "rares"] : ["npcs"], [npcZone.get(npcId) ?? null], [npcId]);
     const vote = (k: "name" | "level" | "creatureType" | "rank") => rows.flatMap((r) => (r[k] === undefined ? [] : [{ installId: r.installId, value: r[k]!, ...when(r) }]));
     const name = field(vote("name"), asOf, s), level = field(vote("level"), asOf, s);
     const creatureType = field(vote("creatureType"), asOf, s), rank = field(vote("rank"), asOf, s);
@@ -428,7 +428,7 @@ export function computeSettled(input: SettledInput): SettledFile {
     const items: [number, number, number][] = [];
     let open = false;
     for (const [itemId, offers] of groupBy(rows, (r) => r.itemId)) {
-      const s = scopeSince(scopes, ["vendors"], mapsOf.get(vendorNpcId) ?? [], [vendorNpcId, itemId]);
+      const s = scopeSince(scopes, ["vendors"], [npcZone.get(vendorNpcId) ?? null], [vendorNpcId, itemId]);
       const price = settledValue(offers.map((r) => ({ installId: r.installId, value: r.priceCopper, ...when(r) })), asOf, s);
       const stock = settledValue(offers.map((r) => ({ installId: r.installId, value: r.limitedStock ?? 0, ...when(r) })), asOf, s);
       if (!price || !stock) { open = true; break; }

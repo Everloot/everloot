@@ -4,25 +4,36 @@ import { WIKI_URL } from "@/components/LoreSource";
 import { CURRENT_VERSION } from "@/lib/game-version";
 import { loadSiteAssets } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";
+import { guildsOn } from "@/lib/guild-switch";
 import { playerPagesOn } from "@/lib/player-pages";
 import { pageMetadata } from "@/lib/seo";
 import { REPO_URL } from "@/lib/source";
 import { CREDIT } from "@/lib/talents/assets";
 import { MAP_SOURCE } from "@/lib/world-map";
-import { Container, PageHeader, SectionHeading } from "@/components/ui";
+import { PageHeader, ReadingLayout, SectionHeading, type TocItem } from "@/components/ui";
 
 const description =
   "How Everloot turns addon uploads into WoW Forever facts: three installs must agree, addresses are never published, and names only on the player pages.";
 
 export const metadata: Metadata = pageMetadata({ title: "How We Count WoW Forever Data", description, path: "/methodology" });
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
+
+const SECTIONS: TocItem[] = [
+  { id: "three", label: "Three installs have to agree" },
+  { id: "zero", label: "Unrecorded is not zero" },
+  { id: "never", label: "What we never publish" },
+  { id: "files", label: "Game files and play are kept apart" },
+  { id: "population", label: "Population numbers" },
+  { id: "guilds", label: "How guilds are counted" },
+  { id: "credits", label: "Credits" },
+];
 
 export default async function MethodologyPage() {
   // The art's build comes from the asset manifest, only when the asset URL is set.
   const assets = await loadSiteAssets();
   return (
-    <Container width="reading">
+    <ReadingLayout items={SECTIONS.filter((s) => s.id !== "guilds" || guildsOn())}>
       <PageHeader
         title="How we count"
         lede="Every fact on Everloot comes from players running the Everloot addon and choosing to upload what it recorded."
@@ -139,6 +150,32 @@ export default async function MethodologyPage() {
           </div>
         </section>
 
+        {/* Only while the guild pages are on: it describes pages, a ladder and a hide form that are off otherwise. */}
+        {guildsOn() && <section aria-labelledby="guilds">
+          <SectionHeading id="guilds">How guilds are counted</SectionHeading>
+          <div className="space-y-4">
+            <p className="text-fg-2">
+              A guild&apos;s boss kills come from its own members. With <code className="font-mono text-fg">/everloot players on</code>,
+              a kill inside a dungeon or raid is one row for the player&apos;s guild: the guild, the realm, the faction, the boss and the
+              time. No names. A kill counts as the guild&apos;s once two installs report the same guild and boss, and its date is the
+              earliest of their reports. One member&apos;s upload is not enough.
+            </p>
+            <ul className="list-disc pl-6 space-y-1 text-fg-2">
+              <li>The ladder ranks one raid or dungeon at a time: bosses killed, then whoever reached their latest kill first. Guilds
+                level on both share a rank. There is no score and no total across instances.</li>
+              <li>An instance&apos;s boss list is the encounters three installs reported there. A kill of a boss not on it counts for
+                nothing.</li>
+              <li>Officers can also publish their guild&apos;s lockouts through the guild board. Those kills carry no date, so they rank
+                after dated kills with the same count. A boss both report is listed once.</li>
+              <li>The roster on a guild page is the characters the addon saw in that guild, newest first. They are sightings, not the
+                game&apos;s member list. An officers&apos; roster, when they publish one, is shown above it.</li>
+              <li>Anyone can hide a guild on the <Link href="/guilds/hide" className={link}>guild hide form</Link>, without an account or
+                an officer rank. The guild leaves the pages, the ladder and the search at once, and its kills are not kept from then on.
+                A character is hidden on its own <Link href="/players/opt-out" className={link}>hide form</Link>.</li>
+            </ul>
+          </div>
+        </section>}
+
         {/* The full attribution. Pages carry none of their own; the footer's one line links here (docs/DATA_POLICY.md). */}
         <section aria-labelledby="credits">
           <SectionHeading id="credits">Credits</SectionHeading>
@@ -170,6 +207,6 @@ export default async function MethodologyPage() {
           </ul>
         </section>
       </div>
-    </Container>
+    </ReadingLayout>
   );
 }

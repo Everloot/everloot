@@ -13,6 +13,7 @@ import { collectionFactsFromRecords, collectionGap, handleCollectionGap } from "
 import { completionProgress, handleCompletionProgress, type CompletionFacts } from "./completion.js";
 import { goldFactsFromRecords, goldLedger, handleGoldLedger } from "./gold-ledger.js";
 import { guildBoard, guildFactsFromRecords, handleGuildBoard } from "./guild-board.js";
+import { formatGuildPage, formatGuildSearch, formatLadder, guildLadder, guildPageOut, ladderOut, summaryOut, type GuildReader } from "./guilds.js";
 import { itemFactsFromRecords } from "./drop-rollup.js";
 import { formatItemPage, itemPage } from "./item-page.js";
 import { formatItemNumbers, itemToolFactsFromRecords } from "./item-page-tool.js";
@@ -32,15 +33,17 @@ import { formatNpcPage, formatQuestPage, formatVendorPage, npcFactsFromRecords, 
 import { handleWorldMapNear, mapFactsFromRecords, nearResult, nearZoneSpot } from "./world-map-near.js";
 import { WORLD_MAP_DATA } from "./world-map-file.js";
 import { CLIENT_EDGES, CLIENT_LAYER, CLIENT_TAXONOMY } from "./client-layer-file.js";
+import { RACE_TABLE } from "./client-races-file.js";
+import { handleClassRaces } from "./class-races-tool.js";
 import { categoryOf, handleItemCategories, itemCategoriesStructured } from "./item-taxonomy.js";
 import { entityRelationsStructured, handleEntityRelations, observedEdgesFromRecords, type Edge } from "./edges.js";
 import type { DB } from "./db.js";
 import { recordUrl } from "./lore-slug.js";
 import {
-  changesUrl, collectionsUrl, ECOSYSTEM_URL, goldLedgerUrl, guildBoardUrl, itemPageUrl, ITEMS_URL, loreUrls, mapSpotUrl, marketItemUrl,
+  changesUrl, collectionsUrl, ECOSYSTEM_URL, goldLedgerUrl, guildBoardUrl, guildPageUrl, guildsUrl, itemPageUrl, ITEMS_URL, loreUrls, mapSpotUrl, marketItemUrl,
   npcPageUrl, npcUrl, objectPageUrl, professionsUrl, questPageUrl, vendorPageUrl, withMore,
 } from "./page-urls.js";
-import { getByName, getDocument, getEntity, search, type SearchHit } from "./search.js";
+import { getByName, getDocument, getEntity, search, searchSomeWords, SOME_WORDS, type SearchHit } from "./search.js";
 
 export const SERVER_NAME = "everloot-knowledge";
 export const SERVER_VERSION = "0.8.0";
@@ -449,18 +452,24 @@ function formatHits(db: DB, hits: SearchHit[]): string {
   return withPages(db, hits).map((h) => withMore(`[${h.kind}/${h.gameVersion}] ${h.name}\n${h.snippet}\nSource: ${h.sourceUrl} (${h.licence}, retrieved ${h.retrievedAt})`, h.url)).join("\n\n");
 }
 
+export { SOME_WORDS };
+
+/** The hits for every asked word, or, when no page has them all, the pages with some of them. */
+function searchResult(db: DB, args: SearchArgs): { hits: SearchHit[]; some: boolean } {
+  const opts = { kinds: args.kind ? [args.kind] : undefined, versions: args.version ? [args.version] : undefined };
+  const hits = search(db, args.query, args.limit, opts);
+  return hits.length ? { hits, some: false } : { hits: searchSomeWords(db, args.query, args.limit, opts), some: true };
+}
+
 /** Pure handlers — tested directly; the MCP registration below is a thin wrapper. */
 export function searchHits(db: DB, args: SearchArgs): SearchHit[] {
-  return search(db, args.query, args.limit, {
-    kinds: args.kind ? [args.kind] : undefined,
-    versions: args.version ? [args.version] : undefined,
-  });
+  return searchResult(db, args).hits;
 }
 
 export function handleSearch(db: DB, args: SearchArgs): string {
-  const hits = searchHits(db, args);
+  const { hits, some } = searchResult(db, args);
   if (hits.length === 0) return "No matches. Try fewer or different words.";
-  return formatHits(db, hits);
+  return some ? `${SOME_WORDS}\n\n${formatHits(db, hits)}` : formatHits(db, hits);
 }
 
 /** A tool answer: the text every client gets, plus structured content for tools with an output schema. */
@@ -553,7 +562,19 @@ function professionArg(profession: string): string {
 }
 
 /** The readers a host lends the tools: the site's store in process, or nothing for a standalone server. */
-export interface ToolOptions { corpus?: CorpusLoader; market?: MarketLoader; completion?: CompletionLoader; changes?: ChangesLoader; ecosystem?: EcosystemLoader; census?: CensusLoader; coverage?: CoverageLoader; settledSummary?: SettledSummaryLoader; recheck?: readonly RecheckScope[] }
+export interface ToolOptions { corpus?: CorpusLoader; market?: MarketLoader; completion?: CompletionLoader; changes?: ChangesLoader; ecosystem?: EcosystemLoader; census?: CensusLoader; coverage?: CoverageLoader; settledSummary?: SettledSummaryLoader; guilds?: GuildReader; recheck?: readonly RecheckScope[] }
+
+/** The guild ladder's tools: registered only when the host lends a guild reader (EVERLOOT_GUILDS on the site). */
+export const GUILD_TOOLS: readonly McpToolName[] = ["guild_search", "guild_rankings"];
+
+/** The protocol's tools this host answers: every one, less the guild ladder's without a guild reader. */
+export function registeredToolNames(options: Pick<ToolOptions, "guilds"> = {}): McpToolName[] {
+  return MCP_TOOL_NAMES.filter((name) => options.guilds || !GUILD_TOOLS.includes(name));
+}
+
+const GUILDS_OFF = "Guild pages are not on for this server.";
+const GUILDS_UNREAD = "Guild data unavailable. It is unrecorded, not zero.";
+const GUILD_HIDDEN = "This guild asked to be hidden. Nothing about it is shown.";
 
 /** A tool's answer: the text every client gets, and the structured content of the tool's output schema. */
 export type ToolAnswer = Answer;
@@ -590,7 +611,9 @@ export function createToolHandlers(db: DB, options: ToolOptions = {}): ToolHandl
     answer_sources: async (args) => {
       const read = await readTooledFacts<AnswerSourcesFacts>("answer_sources", options.corpus, recheck);
       const result = answerSources(db, args, read?.facts ?? null, read?.dataAsOf ?? null);
-      return { text: `${formatAnswerSources(result, read !== null)}\n${read ? answerFooter(read.dataAsOf) : MCP_CREDIT}`, structured: result };
+      // The fallback is said in the text; the structured answer keeps its published shape.
+      const { someWords: _someWords, ...structured } = result;
+      return { text: `${formatAnswerSources(result, read !== null)}\n${read ? answerFooter(read.dataAsOf) : MCP_CREDIT}`, structured };
     },
     profession_path: (args) => {
       // The same defaults the text handler applies: from 1, to the start when no end is given.
@@ -663,17 +686,74 @@ export function createToolHandlers(db: DB, options: ToolOptions = {}): ToolHandl
     },
     talent_tree: (args) => handleTalentTree(args),
     talent_plan: (args) => handleTalentPlan(args),
+    class_races: (args) => handleClassRaces(args, RACE_TABLE),
     collection_gap: (args) => readPageIn("collection_gap", (facts: ReturnType<typeof collectionFactsFromRecords>) => {
       const page = collectionGap(args.collection, args.ownerInstallId, facts);
       const url = page.groups.length ? collectionsUrl({ collection: args.collection, install: args.ownerInstallId }) : undefined;
       return { text: handleCollectionGap(args, facts), page, url };
     }),
     completion_progress: (args) => completionProgressAnswer(args, options.completion),
-    guild_board: (args) => readPageIn("guild_board", (facts: ReturnType<typeof guildFactsFromRecords>) => {
-      const page = guildBoard(args.guildName, args.realm, facts);
-      const published = page.roster.length || page.progression.length || page.loot.length;
-      return { text: handleGuildBoard(args, facts), page, url: published ? guildBoardUrl(page.guildName, page.realm) : undefined };
-    }),
+    guild_board: async (args) => {
+      // The ladder side (members' kills, sightings, ranks) only when the host lends a guild reader. With one, the hide
+      // list is authoritative: a hidden guild answers nothing, the officers' board included, and a reader that cannot
+      // tell (the hide list unreadable) withholds the answer rather than show a guild that may be hidden.
+      let ladder: Awaited<ReturnType<GuildReader["page"]>> = null;
+      if (options.guilds) {
+        try { ladder = await options.guilds.page(args.guildName, args.realm); } catch { ladder = null; }
+        if (!ladder) return notRead(GUILDS_UNREAD);
+        if (ladder.hidden) return { text: GUILD_HIDDEN, structured: { connected: true, dataAsOf: ladder.dataAsOf } };
+      }
+      const guildPage = ladder?.page ?? null;
+      return readPageIn("guild_board", (facts: ReturnType<typeof guildFactsFromRecords>) => {
+        const page = guildBoard(args.guildName, args.realm, facts);
+        const published = page.roster.length || page.progression.length || page.loot.length;
+        const text = handleGuildBoard(args, facts);
+        if (!guildPage) {
+          return { text, page, url: published ? guildBoardUrl(page.guildName, page.realm) : undefined };
+        }
+        return {
+          text: `${text}\n\n${formatGuildPage(guildPage)}`,
+          page: { ...page, ...guildPageOut(guildPage) },
+          url: guildPageUrl(guildPage.summary.realm, guildPage.summary.guildName),
+        };
+      });
+    },
+    guild_search: async (args) => {
+      if (!options.guilds) return notRead(GUILDS_OFF);
+      let read: Awaited<ReturnType<GuildReader["search"]>>;
+      try { read = await options.guilds.search(args.query, args.limit ?? 10); } catch { read = null; }
+      if (!read) return notRead(GUILDS_UNREAD);
+      const url = read.guilds.length ? guildsUrl({ q: args.query }) : undefined;
+      return {
+        text: `${withMore(formatGuildSearch(read.guilds, args.query), url)}\n${answerFooter(read.dataAsOf)}`,
+        structured: { connected: true, dataAsOf: read.dataAsOf, ...(url ? { url } : {}), page: { guilds: read.guilds.map(summaryOut) } },
+      };
+    },
+    guild_rankings: async (args) => {
+      if (!options.guilds) return notRead(GUILDS_OFF);
+      let read: Awaited<ReturnType<GuildReader["ladder"]>>;
+      try { read = await options.guilds.ladder(); } catch { read = null; }
+      if (!read) return notRead(GUILDS_UNREAD);
+      const ranked = new Set(read.progress.filter((p) => p.killed > 0).map((p) => p.instanceMapId));
+      const candidates = read.instances.filter((i) => ranked.has(i.instanceMapId));
+      // Without an instance, the newest raid with a kill; a dungeon only when no raid has one.
+      const instance = args.instanceMapId !== undefined
+        ? candidates.find((i) => i.instanceMapId === args.instanceMapId) ?? null
+        : [...candidates].sort((a, b) => b.tier - a.tier)[0] ?? null;
+      const filter = { ...(args.realm?.trim() ? { realm: args.realm.trim() } : {}), ...(args.faction ? { faction: args.faction } : {}) };
+      const rows = instance ? guildLadder(read.progress, instance.instanceMapId, filter).slice(0, args.limit ?? 20) : [];
+      const url = instance ? guildsUrl({ instance: instance.instanceMapId, realm: filter.realm, faction: filter.faction }) : undefined;
+      const text = args.instanceMapId !== undefined && !instance
+        ? `No agreed kill in instance ${args.instanceMapId} yet.`
+        : formatLadder(rows, instance, filter);
+      return {
+        text: `${withMore(text, url)}\n${answerFooter(read.dataAsOf)}`,
+        structured: {
+          connected: true, dataAsOf: read.dataAsOf, ...(url ? { url } : {}),
+          page: { instance: instance ? { instanceMapId: instance.instanceMapId, name: instance.name } : null, rows: rows.map(ladderOut) },
+        },
+      };
+    },
     auction_history: (args) => readPageIn("auction_history", (facts: ReturnType<typeof auctionSightingsFromRecords>) => {
       const page = auctionHistory(args.realm, args.itemId, facts);
       return { text: handleAuctionHistory(args, facts), page, url: page.points.length ? marketItemUrl(args.realm, args.itemId) : undefined };
@@ -732,7 +812,7 @@ export function createKnowledgeServer(db: DB, options: ToolOptions = {}, extraTo
       return { content: [{ type: "text" as const, text }], ...(structuredContent ? { structuredContent } : {}) };
     },
   );
-  for (const name of MCP_TOOL_NAMES) register(name, MCP_TOOLS[name], handlers[name] as (a: unknown) => Answer | Promise<Answer>);
+  for (const name of registeredToolNames(options)) register(name, MCP_TOOLS[name], handlers[name] as (a: unknown) => Answer | Promise<Answer>);
   // After the public tools, so a clash with one of their names throws instead of replacing it.
   for (const extra of extraTools) register(extra.name, extra.def, extra.handler);
   for (const uri of MCP_RESOURCE_URIS) {

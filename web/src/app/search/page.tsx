@@ -8,6 +8,7 @@ import { CC_BY_SA } from "@/lib/jsonld";
 import { BROWSE_HEADINGS, BROWSE_TYPES, hasTypes, loreSlug, MAX_QUERY, searchLore, UNAVAILABLE, UNAVAILABLE_COPY, type BrowseSlug, type LoreType } from "@/lib/lore";
 import { isScope, siteSearch, type Scope, type SearchGroup, type SearchResult } from "@/lib/site-search";
 import { loadShownSearchNames } from "@/lib/shown-search-names";
+import { loadShownNames } from "@/lib/shown-item-names";
 import { shownItemIcons } from "@/lib/item-icons";
 
 /** A `type=` value is one of the stored types; anything else means All. */
@@ -33,12 +34,15 @@ function sourceHost(url: string): string {
 /** Next hands a repeated parameter over as an array; the first value is the one we answer. */
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 type Params = { q?: string | string[]; page?: string | string[]; type?: string | string[]; in?: string | string[] };
 
 /** Rows a scoped search (`in=item`) lists; the overview lists 8 per type. */
 const SCOPED_LIMIT = 50;
+
+/** The paginated database list that takes the same `?q=`, for the scopes that have one (objects have no list). */
+const DATABASE_LIST = { item: "items", npc: "npcs", quest: "quests" } as const;
 
 export default async function SearchPage(props: { searchParams: Promise<Params> }) {
   const params = await props.searchParams;
@@ -48,10 +52,12 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
   if (first(params.in) === "lore" || params.page !== undefined || params.type !== undefined) return <LoreResults q={q} params={params} />;
   const scope = isScope(first(params.in)) ? (first(params.in) as Scope) : undefined;
 
+  // Reuse item facts only within this render; the next request rechecks publication.
+  const shown = q ? loadShownNames() : undefined;
   // Matched on the names the database pages show, so a name a list prints is found here too.
-  const groups = q ? await siteSearch(q, { ...(scope ? { only: scope, limit: SCOPED_LIMIT } : {}), names: await loadShownSearchNames() }) : null;
+  const groups = q ? await siteSearch(q, { ...(scope ? { only: scope, limit: SCOPED_LIMIT } : {}), names: loadShownSearchNames(shown) }) : null;
   // The game icon beside each item hit, where its page shows one.
-  const icons = await shownItemIcons(groups?.find((g) => g.type === "item")?.results.flatMap((r) => (r.id === undefined ? [] : [r.id])) ?? []);
+  const icons = await shownItemIcons(groups?.find((g) => g.type === "item")?.results.flatMap((r) => (r.id === undefined ? [] : [r.id])) ?? [], shown);
   const base = `/search?q=${encodeURIComponent(q)}`;
   const tabs = groups && groups.length > 0 && [
     { label: "All", href: base, current: !scope },
@@ -92,9 +98,11 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
 function ResultTable({ group, q, scoped, icons }: { group: SearchGroup; q: string; scoped: boolean; icons: Map<number, string> }) {
   const more = group.total > group.results.length;
   const all = isScope(group.type) ? `/search?q=${encodeURIComponent(q)}&in=${group.type}` : group.type === "lore" ? `/search?q=${encodeURIComponent(q)}&in=lore` : null;
+  const list = more && scoped && group.type in DATABASE_LIST ? `/database/${DATABASE_LIST[group.type as keyof typeof DATABASE_LIST]}?q=${encodeURIComponent(q)}` : null;
   const name = (r: SearchResult) => {
-    const colour = group.type === "item" && typeof r.quality === "number" && r.quality <= 5 ? QUALITY_TEXT[qualityOf(r.quality)] : "text-accent";
-    const link = <Link href={r.href} className={`${colour} hover:underline underline-offset-4`}>{r.label}</Link>;
+    // An item name takes its quality colour; any other hit is a plain link, never the accent an uncommon item resembles.
+    const style = group.type === "item" && typeof r.quality === "number" && r.quality <= 5 ? `${QUALITY_TEXT[qualityOf(r.quality)]} hover:underline underline-offset-4` : "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
+    const link = <Link href={r.href} className={style}>{r.label}</Link>;
     // Item hits carry the game icon as the item lists do, and an empty box where an item has none.
     if (group.type !== "item" || icons.size === 0) return link;
     const icon = r.id === undefined ? undefined : icons.get(r.id);
@@ -121,7 +129,11 @@ function ResultTable({ group, q, scoped, icons }: { group: SearchGroup; q: strin
         rows={group.results}
         rowKey={(r) => r.href}
         meta={(r) => (group.type === "item" ? [r.meta, r.id !== undefined && `ID ${r.id}`] : [r.id !== undefined ? `ID ${r.id}` : r.note]).filter(Boolean).join(" · ")}
-        footer={more && all && !scoped ? <Link href={all} className={link}>All {group.total} {group.type === "lore" ? "lore results" : group.heading.toLowerCase()}</Link> : undefined}
+        footer={
+          more && all && !scoped ? <Link href={all} className={link}>All {group.total} {group.type === "lore" ? "lore results" : group.heading.toLowerCase()}</Link>
+          : list ? <>{`Showing ${group.results.length} of ${group.total}. `}<Link href={list} className={link}>See every match in the database</Link></>
+          : undefined
+        }
       />
     </section>
   );

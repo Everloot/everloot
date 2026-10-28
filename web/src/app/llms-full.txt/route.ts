@@ -5,6 +5,6 @@ import { llmsFullTxt } from "@/lib/llms";
 export const dynamic = "force-static";
 export const revalidate = 3600;
 
-export function GET(): Response {
-  return new Response(llmsFullTxt(), { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=300, s-maxage=3600", ...attributionHeaders() } });
+export async function GET(): Promise<Response> {
+  return new Response(await llmsFullTxt(), { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=300, s-maxage=3600", ...attributionHeaders() } });
 }

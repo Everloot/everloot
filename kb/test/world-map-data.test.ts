@@ -110,6 +110,44 @@ describe("map data from client tables", () => {
   });
 });
 
+describe("instance levels from MapDifficulty, ContentTuning and LFGDungeons", () => {
+  const tuning = (ID: number, MinLevelSquish: number, MaxLevelSquish: number): Row => ({ ID, MinLevelSquish, MaxLevelSquish });
+  const withLevels: typeof tables = {
+    ...tables,
+    ContentTuning: rows([tuning(1, 24, 24), tuning(2, 60, 60), tuning(3, 17, 24), tuning(4, 0, 0), tuning(5, 10, 12)]),
+    // Stockade by MapID (two difficulty rows naming the same tuning), Scarlet Monastery has two different ones, Ragefire's tuning row is empty.
+    MapDifficulty: rows([
+      { ID: 1, MapID: 34, ContentTuningID: 3 }, { ID: 2, MapID: 34, ContentTuningID: 3 },
+      { ID: 3, MapID: 189, ContentTuningID: 3 }, { ID: 4, MapID: 189, ContentTuningID: 5 },
+      { ID: 5, MapID: 389, ContentTuningID: 4 }, { ID: 6, MapID: 409, ContentTuningID: 0 },
+    ]),
+    // No MapID in this build's LFGDungeons: Molten Core is found by its exact name; "Naxxramas" has no row at all.
+    LFGDungeons: rows([{ ID: 1, Name_lang: "Molten Core", ContentTuningID: 2 }, { ID: 2, Name_lang: "Ragefire", ContentTuningID: 1 }]),
+  };
+  const d = buildWorldMapData((t) => withLevels[t], source);
+  const level = (name: string) => { const e = d.entrances.find((x) => x.name === name)!; return [e.minLevel, e.maxLevel]; };
+
+  test("a dungeon takes its range from the tuning row MapDifficulty names", () => {
+    expect(level("Stormwind Stockade")).toEqual([17, 24]);
+  });
+
+  test("a raid with no tuning in MapDifficulty takes the LFGDungeons row with exactly its name", () => {
+    expect(level("Molten Core")).toEqual([60, 60]);
+  });
+
+  test("an instance with no usable row, an empty range or two different ranges has no level, not a guess", () => {
+    expect(level("Ragefire Chasm")).toEqual([undefined, undefined]);
+    expect(level("Scarlet Monastery")).toEqual([undefined, undefined]);
+    expect(d.entrances.find((e) => e.name === "Ragefire Chasm")).not.toHaveProperty("minLevel");
+  });
+
+  test("a snapshot without ContentTuning gives no levels and still builds", () => {
+    const { ContentTuning: _t, ...rest } = withLevels;
+    const none = buildWorldMapData((t) => rest[t], source);
+    expect(none.entrances.every((e) => e.minLevel === undefined && e.maxLevel === undefined)).toBe(true);
+  });
+});
+
 describe("the zone each entrance is in, from the ground under it", () => {
   // Each zone's whole-map assignment names the area it shows; the terrain chunk under a spot names its area.
   const ground = (continentId: number, worldX: number, worldY: number, AreaID: number): Row => {
@@ -241,14 +279,63 @@ describe("flight masters and flight lines from the taxi tables", () => {
   });
 });
 
+describe("difficulty names and the difficulties an instance has, from Difficulty and MapDifficulty", () => {
+  const diff = (ID: number, Name_lang: string, MinPlayers?: number, MaxPlayers?: number): Row => ({ ID, Name_lang, MinPlayers, MaxPlayers });
+  const withDifficulties: typeof tables = {
+    ...tables,
+    Difficulty: rows([diff(1, "Normal", 5, 5), diff(2, "Heroic", 5, 5), diff(3, "10 Player", 10, 10), diff(4, "  ", 0, 0), diff(5, "Blanks")]),
+    // Stockade has Normal and Heroic; the Monastery lists Heroic twice; no row at all for Ragefire.
+    MapDifficulty: rows([
+      { ID: 1, MapID: 34, DifficultyID: 2 }, { ID: 2, MapID: 34, DifficultyID: 1 }, { ID: 3, MapID: 34, DifficultyID: 2 },
+      { ID: 4, MapID: 189, DifficultyID: 2 }, { ID: 5, MapID: 189, DifficultyID: 2 },
+    ]),
+  };
+  const d = buildWorldMapData((t) => withDifficulties[t], source);
+
+  test("the Difficulty table names each difficulty by id, with its group size when given", () => {
+    expect(d.difficulties).toEqual({
+      1: { name: "Normal", minPlayers: 5, maxPlayers: 5 },
+      2: { name: "Heroic", minPlayers: 5, maxPlayers: 5 },
+      3: { name: "10 Player", minPlayers: 10, maxPlayers: 10 },
+      5: { name: "Blanks" },
+    });
+  });
+
+  test("an instance's difficulties are the distinct ids of its MapDifficulty rows, in order; none when it has no rows", () => {
+    const stockade = d.entrances.find((e) => e.name === "Stormwind Stockade")!;
+    expect(stockade.difficultyIds).toEqual([1, 2]);
+    const monastery = d.entrances.find((e) => e.name === "Scarlet Monastery")!;
+    expect(monastery.difficultyIds).toEqual([2]);
+    expect(d.entrances.find((e) => e.name === "Ragefire Chasm")).not.toHaveProperty("difficultyIds");
+  });
+
+  test("a snapshot without the Difficulty tables still builds", () => {
+    expect(data.difficulties).toEqual({});
+    expect(data.entrances.every((e) => !("difficultyIds" in e))).toBe(true);
+  });
+});
+
 describe("the committed map data", () => {
   const committed = WorldMapData.parse(JSON.parse(readFileSync(join(import.meta.dirname, "..", "..", "web", "src", "data", "game-data", "map.json"), "utf8")));
 
   test("is stamped with a build and labelled as game file data, not our licence", () => {
     expect(committed.schema).toBe(WORLD_MAP_SCHEMA);
-    expect(committed.source).toMatchObject({ product: "wow_classic_beta", status: "found in game files, unconfirmed", licence: "Blizzard game data, not under our licence" });
+    expect(committed.source).toMatchObject({ product: "wowf", status: "found in game files, unconfirmed", licence: "Blizzard game data, not under our licence" });
     expect(committed.source.buildId).toBeGreaterThan(70000);
-    expect(committed.source.tables.map((t) => t.table).sort()).toEqual(["AreaTable", "Map", "TaxiNodes", "TaxiPath", "TaxiPathNode", "TerrainArea", "UiMap", "UiMapAssignment"]);
+    // The known tables must all be there; the Difficulty names join in when the build watch regenerates. No
+    // table outside the set the pages read.
+    const known = ["AreaTable", "ContentTuning", "LFGDungeons", "Map", "MapDifficulty", "TaxiNodes", "TaxiPath", "TaxiPathNode", "TerrainArea", "UiMap", "UiMapAssignment"];
+    const read = committed.source.tables.map((t) => t.table).sort();
+    expect(read.filter((t) => !known.includes(t))).toEqual([]);
+    for (const t of known) expect(read).toContain(t);
+  });
+
+  test("an entrance's level is both ends or neither, within the game's 1 to 60, and most instances have one", () => {
+    for (const e of committed.entrances) {
+      expect(e.minLevel === undefined, e.name).toBe(e.maxLevel === undefined);
+      if (e.minLevel !== undefined) expect(e.minLevel >= 1 && e.minLevel <= e.maxLevel! && e.maxLevel! <= 60, e.name).toBe(true);
+    }
+    expect(committed.entrances.filter((e) => e.minLevel !== undefined).length).toBeGreaterThan(committed.entrances.length / 2);
   });
 
   test("every entrance and flight master has the zone its ground belongs to, and the zone is on its continent", () => {

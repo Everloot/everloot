@@ -5,6 +5,7 @@ import { loadCoverage } from "./coverage-compute";
 import { loadCompletion } from "./completion-store";
 import { attributionHeaders } from "./data-guard";
 import { loadEcosystem } from "./ecosystem";
+import { guildReader, guildsOn } from "./guilds";
 import { accountMcpTools } from "./my-builds-tool";
 import { getRelease } from "./release";
 import { RECHECK_SCOPES } from "./recheck-scopes";
@@ -37,9 +38,9 @@ export function toolLoaders(): ToolOptions {
       const list = await readSettledList(build);
       return { build: list.build, dataAsOf: list.dataAsOf, facts: settledKeys(list).size };
     },
-    // The same timeline the /changes page shows, read from the files bundled with the site. The regional
-    // copies stay on the site: the protocol's change entry has no field for them.
-    changes: () => loadTimeline().map(({ copies: _copies, ...e }) => e),
+    // Only official posts and builds fit the published MCP contract. Exclude manual summaries
+    // before the tool filters or limits results; regional copies also stay on the site.
+    changes: async () => (await loadTimeline()).filter((e) => e.source !== "manual").map(({ copies: _copies, ...e }) => e),
     // The registry and GitHub snapshot bundled with the site, joined with the same install counts as /addons/popular.
     ecosystem: () => loadEcosystem(),
     // Same deployment as the store: read the public records in process, no HTTP self-fetch or byte ceiling.
@@ -52,6 +53,8 @@ export function toolLoaders(): ToolOptions {
       const loaded = await uploadStore.loadMarket();
       return loaded.state ? { state: loaded.state, dataAsOf: loaded.dataAsOf } : null;
     },
+    // The guild ladder, only while its switch is on: off, guild_search and guild_rankings are not listed.
+    ...(guildsOn() ? { guilds: guildReader } : {}),
     // The same census /census shows: counts only, under its thresholds.
     census: async () => {
       const loaded = await loadCensus();

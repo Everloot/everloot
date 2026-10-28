@@ -1,0 +1,569 @@
+{
+ "schema": "everloot.races/1",
+ "label": "Found in game files, unconfirmed",
+ "credit": "Game data © Blizzard Entertainment, Inc., read from the public client; not under Everloot's licence. Column names from WoWDBDefs (https://github.com/wowdev/WoWDBDefs), CC BY-SA 4.0.",
+ "build": {
+  "product": "wowf",
+  "buildId": 70634,
+  "version": "1.60.1.70634",
+  "buildConfig": "7d8ae4cd9c1f639a3ea04fd47e21c746",
+  "definitions": "50ce5d272897",
+  "extractedAt": "2026-10-27T22:00:07.150Z"
+ },
+ "races": [
+  {
+   "id": 1,
+   "name": "Human",
+   "faction": "Alliance",
+   "classes": [
+    {
+     "id": 1,
+     "name": "Warrior"
+    },
+    {
+     "id": 2,
+     "name": "Paladin"
+    },
+    {
+     "id": 3,
+     "name": "Hunter"
+    },
+    {
+     "id": 4,
+     "name": "Rogue"
+    },
+    {
+     "id": 5,
+     "name": "Priest"
+    },
+    {
+     "id": 8,
+     "name": "Mage"
+    },
+    {
+     "id": 9,
+     "name": "Warlock"
+    }
+   ],
+   "traits": [
+    {
+     "name": "Will to Survive",
+     "kind": "active",
+     "order": 0,
+     "description": "Remove Stuns"
+    },
+    {
+     "name": "Perception",
+     "kind": "active",
+     "order": 1,
+     "description": "Detect Stealthed enemies for 20 sec"
+    },
+    {
+     "name": "Ruthless",
+     "kind": "passive",
+     "order": 2,
+     "description": "Increases spell and ability critical chance by 2%"
+    },
+    {
+     "name": "The Human Spirit",
+     "kind": "passive",
+     "order": 3,
+     "description": "5% increased Spirit"
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "name": "Orc",
+   "faction": "Horde",
+   "classes": [
+    {
+     "id": 1,
+     "name": "Warrior"
+    },
+    {
+     "id": 3,
+     "name": "Hunter"
+    },
+    {
+     "id": 4,
+     "name": "Rogue"
+    },
+    {
+     "id": 7,
+     "name": "Shaman"
+    },
+    {
+     "id": 8,
+     "name": "Mage"
+    },
+    {
+     "id": 9,
+     "name": "Warlock"
+    }
+   ],
+   "traits": [
+    {
+     "name": "Blood Fury",
+     "kind": "active",
+     "order": 0,
+     "description": "Increases Attack Power and Spell Power by 10% for 15 sec"
+    },
+    {
+     "name": "Shatter Curse",
+     "kind": "active",
+     "order": 1,
+     "description": "Removes Curses and Banes and reduces Magical damage taken by 5% for 8 sec"
+    },
+    {
+     "name": "Savage",
+     "kind": "passive",
+     "order": 2,
+     "description": "Increases spell and ability critical chance by 1%"
+    },
+    {
+     "name": "Hardiness",
+     "kind": "passive",
+     "order": 3,
+     "description": "Stun durations decreased by 20%"
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "name": "Dwarf",
+   "faction": "Alliance",
+   "classes": [
+    {
+     "id": 1,
+     "name": "Warrior"
+    },
+    {
+     "id": 2,
+     "name": "Paladin"
+    },
+    {
+     "id": 3,
+     "name": "Hunter"
+    },
+    {
+     "id": 4,
+     "name": "Rogue"
+    },
+    {
+     "id": 5,
+     "name": "Priest"
+    },
+    {
+     "id": 7,
+     "name": "Shaman"
+    }
+   ],
+   "traits": [
+    {
+     "name": "Stoneform",
+     "kind": "active",
+     "order": 0,
+     "description": "Gain immunity to Bleeds, Poisons, and Diseases and reduce Physical damage taken by 10% for 8 sec"
+    },
+    {
+     "name": "Find Treasure",
+     "kind": "active",
+     "order": 1,
+     "description": "Track nearby treasure chests and gain a chance to find more valuables in them"
+    },
+    {
+     "name": "Earth Fury",
+     "kind": "passive",
+     "order": 2,
+     "description": "Critical Damage and Healing increased by 2%"
+    },
+    {
+     "name": "Big Game Hunter",
+     "kind": "passive",
+     "order": 3,
+     "description": "Damage to Beasts increased by 5%"
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "name": "Night Elf",
+   "faction": "Alliance",
+   "classes": [
+    {
+     "id": 1,
+     "name": "Warrior"
+    },
+    {
+     "id": 3,
+     "name": "Hunter"
+    },
+    {
+     "id": 4,
+     "name": "Rogue"
+    },
+    {
+     "id": 5,
+     "name": "Priest"
+    },
+    {
+     "id": 11,
+     "name": "Druid"
+    }
+   ],
+   "traits": [
+    {
+     "name": "Elune's Light",
+     "kind": "active",
+     "order": 0,
+     "description": "Increases critical chance by 10% for 15 sec"
+    },
+    {
+     "name": "Shadowmeld",
+     "kind": "active",
+     "order": 1,
+     "description": "Gain Stealth while immobile"
+    },
+    {
+     "name": "Quickness",
+     "kind": "passive",
+     "order": 2,
+     "description": "1% increased Dodge chance and 2% increased run speed"
+    },
+    {
+     "name": "Wisp Spirit",
+     "kind": "passive",
+     "order": 3,
+     "description": "75% increased run speed while dead"
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "name": "Undead",
+   "faction": "Horde",
+   "classes": [
+    {
+     "id": 1,
+     "name": "Warrior"
+    },
+    {
+     "id": 2,
+     "name": "Paladin"
+    },
+    {
+     "id": 4,
+     "name": "Rogue"
+    },
+    {
+     "id": 5,
+     "name": "Priest"
+    },
+    {
+     "id": 8,
+     "name": "Mage"
+    },
+    {
+     "id": 9,
+     "name": "Warlock"
+    }
+   ],
+   "traits": [
+    {
+     "name": "Will of the Forsaken",
+     "kind": "active",
+     "order": 0,
+     "description": "Removes Charm, Fear, and Sleep"
+    },
+    {
+     "name": "Cannibalize",
+     "kind": "active",
+     "order": 1,
+     "description": "Consume corpses to regenerate 35% Health and Mana over time"
+    },
+    {
+     "name": "Underwater Breathing",
+     "kind": "passive",
+     "order": 2,
+     "description": "Breathe 300% longer underwater"
+    },
+    {
+     "name": "Touch of the Grave",
+     "kind": "passive",
+     "order": 3,
+     "description": "Sometimes drain health with your attacks"
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "name": "Tauren",
+   "faction": "Horde",
+   "classes": [
+    {
+     "id": 1,
+     "name": "Warrior"
+    },
+    {
+     "id": 3,
+     "name": "Hunter"
+    },
+    {
+     "id": 7,
+     "name": "Shaman"
+    },
+    {
+     "id": 11,
+     "name": "Druid"
+    }
+   ],
+   "traits": [
+    {
+     "name": "War Stomp",
+     "kind": "active",
+     "order": 0,
+     "description": "Stuns nearby enemies for 2 sec"
+    },
+    {
+     "name": "Cultivation",
+     "kind": "active",
+     "order": 1,
+     "description": "Grow bonus herbs that don't require herbalism to gather"
+    },
+    {
+     "name": "Plainsrunning",
+     "kind": "passive",
+     "order": 2,
+     "description": "Gain increased movement speed the longer you stay moving and move faster while mounted"
+    },
+    {
+     "name": "Endurance",
+     "kind": "passive",
+     "order": 3,
+     "description": "Total Health increased by 5% and Critical Damage and Healing increased by 2%"
+    }
+   ]
+  },
+  {
+   "id": 7,
+   "name": "Gnome",
+   "faction": "Alliance",
+   "classes": [
+    {
+     "id": 1,
+     "name": "Warrior"
+    },
+    {
+     "id": 4,
+     "name": "Rogue"
+    },
+    {
+     "id": 5,
+     "name": "Priest"
+    },
+    {
+     "id": 8,
+     "name": "Mage"
+    },
+    {
+     "id": 9,
+     "name": "Warlock"
+    }
+   ],
+   "traits": [
+    {
+     "name": "Escape Artist",
+     "kind": "active",
+     "order": 0,
+     "description": "Brief Immunity to Roots and Snares"
+    },
+    {
+     "name": "Eureka!",
+     "kind": "active",
+     "order": 1,
+     "description": "Reduced cost and 10% increased damage or healing on spells and abilities for 8 sec."
+    },
+    {
+     "name": "Expansive Mind",
+     "kind": "passive",
+     "order": 2,
+     "description": "Maximum Mana, Rage, or Energy increased by 5%"
+    },
+    {
+     "name": "Engineering Specialization",
+     "kind": "passive",
+     "order": 3,
+     "description": "More reliable engineering devices"
+    }
+   ]
+  },
+  {
+   "id": 8,
+   "name": "Troll",
+   "faction": "Horde",
+   "classes": [
+    {
+     "id": 1,
+     "name": "Warrior"
+    },
+    {
+     "id": 3,
+     "name": "Hunter"
+    },
+    {
+     "id": 4,
+     "name": "Rogue"
+    },
+    {
+     "id": 5,
+     "name": "Priest"
+    },
+    {
+     "id": 7,
+     "name": "Shaman"
+    },
+    {
+     "id": 8,
+     "name": "Mage"
+    },
+    {
+     "id": 9,
+     "name": "Warlock"
+    }
+   ],
+   "traits": [
+    {
+     "name": "Berserking",
+     "kind": "active",
+     "order": 0,
+     "description": "Increases casting and attack speed by 10% for 10 sec"
+    },
+    {
+     "name": "Rapid Regeneration",
+     "kind": "active",
+     "order": 1,
+     "description": "Regenerate 50% of maximum Health over time"
+    },
+    {
+     "name": "Beast Slaying",
+     "kind": "passive",
+     "order": 2,
+     "description": "Damage to Beasts increased by 5%"
+    },
+    {
+     "name": "Regeneration",
+     "kind": "passive",
+     "order": 3,
+     "description": "20% of Health regeneration continues during combat"
+    }
+   ]
+  },
+  {
+   "id": 95,
+   "name": "High Order Skyborne",
+   "faction": "Alliance",
+   "classes": [
+    {
+     "id": 1,
+     "name": "Warrior"
+    },
+    {
+     "id": 3,
+     "name": "Hunter"
+    },
+    {
+     "id": 4,
+     "name": "Rogue"
+    },
+    {
+     "id": 8,
+     "name": "Mage"
+    },
+    {
+     "id": 11,
+     "name": "Druid"
+    }
+   ],
+   "traits": [
+    {
+     "name": "Walk on Air",
+     "kind": "active",
+     "order": 0,
+     "description": "Glide downward through the air for 10 sec"
+    },
+    {
+     "name": "Read Leyline",
+     "kind": "active",
+     "order": 1,
+     "description": "Activate a leyline to gain 100% increased Health and Mana regeneration"
+    },
+    {
+     "name": "Wind Blessed",
+     "kind": "passive",
+     "order": 2,
+     "description": "3% increased melee, ranged, and spellcasting Haste"
+    },
+    {
+     "name": "Elemental Insight",
+     "kind": "passive",
+     "order": 3,
+     "description": "Damage to Elementals increased by 5%"
+    }
+   ]
+  },
+  {
+   "id": 96,
+   "name": "Windshaper Skyborne",
+   "faction": "Horde",
+   "classes": [
+    {
+     "id": 1,
+     "name": "Warrior"
+    },
+    {
+     "id": 3,
+     "name": "Hunter"
+    },
+    {
+     "id": 4,
+     "name": "Rogue"
+    },
+    {
+     "id": 7,
+     "name": "Shaman"
+    },
+    {
+     "id": 11,
+     "name": "Druid"
+    }
+   ],
+   "traits": [
+    {
+     "name": "Walk on Air",
+     "kind": "active",
+     "order": 0,
+     "description": "Glide downward through the air for 10 sec"
+    },
+    {
+     "name": "Skysight",
+     "kind": "active",
+     "order": 1,
+     "description": "Receive an Elemental Blessing increasing run speed by 10%"
+    },
+    {
+     "name": "Wind Blessed",
+     "kind": "passive",
+     "order": 2,
+     "description": "3% increased melee, ranged, and spellcasting Haste"
+    },
+    {
+     "name": "Elemental Insight",
+     "kind": "passive",
+     "order": 3,
+     "description": "Damage to Elementals increased by 5%"
+    }
+   ]
+  }
+ ]
+}

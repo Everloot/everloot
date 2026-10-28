@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, expect, test, vi } from "vitest";
 import { latestAddonRelease } from "@/lib/addon-release";
+import { servedFile } from "@/lib/everloot-releases";
 
 vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a>,
@@ -11,6 +12,8 @@ import AddonPage from "./page";
 
 const DL = "https://github.com/Everloot/everloot/releases/download";
 const addon = latestAddonRelease()!;
+const served = servedFile(addon.downloadPath)!;
+const addonZip = { name: `Everloot-${addon.version}.zip`, size: served.size, digest: `sha256:${served.sha256}`, browser_download_url: `${DL}/addon-v${addon.version}/Everloot-${addon.version}.zip` };
 const desktop = (name: string, size: number) => ({ name, size, digest: `sha256:${"b".repeat(64)}`, browser_download_url: `${DL}/desktop-v0.1.0/${name}` });
 const releases = [
   {
@@ -25,7 +28,7 @@ const releases = [
   },
   {
     tag_name: `addon-v${addon.version}`, html_url: `https://github.com/Everloot/everloot/releases/tag/addon-v${addon.version}`, published_at: "2026-10-18T00:05:47Z", draft: false, prerelease: false,
-    assets: [{ name: "SHA256SUMS", size: 85, digest: null, browser_download_url: `${DL}/addon-v${addon.version}/SHA256SUMS` }],
+    assets: [addonZip, { name: "SHA256SUMS", size: 85, digest: null, browser_download_url: `${DL}/addon-v${addon.version}/SHA256SUMS` }],
   },
 ];
 
@@ -37,11 +40,33 @@ async function render(answer: () => Promise<Response>) {
 
 afterEach(() => vi.unstubAllGlobals());
 
+test("the download is clearly labelled Alpha with live-client checks pending", async () => {
+  const html = await render(() => Promise.resolve(Response.json(releases)));
+  expect(visible(html)).toContain("Alpha");
+  expect(visible(html)).toContain("Live-client verification is pending");
+});
+
+test.each([
+  { reason: "different bytes", zip: { ...addonZip, digest: `sha256:${"0".repeat(64)}` } },
+  { reason: "different size", zip: { ...addonZip, size: served.size + 1 } },
+  { reason: "different filename", zip: { ...addonZip, name: "another-addon.zip" } },
+  { reason: "unknown digest", zip: { ...addonZip, digest: null } },
+])("the site keeps its own checksum but hides release sums for $reason", async ({ zip }) => {
+  const mismatched = releases.map((release) => release.tag_name === `addon-v${addon.version}`
+    ? { ...release, assets: [zip, release.assets[1]] }
+    : release);
+  const html = await render(() => Promise.resolve(Response.json(mismatched)));
+  expect(html).toContain(`href="${addon.downloadPath}"`);
+  expect(html).toContain(served.sha256);
+  expect(html).not.toContain(`href="${DL}/addon-v${addon.version}/SHA256SUMS"`);
+  expect(html).toContain(`href="${DL}/desktop-v0.1.0/SHA256SUMS"`);
+});
+
 test("the addon and every desktop build are offered with version, date, size and checksum", async () => {
   const html = await render(() => Promise.resolve(Response.json(releases)));
   const text = visible(html);
   expect(html).toContain(`href="${addon.downloadPath}"`);
-  expect(text).toContain(`Version ${addon.version}, beta, released 2026-10-18`);
+  expect(text).toContain(`Version ${addon.version}, Alpha, released 2026-10-18`);
   expect(text).toContain("Version 0.1.0, released 2026-10-19");
   for (const [label, size] of [["Windows installer", "108 MB"], ["Windows portable", "108 MB"], ["macOS disk image", "125 MB"], ["Linux AppImage", "122 MB"]]) {
     expect(text).toContain(`${label} (${size})`);

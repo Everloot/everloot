@@ -5,7 +5,10 @@ import { describe } from "../../../kb/src/item-taxonomy";
 import { objectList } from "../../../kb/src/object-page";
 import { achievementHref, chainHref, factionHref, loadCatalog, titleHref } from "./completion-lists";
 import { CLIENT_TAXONOMY } from "./items";
-import { loreSlug, MAX_QUERY, searchLore, UNAVAILABLE } from "./lore";
+import type { SearchHit } from "../../../kb/src/search";
+import { classLabel } from "./class-context";
+import { CLASSES } from "@/design/tokens";
+import { loreSlug, MAX_QUERY, searchLore, searchLoreSomeWords, UNAVAILABLE } from "./lore";
 import { loadNames, type Names } from "./names";
 import { loadObjectFacts } from "./objects";
 import { WORLD_MAP } from "./world-map";
@@ -17,16 +20,18 @@ import { zoneHref } from "./zones";
  * the item is in the build.
  */
 export interface SearchResult { label: string; href: string; note?: string; exact: boolean; id?: number; quality?: number | null; meta?: string }
-export type SearchType = "item" | "npc" | "quest" | "object" | "achievement" | "faction" | "title" | "chain" | "zone" | "lore" | "tool" | "doc";
+export type SearchType = "class" | "item" | "npc" | "quest" | "object" | "achievement" | "faction" | "title" | "chain" | "zone" | "lore" | "tool" | "doc";
 /** `total` counts every match; `results` holds the first `limit` of them. */
 export interface SearchGroup { type: SearchType; heading: string; results: SearchResult[]; total: number }
 export const GROUP_LIMIT = 8;
 export const LORE_LIMIT = 5;
 
 export const HEADINGS: Record<SearchType, string> = {
-  item: "Items", npc: "NPCs", quest: "Quests", object: "Objects", achievement: "Achievements", faction: "Factions", title: "Titles", chain: "Quest chains", zone: "Zones", lore: "Lore archive", tool: "Tools", doc: "Docs",
+  class: "Classes", item: "Items", npc: "NPCs", quest: "Quests", object: "Objects", achievement: "Achievements", faction: "Factions", title: "Titles", chain: "Quest chains", zone: "Zones", lore: "Lore archive", tool: "Tools", doc: "Docs",
 };
-const ORDER: SearchType[] = ["item", "npc", "quest", "object", "achievement", "faction", "title", "chain", "zone", "lore", "tool", "doc"];
+/** The lore group's heading when its pages hold only some of the asked words. */
+export const LORE_SOME_WORDS = "Lore archive, some of your words";
+const ORDER: SearchType[] = ["class", "item", "npc", "quest", "object", "achievement", "faction", "title", "chain", "zone", "lore", "tool", "doc"];
 /** The types a search can be scoped to (`/search?q=…&in=item`); `in=lore` is the lore archive's own list. */
 export const SCOPES = ["item", "npc", "quest", "object"] as const satisfies readonly SearchType[];
 export type Scope = (typeof SCOPES)[number];
@@ -91,21 +96,21 @@ async function objectById(id: number | null, names: Map<number, string>): Promis
  * lore comes from the archive, tools from the tool list. A group with an exact id or name match comes first; an
  * empty group is left out. `only` keeps one database type; `limit` is the rows per group.
  */
-export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, names: given }: { only?: Scope; limit?: number; names?: Names } = {}): Promise<SearchGroup[]> {
+export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, names: given }: { only?: Scope; limit?: number; names?: Names | Promise<Names> } = {}): Promise<SearchGroup[]> {
   const text = raw.trim().slice(0, MAX_QUERY);
   const q = text.toLowerCase();
   if (!q) return [];
   const id = exactId(q);
-  const found = new Map<SearchType, { results: SearchResult[]; total: number }>();
+  const found = new Map<SearchType, { results: SearchResult[]; total: number; heading?: string }>();
   const want = (t: SearchType) => !only || only === t;
 
-  const names = given ?? await loadNames();
+  // Neither read depends on the other. Scoped searches do not need the completion catalogue.
+  const [names, catalog] = await Promise.all([given ?? loadNames(), only ? null : loadCatalog()]);
   for (const kind of ["item", "npc", "quest"] as const) if (want(kind)) found.set(kind, agreed(kind, names[`${kind}s`], q, id));
   if (want("object")) { const objects = await objectById(id, names.objects); found.set("object", { results: objects, total: objects.length }); }
 
   if (!only) {
     // Achievements, factions, titles and quest chains three players reported, by name or id; none when the rollup cannot be read.
-    const catalog = await loadCatalog();
     if (catalog) {
       const hit = (label: string, href: string, n: number, exact: boolean): SearchResult => ({ label, href, note: `id ${n}`, exact, id: n });
       const achievements = byName(catalog.achievements, q).map(({ entry, exact }) => hit(entry.name, achievementHref(entry.achievementId, entry.name), entry.achievementId, exact));
@@ -132,10 +137,22 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, names
       .map(({ entry, exact }) => ({ label: entry.name, href: zoneHref(entry.id, entry.name), note: "zone", exact }));
     found.set("zone", { results: zones, total: zones.length });
 
+    // A class named anywhere in the words ("best race for a warlock") leads to its page: guides, talents, who can play it.
+    const words = new Set(q.split(/[^a-z]+/).flatMap((w) => [w, w.replace(/s$/, "")]));
+    const classes = CLASSES.filter((slug) => words.has(slug))
+      .map((slug) => ({ label: classLabel(slug), href: `/classes/${slug}`, note: "Guides, talents and who can play it", exact: q.replace(/s$/, "") === slug }));
+    found.set("class", { results: classes, total: classes.length });
+
     const lore = searchLore(text, 1);
     if (lore !== UNAVAILABLE) {
-      const hits = lore.hits.map((h) => ({ label: h.name, href: `/lore/${loreSlug(h)}`, note: h.snippet, exact: h.name.toLowerCase() === q }));
-      found.set("lore", { results: hits.slice(0, LORE_LIMIT), total: hits.length });
+      const loreHit = (h: SearchHit) => ({ label: h.name, href: `/lore/${loreSlug(h)}`, note: h.snippet, exact: h.name.toLowerCase() === q });
+      const some = lore.hits.length ? [] : searchLoreSomeWords(text, LORE_LIMIT);
+      if (lore.hits.length || some === UNAVAILABLE) {
+        const hits = lore.hits.map(loreHit);
+        found.set("lore", { results: hits.slice(0, LORE_LIMIT), total: hits.length });
+      } else {
+        found.set("lore", { results: some.map(loreHit), total: some.length, heading: LORE_SOME_WORDS });
+      }
     }
 
     const matches = tools.flatMap((t) => {
@@ -156,7 +173,7 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, names
   return ORDER
     .map((type) => {
       const f = found.get(type) ?? { results: [], total: 0 };
-      return { type, heading: HEADINGS[type], results: f.results.slice(0, limit).map(strip), total: f.total };
+      return { type, heading: f.heading ?? HEADINGS[type], results: f.results.slice(0, limit).map(strip), total: f.total };
     })
     .filter((g) => g.results.length > 0)
     .map((g, i) => ({ g, i, tier: tier(g) }))
@@ -166,7 +183,7 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, names
 
 /** The things a player meets in the game: their groups lead the page. */
 const GAME: ReadonlySet<SearchType> = new Set(["item", "npc", "quest", "object", "zone"]);
-const DATABASE: ReadonlySet<SearchType> = new Set([...GAME, "achievement", "faction", "title", "chain"]);
+const DATABASE: ReadonlySet<SearchType> = new Set([...GAME, "class", "achievement", "faction", "title", "chain"]);
 
 /**
  * Where a group sits, lowest first; the order above within a tier. An exact name or id on a game entry leads,

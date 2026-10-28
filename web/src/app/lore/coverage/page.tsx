@@ -29,7 +29,7 @@ const FACET_LABELS: Record<FacetKey, string> = {
 };
 const formatter = new Intl.NumberFormat("en-US");
 const num = (n: number) => formatter.format(n);
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 type TypeRow = { key: string; heading: string; href?: string; n: number };
 

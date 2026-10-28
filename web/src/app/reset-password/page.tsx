@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 // Without a token: ask for the email. With one (the link in the email lands here): choose the new password.
 export default async function ResetPasswordPage({ searchParams }: { searchParams: Promise<{ token?: string; error?: string }> }) {
   const { token, error } = await searchParams;
-  const link = "text-accent hover:underline underline-offset-4";
+  const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
   return (
     <article className="max-w-3xl space-y-6">
       <h1 className="text-3xl font-bold text-fg">Reset your password</h1>

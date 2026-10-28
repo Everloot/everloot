@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { atlasPieces, blpSize, narrowCrop, ORIGINAL_MAP_MAX, planLoadingScreens, racesInBuild } from "../src/assets/banners.js";
+import { atlasPieces, blpSize, narrowCrop, ORIGINAL_MAP_MAX, planLoadingScreens, POI_ELEMENTS, racesInBuild } from "../src/assets/banners.js";
 import type { Row, Rows } from "../src/talents/build-catalog.js";
 
 const t = (rows: Row[]): Rows => new Map(rows.map((r, i) => [typeof r.ID === "number" ? r.ID : i + 1, r]));
@@ -76,4 +76,17 @@ test("atlas pieces come with their file and rectangle; an element without a memb
 
 test("only the announced races the build has are extracted, matched by the client's file string", () => {
   expect(racesInBuild(get)).toEqual(["Human", "Undead", "Skyborne"]);
+});
+
+test("the map legend's icons name a legend category each, with at least one atlas element to try", () => {
+  const categories = ["flight", "path", "dungeon", "raid", "zone", "vendor", "trainer", "quest", "service", "npc", "herb", "ore", "chest"];
+  for (const [category, elements] of Object.entries(POI_ELEMENTS)) {
+    expect(categories, category).toContain(category);
+    expect(elements.length, category).toBeGreaterThan(0);
+  }
+  // Zones and flight paths are shapes on the map, never icons.
+  expect(POI_ELEMENTS.zone).toBeUndefined();
+  expect(POI_ELEMENTS.path).toBeUndefined();
+  // A build without a piece gives nothing for its category; the site keeps its glyph.
+  expect(atlasPieces((name) => tables[name], POI_ELEMENTS.dungeon!).size).toBe(0);
 });

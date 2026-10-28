@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { CURRENT_BUILD, TABLES } from "@/data/game-data/raid";
 import {
   assetUrl, BANNER_MAP, buildFolder, classAndProfessionIcons, continentArt, creditWhat, emblems, FETCH_TIMEOUT_MS, forgetPrivateReads, iconUrl,
-  instanceThumbs, itemIconUrl, itemShard, itemTip, gameNameFor, launchArt, loadingArt, loadItemNames, loadItemSetNames, loadItemTips, loadQuestNames, loadSpellNames, loadSiteAssets, parseSiteManifest, privateStoreFromEnv, raidArt,
+  instanceThumbs, itemIconUrl, itemShard, itemTip, gameNameFor, launchArt, loadingArt, loadItemNames, loadItemSetNames, loadItemTips, loadQuestNames, loadSpellNames, loadSiteAssets, parseSiteManifest, poiIcons, privateStoreFromEnv, raidArt,
 } from "./game-assets";
 import { itemTipText, qualityColor, tipLines, WHY } from "./item-names";
 import { cameraBox, zoneArtShown, ZONE_ART_ZOOM, type Box, type Camera } from "./map-view";
@@ -38,12 +38,13 @@ test("a full manifest becomes ready URLs: classes, professions with icons, buff 
 });
 
 test("a manifest from before the site-wide art (talent art only, with its icon list) still reads, with nothing to show", () => {
-  const later = ["classes", "professions", "spellIcons", "maps", "spellTips", "loadingScreens", "races", "factions", "logo"];
+  const later = ["classes", "professions", "spellIcons", "maps", "spellTips", "loadingScreens", "races", "factions", "poi", "logo"];
   const talentsOnly = { ...Object.fromEntries(Object.entries(siteManifest).filter(([k]) => !later.includes(k))), icons: {} };
   const a = parseSiteManifest(talentsOnly, BASE)!;
   expect(a.classes.size + a.professions.size + a.spellIcons.size + a.maps.length).toBe(0);
   expect(a.spellTips.size + a.loadingScreens.size + a.races.size + a.factions.size).toBe(0);
   expect(a.logo).toBeNull();
+  expect(poiIcons(a)).toEqual({});
   expect(launchArt(a)).toBeNull();
   expect(classAndProfessionIcons(a)).toEqual({ classes: [], professions: [] });
 });
@@ -222,10 +223,20 @@ test("map pictures land on the stitched map; held-back zones wait for spoilers, 
 const frame: Box = { x: -4000, y: -4000, width: 8000, height: 8000 };
 const at = (zoom: number, cx: number, cy: number): [Camera, Box] => [{ zoom, cx, cy }, cameraBox(frame, { zoom, cx, cy })];
 
-test("with a continent picture, a zone's own picture shows only when zoomed in over it", () => {
+test("the map legend's icons come by category, only the categories the upload has pieces for", () => {
+  const a = parseSiteManifest(siteManifest, BASE)!;
+  expect(poiIcons(a)).toEqual({ dungeon: `${BASE}/poi/Dungeon.webp`, flight: `${BASE}/poi/TaxiNode_Neutral.webp` });
+  expect(poiIcons(null)).toEqual({});
+  // A piece under a name that is not a legend category is ignored.
+  expect(poiIcons(parseSiteManifest({ ...siteManifest, poi: { boats: { file: "poi/Boat.webp", width: 32, height: 32 } } }, BASE))).toEqual({});
+});
+
+test("with a continent picture, a zone's own picture shows only when zoomed in over it, one zone at a time", () => {
   const art = continentArt(parseSiteManifest(siteManifest, BASE)!, 0, false)!;
   expect(zoneArtShown(art, ...at(1, -500, 0))).toEqual([]);
+  expect(zoneArtShown(art, ...at(ZONE_ART_ZOOM - 0.25, -500, 0))).toEqual([]);
   expect(zoneArtShown(art, ...at(ZONE_ART_ZOOM, -500, 0)).map((z) => [z.uiMapId, z.url])).toEqual([[1429, `${BASE}/maps/1429.webp`]]);
+  // Between two zones, over neither: nothing, rather than a quilt of both.
   expect(zoneArtShown(art, ...at(ZONE_ART_ZOOM, 2000, -2000))).toEqual([]);
 });
 

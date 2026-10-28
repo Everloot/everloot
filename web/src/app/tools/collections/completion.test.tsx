@@ -48,11 +48,20 @@ beforeEach(() => {
   store.loadState.mockReset().mockResolvedValue({ grants: [grant], suppressions: [] });
 });
 
-test("with no install the page asks for one and says nothing is measured", async () => {
+test("with no install the overview is the agreed lists with nothing counted as done", async () => {
   const html = await render({});
   expect(html).toContain("Enter an install id");
-  expect(html).not.toContain('role="progressbar"');
-  // No collection upload exists yet, so the gap box is the empty state rather than a prompt.
+  expect(html).toContain("Total complete");
+  // One achievement, one faction, one title and one chain are agreed: 0 of 4, no percentage, nobody's progress.
+  expect(html).toMatch(/aria-label="Total complete" aria-valuemin="0" aria-valuemax="4" aria-valuenow="0"/);
+  expect(html).not.toMatch(/ · \d+%/);
+  expect(html).not.toContain("Friendly");
+  expect(html).not.toContain("Closest to done");
+  expect(store.loadCorpus).not.toHaveBeenCalled();
+});
+
+test("with no collection upload yet, the gap view is the empty state", async () => {
+  const html = await render({ view: "gap" });
   expect(html).toContain("No collection list yet");
   expect(html).toContain("data-empty-state");
 });
@@ -62,7 +71,7 @@ test("once collection lists exist, the gap box asks for a collection", async () 
     uploads: 3, dataAsOf: null,
     records: three({ kind: "collection_catalog", collection: "Mounts", itemId: 1, source: "Vendor" }),
   });
-  expect(await render({})).toContain("Name a collection.");
+  expect(await render({ view: "gap" })).toContain("Name a collection.");
 });
 
 test("an install that uploaded no completion data gets an honest empty state, not zeros", async () => {
@@ -76,8 +85,11 @@ test("an install that uploaded no completion data gets an honest empty state, no
 
 test("a character shows what is done and what is closest to done", async () => {
   const html = await render({ install: "owner-install" });
-  expect(html).toContain("Mage");
+  expect(html).toContain("Mage level 40");
   expect(html).toContain("key 0a1b2c3d");
+  // One title of four agreed entries is done.
+  expect(html).toMatch(/aria-label="Total complete" aria-valuemin="0" aria-valuemax="4" aria-valuenow="1"/);
+  expect(html).toContain("1 of 4 · 25%");
   expect(html).toContain("Achievements closest to done");
   expect(html).toContain("Ten Quests");
   expect(html).toContain("Quests · 8 of 10 criteria");
@@ -86,7 +98,9 @@ test("a character shows what is done and what is closest to done", async () => {
   expect(html).toContain("The Defias");
   expect(html).toContain("3 of 4 quests");
   expect(html).toContain('aria-label="Titles"');
-  expect(html.match(/role="progressbar"/g)).toHaveLength(4);
+  // Total, then Quests achievements, Reputation and its Alliance header, Titles, Quest chains.
+  expect(html.match(/role="progressbar"/g)).toHaveLength(6);
+  expect(html).toContain('href="/tools/collections?view=achievements-quests&amp;install=owner-install&amp;character=0a1b2c3d"');
   expect(html).toContain("Data as of 2026-10-19 06:30 UTC");
 });
 
@@ -140,4 +154,66 @@ test("when older characters gave way the page says so, instead of acting as if t
   const html = await render({ install: "owner-install" });
   expect(html).toContain("1 older character is no longer kept for this install");
   expect(html).not.toContain("key 00000000");
+});
+
+// A Quests category with one done, one started and one untouched achievement.
+const detailRecords = [
+  ...records,
+  ...three({ kind: "achievement_catalog", achievementId: 2, name: "Twenty Quests", categoryId: 2, category: "Quests", points: 10, criteriaCount: 1, criteria: [] }),
+  ...three({ kind: "achievement_catalog", achievementId: 3, name: "Five Quests", categoryId: 2, category: "Quests", points: 5, criteriaCount: 1, criteria: [] }),
+  mine({ kind: "achievement_owned", achievementId: 3, completed: true, earnedByMe: true, criteriaMet: 1, criteriaTotal: 1 }),
+];
+const detail = (show?: string) =>
+  render({ install: "owner-install", view: "achievements-quests", ...(show ? { show } : {}) });
+const names = (html: string) => ["Five Quests", "Ten Quests", "Twenty Quests"].filter((n) => html.includes(`>${n}</a>`));
+
+test("a category's detail view lists its rows, and each filter is a GET link", async () => {
+  store.loadCompletion.mockResolvedValue({ state: rollup(detailRecords), dataAsOf: null });
+  const all = await detail();
+  expect(names(all)).toEqual(["Five Quests", "Ten Quests", "Twenty Quests"]);
+  expect(all).toContain("Quests achievements");
+  expect(all).toContain("8 of 10 criteria");
+  for (const show of ["done", "missing", "started"]) {
+    expect(all).toContain(`href="/tools/collections?view=achievements-quests&amp;install=owner-install&amp;character=0a1b2c3d&amp;show=${show}"`);
+  }
+  expect(all).toContain('href="/database/achievements/1-ten-quests"');
+
+  expect(names(await detail("done"))).toEqual(["Five Quests"]);
+  expect(names(await detail("missing"))).toEqual(["Ten Quests", "Twenty Quests"]);
+  expect(names(await detail("started"))).toEqual(["Ten Quests"]);
+});
+
+test("a filter with nothing in it says so and links back to all", async () => {
+  const html = await detail("done");
+  expect(html).toContain("Nothing done here.");
+  expect(html).toContain('>Show all</a>');
+});
+
+test("a reputation detail calls a standing below the top started", async () => {
+  const html = await render({ install: "owner-install", view: "reputation", show: "started" });
+  expect(html).toContain(">Darnassus</a>");
+  expect(html).toContain("Friendly, 500 to go");
+});
+
+test("with no install a detail view lists the agreed rows without filters or status", async () => {
+  store.loadCompletion.mockResolvedValue({ state: rollup(detailRecords), dataAsOf: null });
+  const html = await render({ view: "achievements-quests" });
+  expect(names(html)).toEqual(["Five Quests", "Ten Quests", "Twenty Quests"]);
+  expect(html).not.toContain("show=done");
+  expect(html).not.toContain("criteria");
+  expect(html).toContain("Enter an install id to see which of these a character has done.");
+});
+
+test("before any list is agreed there is one framed empty state and no bars", async () => {
+  store.loadCompletion.mockResolvedValue({ state: rollup([]), dataAsOf: null });
+  const html = await render({});
+  expect(html.match(/data-empty-state/g)).toHaveLength(1);
+  expect(html).toContain("No list is public yet");
+  expect(html).not.toContain('role="progressbar"');
+});
+
+test("the remember helper is offered for a chosen character and makes no request", async () => {
+  const html = await render({ install: "owner-install" });
+  expect(html).toContain("Remember this character on this browser");
+  expect(await render({})).not.toContain("Remember this character");
 });

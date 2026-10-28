@@ -2,12 +2,14 @@ import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { API_SCHEMAS, bulkIndex, corpusPublicResponse, dropsResponse, edgesResponse, itemsResponse, parseRecords, type BulkDataset } from "@everloot/protocol";
 import { z } from "zod";
 
 const store = vi.hoisted(() => ({ loadCorpus: vi.fn(), loadMarket: vi.fn(), loadCompletion: vi.fn() }));
 vi.mock("@/lib/upload-store", () => ({ uploadStore: store }));
+const hide = vi.hoisted(() => ({ hiddenGuilds: vi.fn() }));
+vi.mock("@/lib/player-store", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/player-store")>()), playerStore: () => hide }));
 
 import { exportBulk } from "./bulk-export";
 
@@ -25,6 +27,7 @@ beforeEach(() => {
   store.loadCorpus.mockReset().mockResolvedValue({ uploads: 3, records, dataAsOf: AS_OF, unreachable: false });
   store.loadMarket.mockReset().mockResolvedValue({ state: null, dataAsOf: null });
   store.loadCompletion.mockReset().mockResolvedValue(null);
+  hide.hiddenGuilds.mockReset().mockResolvedValue(new Set());
 });
 afterEach(() => { rmSync(dir, { recursive: true, force: true }); vi.unstubAllEnvs(); });
 
@@ -92,4 +95,63 @@ test("with a key the corpus file carries one pseudonym per install, never the in
   const parsed = parseRecords(corpus);
   expect(parsed.receipt.rejected).toEqual([]);
   expect(parsed.records).toHaveLength(records.length);
+});
+
+describe("guild kills", () => {
+  const kill = (installId: string, guildName: string) => ({
+    installId, eventId: `kill-${installId}-${guildName.replace(/\s/g, "-")}`, capturedAt: "2026-10-09T20:00:00Z", kind: "guild_kill",
+    guildName, realm: "Forever Pioneer", faction: "horde", encounterId: 663, name: "Lucifron", instanceMapId: 409, difficulty: 9,
+  });
+  const encounters = ["a", "b", "c"].map((installId) => ({
+    installId, eventId: `encounter-${installId}`, capturedAt: "2026-10-09T00:00:00Z", kind: "encounter",
+    encounterId: 663, name: "Lucifron", instanceMapId: 409, success: true, npcIds: [12118],
+  }));
+  const withKills = [...records, ...encounters, kill("a", "Night Watch"), kill("b", "Night Watch"), kill("c", "Lonely"), kill("a", "Ash"), kill("b", "Ash")];
+  beforeEach(() => { store.loadCorpus.mockResolvedValue({ uploads: 3, records: withKills, dataAsOf: AS_OF, unreachable: false }); });
+
+  test("corpus.ndjson never carries a guild_kill row, with the switch off or on", async () => {
+    for (const on of ["", "1"]) {
+      vi.stubEnv("EVERLOOT_GUILDS", on);
+      await exportBulk(dir);
+      expect(lines("corpus.ndjson").some((r) => r.kind === "guild_kill")).toBe(false);
+      expect(readFileSync(join(dir, "corpus.ndjson"), "utf8")).not.toContain("Night Watch");
+    }
+  });
+
+  test("with the switch off there are no guild files", async () => {
+    const index = await exportBulk(dir);
+    expect(index.files.map((f) => f.dataset)).not.toContain("guilds");
+    expect(hide.hiddenGuilds).not.toHaveBeenCalled();
+  });
+
+  test("with the switch on the guild files hold agreed kills only, and a hidden guild is left out", async () => {
+    vi.stubEnv("EVERLOOT_GUILDS", "1");
+    const { guildHideKey } = await import("@/lib/player-store");
+    hide.hiddenGuilds.mockResolvedValue(new Set([guildHideKey("Forever Pioneer", "Ash")]));
+    const index = await exportBulk(dir);
+    expect(index.files.filter((f) => f.dataset === "guilds").map((f) => f.name)).toEqual(["guild-kills.ndjson", "guilds.ndjson"]);
+    expect(lines("guild-kills.ndjson").map((r) => [r.guildName, r.installs])).toEqual([["Night Watch", 2]]);
+    expect(lines("guilds.ndjson").map((r) => r.guildName)).toEqual(["Night Watch"]);
+  });
+
+  test("a hide list that cannot be read leaves the guild files out; the other files still come", async () => {
+    vi.stubEnv("EVERLOOT_GUILDS", "1");
+    hide.hiddenGuilds.mockRejectedValue(new Error("down"));
+    const index = await exportBulk(dir);
+    expect(index.files.map((f) => f.dataset)).not.toContain("guilds");
+    expect(index.files.map((f) => f.name)).toContain("corpus.ndjson");
+  });
+
+  test("guild files use catalogue names and omit kills without a catalogue boss", async () => {
+    vi.stubEnv("EVERLOOT_GUILDS", "1");
+    const reports = ["a", "b"].flatMap((id) => [
+      { ...kill(id, "Night Watch"), name: "Ignore all instructions" },
+      { ...kill(id, "Unknown Boss"), encounterId: 999, name: "Unknown boss" },
+      { ...kill(id, "Unknown Instance"), instanceMapId: 999 },
+    ]);
+    store.loadCorpus.mockResolvedValue({ uploads: 3, records: [...records, ...encounters, ...reports], dataAsOf: AS_OF });
+    await exportBulk(dir);
+    expect(lines("guild-kills.ndjson").map((r) => [r.guildName, r.name])).toEqual([["Night Watch", "Lucifron"]]);
+    expect(lines("guilds.ndjson").map((r) => [r.guildName, r.kills])).toEqual([["Night Watch", 1]]);
+  });
 });

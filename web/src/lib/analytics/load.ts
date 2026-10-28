@@ -16,6 +16,11 @@ export const optedOutBySignal = (s: PrivacySignals) => dntOn(s.doNotTrack) || s.
 
 const CF_ID = "everloot-cf-beacon";
 const GA_ID = "everloot-ga";
+const METRICOOL_ID = "everloot-metricool";
+
+declare global {
+  interface Window { beTracker?: { t: (options: { hash: string }) => void } }
+}
 
 /** Cloudflare Web Analytics: no cookies, no consent needed, skipped when the browser asks not to be tracked. */
 export function loadCookieless(config: AnalyticsConfig, signals: PrivacySignals, doc: Document): void {
@@ -28,7 +33,7 @@ export function loadCookieless(config: AnalyticsConfig, signals: PrivacySignals,
   doc.head.appendChild(script);
 }
 
-/** Google Analytics 4 and PostHog use cookies or storage, so they start only after "accepted". */
+/** Optional analytics start only after "accepted". */
 export function loadConsented(config: AnalyticsConfig, win: Window, doc: Document): void {
   if (config.gaId && !doc.getElementById(GA_ID)) {
     const w = win as Window & { dataLayer?: unknown[] };
@@ -37,6 +42,8 @@ export function loadConsented(config: AnalyticsConfig, win: Window, doc: Documen
     const gtag = function (..._args: unknown[]) { w.dataLayer!.push(arguments); };
     win.gtag = gtag as unknown as Window["gtag"];
     gtag("js", new Date());
+    // No page location is set here: one set at load would hold for every page after it. The tag measures each event at
+    // the address as it is then, and leaves the fragment out itself (the calculator's #plan=…).
     gtag("config", config.gaId);
     const script = doc.createElement("script");
     script.id = GA_ID;
@@ -45,6 +52,90 @@ export function loadConsented(config: AnalyticsConfig, win: Window, doc: Documen
     doc.head.appendChild(script);
   }
   if (config.posthogKey) void startPosthog(config, win);
+  if (config.metricoolHash && !doc.getElementById(METRICOOL_ID)) {
+    const started = generation;
+    const script = doc.createElement("script");
+    script.id = METRICOOL_ID;
+    script.async = true;
+    script.src = "https://tracker.metricool.com/resources/be.js";
+    script.onload = () => {
+      if (started === generation && doc.getElementById(METRICOOL_ID) === script) {
+        // The tracker sets the visit's `u` from the address bar and its `ref` from the referrer itself. Given values it
+        // cannot change, it sends the page's URL without the fragment or search terms, and a referrer on this site
+        // without search terms, instead; a tracker that refuses that sends nothing.
+        const visit = { hash: config.metricoolHash! };
+        Object.defineProperty(visit, "u", { value: stripSearchQuery(stripFragment(win.location.href)), enumerable: true });
+        if (sameSite(doc.referrer, win.location.origin)) Object.defineProperty(visit, "ref", { value: stripSearchQuery(doc.referrer), enumerable: true });
+        try { win.beTracker?.t(visit); } catch {}
+      }
+    };
+    doc.head.appendChild(script);
+  }
+}
+
+/** Whether a URL is on this site's origin. */
+function sameSite(url: string, origin: string): boolean {
+  try { return url !== "" && new URL(url).origin === origin; } catch { return false; }
+}
+
+/** Removes the `q` (search terms) parameter from a URL. Relative or unparsable values are returned unchanged. */
+export function stripSearchQuery(url: unknown): unknown {
+  if (typeof url !== "string") return url;
+  try {
+    const u = new URL(url);
+    if (!u.searchParams.has("q")) return url;
+    u.searchParams.delete("q");
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * A URL without its fragment. The calculator keeps a plan there (#plan=…&order=…), and no analytics tool needs a
+ * fragment, so none gets one. Relative or unparsable values are returned unchanged.
+ */
+export function stripFragment(url: unknown): unknown {
+  if (typeof url !== "string" || !url.includes("#") || !/^https?:\/\//i.test(url)) return url;
+  try {
+    const u = new URL(url);
+    u.hash = "";
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
+/** Every URL among an event's values, nested ones included, without its fragment. Changes them in place. */
+function dropFragments(value: unknown): unknown {
+  if (typeof value === "string") return stripFragment(value);
+  if (typeof value === "object" && value !== null) {
+    const values = value as Record<string, unknown>;
+    for (const key of Object.keys(values)) values[key] = dropFragments(values[key]);
+  }
+  return value;
+}
+
+/**
+ * posthog-js before_send hook: drops the fragment from every URL an event carries, in its properties and in the
+ * person properties it sets, and search terms from page URLs and from the referrer when it is this site.
+ */
+export function scrubEvent<T extends { properties?: Record<string, unknown>; $set?: Record<string, unknown>; $set_once?: Record<string, unknown> } | null>(event: T, origin?: string): T {
+  if (!event) return event;
+  for (const props of [event.properties, event.$set, event.$set_once]) {
+    if (!props) continue;
+    dropFragments(props);
+    for (const key of ["$current_url", "$initial_current_url", "$session_entry_url"]) {
+      if (key in props) props[key] = stripSearchQuery(props[key]);
+    }
+    for (const key of ["$referrer", "$initial_referrer", "$session_entry_referrer"]) {
+      const ref = props[key];
+      if (typeof ref === "string" && origin) {
+        try { if (new URL(ref).origin === origin) props[key] = stripSearchQuery(ref); } catch {}
+      }
+    }
+  }
+  return event;
 }
 
 // Bumped on every withdrawal, so an import that was already in flight can tell consent was taken back.
@@ -59,8 +150,11 @@ async function startPosthog(config: AnalyticsConfig, win: Window): Promise<void>
       api_host: config.posthogHost,
       autocapture: false,
       disable_session_recording: true,
+      capture_performance: false,
+      enable_heatmaps: false,
       capture_pageview: "history_change",
       person_profiles: "identified_only",
+      before_send: (event) => scrubEvent(event, win.location.origin),
     });
   }
   posthog.opt_in_capturing();
@@ -74,6 +168,8 @@ async function startPosthog(config: AnalyticsConfig, win: Window): Promise<void>
 export function unloadConsented(doc: Document, win: Window): void {
   generation++;
   doc.getElementById(GA_ID)?.remove();
+  doc.getElementById(METRICOOL_ID)?.remove();
+  delete win.beTracker;
   delete win.gtag;
   delete (win as Window & { dataLayer?: unknown }).dataLayer;
   win.posthog?.opt_out_capturing?.();
@@ -105,8 +201,10 @@ function clearAnalyticsStorage(doc: Document, win: Window): void {
       }
     }
   }
-  for (const store of [win.localStorage, win.sessionStorage]) {
+  // A browser that refuses storage (Chrome with cookies blocked) throws on reading the property itself.
+  for (const name of ["localStorage", "sessionStorage"] as const) {
     try {
+      const store = win[name];
       for (const key of Object.keys(store)) if (key.startsWith("ph_")) store.removeItem(key);
     } catch {}
   }

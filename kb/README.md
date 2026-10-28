@@ -110,6 +110,8 @@ and exits 1 if it holds anything that may not be published.
 | `src/blizzard/` | The Battle.net API client; its cache stays local |
 | `curated/` | Facts written in our own words, each with its source URL |
 | `wiki/`, `src/wiki/` | The wiki's pages (CC BY-SA 4.0, see [`wiki/README.md`](wiki/README.md)) and their parser and page check, `npm run kb -- wiki-check` |
+| `news/`, `src/news/` | The site's news posts (CC BY-SA 4.0, see [`news/README.md`](news/README.md)) and their post check, `npm run kb -- news-check` |
+| `guides/`, `src/guides/` | The site's guides (CC BY-SA 4.0, see [`guides/README.md`](guides/README.md)) and their guide check, `npm run kb -- guide-check` |
 | `test/` | Vitest tests and fixtures |
 
 ## Rules

@@ -15,7 +15,7 @@ export const metadata: Metadata = pageMetadata({
 export const dynamic = "force-dynamic";
 
 const EXT = "noopener noreferrer nofollow";
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const day = (iso: string) => iso.slice(0, 10);
 const refreshed = (iso: string | null) =>
@@ -91,7 +91,7 @@ export default async function EcosystemPage() {
   const boards = buildBoards(view, new Date());
   const issueUrl = `${REPO_URL}/issues/new?template=ecosystem-project.yml`;
   return (
-    <Container width="wide">
+    <Container width="data">
       <article>
         <PageHeader
           trail={trailFor("/addons/ecosystem")!}

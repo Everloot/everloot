@@ -7,7 +7,7 @@ vi.mock("next/link", () => ({
   default: ({ href, title, children }: { href: string; title?: string; children: ReactNode }) => <a href={href} title={title}>{children}</a>,
 }));
 
-import { EntityRelations, RelationTarget } from "./EntityRelations";
+import { EntityRelations, RelationTarget, SameIcon } from "./EntityRelations";
 
 const client = (fromId: number, rel: Edge["rel"], toKind: Edge["toKind"], toId: number): Edge =>
   ({ fromKind: "item", fromId, rel, toKind, toId, evidence: "client", build: "1.60.1.70450", installs: null, firstSeen: null, lastSeen: null });
@@ -30,7 +30,9 @@ test("relations are grouped and linked where a page exists; observed rows count 
   expect(html).not.toContain("unconfirmed, build");
   expect(html.match(/found in game files, unconfirmed/g)).toHaveLength(1);
   expect(html).toContain("read from build 1.60.1.70450");
-  expect(html).toContain('href="/database/items/2863"');
+  // An item sharing the icon has no name here, so it is counted, not listed as "item 2863".
+  expect(html).toContain("shared with 1 item with no name yet");
+  expect(html).not.toContain("item 2863");
   expect(html).toContain("Blizzard Entertainment");
   // The drop table above already shows drops in full.
   expect(html).not.toContain("Dropped by");
@@ -68,4 +70,20 @@ test("a relation target named from the name files: players first, a wiki title (
 test("only observed relations: no game-file notice; none at all: says what is needed", () => {
   expect(renderToStaticMarkup(<EntityRelations kind="item" id={2862} observed={observed} client={[]} />)).not.toContain("Blizzard");
   expect(renderToStaticMarkup(<EntityRelations kind="item" id={1} observed={[]} client={[]} />)).toContain("No relations recorded");
+});
+
+test("items sharing an icon: named ones are links with their icon, nameless ones are one muted count, never a list of ids", () => {
+  const icon = [10, 11, 12, 13, 14].map((id) => client(id, "same_icon", "icon", 135249));
+  const names = new Map([[11, "Linen Cloak"], [12, "Wool Cloak"]]);
+  const html = renderToStaticMarkup(<SameIcon edge={icon[0]} self={10} client={icon} itemName={(id) => names.get(id)} itemIcon={(id) => (id === 11 ? "https://x.test/cloak.jpg" : undefined)} />);
+  expect(html).toContain("Icon file 135249, shared with ");
+  expect(html).toContain('href="/database/items/11">Linen Cloak</a>');
+  expect(html).toContain('href="/database/items/12">Wool Cloak</a>');
+  expect(html).toContain("cloak.jpg");
+  expect(html).toContain('<span class="text-muted">; 2 items with no name yet</span>');
+  expect(html).not.toMatch(/item 1[34]/);
+  // No names at all: only the count.
+  const bare = renderToStaticMarkup(<SameIcon edge={icon[0]} self={10} client={icon} />);
+  expect(bare).toContain("4 items with no name yet");
+  expect(bare).not.toContain("<a ");
 });

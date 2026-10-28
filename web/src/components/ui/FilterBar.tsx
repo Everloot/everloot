@@ -1,3 +1,4 @@
+import FilterMenus from "./FilterMenus";
 import Link from "./PendingLink";
 import type { CSSProperties, ReactNode } from "react";
 
@@ -36,8 +37,11 @@ function Chevron() {
   return <svg aria-hidden="true" width="10" height="10" viewBox="0 0 10 10" className="text-muted [[open]>summary>&]:rotate-180"><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>;
 }
 
-function Menu({ c, phone }: { c: Extract<FilterControl, { type: "menu" }>; phone: boolean }) {
-  if (c.options.length === 0) return null;
+function Menu({ c: given, phone }: { c: Extract<FilterControl, { type: "menu" }>; phone: boolean }) {
+  // A choice that matches nothing is noise ("Alliance 0" before launch): it stays only while selected, and a menu
+  // left with nothing to pick is not drawn.
+  const c = { ...given, options: given.options.filter((o) => o.reset || o.on || o.count !== 0) };
+  if (!c.options.some((o) => !o.reset)) return null;
   const on = c.options.filter((o) => o.on && !o.reset);
   const summary = on.length === 0 ? c.label : on.length === 1 ? <>{c.label}: <span className="text-fg">{on[0].label}</span></> : <>{c.label} ({on.length})</>;
   return (
@@ -88,7 +92,7 @@ function Controls({ search, controls, active, clearHref, phone }: FilterBarProps
         : <Link key={c.key} href={c.href} aria-current={c.on ? "true" : undefined} className={`${control} ${c.on ? lit : idle}`}>
             <span aria-hidden="true" className={`h-3 w-3 shrink-0 rounded-[3px] border ${c.on ? "border-accent bg-accent" : "border-edge"}`} />{c.label}
           </Link>)}
-      {active > 0 && <Link href={clearHref} className="ctl inline-flex items-center px-2 text-accent hover:underline underline-offset-4">Clear filters</Link>}
+      {active > 0 && <Link href={clearHref} className="ctl inline-flex items-center px-2 text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Clear filters</Link>}
     </>
   );
 }
@@ -101,7 +105,7 @@ function Controls({ search, controls, active, clearHref, phone }: FilterBarProps
 export default function FilterBar(props: FilterBarProps) {
   const { label, active, aside } = props;
   return (
-    <div role="group" aria-label={label} data-filter-bar className="flex flex-wrap items-center gap-2">
+    <FilterMenus label={label} className="flex flex-wrap items-center gap-2">
       <details className="w-full sm:hidden">
         <summary className={`${control} cursor-pointer list-none [&::-webkit-details-marker]:hidden ${active ? lit : idle}`}>
           Filters{active > 0 && <span className="tabular-nums"> ({active})</span>}<Chevron />
@@ -114,6 +118,6 @@ export default function FilterBar(props: FilterBarProps) {
         <Controls {...props} phone={false} />
       </div>
       {aside && <div className="ml-auto min-w-0 max-sm:w-full">{aside}</div>}
-    </div>
+    </FilterMenus>
   );
 }

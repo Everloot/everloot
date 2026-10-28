@@ -4,10 +4,18 @@ import JsonLd from "@/components/JsonLd";
 import type { ChangeEntry } from "./changes";
 import {
   aboutPageJsonLd, breadcrumbJsonLd, changesJsonLd, datasetJsonLd, loreCollectionJsonLd, organizationJsonLd,
-  serializeJsonLd, softwareApplicationJsonLd, webApplicationJsonLd, websiteJsonLd,
+  newsArticleJsonLd, serializeJsonLd, softwareApplicationJsonLd, webApplicationJsonLd, websiteJsonLd,
 } from "./jsonld";
 
 const everything = JSON.stringify;
+
+test("news image is optional and site paths become absolute without changing author policy", () => {
+  const post = { title: "Title", description: "Summary", path: "/news/example", published: "2026-10-25", modified: "2026-10-26", author: "Visible author" };
+  expect(newsArticleJsonLd(post)).not.toHaveProperty("image");
+  expect(newsArticleJsonLd({ ...post, image: "/news/heroes/example/share.png" })).toMatchObject({
+    image: ["https://everloot.app/news/heroes/example/share.png"], author: { "@type": "Organization", name: "Everloot Team" },
+  });
+});
 
 test("a less-than sign in a value cannot close the script tag", () => {
   const text = serializeJsonLd({ name: "</script><b>x" });
@@ -21,12 +29,12 @@ test("JsonLd renders nothing for null", () => {
   expect(renderToStaticMarkup(<JsonLd data={null} />)).toBe("");
 });
 
-test("Organization carries the repository, the email and the non-affiliation line, and WebSite describes its search as lore search", () => {
+test("Organization carries the repository, the email and the site blurb, and WebSite describes its search as lore search", () => {
   const org = organizationJsonLd() as Record<string, unknown> & { description: string };
-  expect(org.sameAs).toEqual(["https://github.com/Everloot/everloot", "https://discord.gg/9CKsbHTRu3"]);
+  expect(org.sameAs).toEqual(["https://github.com/Everloot/everloot", "https://discord.gg/9CKsbHTRu3", "https://x.com/WowEverloot", "https://www.facebook.com/WowEverloot", "https://www.instagram.com/woweverloot/", "https://www.pinterest.com/woweverloot/"]);
   expect(org.email).toBe("hello@everloot.app");
   expect(org.publishingPrinciples).toBe("https://everloot.app/methodology");
-  expect(org.description).toContain("Not affiliated with or endorsed by Blizzard Entertainment.");
+  expect(org.description).toBe("The WoW: Forever database, written by its players.");
   // The operator the footer and /about name, and the square logo the listings use.
   expect(org.parentOrganization).toEqual({ "@type": "Organization", name: "R21 Media Group, LLC" });
   expect(org.logo).toEqual({ "@type": "ImageObject", url: "https://everloot.app/icon-512.png", width: 512, height: 512 });

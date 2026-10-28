@@ -3,7 +3,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
-from check_internal_paths import offending_lines  # noqa: E402
+from check_internal_paths import offending_lines, skipped  # noqa: E402
 
 # Private: the maintainer's workspace, secrets folder, user folder and agent worktrees.
 assert offending_lines("cd D:\\R21-Brain\\projects\\everloot") == [1]
@@ -17,4 +17,8 @@ assert offending_lines("cd projects/everloot/web") == [1]
 # Generic example paths in docs and tests are fine.
 assert offending_lines('{ "apiKeyFile": "C:/Users/<you>/keys/anthropic.txt" }') == []
 assert offending_lines('parseArgs(["watch", "--game", "C:/Games/WoW"]) and "C:\\\\Users\\\\p\\\\AppData"') == []
-print("check_internal_paths: 10 cases pass")
+# Lockfiles are checked: a file: dependency would leak a local path there.
+assert not skipped("web/package-lock.json")
+assert not skipped("package-lock.json")
+assert skipped("scripts/check_internal_paths.py")
+print("check_internal_paths: 13 cases pass")

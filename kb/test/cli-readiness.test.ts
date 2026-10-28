@@ -345,3 +345,27 @@ test("serve-mcp answers initialize, tools/list and a sourced search over stdio",
   }
   expect(sha256(dbPath)).toBe(before);
 });
+
+test("audit-sources prints one line per file and exits 1 only when a file is not publishable", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "kb-audit-cli-"));
+  const build = async (name: string, sources: Array<"curated" | "blizzard-api">): Promise<string> => {
+    const path = join(dir, name);
+    const db = openDb(path);
+    for (const source of sources) await replaceSourceRows(db, source, ["lore_page"], [{ ...LORE, extId: source }]);
+    db.close();
+    return path;
+  };
+  const clean = await build("clean.sqlite", ["curated"]);
+  const dirty = await build("dirty.sqlite", ["curated", "blizzard-api"]);
+
+  const ok = await runCli(["audit-sources", clean]);
+  expect(ok.code).toBe(0);
+  expect(ok.stdout.trim()).toBe(`${clean}: curated=1 api_cache=0`);
+
+  const both = await runCli(["audit-sources", clean, dirty]);
+  expect(both.code).toBe(1);
+  expect(both.stdout.trim().split("\n")).toEqual([
+    `${clean}: curated=1 api_cache=0`,
+    `${dirty}: blizzard-api=1 curated=1 api_cache=0  NOT PUBLISHABLE: blizzard-api`,
+  ]);
+});

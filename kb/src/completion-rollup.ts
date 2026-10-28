@@ -60,7 +60,7 @@ type Variant = { c: string; v: string[]; s: number; f?: number; by: [string, str
 type CatalogKey = "a" | "f" | "t" | "q" | "c";
 const KEYS = ["a", "f", "t", "q", "c"] as const;
 type Stamp = { at: string; n: number };
-type AchState = Stamp & { c: boolean; e?: boolean; m: number; t: number; q?: number; r?: number };
+type AchState = Stamp & { c: boolean; e?: boolean; m: number; t: number; q?: number; r?: number; d?: string };
 type RepState = Stamp & { k: number; s: number; lo: number; hi: number };
 export type CharacterState = {
   class: string; level: number; at: string; n: number;
@@ -313,7 +313,7 @@ export function foldCompletion(state: CompletionState, uploads: readonly Complet
       if (row.kind === "achievement_owned") {
         const old = character.a[row.achievementId];
         if (!old || later(row, old)) {
-          character.a[row.achievementId] = { ...stamp, c: row.completed, e: row.earnedByMe, m: row.criteriaMet, t: row.criteriaTotal, q: row.quantity, r: row.required };
+          character.a[row.achievementId] = { ...stamp, c: row.completed, e: row.earnedByMe, m: row.criteriaMet, t: row.criteriaTotal, q: row.quantity, r: row.required, d: row.earnedOn };
         }
       } else if (row.kind === "reputation_owned") {
         const old = character.f[row.factionId];
@@ -459,7 +459,7 @@ export function completionFactsOf(state: CompletionState, owners: ReadonlySet<st
     for (const [characterKey, c] of Object.entries(install.characters)) {
       owned.push({
         installId, characterKey, class: c.class, level: c.level,
-        achievements: new Map(Object.entries(c.a).map(([id, a]) => [Number(id), { completed: a.c, earnedByMe: a.e, criteriaMet: a.m, criteriaTotal: a.t, quantity: a.q, required: a.r }])),
+        achievements: new Map(Object.entries(c.a).map(([id, a]) => [Number(id), { completed: a.c, earnedByMe: a.e, criteriaMet: a.m, criteriaTotal: a.t, quantity: a.q, required: a.r, earnedOn: a.d }])),
         factions: new Map(Object.entries(c.f).map(([id, f]) => [Number(id), { reaction: f.k, standing: f.s, floor: f.lo, ceiling: f.hi }])),
         titles: new Set(c.t), quests: new Set(c.q),
       });

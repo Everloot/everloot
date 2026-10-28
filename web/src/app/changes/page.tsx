@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import AdSlot from "@/components/AdSlot";
 import JsonLd from "@/components/JsonLd";
-import { Badge, Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, type FilterControl } from "@/components/ui";
+import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, type FilterControl } from "@/components/ui";
 import { CHANGE_FILTERS, GAME_LABEL, TYPE_LABEL, filterTimeline, forumRegions, loadTimeline, parseFilter, postPath, type ChangeEntry, type ChangeFilter } from "@/lib/changes";
 import { latestBuildLine } from "@/lib/changes-facts";
 import { loadSiteAssets } from "@/lib/game-assets";
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 
 const TITLE = "Changes";
 const LEAD = "Blue posts, hotfixes and new game builds, newest first.";
-const LINK = "text-accent hover:underline underline-offset-4";
+const LINK = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 /** Blizzard's posts and hotfixes, never builds, in the blue of a blue post. */
 const BLUE = "text-blue-post hover:underline underline-offset-4";
 
@@ -31,7 +31,7 @@ type Sort = (typeof SORTS)[number];
 const DEFAULT_SORT = { key: "date" as Sort, desc: true };
 
 const TYPE_FILTER_LABEL: Record<ChangeFilter, string> = { all: "Any type", posts: "Blue posts", hotfixes: "Hotfixes", builds: "Builds" };
-const GAMES = { forever: "WoW: Forever", classic: "WoW Classic", all: "Both games" } as const;
+const GAMES = { forever: "WoW: Forever", classic: "WoW Classic", retail: "WoW (retail)", all: "All games" } as const;
 type Game = keyof typeof GAMES;
 const REGIONS = { us: "US forum", eu: "EU forum" } as const;
 type Region = keyof typeof REGIONS;
@@ -43,7 +43,7 @@ interface ChangesQuery extends ListQuery<Sort> { show: ChangeFilter; game: Game;
 const one = (search: Search, k: string) => (typeof search[k] === "string" ? (search[k] as string) : undefined);
 
 /**
- * The filters from the URL: `q`, `show=posts|hotfixes|builds`, `game=classic|all` (Forever when absent),
+ * The filters from the URL: `q`, `show=posts|hotfixes|builds`, `game=classic|retail|all` (Forever when absent),
  * `region=us|eu`, `author=`, `days=7|30|90|365`, `sort`, `page`. An unknown filter value is ignored, as the old
  * links did; a malformed sort or page is a 404, as on the database lists.
  */
@@ -55,7 +55,7 @@ function changesQuery(search: Search): ChangesQuery | null {
   return {
     ...base,
     show: parseFilter(one(search, "show")),
-    game: game === "classic" || game === "all" ? game : "forever",
+    game: game === "classic" || game === "retail" || game === "all" ? game : "forever",
     ...(region === "us" || region === "eu" ? { region } : {}),
     ...(author ? { author } : {}),
     ...(days in DAYS ? { days: days as Days } : {}),
@@ -70,7 +70,7 @@ const href = (q: Partial<ChangesQuery>) => listHref("/changes", [
 const active = (q: ChangesQuery) => [q.q, q.show !== "all", q.game !== "forever", q.region, q.author, q.days].filter(Boolean).length;
 
 /** Every forum an announcement was posted on: "US forum", or "US · EU forum" for one posted on both. */
-const SOURCE_LABEL = (e: ChangeEntry) => e.type === "build" ? "" : e.source === "bluesky" ? "Bluesky"
+const SOURCE_LABEL = (e: ChangeEntry) => e.type === "build" ? "" : e.source === "bluesky" ? "Bluesky" : e.source === "manual" ? e.category || "Everloot"
   : `${forumRegions(e).map((r) => r.toUpperCase()).join(" · ")} forum`;
 /** The announcement and its regional copies, for the filters that look inside them. */
 const copiesOf = (e: ChangeEntry) => [e, ...(e.copies ?? [])];
@@ -78,7 +78,7 @@ const copiesOf = (e: ChangeEntry) => [e, ...(e.copies ?? [])];
 export default async function ChangesPage({ searchParams }: { searchParams: Promise<Search> }) {
   const q = changesQuery((await searchParams) ?? {});
   if (!q) notFound();
-  const all = loadTimeline();
+  const all = await loadTimeline();
   const scope = filterTimeline(all, "all", q.game === "all" ? undefined : q.game);
   const text = q.q?.toLowerCase();
   const since = q.days ? new Date(Date.now() - q.days * 86_400_000).toISOString() : undefined;
@@ -107,24 +107,42 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
   const index = mentionIndex(assets, assets ? await siteSpellNames() : []);
 
   const dash = <span className="text-muted">—</span>;
+  // Sorted by date, a day's date shows once, on its first row on this page (in the date column, or a phone's muted
+  // line); the rows under it keep it for screen readers.
+  const sameDayAsAbove = new Set(sort.key === "date" ? shown.filter((e, i) => i > 0 && e.at.slice(0, 10) === shown[i - 1].at.slice(0, 10)).map((e) => e.id) : []);
+  const titleLink = (e: ChangeEntry) => {
+    const page = postPath(e);
+    const title = page
+      ? <Link href={page} className={`${BLUE} font-medium`}>{e.title}</Link>
+      : <span className="font-medium">{e.title}</span>;
+    return e.source === "manual" ? <>{title}<span className="block text-cell-2 text-muted">Summary by Everloot. {e.url && <a href={e.url} className={LINK}>Original source</a>}</span></> : title;
+  };
   const columns: Column<ChangeEntry>[] = [
     {
+      // On a phone this is the only column shown, so it carries the title and the muted line holds the date.
       key: "date", header: "Date", sortable: true, nowrap: true, cell: (e) => (
-        <time dateTime={e.at} title={e.type === "build" ? `${stamp(e.at)}, when Everloot first saw it` : stamp(e.at)} className="font-mono tabular-nums text-fg-2">{e.at.slice(0, 10)}</time>
+        <>
+          <time
+            dateTime={e.source === "manual" ? e.at.slice(0, 10) : e.at}
+            title={e.source === "manual" ? e.at.slice(0, 10) : e.type === "build" ? `${stamp(e.at)}, when Everloot first saw it` : stamp(e.at)}
+            className={sameDayAsAbove.has(e.id) ? "sr-only" : "hidden font-mono tabular-nums text-fg-2 sm:inline"}
+          >
+            {e.at.slice(0, 10)}
+          </time>
+          <div data-phone-title className="whitespace-normal py-1 sm:hidden">{titleLink(e)}{e.source === "manual" && e.summary && <span className="block text-cell-2 text-muted">{e.summary}</span>}</div>
+        </>
       ),
     },
-    { key: "type", header: "Type", sortable: true, nowrap: true, cell: (e) => <Badge tone="neutral">{TYPE_LABEL[e.type]}</Badge> },
+    // Plain mono, as on the home page: a pill on every row is noise (design system rule 8).
+    { key: "type", header: "Type", sortable: true, nowrap: true, cell: (e) => <span data-type className="font-mono text-xs text-muted">{e.source === "manual" && e.type === "post" ? "Post" : TYPE_LABEL[e.type]}</span> },
     {
       key: "title", header: "Title", sortable: true, cell: (e) => {
         const line = e.type === "build"
-          ? <>First seen by Everloot. {e.diffUrl ? <a href={e.diffUrl} className={LINK}>See what changed</a> : "What changed: not published yet."}</>
+          ? <>First seen by Everloot.{e.diffUrl && <> <a href={e.diffUrl} className={LINK}>See what changed</a></>}</>
           : (e.summary ?? e.excerpt) && <WithSpells text={(e.summary ?? e.excerpt)!} index={index} />;
-        const page = postPath(e);
         return (
-          <div data-change-row data-blue-post={page ? "" : undefined} className="min-w-0 py-1">
-            {page
-              ? <Link href={page} className={`${BLUE} font-medium`}>{e.title}</Link>
-              : <span className="font-medium">{e.title}</span>}
+          <div data-change-row data-blue-post={postPath(e) ? "" : undefined} className="min-w-0 py-1">
+            {titleLink(e)}
             {q.game === "all" && <span className="ml-2 text-cell-2 text-muted">{GAME_LABEL[e.game]}</span>}
             {line && <p className="line-clamp-2 text-cell-2 text-muted">{line}</p>}
           </div>
@@ -193,10 +211,10 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
   return (
     <Container width="data">
       <article>
-        <JsonLd data={changesJsonLd({ name: TITLE, description: LEAD, path: "/changes", entries: shown })} />
+        <JsonLd data={changesJsonLd({ name: TITLE, description: LEAD, path: "/changes", entries: shown.map((e) => e.source === "manual" ? { ...e, at: e.at.slice(0, 10), author: "Everloot" } : e) })} />
         <DataTitle
           title={TITLE}
-          meta={<>{LEAD} {latestBuildLine(all)} <a href="/changes/feed.xml" className={LINK}>RSS</a></>}
+          meta={<>{LEAD} {latestBuildLine(all)} <a href="/changes/feed.xml" className={LINK}>RSS</a> · <Link href="/news" className={LINK}>Everloot news</Link></>}
           aside={strip}
         />
         <FilterBar
@@ -215,7 +233,7 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
             rowKey={(e) => e.id}
             sort={{ key: sort.key, direction: sort.desc ? "desc" : "asc" }}
             sortHref={(k, d) => here({ sort: nextSort(k, d, DEFAULT_SORT) })}
-            meta={(e) => [e.at.slice(0, 10), TYPE_LABEL[e.type], e.author, SOURCE_LABEL(e)].filter(Boolean).join(" · ")}
+            meta={(e) => [sameDayAsAbove.has(e.id) ? undefined : e.at.slice(0, 10), e.source === "manual" && e.type === "post" ? "Post" : TYPE_LABEL[e.type], e.author, SOURCE_LABEL(e)].filter(Boolean).join(" · ")}
             empty={empty}
           />
         </div>

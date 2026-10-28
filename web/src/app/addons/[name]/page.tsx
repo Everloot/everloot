@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 
 /** Every link that leaves Everloot. */
 const EXT = "noopener noreferrer nofollow";
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 const button = "btn min-h-11";
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -60,7 +60,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return pageMetadata({
     title: `${title}: addon for WoW: Forever`,
     description: `How many Everloot installs run ${title}, where its author publishes it and what its repository shows. Counts appear once three installs report the addon.`,
-    path: `/addons/${encodeURIComponent(found.name)}`,
+    // Polestar has a dedicated guide page at the lowercase address.
+    path: found.name.toLowerCase() === "polestar" ? "/addons/polestar" : `/addons/${encodeURIComponent(found.name)}`,
   });
 }
 

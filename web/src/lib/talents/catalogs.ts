@@ -18,7 +18,7 @@ export type TalentClassSlug = keyof typeof loaders;
 
 export const TALENT_CLASSES = Object.keys(loaders) as TalentClassSlug[];
 
-export const isTalentClass = (slug: string): slug is TalentClassSlug => slug in loaders;
+export const isTalentClass = (slug: string): slug is TalentClassSlug => Object.hasOwn(loaders, slug);
 
 export async function loadCatalog(slug: TalentClassSlug): Promise<TalentCatalog> {
   const data = await loaders[slug]();

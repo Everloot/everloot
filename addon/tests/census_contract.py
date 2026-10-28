@@ -169,6 +169,12 @@ assert(r.installId == EverlootDB.installId and r.capturedAt == '2026-10-18T00:00
 NOW_T = NOW_T + 60
 event('PLAYER_LEVEL_UP', 13)
 assert(#own == 1 and own[1].level == 13 and own[1].capturedAt == '2026-10-18T00:01:00Z', 'level-up updates today\\'s row')
+-- A new level is a new revision of that day's row: the uploader skips every event id it already confirmed, so
+-- the row needs an id of its own or the new level would never be sent. The server keys the row by character
+-- and day, so the new id replaces the day's row and does not add one.
+assert(own[1].eventId == 'census_self:2026-10-18:2', 'a level-up takes the next event id, got ' .. tostring(own[1].eventId))
+event('PLAYER_LEVEL_UP', 13)
+assert(own[1].eventId == 'census_self:2026-10-18:2', 'the same level keeps the revision')
 
 units.target = player(1, { level = 30 })
 event('PLAYER_TARGET_CHANGED')
@@ -228,7 +234,10 @@ NOW_T = 1792281600 + 3660
 units.target = player(1, { level = 31 })
 event('PLAYER_TARGET_CHANGED')
 assert(#seen == count and seen[1].level == 31 and seen[1].via == 'target' and seen[1].capturedAt == '2026-10-18T01:01:00Z', 'a new level updates level and time only')
-assert(seen[1].eventId == 'census_seen:2026-10-18:1', 'the row keeps its event id')
+assert(seen[1].eventId == 'census_seen:2026-10-18:6', 'a new level is a new revision (five rows came before it), got ' .. tostring(seen[1].eventId))
+units.target = player(1, { level = 31 })
+event('PLAYER_TARGET_CHANGED')
+assert(seen[1].eventId == 'census_seen:2026-10-18:6', 'the same level keeps the revision')
 """)
 
 # A reload the same day (a new Lua state from the saved file) finds today's rows again.
@@ -243,6 +252,8 @@ event('PLAYER_TARGET_CHANGED')
 assert(#rows('census_seen') == count and #rows('census_self') == 1, 'a reload adds no duplicates')
 assert(rows('census_self')[1].capturedAt == '2026-10-18T00:01:00Z' and rows('census_self')[1].level == 13, 'logging in again at the same level leaves your row as it was')
 assert(rows('census_seen')[2].level == 25 and rows('census_seen')[2].via == 'mouseover', 'and still takes a new level, keeping the first via')
+assert(rows('census_self')[1].eventId == 'census_self:2026-10-18:2', 'and an unchanged row keeps its revision after a reload')
+assert(rows('census_seen')[2].eventId == 'census_seen:2026-10-18:7', 'a new level after a reload takes the next id from the saved counter, got ' .. tostring(rows('census_seen')[2].eventId))
 
 -- The next UTC day is a new row, with a new id.
 NOW_T = 1792281600 + 86400 + 5
@@ -250,8 +261,8 @@ event('UPDATE_MOUSEOVER_UNIT')
 event('PLAYER_LOGIN')
 local seen = rows('census_seen')
 assert(#seen == count + 1 and seen[#seen].capturedAt == '2026-10-19T00:00:05Z', 'a new day, a new row')
-assert(seen[#seen].eventId == 'census_seen:2026-10-19:' .. (count + 1), seen[#seen].eventId)
-assert(#rows('census_self') == 2 and rows('census_self')[2].eventId == 'census_self:2026-10-19:2')
+assert(seen[#seen].eventId == 'census_seen:2026-10-19:8', seen[#seen].eventId)
+assert(#rows('census_self') == 2 and rows('census_self')[2].eventId == 'census_self:2026-10-19:3', rows('census_self')[2].eventId)
 """)
 
 # --- The busy path allocates nothing when the player is already recorded at that level ---

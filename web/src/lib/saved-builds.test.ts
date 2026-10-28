@@ -1,11 +1,28 @@
-import { expect, test } from "vitest";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { MCP_TOOL_NAMES } from "@everloot/protocol";
+import { afterEach, beforeAll, expect, test, vi } from "vitest";
+import { openDb } from "../../../kb/src/db";
+import { replaceSourceRows } from "../../../kb/src/entities";
+import { snapshot } from "../../../kb/src/snapshot";
 import { safeReturnTo, signInPath } from "./auth/return-to";
-import { codeClass, editPath, LIMITS, parseBuildInput, parseCharacterInput, savedBuildsOn, toBuild, toCharacters, type BuildRow } from "./saved-builds";
+import {
+  BUILD_COLUMNS, codeClass, editPath, LIMITS, MY_BUILDS, ORDER_COLUMNS, parseBuildInput, parseCharacterInput, savedBuildsOn, toBuild, toCharacters,
+  type BuildRow,
+} from "./saved-builds";
+
+// The public MCP endpoint, for the catalogue test at the end: its per-IP quota lets every request through.
+vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { mcp: async () => ({ allowed: true, retryAfter: 0 }) } }));
+vi.mock("@/lib/upload-store", () => ({ uploadStore: { loadCorpus: async () => ({ uploads: 0, records: [], dataAsOf: null }) } }));
 
 const MAGE = "EL1-mage-0-1.60.1.70450-MTE6NQ";
 const MAGE2 = "EL1-mage-1482-1.60.1.70450-MjE6MQ";
 const WARRIOR = "EL1-warrior-0-1.60.1.70450-MTE6NQ";
 const ID = "0b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e11";
+// MAGE spends 5 points in node 11 and MAGE2 one in node 21: each token names its own set's points, one letter a point.
+const ORDER = "O1p-AAAAA";
+const ORDER2 = "O1g-A";
 
 test("the switch is on only for exactly 1", () => {
   expect(savedBuildsOn({ EVERLOOT_SAVED_BUILDS: "1" })).toBe(true);
@@ -58,6 +75,46 @@ test("ids are uuids and the switches are booleans", () => {
   expect(parseBuildInput(null)).toMatchObject({ ok: false });
 });
 
+test("each set's spend order rides beside its code: the token as sent, trimmed, its maker's letter kept", () => {
+  expect(parseBuildInput({ name: "a", code: MAGE, code2: MAGE2, order: ` ${ORDER}\n`, order2: ORDER2 }))
+    .toMatchObject({ ok: true, value: { order: ORDER, order2: ORDER2 } });
+  // An unknown order is null; a body from before orders has none, and the database keeps the stored ones while the codes stay.
+  expect(parseBuildInput({ name: "a", code: MAGE, order: null, order2: "" })).toMatchObject({ ok: true, value: { order: null, order2: null } });
+  const old = parseBuildInput({ name: "a", code: MAGE, code2: MAGE2 });
+  expect(old.ok).toBe(true);
+  expect(JSON.stringify(old.ok && old.value)).not.toContain("order");
+});
+
+test("an order that does not name exactly its own set's points is refused, whoever made it", () => {
+  const refused = (body: object) => parseBuildInput({ name: "a", code: MAGE, ...body });
+  for (const order of ["O1p-AAAA", "O1p-AAAAAA", "O1p-AAAAB", "O2p-AAAAA", "O1x-AAAAA", "O1p AAAAA", "AAAAA", 5, ["O1p-AAAAA"]]) {
+    expect(refused({ order })).toEqual({ ok: false, error: "The spend order does not fit the talents in the share code." });
+  }
+  // Set 2's order is read against set 2's code: set 1's order does not fit it, and with no second set there is nothing to order.
+  expect(refused({ code2: MAGE2, order2: ORDER })).toEqual({ ok: false, error: "The second spend order does not fit the talents in the second share code." });
+  expect(refused({ order2: ORDER2 })).toEqual({ ok: false, error: "The second spend order does not fit the talents in the second share code." });
+});
+
+test("a new build may carry a transfer key: 16 to 64 letters, digits, - or _, taken as sent", () => {
+  for (const key of ["a".repeat(16), "Ab3_-".repeat(12) + "Ab3_", "device-plan_0123456789"]) {
+    expect(parseBuildInput({ name: "a", code: MAGE, transferKey: key })).toMatchObject({ ok: true, value: { transferKey: key } });
+  }
+  // Left out or null, there is none, and the parsed build says nothing of one.
+  for (const body of [{ name: "a", code: MAGE }, { name: "a", code: MAGE, transferKey: null }]) {
+    const parsed = parseBuildInput(body);
+    expect(parsed.ok).toBe(true);
+    expect(JSON.stringify(parsed.ok && parsed.value)).not.toContain("transferKey");
+  }
+});
+
+test("a transfer key of another shape, or on an update, is refused", () => {
+  for (const transferKey of ["a".repeat(15), "a".repeat(65), " device-plan-0123456", "device plan 0123456789", "device.plan.0123456789", "dévice-plan-0123456789", 1234567890123456, ["device-plan-0123456789"]]) {
+    expect(parseBuildInput({ name: "a", code: MAGE, transferKey })).toEqual({ ok: false, error: "A transfer key is 16 to 64 letters, digits, - or _." });
+  }
+  expect(parseBuildInput({ id: ID, name: "a", code: MAGE, transferKey: "device-plan-0123456789" }))
+    .toEqual({ ok: false, error: "A transfer key is for a new build only." });
+});
+
 test("a character label: a name of 1 to 24, a class, optional realm and note", () => {
   expect(parseCharacterInput({ name: " Jaina ", classSlug: "mage", realm: " ", note: "" }))
     .toEqual({ ok: true, value: { id: null, name: "Jaina", classSlug: "mage", realm: null, note: null } });
@@ -80,6 +137,20 @@ test("a stored row becomes the API's shape, with the short link only while share
   expect(toBuild({ ...row, shared: false }, "https://everloot.app").link).toBeNull();
 });
 
+test("a row read with the order columns carries each set's order; a key's read, which has none, leaves them out", () => {
+  expect(ORDER_COLUMNS).toBe("point_order,point_order2");
+  expect(BUILD_COLUMNS.split(",")).not.toContain("point_order");
+  const row: BuildRow = {
+    id: ID, slug: "AbCd1234", name: "Fire", notes: null, class_slug: "mage", character_id: null, code: MAGE, code2: MAGE2,
+    game_build: "1.60.1.70450", shared: true, show_name: false, active: false, updated_at: "2026-10-20T12:00:00+00:00",
+  };
+  expect(toBuild({ ...row, point_order: ORDER, point_order2: ORDER2 }, "https://everloot.app")).toMatchObject({ order: ORDER, order2: ORDER2 });
+  expect(toBuild({ ...row, point_order: null, point_order2: null }, "https://everloot.app")).toMatchObject({ order: null, order2: null });
+  // Not unknown, which would claim the build has no order: a key's read does not say.
+  expect(toBuild(row, "https://everloot.app")).not.toHaveProperty("order");
+  expect(toBuild(row, "https://everloot.app")).not.toHaveProperty("order2");
+});
+
 test("characters come back in one order on every path: lower-case name, then id", () => {
   const row = (id: string, name: string) => ({ id, name, class_slug: "mage", realm: null, note: null });
   expect(toCharacters([row("b", "jaina"), row("c", "Arthas"), row("a", "Jaina"), row("d", "zed")]).map((c) => `${c.name}/${c.id}`))
@@ -91,9 +162,77 @@ test("opening a saved build marks the calculator as editing it, with both sets i
   expect(editPath({ id: ID, classSlug: "mage", code: MAGE, code2: null })).toBe(`/tools/talents/mage?saved=${ID}#plan=${MAGE}`);
 });
 
+test("reopening a saved build brings each set's spend order, after both codes, as the calculator writes its links", () => {
+  expect(editPath({ id: ID, classSlug: "mage", code: MAGE, code2: MAGE2, order: ORDER, order2: ORDER2 }))
+    .toBe(`/tools/talents/mage?saved=${ID}#plan=${MAGE}&plan2=${MAGE2}&order=${ORDER}&order2=${ORDER2}`);
+  expect(editPath({ id: ID, classSlug: "mage", code: MAGE, code2: MAGE2, order: null, order2: ORDER2 }))
+    .toBe(`/tools/talents/mage?saved=${ID}#plan=${MAGE}&plan2=${MAGE2}&order2=${ORDER2}`);
+  // An order never rides without its own set's code.
+  expect(editPath({ id: ID, classSlug: "mage", code: MAGE, code2: null, order: ORDER, order2: ORDER2 }))
+    .toBe(`/tools/talents/mage?saved=${ID}#plan=${MAGE}&order=${ORDER}`);
+});
+
 test("after sign-in the visitor returns only to a path on this site", () => {
   expect(safeReturnTo("/tools/talents/mage?save=1")).toBe("/tools/talents/mage?save=1");
   for (const bad of ["https://evil.example", "//evil.example", "/\\evil.example", "me", "/a\nb", 7, null, `/${"a".repeat(600)}`]) expect(safeReturnTo(bad)).toBeNull();
   expect(signInPath("/tools/talents/mage?save=1")).toBe("/sign-in?returnTo=%2Ftools%2Ftalents%2Fmage%3Fsave%3D1");
   expect(signInPath("//evil.example")).toBe("/sign-in");
+});
+
+test("sign-in can bring the visitor back to the saved build they were editing, with Save open again", () => {
+  const back = `/tools/talents/warlock?saved=${ID}&save=1`;
+  expect(safeReturnTo(back)).toBe(back);
+  expect(signInPath(back)).toBe(`/sign-in?returnTo=%2Ftools%2Ftalents%2Fwarlock%3Fsaved%3D${ID}%26save%3D1`);
+});
+
+// What the MCP directories copied when they listed Everloot is the keyless tools/list of /mcp/public: with the guild
+// ladder on, as in production, the protocol's 32 tools. Saved builds must not move it; my_builds is listed only for a
+// key that reads its owner's builds, after those 32.
+let release = "";
+beforeAll(async () => {
+  const dir = mkdtempSync(join(tmpdir(), "everloot-saved-builds-mcp-"));
+  const source = openDb(join(dir, "source.sqlite"));
+  await replaceSourceRows(source, "curated", ["lore_page"], [{ kind: "lore_page", extId: "1", name: "Thrall",
+    body: "Warchief of the Horde", gameVersion: "lore", sourceUrl: "https://example.test/thrall", retrievedAt: "2023-11-13" }]);
+  release = join(dir, "release", "release.sqlite");
+  snapshot(source, release, new Date("2026-10-10T00:00:00Z"));
+  source.close();
+});
+afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.resetModules(); });
+
+/** /mcp/public's tools/list as a directory syncs it, with EVERLOOT_SAVED_BUILDS as given and, if any, a key. */
+async function publicTools(savedBuilds: string, key?: string) {
+  vi.resetModules();
+  vi.unstubAllEnvs();
+  const env = { KB_SNAPSHOT_PATH: release, EVERLOOT_MCP_PUBLIC: "1", EVERLOOT_GUILDS: "1", EVERLOOT_DATA_GUARD: "1",
+    EVERLOOT_SAVED_BUILDS: savedBuilds, SUPABASE_URL: "https://db.example", SUPABASE_SERVICE_ROLE_KEY: "service" };
+  for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value);
+  // Supabase, for the key: live, within its allowance, and made with "Read my saved builds".
+  vi.stubGlobal("fetch", async (url: RequestInfo | URL) => {
+    const path = String(url);
+    if (path.includes("/rpc/consume_api_key")) return Response.json([{ allowed: true, retry_after: 0, key_ref: crypto.randomUUID() }]);
+    if (path.includes("/api_keys?")) return Response.json([{ scopes: ["read:public", "read:own"], expires_at: null }]);
+    throw new Error(`unexpected ${path}`);
+  });
+  const { POST } = await import("@/app/mcp/public/route");
+  const response = await POST(new Request("https://everloot.app/mcp/public", {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json, text/event-stream", ...(key ? { authorization: `Bearer ${key}` } : {}) },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
+  }));
+  expect(response.status).toBe(200);
+  return (await response.json()).result.tools as Array<{ name: string }>;
+}
+
+test("saved builds leave the public MCP catalogue as the directories copied it: the same 32 tools, my_builds only for a key", async () => {
+  const before = await publicTools("");
+  const after = await publicTools("1");
+  expect(after.map((tool) => tool.name)).toEqual(MCP_TOOL_NAMES);
+  expect(after).toHaveLength(32);
+  // Names, titles, descriptions, schemas and annotations: everything a directory keeps a copy of.
+  expect(after).toEqual(before);
+  expect(MCP_TOOL_NAMES).not.toContain(MY_BUILDS);
+  const keyed = await publicTools("1", `evl_${"a".repeat(64)}`);
+  expect(keyed.slice(0, 32)).toEqual(after);
+  expect(keyed.slice(32).map((tool) => tool.name)).toEqual([MY_BUILDS]);
 });

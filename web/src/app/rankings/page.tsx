@@ -1,14 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import JsonLd from "@/components/JsonLd";
-import { Card, Container, EmptyState, PageHeader, SectionHeading } from "@/components/ui";
+import { Card, Container, PageHeader, SectionHeading } from "@/components/ui";
 import { dataAgeLabel } from "@/lib/data-age";
-import {
-  COLLECTING_LINE, HUB_ROWS, RANKINGS, START_LINE, hubIndexable, itemListJsonLd, loadRankingWeeks, rankingPath, rankingView,
-} from "@/lib/rankings";
+import { RANKINGS, hubIndexable, itemListJsonLd, loadRankingWeeks, rankingPath, rankingView } from "@/lib/rankings";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
-import { HowItCounts, ONE_WEEK_LINE, RankTable, RankingRail, link, weekLabel } from "./parts";
+import { HowItCounts, ONE_WEEK_LINE, RankCard, RankingRail, StackedWeeks, StartState } from "./parts";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +24,9 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RankingsHub() {
   const { weeks, unreachable, dataAsOf } = await loadRankingWeeks();
   const views = RANKINGS.map((def) => rankingView(def, weeks));
-  const withNumbers = views[0]?.weeksWithNumbers ?? 0;
+  // The hero stacks the class shares: the first ranking, every class with a number in the newest week.
+  const classes = views[0];
+  const withNumbers = classes.weeksWithNumbers;
   return (
     <Container width="data">
       <article>
@@ -36,44 +35,37 @@ export default async function RankingsHub() {
           lede="WoW: Forever week by week, from players who turned the census on."
           meta={!unreachable && <span>{dataAgeLabel(dataAsOf)}</span>}
         />
-        <div className="grid gap-4 lg:grid-cols-[11rem_minmax(0,1fr)] lg:gap-6">
-          <RankingRail />
-          <div className="min-w-0 space-y-10">
-            {unreachable ? (
-              <Card><p className="text-fg-2">{STORAGE_UNREACHABLE}</p></Card>
-            ) : weeks.length === 0 ? (
-              <EmptyState message={START_LINE} />
-            ) : (
-              <>
-                {withNumbers === 1 && <p className="text-cell text-muted">{ONE_WEEK_LINE}</p>}
-                {views.map((view) => (
-                  <section key={view.def.slug} aria-labelledby={view.def.slug}>
-                    <SectionHeading
-                      id={view.def.slug}
-                      note={`${view.def.lede} ${weekLabel(view.week!)}.`}
-                      action={<Link href={rankingPath(view.def.slug)} className={link}>Full ranking<span className="sr-only">: {view.def.title}</span></Link>}
-                    >
-                      {view.def.title}
-                    </SectionHeading>
-                    {view.week!.window.collecting ? (
-                      <EmptyState count={view.week!.window.installs} message={COLLECTING_LINE} />
-                    ) : (
-                      <RankTable
-                        rows={view.rows.filter((r) => r.rank !== null).slice(0, HUB_ROWS)}
-                        caption={`${view.def.title}: top ${HUB_ROWS}`}
-                        showChange={view.previous !== null}
-                        asOf={view.week!.to}
-                      />
-                    )}
-                  </section>
-                ))}
-                {hubIndexable(weeks) && (
-                  <JsonLd data={itemListJsonLd("WoW Forever rankings", "/rankings", RANKINGS.map((r) => ({ name: r.title, path: rankingPath(r.slug) })))} />
-                )}
-              </>
-            )}
-            <HowItCounts />
-          </div>
+        <div className="space-y-6">
+          <RankingRail row />
+          {unreachable ? (
+            <Card><p className="text-fg-2">{STORAGE_UNREACHABLE}</p></Card>
+          ) : weeks.length === 0 ? (
+            <StartState />
+          ) : (
+            <>
+              {withNumbers === 1 && <p className="text-cell text-muted">{ONE_WEEK_LINE}</p>}
+              {withNumbers >= 1 && classes.week && (
+                <section aria-labelledby="by-class">
+                  <SectionHeading id="by-class" note="Each class's part of the characters counted that week, from the oldest week shown to this one so far.">
+                    Share of each week&apos;s characters by class
+                  </SectionHeading>
+                  <StackedWeeks
+                    weeks={weeks}
+                    series={classes.series}
+                    hidden={classes.rows.some((r) => r.count === null)}
+                    title={`Share of each week's characters by class, ${classes.series.length} classes`}
+                  />
+                </section>
+              )}
+              <div className="grid gap-4 md:grid-cols-2 lg:gap-6">
+                {views.map((view) => <RankCard key={view.def.slug} view={view} />)}
+              </div>
+              {hubIndexable(weeks) && (
+                <JsonLd data={itemListJsonLd("WoW Forever rankings", "/rankings", RANKINGS.map((r) => ({ name: r.title, path: rankingPath(r.slug) })))} />
+              )}
+            </>
+          )}
+          <HowItCounts />
         </div>
       </article>
     </Container>

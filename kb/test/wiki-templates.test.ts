@@ -39,6 +39,14 @@ test("icons, hatnotes and stubs vanish without leaving double spaces", () => {
   expect(repairTemplates("{{for|the achievement|Kirin Tor Offensive (achievement)}}\n{{Removed|patch=4.0.1}}\nBody")).toBe("Body");
 });
 
+test("code tags keep their text, with templates rendered inside them", () => {
+  expect(wtf("Use <code>/run foo</code> now.").text()).toBe("Use  now.");
+  expect(wtf(repairTemplates("Use <code>/run foo</code> now.")).text()).toBe("Use /run foo now.");
+  expect(wtf(repairTemplates("Sold for <code>{{cost|1|50}}</code> by <code>{{npc|Horde|Grex}}</code>.")).text()).toBe("Sold for 1g 50s by Grex.");
+  expect(wtf(repairTemplates('A <CODE class="x"><nowiki>C_Map.GetBestMapForUnit</nowiki></CODE> b')).text()).toBe("A C_Map.GetBestMapForUnit b");
+  expect(repairTemplates("<code>a\nb</code> c")).toBe("a\nb c");
+});
+
 test("unknown templates are left for the converter", () => {
   expect(repairTemplates("{{Companions|Critter}} and {{npcbox|name=x}}")).toBe("{{Companions|Critter}} and {{npcbox|name=x}}");
 });
@@ -137,4 +145,90 @@ test("a sentence that broke on these templates converts without damage", () => {
   const src = "can be purchased from {{Alliance}} [[Dawn-Seeker Kasrek]] in [[Stormshield]] or {{Horde}} [[Dawn-Seeker Skariss]] in [[Warspear]] for {{Cost|10,000}}.";
   expect(countDamage(wtf(src).text())).toBeGreaterThan(0);
   expect(countDamage(wtf(repairTemplates(src)).text())).toBe(0);
+});
+
+test("{{co}} and {{coords}} show the map coordinates in brackets", () => {
+  expect(repairTemplates("f Hearthglen are at {{co|48|21|Western Plaguelands}}.")).toBe("f Hearthglen are at [48, 21].");
+  expect(repairTemplates("| location = [[Booty Bay]], [[Cape of Stranglethorn]]{{coords|43.1|73.0|Cape of Stranglethorn}}"))
+    .toBe("| location = [[Booty Bay]], [[Cape of Stranglethorn]][43.1, 73.0]");
+  expect(repairTemplates("{{co|47|78|Arathi Highlands||1}}")).toBe("[47, 78]");
+  expect(repairTemplates("{{coords}}")).toBe("[0, 0]");
+});
+
+test("{{reputation}} and {{quality}} show the label, else the standing or quality as written", () => {
+  expect(repairTemplates("to go from {{reputation|revered}} to {{reputation|exalted}}, 880 kills total"))
+    .toBe("to go from revered to exalted, 880 kills total");
+  expect(repairTemplates("*[[Mantles of the Dawn]] ({{reputation|Revered}})")).toBe("*[[Mantles of the Dawn]] (Revered)");
+  expect(repairTemplates("especially {{quality|epic}} ones")).toBe("especially epic ones");
+  expect(repairTemplates("Teaches only {{Quality|poor|Apprentice}} level.")).toBe("Teaches only Apprentice level.");
+  expect(repairTemplates("{{quality|rare|Thunderfury|Thunderfury, Blessed Blade|nobold=1}}")).toBe("Thunderfury, Blessed Blade");
+});
+
+test("{{costitem}} shows the count and the item name", () => {
+  expect(repairTemplates("| [[Plans: Vicious Pyrium Breastplate]] || {{Costitem|5|Pyrium Bar}}"))
+    .toBe("| [[Plans: Vicious Pyrium Breastplate]] || 5 Pyrium Bar");
+  expect(repairTemplates("{{costitem|1500|Gold Ore}}")).toBe("1,500 Gold Ore");
+  expect(repairTemplates("{{costitem||Pyrium Bar}}")).toBe("1 Pyrium Bar");
+  expect(repairTemplates("{{costitem|5}}")).toBe("5");
+});
+
+test("{{cost}} shows its named currencies after the coins, in the template's order", () => {
+  expect(repairTemplates("for {{cost|eo=500}} and")).toBe("for 500 Elemental Overflow and");
+  expect(repairTemplates("{{cost|sts=10}}")).toBe("10 Storm Sigil");
+  expect(repairTemplates("{{cost|5|hon=1500|ach=10}}")).toBe("5g 10 Achievement point 1500 Honor");
+  expect(repairTemplates("{{cost|g=2|s=50}}")).toBe("2g 50s");
+  expect(repairTemplates("{{cost|es=30}}")).toBe("30 Eye of the Storm Mark of Honor");
+  expect(repairTemplates("{{cost|cost=3|name=Mark of Sargeras|icon=inv_misc_token.png}}")).toBe("3 Mark of Sargeras");
+});
+
+test("sentences that broke on {{reputation}}, {{costitem}} and {{cost}} currencies convert without damage", () => {
+  const vendor = "is sold by [[Mythressa]] for {{cost|eo=500}} and [[Rethelshi]] in [[Valdrakken]] for {{cost|sts=10}} {{costitem|1|Helm of Raging Tempests}}.";
+  expect(wtf(repairTemplates(vendor)).text()).toBe(
+    "is sold by Mythressa for 500 Elemental Overflow and Rethelshi in Valdrakken for 10 Storm Sigil 1 Helm of Raging Tempests.",
+  );
+  for (const src of [
+    "He was {{reputation|friendly}} towards the [[Horde]] and the [[Alliance]], although once the escort quest was started he became {{reputation|neutral}} to the Alliance.",
+    "The '''{{quality|Rare|Toxic Revenger}}''' is a one-handed dagger",
+    "Rare blue items are between {{quality|uncommon|uncommon|green}} and {{quality|epic|epic|purple}} in [[quality]].",
+  ]) {
+    expect(countDamage(wtf(src).text())).toBeGreaterThan(0);
+    expect(countDamage(wtf(repairTemplates(src)).text())).toBe(0);
+  }
+  expect(wtf(repairTemplates("purchase it for {{costitem|1|Apexis Crystal (item)}} {{costitem|50|Apexis Shard}} from")).text())
+    .toBe("purchase it for 1 Apexis Crystal (item) 50 Apexis Shard from");
+});
+
+test("{{api}} shows the label or the name, and keeps a function's argument list", () => {
+  expect(repairTemplates("the return of {{api|GetSubZoneText}}() or {{api|GetZoneText}}()")).toBe("the return of GetSubZoneText() or GetZoneText()");
+  expect(repairTemplates("{{api|CreateFrame()}} and {{api|t=w|ScriptRegion:EnableMouse|EnableMouse}}")).toBe("CreateFrame() and EnableMouse");
+  expect(repairTemplates("via {{api|t=wh|OnEvent}} handlers")).toBe("via OnEvent handlers");
+});
+
+test("icon-only templates (race, class, socket, quest marker, expansion logo) vanish", () => {
+  expect(repairTemplates("{{RaceIcon|Human|Male}} Human")).toBe("Human");
+  expect(repairTemplates("{{ClassIcon|Mage|small}} Mage and {{socket icon|Red}} gem")).toBe("Mage and gem");
+  expect(repairTemplates("Accept {{QuestStart}} the quest {{Wotlk-inline|}} patch")).toBe("Accept the quest patch");
+});
+
+test("{{mob}}, {{fu}}, {{expac}}, {{achievement}}, {{school}}, {{gossip}}, {{keypress}} and the wiki links render their name or label", () => {
+  expect(repairTemplates("kill {{Mob|C'Thun (tactics)||C'Thun}} and {{mob|Blackhand Elite}}")).toBe("kill C'Thun and Blackhand Elite");
+  expect(repairTemplates("{{Fu|Durotan}} of the {{fu|Frostwolf clan|Frostwolves}}")).toBe("Durotan of the Frostwolves");
+  expect(repairTemplates("added in {{expac|Dragonflight}}")).toBe("added in Dragonflight");
+  expect(repairTemplates("earn {{achievement|icon=|Kul Tiran Curator}} or {{achievement|The Fishing Diplomat|the fish}}")).toBe("earn Kul Tiran Curator or the fish");
+  expect(repairTemplates("{{School|Fire}} damage, {{Gossip|Um, what?}}, press {{keypress|Shift|1}}")).toBe("Fire damage, Um, what?, press Shift+1");
+  expect(repairTemplates("{{Sc|Ares (game)|Project Ares}} {{dash}} {{StarCraft|Nova}}")).toBe("Project Ares – Nova");
+});
+
+test("{{title}} shows its text in angle brackets", () => {
+  expect(repairTemplates("Cheese Vendor {{title|Cheese Vendor}}")).toBe("Cheese Vendor <Cheese Vendor>");
+});
+
+test("sentences that broke on {{RaceIcon}} and {{mob}} convert without damage", () => {
+  for (const src of [
+    "Fought {{RaceIcon|Human|Male}} Varian at {{RaceIcon|Orc|Male}} Garrosh",
+    "She kills {{Mob|Lady Vashj (tactics)||Lady Vashj}} at {{mob|Sunblade Imp}} too",
+  ]) {
+    expect(countDamage(wtf(src).text())).toBeGreaterThan(0);
+    expect(countDamage(wtf(repairTemplates(src)).text())).toBe(0);
+  }
 });

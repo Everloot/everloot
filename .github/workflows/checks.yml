@@ -71,6 +71,24 @@ jobs:
       - name: Wiki pages pass the page check
         run: npm run kb -- wiki-check
         working-directory: kb
+      - name: News posts pass the post check
+        run: npm run kb -- news-check
+        working-directory: kb
+      # Published guides stay as they were, so the check compares with kb/guides at the base: a pull request's base,
+      # the commit a push to main replaced, or a manual run's parent. The base's Markdown is read from git as data;
+      # nothing from it is checked out or run. A base without the folder compares with an empty one; a base that does
+      # not fetch, list or read fails the step.
+      - name: Guides pass the guide check, published versions as at the base
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            git fetch --quiet --no-tags --depth=2 origin "$GITHUB_SHA"
+            BASE_SHA=$(git rev-parse "$GITHUB_SHA^")
+          fi
+          python3 scripts/test_export_base_guides.py
+          python3 scripts/export_base_guides.py "$BASE_SHA" "$RUNNER_TEMP/base-guides"
+          cd kb && npm run kb -- guide-check --previous "$RUNNER_TEMP/base-guides"
       - run: npm test && npm run typecheck && npm run lint && npm run build
         working-directory: web
       - run: npm ci && npm test && npm run typecheck
@@ -81,7 +99,11 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install lupa==2.6 jsonschema==4.25.1
-      - run: python addon/tests/event_identity.py && python addon/tests/collection_contract.py && python addon/tests/map_positions_contract.py && python addon/tests/item_facts_contract.py && python addon/tests/auction_contract.py && python addon/tests/gold_contract.py && python addon/tests/ask_contract.py && python addon/tests/recipes_contract.py && python addon/tests/addons_contract.py && python addon/tests/mapbounds_contract.py && python addon/tests/market_contract.py && python addon/tests/drops_contract.py && python addon/tests/scan_prompt_contract.py && python addon/tests/auction_tab_contract.py && python addon/tests/options_contract.py && python addon/tests/gph_contract.py && python addon/tests/talents_contract.py && python addon/tests/plan_contract.py && python addon/tests/raid_contract.py && python addon/tests/completion_contract.py && python addon/tests/census_contract.py && python addon/tests/players_contract.py && python addon/tests/protocol_contract.py && python addon/tests/no_ads_contract.py
+      - run: python addon/tests/event_identity.py && python addon/tests/collection_contract.py && python addon/tests/map_positions_contract.py && python addon/tests/loot_types_contract.py && python addon/tests/item_facts_contract.py && python addon/tests/auction_contract.py && python addon/tests/gold_contract.py && python addon/tests/ask_contract.py && python addon/tests/recipes_contract.py && python addon/tests/addons_contract.py && python addon/tests/mapbounds_contract.py && python addon/tests/market_contract.py && python addon/tests/drops_contract.py && python addon/tests/scan_prompt_contract.py && python addon/tests/auction_tab_contract.py && python addon/tests/options_contract.py && python addon/tests/gph_contract.py && python addon/tests/talents_contract.py && python addon/tests/plan_contract.py && python addon/tests/raid_contract.py && python addon/tests/completion_contract.py && python addon/tests/census_contract.py && python addon/tests/players_contract.py && python addon/tests/conveniences_contract.py && python addon/tests/protocol_contract.py && python addon/tests/no_ads_contract.py && python addon/tests/minimap_contract.py
+      - name: Website plans import into the addon workspace
+        run: python addon/tests/raid_plan_contract.py && python addon/tests/planner_contract.py
+      - name: Alpha releases stay pre-releases
+        run: python scripts/test_alpha_release.py
       # A released version's zip is the published download: rebuild it to prove the source packages, then
       # put the published one back. An unreleased version's zip must match the source byte for byte.
       # release.yml stays strict.

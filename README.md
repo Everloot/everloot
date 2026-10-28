@@ -56,8 +56,25 @@ the original and an RSS feed. [everloot.app/changes](https://everloot.app/change
 
 ![The change tracker](docs/media/changes.webp)
 
+**News.** What is new on Everloot and what it means for Forever players, written by us, with the
+sources each post draws on. [everloot.app/news](https://everloot.app/news)
+
 **Lore archive.** The Warcraft Wiki (CC BY-SA 4.0), browsable by type and searchable.
 [everloot.app/lore](https://everloot.app/lore)
+
+**Guild ladder.** Guilds ranked by raid progression, one ladder per raid. A kill counts once uploads
+from two guild members agree on it, and the addon records the guild, never a character name.
+[everloot.app/guilds](https://everloot.app/guilds)
+
+**Census and rankings.** Factions, races, classes and levels from addon uploads. Each character
+counts once, and a group appears only once it holds 10 characters. Rankings show the most played
+classes and races each week. [everloot.app/census](https://everloot.app/census) ·
+[everloot.app/rankings](https://everloot.app/rankings)
+
+**Ask Everloot.** Ask a question in plain words with your own AI provider's API key. The model looks
+the answer up in Everloot's data and names its sources. Your key stays in your browser tab and never
+reaches Everloot.
+[everloot.app/chat](https://everloot.app/chat)
 
 **Addon leaderboard and profiles.** Which addons Forever players run, for the players who opt in to
 share their list. A count appears only when three installs report it.
@@ -71,10 +88,10 @@ that players start with the addon's **Everloot scan** button. The site shows a r
 60-day chart per item, a day is published once three reporters agree, and the same prices appear in
 item tooltips in game. [everloot.app/tools/auctions](https://everloot.app/tools/auctions)
 
-**MCP server.** 28 tools that let an AI assistant search the archive and read the same sourced
+**MCP server.** 32 tools that let an AI assistant search the archive and read the same sourced
 facts the site shows: items, NPCs, quests, vendors, profession paths, recipe ranges, auction history,
-market values, recent Blizzard changes and more. The public endpoint is read only and rate limited:
-`https://everloot.app/mcp/public`.
+market values, guild progression, recent Blizzard changes and more. The public endpoint is read
+only and rate limited: `https://everloot.app/mcp/public`.
 
 ## How it fits together
 
@@ -95,7 +112,7 @@ flowchart LR
   market --> site
   market --> companion
   rollups --> site["Site pages and tools"]
-  rollups --> mcp["MCP server<br/>28 tools"]
+  rollups --> mcp["MCP server<br/>32 tools"]
   wiki["Warcraft Wiki dump<br/>CC BY-SA 4.0"] --> kb["kb/<br/>import, provenance, snapshot"]
   files["Game files<br/>maintainer extraction"] --> gamedata["Reviewed game-data files<br/>unconfirmed"]
   kb --> site
@@ -120,8 +137,9 @@ flowchart LR
 
 ### Players
 
-1. Download the addon from [everloot.app/addon](https://everloot.app/addon) and extract
-   `Everloot/` into the game's `Interface/AddOns/`.
+1. Install the addon from [CurseForge](https://www.curseforge.com/wow/addons/everloot), or download
+   it from [everloot.app/addon](https://everloot.app/addon) and extract `Everloot/` into the game's
+   `Interface/AddOns/`.
 2. Play. Log out, or type `/reload`, to save.
 3. Upload `WTF/Account/<account>/SavedVariables/Everloot.lua` at everloot.app/upload. You preview
    everything before it is sent.
@@ -170,16 +188,18 @@ files are under [`/schema/`](https://everloot.app/schema/index.json).
 
 ## Project status
 
-Beta. The addon passes its automated tests (the current version is on
-[everloot.app/addon](https://everloot.app/addon)); the in-client checks in
-[`docs/2026-10-08-beta-client-checklist.md`](docs/2026-10-08-beta-client-checklist.md) and
+Pre-launch. The WoW: Forever beta closed on 2026-10-23 and the game launches on 2026-11-04.
+
+The addon passes its automated tests and is published as an Alpha on
+[CurseForge](https://www.curseforge.com/wow/addons/everloot) and on
+[everloot.app/addon](https://everloot.app/addon). The in-client checks in
+[`docs/2026-10-08-beta-client-checklist.md`](docs/2026-10-08-beta-client-checklist.md),
 [`docs/2026-10-18-addon-0.3.2-beta-checklist.md`](docs/2026-10-18-addon-0.3.2-beta-checklist.md) and
-[`docs/2026-10-19-addon-0.3.3-beta-checklist.md`](docs/2026-10-19-addon-0.3.3-beta-checklist.md) are still open
-until the game is playable. The Everloot Desktop App had its first release on 2026-10-19; its builds
-are not code-signed yet. The game-file layers (talents, raid buffs, map) are read from build
-`1.60.1.70450` and marked unconfirmed. A [build watch](docs/BUILD_WATCH.md) checks for new builds
-every half hour and opens a reviewed pull request when one appears. WoW: Forever launches on
-2026-11-04.
+[`docs/2026-10-19-addon-0.3.3-beta-checklist.md`](docs/2026-10-19-addon-0.3.3-beta-checklist.md) stay
+open until the live servers are up. The Everloot Desktop App's builds are not code-signed yet.
+Everything read from the game files (talents, raid buffs, the map) stays marked unconfirmed until
+players see it in game. A [build watch](docs/BUILD_WATCH.md) checks for new builds every
+half hour and opens a reviewed pull request when one appears.
 
 What is next is in [`ROADMAP.md`](ROADMAP.md). What has shipped is in [`CHANGELOG.md`](CHANGELOG.md).
 Nightly pre-releases of the addon are on the [releases page](https://github.com/Everloot/everloot/releases).

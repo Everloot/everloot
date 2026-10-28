@@ -3,8 +3,9 @@
 The players module: off by default, one row per character kept in place, and nothing read about another
 player beyond name, realm, race, class, level and guild. Reads are throttled (10 minutes per player, a quarter
 of a second between reads), new characters are capped at 300 a UTC day, and the file holds at most 1,000 rows
-with the oldest going first. The rows are checked in the exact shape the upload sends, against the protocol's
-JSON Schema.
+with the oldest going first. A boss kill inside a dungeon or raid while your character is in a guild is one
+guild_kill row (guild, realm, faction, encounter, instance, time; no name), at most 60 a UTC day. The rows are
+checked in the exact shape the upload sends, against the protocol's JSON Schema.
 """
 import json
 import re
@@ -12,7 +13,7 @@ from pathlib import Path
 
 from lupa.lua51 import LuaRuntime
 
-from protocol_schema import check_rows, to_plain
+from protocol_schema import SCHEMA_DIR, check_rows, to_plain
 
 root = Path(__file__).parents[1]
 toc = (root / "Everloot.toc").read_text(encoding="utf-8")
@@ -46,7 +47,8 @@ for event in ("NAME_PLATE_UNIT_ADDED", "INSPECT_READY", "GUILD_ROSTER_UPDATE", "
 # Every game call in the code (comments stripped) is on the module's own list, and the list holds only these.
 code = "\n".join(line.split("--")[0] for line in source.splitlines())
 called = set(re.findall(r"(?<![\w.:])([A-Z][A-Za-z0-9_]*)\s*\(", code))
-ALLOWED = {"UnitIsPlayer", "UnitGUID", "UnitName", "UnitLevel", "UnitRace", "UnitClass", "GetGuildInfo", "GetRealmName", "GetTime", "IsInRaid"}
+ALLOWED = {"UnitIsPlayer", "UnitGUID", "UnitName", "UnitLevel", "UnitRace", "UnitClass", "GetGuildInfo", "GetRealmName", "GetTime", "IsInRaid",
+           "UnitFactionGroup", "GetInstanceInfo"}
 assert called <= ALLOWED, f"players.lua calls {sorted(called - ALLOWED)}, which are not on the players list"
 declared = set(re.search(r"P\.API = \{([^}]*)\}", source).group(1).replace('"', "").replace(" ", "").split(","))
 assert declared == ALLOWED, f"P.API lists {sorted(declared)}"
@@ -85,6 +87,10 @@ UnitClass = function(unit) local u = units[unit]; if u then return 'Display', u.
 GetGuildInfo = function(unit) local u = units[unit]; if u and u.guild then return u.guild, 'Rank', 1 end end
 GetRealmName = function() return realm end
 IsInRaid = function() return inRaid end
+faction = 'Alliance'
+UnitFactionGroup = function(unit) if unit == 'player' then return faction, faction end end
+instance = { 'Elwynn Forest', 'none', 0, '', 0, 0, false, 0 }
+GetInstanceInfo = function() return unpack(instance, 1, 10) end
 for _, name in ipairs({ 'GetGuildRosterInfo', 'GetNumGuildMembers', 'UnitFullName', 'UnitPosition', 'GetInventoryItemLink', 'NotifyInspect', 'GetPlayerInfoByGUID', 'GetUnitName' }) do
  _G[name] = function() forbidden = forbidden + 1 end
 end
@@ -125,7 +131,8 @@ def fresh(saved: str = "nil", extra: str = "", files=("core.lua", "modules/playe
         lua.execute((root / file).read_text(encoding="utf-8"))
     lua.execute("""
 Everloot.frame.onEvent(nil,'ADDON_LOADED','Everloot')
-function event(name, arg) for _, hook in ipairs(Everloot.frame.hooks or {}) do hook(nil, name, arg) end end
+function event(name, ...) for _, hook in ipairs(Everloot.frame.hooks or {}) do hook(nil, name, ...) end end
+function kills() return EverlootDB.records.guild_kill or {} end
 function reload() Everloot.frame.hooks = nil; registered = {}; Everloot.frame.onEvent(nil,'ADDON_LOADED','Everloot'); event('PLAYER_LOGIN') end
 function rows() return EverlootDB.records.player_seen or {} end
 function sweep(from, to, fields)
@@ -139,13 +146,16 @@ end
 lua = fresh()
 lua.execute("""
 assert(EverlootDB.toggles.players == false, 'players is off by default')
-for _, name in ipairs({ 'PLAYER_TARGET_CHANGED', 'UPDATE_MOUSEOVER_UNIT', 'GROUP_ROSTER_UPDATE', 'PLAYER_LOGIN', 'PLAYER_LEVEL_UP' }) do
+for _, name in ipairs({ 'PLAYER_TARGET_CHANGED', 'UPDATE_MOUSEOVER_UNIT', 'GROUP_ROSTER_UPDATE', 'PLAYER_LOGIN', 'PLAYER_LEVEL_UP', 'ENCOUNTER_END' }) do
  assert(registered[name] == nil, 'off registers nothing: ' .. name)
 end
 assert(Everloot.frame.hooks == nil, 'off adds no event handler')
 units.target = player(1); units.mouseover = player(2); units.party1 = player(3)
+instance = { 'Molten Core', 'raid', 9, '40 Player', 40, 0, false, 409 }
 event('PLAYER_LOGIN'); event('PLAYER_TARGET_CHANGED'); event('UPDATE_MOUSEOVER_UNIT'); event('GROUP_ROSTER_UPDATE')
+event('ENCOUNTER_END', 663, 'Lucifron', 9, 40, 1)
 assert(#rows() == 0, 'nothing is recorded while players is off')
+assert(#kills() == 0, 'no guild kill is recorded while players is off')
 assert(nameCalls == 0, 'no name was read while players is off')
 assert(string.find(Everloot:Status(), 'players: off by toggle', 1, true), 'status shows players is off')
 SlashCmdList.EVERLOOT('players')
@@ -165,7 +175,7 @@ local said = printed[#printed]
 assert(string.find(said, 'name, realm, race, class, level and guild', 1, true) and string.find(said, 'upload page', 1, true)
   and string.find(said, 'Never where they are', 1, true) and string.find(said, 'hidden', 1, true), said)
 reload()
-assert(registered.PLAYER_TARGET_CHANGED and registered.UPDATE_MOUSEOVER_UNIT and registered.GROUP_ROSTER_UPDATE and registered.PLAYER_LEVEL_UP)
+assert(registered.PLAYER_TARGET_CHANGED and registered.UPDATE_MOUSEOVER_UNIT and registered.GROUP_ROSTER_UPDATE and registered.PLAYER_LEVEL_UP and registered.ENCOUNTER_END)
 assert(not registered.NAME_PLATE_UNIT_ADDED and not registered.GUILD_ROSTER_UPDATE, 'no nameplate or roster events')
 assert(string.find(Everloot:Status(), 'players: ready', 1, true), Everloot:Status())
 
@@ -179,6 +189,9 @@ assert(r.installId == EverlootDB.installId and r.capturedAt == '2026-10-18T00:00
 NOW_T = NOW_T + 60
 event('PLAYER_LEVEL_UP', 13)
 assert(#rows() == 1 and rows()[1].level == 13 and rows()[1].capturedAt == '2026-10-18T00:01:00Z', 'level-up updates your row in place')
+-- A changed row is a new revision: the uploader skips every event id it already confirmed, so the changed row
+-- needs an id of its own or it would never be sent again.
+assert(rows()[1].eventId == 'player_seen:2', 'a level-up takes the next event id, got ' .. tostring(rows()[1].eventId))
 
 GT = GT + 5
 units.target = player(1, { level = 30, guild = 'Red Hand' })
@@ -190,7 +203,7 @@ units.party1 = player(3, { race = 'Human' }); units.party2 = player(4)
 event('GROUP_ROSTER_UPDATE')
 local seen = rows()
 assert(#seen == 5, 'you, target, mouseover and two party members; got ' .. #seen)
-assert(seen[2].name == nameOf(1) and seen[2].level == 30 and seen[2].guild == 'Red Hand' and seen[2].eventId == 'player_seen:2')
+assert(seen[2].name == nameOf(1) and seen[2].level == 30 and seen[2].guild == 'Red Hand' and seen[2].eventId == 'player_seen:3')
 assert(seen[3].race == 'Scourge' and seen[3].class == 'PRIEST' and seen[3].guild == nil, 'no guild is no field')
 assert(seen[4].race == 'Human' and seen[5].name == nameOf(4))
 
@@ -245,26 +258,53 @@ GT = GT + 700
 units.mouseover = player(1, { level = 30, guild = 'Red Hand' })
 event('UPDATE_MOUSEOVER_UNIT')
 for k, v in pairs(seen[2]) do assert(snapshot[k] == v, 'a repeat changed ' .. k) end
+assert(seen[2].eventId == 'player_seen:3', 'an unchanged reread keeps the event id')
+
+-- Each changed row takes an id above every id handed out so far, so an id is never reused.
+local function highest()
+  local top = 0
+  for _, row in ipairs(seen) do top = math.max(top, tonumber(row.eventId:match(':(%d+)$'))) end
+  return top
+end
 
 -- A new level changes the row and its time; a missing guild keeps the one it had.
 NOW_T = NOW_T + 3600
 GT = GT + 700
+local top = highest()
 units.mouseover = player(1, { level = 31, guild = false })
 event('UPDATE_MOUSEOVER_UNIT')
 assert(#seen == count and seen[2].level == 31 and seen[2].guild == 'Red Hand' and seen[2].capturedAt == '2026-10-18T01:01:00Z', 'new level, kept guild')
-assert(seen[2].eventId == 'player_seen:2', 'the row keeps its event id')
--- A new guild replaces the old one.
+assert(seen[2].eventId == 'player_seen:' .. (top + 1), 'a new level is a new revision, got ' .. tostring(seen[2].eventId))
+-- Rereading the same level and guild keeps that revision.
+GT = GT + 700
+units.mouseover = player(1, { level = 31, guild = false })
+event('UPDATE_MOUSEOVER_UNIT')
+assert(seen[2].eventId == 'player_seen:' .. (top + 1), 'the same data keeps its revision')
+-- A new guild replaces the old one, under a new revision.
 GT = GT + 700
 units.mouseover = player(1, { level = 31, guild = 'Blue Hand' })
 event('UPDATE_MOUSEOVER_UNIT')
 assert(seen[2].guild == 'Blue Hand')
+assert(seen[2].eventId == 'player_seen:' .. (top + 2), 'a new guild is a new revision, got ' .. tostring(seen[2].eventId))
 
--- The next UTC day moves the date of a character seen again, with no new row.
+-- The next UTC day moves the date of a character seen again, with no new row, under a new revision: the
+-- dated row has to be sent again for the site to show when the character was last seen.
 NOW_T = 1792281600 + 86400 + 5
 GT = GT + 700
 units.mouseover = player(1, { level = 31, guild = 'Blue Hand' })
 event('UPDATE_MOUSEOVER_UNIT')
 assert(#seen == count and seen[2].capturedAt == '2026-10-19T00:00:05Z', 'a new day moves the date, not the row count')
+assert(seen[2].eventId == 'player_seen:' .. (top + 3), 'a new day is a new revision, got ' .. tostring(seen[2].eventId))
+-- A second read the same day changes nothing.
+GT = GT + 700
+units.mouseover = player(1, { level = 31, guild = 'Blue Hand' })
+event('UPDATE_MOUSEOVER_UNIT')
+assert(seen[2].eventId == 'player_seen:' .. (top + 3), 'the same day keeps the revision')
+local seenIds = {}
+for _, row in ipairs(seen) do assert(not seenIds[row.eventId], 'duplicate event id ' .. row.eventId); seenIds[row.eventId] = true end
+-- The counter lives in the file, so a revision after a reload still goes up.
+local stored = EverlootDB.playersNext
+assert(stored == top + 3, 'the saved counter is the last id handed out, got ' .. tostring(stored))
 """)
 
 # --- Throttle: a player is read again after 10 minutes, and target/mouseover reads keep a quarter-second apart ---
@@ -354,6 +394,69 @@ event('UPDATE_MOUSEOVER_UNIT')
 assert(#rows() == count, 'a character in the file is found again, not added twice (' .. count .. ' -> ' .. #rows() .. ')')
 """)
 
+# --- Guild kills: ENCOUNTER_END with success, in a dungeon or raid, while your character is in a guild ---
+lua = fresh("{ installId = 'abcd-1234', toggles = { players = true }, records = {} }")
+lua.execute("""
+event('PLAYER_LOGIN')
+-- Outdoors, nothing: ENCOUNTER_END only counts inside a dungeon or raid.
+event('ENCOUNTER_END', 663, 'Lucifron', 9, 40, 1)
+assert(#kills() == 0, 'a kill outside an instance is not a row')
+instance = { 'Molten Core', 'raid', 9, '40 Player', 40, 0, false, 409 }
+faction = 'Horde'
+event('ENCOUNTER_END', 663, 'Lucifron', 9, 40, 1)
+assert(#kills() == 1, 'a kill in a raid is one row')
+local k = kills()[1]
+assert(k.installId == 'abcd-1234' and k.capturedAt == '2026-10-18T00:00:00Z' and type(k.eventId) == 'string', tostring(k.eventId))
+assert(k.guildName == 'Night Watch' and k.realm == 'Forever Pioneer' and k.faction == 'horde', 'guild, realm and lower-cased faction')
+assert(k.encounterId == 663 and k.name == 'Lucifron' and k.instanceMapId == 409 and k.difficulty == 9 and k.size == 40, 'the encounter and where')
+for key in pairs(k) do
+ assert(key ~= 'name' or k[key] == 'Lucifron', 'the only name is the boss')
+ assert(key ~= 'guid' and key ~= 'player' and key ~= 'character', 'no character on a kill row')
+end
+assert(EverlootDB.playersKillDay.n == 1)
+
+-- A wipe, a missing guild, a kill the game reports without a size, a bad faction or a dungeon finder realm name.
+event('ENCOUNTER_END', 664, 'Magmadar', 9, 40, 0)
+assert(#kills() == 1, 'a wipe is not a row')
+me.guild = nil
+event('ENCOUNTER_END', 664, 'Magmadar', 9, 40, 1)
+assert(#kills() == 1, 'no guild, no row')
+me.guild = 'Night Watch'
+faction = 'Neutral'
+event('ENCOUNTER_END', 664, 'Magmadar', 9, 40, 1)
+assert(#kills() == 1, 'a faction that is not alliance or horde is not a row')
+faction = 'Alliance'
+event('ENCOUNTER_END', 664, 'Magmadar', 9, nil, 1)
+assert(#kills() == 2 and kills()[2].size == nil and kills()[2].faction == 'alliance', 'a kill without a size is a row without one')
+instance = { 'The Deadmines', 'party', 1, 'Normal', 5, 0, false, 36 }
+event('ENCOUNTER_END', 2, 'Cookie', 1, 5, 1)
+assert(#kills() == 3 and kills()[3].instanceMapId == 36, 'a dungeon counts too')
+-- The same boss again the same day is another row: the site keeps the earliest.
+event('ENCOUNTER_END', 2, 'Cookie', 1, 5, 1)
+assert(#kills() == 4 and kills()[4].eventId ~= kills()[3].eventId, 'two kills, two rows, two ids')
+
+-- At most 60 a UTC day; the next day starts over.
+for i = 5, 70 do event('ENCOUNTER_END', 100 + i, 'Boss' .. i, 1, 5, 1) end
+assert(#kills() == 60, 'at most 60 kills a day; got ' .. #kills())
+assert(kills()[60].name == 'Boss60')
+NOW_T = NOW_T + 86400
+event('ENCOUNTER_END', 200, 'Tomorrow', 1, 5, 1)
+assert(#kills() == 61 and kills()[61].capturedAt == '2026-10-19T00:00:00Z', 'the next day counts again')
+assert(#rows() == 1, 'kills write no player row')
+SlashCmdList.EVERLOOT('players')
+assert(string.find(printed[#printed], '61 boss kills by your guild', 1, true), printed[#printed])
+""")
+db = lua.globals().EverlootDB
+kill_rows = to_plain(db.records.guild_kill)
+for row in kill_rows:
+    assert {"installId", "eventId", "capturedAt", "guildName", "realm", "faction", "encounterId", "name", "instanceMapId", "difficulty"} <= set(row), sorted(row)
+    assert set(row) <= {"installId", "eventId", "capturedAt", "kindLoggedAt", "guildName", "realm", "faction", "encounterId", "name", "instanceMapId", "difficulty", "size"}, sorted(row)
+    assert "Myself" not in json.dumps(row) and "Player-" not in json.dumps(row), "no character on a kill row"
+if (SCHEMA_DIR / "records" / "guild_kill.json").exists():
+    check_rows("guild_kill", [{k: v for k, v in r.items() if k not in ("kind", "installId")} for r in kill_rows], db.installId)
+else:
+    print("players: packages/protocol has no guild_kill schema yet, so the kill rows were checked by shape only")
+
 # --- The record each row becomes on upload ---
 lua = fresh("{ installId = 'abcd-1234', toggles = { players = true }, records = {} }")
 lua.execute("""
@@ -389,9 +492,16 @@ check_rows("player_seen", [{k: v for k, v in r.items() if k not in ("kind", "ins
 lua.execute("""
 EverlootDB.paused = { player_seen = true, loot = true }
 local last = EverlootDB.playersNext
+instance = { 'The Deadmines', 'party', 1, 'Normal', 5, 0, false, 36 }
+event('ENCOUNTER_END', 1, 'Rhahk\\'Zor', 1, 5, 1)
+assert(#kills() == 1, 'a kill before off is a row')
+EverlootDB.paused.guild_kill = true
 SlashCmdList.EVERLOOT('players off')
 assert(EverlootDB.toggles.players == false and #rows() == 0, 'off deletes the player rows')
-assert(EverlootDB.paused.player_seen == nil and EverlootDB.paused.loot == true, 'off clears the players pause only')
+assert(EverlootDB.records.guild_kill == nil and EverlootDB.playersKillDay == nil, 'off deletes the guild kill rows and their day count')
+assert(EverlootDB.paused.player_seen == nil and EverlootDB.paused.guild_kill == nil and EverlootDB.paused.loot == true, 'off clears the players pauses only')
+event('ENCOUNTER_END', 1, 'Rhahk\\'Zor', 1, 5, 1)
+assert(#kills() == 0, 'no kill is recorded after off')
 assert(string.find(printed[#printed], 'deleted', 1, true))
 local calls = nameCalls
 GT = GT + 1000
@@ -442,4 +552,4 @@ assert(#rows() == before + 1, 'a unit on another realm is not a row; got ' .. (#
 """)
 
 print("Lua 5.1 players: off by default, no roster/gear/position calls, one row per character kept in place, throttled reads, "
-      "300 new a day, 1000 rows with the oldest dropped, rows match the protocol schema, off deletes, census stays anonymous")
+      "300 new a day, 1000 rows with the oldest dropped, rows match the protocol schema, guild kills at most 60 a day, off deletes, census stays anonymous")

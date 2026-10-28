@@ -8,12 +8,17 @@ local E = Everloot
 local O = {}
 E.Options = O
 
--- In page order. `command` is the /everloot word; `field` is a top-level EverlootDB key instead of a toggle.
+-- In page order. `command` is the /everloot word; `field` is a top-level EverlootDB key instead of a toggle;
+-- `defaultOff` reads a missing field as off.
 O.ROWS = {
   { key = "auctions", command = "auctions", label = "Auction scans",
     text = "Scan this house from the Everloot tab at the auction house, one click at a time. Item prices and quantities, never sellers." },
   { key = "scanPrompt", command = "scanprompt", field = true, label = "Scan prompt at the auction house",
     text = "A small reminder beside the house when a scan can run. The tab and /everloot scan work either way." },
+  { key = "autoVendor", command = "vendor", field = true, defaultOff = true, label = "Sell greys and repair at merchants",
+    text = "When a merchant window opens: sells grey items and repairs with your own gold, never the guild bank. Records nothing itself." },
+  { key = "mailCollect", command = "mail", field = true, defaultOff = true, label = "Collect all at the mailbox",
+    text = "A button that takes money and items from auction letters only, one at a time. Skips cash on delivery and other letters." },
   { key = "census", command = "census", label = "Census",
     text = "Race, class, level and faction of your characters and of players you see. Never names, guilds, gear or places. Off deletes its rows." },
   { key = "openworld", label = "World",
@@ -35,7 +40,10 @@ O.ROWS = {
 }
 
 function O.IsOn(row)
-  if row.field then return EverlootDB[row.key] ~= false end
+  if row.field then
+    if row.defaultOff then return EverlootDB[row.key] == true end
+    return EverlootDB[row.key] ~= false
+  end
   return EverlootDB.toggles[row.key] ~= false
 end
 

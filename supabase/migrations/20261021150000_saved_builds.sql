@@ -3,6 +3,8 @@
 -- seven functions; api_key_usage gains a 'builds' surface and create_api_key an optional scopes argument.
 -- Apply before setting EVERLOOT_SAVED_BUILDS=1; until then the site never calls anything here
 -- (docs/design/specs/2026-10-20-saved-builds-design.md). Safe to apply twice.
+-- users.name is optional: accounts v2 is not a prerequisite. Battle.net accounts have no public owner name.
+-- An email-only account's sign-up name appears only with show_name on; never substitute a BattleTag.
 --
 -- Only what the player typed and the share codes they built are stored. A character label is not checked
 -- against the game or the census and is not linked to player pages. The server reads with the service role
@@ -250,13 +252,15 @@ revoke all on function public.delete_build_character(uuid, uuid) from public, an
 grant execute on function public.delete_build_character(uuid, uuid) to service_role;
 
 -- 5. The public read behind /b/<slug>: a shared build, or no row. The owner's name only when they chose to show it.
+-- Read optional fields through the row so this compiles before accounts v2. Battle.net account names can
+-- contain a current or stale BattleTag; their public profile display name belongs to a separate feature.
 create or replace function public.shared_build(p_slug text)
 returns table (name text, notes text, class_slug text, code text, code2 text, game_build text,
   character_name text, character_class text, owner_name text, updated_at timestamptz)
 language sql stable security definer set search_path = '' set lock_timeout = '3s'
 as $$
   select b.name, b.notes, b.class_slug, b.code, b.code2, b.game_build, c.name, c.class_slug,
-    case when b.show_name then u.name end, b.updated_at
+    case when b.show_name and to_jsonb(u) ->> 'bnet_id' is null then to_jsonb(u) ->> 'name' end, b.updated_at
   from public.saved_builds b
   join public.users u on u.id = b.user_id
   left join public.build_characters c on c.id = b.character_id

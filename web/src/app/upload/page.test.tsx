@@ -15,6 +15,12 @@ test("the upload page links the downloads page", () => {
   expect(renderToStaticMarkup(<UploadPage />)).toContain('href="/addon"');
 });
 
+test("the upload page links the data policy on GitHub", () => {
+  expect(renderToStaticMarkup(<UploadPage />)).toContain(
+    'href="https://github.com/Everloot/everloot/blob/main/docs/DATA_POLICY.md"',
+  );
+});
+
 test("a player with only the Polestar Recorder is told they can upload its file without installing anything else", () => {
   const html = renderToStaticMarkup(<UploadPage />);
   const text = html.replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/\s+/g, " ");

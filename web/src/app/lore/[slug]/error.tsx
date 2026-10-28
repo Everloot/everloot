@@ -15,7 +15,7 @@ export default function LoreUnavailable({ reset }: { error: Error; reset: () => 
           <p className="text-fg-2">The lore archive couldn&apos;t load right now. Try again in a few minutes.</p>
           <p className="mt-4 flex flex-wrap items-center gap-x-4 text-sm">
             <button type="button" onClick={reset} className="btn btn-primary">Try again</button>
-            <Link href="/lore" className="text-accent hover:underline underline-offset-4">Lore archive</Link>
+            <Link href="/lore" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Lore archive</Link>
           </p>
         </Card>
       </article>

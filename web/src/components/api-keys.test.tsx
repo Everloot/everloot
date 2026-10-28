@@ -2,10 +2,16 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import ApiKeys from "./ApiKeys";
+import { NO_LIVE_KEY } from "@/lib/api-key-policy";
+import ApiKeys, { KEYS_CHANGED_EVENT, KeysRefresh, RemoveAccess } from "./ApiKeys";
+
+const router = vi.hoisted(() => ({ refresh: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
 
 let container: HTMLDivElement;
 let root: Root;
+/** Hears every "the keys changed" the page is told. */
+const heard = vi.fn();
 const DAY = 86_400_000;
 const KEY = {
   id: "0b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e11", hint: "beef", label: "bot", purpose: "Drop rates", scopes: ["read:public"],
@@ -19,14 +25,20 @@ beforeEach(() => {
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
+  heard.mockClear();
+  router.refresh.mockClear();
+  window.addEventListener(KEYS_CHANGED_EVENT, heard);
 });
 afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
+  document.querySelectorAll("#after").forEach((target) => target.remove());
+  window.removeEventListener(KEYS_CHANGED_EVENT, heard);
   vi.unstubAllGlobals();
 });
 
-const buttonNamed = (label: string) => Array.from(container.querySelectorAll("button")).find((b) => b.textContent === label || b.getAttribute("aria-label") === label);
+const buttonsNamed = (label: string) => Array.from(container.querySelectorAll("button")).filter((b) => b.textContent === label || b.getAttribute("aria-label") === label);
+const buttonNamed = (label: string) => buttonsNamed(label)[0];
 const click = async (label: string) => act(async () => buttonNamed(label)!.click());
 const labelled = <T extends HTMLElement>(text: string) => {
   const label = Array.from(container.querySelectorAll("label")).find((l) => l.textContent?.startsWith(text))!;
@@ -229,4 +241,434 @@ test("a revoked key offers Delete, which erases it", async () => {
   expect(buttonNamed("Roll bot")).toBeUndefined();
   await click("Delete bot");
   expect(calls.filter((c) => c.method === "DELETE").map((c) => c.url)).toEqual([`/api/keys?id=${KEY.id}&erase=1`]);
+});
+
+test("a change made in the list is announced, so the rest of the page can read the keys again", async () => {
+  api(ready());
+  await act(async () => root.render(<ApiKeys />));
+  await click("Revoke bot");
+  await click("Revoke key");
+  expect(heard).toHaveBeenCalledTimes(1);
+});
+
+test("the list reads the keys again when something else on the page changes them", async () => {
+  let revoked: string | null = null;
+  const reads = vi.fn();
+  vi.stubGlobal("fetch", async (_url: string, init?: RequestInit) => {
+    if (!init?.method) reads();
+    return Response.json(ready({ keys: [{ ...KEY, revoked_at: revoked }] }));
+  });
+  await act(async () => root.render(<ApiKeys />));
+  expect(buttonNamed("Revoke bot")).toBeDefined();
+  revoked = "2026-10-20T00:00:00Z";
+  await act(async () => { window.dispatchEvent(new Event(KEYS_CHANGED_EVENT)); });
+  expect(reads).toHaveBeenCalledTimes(2);
+  expect(container.textContent).toContain("Revoked 2026-10-20");
+  expect(buttonNamed("Revoke bot")).toBeUndefined();
+});
+
+/** Where focus goes once Remove access has revoked the key and its card is about to leave the page. afterEach removes it. */
+function focusTarget() {
+  const target = document.createElement("h3");
+  target.id = "after";
+  target.tabIndex = -1;
+  document.body.append(target);
+  return target;
+}
+
+test("Remove access asks the list's own question first; Cancel sends nothing and returns focus to it", async () => {
+  const calls = api(ready());
+  await act(async () => root.render(<RemoveAccess id={KEY.id} name="bot" hint="beef" focusAfter="after" />));
+  buttonNamed("Remove access for bot (evl_…beef)")!.focus();
+  await click("Remove access for bot (evl_…beef)");
+  expect(container.querySelector('[role="group"]')?.getAttribute("aria-label")).toBe("Confirm revoke bot");
+  expect(container.textContent).toContain("Revoke bot? Anything using evl_…beef stops working at once.");
+  expect(document.activeElement).toBe(buttonNamed("Revoke key"));
+  await click("Cancel");
+  expect(calls).toEqual([]);
+  expect(document.activeElement).toBe(buttonNamed("Remove access for bot (evl_…beef)"));
+});
+
+test("Remove access revokes with the list's own request, moves focus on and tells the page its keys changed", async () => {
+  const calls = api(ready());
+  const target = focusTarget();
+  await act(async () => root.render(<><RemoveAccess id={KEY.id} name="bot" hint="beef" focusAfter="after" /><KeysRefresh /></>));
+  await click("Remove access for bot (evl_…beef)");
+  await click("Revoke key");
+  expect(calls).toEqual([{ url: `/api/keys?id=${KEY.id}`, method: "DELETE", body: null }]);
+  expect(heard).toHaveBeenCalledTimes(1);
+  expect(document.activeElement).toBe(target);
+  expect(Array.from(container.querySelectorAll('[role="status"]'), (s) => s.textContent)).toEqual(["Access removed for bot (evl_…beef)."]);
+});
+
+test("a refused Remove access says why, keeps the question open and announces nothing", async () => {
+  vi.stubGlobal("fetch", async () => Response.json({ ok: false, error: "Keys are temporarily unavailable." }, { status: 503 }));
+  await act(async () => root.render(<RemoveAccess id={KEY.id} name="bot" hint="beef" focusAfter="after" />));
+  await click("Remove access for bot (evl_…beef)");
+  await click("Revoke key");
+  expect(container.querySelector('[role="alert"]')?.textContent).toBe("Keys are temporarily unavailable.");
+  expect(buttonNamed("Revoke key")).toBeDefined();
+  expect(heard).not.toHaveBeenCalled();
+});
+
+/** The keys API with one key: DELETE revokes it (404 once it is revoked), GET reads it as it now is. */
+function oneKey({ hold = false } = {}) {
+  let revoked: string | null = null;
+  let release = () => {};
+  const deletes: string[] = [];
+  vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+    if (init?.method !== "DELETE") return Response.json(ready({ keys: [{ ...KEY, revoked_at: revoked }] }));
+    deletes.push(url);
+    if (hold) await new Promise<void>((resolve) => { release = resolve; });
+    if (revoked) return Response.json({ ok: false, error: NO_LIVE_KEY }, { status: 404 });
+    revoked = "2026-10-27T00:00:00Z";
+    return Response.json({ ok: true });
+  });
+  return { deletes, release: () => release() };
+}
+const both = <><ApiKeys /><RemoveAccess id={KEY.id} name="bot" hint="beef" focusAfter="after" /></>;
+const row = () => container.querySelector<HTMLElement>(`li[data-key="${KEY.id}"]`)!;
+
+test("a question left open in the list closes once Remove access revokes its key, and focus stays where Remove access put it", async () => {
+  const { deletes } = oneKey();
+  const target = focusTarget();
+  await act(async () => root.render(both));
+  await click("Revoke bot");
+  await click("Remove access for bot (evl_…beef)");
+  const [, card] = buttonsNamed("Revoke key");
+  await act(async () => card.click());
+  expect(row().textContent).toContain("Revoked 2026-10-27");
+  expect(Array.from(row().querySelectorAll("button"), (b) => b.textContent)).toEqual(["Delete"]);
+  expect(deletes).toHaveLength(1);
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+  expect(document.activeElement).toBe(target);
+});
+
+test("the list and Remove access revoking one key at the same time send one request, and neither asks to retry", async () => {
+  const { deletes, release } = oneKey({ hold: true });
+  await act(async () => root.render(both));
+  await click("Revoke bot");
+  await click("Remove access for bot (evl_…beef)");
+  const [list, card] = buttonsNamed("Revoke key");
+  await act(async () => { card.click(); list.click(); });
+  await act(async () => release());
+  expect(deletes).toEqual([`/api/keys?id=${KEY.id}`]);
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+  expect(buttonsNamed("Revoke key")).toEqual([]);
+  expect(row().textContent).toContain("Revoked 2026-10-27");
+});
+
+test("Remove access asks with the card's pill buttons, and the list's question keeps the list's own buttons", async () => {
+  api(ready());
+  await act(async () => root.render(both));
+  await click("Revoke bot");
+  await click("Remove access for bot (evl_…beef)");
+  const classes = (b: HTMLButtonElement) => b.className.split(" ");
+  const [listRevoke, cardRevoke] = buttonsNamed("Revoke key");
+  const [listCancel, cardCancel] = buttonsNamed("Cancel");
+  expect(classes(cardRevoke)).toEqual(expect.arrayContaining(["btn", "btn-primary"]));
+  expect(classes(cardCancel)).toContain("btn");
+  expect(classes(cardCancel)).not.toContain("btn-primary");
+  for (const b of [listRevoke, listCancel]) {
+    expect(classes(b)).toContain("rounded-lg");
+    expect(classes(b)).not.toContain("btn");
+  }
+});
+
+test("revoking a key that is already revoked (404) reads the keys again instead of asking to retry", async () => {
+  let reads = 0;
+  vi.stubGlobal("fetch", async (_url: string, init?: RequestInit) => {
+    if (init?.method === "DELETE") return Response.json({ ok: false, error: NO_LIVE_KEY }, { status: 404 });
+    reads += 1;
+    return Response.json(ready({ keys: [{ ...KEY, revoked_at: reads > 1 ? "2026-10-27T00:00:00Z" : null }] }));
+  });
+  await act(async () => root.render(<ApiKeys />));
+  await click("Revoke bot");
+  await click("Revoke key");
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+  expect(reads).toBe(2);
+  expect(buttonNamed("Revoke key")).toBeUndefined();
+  expect(row().textContent).toContain("Revoked 2026-10-27");
+});
+
+test("Remove access on a key that is already revoked (404) has the page read its keys again instead of asking to retry", async () => {
+  vi.stubGlobal("fetch", async () => Response.json({ ok: false, error: NO_LIVE_KEY }, { status: 404 }));
+  await act(async () => root.render(<RemoveAccess id={KEY.id} name="bot" hint="beef" focusAfter="after" />));
+  await click("Remove access for bot (evl_…beef)");
+  await click("Revoke key");
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+  expect(buttonNamed("Revoke key")).toBeUndefined();
+  expect(heard).toHaveBeenCalledTimes(1);
+});
+
+test("on the account page, a change to the keys reads the server's parts again", async () => {
+  await act(async () => root.render(<KeysRefresh />));
+  expect(router.refresh).not.toHaveBeenCalled();
+  await act(async () => { window.dispatchEvent(new Event(KEYS_CHANGED_EVENT)); });
+  expect(router.refresh).toHaveBeenCalledTimes(1);
+});
+
+const card = <><RemoveAccess id={KEY.id} name="bot" hint="beef" focusAfter="after" /><KeysRefresh /></>;
+const said = () => container.querySelector('[role="status"]')?.textContent;
+
+test("a 404 that is the route's own no-live-key answer reads the keys again and says so plainly, never that access was removed", async () => {
+  vi.stubGlobal("fetch", async () => Response.json({ ok: false, error: NO_LIVE_KEY }, { status: 404 }));
+  await act(async () => root.render(card));
+  await click("Remove access for bot (evl_…beef)");
+  await click("Revoke key");
+  expect(said()).toBe("bot (evl_…beef) is no longer on this account's list.");
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+  expect(router.refresh).toHaveBeenCalledTimes(1);
+});
+
+test.each([
+  ["a routing page", () => new Response("<html>Not found</html>", { status: 404, headers: { "content-type": "text/html" } }), "That did not work. Try again."],
+  ["another message", () => Response.json({ ok: false, error: "Not found" }, { status: 404 }), "Not found"],
+  ["no ok field", () => Response.json({ error: NO_LIVE_KEY }, { status: 404 }), NO_LIVE_KEY],
+])("a 404 the route did not send (%s) stays an error: nothing is said, the question stays open and nothing is read again", async (_kind, answer, error) => {
+  vi.stubGlobal("fetch", async () => answer());
+  await act(async () => root.render(card));
+  await click("Remove access for bot (evl_…beef)");
+  await click("Revoke key");
+  expect(said()).toBe("");
+  expect(container.querySelector('[role="alert"]')?.textContent).toBe(error);
+  expect(buttonNamed("Revoke key")).toBeDefined();
+  expect(router.refresh).not.toHaveBeenCalled();
+});
+
+test("in the list too, a 404 the route did not send is an error and the question stays open", async () => {
+  vi.stubGlobal("fetch", async (_url: string, init?: RequestInit) => init?.method === "DELETE"
+    ? new Response("<html>Not found</html>", { status: 404, headers: { "content-type": "text/html" } })
+    : Response.json(ready()));
+  await act(async () => root.render(<ApiKeys />));
+  await click("Revoke bot");
+  await click("Revoke key");
+  expect(container.querySelector('[role="alert"]')?.textContent).toBe("That did not work. Try again.");
+  expect(buttonNamed("Revoke key")).toBeDefined();
+  expect(heard).not.toHaveBeenCalled();
+});
+
+// Probes from the second review, kept as regression tests: refusals let go of the shared request, focus is not taken
+// back from where the user moved it, and an open Roll question closes once its key is revoked elsewhere.
+test("a refused revoke lets go of its key, so a retry sends a new request and can succeed", async () => {
+  let deletes = 0;
+  vi.stubGlobal("fetch", async () => (++deletes === 1
+    ? Response.json({ ok: false, error: "Keys are temporarily unavailable." }, { status: 503 })
+    : Response.json({ ok: true })));
+  await act(async () => root.render(card));
+  await click("Remove access for bot (evl_…beef)");
+  await click("Revoke key");
+  expect(container.querySelector('[role="alert"]')?.textContent).toBe("Keys are temporarily unavailable.");
+  expect(router.refresh).not.toHaveBeenCalled();
+  await click("Revoke key");
+  expect(deletes).toBe(2);
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+  expect(router.refresh).toHaveBeenCalledTimes(1);
+  expect(said()).toBe("Access removed for bot (evl_…beef).");
+});
+
+test("removing a second key with the same name is said again: each line names the key by its last four characters", async () => {
+  const OTHER = "1b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e22";
+  const deletes: string[] = [];
+  vi.stubGlobal("fetch", async (url: string) => { deletes.push(url); return Response.json({ ok: true }); });
+  await act(async () => root.render(
+    <>
+      <RemoveAccess key="first" id={KEY.id} name="Desktop App key" hint="beef" focusAfter="after" />
+      <RemoveAccess key="second" id={OTHER} name="Desktop App key" hint="d00d" focusAfter="after" />
+      <KeysRefresh />
+    </>,
+  ));
+  const status = container.querySelector('[role="status"]')!;
+  await click("Remove access for Desktop App key (evl_…beef)");
+  await click("Revoke key");
+  expect(status.textContent).toBe("Access removed for Desktop App key (evl_…beef).");
+  const updates = vi.fn();
+  const observer = new MutationObserver(updates);
+  observer.observe(status, { childList: true, characterData: true, subtree: true });
+  try {
+    await click("Remove access for Desktop App key (evl_…d00d)");
+    await click("Revoke key");
+    await Promise.resolve();
+    expect(deletes).toEqual([`/api/keys?id=${KEY.id}`, `/api/keys?id=${OTHER}`]);
+    expect(status.textContent).toBe("Access removed for Desktop App key (evl_…d00d).");
+    expect(updates).toHaveBeenCalled();
+  } finally {
+    observer.disconnect();
+  }
+});
+
+test("a shared revoke that fails is let go for both controls, and a later retry from the card succeeds", async () => {
+  let deletes = 0;
+  let revoked: string | null = null;
+  let release = () => {};
+  vi.stubGlobal("fetch", async (_url: string, init?: RequestInit) => {
+    if (init?.method !== "DELETE") return Response.json(ready({ keys: [{ ...KEY, revoked_at: revoked }] }));
+    if (++deletes === 1) {
+      await new Promise<void>((resolve) => { release = resolve; });
+      return Response.json({ ok: false, error: "Keys are temporarily unavailable." }, { status: 503 });
+    }
+    revoked = "2026-10-27T00:00:00Z";
+    return Response.json({ ok: true });
+  });
+  await act(async () => root.render(<>{both}<KeysRefresh /></>));
+  await click("Revoke bot");
+  await click("Remove access for bot (evl_…beef)");
+  const [list, inCard] = buttonsNamed("Revoke key");
+  await act(async () => { inCard.click(); list.click(); });
+  expect(deletes).toBe(1);
+  await act(async () => release());
+  expect(container.querySelectorAll('[role="alert"]')).toHaveLength(2);
+  await act(async () => buttonsNamed("Revoke key")[1]!.click());
+  expect(deletes).toBe(2);
+  expect(buttonsNamed("Revoke key")).toHaveLength(0);
+  expect(router.refresh).toHaveBeenCalledTimes(1);
+});
+
+test("finishing Remove access leaves focus where the user moved it meanwhile", async () => {
+  let release = () => {};
+  vi.stubGlobal("fetch", async () => {
+    await new Promise<void>((resolve) => { release = resolve; });
+    return Response.json({ ok: true });
+  });
+  focusTarget();
+  await act(async () => root.render(<>{card}<button id="other">Other</button></>));
+  await click("Remove access for bot (evl_…beef)");
+  await click("Revoke key");
+  const other = document.getElementById("other")!;
+  other.focus();
+  await act(async () => release());
+  expect(document.activeElement).toBe(other);
+});
+
+test("a revoke that succeeds elsewhere clears the error the list kept from its own failed try", async () => {
+  let deletes = 0;
+  let revoked: string | null = null;
+  vi.stubGlobal("fetch", async (_url: string, init?: RequestInit) => {
+    if (init?.method !== "DELETE") return Response.json(ready({ keys: [{ ...KEY, revoked_at: revoked }] }));
+    if (++deletes === 1) return Response.json({ ok: false, error: "Keys are temporarily unavailable." }, { status: 503 });
+    revoked = "2026-10-27T00:00:00Z";
+    return Response.json({ ok: true });
+  });
+  await act(async () => root.render(<>{both}<KeysRefresh /></>));
+  await click("Revoke bot");
+  await click("Revoke key");
+  expect(container.querySelector('[role="alert"]')?.textContent).toBe("Keys are temporarily unavailable.");
+  await click("Remove access for bot (evl_…beef)");
+  await act(async () => buttonsNamed("Revoke key")[1]!.click());
+  expect(deletes).toBe(2);
+  expect(row().textContent).toContain("Revoked 2026-10-27");
+  expect(said()).toBe("Access removed for bot (evl_…beef).");
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+});
+
+const OTHER = { ...KEY, id: "1b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e22", label: "other", hint: "d00d" };
+const otherRow = () => container.querySelector<HTMLElement>(`li[data-key="${OTHER.id}"]`)!;
+
+/** Two keys: revoking KEY is refused with a 503, revoking OTHER works. Counts the list's reads. */
+function twoKeys() {
+  let otherRevoked: string | null = null;
+  const reads = { count: 0 };
+  vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+    if (init?.method !== "DELETE") {
+      reads.count++;
+      return Response.json(ready({ keys: [KEY, { ...OTHER, revoked_at: otherRevoked }] }));
+    }
+    if (url.includes(KEY.id)) return Response.json({ ok: false, error: "Keys are temporarily unavailable." }, { status: 503 });
+    otherRevoked = "2026-10-27T00:00:00Z";
+    return Response.json({ ok: true });
+  });
+  return reads;
+}
+
+test("a failed revoke keeps its error and its open question while another key's removal from its card succeeds", async () => {
+  const reads = twoKeys();
+  await act(async () => root.render(<><ApiKeys /><RemoveAccess id={OTHER.id} name={OTHER.label} hint={OTHER.hint} focusAfter="after" /><KeysRefresh /></>));
+  await click("Revoke bot");
+  await click("Revoke key");
+  expect(row().querySelector('[role="alert"]')?.textContent).toBe("Keys are temporarily unavailable.");
+  await click("Remove access for other (evl_…d00d)");
+  await act(async () => buttonsNamed("Revoke key")[1]!.click());
+  expect(reads.count).toBe(2);
+  expect(said()).toBe("Access removed for other (evl_…d00d).");
+  expect(otherRow().textContent).toContain("Revoked 2026-10-27");
+  expect(row().textContent).toContain("Active");
+  expect(row().querySelector('[role="group"]')).not.toBeNull();
+  expect(row().querySelector('[role="alert"]')?.textContent).toBe("Keys are temporarily unavailable.");
+});
+
+test("a failed revoke keeps its error while the list revokes another key", async () => {
+  twoKeys();
+  await act(async () => root.render(<ApiKeys />));
+  await click("Revoke bot");
+  await click("Revoke key");
+  await click("Revoke other");
+  await click("Revoke key");
+  expect(otherRow().textContent).toContain("Revoked 2026-10-27");
+  expect(otherRow().querySelector('[role="alert"]')).toBeNull();
+  expect(row().querySelector('[role="alert"]')?.textContent).toBe("Keys are temporarily unavailable.");
+});
+
+test("a failed revoke's error goes when its own retry from the list succeeds", async () => {
+  let deletes = 0;
+  let revoked: string | null = null;
+  vi.stubGlobal("fetch", async (_url: string, init?: RequestInit) => {
+    if (init?.method !== "DELETE") return Response.json(ready({ keys: [{ ...KEY, revoked_at: revoked }] }));
+    if (++deletes === 1) return Response.json({ ok: false, error: "Keys are temporarily unavailable." }, { status: 503 });
+    revoked = "2026-10-27T00:00:00Z";
+    return Response.json({ ok: true });
+  });
+  await act(async () => root.render(<ApiKeys />));
+  await click("Revoke bot");
+  await click("Revoke key");
+  expect(container.querySelector('[role="alert"]')?.textContent).toBe("Keys are temporarily unavailable.");
+  await click("Revoke key");
+  expect(deletes).toBe(2);
+  expect(row().textContent).toContain("Revoked 2026-10-27");
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+});
+
+test("a 404 after an account switch reads the new account's keys and never says access was removed", async () => {
+  let switched = false;
+  let reads = 0;
+  vi.stubGlobal("fetch", async (_url: string, init?: RequestInit) => {
+    if (init?.method === "DELETE") {
+      switched = true;
+      return Response.json({ ok: false, error: NO_LIVE_KEY }, { status: 404 });
+    }
+    reads++;
+    return Response.json(ready({ keys: switched ? [] : [KEY] }));
+  });
+  await act(async () => root.render(<><ApiKeys />{card}</>));
+  await click("Remove access for bot (evl_…beef)");
+  await click("Revoke key");
+  expect(reads).toBe(2);
+  expect(router.refresh).toHaveBeenCalledTimes(1);
+  expect(said()).toBe("bot (evl_…beef) is no longer on this account's list.");
+  expect(container.querySelector(`li[data-key="${KEY.id}"]`)).toBeNull();
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+});
+
+test("two keys with one name get Remove access buttons with distinct names, each ending in the key's last four characters", async () => {
+  await act(async () => root.render(
+    <>
+      <RemoveAccess key="first" id={KEY.id} name="Desktop App key" hint="beef" focusAfter="after" />
+      <RemoveAccess key="second" id={OTHER.id} name="Desktop App key" hint="d00d" focusAfter="after" />
+    </>,
+  ));
+  const names = Array.from(container.querySelectorAll("button"), (b) => b.getAttribute("aria-label"));
+  expect(names).toEqual(["Remove access for Desktop App key (evl_…beef)", "Remove access for Desktop App key (evl_…d00d)"]);
+  // The visible label stays inside the name, so speech input can still say "Remove access".
+  for (const b of container.querySelectorAll("button")) expect(b.getAttribute("aria-label")).toContain(b.textContent!);
+});
+
+test("an open Roll question closes once the key is revoked elsewhere, and focus moves to the key's row", async () => {
+  let revoked: string | null = null;
+  vi.stubGlobal("fetch", async () => Response.json(ready({ keys: [{ ...KEY, revoked_at: revoked }] })));
+  await act(async () => root.render(<ApiKeys />));
+  await click("Roll bot");
+  expect(document.activeElement).toBe(buttonNamed("Roll key"));
+  revoked = "2026-10-27T00:00:00Z";
+  await act(async () => { window.dispatchEvent(new Event(KEYS_CHANGED_EVENT)); });
+  expect(container.querySelector('[role="group"]')).toBeNull();
+  expect(document.activeElement).toBe(row());
 });

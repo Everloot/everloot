@@ -22,6 +22,7 @@ let profileRow: object | null;
 
 beforeEach(() => {
   vi.stubEnv("EVERLOOT_PROFILES", "1");
+  vi.stubEnv("EVERLOOT_SAVED_BUILDS", "1");
   profileRow = { handle: "thrall", display_name: null, status_emoji: "🔥", status_text: "Raiding", status_clears_at: "2099-01-01T00:00:00+00:00",
     public_profile: true, show_characters: true, show_builds: false, show_status: true, main_character_id: THRALL, active_character_id: null };
   auth.getUser.mockReset().mockResolvedValue(USER);
@@ -59,6 +60,12 @@ test("profile, status, characters with the main marked, and the links to keys an
   expect(html).toContain('aria-label="Make Jaina your main"');
   expect(html).toContain('aria-label="Unset Thrall as main"');
   expect(html).toContain('href="/me"');
+  // The section nav lists the four sections in page order.
+  expect(html).toMatch(/<nav aria-label="Settings sections"[^>]*>(<a href="#(profile|status|characters|more)"[^>]*>[^<]+<\/a>){4}<\/nav>/);
+  expect(html.match(/<a href="#(profile|status|characters|more)"/g)).toEqual(['<a href="#profile"', '<a href="#status"', '<a href="#characters"', '<a href="#more"']);
+  // Settings points back at the account overview, which is where data and privacy live.
+  expect(html).toContain('href="/account"');
+  expect(html).toContain("overview, data and privacy");
   expect(html).toContain('href="/account#keys"');
   expect(html).toContain('href="/addon"');
   // Chat keys live on /account; Settings only links there.
@@ -79,6 +86,39 @@ test("before anything is saved: the defaults, private and with no handle", async
   expect(html).not.toContain("Keep current");
   expect(html).toContain('<option value="never" selected="">Never</option>');
   expect(html).not.toContain('href="/u/');
+});
+
+test("disabled saved builds leaves characters visible without links to unavailable pages", async () => {
+  vi.stubEnv("EVERLOOT_SAVED_BUILDS", "0");
+  const html = renderToStaticMarkup(await SettingsPage());
+  expect(html).toContain("Jaina");
+  expect(html).toContain('aria-label="Make Jaina your main"');
+  expect(html).not.toMatch(/href="\/me(?:"|\/)/);
+  expect(html).toContain('href="/account"');
+});
+
+test("every PROFILES and SAVED_BUILDS combination: a legacy Battle.net account edits its profile, status and main only while profiles are on", async () => {
+  for (const [profiles, savedBuilds] of [["0", "0"], ["0", "1"], ["1", "0"], ["1", "1"]]) {
+    vi.stubEnv("EVERLOOT_PROFILES", profiles);
+    vi.stubEnv("EVERLOOT_SAVED_BUILDS", savedBuilds);
+    auth.getUser.mockClear();
+    if (profiles === "0") {
+      await expect(SettingsPage()).rejects.toThrow("NEXT_NOT_FOUND");
+      expect(auth.getUser).not.toHaveBeenCalled();
+      continue;
+    }
+    const html = renderToStaticMarkup(await SettingsPage());
+    for (const field of ["handle", "displayName", "publicProfile", "showCharacters", "showBuilds", "showStatus", "emoji", "text", "clearAfter"]) {
+      expect(html, `${profiles}/${savedBuilds} ${field}`).toContain(`name="${field}"`);
+    }
+    expect(html).toContain('aria-label="Make Jaina your main"');
+    expect(html).toContain('aria-label="Unset Thrall as main"');
+    expect(/href="\/me(?:"|\/)/.test(html)).toBe(savedBuilds === "1");
+    // The BattleTag and the account id stay off the page; the placeholder is the name without its number.
+    expect(html).toMatch(/placeholder="Thrall"/);
+    expect(html).not.toContain("Thrall#1234");
+    expect(html).not.toContain(USER.id);
+  }
 });
 
 test("storage trouble says so instead of failing the page", async () => {

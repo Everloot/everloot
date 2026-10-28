@@ -40,6 +40,8 @@ const routes: [string, () => Promise<{ metadata: Metadata }>, boolean][] = [
   ["/database/quests", async () => ({ metadata: await (await import("./database/quests/page")).generateMetadata({}) }), true],
   ["/database/titles", async () => ({ metadata: await (await import("./database/titles/page")).generateMetadata({}) }), true],
   ["/database/vendors", async () => ({ metadata: await (await import("./database/vendors/page")).generateMetadata({}) }), true],
+  // A filtered list of guides is noindex; the plain list is checked here.
+  ["/guides", async () => ({ metadata: await (await import("./guides/page")).generateMetadata({ searchParams: Promise.resolve({}) }) }), true],
   ["/lore", () => import("./lore/page"), false],
   ["/lore/coverage", async () => ({ metadata: await (await import("./lore/coverage/page")).generateMetadata() }), false],
   // The map's description depends on whether the game's map pictures are on, so it is generated.
@@ -104,9 +106,9 @@ test("the map descriptions still fit when the game's map pictures are on", async
 
 test("every MCP tool page has a description that fits", async () => {
   const { generateMetadata } = await import("./docs/mcp/tools/[tool]/page");
-  const { MCP_TOOL_NAMES } = await import("@everloot/protocol");
+  const { liveToolNames } = await import("@/lib/guild-switch");
   const { toolHref } = await import("@/lib/docs/nav");
-  for (const name of MCP_TOOL_NAMES) {
+  for (const name of liveToolNames()) {
     const slug = toolHref(name).split("/").pop()!;
     const m = await generateMetadata({ params: Promise.resolve({ tool: slug }) });
     within(m.description, name);

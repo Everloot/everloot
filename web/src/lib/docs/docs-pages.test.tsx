@@ -19,6 +19,7 @@ vi.mock("@/components/ApiKeys", () => ({ default: () => <div data-testid="api-ke
 
 import { CONNECT_EXAMPLES, CORPUS_URL, MCP_PROMPTS, MCP_RESOURCE_TEMPLATES, MCP_RESOURCES, MCP_TOOLS, MCP_URL, REQUESTS_PER_HOUR } from "./connect-data";
 import { API_ROUTES, MCP_PROMPT_NAMES, MCP_RESOURCE_TEMPLATE_URIS, MCP_RESOURCE_URIS, MCP_TOOL_NAMES, PROTOCOL_VERSION, PUBLIC_RECORD_KINDS } from "@everloot/protocol";
+import { liveToolNames } from "@/lib/guild-switch";
 import { createIntakeQuota } from "@/lib/intake-quota";
 import { ANON_PAGE, ANON_PER_HOUR, attribution, KEY_PAGE, KEY_PER_HOUR } from "@/lib/data-guard";
 import sitemap from "@/app/sitemap";
@@ -35,7 +36,7 @@ async function renderDocs(): Promise<string> {
   const out: string[] = [];
   for (const [path, mod] of Object.entries(modules)) {
     const calls = path.includes("[endpoint]") ? API_ROUTES.map((r) => ({ endpoint: endpointSlug(r) }))
-      : path.includes("[tool]") ? MCP_TOOL_NAMES.map((n) => ({ tool: n.replaceAll("_", "-") }))
+      : path.includes("[tool]") ? liveToolNames().map((n) => ({ tool: n.replaceAll("_", "-") }))
       : [{}];
     for (const params of calls) out.push(renderToStaticMarkup((await mod.default({ params: Promise.resolve(params) })) as ReactNode));
   }
@@ -63,7 +64,9 @@ beforeAll(async () => {
 test("the tool list is exactly the tools the protocol declares, in order", () => {
   expect(MCP_TOOL_NAMES.length).toBeGreaterThan(0);
   expect(MCP_TOOLS.map((tool) => tool.name)).toEqual(MCP_TOOL_NAMES);
-  for (const tool of MCP_TOOLS) expect(page).toContain(`>${tool.name}</code>`);
+  // The page lists the tools the server lists: the guild ladder's two only while EVERLOOT_GUILDS is on.
+  for (const name of liveToolNames()) expect(page).toContain(`>${name}</code>`);
+  expect(page).not.toContain(">guild_search</code>");
 });
 
 test("the resource and prompt lists are exactly what the protocol declares, in order, with their schema files", () => {
@@ -78,7 +81,8 @@ test("the resource and prompt lists are exactly what the protocol declares, in o
 });
 
 test("the reference lists every tool with its arguments, every endpoint, the OpenAPI file and the schema index", () => {
-  for (const tool of MCP_TOOLS) expect(page).toContain(`/schema/mcp/${tool.name}.json`);
+  for (const name of liveToolNames()) expect(page).toContain(`/schema/mcp/${name}.json`);
+  expect(page).not.toContain("/schema/mcp/guild_rankings.json");
   for (const text of ["connected", "dataAsOf", "an absent page is not a measured zero"]) expect(decoded).toContain(text);
   for (const text of ["query", "itemId", "ownerInstallId", "required", "player data"]) expect(decoded).toContain(text);
   for (const route of API_ROUTES) expect(decoded).toContain(route.path);
@@ -197,7 +201,7 @@ test("my_builds is documented only while saved builds are on: the key permission
   try {
     const on = decode(stripTags(await renderDocs()));
     for (const text of ["One more tool, my_builds", "It is not in the public list", "Read my saved builds", "With a build's slug",
-      "short link while sharing is on", `"${MY_BUILDS_REFUSAL}"`, "the same key adds a my_builds tool"]) expect(on).toContain(text);
+      "older or newer than the calculator's tree", "short link while sharing is on", `"${MY_BUILDS_REFUSAL}"`, "the same key adds a my_builds tool"]) expect(on).toContain(text);
   } finally { vi.unstubAllEnvs(); }
 });
 

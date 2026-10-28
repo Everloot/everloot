@@ -1,12 +1,14 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { readAsks } from "./asks";
 import { writeAnswersAddon, type Answer } from "./answers";
 import { MAX_ANSWER, type AnswerEngine } from "./engine";
+import { readStateFile } from "../state-file";
 
 /** Answers already given, kept in the companion's data folder (the newest 20 go back into the game). */
-export function createAnswerStore(path: string) {
-  let answers: Answer[] = existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as Answer[]) : [];
+export function createAnswerStore(path: string, onRecovery: (message: string) => void = console.warn) {
+  let answers = readStateFile(path, (value): value is Answer[] => Array.isArray(value) && value.every((row) =>
+    row !== null && typeof row === "object" && [row.id, row.answer, row.source, row.answeredAt].every((field) => typeof field === "string")), onRecovery) ?? [];
   return {
     has: (id: string) => answers.some((a) => a.id === id),
     list: () => [...answers],
@@ -38,7 +40,7 @@ export async function answerPending(options: {
   let answered = 0;
   for (const ask of pending) {
     try {
-      const { answer, source } = await options.engine.answer(ask.question);
+      const { answer, source } = await options.engine.answer(ask.question, ask.realm ? { realm: ask.realm } : undefined);
       options.store.add({ id: ask.id, answer: answer.slice(0, MAX_ANSWER), source, answeredAt: now().toISOString() });
       answered++;
     } catch (err) {

@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import type { DB } from "./db.js";
 import { createKnowledgeServer, type ChangesLoader, type CompletionLoader, type CorpusLoader, type EcosystemLoader, type ExtraTool, type MarketLoader } from "./mcp-server.js";
+import type { GuildReader } from "./guilds.js";
 import type { CensusLoader } from "./population.js";
 import type { RecheckScope } from "./coverage.js";
 
@@ -28,6 +29,8 @@ export interface PublicMcpConfig {
   ecosystem?: EcosystemLoader;
   /** The web route's census rollup reader, aggregate only; without it population says it is not connected. */
   census?: CensusLoader;
+  /** The web route's guild ladder reader; without it guild_search and guild_rankings are not listed. */
+  guilds?: GuildReader;
   /**
    * Tools for this caller only, decided per request from its headers and the JSON-RPC body (the site's account
    * tools, for a player's own key). Without it, or when it returns none, the server lists the public tools alone.
@@ -36,10 +39,10 @@ export interface PublicMcpConfig {
 }
 
 export function createPublicMcpServer(
-  config: { db: DB; corpus?: CorpusLoader; market?: MarketLoader; completion?: CompletionLoader; changes?: ChangesLoader; ecosystem?: EcosystemLoader; census?: CensusLoader; recheck?: readonly RecheckScope[] },
+  config: { db: DB; corpus?: CorpusLoader; market?: MarketLoader; completion?: CompletionLoader; changes?: ChangesLoader; ecosystem?: EcosystemLoader; census?: CensusLoader; guilds?: GuildReader; recheck?: readonly RecheckScope[] },
   extraTools: readonly ExtraTool[] = [],
 ) {
-  const server = createKnowledgeServer(config.db, { corpus: config.corpus, market: config.market, completion: config.completion, changes: config.changes, ecosystem: config.ecosystem, census: config.census, recheck: config.recheck }, extraTools);
+  const server = createKnowledgeServer(config.db, { corpus: config.corpus, market: config.market, completion: config.completion, changes: config.changes, ecosystem: config.ecosystem, census: config.census, guilds: config.guilds, recheck: config.recheck }, extraTools);
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined, enableJsonResponse: true,
   });

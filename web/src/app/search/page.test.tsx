@@ -13,11 +13,16 @@ vi.mock("next/link", () => ({
 
 let release = "";
 beforeAll(async () => { release = await buildLoreRelease(); });
-afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); vi.restoreAllMocks(); });
+afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); vi.restoreAllMocks(); namesRead.pending = null; siteSearch.names = undefined; });
 
-const siteSearch = vi.hoisted(() => ({ groups: [] as unknown[] }));
-vi.mock("@/lib/site-search", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/site-search")>()), siteSearch: async () => siteSearch.groups }));
-vi.mock("@/lib/shown-search-names", () => ({ loadShownSearchNames: async () => ({ items: new Map(), npcs: new Map(), quests: new Map() }) }));
+const siteSearch = vi.hoisted(() => ({ groups: [] as unknown[], names: undefined as unknown }));
+const namesRead = vi.hoisted(() => ({ pending: null as Promise<unknown> | null }));
+vi.mock("@/lib/site-search", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/site-search")>()), siteSearch: async (_q: string, options: { names?: unknown }) => { siteSearch.names = options.names; await options.names; return siteSearch.groups; } }));
+vi.mock("@/lib/shown-item-names", () => ({ loadShownNames: async () => ({
+  facts: { rates: [], names: [], npcs: [], unreachable: false }, agreed: new Map(), matched: null,
+  named: { has: () => false }, showsTip: () => false,
+}) }));
+vi.mock("@/lib/shown-search-names", () => ({ loadShownSearchNames: () => namesRead.pending ?? Promise.resolve({ items: new Map(), npcs: new Map(), quests: new Map() }) }));
 const icons = vi.hoisted(() => ({ asked: [] as number[][], map: new Map<number, string>() }));
 vi.mock("@/lib/item-icons", () => ({ shownItemIcons: async (ids: number[]) => { icons.asked.push(ids); return icons.map; } }));
 
@@ -29,6 +34,18 @@ async function render(query: Record<string, string>, path = release) {
 
 /** The full lore list, which `in=lore` opens from the overview's lore group. */
 const renderLore = (query: Record<string, string>, path = release) => render({ in: "lore", ...query }, path);
+
+test("the page starts search without waiting for its independent name loader", async () => {
+  let finish!: (value: unknown) => void;
+  namesRead.pending = new Promise((resolve) => { finish = resolve; });
+  const { default: SearchPage } = await import("./page");
+  const answer = SearchPage({ searchParams: Promise.resolve({ q: "Linen Cloth" }) });
+  await Promise.resolve();
+  const passedPendingNames = siteSearch.names === namesRead.pending;
+  finish({ items: new Map(), npcs: new Map(), quests: new Map(), objects: new Map() });
+  await answer;
+  expect(passedPendingNames).toBe(true);
+});
 
 test("without a query it shows the form and no results", async () => {
   const html = await render({});
@@ -75,6 +92,40 @@ test("item hits lead with the game icon and the quality colour, and no hit carri
   expect(html.indexOf('id="results-item"')).toBeLessThan(html.indexOf('id="results-lore"'));
   expect(html).not.toMatch(/<a [^>]*title=/);
   icons.map = new Map();
+  siteSearch.groups = [];
+});
+
+const manyResults = (n: number) => Array.from({ length: n }, (_, i) => ({ label: `Potion ${i}`, href: `/database/items/${i + 1}`, exact: false, id: i + 1, quality: 1 }));
+
+test("a scoped search that found more than it lists says how many it shows and links to the full database list", async () => {
+  siteSearch.groups = [{ type: "item", heading: "Items", total: 222, results: manyResults(50) }];
+  const html = await render({ q: "potion & elixir", in: "item" });
+  expect(html).toContain("Showing 50 of 222");
+  expect(html).toContain('href="/database/items?q=potion%20%26%20elixir"');
+  siteSearch.groups = [{ type: "quest", heading: "Quests", total: 1221, results: manyResults(50) }];
+  expect(await render({ q: "the", in: "quest" })).toContain('href="/database/quests?q=the"');
+  siteSearch.groups = [{ type: "npc", heading: "NPCs", total: 318, results: manyResults(50) }];
+  expect(await render({ q: "cloth", in: "npc" })).toContain('href="/database/npcs?q=cloth"');
+  siteSearch.groups = [];
+});
+
+test("a scoped search that lists every match, or has no database list to open, adds no footer", async () => {
+  siteSearch.groups = [{ type: "item", heading: "Items", total: 3, results: manyResults(3) }];
+  expect(await render({ q: "potion", in: "item" })).not.toContain("Showing");
+  siteSearch.groups = [{ type: "object", heading: "Objects", total: 2, results: manyResults(1) }];
+  const objects = await render({ q: "chest", in: "object" });
+  expect(objects).not.toContain("Showing");
+  expect(objects).not.toContain("/database/objects");
+  siteSearch.groups = [];
+});
+
+test("the overview keeps its All-N link into the scoped search, not the database list", async () => {
+  siteSearch.groups = [{ type: "item", heading: "Items", total: 222, results: manyResults(8) }];
+  const html = await render({ q: "potion" });
+  expect(html).toContain('href="/search?q=potion&amp;in=item"');
+  expect(html).toContain("All 222 items");
+  expect(html).not.toContain("Showing");
+  expect(html).not.toContain('href="/database/items?q=');
   siteSearch.groups = [];
 });
 

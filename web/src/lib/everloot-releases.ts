@@ -1,7 +1,8 @@
 // Everloot's own releases from GitHub's public REST API, for the /addon page, cached for an hour.
 // One request reads the newest hundred releases: the newest `desktop-vX.Y.Z` among them is the app
 // offered, and the `addon-vX.Y.Z` that matches the zip the site serves gives its release date.
-// Pre-releases (the nightlies) and drafts are skipped. GITHUB_TOKEN is optional. Nothing here throws:
+// Desktop pre-releases and all drafts are skipped. The exact served addon version can be an Alpha.
+// Nightly tags never match an addon-vX.Y.Z tag. GITHUB_TOKEN is optional. Nothing here throws:
 // when GitHub cannot be read, the page links the releases page instead.
 
 import { createHash } from "node:crypto";
@@ -84,10 +85,10 @@ function shape(release: GithubRelease, version: string): EverlootRelease | null 
 }
 
 /** The published releases whose tag is the prefix and a plain X.Y.Z version. */
-function tagged(list: unknown[], prefix: string) {
+function tagged(list: unknown[], prefix: string, includePrereleases = false) {
   const out: { release: GithubRelease; version: string }[] = [];
   for (const release of list as GithubRelease[]) {
-    if (!release || release.draft || release.prerelease || typeof release.tag_name !== "string") continue;
+    if (!release || release.draft || (!includePrereleases && release.prerelease) || typeof release.tag_name !== "string") continue;
     const m = /^(.+-v)(\d+\.\d+\.\d+)$/.exec(release.tag_name);
     if (m && m[1] === prefix) out.push({ release, version: m[2] });
   }
@@ -104,7 +105,7 @@ export function newestDesktopRelease(list: unknown[] | null): EverlootRelease | 
 /** The published addon release for one version, so its date and checksums match the zip the site serves. */
 export function addonReleaseFor(list: unknown[] | null, version: string): EverlootRelease | null {
   if (!list) return null;
-  const found = tagged(list, "addon-v").find((r) => r.version === version);
+  const found = tagged(list, "addon-v", true).find((r) => r.version === version);
   return found ? shape(found.release, found.version) : null;
 }
 

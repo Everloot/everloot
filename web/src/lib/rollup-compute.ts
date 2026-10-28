@@ -2,7 +2,7 @@ import { popularAddonsFromRecords, type AddonRollup } from "../../../kb/src/addo
 import { censusFromRows, type CensusView } from "../../../kb/src/census";
 import { itemFactsFromRecords, recheckLootRecords } from "../../../kb/src/drop-rollup";
 import { observedEdges, type Edge } from "../../../kb/src/edges";
-import { itemFactRowsFromRecords, reportedItemFacts, type ItemFactState } from "../../../kb/src/item-facts";
+import { itemFactProgress, itemFactRowsFromRecords, reportedItemFacts, type ItemFactProgress, type ItemFactState } from "../../../kb/src/item-facts";
 import type { ItemFacts } from "../../../kb/src/item-page";
 import { craftedItemsFromRecords } from "../../../kb/src/item-source";
 import { instanceFactsFromRecords, type InstanceFacts } from "../../../kb/src/instances";
@@ -139,10 +139,10 @@ export async function loadInstanceFacts(): Promise<InstanceFacts & { sightings: 
 }
 
 /** One item's tooltip numbers 3 installs agree on, and the lines they disagree on (kb/src/item-facts.ts). */
-export async function loadReportedItemFacts(itemId: number): Promise<ItemFactState & { unreachable: boolean }> {
+export async function loadReportedItemFacts(itemId: number): Promise<ItemFactState & { progress?: ItemFactProgress[]; unreachable: boolean }> {
   const agg = await loadAggregates();
   if (!agg) return { shown: [], contested: [], unreachable: true };
-  return { ...reportedItemFacts(agg.itemFacts.get(itemId), agg.dataAsOf ? new Date(agg.dataAsOf) : new Date()), unreachable: false };
+  return { ...reportedItemFacts(agg.itemFacts.get(itemId), agg.dataAsOf ? new Date(agg.dataAsOf) : new Date()), progress: itemFactProgress(agg.itemFacts.get(itemId)), unreachable: false };
 }
 
 /** Items players have seen a recipe make (3 installs), for the item lists' Source column. */

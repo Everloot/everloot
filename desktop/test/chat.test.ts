@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
-import { ACCOUNT_KEY_FILE } from "../src/main/account";
+import { ACCOUNT_KEY_FILE, writeKeyOrigin } from "../src/main/account";
 import { answer } from "../src/main/agent";
 import { createChat } from "../src/main/chat";
 import { defaultSettings } from "../src/main/settings";
@@ -17,6 +17,32 @@ afterEach(() => { mockAnswer.mockReset(); for (const d of dirs.splice(0)) rmSync
 
 const reply = (text: string) => ({ text, model: null, sources: [], steps: [] });
 const settings = (patch: Partial<Settings> = {}): Settings => ({ ...defaultSettings(), endpoint: "https://example.test", ...patch });
+
+test.each(["https://other.test", "http://everloot.app", "https://everloot.app:444"])("Chat withholds the account key from a changed site %s", async (endpoint) => {
+  const d = dir();
+  writeFileSync(join(d, ACCOUNT_KEY_FILE), `evl_${"ab".repeat(32)}`);
+  mockAnswer.mockResolvedValueOnce(reply("ok"));
+  await createChat(d, () => settings({ endpoint })).send("q");
+  expect(mockAnswer.mock.calls[0][0].mcp.token).toBeNull();
+  expect(createChat(d, () => settings({ endpoint })).info().withAccountKey).toBe(false);
+});
+
+test("Chat sends the account key to the site it was checked against", async () => {
+  const d = dir();
+  const key = `evl_${"ab".repeat(32)}`;
+  writeFileSync(join(d, ACCOUNT_KEY_FILE), key);
+  writeKeyOrigin(d, "https://example.test");
+  mockAnswer.mockResolvedValueOnce(reply("ok"));
+  await createChat(d, () => settings()).send("q");
+  expect(mockAnswer.mock.calls[0][0].mcp.token).toBe(key);
+  expect(createChat(d, () => settings()).info().withAccountKey).toBe(true);
+});
+
+test("Chat gives the agent the site for item names and the followed realms to suggest, nothing it could choose from", async () => {
+  mockAnswer.mockResolvedValueOnce(reply("ok"));
+  await createChat(dir(), () => settings({ market: { realms: ["Forever", "Nightslayer"] } })).send("price 2589");
+  expect(mockAnswer.mock.calls[0][0]).toMatchObject({ site: "https://example.test", realms: ["Forever", "Nightslayer"] });
+});
 
 test("a question and its answer land in chat.json and come back on the next start", async () => {
   const d = dir();
@@ -86,6 +112,7 @@ test("signed in, the public mount gets the account key; a token file still wins"
   const d = dir();
   const key = `evl_${"0f".repeat(32)}`;
   writeFileSync(join(d, ACCOUNT_KEY_FILE), key + "\n");
+  writeKeyOrigin(d, "https://example.test");
   const chat = createChat(d, () => settings());
   expect(chat.info()).toMatchObject({ mcpUrl: "https://example.test/mcp/public", withToken: false });
   mockAnswer.mockResolvedValueOnce(reply("ok"));

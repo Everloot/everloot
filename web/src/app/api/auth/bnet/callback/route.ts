@@ -12,7 +12,9 @@ export async function GET(req: Request) {
   const returnTo = safeReturnTo(jar.get(RETURN_COOKIE)?.value) ?? "";
   jar.delete("bnet_oauth_state");
   jar.delete(RETURN_COOKIE);
-  const failure = (reason: string) => NextResponse.redirect(`${siteUrl()}/?auth_error=${reason}`);
+  // A failed sign-in lands back on the sign-in page, which explains the reason and keeps the return path for a retry.
+  const failure = (reason: string) =>
+    NextResponse.redirect(`${siteUrl()}/sign-in?error=${reason}${returnTo ? `&returnTo=${encodeURIComponent(returnTo)}` : ""}`);
   if (!state || !storedState || state !== storedState) return failure("invalid_state");
   if (url.searchParams.has("error")) return failure("access_denied");
   if (!code) return failure("missing_code");

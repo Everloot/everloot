@@ -56,8 +56,11 @@ test("before the first full week: the start line, no table, no chart, not indexe
   store.loadCensus.mockResolvedValue(read(week("2026-11-06T10:00:00.000Z", "l"), "2026-11-07T00:00:00.000Z"));
   for (const page of [await hub(), await ranking("classes")]) {
     expect(text(page)).toContain(START_LINE);
+    expect(text(page)).toContain("What will be here");
     expect(page).not.toContain("<table");
     expect(page).not.toContain("data-weekly-chart");
+    expect(page).not.toContain("data-stacked-chart");
+    expect(page).not.toContain("data-leaderboard");
   }
   expect(await hubMetadata()).toMatchObject({ robots: { index: false } });
   expect(await meta("classes")).toMatchObject({ robots: { index: false } });
@@ -86,8 +89,14 @@ test("with two weeks: the weekly chart, the change column and the current week m
   expect(text(page)).toContain("1 Warrior ▲2 · 80 characters · 40% ▲2 up 2 80 40% 2026-11-20");
   expect(text(page)).toContain("2 Hunter ▼1 · 65 characters · 33% ▼1 down 1 65 33%");
   expect(text(page)).not.toContain(ONE_WEEK_LINE);
+  // The hub: the stacked class chart with every class named, then each ranking's top rows with their change marks.
   const hubPage = await hub();
-  expect(hubPage).toMatch(/<th[^>]*>(?:<[^>]+>)*Change</);
+  expect(hubPage).toContain("data-stacked-chart");
+  expect(hubPage).toContain("fill-class-warrior");
+  expect(hubPage).toMatch(/aria-label="Legend"[^]*Warrior[^]*Hunter[^]*Priest/);
+  expect(hubPage).toContain("data-leaderboard");
+  expect(text(hubPage)).toMatch(/1 Warrior .*▲2 up 2/);
+  expect(text(hubPage)).toMatch(/2 Hunter .*▼1 down 1/);
   for (const slug of ["classes", "races", "factions"]) expect(hubPage).toContain(`href="/rankings/${slug}"`);
 });
 

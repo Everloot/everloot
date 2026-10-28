@@ -1,10 +1,15 @@
+import { guildKey } from "../../../kb/src/guilds";
+import { linkRealmKey } from "./character-links";
 import { DEFAULT_RULESET, realmSlug, type Player, type PlayerUpsert } from "./player-pages";
 
 /**
- * Where the player rows live: Supabase in production (the functions in 20261021130000_players.sql), and a map in
- * memory in development, which behaves the same way and forgets everything on restart. Every call is one
- * request, and a write is one batched call per upload, never one per row.
+ * Where the player rows live: Supabase in production (the functions in 20261021130000_players.sql and
+ * 20261025120000_guilds.sql), and a map in memory in development, which behaves the same way and forgets
+ * everything on restart. Every call is one request, and a write is one batched call per upload, never one per row.
  */
+
+/** One guild the search found: where it is, how many characters were seen in it and the newest day. */
+export interface GuildHit { realm: string; guild: string; members: number; lastSeen: string }
 
 export interface PlayerStore {
   /** Write a batch; a suppressed character is skipped and an older report never replaces a newer row. */
@@ -15,16 +20,33 @@ export interface PlayerStore {
   /** Hide a character: record the opt-out and delete its row. */
   suppress(realm: string, name: string): Promise<void>;
   prune(): Promise<void>;
+  /** The characters seen in a guild on a realm, newest last seen first, at most 500. Empty for a hidden guild. */
+  guildMembers(realm: string, guild: string): Promise<Player[]>;
+  /** Guilds whose name starts with `prefix` (2 or more letters), one per realm and guild, at most 25, in name order. */
+  searchGuilds(prefix: string): Promise<GuildHit[]>;
+  /** Hide a guild: both guild reads leave it out from then on. The characters keep their own rows. */
+  suppressGuild(realm: string, guild: string): Promise<void>;
+  /** Every hidden guild, as `guildHideKey` keys, so the ladder can leave them out too. */
+  hiddenGuilds(): Promise<Set<string>>;
 }
 
 const SEARCH_LIMIT = 25;
+const ROSTER_LIMIT = 500;
 export const PLAYER_KEPT_DAYS = 90;
 
+/**
+ * The key a guild hide is recorded under: the realm as the players table keys it (so a spelling cannot dodge
+ * the hide), then the guild name, cleaned the way the ladder keys guilds.
+ */
+export const guildHideKey = (realm: string, guild: string): string => guildKey(linkRealmKey(realm), guild);
+
 interface Stored { name: string; realm: string; ruleset?: string; race: string; class: string; level: number; guild: string | null; last_seen: string }
+interface StoredGuild { realm: string; guild: string; members: number; last_seen: string }
 
 const toPlayer = (row: Stored, ruleset: string): Player => ({
   name: row.name, realm: row.realm, ruleset: row.ruleset ?? ruleset, race: row.race, class: row.class, level: row.level, guild: row.guild, lastSeen: row.last_seen,
 });
+const toGuild = (row: StoredGuild): GuildHit => ({ realm: row.realm, guild: row.guild, members: Number(row.members), lastSeen: row.last_seen });
 
 export function createCloudPlayerStore(url: string, key: string, doFetch: typeof fetch = fetch): PlayerStore {
   async function rpc<T>(fn: string, body: unknown): Promise<T> {
@@ -51,6 +73,19 @@ export function createCloudPlayerStore(url: string, key: string, doFetch: typeof
     },
     async suppress(realm, name) { await rpc("suppress_player", { p_realm: realm, p_name: name }); },
     async prune() { await rpc("prune_players", {}); },
+    async guildMembers(realm, guild) {
+      const rows = await rpc<Stored[]>("guild_members", { p_ruleset: DEFAULT_RULESET, p_realm_key: linkRealmKey(realm), p_guild_key: guild });
+      return Array.isArray(rows) ? rows.map((row) => toPlayer(row, DEFAULT_RULESET)) : [];
+    },
+    async searchGuilds(prefix) {
+      const rows = await rpc<StoredGuild[]>("search_guilds", { p_prefix: prefix, p_limit: SEARCH_LIMIT });
+      return Array.isArray(rows) ? rows.map(toGuild) : [];
+    },
+    async suppressGuild(realm, guild) { await rpc("suppress_guild", { p_realm: realm, p_guild: guild }); },
+    async hiddenGuilds() {
+      const rows = await rpc<{ realm_key: string; guild_key: string }[]>("hidden_guilds", {});
+      return new Set(Array.isArray(rows) ? rows.map((row) => guildHideKey(row.realm_key, row.guild_key)) : []);
+    },
   };
 }
 
@@ -58,6 +93,7 @@ export function createCloudPlayerStore(url: string, key: string, doFetch: typeof
 export function createMemoryPlayerStore(now: () => Date = () => new Date()): PlayerStore {
   const rows = new Map<string, Player>();
   const hidden = new Set<string>();
+  const hiddenGuilds = new Set<string>();
   const key = (realm: string, name: string) => `${realm.trim().toLowerCase()}\u0000${name.toLowerCase()}`;
   const visible = (p: Player) => !hidden.has(key(p.realm, p.name));
   return {
@@ -82,6 +118,28 @@ export function createMemoryPlayerStore(now: () => Date = () => new Date()): Pla
       const cutoff = new Date(now().getTime() - PLAYER_KEPT_DAYS * 86_400_000).toISOString().slice(0, 10);
       for (const [k, p] of rows) if (p.lastSeen < cutoff) rows.delete(k);
     },
+    async guildMembers(realm, guild) {
+      const wanted = guildHideKey(realm, guild);
+      if (hiddenGuilds.has(wanted)) return [];
+      return [...rows.values()].filter((p) => visible(p) && p.guild !== null && guildHideKey(p.realm, p.guild) === wanted)
+        .sort((a, b) => b.lastSeen.localeCompare(a.lastSeen) || a.name.toLowerCase().localeCompare(b.name.toLowerCase())).slice(0, ROSTER_LIMIT);
+    },
+    async searchGuilds(prefix) {
+      const p = prefix.trim().toLowerCase();
+      if (p.length < 2 || /[%_\\]/.test(p)) return [];
+      const groups = new Map<string, GuildHit>();
+      for (const r of rows.values()) {
+        if (!visible(r) || r.guild === null || !r.guild.toLowerCase().startsWith(p)) continue;
+        const k = guildHideKey(r.realm, r.guild);
+        if (hiddenGuilds.has(k)) continue;
+        const have = groups.get(k);
+        if (have) { have.members += 1; if (r.lastSeen > have.lastSeen) have.lastSeen = r.lastSeen; }
+        else groups.set(k, { realm: r.realm, guild: r.guild, members: 1, lastSeen: r.lastSeen });
+      }
+      return [...groups.values()].sort((a, b) => a.guild.toLowerCase().localeCompare(b.guild.toLowerCase()) || a.realm.localeCompare(b.realm)).slice(0, SEARCH_LIMIT);
+    },
+    async suppressGuild(realm, guild) { hiddenGuilds.add(guildHideKey(realm, guild)); },
+    async hiddenGuilds() { return new Set(hiddenGuilds); },
   };
 }
 

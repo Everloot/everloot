@@ -2,11 +2,12 @@ import type { Crumb } from "./jsonld";
 import { CLASSES } from "@/design/tokens";
 
 /**
- * Where a page sits, for the visible breadcrumb and its BreadcrumbList. /tools is not a page (it 404s), so a
- * tool's trail goes from Home straight to the tool. Pages without an entry have no breadcrumb.
+ * Where a page sits, for the visible breadcrumb and its BreadcrumbList. /tools is the index of the menu, but a
+ * tool's trail still goes from Home straight to the tool. Pages without an entry have no breadcrumb.
  */
 const NAMES: Record<string, string> = {
   "/about": "About",
+  "/tools": "Tools",
   "/privacy": "Privacy",
   "/terms": "Terms of use",
   "/security": "Security",
@@ -22,6 +23,7 @@ const NAMES: Record<string, string> = {
   "/census": "Census",
   "/rankings": "Rankings",
   "/wiki": "Wiki",
+  "/news": "News",
   "/lore": "Lore archive",
   "/lore/coverage": "What the archive covers",
   "/lore/npcs": "NPCs",
@@ -50,7 +52,9 @@ const NAMES: Record<string, string> = {
   "/addons/polestar/packs": "Guide packs",
   "/addons/polestar/wanted": "Pack ideas",
   "/tools/talents": "Talent calculator",
-  "/tools/raid": "Raid buff planner",
+  "/tools/builds": "Plans on this device",
+  "/tools/alts": "Alts on this device",
+  "/tools/raid": "Raid builder",
   "/tools/collections": "Collection gap",
   "/tools/guild-board": "Guild board",
   "/tools/auctions": "Auction House",

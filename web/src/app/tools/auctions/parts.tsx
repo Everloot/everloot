@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import ItemTip from "@/components/game/ItemTip";
-import { Card, DataTable, EmptyState, QUALITY_LABEL, QUALITY_TEXT, SectionHeading, qualityOf as qualityToken, type Column, type Quality } from "@/components/ui";
+import { Card, Contribute as ContributeCard, DataTable, EmptyState, QUALITY_LABEL, QUALITY_TEXT, qualityOf as qualityToken, type Column, type Quality } from "@/components/ui";
 import { SPARK_BOX, itemHref, itemLabel, money, sparkline, type ItemNames, type MarketRow } from "@/lib/auction-house";
 import { HISTORY_DAYS, formatCopper, type PublicDay } from "../../../../../kb/src/market";
 import type { ItemTip as Tip } from "./art";
@@ -27,7 +27,7 @@ export function ItemLink({ id, href, tip, names }: { id: number; href: string; t
   const q = itemQuality(id, tip, names.has(id));
   return (
     <ItemTip tip={tip}>
-      <Link href={href} className={`underline-offset-4 hover:underline ${q ? QUALITY_TEXT[q] : "text-accent"}`}>{itemLabel(id, names)}</Link>
+      <Link href={href} className={`underline-offset-4 hover:underline ${q ? QUALITY_TEXT[q] : "text-fg"}`}>{itemLabel(id, names)}</Link>
     </ItemTip>
   );
 }
@@ -58,15 +58,11 @@ export function HousePrices({ rows, caption, now }: { rows: MarketRow[]; caption
 /** Contributing is the one way a realm gets prices: run a scan, upload it. */
 export function Contribute() {
   return (
-    <Card as="section" aria-labelledby="ah-contribute">
-      <SectionHeading id="ah-contribute" note="Open the auction house in game and press Everloot scan. The Desktop App uploads the scan when you log out and puts these prices in your item tooltips.">
-        Add your realm&apos;s prices
-      </SectionHeading>
-      <div className="flex flex-wrap gap-2">
-        <Link href="/addon" className="btn">Get the addon</Link>
-        <Link href="/addon#desktop" className="btn">Get the Desktop App</Link>
-      </div>
-    </Card>
+    <ContributeCard
+      id="ah-contribute"
+      title={<>Add your realm&apos;s prices</>}
+      note="Open the auction house in game and press Everloot scan. The Desktop App uploads the scan when you log out and puts these prices in your item tooltips."
+    />
   );
 }
 
@@ -132,7 +128,7 @@ export function RealmPrices({ rows, caption, empty }: { rows: MarketRow[]; capti
   const columns: Column<MarketRow>[] = [
     {
       key: "realm", header: "Realm", nowrap: true,
-      cell: (r) => <Link href={itemHref(r.realm, r.value.itemId)} className="text-accent underline-offset-4 hover:underline">{r.realm.name}</Link>,
+      cell: (r) => <Link href={itemHref(r.realm, r.value.itemId)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{r.realm.name}</Link>,
     },
     { key: "market", header: "Market value", numeric: true, cell: (r) => <span className={r.value.market === null ? "text-muted" : undefined}>{money(r.value.market)}</span> },
     { key: "min", header: "Min buyout", numeric: true, cell: (r) => formatCopper(r.value.min) },

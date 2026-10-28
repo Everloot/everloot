@@ -1,4 +1,4 @@
-import type { JobStatus } from "../shared/types";
+import type { AppState, Job, JobState, JobStatus } from "../shared/types";
 
 /** The renderer's text helpers; no DOM, so they are tested on their own. */
 
@@ -31,6 +31,42 @@ export function statusText(j: JobStatus): string {
     case "ok": return j.message || "Done";
     case "error": return j.message;
   }
+}
+
+export type CompanionState = "setup" | "paused" | "error" | "running" | "off" | "idle";
+/** The Overview headline: one answer from the three jobs. `jobs` are the ones the state is about, in upload, prices, ask order. */
+export interface CompanionStatus { state: CompanionState; headline: string; detail: string; jobs: Job[] }
+
+export const JOB_NAMES: Record<Job, string> = { upload: "Upload", prices: "Market prices", ask: "In-game /ask" };
+const ORDER: Job[] = ["upload", "prices", "ask"];
+const list = (jobs: Job[]) => { const n = jobs.map((j) => JOB_NAMES[j]); return n.length < 3 ? n.join(" and ") : `${n.slice(0, -1).join(", ")} and ${n[n.length - 1]}`; };
+
+/**
+ * What the app is doing, truthfully. Checked in this order: no consent, no game folder, paused, any failure,
+ * any job running, everything off, else waiting. "ok" describes a last run, so it counts as waiting, not as healthy.
+ */
+export function companionStatus(s: Pick<AppState, "settings" | "engine">): CompanionStatus {
+  const { settings, engine } = s;
+  const withState = (...states: JobState[]) => ORDER.filter((j) => states.includes(engine.jobs[j].state));
+  const errors = withState("error"), running = withState("running");
+  if (!settings.consentedAt) return { state: "setup", headline: "Finish setup", detail: "Choose a game folder and press Start. Nothing runs before that.", jobs: [] };
+  if (!settings.gameFolder) return { state: "setup", headline: "Choose a game folder", detail: "Everloot needs the World of Warcraft folder that holds WTF before it can watch for the addon.", jobs: [] };
+  if (engine.paused) {
+    const notes = [running.length ? `${list(running)} ${running.length === 1 ? "was" : "were"} already running and may still finish.` : "", errors.length ? `${list(errors)} failed last time.` : ""].filter(Boolean);
+    return { state: "paused", headline: "Paused", detail: ["Nothing new is scheduled until you resume.", ...notes].join(" "), jobs: [...errors, ...running] };
+  }
+  if (errors.length) {
+    return { state: "error", headline: "Needs attention", detail: `${list(errors)} failed.${running.length ? ` ${list(running)} ${running.length === 1 ? "is" : "are"} running.` : ""}`, jobs: errors };
+  }
+  if (running.length) return { state: "running", headline: "Working", detail: `${list(running)} ${running.length === 1 ? "is" : "are"} running.`, jobs: running };
+  if (ORDER.every((j) => engine.jobs[j].state === "off")) return { state: "off", headline: "Automatic jobs are off", detail: "Upload, market prices and /ask are all turned off. Turn one on below.", jobs: [] };
+  const n = engine.files.length;
+  // Only an enabled upload gets a schedule promise; otherwise name the jobs that are on.
+  const on = ORDER.filter((j) => engine.jobs[j].state !== "off");
+  const waiting = engine.jobs.upload.state !== "off" ? "The next upload starts after you log out of the game or /reload." : `Upload is off. ${list(on)} ${on.length === 1 ? "is" : "are"} waiting.`;
+  return n
+    ? { state: "idle", headline: `Watching ${n} account file${n === 1 ? "" : "s"}`, detail: waiting, jobs: [] }
+    : { state: "idle", headline: "Waiting for the first addon file", detail: "Log out of the game once so the addon writes Everloot.lua. Setup is done.", jobs: [] };
 }
 
 /** A 96x24 line of a character's gold over time; nothing for fewer than two points. */

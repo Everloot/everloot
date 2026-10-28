@@ -1,6 +1,7 @@
 import { SITE, type ChangeFilter, type TalentClass } from "@everloot/protocol";
 import { previewPath } from "../../web/src/lib/talents/summary";
 import type { DB } from "./db.js";
+import { guildSlug } from "./guilds.js";
 import { INDEXABLE_MIN_BODY, lorePath } from "./lore-slug.js";
 import { SOURCES } from "./sources.js";
 
@@ -102,6 +103,16 @@ export function guildBoardUrl(guild: string, realm: string): string {
   return abs(`/tools/guild-board${query({ guild, realm })}`);
 }
 
+/** A guild's page: /guilds/<realm>/<guild>, each the slug kb/src/guilds.ts makes. */
+export function guildPageUrl(realm: string, guild: string): string {
+  return abs(`/guilds/${encodeURIComponent(guildSlug(realm))}/${encodeURIComponent(guildSlug(guild))}`);
+}
+
+/** The guild ladder, for one instance and filters. */
+export function guildsUrl(params: { instance?: number; realm?: string; faction?: string; q?: string } = {}): string {
+  return abs(`/guilds${query(params)}`);
+}
+
 export function goldLedgerUrl(character: string, realm: string): string {
   return abs(`/tools/gold-ledger${query({ character, realm })}`);
 }
@@ -118,6 +129,11 @@ export function changesUrl(filter: ChangeFilter, game?: "forever" | "classic"): 
 
 export function talentsUrl(classSlug: TalentClass): string {
   return abs(`/tools/talents/${classSlug}`);
+}
+
+/** The class's hub: who can be one, with racial traits, its guides and the pages to plan with. */
+export function classUrl(classSlug: TalentClass): string {
+  return abs(`/classes/${classSlug}`);
 }
 
 /** A build's own link: the calculator opened on the plan, with a preview card. */

@@ -1,7 +1,11 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { MCP_TOOL_NAMES } from "@everloot/protocol";
+import { MCP_TOOL_NAMES, MCP_TOOLS } from "@everloot/protocol";
+import { z } from "zod";
+
+/** The keyless list with EVERLOOT_GUILDS off: the protocol's tools less the guild ladder's two. */
+const PUBLIC_NAMES = MCP_TOOL_NAMES.filter((name) => name !== "guild_search" && name !== "guild_rankings");
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { MY_BUILDS_REFUSAL } from "@/lib/saved-builds";
 import { openDb } from "../../../../../kb/src/db";
@@ -9,6 +13,8 @@ import { replaceSourceRows } from "../../../../../kb/src/entities";
 import { snapshot } from "../../../../../kb/src/snapshot";
 
 const deps = vi.hoisted(() => ({ mcp: vi.fn(), loadCorpus: vi.fn() }));
+const changeFixtures = vi.hoisted(() => ({ entries: [] as import("@/lib/changes").ChangeEntry[] }));
+vi.mock("@/lib/changes", () => ({ loadTimeline: async () => changeFixtures.entries }));
 vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { mcp: deps.mcp } }));
 vi.mock("@/lib/upload-store", () => ({ uploadStore: { loadCorpus: deps.loadCorpus } }));
 
@@ -27,6 +33,28 @@ beforeEach(() => {
   deps.loadCorpus.mockReset().mockResolvedValue({ uploads: 0, records: [], dataAsOf: "2026-10-10T06:30:00.000Z" });
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); });
+
+test.each([1, 25])("mounted recent_changes excludes manual entries before limit %i and preserves schema and Blizzard attribution", async (limit) => {
+  changeFixtures.entries = [
+    { id: "manual:new", type: "hotfix", game: "retail", source: "manual", title: "Private manual fixture", at: "2026-10-24T00:00:00Z", url: "https://example.test/manual" },
+    { id: "manual:forever", type: "hotfix", game: "forever", source: "manual", title: "Manual Forever fixture", at: "2026-10-24T00:00:00Z", url: "https://example.test/manual" },
+    { id: "forum:1", type: "hotfix", game: "forever", source: "forum", title: "Official fixture", author: "Kaivax", at: "2026-10-23T18:00:00Z", url: "https://us.forums.blizzard.com/en/wow/t/x/1" },
+  ];
+  const { POST } = await route({ KB_SNAPSHOT_PATH: release, EVERLOOT_MCP_PUBLIC: "1" });
+  const res = await POST(new Request("https://everloot.app/mcp/public", {
+    method: "POST", headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "recent_changes", arguments: { limit, filter: "hotfixes" } } }),
+  }));
+  const answer = (await res.json()).result;
+  expect(answer.isError).not.toBe(true);
+  expect(z.object(MCP_TOOLS.recent_changes.outputSchema).safeParse(answer.structuredContent).success).toBe(true);
+  expect(JSON.stringify(answer)).not.toContain("manual");
+  expect(answer.structuredContent.entries).toHaveLength(1);
+  expect(answer.structuredContent.entries[0]).toMatchObject({ id: "forum:1", game: "forever", author: "Kaivax" });
+  expect(answer.content[0].text).toContain("Kaivax");
+  expect(answer.content[0].text).not.toMatch(/By:\s*\n/);
+  changeFixtures.entries = [];
+});
 
 async function route(env: Record<string, string>) {
   for (const [k, v] of Object.entries(env)) vi.stubEnv(k, v);
@@ -103,7 +131,7 @@ describe("my_builds, the account tool", () => {
   test("the keyless list is exactly the protocol's tools, and a call is refused in words", async () => {
     const send = database(["read:public", "read:own"]);
     const { POST } = await route(env("1"));
-    expect(await listed(await POST(rpc("tools/list", {})))).toEqual(MCP_TOOL_NAMES);
+    expect(await listed(await POST(rpc("tools/list", {})))).toEqual(PUBLIC_NAMES);
     const called = (await (await POST(rpc("tools/call", { name: "my_builds", arguments: {} }))).json()).result;
     expect(called).toEqual({ content: [{ type: "text", text: MY_BUILDS_REFUSAL }], isError: true });
     expect(send).not.toHaveBeenCalled();
@@ -112,7 +140,7 @@ describe("my_builds, the account tool", () => {
   test("a key without read:own sees the public list and gets the refusal", async () => {
     database(["read:public"]);
     const { POST } = await route(env("1"));
-    expect(await listed(await POST(rpc("tools/list", {}, KEY)))).toEqual(MCP_TOOL_NAMES);
+    expect(await listed(await POST(rpc("tools/list", {}, KEY)))).toEqual(PUBLIC_NAMES);
     const called = (await (await POST(rpc("tools/call", { name: "my_builds", arguments: {} }, KEY))).json()).result;
     expect(called.isError).toBe(true);
     expect(called.content[0].text).toBe(MY_BUILDS_REFUSAL);
@@ -121,13 +149,13 @@ describe("my_builds, the account tool", () => {
   test("with the switch off even a read:own key sees the public list only", async () => {
     database(["read:public", "read:own"]);
     const { POST } = await route(env(""));
-    expect(await listed(await POST(rpc("tools/list", {}, KEY)))).toEqual(MCP_TOOL_NAMES);
+    expect(await listed(await POST(rpc("tools/list", {}, KEY)))).toEqual(PUBLIC_NAMES);
   });
 
   test("a read:own key gets my_builds after the public tools, and it answers", async () => {
     const send = database(["read:public", "read:own"]);
     const { POST } = await route(env("1"));
-    expect(await listed(await POST(rpc("tools/list", {}, KEY)))).toEqual([...MCP_TOOL_NAMES, "my_builds"]);
+    expect(await listed(await POST(rpc("tools/list", {}, KEY)))).toEqual([...PUBLIC_NAMES, "my_builds"]);
     const called = (await (await POST(rpc("tools/call", { name: "my_builds", arguments: {} }, KEY))).json()).result;
     expect(called.isError).not.toBe(true);
     expect(called.content[0].text).toContain("No saved builds yet.");

@@ -69,12 +69,14 @@ export default function Page() {
 
       <H2 id="commands">Slash commands</H2>
       <P>
-        Most commands start with <C>/everloot</C>. Typing it on its own prints the status. These are the commands the
+        Most commands start with <C>/everloot</C>. Typing it on its own opens the Talents / Raid workspace.
+        Left-click the minimap button for that workspace; right-click it for settings. These are the commands the
         addon has:
       </P>
       <Table
         head={["Command", "What it does"]}
         rows={[
+          [<C key="planner">/everloot planner [talents|raid]</C>, "Opens the matching planner tab. Copy a plan on the website with Copy for addon, paste it here and choose Import."],
           [<C key="a">/everloot status</C>, "Prints the version and your install id, each part of the addon and how many rows it holds."],
           [<C key="a2">/everloot options</C>, "Opens the addon's settings page, with a switch for each part and what it records."],
           [<C key="b">/everloot version</C>, "Prints the addon version."],

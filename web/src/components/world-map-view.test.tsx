@@ -89,6 +89,15 @@ const button = (label: string, scope: ParentNode = container) =>
 const click = (el: Element) => act(async () => (el as HTMLElement).click());
 const shell = () => $("[data-map-shell]");
 const panel = () => $("#map-panel");
+test("pointer coordinates update without rendering the surrounding map view", async () => {
+  await mount();
+  const before = leaflet.props;
+  await act(async () => before.onHover({ x: 250, y: 400 }));
+  expect($("[data-coordinates]").textContent).toContain("Durotar 25, 40");
+  expect(leaflet.props).toBe(before);
+  await act(async () => before.onHover(null));
+  expect($("[data-coordinates]").textContent).toContain("Move over the map");
+});
 const listRows = (id: string) => Array.from(container.querySelectorAll(`[aria-labelledby="${id}"] li`)).map((li) => li.textContent ?? "");
 
 test("the desk sidebar collapses to a rail, and this browser remembers it", async () => {
@@ -352,6 +361,22 @@ test("a pin link to a point past what the page carried opens on it once the pins
   expect($("[data-map-card]").querySelector('a[href="/database/npcs/5"]')).not.toBeNull();
 });
 
+test("the legend's marks are the map's: the game's icon where the upload has one, the glyph elsewhere, and the map gets the same icons", async () => {
+  const poi = { dungeon: "https://assets.example.test/b/poi/Dungeon.webp", flight: "https://assets.example.test/b/poi/TaxiNode_Neutral.webp" };
+  await mount({ poi });
+  const row = (name: string) => [...container.querySelectorAll("label")].find((l) => l.textContent?.includes(name))!;
+  expect(row("Dungeon entrances").querySelector("img[data-swatch-icon]")?.getAttribute("src")).toBe(poi.dungeon);
+  expect(row("Flight masters").querySelector("img[data-swatch-icon]")?.getAttribute("src")).toBe(poi.flight);
+  // Raids have no piece in this upload: the glyph stays, and so does the pin's.
+  expect(row("Raid entrances").querySelector("img")).toBeNull();
+  expect(row("Raid entrances").querySelector("svg")).not.toBeNull();
+  expect(leaflet.props.icons).toEqual(poi);
+  await act(async () => root.unmount());
+  await mount();
+  expect(container.querySelector("img[data-swatch-icon]")).toBeNull();
+  expect(leaflet.props.icons).toEqual({});
+});
+
 test("reduced motion: the sheet slides only when motion is welcome, and the global rule stops the rest", () => {
   const css = readFileSync(source("components/map/world-map.css"), "utf8").replace(/\r\n/g, "\n");
   const motionBlock = css.slice(css.indexOf("@media (max-width: 767.98px) and (prefers-reduced-motion: no-preference)"));
@@ -365,4 +390,13 @@ test("reduced motion: the sheet slides only when motion is welcome, and the glob
   const leafletSource = readFileSync(source("components/map/LeafletMap.tsx"), "utf8");
   expect(leafletSource).toContain("zoomAnimation: !reducedMotion()");
   expect(leafletSource).toContain("animate: !reducedMotion()");
+});
+
+test("the frame never shows Leaflet's grey: the panel colour beats it, and the continent's picture bounds a zoom that fills the frame", () => {
+  const css = readFileSync(source("components/map/world-map.css"), "utf8");
+  // Leaflet's stylesheet loads later with the same one-class weight, so the panel colour needs the second class.
+  expect(css).toMatch(/\.wm-map\.leaflet-container \{\s*background: rgb\(var\(--panel\)\);/);
+  const leafletSource = readFileSync(source("components/map/LeafletMap.tsx"), "utf8");
+  expect(leafletSource).toContain("p.art?.continent");
+  expect(leafletSource).toContain("m.getBoundsZoom(limit, Boolean(picture))");
 });

@@ -16,6 +16,22 @@ export function siteUrl(): string {
   return url.origin;
 }
 
+/**
+ * A request PostgREST refused: its status, and the error code and message its body gave, PostgreSQL's (42703, a column
+ * that does not exist) or PostgREST's own (PGRST202, a function its schema cache does not have). Null and "" without.
+ */
+export class StorageError extends Error {
+  readonly status: number;
+  readonly code: string | null;
+  readonly reason: string;
+  constructor(status: number, code: string | null, reason: string) {
+    super(`Authentication storage failed (${status})`);
+    this.status = status;
+    this.code = code;
+    this.reason = reason;
+  }
+}
+
 export async function authQuery<T>(path: string, init: RequestInit = {}): Promise<T> {
   const url = process.env.SUPABASE_URL?.trim();
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
@@ -26,7 +42,10 @@ export async function authQuery<T>(path: string, init: RequestInit = {}): Promis
     signal: AbortSignal.timeout(10_000),
     headers: { apikey: key, authorization: `Bearer ${key}`, "content-type": "application/json", ...init.headers },
   });
-  if (!response.ok) throw new Error(`Authentication storage failed (${response.status})`);
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { code?: unknown; message?: unknown } | null;
+    throw new StorageError(response.status, typeof body?.code === "string" ? body.code : null, typeof body?.message === "string" ? body.message : "");
+  }
   if (response.status === 204 || new Headers(init.headers).get("prefer")?.includes("return=minimal")) return undefined as T;
   return await response.json() as T;
 }

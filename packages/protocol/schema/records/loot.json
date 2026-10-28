@@ -35,6 +35,31 @@
       "exclusiveMinimum": 0,
       "maximum": 9007199254740991
     },
+    "sourceItemId": {
+      "description": "The item that was disenchanted or opened (a lockbox, a clam, a bag). Older addons send none.",
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "lootType": {
+      "description": "What opened the window, from the spell cast just before it (`LOOT_TYPES`). Absent on windows from older addons and converted Recorder files; those are never sorted into a type by guessing.",
+      "type": "string",
+      "enum": [
+        "kill",
+        "pickpocket",
+        "skinning",
+        "gather",
+        "disenchant",
+        "container",
+        "fishing"
+      ]
+    },
+    "copper": {
+      "description": "The coin in the window, in copper. Absent when the window held none or the addon could not read it.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10000000000
+    },
     "sourceEvidence": {
       "description": "Legacy target guesses are withheld from public loot observations.",
       "type": "string",
@@ -105,5 +130,5 @@
     "kind",
     "items"
   ],
-  "description": "Everloot upload record: loot. The server also checks: loot needs a source: npc or object; a loot position needs mapId, x and y together."
+  "description": "Everloot upload record: loot. The server also checks: loot needs a source: npc, object or item; a loot position needs mapId, x and y together."
 }

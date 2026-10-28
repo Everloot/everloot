@@ -32,6 +32,23 @@ The entrance lies in {zone:1436}, under the hills south of the main road. See [[
 itself, and [[test-draft]] is a draft, so it never becomes a link. Players reach it by road from the town
 in the middle of the zone, and the way down is easy to miss the first time.
 
+Markdown links follow the same rule: [the zone page](/wiki/test-zone#history) is published, so it stays a
+link, while [the draft](/wiki/test-draft/), [the draft in full](https://everloot.app/wiki/test-draft?from=here)
+and [a page never written](/wiki/no-such-page) stay words. [Blizzard's post](https://worldofwarcraft.blizzard.com/en-us/news/1)
+and [the zone's database page](/database/zones/1436-westfall) are not wiki pages.
+
+Written out on the site, in any case and with its default port, they keep the rule:
+[the zone in full](https://everloot.app/wiki/test-zone#history), [in capitals](https://EVERLOOT.APP/wiki/test-zone?from=here)
+and [on the default port](https://everloot.app:443/wiki/test-zone/) stay links, while
+[the draft in capitals](https://EVERLOOT.APP/wiki/test-draft#history), [the draft on the default port](https://everloot.app:443/wiki/test-draft?from=here),
+[a lost page in full](https://everloot.app/wiki/no-such-page), [a lost page in capitals](https://EVERLOOT.APP/wiki/no-such-page#top)
+and [a lost page on the default port](https://EVERLOOT.APP:443/wiki/no-such-page) stay words.
+
+## Before you go
+
+Go with a full group and someone who can heal. The tunnels are narrow, so pull one pack at a time, and
+read [[test-draft]] before you set out.
+
 ## History
 
 The mines were dug long before the brotherhood took them over. When the workers who built the city were

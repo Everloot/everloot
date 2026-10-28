@@ -5,6 +5,7 @@ import { expect, test, vi } from "vitest";
 const facts = vi.hoisted(() => ({ rates: [] as unknown[], names: [] as unknown[], npcs: [] as unknown[], unreachable: false }));
 vi.mock("@/lib/rollup-compute", () => ({
   loadItemFacts: async () => facts,
+  loadReportedItemFacts: async () => ({ shown: [], contested: [], progress: [], unreachable: false }),
   loadWorldFacts: async () => ({ npcs: [], quests: [], vendors: [], unreachable: false }),
   loadCraftedItems: async () => ({ items: new Set<number>(), unreachable: false }),
   loadObservedEdges: async () => ({ edges: [], unreachable: false, dataAsOf: null }),
@@ -134,7 +135,7 @@ test("a plain category page is indexed once half the rows it shows have a name, 
     expect((await subclassMetadata(sub("weapons", "one-handed-swords"))).robots).toMatchObject({ index: false });
     facts.names = name(late.slice(0, half));
     expect((await subclassMetadata(sub("weapons", "one-handed-swords"))).robots).toMatchObject({ index: true });
-    const list = await html(SubclassPage(sub("weapons", "one-handed-swords")));
+    const list = await html(SubclassPage(sub("weapons", "one-handed-swords", { unnamed: "1" })));
     const firstRow = list.slice(list.indexOf("<tbody"));
     expect(firstRow.indexOf(`Sword ${late[0]}`)).toBeGreaterThan(-1);
     expect(firstRow.indexOf(`Sword ${late[0]}`)).toBeLessThan(firstRow.indexOf(`>Item ${all[0]}<`));
@@ -189,9 +190,174 @@ test("the Source column and filter: reported items show where they come from, th
     // The source menu turns it off, the other menus and the header links keep it, and the name box carries it as a hidden field.
     expect(hit).toContain('href="/database/items/armor/cloth?sort=-seen"');
     expect(hit).toContain('href="/database/items/armor?src=drop&amp;sort=-seen"');
-    expect(hit).toContain('href="/database/items/armor/cloth?quality=epic&amp;src=drop&amp;sort=-seen"');
+    // (The quality menu offers the qualities of the rows the list can show: here the reported item's.)
+    expect(hit).toMatch(/href="\/database\/items\/armor\/cloth\?quality=[a-z]+&amp;src=drop&amp;sort=-seen"/);
     expect(hit).toMatch(/<input[^>]*name="src"[^>]*value="drop"|<input[^>]*value="drop"[^>]*name="src"/);
   } finally {
     facts.rates = [];
   }
+});
+
+test("development leftovers are out of a list by default, counted honestly, and one click or an id brings them back", async () => {
+  const cloth = CLIENT_TAXONOMY.items.filter((r) => r[1] === 4 && r[2] === 1).map((r) => r[0]);
+  const [dev, real] = cloth;
+  const total = cloth.length;
+  const name = (itemId: number, label: string) => ["a", "b", "c"].map((installId) => ({ installId, itemId, name: label }));
+  facts.names = [...name(dev, "Deprecated Cloth Cap"), ...name(real, "Linen Cap")];
+  try {
+    const list = await html(SubclassPage(sub("armor", "cloth", { unnamed: "1" })));
+    expect(list).toContain("Linen Cap");
+    expect(list).not.toContain("Deprecated Cloth Cap");
+    // The total, the title and the control all say one item is held back.
+    expect(list).toContain(`>${(total - 1).toLocaleString("en-US")}</span> items`);
+    expect(list).toContain("Show 1 development leftover");
+    expect(list).toContain('href="/database/items/armor/cloth?dev=1&amp;unnamed=1"');
+    expect(String((await subclassMetadata(sub("armor", "cloth"))).title)).toContain(`${(total - 1).toLocaleString("en-US")} Items`);
+    // Asked for, the leftover is listed and the control turns around; the view is its own URL and stays out of search.
+    const all = await html(SubclassPage(sub("armor", "cloth", { dev: "1", unnamed: "1" })));
+    expect(all).toContain("Deprecated Cloth Cap");
+    expect(all).toContain(`>${total.toLocaleString("en-US")}</span> items`);
+    expect(all).toContain("Hide 1 development leftover");
+    expect(all).toContain('href="/database/items/armor/cloth?unnamed=1"');
+    expect(all).toContain("dev=1&amp;unnamed=1&amp;sort=");
+    const m = await subclassMetadata(sub("armor", "cloth", { dev: "1", unnamed: "1" }));
+    expect(m.robots).toMatchObject({ index: false });
+    expect(m.alternates?.canonical).toBe("/database/items/armor/cloth");
+    // Its id finds it without the switch; its name does not.
+    expect(await html(SubclassPage(sub("armor", "cloth", { q: String(dev) })))).toContain("Deprecated Cloth Cap");
+    expect(await html(SubclassPage(sub("armor", "cloth", { q: "cloth cap" })))).not.toContain("Deprecated Cloth Cap");
+    expect(await html(SubclassPage(sub("armor", "cloth", { q: "cloth cap", dev: "1" })))).toContain("Deprecated Cloth Cap");
+    // Its own page says what it is, and stays out of search.
+    const page = await html(ItemPage(props(String(dev))));
+    expect(page).toContain("The game files mark this as a development item");
+    expect((await generateMetadata(props(String(dev)))).robots).toMatchObject({ index: false });
+    expect(await html(ItemPage(props(String(real))))).not.toContain("development item");
+  } finally {
+    facts.names = [];
+  }
+});
+
+test("items no source names are one line above the list, sort last when shown, and the unrecorded view lists them plainly", async () => {
+  const cloth = CLIENT_TAXONOMY.items.filter((r) => r[1] === 4 && r[2] === 1);
+  const [first, second] = cloth.map((r) => r[0]);
+  const name = (itemId: number, label: string) => ["a", "b", "c"].map((installId) => ({ installId, itemId, name: label }));
+  facts.names = [...name(second, "Linen Cap")];
+  const total = cloth.length;
+  try {
+    const list = await html(SubclassPage(sub("armor", "cloth")));
+    // Only the named row is listed; the line counts the rest and says when names come.
+    expect(list.match(/<tr /g)).toHaveLength(1);
+    expect(list).toContain("Linen Cap");
+    expect(list).not.toContain(`>Item ${first}<`);
+    expect(list).toContain(`${(total - 1).toLocaleString("en-US")} items the game files do not name yet.`);
+    expect(list).toMatch(/Their names arrive from the addon (after launch on November 4, 2026|as players see them)\./);
+    expect(list).toContain('href="/database/items/armor/cloth?unnamed=1"');
+    expect(list).toContain(`>${"1"}</span> item`);
+    // Expanded: the named row first, then the ids with the placeholder tile; the view is its own URL, noindex.
+    const open = await html(SubclassPage(sub("armor", "cloth", { unnamed: "1" })));
+    expect(open.indexOf("Linen Cap")).toBeLessThan(open.indexOf(`>Item ${first}<`));
+    expect(open).toContain(`>${total.toLocaleString("en-US")}</span> items`);
+    expect(open).toContain(`Hide the ${(total - 1).toLocaleString("en-US")} unnamed items`);
+    expect(open).toContain(">?</span>");
+    const m = await subclassMetadata(sub("armor", "cloth", { unnamed: "1" }));
+    expect(m.robots).toMatchObject({ index: false });
+    expect(m.alternates?.canonical).toBe("/database/items/armor/cloth");
+    // An id lookup finds an unnamed item without the switch.
+    expect(await html(SubclassPage(sub("armor", "cloth", { q: String(first) })))).toContain(`>Item ${first}<`);
+    // The unrecorded view is what the reader asked for: plain rows, no fold line.
+    const unrecorded = CLIENT_TAXONOMY.items.find((r) => r[1] === 4 && r[2] === 1 && r[4] === null && r[0] !== second);
+    if (unrecorded) {
+      const view = await html(SubclassPage(sub("armor", "cloth", { quality: "unrecorded" })));
+      expect(view).toContain(`>Item ${unrecorded[0]}<`);
+      expect(view).not.toContain("do not name yet");
+    }
+  } finally {
+    facts.names = [];
+  }
+});
+
+test("with no development names the list shows no control", async () => {
+  expect(await html(SubclassPage(sub("armor", "cloth")))).not.toContain("development leftover");
+});
+
+test("the profession menu leaves out a development profession unless the leftovers are asked for", async () => {
+  const plain = await html(ItemPage(props("trade-goods")));
+  expect(plain).toContain("?skill=tailoring");
+  expect(plain).not.toContain("Test Profession [DNT]");
+  expect(await html(ItemPage(props("trade-goods", { dev: "1" })))).toContain("Test Profession [DNT]");
+});
+
+/* ---------- A class context (class hubs) ---------- */
+
+const rows = (page: string) => page.slice(page.indexOf("<tbody"), page.indexOf("</tbody>"));
+
+test("a class context is a chip, never an item filter: the rows are the same for every class and role, and nothing is called best", async () => {
+  const plain = await html(SubclassPage(sub("armor", "cloth")));
+  const mage = await html(SubclassPage(sub("armor", "cloth", { class: "mage", level: "25", role: "damage" })));
+  const warrior = await html(SubclassPage(sub("armor", "cloth", { class: "warrior", role: "tank" })));
+  expect(rows(plain).match(/<tr /g)?.length).toBeGreaterThan(0);
+  expect(rows(mage)).toBe(rows(plain));
+  expect(rows(warrior)).toBe(rows(plain));
+  expect(mage).toContain('href="/classes/mage?level=25&amp;role=damage"');
+  // Which items a class can use is not proven by any source we read, so the list says it is not narrowed.
+  expect(mage).toContain("The list is the same for every class and role: which items a class can use is not in our data yet.");
+  expect(await html(SubclassPage(sub("armor", "cloth", { class: "mage" })))).toContain("The list is the same for every class: which items a class can use is not in our data yet.");
+  for (const page of [mage, warrior]) expect(page).not.toMatch(/best in slot|\bBiS\b|best for|recommended/i);
+  expect(plain).not.toContain("data-class-context");
+});
+
+test("a level offers the required-level filter, on the levels items show; the context never sets it by itself", async () => {
+  const page = await html(items({ class: "mage", level: "25" }));
+  expect(page).toContain('href="/database/items?req=1-25&amp;class=mage&amp;level=25"');
+  expect(page).toContain("Filter to required level 25 or lower");
+  expect(page).toContain(`>${CLIENT_TAXONOMY.items.length.toLocaleString("en-US")}</span> items`);
+  // A required level already chosen is kept, and none is offered over it.
+  const chosen = await html(items({ req: "11-20", class: "mage", level: "25" }));
+  expect(chosen).not.toContain("Filter to required level");
+  expect(chosen).toContain('href="/database/items?req=11-20"');
+  // Without a level there is nothing to offer.
+  expect(await html(items({ class: "mage" }))).not.toContain("Filter to required level");
+});
+
+test("a required level the menu does not list shows as its own choice, so the filter the level offers is visible", async () => {
+  const page = await html(items({ req: "1-25", class: "mage", level: "25" }));
+  expect(page).toMatch(/Req\. level: <span class="text-fg">1–25<\/span>/);
+  expect(page).toContain('href="/database/items?class=mage&amp;level=25"');
+});
+
+test("taking the context off keeps every filter; the list's own links, menus and name box keep the context", async () => {
+  const page = await html(SubclassPage(sub("armor", "cloth", { quality: "rare,epic", sort: "-id", class: "mage", level: "25", role: "damage" })));
+  // The chip's cross: the same view without the context.
+  expect(page).toContain('href="/database/items/armor/cloth?quality=rare,epic&amp;sort=-id"');
+  // A quality choice, the type menu and Clear filters keep the context; Clear filters keeps nothing else.
+  expect(page).toContain('href="/database/items/armor/cloth?quality=epic&amp;sort=-id&amp;class=mage&amp;level=25&amp;role=damage"');
+  expect(page).toContain('href="/database/items/armor?quality=rare,epic&amp;sort=-id&amp;class=mage&amp;level=25&amp;role=damage"');
+  expect(page).toContain('href="/database/items/armor/cloth?class=mage&amp;level=25&amp;role=damage"');
+  expect(page).toMatch(/<input[^>]*name="role"[^>]*value="damage"/);
+});
+
+test("an old singular category address moves to the plural one with its class context, when the context reads", async () => {
+  await expect(html(ItemPage(props("weapon", { quality: "rare", class: "mage", level: "25" })))).rejects.toThrow(/^NEXT_REDIRECT \/database\/items\/weapons\?quality=rare&class=mage&level=25$/);
+  await expect(html(SubclassPage(sub("weapon", "one-handed-swords", { class: "warrior", role: "tank" })))).rejects.toThrow(/^NEXT_REDIRECT \/database\/items\/weapons\/one-handed-swords\?class=warrior&role=tank$/);
+  // A context the page cannot read is not carried on.
+  await expect(html(ItemPage(props("weapon", { quality: "rare", class: "deathknight" })))).rejects.toThrow(/^NEXT_REDIRECT \/database\/items\/weapons\?quality=rare$/);
+});
+
+test("a class context the page cannot read is named and left out, and the page is not a 404", async () => {
+  const page = await html(items({ class: "deathknight", sort: "name" }));
+  expect(page).toContain("&quot;deathknight&quot; is not one of the nine classes. This page leaves the class out.");
+  expect(page).toContain('href="/database/items?sort=name"');
+  expect(page).not.toContain("class=deathknight");
+});
+
+test("an address with a class context is noindex, with the plain category as its canonical", async () => {
+  for (const search of [{ class: "mage" }, { class: "mage", level: "25", role: "damage" }, { class: "deathknight" }, { class: "mage", page: "2" }] as Record<string, string>[]) {
+    const m = await subclassMetadata(sub("armor", "cloth", search));
+    expect(m.robots, JSON.stringify(search)).toMatchObject({ index: false, follow: true });
+    expect(m.alternates?.canonical, JSON.stringify(search)).toBe("/database/items/armor/cloth");
+  }
+  const { generateMetadata: allMetadata } = await import("./page");
+  const all = await allMetadata({ searchParams: Promise.resolve({ class: "mage", level: "25" }) });
+  expect(all.robots).toMatchObject({ index: false, follow: true });
+  expect(all.alternates?.canonical).toBe("/database/items");
 });

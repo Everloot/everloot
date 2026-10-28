@@ -22,10 +22,11 @@ function M.Button()
     icon:SetTexture("Interface\\Icons\\INV_Misc_Book_09")
     button.icon = icon
   end
-  button:SetScript("OnClick", function()
-    if E.Options and E.Options.Open then E.Options.Open() end
+  button:SetScript("OnClick", function(_, mouseButton)
+    if mouseButton ~= "RightButton" and E.Planner then E.Planner.Open()
+    elseif E.Options and E.Options.Open then E.Options.Open() end
   end)
-  if button.RegisterForClicks then button:RegisterForClicks("LeftButtonUp") end
+  if button.RegisterForClicks then button:RegisterForClicks("LeftButtonUp", "RightButtonUp") end
   M.button = button
   return button
 end

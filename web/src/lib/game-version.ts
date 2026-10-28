@@ -36,5 +36,5 @@ export const CURRENT_VERSION: GameVersion = GAME_VERSIONS.find((v) => v.availabl
 /** "1.60.1" for "1.60.1.70450": the label form; the full string is the build. */
 export const shortBuild = (build: string): string => build.split(".").slice(0, 3).join(".");
 
-/** The compact header label, "Beta · 1.60.1". */
-export const versionLabel = (v: GameVersion = CURRENT_VERSION): string => (v.build ? `${v.label} · ${shortBuild(v.build)}` : v.label);
+/** The compact header label, "Build 1.60.1": the build only, so it stays true when Live replaces Beta. */
+export const versionLabel = (v: GameVersion = CURRENT_VERSION): string => (v.build ? `Build ${shortBuild(v.build)}` : v.label);

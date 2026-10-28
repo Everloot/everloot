@@ -56,6 +56,16 @@ export function levelFor(catalog: TalentCatalog, points: number): number {
   return firstPointLevel + points - 1;
 }
 
+/** The catalog as one set's points see it. The second set opens at the level the rules give for it, so every point the
+ *  levels before that give arrives there instead; the first set is the catalog as it is. The order engine reads its
+ *  levels from this, so a step, a moved point or a refusal says the level that set's point comes at. */
+export function forSet(catalog: TalentCatalog, slot: 0 | 1): TalentCatalog {
+  if (slot === 0) return catalog;
+  const { rules } = catalog;
+  const pointLevels = Array.from({ length: pointsAtLevel(catalog, rules.maxLevel) }, (_, i) => Math.max(levelFor(catalog, i + 1), rules.dualSpecLevel));
+  return { ...catalog, rules: { ...rules, pointLevels } };
+}
+
 /** Which entry of a node a rank falls in: a tiered node buys its entries in order. */
 export function entryAtRank(node: TalentNode, rank: number) {
   if (node.kind !== "tiered") return node.entries[0];
@@ -122,7 +132,8 @@ export function canRemove(catalog: TalentCatalog, ranks: Ranks, id: number): Ver
   return isLegal(catalog, withRank(ranks, id, rankOf(ranks, id) - 1, ranks[id]?.choice)) ? OK : no("dependents");
 }
 
-function withRank(ranks: Ranks, id: number, rank: number, choice?: number): Ranks {
+/** The ranks with one node set to `rank` and, for a choice node, `choice`; at 0 the node is left out. */
+export function withRank(ranks: Ranks, id: number, rank: number, choice?: number): Ranks {
   const next = { ...ranks };
   if (rank <= 0) delete next[id];
   else next[id] = choice === undefined ? { rank } : { rank, choice };

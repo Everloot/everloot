@@ -1,3 +1,6 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { expect, test, vi } from "vitest";
 import { LAUNCH } from "@/data/wow-forever";
 import { MAP_DATA_EXTRACTED_AT, TALENT_DATA_EXTRACTED_AT } from "@/lib/build-stamp";
@@ -5,6 +8,8 @@ import { loadTimeline, postPath } from "@/lib/changes";
 import { CLIENT_TAXONOMY, ITEMS_PER_PAGE, itemsHref } from "@/lib/items";
 import { filterItems } from "../../../kb/src/item-taxonomy";
 import { instanceHref, instanceRows } from "@/lib/instances";
+import { loadCatalog, TALENT_CLASSES } from "@/lib/talents/catalogs";
+import { encodeBuild, encodeOrder } from "@/lib/talents/share";
 import sitemap from "./sitemap";
 
 const facts = vi.hoisted(() => ({ rates: [] as unknown[], names: [] as { installId: string; itemId: number; name: string }[], npcs: [] as unknown[], unreachable: false }));
@@ -20,17 +25,23 @@ vi.mock("@/lib/database-hubs", async (importOriginal) => {
 const blue = vi.hoisted(() => ({ writeups: new Map<string, { postId: string; reviewed: { by: string; on: string }; body: string }>() }));
 vi.mock("@/lib/changes", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/changes")>()), loadWriteups: () => blue.writeups }));
 
+const news = vi.hoisted(() => ({ posts: new Map<string, unknown>() }));
+vi.mock("@/lib/news", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/news")>();
+  return { ...real, loadNews: () => news.posts };
+});
+
 const entries = await sitemap();
 const byPath = new Map(entries.map((e) => [new URL(e.url).pathname, e]));
 
-test("/changes is dated by its newest entry", () => {
-  const newest = loadTimeline()[0];
+test("/changes is dated by its newest entry", async () => {
+  const newest = (await loadTimeline())[0];
   expect(newest).toBeDefined();
   expect(byPath.get("/changes")?.lastModified).toEqual(new Date(newest.at));
 });
 
 test("a blue post's page is listed only once it has a reviewed write-up, dated by the review", async () => {
-  const posts = loadTimeline().filter((e) => e.type !== "build");
+  const posts = (await loadTimeline()).filter((e) => e.type !== "build");
   const listed = (all: typeof entries) => all.map((e) => new URL(e.url).pathname).filter((p) => /^\/changes\/./.test(p) && p !== "/changes/feed.xml");
   expect(listed(entries)).toEqual([]);
   const [first, second] = posts;
@@ -42,6 +53,56 @@ test("a blue post's page is listed only once it has a reviewed write-up, dated b
     expect(listed(withOne)).not.toContain(postPath(second));
   } finally {
     blue.writeups = new Map();
+  }
+});
+
+test("the news hub and its posts are listed only once a post is published, dated by its last change", async () => {
+  const listed = (all: typeof entries) => all.map((e) => new URL(e.url).pathname).filter((p) => p === "/news" || p.startsWith("/news/"));
+  expect(listed(entries)).toEqual([]);
+  try {
+    news.posts = new Map([["launch", { slug: "launch", title: "Launch", summary: "s", author: "a", published: "2026-10-24", updated: "2026-10-25", tags: [], sources: [], status: "published", blocks: [] }]]);
+    const withOne = await sitemap();
+    expect(listed(withOne)).toEqual(["/news", "/news/launch"]);
+    expect(withOne.find((e) => e.url.endsWith("/news/launch"))?.lastModified).toEqual(new Date("2026-10-25"));
+  } finally {
+    news.posts = new Map();
+  }
+});
+
+test("a guide is listed only while its page asks to be indexed, dated by its review, with the guide index; a draft never; the class hubs carry their races' traits, so they are listed without one", async () => {
+  const listed = (all: typeof entries) => all.map((e) => new URL(e.url).pathname).filter((p) => /^\/(?:guides|classes)(?:\/|$)/.test(p));
+  const hubs = ["/classes", ...TALENT_CLASSES.map((slug) => `/classes/${slug}`)];
+  expect(listed(entries).sort()).toEqual([...hubs].sort());
+  // One point on the Mage tree the site ships, made and reviewed on its build: a plan that fits.
+  const mage = await loadCatalog("mage");
+  const node = mage.nodes.find((n) => n.row === 1 && n.kind === "single" && !n.unlock && n.prereqs.length === 0 && !n.anyOf?.length);
+  expect(node).toBeDefined();
+  const ranks = { [node!.id]: { rank: 1 } };
+  const file = (id: number, slug: string, { status = "published", words = 48 }: { status?: string; words?: number } = {}) => {
+    const reviewed = status === "published";
+    return [
+      "---", `id: ${id}`, `slug: ${slug}`, "version: 1", `status: ${status}`, `title: ${slug}`, 'summary: "A test guide."', "classSlug: mage",
+      "activity: leveling", "roles: [damage]", "levels: { from: 10, to: 60 }",
+      `code: ${encodeBuild({ classSlug: "mage", specId: mage.specId, build: mage.build, ranks })}`, `order: ${encodeOrder(ranks, [node!.id], "planned")}`, "author: Robin",
+      `reviewed: ${reviewed ? `{ by: Kai, on: 2026-10-20, build: ${mage.build} }` : "null"}`,
+      `history: ${reviewed ? `[{ version: 1, on: 2026-10-20, by: Kai, build: ${mage.build}, note: First published version. }]` : "[]"}`, "---", "",
+      ...["Who it is for", "Why this plan", "How to play it", "What we do not know yet"].flatMap((h) => [`## ${h}`, "", Array.from({ length: words }, (_, i) => `word${i}`).join(" "), ""]),
+    ].join("\n");
+  };
+  const dir = mkdtempSync(join(tmpdir(), "sitemap-guides-"));
+  writeFileSync(join(dir, "README.md"), "# not a guide");
+  writeFileSync(join(dir, "frost-leveling.md"), file(1, "frost-leveling"));
+  writeFileSync(join(dir, "fire-draft.md"), file(2, "fire-draft", { status: "draft" }));
+  // Published, but under the guides' 150 words of their own: shown, and out of search.
+  writeFileSync(join(dir, "thin-guide.md"), file(3, "thin-guide", { words: 2 }));
+  vi.stubEnv("GUIDES_DIR", dir);
+  try {
+    const withGuides = await sitemap();
+    expect(listed(withGuides).sort()).toEqual([...hubs, "/guides", "/guides/frost-leveling"].sort());
+    expect(withGuides.find((e) => e.url.endsWith("/guides/frost-leveling"))?.lastModified).toEqual(new Date("2026-10-20"));
+    expect(withGuides.find((e) => e.url.endsWith("/guides"))?.lastModified).toBeUndefined();
+  } finally {
+    vi.unstubAllEnvs();
   }
 });
 

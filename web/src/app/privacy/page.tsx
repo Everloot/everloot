@@ -4,7 +4,7 @@ import { pageMetadata } from "@/lib/seo";
 import { REVOKED_KEPT_DAYS, USAGE_KEPT_DAYS } from "@/lib/api-keys";
 import { OPERATOR } from "@/lib/jsonld";
 import { trailFor } from "@/lib/breadcrumbs";
-import { Container, PageHeader, Prose, SectionHeading, TocLayout, type TocItem } from "@/components/ui";
+import { Container, PageHeader, Prose, SectionHeading, ReadingLayout, type TocItem } from "@/components/ui";
 
 export const metadata: Metadata = {
   ...pageMetadata({ title: "Privacy Policy", description: "How Everloot handles your data, cookies and usage statistics, and what happens to the addon files you upload to the WoW: Forever database.", path: "/privacy" }),
@@ -34,13 +34,13 @@ function Section({ id, children }: { id: string; children: React.ReactNode }) {
 }
 
 export default function PrivacyPage() {
-  const updated = "20 October 2026";
+  const updated = "27 October 2026";
   return (
     <article>
       <Container width="reading">
         <PageHeader trail={trailFor("/privacy")!} title="Privacy Policy" meta={<span>Last updated: {updated}</span>} />
       </Container>
-      <TocLayout items={SECTIONS}>
+      <ReadingLayout items={SECTIONS}>
         <Prose>
           <Section id="overview">
             <p>
@@ -77,8 +77,10 @@ export default function PrivacyPage() {
               <li>
                 <strong>Our own counters:</strong> our servers keep a daily count of
                 calls to our API and to the public MCP endpoint, by endpoint or tool
-                name. These counts contain no IP address, install id, search text or
-                other detail about who made the call. Rate limiting separately keeps
+                name, and, for the lookup tools the chat uses, whether the lookup found
+                something or nothing. These counts contain no IP address, install id,
+                question or search text, looked-up name, account or other detail about
+                who made the call. Rate limiting separately keeps
                 a one-way hash of an address for a short time to enforce limits.
               </li>
               <li>
@@ -141,6 +143,29 @@ export default function PrivacyPage() {
                 search engines index it only while it is public. Turning it off hides it at once.
                 Deleting your account deletes your profile with it.
               </li>
+              <li id="chat-projects">
+                <strong>Chat projects (optional):</strong> while signed in, Chat can keep your
+                conversations, projects, notes and saved entries in your account so they follow
+                you to other devices. Only you can see them. A saved build or page is kept as a link
+                to it and the label you type, not a copy of the build or the page. Notes are sent to
+                your model only when you attach one to a question. You can choose to keep a chat in
+                this browser instead, and older browser chats are copied to your account only when
+                you choose Import. Chat keys, unsent drafts and audio are never stored in your
+                account. In Chat&apos;s All chats view you can download all of it or delete all of
+                it; deleting your account deletes it too.
+              </li>
+              <li id="free-chat">
+                <strong>Chat&apos;s free model (optional):</strong> when Chat offers Everloot (free) and you ask with
+                it, your question, the earlier turns of that chat and what Everloot&apos;s lookups found go through
+                our server to Groq, or to Cloudflare Workers AI when Groq is busy or at its limit, which writes the
+                answer. Each answer names the provider that wrote it. A character or note goes only if you attach it.
+                Nothing else of yours goes: no account details, no key, no cookie and not your address. We don&apos;t
+                keep the questions or the answers. To enforce the daily limit our server keeps a keyed one-way hash of
+                your address for a day. Groq&apos;s terms say it does not train models on them and keeps them at most 30
+                days, for reliability and abuse checks. Cloudflare says it does not use Workers AI content to train
+                models and does not keep it once the request is answered. Everloot search, and a model you set up with
+                your own key, do not use this.
+              </li>
               <li>
                 <strong>Uploads:</strong> files you send on the upload page
                 (addon records plus a random install id — no account, no character
@@ -198,6 +223,13 @@ export default function PrivacyPage() {
                 recorded again. If you play a character and do not want a page, hide it. You can also
                 email{" "}
                 <a href="mailto:hello@everloot.app">hello@everloot.app</a>.
+                {" "}The same module also records your own guild&apos;s boss kills: the guild, the realm, your
+                faction, the boss and the time, with no names. If the site has guild pages on, a kill is shown on
+                the guild&apos;s page once two players&apos; uploads report it, and a guild page lists the
+                characters seen in that guild, labelled as sightings, not the game&apos;s member list. Anyone can
+                hide a guild, without an account or an officer rank, on the{" "}
+                <Link href="/guilds/hide">guild hide form</Link>; its kills are then not kept. Its characters
+                keep their own pages, which the character hide form covers.
               </li>
               <li>
                 <strong>Cookies:</strong> an essential login cookie if you sign in (plus a
@@ -234,6 +266,11 @@ export default function PrivacyPage() {
               <li>
                 <strong>Google Analytics</strong> (consent required) measures page views
                 and visits using cookies.
+              </li>
+              <li>
+                <strong>Metricool</strong> (consent required) measures visits and the
+                pages viewed. Its tracker receives the page URL, referrer and browser
+                window size. Metricool states that this tracker uses no cookies.
               </li>
             </ul>
           </Section>
@@ -313,6 +350,10 @@ export default function PrivacyPage() {
                 <strong>Your profile</strong> is changed, cleared or made private again on Settings.
               </li>
               <li>
+                <strong>Chat projects and account chats</strong> are downloaded or deleted in
+                Chat&apos;s All chats view.
+              </li>
+              <li>
                 <strong>Uploads</strong> you ask us to remove are deleted, and the
                 next rollup rebuild removes anything derived from them.
               </li>
@@ -327,8 +368,9 @@ export default function PrivacyPage() {
               <li><strong>Account email, name and password hash:</strong> until you ask us to delete your account. Unused confirmation and reset links expire after one hour.</li>
               <li><strong>API key usage counts:</strong> {USAGE_KEPT_DAYS} days. A revoked key and its counts: {REVOKED_KEPT_DAYS} days after revocation, or at once when you delete it.</li>
               <li><strong>Saved builds and characters:</strong> until you delete them or your account.</li>
+              <li><strong>Chat projects, account chats, notes and saved entries:</strong> until you delete them, clear them in Chat or delete your account.</li>
               <li><strong>Handle, display name, status and profile choices:</strong> until you change them or delete your account. A status with a clear-after time stops showing at that time.</li>
-              <li><strong>Rate-limit hashes:</strong> a short time, long enough to enforce the limit, then discarded.</li>
+              <li><strong>Rate-limit hashes:</strong> a short time, long enough to enforce the limit (a day for Chat&apos;s free model), then discarded.</li>
               <li><strong>Uploads:</strong> until you ask us to remove them. They are the public database.</li>
               <li><strong>Census rows:</strong> as long as the upload they came in, and removed with it. They hold the character&apos;s hash, never its id, and a one-way hash of the address they came from, never the address. They are only ever published as counts.</li>
               <li><strong>Upload address hash:</strong> as long as the upload it belongs to. The completion rollup keeps its link between an address hash and an install until the rollup is next rebuilt.</li>
@@ -355,7 +397,7 @@ export default function PrivacyPage() {
             </p>
           </Section>
         </Prose>
-      </TocLayout>
+      </ReadingLayout>
     </article>
   );
 }

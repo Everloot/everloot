@@ -5,7 +5,7 @@
 Everloot = Everloot or {}
 local E = Everloot
 
-E.VERSION = "0.3.10"
+E.VERSION = "0.3.12"
 E.MAX_ROWS_PER_KIND = 2000
 
 -- Same Adler-32 the companion writes into its slot addons; Lua 5.1 arithmetic only.
@@ -196,10 +196,14 @@ SlashCmdList["EVERLOOT"] = function(msg)
   -- An item name or link keeps its case too: the price of an item, from the files already in the game.
   local item = type(msg) == "string" and msg:match("^%s*[Pp][Rr][Ii][Cc][Ee]%s*(.-)%s*$")
   if item and E.PriceCommand and msg:lower():match("^%s*price%f[%s%z]") then return E.PriceCommand(item) end
+  local workspace = type(msg) == "string" and msg:lower():match("^%s*planner%f[%s%z]%s*(.-)%s*$")
+  if workspace and E.Planner then return E.Planner.Open(workspace) end
   msg = msg and msg:lower():gsub("^%s+", "") or ""
   local gph = msg:match("^gph%f[%s%z]%s*(.-)%s*$")
   if gph and E.GphCommand then return E.GphCommand(gph) end
-  if msg == "status" or msg == "" then
+  if msg == "" and E.Planner then
+    E.Planner.Open()
+  elseif msg == "status" or msg == "" then
     print(E:Status())
   elseif (msg == "options" or msg == "settings" or msg == "config") and E.Options then
     E.Options.Open()
@@ -239,7 +243,7 @@ SlashCmdList["EVERLOOT"] = function(msg)
   elseif msg == "players on" or msg == "players off" then
     EverlootDB.toggles.players = (msg == "players on")
     if EverlootDB.toggles.players then
-      print("Everloot: players on. It records the name, realm, race, class, level and guild of your characters and of players you target, mouse over or group with, one row per character and the day you saw it. Never where they are, their gear or what they do. It is sent only from the everloot.app upload page, after its preview. If the site has player pages on, these characters can appear there, and anyone can have a character hidden. /reload to apply.")
+      print("Everloot: players on. It records the name, realm, race, class, level and guild of your characters and of players you target, mouse over or group with, one row per character and the day you saw it, and the bosses your guild kills (the guild, the boss and the time, no names). Never where they are, their gear or what they do. It is sent only from the everloot.app upload page, after its preview. If the site has player pages on, these characters can appear there, and anyone can have a character hidden. /reload to apply.")
     else
       -- Turning it off withdraws what it wrote: every player row is deleted from this file.
       if E.Players then E.Players.Withdraw() end
@@ -251,6 +255,12 @@ SlashCmdList["EVERLOOT"] = function(msg)
     EverlootDB.scanPrompt = (msg == "scanprompt on")
     print("Everloot: the scan prompt at the auction house is " .. (EverlootDB.scanPrompt and "on" or "off")
       .. ". The Everloot scan button and /everloot scan still work.")
+  elseif msg == "vendor on" or msg == "vendor off" then
+    EverlootDB.autoVendor = (msg == "vendor on")
+    print("Everloot: at a merchant, " .. (EverlootDB.autoVendor and "sell grey items and repair with your own gold is on. Guild-bank repair is never used." or "selling grey items and repairing is off."))
+  elseif msg == "mail on" or msg == "mail off" then
+    EverlootDB.mailCollect = (msg == "mail on")
+    print("Everloot: the Collect all button at the mailbox is " .. (EverlootDB.mailCollect and "on. It takes money and items from auction letters only, never cash on delivery." or "off."))
   elseif msg == "scan" then
     if E.StartScan then E:StartScan() else print("Everloot: full scans are not available in this client.") end
   elseif msg == "addons on" or msg == "addons off" then
@@ -265,6 +275,6 @@ SlashCmdList["EVERLOOT"] = function(msg)
       print("Everloot: installed addon list off; all recorded addon rows were deleted from this file. /reload to apply.")
     end
   else
-    print("Everloot commands: /everloot options, /everloot status, /everloot auctions on|off, /everloot scan, /everloot scanprompt on|off, /everloot price [item], /everloot gph [start|pause|stop|reset|show|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], /everloot selftest, /everloot talents, /everloot plan [share code|number], /everloot raid [code], /ask <question>")
+    print("Everloot commands: /everloot options, /everloot status, /everloot auctions on|off, /everloot scan, /everloot scanprompt on|off, /everloot vendor on|off, /everloot mail on|off, /everloot price [item], /everloot gph [start|pause|stop|reset|show|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], /everloot selftest, /everloot talents, /everloot plan [share code|number], /everloot raid [code], /ask <question>")
   end
 end

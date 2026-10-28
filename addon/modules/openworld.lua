@@ -26,6 +26,12 @@ local function objectIdFromGuid(guid)
   return type(guid) == "string" and tonumber(guid:match("^GameObject%-%d+%-%d+%-%d+%-%d+%-(%d+)%-")) or nil
 end
 
+-- True for an item GUID (Item-server-0-id): a disenchanted item or an opened container. The GUID does not hold
+-- the item's id; see itemIdFromGuid.
+local function isItemGuid(guid)
+  return type(guid) == "string" and guid:find("^Item%-") ~= nil
+end
+
 -- A whole number from lo to hi, else nil.
 local function whole(v, lo, hi)
   if type(v) == "number" and v == math.floor(v) and v >= lo and v <= hi then return v end
@@ -60,12 +66,13 @@ end
 local function sightingShare(row)
   return (row.positionKind == "interaction" or row.positionKind == "vignette") and row.positionKind or "targeting"
 end
-local function lootShare(row) return row.sourceObjectId and "objects" or "creatures" end
+local function lootShare(row) return row.sourceItemId and "items" or row.sourceObjectId and "objects" or "creatures" end
 local TARGETING = { name = "targeting", of = sightingShare }
 local INTERACTION = { name = "interaction", of = sightingShare }
 local VIGNETTE = { name = "vignette", of = sightingShare }
 local OBJECTS = { name = "objects", of = lootShare }
 local CREATURES = { name = "creatures", of = lootShare }
+local ITEMS = { name = "items", of = lootShare }
 
 local function targetSighting(unit)
   local guid = UnitGUID(unit)
@@ -178,6 +185,14 @@ local GATHER_BY_ID = {
   [3365] = "chest", [6247] = "chest", [6477] = "chest", [6478] = "chest", [21651] = "chest", [22810] = "chest",
   [7620] = "fishing", [7731] = "fishing", [7732] = "fishing", [18248] = "fishing",
 }
+-- The same cast also types a window on a creature or an item (loot tables spec, section 4): pick-pocketing and
+-- skinning open a second window on the creature's GUID, disenchanting and picking a lock name an item. Only the
+-- spell's English name or Classic id decides it; the cast's target is never kept for these.
+local LOOT_BY_NAME = { ["Pick Pocket"] = "pickpocket", ["Skinning"] = "skinning", ["Disenchant"] = "disenchant", ["Pick Lock"] = "container" }
+local LOOT_BY_ID = {
+  [921] = "pickpocket", [8613] = "skinning", [8617] = "skinning", [8618] = "skinning", [10768] = "skinning",
+  [13262] = "disenchant", [1804] = "container",
+}
 -- A loot window more than this many seconds after the cast is not that cast's. A fish can take longer to bite.
 local GATHER_WINDOW, FISHING_WINDOW = 8, 30
 local NAMED_KINDS = { herb = true, ore = true, chest = true }
@@ -217,11 +232,28 @@ local function castSent(unit, a2, a3, a4)
   local spellId, name, target
   if type(a4) == "number" then spellId, target = a4, a2
   elseif type(a2) == "string" then name, target = a2, a4 end
-  local kind = (spellId and GATHER_BY_ID[spellId]) or GATHER_BY_NAME[name or (spellId and spellName(spellId)) or ""] or "other"
+  local spell = name or (spellId and spellName(spellId)) or ""
+  local kind = (spellId and GATHER_BY_ID[spellId]) or GATHER_BY_NAME[spell] or "other"
+  local lootKind = (spellId and LOOT_BY_ID[spellId]) or LOOT_BY_NAME[spell]
+  -- Disenchanting and picking a lock target an item by name: its id is read now, while the item is in the bags.
+  local itemId
+  if (lootKind == "disenchant" or lootKind == "container") and type(target) == "string" and target ~= "" then
+    local info = C_Item and C_Item.GetItemInfoInstant or GetItemInfoInstant
+    local ok, id = pcall(info or error, target)
+    itemId = ok and whole(id, 1, 10000000) or nil
+  end
   if not NAMED_KINDS[kind] or type(target) ~= "string" or target == "" or #target > 120 or targetPlayerNamed(target) then
     target = nil
   end
-  lastCast = { gatherKind = kind, name = target, at = now() }
+  lastCast = { gatherKind = kind, lootKind = lootKind, itemId = itemId, name = target, at = now(),
+    castGuid = spellId and type(a3) == "string" and a3 or nil }
+end
+
+-- True when a cast event is for the pending cast: by cast GUID where both have one, else any cast of the player's.
+local function pendingCast(castGuid)
+  if not lastCast then return false end
+  if lastCast.castGuid and type(castGuid) == "string" and castGuid:find("^Cast%-") then return lastCast.castGuid == castGuid end
+  return true
 end
 
 local function gatherContext()
@@ -231,6 +263,11 @@ local function gatherContext()
   local t = now()
   local window = cast.gatherKind == "fishing" and FISHING_WINDOW or GATHER_WINDOW
   if cast.at and t and t - cast.at > window then return nil end
+  -- A creature or item type needs the cast to have succeeded; an instant Pick Pocket may also count for 2 seconds
+  -- after it was sent. A cast that failed or was interrupted never gets here (it clears lastCast).
+  if cast.lootKind and not cast.succeeded and not (cast.lootKind == "pickpocket" and cast.at and t and t - cast.at <= 2) then
+    cast.lootKind, cast.itemId = nil, nil
+  end
   return cast
 end
 
@@ -297,39 +334,118 @@ local function rememberItem(itemId)
   })
 end
 
+-- The game's own "N Gold", "N Silver" and "N Copper" strings, as patterns, so a coin slot's text reads in any
+-- language; English where the client does not define them. A count may carry a thousands separator.
+local COIN_UNITS = { { "GOLD_AMOUNT", "%d Gold", 10000 }, { "SILVER_AMOUNT", "%d Silver", 100 }, { "COPPER_AMOUNT", "%d Copper", 1 } }
+local function coinPatterns()
+  local out = {}
+  for _, unit in ipairs(COIN_UNITS) do
+    local fmt = type(_G[unit[1]]) == "string" and _G[unit[1]] or unit[2]
+    out[#out + 1] = { fmt:gsub("[%^%$%(%)%.%[%]%*%+%-%?]", "%%%0"):gsub("%%d", "([%%d,%%.]+)"), unit[3] }
+  end
+  return out
+end
+
+-- The copper in loot slot i when it is the coin slot, read from the slot's text; nil for an item slot or a text
+-- that holds no amount.
+local function slotCopper(i, text)
+  local slotType = GetLootSlotType and select(2, pcall(GetLootSlotType, i))
+  if slotType ~= (Enum and Enum.LootSlotType and Enum.LootSlotType.Money or LOOT_SLOT_MONEY or 2) or type(text) ~= "string" then
+    return nil
+  end
+  local total = 0
+  for _, unit in ipairs(coinPatterns()) do
+    local digits = text:match(unit[1])
+    local amount = digits and tonumber((digits:gsub("%D", "")))
+    if amount then total = total + amount * unit[2] end
+  end
+  return total >= 1 and total <= 10000000000 and total or nil
+end
+
+-- The id of the item an item GUID names. The GUID itself does not hold it: the disenchant or lock cast read it
+-- from the target's name, and an item opened with no cast is looked up by its GUID. Nil when neither works.
+local function itemIdFromGuid(guid, cast)
+  if cast and cast.itemId and (cast.lootKind == "disenchant" or cast.lootKind == "container") then return cast.itemId end
+  if not C_Item then return nil end
+  if C_Item.GetItemIDByGUID then
+    local ok, id = pcall(C_Item.GetItemIDByGUID, guid)
+    if ok and whole(id, 1, 10000000) then return id end
+  end
+  if C_Item.GetItemLocation and C_Item.GetItemID then
+    local okLoc, location = pcall(C_Item.GetItemLocation, guid)
+    local ok, id = pcall(C_Item.GetItemID, location)
+    if okLoc and location and ok and whole(id, 1, 10000000) then return id end
+  end
+  return nil
+end
+
+-- What opened the window, from the source and the cast just before it. A creature's skinning window shares its
+-- GUID with the kill; an item is disenchanted or opened as a container.
+local function lootTypeOf(group, cast)
+  local lootKind, gatherKind = cast and cast.lootKind, cast and cast.gatherKind
+  if group.itemGuid then return lootKind == "disenchant" and "disenchant" or "container" end
+  if group.sourceObjectId then return gatherKind == "fishing" and "fishing" or "gather" end
+  if lootKind == "pickpocket" then return "pickpocket" end
+  if lootKind == "skinning" or gatherKind == "herb" or gatherKind == "ore" then return "skinning" end
+  return "kill"
+end
+
 local function lootCapture()
   -- Source pairs are GUID, quantity, GUID, quantity. Never infer loot from the target.
   if not (GetLootSourceInfo and GetLootSlotInfo and GetLootSlotLink) then return end
   local cast = gatherContext()
   EverlootDB.lootSources = EverlootDB.lootSources or {}
   local groups = {}
+  local function groupFor(guid)
+    local npcId, objectId = npcIdFromGuid(guid), objectIdFromGuid(guid)
+    local itemGuid = not npcId and not objectId and isItemGuid(guid) and guid or nil
+    if not (npcId or objectId or itemGuid) then return nil end
+    groups[guid] = groups[guid] or { sourceNpcId = npcId, sourceObjectId = objectId, itemGuid = itemGuid, items = {} }
+    return groups[guid]
+  end
   local n = GetNumLootItems and GetNumLootItems() or 0
   for i = 1, math.min(n, 50) do
     local okLink, link = pcall(GetLootSlotLink, i)
-    local okInfo, _, _, count = pcall(GetLootSlotInfo, i)
+    local okInfo, _, slotText, count = pcall(GetLootSlotInfo, i)
     if not okLink or not okInfo or type(link) ~= "string" then link = nil end
     local itemId = link and tonumber(link:match("item:(%d+)"))
-    if itemId and type(count) == "number" and count > 0 then
+    local copper = not link and okInfo and slotCopper(i, slotText) or nil
+    if (itemId and type(count) == "number" and count > 0) or copper then
       local sources = { pcall(GetLootSourceInfo, i) }
+      local coinSources, shared = {}, 0
       if sources[1] then
         for j = 2, #sources, 2 do
           local guid, quantity = sources[j], sources[j + 1]
-          local npcId = npcIdFromGuid(guid)
-          local objectId = objectIdFromGuid(guid)
-          if (npcId or objectId) and type(quantity) == "number" and quantity >= 1
-            and quantity <= 1000 and quantity == math.floor(quantity) then
-            local group = groups[guid] or { sourceNpcId = npcId, sourceObjectId = objectId, items = {} }
-            group.items[#group.items + 1] = { itemId = itemId, count = quantity }
-            groups[guid] = group
+          if copper then
+            local group = groupFor(guid)
+            if group and type(quantity) == "number" then coinSources[#coinSources + 1] = { group, quantity } end
+          elseif type(quantity) == "number" and quantity >= 1 and quantity <= 1000 and quantity == math.floor(quantity) then
+            local group = groupFor(guid)
+            if group then group.items[#group.items + 1] = { itemId = itemId, count = quantity } end
           end
         end
       end
-      rememberItem(itemId)
+      -- Coin shared by several sources is split only when the per-source amounts add up to the slot's.
+      for _, source in ipairs(coinSources) do shared = shared + source[2] end
+      if #coinSources == 1 then coinSources[1][1].copper = copper
+      elseif #coinSources > 1 and shared == copper then
+        for _, source in ipairs(coinSources) do source[1].copper = source[2] end
+      end
+      if itemId then rememberItem(itemId) end
     end
   end
   local where
   for guid, group in pairs(groups) do
-    if not EverlootDB.lootSources[guid] then
+    local lootType = lootTypeOf(group, cast)
+    -- Windows from before the type existed were keyed by the GUID alone, and were kill or gathering windows.
+    local skip = EverlootDB.lootSources[guid .. ":" .. lootType]
+      or (EverlootDB.lootSources[guid] and (lootType == "kill" or lootType == "gather" or lootType == "fishing"))
+    if group.itemGuid then group.sourceItemId = itemIdFromGuid(group.itemGuid, cast) end
+    -- An item whose id cannot be read, or a source with nothing in it, records nothing.
+    if (group.itemGuid and not group.sourceItemId) or (#group.items == 0 and not group.copper) then skip = true end
+    if not skip then
+      group.itemGuid = nil
+      group.lootType = lootType
       -- An object stays where it is: the player's position, how it was opened and its name go with it.
       if group.sourceObjectId then
         if where == nil then
@@ -342,10 +458,11 @@ local function lootCapture()
       group.installId = EverlootDB.installId
       group.capturedAt = date("!%Y-%m-%dT%H:%M:%SZ")
       group.sourceEvidence = "loot-api"
-      if E:Store("loot", group, nil, group.sourceObjectId and OBJECTS or CREATURES) then
-        -- Local-only corpse identity: retained across reloads, never exported as a row.
+      if E:Store("loot", group, nil, group.sourceItemId and ITEMS or group.sourceObjectId and OBJECTS or CREATURES) then
+        -- Local-only corpse identity, by GUID and loot type so a kill and a skinning window on one corpse are both
+        -- kept: retained across reloads, never exported as a row.
         -- Bounded by the same retained loot-row capacity; failures do not mark seen.
-        EverlootDB.lootSources[guid] = true
+        EverlootDB.lootSources[guid .. ":" .. lootType] = true
       end
     end
   end
@@ -514,7 +631,7 @@ E:RegisterModule("openworld", function()
   if EverlootDB.paused then EverlootDB.paused.npc_sighting, EverlootDB.paused.loot = nil, nil end
   for event in pairs(WINDOW_ROLES) do pcall(function() f:RegisterEvent(event) end) end
   for _, event in ipairs({ "PLAYER_INTERACTION_MANAGER_FRAME_SHOW", "UNIT_SPELLCAST_SENT", "UNIT_SPELLCAST_FAILED",
-    "UNIT_SPELLCAST_INTERRUPTED", "LOOT_CLOSED", "VIGNETTE_MINIMAP_UPDATED", "VIGNETTES_UPDATED", "PLAYER_LEAVING_WORLD",
+    "UNIT_SPELLCAST_FAILED_QUIET", "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_INTERRUPTED", "LOOT_CLOSED", "VIGNETTE_MINIMAP_UPDATED", "VIGNETTES_UPDATED", "PLAYER_LEAVING_WORLD",
     "PLAYER_ENTERING_WORLD", "ENCOUNTER_END" }) do
     pcall(function() f:RegisterEvent(event) end)
   end
@@ -524,7 +641,11 @@ E:RegisterModule("openworld", function()
     elseif event == "LOOT_OPENED" then lootCapture()
     elseif event == "QUEST_ACCEPTED" then questCapture(arg1, arg2)
     elseif event == "UNIT_SPELLCAST_SENT" then pcall(castSent, arg1, arg2, arg3, arg4)
-    elseif (event == "UNIT_SPELLCAST_FAILED" or event == "UNIT_SPELLCAST_INTERRUPTED") and arg1 == "player" then lastCast = nil
+    elseif (event == "UNIT_SPELLCAST_FAILED" or event == "UNIT_SPELLCAST_FAILED_QUIET" or event == "UNIT_SPELLCAST_INTERRUPTED")
+      and arg1 == "player" then
+      if pendingCast(arg2) then lastCast = nil end
+    elseif event == "UNIT_SPELLCAST_SUCCEEDED" and arg1 == "player" then
+      if pendingCast(arg2) then lastCast.succeeded = true end
     elseif event == "LOOT_CLOSED" then lastCast = nil
     elseif event == "VIGNETTE_MINIMAP_UPDATED" then if arg2 then pcall(vignetteSighting, arg1) end
     elseif event == "VIGNETTES_UPDATED" then pcall(vignettesUpdated)

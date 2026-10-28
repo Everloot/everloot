@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { GAME_VERSIONS, CURRENT_VERSION, versionLabel } from "@/lib/game-version";
 
-/** The version label next to the search ("Beta · 1.60.1"): a button that opens the list of versions. Only the current one can be chosen. */
+/** The version label next to the search ("Build 1.60.1"): a button that opens the list of versions. Only the current one can be chosen. */
 export default function GameVersionLabel({ className = "" }: { className?: string }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);

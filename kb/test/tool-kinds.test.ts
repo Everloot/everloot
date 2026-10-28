@@ -58,6 +58,8 @@ const EVERY_KIND = parseRecords([
   { ...base, eventId: "e:31", kind: "quest_owned", characterKey: "0a1b2c3d", class: "MAGE", level: 30, questIds: [7] },
   // Read by the market rollup, never by a corpus tool: no TOOL_KINDS entry lists it.
   { ...base, eventId: "e:23", kind: "auction_snapshot", realm: "Forever", scanId: "scan-1", part: 1, parts: 1, items: [[5, 1, 1, 10, 10]] },
+  // Read by the guild ladder through the host's guild reader (kb/src/guilds.ts), never by a corpus tool.
+  { ...base, eventId: "e:41", kind: "guild_kill", ...guild, faction: "horde", encounterId: 663, name: "Lucifron", instanceMapId: 409, difficulty: 9, size: 40 },
   // Census rows are published only as counts, never read by a corpus tool.
   { ...base, eventId: "e:32", kind: "census_self", guid: "Player-4395-0A1B2C3D", race: "Orc", class: "WARRIOR", level: 30, faction: "Horde", realm: "Forever" },
   // Player rows go to the player pages, never to a corpus tool.

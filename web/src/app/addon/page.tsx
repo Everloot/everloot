@@ -3,8 +3,10 @@ import Link from "next/link";
 import { pageMetadata } from "@/lib/seo";
 import { latestAddonRelease } from "@/lib/addon-release";
 import { addonReleaseFor, fetchReleases, fileSize, newestDesktopRelease, RELEASES_PAGE, servedFile } from "@/lib/everloot-releases";
+import { guildsOn } from "@/lib/guild-switch";
 import { REPO_URL } from "@/lib/source";
 import JsonLd from "@/components/JsonLd";
+import TrackedDownload from "@/components/TrackedDownload";
 import { softwareApplicationJsonLd } from "@/lib/jsonld";
 import { Badge, Card, Container, Disclosure, PageHeader, SectionHeading } from "@/components/ui";
 
@@ -15,7 +17,7 @@ export const metadata: Metadata = {
 // The Desktop App release is read from GitHub, so the page is rebuilt at most once an hour.
 export const revalidate = 3600;
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 const EXT = "noopener noreferrer";
 
 /** The Desktop App files the page offers, in this order, matched by the end of the artifact name. */
@@ -47,6 +49,9 @@ export default async function AddonPage() {
   const served = addon ? servedFile(zipHref) : null;
   const releases = await fetchReleases();
   const addonRelease = addon ? addonReleaseFor(releases, addon.version) : null;
+  const addonSums = served && addonRelease?.files.some((file) =>
+    file.name === zipName && file.size === served.size && file.sha256 === served.sha256,
+  ) ? addonRelease.sums : null;
   const desktop = newestDesktopRelease(releases);
   const desktopFiles = desktop
     ? DESKTOP_KINDS.flatMap((kind) => {
@@ -73,15 +78,16 @@ export default async function AddonPage() {
           <Card as="section" aria-labelledby="addon" className="space-y-6">
             <SectionHeading
               id="addon"
-              note={addon ? `Version ${addon.version}, beta${addonRelease ? `, released ${addonRelease.date}` : ""}. For the WoW: Forever client.` : undefined}
+              note={addon ? `Version ${addon.version}, Alpha${addonRelease ? `, released ${addonRelease.date}` : ""}. For the WoW: Forever client.` : undefined}
             >
               The addon
             </SectionHeading>
             {addon ? (
               <>
-                <a className="btn btn-primary" href={zipHref} download>
+                <TrackedDownload className="btn btn-primary" href={zipHref} addon="everloot" to="site" download>
                   Download addon {addon.version}{served ? ` (.zip, ${fileSize(served.size)})` : ""}
-                </a>
+                </TrackedDownload>
+                <p className="text-sm text-fg-2">Live-client verification is pending. This Alpha includes website talent and raid plan imports; use <code className="font-mono">/everloot</code> to open the planners.</p>
                 <div>
                   <SectionHeading as="h3">Install</SectionHeading>
                   <ol className="list-decimal space-y-1 pl-5 text-sm text-fg-2">
@@ -102,7 +108,7 @@ export default async function AddonPage() {
                 {served && (
                   <Disclosure summary="SHA-256 checksum">
                     <ul className="text-sm"><Checksum name={zipName} sha256={served.sha256} /></ul>
-                    {addonRelease?.sums && <p className="text-sm"><a className={link} href={addonRelease.sums} rel={EXT}>SHA256SUMS</a></p>}
+                    {addonSums && <p className="text-sm"><a className={link} href={addonSums} rel={EXT}>SHA256SUMS</a></p>}
                   </Disclosure>
                 )}
                 <p className="text-sm text-fg-2">
@@ -252,8 +258,11 @@ export default async function AddonPage() {
               install and says so once in chat: it counts the race, class, level and faction of characters you see, never a
               name. <code>/everloot census off</code> turns it off and deletes its rows. The players module is off
               until you type <code>/everloot players on</code>; when you turn it on, the addon records the name, realm,
-              race, class, level and guild of your own characters and of players you target, mouse over or group with.
-              Those rows can appear on the site&apos;s player pages, and any character can be hidden without an account.
+              race, class, level and guild of your own characters and of players you target, mouse over or group with,
+              and your own guild&apos;s boss kills (the guild, the boss and the time, no names).
+              {guildsOn()
+                ? " Those rows can appear on the site's player and guild pages, and any character or guild can be hidden without an account. "
+                : " The characters can appear on the site's player pages, and any character can be hidden without an account. The kills stay unpublished until the site turns its guild pages on. "}
               Read the{" "}
               <Link href="/privacy" className={link}>Privacy Policy</Link> and the{" "}
               <a className={link} href={`${REPO_URL}/blob/main/docs/DATA_POLICY.md`} rel={EXT}>data policy</a>.

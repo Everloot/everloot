@@ -6,6 +6,7 @@ import { TABLES, CURRENT_BUILD } from "@/data/game-data/raid";
 import nextConfig from "../../next.config.js";
 import { latestAddonRelease } from "./addon-release";
 import { trailFor } from "./breadcrumbs";
+import { CHAT_PROVIDERS } from "./chat/providers";
 import { raidTalentFacts } from "./raid-facts";
 
 test("the newest addon zip wins by version number, not by name order", () => {
@@ -40,6 +41,8 @@ test("breadcrumbs go from Home to the page and never through /tools", () => {
   expect(trailFor("/database/coverage")?.map((c) => c.path)).toEqual(["/", "/database", "/database/coverage"]);
   expect(trailFor("/database/download")?.map((c) => c.path)).toEqual(["/", "/database", "/database/download"]);
   expect(trailFor("/docs")).toEqual([{ name: "Home", path: "/" }, { name: "Docs", path: "/docs" }]);
+  expect(trailFor("/tools/builds")).toEqual([{ name: "Home", path: "/" }, { name: "Plans on this device", path: "/tools/builds" }]);
+  expect(trailFor("/tools/alts")).toEqual([{ name: "Home", path: "/" }, { name: "Alts on this device", path: "/tools/alts" }]);
   for (const path of ["/tools/talents", "/tools/raid", "/lore/npcs", "/database/drops", "/map", "/changes"]) {
     expect(trailFor(path)!.some((c) => c.path === "/tools"), path).toBe(false);
   }
@@ -72,6 +75,8 @@ test("every response carries the security headers; the CSP enforces only the plu
   for (const host of ["static.cloudflareinsights.com", "www.googletagmanager.com", "eu.i.posthog.com", "pagead2.googlesyndication.com"]) expect(csp).toContain(host);
   // The talent calculator fetches its asset manifest from the asset host.
   expect(csp).toMatch(/connect-src [^;]*https:\/\/assets\.everloot\.app/);
-  // /chat calls the player's own provider from the page.
-  expect(csp).toMatch(/connect-src [^;]*https:\/\/api\.anthropic\.com [^;]*https:\/\/openrouter\.ai [^;]*http:\/\/localhost:11434/);
+  // /chat calls the player's own provider from the page: every provider the browser may call is listed, so the
+  // report-only policy stays quiet and would not break chat if it were enforced.
+  const connect = csp.match(/connect-src ([^;]*)/)![1].split(" ");
+  for (const p of CHAT_PROVIDERS) expect(connect).toContain(new URL(p.baseUrl).origin);
 });

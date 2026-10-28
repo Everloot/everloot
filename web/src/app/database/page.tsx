@@ -16,6 +16,7 @@ import { asOfLine, EVIDENCE_KEY } from "@/lib/evidence";
 import { loadSpellNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";
 import { datasetJsonLd } from "@/lib/jsonld";
+import { LAUNCH, LAUNCH_AT, longDate } from "@/data/wow-forever";
 
 const TITLE = "WoW Forever Database";
 const description = "Loot-window observations, NPC sightings, quests and vendors for WoW: Forever, from addon uploads. Public facts need corroborated install reports.";
@@ -29,13 +30,14 @@ export const dynamic = "force-dynamic";
 const n = (x: number) => x.toLocaleString("en-US");
 
 /** One block of the browse index: a heading with its count, then its links, 13 px on 26 px lines. */
-function Block({ heading, href, count, links }: { heading: string; href?: string; count?: ReactNode; links: { href: string; label: string; count?: ReactNode }[] }) {
+function Block({ heading, href, count, note, links }: { heading: string; href?: string; count?: ReactNode; note?: string; links: { href: string; label: string; count?: ReactNode }[] }) {
   return (
     <section className="mb-6 break-inside-avoid">
       <h2 className="flex items-baseline justify-between gap-3 text-cell font-semibold text-fg">
         {href ? <Link href={href} className="hover:text-accent">{heading}</Link> : heading}
         {count !== undefined && <span className="text-meta font-normal tabular-nums text-muted">{count}</span>}
       </h2>
+      {note && <p className="mt-1 text-meta text-muted">{note}</p>}
       {links.length > 0 && (
         <ul className="mt-1">
           {links.map((l) => (
@@ -100,7 +102,8 @@ export default async function DatabasePage() {
         />
 
         <nav aria-label="Browse the database" className="mt-6 columns-2 gap-x-8 sm:columns-3 lg:columns-4">
-          <Block heading="Seen by players" links={players} />
+          {/* Before launch every count here is empty; one line says why rather than a column of blanks. */}
+          <Block heading="Seen by players" note={Date.now() < Date.parse(LAUNCH_AT) ? `The addon starts recording when the game launches on ${longDate(LAUNCH.date)}.` : undefined} links={players} />
           <Block heading="All items" href="/database/items" count={n(T.items.length)} links={[]} />
           {classes.map((c) => (
             <Block
@@ -125,7 +128,7 @@ export default async function DatabasePage() {
             ))}
           </dl>
           <p className="mt-3 text-sm text-fg-2">
-            The method behind every count is on the <Link href="/methodology" className="text-accent hover:underline underline-offset-4">methodology page</Link>.
+            The method behind every count is on the <Link href="/methodology" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">methodology page</Link>.
           </p>
         </section>
       </article>

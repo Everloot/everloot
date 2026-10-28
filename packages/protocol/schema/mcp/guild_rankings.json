@@ -1,0 +1,184 @@
+{
+  "$id": "https://everloot.app/schema/mcp/guild_rankings.json",
+  "title": "Guild ladder for one raid or dungeon",
+  "description": "Every guild with an agreed kill in one instance, ordered by bosses killed, then by who reached its latest kill first, then by name; equal rows share a rank. A kill is a guild's once 2 of its members' installs report the same boss there, timed at the earliest report, or once its officers published it through the guild board, which carries no time. The boss list and its order are the encounters 3 installs reported in that instance; a kill of a boss not on it counts for nothing. There is no score, no rating and no total across instances. Without an instance, the newest raid with a kill is ranked; realm and faction narrow the ladder. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.",
+  "annotations": {
+    "readOnlyHint": true,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "instanceMapId": {
+        "description": "The instance's map id, as instance_entrance carries it. Omit for the newest raid with a kill.",
+        "type": "integer",
+        "exclusiveMinimum": 0,
+        "maximum": 9007199254740991
+      },
+      "realm": {
+        "description": "Only guilds on this realm.",
+        "type": "string",
+        "maxLength": 60
+      },
+      "faction": {
+        "description": "Only alliance or horde guilds.",
+        "type": "string",
+        "enum": [
+          "alliance",
+          "horde"
+        ]
+      },
+      "limit": {
+        "default": 20,
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    }
+  },
+  "outputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "connected": {
+        "type": "boolean",
+        "description": "False when no corpus was read; the page is then absent, which is not a measured zero."
+      },
+      "dataAsOf": {
+        "description": "The corpus snapshot time, or null when unrecorded.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "reason": {
+        "description": "Why nothing was read, when connected is false.",
+        "type": "string"
+      },
+      "url": {
+        "description": "The everloot.app page that shows this answer, absolute. Absent when there is no such page or it would be empty.",
+        "type": "string"
+      },
+      "page": {
+        "type": "object",
+        "properties": {
+          "instance": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "instanceMapId": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "instanceMapId",
+                  "name"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The instance ranked; null when no instance has an agreed kill."
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "rank": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991,
+                  "description": "Equal kills and latest-kill time share a rank."
+                },
+                "guildName": {
+                  "type": "string"
+                },
+                "realm": {
+                  "type": "string"
+                },
+                "faction": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "alliance",
+                        "horde"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "killed": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "bosses": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "latestKillAt": {
+                  "description": "When the guild's latest kill in this instance was first reported, ISO; null when only the officers published it.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "membersSeen": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "rank",
+                "guildName",
+                "realm",
+                "faction",
+                "killed",
+                "bosses",
+                "latestKillAt",
+                "membersSeen"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "instance",
+          "rows"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "connected",
+      "dataAsOf"
+    ],
+    "additionalProperties": false
+  },
+  "x-everloot-output": {
+    "type": "text",
+    "endsWith": "Licence: CC BY-SA 4.0. Credit: Everloot contributors, https://everloot.app"
+  }
+}

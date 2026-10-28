@@ -1,4 +1,5 @@
-import { API_ROUTES, API_SCHEMAS, MCP_TOOL_NAMES, PROTOCOL_VERSION } from "@everloot/protocol";
+import { API_ROUTES, API_SCHEMAS, PROTOCOL_VERSION } from "@everloot/protocol";
+import { liveToolNames } from "@/lib/guild-switch";
 import { expect, test } from "vitest";
 import { GET } from "@/app/api/openapi.json/route";
 import { openApiDocument } from "./openapi";
@@ -48,7 +49,8 @@ test("query parameters, operation ids and tags are well formed", () => {
   }
   const corpus = doc.paths["/api/corpus/public"].get;
   expect(corpus.parameters?.map((p) => p.name)).toEqual(["kinds", "offset", "limit"]);
-  expect(doc["x-everloot"].mcp.tools).toEqual(MCP_TOOL_NAMES);
+  expect(doc["x-everloot"].mcp.tools).toEqual(liveToolNames());
+  expect(doc["x-everloot"].mcp.tools).not.toContain("guild_search");
 });
 
 test("the route serves the document as cacheable JSON that round-trips", async () => {

@@ -214,7 +214,7 @@ lua.execute("""
 SlashCmdList.EVERLOOT('selftest')
 local st = EverlootDB.selftest
 assert(st and st.failed == 0 and st.passed >= 20, 'healthy client: ' .. table.concat(st.results, '\\n'))
-assert(st.addonVersion == '0.3.10' and st.clientBuild == '1.60.1.70450' and st.at)
+assert(st.addonVersion == Everloot.VERSION and st.clientBuild == '1.60.1.70450' and st.at)
 local text = table.concat(st.results, '\\n')
 for _, expected in ipairs({ 'PASS C_Traits.GenerateImportString', 'PASS C_ClassTalents.ImportLoadout exists', 'PASS group 1 (active) loadout export',
   'PASS group 2 reads', 'PASS group 1 (active) export spec id', 'PASS group 1 (active) node order', 'INFO serialization version: 2',

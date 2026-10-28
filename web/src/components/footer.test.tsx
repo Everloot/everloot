@@ -10,11 +10,18 @@ vi.mock("next/link", () => ({
 vi.mock("./CookieConsent", () => ({ CookiePreferencesButton: () => <button type="button">Cookie preferences</button> }));
 
 import Footer from "./Footer";
-import { TRADEMARK_LINE } from "@/lib/jsonld";
+import { NON_AFFILIATION, TRADEMARK_LINE } from "@/lib/jsonld";
 
 afterEach(() => { vi.unstubAllEnvs(); });
 
 const html = () => renderToStaticMarkup(<Footer />);
+
+test("links the four verified social profiles on desktop and mobile", () => {
+  const markup = html();
+  for (const href of ["https://x.com/WowEverloot", "https://www.facebook.com/WowEverloot", "https://www.instagram.com/woweverloot/", "https://www.pinterest.com/woweverloot/"]) {
+    expect(markup.split(`href="${href}"`).length - 1, href).toBe(2);
+  }
+});
 const text = () => html().replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ");
 
 function sourceHref(): string | undefined {
@@ -54,9 +61,11 @@ test("one site-wide credit line, linked to the full credits on /methodology", ()
   expect(html()).toMatch(/<p data-site-credit[^>]*>[\s\S]*href="\/methodology#credits"[\s\S]*<\/p>/);
 });
 
-test("carries the full Blizzard trademark sentence", () => {
-  expect(text()).toContain(TRADEMARK_LINE);
-  expect(TRADEMARK_LINE).toContain("registered trademarks of Blizzard Entertainment, Inc.");
+test("links the full trademark notice and credits instead of repeating them on every page", () => {
+  expect(html()).toContain('href="/terms#trademarks"');
+  expect(html()).toContain('href="/methodology#credits"');
+  expect(text()).not.toContain(TRADEMARK_LINE);
+  expect(text()).not.toContain(NON_AFFILIATION);
 });
 
 test("links How we count and the Discord invite", () => {
@@ -95,8 +104,8 @@ test("is compact: two rows, no four-column block", () => {
 test("keeps every link the four-column footer had", () => {
   const markup = html();
   const before = [
-    "/database", "/map", "/changes", "/lore", "/addons",
-    "/addon", "/upload", "/docs", "/methodology", "https://github.com/Everloot/everloot/blob/main/docs/DATA_POLICY.md", "/changes/feed.xml",
+    "/database", "/map", "/changes", "/news", "/lore", "/addons",
+    "/addon", "/upload", "/docs", "/methodology", "https://github.com/Everloot/everloot/blob/main/docs/DATA_POLICY.md", "/changes/feed.xml", "/news/feed.xml",
     "/about", "/contact", "https://discord.gg/9CKsbHTRu3", "https://github.com/Everloot/everloot",
     "https://github.com/Everloot/everloot/blob/main/CONTRIBUTING.md", "/security",
     "/privacy", "/terms", "/privacy#choices", "/terms#takedown", "/terms#trademarks", "/accessibility",
@@ -113,6 +122,7 @@ test("Glint perches on the footer's edge as a labelled button, his drawing hidde
 
 test("says when the beta ends and when the game launches", () => {
   const t = text();
-  expect(t).toContain("The beta runs until October 21, 2026");
+  // The beta's last day has passed, so the sentence is in the past; the launch is still ahead.
+  expect(t).toContain("The beta ran until October 23, 2026");
   expect(t).toContain("the game launches November 4, 2026");
 });

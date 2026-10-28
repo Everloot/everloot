@@ -14,7 +14,31 @@ build that has a zip in the repository. Earlier builds have none.
 
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
+### Added
+- Site and MCP: racial traits from the game files (build-stamped `races.json`, found in game files, unconfirmed).
+  Each class page lists, under "Who can be a {Class}", every race's traits with active or passive and the short
+  text; `/wow-forever` adds a trait table per faction. New MCP tool `class_races` (protocol 1.20.0): the races that
+  can be a class per faction, with trait names and no game text; the chat uses it for builds questions.
+- Site: **Copy for addon** on both planners, exporting the selected talent set or planned raid code.
+- Site: a news section. Posts are Markdown files under `kb/news/` with front matter (`npm run kb -- news-check`
+  runs in CI), written in the wiki's syntax so they link database entities and wiki pages the same way. Published
+  posts appear at `/news` and `/news/<slug>` with Article structured data, in the `/news/feed.xml` RSS feed, in the
+  sitemap and in llms.txt; a draft is built nowhere. Blizzard's own posts stay on `/changes`, which the hub links.
+- Site, behind `EVERLOOT_GUILDS` (off): `/guilds`, a ladder per raid from the kills two members' installs agree on
+  (bosses killed, then first to the latest kill; no score), with guild search and realm and faction filters;
+  `/guilds/<realm>/<guild>` with progression per instance, the officers' roster and the characters seen in the guild
+  (labelled as sightings), activity and a hide form that works without an account. MCP `guild_search` and
+  `guild_rankings`, and `guild_board` gains the ladder side; the open data export gains `guild-kills.ndjson` and
+  `guilds.ndjson`. Migration `20261025120000_guilds.sql`, applied by hand before the switch goes on.
+- Site: `/tools/collections` opens on a completionist overview, a "Total complete" bar and one bar per category
+  from the agreed lists, with done, missing and started views and a "remember this character" helper on the browser.
+- Site: `/tools/gold-ledger` reads `Everloot.lua` in the browser, nothing sent: characters, the last 30 days of money
+  in and out, this week, categories, receipts and gold history. The published ledgers stay below.
+
 ### Changed
+- Site and Desktop App: Ollama suggests one small model, `qwen3:4b` (2.5 GB, calls tools), instead of `qwen3:8b`, and
+  says what running a model on your own computer means: private and free, slower, and it uses your memory while it
+  answers. The free cloud models stay the first choice.
 - Knowledge base: `entities.name_norm` stores each name's words as the search re-rank reads them, with an index on
   `(name_norm, kind)`. The exact-name lookup reads it instead of scanning every row through `lower(replace(...))`,
   and now matches non-ASCII capitals and punctuation the SQL expression missed. A punctuated name with stopwords
@@ -61,9 +85,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   form. The search index stays off for now, so the pages are reached by name and are not listed anywhere.
 
 ### Added
-- Desktop app: a Stop button on the Chat page while an answer is being written. It ends the request to the
-  provider (Anthropic or an OpenAI-compatible server) and any tool calls still to come; the question and the text
-  that had arrived stay in the transcript, marked "Stopped", and a screen reader hears "Stopped".
 - Site: the open data export, at `/database/download`. The published data as NDJSON files anyone can download
   and build on, under CC BY-SA 4.0: what three installs agree on, and the game files' own layer, with a
   manifest that says the build, the date the data was current, the method, the row count of every file and
@@ -81,8 +102,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   are uploaded, never the rows.
 - Knowledge base: the settled list, one list per client build of the facts three players confirmed and two
   more agreed on, and the uploaders that stop sending what is already settled. The site's copy is served at
-  `/api/coverage/settled`; the Desktop App keeps it beside its sent log, refreshes it once a day, and says
-  how many rows it skipped. The server-side tally of the extra agreement is behind a switch that stays off
+  `/api/coverage/settled`. The server-side tally of the extra agreement is behind a switch that stays off
   until the data policy says how it is published.
 - Site and MCP server: a `coverage` tool, the same counts as the coverage page as text, per zone and per
   type. The public tool list is 29 tools; the directory submissions carry the older count until they are
@@ -114,10 +134,39 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
   instead of withdrawing the event as a conflict. The map shows none of this yet.
 
+## [0.3.12] - 2026-10-24
+
+Release channel: Alpha
+
+Live-client verification is pending. This is a pre-release for WoW: Forever 1.60.1, not a verified stable build.
+
+### Added
+- While `/everloot players` is on, a boss kill inside a dungeon or raid with your character in a guild writes a
+  `guild_kill` row: guild, realm, faction, encounter, instance and time, never a character name. At most 60 a UTC
+  day; `/everloot players off` deletes them with the player rows. The players module now also reads
+  `UnitFactionGroup` (the guild's faction) and `GetInstanceInfo` (the instance the kill was in), on your own
+  character only. The site's guild ladder, built from these rows, stays off until its switch is turned on.
+  Design: `docs/design/specs/2026-10-24-guild-board-design.md`.
+
+## [0.3.11] - 2026-10-24
+
+Release channel: Alpha
+
+Live-client verification is pending. This is a pre-release for WoW: Forever 1.60.1, not a verified stable build.
+
+### Added
+- A Talents / Raid workspace opened with `/everloot` or the minimap. Build on the website, choose
+  **Copy for addon**, then paste into the matching tab and choose **Import**.
+- Talent progress, next-point guidance and click-through highlights, with one Everloot window at a time.
+- Raid plan imports compare class counts by group beside the current roster's buff check. Plans stay local;
+  the addon cannot identify players from a plan or verify their talent choices. No points are spent or players moved.
+- Copy imported plans or the current raid back to the website. Right-click the minimap button for settings.
+
 ### Fixed
-- Desktop app: on the Chat page, a screen reader hears "Copied" or "Copy failed" after Copy, and the button keeps
-  saying it for the full second and a half even when the thread is redrawn, as when a new question goes out.
-  Clear is off while an answer is being written, so the question can no longer be cleared out from under it.
+- Mail collection stops retain an unresolved money transfer until its event or timeout clears it. An early
+  restart asks for another click rather than automatically taking the same pending money again.
+- Planner links handle saved builds, second-set-only links and differing game builds; damaged imports keep
+  the last valid plan. Workspace preference survives reloads without opening a second guide panel.
 
 ## [0.3.10] - 2026-10-23
 
@@ -192,6 +241,28 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   off until `/everloot census on`. The Desktop App sends census rows with its uploads when the player leaves
   the census box ticked on its setup screen, or turns it on in Settings; a setup finished before this keeps
   it off. Still never names, guilds, gear or places, and the site shows only totals.
+
+## [desktop-v0.1.7] - 2026-10-24
+
+### Added
+- A Stop button ends the current chat request and any tool calls still to come. The question and text already
+  received stay in the transcript, marked "Stopped", and a screen reader hears "Stopped".
+- Chat shares the site's provider and model catalogue, reads model lists from the configured provider, and
+  falls back to the catalogue when that provider cannot be reached.
+- The prices file includes public drop rates beside market prices, refreshed at most once a day. With that
+  file in the game, addon tooltips can show up to three sources under the usual three-install agreement rule.
+
+### Changed
+- The app keeps the settled-facts list beside its sent log, refreshes it once a day, skips rows that are already
+  settled, and reports how many it skipped.
+
+### Fixed
+- A screen reader hears "Copied" or "Copy failed" after Copy. The button keeps its feedback for the full second
+  and a half even when the thread redraws. Clear is disabled while an answer is being written.
+
+### Security
+- Update Electron to 44.9.1, including its compromised-certificate mitigation.
+- Update the locked body-parser and fast-uri dependencies to their patched releases.
 
 ## [desktop-v0.1.6] - 2026-10-21
 

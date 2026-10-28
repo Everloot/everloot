@@ -2,9 +2,11 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { testKey } from "@/lib/chat/agent";
+import { providerStorage } from "@/lib/chat/provider-session";
 import { inkOn, listModels } from "@/lib/chat/catalogue";
 import { CHAT_PROVIDERS, chatProvider, type ChatModel, type ChatProviderKind, type ChatProviderPreset } from "@/lib/chat/providers";
 import { loadProviders, maskKey, recordCheck, removeProvider, saveProvider, setDefault, setModel, type SavedProvider } from "@/lib/chat/store";
+import { crossesDocumentBoundary } from "@/lib/document-boundary";
 
 const field = "w-full rounded-control border border-edge bg-canvas px-3 py-2 text-fg placeholder:text-muted focus:border-accent";
 const small = "btn min-h-11 px-3 text-sm";
@@ -85,7 +87,7 @@ function ModelPicker({ preset, models, value, onPick, name }: { preset: ChatProv
         <div className="flex flex-wrap gap-2">
           <input id={models.length ? `${id}-other` : `${id}-model`} name={name ? `${name}Text` : undefined} spellCheck={false} value={text}
             aria-label={models.length ? `${label} id` : label} onChange={(e) => setText(e.target.value)}
-            className={`${field} min-w-0 flex-1`} placeholder={models.length ? "A model id from the provider" : "The model you pulled, like qwen3:8b"} />
+            className={`${field} min-w-0 flex-1`} placeholder={models.length ? "A model id from the provider" : "The model you pulled, like qwen3:4b"} />
           {onPick && <button type="button" className={small} onClick={() => onPick(text.trim())}>Use model</button>}
         </div>
       )}
@@ -157,7 +159,7 @@ function ProviderCard({ preset, saved, isDefault, busy, onSave, onTest, onRemove
       )}
 
       <p className="text-xs text-muted">
-        <a href={preset.getKey.href} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline underline-offset-4">
+        <a href={preset.getKey.href} target="_blank" rel="noopener noreferrer" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">
           {preset.getKey.text}<span className="sr-only"> (opens in a new tab)</span>
         </a>
         {" · "}{preset.dataNote}
@@ -169,7 +171,7 @@ function ProviderCard({ preset, saved, isDefault, busy, onSave, onTest, onRemove
 /**
  * The Chat keys section of /account: one card per provider Chat supports, each with its key's status, its model and
  * Add, Replace, Test and Remove, and the default provider Chat uses. Everything is read from and written to this
- * browser's localStorage (lib/chat/store.ts); nothing here talks to Everloot. Test sends the key to its own
+ * tab's sessionStorage (lib/chat/store.ts); nothing here talks to Everloot. Test sends the key to its own
  * provider only.
  */
 export default function ChatKeys() {
@@ -178,8 +180,13 @@ export default function ChatKeys() {
   const [testing, setTesting] = useState<ChatProviderKind | null>(null);
   const legend = useId();
 
-  // localStorage only exists in the browser; read it after the first render.
-  useEffect(() => { setProviders(loadProviders(localStorage)); }, []);
+  // localStorage only exists in the browser; read it after the first render. Not in a document that came with
+  // a public page's policy: DocumentBoundary reloads it first.
+  useEffect(() => {
+    if (crossesDocumentBoundary(window.location.pathname)) return;
+    try { setProviders(loadProviders(providerStorage())); }
+    catch { setStatus("Chat keys could not move to this tab. Allow browser storage and reload before saving a key."); }
+  }, []);
 
   function attempt(action: () => string): boolean {
     try { setStatus(action()); return true; } catch (e) { setStatus(e instanceof Error ? e.message : String(e)); return false; }
@@ -191,9 +198,9 @@ export default function ChatKeys() {
     const saved = providers.find((p) => p.kind === kind);
     const model = saved?.model ?? (text("model") === OTHER || !text("model") ? text("modelText") : text("model"));
     return attempt(() => {
-      const next = saveProvider(localStorage, { kind, model, key: text("key") }, { asDefault: false });
+      const next = saveProvider(providerStorage(), { kind, model, key: text("key") }, { asDefault: false });
       setProviders(next);
-      return `${providerName(kind)} saved in this browser.${next[0].kind === kind ? ` Chat uses ${next[0].model}.` : ""}`;
+      return `${providerName(kind)} saved in this tab.${next[0].kind === kind ? ` Chat uses ${next[0].model}.` : ""}`;
     });
   }
 
@@ -202,10 +209,10 @@ export default function ChatKeys() {
     setStatus(`Testing ${providerName(p.kind)}…`);
     try {
       const said = await testKey(chatProvider(p.kind)!, p.model, p.key);
-      setProviders(recordCheck(localStorage, p.kind, true));
+      setProviders(recordCheck(providerStorage(), p.kind, true));
       setStatus(said);
     } catch (e) {
-      setProviders(recordCheck(localStorage, p.kind, false));
+      setProviders(recordCheck(providerStorage(), p.kind, false));
       setStatus(e instanceof Error ? e.message : String(e));
     } finally {
       setTesting(null);
@@ -224,8 +231,8 @@ export default function ChatKeys() {
         <ProviderCard preset={preset} saved={saved} isDefault={!!saved && active?.kind === preset.kind} busy={testing !== null}
           onSave={(form) => onSave(preset.kind, form)}
           onTest={() => void onTest(saved!)}
-          onRemove={() => attempt(() => { setProviders(removeProvider(localStorage, preset.kind)); return `${providerName(preset.kind)} removed from this browser.`; })}
-          onModel={(model) => attempt(() => { setProviders(setModel(localStorage, preset.kind, model)); return `${providerName(preset.kind)} uses ${model}.`; })} />
+          onRemove={() => attempt(() => { setProviders(removeProvider(providerStorage(), preset.kind)); return `${providerName(preset.kind)} removed from this tab.`; })}
+          onModel={(model) => attempt(() => { setProviders(setModel(providerStorage(), preset.kind, model)); return `${providerName(preset.kind)} uses ${model}.`; })} />
       </li>
     );
   };
@@ -233,9 +240,11 @@ export default function ChatKeys() {
   return (
     <div className="space-y-4 text-sm">
       <p className="text-fg-2">
-        Chat answers with your own model. Your keys are kept in this browser only and go from here straight to the
-        provider; Everloot&apos;s servers never receive them. Another browser or device needs its own key, and clearing
-        this site&apos;s data in your browser removes them.
+        Everloot search is free and needs no key. Add a model here only if you want AI-written answers: it runs on
+        your own provider account, so that provider&apos;s pricing and limits apply, and some models have a limited
+        free tier. A ChatGPT or Claude subscription is not an API key. Your keys are kept in this tab only and go
+        from here straight to the provider; Everloot&apos;s servers never receive them. Closing the tab forgets them.
+        Another tab, another device or the Desktop App needs its own setup; conversation history stays in this browser.
       </p>
 
       {providers.length > 0 && (
@@ -246,7 +255,7 @@ export default function ChatKeys() {
             {providers.map((p) => (
               <label key={p.kind} className="flex min-h-11 items-center gap-2 text-fg">
                 <input type="radio" name={`${legend}-default`} className="size-5" checked={active?.kind === p.kind}
-                  onChange={() => attempt(() => { setProviders(setDefault(localStorage, p.kind)); return `Chat now uses ${providerName(p.kind)}, ${p.model}.`; })} />
+                  onChange={() => attempt(() => { setProviders(setDefault(providerStorage(), p.kind)); return `Chat now uses ${providerName(p.kind)}, ${p.model}.`; })} />
                 {providerName(p.kind)} <span className="text-muted">· {p.model}</span>
               </label>
             ))}

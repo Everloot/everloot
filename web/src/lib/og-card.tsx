@@ -56,12 +56,23 @@ export async function renderBuildCard(card: { label: string; title: string; colo
 }
 
 /**
- * A text-only social card on the brand canvas: the diamond mark, a small label, the page title and one
- * line under it. Nothing from the game, so no Blizzard art can end up in a shared link.
+ * How the card draws a title whose length the page does not set (a guide's, up to 90 characters): the full size over
+ * two lines when it is short, a smaller one over three when it is not, and an ellipsis past those lines. Either way
+ * the title stays clear of the line under it.
  */
-export async function renderCard(card: { label: string; title: string; subtitle: string }): Promise<ImageResponse> {
+export function fittedTitle(title: string): { fontSize: number; lines: number } {
+  return title.length <= 40 ? { fontSize: 84, lines: 2 } : { fontSize: 64, lines: 3 };
+}
+
+/**
+ * A text-only social card on the brand canvas: the diamond mark, a small label, the page title and one
+ * line under it. Nothing from the game, so no Blizzard art can end up in a shared link. `fit` bounds the title
+ * (fittedTitle); without it the title is drawn at full size as it is.
+ */
+export async function renderCard(card: { label: string; title: string; subtitle: string; fit?: boolean }): Promise<ImageResponse> {
   const [bold, regular] = await Promise.all([readFile(join(fonts, "Geist-Bold.ttf")), readFile(join(fonts, "Geist-Regular.ttf"))]);
   const c = tokens.dark;
+  const fit = card.fit ? fittedTitle(card.title) : null;
   return new ImageResponse(
     (
       <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", padding: "80px", background: c.canvas, color: c.fg, fontFamily: "Geist" }}>
@@ -71,7 +82,7 @@ export async function renderCard(card: { label: string; title: string; subtitle:
           </svg>
           <div style={{ fontSize: 40, fontWeight: 700, color: c.accent }}>{card.label}</div>
         </div>
-        <div style={{ fontSize: 84, fontWeight: 700, letterSpacing: -2, marginTop: 40, lineHeight: 1.05 }}>{card.title}</div>
+        <div style={{ fontSize: fit?.fontSize ?? 84, fontWeight: 700, letterSpacing: -2, marginTop: 40, lineHeight: 1.05, ...(fit ? { display: "block", lineClamp: fit.lines } : {}) }}>{card.title}</div>
         <div style={{ fontSize: 36, marginTop: 28, color: c["fg-2"] }}>{card.subtitle}</div>
         <div style={{ fontSize: 28, marginTop: 56, color: c.muted }}>everloot.app</div>
       </div>

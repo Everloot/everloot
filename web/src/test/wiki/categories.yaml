@@ -4,6 +4,7 @@ place:
   westfall: Westfall
 kind:
   dungeons: Dungeons
+  raids: Raids
   zones: Zones
   concepts: Concepts
 theme: {}

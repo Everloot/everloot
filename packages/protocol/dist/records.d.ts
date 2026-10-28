@@ -10,7 +10,7 @@ import { z } from "zod";
  * the generated JSON Schema's description, so a reader of the schema files knows the server checks them.
  */
 export declare const RULES: {
-    readonly loot: readonly ["loot needs a source: npc or object", "a loot position needs mapId, x and y together"];
+    readonly loot: readonly ["loot needs a source: npc, object or item", "a loot position needs mapId, x and y together"];
     readonly achievement_catalog: readonly ["criteria cannot outnumber criteriaCount"];
     readonly achievement_owned: readonly ["quantity and required come together", "quantity cannot exceed required", "criteriaMet cannot exceed criteriaTotal", "only a completed achievement has a date", "earnedOn is a real calendar date"];
     readonly reputation_owned: readonly ["floor cannot exceed ceiling"];
@@ -31,6 +31,8 @@ export declare const QUEST_TAGS: readonly ["group", "dungeon", "raid", "pvp"];
 export declare const NPC_ROLES: readonly ["vendor", "trainer", "questgiver", "flightmaster", "banker", "auctioneer", "stablemaster", "innkeeper", "repair"];
 /** How an object was opened, from the spell the player cast on it. */
 export declare const GATHER_KINDS: readonly ["herb", "ore", "chest", "fishing", "other"];
+/** What opened a loot window, from the spell cast just before it and the kind of source (loot tables spec, section 4). */
+export declare const LOOT_TYPES: readonly ["kill", "pickpocket", "skinning", "gather", "disenchant", "container", "fishing"];
 export declare const npcSighting: z.ZodObject<{
     installId: z.ZodString;
     eventId: z.ZodOptional<z.ZodString>;
@@ -94,6 +96,17 @@ export declare const lootWindow: z.ZodObject<{
     kind: z.ZodLiteral<"loot">;
     sourceNpcId: z.ZodOptional<z.ZodNumber>;
     sourceObjectId: z.ZodOptional<z.ZodNumber>;
+    sourceItemId: z.ZodOptional<z.ZodNumber>;
+    lootType: z.ZodOptional<z.ZodEnum<{
+        container: "container";
+        disenchant: "disenchant";
+        fishing: "fishing";
+        gather: "gather";
+        kill: "kill";
+        pickpocket: "pickpocket";
+        skinning: "skinning";
+    }>>;
+    copper: z.ZodOptional<z.ZodNumber>;
     sourceEvidence: z.ZodOptional<z.ZodLiteral<"loot-api">>;
     items: z.ZodArray<z.ZodObject<{
         itemId: z.ZodNumber;
@@ -780,6 +793,29 @@ export declare const playerSeen: z.ZodObject<{
 }, z.core.$strip>;
 /** The player-page kind. Never part of the public corpus; intake writes it to the players table, not to the upload. */
 export declare const PLAYER_KINDS: readonly string[];
+/**
+ * The guild kill kind. Stored with the upload, never served raw: it is not on the public corpus allowlist, and
+ * only the guild rollup (2 installs, hidden guilds out, behind the switch) publishes kills.
+ */
+export declare const GUILD_KILL_KINDS: readonly string[];
+/** One boss kill as a member's client saw it, credited to that member's own guild. */
+export declare const guildKill: z.ZodObject<{
+    installId: z.ZodString;
+    eventId: z.ZodOptional<z.ZodString>;
+    capturedAt: z.ZodString;
+    kind: z.ZodLiteral<"guild_kill">;
+    guildName: z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>;
+    realm: z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>;
+    faction: z.ZodEnum<{
+        alliance: "alliance";
+        horde: "horde";
+    }>;
+    encounterId: z.ZodNumber;
+    name: z.ZodString;
+    instanceMapId: z.ZodNumber;
+    difficulty: z.ZodOptional<z.ZodNumber>;
+    size: z.ZodOptional<z.ZodNumber>;
+}, z.core.$strip>;
 /** A link code as the site shows it: EL-, four characters, a hyphen and two more, from Crockford's base 32 alphabet. */
 export declare const LINK_CODE: z.ZodString;
 /** One of your own characters, written when you type `/everloot link <code>` on it. */
@@ -868,6 +904,17 @@ export declare const recordSchemas: {
         kind: z.ZodLiteral<"loot">;
         sourceNpcId: z.ZodOptional<z.ZodNumber>;
         sourceObjectId: z.ZodOptional<z.ZodNumber>;
+        sourceItemId: z.ZodOptional<z.ZodNumber>;
+        lootType: z.ZodOptional<z.ZodEnum<{
+            container: "container";
+            disenchant: "disenchant";
+            fishing: "fishing";
+            gather: "gather";
+            kill: "kill";
+            pickpocket: "pickpocket";
+            skinning: "skinning";
+        }>>;
+        copper: z.ZodOptional<z.ZodNumber>;
         sourceEvidence: z.ZodOptional<z.ZodLiteral<"loot-api">>;
         items: z.ZodArray<z.ZodObject<{
             itemId: z.ZodNumber;
@@ -1433,6 +1480,23 @@ export declare const recordSchemas: {
         guid: z.ZodString;
         completionKey: z.ZodString;
     }, z.core.$strip>;
+    readonly guild_kill: z.ZodObject<{
+        installId: z.ZodString;
+        eventId: z.ZodOptional<z.ZodString>;
+        capturedAt: z.ZodString;
+        kind: z.ZodLiteral<"guild_kill">;
+        guildName: z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>;
+        realm: z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>;
+        faction: z.ZodEnum<{
+            alliance: "alliance";
+            horde: "horde";
+        }>;
+        encounterId: z.ZodNumber;
+        name: z.ZodString;
+        instanceMapId: z.ZodNumber;
+        difficulty: z.ZodOptional<z.ZodNumber>;
+        size: z.ZodOptional<z.ZodNumber>;
+    }, z.core.$strip>;
 };
 export type RecordKind = keyof typeof recordSchemas;
 export declare const ALL_RECORD_KINDS: RecordKind[];
@@ -1499,6 +1563,17 @@ export declare const anyRecord: z.ZodDiscriminatedUnion<[z.ZodObject<{
     kind: z.ZodLiteral<"loot">;
     sourceNpcId: z.ZodOptional<z.ZodNumber>;
     sourceObjectId: z.ZodOptional<z.ZodNumber>;
+    sourceItemId: z.ZodOptional<z.ZodNumber>;
+    lootType: z.ZodOptional<z.ZodEnum<{
+        container: "container";
+        disenchant: "disenchant";
+        fishing: "fishing";
+        gather: "gather";
+        kill: "kill";
+        pickpocket: "pickpocket";
+        skinning: "skinning";
+    }>>;
+    copper: z.ZodOptional<z.ZodNumber>;
     sourceEvidence: z.ZodOptional<z.ZodLiteral<"loot-api">>;
     items: z.ZodArray<z.ZodObject<{
         itemId: z.ZodNumber;
@@ -2026,6 +2101,22 @@ export declare const anyRecord: z.ZodDiscriminatedUnion<[z.ZodObject<{
     }>;
     guid: z.ZodString;
     completionKey: z.ZodString;
+}, z.core.$strip>, z.ZodObject<{
+    installId: z.ZodString;
+    eventId: z.ZodOptional<z.ZodString>;
+    capturedAt: z.ZodString;
+    kind: z.ZodLiteral<"guild_kill">;
+    guildName: z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>;
+    realm: z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>;
+    faction: z.ZodEnum<{
+        alliance: "alliance";
+        horde: "horde";
+    }>;
+    encounterId: z.ZodNumber;
+    name: z.ZodString;
+    instanceMapId: z.ZodNumber;
+    difficulty: z.ZodOptional<z.ZodNumber>;
+    size: z.ZodOptional<z.ZodNumber>;
 }, z.core.$strip>], "kind">;
 export type IntakeRecord = z.infer<typeof anyRecord>;
 /**

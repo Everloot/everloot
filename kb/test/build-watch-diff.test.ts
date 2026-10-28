@@ -207,6 +207,7 @@ describe("rendering", () => {
     expect(body).toContain("Battle Shout: party -> raid");
     expect(body).toContain("#31");
     expect(body).toContain("blue tracker");
+    expect(body).toContain("asset URL setting points at it");
   });
 
   it("lists map changes and added classes as spoilers", () => {

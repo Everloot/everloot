@@ -11,7 +11,7 @@ const KIND_LABEL: Record<FamilyFact["kind"], string> = {
   sighting: "Name sighted",
 };
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 export function generateStaticParams() {
   return FAMILIES.map((family) => ({ slug: family.slug }));
@@ -45,7 +45,7 @@ export default async function GuildFamilyPage(props: { params: Promise<{ slug: s
   const answer = (value: "answers" | "refused") => (value === "answers" ? "Answers" : "Refused");
 
   return (
-    <Container width="wide">
+    <Container width="data">
       <article>
         <PageHeader
           trail={[{ name: "Home", path: "/" }, { name: `${family.name} family`, path: `/guilds/${family.slug}` }]}

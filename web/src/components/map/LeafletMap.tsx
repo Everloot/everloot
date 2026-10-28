@@ -8,7 +8,10 @@ import { useEffect, useRef } from "react";
 import {
   labelFontPx, placeLabels, zoneArtShown, type ArtImage, type Box, type InitialView, type LabelCandidate, type MapArtLayer, type MapItems, type MapZone,
 } from "@/lib/map-view";
+import { pinIconUrl, pinMarkHtml, type PinKind, type PoiIcons } from "@/lib/map-marks";
 import { reducedMotion } from "@/lib/motion";
+import { MOTION } from "@/design/tokens";
+import { artHandoff } from "./art-handoff";
 
 /** Where the reader's deep link points: a ring on the spot. */
 export interface MapMarker { x: number; y: number; label: string }
@@ -26,6 +29,8 @@ export interface LeafletMapProps {
   zones: MapZone[];
   art: MapArtLayer | null;
   showArt: boolean;
+  /** The game's minimap icons by legend category; a pin whose category has none is drawn as a glyph. */
+  icons: PoiIcons;
   selectedId: string | null;
   marker: MapMarker | null;
   /** Where to open: a box to fit, or a centre and a zoom from the address. */
@@ -45,8 +50,19 @@ const ll = (x: number, y: number) => L.latLng(-y, x);
 const bounds = (b: Box) => L.latLngBounds(ll(b.x, b.y + b.height), ll(b.x + b.width, b.y));
 const box = (b: L.LatLngBounds): Box => ({ x: b.getWest(), y: -b.getNorth(), width: b.getEast() - b.getWest(), height: b.getNorth() - b.getSouth() });
 
-function pinIcon(kind: string, selected: boolean) {
-  return L.divIcon({ className: `wm-pin wm-pin-${kind}${selected ? " wm-selected" : ""}`, html: "<span></span>", iconSize: [26, 26], iconAnchor: [13, 13] });
+function pinIcon(kind: PinKind, selected: boolean, icons: PoiIcons) {
+  const image = pinIconUrl(kind, icons) !== null;
+  return L.divIcon({
+    className: `wm-pin wm-pin-${kind}${image ? " wm-pin-img" : ""}${selected ? " wm-selected" : ""}`,
+    html: pinMarkHtml(kind, icons), iconSize: [26, 26], iconAnchor: [13, 13],
+  });
+}
+
+/** The name a pin shows on hover (and on a tap, before its card). Text, never markup: names come from uploads too. */
+function tooltipFor(name: string): HTMLElement {
+  const el = document.createElement("span");
+  el.textContent = name;
+  return el;
 }
 
 function labelIcon(l: LabelCandidate) {
@@ -98,11 +114,14 @@ export default function LeafletMap(props: LeafletMapProps) {
     const p = live.current, pins = markers.current, art = artLayers.current;
     const m = L.map(el, {
       crs: L.CRS.Simple, zoomSnap: 0.25, zoomDelta: 0.5, wheelPxPerZoomLevel: 90, maxZoom: MAX_ZOOM, minZoom: -8,
-      attributionControl: false, zoomControl: false, maxBoundsViscosity: 1, zoomAnimation: !reducedMotion(), markerZoomAnimation: false,
+      attributionControl: false, zoomControl: false, maxBoundsViscosity: 1, zoomAnimation: !reducedMotion(), markerZoomAnimation: !reducedMotion(),
     });
     map.current = m;
     const pad = Math.max(p.base.width, p.base.height) * 0.02;
-    const limit = bounds({ x: p.base.x - pad, y: p.base.y - pad, width: p.base.width + 2 * pad, height: p.base.height + 2 * pad });
+    // With the continent's picture the frame is bounded by the picture, which is larger than the zones' box, and is
+    // always filled by it. Without one, the whole zones' box fits and the panel colour shows around it.
+    const picture = p.art?.continent ?? null;
+    const limit = picture ? bounds(picture) : bounds({ x: p.base.x - pad, y: p.base.y - pad, width: p.base.width + 2 * pad, height: p.base.height + 2 * pad });
     m.setMaxBounds(limit);
     zoomButtons(m).addTo(m);
     m.getContainer().setAttribute("role", "group");
@@ -124,7 +143,7 @@ export default function LeafletMap(props: LeafletMapProps) {
       const { x, y } = m.getSize();
       // A box with no size yet (hidden, or mid-resize) has no zoom that fits.
       if (!x || !y) return m.getMinZoom();
-      const min = m.getBoundsZoom(limit, false);
+      const min = m.getBoundsZoom(limit, Boolean(picture));
       if (Number.isFinite(min)) m.setMinZoom(min);
       return m.getMinZoom();
     };
@@ -157,17 +176,44 @@ export default function LeafletMap(props: LeafletMapProps) {
       for (const l of placeLabels(out, v, px, fontPx)) L.marker(ll(l.x, l.y), { icon: labelIcon(l), interactive: false, keyboard: false }).addTo(g.labels);
     };
 
-    // Which of the game's zone pictures to show at this zoom and place; the continent's own is laid once.
+    let zoneImage: ArtImage | null = null;
+    const zoneArt = artHandoff((key) => {
+      const a = zoneImage!;
+      const layer = L.imageOverlay(key, bounds(a), { pane: "art", interactive: false, alt: "", opacity: 0, className: "wm-zone-art" });
+      const ready = new Promise<void>((resolve, reject) => {
+        layer.once("load", () => {
+          const image = layer.getElement();
+          if (image?.decode) image.decode().then(resolve, resolve);
+          else resolve();
+        });
+        layer.once("error", reject);
+      });
+      layer.addTo(groups.current!.art);
+      return { layer, ready };
+    }, (layer, previous) => {
+      layer.bringToFront();
+      // Commit the hidden state before starting the fade, including a browser-cached image.
+      const image = layer.getElement();
+      if (image) getComputedStyle(image).opacity;
+      layer.setOpacity(1);
+      previous?.setOpacity(0);
+    }, (layer) => { layer.off(); groups.current?.art.removeLayer(layer); }, reducedMotion() ? 0 : MOTION.duration.fade);
+
+    // The continent stays underneath; only its detail image gets softened edges and a load-ready handoff.
     resync.current = () => {
       const g = groups.current, now = live.current;
       if (!g) return;
       const wanted = new Map<string, ArtImage>();
+      zoneImage = null;
       if (now.art && now.showArt) {
         const v = view();
         const camera = { zoom: Math.max(1, now.base.width / v.width), cx: v.x + v.width / 2, cy: v.y + v.height / 2 };
         if (now.art.continent) wanted.set(`c-${now.art.continent.url}`, now.art.continent);
-        for (const z of zoneArtShown(now.art, camera, v)) wanted.set(`${z.uiMapId}-${z.url}`, z);
+        const zones = zoneArtShown(now.art, camera, v);
+        if (now.art.continent) zoneImage = zones[0] ?? null;
+        else for (const z of zones) wanted.set(`${z.uiMapId}-${z.url}`, z);
       }
+      zoneArt.set(zoneImage?.url ?? null);
       for (const [key, layer] of artLayers.current) if (!wanted.has(key)) { g.art.removeLayer(layer); artLayers.current.delete(key); }
       for (const [key, a] of wanted) {
         if (artLayers.current.has(key)) continue;
@@ -184,8 +230,13 @@ export default function LeafletMap(props: LeafletMapProps) {
       live.current.onView({ x: c.lng, y: -c.lat, zoom: m.getZoom() });
     });
     m.on("resize", () => { fitMin(); relabel.current(); resync.current(); });
-    m.on("mousemove", (e: L.LeafletMouseEvent) => live.current.onHover({ x: e.latlng.lng, y: -e.latlng.lat }));
-    m.on("mouseout", () => live.current.onHover(null));
+    let hoverFrame = 0;
+    let hoverPoint: { x: number; y: number } | null = null;
+    m.on("mousemove", (e: L.LeafletMouseEvent) => {
+      hoverPoint = { x: e.latlng.lng, y: -e.latlng.lat };
+      if (!hoverFrame) hoverFrame = requestAnimationFrame(() => { hoverFrame = 0; live.current.onHover(hoverPoint); });
+    });
+    m.on("mouseout", () => { cancelAnimationFrame(hoverFrame); hoverFrame = 0; live.current.onHover(null); });
     m.on("click", (e: L.LeafletMouseEvent) => {
       const now = live.current, x = e.latlng.lng, y = -e.latlng.lat;
       // The smallest zone under the click: zoom to it from afar, drop a point once already close.
@@ -203,6 +254,8 @@ export default function LeafletMap(props: LeafletMapProps) {
     p.onView({ x: c.lng, y: -c.lat, zoom: m.getZoom() });
     return () => {
       observer.disconnect();
+      cancelAnimationFrame(hoverFrame);
+      zoneArt.set(null);
       m.remove();
       map.current = null;
       groups.current = null;
@@ -228,18 +281,19 @@ export default function LeafletMap(props: LeafletMapProps) {
     for (const l of props.items.flightLines) {
       L.polyline(l.points.map(([x, y]) => ll(x, y)), { pane: "flights", weight: 1.5, className: "wm-flight-line", interactive: false, smoothFactor: 0 }).addTo(g.flights);
     }
-    const add = (id: string, x: number, y: number, kind: string) => {
-      const mk = L.marker(ll(x, y), { icon: pinIcon(kind, id === live.current.selectedId), keyboard: false, riseOnHover: true });
+    const add = (id: string, x: number, y: number, kind: PinKind, name: string) => {
+      const mk = L.marker(ll(x, y), { icon: pinIcon(kind, id === live.current.selectedId, props.icons), keyboard: false, riseOnHover: true });
+      mk.bindTooltip(tooltipFor(name), { direction: "top", offset: [0, -12], className: "wm-tooltip", opacity: 1 });
       mk.on("click", () => live.current.onSelect(id));
       mk.addTo(g.pins);
       markers.current.set(id, mk);
     };
-    for (const e of props.items.entrances) add(`e${e.id}`, e.x, e.y, e.raid ? "raid" : "dungeon");
-    for (const f of props.items.flightMasters) add(f.id, f.x, f.y, "flight");
-    for (const p of props.items.pins) add(p.id, p.x, p.y, p.kind);
-    for (const t of props.items.treasures) add(t.id, t.x, t.y, "chest");
+    for (const e of props.items.entrances) add(`e${e.id}`, e.x, e.y, e.raid ? "raid" : "dungeon", e.names.join(", "));
+    for (const f of props.items.flightMasters) add(f.id, f.x, f.y, "flight", f.name);
+    for (const p of props.items.pins) add(p.id, p.x, p.y, p.kind, p.name ?? `NPC ${p.npcId}`);
+    for (const t of props.items.treasures) add(t.id, t.x, t.y, "chest", t.name ?? `Object ${t.objectId}`);
     relabel.current();
-  }, [props.items]);
+  }, [props.items, props.icons]);
 
   // The selected pin is drawn bigger.
   useEffect(() => {

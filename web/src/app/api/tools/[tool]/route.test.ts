@@ -62,6 +62,12 @@ test("numbers and booleans are read from their text; strings stay strings", () =
   expect(argumentsFromQuery("item_page", new URLSearchParams("itemId=abc"))).toEqual({ itemId: "abc" });
 });
 
+test("a choice from a fixed list matches without regard to case; anything off the list stays as written", () => {
+  expect(argumentsFromQuery("search_knowledge", new URLSearchParams("query=x&version=Classic"))).toEqual({ query: "x", version: "classic" });
+  expect(argumentsFromQuery("search_knowledge", new URLSearchParams("query=x&version=+FOREVER+"))).toEqual({ query: "x", version: "forever" });
+  expect(argumentsFromQuery("search_knowledge", new URLSearchParams("query=x&version=World+of+Warcraft"))).toEqual({ query: "x", version: "World of Warcraft" });
+});
+
 test("a wrong argument is a 400 that names it, an unknown tool a 404 that lists the tools, a missing release a 503", async () => {
   const bad = await get("item_page", "?itemId=abc");
   expect(bad.status).toBe(400);
@@ -77,11 +83,23 @@ test("a wrong argument is a 400 that names it, an unknown tool a 404 that lists 
   expect((await gone.json()).error).toContain("unrecorded, not zero");
 });
 
+test("the guild ladder's tools are unknown with EVERLOOT_GUILDS off, and answer under their schema with it on", async () => {
+  const off = await get("guild_rankings");
+  expect(off.status).toBe(404);
+  expect((await off.json()).error.split("Tools: ")[1]).not.toMatch(/guild_(search|rankings)/);
+  vi.stubEnv("EVERLOOT_GUILDS", "1");
+  const on = toolAnswerResponse.parse(await (await get("guild_rankings")).json());
+  expect(z.object(MCP_TOOLS.guild_rankings.outputSchema).parse(on.answer)).toMatchObject({ connected: true, page: { instance: null, rows: [] } });
+  expect(on.text).toContain("No instance has an agreed kill yet.");
+  const search = toolAnswerResponse.parse(await (await get("guild_search", "?query=night")).json());
+  expect(z.object(MCP_TOOLS.guild_search.outputSchema).parse(search.answer)).toMatchObject({ connected: true, page: { guilds: [] } });
+});
+
 test("my_builds is unknown with the switch off, and with it on answers for the session without the public quota", async () => {
   vi.stubEnv("EVERLOOT_DATA_GUARD", "1");
   const off = await get("my_builds");
   expect(off.status).toBe(404);
-  expect((await off.json()).error).toBe(`No tool named my_builds. Tools: ${MCP_TOOL_NAMES.join(", ")}.`);
+  expect((await off.json()).error).toBe(`No tool named my_builds. Tools: ${MCP_TOOL_NAMES.filter((n) => n !== "guild_search" && n !== "guild_rankings").join(", ")}.`);
   vi.stubEnv("EVERLOOT_SAVED_BUILDS", "1");
   auth.getUser.mockResolvedValue(null);
   const signedOut = await get("my_builds");

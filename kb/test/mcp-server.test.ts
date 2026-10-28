@@ -15,7 +15,11 @@ import {
   handleGetByName,
   handleGetEntity,
   handleSearch,
+  registeredToolNames,
+  searchHits,
+  SOME_WORDS,
 } from "../src/mcp-server.js";
+import type { GuildReader } from "../src/guilds.js";
 import { CREDIT_LINE, MCP_CREDIT } from "@everloot/protocol";
 
 const UNAVAILABLE_TEXT = "Public corpus unavailable. These figures are unrecorded, not zero.";
@@ -49,6 +53,16 @@ test("search handler answers questions and shows provenance", async () => {
 
 test("search handler says so when nothing matches", async () => {
   expect(handleSearch(await seed(), { query: "xyznothinghere", limit: 8 })).toContain("No matches");
+});
+
+test("search handler falls back to pages with some of the words, and says so first", async () => {
+  // Found live: "whats the best racial class for warlock on horde" matched no page, so the chat had nothing.
+  const db = await seed();
+  const text = handleSearch(db, { query: "best sword Thunderfury", limit: 8 });
+  expect(text.startsWith(SOME_WORDS)).toBe(true);
+  expect(text).toContain("Thunderfury, Blessed Blade");
+  expect(searchHits(db, { query: "best sword Thunderfury", limit: 8 }).map((h) => h.name)[0]).toBe("Thunderfury, Blessed Blade");
+  expect(handleSearch(db, { query: "Thunderfury", limit: 8 })).not.toContain(SOME_WORDS);
 });
 
 test("get_entity handler returns the row or names the missing id", async () => {
@@ -219,7 +233,7 @@ test("the stdio server reuses a corpus read for the snapshot interval, then read
   } finally { cachePublicCorpus(0); vi.useRealTimers(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); }
 });
 
-test("tools/list is exactly the protocol's tool table, in order, with its input shapes", async () => {
+test("tools/list is exactly the protocol's tool table, in order, with its input shapes (the guild ladder's two only with a guild reader)", async () => {
   const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
   const { InMemoryTransport } = await import("@modelcontextprotocol/sdk/inMemory.js");
   const { MCP_TOOL_NAMES, MCP_TOOLS } = await import("@everloot/protocol");
@@ -230,7 +244,9 @@ test("tools/list is exactly the protocol's tool table, in order, with its input 
   const client = new Client({ name: "test", version: "0" });
   await client.connect(clientSide);
   const listed = (await client.listTools()).tools;
-  expect(listed.map((t) => t.name)).toEqual(MCP_TOOL_NAMES);
+  expect(listed.map((t) => t.name)).toEqual(MCP_TOOL_NAMES.filter((name) => name !== "guild_search" && name !== "guild_rankings"));
+  expect(registeredToolNames()).toHaveLength(MCP_TOOL_NAMES.length - 2);
+  expect(registeredToolNames({ guilds: {} as GuildReader })).toEqual(MCP_TOOL_NAMES);
   for (const tool of listed) {
     const expected = z.toJSONSchema(z.object(MCP_TOOLS[tool.name as keyof typeof MCP_TOOLS].inputSchema), { io: "input" }) as { properties?: Record<string, unknown>; required?: string[] };
     expect(Object.keys(tool.inputSchema.properties ?? {}).sort()).toEqual(Object.keys(expected.properties ?? {}).sort());

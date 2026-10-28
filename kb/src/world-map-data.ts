@@ -16,6 +16,12 @@
  * - TaxiNodes, TaxiPath, TaxiPathNode: flight masters (a node with a flight to or from it), and each
  *   flight's line through its path points. Boats and zeppelins are paths that start or end at "Transport"
  *   stand-in nodes (some hop to another continent), not at a dock, so they are left out for now.
+ * - MapDifficulty, ContentTuning, LFGDungeons: the level of each dungeon and raid. MapDifficulty names an instance's
+ *   ContentTuning row by `MapID`; ContentTuning holds `MinLevelSquish` and `MaxLevelSquish`. For an instance with no
+ *   tuning in MapDifficulty (the raids), the LFGDungeons row with exactly the instance's name gives its tuning
+ *   (LFGDungeons has no `MapID` in this build). An instance the files give no level for has none here.
+ * - Difficulty: the build's own difficulty names and group sizes, by id ("Normal", "40 Player"); MapDifficulty
+ *   joins each instance map to the difficulties it has. Both default to empty in older committed files.
  * - AreaTable and TerrainArea (derived at extraction, terrain-area.ts): the zone each entrance and flight master
  *   is in. An area's `ParentAreaID` chain reaches the area a zone's UiMapAssignment names (`AreaID`). For an
  *   entrance, the area that starts the chain is the outdoor area named after the instance on the entrance's
@@ -31,7 +37,7 @@ import { TERRAIN_AREA_TABLE, terrainAreaAt } from "./terrain-area.js";
 
 export const WORLD_MAP_SCHEMA = "everloot.world-map/1";
 /** Tables this file is built from. */
-export const WORLD_MAP_TABLES = ["Map", "UiMap", "UiMapAssignment", "TaxiNodes", "TaxiPath", "TaxiPathNode", "AreaTable", TERRAIN_AREA_TABLE] as const;
+export const WORLD_MAP_TABLES = ["Map", "UiMap", "UiMapAssignment", "TaxiNodes", "TaxiPath", "TaxiPathNode", "AreaTable", "MapDifficulty", "ContentTuning", "LFGDungeons", TERRAIN_AREA_TABLE] as const;
 
 /**
  * Zones of the original world, as numbered by their UiMap ids (1411 to 1458). Zones with later ids are
@@ -61,10 +67,18 @@ export const WorldMapData = z.object({
   zones: z.array(ZoneRow),
   /** Zones with later UiMap ids: Forever additions that may be unreleased. Shown only when the reader turns spoilers on. */
   heldBackZones: z.array(ZoneRow).default([]),
+  /** The difficulties the build's Difficulty table names ("Normal", "40 Player"), by id, with the group size. Older committed files, and tests, may lack the record. */
+  difficulties: z.record(z.string(), z.object({
+    name: z.string(), minPlayers: z.number().int().optional(), maxPlayers: z.number().int().optional(),
+  })).optional(),
   /** `uiMapId`, here and on flight masters: the zone the game files put the spot in (see the header). Absent when they give none. */
   entrances: z.array(z.object({
     mapId: z.number().int(), name: z.string(), raid: z.boolean(), continentId: z.number().int(), worldX: z.number(), worldY: z.number(),
     uiMapId: z.number().int().optional(),
+    /** The level range the game files give the instance (ContentTuning); both absent when they give none. Equal when it is one level. */
+    minLevel: z.number().int().optional(), maxLevel: z.number().int().optional(),
+    /** The difficulties the game files give the instance (MapDifficulty), the files' own names. Absent when they give none. */
+    difficultyIds: z.array(z.number().int()).optional(),
   })),
   /** Flight masters: the taxi nodes that a flight starts or ends at (TaxiNodes). World yards, as everything else here. */
   flightNodes: z.array(z.object({
@@ -148,6 +162,34 @@ export function zoneOfNamedArea(instance: Record<string, unknown>, continentId: 
   return found.size === 1 ? [...found][0]! : null;
 }
 
+/**
+ * The level range of each instance map (by map id) the game files give: its ContentTuning row, named by MapDifficulty
+ * or, failing that, by the LFGDungeons row with exactly the map's name. A map whose rows name different ranges, or whose
+ * range is not 1 to 255, has none.
+ */
+export function instanceLevels(maps: Rows, difficulties: Rows | undefined, tuning: Rows | undefined, lfg: Rows | undefined): Map<number, { min: number; max: number }> {
+  const out = new Map<number, { min: number; max: number }>();
+  if (!tuning) return out;
+  const rangeOf = (ids: Iterable<unknown>): { min: number; max: number } | null => {
+    const seen = new Map<string, { min: number; max: number }>();
+    for (const id of ids) {
+      const t = tuning.get(Number(id)), min = num(t?.MinLevelSquish), max = num(t?.MaxLevelSquish);
+      if (min !== null && max !== null && min >= 1 && max >= min && max <= 255) seen.set(`${min}-${max}`, { min, max });
+    }
+    return seen.size === 1 ? [...seen.values()][0]! : null;
+  };
+  const byMap = new Map<number, unknown[]>();
+  for (const d of difficulties?.values() ?? []) if (d.ContentTuningID) byMap.set(Number(d.MapID), [...(byMap.get(Number(d.MapID)) ?? []), d.ContentTuningID]);
+  const byName = new Map<string, unknown[]>();
+  for (const l of lfg?.values() ?? []) if (l.ContentTuningID && typeof l.Name_lang === "string") byName.set(l.Name_lang.trim(), [...(byName.get(l.Name_lang.trim()) ?? []), l.ContentTuningID]);
+  for (const m of maps.values()) {
+    const name = typeof m.MapName_lang === "string" ? m.MapName_lang.trim() : "";
+    const range = rangeOf(byMap.get(Number(m.ID)) ?? []) ?? (name ? rangeOf(byName.get(name) ?? []) : null);
+    if (range) out.set(Number(m.ID), range);
+  }
+  return out;
+}
+
 export function buildWorldMapData(
   get: (table: string) => Rows | undefined,
   source: WorldMapData["source"],
@@ -187,12 +229,39 @@ export function buildWorldMapData(
   heldBackZones.sort((a, b) => a.uiMapId - b.uiMapId);
   if (heldBackZones.length) warnings.push(`${heldBackZones.length} zone(s) with later UiMap ids are held back as possibly unreleased`);
 
+  // The build's own difficulty names and group sizes, by id (Difficulty; 22 rows in the 70630 build).
+  const difficulties: WorldMapData["difficulties"] = {};
+  for (const d of get("Difficulty")?.values() ?? []) {
+    const id = num(d.ID);
+    const name = typeof d.Name_lang === "string" ? d.Name_lang.trim() : "";
+    if (id === null || !name) continue;
+    const min = num(d.MinPlayers) ?? undefined, max = num(d.MaxPlayers) ?? undefined;
+    difficulties[id] = { name, ...(min !== undefined || max !== undefined ? { minPlayers: min, maxPlayers: max } : {}) };
+  }
+  // Each instance's difficulties: the MapDifficulty rows of its map id, distinct and ordered.
+  const difficultiesOfMap = new Map<number, number[]>();
+  for (const d of get("MapDifficulty")?.values() ?? []) {
+    const mapId = num(d.MapID), difficultyId = num(d.DifficultyID);
+    if (mapId === null || difficultyId === null) continue;
+    const list = difficultiesOfMap.get(mapId);
+    if (list && !list.includes(difficultyId)) list.push(difficultyId);
+    else if (!list) difficultiesOfMap.set(mapId, [difficultyId]);
+  }
+  for (const list of difficultiesOfMap.values()) list.sort((a, b) => a - b);
+
+  const levels = instanceLevels(maps, get("MapDifficulty"), get("ContentTuning"), get("LFGDungeons"));
   const entrances: WorldMapData["entrances"] = [];
   for (const m of maps.values()) {
     const kind = m.InstanceType, at = pair(m.Corpse), name = m.MapName_lang;
     if ((kind !== 1 && kind !== 2) || !at || typeof name !== "string" || /^<unused>/i.test(name.trim())) continue;
     if (!continentIds.has(Number(m.CorpseMapID)) || (at[0] === 0 && at[1] === 0)) continue;
-    entrances.push({ mapId: Number(m.ID), name, raid: kind === 2, continentId: Number(m.CorpseMapID), worldX: round(at[0]), worldY: round(at[1]) });
+    const level = levels.get(Number(m.ID));
+    const difficultyIds = difficultiesOfMap.get(Number(m.ID));
+    entrances.push({
+      mapId: Number(m.ID), name, raid: kind === 2, continentId: Number(m.CorpseMapID), worldX: round(at[0]), worldY: round(at[1]),
+      ...(level ? { minLevel: level.min, maxLevel: level.max } : {}),
+      ...(difficultyIds?.length ? { difficultyIds } : {}),
+    });
   }
   entrances.sort((a, b) => a.mapId - b.mapId);
 
@@ -227,7 +296,7 @@ export function buildWorldMapData(
     warnings.push("no terrain areas in the snapshot: entrances and flight masters are placed by zone rectangles, which overlap");
   }
 
-  return WorldMapData.parse({ schema: WORLD_MAP_SCHEMA, source, continents, zones, heldBackZones, entrances, flightNodes, flightPaths, warnings });
+  return WorldMapData.parse({ schema: WORLD_MAP_SCHEMA, source, continents, zones, heldBackZones, difficulties, entrances, flightNodes, flightPaths, warnings });
 }
 
 /** Taxi nodes that are not flight masters: test targets, transport (boat and zeppelin) stand-ins, a ferry, quest-only paths, retired rows. */

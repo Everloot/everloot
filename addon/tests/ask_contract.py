@@ -66,4 +66,66 @@ printed = {}
 Everloot:InitModules()
 assert(not string.find(table.concat(printed, '\\n'), 'Warchief'), 'an answer is shown once')
 """)
-print("Lua 5.1 ask: /ask stores bounded questions, verified answers show once, bad checksums are refused")
+# A full queue refuses the new question and keeps every waiting one: an unanswered question is never dropped to
+# make room, because its answer could then never be matched.
+lua.execute("""
+EverlootDB.asks = {}
+EverlootAnswersDB = {}
+printed = {}
+for i = 1, 20 do SLASH_ASK('question ' .. i) end
+assert(#EverlootDB.asks == 20, 'twenty questions fit; got ' .. #EverlootDB.asks)
+counter = EverlootDB.askCounter
+ids = {}
+for i, ask in ipairs(EverlootDB.asks) do ids[i] = ask.id end
+printed = {}
+SLASH_ASK('question 21')
+assert(#EverlootDB.asks == 20, 'the 21st question is refused; got ' .. #EverlootDB.asks)
+for i, ask in ipairs(EverlootDB.asks) do
+  assert(ask.id == ids[i] and ask.question == 'question ' .. i, 'every waiting question survives; slot ' .. i .. ' is ' .. tostring(ask.question))
+end
+assert(EverlootDB.askCounter == counter, 'a refused question uses no id')
+local said = table.concat(printed, '\\n')
+assert(not string.find(said, 'saved'), 'a refused question is not reported as saved: ' .. said)
+assert(string.find(said, '20 questions', 1, true) and string.find(said, 'waiting', 1, true) and string.find(said, '/reload', 1, true) and string.find(said, 'ask again', 1, true), 'the refusal says what to do: ' .. said)
+""")
+lua.execute(f"""
+-- A bad checksum frees nothing: that answer was never shown.
+EverlootAnswersDB = {{ [ids[1]] = {{ answer = "Tampered.", source = "none", answeredAt = "x", sum = 1 }} }}
+Everloot:InitModules()
+assert(#EverlootDB.asks == 20, 'a failed checksum keeps its slot; got ' .. #EverlootDB.asks)
+printed = {{}}
+SLASH_ASK('question 21')
+assert(#EverlootDB.asks == 20 and string.find(table.concat(printed, '\\n'), '20 questions', 1, true), 'still refused')
+-- A verified answer frees exactly one slot, and the next question then fits behind the others.
+EverlootAnswersDB = {{ [ids[1]] = {{ answer = "Done.", source = "none", answeredAt = "x", sum = {adler32("Done.")} }} }}
+Everloot:InitModules()
+assert(#EverlootDB.asks == 19 and EverlootDB.asks[1].id == ids[2], 'the answered question leaves; got ' .. #EverlootDB.asks)
+printed = {{}}
+SLASH_ASK('question 21')
+assert(#EverlootDB.asks == 20 and EverlootDB.asks[20].question == 'question 21' and EverlootDB.asks[1].id == ids[2], 'the freed slot takes the new question')
+assert(string.find(table.concat(printed, '\\n'), 'question saved', 1, true), 'and it is saved')
+""")
+# A price question needs a realm. The ask carries the one the player is on, so "price 2589" can be answered;
+# an ask made where the game gives no usable realm name stays as it was, and the companion asks which realm.
+lua.execute("""
+EverlootDB.asks = {}
+EverlootAnswersDB = {}
+SLASH_ASK('before the realm is known')
+assert(EverlootDB.asks[1].realm == nil, 'no GetRealmName: the ask has no realm')
+GetRealmName = function() return 'Forever' end
+SLASH_ASK('price 2589')
+assert(EverlootDB.asks[2].realm == 'Forever', 'the ask carries the realm the player is on; got ' .. tostring(EverlootDB.asks[2].realm))
+GetRealmName = function() return "  Dawn's Reach  " end
+SLASH_ASK('price 2589 again')
+assert(EverlootDB.asks[3].realm == "Dawn's Reach", 'the realm is trimmed; got ' .. tostring(EverlootDB.asks[3].realm))
+for i, bad in ipairs({ '', 'X', string.rep('a', 41), 'Fore\\nver', 'a|cffff0000b' }) do
+  GetRealmName = function() return bad end
+  SLASH_ASK('bad realm ' .. i)
+  assert(EverlootDB.asks[3 + i].realm == nil and EverlootDB.asks[3 + i].question == 'bad realm ' .. i, 'an unusable realm name is left out, the question is kept: ' .. bad)
+end
+GetRealmName = function() return 42 end
+SLASH_ASK('a number is not a realm')
+assert(EverlootDB.asks[9].realm == nil, 'only a string is a realm')
+assert(EverlootDB.asks[2].id ~= nil and EverlootDB.asks[2].askedAt ~= nil and EverlootDB.asks[2].question == 'price 2589', 'the realm adds a field and changes none')
+""")
+print("Lua 5.1 ask: /ask stores bounded questions with the player's realm when it is a realm name, a full queue refuses a new one and keeps every waiting question, verified answers show once, bad checksums are refused")

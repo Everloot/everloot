@@ -1,6 +1,7 @@
 import { postPath } from "../../../kb/src/blue-pages";
 import type { ChangeEntry } from "./changes";
 import { REPO_URL } from "./source";
+import { SOCIAL_PROFILES } from "./social";
 import { absoluteUrl, SITE_NAME, SITE_URL } from "./seo";
 
 /**
@@ -46,10 +47,10 @@ export function organizationJsonLd(): JsonLd {
     url: SITE_URL,
     logo: { "@type": "ImageObject", url: absoluteUrl(LOGO.path), width: LOGO.size, height: LOGO.size },
     email: CONTACT_EMAIL,
-    description: `${SITE_BLURB} ${NON_AFFILIATION}`,
+    description: SITE_BLURB,
     // The company the footer's copyright line and /about name.
     parentOrganization: { "@type": "Organization", name: OPERATOR },
-    sameAs: [REPO_URL, DISCORD_INVITE],
+    sameAs: [REPO_URL, DISCORD_INVITE, ...SOCIAL_PROFILES.map((profile) => profile.href)],
     publishingPrinciples: `${SITE_URL}/methodology`,
   };
 }
@@ -276,6 +277,49 @@ export function wikiArticleJsonLd(page: { title: string; summary: string; path: 
     license: CC_BY_SA.url,
     ...(page.reviewedOn ? { dateModified: page.reviewedOn } : {}),
     ...(page.about ? { about: { "@type": "Thing", name: page.about.name, ...(page.about.path ? { url: absoluteUrl(page.about.path) } : {}) } } : {}),
+  };
+}
+
+/**
+ * A news post: Everloot's own text, so its CC BY-SA licence may be stated. The author is named in the visible
+ * byline only; here the organization stands as author and publisher, as on every other page (no Person).
+ */
+export function newsArticleJsonLd(page: { title: string; description: string; path: string; published: string; modified: string; author: string; image?: string }): JsonLd {
+  return {
+    "@context": CONTEXT,
+    "@type": "NewsArticle",
+    headline: page.title,
+    description: page.description,
+    ...(page.image ? { image: [page.image.startsWith("/") ? absoluteUrl(page.image) : page.image] } : {}),
+    url: absoluteUrl(page.path),
+    mainEntityOfPage: absoluteUrl(page.path),
+    isPartOf: { "@id": WEBSITE_ID },
+    datePublished: page.published,
+    dateModified: page.modified,
+    author: { "@type": "Organization", name: "Everloot Team" },
+    publisher,
+    license: CC_BY_SA.url,
+  };
+}
+
+/**
+ * A guide: Everloot's own reviewed advice, so its CC BY-SA licence may be stated. Dated as its version history shows
+ * it: published on the first version's day, modified on the review of the version shown. The page names its author, a
+ * person, and no Person goes in structured data, so there is no author here; Everloot is the publisher. No rating.
+ */
+export function guideArticleJsonLd(page: { title: string; summary: string; path: string; published: string; modified: string }): JsonLd {
+  return {
+    "@context": CONTEXT,
+    "@type": "Article",
+    headline: page.title,
+    description: page.summary,
+    url: absoluteUrl(page.path),
+    mainEntityOfPage: absoluteUrl(page.path),
+    isPartOf: { "@id": WEBSITE_ID },
+    datePublished: page.published,
+    dateModified: page.modified,
+    publisher,
+    license: CC_BY_SA.url,
   };
 }
 

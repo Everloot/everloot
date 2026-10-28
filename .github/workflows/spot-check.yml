@@ -1,0 +1,110 @@
+name: Weekly spot check
+# Runs the weekly spot check (kb/src/spot-check.ts, `npm run kb -- spot-check`) over the public corpus. A fact
+# the week's pick left out of the settled list and a later report contradicted becomes a recheck scope in
+# kb/curated/recheck.json. It never pushes to main and never merges: new scopes go to one rolling pull request
+# from the branch data/spot-check, and a maintainer merges it. Every merge deploys the site.
+on:
+  schedule:
+    # Mondays, soon after the ISO week turns over (00:00 UTC), at an odd minute when GitHub's scheduler is quieter.
+    - cron: '41 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      week:
+        description: "ISO week to check, YYYY-Www. Empty: the current UTC week"
+        required: false
+        default: ""
+permissions: {}
+concurrency:
+  group: spot-check
+  cancel-in-progress: false
+jobs:
+  collect:
+    # Reads the public corpus API and writes one file. The token only lifts the rate limit on GitHub's side.
+    if: github.repository == 'Everloot/everloot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Start from the open spot check pull request, if there is one
+        run: |
+          git fetch --depth=1 origin data/spot-check:refs/remotes/origin/data/spot-check || exit 0
+          git checkout origin/data/spot-check -- kb/curated/recheck.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.23.2'
+          cache: npm
+          cache-dependency-path: |
+            kb/package-lock.json
+            web/package-lock.json
+      - run: npm ci
+        working-directory: kb
+      # The knowledge-base CLI imports a few helpers from web/.
+      - run: npm ci
+        working-directory: web
+      - name: Run the spot check
+        working-directory: kb
+        env:
+          # No EVERLOOT_API_KEY: the repository has no such secret, so the feed is read at the public rate limit.
+          EVERLOOT_PUBLIC_CORPUS_URL: https://everloot.app/api/corpus/public
+          INPUT_WEEK: ${{ inputs.week }}
+        run: |
+          args=(--root ..)
+          [ -n "$INPUT_WEEK" ] && args+=(--week "$INPUT_WEEK")
+          npm run kb -- spot-check "${args[@]}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: spot-check
+          path: kb/curated/recheck.json
+          retention-days: 1
+  publish:
+    # The only job with a write token, and only the step that pushes and opens the pull request sees it.
+    needs: collect
+    if: github.repository == 'Everloot/everloot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: spot-check
+          path: kb/curated
+      - name: Is there anything new?
+        id: news
+        run: |
+          git add kb/curated/recheck.json
+          news=no
+          if ! git diff --cached --quiet -- kb/curated/recheck.json; then news=yes; fi
+          if [ "$news" = yes ] && git rev-parse -q --verify origin/data/spot-check >/dev/null; then
+            news=no
+            if ! git diff --quiet origin/data/spot-check -- kb/curated/recheck.json; then news=yes; fi
+          fi
+          echo "news=$news" >> "$GITHUB_OUTPUT"
+      - name: Update the rolling pull request
+        if: steps.news.outputs.news == 'yes'
+        env:
+          GH_TOKEN: ${{ secrets.BUILD_WATCH_TOKEN || github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          git config user.name 'everloot-spot-check[bot]'
+          git config user.email 'hello@everloot.app'
+          git checkout -q -B data/spot-check
+          git commit -s -q -m 'Spot check: add recheck scopes'
+          lease=$(git rev-parse -q --verify origin/data/spot-check || true)
+          git push --force-with-lease="data/spot-check:${lease}" "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" data/spot-check
+          if [ -z "$(gh pr list --repo "$REPO" --head data/spot-check --state open --json number --jq '.[0].number')" ]; then
+            gh pr create --repo "$REPO" --base main --head data/spot-check \
+              --title 'data(kb): add recheck scopes from the weekly spot check' \
+              --body 'Automatic result of the weekly spot check: facts the settled list left out for the week and a later report contradicted, added to kb/curated/recheck.json as recheck scopes. The Weekly spot check workflow keeps this one pull request up to date. It never merges it: a maintainer does, and every merge deploys the site.'
+          fi

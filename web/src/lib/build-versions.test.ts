@@ -1,7 +1,8 @@
 import { getPathMatch } from "next/dist/shared/lib/router/utils/path-match";
 import { describe, expect, test } from "vitest";
+import { withoutVersionPrefix as kbWithoutVersionPrefix } from "../../../kb/src/wiki/page";
 import nextConfig from "../../next.config.js";
-import { PREFIXES, SERVED, WITHOUT_SNAPSHOT, hasSnapshot, versionHref } from "./build-versions";
+import { PREFIXES, SERVED, WITHOUT_SNAPSHOT, hasSnapshot, versionHref, withoutVersionPrefix } from "./build-versions";
 import { CURRENT_VERSION, GAME_VERSIONS } from "./game-version";
 
 const byId = (id: string) => GAME_VERSIONS.find((v) => v.id === id)!;
@@ -51,6 +52,22 @@ describe("game version routing", () => {
     // Unprefixed addresses are untouched, including ones that only start with a prefix's letters.
     expect(await served("/database/items/2589")).toBe("/database/items/2589");
     expect(await served("/betamax")).toBe("/betamax");
+  });
+
+  test("a path without its version's prefix is the page the unprefixed address shows, for every prefix the table lists", () => {
+    expect(withoutVersionPrefix("/beta/guides/fire-draft")).toBe("/guides/fire-draft");
+    expect(withoutVersionPrefix("/beta")).toBe("/");
+    expect(withoutVersionPrefix("/ptr/guides/fire-draft")).toBe("/guides/fire-draft");
+    for (const prefix of Object.values(PREFIXES)) expect(withoutVersionPrefix(`${prefix}/wiki/deadmines`), prefix).toBe("/wiki/deadmines");
+    // Paths without a prefix, and ones that only start with a prefix's letters, are left as they are.
+    expect(withoutVersionPrefix("/guides/fire-draft")).toBe("/guides/fire-draft");
+    expect(withoutVersionPrefix("/betamax/guides/x")).toBe("/betamax/guides/x");
+  });
+
+  test("the kb's copy, which its page checks and the wiki's link reading use, takes off the same prefixes", () => {
+    for (const path of ["/beta/wiki/x", "/ptr/guides/x", "/beta", "/ptr", "/wiki/x", "/betamax/wiki/x", "/ptrx", "/"]) {
+      expect(kbWithoutVersionPrefix(path), path).toBe(withoutVersionPrefix(path));
+    }
   });
 
   test("the notice's internal address redirects to its prefix", async () => {

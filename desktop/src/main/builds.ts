@@ -2,8 +2,10 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { INTERFACE } from "../../../companion/src/bridge/answers";
 import { luaString } from "../../../companion/src/bridge/lua";
+import { decodeBuild, decodeOrder } from "../../../web/src/lib/talents/share";
 import type { BuildsStatus } from "../shared/types";
-import { readAccountKey, readKeyOrigin, writeKeyOrigin } from "./account";
+import { keySiteOrigin, readAccountKey, readKeyOrigin, writeKeyOrigin } from "./account";
+export { keySiteOrigin } from "./account";
 
 /**
  * The player's saved talent builds into the game: read from everloot.app/api/me/builds with the
@@ -30,10 +32,18 @@ const GAME_BUILD = /^\d+(\.\d+)+$/;
 const codeFor = (code: unknown, slug: string): code is string => str(code) && code.length <= MAX_CODE && CODE.exec(code)?.[1] === slug;
 
 /** One build as the file carries it: what the addon needs to list it and load it, nothing more. */
-export interface GameBuild { name: string; character: string | null; realm: string | null; class: string; code: string; code2: string | null; active: boolean; gameBuild: string }
+export interface GameBuild { name: string; character: string | null; realm: string | null; class: string; code: string; code2: string | null; order?: string | null; order2?: string | null; active: boolean; gameBuild: string }
 
 const str = (v: unknown): v is string => typeof v === "string";
 const clip = (s: string, n: number) => [...s].slice(0, n).join("");
+
+/** Order is optional metadata: a damaged or unsupported token never changes the ranks. Reuse the
+ * transport codec (including its exact whitespace set); no catalog or generated order is needed. */
+function gameOrder(token: unknown, code: string | null): string | null {
+  if (!str(token) || !code) return null;
+  const build = decodeBuild(code);
+  return build.ok && decodeOrder(token, build.build.ranks).ok ? token.trim() : null;
+}
 
 /**
  * The builds from the site's answer, joined with their character labels. Anything malformed is left
@@ -61,6 +71,8 @@ export function gameBuilds(body: unknown): GameBuild[] {
       class: r.classSlug,
       code: r.code,
       code2,
+      order: gameOrder(r.order, r.code),
+      order2: gameOrder(r.order2, code2),
       active: r.active === true,
       gameBuild: r.gameBuild,
     };
@@ -76,7 +88,7 @@ export function renderBuildsAddon(builds: GameBuild[], syncedAt: string): { toc:
   const toc = [
     `## Interface: ${INTERFACE}`,
     "## Title: Everloot Builds",
-    "## Notes: Written by the Everloot Desktop App. Your saved talent builds, listed by /everloot plan after /reload.",
+    "## Notes: Written by the Everloot Desktop App. /everloot plan after /reload. Spend order needs an updated Everloot addon; older addons load ranks only.",
     "## Author: Everloot",
     "",
     BUILDS_DATA,
@@ -90,6 +102,8 @@ export function renderBuildsAddon(builds: GameBuild[], syncedAt: string): { toc:
       `class = ${luaString(b.class)}`,
       `code = ${luaString(b.code)}`,
       b.code2 !== null ? `code2 = ${luaString(b.code2)}` : null,
+      b.order ? `order = ${luaString(b.order)}` : null,
+      b.code2 !== null && b.order2 ? `order2 = ${luaString(b.order2)}` : null,
       `active = ${b.active ? "true" : "false"}`,
       `gameBuild = ${luaString(b.gameBuild)}`,
     ].filter((f) => f !== null);
@@ -145,14 +159,6 @@ export class BuildsError extends Error {
     this.retryAfterMs = extra.retryAfterMs ?? 0;
     this.revoked = extra.revoked ?? false;
   }
-}
-
-/** The site's origin when the key may go there: https, or http on this computer for development; null otherwise. */
-export function keySiteOrigin(endpoint: string): string | null {
-  let u: URL;
-  try { u = new URL(endpoint); } catch { return null; }
-  if (u.protocol === "https:" || (u.protocol === "http:" && (u.hostname === "localhost" || u.hostname === "127.0.0.1"))) return u.origin;
-  return null;
 }
 
 /** GET /api/me/builds with the key. Only this request carries it, and it does not follow redirects. */

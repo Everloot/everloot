@@ -49,7 +49,7 @@ export default function Page() {
 
       <H2 id="your-account">Your account page</H2>
       <P>
-        <Link href="/account" className={docLink}>Your account</Link> has five sections, with links to each at the top.
+        <Link href="/account" className={docLink}>Your account</Link> has six sections, with links to each at the top.
         Only you can open it.
       </P>
       <List>
@@ -64,10 +64,15 @@ export default function Page() {
           <strong>Profile.</strong> {profiles ? <>Your display name, the</> : <>The</>} email on the account if it has one,
           and a link to change your password if you signed up with one.{profiles && <> Your handle, display name and status are edited on <Link href="/settings" className={docLink}>Settings</Link>.</>}
         </li>
+        <li>
+          <strong>Integrations.</strong> What is connected to your account: Battle.net, if you sign in with it
+          {keys && <>, and each active API key, the Desktop App&apos;s included. <strong>Remove access</strong> on a key revokes it</>}.
+          Below that is what you can add: the addon, the Desktop App, Claude and ChatGPT, each with a link to its download or setup steps.
+        </li>
         <li><strong>API keys.</strong> Your keys, described below.</li>
         <li>
-          <strong>Chat keys.</strong> One card per provider Chat supports, with its key, its model and a Test button, and the
-          provider Chat uses by default. The keys stay in that browser and never reach Everloot.
+          <strong>Assistant setup.</strong> Optional AI: one card per provider Chat supports, with its key, its model and a Test button, and the
+          provider Chat uses by default. The keys stay in that tab until it closes and never reach Everloot.
         </li>
         <li><strong>Data and privacy.</strong> What we keep, where you delete each part, and how to delete your account.</li>
       </List>

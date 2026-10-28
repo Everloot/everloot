@@ -1,4 +1,5 @@
-import { API_ROUTES, MCP_TOOL_NAMES, MCP_TOOLS, PLAYER_DATA_TOOLS, STRUCTURED_TOOLS, type ApiRoute, type McpToolName } from "@everloot/protocol";
+import { API_ROUTES, MCP_TOOLS, PLAYER_DATA_TOOLS, STRUCTURED_TOOLS, type ApiRoute, type McpToolName } from "@everloot/protocol";
+import { liveToolNames } from "@/lib/guild-switch";
 import { z } from "zod";
 
 /**
@@ -106,7 +107,7 @@ export interface ToolDoc {
 }
 
 export function toolDocs(): ToolDoc[] {
-  return MCP_TOOL_NAMES.map((name) => ({
+  return liveToolNames().map((name) => ({
     name,
     title: MCP_TOOLS[name].title,
     description: MCP_TOOLS[name].description,

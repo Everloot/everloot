@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { analyticsConfig, needsAnalyticsConsent } from "./config";
-import { loadConsented, loadCookieless, optedOutBySignal, privacySignals, unloadConsented } from "./load";
+import { loadConsented, loadCookieless, optedOutBySignal, privacySignals, scrubEvent, stripSearchQuery, unloadConsented } from "./load";
 
 const posthogMock = vi.hoisted(() => ({ init: vi.fn(), opt_in_capturing: vi.fn(), opt_out_capturing: vi.fn(), __loaded: false }));
 vi.mock("posthog-js", () => ({ default: posthogMock }));
@@ -10,6 +10,7 @@ import { track } from "./track";
 const GA = "G-ABCD1234";
 const PH = "phc_abcdefghij1234567890";
 const CF = "0123456789abcdef0123456789abcdef";
+const METRICOOL = "424c5c3857a5c9d4bfab8635880f0e69";
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -19,9 +20,17 @@ afterEach(() => {
   document.head.innerHTML = "";
   delete window.gtag;
   delete window.posthog;
+  delete window.beTracker;
 });
 
 describe("analyticsConfig", () => {
+  it("validates the Metricool hash and requires analytics consent", () => {
+    expect(analyticsConfig({}).metricoolHash).toBeUndefined();
+    expect(analyticsConfig({ NEXT_PUBLIC_METRICOOL_HASH: "<script>" }).metricoolHash).toBeUndefined();
+    const config = analyticsConfig({ NEXT_PUBLIC_METRICOOL_HASH: ` ${METRICOOL} ` });
+    expect(config.metricoolHash).toBe(METRICOOL);
+    expect(needsAnalyticsConsent(config)).toBe(true);
+  });
   it("has every tool off when no variable is set", () => {
     const c = analyticsConfig({});
     expect(c.gaId).toBeUndefined();
@@ -35,17 +44,51 @@ describe("analyticsConfig", () => {
     expect(c.gaId).toBeUndefined();
     expect(c.posthogKey).toBeUndefined();
     expect(c.cfBeaconToken).toBeUndefined();
-    expect(c.posthogHost).toBe("https://eu.i.posthog.com");
+    expect(c.posthogHost).toBe("https://us.i.posthog.com");
+  });
+
+  it("defaults PostHog to the US cloud and keeps an EU override", () => {
+    expect(analyticsConfig({}).posthogHost).toBe("https://us.i.posthog.com");
+    expect(analyticsConfig({ NEXT_PUBLIC_POSTHOG_HOST: "https://eu.i.posthog.com" }).posthogHost).toBe("https://eu.i.posthog.com");
+  });
+
+  it("turns PostHog on only for the Production deployment", () => {
+    expect(analyticsConfig({ NEXT_PUBLIC_POSTHOG_KEY: PH }).posthogKey).toBeUndefined();
+    expect(analyticsConfig({ NEXT_PUBLIC_POSTHOG_KEY: PH, VERCEL_ENV: "preview" }).posthogKey).toBeUndefined();
+    expect(analyticsConfig({ NEXT_PUBLIC_POSTHOG_KEY: PH, VERCEL_ENV: "production" }).posthogKey).toBe(PH);
   });
 
   it("accepts well-formed values", () => {
-    const c = analyticsConfig({ NEXT_PUBLIC_GA_ID: GA, NEXT_PUBLIC_POSTHOG_KEY: PH, NEXT_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com/", NEXT_PUBLIC_CF_BEACON_TOKEN: CF });
+    const c = analyticsConfig({ NEXT_PUBLIC_GA_ID: GA, NEXT_PUBLIC_POSTHOG_KEY: PH, NEXT_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com/", NEXT_PUBLIC_CF_BEACON_TOKEN: CF, VERCEL_ENV: "production" });
     expect(c).toEqual({ gaId: GA, posthogKey: PH, posthogHost: "https://us.i.posthog.com", cfBeaconToken: CF });
     expect(needsAnalyticsConsent(c)).toBe(true);
   });
 });
 
 describe("script loading", () => {
+  it("loads Metricool once after consent and sends the supplied hash when ready", () => {
+    const t = vi.fn();
+    window.beTracker = { t };
+    loadConsented({ metricoolHash: METRICOOL }, window, document);
+    loadConsented({ metricoolHash: METRICOOL }, window, document);
+    const scripts = document.querySelectorAll<HTMLScriptElement>('script[src="https://tracker.metricool.com/resources/be.js"]');
+    expect(scripts).toHaveLength(1);
+    expect(t).not.toHaveBeenCalled();
+    scripts[0].dispatchEvent(new Event("load"));
+    expect(t).toHaveBeenCalledExactlyOnceWith({ hash: METRICOOL, u: window.location.href });
+  });
+
+  it("does not send a visit if consent is withdrawn before Metricool finishes loading", () => {
+    const t = vi.fn();
+    loadConsented({ metricoolHash: METRICOOL }, window, document);
+    const script = document.querySelector<HTMLScriptElement>('script[src="https://tracker.metricool.com/resources/be.js"]')!;
+    expect(script).not.toBeNull();
+    unloadConsented(document, window);
+    window.beTracker = { t };
+    script.dispatchEvent(new Event("load"));
+    expect(t).not.toHaveBeenCalled();
+    expect(document.getElementById("everloot-metricool")).toBeNull();
+  });
   it("loads nothing without env vars, even after consent", () => {
     loadCookieless({}, {}, document);
     loadConsented({}, window, document);
@@ -127,7 +170,7 @@ describe("PostHog consent gating", () => {
   it("starts after consent", async () => {
     loadConsented(config, window, document);
     await vi.waitFor(() => expect(posthogMock.init).toHaveBeenCalledOnce());
-    expect(posthogMock.init.mock.calls[0][1]).toMatchObject({ autocapture: false, disable_session_recording: true });
+    expect(posthogMock.init.mock.calls[0][1]).toMatchObject({ autocapture: false, disable_session_recording: true, capture_performance: false, enable_heatmaps: false });
   });
 
   it("does not initialise if consent is withdrawn while the import is in flight", async () => {
@@ -136,6 +179,39 @@ describe("PostHog consent gating", () => {
     await new Promise((r) => setTimeout(r, 10));
     expect(posthogMock.init).not.toHaveBeenCalled();
     expect(window.posthog).toBeUndefined();
+  });
+});
+
+describe("search term scrubbing", () => {
+  it("strips q and keeps other params", () => {
+    expect(stripSearchQuery("https://everloot.app/search?q=thunderfury&page=2")).toBe("https://everloot.app/search?page=2");
+    expect(stripSearchQuery("https://everloot.app/items")).toBe("https://everloot.app/items");
+    expect(stripSearchQuery(undefined)).toBeUndefined();
+  });
+
+  it("scrubs page URLs and same-origin referrers only", () => {
+    const e = scrubEvent({ properties: { $current_url: "https://everloot.app/?q=onyxia", $referrer: "https://everloot.app/s?q=x", $initial_referrer: "https://google.com/?q=everloot" } }, "https://everloot.app");
+    expect(e.properties).toEqual({ $current_url: "https://everloot.app/", $referrer: "https://everloot.app/s", $initial_referrer: "https://google.com/?q=everloot" });
+    expect(scrubEvent(null)).toBeNull();
+  });
+
+  it("wires before_send into init", async () => {
+    loadConsented({ posthogKey: PH, posthogHost: "https://us.i.posthog.com" }, window, document);
+    await vi.waitFor(() => expect(posthogMock.init).toHaveBeenCalledOnce());
+    const before = posthogMock.init.mock.calls[0][1].before_send;
+    expect(before({ properties: { $current_url: `${window.location.origin}/x?q=1` } }).properties.$current_url).toBe(`${window.location.origin}/x`);
+  });
+
+  it("removes search terms from session entry properties on every event", () => {
+    const event = scrubEvent({ properties: {
+      $session_entry_url: "https://everloot.app/search?q=private&page=2",
+      $session_entry_referrer: "https://everloot.app/players?q=private",
+    } }, "https://everloot.app");
+    expect(event.properties).toEqual({
+      $session_entry_url: "https://everloot.app/search?page=2",
+      $session_entry_referrer: "https://everloot.app/players",
+    });
+    expect(scrubEvent({ properties: { $session_entry_referrer: "https://example.com/?q=external" } }, "https://everloot.app").properties.$session_entry_referrer).toBe("https://example.com/?q=external");
   });
 });
 
@@ -156,5 +232,152 @@ describe("withdrawal cleanup", () => {
     expect(localStorage.getItem("gg-cookie-consent-v1")).toBe("accepted");
     expect((window as Window & { dataLayer?: unknown }).dataLayer).toBeUndefined();
     expect(posthogMock.opt_out_capturing).toHaveBeenCalled();
+  });
+
+  it("keeps the cookieless beacon, the consent record and the tab's veto", () => {
+    loadCookieless({ cfBeaconToken: CF }, {}, document);
+    loadConsented({ gaId: GA, metricoolHash: METRICOOL }, window, document);
+    localStorage.setItem("everloot-analytics-consent-v1", "rejected");
+    sessionStorage.setItem("everloot-analytics-rejection", "rejected");
+    try {
+      unloadConsented(document, window);
+      expect(Array.from(document.head.querySelectorAll("script"), (s) => s.id)).toEqual(["everloot-cf-beacon"]);
+      expect(localStorage.getItem("everloot-analytics-consent-v1")).toBe("rejected");
+      expect(sessionStorage.getItem("everloot-analytics-rejection")).toBe("rejected");
+    } finally {
+      sessionStorage.clear();
+    }
+  });
+
+  it("still unloads when the browser refuses storage outright, as Chrome does with cookies blocked", () => {
+    loadConsented({ gaId: GA, metricoolHash: METRICOOL }, window, document);
+    const own = (["localStorage", "sessionStorage"] as const).map((name) => [name, Object.getOwnPropertyDescriptor(window, name)] as const);
+    for (const [name] of own) {
+      Object.defineProperty(window, name, { configurable: true, get() { throw new DOMException("Access is denied for this document.", "SecurityError"); } });
+    }
+    try {
+      expect(() => unloadConsented(document, window)).not.toThrow();
+      expect(document.head.querySelectorAll("script")).toHaveLength(0);
+    } finally {
+      for (const [name, descriptor] of own) {
+        if (descriptor) Object.defineProperty(window, name, descriptor);
+        else delete (window as unknown as Record<string, unknown>)[name];
+      }
+    }
+  });
+
+  it("still removes the tags when browser storage refuses the cleanup", () => {
+    loadConsented({ gaId: GA, metricoolHash: METRICOOL }, window, document);
+    localStorage.setItem("ph_phc_key_posthog", "{}");
+    const removeItem = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => { throw new DOMException("blocked", "SecurityError"); });
+    try {
+      expect(() => unloadConsented(document, window)).not.toThrow();
+      expect(document.head.querySelectorAll("script")).toHaveLength(0);
+      expect(window.gtag).toBeUndefined();
+    } finally {
+      removeItem.mockRestore();
+    }
+  });
+});
+
+describe("a plan in the address never reaches an analytics tool", () => {
+  // The calculator keeps a plan in the page's fragment (#plan=…&plan2=…&order=…&order2=…), and a link from an alt opens
+  // it there: each tool gets the page's URL without it.
+  const CODE = "EL1-mage-1482-1.60.1.70450-OTAwMDE6Miw5MDAwMjoxOjEsOTAwMDQ6Mg";
+  const PLAN = `#plan=${CODE}&plan2=${CODE}&order=O1p-AABCC&order2=O1g-A`;
+  const at = (path: string) => window.history.replaceState(null, "", path);
+  const dataLayer = () => ((window as Window & { dataLayer?: ArrayLike<unknown>[] }).dataLayer ?? []).map((args) => Array.from(args));
+  afterEach(() => {
+    at("/");
+    delete (window as Window & { dataLayer?: unknown }).dataLayer;
+  });
+
+  it("PostHog: every URL an event carries loses its fragment, in its own properties and the person's, nested ones too", () => {
+    const page = `https://everloot.app/tools/talents/mage?q=x${PLAN}`;
+    const event = scrubEvent({
+      properties: {
+        $current_url: page, $initial_current_url: page, $session_entry_url: page, $referrer: page, $prev_pageview_url: page,
+        $session_entry_referrer: `https://example.com/x${PLAN}`, $initial_referrer_info: { $referrer: page }, $urls: [page],
+        $pathname: "/tools/talents/mage", title: "Mage talent calculator",
+      },
+      $set: { $current_url: page },
+      $set_once: { $initial_current_url: page, $initial_referrer: page },
+    }, "https://everloot.app");
+    const sent = JSON.stringify(event);
+    expect(sent).not.toContain(CODE);
+    expect(sent).not.toContain("#");
+    expect(event.properties.$current_url).toBe("https://everloot.app/tools/talents/mage");
+    expect(event.properties.$prev_pageview_url).toBe("https://everloot.app/tools/talents/mage?q=x");
+    expect(event.properties.$session_entry_referrer).toBe("https://example.com/x");
+    expect(event.properties.$pathname).toBe("/tools/talents/mage");
+    expect(event.properties.title).toBe("Mage talent calculator");
+  });
+
+  it("PostHog: that scrubber is the one before_send runs on every event", async () => {
+    loadConsented({ posthogKey: PH, posthogHost: "https://us.i.posthog.com" }, window, document);
+    await vi.waitFor(() => expect(posthogMock.init).toHaveBeenCalledOnce());
+    const before = posthogMock.init.mock.calls[0][1].before_send;
+    const event = before({ properties: { $current_url: `${window.location.origin}/tools/talents/mage${PLAN}` }, $set_once: { $initial_current_url: `${window.location.origin}/b${PLAN}` } });
+    expect(event.properties.$current_url).toBe(`${window.location.origin}/tools/talents/mage`);
+    expect(event.$set_once.$initial_current_url).toBe(`${window.location.origin}/b`);
+  });
+
+  // The production Google tag measures every event at the address it has then, and leaves the fragment out itself:
+  // run in Chrome with it, a page opened with a plan and a client move to one both sent no fragment.
+  it("Google Analytics: a page opened with a plan gives the tag nothing from its address, so no fragment", () => {
+    at(`/tools/talents/mage${PLAN}`);
+    loadConsented({ gaId: GA }, window, document);
+    expect(dataLayer().find((args) => args[0] === "config")).toEqual(["config", GA]);
+    expect(JSON.stringify(dataLayer())).not.toContain(CODE);
+  });
+
+  it("Google Analytics: entering with a fragment does not pin the page location, so later events count where they happen (reported case)", () => {
+    at("/start#chapter");
+    loadConsented({ gaId: GA }, window, document);
+    expect(dataLayer().filter((args) => args[0] === "config" || args[0] === "set")).toEqual([["config", GA]]);
+  });
+
+  /** What tracker.metricool.com/resources/be.js does: set `u` from the address bar and `ref` from the referrer, then
+   *  send every field it holds. */
+  function metricool(): Record<string, string>[] {
+    const sent: string[] = [];
+    (globalThis as { metricoolSent?: string[] }).metricoolSent = sent;
+    const t = new Function("a", "a.u = document.location.href; a.bw = 1280; document.referrer && (a.ref = document.referrer); var b = []; for (var c in a) if (a.hasOwnProperty(c)) b.push(encodeURIComponent(c) + '=' + encodeURIComponent(a[c])); globalThis.metricoolSent.push(b.join('&'));");
+    window.beTracker = { t: t as (options: { hash: string }) => void };
+    loadConsented({ metricoolHash: METRICOOL }, window, document);
+    document.querySelector('script[src="https://tracker.metricool.com/resources/be.js"]')!.dispatchEvent(new Event("load"));
+    delete (globalThis as { metricoolSent?: string[] }).metricoolSent;
+    return sent.map((query) => Object.fromEntries(new URLSearchParams(query)));
+  }
+
+  it("Metricool: its tracker reads the address bar itself, and still sends the page URL without the fragment or search terms", () => {
+    at(`/tools/talents/mage?q=thunderfury&tab=2${PLAN}`);
+    const [visit, ...more] = metricool();
+    expect(more).toEqual([]);
+    expect(visit.u).toBe(`${window.location.origin}/tools/talents/mage?tab=2`);
+    expect(JSON.stringify(visit)).not.toContain(CODE);
+    expect(JSON.stringify(visit)).not.toContain("thunderfury");
+  });
+
+  it("Metricool: a referrer on this site goes without its search terms; another site's is the tracker's own", () => {
+    at("/tools/talents/mage");
+    const referrer = (value: string) => Object.defineProperty(document, "referrer", { value, configurable: true });
+    try {
+      referrer(`${window.location.origin}/search?q=thunderfury&scope=items`);
+      expect(metricool()[0].ref).toBe(`${window.location.origin}/search?scope=items`);
+      document.head.innerHTML = "";
+      referrer("https://www.google.com/");
+      expect(metricool()[0].ref).toBe("https://www.google.com/");
+    } finally {
+      delete (document as { referrer?: string }).referrer;
+    }
+  });
+
+  it("Cloudflare: the beacon is given no page URL here (it reads the address itself, and drops fragments and queries)", () => {
+    at(`/tools/talents/mage${PLAN}`);
+    loadCookieless({ cfBeaconToken: CF }, {}, document);
+    const script = document.getElementById("everloot-cf-beacon")!;
+    expect(script.getAttribute("data-cf-beacon")).toBe(JSON.stringify({ token: CF }));
+    expect(script.outerHTML).not.toContain(CODE);
   });
 });

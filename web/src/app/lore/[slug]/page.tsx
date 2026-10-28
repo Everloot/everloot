@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 import { FEED, IMAGE, TWITTER_IMAGE } from "@/lib/seo";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { Card, Container, Explainer, Facts, PageHeader, Prose, SectionHeading } from "@/components/ui";
+import { Card, Explainer, Facts, PageHeader, Prose, ReadingLayout, SectionHeading, type TocItem } from "@/components/ui";
 import LoreSource from "@/components/LoreSource";
 import { trailFor } from "@/lib/breadcrumbs";
 import { entityHref } from "@/components/EntityLink";
 import { idForName, loadNames } from "@/lib/names";
 import { BROWSE_HEADINGS, BROWSE_TYPES, CONVERSION_NOTE, FACET_KEYS, firstSentence, isIndexable, loreByExtId, loreSlug, parseLoreSlug, renderBody, UNAVAILABLE, UNAVAILABLE_COPY, type BrowseSlug, type LorePage as Lore } from "@/lib/lore";
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 const FACET_LABELS = { expansion: "Expansion", profession: "Profession", class: "Class", race: "Race", zone: "Zone", faction: "Faction" } as const;
 
@@ -81,8 +81,18 @@ export default async function LorePage(props: { params: Promise<{ slug: string }
   const dbKind = wiki && (page.type === "npc" || page.type === "item" || page.type === "quest") ? page.type : null;
   const names = dbKind ? await loadNames() : null;
   const dbId = dbKind && names ? idForName(dbKind === "npc" ? names.npcs : dbKind === "item" ? names.items : names.quests, page.name) : null;
+  // The archive has no source headings; link to its text and the metadata sections without inventing story sections.
+  const sections: TocItem[] = [
+    { id: "lore-text", label: "Article text" },
+    ...(dbKind && dbId !== null ? [{ id: "in-database", label: "In the database" }] : []),
+    ...(infoboxEntries.length > 0 ? [{ id: "infobox", label: "Wiki infobox" }] : []),
+    ...(typeSlug || page.categories.length > 0 ? [{ id: "categories", label: "Categories" }] : []),
+  ];
+  const source = (
+    <LoreSource className="" href={page.sourceUrl} wiki={wiki} name={wiki ? undefined : page.sourceUrl.replace(/^https?:\/\//, "").split("/")[0]} licence={page.licence.replace("CC-BY-SA-4.0", "CC BY-SA 4.0")} />
+  );
   return (
-    <Container width="reading">
+    <ReadingLayout items={sections.length > 1 ? sections : []} meta={source}>
       <article>
         <PageHeader
           trail={trail}
@@ -95,17 +105,30 @@ export default async function LorePage(props: { params: Promise<{ slug: string }
           }
         />
 
-        <Prose>
-          {blocks.map((block, i) =>
-            block.type === "p" ? (
-              <p key={i}>{block.text}</p>
-            ) : (
-              <ul key={i}>
-                {block.items.map((item, j) => <li key={j}>{item}</li>)}
+        {sections.length > 1 && (
+          <details className="mb-6 rounded-card border border-line p-3 lg:hidden">
+            <summary className="min-h-9 cursor-pointer text-sm text-fg-2">On this page</summary>
+            <nav aria-label="Article sections">
+              <ul className="mt-2 space-y-1">
+                {sections.map((item) => <li key={item.id}><a href={`#${item.id}`} className={`inline-flex min-h-9 items-center text-sm ${link}`}>{item.label}</a></li>)}
               </ul>
-            ),
-          )}
-        </Prose>
+            </nav>
+          </details>
+        )}
+
+        <section id="lore-text" aria-label="Article text" tabIndex={-1} className="scroll-mt-24">
+          <Prose>
+            {blocks.map((block, i) =>
+              block.type === "p" ? (
+                <p key={i}>{block.text}</p>
+              ) : (
+                <ul key={i}>
+                  {block.items.map((item, j) => <li key={j}>{item}</li>)}
+                </ul>
+              ),
+            )}
+          </Prose>
+        </section>
 
         {dbKind && dbId !== null && (
           <Card as="section" aria-labelledby="in-database" className="mt-12">
@@ -159,8 +182,7 @@ export default async function LorePage(props: { params: Promise<{ slug: string }
             <p>{CONVERSION_NOTE}</p>
           </Explainer>
         )}
-        <LoreSource href={page.sourceUrl} wiki={wiki} name={wiki ? undefined : page.sourceUrl.replace(/^https?:\/\//, "").split("/")[0]} licence={page.licence.replace("CC-BY-SA-4.0", "CC BY-SA 4.0")} />
       </article>
-    </Container>
+    </ReadingLayout>
   );
 }

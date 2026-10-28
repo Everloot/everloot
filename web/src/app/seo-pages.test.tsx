@@ -40,12 +40,13 @@ test("the home page carries Organization and WebSite, and shows the lore search 
   expect(html).toContain('action="/search"');
 });
 
-test("the footer shows the email, the blurb and the non-affiliation line the Organization repeats", async () => {
+test("the footer shows the email and the blurb the Organization repeats", async () => {
   const { default: Footer } = await import("@/components/Footer");
-  const { organizationJsonLd } = await import("@/lib/jsonld");
+  const { organizationJsonLd, SITE_BLURB } = await import("@/lib/jsonld");
   const text = visible(renderToStaticMarkup(<Footer />));
   const org = organizationJsonLd() as { email: string; description: string };
   expect(text).toContain(org.email);
+  expect(org.description).toBe(SITE_BLURB);
   for (const sentence of org.description.split(/(?<=\.) /)) expect(text).toContain(sentence);
 });
 
@@ -147,7 +148,7 @@ test("/upload: the download is the one the site serves, with the licence beside 
   expect(blocks(html).find((b) => b["@type"] === "SoftwareApplication")).toBeUndefined();
   const release = latestAddonRelease()!;
   expect(html).toContain(`href="${release.downloadPath}"`);
-  expect(visible(html)).toContain(`Download beta addon ${release.version}`);
+  expect(visible(html)).toContain(`Download Alpha addon ${release.version}`);
   expect(visible(html)).toContain("Licence: AGPL-3.0");
 });
 
@@ -223,8 +224,10 @@ test("/wow-forever shows Blizzard's race and class tables with the new combinati
   expect(visible(html)).toContain("Which races and classes can you play?");
   expect(html).toContain(`href="${RACES.sourceUrl}"`);
   expect(visible(html)).toContain("published September 22, 2026");
-  expect(html.match(/<table/g)).toHaveLength(2);
-  const tables = html.match(/<table[\s\S]*?<\/table>/g)!.join("");
+  const races = html.slice(html.indexOf('aria-labelledby="races"'), html.indexOf('aria-labelledby="latest"'));
+  // Per faction: who can be what, then the racial traits.
+  expect(races.match(/<table/g)).toHaveLength(4);
+  const tables = races.match(/<table[\s\S]*?<\/table>/g)!.join("");
   expect(tables.match(/>New</g)).toHaveLength(NEW_COMBOS.length);
 });
 

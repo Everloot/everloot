@@ -15,6 +15,22 @@ required, or tightening a limit is a major release.
   without a key, 5,000 with one), and the corpus and client-layer routes and the market rule read in plain words.
 
 ### Added
+- 1.20.0 (record protocol unchanged, 1.10.0): the tool `class_races`, which races can be a class, on which faction,
+  and each race's racial traits (name, active or passive, order), read from the committed race table
+  (`web/src/data/game-data/races.json`, found in game files, unconfirmed, with the build). Trait descriptions are
+  game text and stay on the class pages, out of the answer. The public catalogue is 32 tools.
+- 1.19.0 (record protocol 1.10.0), for the guild ladder (`docs/design/specs/2026-10-24-guild-board-design.md`):
+  the `guild_kill` record, a boss kill credited to the uploading member's own guild (guild, realm, faction,
+  encounter, name, instance, difficulty, size; no character), counted once 2 installs report it. It is not a public
+  corpus kind: kills are published only through the guild rollup, behind the guild switch, with hidden guilds left out.
+  Two tools, `guild_search` and `guild_rankings`, with output schemas `guildSearch` and `guildRankings`;
+  `guild_board`'s output gains optional `ladderProgression`, `activity`, `seenRoster` and `ranks`, its inputs
+  untouched. The public catalogue is 31 tools.
+- 1.18.0 (record protocol 1.9.0), for loot tables by source type: the `loot` record gains three optional fields.
+  `lootType` (`LOOT_TYPES`: kill, pickpocket, skinning, gather, disenchant, container, fishing) says what opened
+  the window; `sourceItemId` names the item that was disenchanted or opened, and counts as a source beside
+  `sourceNpcId` and `sourceObjectId`; `copper` is the coin in the window. Windows without them stay valid and are
+  never sorted into a type by guessing. MCP tools are unchanged.
 - 1.17.0 (record protocol unchanged, 1.8.0): optional `itemPage.reported` holds agreed item numbers with
   installs, build and last seen, plus contested line keys without values. Tool inputs are unchanged.
   `item_page` and `coverage` descriptions now document item-number evidence, scoped coverage totals and

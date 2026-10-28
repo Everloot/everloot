@@ -199,6 +199,42 @@ export const collectionGap = z.object({
   queued: z.array(z.number().int()).describe("Catalog entries fewer than 3 installs reported yet."),
   ownedRecorded: z.boolean().describe("False when this install never uploaded this collection: owned is unknown, not empty."),
 });
+/** Who reported a guild's kill: its members' uploads (2 installs agreeing) or its officers' published board. */
+export const KILL_SOURCES = ["members", "officers"] as const;
+export const GUILD_FACTIONS = ["alliance", "horde"] as const;
+
+/** One boss in a guild's progression through an instance. */
+export const guildBossProgress = z.object({
+  encounterId: z.number().int(),
+  name: z.string(),
+  killed: z.boolean(),
+  killedAt: z.string().nullable().describe("The earliest agreeing report, ISO; null for an unkilled boss or one only the officers published."),
+  source: z.enum(KILL_SOURCES).nullable().describe("Who reported the kill; null for an unkilled boss."),
+});
+/** A guild's standing in one instance: bosses killed out of the bosses 3 installs reported there. */
+export const guildInstanceProgress = z.object({
+  instanceMapId: z.number().int(),
+  name: z.string(),
+  killed: z.number().int(),
+  bosses: z.number().int(),
+  list: z.array(guildBossProgress).describe("Every boss of the instance in encounter order, killed or not."),
+});
+/** One agreed kill, for a guild's activity feed. */
+export const guildKillEntry = z.object({
+  encounterId: z.number().int(),
+  name: z.string(),
+  instanceMapId: z.number().int(),
+  killedAt: z.string().describe("The earliest agreeing report, ISO."),
+  source: z.enum(KILL_SOURCES),
+});
+/** A guild's rank in the newest instance it has a kill in. */
+export const guildRanks = z.object({
+  instanceMapId: z.number().int(),
+  instanceName: z.string(),
+  realm: z.number().int().describe("Rank among the realm's guilds in that instance."),
+  overall: z.number().int().describe("Rank among every guild in that instance."),
+});
+
 export const guildBoard = z.object({
   guildName: z.string(),
   realm: z.string(),
@@ -210,6 +246,41 @@ export const guildBoard = z.object({
   gearCoverage: z.object({ measured: z.number().int(), roster: z.number().int() }).describe("Roster members with one agreed item level, over the agreed roster."),
   present: z.array(z.string()),
   attendanceWaiting: z.boolean(),
+  // The ladder side of the guild (guilds design, 2026-10-24): members' agreed kills joined with the officers' board.
+  ladderProgression: z.array(guildInstanceProgress).optional().describe("Per instance, newest first: bosses killed out of the instance's bosses, each kill with its date and who reported it. Members' kills and the officers' board together; a boss both report is one line."),
+  activity: z.array(guildKillEntry).optional().describe("The agreed kills, newest first."),
+  seenRoster: z.object({
+    count: z.number().int(),
+    members: z.array(z.object({ name: z.string(), level: z.number().int(), class: z.string(), lastSeen: z.string() })),
+  }).nullable().optional().describe("Characters the addon saw in this guild, newest first: sightings, not the game's roster. Null when the player pages are not connected, which is not an empty guild."),
+  ranks: guildRanks.nullable().optional().describe("Rank on the realm and overall in the newest instance with a kill; null without one."),
+});
+
+/** One guild as guild_search lists it. */
+export const guildSummary = z.object({
+  guildName: z.string(),
+  realm: z.string(),
+  faction: z.enum(GUILD_FACTIONS).nullable().describe("Null until a kill or a board names it."),
+  membersSeen: z.number().int().nullable().describe("Characters the addon saw in the guild; null when the player pages are not connected, which is not zero."),
+  kills: z.number().int().describe("Agreed boss kills, members' and officers' together."),
+  latestKillAt: z.string().nullable().describe("The newest agreed kill, ISO; null without a timed kill."),
+});
+export const guildSearch = z.object({ guilds: z.array(guildSummary) });
+
+/** One row of the guild ladder for one instance. */
+export const ladderRow = z.object({
+  rank: z.number().int().describe("Equal kills and latest-kill time share a rank."),
+  guildName: z.string(),
+  realm: z.string(),
+  faction: z.enum(GUILD_FACTIONS).nullable(),
+  killed: z.number().int(),
+  bosses: z.number().int(),
+  latestKillAt: z.string().nullable().describe("When the guild's latest kill in this instance was first reported, ISO; null when only the officers published it."),
+  membersSeen: z.number().int().nullable(),
+});
+export const guildRankings = z.object({
+  instance: z.object({ instanceMapId: z.number().int(), name: z.string() }).nullable().describe("The instance ranked; null when no instance has an agreed kill."),
+  rows: z.array(ladderRow),
 });
 
 const reagent = z.object({ item: z.string(), count: z.number().int() });
@@ -715,6 +786,38 @@ export const MCP_TOOLS = {
     },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
+  class_races: {
+    title: "Races that can be a class, with their racial traits",
+    description:
+      "Which races can be one class in WoW: Forever, on which faction, and each race's racial traits (name, active or passive) from the game files (found in game files, unconfirmed, with the build). Narrow to one faction. What each trait does is on the class page, linked from the answer.",
+    inputSchema: {
+      class: z.string().min(1).max(40).describe("Class name or slug, such as Warlock or warlock."),
+      faction: z.enum(GUILD_FACTIONS).optional().describe("alliance or horde. Without it, both."),
+    },
+    outputSchema: {
+      label: z.string(),
+      build: z.string().describe("The game build the races were read from."),
+      class: z.enum(TALENT_CLASSES).optional().describe("Absent when the class is not one the files list."),
+      className: z.string().optional(),
+      faction: z.enum(GUILD_FACTIONS).optional(),
+      factions: z.array(z.object({
+        faction: z.enum(["Alliance", "Horde", "Neutral"]),
+        races: z.array(z.object({
+          id: z.number().int().describe("The client's race id (ChrRaces)."),
+          name: z.string().describe("The race's name in the game files."),
+          traits: z.array(z.object({
+            name: z.string(),
+            kind: z.enum(["active", "passive"]),
+            order: z.number().int().describe("The order on the character screen."),
+          })),
+        })),
+      })).describe("Alliance first. Empty when the class is unknown."),
+      error: z.string().optional().describe("A class the files do not list."),
+      credit: z.string(),
+      url: z.string().optional().describe(PAGE_URL),
+    },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
   collection_gap: {
     title: "Owned versus missing in a collection",
     description:
@@ -746,6 +849,30 @@ export const MCP_TOOLS = {
       realm: z.string().describe("Realm name."),
     },
     outputSchema: { ...uploadsAnswer, page: guildBoard.optional() },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  guild_search: {
+    title: "Find a guild by the start of its name",
+    description:
+      "Guilds whose name starts with what you typed, each with its realm, faction, how many characters the addon saw in it, and the count and date of its agreed boss kills. A guild is listed once its members' uploads agree on a kill (2 installs reporting the same guild and boss), once its officers published a board, or once a character was seen in it. Guild names only, never a member's name, and a guild that asked to be hidden is left out. Members seen are counted only when the player pages are connected; otherwise the count is unrecorded, not zero. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.",
+    inputSchema: {
+      query: z.string().min(2).max(24).describe("The start of the guild's name, 2 to 24 characters."),
+      limit: z.number().int().min(1).max(25).default(10),
+    },
+    outputSchema: { ...uploadsAnswer, page: guildSearch.optional() },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  guild_rankings: {
+    title: "Guild ladder for one raid or dungeon",
+    description:
+      "Every guild with an agreed kill in one instance, ordered by bosses killed, then by who reached its latest kill first, then by name; equal rows share a rank. A kill is a guild's once 2 of its members' installs report the same boss there, timed at the earliest report, or once its officers published it through the guild board, which carries no time. The boss list and its order are the encounters 3 installs reported in that instance; a kill of a boss not on it counts for nothing. There is no score, no rating and no total across instances. Without an instance, the newest raid with a kill is ranked; realm and faction narrow the ladder. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.",
+    inputSchema: {
+      instanceMapId: z.number().int().positive().optional().describe("The instance's map id, as instance_entrance carries it. Omit for the newest raid with a kill."),
+      realm: z.string().max(60).optional().describe("Only guilds on this realm."),
+      faction: z.enum(GUILD_FACTIONS).optional().describe("Only alliance or horde guilds."),
+      limit: z.number().int().min(1).max(100).default(20),
+    },
+    outputSchema: { ...uploadsAnswer, page: guildRankings.optional() },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
   auction_history: {
@@ -878,7 +1005,7 @@ export const CHATGPT_TOOLS: readonly McpToolName[] = ["search", "fetch"];
 /** The tools whose answers are built on player uploads and therefore end with TOOL_OUTPUT.endsWith. */
 export const PLAYER_DATA_TOOLS: readonly McpToolName[] = [
   "answer_sources", "profession_path", "recipe_thresholds", "item_page", "npc_page", "object_page", "quest_page", "vendor_page",
-  "world_map_near", "entity_relations", "collection_gap", "completion_progress", "guild_board", "auction_history",
+  "world_map_near", "entity_relations", "collection_gap", "completion_progress", "guild_board", "guild_search", "guild_rankings", "auction_history",
   "market_value", "gold_ledger", "population", "coverage",
 ];
 

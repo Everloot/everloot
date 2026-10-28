@@ -2,15 +2,16 @@ import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import JsonLd from "@/components/JsonLd";
-import { toolHref, tools } from "@/data/tools";
-import { Container, PageHeader, SectionHeading } from "@/components/ui";
+import { TOOL_LINES, toolGroups } from "@/data/tools";
+import { PageHeader, ReadingLayout, SectionHeading } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
-import { aboutPageJsonLd, DISCORD_INVITE, NON_AFFILIATION, OPERATOR, TRADEMARK_LINE } from "@/lib/jsonld";
+import { guildsOn } from "@/lib/guild-switch";
+import { aboutPageJsonLd, DISCORD_INVITE, OPERATOR } from "@/lib/jsonld";
 
 const TITLE = "About Everloot";
-const description = `Everloot offers free WoW: Forever tools and a database built from player addon uploads. It is run by ${OPERATOR} and not affiliated with Blizzard.`;
+const description = `Everloot offers free WoW: Forever tools and a database built from player addon uploads. It is an independent project run by ${OPERATOR}.`;
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 export const metadata: Metadata = {
   // The layout adds "· Everloot", so the tab reads "About · Everloot" rather than naming Everloot twice.
@@ -19,17 +20,17 @@ export const metadata: Metadata = {
 
 export default function AboutPage() {
   return (
-    <Container width="reading">
+    <ReadingLayout items={[{ id: "the-tools", label: "The tools" }, { id: "free", label: "How it stays free" }, { id: "independent", label: "An independent project" }]}>
       <JsonLd data={aboutPageJsonLd({ name: TITLE, description, path: "/about" })} />
       <PageHeader title={TITLE} lede={description} trail={trailFor("/about")!} />
 
       <div className="space-y-12">
         <section className="space-y-4 text-fg-2">
           <p>
-            Everloot is the WoW: Forever database, rebuilt Thottbot-style: drop
-            rates, spawn maps, quest pages and guild progression collected by
-            players running our lightweight addon — plus free tools that make the
-            data usable. No account required to browse.
+            Everloot is a database and a set of tools for WoW: Forever. Drop rates,
+            spawn points, quests and guild progression come from players who run
+            our addon and choose to upload what it recorded. You don&apos;t need an
+            account to browse.
           </p>
           <p>
             How uploads become facts, and what is never published, is on{" "}
@@ -39,23 +40,17 @@ export default function AboutPage() {
           </p>
         </section>
 
-        <section aria-labelledby="different">
-          <SectionHeading id="different">What makes these tools different</SectionHeading>
-          <p className="text-fg-2">
-            Big WoW databases are great for looking things up, but terrible for
-            actually <em>doing</em> something with the information. These tools are
-            focused: one problem, one page, one answer. Input your data, get your
-            answer, close the tab.
-          </p>
-        </section>
-
         <section aria-labelledby="the-tools">
           <SectionHeading id="the-tools">The tools</SectionHeading>
+          <p className="mb-4 text-fg-2">
+            Each tool does one job on one page. They are also listed on the{" "}
+            <Link href="/tools" className={link}>Tools page</Link>.
+          </p>
           <ul className="divide-y divide-line border-y border-line">
-            {tools.map((t) => (
-              <li key={t.slug} className="flex flex-wrap items-baseline gap-x-4 gap-y-1 py-3">
-                <Link href={toolHref(t)} className={link}>{t.title}</Link>
-                <span className="text-sm text-muted">{t.tagline}{t.status === "coming-soon" && " Planned."}</span>
+            {toolGroups(guildsOn()).flatMap((g) => g.links).map((t) => (
+              <li key={t.href} className="flex flex-wrap items-baseline gap-x-4 gap-y-1 py-3">
+                <Link href={t.href} className={link}>{t.label}</Link>
+                <span className="text-sm text-muted">{TOOL_LINES[t.href]}</span>
               </li>
             ))}
           </ul>
@@ -69,15 +64,24 @@ export default function AboutPage() {
             sell data, we don&apos;t gate tools behind signups, and we don&apos;t show
             popups or interstitials.
           </p>
+          <p className="mt-4 text-fg-2">
+            Everloot search is free. If you add an optional AI model to{" "}
+            <Link href="/chat" className={link}>Chat</Link>, it runs on your own provider account,
+            so that provider&apos;s pricing and limits apply; some models have a limited free tier.
+            A ChatGPT or Claude subscription is not an API key.
+          </p>
         </section>
 
-        <section aria-labelledby="blizzard">
-          <SectionHeading id="blizzard">Not affiliated with Blizzard</SectionHeading>
+        <section aria-labelledby="independent">
+          <SectionHeading id="independent">An independent project</SectionHeading>
           <p className="text-fg-2">
-            Everloot is an independent fan project. {NON_AFFILIATION} {TRADEMARK_LINE}
+            Everloot is an independent fan project, built and run by {OPERATOR}.
+            The game, its data and its art belong to Blizzard Entertainment; the
+            full credits are on <Link href="/methodology#credits" className={link}>How we count</Link>, and
+            the trademark notice is in the <Link href="/terms#trademarks" className={link}>Terms of Use</Link>.
           </p>
         </section>
       </div>
-    </Container>
+    </ReadingLayout>
   );
 }

@@ -2,8 +2,9 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "vitest";
 import { emptyStore, loadStore, mergePosts, parseBlueskyFeed, type BluePost } from "../src/blue-posts.js";
-import { blueThreads, buildTimeline, filterTimeline, forumRegions, groupAnnouncements, handleRecentChanges, parseFilter, renderFeed, sameAnnouncement, type BuildLike } from "../src/changes.js";
+import { blueThreads, buildTimeline, filterTimeline, forumRegions, groupAnnouncements, handleRecentChanges, manualEntries, parseFilter, renderFeed, sameAnnouncement, type BuildLike } from "../src/changes.js";
 import { clampExcerpt, safeHttpUrl } from "../src/text-safety.js";
+import { postPath } from "../src/changes.js";
 
 const fixture = (name: string) => JSON.parse(readFileSync(new URL(`./fixtures/blue/${name}`, import.meta.url), "utf8"));
 const seen = new Date("2026-10-17T12:00:00Z");
@@ -29,6 +30,11 @@ test("a build is labelled as first seen by Everloot and carries an empty diff sl
   expect(early).toMatchObject({ game: "forever", title: "WoW: Forever build 1.60.1.70450", url: null, diffUrl: null });
   expect(timeline.find((e) => e.version === "1.60.1.70460")!.diffUrl).toBe("https://everloot.app/changes/diff/70460");
   expect(timeline.find((e) => e.version === "1.15.9.70001")!.game).toBe("classic");
+});
+
+test("a build of WoW Forever's own product (wowf) is a WoW: Forever build", () => {
+  const build = { key: "wowf:eee", product: "wowf", buildId: 70630, version: "1.60.1.70630", firstSeen: "2026-10-27T05:12:02.000Z" };
+  expect(buildTimeline([], [build])).toMatchObject([{ id: "build:wowf:eee", type: "build", game: "forever", title: "WoW: Forever build 1.60.1.70630" }]);
 });
 
 test("filters: blue posts, hotfixes, builds, and a game", () => {
@@ -274,4 +280,37 @@ test("the RSS feed of the grouped timeline has one item per announcement", () =>
   expect((xml.match(/<item>/g) ?? []).length).toBe(5);
   expect(xml).not.toContain("eu-6443510");
   expect(xml.match(/Raid Overview/g)).toHaveLength(2);
+});
+test("hand-written entries carry a manual source and id, may be retail, and are kept out of the Forever filter", () => {
+  const manual = manualEntries({ entries: [
+    { id: "retail-hotfix", type: "hotfix", game: "retail", at: "2026-10-23T00:00:00Z", title: "Retail hotfixes", summary: "Fixes.", url: "https://example.com/x" },
+    { id: "Bad Id", game: "retail", at: "2026-10-23T00:00:00Z", title: "Skipped" },
+    { id: "no-game", at: "2026-10-23T00:00:00Z", title: "Skipped" },
+  ] });
+  expect(manual).toEqual([expect.objectContaining({ id: "manual:retail-hotfix", source: "manual", type: "hotfix", game: "retail", url: "https://example.com/x" })]);
+  expect(filterTimeline([...timeline, ...manual], "all", "forever").some((e) => e.source === "manual")).toBe(false);
+  expect(groupAnnouncements([...timeline, ...manual]).some((e) => e.id === "manual:retail-hotfix")).toBe(true);
+  expect(manualEntries(null)).toEqual([]);
+});
+
+const manualFixture = { id: "source-fixture", type: "post", game: "retail", at: "2026-10-23", title: "A summary", summary: "Our words.", url: "https://us.forums.blizzard.com/en/wow/t/example/123/4" };
+test("manual file rejects unknown top-level publication flags", () => {
+  expect(manualEntries({ entries: [manualFixture], private: true })).toEqual([]);
+});
+test.each(["private", "spoiler", "published", "unknown"])("manual parser rejects unknown or private field %s", (key) => {
+  expect(manualEntries({ entries: [{ ...manualFixture, [key]: true }] })).toEqual([]);
+});
+test.each([undefined, "build", "typo", null])("manual parser rejects invalid type %s", (type) => {
+  expect(manualEntries({ entries: [{ ...manualFixture, type }] })).toEqual([]);
+});
+test.each([undefined, "", "javascript:alert(1)", "not a URL", "https://user:secret@example.com/x"])("manual parser requires safe original URL %s", (url) => {
+  expect(manualEntries({ entries: [{ ...manualFixture, url }] })).toEqual([]);
+});
+test("manual duplicate ids reject every conflicting entry regardless of order", () => {
+  expect(manualEntries({ entries: [manualFixture, { ...manualFixture, title: "Conflicting claim" }] })).toEqual([]);
+});
+test("manual source fixture keeps sanitized source and text, with no detail page", () => {
+  const [entry] = manualEntries({ entries: [{ ...manualFixture, title: "<b>Our</b> summary", summary: "<i>Our</i> words." }] });
+  expect(entry).toMatchObject({ title: "Our summary", summary: "Our words.", url: manualFixture.url, source: "manual" });
+  expect(postPath(entry)).toBeNull();
 });

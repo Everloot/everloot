@@ -8,6 +8,7 @@ import { MY_BUILDS, MY_BUILDS_LINE, MY_BUILDS_REFUSAL, savedBuildsOn, SLUG_PATTE
 import { fail, keyReadsOwn, limitedText, listOwn, NO_STORE, ownBuildsForKey, unavailable } from "./saved-builds-store";
 import { getUser, siteUrl } from "./supabase/server";
 import { isTalentClass, loadCatalog } from "./talents/catalogs";
+import { compareGameBuilds } from "./talents/freshness";
 import { nodeMap } from "./talents/rules";
 import { decodeBuild, resolveBuild, type ResolvedBuild } from "./talents/share";
 import { buildTitle, previewPath, summarizeBuild } from "./talents/summary";
@@ -20,7 +21,7 @@ import type { TalentCatalog } from "./talents/types";
  */
 export const MY_BUILDS_TOOL: McpToolDef = {
   title: "My saved builds",
-  description: `${MY_BUILDS_LINE} Needs a key made with "Read my saved builds". Each build links its short link while sharing is on, otherwise the calculator.`,
+  description: `${MY_BUILDS_LINE} Needs a key made with "Read my saved builds". Each build links its short link while sharing is on, otherwise the calculator, and says whether it was made on an older or a newer game build than the calculator's tree (olderBuild, newerBuild).`,
   inputSchema: { slug: z.string().regex(SLUG_PATTERN).optional().describe("A build's slug from the list, for that build's talents.") },
   annotations: { readOnlyHint: true, openWorldHint: false },
 };
@@ -74,7 +75,8 @@ export async function answerMyBuilds(data: AccountBuilds, args: Args, site = sit
     const facts = await describeBuilds(data.builds);
     const builds = data.builds.map((b) => ({
       slug: b.slug, name: b.name, class: b.classSlug, title: facts.get(b.id)?.title ?? b.classSlug, character: character(b),
-      active: b.active, gameBuild: b.gameBuild, olderBuild: facts.get(b.id)?.older ?? false, link: b.link, url: buildUrl(b, site),
+      active: b.active, gameBuild: b.gameBuild, olderBuild: facts.get(b.id)?.older ?? false, newerBuild: facts.get(b.id)?.newer ?? false,
+      link: b.link, url: buildUrl(b, site),
     }));
     if (builds.length === 0) {
       return { text: `No saved builds yet. Make one in the talent calculator and press Save: ${site}/tools/talents`, structured: { builds } };
@@ -82,7 +84,7 @@ export async function answerMyBuilds(data: AccountBuilds, args: Args, site = sit
     const lines = [`${plural(builds.length, "saved build", "saved builds")}, newest first. Ask again with a slug for a build's talents.`];
     for (const b of builds) {
       lines.push(`- ${b.name} (slug ${b.slug}): ${b.title}${b.character ? `, character ${b.character}` : ""}${b.active ? ", active" : ""}. ` +
-        `Game build ${b.gameBuild}${b.olderBuild ? " (older build)" : ""}. ${b.url}`);
+        `Game build ${b.gameBuild}${b.olderBuild ? " (older build)" : ""}${b.newerBuild ? " (newer build)" : ""}. ${b.url}`);
     }
     return { text: lines.join("\n"), structured: { builds } };
   }
@@ -91,12 +93,17 @@ export async function answerMyBuilds(data: AccountBuilds, args: Args, site = sit
   if (!b) return { text: `No saved build with slug ${args.slug} on this account. Ask without a slug for the list.`, structured: { build: null } };
   const catalog = isTalentClass(b.classSlug) ? await loadCatalog(b.classSlug) : null;
   const sets = catalog ? [b.code, b.code2].filter((code): code is string => !!code).map((code) => talentSet(catalog, code)) : [];
-  const olderBuild = catalog ? b.gameBuild !== catalog.build : false;
+  // -1 older than the tree, 1 newer; null when either build cannot be read, and then it is neither.
+  const order = catalog ? compareGameBuilds(b.gameBuild, catalog.build) : null;
+  const olderBuild = order === -1;
+  const newerBuild = order === 1;
   const url = buildUrl(b, site);
 
   const lines = [
     `${b.name}${character(b) ? `, character ${character(b)}` : ""}${b.active ? ", active" : ""}. ` +
-      (olderBuild ? `Made on game build ${b.gameBuild}; the calculator's tree is build ${catalog!.build}, so check each talent.` : `Game build ${b.gameBuild}.`),
+      (olderBuild ? `Made on game build ${b.gameBuild}; the calculator's tree is build ${catalog!.build}, so check each talent.`
+        : newerBuild ? `Made on game build ${b.gameBuild}, newer than the calculator's tree (build ${catalog!.build}), which has not caught up with it yet.`
+        : `Game build ${b.gameBuild}.`),
   ];
   if (b.notes) lines.push(`Notes: ${b.notes}`);
   sets.forEach((set, i) => {
@@ -113,7 +120,7 @@ export async function answerMyBuilds(data: AccountBuilds, args: Args, site = sit
     structured: {
       build: {
         slug: b.slug, name: b.name, notes: b.notes, class: b.classSlug, character: character(b), active: b.active,
-        gameBuild: b.gameBuild, treeBuild: catalog?.build ?? null, olderBuild, link: b.link, url, sets,
+        gameBuild: b.gameBuild, treeBuild: catalog?.build ?? null, olderBuild, newerBuild, link: b.link, url, sets,
       },
     },
   };

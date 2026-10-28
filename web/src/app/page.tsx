@@ -1,6 +1,7 @@
 import Link from "next/link";
 import AdSlot from "@/components/AdSlot";
 import type { Metadata } from "next";
+import TrackedDownload from "@/components/TrackedDownload";
 import JsonLd from "@/components/JsonLd";
 import GlintHero from "@/components/glint/GlintHero";
 import LoreSearchForm from "@/components/LoreSearchForm";
@@ -17,13 +18,13 @@ import { FEED } from "@/lib/seo";
 import { classAndProfessionIcons, launchArt, loadSiteAssets } from "@/lib/game-assets";
 import GameIcon from "@/components/game/GameIcon";
 import { BannerArt } from "@/components/game/PageBanner";
-import { CONNECT_EXAMPLES, MCP_TOOLS } from "@/lib/docs/connect-data";
+import { CONNECT_EXAMPLES, liveMcpTools } from "@/lib/docs/connect-data";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/", types: FEED },
 };
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 /** What each tool in the grouped list is for, in a few words. The groups themselves are the header's Tools menu. */
 const TOOL_NOTES: Record<string, string> = {
@@ -65,7 +66,7 @@ export default async function Home() {
   const categories = CLIENT_TAXONOMY.classes.filter((c) => c.items > 0).sort((a, b) => b.items - a.items).slice(0, 6);
   // What's new: the newest entries the site's own timeline holds, newest first.
   // One line per announcement: loadTimeline already folds the regional copies together.
-  const newest = loadTimeline().slice(0, 4);
+  const newest = (await loadTimeline()).slice(0, 4);
   const status = new Map(tools.map((t) => [toolHref(t), t.status]));
   const groups = TOOL_GROUPS.map((g) => ({ ...g, links: g.links.filter((l) => l.href !== "/tools/talents") }));
 
@@ -74,28 +75,16 @@ export default async function Home() {
       <JsonLd data={organizationJsonLd()} />
       <JsonLd data={websiteJsonLd()} />
 
-      {/* The hero: the section banner at full height, over the game's own loading screen, with its logo.
+      {/* The hero: the section banner at full height, over the game's own loading screen.
           The scripts above it would give it the list's top margin; the banner meets the site header instead. */}
       <section aria-labelledby="hero-title" data-launch-banner={launch ? "" : undefined} className="!mt-0">
         <Banner
           hero
           image={launch?.background && <BannerArt art={launch.background} eager position={HERO_ART_POSITION} sizes={HERO_ART_SIZES} />}
           aside={launch && (
-            // The game's name and the disclaimer stay real text under its logo; the logo is decorative. On a
-            // phone only the disclaimer shows, under the buttons, to keep the hero short.
+            // Keep the game name as text on every screen; the hero uses Everloot's branding.
             <div className="lg:text-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={launch.logo.url}
-                alt=""
-                aria-hidden="true"
-                width={launch.logo.width}
-                height={launch.logo.height}
-                decoding="async"
-                className="mx-auto mb-3 hidden h-28 w-28 object-contain lg:block"
-              />
-              <p className="hidden font-semibold text-fg lg:block">World of Warcraft: Forever</p>
-              <p className="text-xs text-fg-2 lg:mt-1 lg:text-sm">Not affiliated with or endorsed by Blizzard Entertainment.</p>
+              <p className="text-sm font-semibold text-fg lg:text-base">World of Warcraft: Forever</p>
             </div>
           )}
         >
@@ -136,8 +125,8 @@ export default async function Home() {
           </ul>
           {addon && (
             <p className="text-sm text-fg-2 md:max-w-[26ch]">
-              The addon is <span className="tabular-nums text-fg">{addon.version}</span>. It reads the client and
-              sends what you allow.
+              The addon is <span className="tabular-nums text-fg">{addon.version} Alpha</span>. Live-client verification
+              is pending. It reads the client and sends what you allow.
             </p>
           )}
         </Card>
@@ -149,10 +138,11 @@ export default async function Home() {
         <Card unconfirmed className="grid gap-8 md:grid-cols-[auto_minmax(0,1fr)] md:items-center">
           <div>
             <p className="text-5xl font-bold tabular-nums tracking-tight text-fg">{CLIENT_TAXONOMY.items.length.toLocaleString("en-US")}</p>
-            <p className="mt-2 max-w-[28ch] text-sm text-fg-2">items in the game files. Players turn them into facts.</p>
+            <p className="mt-2 max-w-[28ch] text-sm text-fg-2">items in the game files. Players turn them into facts. Lists show named items; the rest wait for a name.</p>
           </div>
           <div className="min-w-0">
-            <ul aria-label="Items by category" className="grid gap-x-8 sm:grid-cols-2 lg:grid-cols-3">
+            <p className="mb-2 font-mono text-xs text-muted">The largest categories</p>
+            <ul aria-label="The largest item categories" className="grid gap-x-8 sm:grid-cols-2 lg:grid-cols-3">
               {categories.map((c) => (
                 <li key={c.id} className="border-b border-line">
                   <Link href={itemsHref(c.slug)} className="flex min-h-11 items-center justify-between gap-4 text-fg hover:text-accent">
@@ -227,7 +217,7 @@ export default async function Home() {
           note="The addon records what you see. No fact goes public on one person's word."
           action={<Link href="/methodology" className={link}>How we count →</Link>}
         >
-          Three players agree. Then it&apos;s a fact.
+          Three installs agree. Then it&apos;s a fact.
         </SectionHeading>
         <ol className="grid gap-x-6 gap-y-4 border-t border-line pt-6 sm:grid-cols-2 lg:grid-cols-4">
           {AGREEMENT_STEPS.map((step) => (
@@ -256,7 +246,7 @@ export default async function Home() {
         </div>
         <div className="min-w-0 space-y-2">
           <CodeBlock title="Claude Code" label="Add Everloot to Claude Code">{CONNECT_EXAMPLES.claudeCode}</CodeBlock>
-          <p className="text-sm text-muted">{MCP_TOOLS.length} read-only tools. Works with Claude, ChatGPT, Grok and any client that takes a URL.</p>
+          <p className="text-sm text-muted">{liveMcpTools().length} read-only tools. Works with Claude, ChatGPT, Grok and any client that takes a URL.</p>
         </div>
       </section>
 
@@ -267,7 +257,7 @@ export default async function Home() {
         </SectionHeading>
         <div className="flex flex-wrap items-center gap-3">
           {addon
-            ? <a href={addon.downloadPath} download className="btn btn-primary">Download addon {addon.version}</a>
+            ? <TrackedDownload href={addon.downloadPath} addon="everloot" to="site" download className="btn btn-primary">Download addon {addon.version} Alpha</TrackedDownload>
             : <Link href="/addon" className="btn btn-primary">Get the addon</Link>}
           <Link href="/addon" className="btn">Desktop app</Link>
         </div>

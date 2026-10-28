@@ -17,7 +17,7 @@ export async function GET(req: Request) {
   if (req.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
-  const urls = changeUrlsToPing(loadTimeline(), new Date(), WINDOW_MS);
+  const urls = changeUrlsToPing(await loadTimeline(), new Date(), WINDOW_MS);
   const result = await pingIndexNow(urls);
   return NextResponse.json({ ok: true, urls: urls.length, ...result });
 }

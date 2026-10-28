@@ -47,8 +47,8 @@ describe("the answer", () => {
     const codeLink = `${SITE}/tools/talents/mage/b/${older}`;
     expect(structured).toMatchObject({
       builds: [
-        { slug: "AbCd1234", name: "Fire", class: "mage", character: "Jaina", active: true, gameBuild: mage.build, olderBuild: false, link: `${SITE}/b/AbCd1234`, url: `${SITE}/b/AbCd1234` },
-        { slug: "Zz9Zz9Zz", name: "Old frost", character: null, active: false, gameBuild: "1.0.0.1", olderBuild: true, link: null, url: codeLink },
+        { slug: "AbCd1234", name: "Fire", class: "mage", character: "Jaina", active: true, gameBuild: mage.build, olderBuild: false, newerBuild: false, link: `${SITE}/b/AbCd1234`, url: `${SITE}/b/AbCd1234` },
+        { slug: "Zz9Zz9Zz", name: "Old frost", character: null, active: false, gameBuild: "1.0.0.1", olderBuild: true, newerBuild: false, link: null, url: codeLink },
       ],
     });
     expect(text).toContain("2 saved builds, newest first.");
@@ -70,14 +70,50 @@ describe("the answer", () => {
     expect(fire.text).toContain(`  ${tree} 1: ${first.entries[0].name} 1/${first.maxRanks}`);
     expect(fire.text).toContain(`Open: ${SITE}/b/AbCd1234`);
     expect(fire.text.endsWith(GAME_DATA_CREDIT)).toBe(true);
-    expect(fire.structured).toMatchObject({ build: { slug: "AbCd1234", olderBuild: false, treeBuild: mage.build, sets: [{ spent: 1, unknown: [], buildDiffers: false }] } });
+    expect(fire.structured).toMatchObject({ build: { slug: "AbCd1234", olderBuild: false, newerBuild: false, treeBuild: mage.build, sets: [{ spent: 1, unknown: [], buildDiffers: false }] } });
 
     const old = await answerMyBuilds(account(), { slug: "Zz9Zz9Zz" }, SITE);
     expect(old.text).toContain(`Made on game build 1.0.0.1; the calculator's tree is build ${mage.build}, so check each talent.`);
     expect(old.text).toContain("Notes: From the beta");
     expect(old.text).toContain("1 talent is not in today's tree: node 999999.");
     expect(old.text).toContain(`Open: ${SITE}/tools/talents/mage/b/${older}`);
-    expect(old.structured).toMatchObject({ build: { olderBuild: true, link: null, sets: [{ unknown: [{ id: 999999, rank: 2 }], buildDiffers: true }] } });
+    expect(old.structured).toMatchObject({ build: { olderBuild: true, newerBuild: false, link: null, sets: [{ unknown: [{ id: 999999, rank: 2 }], buildDiffers: true }] } });
+  });
+
+  test("one build's game build is older only when it is older, newer when it is newer, and neither for the tree's or an unreadable one", async () => {
+    const parts = mage.build.split(".");
+    const newer = [...parts.slice(0, -1), String(Number(parts.at(-1)) + 1)].join(".");
+    const detail = async (gameBuild: string) => {
+      const { text, structured } = await answerMyBuilds({ characters: [], builds: [build({ gameBuild, characterId: null })] }, { slug: "AbCd1234" }, SITE);
+      const { olderBuild, newerBuild } = (structured as { build: { olderBuild: boolean; newerBuild: boolean } }).build;
+      return { text, olderBuild, newerBuild };
+    };
+
+    expect(await detail("1.0.0.1")).toMatchObject({ olderBuild: true, newerBuild: false, text: expect.stringContaining("Made on game build 1.0.0.1; the calculator's tree") });
+    const ahead = await detail(newer);
+    expect(ahead).toMatchObject({ olderBuild: false, newerBuild: true });
+    expect(ahead.text).toContain(`Made on game build ${newer}, newer than the calculator's tree (build ${mage.build}), which has not caught up with it yet.`);
+    expect(ahead.text).not.toContain("check each talent");
+    expect(await detail(mage.build)).toMatchObject({ olderBuild: false, newerBuild: false, text: expect.stringContaining(`active. Game build ${mage.build}.`) });
+    expect(await detail("beta")).toMatchObject({ olderBuild: false, newerBuild: false, text: expect.stringContaining("active. Game build beta.") });
+  });
+
+  test("the list and one build agree on older and newer", async () => {
+    const parts = mage.build.split(".");
+    const newer = [...parts.slice(0, -1), String(Number(parts.at(-1)) + 1)].join(".");
+    const games = ["1.0.0.1", newer, mage.build, "beta"];
+    const data: AccountBuilds = {
+      characters: [],
+      builds: games.map((gameBuild, i) => build({ id: `0b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e1${i}`, slug: `AbCd123${i}`, gameBuild, characterId: null })),
+    };
+    const list = await answerMyBuilds(data, {}, SITE);
+    const listed = (list.structured as { builds: Array<{ slug: string; olderBuild: boolean; newerBuild: boolean }> }).builds;
+    expect(listed.map((b) => [b.olderBuild, b.newerBuild])).toEqual([[true, false], [false, true], [false, false], [false, false]]);
+    expect(list.text).toContain(`Game build ${newer} (newer build).`);
+    for (const item of listed) {
+      const one = (await answerMyBuilds(data, { slug: item.slug }, SITE)).structured as { build: { olderBuild: boolean; newerBuild: boolean } };
+      expect([one.build.olderBuild, one.build.newerBuild]).toEqual([item.olderBuild, item.newerBuild]);
+    }
   });
 
   test("a slug that is not on the account says so", async () => {

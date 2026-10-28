@@ -2,13 +2,14 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Badge, Card, LinkTabs, Segmented } from "@/components/ui";
 import {
   allCategories, candidateCounts, categoryCounts, CATEGORY_GROUPS, CATEGORY_IDS, continentPath, initialView, mapUrlSearch, openPageLink,
   parseDeepLink, parseZoneLink, pinHref, readPinSet, searchMap, spotBox, viewSearch, visibleItems, wayCommand, zoneSearch, zoneSpot,
   type Box, type Candidate, type CategoryId, type CategoryState, type MapArtLayer, type MapItems, type MapPinSet, type MapUrlState, type SearchHit,
 } from "@/lib/map-view";
+import type { PoiIcons } from "@/lib/map-marks";
 import { confirmedLine } from "@/lib/report-labels";
 import MapList, { HELD_LABEL } from "./map/MapList";
 import type { FitRequest, MapMarker, MapViewChange } from "./map/LeafletMap";
@@ -25,13 +26,32 @@ const LeafletMap = dynamic(() => import("./map/LeafletMap"), {
 
 /** Where the desktop sidebar's collapsed state is kept, in this browser only. */
 export const SIDEBAR_KEY = "everloot.map.sidebar";
+const EMPTY_ICONS: PoiIcons = {};
+type HoverPoint = { x: number; y: number } | null;
+type CoordinatesHandle = { setPoint: (point: HoverPoint) => void };
+const Coordinates = forwardRef<CoordinatesHandle, { zones: MapItems["zones"] }>(function Coordinates({ zones }, ref) {
+  const [point, setPoint] = useState<HoverPoint>(null);
+  useImperativeHandle(ref, () => ({ setPoint }), []);
+  const hovered = point ? zoneSpot(zones, point.x, point.y) : null;
+  return <p data-coordinates className="pointer-events-none absolute bottom-2 right-2 z-[1100] hidden rounded-control border border-line bg-panel px-3 py-1 font-mono text-xs text-fg-2 md:block">
+    {hovered ? `${hovered.zone.name} ${hovered.x}, ${hovered.y}` : "Move over the map for coordinates"}
+  </p>;
+});
 
 /** The sidebar's two views on a desk; on a phone, which bottom sheet is open. */
 type View = MapUrlState["tab"];
 type Sheet = View | "search";
 
 /** Each category's mark, the same shape the map draws; a category with nothing on the map yet gets an empty ring. */
-function Swatch({ category }: { category: CategoryId }) {
+/**
+ * The mark beside a legend row: the same mark the category's pins carry on the map. The game's own icon where the
+ * upload has one; else the glyph the stylesheet draws on the pins, in the same shape and colour.
+ */
+function Swatch({ category, icon }: { category: CategoryId; icon?: string }) {
+  if (icon) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={icon} alt="" aria-hidden="true" width={18} height={18} data-swatch-icon decoding="async" className="h-[18px] w-[18px] shrink-0 object-contain" />;
+  }
   return (
     <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" className="shrink-0">
       {category === "zone" && <rect x="1.5" y="1.5" width="11" height="11" strokeWidth="1.2" className="fill-fg/10 stroke-edge" />}
@@ -114,6 +134,8 @@ export interface WorldMapViewProps {
   art?: MapArtLayer | null;
   /** Small loading screens by dungeon or raid name, already filtered for spoilers; absent without the asset URL. */
   thumbs?: Record<string, string>;
+  /** The game's minimap icons by legend category, for the legend rows and the pins; absent without the asset URL. */
+  poi?: PoiIcons;
   /** A spot from a deep link: a ring, and the view opens on it. */
   marker: (MapMarker & { mapId: number }) | null;
   /** The zone a link asked for, to open fitted to the view. */
@@ -133,6 +155,7 @@ export interface WorldMapViewProps {
  */
 export default function WorldMapView(props: WorldMapViewProps) {
   const { base, marker, spoilers, art } = props;
+  const icons: PoiIcons = props.poi ?? EMPTY_ICONS;
   const [show, setShow] = useState<CategoryState>(props.url.show);
   const [showArt, setShowArt] = useState(true);
   const [query, setQuery] = useState(props.url.q);
@@ -142,7 +165,8 @@ export default function WorldMapView(props: WorldMapViewProps) {
   const [selectedId, setSelectedId] = useState<string | null>(props.view.pin);
   const [focusZone, setFocusZone] = useState<number | null>(props.marker?.mapId ?? props.zoneId);
   const [spot, setSpot] = useState<{ x: number; y: number } | null>(null);
-  const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
+  const coordinates = useRef<CoordinatesHandle>(null);
+  const onHover = useCallback((point: HoverPoint) => coordinates.current?.setPoint(point), []);
   const [copied, setCopied] = useState("");
   const [request, setRequest] = useState<FitRequest | null>(null);
   const [view, setView] = useState<View>(props.url.tab);
@@ -221,7 +245,6 @@ export default function WorldMapView(props: WorldMapViewProps) {
   const selected = selectedId ? subjects.get(selectedId) ?? null : null;
   const selectedSpot = selected ? zoneSpot(zones, selected.x, selected.y) : null;
   const here = spot ? zoneSpot(zones, spot.x, spot.y) : null;
-  const hovered = hover ? zoneSpot(zones, hover.x, hover.y) : null;
 
   const ask = (to: "search" | "card" | "panel") => setFocusAsk((f) => ({ to, n: (f?.n ?? 0) + 1 }));
   useEffect(() => {
@@ -453,7 +476,7 @@ export default function WorldMapView(props: WorldMapViewProps) {
           {focus && (
             <div data-map-zone className="flex items-center justify-between gap-3 text-sm">
               <p className="min-w-0 font-medium text-fg [overflow-wrap:anywhere]">{focus.name}{focus.heldBack ? " *" : ""}</p>
-              <button type="button" onClick={goHome} className="inline-flex min-h-11 shrink-0 items-center text-accent hover:underline underline-offset-4 md:min-h-8">All of {props.name}</button>
+              <button type="button" onClick={goHome} className="inline-flex min-h-11 shrink-0 items-center text-fg underline decoration-edge underline-offset-4 hover:decoration-fg md:min-h-8">All of {props.name}</button>
             </div>
           )}
 
@@ -496,7 +519,7 @@ export default function WorldMapView(props: WorldMapViewProps) {
                 return (
                   <fieldset key={group.id} data-category-group={group.id}>
                     <legend className="mb-0.5 text-sm font-medium text-fg">{group.label}</legend>
-                    {empty.length > 0 && <p className="text-xs text-muted">Filled by uploads from the <Link href="/addon" className="text-accent hover:underline underline-offset-4">addon</Link> once 3 installs agree on a place.</p>}
+                    {empty.length > 0 && <p className="text-xs text-muted">Filled by uploads from the <Link href="/addon" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">addon</Link> once 3 installs agree on a place.</p>}
                     {group.categories.map((c) => {
                       const idle = c.status === "waiting" && counts[c.id] === 0;
                       const near = candidates[c.id] ?? 0;
@@ -510,7 +533,7 @@ export default function WorldMapView(props: WorldMapViewProps) {
                               type="checkbox" checked={show[c.id]} disabled={idle} aria-describedby={note ? `map-category-${c.id}` : undefined}
                               onChange={() => setShow((s) => ({ ...s, [c.id]: !s[c.id] }))} className="h-4 w-4 accent-accent"
                             />
-                            <Swatch category={c.id} />
+                            <Swatch category={c.id} icon={icons[c.id]} />
                             <span className={`min-w-0 flex-1 ${idle ? "text-muted" : "text-fg"}`}>{c.label}</span>
                             <span data-count className="tabular-nums text-muted"><span className="sr-only">, </span>{counts[c.id]}</span>
                           </label>
@@ -534,7 +557,7 @@ export default function WorldMapView(props: WorldMapViewProps) {
                     Game map art
                   </label>
                 )}
-                <Link href={props.spoilerHref} className="inline-flex min-h-11 items-center text-accent hover:underline underline-offset-4 md:min-h-9">
+                <Link href={props.spoilerHref} className="inline-flex min-h-11 items-center text-fg underline decoration-edge underline-offset-4 hover:decoration-fg md:min-h-9">
                   {spoilers ? "Hide spoilers" : "Show spoilers"}
                 </Link>
               </div>
@@ -556,12 +579,12 @@ export default function WorldMapView(props: WorldMapViewProps) {
 
       <div className="relative isolate min-h-0 min-w-0 flex-1 bg-panel">
         <LeafletMap
-          name={props.name} base={base} items={shown} zones={zones} art={art ?? null} showArt={showArt}
+          name={props.name} base={base} items={shown} zones={zones} art={art ?? null} showArt={showArt} icons={icons}
           selectedId={selectedId} marker={marker} initial={initial} request={request}
           onSelect={(id) => { setSelectedId(id); if (id) { setSpot(null); setSheet(null); returnFocus.current = null; } }}
           onZone={goZone}
           onPoint={(x, y) => { setSpot({ x, y }); setSheet(null); returnFocus.current = null; }}
-          onHover={setHover}
+          onHover={onHover}
           onView={onView}
         />
         {props.notice && noticeOpen && (
@@ -571,9 +594,7 @@ export default function WorldMapView(props: WorldMapViewProps) {
           </div>
         )}
         {/* Where the pointer is, on the game's 0 to 100 scale. A phone has no pointer: it reads the card instead. */}
-        <p data-coordinates className="pointer-events-none absolute bottom-2 right-2 z-[1100] hidden rounded-control border border-line bg-panel px-3 py-1 font-mono text-xs text-fg-2 md:block">
-          {hovered ? `${hovered.zone.name} ${hovered.x}, ${hovered.y}` : "Move over the map for coordinates"}
-        </p>
+        <Coordinates ref={coordinates} zones={zones} />
         {/* The card for what was chosen: a sheet along the bottom on a phone, the map's corner on a desk. */}
         {(selected || (spot && here)) && (
           <div

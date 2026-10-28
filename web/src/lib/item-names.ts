@@ -148,7 +148,7 @@ export function itemTipText(r: ItemRecord, checked: readonly CheckedWeapon[] = C
 /* ---------- The numbers players' tooltips showed (kb/src/item-facts.ts) ---------- */
 
 /** The word on each tooltip line a player can report, as the game prints it; the stats match `STAT`. */
-const FACT_WORD: Record<ItemFactName, string> = {
+export const FACT_WORD: Record<ItemFactName, string> = {
   armor: "Armor", block: "Block", damage_per_second: "damage per second", health: "Health", mana: "Mana",
   agility: "Agility", strength: "Strength", intellect: "Intellect", spirit: "Spirit", stamina: "Stamina",
   defense_rating: "Defense Rating", dodge_rating: "Dodge Rating", parry_rating: "Parry Rating", block_rating: "Block Rating",

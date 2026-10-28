@@ -6,6 +6,16 @@ import sys
 from pathlib import Path
 from urllib.parse import unquote
 
+# Site content, not documentation: a wiki page, news post or guide links site addresses such as /database/items,
+# which are pages, not files. Their links are checked by `npm run kb -- wiki-check`, `news-check` and `guide-check`;
+# each folder's README is documentation and stays checked here.
+CONTENT_DIRS = ("kb/wiki/", "kb/news/", "kb/guides/", "web/src/test/wiki/", "web/src/test/news/")
+
+
+def is_content_page(name: str) -> bool:
+    return name.startswith(CONTENT_DIRS) and not name.endswith("README.md")
+
+
 LINK = re.compile(r"!?\[[^\]]*\]\(<?([^)\s>]+)>?(?:\s+\"[^\"]*\")?\)")
 FENCE = re.compile(r"^\s*(```|~~~)")
 
@@ -36,7 +46,7 @@ def main() -> int:
     bad = 0
     for name in filter(None, files):
         path = root / name
-        if not path.is_file():
+        if not path.is_file() or is_content_page(name):
             continue
         for n, target in broken_links(path, root):
             print(f"{name}:{n}: broken link {target}")

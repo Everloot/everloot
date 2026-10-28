@@ -5,6 +5,7 @@ import { beforeEach, expect, test, vi } from "vitest";
 const state = vi.hoisted(() => ({
   assets: null as unknown, names: [] as unknown[], tipCalls: [] as number[][], matched: null as unknown,
   levels: new Map<number, { level: number; required: number; binding: number }>(),
+  progress: [] as { fact: "armor"; reporters: number; build: string }[],
 }));
 vi.mock("@/lib/game-assets", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/game-assets")>()),
@@ -22,7 +23,7 @@ vi.mock("@/lib/rollup-compute", () => ({
   loadCraftedItems: async () => ({ items: new Set<number>(), unreachable: false }),
   loadObservedEdges: async () => ({ edges: [], unreachable: false, dataAsOf: null }),
   loadLootTables: async () => ({ tables: { sources: new Map(), leftOut: 0 }, unreachable: false, dataAsOf: null }),
-  loadReportedItemFacts: async () => ({ shown: [], contested: [], unreachable: false }),
+  loadReportedItemFacts: async () => ({ shown: [], contested: [], progress: state.progress, unreachable: false }),
 }));
 vi.mock("@/lib/upload-store", () => ({ STORAGE_UNREACHABLE: "Storage unavailable", uploadStore: { loadCompletion: async () => ({ state: null, dataAsOf: null, unreachable: true }) } }));
 vi.mock("next/link", () => ({ default: ({ href, children, style, title }: { href: string; children: ReactNode; style?: object; title?: string }) => <a href={href} title={title} style={style}>{children}</a> }));
@@ -47,7 +48,15 @@ const html = async (el: Promise<ReactNode>) => renderToStaticMarkup(await el);
 const props = (id: string) => ({ params: Promise.resolve({ id }), searchParams: Promise.resolve({}) });
 const agreed = (itemId: number) => ["a", "b", "c"].map((installId) => ({ installId, itemId, name: `Agreed ${itemId}` }));
 
-beforeEach(() => { state.assets = null; state.names = []; state.tipCalls = []; state.matched = null; state.levels = new Map(); });
+beforeEach(() => { state.assets = null; state.names = []; state.tipCalls = []; state.matched = null; state.levels = new Map(); state.progress = []; });
+
+test("a below-threshold item fact shows report progress even without a game-file tooltip", async () => {
+  state.progress = [{ fact: "armor", reporters: 1, build: "1.60.1.70450" }];
+  const page = await html(ItemPage(props(String(made.fromId))));
+  expect(page).toContain("Armor: 1 of 3 installs reported");
+  expect(page).toContain("Not yet confirmed");
+  expect(state.tipCalls).toEqual([]);
+});
 
 test("an unreported item: the creating spell's icon, but no game file tooltip; the credit is the site footer's", async () => {
   state.assets = assets;
@@ -104,13 +113,15 @@ test("a category row shows a name the game files and the wiki agree on, in its q
   expect(page).toContain(`Agreed ${ids[1]}`);
   expect(page).not.toContain(`title="${NAME_TITLE.players}"`);
   expect(page).toContain(`>Agreed ${ids[1]}</a><span class="sr-only"> (name confirmed by players)</span>`);
-  expect(page).toContain(`>Item ${ids[2]}<`);
+  expect(page).not.toContain(`>Item ${ids[2]}<`);
+  expect(page).toContain("do not name yet");
   // No source line, no wiki link and no credit line on the list (density spec, 2026-10-20).
   expect(page).not.toContain(NAME_SOURCE.wiki);
   expect(page).not.toContain(NAME_SOURCE.players);
   expect(page).not.toContain("warcraft.wiki.gg/wiki/");
   // Tooltip facts are asked for the matched item and the reported one only.
   expect(state.tipCalls).toEqual([[ids[0], ids[1]]]);
+  expect(await html(SubclassPage({ params: Promise.resolve({ id: "armor", subclass: "cloth" }), searchParams: Promise.resolve({ unnamed: "1" }) }))).toContain(`>Item ${ids[2]}<`);
 });
 
 test("a name from the game files alone shows with the unconfirmed marker", async () => {
@@ -225,10 +236,10 @@ test("sorting by item level or required level puts known values first, low to hi
   const ids = clothIds();
   state.matched = matchedNames(ids.slice(0, 3));
   state.levels = new Map([[ids[0], { level: 15, required: 10, binding: 2 }], [ids[1], { level: 25, required: 0, binding: 1 }], [ids[2], { level: 15, required: 5, binding: 0 }]]);
-  expect((await clothRows({ sort: "-ilvl" })).rows.slice(0, 4)).toEqual([ids[1], ids[0], ids[2], ids[3]]);
-  expect((await clothRows({ sort: "ilvl" })).rows.slice(0, 4)).toEqual([ids[0], ids[2], ids[1], ids[3]]);
+  expect((await clothRows({ sort: "-ilvl", unnamed: "1" })).rows.slice(0, 4)).toEqual([ids[1], ids[0], ids[2], ids[3]]);
+  expect((await clothRows({ sort: "ilvl", unnamed: "1" })).rows.slice(0, 4)).toEqual([ids[0], ids[2], ids[1], ids[3]]);
   // Item 1's "no required level" sorts with the unknown rows, by id.
-  expect((await clothRows({ sort: "req" })).rows.slice(0, 3)).toEqual([ids[2], ids[0], ids[1]]);
+  expect((await clothRows({ sort: "req", unnamed: "1" })).rows.slice(0, 3)).toEqual([ids[2], ids[0], ids[1]]);
 });
 
 test("the pager and the other filters' links keep the level and binding filters", async () => {

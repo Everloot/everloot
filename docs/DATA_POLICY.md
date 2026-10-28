@@ -52,7 +52,8 @@ installs and check our counts. The facts the site states itself, such as drop ra
 ranges, appear only once at least three installs have reported them. Addon lists are the
 exception to public records: they are never published row by row, only as counts for addons that
 at least three installs report. Guild data is published only through an officer's
-upload, and named records only with that person's sharing choice. Player rows are a second
+upload, and named records only with that person's sharing choice; a guild's boss kills (`guild_kill`, below) are
+the exception, published through the guild pages once two of its members' installs report them. Player rows are a second
 exception, described below: they carry character names, and they are never published as part of
 the public records.
 
@@ -68,6 +69,22 @@ because counting the reporters would mean keeping who reported a row. A row is d
 character was last seen, and a hidden character is deleted at once and never recorded again. The pages are
 unverified information reported by other players, and Everloot makes no statement that a character
 belongs to anyone.
+
+The guild pages are off until the owner turns them on, like the player pages (the guild design,
+`docs/design/specs/2026-10-24-guild-board-design.md`). While the players module is on, the addon also records
+your own guild's boss kills: when `ENCOUNTER_END` reports a kill inside a dungeon or raid and the game shows your
+character in a guild, one `guild_kill` row with the guild's name, the realm, your faction, the encounter's id and
+name, the instance's map id and difficulty, the group size and the time. It holds no character name, no GUID and
+nothing about who else was there; at most 60 are written a UTC day, and `/everloot players off` deletes them with
+the player rows. `guild_kill` rows are never published row by row: they are not in the public corpus API or in
+`corpus.ndjson`, so one install's report and a hidden guild's rows never leave. A kill is the guild's once two
+installs report the same guild and boss, timed at the earliest of their reports; the guild pages, the guild tools and
+the open data export's `guild-kills.ndjson` and `guilds.ndjson` hold only those, and only while the guild pages are on. A guild's page lists its agreed kills, its officers'
+publication when they made one, and the characters the addon saw in that guild: these are player rows, each
+already public on its own page, grouped by the guild the game showed, and the page says they are sightings, not
+the game's member list. Anyone can hide a guild with the guild hide form, without an account or proof of office:
+the guild leaves the pages, the ladder, the search and the export at once, and its kill rows are dropped at
+intake from then on. Its characters keep their own pages, which the character hide form governs.
 
 The addon also reads a few game facts about the NPC you target and the quest you accept, as the game
 shows them to you. For an NPC: its creature type (Beast, Undead, Humanoid) and its rank (normal, elite,
@@ -114,6 +131,11 @@ number is decided within the newest build that three installs reported. Each num
 installs reported it, from which build and when it was last seen. A line installs disagree on is not shown;
 it stays `[?]`, and the tooltip says the installs disagree. The game files' tooltip carries these numbers only
 where it is already shown (the item tooltip rule below).
+
+Item pages may show how many distinct installs reported each tooltip line in its newest reported build
+when fewer than three have reported it (for example, "1 of 3 installs reported"). These progress counts
+are omitted for a line already agreed or contested in any build, include no reported value or install
+identity, and do not lower the confirmation threshold.
 
 Full auction scans are not public records either. They feed market values only, and a value is
 published when three distinct reporters scanned the item. For that count, an upload containing a scan
@@ -169,12 +191,12 @@ Game files show what exists; play shows what is real. Everloot keeps the two apa
 is which.
 
 **What the game files contain.** *Status: the table data is not published yet, except the talent catalog, the map layer, the
-raid buff table, the client layer and the build changes described below.* A maintainer can read tables of a game's current build from the files Blizzard's
+raid buff table, the client layer, the race table, the Legacy perk catalog and the build changes described below.* A maintainer can read tables of a game's current build from the files Blizzard's
 launcher downloads from its public CDN, the same files every player receives, and compare two
 builds field by field. The [source ledger](sources/LEDGER.md) lists the tables we read. Those
 snapshots and comparisons stay on the maintainer's machine. Encrypted blocks are skipped, never
 decrypted: no decryption keys are loaded. Nothing else read from the game files is in the dataset, the
-API or the MCP server; the client layer below is the one game-file layer they carry. On the site, only the talent catalog, the map layer, the raid buff table, the client layer, the build changes,
+API or the MCP server; the client layer and the race table below are the game-file layers they carry. On the site, only the talent catalog, the map layer, the raid buff table, the client layer, the race table, the build changes,
 the icons, tooltip text and frame art covered further down, and the item names, quest titles and item set and spell names covered further down may appear.
 
 Publishing the table data comes later, as a separate step. Once it ships, every entry from game
@@ -261,6 +283,11 @@ interface files, is a different thing and is covered by the second extension. Th
   icons (`CreatureFamily.IconFileID`) in the manifest. Item icons and names on these pages follow the
   item tooltip rule above: only for items 3 installs reported, never in bulk and never for every id,
   except where the item name rule below allows them.
+- **Dungeon and raid levels** (*proposed 2026-10-25, in the pull request that adds them (the maintainer review)*): the level
+  range the files give each instance, read like the entrance points beside it from the unencrypted tables
+  `MapDifficulty`, `ContentTuning` and `LFGDungeons`, published in the map layer's file and shown on `/database/instances`
+  and each instance's page as a fact from the game files. The files give one level for most instances, not a range, and
+  none for some; an instance they give none for shows a dash. Nothing is filled in from memory or another site.
 
 **Second extension: loading screens, race and faction emblems, spell tooltips and the game's logo.**
 Decided 2026-10-18. Carlos: "Approved next: (1) loading-screen art as page banners (zones, dungeons,
@@ -306,9 +333,12 @@ The rules:
   names the Warcraft Wiki contributors. A name from the game files alone carries the quiet unconfirmed marker,
   *From the game files, not yet confirmed by players*. A name 3 installs agree on comes first, with the tooltip
   *Name confirmed by players*. No source label is printed beside a name.
-- There is no id range and no placeholder filter: an item from a later version, an unreleased one, or one the
-  files call "Deprecated" or "[PH]" is named as the files name it. The marker and the build stamp say what the
-  name is: found in game files, unconfirmed.
+- There is no id range: an item from a later version, an unreleased one, or one the files call "Deprecated" or
+  "[PH]" is named as the files name it. The marker and the build stamp say what the name is: found in game files,
+  unconfirmed. Items whose name marks them as development leftovers (test, placeholder and retired items, decided
+  by `kb/src/dev-item-names.ts`, added 2026-10-26) are left out of the category lists and their counts unless the
+  reader asks for them, and their pages stay out of search and the sitemap; their pages, names and id lookups stay
+  as before.
 - The tooltip facts follow the name (added 2026-10-20, at Carlos's request that the database show the game file
   data it already holds, as Wowhead does). Until players confirm the item, its page keeps the quiet unconfirmed
   marker on the icon, whose tooltip says so, and prints no source line. The lists sort and filter by item level,
@@ -392,6 +422,17 @@ game-data file with a README that says it is Blizzard's and outside our licence.
 above apply. Tooltip text, icons and frame art shown with it keep the rules above: asset storage,
 not git.
 
+**The Legacy perk catalog.** Decided 2026-10-27 by the maintainer: the catalog of WoW: Forever's Legacy perks comes
+from the game files only, the Legacy trait trees read from the public client by a maintainer. No other site, guide or
+post supplies a value, and nothing third-party ships in it. It holds the tree, node and entry ids, positions, ranks,
+prerequisites, spend gates, the cost and the cap, with spell ids, perk names and the build stamp, and no descriptions,
+icons or tooltip text. Like the talent catalog it may be committed to the git repository as a clearly marked game-data
+file (`web/src/data/game-data/legacy-perks.json`, see [LEGACY_PERKS](LEGACY_PERKS.md)), labelled *found in game
+files, unconfirmed*: it is Blizzard's data, kept apart from our CC BY-SA data and outside our licence. Each rule says
+how it was read, and a rule the files do not settle has no value. No page shows it and no planner uses it: a Legacy
+planner waits until the cost, the cap and the spend gates it would enforce are confirmed in game or by Blizzard. It is
+not in the dataset, the API or the MCP server.
+
 **The map layer.** From the map tables we publish zone rectangles (`UiMapAssignment`), continents
 and instances (`Map`, `UiMap`), dungeon and raid entrance points (`Map.Corpse`) and, for each entrance
 and flight master, the zone the files put it in (for an entrance, the outdoor `AreaTable` area named
@@ -438,6 +479,22 @@ They are facts: ids and the relation between them, with no Blizzard text and no 
   every item through this layer. The rest of an item's tooltip (name, item level, required level,
   binding, weapon speed, stat kinds, flavour text, sell price) and its icon stay in private storage
   and appear only for items 3 installs reported, as the extension says, or under the item name rule above.
+
+**Races, classes and racial traits.** Decided 2026-10-27 (Carlos: "proceed"), as an extension of the game-file
+layers above: which races can be which class, on which faction, and each race's racial traits, read from
+`ChrRaces`, `CharBaseInfo`, `ChrClasses` and `ChrRaceRacialAbility`. The rules:
+
+- Race and class ids, the race and class pairs (`CharBaseInfo`), each race's faction and the trait names (with
+  active or passive and their order) may be published on the site and through the API, the MCP server (the
+  `class_races` tool) and the bulk download.
+- A trait's description is game text. It stays on pages, the same rule as tooltip text: the class pages and
+  `/wow-forever` may show it, and no API answer, MCP answer or bulk file carries it.
+- Every entry is labelled *found in game files, unconfirmed* and stamped with the build, once per section on a page
+  and with every answer, and the file credits WoWDBDefs, like the client layer.
+- It is committed as one game-data file, `web/src/data/game-data/races.json`, written by
+  `npm run kb -- client-races` and regenerated by the build watch, never edited by hand. A test compares its
+  pairs with Blizzard's race and class article and names any pair the two disagree on; neither is preferred.
+- Skyborne, the new race, is announced by Blizzard in its own posts, so its traits are not marked as spoilers.
 
 **Build changes, beta builds included.** Decided 2026-10-18, the same way Wowhead and other
 datamining sites work: when Blizzard ships a new build, a reviewed pull request records what
@@ -515,6 +572,12 @@ show counts and percentages whose denominator comes from the baseline (how many 
 to hold), but never a baseline name, id or row.
 
 **Facts we write ourselves**, in our own words, each with the page it came from and the date.
+
+**Guides.** A guide (`kb/guides/`, [contract](GUIDES.md)) cites only Blizzard's own posts, on
+worldofwarcraft.blizzard.com, news.blizzard.com and the US and EU forums, each linked where its claim is made with
+the day it was checked, and Everloot's own data through its pages on the site. It adds no source: other sites'
+guides are not sources, and the ledger's exceptions stay in the files and pages they are scoped to.
+`npm run kb -- guide-check` refuses any other link off the site.
 
 Game file data, and the icons, text and art shown on our pages, stay Blizzard's and are not under
 our licence. Everything else Everloot publishes is
@@ -657,3 +720,42 @@ data, not game data and not an observation.
   and a few more) cannot be taken.
 - **Deletion.** The player changes or clears any of it, or turns the public profile off, on
   /settings at any time. Deleting the account (write to hello@everloot.app) deletes the profile.
+
+## Chat
+
+/chat answers questions about the game from Everloot's data. Everloot search needs no model and sends
+the question nowhere but this site. A player may add a model with their own key; that key stays in their
+browser tab and the page talks to their provider directly.
+
+- **Everloot (free).** When the site offers it, a visitor with no key of their own gets a built-in model on
+  providers' free tiers: Groq first, then Cloudflare Workers AI when Groq is busy or at its limit, before
+  any of the answer has been sent. The question, the earlier turns of that chat and what Everloot's tools
+  returned go through this site's server to the provider, which writes the answer; each answer names the
+  provider that wrote it. A character or note goes only if the visitor attaches it. No account data, no
+  key, no cookie and no address goes to the provider. Each provider's key stays on the server, and a
+  provider is never sent another's key.
+- **What we keep.** Not the questions or the answers. To enforce the limits the server keeps a keyed hash
+  of the address, never the address, for a day. The providers' own terms cover their side: Groq's say it
+  does not train models on what it is sent and keeps it at most 30 days, for reliability and abuse checks;
+  Cloudflare's say it does not use Workers AI content to train models and does not keep it once the
+  request is answered.
+- **Limits.** A visitor gets 6 model calls a minute and 45 a day, whichever provider answers; one answer
+  is usually 2 or 3 calls. The site makes at most 900 calls a day to Groq and 55 to Cloudflare, each under
+  its free tier. Past a limit, or when the free tiers are used up, the answer is Everloot search, with a
+  line saying so.
+- **Free means free.** The model runs on the provider's free tier only; Everloot pays for no model.
+
+## The question ledger
+
+What people ask Everloot is the signal that decides which data comes next (docs/design/specs/2026-10-27-question-bank-design.md).
+The ledger records that signal without recording the people or their questions.
+
+- **What it holds.** For each lookup the chat makes through `/api/tools` (`search_knowledge`, `get_by_name`,
+  `get_entity`, `search`, `answer_sources`), one daily counter: the tool's name and whether the lookup found
+  something or nothing. It is a usage counter like the others (`usage_counters`), and nothing else.
+- **What it never holds.** The question's text, the name that was looked up, the answer, an IP address, an
+  install id, a session, an account or a key. A miss says that a lookup found nothing, not what was asked.
+- **Where it is read.** The miss rate per tool, beside the question bank's own gap lists, chooses the next
+  data wave. It is never shown per person, because nothing per person exists.
+- **What would need a new decision.** Recording which names fail to resolve, even without the question, is a
+  different thing: it keeps game names players typed. It is not built, and it needs its own line here first.

@@ -81,7 +81,8 @@ export function SuggestField({ id, name = "q", label, placeholder, defaultValue 
         aria-autocomplete="list"
         aria-activedescendant={shown && active >= 0 ? `${listId}-${active}` : undefined}
         aria-describedby={describedBy}
-        onChange={(event) => { setText(event.target.value); setOpen(true); }}
+        // The rows on screen answer the old text until the next ones arrive, so a pick made in them ends here.
+        onChange={(event) => { setText(event.target.value); setOpen(true); setActive(-1); }}
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
         onKeyDown={onKeyDown}

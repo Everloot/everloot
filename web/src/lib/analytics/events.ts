@@ -8,7 +8,7 @@ export interface EventMap {
   talent_build_loaded: { source: "link" | "import" };
   raid_comp_shared: { via: "link" | "copy" };
   upload_done: { batches: number };
-  addon_download: { addon: string; to: "curseforge" | "github" };
+  addon_download: { addon: string; to: "curseforge" | "github" | "site" };
   connect_copy: { target: "mcp_url" | "claude_command" | "other" };
   /** Whether the search found anything is not known at submit time, so only the surface is sent. */
   search: { surface: "lore" };

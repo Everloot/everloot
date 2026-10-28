@@ -12,7 +12,7 @@ import { validRealm } from "./realm.js";
  * the generated JSON Schema's description, so a reader of the schema files knows the server checks them.
  */
 export const RULES = {
-    loot: ["loot needs a source: npc or object", "a loot position needs mapId, x and y together"],
+    loot: ["loot needs a source: npc, object or item", "a loot position needs mapId, x and y together"],
     achievement_catalog: ["criteria cannot outnumber criteriaCount"],
     achievement_owned: [
         "quantity and required come together",
@@ -48,6 +48,8 @@ export const QUEST_TAGS = ["group", "dungeon", "raid", "pvp"];
 export const NPC_ROLES = ["vendor", "trainer", "questgiver", "flightmaster", "banker", "auctioneer", "stablemaster", "innkeeper", "repair"];
 /** How an object was opened, from the spell the player cast on it. */
 export const GATHER_KINDS = ["herb", "ore", "chest", "fishing", "other"];
+/** What opened a loot window, from the spell cast just before it and the kind of source (loot tables spec, section 4). */
+export const LOOT_TYPES = ["kill", "pickpocket", "skinning", "gather", "disenchant", "container", "fishing"];
 export const npcSighting = base.extend({
     kind: z.literal("npc_sighting"),
     npcId: z.number().int().positive(),
@@ -66,6 +68,9 @@ export const lootWindow = base.extend({
     kind: z.literal("loot"),
     sourceNpcId: z.number().int().positive().optional(),
     sourceObjectId: z.number().int().positive().optional(),
+    sourceItemId: z.number().int().positive().optional().describe("The item that was disenchanted or opened (a lockbox, a clam, a bag). Older addons send none."),
+    lootType: z.enum(LOOT_TYPES).optional().describe("What opened the window, from the spell cast just before it (`LOOT_TYPES`). Absent on windows from older addons and converted Recorder files; those are never sorted into a type by guessing."),
+    copper: z.number().int().min(1).max(10_000_000_000).optional().describe("The coin in the window, in copper. Absent when the window held none or the addon could not read it."),
     sourceEvidence: z.literal("loot-api").optional().describe("Legacy target guesses are withheld from public loot observations."),
     items: z.array(z.object({ itemId: z.number().int().positive(), count: z.number().int().min(1).max(1000) })).max(50),
     mapId: z.number().int().nonnegative().optional().describe("With an object source: the map the player stood on when the object was opened. Older addons send none."),
@@ -73,7 +78,7 @@ export const lootWindow = base.extend({
     y: z.number().min(0).max(100).optional().describe("The player's y on that map, 0 to 100."),
     gatherKind: z.enum(GATHER_KINDS).optional().describe("How the object was opened, from the spell cast on it (`GATHER_KINDS`); `other` when the spell is not one the addon knows."),
     sourceObjectName: z.string().min(1).max(120).optional().describe("The object's name as the game showed it. Public only when 3 installs agree on it."),
-}).refine((r) => r.sourceNpcId !== undefined || r.sourceObjectId !== undefined, {
+}).refine((r) => r.sourceNpcId !== undefined || r.sourceObjectId !== undefined || r.sourceItemId !== undefined, {
     message: RULES.loot[0],
 }).refine((r) => (r.mapId === undefined) === (r.x === undefined) && (r.x === undefined) === (r.y === undefined), {
     message: RULES.loot[1],
@@ -561,6 +566,29 @@ export const playerSeen = base.extend({
 });
 /** The player-page kind. Never part of the public corpus; intake writes it to the players table, not to the upload. */
 export const PLAYER_KINDS = ["player_seen"];
+// --- Guild kills: a boss kill credited to the player's own guild (docs/design/specs/2026-10-24-guild-board-design.md) ---
+// Written by the players module on ENCOUNTER_END with success, when the game shows the player a guild. The row
+// names the guild and the boss, never a character. A kill is the guild's once 2 installs report it.
+/**
+ * The guild kill kind. Stored with the upload, never served raw: it is not on the public corpus allowlist, and
+ * only the guild rollup (2 installs, hidden guilds out, behind the switch) publishes kills.
+ */
+export const GUILD_KILL_KINDS = ["guild_kill"];
+/** One boss kill as a member's client saw it, credited to that member's own guild. */
+export const guildKill = base.extend({
+    kind: z.literal("guild_kill"),
+    guildName: z.string().min(2).max(60).refine(validGuildName, { message: "not a guild name" })
+        .describe("GetGuildInfo for your own character: the guild the kill is credited to."),
+    realm: CENSUS_REALM.describe("GetRealmName(): the realm the addon runs on, the guild's realm."),
+    faction: z.enum(["alliance", "horde"]).describe("UnitFactionGroup for your own character: the guild's faction."),
+    encounterId: z.number().int().positive().describe("The encounter id `ENCOUNTER_END` reports."),
+    // Keep the client's text at intake even when the catalogue has not caught up. Readers use only the
+    // 3-install agreed boss list's names and withhold kills whose encounter is not on that list.
+    name: z.string().min(1).max(120).describe("The encounter's name in the client's language."),
+    instanceMapId: INSTANCE_MAP_ID,
+    difficulty: DIFFICULTY,
+    size: z.number().int().min(1).max(40).optional().describe("The group size the encounter reports."),
+});
 // --- Character links: a code typed in game ties one character to an Everloot account ---
 // The site shows a signed-in player a short code; typed in game, it becomes one character_link row, which the
 // player sends to the account's link endpoint. The GUID is in transit only: the server turns it into a keyed hash
@@ -625,6 +653,7 @@ export const recordSchemas = {
     census_seen: censusSeen,
     player_seen: playerSeen,
     character_link: characterLink,
+    guild_kill: guildKill,
 };
 export const ALL_RECORD_KINDS = Object.keys(recordSchemas);
 /**
@@ -647,6 +676,9 @@ const PUBLIC_KIND_LIST = [
     // The census kinds are absent too: like addon lists, they are published only as counts.
     // So is player_seen: named rows reach the player pages, never this corpus.
     // So is character_link: it goes to the account's link endpoint and is never stored as sent.
+    // So is guild_kill (GUILD_KILL_KINDS): one install's row is not yet a fact, and a hidden guild's rows must not
+    // leave. Kills reach the public only through the guild pages, the guild tools and the guild export files, which
+    // count the 2-install bar, leave hidden guilds out and answer only while EVERLOOT_GUILDS is on.
 ];
 export const PUBLIC_RECORD_KINDS = PUBLIC_KIND_LIST;
 export const anyRecord = z.discriminatedUnion("kind", [
@@ -654,7 +686,7 @@ export const anyRecord = z.discriminatedUnion("kind", [
     guildSnapshot, raidLockout, attendance, lootAward, gearSnapshot,
     collectionCatalog, collectionOwned, achievementCatalog, reputationCatalog, titleCatalog, questChainCatalog,
     achievementOwned, reputationOwned, titleOwned, questOwned, auctionScan, auctionSnapshot, recipeSeen, priceSeen, recipeObserved, trainerSeen,
-    goldSnapshot, moneyEvent, addonSeen, mapBounds, talentSnapshot, censusSelf, censusSeen, playerSeen, characterLink,
+    goldSnapshot, moneyEvent, addonSeen, mapBounds, talentSnapshot, censusSelf, censusSeen, playerSeen, characterLink, guildKill,
 ]);
 /** Where an upload's rows came from when the Everloot addon did not write them. */
 export const UPLOAD_SOURCES = ["polestar_recorder"];

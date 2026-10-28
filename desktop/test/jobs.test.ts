@@ -1,14 +1,86 @@
-import { existsSync, mkdtempSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { emptySettledList, encodeIds } from "../../kb/src/settled-list";
+import * as bridge from "../../companion/src/bridge/engine";
+import { FIXTURE_STRUCTURED, FIXTURE_URL } from "../../web/src/lib/chat/market-fixture";
+import { ACCOUNT_KEY_FILE, writeKeyOrigin } from "../src/main/account";
 import { companionJobs } from "../src/main/jobs";
 import { defaultSettings } from "../src/main/settings";
 
 const dirs: string[] = [];
 const dir = () => { const d = mkdtempSync(join(tmpdir(), "everloot-desktop-")); dirs.push(d); return d; };
 afterEach(() => { for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true }); });
+
+test.each(["https://other.test", "http://everloot.app", "https://everloot.app"])("the ask job scopes the account key to its checked site: %s", async (endpoint) => {
+  const d = dir();
+  const key = `evl_${"ab".repeat(32)}`;
+  writeFileSync(join(d, ACCOUNT_KEY_FILE), key);
+  writeKeyOrigin(d, "https://everloot.app");
+  const file = join(d, "Everloot.lua");
+  // A question that is not about a price, so it reaches the engine (the providers are read only then).
+  writeFileSync(file, `EverlootDB = {["version"] = "0.3.4", ["installId"] = "abcd-1234-ef56-7890", ["records"] = {}, ["asks"] = {{["id"] = "ask:1", ["question"] = "Thrall", ["askedAt"] = "2026-10-27T00:00:00Z"},}}\n`);
+  const engine = vi.spyOn(bridge, "mcpEngine").mockReturnValue({ answer: async () => ({ answer: "ok", source: "test" }) });
+  try {
+    await companionJobs(d, () => ({ ...defaultSettings(), endpoint, gameFolder: d })).deps.ask(file);
+    expect(engine.mock.calls[0][0].token).toBe(endpoint === "https://everloot.app" ? key : null);
+  } finally { engine.mockRestore(); }
+});
+
+describe("a price question in /ask", () => {
+  const ask = (id: string, question: string, realm?: string) =>
+    `{["id"] = "${id}", ["question"] = "${question}", ["askedAt"] = "2026-10-27T00:00:00Z"${realm ? `, ["realm"] = "${realm}"` : ""}},`;
+  const savedVariables = (d: string, asks: string) => {
+    const file = join(d, "Everloot.lua");
+    writeFileSync(file, `EverlootDB = {["version"] = "0.3.4", ["installId"] = "abcd-1234-ef56-7890", ["records"] = {}, ["asks"] = {${asks}}}\n`);
+    return file;
+  };
+  const settingsFor = (d: string, realms: string[] = []) => ({ ...defaultSettings(), gameFolder: d, endpoint: "https://everloot.app", market: { realms } });
+  const written = (d: string) => readFileSync(join(d, "Interface", "AddOns", "EverlootAnswers", "EverlootAnswers.lua"), "utf8");
+
+  test("is answered from market_value without the search engine or a model, then shown once", async () => {
+    const d = dir();
+    const file = savedVariables(d, ask("ask:1", "price 2589", "Forever") + ask("ask:2", "Thrall"));
+    const search = vi.spyOn(bridge, "mcpEngine").mockReturnValue({ answer: vi.fn(async () => ({ answer: "Warchief.", source: "wiki" })) });
+    const market = vi.spyOn(bridge, "mcpMarketValue").mockResolvedValue(FIXTURE_STRUCTURED);
+    try {
+      const { deps } = companionJobs(join(d, "data"), () => settingsFor(d));
+      expect(await deps.ask(file)).toMatch(/^answered 2, failed 0/);
+      const lua = written(d);
+      expect(lua).toContain(`["ask:1"] = { ["answer"] = "Item 2589 on Forever, all houses: market 3s 10c`);
+      expect(lua).toContain(`["source"] = ${JSON.stringify(FIXTURE_URL)}`);
+      expect(lua).toContain('["ask:2"] = { ["answer"] = "Warchief."');
+      expect(market).toHaveBeenCalledTimes(1);
+      expect(market.mock.calls[0].slice(1, 3)).toEqual(["Forever", 2589]);
+      expect(await deps.ask(file)).toMatch(/^nothing pending/);
+      expect(market).toHaveBeenCalledTimes(1);
+    } finally { search.mockRestore(); market.mockRestore(); }
+  });
+
+  test("with no realm in the ask or the words, it asks which, offering the followed realms", async () => {
+    const d = dir();
+    const file = savedVariables(d, ask("ask:3", "price 2589"));
+    const search = vi.spyOn(bridge, "mcpEngine").mockReturnValue({ answer: vi.fn() });
+    const market = vi.spyOn(bridge, "mcpMarketValue").mockResolvedValue(FIXTURE_STRUCTURED);
+    try {
+      await companionJobs(join(d, "data"), () => settingsFor(d, ["Nightslayer"])).deps.ask(file);
+      expect(written(d)).toMatch(/\["ask:3"\] = \{ \["answer"\] = "Which realm\? .*Realms you follow: Nightslayer\./);
+      expect(market).not.toHaveBeenCalled();
+    } finally { search.mockRestore(); market.mockRestore(); }
+  });
+});
+
+test("startup recovery exposes warnings for both damaged state files", () => {
+  const d = dir();
+  writeFileSync(join(d, "sent.json"), "");
+  writeFileSync(join(d, "answers.json"), "{");
+  const jobs = companionJobs(d, defaultSettings);
+  expect(jobs.notices).toHaveLength(2);
+  expect(jobs.notices.join("\n")).toContain("sent.json.corrupt-");
+  expect(jobs.notices.join("\n")).toContain("answers.json.corrupt-");
+  expect(jobs.answerStore.list()).toEqual([]);
+});
 
 const until = (check: () => boolean, ms = 3000) => new Promise<void>((res, rej) => {
   const start = Date.now();

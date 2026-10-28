@@ -6,7 +6,7 @@ vi.mock("@/lib/upload-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/upload-store")>()),
   uploadStore: { loadCorpus: store.loadCorpus },
 }));
-// Item names the game files and the Warcraft Wiki agree on; none unless a test sets them.
+// Source-backed item names; none unless a test sets them.
 const names = vi.hoisted(() => ({ matched: null as unknown }));
 vi.mock("@/lib/game-assets", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/game-assets")>()),
@@ -95,6 +95,30 @@ test("past 40,000 pages the index points at a second chunk; a chunk past the end
   expect(urls(await (await chunkAt("1.xml")).text())).toHaveLength(8);
   expect((await chunkAt("2.xml")).status).toBe(404);
   expect((await chunkAt("x.xml")).status).toBe(404);
+});
+
+test("a current-build item named only in the files is listed and its page asks to be indexed", async () => {
+  names.matched = {
+    ...matched([]),
+    names: new Map([[25, { name: "Worn Shortsword", color: "#ffffff", wikiPage: null, source: "files" }]]),
+  };
+  const listed = urls(await (await chunkAt("0.xml")).text()).map((u) => new URL(u).pathname);
+  const { generateMetadata } = await import("../database/items/[id]/page");
+  const meta = await generateMetadata({ params: Promise.resolve({ id: "25" }), searchParams: Promise.resolve({}) });
+  expect({ listed: listed.includes("/database/items/25"), robots: meta.robots }).toMatchObject({ listed: true, robots: { index: true } });
+  expect(listed).not.toContain("/database/items/118");
+});
+
+test("a file-named item stays indexable during an upload outage while the sitemap answers 503", async () => {
+  names.matched = {
+    ...matched([]),
+    names: new Map([[25, { name: "Worn Shortsword", color: "#ffffff", wikiPage: null, source: "files" }]]),
+  };
+  store.loadCorpus.mockResolvedValue({ uploads: 0, records: [], unreachable: true });
+  const { generateMetadata } = await import("../database/items/[id]/page");
+  const meta = await generateMetadata({ params: Promise.resolve({ id: "25" }), searchParams: Promise.resolve({}) });
+  expect(meta.robots).toMatchObject({ index: true });
+  expect((await chunkAt("0.xml")).status).toBe(503);
 });
 
 test("unreadable upload storage is a 503, not a short list", async () => {

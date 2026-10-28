@@ -4,7 +4,7 @@ import { PLAYER_DATA_TOOLS } from "@everloot/protocol";
 import { C, Cards, H2, H3, LinkCard, List, P, Table, docLink } from "@/components/docs/blocks";
 import { CodeGroup } from "@/components/docs/DocsClient";
 import DocPage from "@/components/docs/DocPage";
-import { CONNECT_EXAMPLES as ex, MCP_TOOLS, MCP_URL } from "@/lib/docs/connect-data";
+import { CONNECT_EXAMPLES as ex, liveMcpTools, MCP_URL } from "@/lib/docs/connect-data";
 import { DOCS_TABS } from "@/lib/docs/nav";
 import { MY_BUILDS_REFUSAL, savedBuildsOn } from "@/lib/saved-builds";
 import { pageMetadata } from "@/lib/seo";
@@ -17,7 +17,7 @@ export const metadata: Metadata = pageMetadata({
 
 /** The sidebar's tool groups, with each tool's one sentence. */
 function toolGroups() {
-  const text = new Map<string, string>(MCP_TOOLS.map((tool) => [tool.name, tool.text]));
+  const text = new Map<string, string>(liveMcpTools().map((tool) => [tool.name, tool.text]));
   return (DOCS_TABS.find((tab) => tab.id === "mcp")?.groups ?? [])
     .map((group) => ({ title: group.title, tools: group.pages.filter((page) => page.href.startsWith("/docs/mcp/tools/")) }))
     .filter((group) => group.tools.length > 0)
@@ -128,11 +128,11 @@ export default function McpOverview() {
           <List>
             <li>
               With no argument it lists your builds, newest first: name, slug, class and points, character, the active mark, the
-              game build (and whether it is older than the calculator&apos;s tree) and a link.
+              game build (and whether it is older or newer than the calculator&apos;s tree) and a link.
             </li>
             <li>
-              With a build&apos;s <C>slug</C> it returns that build: points per tree, the talents taken in each set, your notes and
-              anything that no longer fits today&apos;s tree.
+              With a build&apos;s <C>slug</C> it returns that build: points per tree, the talents taken in each set, your notes,
+              whether its game build is older or newer than the tree, and anything that no longer fits today&apos;s tree.
             </li>
             <li>
               The link is the build&apos;s short link while sharing is on, and otherwise a calculator link with the build&apos;s

@@ -5,7 +5,11 @@ import { tools, toolHref } from "@/data/tools";
 import { allDocsPages } from "@/lib/docs/nav";
 import { MAP_DATA_EXTRACTED_AT, TALENT_DATA_EXTRACTED_AT } from "@/lib/build-stamp";
 import { loadTimeline, loadWriteups, postPath, writeupFor } from "@/lib/changes";
-import { TALENT_CLASSES } from "@/lib/talents/catalogs";
+import { classesIndexable, hubIndexable as classHubIndexable } from "@/lib/class-hub";
+import { guideFreshness, guideIndexable } from "@/lib/guide-freshness";
+import { guideHref, loadGuides, publishedGuides } from "@/lib/guides";
+import { TALENT_CLASSES, loadCatalog as loadTalentCatalog } from "@/lib/talents/catalogs";
+import { PUBLISHED_CHANGES, classTalentChanges } from "@/lib/talents/freshness-records";
 import { CLIENT_LAYER, CLIENT_TAXONOMY, categoryNamedEnough, itemsHref } from "@/lib/items";
 import { DATABASE_HUB_PATHS } from "@/lib/database-hubs";
 import { instancePaths } from "@/lib/database-sitemap";
@@ -15,6 +19,7 @@ import { achievementHref, chainHref, factionHref, loadCatalog, titleHref } from 
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { RANKINGS, hubIndexable, loadRankingWeeks, rankingIndexable, rankingPath, rankingView } from "@/lib/rankings";
 import { hasContent, publicZones, zoneContents, zoneHref } from "@/lib/zones";
+import { loadNews, newsSitemapPaths } from "@/lib/news";
 import { wikiSitemapPaths } from "@/lib/wiki";
 
 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://everloot.app";
@@ -25,7 +30,7 @@ const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://everloot.app";
  * /wow-forever. Every other page has none, because a made-up date teaches crawlers to ignore the field.
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const staticRoutes = ["/", "/wow-forever", "/methodology", "/about", "/privacy", "/terms", "/security", "/accessibility", "/contact", "/upload", "/addon", "/lore", "/lore/coverage", "/changes", "/map", "/map/eastern-kingdoms", "/map/kalimdor", ...DATABASE_HUB_PATHS, "/tools/collections", "/tools/guild-board", "/tools/auctions", "/tools/gold-ledger", "/addons", "/addons/popular", "/census", "/addons/ecosystem", "/addons/polestar", "/addons/polestar/packs", "/addons/polestar/wanted"];
+  const staticRoutes = ["/", "/wow-forever", "/methodology", "/about", "/privacy", "/terms", "/security", "/accessibility", "/contact", "/upload", "/addon", "/lore", "/lore/coverage", "/changes", "/map", "/map/eastern-kingdoms", "/map/kalimdor", ...DATABASE_HUB_PATHS, "/tools", "/tools/collections", "/tools/guild-board", "/tools/auctions", "/tools/gold-ledger", "/addons", "/addons/popular", "/census", "/addons/ecosystem", "/addons/polestar", "/addons/polestar/packs", "/addons/polestar/wanted"];
 
   const talentRoutes = TALENT_CLASSES.map((slug) => `/tools/talents/${slug}`);
   // Item categories from the client layer: each class and subclass that holds items, first page only, and only
@@ -53,9 +58,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...(hubIndexable(rankings.weeks) ? ["/rankings"] : []),
     ...RANKINGS.filter((def) => rankingIndexable(rankingView(def, rankings.weeks))).map((def) => rankingPath(def.slug)),
   ];
-  const paths = [...new Set([...staticRoutes, ...rankingRoutes, ...talentRoutes, ...itemRoutes, ...zoneRoutes, ...instanceRoutes, ...catalogRoutes, ...tools.filter((tool) => tool.status !== "coming-soon").map(toolHref), ...allDocsPages().map((page) => page.href)])];
+  // Each guide by the rule its page's robots use, read against its class's tree and the published change records;
+  // the guide index once it lists one. The class hubs once they list a published guide, as their own robots say.
+  const guides = loadGuides();
+  const today = new Date().toISOString().slice(0, 10);
+  const indexedGuides = (await Promise.all(publishedGuides(guides).map(async (g) => {
+    const catalog = await loadTalentCatalog(g.classSlug);
+    return guideIndexable(g, guideFreshness(g, catalog, classTalentChanges(PUBLISHED_CHANGES, catalog.classId), today)) ? [g] : [];
+  }))).flat();
+  const guideRoutes: { path: string; lastModified?: Date }[] = indexedGuides.length ? [{ path: "/guides" }, ...indexedGuides.map((g) => ({ path: guideHref(g.slug), lastModified: g.reviewed ? new Date(g.reviewed.on) : undefined }))] : [];
+  const classRoutes = classesIndexable(guides) ? ["/classes", ...TALENT_CLASSES.filter((slug) => classHubIndexable(slug, guides)).map((slug) => `/classes/${slug}`)] : [];
+  const paths = [...new Set([...staticRoutes, ...rankingRoutes, ...talentRoutes, ...classRoutes, ...itemRoutes, ...zoneRoutes, ...instanceRoutes, ...catalogRoutes, ...tools.filter((tool) => tool.status !== "coming-soon").map(toolHref), ...allDocsPages().map((page) => page.href)])];
 
-  const timeline = loadTimeline();
+  const timeline = await loadTimeline();
   const newestChange = timeline[0]?.at;
   // A blue post's page only once it carries our reviewed write-up (it says noindex until then), dated by the review.
   const writeups = loadWriteups();
@@ -82,5 +97,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...FAMILIES.map((family) => ({ url: `${baseUrl}/guilds/${family.slug}` })),
     // The wiki hub and each indexable wiki page, dated by the day a maintainer reviewed it.
     ...wikiSitemapPaths().map(({ path, lastModified }) => ({ url: `${baseUrl}${path}`, ...(lastModified ? { lastModified } : {}) })),
+    // The news hub and each published post, dated by the day the post last changed.
+    ...newsSitemapPaths(loadNews()).map(({ path, lastModified }) => ({ url: `${baseUrl}${path}`, ...(lastModified ? { lastModified } : {}) })),
+    // The guide index and each indexed guide, dated by the review of the version it shows.
+    ...guideRoutes.map(({ path, lastModified }) => ({ url: `${baseUrl}${path}`, ...(lastModified ? { lastModified } : {}) })),
   ];
 }

@@ -21,7 +21,8 @@ function E:OwnScan(realm)
 end
 
 E.THIN_UNITS = 5          -- as kb/src/market.ts: this many units listed or fewer is a thin market
-E.STALE_DAYS = 2          -- community prices older than this show a stale marker
+E.STALE_DAYS = 2          -- an item's newest public day or the price file older than this many days shows a stale marker
+E.PRICE_FILE_ROWS = 2000  -- as kb/src/market.ts MAX_PRICE_ROWS: the most items one realm's price file holds
 local VERIFY_SLICE = 20000 -- checksum characters per frame, so a large price file never stalls the client
 
 --- Days since 1970-01-01 for a "YYYY-MM-DD..." string, or nil. Civil-date arithmetic, no os library.
@@ -89,7 +90,11 @@ local function communityFor(realm)
       verify(db.data, db.sum, function(ok)
         if community[key] ~= entry then return end -- reset while checking
         entry.status = ok and "ready" or "bad"
-        if not ok then
+        if ok then
+          -- A file with this many rows was cut at the cap: an item it lacks may still have a public price.
+          local _, separators = entry.data:gsub(";", "")
+          entry.full = separators - 1 >= E.PRICE_FILE_ROWS
+        else
           entry.data = nil
           print("Everloot: community prices for " .. realm .. " failed their checksum and are not shown.")
         end
@@ -131,17 +136,26 @@ local function priceLines(realm, itemId)
   if row then
     local market = row.market and E.Coins(row.market)
       or (row.quantity <= E.THIN_UNITS and "unrecorded (thin)" or "unrecorded")
-    add(string.format("Everloot market %s · min %s · historical %s",
+    -- The website can show one auction house; this file blends every house on the realm, so say so beside the numbers.
+    add(string.format("Everloot market %s · min %s · historical %s · all houses",
       market, E.Coins(row.min), E.Coins(row.historical)), 0.9, 0.8, 0.5)
     add(string.format("  %d up · %d reporters · %s", row.quantity, row.reporters, row.day), 0.6, 0.6, 0.6)
-    -- The file is only as fresh as the companion's last run: show its date, and flag it when old.
-    local fetched, today = E.DayNumber(entry.asOf or ""), E.DayNumber(date("!%Y-%m-%d"))
-    if not fetched or not today then
-      add("  price data age unknown (stale?)", 1, 0.4, 0.4)
-    elseif today - fetched > E.STALE_DAYS then
-      add(string.format("  STALE: prices from %s; run the companion to refresh", entry.asOf:sub(1, 10)), 1, 0.4, 0.4)
+    -- Two separate facts. The item's newest public day says how old its prices are; the file's build time says
+    -- how long since the companion last ran. A file built today can still hold an item nobody scanned for a week.
+    local today = E.DayNumber(date("!%Y-%m-%d"))
+    local seen = E.DayNumber(row.day)
+    if not seen or not today then
+      add("  public day unknown (stale?)", 1, 0.4, 0.4)
+    elseif today - seen > E.STALE_DAYS then
+      add(string.format("  STALE: newest public day %s is %d days old", row.day, today - seen), 1, 0.4, 0.4)
+    end
+    local built = E.DayNumber(entry.asOf or "")
+    if not built or not today then
+      add("  price file age unknown (stale?)", 1, 0.4, 0.4)
+    elseif today - built > E.STALE_DAYS then
+      add(string.format("  OLD FILE: built %s; the Desktop App or companion refreshes it, then /reload", entry.asOf:sub(1, 10)), 1, 0.4, 0.4)
     else
-      add("  prices fetched " .. entry.asOf:sub(1, 10), 0.6, 0.6, 0.6)
+      add("  price file built " .. entry.asOf:sub(1, 10), 0.6, 0.6, 0.6)
     end
   end
   local own = E:OwnScan(realm)
@@ -166,8 +180,13 @@ local function addLines(tooltip, itemId)
   local missing = {}
   if type(EverlootPricesDB) == "table" and entry.status ~= "verifying" then
     if #lines == 0 then
-      missing[#missing + 1] = entry.status == "bad" and not entry.silent and "community prices failed their checksum"
-        or ("no price on " .. realm .. " yet")
+      if entry.status == "bad" and not entry.silent then
+        missing[#missing + 1] = "community prices failed their checksum"
+      elseif entry.full then
+        missing[#missing + 1] = "not in the local price file, which keeps 2,000 items"
+      else
+        missing[#missing + 1] = "no price on " .. realm .. " yet"
+      end
     end
     missing[#missing + 1] = dropNote
   end
@@ -189,6 +208,25 @@ end
 
 local function hex(r, g, b) return string.format("|cff%02x%02x%02x", r * 255, g * 255, b * 255) end
 
+--- Why a price command found nothing, said exactly: no file, a file without this realm, a file that failed its
+--- checksum, a full file (the item may be public but cut), or a small file that simply has no price for it.
+local function missingNote(realm, entry)
+  if entry.status == "verifying" then return "The price file is still being checked; try again in a moment." end
+  if entry.status == "bad" and not entry.silent then
+    return "The community prices for " .. realm .. " failed their checksum and were not used: refresh them with the Desktop App or companion, then /reload."
+  end
+  if entry.status == "bad" then
+    if type(EverlootPricesDB) ~= "table" then
+      return "No Everloot price file in the game yet: the Everloot Desktop App or companion writes it, then /reload."
+    end
+    return "The Everloot price file has no data for " .. realm .. " yet: scan its auction house or follow it in the Desktop App, then /reload."
+  end
+  if entry.full then
+    return "Not in this realm's price file, which keeps only the 2,000 items with the most units listed. A public price may still be on the website."
+  end
+  return "No price for this item on this realm yet: no public day (3 reporters) and no scan of your own."
+end
+
 --- /everloot price <item>: the same lines as the tooltip, in chat, anywhere in the world. Read from the
 --- files already in the game (the companion's prices and the player's own scans); nothing is fetched.
 --- The full history, every realm and the chart are on the site.
@@ -207,11 +245,8 @@ function E.PriceCommand(text, tries)
   end
   local name = (GetItemInfo and select(2, GetItemInfo(id))) or ("item " .. id)
   print("Everloot price: " .. name .. " on " .. realm)
-  if #lines == 0 then
-    print(entry.status == "bad" and entry.silent
-      and "  No community prices in the game for this realm yet: the Everloot Desktop App or companion writes them, then /reload."
-      or "  No price for this item on this realm yet: no public day (3 reporters) and no scan of your own.")
-  end
+  -- A failed checksum is said even when the player's own scan answers: the community prices were there to be shown.
+  if #lines == 0 or (entry.status == "bad" and not entry.silent) then print("  " .. missingNote(realm, entry)) end
   for _, line in ipairs(lines) do print(hex(line.r, line.g, line.b) .. line.text .. "|r") end
   local dropLines, dropNote = E:DropLines(id)
   for _, line in ipairs(dropLines or {}) do print(hex(line.r, line.g, line.b) .. line.text .. "|r") end

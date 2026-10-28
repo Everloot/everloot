@@ -1,3 +1,4 @@
+import { liveToolNames } from "@/lib/guild-switch";
 import { CREDIT_LINE, LICENCE, LICENCE_URL, MCP_PROMPT_NAMES, MCP_RESOURCE_TEMPLATE_LIST, MCP_RESOURCE_URIS, MCP_TOOL_NAMES, SITE, TERMS_URL, type McpPromptName, type McpResourceUri, type McpToolName } from "@everloot/protocol";
 
 export const MCP_URL = `${SITE}/mcp/public`;
@@ -29,9 +30,12 @@ const TOOL_TEXT: Record<McpToolName, string> = {
   item_categories: "Item classes, subclasses, slots and qualities from the game files, with item counts; one item's category path, or the items in a category. Found in game files, unconfirmed, with the build.",
   talent_tree: "One class's talent trees from the game files: every node with its talents, ranks, position, prerequisites and row gate. Found in game files, unconfirmed, with the build.",
   talent_plan: "Reads a talent share code or calculator link: the talents and ranks it holds, points per tree, the lowest level for it, and every problem in plain words.",
+  class_races: "Which races can be a class, on which faction, with each race's racial traits (name, active or passive). Found in game files, unconfirmed, with the build.",
   collection_gap: "What one install is missing from a collection, such as Mounts.",
   completion_progress: "What one install's characters finished in achievements, reputation, titles and quest chains, and what is closest to done.",
   guild_board: "A guild's roster, bosses, loot and attendance, from officer uploads.",
+  guild_search: "Guilds by the start of their name, with realm, members seen and agreed kills. Listed only while the guild pages are on.",
+  guild_rankings: "The guild ladder for one raid or dungeon: bosses killed, then who got there first. Listed only while the guild pages are on.",
   auction_history: "Daily median auction price for one item on one realm.",
   market_value: "Market value, minimum buyout, historical value and units listed for one item on one realm, from full scans players started.",
   gold_ledger: "Peak gold and money events for one character, from that player's own upload.",
@@ -41,8 +45,14 @@ const TOOL_TEXT: Record<McpToolName, string> = {
   everloot_plan: "What is built, what is next and what is waiting. Read it before assuming a tool exists.",
 };
 
-/** Every tool the MCP server registers, in the protocol's order. */
+/** Every tool in the protocol's table, in its order, each with its sentence. */
 export const MCP_TOOLS: readonly { name: McpToolName; text: string }[] = MCP_TOOL_NAMES.map((name) => ({ name, text: TOOL_TEXT[name] }));
+
+/** The tools the MCP server lists today: the guild ladder's two only while EVERLOOT_GUILDS is on. */
+export function liveMcpTools(): readonly { name: McpToolName; text: string }[] {
+  const live = liveToolNames();
+  return MCP_TOOLS.filter((tool) => live.includes(tool.name));
+}
 
 /** One plain sentence per resource, keyed by URI so a new resource in the protocol fails the type check here. */
 const RESOURCE_TEXT: Record<McpResourceUri, string> = {

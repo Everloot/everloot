@@ -1,10 +1,26 @@
 // @vitest-environment jsdom
-import { act } from "react";
+import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { CURRENT_BUILD } from "@/data/game-data/raid";
 import { emptySlots, encodeRaid } from "@/lib/raid";
 import RaidBuilder from "./RaidBuilder";
+import { track } from "@/lib/analytics/track";
+
+vi.mock("@/lib/analytics/track", () => ({ track: vi.fn() }));
+// The class context chip reads its class from the address through the app router, which renders again when the
+// address changes (a popstate stands for that); its links are plain anchors here.
+vi.mock("next/navigation", async () => {
+  const { useSyncExternalStore } = await import("react");
+  const subscribe = (fn: () => void) => { window.addEventListener("popstate", fn); return () => window.removeEventListener("popstate", fn); };
+  return {
+    useSearchParams: () => new URLSearchParams(useSyncExternalStore(subscribe, () => window.location.search, () => window.location.search)),
+    usePathname: () => window.location.pathname,
+  };
+});
+vi.mock("next/link", () => ({
+  default: ({ href, children, ...rest }: { href: string; children: ReactNode }) => <a href={href} {...rest}>{children}</a>,
+}));
 
 let container: HTMLDivElement;
 let root: Root;
@@ -12,6 +28,7 @@ let root: Root;
 let under: Element | null = null;
 
 beforeEach(() => {
+  vi.mocked(track).mockClear();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   window.history.replaceState(null, "", "/tools/raid");
   document.elementFromPoint = () => under;
@@ -29,6 +46,34 @@ afterEach(async () => {
 });
 
 const render = (initialCode?: string) => act(async () => root.render(<RaidBuilder initialCode={initialCode} />));
+
+test("copies a bare raid code for importing into the addon", async () => {
+  await render();
+  expect([...container.querySelectorAll("button")].find((b) => b.textContent?.startsWith("Copy for addon"))?.disabled).toBe(true);
+  await click(tile("Mage"));
+  await click(slot(0));
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  const copy = [...container.querySelectorAll("button")].find((b) => b.textContent?.startsWith("Copy for addon"));
+  expect(copy).toBeDefined();
+  await click(copy!);
+  expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/^ELR1-20-[\d.]+-/));
+  expect(container.textContent).toContain("Raid tab");
+});
+
+test("counts a shared raid only when copying succeeds", async () => {
+  await render();
+  await click(tile("Mage"));
+  await click(slot(0));
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: vi.fn().mockResolvedValue(undefined) } });
+  const copy = [...container.querySelectorAll("button")].find((b) => b.textContent?.startsWith("Copy link"))!;
+  await click(copy);
+  expect(track).toHaveBeenCalledExactlyOnceWith("raid_comp_shared", { via: "copy" });
+  vi.mocked(track).mockClear();
+  vi.mocked(navigator.clipboard.writeText).mockRejectedValue(new Error("denied"));
+  await click(copy);
+  expect(track).not.toHaveBeenCalled();
+});
 const palette = () => container.querySelector('[role="group"][aria-label="Classes"]')!;
 const tile = (name: string) => [...palette().querySelectorAll("button")].find((b) => b.textContent?.startsWith(name))!;
 const slot = (i: number) => container.querySelector<HTMLButtonElement>(`[data-drop-slot="${i}"]`)!;
@@ -188,6 +233,39 @@ test("a party buff in one group is missing only for the others, by group", async
   await dragTo(tile("Paladin"), slot(0));
   const missing = [...container.querySelectorAll("[data-raid-missing] li")].map((li) => li.textContent);
   expect(missing.some((m) => / · G2 G3 G4$/.test(m!))).toBe(true);
+});
+
+/* ---------- The class context chip, on the planner page ---------- */
+
+const removeContext = () => [...container.querySelectorAll("a")].find((a) => a.textContent?.includes("Remove Mage, level 25")) ?? null;
+const raidAddress = (slots: ReturnType<typeof emptySlots>) => `/tools/raid#raid=${encodeRaid({ size: 20, build: CURRENT_BUILD, slots })}`;
+const button = (text: string) => [...container.querySelectorAll("button")].find((b) => b.textContent === text)!;
+
+test("the class context chip's links hold the raid as it is after an add, an undo and a clear, with no event to catch", async () => {
+  window.history.replaceState(null, "", "/tools/raid?class=mage&level=25");
+  await act(async () => root.render(<RaidBuilder classContext />));
+  expect(removeContext()?.getAttribute("href")).toBe("/tools/raid");
+  const mage = emptySlots(20);
+  mage[0] = { class: "mage", tree: 0 };
+  await click(tile("Mage"));
+  await click(slot(0));
+  expect(removeContext()!.getAttribute("href")).toBe(raidAddress(mage));
+  // Undo from the keyboard with the link focused: copying it or a modified click must not bring the undone raid back.
+  removeContext()!.focus();
+  await act(async () => { removeContext()!.dispatchEvent(new KeyboardEvent("keydown", { key: "z", ctrlKey: true, bubbles: true, cancelable: true })); });
+  expect(label(0)).toBe("Group 1, slot 1: empty");
+  expect(removeContext()!.getAttribute("href")).toBe("/tools/raid");
+  await click(slot(0));
+  expect(removeContext()!.getAttribute("href")).toBe(raidAddress(mage));
+  await click(button("Undo"));
+  expect(removeContext()!.getAttribute("href")).toBe("/tools/raid");
+  await click(slot(0));
+  await click(button("Clear"));
+  expect(removeContext()!.getAttribute("href")).toBe("/tools/raid");
+  // A plain click takes the context off in place, and the raid the planner holds stays in the address.
+  await click(slot(0));
+  await click(removeContext()!);
+  expect(`${location.pathname}${location.search}${location.hash}`).toBe(raidAddress(mage));
 });
 
 test("a raid link still opens its raid", async () => {

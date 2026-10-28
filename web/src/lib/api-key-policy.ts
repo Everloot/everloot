@@ -24,6 +24,13 @@ export const KEY_SCOPES = [
 ] as const;
 export type KeyScope = (typeof KEY_SCOPES)[number]["id"];
 
+/**
+ * DELETE /api/keys's error, with a 404, when the key is no live key of the signed-in account: already revoked, or
+ * another account's (after a switch in another tab). The keys list takes only this exact answer as "no longer on this
+ * account's list"; any other 404 is an error. The route's test pins its answer to this text.
+ */
+export const NO_LIVE_KEY = "No live key with that id on this account.";
+
 /** The expiry choices in days; 90 is the one we suggest. A custom date may be up to MAX_EXPIRY_DAYS ahead. */
 export const EXPIRY_DAYS = [7, 30, 90, 365] as const;
 export const DEFAULT_EXPIRY_DAYS = 90;

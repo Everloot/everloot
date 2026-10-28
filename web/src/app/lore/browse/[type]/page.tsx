@@ -13,7 +13,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const link = "text-accent hover:underline underline-offset-4";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 /** The page's one source line: everything here is the 2023 wiki. */
 const SOURCE = <LoreSource />;
