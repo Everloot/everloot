@@ -448,29 +448,146 @@ describe("the dungeon pilots", () => {
   ];
   const pilots = () => checkWiki(readWikiPages(), committed()).pages.filter((p) => DUNGEON_PILOTS.includes(p.fm.slug));
 
-  test("a pilot types no count by hand, in words either: counts come from the page's data", () => {
-    const COUNT = /\b(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty|forty|fifty|sixty|hundred|dozen)\b/i;
-    for (const p of pilots()) for (const text of proseOf(p)) expect(COUNT.exec(text)?.[0], `${p.file}: ${text}`).toBeUndefined();
+  // A count typed by hand: a number, in words or digits, before what it counts, or the only one of something. The page
+  // check refuses digits beside a unit; this finds the rest, in a pilot's own prose.
+  const ONES = "one|two|three|four|five|six|seven|eight|nine";
+  const TENS = "twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety";
+  const NUMBER = `(?:\\d+(?:,\\d{3})*|(?:${TENS})-(?:${ONES})|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|${TENS}|${ONES}|hundred|thousand|dozen)`;
+  /** What a dungeon page could count, singular or plural: its data gives these numbers. */
+  const COUNTED =
+    "(?:flight )?points?|boss(?:es)?|players?|entrances?|exits?|levels?|quests?|items?|drops?|dungeons?|raids?|instances?|wings?|floors?|rooms?|zones?" +
+    "|members?|groups?|part(?:y|ies)|pulls?|packs?|enem(?:y|ies)|mobs?|creatures?|npcs?|encounters?|chests?|rares?|elites?|waves?|phases?|slots?" +
+    "|stacks?|charges?|kills?|healers?|tanks?|vendors?|trainers?|talents?|ranks?|spells?|tunnels?|caves?|caverns?|passages?|m[ae]n|gold|silver|copper";
+  const WORD = "[a-z][a-z'’]*";
+  /** A plural noun, not a word that only ends in s. */
+  const PLURAL = `(?!(?:is|was|has|as|us|this|its|his|hers|ours|yours|theirs|always|perhaps|less|unless|thus|plus|across|towards|besides)\\b)${WORD}s`;
+  const COMPOUND = new RegExp(`\\b${NUMBER}-(${WORD})\\b`, "gi");
+  const BEFORE_NOUN = new RegExp(`\\b(${NUMBER})(?![\\w-])\\s+((?:${WORD}\\s+){0,2}?)(?:${COUNTED}|${PLURAL})\\b`, "gi");
+  const SOLE = new RegExp(`\\b(?:the|its|their|his|her|an?|[a-z]+['’]s)\\s+(?:only|sole|single|lone)\\s+(?:${WORD}\\s+)?(?:${COUNTED})\\b`, "i");
+  /** "one" standing for a thing already named: "this one", "the nearest one". */
+  const ONE_AS_PRONOUN = /\b(?:this|that|the|each|every|no|any|which|another|nearest|same|other|only)\s+$/i;
+
+  /** The first count typed by hand in a text, or null. A compound counts only when its other half is counted ("a
+   *  ten-man raid", not "two-handed"); "one of" and "one" as a pronoun count nothing. */
+  function handCount(text: string): string | null {
+    for (const m of text.matchAll(COMPOUND)) if (new RegExp(`^(?:${COUNTED})$`, "i").test(m[1])) return m[0];
+    for (const m of text.matchAll(BEFORE_NOUN)) {
+      if (/^one$/i.test(m[1]) && (/^of\s/i.test(m[2]) || ONE_AS_PRONOUN.test(text.slice(0, m.index ?? 0)))) continue;
+      return m[0];
+    }
+    return SOLE.exec(text)?.[0] ?? null;
+  }
+
+  interface Post { game: string; postedAt: string; title: string; excerpt?: string | null }
+  /** The one way a pilot says Blizzard has said nothing: what Everloot's record of the posts holds, up to a date. */
+  const RECORD = /^Everloot['’]s record of Blizzard['’]s posts, through (\d{4}-\d{2}-\d{2}), has nothing about (.+) for WoW: Forever\.$/;
+  /** A sentence that says, in any words, that Blizzard has announced or posted nothing. */
+  const saysNothing = (s: string) => /\b(?:Blizzard|announc\w*|posts?|posted|news)\b/i.test(s) && /\b(?:nothing|not|never|no|none)\b|\byet to\b/i.test(s);
+  const isDate = (iso: string) => {
+    const [y, m, d] = iso.split("-").map(Number);
+    const t = new Date(Date.UTC(y, m - 1, d));
+    return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d;
+  };
+  const bare = (name: string) => name.replace(/^the\s+/i, "").toLowerCase();
+
+  /** What is wrong with what a page's prose says of Blizzard's posts, against the stored record. Each sentence that
+   *  says Blizzard has said nothing must be the record line, through a real date the record reaches, about the page's
+   *  own subject, and no WoW: Forever post up to that date may name it. */
+  function recordProblems(prose: string[], title: string, posts: Post[]): string[] {
+    const newest = posts.map((x) => x.postedAt.slice(0, 10)).sort().at(-1) ?? "";
+    const problems: string[] = [];
+    for (const sentence of prose.flatMap((t) => t.split(/(?<=[.!?])\s+/))) {
+      if (!saysNothing(sentence)) continue;
+      const said = RECORD.exec(sentence.trim());
+      if (!said) {
+        problems.push(`"${sentence}" says Blizzard has said nothing; say what Everloot's record of Blizzard's posts, through a date, has`);
+        continue;
+      }
+      const [, through, subject] = said;
+      if (!isDate(through)) problems.push(`${through} is not a date`);
+      else if (through > newest) problems.push(`the record runs to ${newest}, not ${through}`);
+      if (bare(subject) !== bare(title)) problems.push(`the record line is about ${subject}, and the page is ${title}`);
+      const name = new RegExp(bare(subject).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      for (const x of posts) if (x.game === "forever" && x.postedAt.slice(0, 10) <= through && name.test(`${x.title} ${x.excerpt ?? ""}`)) problems.push(`the record holds "${x.title}"`);
+    }
+    return problems;
+  }
+
+  test.each([
+    ["The game files place three flight points in the zone.", "three flight points"],
+    ["There are thirteen flight points.", "thirteen flight points"],
+    ["Twenty-five players can go in.", "Twenty-five players"],
+    ["It holds 3 flight points.", "3 flight points"],
+    ["Two bosses wait inside.", "Two bosses"],
+    ["The cave has one entrance.", "one entrance"],
+    ["Two of his followers stayed loyal.", "Two of his followers"],
+    ["A dozen bosses wait inside.", "dozen bosses"],
+    ["It is a ten-man raid.", "ten-man"],
+    ["Sentinel Hill is the zone's only flight point.", "zone's only flight point"],
+    ["It is the only flight point there.", "the only flight point"],
+    ["A single boss guards it.", "A single boss"],
+  ])("the count guard finds a count typed by hand: %s", (text, count) => {
+    expect(handCount(text)).toBe(count);
   });
 
-  test("what a pilot says of Blizzard's posts is Everloot's record up to a date, and the record bears it out", () => {
-    const { posts } = JSON.parse(readFileSync(new URL("../changes/blue-posts.json", import.meta.url), "utf8")) as {
-      posts: { game: string; postedAt: string; title: string; excerpt?: string }[];
-    };
-    const newest = posts.map((x) => x.postedAt.slice(0, 10)).sort().at(-1)!;
-    const SAID = /Everloot's record of Blizzard's posts, through (\d{4}-\d{2}-\d{2}), has nothing about (.+?) for WoW: Forever/;
-    for (const p of pilots()) {
-      const text = proseOf(p).join("\n");
-      // Not the whole of what Blizzard has said: only what the record holds, and up to when.
-      expect(text, p.file).not.toMatch(/Blizzard has (?:not|never) (?:announced|said)/i);
-      const said = SAID.exec(text);
-      if (!said) continue;
-      const [, through, what] = said;
-      expect(through <= newest, `${p.file}: the record runs to ${newest}`).toBe(true);
-      const name = new RegExp(what.replace(/^the /i, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
-      const naming = posts.filter((x) => x.game === "forever" && x.postedAt.slice(0, 10) <= through && name.test(`${x.title} ${x.excerpt ?? ""}`));
-      expect(naming.map((x) => x.title), p.file).toEqual([]);
-    }
+  test.each([
+    "He swings a two-handed weapon.",
+    "One of the druids stayed loyal.",
+    "No one would wake him.",
+    "Of all the dungeon entrances in the game files, this one has the lowest level.",
+    "Orgrimmar's own flight point is the nearest one in the game files.",
+    "The only way in is through Orgrimmar.",
+    "They fought in the First War.",
+    "A handful who escaped the taint still try to free him.",
+    "Its bosses are listed here once players report them.",
+    "Everloot's record of Blizzard's posts, through 2026-10-23, has nothing about Ragefire Chasm for WoW: Forever.",
+  ])("the count guard leaves a text that counts nothing alone: %s", (text) => {
+    expect(handCount(text)).toBeNull();
+  });
+
+  test("a pilot types no count by hand, in words or digits: counts come from the page's data", () => {
+    for (const p of pilots()) for (const text of proseOf(p)) expect(handCount(text), `${p.file}: ${text}`).toBeNull();
+  });
+
+  const POSTS: Post[] = [
+    { game: "forever", postedAt: "2026-10-20T17:00:14Z", title: "Explore the New Dungeons of World of Warcraft: Forever" },
+    { game: "classic", postedAt: "2026-10-21T10:00:00Z", title: "Classic Era hotfixes", excerpt: "Undead outside the Deadmines now respawn less often." },
+    { game: "forever", postedAt: "2026-10-23T17:01:38Z", title: "Hotfixes", excerpt: null },
+  ];
+  const recordLine = (through: string, subject = "Ragefire Chasm") =>
+    `Everloot's record of Blizzard's posts, through ${through}, has nothing about ${subject} for WoW: Forever.`;
+
+  test("the record guard takes the scoped form through a real date the record reaches, about the page's own subject", () => {
+    expect(recordProblems([recordLine("2026-10-23")], "Ragefire Chasm", POSTS)).toEqual([]);
+    // A Classic post that names the dungeon says nothing about WoW: Forever.
+    expect(recordProblems([recordLine("2026-10-23", "the Deadmines")], "The Deadmines", POSTS)).toEqual([]);
+    // A post after the cutoff leaves the line true as written.
+    const later: Post = { game: "forever", postedAt: "2026-10-23T09:00:00Z", title: "Ragefire Chasm returns" };
+    expect(recordProblems([recordLine("2026-10-22")], "Ragefire Chasm", [...POSTS, later])).toEqual([]);
+    // Prose that says nothing of Blizzard's posts needs no record line.
+    expect(recordProblems(["The troggs came up from far below."], "Ragefire Chasm", POSTS)).toEqual([]);
+  });
+
+  test.each([
+    ["the cutoff removed", "Everloot's record of Blizzard's posts has nothing about Ragefire Chasm for WoW: Forever.", "says Blizzard has said nothing"],
+    ["nothing announced", "Nothing has been announced for Ragefire Chasm in WoW: Forever.", "says Blizzard has said nothing"],
+    ["Blizzard has not announced", "Blizzard has not announced anything specific to Ragefire Chasm for WoW: Forever yet.", "says Blizzard has said nothing"],
+    ["no post", "No Blizzard post mentions Ragefire Chasm yet.", "says Blizzard has said nothing"],
+    ["a date that does not exist", recordLine("2026-02-30"), "2026-02-30 is not a date"],
+    ["a cutoff after the record", recordLine("2026-10-30"), "the record runs to 2026-10-23, not 2026-10-30"],
+    ["another page's subject", recordLine("2026-10-23", "the Deadmines"), "the record line is about the Deadmines"],
+  ])("the record guard refuses %s", (_, sentence, problem) => {
+    expect(recordProblems([sentence], "Ragefire Chasm", POSTS)).toEqual([expect.stringContaining(problem)]);
+  });
+
+  test("the record guard refuses a line the record contradicts", () => {
+    const naming: Post = { game: "forever", postedAt: "2026-10-22T12:00:00Z", title: "Ragefire Chasm in WoW: Forever" };
+    expect(recordProblems([recordLine("2026-10-23")], "Ragefire Chasm", [...POSTS, naming])).toEqual(['the record holds "Ragefire Chasm in WoW: Forever"']);
+  });
+
+  test("what a pilot says of Blizzard's posts is Everloot's record through a real date, and the stored record bears it out", () => {
+    const { posts } = JSON.parse(readFileSync(new URL("../changes/blue-posts.json", import.meta.url), "utf8")) as { posts: Post[] };
+    for (const p of pilots()) expect(recordProblems(proseOf(p), p.fm.title, posts), p.file).toEqual([]);
   });
 
   test("proposed advice stays off the site: a published page has no Editor to confirm label, and an unreviewed pilot labels its advice", () => {
