@@ -79,6 +79,24 @@ They become Workers Cron Triggers calling the same handlers.
 Build and deploy from GitHub Actions on merge to `main` (a scoped deploy token), or Workers Builds. Check that
 `desktop`, `addon` and `kb` steps stay where they are.
 
+## Coordination with the platform plan
+
+The platform readiness plan (desktop terminal, `docs/superpowers/plans/2026-10-28-platform-readiness.md` on its
+branch) leaves the Cloudflare runtime, resources and this branch to this migration. Its gates are acceptance criteria
+here:
+
+- **Private pages never reach a shared cache.** Only pre-built and ISR pages go through the OpenNext cache; no
+  Cloudflare cache rule caches HTML wholesale. Two signed-in sessions never see each other's response.
+- **Opt-outs clear cached copies.** `revalidateTag`/`revalidatePath` from `api/players/opt-out` and
+  `api/guilds/hide` go through the D1 tag cache; prove it on a controlled custom hostname before the cutover.
+- **One writer for the rollup.** Cron Triggers stay off on the Worker until Vercel's crons are switched off at the
+  cutover, never both.
+- **The rollup fits its CPU budget.** A schedule more frequent than hourly gets 30 seconds of CPU per run on Workers
+  (Vercel gives the route 300 s of wall time). Measure `/api/cron/snapshot`; if it does not fit, process in
+  resumable chunks with checkpoints.
+- The platform plan produces the route matrix (status, cache policy, identity) for production and the Worker preview;
+  this migration provides the preview and the CPU and D1 numbers.
+
 ## Order
 
 1. Page cache (1) and bundled files (2): every page except lore, search and MCP renders on workers.dev.

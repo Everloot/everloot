@@ -13,6 +13,33 @@
   "services": [
     { "binding": "WORKER_SELF_REFERENCE", "service": "everloot-web" }
   ],
+  // The page cache: pre-built and ISR pages (OpenNext incremental cache), the revalidation queue and the tags
+  // revalidateTag and revalidatePath write.
+  "r2_buckets": [
+    { "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "everloot-next-cache" }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "NEXT_CACHE_DO_QUEUE", "class_name": "DOQueueHandler" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["DOQueueHandler"] }
+  ],
+  "d1_databases": [
+    { "binding": "NEXT_TAG_CACHE_D1", "database_name": "everloot-next-tags", "database_id": "807622c4-4651-476c-b86a-d2cfd41ad59c" }
+  ],
+  // Repository files the pages read at run time (news, guides, wiki pages), copied into .open-next/repo by
+  // scripts/cf-bundle-files.mjs and uploaded as text modules, so node:fs finds them under /bundle/repo.
+  "find_additional_modules": true,
+  "rules": [
+    { "type": "Text", "globs": ["repo/**/*.md", "repo/**/*.yaml", "repo/**/*.yml", "repo/**/*.json"], "fallthrough": true }
+  ],
+  "vars": {
+    "NEWS_DIR": "/bundle/repo/kb/news",
+    "GUIDES_DIR": "/bundle/repo/kb/guides",
+    "WIKI_DIR": "/bundle/repo/kb/wiki"
+  },
   "observability": {
     "enabled": true,
     "head_sampling_rate": 0.1
