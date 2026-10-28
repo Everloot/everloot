@@ -154,5 +154,30 @@ here:
 2. Secrets and crons (4, 5): uploads, accounts, guilds and the cron snapshot run on Workers.
 3. D1 (3): lore, search, sitemaps and MCP.
 4. Side-by-side check of every route against production; load test.
-5. After 11/04: Access to previews only, attach `everloot.app` to the Worker, keep Vercel for rollback a week, then
-   retire the Vercel project.
+5. The switch, **before the 11/04 launch once D1 passes the route check** (Carlos, 10/28): the runbook below. Keep
+   Vercel deployed for rollback a week, then retire the Vercel project (not the team, see section 4).
+
+## Switch runbook (in the dashboards)
+
+DNS today (zone `everloot.app`, this account, Free plan): apex `A 76.76.21.21` and `www CNAME cname.vercel-dns.com`
+(Vercel, DNS only); `assets` and `data` (R2 custom domains), three Email Routing MX records, SPF, DKIM, and the
+Google, Bing and Pinterest verification records. Only the apex A and the `www` CNAME change. The site uses no
+`next/image`, so nothing depends on Vercel's image optimizer.
+
+Before: D1 imported and the route check all green; `wrangler.jsonc` `EVERLOOT_DEPLOY_ENV` = `production` and
+`triggers.crons` added on the release commit, built and uploaded but not yet routed.
+
+1. Worker → Access: scope to **Previews only** (or remove), so `everloot.app` does not ask for a sign-in.
+2. Vercel project → Settings → Cron Jobs: **disable**. In the same minute, deploy the Worker version with
+   `triggers.crons` (one writer at a time).
+3. DNS: delete the apex A record and the `www` CNAME, then Worker → Domains & Routes → add Custom Domains
+   `everloot.app` and `www.everloot.app` (Cloudflare creates the records and certificates).
+4. Rules → Redirect Rules: `www.everloot.app/*` → `https://everloot.app/$1` (301), as Vercel does today.
+5. Check: the route check against `https://everloot.app` (no sign-in now), `/api/health` fresh, one MCP call,
+   one upload from the addon or desktop app, Battle.net sign-in end to end, the footer shows the release commit.
+6. Bots: Security → bots / AI crawl control, decide on `meta-externalagent` (40% of function calls on 10/28,
+   ignores robots.txt). Carlos's call.
+
+Rollback: Vercel → Cron Jobs enable; Worker → remove the two custom domains; DNS → re-add `A @ 76.76.21.21` and
+`CNAME www cname.vercel-dns.com` (DNS only); Worker → Cron Triggers remove. Vercel's last production deployment
+serves again within the DNS TTL.
