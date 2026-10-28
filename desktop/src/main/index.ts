@@ -286,6 +286,7 @@ if (!app.requestSingleInstanceLock()) {
     try {
       await runInstaller(downloaded.path);
     } catch (err) {
+      downloaded = null;
       updateProgress = { stage: "failed", percent: 0, error: `the installer did not start (${err instanceof Error ? err.message : String(err)})` };
       broadcast();
       return false;

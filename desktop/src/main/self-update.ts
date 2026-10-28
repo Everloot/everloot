@@ -63,9 +63,14 @@ async function* bounded(res: Response, limit: number, what: string): AsyncGenera
   }
 }
 
-/** GitHub answers a release download with a redirect to its own download host; that is followed, but never off HTTPS. */
-function stayedHttps(res: Response, what: string): void {
-  if (res.url && !res.url.startsWith("https://")) throw new Error(`${what} was redirected off HTTPS`);
+/** GitHub's asset redirects are followed; refuse a failed response or a final URL that is not HTTPS. */
+async function checkResponse(res: Response, what: string): Promise<void> {
+  const error = !res.ok || !res.body ? `${what}: ${res.status}`
+    : res.url && !res.url.startsWith("https://") ? `${what} final URL is not HTTPS` : null;
+  if (error) {
+    await res.body?.cancel().catch(() => {});
+    throw new Error(error);
+  }
 }
 
 /**
@@ -89,29 +94,31 @@ export async function downloadUpdate(options: {
   const file = asset.name;
 
   const sumsRes = await send(options.sumsUrl, { signal: AbortSignal.timeout(15_000) });
-  if (!sumsRes.ok) throw new Error(`release checksums: ${sumsRes.status}`);
-  stayedHttps(sumsRes, "release checksums");
+  await checkResponse(sumsRes, "release checksums");
   const sumsChunks: Uint8Array[] = [];
   for await (const chunk of bounded(sumsRes, SUMS_LIMIT, "release checksums")) sumsChunks.push(chunk);
   const expected = checksumFor(Buffer.concat(sumsChunks).toString("utf8"), file);
   if (!expected) throw new Error(`${file} is not listed in the release checksums`);
 
   const res = await send(options.url, { signal: AbortSignal.timeout(15 * 60_000) });
-  if (!res.ok || !res.body) throw new Error(`download: ${res.status}`);
-  stayedHttps(res, "download");
+  await checkResponse(res, "download");
   const total = Number(res.headers.get("content-length")) || 0;
-  mkdirSync(options.dir, { recursive: true });
   const target = join(options.dir, file);
   const part = `${target}.part`;
   const hash = createHash("sha256");
   let got = 0;
   let shown = -1;
   try {
+    mkdirSync(options.dir, { recursive: true });
     const out = await open(part, "w");
     try {
       for await (const chunk of bounded(res, limit, file)) {
+        for (let offset = 0; offset < chunk.length;) {
+          const { bytesWritten } = await out.write(chunk, offset, chunk.length - offset);
+          if (!bytesWritten) throw new Error(`${file} could not be written`);
+          offset += bytesWritten;
+        }
         hash.update(chunk);
-        await out.write(chunk);
         got += chunk.length;
         const percent = total ? Math.min(99, Math.floor((got / total) * 100)) : 0;
         if (percent !== shown) { shown = percent; options.onProgress?.(percent); }
@@ -123,7 +130,8 @@ export async function downloadUpdate(options: {
     // Replaces the old installer in one step; until here it was left as it was.
     renameSync(part, target);
   } catch (err) {
-    rmSync(part, { force: true });
+    await res.body?.cancel().catch(() => {});
+    try { rmSync(part, { force: true }); } catch { /* Keep the original failure if the partial file is locked. */ }
     throw err;
   }
   options.onProgress?.(100);

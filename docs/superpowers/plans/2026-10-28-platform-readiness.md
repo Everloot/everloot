@@ -294,8 +294,9 @@ tests (REL-08); existing release workflow and native acceptance checklist (REL-0
   interruption/retry and refusal visibility; never fabricate durable receipts or widen sharing. `821582ce`
   independently reviewed SPEC/QUALITY PASS; parent web38/companion41 and web typecheck PASS. Review wording
   and one-row negative-index test follow-ups are addressed. Deployed browser/Cloudflare acceptance remains open.
-- [ ] REL-08: add failing regressions for hostile URLs/filenames, oversized bodies, checksum failure and installer
-  launch errors; implement minimal recovery-safe guards without adding an unapproved signing service.
+- [x] REL-08 source/fixture slice: hostile URLs/filenames, bounded downloads, checksum preservation and installer
+  spawn errors covered. Independent review's short-write blocker corrected with failing-then-passing regressions;
+  parent updater28/full Desktop265/typecheck PASS. Real native install and publisher verification stay in REL-09.
 - [ ] REL-09: prepare the publisher-trust/key-rotation decision and isolated install/upgrade/uninstall checklist.
   The operator handles real keys and package acceptance; code tests cannot establish independent publisher trust.
 - [ ] Run affected suites/typechecks, independent review and updated package acceptance for each separate task.

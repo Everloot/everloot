@@ -65,6 +65,15 @@ rows within the same session, and analytics outcome distinctions are separate fo
 browser/shared suites passed 34 tests after the follow-up. This closes the
 source/fixture slice only: no deployed browser or Cloudflare upload acceptance, push or release is claimed.
 
+REL-08 source guards are implemented locally: exact project/release installer and checksum URLs, matching
+announced version, 512 MiB streamed installer and 64 KiB manifest caps, checksum before replacement, and
+installer-spawn confirmation before quitting. Independent review found a short-write integrity blocker;
+root reproduced it, added full-write handling and zero-progress refusal, and fixed response cancellation
+and redownload after launch failure. Seven new regressions failed before the correction; parent updater28,
+full Desktop265 and Desktop typecheck pass. Initial/final URLs are checked, not every intermediate automatic
+redirect. No real installer was downloaded or launched. Successful spawn is not install success; publisher
+trust, signing/key rotation, native upgrade/uninstall and deployed delivery remain REL-09 gates.
+
 ## Identity, character hub and completion
 
 | ID | Gap / deliverable | Depends on | Acceptance |

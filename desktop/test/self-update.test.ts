@@ -3,8 +3,14 @@ import { EventEmitter } from "node:events";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { open } from "node:fs/promises";
 import { afterEach, expect, test, vi } from "vitest";
 import { canInstallInPlace, downloadUpdate, runInstaller } from "../src/main/self-update";
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const fs = await importOriginal<typeof import("node:fs/promises")>();
+  return { ...fs, open: vi.fn(fs.open) };
+});
 
 const dirs: string[] = [];
 const dir = () => { const d = mkdtempSync(join(tmpdir(), "everloot-update-")); dirs.push(d); return d; };
@@ -172,6 +178,64 @@ test("a verified download replaces the old installer", async () => {
   const path = await downloadUpdate({ url: URL_EXE, sumsUrl: URL_SUMS, version: "0.2.0", dir: d, send: fake(SUMS_OK) });
   expect(readFileSync(path).equals(installer)).toBe(true);
   expect(readdirSync(d)).toEqual([TARGET]);
+});
+
+test("short writes are completed before a verified installer replaces the old one", async () => {
+  const { open: realOpen } = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
+  let writes = 0;
+  vi.mocked(open).mockImplementationOnce(async (...args) => {
+    const out = await realOpen(...args);
+    const write = out.write.bind(out);
+    out.write = (async (buffer: Uint8Array, offset = 0, length = buffer.length - offset) => {
+      writes++;
+      return write(buffer, offset, Math.min(length, 4096));
+    }) as typeof out.write;
+    return out;
+  });
+  const d = withOldInstaller();
+  const path = await downloadUpdate({ url: URL_EXE, sumsUrl: URL_SUMS, dir: d, send: fake(SUMS_OK) });
+  expect(readFileSync(path).equals(installer)).toBe(true);
+  expect(writes).toBeGreaterThan(1);
+  expect(sha(readFileSync(path))).toBe(sha(installer));
+  expect(readdirSync(d)).toEqual([TARGET]);
+});
+
+test("a write that makes no progress fails safely and retains the old installer", async () => {
+  const { open: realOpen } = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
+  vi.mocked(open).mockImplementationOnce(async (...args) => {
+    const out = await realOpen(...args);
+    out.write = (async (buffer: Uint8Array) => ({ bytesWritten: 0, buffer })) as typeof out.write;
+    return out;
+  });
+  const d = withOldInstaller();
+  await expect(downloadUpdate({ url: URL_EXE, sumsUrl: URL_SUMS, dir: d, send: fake(SUMS_OK) })).rejects.toThrow(/could not be written/);
+  untouched(d);
+});
+
+for (const stage of ["checksums", "installer"]) for (const failure of ["status", "redirect"]) {
+  test(`an early ${stage} ${failure} refusal cancels its body`, async () => {
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({ cancel() { cancelled = true; } });
+    const send = vi.fn(async (url: string) => {
+      if (stage === "installer" && url === URL_SUMS) return new Response(SUMS_OK);
+      const res = new Response(body, { status: failure === "status" ? 503 : 200 });
+      Object.defineProperty(res, "url", { value: failure === "redirect" ? "http://example.test/file" : url });
+      return res;
+    }) as unknown as typeof fetch;
+    const d = withOldInstaller();
+    await expect(downloadUpdate({ url: URL_EXE, sumsUrl: URL_SUMS, dir: d, send })).rejects.toThrow();
+    expect(cancelled).toBe(true);
+    untouched(d);
+  });
+}
+
+test("a disk-open failure cancels the installer body and keeps the old installer", async () => {
+  vi.mocked(open).mockRejectedValueOnce(new Error("disk unavailable"));
+  const { state, send } = streamed(installer, 1);
+  const d = withOldInstaller();
+  await expect(downloadUpdate({ url: URL_EXE, sumsUrl: URL_SUMS, dir: d, send })).rejects.toThrow("disk unavailable");
+  expect(state.cancelled).toBe(true);
+  untouched(d);
 });
 
 test("an oversized checksum file is refused without reading it all", async () => {
