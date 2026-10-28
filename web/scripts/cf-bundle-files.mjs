@@ -18,4 +18,6 @@ rmSync(OUT, { recursive: true, force: true });
 for (const dir of DIRS) cpSync(join("..", dir), join(OUT, dir), { recursive: true });
 // The protocol's JSON Schema files, served by /schema/<file>.json (PROTOCOL_SCHEMA_DIR).
 cpSync(join("node_modules", "@everloot", "protocol", "schema"), join(OUT, "protocol-schema"), { recursive: true });
-console.log(`Copied ${DIRS.join(", ")} and the protocol schemas into ${OUT}`);
+// The Worker entry (wrangler.jsonc `main`): OpenNext's worker plus the scheduled jobs.
+cpSync(join("scripts", "cf-entry.mjs"), join(".open-next", "cf-entry.mjs"));
+console.log(`Copied ${DIRS.join(", ")} and the protocol schemas into ${OUT}, and the Worker entry`);

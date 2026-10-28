@@ -3,7 +3,9 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "everloot-web",
-  "main": ".open-next/worker.js",
+  // scripts/cf-entry.mjs, copied here by scripts/cf-bundle-files.mjs: OpenNext's worker plus the scheduled jobs.
+  "main": ".open-next/cf-entry.mjs",
+  // No `triggers.crons` until the cutover: Vercel runs the crons until then, and only one host may (src/lib/cf-crons.ts).
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": {
