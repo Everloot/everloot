@@ -99,7 +99,8 @@ paged store contracts and bounded work; select storage after a measured represen
 - Exactly one scheduler writes each rollup during overlap and cutover; verify replay and rollback.
 - Test auth connections across separate Worker requests, not just one successful sign-in.
 - Measure the same public and private routes before/after; no promised performance multiplier.
-- Follow the existing decision: production cutover after November 4 and only after parity acceptance.
+- Follow the latest migration-owner decision: cutover before launch once the required parity and rollback
+  checks pass; this supersedes the earlier after-November-4 sequence. The migration lane executes it.
 - Workers Paid is approved; new paid products or changed spending require a separately named decision.
 
 ## Team operations and SaaS structure

@@ -2,6 +2,7 @@
 
 Date: 2026-10-28. Implementation order approved; review findings resolved. Code baseline `29a51c6f`;
 Cloudflare committed spike baseline `6dba219e`, with additional uncommitted work owned by the migration terminal.
+The [session handoff](2026-10-28-readiness-handoff.md) gives the next terminal goal and current delivery boundaries.
 Code evidence is not deployment evidence. Existing feature flags and database migrations must be
 read back before activation; older status notes disagree and are not proof of the current live state.
 
@@ -31,7 +32,7 @@ This set is committed locally, not pushed, installed, packaged or released.
 | CF-07 | Versioned knowledge release import and async D1 reads | Release manifest | Search/FTS/lore/MCP/sitemap fixture parity; restore original release on failure |
 | CF-08 | Linux CI build, route parity and rollback | CF-01..07 | Exact artifact built and tested on target runtime |
 | CF-09 | Public tag purge on a controlled custom hostname | CF-01, SEC-01 | Hidden player/guild disappears from warm page/search cache before production cutover |
-| CF-10 | Production cutover after November 4 | CF-08..09, PERF-01 | Owner executes reviewed cutover/rollback; Access mode and scheduler ownership verified |
+| CF-10 | Production cutover under the latest owner-approved sequence | CF-08..09, PERF-01 | Migration owner executes reviewed cutover/rollback before launch once gates pass; Access mode and scheduler ownership verified |
 
 ## Cross-platform safeguards: readiness implementation can proceed separately
 
