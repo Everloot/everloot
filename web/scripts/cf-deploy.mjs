@@ -7,6 +7,7 @@
 import { execFileSync, execSync } from "node:child_process";
 
 const sha = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
-const run = (cmd) => execSync(cmd, { stdio: "inherit" });
+// Pre-built pages (the home page among them) render the footer at build time, so the build sees the commit too.
+const run = (cmd) => execSync(cmd, { stdio: "inherit", env: { ...process.env, EVERLOOT_COMMIT_SHA: sha } });
 run("npm run cf:build");
 run(`npx opennextjs-cloudflare deploy --var EVERLOOT_COMMIT_SHA:${sha}`);
