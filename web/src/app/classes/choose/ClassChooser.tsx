@@ -5,7 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "re
 import { CLASS_TEXT } from "@/components/talents/TalentTreeView";
 import { Card, SectionHeading } from "@/components/ui";
 import {
-  FACTIONS, RACE, READING, ROLE_DOES, answersHash, article, chooseClasses, listed, parseAnswers, raceChoices, raceLabel,
+  FACTIONS, RACE, READING, ROLE_DOES, answersHash, article, chooseClasses, listed, notOffered, optionOffered, parseAnswers, raceChoices, raceLabel,
   type Answers, type ChooserResult, type ClassFit, type RaceChoice,
 } from "@/lib/class-chooser";
 import { classHubHref, classLabel } from "@/lib/class-context";
@@ -120,19 +120,31 @@ export default function ClassChooser({ data }: { data: ClassChooserData }) {
               ))}
             </select>
           </label>
-          {data.chooser.questions.map((q) => (
-            <fieldset key={q.id}>
-              <legend className="text-sm font-semibold text-fg">{q.text}</legend>
-              <div className="mt-1 grid gap-x-6 sm:grid-cols-2">
-                {[{ id: "", text: "No preference" }, ...q.options].map((o) => (
-                  <label key={o.id || "none"} className="flex min-h-11 items-center gap-3 text-sm text-fg-2">
-                    <input type="radio" name={q.id} value={o.id} defaultChecked={(answers[q.id] ?? "") === o.id} className="size-5 shrink-0" />
-                    {o.text}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-          ))}
+          {data.chooser.questions.map((q) => {
+            // A role answer no class is named for yet stays in the form, disabled, with why beside the question.
+            const held = q.options.filter((o) => !optionOffered(o, data));
+            const note = (id: string) => `${q.id}-${id}-note`;
+            return (
+              <fieldset key={q.id}>
+                <legend className="text-sm font-semibold text-fg">{q.text}</legend>
+                {held.map((o) => <p key={o.id} id={note(o.id)} className="mt-1 text-meta text-muted">{notOffered(o.role!)}</p>)}
+                <div className="mt-1 grid gap-x-6 sm:grid-cols-2">
+                  {[{ id: "", text: "No preference" }, ...q.options].map((o) => {
+                    const off = held.some((h) => h.id === o.id);
+                    return (
+                      <label key={o.id || "none"} className={`flex min-h-11 items-center gap-3 text-sm ${off ? "text-muted" : "text-fg-2"}`}>
+                        <input
+                          type="radio" name={q.id} value={o.id} defaultChecked={(answers[q.id] ?? "") === o.id} disabled={off}
+                          aria-describedby={off ? note(o.id) : undefined} className="size-5 shrink-0"
+                        />
+                        {o.text}
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
+            );
+          })}
           <noscript>
             <p className="text-sm text-muted">The chooser works out its answer in your browser, so it needs JavaScript. How each answer counts is below either way.</p>
           </noscript>

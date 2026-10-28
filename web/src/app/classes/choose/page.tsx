@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { Container, PageHeader, SectionHeading } from "@/components/ui";
 import { CURRENT_BUILD } from "@/data/game-data/raid";
 import { CLASSES } from "@/design/tokens";
-import { READING, ROLE_DOES, chooserReviewed, listed, optionWeights } from "@/lib/class-chooser";
+import { READING, ROLE_DOES, chooserReviewed, listed, notOffered, optionOffered, optionWeights } from "@/lib/class-chooser";
 import { ROLES, classLabel, type ClassSlug } from "@/lib/class-context";
 import { guidesDir } from "@/lib/guides";
 import { pageMetadata } from "@/lib/seo";
@@ -116,19 +116,23 @@ function Weights({ data }: { data: ClassChooserData }) {
               return (
                 <li key={o.id} data-option={`${q.id}.${o.id}`}>
                   <span className="font-semibold text-fg">{o.text}</span>{" "}
-                  {o.role && `+${o.weight} for each class the source says ${ROLE_DOES[o.role].one}.`}
-                  {o.role && !facts.length && ` No class: the source does not say which classes ${ROLE_DOES[o.role].many}.`}
-                  {facts.length > 0 && (
-                    <ul className="mt-1 space-y-1 pl-4">
-                      {facts.map((w) => <li key={w.classSlug}>{o.role ? `${classLabel(w.classSlug)}: ${w.why}` : `${classLabel(w.classSlug)}: +${w.weight}. ${w.why}`}</li>)}
-                    </ul>
-                  )}
-                  {readings.length > 0 && (
+                  {o.role && !optionOffered(o, data) ? `Not offered yet. ${notOffered(o.role)}` : (
                     <>
-                      <p className="mt-1">{`And by ${READING}:`}</p>
-                      <ul className="mt-1 space-y-1 pl-4">
-                        {readings.map((w) => <li key={w.classSlug}>{`${classLabel(w.classSlug)}: +${w.weight}. ${w.why}`}</li>)}
-                      </ul>
+                      {o.role && `+${o.weight} for each class the source says ${ROLE_DOES[o.role].one}.`}
+                      {o.role && !facts.length && ` No class: the source does not say which classes ${ROLE_DOES[o.role].many}.`}
+                      {facts.length > 0 && (
+                        <ul className="mt-1 space-y-1 pl-4">
+                          {facts.map((w) => <li key={w.classSlug}>{o.role ? `${classLabel(w.classSlug)}: ${w.why}` : `${classLabel(w.classSlug)}: +${w.weight}. ${w.why}`}</li>)}
+                        </ul>
+                      )}
+                      {readings.length > 0 && (
+                        <>
+                          <p className="mt-1">{`And by ${READING}:`}</p>
+                          <ul className="mt-1 space-y-1 pl-4">
+                            {readings.map((w) => <li key={w.classSlug}>{`${classLabel(w.classSlug)}: +${w.weight}. ${w.why}`}</li>)}
+                          </ul>
+                        </>
+                      )}
                     </>
                   )}
                 </li>

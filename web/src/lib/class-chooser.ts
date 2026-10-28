@@ -64,8 +64,10 @@ export function parseAnswers(search: URLSearchParams, data: ClassChooserData): A
     const [value] = given;
     if (value === undefined) continue;
     if (!question && !races.some((r) => r.key === value)) return { ok: false, error: `${quoted(value)} is not one of the races in Blizzard's tables.` };
-    if (question && !question.options.some((o) => o.id === value)) {
-      return { ok: false, error: `The link answers ${JSON.stringify(question.text)} with ${quoted(value)}, which is not one of its answers.` };
+    const option = question?.options.find((o) => o.id === value);
+    if (question && !option) return { ok: false, error: `The link answers ${JSON.stringify(question.text)} with ${quoted(value)}, which is not one of its answers.` };
+    if (question && option && !optionOffered(option, data)) {
+      return { ok: false, error: `The link answers ${JSON.stringify(question.text)} with ${JSON.stringify(option.text)}, which is not offered yet. ${notOffered(option.role!)}` };
     }
     answers[key] = value;
   }
@@ -96,6 +98,15 @@ export function optionWeights(option: ChooserOption, { roles }: ClassChooserData
     : (option.classes ?? []).map((c) => ({ classSlug: c.class, weight: c.weight, why: c.why }));
   return weighed.sort((a, b) => b.weight - a.weight || byName(a.classSlug, b.classSlug));
 }
+
+/** What a role answer asks of a class, in the note that says no class is named for it yet. */
+const ROLE_DOING: Record<GuideRole, string> = { tank: "protecting the group", healer: "healing", damage: "dealing damage" };
+
+/** Why the form does not offer a role answer yet. */
+export const notOffered = (role: GuideRole): string => `No class is named for ${ROLE_DOING[role]} in Blizzard's descriptions yet.`;
+
+/** Whether the form offers an answer: all but a role no class is named for yet, in the facts or by a reading. */
+export const optionOffered = (option: ChooserOption, data: ClassChooserData): boolean => !option.role || optionWeights(option, data).length > 0;
 
 export interface Reason { question: string; answer: string; weight: number; why: string; reading?: true }
 export interface ClassFit { classSlug: ClassSlug; score: number; reasons: Reason[] }

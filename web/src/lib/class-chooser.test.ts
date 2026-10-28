@@ -4,7 +4,7 @@ import { describe, expect, test } from "vitest";
 import { CLASSES } from "@/design/tokens";
 import { FACTIONS as KB_FACTIONS, RACE_QUESTION, parseClassChooser, type ClassChooserData } from "../../../kb/src/guides/class-chooser";
 import {
-  FACTIONS, RACE, answersHash, chooseClasses, chooserReviewed, optionWeights, parseAnswers, raceChoices, type Answers,
+  FACTIONS, RACE, answersHash, chooseClasses, chooserReviewed, notOffered, optionOffered, optionWeights, parseAnswers, raceChoices, type Answers,
 } from "./class-chooser";
 import { classRaces } from "./class-hub";
 import { guidesDir } from "./guides";
@@ -158,6 +158,13 @@ describe("the link", () => {
     expect(read(`role=${"x".repeat(60)}`)).toEqual({ ok: false, error: `The link answers "${ROLE_Q}" with "${"x".repeat(40)}…", which is not one of its answers.` });
   });
 
+  test("refuses a role answer no class is named for yet: the form does not offer it", () => {
+    expect(read("role=protect")).toEqual({
+      ok: false,
+      error: `The link answers "${ROLE_Q}" with "Protect my group", which is not offered yet. No class is named for protecting the group in Blizzard's descriptions yet.`,
+    });
+  });
+
   test("writes the race first, then the questions in their order, and reads back the same answers", () => {
     const answers = { theme: "frost", race: "horde-tauren", role: "heal" };
     expect(answersHash(answers, data)).toBe("#race=horde-tauren&role=heal&theme=frost");
@@ -185,6 +192,16 @@ test("an option's weights, a role's expanded from the facts, the heaviest first"
   expect(optionWeights(data.chooser.questions[0].options[2], data)).toEqual([]);
 });
 
+test("an answer is offered unless it is a role no class is named for, in the facts or by a reading", () => {
+  const [heal, , protect] = data.chooser.questions[0].options;
+  expect(optionOffered(heal, data)).toBe(true);
+  expect(optionOffered(protect, data)).toBe(false);
+  expect(optionOffered(data.chooser.questions[1].options[0], data)).toBe(true);
+  const read = parseClassChooser(ROLES, CHOOSER.replace("{ id: protect, text: Protect my group, role: tank, weight: 2 }", '{ id: protect, text: Protect my group, role: tank, weight: 2, readings: [{ class: warrior, weight: 1, why: "Strong and tough." }] }'))!;
+  expect(optionOffered(read.chooser.questions[0].options[2], read)).toBe(true);
+  expect(notOffered("tank")).toBe("No class is named for protecting the group in Blizzard's descriptions yet.");
+});
+
 test("the chooser is reviewed only when both files are", () => {
   expect(chooserReviewed(data)).toBe(false);
   const reviewed = (s: string) => s.replace("status: draft", "status: reviewed").replace('reviewer: ""', "reviewer: Kai").replace("reviewedOn: null", "reviewedOn: 2026-10-26");
@@ -203,9 +220,10 @@ describe("the committed chooser", () => {
   const file = (name: string) => readFileSync(join(guidesDir(), name), "utf8");
   const committed = parseClassChooser(file("class-roles.yaml"), file("class-chooser.yaml")) as ClassChooserData;
 
-  /** Every set of answers the form allows: each question unanswered or given one of its answers. */
+  /** Every set of answers the form allows: each question unanswered or given one of the answers it offers. */
   function everyAnswerSet(): Answers[] {
-    const questions: [string, string[]][] = [[RACE, raceChoices(committed).map((r) => r.key)], ...committed.chooser.questions.map((q): [string, string[]] => [q.id, q.options.map((o) => o.id)])];
+    const offered = (q: ClassChooserData["chooser"]["questions"][number]) => q.options.filter((o) => optionOffered(o, committed)).map((o) => o.id);
+    const questions: [string, string[]][] = [[RACE, raceChoices(committed).map((r) => r.key)], ...committed.chooser.questions.map((q): [string, string[]] => [q.id, offered(q)])];
     return questions.reduce<Answers[]>((sets, [key, ids]) => sets.flatMap((s) => [s, ...ids.map((id) => ({ ...s, [key]: id }))]), [{}]);
   }
 

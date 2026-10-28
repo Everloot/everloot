@@ -160,7 +160,7 @@ describe("the chooser page", () => {
       "What would you like to do in a group?", "Which of these draws you in?", "Effects that strengthen my group",
       "Heal my allies +2 for each class the source says heals.",
       "Paladin: Blizzard's article says paladins call upon the Light to heal wounds.",
-      "Protect my group +2 for each class the source says protects a group. No class: the source does not say which classes protect a group.",
+      "Protect my group Not offered yet. No class is named for protecting the group in Blizzard's descriptions yet.",
       "Rogue: +2. Blizzard's article says rogues rely on stealth and are fond of poisons.",
       "Priest: +1. Power Word: Fortitude, Divine Spirit and Shadow Protection, in the raid builder's table.",
       "A race keeps the classes Blizzard's race tables let it be, and adds no weight.",
@@ -178,6 +178,17 @@ describe("the chooser page", () => {
       "Your answers stay in this page's address, after the # sign",
     ]) expect(page, limit).toContain(limit);
     expect(page.toLowerCase()).not.toMatch(NO_RANKING);
+  });
+
+  test("an answer no class is named for yet is disabled, with why beside its question", () => {
+    const doc = new DOMParser().parseFromString(renderToStaticMarkup(<ChooserPage />), "text/html");
+    const role = [...doc.querySelectorAll("fieldset")].find((f) => words(f.querySelector("legend")) === "What would you like to do in a group?")!;
+    const protect = role.querySelector<HTMLInputElement>('input[value="protect"]')!;
+    expect(protect.disabled).toBe(true);
+    const note = doc.getElementById(protect.getAttribute("aria-describedby")!);
+    expect(role.contains(note)).toBe(true);
+    expect(words(note)).toBe("No class is named for protecting the group in Blizzard's descriptions yet.");
+    expect([...role.querySelectorAll<HTMLInputElement>("input")].filter((i) => i.disabled).map((i) => i.value)).toEqual(["protect"]);
   });
 
   test("as built, the buttons wait for the browser, and the page says the chooser needs JavaScript", () => {
@@ -230,9 +241,14 @@ describe("choosing in the browser", () => {
     expect(result()).toContain("They tie on your answers. Tied classes are listed in alphabetical order; the chooser does not break a tie.");
   });
 
-  test("an answer that weighs no class says why", async () => {
-    await open("#role=protect");
-    expect(result()).toContain('"Protect my group" gives weight to no class: the source does not say which classes protect a group.');
+  test("a link with an answer the form does not offer yet says why and shows no answers", async () => {
+    await open("#role=protect&theme=weapons");
+    expect(words(container!.querySelector('[role="alert"]'))).toContain('with "Protect my group", which is not offered yet. No class is named for protecting the group in Blizzard\'s descriptions yet.');
+    expect(location.hash).toBe("");
+    expect(result()).toContain("Answer at least one question");
+  });
+
+  test("an answer that weighs no class the race can be says why", async () => {
     await open("#race=horde-tauren&theme=frost-and-flame");
     expect(result()).toContain('"Frost and flame, from a distance" gives weight to no class a Tauren can be.');
     expect(result()).toContain("A Tauren can be a Druid, Hunter, Shaman or Warrior");
