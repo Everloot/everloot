@@ -3,11 +3,11 @@
  "label": "found in game files, unconfirmed",
  "build": {
   "product": "wowf",
-  "buildId": 70634,
-  "version": "1.60.1.70634",
-  "buildConfig": "7d8ae4cd9c1f639a3ea04fd47e21c746",
-  "definitions": "50ce5d272897",
-  "extractedAt": "2026-10-27T18:15:44.450Z"
+  "buildId": 70658,
+  "version": "1.60.1.70658",
+  "buildConfig": "165410aca770316ea0f88100bb4830c2",
+  "definitions": "72891e941188",
+  "extractedAt": "2026-10-28T01:38:30.566Z"
  },
  "classId": 2,
  "className": "Paladin",

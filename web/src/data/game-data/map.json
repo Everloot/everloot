@@ -6,11 +6,11 @@
     "licence": "Blizzard game data, not under our licence",
     "licenceUrl": "https://github.com/Everloot/everloot/blob/main/docs/DATA_POLICY.md",
     "product": "wowf",
-    "buildId": 70634,
-    "version": "1.60.1.70634",
-    "buildConfig": "7d8ae4cd9c1f639a3ea04fd47e21c746",
-    "definitions": "50ce5d272897",
-    "extractedAt": "2026-10-27T18:15:44.450Z",
+    "buildId": 70658,
+    "version": "1.60.1.70658",
+    "buildConfig": "165410aca770316ea0f88100bb4830c2",
+    "definitions": "72891e941188",
+    "extractedAt": "2026-10-28T01:38:30.566Z",
     "tables": [
       {
         "table": "Map",
@@ -634,6 +634,118 @@
       }
     }
   ],
+  "difficulties": {
+    "1": {
+      "name": "Normal",
+      "minPlayers": 5,
+      "maxPlayers": 5
+    },
+    "9": {
+      "name": "40 Player",
+      "minPlayers": 40,
+      "maxPlayers": 40
+    },
+    "148": {
+      "name": "20 Player",
+      "minPlayers": 20,
+      "maxPlayers": 20
+    },
+    "184": {
+      "name": "Normal",
+      "minPlayers": 5,
+      "maxPlayers": 5
+    },
+    "185": {
+      "name": "20 Player",
+      "minPlayers": 20,
+      "maxPlayers": 20
+    },
+    "186": {
+      "name": "40 Player",
+      "minPlayers": 40,
+      "maxPlayers": 40
+    },
+    "197": {
+      "name": "10 Player",
+      "minPlayers": 10,
+      "maxPlayers": 10
+    },
+    "198": {
+      "name": "Normal",
+      "minPlayers": 10,
+      "maxPlayers": 10
+    },
+    "201": {
+      "name": "Normal",
+      "minPlayers": 5,
+      "maxPlayers": 5
+    },
+    "202": {
+      "name": "Difficulty A",
+      "minPlayers": 5,
+      "maxPlayers": 5
+    },
+    "203": {
+      "name": "Difficulty B",
+      "minPlayers": 5,
+      "maxPlayers": 5
+    },
+    "204": {
+      "name": "Difficulty C",
+      "minPlayers": 5,
+      "maxPlayers": 5
+    },
+    "207": {
+      "name": "Normal",
+      "minPlayers": 1,
+      "maxPlayers": 1
+    },
+    "213": {
+      "name": "Infinite",
+      "minPlayers": 5,
+      "maxPlayers": 5
+    },
+    "214": {
+      "name": "DNT - Internal only",
+      "minPlayers": 5,
+      "maxPlayers": 5
+    },
+    "215": {
+      "name": "Normal",
+      "minPlayers": 20,
+      "maxPlayers": 20
+    },
+    "226": {
+      "name": "20 Player",
+      "minPlayers": 20,
+      "maxPlayers": 20
+    },
+    "231": {
+      "name": "Normal",
+      "minPlayers": 1,
+      "maxPlayers": 1
+    },
+    "242": {
+      "name": "20 Player",
+      "minPlayers": 20,
+      "maxPlayers": 20
+    },
+    "243": {
+      "name": "10 Player",
+      "minPlayers": 10,
+      "maxPlayers": 10
+    },
+    "255": {
+      "name": "20 Player",
+      "minPlayers": 20,
+      "maxPlayers": 20
+    },
+    "256": {
+      "name": "10 Player",
+      "minPlayers": 10,
+      "maxPlayers": 10
+    }
+  },
   "entrances": [
     {
       "mapId": 33,
@@ -644,7 +756,12 @@
       "worldY": 1571.6,
       "uiMapId": 1421,
       "minLevel": 18,
-      "maxLevel": 18
+      "maxLevel": 18,
+      "difficultyIds": [
+        1,
+        201,
+        207
+      ]
     },
     {
       "mapId": 34,
@@ -655,7 +772,12 @@
       "worldY": 848,
       "uiMapId": 1453,
       "minLevel": 23,
-      "maxLevel": 23
+      "maxLevel": 23,
+      "difficultyIds": [
+        1,
+        201,
+        214
+      ]
     },
     {
       "mapId": 36,
@@ -666,7 +788,12 @@
       "worldY": 1681.2,
       "uiMapId": 1436,
       "minLevel": 16,
-      "maxLevel": 16
+      "maxLevel": 16,
+      "difficultyIds": [
+        1,
+        201,
+        213
+      ]
     },
     {
       "mapId": 43,
@@ -677,7 +804,11 @@
       "worldY": -2209.2,
       "uiMapId": 1413,
       "minLevel": 17,
-      "maxLevel": 17
+      "maxLevel": 17,
+      "difficultyIds": [
+        1,
+        201
+      ]
     },
     {
       "mapId": 47,
@@ -688,7 +819,11 @@
       "worldY": -1660.2,
       "uiMapId": 1413,
       "minLevel": 24,
-      "maxLevel": 24
+      "maxLevel": 24,
+      "difficultyIds": [
+        1,
+        201
+      ]
     },
     {
       "mapId": 48,
@@ -699,7 +834,12 @@
       "worldY": 748.4,
       "uiMapId": 1440,
       "minLevel": 22,
-      "maxLevel": 22
+      "maxLevel": 22,
+      "difficultyIds": [
+        1,
+        198,
+        201
+      ]
     },
     {
       "mapId": 70,
@@ -710,7 +850,11 @@
       "worldY": -2955,
       "uiMapId": 1418,
       "minLevel": 35,
-      "maxLevel": 35
+      "maxLevel": 35,
+      "difficultyIds": [
+        1,
+        201
+      ]
     },
     {
       "mapId": 90,
@@ -721,7 +865,12 @@
       "worldY": 931.6,
       "uiMapId": 1426,
       "minLevel": 25,
-      "maxLevel": 25
+      "maxLevel": 25,
+      "difficultyIds": [
+        1,
+        198,
+        201
+      ]
     },
     {
       "mapId": 109,
@@ -732,7 +881,13 @@
       "worldY": -3996,
       "uiMapId": 1435,
       "minLevel": 45,
-      "maxLevel": 45
+      "maxLevel": 45,
+      "difficultyIds": [
+        1,
+        184,
+        201,
+        215
+      ]
     },
     {
       "mapId": 129,
@@ -743,7 +898,11 @@
       "worldY": -2535.9,
       "uiMapId": 1413,
       "minLevel": 34,
-      "maxLevel": 34
+      "maxLevel": 34,
+      "difficultyIds": [
+        1,
+        201
+      ]
     },
     {
       "mapId": 189,
@@ -754,7 +913,12 @@
       "worldY": -811.3,
       "uiMapId": 1420,
       "minLevel": 30,
-      "maxLevel": 30
+      "maxLevel": 30,
+      "difficultyIds": [
+        1,
+        201,
+        207
+      ]
     },
     {
       "mapId": 209,
@@ -765,7 +929,13 @@
       "worldY": -2891.3,
       "uiMapId": 1446,
       "minLevel": 42,
-      "maxLevel": 42
+      "maxLevel": 42,
+      "difficultyIds": [
+        1,
+        184,
+        201,
+        207
+      ]
     },
     {
       "mapId": 229,
@@ -776,7 +946,12 @@
       "worldY": -1233,
       "uiMapId": 1428,
       "minLevel": 53,
-      "maxLevel": 53
+      "maxLevel": 53,
+      "difficultyIds": [
+        1,
+        201,
+        207
+      ]
     },
     {
       "mapId": 230,
@@ -787,7 +962,12 @@
       "worldY": -928.6,
       "uiMapId": 1427,
       "minLevel": 48,
-      "maxLevel": 48
+      "maxLevel": 48,
+      "difficultyIds": [
+        1,
+        184,
+        201
+      ]
     },
     {
       "mapId": 249,
@@ -796,7 +976,11 @@
       "continentId": 1,
       "worldX": -4753.3,
       "worldY": -3752.4,
-      "uiMapId": 1445
+      "uiMapId": 1445,
+      "difficultyIds": [
+        9,
+        186
+      ]
     },
     {
       "mapId": 289,
@@ -807,7 +991,11 @@
       "worldY": -2552.6,
       "uiMapId": 1422,
       "minLevel": 57,
-      "maxLevel": 57
+      "maxLevel": 57,
+      "difficultyIds": [
+        1,
+        201
+      ]
     },
     {
       "mapId": 309,
@@ -818,7 +1006,13 @@
       "worldY": -1224.6,
       "uiMapId": 1434,
       "minLevel": 60,
-      "maxLevel": 60
+      "maxLevel": 60,
+      "difficultyIds": [
+        148,
+        185,
+        197,
+        226
+      ]
     },
     {
       "mapId": 329,
@@ -829,7 +1023,12 @@
       "worldY": -3378.5,
       "uiMapId": 1423,
       "minLevel": 55,
-      "maxLevel": 55
+      "maxLevel": 55,
+      "difficultyIds": [
+        1,
+        184,
+        201
+      ]
     },
     {
       "mapId": 349,
@@ -840,7 +1039,12 @@
       "worldY": 2925,
       "uiMapId": 1443,
       "minLevel": 42,
-      "maxLevel": 42
+      "maxLevel": 42,
+      "difficultyIds": [
+        1,
+        184,
+        201
+      ]
     },
     {
       "mapId": 389,
@@ -851,7 +1055,11 @@
       "worldY": -4423.4,
       "uiMapId": 1454,
       "minLevel": 13,
-      "maxLevel": 13
+      "maxLevel": 13,
+      "difficultyIds": [
+        1,
+        201
+      ]
     },
     {
       "mapId": 409,
@@ -862,7 +1070,12 @@
       "worldY": -1036.7,
       "uiMapId": 1428,
       "minLevel": 60,
-      "maxLevel": 60
+      "maxLevel": 60,
+      "difficultyIds": [
+        9,
+        186,
+        226
+      ]
     },
     {
       "mapId": 429,
@@ -873,7 +1086,13 @@
       "worldY": 1130,
       "uiMapId": 1444,
       "minLevel": 54,
-      "maxLevel": 54
+      "maxLevel": 54,
+      "difficultyIds": [
+        1,
+        184,
+        201,
+        207
+      ]
     },
     {
       "mapId": 469,
@@ -884,7 +1103,12 @@
       "worldY": -1218.7,
       "uiMapId": 1428,
       "minLevel": 60,
-      "maxLevel": 60
+      "maxLevel": 60,
+      "difficultyIds": [
+        9,
+        186,
+        231
+      ]
     },
     {
       "mapId": 509,
@@ -893,7 +1117,11 @@
       "continentId": 1,
       "worldX": -8114.5,
       "worldY": 1526.4,
-      "uiMapId": 1451
+      "uiMapId": 1451,
+      "difficultyIds": [
+        148,
+        185
+      ]
     },
     {
       "mapId": 531,
@@ -902,7 +1130,11 @@
       "continentId": 1,
       "worldX": -8111.7,
       "worldY": 1526.8,
-      "uiMapId": 1451
+      "uiMapId": 1451,
+      "difficultyIds": [
+        9,
+        186
+      ]
     }
   ],
   "flightNodes": [
