@@ -1,4 +1,4 @@
-import { readFileSync, watch as fsWatch } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { answerPending, createAnswerStore } from "../../../companion/src/bridge/run";
 import { lazyEngine, mcpEngine, mcpMarketValue, mcpSearch, siteItemSearch, withMarket } from "../../../companion/src/bridge/engine";
@@ -7,6 +7,7 @@ import { providersOnDemand } from "../../../companion/src/providers/config";
 import { findEverlootFiles } from "../../../companion/src/savedvariables";
 import { createSentState } from "../../../companion/src/sent-state";
 import { uploadFile } from "../../../companion/src/uploader";
+import { watchFile } from "../../../companion/src/watch-file";
 import { appSettledList } from "../../../web/src/lib/settled-cache";
 import type { RealmSummary, Settings } from "../shared/types";
 import { accountKeyForSite } from "./account";
@@ -70,27 +71,7 @@ export function companionJobs(dataFolder: string, current: () => Settings): { de
       catch (err) { how = `config.json: ${err instanceof Error ? err.message : String(err)}`; }
       return r.answered || r.failed ? `answered ${r.answered}, failed ${r.failed} (${how}); /reload in game to read them` : `nothing pending (${how})`;
     },
-    watch(file, onChange) {
-      // fs.watch emits "error" when the folder vanishes (drive unplugged, WTF moved); with no listener
-      // that is an uncaught exception. Close and try again every few seconds until stopped.
-      let w: ReturnType<typeof fsWatch> | null = null;
-      let stopped = false;
-      let retry: ReturnType<typeof setTimeout> | null = null;
-      const arm = () => {
-        if (stopped) return;
-        // The game saves by moving the old file aside and writing a new one. On Linux and macOS a watch
-        // follows the moved file, so after a rename it is armed again on the new one.
-        try {
-          w = fsWatch(file, (event) => {
-            onChange();
-            if (event === "rename") { w?.close(); w = null; if (retry) clearTimeout(retry); retry = setTimeout(arm, 500); }
-          });
-        } catch { retry = setTimeout(arm, 5000); return; }
-        w.on("error", () => { w?.close(); w = null; retry = setTimeout(arm, 5000); });
-      };
-      arm();
-      return () => { stopped = true; if (retry) clearTimeout(retry); w?.close(); w = null; };
-    },
+    watch: (file, onChange) => watchFile(file, onChange),
   };
   return { deps, lastMarket: () => lastMarket, answerStore, notices };
 }

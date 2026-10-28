@@ -8,7 +8,7 @@
  * Sends only events the site has not confirmed. Named data (guild, gear, gold, collection) stays on
  * this machine; share it on the website with a verified grant. Nothing here touches the game client.
  */
-import { readFileSync, watch } from "node:fs";
+import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, posix, win32 } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -20,6 +20,7 @@ import { findEverlootFiles } from "./savedvariables";
 import { createSentState } from "./sent-state";
 import { refreshPrices } from "./prices";
 import { uploadFile, type UploadResult } from "./uploader";
+import { watchFile } from "./watch-file";
 
 export interface CliArgs {
   command: "upload" | "watch" | "bridge" | "prices"; file?: string; game?: string; endpoint: string; state?: string;
@@ -111,7 +112,7 @@ async function main(argv: string[]): Promise<void> {
     };
     for (const file of files) {
       await answer(file);
-      watch(file, debounce(() => void answer(file), 2000));
+      watchFile(file, debounce(() => void answer(file), 2000));
     }
     console.log(`Answering /ask for ${files.length} account(s). Leave this running; Ctrl+C stops it.`);
     return;
@@ -139,7 +140,7 @@ async function main(argv: string[]): Promise<void> {
   for (const file of files) await send(file);
   if (args.command === "watch") {
     // The game writes SavedVariables at logout or /reload; wait for the write to settle.
-    for (const file of files) watch(file, debounce(() => void send(file), 5000));
+    for (const file of files) watchFile(file, debounce(() => void send(file), 5000));
     console.log(`Watching ${files.length} file(s). Leave this running while you play; Ctrl+C stops it.`);
   }
 }
