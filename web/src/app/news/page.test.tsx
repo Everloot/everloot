@@ -285,12 +285,14 @@ const CORPUS = {
   "wow-forever-character-creation-opens-tomorrow-checklist": "f73c200327bd9fdbd8b0c15066727329d83e5f7b8d3a94c57b7ee2823513d847",
   "wow-forever-journey-episode-1-norway": "132576ceda1e06c3c133f56e71c619c519e185b843b51fd37152c49e270166c8",
   "wow-forever-molten-core-new-mechanics-raid-tease": "b9f2a33a4027f45e45dc19c20c4f97e559d752678ae18f5cb21cf70648b901c9",
+  "wow-forever-racial-changes-character-creation": "d4f0eae6d6160c50dfc8169ee6625fc651d16051377216c02e241efccebacc7f",
+  "wow-forever-restricted-name-bug-fix": "345eae53307068917a95ed036ae00665f4d11f1961e5b36fb2d0b2fd289f0a0d",
   "wow-forever-name-reservations-how-to-reserve": "e6ef0ebd510cc478ff17bea1667f8d82d41601739f92ceeca652487219b48e53",
   "wow-forever-rulesets-explained-pvp-rp-pvp-hardcore": "04ec3dc8ac735626be9ebec24d742fbe9ebe6d984c108e724e3f0db4e59e4905",
   "wow-weekly-forever-name-reservations-zulaman-hallows-end": "64c5c8d7dff54cbeaa1b1030179939e01207d0a92e79b5b59b655e3f4c8815be"
 };
 
-test("all 11 published posts retain their editorial source and survive pages, hub, RSS and sitemap with eight heroes", async () => {
+test("all 13 published posts retain their editorial source and survive pages, hub, RSS and sitemap with eight heroes", async () => {
   const dir = fileURLToPath(new URL("../../../../kb/news/", import.meta.url));
   vi.stubEnv("NEWS_DIR", dir); vi.stubEnv("WIKI_DIR", WIKI);
   vi.stubEnv("NEXT_PUBLIC_ADSENSE_CLIENT", "ca-pub-test");
@@ -307,9 +309,9 @@ test("all 11 published posts retain their editorial source and survive pages, hu
   const hub = renderToStaticMarkup(await NewsHub());
   const rss = await GET().text();
   const sitemap = newsSitemapPaths(news).map((p) => p.path);
-  expect(hub.match(/data-news-post=/g)).toHaveLength(11);
-  expect(rss.match(/<item>/g)).toHaveLength(11);
-  expect(sitemap).toHaveLength(12);
+  expect(hub.match(/data-news-post=/g)).toHaveLength(13);
+  expect(rss.match(/<item>/g)).toHaveLength(13);
+  expect(sitemap).toHaveLength(14);
   expect(hub).not.toContain("data-ad-slot");
   for (const post of posts) {
     const source = readFileSync(join(dir, `${post.slug}.md`), "utf8").replace(/\r\n/g, "\n");
