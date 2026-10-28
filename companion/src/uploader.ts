@@ -145,9 +145,11 @@ export async function uploadFile(file: string, options: UploadOptions): Promise<
     // Only the rows the receipt names as accepted are sent. A rejected row, or an index that names no row, stays
     // unsent and goes again next run: a stored batch can still turn rows away for now (a store that was down).
     const rows = JSON.parse(session.batches[session.next - 1]).records as { eventId: string }[];
+    const rejected = new Set((session.receipts[session.next - 1].rejected ?? [])
+      .map((r) => (r as { index?: unknown } | null)?.index));
     const indices = new Set((session.receipts[session.next - 1].accepted ?? [])
       .map((a) => (a as { index?: unknown } | null)?.index)
-      .filter((i): i is number => Number.isInteger(i) && (i as number) >= 0 && (i as number) < rows.length));
+      .filter((i): i is number => Number.isInteger(i) && (i as number) >= 0 && (i as number) < rows.length && !rejected.has(i)));
     options.state.add(receiptKey, [...indices].map((i) => rows[i].eventId));
     result.sent += indices.size;
   }, new URL("/api/intake", options.endpoint).href);
