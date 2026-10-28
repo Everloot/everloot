@@ -91,14 +91,39 @@ Vercel, `cf-connecting-ip` on the Worker, never the other host's header), the en
 (`EVERLOOT_DEPLOY_ENV`, `preview` until the cutover) and the deployed commit (`EVERLOOT_COMMIT_SHA`, stamped by
 `scripts/cf-deploy.mjs`).
 
-🔴 **The Supabase project was created through the Vercel Marketplace** (organization `vercel_icfg_…`). Before
-the Vercel project or team is retired, move the Supabase organization to direct Supabase billing, or the database
-goes with the integration.
+🔴 **The Supabase project was created through the Vercel Marketplace** (organization `vercel_icfg_…`). Supabase
+removes such an organization "only when you delete all their projects and then uninstall the Vercel Marketplace
+integration", and its owners come from the Vercel **team** roles. Retiring the `everloot-web` Vercel project is
+therefore safe; keep the R21 Vercel team and its Supabase integration installed (it stays for the other client
+sites), or move the organization to direct Supabase billing first (no self-serve path in the docs: ask Supabase
+support).
+
+🔑 **Feature switches are plain `vars`, not secrets**, and `scripts/cf-deploy.mjs` passes every var except the
+in-Worker `*_DIR` paths to the build: pages built ahead of time read the switches during the build, so as secrets
+they rendered with every switch off (seen on `/docs/api/keys`).
 
 ### 5. Crons
 
 `vercel.json` runs `/api/cron/snapshot` and `/api/cron/blue` every 10 minutes and `/api/cron/indexnow` hourly.
-They become Workers Cron Triggers calling the same handlers.
+They become Workers Cron Triggers calling the same handlers: `web/src/lib/cf-crons.ts` lists them (a test keeps
+it equal to `vercel.json`) and `web/scripts/cf-entry.mjs` (the Worker's `main`) adds a `scheduled` handler that
+calls each route with `Authorization: Bearer $CRON_SECRET`. Checked locally with `wrangler dev --test-scheduled`:
+the 10-minute trigger reaches both routes and passes their auth. `wrangler.jsonc` has **no `triggers.crons`
+until the cutover** (one writer); at the cutover, add
+`"triggers": { "crons": ["*/10 * * * *", "23 * * * *"] }` in the same step that removes Vercel's crons.
+
+CPU budget: Vercel's Cron Jobs view (10/28, last day, P75 wall time) shows snapshot 2.67 s, blue 49 s (mostly
+waiting on Blizzard's forums; waiting is not CPU on Workers), indexnow 0.46 s, all inside the 30 s CPU a sub-hourly
+trigger gets. Measure CPU on the Worker after the cutover; if the snapshot grows past ~15 s with launch traffic,
+split it into resumable chunks.
+
+## Route check (10/28)
+
+99 routes (every static page and one real sample per dynamic page, `D:/R21-Brain/tmp/everloot-route-*.mjs`)
+requested from production and from the Worker: 90 identical in status, title and size; median 266 ms on the
+Worker vs 288 ms on Vercel. Differences: the lore routes and the lore part of `sitemap.xml` (D1, section 3),
+`/schema/*` (fixed after the run, matches), `/docs/api/keys` (switches at build time; fixed, 134 KB vs 139 KB, and the footer reads the deployed commit), and two redirects the
+browser reports as status 0 (not a difference).
 
 ### 6. Builds and deploys
 
