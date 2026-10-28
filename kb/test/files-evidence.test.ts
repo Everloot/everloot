@@ -13,7 +13,7 @@ const files = {
     source: { version: "1.0.0.70634", extractedAt: "2026-10-27T08:00:00.000Z" },
     continents: [{ id: 0, name: "Synthetic Kingdoms" }],
     zones: [{ uiMapId: 1429, name: "Synthetic Forest", continentId: 0 }],
-    entrances: [{ mapId: 34, name: "Synthetic Stockade", raid: false, uiMapId: 1429, minLevel: 17, maxLevel: 24 }, { mapId: 34, name: "Synthetic Stockade", raid: false, uiMapId: 1429 }, { mapId: 409, name: "Synthetic Core", raid: true, uiMapId: 9999, minLevel: 60, maxLevel: 60 }],
+    entrances: [{ mapId: 34, name: "Synthetic Stockade", raid: false, uiMapId: 1429, minLevel: 17, maxLevel: 24 }, { mapId: 34, name: "Synthetic Stockade", raid: false, uiMapId: 1429 }, { mapId: 409, name: "Molten Core", raid: true, uiMapId: 9999, minLevel: 60, maxLevel: 60 }],
     flightNodes: [{ id: 2, name: "Synthetic Keep, Synthetic Forest", uiMapId: 1429 }],
   },
   encounters: { build: { version: "1.0.0.70634" }, instances: { "34": [{ id: 1, name: "Synthetic Warden" }, { id: 2, name: "Synthetic Stockade" }] } },
@@ -31,7 +31,7 @@ test("buildFilesIndex: one fact per thing, ids and facts only, the build stamped
   // Two entrance pins of one instance give one fact; the level, the zone and the encounter count are in it.
   expect(byKind("instance").map((f) => f.claim)).toEqual([
     "Synthetic Stockade: a dungeon, levels 17 to 24, entered from Synthetic Forest; the files list 2 encounters.",
-    "Synthetic Core: a raid, level 60.",
+    "Molten Core: a raid, level 60.",
   ]);
   expect(byKind("instance")[0]!.url).toBe("https://everloot.app/database/instances/34-synthetic-stockade");
   expect(byKind("boss").map((f) => f.claim)).toEqual(["Synthetic Warden: encounter 1 of 2 in Synthetic Stockade, in the game files.", "Synthetic Stockade: encounter 2 of 2 in Synthetic Stockade, in the game files."]);
@@ -59,6 +59,8 @@ test("filesEvidence: whole-word mentions, longest names first, one per thing, la
   expect(filesEvidence("Synthetic Forestry", index, 8)).toEqual([]);
   expect(filesEvidence("Synthetic Horse and Synthetic Wolf", index, 1)).toHaveLength(1);
   expect(filesEvidence("Synthetic Horse", null, 8)).toEqual([]);
+  // A short form names its page here too: "MC" is Molten Core.
+  expect(filesEvidence("where is MC", index, 8).map((e) => e.claim)).toEqual(["Molten Core: a raid, level 60."]);
 });
 
 test("readFilesIndex: the same index from the files on disk, missing files left out", () => {
