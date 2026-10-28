@@ -243,6 +243,16 @@ describe("reviewed versions stay as they were", () => {
     expect(compared(files(reviewed(ROLES), v2(mage3(CHOOSER))))).toEqual([]);
   });
 
+  test("a new version needs a review of its own even when nothing else changed", () => {
+    const bumped = v2(reviewed(CHOOSER));
+    expect(compared(files(reviewed(ROLES), bumped))).toEqual([at(CHOOSER_PATH, bumped, "reviewedOn:", "version 2 carries version 1's review (Kai, 2026-10-26)")]);
+    const facts = v2(reviewed(ROLES));
+    expect(compared(files(facts, reviewed(CHOOSER)))).toEqual([at(ROLES_PATH, facts, "reviewedOn:", "version 2 carries version 1's review (Kai, 2026-10-26)")]);
+    expect(compared(files(reviewed(ROLES), v2(reviewed(CHOOSER, "Kai", "2026-10-27"))))).toEqual([]);
+    expect(compared(files(reviewed(ROLES), v2(reviewed(CHOOSER, "Ana", "2026-10-26"))))).toEqual([]);
+    expect(compared(files(reviewed(ROLES), v2(CHOOSER)))).toEqual([]);
+  });
+
   test("a new review is a change too: no restamping without a new version", () => {
     const restamped = reviewed(CHOOSER, "Kai", "2026-10-27");
     expect(compared(files(reviewed(ROLES), restamped))).toEqual([at(CHOOSER_PATH, restamped, "version:", "class-chooser.yaml version 1 was reviewed by Kai on 2026-10-26; a new review is a new version")]);
@@ -252,14 +262,25 @@ describe("reviewed versions stay as they were", () => {
     expect(compared(files(reviewed(ROLES), CHOOSER))).toEqual([]);
   });
 
-  test("versions never go down", () => {
+  test("versions never go down, whatever the file was before", () => {
     const down = reviewed(CHOOSER, "Kai", "2026-10-27");
     expect(compared(files(reviewed(ROLES), down), files(reviewed(ROLES), reviewed(CHOOSER).replace("version: 1", "version: 3")))).toEqual([at(CHOOSER_PATH, down, "version:", "version 1 is below version 3")]);
+    expect(compared(files(ROLES, CHOOSER), files(ROLES, CHOOSER.replace("version: 1", "version: 3")))).toEqual([at(CHOOSER_PATH, CHOOSER, "version:", "version 1 is below version 3")]);
   });
 
   test("a draft before the change, or a file that was not there, may change freely", () => {
     expect(compared(files(ROLES, mage3(CHOOSER)), files(ROLES, CHOOSER))).toEqual([]);
     expect(compared(before(), files(null, null))).toEqual([]);
+  });
+
+  test("a reviewed file is never deleted or renamed; drafts may go, together", () => {
+    expect(compared(files(null, null))).toEqual([
+      { file: ROLES_PATH, message: expect.stringContaining("class-roles.yaml was reviewed as version 1 before this change and is gone") },
+      { file: CHOOSER_PATH, message: expect.stringContaining("class-chooser.yaml was reviewed as version 1 before this change and is gone") },
+    ]);
+    expect(compared(files(reviewed(ROLES), null))).toEqual([{ file: CHOOSER_PATH, message: expect.stringContaining("class-chooser.yaml was reviewed as version 1 before this change and is gone") }]);
+    expect(compared(files(null, null), files(ROLES, CHOOSER))).toEqual([]);
+    expect(compared(files(ROLES, null), files(ROLES, CHOOSER))).toEqual([{ file: CHOOSER_PATH, message: expect.stringContaining("is missing: the class chooser reads") }]);
   });
 
   test("a copy from before the change that does not read fails, so no change slips past it", () => {
@@ -306,5 +327,33 @@ describe("guide-check", () => {
       stderr: expect.stringContaining(`${CHOOSER_PATH}:${lineOf(changed, "version:")}: class-chooser.yaml was reviewed as version 1 and has changed since`),
     });
     expect(guideCheck(folder({ "class-roles.yaml": reviewed(ROLES), "class-chooser.yaml": reviewed(CHOOSER) }), "--previous", then)).toMatchObject({ code: 0 });
+  });
+
+  test("with --previous, a version raised with nothing else changed fails: the old review stays with the old version", { timeout: 60_000 }, () => {
+    const then = folder({ "class-roles.yaml": reviewed(ROLES), "class-chooser.yaml": reviewed(CHOOSER) });
+    const bumped = reviewed(CHOOSER).replace("version: 1", "version: 2");
+    expect(guideCheck(folder({ "class-roles.yaml": reviewed(ROLES), "class-chooser.yaml": bumped }), "--previous", then)).toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining(`${CHOOSER_PATH}:${lineOf(bumped, "reviewedOn:")}: version 2 carries version 1's review (Kai, 2026-10-26)`),
+    });
+  });
+
+  test("with --previous, deleting or renaming both reviewed files fails; deleting both drafts passes", { timeout: 60_000 }, () => {
+    const then = folder({ "class-roles.yaml": reviewed(ROLES), "class-chooser.yaml": reviewed(CHOOSER) });
+    for (const now of [folder({}), folder({ "roles.yaml": reviewed(ROLES), "chooser.yaml": reviewed(CHOOSER) })]) {
+      const run = guideCheck(now, "--previous", then);
+      expect(run).toMatchObject({ code: 1, stdout: expect.stringContaining("class chooser: no files in this folder, 2 problems; compared with 2 of its files from before the change") });
+      expect(run.stderr).toContain(`${ROLES_PATH}: class-roles.yaml was reviewed as version 1 before this change and is gone`);
+      expect(run.stderr).toContain(`${CHOOSER_PATH}: class-chooser.yaml was reviewed as version 1 before this change and is gone`);
+    }
+    expect(guideCheck(folder({}), "--previous", folder({ "class-roles.yaml": ROLES, "class-chooser.yaml": CHOOSER }))).toMatchObject({ code: 0 });
+  });
+
+  test("with --previous, a draft's version cannot go down either", { timeout: 60_000 }, () => {
+    const then = folder({ "class-roles.yaml": ROLES, "class-chooser.yaml": CHOOSER.replace("version: 1", "version: 3") });
+    expect(guideCheck(folder({ "class-roles.yaml": ROLES, "class-chooser.yaml": CHOOSER }), "--previous", then)).toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining(`${CHOOSER_PATH}:${lineOf(CHOOSER, "version:")}: version 1 is below version 3`),
+    });
   });
 });

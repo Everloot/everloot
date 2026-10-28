@@ -909,12 +909,16 @@ async function main(): Promise<number> {
       // its copy in --previous the way a published guide is.
       const chooserFiles = readClassChooserFiles(dir);
       const previousChooser = previousDir === undefined ? undefined : readClassChooserFiles(previousDir);
-      const chooser = chooserFiles.roles || chooserFiles.chooser ? checkClassChooser(chooserFiles, context.today, previousChooser) : null;
+      // Run when either side has them, so deleting or renaming both files is checked against the copy from before too.
+      const present = Boolean(chooserFiles.roles || chooserFiles.chooser);
+      const chooser = present || previousChooser?.roles || previousChooser?.chooser ? checkClassChooser(chooserFiles, context.today, previousChooser) : null;
       for (const p of [...result.problems, ...(chooser?.problems ?? [])]) console.error(`${p.file}${p.line ? `:${p.line}` : ""}: ${p.message}`);
       const published = result.guides.filter((g) => g.fm.status === "published").length;
       console.log(`${result.guides.length} guides (${published} published, ${result.guides.length - published} draft), ${result.problems.length} problems`);
       console.log(previous ? `compared with ${previous.length} guides from before the change` : "not compared with the guides from before the change; pass --previous for that");
-      const versions = chooser?.data ? `${CHOOSER_FILES.roles} ${chooser.data.roles.status} version ${chooser.data.roles.version}, ${CHOOSER_FILES.chooser} ${chooser.data.chooser.status} version ${chooser.data.chooser.version}, ` : "";
+      const versions = chooser?.data
+        ? `${CHOOSER_FILES.roles} ${chooser.data.roles.status} version ${chooser.data.roles.version}, ${CHOOSER_FILES.chooser} ${chooser.data.chooser.status} version ${chooser.data.chooser.version}, `
+        : present ? "" : "no files in this folder, ";
       const compared = previousChooser
         ? `; compared with ${[previousChooser.roles, previousChooser.chooser].filter(Boolean).length} of its files from before the change`
         : "; not compared with its files from before the change";

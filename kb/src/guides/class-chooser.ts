@@ -224,26 +224,36 @@ function vouchedFor(data: unknown): string {
     : value));
 }
 
+/** A file as it was before the change, read as plain YAML so a later schema cannot hide it: its data, or why it does not read. */
+function readBefore(path: string, before: ChooserFile): { then: Partial<Review> & Record<string, unknown>; problem: null } | { then: null; problem: Problem } {
+  const doc = parseDocument(normal(before.source));
+  if (doc.errors.length) return { then: null, problem: yamlProblem(path, doc, "as it was before this change, the file does not read, so the change cannot be held to its review: ") };
+  const data = doc.toJS();
+  return { then: data && typeof data === "object" && !Array.isArray(data) ? data : {}, problem: null };
+}
+
 /**
- * A file held to its review before the change, as the guides hold a published version: once reviewed, any change to
- * it is a new version, which carries a review of its own or goes back to draft until it has one. A new review of the
- * same content is a new version too, and versions never go down. A file that was a draft, or was not there, is free.
+ * A file held to its version and review before the change, as the guides hold a published version. Versions never go
+ * down, whatever the file was. Once reviewed, a file changes only as a new version, and a new version carries a review
+ * of its own, a different reviewer or day, or goes back to draft until it has one; a new review of the same content
+ * is a new version too. A file that was a draft may otherwise change freely.
  */
 function heldToReview(name: string, path: string, now: { value: Review; raw: unknown }, lineOf: LineOf, before: ChooserFile): Problem[] {
-  const doc = parseDocument(normal(before.source));
-  if (doc.errors.length) return [yamlProblem(path, doc, "as it was before this change, the file does not read, so the change cannot be held to its review: ")];
-  const then = doc.toJS() as Partial<Review> | null;
-  if (then?.status !== "reviewed") return [];
+  const base = readBefore(path, before);
+  if (!base.then) return [base.problem];
+  const { then } = base;
   const v = then.version;
   const problem = (field: string, message: string): Problem[] => [{ file: path, line: lineOf([field]), message }];
-  if (typeof v === "number" && now.value.version < v) return problem("version", `version ${now.value.version} is below version ${v}, reviewed before this change: versions never go down`);
+  if (typeof v === "number" && now.value.version < v) return problem("version", `version ${now.value.version} is below version ${v}, the file's version before this change: versions never go down`);
+  if (then.status !== "reviewed") return [];
   const sameReview = now.value.reviewer === then.reviewer && now.value.reviewedOn === then.reviewedOn;
-  if (vouchedFor(now.raw) !== vouchedFor(then)) {
-    if (now.value.version === v) return problem("version", `${name} was reviewed as version ${v} and has changed since: a change is a new version, so raise version above ${v}`);
-    if (now.value.status === "reviewed" && sameReview) {
-      return problem("reviewedOn", `version ${now.value.version} carries version ${v}'s review (${then.reviewer}, ${then.reviewedOn}); a new version needs its own review, or status: draft until it has one`);
-    }
-  } else if (now.value.version === v && now.value.status === "reviewed" && !sameReview) {
+  if (now.value.version !== v) {
+    return now.value.status === "reviewed" && sameReview
+      ? problem("reviewedOn", `version ${now.value.version} carries version ${v}'s review (${then.reviewer}, ${then.reviewedOn}); a new version needs its own review, or status: draft until it has one`)
+      : [];
+  }
+  if (vouchedFor(now.raw) !== vouchedFor(then)) return problem("version", `${name} was reviewed as version ${v} and has changed since: a change is a new version, so raise version above ${v}`);
+  if (now.value.status === "reviewed" && !sameReview) {
     return problem("version", `${name} version ${v} was reviewed by ${then.reviewer} on ${then.reviewedOn}; a new review is a new version, so raise version above ${v}`);
   }
   return [];
@@ -252,14 +262,23 @@ function heldToReview(name: string, path: string, now: { value: Review; raw: unk
 /**
  * Every rule the two files keep, each problem with its file and line. `today`: a review is never dated after it. The
  * files are read together, so one without the other is a problem. Given the files as they were before the change
- * (`previous`), a reviewed file is held to that review.
+ * (`previous`), each is held to its version and review there, and a file that was reviewed is never deleted or
+ * renamed; drafts may go, both together.
  */
 export function checkClassChooser(files: ChooserFiles, today: string, previous?: ChooserFiles): { data: ClassChooserData | null; problems: Problem[] } {
   const problems: Problem[] = [];
   const read = <T extends Review>(key: keyof ChooserFiles, schema: z.ZodType<T>): { value: T | null; lineOf: LineOf } | null => {
     const file = files[key];
+    const name = CHOOSER_FILES[key];
     if (!file) {
-      problems.push({ file: `guides/${CHOOSER_FILES[key]}`, message: `guides/${CHOOSER_FILES[key]} is missing: the class chooser reads ${CHOOSER_FILES.roles} and ${CHOOSER_FILES.chooser} together` });
+      const was = previous?.[key];
+      const base = was ? readBefore(`guides/${name}`, was) : null;
+      if (base?.problem) problems.push(base.problem);
+      else if (base?.then.status === "reviewed") {
+        problems.push({ file: `guides/${name}`, message: `${name} was reviewed as version ${base.then.version} before this change and is gone: a reviewed file is never deleted or renamed; to withdraw it, set status: draft` });
+      } else if (files.roles || files.chooser) {
+        problems.push({ file: `guides/${name}`, message: `guides/${name} is missing: the class chooser reads ${CHOOSER_FILES.roles} and ${CHOOSER_FILES.chooser} together` });
+      }
       return null;
     }
     const { value, raw, problems: found, lineOf } = readFile(file, schema, today);
