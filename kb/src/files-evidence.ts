@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { GAME_DATA_CREDIT, SITE, TALENT_CLASSES } from "@everloot/protocol";
 import { CLIENT_LABEL } from "./edges.js";
 import { slugify } from "./lore-slug.js";
+import { expandAliases } from "./name-aliases.js";
 
 export type FilesFactKind = "instance" | "boss" | "zone" | "flight" | "mount" | "achievement" | "talent";
 
@@ -179,7 +180,8 @@ export interface FilesEvidence {
  */
 export function filesEvidence(question: string, index: FilesIndex | null, limit: number): FilesEvidence[] {
   if (!index || !index.facts.length || limit <= 0) return [];
-  const q = question.trim();
+  // "where is BRD" names Blackrock Depths: the short forms expand before the facts are matched, as in search.
+  const q = expandAliases(question.trim()).text;
   if (!q) return [];
   const matched = index.facts.filter((f) => f.name.length >= 3 && mentions(q, f.name));
   matched.sort((a, b) => b.name.length - a.name.length);
