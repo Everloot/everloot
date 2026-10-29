@@ -64,6 +64,11 @@ with the question it follows, and a provider is then told that question and its 
 keeps to Orgrimmar however it is typed. The questions are kept only in the companion's own `answers.json`; the slot
 addon carries answers. Characters on one account share that store, so a question can follow another character's.
 
+A question also carries the asking character's class, level and zone (addon after 0.3.12). The lookup reads "here"
+(or "aquí") as the zone and "my class" (or "mi clase") as the class, and a provider is told who is asking. Only the
+question, with "here" as its zone, is kept in `answers.json`; the class and level are not (docs/DATA_POLICY.md,
+"Who is asking, in `/ask`").
+
 Explicit item-price questions use `market_value` before search or a model, so they need no AI provider.
 For example, `/ask price 2589 on Nightslayer` asks for that realm's recorded all-house values.
 New addon questions carry the player's realm when none is named; older questions must name one.

@@ -34,6 +34,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   from the agreed lists, with done, missing and started views and a "remember this character" helper on the browser.
 - Site: `/tools/gold-ledger` reads `Everloot.lua` in the browser, nothing sent: characters, the last 30 days of money
   in and out, this week, categories, receipts and gold history. The published ledgers stay below.
+- Addon, Desktop App and companion: `/ask` carries the asking character's class, level and zone, for that answer only.
+  "here" and "aquí" are looked up as the zone, "my class" and "mi clase" as the class, and a configured model is told
+  who is asking. The queue never leaves the player's computer, and the class and level are not kept.
 
 ### Changed
 - Site and Desktop App: Ollama suggests one small model, `qwen3:4b` (2.5 GB, calls tools), instead of `qwen3:8b`, and

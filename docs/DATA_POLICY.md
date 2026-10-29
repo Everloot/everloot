@@ -779,3 +779,18 @@ The ledger records that signal without recording the people or their questions.
   data wave. It is never shown per person, because nothing per person exists.
 - **What would need a new decision.** Recording which names fail to resolve, even without the question, is a
   different thing: it keeps game names players typed. It is not built, and it needs its own line here first.
+
+## Who is asking, in `/ask`
+
+*Decided 2026-10-29 by Carlos: use it for the answer, and don't collect more than that.* A question asked with
+`/ask` carries the asking character's class (the game's token, such as `MAGE`), level and current zone, beside the
+realm it already carried. They are there so "where is the flight master here" or "best talents for my class" can be
+answered:
+
+- They wait in the addon's question queue in the player's own SavedVariables file. Uploads never carry that queue: the
+  Desktop App, the uploader and the upload page send recorded rows only.
+- The Desktop App or companion reads them for that one answer: "here" becomes the zone and "my class" the class in the
+  lookup, and a model the player configured is told who is asking. A lookup sends only the question's words, as before.
+- The local answer store keeps the question as it was looked up ("here" as its zone), for follow-ups, and never the
+  class or level. Nothing on the site keeps any of them; the question ledger counts tools, as above.
+- Any wider use (collecting them, counting them by class or zone) is not built and needs its own line here first.

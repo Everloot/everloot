@@ -15,6 +15,20 @@ local function currentRealm()
   return realm
 end
 
+--- Who is asking, for that one answer: the class (the game's token, "MAGE", the same in every language), the level
+--- and the zone. They stay in this queue on the player's computer; uploads never carry the queue (docs/DATA_POLICY.md).
+local function currentPlayer()
+  local class
+  if UnitClass then class = select(2, UnitClass("player")) end
+  local level = UnitLevel and UnitLevel("player")
+  local zone = GetRealZoneText and GetRealZoneText()
+  if type(class) ~= "string" or not class:find("^%u+$") or #class > 20 then class = nil end
+  if type(level) ~= "number" or level < 1 or level > 100 or level % 1 ~= 0 then level = nil end
+  if type(zone) == "string" then zone = zone:gsub("^%s+", ""):gsub("%s+$", "") end
+  if type(zone) ~= "string" or #zone < 2 or #zone > 60 or zone:find("[%c|]") then zone = nil end
+  return class, level, zone
+end
+
 function E:Ask(text)
   local question = type(text) == "string" and (text:gsub("^%s+", ""):gsub("%s+$", "")) or ""
   if question == "" then
@@ -33,11 +47,15 @@ function E:Ask(text)
     return
   end
   EverlootDB.askCounter = (EverlootDB.askCounter or 0) + 1
+  local class, level, zone = currentPlayer()
   table.insert(EverlootDB.asks, {
     id = "ask:" .. EverlootDB.installId .. ":" .. EverlootDB.askCounter,
     question = question,
     askedAt = date("!%Y-%m-%dT%H:%M:%SZ"),
     realm = currentRealm(),
+    class = class,
+    level = level,
+    zone = zone,
   })
   print("Everloot: question saved. Keep the companion running, then /reload to read the answer.")
 end

@@ -128,4 +128,25 @@ SLASH_ASK('a number is not a realm')
 assert(EverlootDB.asks[9].realm == nil, 'only a string is a realm')
 assert(EverlootDB.asks[2].id ~= nil and EverlootDB.asks[2].askedAt ~= nil and EverlootDB.asks[2].question == 'price 2589', 'the realm adds a field and changes none')
 """)
-print("Lua 5.1 ask: /ask stores bounded questions with the player's realm when it is a realm name, a full queue refuses a new one and keeps every waiting question, verified answers show once, bad checksums are refused")
+# Who is asking goes with the question for its answer: the class token, the level and the zone, each left out
+# when the game gives nothing usable, and the question kept either way.
+lua.execute("""
+EverlootDB.asks = {}
+SLASH_ASK('no player functions')
+assert(EverlootDB.asks[1].class == nil and EverlootDB.asks[1].level == nil and EverlootDB.asks[1].zone == nil, 'nothing known, nothing added')
+UnitClass = function(unit) assert(unit == 'player'); return 'Mago', 'MAGE', 8 end
+UnitLevel = function(unit) assert(unit == 'player'); return 34 end
+GetRealZoneText = function() return '  Stranglethorn Vale ' end
+SLASH_ASK('where is the flight master here')
+local a = EverlootDB.asks[2]
+assert(a.class == 'MAGE' and a.level == 34 and a.zone == 'Stranglethorn Vale', 'class token, level and trimmed zone; got ' .. tostring(a.class) .. ' ' .. tostring(a.level) .. ' ' .. tostring(a.zone))
+assert(a.question == 'where is the flight master here' and a.id ~= nil and a.askedAt ~= nil, 'the other fields are unchanged')
+UnitClass = function() return 'x', 'mage' end
+UnitLevel = function() return 0 end
+GetRealZoneText = function() return 'Zone|cffff0000' end
+SLASH_ASK('bad player values')
+local b = EverlootDB.asks[3]
+assert(b.class == nil and b.level == nil and b.zone == nil and b.question == 'bad player values', 'unusable values are left out, the question kept')
+UnitClass, UnitLevel, GetRealZoneText = nil, nil, nil
+""")
+print("Lua 5.1 ask: /ask stores bounded questions with the player's realm, class, level and zone when the game gives usable ones, a full queue refuses a new one and keeps every waiting question, verified answers show once, bad checksums are refused")

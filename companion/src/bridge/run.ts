@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { readAsks, type Ask } from "./asks";
 import { writeAnswersAddon, type Answer } from "./answers";
-import { lookupText, MAX_ANSWER, readsAsFollowUp, type AnswerEngine, type Earlier } from "./engine";
+import { lookupText, MAX_ANSWER, readsAsFollowUp, withPlayer, type AnswerEngine, type Earlier } from "./engine";
 import { readStateFile } from "../state-file";
 
 /** Answers already given, kept in the companion's data folder (the newest 20 go back into the game). */
@@ -56,10 +56,12 @@ export async function answerPending(options: {
   for (const ask of pending) {
     try {
       const earlier = earlierFor(ask, options.store.list());
-      const context = { ...(ask.realm ? { realm: ask.realm } : {}), ...(earlier ? { earlier } : {}) };
+      const context = { ...(ask.realm ? { realm: ask.realm } : {}), ...(earlier ? { earlier } : {}), ...(ask.player ? { player: ask.player } : {}) };
       const { answer, source } = await options.engine.answer(ask.question, Object.keys(context).length ? context : undefined);
-      // A follow-up is kept with the question it leaned on, so the next follow-up still carries the first one's names.
-      const kept = earlier ? lookupText(ask.question, { earlier }) : ask.question;
+      // A follow-up is kept with the question it leaned on, so the next follow-up still carries the first one's names;
+      // "here" is kept as the zone it meant, in this local store. The class and level are not kept.
+      const asked = withPlayer(ask.question, ask.player);
+      const kept = earlier ? lookupText(asked, { earlier }) : asked;
       options.store.add({ id: ask.id, answer: answer.slice(0, MAX_ANSWER), source, answeredAt: now().toISOString(), question: kept, askedAt: ask.askedAt });
       answered++;
     } catch (err) {
