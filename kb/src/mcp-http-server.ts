@@ -1,12 +1,16 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import type { ReleaseSource } from "./release-db.js";
-import { createKnowledgeServer, type ChangesLoader, type CompletionLoader, type CorpusLoader, type EcosystemLoader, type ExtraTool, type MarketLoader } from "./mcp-server.js";
+import { createKnowledgeServer, type ChangesLoader, type CompletionLoader, type CorpusLoader, type EcosystemLoader, type ExtraTool, type MarketLoader, type ToolOptions } from "./mcp-server.js";
 import type { GuildReader } from "./guilds.js";
 import type { CensusLoader } from "./population.js";
 import type { RecheckScope } from "./coverage.js";
 
-export interface PublicMcpConfig {
+/**
+ * Every loader the knowledge server takes (`ToolOptions`) passes through as given: a hand-picked list here once
+ * dropped the game files' facts, the coverage reader and the settled summary from both MCP mounts.
+ */
+export interface PublicMcpConfig extends ToolOptions {
   db: ReleaseSource;
   /** Null means a public, read-only mount: no bearer, rate-limited by the caller before this handler. */
   bearerToken: string | null;
@@ -38,11 +42,24 @@ export interface PublicMcpConfig {
   extraTools?: (req: Request, body: string) => readonly ExtraTool[] | Promise<readonly ExtraTool[]>;
 }
 
-export function createPublicMcpServer(
-  config: { db: ReleaseSource; corpus?: CorpusLoader; market?: MarketLoader; completion?: CompletionLoader; changes?: ChangesLoader; ecosystem?: EcosystemLoader; census?: CensusLoader; guilds?: GuildReader; recheck?: readonly RecheckScope[] },
-  extraTools: readonly ExtraTool[] = [],
-) {
-  const server = createKnowledgeServer(config.db, { corpus: config.corpus, market: config.market, completion: config.completion, changes: config.changes, ecosystem: config.ecosystem, census: config.census, guilds: config.guilds, recheck: config.recheck }, extraTools);
+/**
+ * Every `ToolOptions` key, and only those: `satisfies` fails the build when the knowledge server gains a loader this
+ * list lacks, and the mount's own settings (its bearer token, origins, limits) never reach the tool layer.
+ */
+const TOOL_OPTION_KEYS = {
+  corpus: true, market: true, gameData: true, completion: true, changes: true, ecosystem: true, census: true,
+  coverage: true, settledSummary: true, guilds: true, recheck: true,
+} as const satisfies Record<keyof ToolOptions, true>;
+
+/** The loaders a config carries, picked out of the mount's settings. */
+export function toolOptionsOf(config: ToolOptions): ToolOptions {
+  const picked: Record<string, unknown> = {};
+  for (const key of Object.keys(TOOL_OPTION_KEYS) as (keyof ToolOptions)[]) if (config[key] !== undefined) picked[key] = config[key];
+  return picked as ToolOptions;
+}
+
+export function createPublicMcpServer(config: { db: ReleaseSource } & ToolOptions, extraTools: readonly ExtraTool[] = []) {
+  const server = createKnowledgeServer(config.db, toolOptionsOf(config), extraTools);
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined, enableJsonResponse: true,
   });
