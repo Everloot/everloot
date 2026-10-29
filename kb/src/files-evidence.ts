@@ -126,7 +126,9 @@ export function buildFilesIndex(files: GameDataFiles): FilesIndex {
     const points = num(r?.points) ?? 0; const criteria = arr(r?.criteria).length;
     facts.push({
       kind: "achievement", name: title,
-      claim: `${title}: an achievement, ${points} points${criteria ? `, ${criteria} criteria` : ""}; the criteria text is on its page.`,
+      claim: r?.statistic === true
+        ? `${title}: a statistic the game keeps (a counter, not an achievement to earn); the criteria text is on its page.`
+        : `${title}: an achievement, ${points} points${criteria ? `, ${criteria} criteria` : ""}; the criteria text is on its page.`,
       url: `${SITE}/database/achievements/${segment(Number(id), title)}`,
     });
   }

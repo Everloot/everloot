@@ -142,7 +142,8 @@ const nameOf = (v: unknown): string | undefined => { const r = asRecord(v); retu
 export function gameDataSubjects(gameDataDir: string): Subject[] {
   const out: Subject[] = [];
   const seen = new Set<string>();
-  const push = (s: Subject) => { const key = `${s.kind}|${s.name.toLowerCase()}`; if (!seen.has(key)) { seen.add(key); out.push(s); } };
+  // A name the game marks [DNT] ("do not translate") is test data, not something a player meets.
+  const push = (s: Subject) => { const key = `${s.kind}|${s.name.toLowerCase()}`; if (!seen.has(key) && !/\[DNT\]/i.test(s.name)) { seen.add(key); out.push(s); } };
   const map = asRecord(readJson(join(gameDataDir, "map.json")));
   for (const z of asArray(map?.zones)) { const name = nameOf(z); if (name) push({ kind: "zone", name, id: asRecord(z)?.uiMapId as number }); }
   for (const e of asArray(map?.entrances)) { const name = nameOf(e); if (name) push({ kind: "instance", name, id: asRecord(e)?.mapId as number }); }
@@ -154,7 +155,8 @@ export function gameDataSubjects(gameDataDir: string): Subject[] {
   const mounts = asRecord(asRecord(readJson(join(gameDataDir, "client-mounts.json")))?.mounts);
   for (const [id, m] of Object.entries(mounts ?? {})) { const name = nameOf(m); if (name) push({ kind: "mount", name, id }); }
   const achievements = asRecord(asRecord(readJson(join(gameDataDir, "client-achievements.json")))?.achievements);
-  for (const [id, a] of Object.entries(achievements ?? {})) { const r = asRecord(a); const title = r && typeof r.title === "string" ? r.title.trim() : ""; if (title) push({ kind: "achievement", name: title, id }); }
+  // A statistic (a counter the game keeps) is not an achievement anyone asks how to earn.
+  for (const [id, a] of Object.entries(achievements ?? {})) { const r = asRecord(a); const title = r && typeof r.title === "string" ? r.title.trim() : ""; if (title && r?.statistic !== true) push({ kind: "achievement", name: title, id }); }
   const layer = asRecord(asRecord(readJson(join(gameDataDir, "client-layer.json")))?.categories);
   for (const s of asArray(layer?.skills)) { const name = nameOf(s); if (name) push({ kind: "profession", name, id: asRecord(s)?.id as number }); }
   for (const c of asArray(layer?.classes)) { const r = asRecord(c); const label = r && typeof r.label === "string" ? r.label : nameOf(c); if (label) push({ kind: "item_category", name: label, id: r?.id as number }); }

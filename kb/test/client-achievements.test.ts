@@ -50,7 +50,8 @@ const build = snapshotWith([
   table("Achievement", [
     [49, { ID: 49, Title_lang: "Storm the Chasm", Description_lang: "Topple the Chasm's keeper", Points: 10, Criteria_tree: 100 }],
     [50, { ID: 50, Title_lang: "   ", Points: 5, Criteria_tree: 100 }],
-    [51, { ID: 51, Title_lang: "No criteria asked", Points: 0, Criteria_tree: 0 }],
+    [51, { ID: 51, Title_lang: "No criteria asked", Points: 0, Criteria_tree: 0, Flags: 524288 }],
+    [53, { ID: 53, Title_lang: "Battles won", Points: 0, Criteria_tree: 0, Flags: 524289 }],
     [52, { ID: 52, Title_lang: "Done twice", Points: 0, Criteria_tree: 100 }],
   ]),
   table("CriteriaTree", tree),
@@ -68,7 +69,10 @@ test("buildClientAchievements: ids keyed, the files' text with reports-style cri
   expect(achievements.achievements["52"]).toEqual({ title: "Done twice", points: 0, criteria: [{ text: "Win battles" }, { text: "Kill 5 foes", amount: 5 }, { text: "Do half" }] });
   // Nameless (blank title) rows are left out; the count in the file matches.
   expect(achievements.achievements["50"]).toBeUndefined();
-  expect(Object.keys(achievements.achievements)).toEqual(["49", "51", "52"]);
+  expect(Object.keys(achievements.achievements)).toEqual(["49", "51", "52", "53"]);
+  // Flags bit 1 marks a statistic (a counter the game keeps); other bits leave the row an achievement.
+  expect(achievements.achievements["53"]).toEqual({ title: "Battles won", points: 0, criteria: [], statistic: true });
+  expect(achievements.achievements["51"]).not.toHaveProperty("statistic");
 });
 
 test("a snapshot without the two tables still yields a file, empty and labelled", () => {
