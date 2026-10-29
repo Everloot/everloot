@@ -100,8 +100,10 @@ provider or a cheap model, and score whether the answer cites the evidence and n
 counter, `ledger.<tool>.hit` or `ledger.<tool>.miss`, for `search_knowledge`, `get_by_name`, `get_entity`,
 `search` and `answer_sources` (`web/src/lib/question-ledger.ts`). The tool's name and found-or-not, nothing else:
 no question text, no looked-up name, no account. docs/DATA_POLICY.md, "The question ledger", and the privacy
-page say so. Lookups over the MCP mounts (the Desktop App, in-game `/ask`, the public MCP) are counted by call
-today, not by hit or miss: counting those the same way is the next step on this phase.
+page say so. Lookups over the MCP mounts (the Desktop App, in-game `/ask`, AI clients) are counted the same way
+since 2026-10-29 (`mcpLedgerMetrics`): each `tools/call` of a lookup tool is matched to its JSON answer by id, and only
+whether the structured answer found anything is read. The per-tool call counters now take the protocol's tool list,
+so `answer_sources` and the newer tools no longer count as "other".
 
 **3b, design only, needs its own data-policy line:** which named subjects fail to resolve, kept as game names
 without the question. That is what would feed the bank with the aliases players actually use.

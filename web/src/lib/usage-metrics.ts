@@ -1,3 +1,4 @@
+import { MCP_TOOL_NAMES } from "@everloot/protocol";
 import { after } from "next/server";
 
 /**
@@ -6,10 +7,8 @@ import { after } from "next/server";
  * or user agent is recorded. Off unless EVERLOOT_USAGE_METRICS=1 (set after the usage_counters
  * migration is applied) and Supabase is configured. A failure here never affects a response.
  */
-export const MCP_TOOLS = [
-  "search_knowledge", "get_entity", "get_by_name", "search", "fetch", "profession_path", "recipe_thresholds", "item_page", "npc_page", "object_page",
-  "quest_page", "vendor_page", "entity_relations", "item_categories", "collection_gap", "completion_progress", "guild_board", "auction_history", "gold_ledger", "population", "everloot_plan",
-] as const;
+/** Every tool the protocol publishes; a hand-kept list here had fallen behind it (answer_sources counted as "other"). */
+export const MCP_TOOLS: readonly string[] = MCP_TOOL_NAMES;
 
 /** A batched JSON-RPC request counts at most this many calls. */
 export const MAX_BUMPS_PER_REQUEST = 5;

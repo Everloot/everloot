@@ -750,9 +750,10 @@ browser tab and the page talks to their provider directly.
 What people ask Everloot is the signal that decides which data comes next (docs/design/specs/2026-10-27-question-bank-design.md).
 The ledger records that signal without recording the people or their questions.
 
-- **What it holds.** For each lookup the chat makes through `/api/tools` (`search_knowledge`, `get_by_name`,
-  `get_entity`, `search`, `answer_sources`), one daily counter: the tool's name and whether the lookup found
-  something or nothing. It is a usage counter like the others (`usage_counters`), and nothing else.
+- **What it holds.** For each lookup made through `/api/tools` or an MCP mount (the site's chat, the Desktop App,
+  in-game `/ask`, AI clients) with `search_knowledge`, `get_by_name`, `get_entity`, `search` or `answer_sources`,
+  one daily counter: the tool's name and whether the lookup found something or nothing. On an MCP mount the answer
+  is read from a copy for that alone, and nothing of it is kept. It is a usage counter like the others (`usage_counters`), and nothing else.
 - **What it never holds.** The question's text, the name that was looked up, the answer, an IP address, an
   install id, a session, an account or a key. A miss says that a lookup found nothing, not what was asked.
 - **Where it is read.** The miss rate per tool, beside the question bank's own gap lists, chooses the next
