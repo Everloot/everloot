@@ -19,7 +19,7 @@ function gameDataDir(o: { version?: string; ridingSkill?: number; bosses?: strin
   }));
   writeFileSync(join(dir, "client-encounters.json"), JSON.stringify({ build: build(version), instances: { "34": (o.bosses ?? ["Synthetic Warden", "Synthetic Jailer"]).map((name, i) => ({ id: i + 1, name })) } }));
   writeFileSync(join(dir, "client-mounts.json"), JSON.stringify({ build: build(version), mounts: { "6": { name: "Synthetic Horse", spellId: 458, ridingSkill: o.ridingSkill ?? 75 }, "7": { name: "Synthetic Goat", spellId: 459 } } }));
-  writeFileSync(join(dir, "client-achievements.json"), JSON.stringify({ build: build(version), achievements: { "49": { title: "Synthetic Feat", criteria: [{ text: "Win once" }, { text: "Win twice" }] }, "50": { title: "Synthetic Count", criteria: [{ text: "Synthetic Count" }] } } }));
+  writeFileSync(join(dir, "client-achievements.json"), JSON.stringify({ build: build(version), achievements: { "49": { title: "Synthetic Feat", criteria: [{ text: "Win once" }, { text: "Win twice" }] }, "50": { title: "Synthetic Count" } } }));
   mkdirSync(join(dir, "talents"));
   writeFileSync(join(dir, "talents", "mage.json"), JSON.stringify({ build: build(version), className: "Mage", trees: [{ nodes: [{ entries: [{ spellId: 9, name: "Synthetic Blast" }] }] }] }));
   writeFileSync(join(dir, "talents", "priest.json"), JSON.stringify({ build: build(version), className: "Priest", trees: [{ nodes: [{ entries: [{ spellId: 10, name: "Synthetic Blast" }] }] }] }));
@@ -41,7 +41,8 @@ test("gameDataAnswerKey: each template the files can answer gets its facts, the 
   expect(answer("where-is:flight:synthetic-port")?.facts).toEqual(["Synthetic Shore"]);
   // A talent two classes share names both.
   expect(answer("talent-class:talent:synthetic-blast")).toEqual({ facts: ["Mage", "Priest"], from: "talents/*.json className", build: "1.0.0.1" });
-  expect(answer("criteria:achievement:synthetic-feat")?.facts).toEqual(["Win once", "Win twice"]);
+  // Criteria text stays on the achievement's page, so no question is keyed to it.
+  expect(answer("criteria:achievement:synthetic-feat")).toBeUndefined();
 });
 
 test("gameDataAnswerKey: a missing field or file gives no answer, never a guess", () => {
@@ -50,7 +51,6 @@ test("gameDataAnswerKey: a missing field or file gives no answer, never a guess"
   expect(has("riding-skill:mount:synthetic-goat")).toBe(false);
   expect(has("level:instance:synthetic-vault")).toBe(false);
   expect(has("where-is:instance:synthetic-vault")).toBe(false);
-  expect(has("criteria:achievement:synthetic-count")).toBe(false);
   // Templates the files cannot answer stay without one.
   expect(has("what-is:mount:synthetic-horse")).toBe(false);
   expect(bank.find((q) => q.id === "what-is:mount:synthetic-horse")).not.toHaveProperty("answer");

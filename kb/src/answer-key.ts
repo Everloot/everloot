@@ -37,8 +37,6 @@ export function gameDataAnswerKey(gameDataDir: string): AnswerKey {
   const encounters = asRecord(asRecord(encountersFile)?.instances) ?? {};
   const mountsFile = readJson(join(gameDataDir, "client-mounts.json"));
   const mounts = asRecord(asRecord(mountsFile)?.mounts) ?? {};
-  const achievementsFile = readJson(join(gameDataDir, "client-achievements.json"));
-  const achievements = asRecord(asRecord(achievementsFile)?.achievements) ?? {};
 
   // A talent name can sit in more than one class's tree; every class that has it is part of the answer.
   const talentClasses = new Map<string, string[]>();
@@ -86,11 +84,7 @@ export function gameDataAnswerKey(gameDataDir: string): AnswerKey {
       }
       case "talent-class:talent":
         return answer(talentClasses.get(s.name.toLowerCase()) ?? [], "talents/*.json className", talentBuild);
-      case "criteria:achievement": {
-        // A statistic's one criterion repeats its title, which any answer naming the subject would carry: not a fact.
-        const criteria = asArray(asRecord(achievements[String(s.id)])?.criteria).map((c) => text(asRecord(c)?.text));
-        return answer(criteria.filter((c) => c?.toLowerCase() !== s.name.toLowerCase()), "client-achievements.json criteria.text", versionOf(achievementsFile));
-      }
+      // No criteria: their text stays on the achievement's page (docs/DATA_POLICY.md), so no tool answer carries it.
       default:
         return undefined;
     }

@@ -96,7 +96,7 @@ again from the game-data files each time the bank is generated (`kb/src/answer-k
 so nothing goes stale.
 
 Each question the files can answer carries `answer: { facts, from, build }`: the facts a correct answer has to
-contain, the file and field they came from, and the game build of that file. On build 1.60.1.70658, 1,232 of the
+contain, the file and field they came from, and the game build of that file. On build 1.60.1.70685, 1,013 of the
 4,434 questions carry one:
 
 | template | subject | facts from |
@@ -108,10 +108,10 @@ contain, the file and field they came from, and the game build of that file. On 
 | where-is | boss | the instance whose map lists the boss |
 | where-is, flight-to | flight | the node's zone (the zone list, else the zone in the node's own name) |
 | talent-class | talent | `talents/*.json` className, every class that has the name |
-| criteria | achievement | `client-achievements.json` criteria text, leaving out a statistic's criterion that only repeats its title |
 
-A missing file or field gives no answer, never a guess. Wiki subjects and the other templates have none yet: their
-answers live in the knowledge release or in play, not in these files.
+A missing file or field gives no answer, never a guess. Achievement criteria have none on purpose: their text stays
+on the achievement's page (docs/DATA_POLICY.md), so no tool answer can carry it. Wiki subjects and the other
+templates have none yet: their answers live in the knowledge release or in play, not in these files.
 
 **Between builds**, `npm run kb -- question-diff <before.jsonl> <after.jsonl> [--out <report.md>]` compares two
 banks question by question and lists the answers a build changed, added and removed, with both builds named.
@@ -119,10 +119,27 @@ Order inside a list (a boss list, say) is not a change. The "before" bank is gen
 (`git archive <commit> web/src/data/game-data`, then `question-bank --game-data <that folder>`). Against 70532, the
 70658 bank removed "which class has Piercing Ice" (Mage) and added Arcane Wrath (Mage), which is what the build's
 own change file (`changes/wowf-70630.json`) records; 70634 to 70658 changed none of these answers, and that
-build's change file lists no talent or map changes either.
+build's change file lists no talent or map changes either. 70658 to 70685 changed none, and neither does its
+change file.
 
-What this is for: the changed list is what to recheck in game after a patch, and the facts are what an eval of the
-written answer (in game or on the site) checks for. Scoring the answer against them is the next step, not built.
+**In the eval**, a new column, "answer in evidence": of the questions with an answer key, how many got
+`answer_sources` evidence carrying every fact (a whole word or number, any case: 75 is not found in 175). The
+report's last list, "Answers missing from the evidence", names the question and the facts it lacked. That is what
+the model is handed, so a fact missing there is one no model can answer from.
+
+The first run found four gaps in `files-evidence.ts`, all fixed in the same pull request, taking the column from
+82% to 100% of the 1,013 keyed questions (`docs/evals/question-eval-2026-10-29-answer-key.md` is the run after):
+
+- **Boss lists (4% → 100%).** An instance's fact gave the number of encounters but not their names; it names them now.
+  The names were already facts, one per boss.
+- **Shared talents (99% → 100%).** Evidence kept one fact per name, so a talent two classes have (Deflection,
+  Flurry, Precision, …) came back with one class. It keeps one per fact now.
+- **New zones (94% → 100%).** Flight masters in Riverglades and Mount Hyjal, whose maps the zone list lacks, had no
+  zone. They take the zone their node's own name carries, as the answer key does.
+- **Achievement criteria** were scored against text the policy keeps on the page; they left the key instead.
+
+What this is for: the changed list is what to recheck in game after a patch; the column says whether the facts reach
+the model. Whether the model's written answer then carries them (in game or on the site) is phase 2.
 
 ## Phase 2 (design only): a model in the loop
 

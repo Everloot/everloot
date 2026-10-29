@@ -5,7 +5,8 @@ import { expect, test } from "vitest";
 import { openDb } from "../src/db.js";
 import { replaceSourceRows, type EntityInput } from "../src/entities.js";
 import { buildQuestionBank, gameDataSubjects, INSTANCE_ALIASES, parseQuestionBank, serializeQuestionBank, TEMPLATES, TOPICS, wikiSubjects } from "../src/question-bank.js";
-import { evaluateBank, formatEvalReport, resolve } from "../src/question-eval.js";
+import type { AnswerKey } from "../src/answer-key.js";
+import { carries, evaluateBank, formatEvalReport, resolve } from "../src/question-eval.js";
 
 // SYNTHETIC game-data files in the shape of web/src/data/game-data; the names are made up.
 function gameDataDir(): string {
@@ -109,4 +110,30 @@ test("evaluateBank: totals, per-template and per-kind rows, the unresolved names
   expect(md).toContain("- **boss** (1): Nobody Here");
   expect(md).toMatch(/\| all \| \d+ \| \d+% \| \d+% \| \d+% \|/);
   expect(md).toContain("| with files |");
+});
+
+test("carries: a fact as a whole word or number, any case", () => {
+  expect(carries("needs riding skill 75.", "75")).toBe(true);
+  expect(carries("needs riding skill 175.", "75")).toBe(false);
+  expect(carries("Bosses: Rhahk'Zor, Mr. Smite", "mr. smite")).toBe(true);
+  expect(carries("Rhahk'Zorn", "Rhahk'Zor")).toBe(false);
+});
+
+test("evaluateBank: a question with an answer key is scored on whether its evidence carries every fact", async () => {
+  const db = await seed();
+  const key: AnswerKey = (template) =>
+    template === "where-is" ? { facts: ["dungeon", "keep"], from: "synthetic", build: "1" }
+      : template === "level" ? { facts: ["dungeon", "Nowhere"], from: "synthetic", build: "1" } : undefined;
+  const bank = buildQuestionBank([{ kind: "instance", name: "Synthetic Stockade", id: 34 }], key).filter((q) => q.template === "where-is" || q.template === "level" || q.template === "bosses");
+  const report = await evaluateBank(db, bank, null, { release: "test.sqlite", dataAsOf: null, ranAt: "2026-10-28T12:00:00.000Z" });
+  const byId = new Map(report.results.map((r) => [r.id, r]));
+  expect(byId.get("where-is:instance:synthetic-stockade")?.missingFacts).toEqual([]);
+  expect(byId.get("level:instance:synthetic-stockade")?.missingFacts).toEqual(["Nowhere"]);
+  expect(byId.get("bosses:instance:synthetic-stockade")).not.toHaveProperty("missingFacts");
+  expect(report.totals).toMatchObject({ withKey: 2, keyFound: 1 });
+  expect(report.keyMissing).toEqual([{ template: "level", count: 1, examples: [{ text: "what level is Synthetic Stockade", missing: ["Nowhere"] }] }]);
+  const md = formatEvalReport(report);
+  expect(md).toContain("| answer in evidence |");
+  expect(md).toContain("| all | 3 | 100% | 0% | 0% | 100% | 0% | 0% | 0% | 50% |");
+  expect(md).toContain(`- **level** (1): "what level is Synthetic Stockade" lacks Nowhere`);
 });

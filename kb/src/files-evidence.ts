@@ -83,10 +83,11 @@ export function buildFilesIndex(files: GameDataFiles): FilesIndex {
     const level = min !== undefined && max !== undefined ? (min === max ? `level ${min}` : `levels ${min} to ${max}`) : "";
     const zone = zoneName.get(num(r?.uiMapId) ?? -1);
     const bosses = arr(encounters?.[String(id)]);
+    const bossNames = bosses.map((b) => str(rec(b)?.name)).filter(Boolean);
     const url = `${SITE}/database/instances/${segment(id, name)}`;
     facts.push({
       kind: "instance", name,
-      claim: `${name}: a ${kind}${level ? `, ${level}` : ""}${zone ? `, entered from ${zone}` : ""}${bosses.length ? `; the files list ${bosses.length} encounters` : ""}.`,
+      claim: `${name}: a ${kind}${level ? `, ${level}` : ""}${zone ? `, entered from ${zone}` : ""}${bosses.length ? `; the files list ${bosses.length} encounters${bossNames.length ? `: ${bossNames.join(", ")}` : ""}` : ""}.`,
       url,
     });
     bosses.forEach((b, i) => {
@@ -95,9 +96,10 @@ export function buildFilesIndex(files: GameDataFiles): FilesIndex {
     });
   }
   for (const f of arr(map?.flightNodes)) {
-    const r = rec(f); const name = str(r?.name).split(",")[0]!.trim();
+    const r = rec(f); const [name = "", ...rest] = str(r?.name).split(",").map((s) => s.trim());
     if (!name) continue;
-    const zone = zoneName.get(num(r?.uiMapId) ?? -1);
+    // A node on a map the zone list lacks (Forever's new zones) still names its zone after the comma.
+    const zone = zoneName.get(num(r?.uiMapId) ?? -1) ?? rest.join(", ");
     facts.push({ kind: "flight", name, claim: `${name}: a flight master${zone ? ` in ${zone}` : ""}, in the game files.`, url: `${SITE}/map` });
   }
 
@@ -188,9 +190,9 @@ export function filesEvidence(question: string, index: FilesIndex | null, limit:
   const out: FilesEvidence[] = [];
   const seen = new Set<string>();
   for (const f of matched) {
-    const key = `${f.kind}|${f.name.toLowerCase()}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
+    // One per thing, not per name: a talent two classes share is two facts, and both are the answer.
+    if (seen.has(f.claim)) continue;
+    seen.add(f.claim);
     out.push({
       claim: f.claim, kind: "files",
       source: { title: `WoW: Forever game files, build ${index.build || "unrecorded"} (${CLIENT_LABEL})`, url: `${SITE}/database/download` },

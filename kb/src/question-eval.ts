@@ -24,9 +24,11 @@ export interface QuestionResult {
   evidenceKinds: EvidenceKind[];
   /** True when at least one piece points at an everloot.app page. */
   page: boolean;
+  /** For a question with an answer key: the key's facts that no piece of evidence carries. Empty means all are there. */
+  missingFacts?: string[];
 }
 
-export interface EvalRow { label: string; questions: number; exact: number; search: number; none: number; withEvidence: number; withObserved: number; withFiles: number; withPage: number }
+export interface EvalRow { label: string; questions: number; exact: number; search: number; none: number; withEvidence: number; withObserved: number; withFiles: number; withPage: number; withKey: number; keyFound: number }
 
 export interface EvalReport {
   schema: "everloot.question-eval/1";
@@ -41,6 +43,8 @@ export interface EvalReport {
   unresolved: { kind: SubjectKind; count: number; names: string[] }[];
   /** Questions that came back with no evidence at all, the first few per template. */
   noEvidence: { template: string; count: number; texts: string[] }[];
+  /** Questions with an answer key whose evidence lacks some of its facts, the first few per template with what was missing. */
+  keyMissing: { template: string; count: number; examples: { text: string; missing: string[] }[] }[];
   results: QuestionResult[];
 }
 
@@ -60,14 +64,22 @@ export async function resolve(db: ReleaseSource, q: Question): Promise<Resolutio
   return (hits.length ? hits : await searchSomeWords(db, q.text, 5)).some((h) => sameName(h.name, q.subject.name)) ? "search" : "none";
 }
 
+/** A fact as a whole word or number in the text, any case: "75" is not found in "175". */
+export function carries(text: string, fact: string): boolean {
+  const escaped = fact.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, "iu").test(text);
+}
+
 export async function evaluateQuestion(db: ReleaseSource, q: Question, facts: AnswerSourcesFacts | null, dataAsOf: string | null, files: FilesIndex | null = null): Promise<QuestionResult> {
   const result = await answerSources(db, { question: q.text, limit: 8 }, facts, dataAsOf, files);
   const kinds = [...new Set(result.evidence.map((e) => e.kind))];
+  const said = result.evidence.map((e) => `${e.claim}\n${e.source.title}`).join("\n");
   return {
     id: q.id, template: q.template, kind: q.subject.kind,
     resolution: await resolve(db, q),
     evidence: result.evidence.length, evidenceKinds: kinds,
     page: result.evidence.some((e) => Boolean(e.url)),
+    ...(q.answer ? { missingFacts: q.answer.facts.filter((f) => !carries(said, f)) } : {}),
   };
 }
 
@@ -81,6 +93,8 @@ function fold(label: string, rows: readonly QuestionResult[]): EvalRow {
     withObserved: rows.filter((r) => r.evidenceKinds.includes("observed")).length,
     withFiles: rows.filter((r) => r.evidenceKinds.includes("files")).length,
     withPage: rows.filter((r) => r.page).length,
+    withKey: rows.filter((r) => r.missingFacts).length,
+    keyFound: rows.filter((r) => r.missingFacts?.length === 0).length,
   };
 }
 
@@ -104,30 +118,33 @@ export async function evaluateBank(
   const noEvidence = [...groupBy(results.filter((r) => r.evidence === 0), (r) => r.template)]
     .map(([template, rows]) => ({ template, count: rows.length, texts: rows.slice(0, sample).map((r) => byId.get(r.id)!.text) }))
     .sort((a, b) => b.count - a.count);
+  const keyMissing = [...groupBy(results.filter((r) => r.missingFacts?.length), (r) => r.template)]
+    .map(([template, rows]) => ({ template, count: rows.length, examples: rows.slice(0, sample).map((r) => ({ text: byId.get(r.id)!.text, missing: r.missingFacts! })) }))
+    .sort((a, b) => b.count - a.count);
   return {
     schema: "everloot.question-eval/1",
     release: meta.release, corpusConnected: facts !== null, dataAsOf: meta.dataAsOf, ranAt: meta.ranAt ?? new Date().toISOString(),
     totals: fold("all", results),
     byTemplate: [...groupBy(results, (r) => r.template)].map(([t, rows]) => fold(t, rows)),
     byKind: [...groupBy(results, (r) => r.kind)].map(([k, rows]) => fold(k, rows)),
-    unresolved, noEvidence, results,
+    unresolved, noEvidence, keyMissing, results,
   };
 }
 
 const pct = (n: number, of: number) => (of === 0 ? "–" : `${Math.round((100 * n) / of)}%`);
 const rowLine = (r: EvalRow) => {
   const resolvable = r.exact + r.search + r.none; // the rows that expected a resolution
-  return `| ${r.label} | ${r.questions} | ${pct(r.exact, resolvable)} | ${pct(r.search, resolvable)} | ${pct(r.none, resolvable)} | ${pct(r.withEvidence, r.questions)} | ${pct(r.withObserved, r.questions)} | ${pct(r.withFiles, r.questions)} | ${pct(r.withPage, r.questions)} |`;
+  return `| ${r.label} | ${r.questions} | ${pct(r.exact, resolvable)} | ${pct(r.search, resolvable)} | ${pct(r.none, resolvable)} | ${pct(r.withEvidence, r.questions)} | ${pct(r.withObserved, r.questions)} | ${pct(r.withFiles, r.questions)} | ${pct(r.withPage, r.questions)} | ${pct(r.keyFound, r.withKey)} |`;
 };
 
 /** The report as the markdown the eval commits: totals, per template, per kind, then the gap lists. */
 export function formatEvalReport(report: EvalReport): string {
-  const head = "| | questions | exact | by search | unresolved | with evidence | with observed | with files | with page |\n|---|---|---|---|---|---|---|---|---|";
+  const head = "| | questions | exact | by search | unresolved | with evidence | with observed | with files | with page | answer in evidence |\n|---|---|---|---|---|---|---|---|---|---|";
   const lines = [
     `# Question eval, ${report.ranAt.slice(0, 10)}`,
     "",
     `Release \`${report.release}\`. Player observations ${report.corpusConnected ? `connected (data as of ${report.dataAsOf ?? "unrecorded"})` : "not connected: the observed layer is unrecorded, not empty"}.`,
-    "Resolution: the subject's name met a record exactly, or through search on the question, or not at all. Evidence: what `answer_sources` returned; \"with files\" counts the game files' own facts (ids and facts, unconfirmed). Percentages of resolution are over the questions that expect one.",
+    "Resolution: the subject's name met a record exactly, or through search on the question, or not at all. Evidence: what `answer_sources` returned; \"with files\" counts the game files' own facts (ids and facts, unconfirmed). Percentages of resolution are over the questions that expect one. \"Answer in evidence\": of the questions with an answer key (the facts the game-data files say a correct answer carries), how many got evidence carrying every one of them.",
     "",
     "## Totals",
     "",
@@ -148,6 +165,10 @@ export function formatEvalReport(report: EvalReport): string {
     "## Questions with no evidence",
     "",
     ...(report.noEvidence.length ? report.noEvidence.map((n) => `- **${n.template}** (${n.count}): ${n.texts.map((t) => `"${t}"`).join(", ")}${n.count > n.texts.length ? ", …" : ""}`) : ["- none"]),
+    "",
+    "## Answers missing from the evidence",
+    "",
+    ...(report.keyMissing.length ? report.keyMissing.map((k) => `- **${k.template}** (${k.count}): ${k.examples.map((e) => `"${e.text}" lacks ${e.missing.join(", ")}`).join("; ")}${k.count > k.examples.length ? "; …" : ""}`) : ["- none"]),
     "",
   ];
   return lines.join("\n");
