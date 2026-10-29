@@ -9,8 +9,8 @@ export interface AnswerEngine { answer(question: string, context?: AskContext): 
 
 export const MAX_ANSWER = 600;
 
-/** One piece of answer_sources evidence, as far as the game needs it. */
-export interface Piece { claim: string; kind: string; source: { url: string }; url?: string }
+/** One piece of answer_sources evidence, as far as the game needs it: the claim, where it is from, and its licence. */
+export interface Piece { claim: string; kind: string; source: { url: string; title?: string }; licence: string; asOf?: string | null; url?: string }
 
 /** answer_sources for one question: the text a model reads, and the pieces as the tool structured them. */
 export interface Sourced { text: string; evidence: Piece[] }
@@ -18,19 +18,33 @@ export interface Sourced { text: string; evidence: Piece[] }
 const NO_ANSWER = { answer: "No sourced answer found.", source: "none" };
 
 /**
- * The first piece and its page. answer_sources orders them observed, curated, game files, then the 2023 wiki, and
- * the first three answer names the question carries, so the first piece is the most direct one. No piece means no
- * answer: nothing unsourced reaches the game.
+ * The in-game source line for a piece, with its licence, as search_knowledge's Source line had it. A wiki excerpt
+ * names the wiki page it quotes (CC BY-SA asks for the source); a game-files fact keeps its label and build
+ * ("found in game files, unconfirmed"); the rest name their everloot.app page.
+ */
+export function sourceLine(piece: Piece): string {
+  const asOf = piece.asOf ? `, as of ${piece.asOf.slice(0, 10)}` : "";
+  if (piece.kind === "lore") return `${piece.source.url} (${piece.licence}${asOf})`;
+  const label = piece.kind === "files" && piece.source.title ? `${piece.source.title}; ` : "";
+  return `${piece.url ?? piece.source.url} (${label}${piece.licence}${asOf})`;
+}
+
+/**
+ * The first piece and its source line. answer_sources orders them observed, curated, game files, then the 2023 wiki,
+ * and the first three answer names the question carries, so the first piece is the most direct one. No piece means
+ * no answer: nothing unsourced reaches the game.
  */
 export function answerFromEvidence(sourced: Sourced): { answer: string; source: string } {
   const piece = sourced.evidence[0];
   if (!piece?.claim.trim()) return NO_ANSWER;
-  return { answer: piece.claim.trim().slice(0, MAX_ANSWER), source: piece.url ?? piece.source.url };
+  return { answer: piece.claim.trim().slice(0, MAX_ANSWER), source: sourceLine(piece) };
 }
 
+const optional = (v: unknown) => v === undefined || typeof v === "string";
 const isPiece = (v: unknown): v is Piece => {
   const r = v as Partial<Piece> | null;
-  return !!r && typeof r.claim === "string" && typeof r.kind === "string" && typeof r.source?.url === "string" && (r.url === undefined || typeof r.url === "string");
+  return !!r && typeof r.claim === "string" && typeof r.kind === "string" && typeof r.licence === "string" && typeof r.source?.url === "string"
+    && optional(r.source.title) && optional(r.url) && (r.asOf === null || optional(r.asOf));
 };
 
 type McpOptions = { url: string; token: string | null };

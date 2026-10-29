@@ -58,12 +58,23 @@ test("the answers addon matches the golden file the Lua 5.1 test loads", () => {
   expect(lua).toBe(readFileSync(FIXTURE, "utf8").replace(/\r\n/g, "\n"));
 });
 
-test("the first piece of evidence becomes a short answer with its page; no evidence, no answer", () => {
-  const files = { claim: "Deadmines: a dungeon, level 16; the files list 8 encounters: Rhahk'Zor, Sneed.", kind: "files", source: { url: "https://everloot.app/database/download" }, url: "https://everloot.app/database/instances/36-deadmines" };
-  const lore = { claim: "The Deadmines is a dungeon under Moonbrook.", kind: "lore", source: { url: "https://warcraft.wiki.gg/wiki/Deadmines" } };
-  expect(answerFromEvidence({ text: "", evidence: [files, lore] })).toEqual({ answer: files.claim, source: "https://everloot.app/database/instances/36-deadmines" });
-  // A piece with no page of its own names its source.
-  expect(answerFromEvidence({ text: "", evidence: [lore] })).toEqual({ answer: lore.claim, source: "https://warcraft.wiki.gg/wiki/Deadmines" });
+test("the first piece of evidence becomes a short answer with its source and licence; no evidence, no answer", () => {
+  const files = {
+    claim: "Deadmines: a dungeon, level 16; the files list 8 encounters.", kind: "files", licence: "Game data © Blizzard Entertainment, Inc.",
+    source: { url: "https://everloot.app/database/download", title: "WoW: Forever game files, build 1.60.1.70685 (Found in game files, unconfirmed)" },
+    url: "https://everloot.app/database/instances/36-deadmines",
+  };
+  const lore = {
+    claim: "The Deadmines is a dungeon under Moonbrook.", kind: "lore", licence: "CC-BY-SA-4.0", asOf: "2023-11-13T00:00:00.000Z",
+    source: { url: "https://warcraft.wiki.gg/wiki/Deadmines", title: "Deadmines" }, url: "https://everloot.app/lore/1-deadmines",
+  };
+  // A game-files fact keeps its label and build with its licence, on its everloot.app page.
+  expect(answerFromEvidence({ text: "", evidence: [files, lore] })).toEqual({
+    answer: files.claim,
+    source: "https://everloot.app/database/instances/36-deadmines (WoW: Forever game files, build 1.60.1.70685 (Found in game files, unconfirmed); Game data © Blizzard Entertainment, Inc.)",
+  });
+  // A wiki excerpt names the wiki page it quotes and its CC BY-SA licence, not the everloot.app copy.
+  expect(answerFromEvidence({ text: "", evidence: [lore] })).toEqual({ answer: lore.claim, source: "https://warcraft.wiki.gg/wiki/Deadmines (CC-BY-SA-4.0, as of 2023-11-13)" });
   expect(answerFromEvidence({ text: "No evidence found.", evidence: [] })).toEqual({ answer: "No sourced answer found.", source: "none" });
   expect(answerFromEvidence({ text: "", evidence: [{ ...lore, claim: "  " }] })).toEqual({ answer: "No sourced answer found.", source: "none" });
 });

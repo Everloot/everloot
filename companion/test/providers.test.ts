@@ -11,7 +11,7 @@ import { llmEngine } from "../src/bridge/llm-engine";
 
 const SOURCED = {
   text: "- [lore (Warcraft Wiki 2023, may differ in WoW: Forever)] Thrall is a shaman and the Warchief of the Horde.\n  Source: https://warcraft.wiki.gg/wiki/Thrall (CC-BY-SA-4.0, as of 2023-11-13)",
-  evidence: [{ claim: "Thrall is a shaman and the Warchief of the Horde.", kind: "lore", source: { url: "https://warcraft.wiki.gg/wiki/Thrall" }, url: "https://everloot.app/lore/481380-thrall" }],
+  evidence: [{ claim: "Thrall is a shaman and the Warchief of the Horde.", kind: "lore", licence: "CC-BY-SA-4.0", asOf: "2023-11-13T00:00:00.000Z", source: { url: "https://warcraft.wiki.gg/wiki/Thrall" }, url: "https://everloot.app/lore/481380-thrall" }],
 };
 
 function fakeAnthropic(reply: () => Promise<unknown>) {
@@ -80,7 +80,8 @@ test("the LLM engine answers only from sources, names the model, and never calls
   const engine = llmEngine({ sources: async () => SOURCED, providers: [{ name: "anthropic", complete }] });
   expect(await engine.answer("Who is Thrall?")).toEqual({
     answer: "Thrall is the Warchief of the Horde. (answered by claude-opus-5-5)",
-    source: "https://everloot.app/lore/481380-thrall",
+    // The wiki page it quotes, with the licence, as the in-game source line has always carried it.
+    source: "https://warcraft.wiki.gg/wiki/Thrall (CC-BY-SA-4.0, as of 2023-11-13)",
   });
   const [system, user] = complete.mock.calls[0] as unknown as [string, string];
   expect(system).toMatch(/only the sources/i);
