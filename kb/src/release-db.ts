@@ -2,7 +2,7 @@ import type { DB } from "./db.js";
 
 /**
  * Reads from a knowledge release, the same SQL wherever the release lives: the SQLite file through
- * better-sqlite3 (Node, Vercel, tests and the CLI) or a Cloudflare D1 database (the site as a Worker).
+ * better-sqlite3 (Node, tests and the CLI) or a Cloudflare D1 database (the site as a Worker).
  * Parameters are positional (`?`). Only the release's read paths go through this; build tools keep the
  * synchronous handle.
  */

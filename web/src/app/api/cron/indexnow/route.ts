@@ -3,7 +3,7 @@ import { loadTimeline } from "@/lib/changes";
 import { changeUrlsToPing, pingIndexNow } from "@/lib/indexnow";
 
 /**
- * GET /api/cron/indexnow: Vercel Cron (vercel.json), hourly. New change entries reach the site with a deploy,
+ * GET /api/cron/indexnow: the Worker's Cron Trigger (src/lib/cf-crons.ts), hourly. New change entries reach the site with a deploy,
  * so each run submits /changes and its feed when an entry from the last two hours exists. An empty list, or
  * nothing recent, sends nothing. Same auth as the snapshot cron: `Authorization: Bearer $CRON_SECRET`.
  */

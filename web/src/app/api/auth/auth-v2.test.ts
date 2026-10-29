@@ -71,7 +71,7 @@ test("v2 bnet start goes through the router with the caller address, so the rate
   );
   const res = await bnetGET(new Request("https://everloot.app/api/auth/bnet", {
     headers: {
-      "x-vercel-forwarded-for": "203.0.113.9", "x-forwarded-for": "203.0.113.9", "x-real-ip": "203.0.113.9",
+      "cf-connecting-ip": "203.0.113.9", "x-forwarded-for": "203.0.113.9", "x-real-ip": "203.0.113.9",
       cookie: "a=b", "x-ignored": "1",
     },
   }));
@@ -82,7 +82,7 @@ test("v2 bnet start goes through the router with the caller address, so the rate
   expect(forwarded.url).toBe("https://everloot.app/api/auth/sign-in/social");
   expect(Object.fromEntries(forwarded.headers)).toEqual({
     "content-type": "application/json", origin: "https://everloot.app",
-    "x-vercel-forwarded-for": "203.0.113.9", "x-forwarded-for": "203.0.113.9", "x-real-ip": "203.0.113.9", cookie: "a=b",
+    "cf-connecting-ip": "203.0.113.9", "x-forwarded-for": "203.0.113.9", "x-real-ip": "203.0.113.9", cookie: "a=b",
   });
   expect(await forwarded.json()).toEqual({ provider: "battlenet", callbackURL: "/" });
 });

@@ -3,7 +3,9 @@
 The public site: the WoW: Forever database built from player uploads, the tools (professions,
 auctions, gold, collections, guild board), the lore archive, the addons hub, the upload page and
 the MCP endpoints (`/mcp`, `/mcp/public`). Next.js 15 (App Router), React 19, TypeScript, Tailwind.
-Deployed on Vercel; every merge to `main` deploys production.
+Deployed as the Cloudflare Worker `everloot-web` (OpenNext, `wrangler.jsonc`); every merge to `main` that
+touches the site deploys production through `.github/workflows/deploy-worker.yml` (`npm run cf:deploy`).
+Rollback: `npx wrangler rollback` from `web/`.
 
 ## Run it
 

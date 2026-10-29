@@ -6,7 +6,7 @@ import type { Manifest } from "../../../kb/src/snapshot";
 
 /**
  * The approved knowledge release, opened once per instance and shared by the MCP mounts and the
- * lore pages. On Node (Vercel, tests) it is the SQLite file; on the Worker, when a D1 binding named
+ * lore pages. On Node (local runs, tests) it is the SQLite file; on the Worker, when a D1 binding named
  * KNOWLEDGE_D1 is present, it is the release imported into D1 (web/scripts/cf-release-d1.mjs). Every
  * open runs the release checks (manifest, hash, non-empty; for D1, the release_meta row against
  * KNOWLEDGE_RELEASE_SHA256); a failure is logged and reported as null so callers answer "unavailable",

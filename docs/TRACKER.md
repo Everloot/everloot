@@ -34,9 +34,9 @@ Rows: 75.
 | `site.signin` | Battle.net sign-in | on everloot.app | Sign in and Sign out on everloot.app. Hashed server sessions; logout revokes the session. Real login and logout verified 2026-10-08. |
 | `ops.health` | Snapshot health | on everloot.app | /api/health reports snapshot age from signed R2 metadata: fresh within 30 minutes, otherwise 503. Age is not proof of complete indexing. |
 | `ops.quotas` | Shared intake quotas | on everloot.app | Supabase counters: 20 uploads per install, 200 requests per IP and 10,000 globally per hour. Production fails closed. Install IDs still do not prove different people. |
-| `ops.stored_rollups` | Corpus snapshot | on everloot.app | Vercel cron every 10 minutes extends snapshots/corpus.json in R2 with uploads it has not seen. Pages read that one object. ?rebuild=1 (with CRON_SECRET) rebuilds from empty after a deletion. |
-| `ops.dns` | everloot.app DNS | on everloot.app | A @ 76.76.21.21 and CNAME www cname.vercel-dns.com in Cloudflare, both DNS only. https://everloot.app and www answer 200 with a Let's Encrypt certificate. |
-| `ops.vercel_git` | vercel git connect | on everloot.app | CDVolvik/everloot is connected and the root directory is web. A push to main deploys production. |
+| `ops.stored_rollups` | Corpus snapshot | on everloot.app | The Worker's Cron Trigger every 10 minutes extends snapshots/corpus.json in R2 with uploads it has not seen. Pages read that one object. ?rebuild=1 (with CRON_SECRET) rebuilds from empty after a deletion. |
+| `ops.dns` | everloot.app DNS | on everloot.app | The apex and www records in Cloudflare are proxied, and the Worker routes everloot.app/* and www.everloot.app/* serve them; www answers a 301 to the apex. |
+| `ops.worker_deploy` | Worker deploys | on everloot.app | A push to main that touches web/, kb/ or packages/protocol builds the site with OpenNext and deploys the everloot-web Worker (.github/workflows/deploy-worker.yml), then fetches every sitemap page and fails on any that does not answer 200. |
 | `ops.supabase` | Supabase + R2 storage | on everloot.app | Intake writes the raw upload to R2 bucket everloot-uploads and one index row to Supabase everloot (ref uinmowrmyckklpbwzqhn); the waitlist is a Supabase table. Pages read the indexed objects. Proven end to end on everloot.app 2026-10-04. |
 
 ## Next

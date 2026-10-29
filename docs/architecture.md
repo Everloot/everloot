@@ -12,11 +12,11 @@ the **companion** uploads and runs the `/ask` bridge on the player's computer.
 | Companion | `companion/` | The player's computer, beside the game |
 | Everloot Desktop App | `desktop/` | The same jobs as the companion, as a tray app built on its modules |
 | Protocol | `packages/protocol/` | The upload contract, the API response shapes and the MCP tool table. Installed into `web/`, `kb/` and `companion/` from the folder; its `schema/` is read by the addon's contract tests and published for API and MCP clients |
-| Site and APIs | `web/` | Vercel, at everloot.app; every merge to `main` deploys production |
+| Site and APIs | `web/` | The Cloudflare Worker `everloot-web` (`web/wrangler.jsonc`), at everloot.app; every merge to `main` that touches the site deploys production through `.github/workflows/deploy-worker.yml` |
 | Raw uploads | `web/src/lib/upload-store.ts` | Cloudflare R2 (`uploads/<date>/<id>.json`), indexed in Supabase |
-| Public corpus | `web/src/app/api/cron/snapshot` | A Vercel cron every 10 minutes extends `snapshots/corpus.json` in R2; pages read that one object |
+| Public corpus | `web/src/app/api/cron/snapshot` | A Cloudflare Cron Trigger every 10 minutes extends `snapshots/corpus.json` in R2; pages read that one object |
 | Sessions, grants, quotas, waitlist | `supabase/` | Supabase Postgres, server-side only, row-level security on every table |
-| Knowledge release (lore) | `kb/` | Built offline into a SQLite file plus a hashed manifest, kept in R2, downloaded and checked at build time, read in process |
+| Knowledge release (lore) | `kb/` | Built offline into a SQLite file plus a hashed manifest, kept in R2, imported into the D1 database `KNOWLEDGE_D1`, served only when it matches the SHA-256 pinned in `web/wrangler.jsonc` |
 | MCP server | `kb/src/mcp-server.ts`, mounted by `web/src/app/mcp/` | `/mcp` (bearer token) and `/mcp/public` (no sign-in, per-IP quota) on the site |
 
 ## Data paths
@@ -36,7 +36,7 @@ Player plays
 Warcraft Wiki dump (CC BY-SA 4.0) + curated entries
   -> kb import -> source database -> validate
   -> snapshot: publishable sources only, sha256 manifest
-  -> R2 -> site build -> /lore, /search, MCP lore answers
+  -> R2 -> D1 -> /lore, /search, MCP lore answers
 
 /ask in game -> SavedVariables -> companion bridge -> MCP search (and an optional model)
   -> EverlootAnswers addon file -> shown after /reload
@@ -51,18 +51,18 @@ Where each kind of data goes, who may write it and how each tier is protected is
   public corpus holds sanitized anonymous observations, plus named records only with a grant.
 - **The knowledge release holds publishable sources only.** The build refuses Battle.net API rows
   and any cached API response, and the site refuses a release that does not match its manifest.
-- **Credentials stay in Vercel.** Nothing in the repository holds a key; `.env.example` lists names.
+- **Credentials stay in the Worker's secrets.** Nothing in the repository holds a key; `.env.example` lists names.
 - **The addon and companion never touch the running game.** They use the addon API and the files
   the game writes. See [`DATA_POLICY.md`](DATA_POLICY.md).
 
 ## Decisions, and why
 
-- **Free hosting only (Vercel, Supabase, Cloudflare R2).** A fan project before launch should cost
-  nothing to run. One Next.js app holds the pages, the APIs, the cron and the MCP endpoints, so
+- **Little hosting to run (a Cloudflare Worker on the Workers Paid plan, Cloudflare R2, Supabase).**
+  One Next.js app holds the pages, the APIs, the crons and the MCP endpoints, so
   there is one deploy and one place to look when something breaks.
-- **Lore and MCP read one immutable SQLite file.** The knowledge release is built offline, hashed,
-  and read in process. No database server to run, and the site and the MCP server answer from the
-  same bytes. A new release is a new file, never an edit.
+- **Lore and MCP read one immutable release.** The knowledge release is built offline as one SQLite
+  file, hashed, and imported into D1. No database server of our own to run, and the site and the MCP
+  server answer from the same release. A new release is a new import, never an edit.
 - **A file bridge, never the game's memory or screen.** The addon writes its save file, and the
   companion reads it and writes answers back as an addon file. That stays inside what Blizzard
   tolerates for addons, and it is why answers appear only after `/reload`.
@@ -84,8 +84,6 @@ Where each kind of data goes, who may write it and how each tier is protected is
 - The companion is an unsigned command-line tool.
 - The standalone MCP server (`kb/src/mcp-http-main.ts`) reads the public corpus URL, which has no
   install ids, so it cannot corroborate on its own. Only the MCP endpoints on the site are deployed.
-- The knowledge release is several hundred megabytes inside a serverless function, so the first
-  lore request after a cold start takes a few seconds.
 
 Every source is recorded in [`sources/LEDGER.md`](sources/LEDGER.md). Design history is in
 `design/specs/` and `design/plans/`.

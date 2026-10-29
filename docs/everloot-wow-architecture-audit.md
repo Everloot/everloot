@@ -10,10 +10,10 @@ Phase 0. It compares the brief with the repository as it is, and proposes a phas
 |---|---|
 | Repository | One monorepo, `CDVolvik/everloot` (public, AGPL-3.0-only, DCO). Parts: `addon/`, `web/`, `kb/`, `companion/`, `supabase/` |
 | Language and package manager | TypeScript on Node 22 with npm (`kb`, `web`, `companion` each have their own lockfile); Lua 5.1 for the addon; Python for addon contract tests and repository scripts |
-| Website and API | Next.js 15 (App Router), React 19, Tailwind, on Vercel. API routes under `web/src/app/api/*`; JSON bodies, `Cache-Control` set per route, 503 when a dependency is unavailable |
+| Website and API | Next.js 15 (App Router), React 19, Tailwind, on Vercel (a Cloudflare Worker since 2026-10-29). API routes under `web/src/app/api/*`; JSON bodies, `Cache-Control` set per route, 503 when a dependency is unavailable |
 | Databases | **SQLite** (better-sqlite3) for the knowledge base: an offline-built, immutable, sha256-checked release opened read-only in process. **Supabase Postgres** for sessions, the private upload index, publication grants and suppressions, intake quotas, the waitlist (row-level security on every table) |
 | Object storage | Cloudflare R2: raw uploads, the public corpus snapshot, knowledge releases |
-| Background work | One Vercel cron (`/api/cron/snapshot`, every 10 minutes). Heavy jobs (wiki import, release build) run on a maintainer's machine through `npm run kb -- …`. No queue service |
+| Background work | One Vercel cron (`/api/cron/snapshot`, every 10 minutes; Cloudflare Cron Triggers since 2026-10-29). Heavy jobs (wiki import, release build) run on a maintainer's machine through `npm run kb -- …`. No queue service |
 | Auth | Battle.net OAuth sessions for named sharing. Uploads are anonymous, keyed by a random install id, protected by quotas |
 | MCP | `kb/src/mcp-server.ts`, mounted at `/mcp` (bearer) and `/mcp/public` (no sign-in, per-IP quota) |
 | Addon | Exists, 0.2.5: sightings, loot windows, vendors, auctions, gold, recipes, trainers, guild (officer-only publication), `/ask` |

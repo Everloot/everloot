@@ -82,11 +82,10 @@ test("the public pages rendered on every request are kept at the CDN; the change
   const brief = "max-age=300, stale-while-revalidate=3600";
   for (const [path, value] of [["/database", hour], ["/map", hour], ["/map/kalimdor", hour], ["/changes", brief], ["/search", brief]] as const) {
     const got = await headersFor(path);
-    expect(got["Vercel-CDN-Cache-Control"], path).toBe(value);
     expect(got["CDN-Cache-Control"], path).toBe(value);
   }
   for (const path of ["/chat", "/account", "/settings", "/sign-in", "/api/tools/search_knowledge", "/changes/feed.xml"]) {
-    expect(await headersFor(path), path).not.toHaveProperty("Vercel-CDN-Cache-Control");
+    expect(await headersFor(path), path).not.toHaveProperty("CDN-Cache-Control");
   }
 });
 
@@ -155,11 +154,9 @@ test("Chat may ask for the microphone (dictation); every other page, the account
 
 test("only the root sitemap gets static CDN caching; fallible sitemaps and private routes set their own policy", async () => {
   const got = await headersFor("/sitemap.xml");
-  expect(got["Vercel-CDN-Cache-Control"]).toBe("max-age=3600, stale-while-revalidate=86400");
   expect(got["CDN-Cache-Control"]).toBe("max-age=3600, stale-while-revalidate=86400");
   for (const path of ["/", "/database-sitemap.xml", "/database-sitemap/3.xml", "/auctions-sitemap.xml", "/auctions-sitemap/0.xml", ...PROTECTED, "/sign-in", "/api/auth/session", "/api/me"]) {
     const h = await headersFor(path);
-    expect(h["Vercel-CDN-Cache-Control"], path).toBeUndefined();
     expect(h["CDN-Cache-Control"], path).toBeUndefined();
   }
 });

@@ -4,7 +4,7 @@ import { FREE_BUDGET, SYSTEM } from "./agent";
 import { createFreeChat, FREE_CHAT_LIMITS, freeChatNames, freeChatProviders } from "./free-chat";
 
 const KEY = "gsk_serverserverserverserver1234";
-const ENV = { EVERLOOT_FREE_CHAT_KEY: KEY, VERCEL: "1", NODE_ENV: "production" };
+const ENV = { EVERLOOT_FREE_CHAT_KEY: KEY, EVERLOOT_PLATFORM: "cloudflare", NODE_ENV: "production" };
 const URL_ = "https://everloot.app/api/chat/free/chat/completions";
 
 /** The same contract as pgRateLimitStore: a fixed window that starts at the first request, counted before the check. */
@@ -32,7 +32,7 @@ const tool = (name: string, extra: Record<string, unknown> = {}) => ({ type: "fu
 function ask(body: unknown, headers: Record<string, string> = {}): Request {
   return new Request(URL_, {
     method: "POST",
-    headers: { "content-type": "application/json", "x-vercel-forwarded-for": "203.0.113.7", cookie: "better-auth.session_token=secret", authorization: "Bearer sk-visitor", ...headers },
+    headers: { "content-type": "application/json", "cf-connecting-ip": "203.0.113.7", cookie: "better-auth.session_token=secret", authorization: "Bearer sk-visitor", ...headers },
     body: typeof body === "string" ? body : JSON.stringify(body),
   });
 }
@@ -196,7 +196,7 @@ describe("failover to the next free provider", () => {
     const total = FREE_CHAT_LIMITS.siteDay + FREE_CHAT_LIMITS.cloudflareDay + 2;
     for (let i = 0; i < total; i++) {
       const ip = `10.${(i >> 16) & 255}.${(i >> 8) & 255}.${i & 255}`;
-      const res = await chat.POST(ask(question(), { "x-vercel-forwarded-for": ip }));
+      const res = await chat.POST(ask(question(), { "cf-connecting-ip": ip }));
       used[(res.headers.get("x-everloot-provider") ?? "none") as keyof typeof used]++;
       if (res.status !== 200) expect(res.status).toBe(429);
     }
@@ -224,16 +224,16 @@ describe("failover to the next free provider", () => {
 });
 
 describe("POST /api/chat/free/chat/completions", () => {
-  test("on the Cloudflare Worker it counts the caller by cf-connecting-ip and refuses a forged Vercel header", async () => {
+  test("on the Cloudflare Worker it counts the caller by cf-connecting-ip and refuses a caller that sends only X-Forwarded-For", async () => {
     const cf = { EVERLOOT_FREE_CHAT_KEY: KEY, EVERLOOT_PLATFORM: "cloudflare", NODE_ENV: "production" };
     expect((await setup(cf).chat.POST(ask(question(), { "cf-connecting-ip": "198.51.100.9" }))).status).toBe(200);
     const forged = setup(cf);
-    expect((await forged.chat.POST(ask(question()))).status).not.toBe(200);
+    expect((await forged.chat.POST(ask(question(), { "cf-connecting-ip": "", "x-forwarded-for": "203.0.113.5" }))).status).not.toBe(200);
     expect(forged.send).not.toHaveBeenCalled();
   });
 
   test("is a 404 while the key is unset, and calls nobody", async () => {
-    const { chat, send } = setup({ VERCEL: "1", NODE_ENV: "production" });
+    const { chat, send } = setup({ EVERLOOT_PLATFORM: "cloudflare", NODE_ENV: "production" });
     const res = await chat.POST(ask(question()));
     expect(res.status).toBe(404);
     expect(((await res.json()) as { error: { code: string } }).error.code).toBe("free_chat_off");
@@ -323,7 +323,7 @@ describe("POST /api/chat/free/chat/completions", () => {
     expect(((await limited.json()) as { error: { code: string } }).error.code).toBe("free_chat_limit");
     expect(send).toHaveBeenCalledTimes(FREE_CHAT_LIMITS.perMinute);
     // Another address has its own allowance; the stored keys never hold an address.
-    expect((await chat.POST(ask(question(), { "x-vercel-forwarded-for": "198.51.100.4" }))).status).toBe(200);
+    expect((await chat.POST(ask(question(), { "cf-connecting-ip": "198.51.100.4" }))).status).toBe(200);
     for (const key of store.keys.keys()) expect(key).not.toMatch(/203\.0\.113|198\.51\.100/);
     // The day's count lives under a daily: key, which the store's pruning keeps for a day.
     expect([...store.keys.keys()].filter((k) => k.startsWith("daily:"))).toHaveLength(3);
@@ -347,7 +347,7 @@ describe("POST /api/chat/free/chat/completions", () => {
     let ok = 0;
     for (let i = 0; i < FREE_CHAT_LIMITS.siteDay + 3; i++) {
       const ip = `10.${(i >> 16) & 255}.${(i >> 8) & 255}.${i & 255}`;
-      if ((await chat.POST(ask(question(), { "x-vercel-forwarded-for": ip }))).status === 200) ok++;
+      if ((await chat.POST(ask(question(), { "cf-connecting-ip": ip }))).status === 200) ok++;
     }
     expect(ok).toBe(FREE_CHAT_LIMITS.siteDay);
     expect(FREE_CHAT_LIMITS.siteDay).toBeLessThan(1000);
@@ -374,7 +374,7 @@ describe("POST /api/chat/free/chat/completions", () => {
 
   test("without a trusted address or the limit store it is unavailable, not unlimited", async () => {
     const noIp = setup();
-    expect((await noIp.chat.POST(ask(question(), { "x-vercel-forwarded-for": "" }))).status).toBe(503);
+    expect((await noIp.chat.POST(ask(question(), { "cf-connecting-ip": "" }))).status).toBe(503);
     const chat = createFreeChat({ env: ENV, store: () => { throw new Error("Authentication storage is not configured"); }, send: vi.fn() as unknown as typeof fetch });
     const res = await chat.POST(ask(question()));
     expect(res.status).toBe(503);

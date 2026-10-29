@@ -203,7 +203,8 @@ only; the menu does not switch anything.
 Done for production on 2026-10-18: public bucket `everloot-assets` at `https://assets.everloot.app`
 (CORS GET/HEAD from everloot.app and www), private bucket `everloot-game-data`, an upload token (read and
 write on both) and a site token (read-only, private bucket only), build 70450 uploaded, and the five
-variables set in Vercel production. The code never creates a bucket, touches DNS or changes an account;
+variables set (since 2026-10-29 the four `GAME_DATA_*` Worker secrets and the asset URL repository variable,
+step 7). The code never creates a bucket, touches DNS or changes an account;
 repeat these steps for a new build or another deployment.
 
 1. **Public bucket.** In the Cloudflare dashboard, R2, create a bucket, for example

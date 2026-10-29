@@ -23,11 +23,11 @@ const POSTHOG_KEY = /^phc_[A-Za-z0-9]{10,100}$/;
 const CF_TOKEN = /^[a-f0-9]{32}$/;
 const POSTHOG_HOSTS = ["https://us.i.posthog.com", "https://eu.i.posthog.com"];
 
-/** A malformed value counts as unset, so a typo in Vercel cannot inject anything into the page. */
+/** A malformed value counts as unset, so a typo in a build variable cannot inject anything into the page. */
 export function analyticsConfig(env: Record<string, string | undefined> = process.env): AnalyticsConfig {
   const gaId = clean(env.NEXT_PUBLIC_GA_ID);
   // PostHog only runs on the Production deployment, so Preview and local builds never send events.
-  // The host's environment (VERCEL_ENV, or EVERLOOT_DEPLOY_ENV on the Worker) is read here on the server
+  // The Worker's environment (EVERLOOT_DEPLOY_ENV) is read here on the server
   // (root layout) and passed down with the rest of the config.
   const posthogKey = deployEnv(env) === "production" ? clean(env.NEXT_PUBLIC_POSTHOG_KEY) : undefined;
   const host = clean(env.NEXT_PUBLIC_POSTHOG_HOST)?.replace(/\/$/, "");

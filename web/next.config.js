@@ -140,16 +140,13 @@ const nextConfig = {
   },
   // Security headers on every route. The full CSP is report-only: it lists what the site loads (the analytics
   // scripts only start after consent), so a missed host shows in the console, not as a broken page. The
-  // enforced CSP holds only the plugin, base-tag and framing rules. Access-Control-Allow-Origin is not set
-  // here: the `*` seen on pages is added by Vercel for prerendered responses, and a header set here could not
-  // remove it.
+  // enforced CSP holds only the plugin, base-tag and framing rules. Access-Control-Allow-Origin is set here only
+  // for the public API routes below that are prerendered; the others set it themselves.
   async headers() {
     const databaseItemsCdnHeaders = [
-      { key: "Vercel-CDN-Cache-Control", value: "max-age=3600, stale-while-revalidate=86400" },
       { key: "CDN-Cache-Control", value: "max-age=3600, stale-while-revalidate=86400" },
     ];
     const briefCdnHeaders = [
-      { key: "Vercel-CDN-Cache-Control", value: "max-age=300, stale-while-revalidate=3600" },
       { key: "CDN-Cache-Control", value: "max-age=300, stale-while-revalidate=3600" },
     ];
     return [
@@ -175,8 +172,7 @@ const nextConfig = {
       // The sitemap reads no cookies and rebuilds from kb on every request (about 4s cold), so the CDN keeps it an hour.
       // The database and auctions sitemaps set these on their own successful responses, so their 503s stay uncached.
       { source: "/sitemap.xml", headers: databaseItemsCdnHeaders },
-      // Two public API routes are prerendered, and Vercel adds `*` to prerendered responses on its own; the
-      // Cloudflare Worker does not, so it is set here for them, the same value on both hosts.
+      // Two public API routes are prerendered, so no handler of theirs runs to set it.
       { source: "/api/items/categories", headers: [{ key: "Access-Control-Allow-Origin", value: "*" }] },
       { source: "/api/edges/client-layer", headers: [{ key: "Access-Control-Allow-Origin", value: "*" }] },
       // The embeddable tooltip script other sites load: an hour in browsers and at the CDN, so a fix reaches them quickly.
@@ -192,7 +188,7 @@ const nextConfig = {
     // Shared KB sources use NodeNext .js imports for their TypeScript modules.
     // https://webpack.js.org/configuration/resolve/#resolveextensionalias
     config.resolve.extensionAlias = { ...config.resolve.extensionAlias, ".js": [".js", ".ts", ".tsx"] };
-    // kb/src imports packages that a Vercel build installs only under web/node_modules.
+    // kb/src imports packages that a build installs only under web/node_modules.
     config.resolve.modules = [...(config.resolve.modules ?? ["node_modules"]), path.join(__dirname, "node_modules")];
     // Webpack's build cache treats a package under node_modules as unchanged while its version stays the same.
     // The protocol is packed from ../packages/protocol, so a change without a version bump came out of the

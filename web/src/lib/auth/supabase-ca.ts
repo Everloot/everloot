@@ -1,4 +1,4 @@
-// Copied verbatim from supabase/certs/prod-ca-2021.crt (Vercel bundles web/ only, so it cannot be read at runtime).
+// Copied verbatim from supabase/certs/prod-ca-2021.crt (the Worker bundles web/ only, so it cannot be read at runtime).
 export const supabaseCa = `-----BEGIN CERTIFICATE-----
 MIIDxDCCAqygAwIBAgIUbLxMod62P2ktCiAkxnKJwtE9VPYwDQYJKoZIhvcNAQEL
 BQAwazELMAkGA1UEBhMCVVMxEDAOBgNVBAgMB0RlbHdhcmUxEzARBgNVBAcMCk5l
