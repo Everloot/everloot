@@ -12,15 +12,15 @@ const bundled = () => groupAnnouncements([...buildTimeline((posts as unknown as 
 it("withholds the unverified source seed rather than publishing unsupported claims", () => {
   expect(manual.entries).toEqual([]);
 });
-it("retains current wowf 70658 as the latest Forever build with live posts and on fallback", async () => {
+it("retains current wowf 70685 as the latest Forever build with live posts and on fallback", async () => {
   vi.stubEnv("R2_ACCOUNT_ID", "");
   const fallback = await loadTimeline();
-  expect(latestForeverBuild(fallback)?.version).toBe("1.60.1.70658");
+  expect(latestForeverBuild(fallback)?.version).toBe("1.60.1.70685");
   configure();
   vi.stubGlobal("fetch", vi.fn(async () => Response.json({ posts: [] })));
   const live = await loadTimeline();
   expect(live.filter((e) => e.type === "build")).toEqual(fallback.filter((e) => e.type === "build"));
-  expect(latestForeverBuild(live)?.version).toBe("1.60.1.70658");
+  expect(latestForeverBuild(live)?.version).toBe("1.60.1.70685");
 });
 function configure() {
   for (const key of ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET"]) vi.stubEnv(key, "test");

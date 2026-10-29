@@ -3,11 +3,11 @@
  "label": "found in game files, unconfirmed",
  "build": {
   "product": "wowf",
-  "buildId": 70658,
-  "version": "1.60.1.70658",
-  "buildConfig": "165410aca770316ea0f88100bb4830c2",
-  "definitions": "72891e941188",
-  "extractedAt": "2026-10-28T01:38:30.566Z"
+  "buildId": 70685,
+  "version": "1.60.1.70685",
+  "buildConfig": "002a8047a7c3a53de5e981936db76cce",
+  "definitions": "835e08f21237",
+  "extractedAt": "2026-10-29T00:00:19.551Z"
  },
  "classId": 3,
  "className": "Hunter",

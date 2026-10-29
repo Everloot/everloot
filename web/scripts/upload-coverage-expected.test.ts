@@ -5,8 +5,8 @@ import { join } from "node:path";
 import { expect, test } from "vitest";
 import { bucketProblems, checkCoverageUpload, committedBuild, liveFolderProblems, publishCoverage, snapshotProblems } from "./upload-coverage-expected";
 
-const build = { product: "wowf", buildId: 70658, buildConfig: "165410aca770316ea0f88100bb4830c2" };
-const FOLDER = "wowf-70658-165410ac";
+const build = { product: "wowf", buildId: 70685, buildConfig: "002a8047a7c3a53de5e981936db76cce" };
+const FOLDER = "wowf-70685-002a8047";
 const AS_OF = "2026-10-22T18:00:00.000Z";
 const expected = () => ({ version: 1, dataAsOf: AS_OF, zones: [{ zone: "1429", types: { quest: 4 }, fields: { quest: { title: 2, level: 2 } } }] });
 const report = (over: Record<string, unknown> = {}) => ({ version: 1, dataAsOf: AS_OF, connected: true, clientConnected: true, rows: [], expected: expected(), plateau: null, ...over });
@@ -66,12 +66,12 @@ test("the client snapshot must be the committed build's, by its manifest, name a
   const snap = (name: string, meta: Record<string, unknown>, body = "sqlite") => {
     const path = join(dir, name);
     writeFileSync(path, body);
-    writeFileSync(`${path}.manifest.json`, JSON.stringify({ ...build, version: "1.60.1.70658", sha256: createHash("sha256").update(body).digest("hex"), ...meta }));
+    writeFileSync(`${path}.manifest.json`, JSON.stringify({ ...build, version: "1.60.1.70685", sha256: createHash("sha256").update(body).digest("hex"), ...meta }));
     return path;
   };
   expect(snapshotProblems(snap(`${FOLDER}.sqlite`, {}), build)).toEqual([]);
   expect(snapshotProblems(snap("wow_classic_beta-70450-84bea423.sqlite", { product: "wow_classic_beta", buildId: 70450, buildConfig: "84bea423aaaaaaaa" }), build)).toEqual([
-    "the client snapshot is build wow_classic_beta-70450-84bea423, the committed client layer is wowf-70658-165410ac",
+    "the client snapshot is build wow_classic_beta-70450-84bea423, the committed client layer is wowf-70685-002a8047",
   ]);
   expect(snapshotProblems(snap(`${FOLDER}.sqlite`, { sha256: "0".repeat(64) }), build)).toEqual(["the client snapshot does not match its manifest's sha256"]);
   expect(snapshotProblems(join(dir, "missing.sqlite"), build)).toEqual(["the client snapshot has no manifest beside it"]);

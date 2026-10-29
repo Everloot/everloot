@@ -2,6 +2,7 @@ import beta70532 from "@/data/game-data/changes/wow_classic_beta-70532.json";
 import wowf70630 from "@/data/game-data/changes/wowf-70630.json";
 import wowf70634 from "@/data/game-data/changes/wowf-70634.json";
 import wowf70658 from "@/data/game-data/changes/wowf-70658.json";
+import wowf70685 from "@/data/game-data/changes/wowf-70685.json";
 import { ChangeEntry } from "../../../../kb/src/build-watch/changes";
 import { compareGameBuilds, type BuildStep, type ClassTalentChanges, type Limit, type Place, type TalentChange } from "./freshness";
 
@@ -12,7 +13,7 @@ import { compareGameBuilds, type BuildStep, type ClassTalentChanges, type Limit,
 
 /** The build watch's published records, bundled with the pages that read them. A new build's pull request adds
  *  its record to the folder; list it here in the same pull request (freshness.test.ts fails until it is). */
-export const PUBLISHED_CHANGES: readonly unknown[] = [beta70532, wowf70630, wowf70634, wowf70658];
+export const PUBLISHED_CHANGES: readonly unknown[] = [beta70532, wowf70630, wowf70634, wowf70658, wowf70685];
 
 // The warnings the build watch writes (kb/src/build-watch/diff.ts and client-digests.ts). Three leave the talent
 // comparison whole: differing table layouts say where a listed change may come from, and the client digests and
