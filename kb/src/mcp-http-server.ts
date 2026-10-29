@@ -1,12 +1,16 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import type { ReleaseSource } from "./release-db.js";
-import { createKnowledgeServer, type ChangesLoader, type CompletionLoader, type CorpusLoader, type EcosystemLoader, type ExtraTool, type MarketLoader } from "./mcp-server.js";
+import { createKnowledgeServer, type ChangesLoader, type CompletionLoader, type CorpusLoader, type EcosystemLoader, type ExtraTool, type MarketLoader, type ToolOptions } from "./mcp-server.js";
 import type { GuildReader } from "./guilds.js";
 import type { CensusLoader } from "./population.js";
 import type { RecheckScope } from "./coverage.js";
 
-export interface PublicMcpConfig {
+/**
+ * Every loader the knowledge server takes (`ToolOptions`) passes through as given: a hand-picked list here once
+ * dropped the game files' facts, the coverage reader and the settled summary from both MCP mounts.
+ */
+export interface PublicMcpConfig extends ToolOptions {
   db: ReleaseSource;
   /** Null means a public, read-only mount: no bearer, rate-limited by the caller before this handler. */
   bearerToken: string | null;
@@ -38,11 +42,9 @@ export interface PublicMcpConfig {
   extraTools?: (req: Request, body: string) => readonly ExtraTool[] | Promise<readonly ExtraTool[]>;
 }
 
-export function createPublicMcpServer(
-  config: { db: ReleaseSource; corpus?: CorpusLoader; market?: MarketLoader; completion?: CompletionLoader; changes?: ChangesLoader; ecosystem?: EcosystemLoader; census?: CensusLoader; guilds?: GuildReader; recheck?: readonly RecheckScope[] },
-  extraTools: readonly ExtraTool[] = [],
-) {
-  const server = createKnowledgeServer(config.db, { corpus: config.corpus, market: config.market, completion: config.completion, changes: config.changes, ecosystem: config.ecosystem, census: config.census, guilds: config.guilds, recheck: config.recheck }, extraTools);
+export function createPublicMcpServer(config: { db: ReleaseSource } & ToolOptions, extraTools: readonly ExtraTool[] = []) {
+  const { db, ...options } = config;
+  const server = createKnowledgeServer(db, options, extraTools);
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined, enableJsonResponse: true,
   });
