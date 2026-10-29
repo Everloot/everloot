@@ -57,7 +57,7 @@ Resolution: the subject's name met a record exactly, or through search on the qu
 - **talent** (68): Vengeance, Ferocity, Primal Bite, Natural Instinct, Improved Shifting Power, Subtlety, Deadly Aspects, Spirit Bond, Summon Hawk, Lethal Attacks, Strider Kick, Lacerating Strikes, …
 - **alias** (17): Molten Core, Blackwing Lair, Zul'Gurub, Ahn'Qiraj Temple, Ruins of Ahn'Qiraj, Scarlet Monastery, Wailing Caverns, Ragefire Chasm, Shadowfang Keep, Sunken Temple, Blackrock Spire, Stratholme, …
 - **item_category** (12): Consumables, Containers, Weapons, Jewelry, Reagents, Projectiles, Generic, Recipes, Quivers, Keys, Permanent, WoW Tokens
-- **flight** (9): Stormwind, The Sepulcher, Grom'gol, Theramore, Summit of Eternity, Rog'mar, Tainted Foothills, Powderfuse Port, Farholde Keep
+- **flight** (9): Stormwind, The Sepulcher, Grom'gol, Theramore, and five flight masters in held-back zones (names left out, docs/DATA_POLICY.md)
 - **zone** (2): The Barrens, The Hinterlands
 - **instance** (2): Sunken Temple, Ahn'Qiraj Temple
 - **profession** (1): Test Profession [DNT]
@@ -67,6 +67,6 @@ Resolution: the subject's name met a record exactly, or through search on the qu
 - **topic** (4): "is Polestar still maintained", "what is Everloot", "how does the Everloot addon work", "does Everloot read my character data"
 - **what-is** (3): "what is Spearing Strike", "what is Bloodthrill", "what is Gore Drinker"
 - **talent-class** (3): "which class has Spearing Strike", "which class has Bloodthrill", "which class has Gore Drinker"
-- **where-is** (2): "where is Powderfuse Port", "where is Farholde Keep"
-- **flight-to** (2): "how do I fly to Powderfuse Port", "how do I fly to Farholde Keep"
+- **where-is** (2): two flight masters in a held-back zone
+- **flight-to** (2): the same two flight masters
 - **alias** (2): "AQ40 attunement", "WC entrance"
