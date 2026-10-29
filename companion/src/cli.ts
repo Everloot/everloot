@@ -90,7 +90,7 @@ async function main(argv: string[]): Promise<void> {
     const providers = providersOnDemand(join(dirname(statePath), "config.json"));
     // A price question is answered from the recorded market first, with no model; the rest follows the providers.
     const engine = withMarket(
-      lazyEngine(() => providers().length ? llmEngine({ sources: (q) => mcpAnswerSources(mcp, q, 6), providers: providers() }) : mcpEngine(mcp)),
+      lazyEngine(() => providers().length ? llmEngine({ sources: (q) => mcpAnswerSources(mcp, q, 3), providers: providers() }) : mcpEngine(mcp)),
       { lookup: (realm, id, signal) => mcpMarketValue(mcp, realm, id, signal), resolveItem: siteItemSearch(args.endpoint) },
     );
     try {

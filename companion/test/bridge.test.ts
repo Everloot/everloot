@@ -406,3 +406,9 @@ describe("market_value over MCP", () => {
     expect(marketValueFrom({ structuredContent: FIXTURE_STRUCTURED })).toEqual(FIXTURE_STRUCTURED);
   });
 });
+
+test("a loose match (no page held every word) is said to be only the closest page", () => {
+  const lore = { claim: "The Barrens is a zone.", kind: "lore", licence: "CC-BY-SA-4.0", source: { url: "https://warcraft.wiki.gg/wiki/The_Barrens" } };
+  expect(answerFromEvidence({ text: "", evidence: [lore], someWords: true }).answer).toBe("No page matched every word; the closest: The Barrens is a zone.");
+  expect(answerFromEvidence({ text: "", evidence: [lore] }).answer).toBe("The Barrens is a zone.");
+});

@@ -12,8 +12,14 @@ export const MAX_ANSWER = 600;
 /** One piece of answer_sources evidence, as far as the game needs it: the claim, where it is from, and its licence. */
 export interface Piece { claim: string; kind: string; source: { url: string; title?: string }; licence: string; asOf?: string | null; url?: string }
 
-/** answer_sources for one question: the text a model reads, and the pieces as the tool structured them. */
-export interface Sourced { text: string; evidence: Piece[] }
+/**
+ * answer_sources for one question: the text a model reads, the pieces as the tool structured them, and whether no page
+ * held every asked word (the tool says so only in its text, so its pieces are the closest pages, not an answer).
+ */
+export interface Sourced { text: string; evidence: Piece[]; someWords?: boolean }
+
+/** The first line answer_sources writes when no page held every asked word (kb/src/search.ts, SOME_WORDS). */
+export const SOME_WORDS = "No page has every word you asked for. Pages with some of them:";
 
 const NO_ANSWER = { answer: "No sourced answer found.", source: "none" };
 
@@ -29,15 +35,21 @@ export function sourceLine(piece: Piece): string {
   return `${piece.url ?? piece.source.url} (${label}${piece.licence}${asOf})`;
 }
 
+/** Every piece's source line, once each: what a model's answer, written from all of them, has to credit. */
+export function sourceLines(sourced: Sourced): string {
+  return [...new Set(sourced.evidence.map(sourceLine))].join(" | ");
+}
+
 /**
  * The first piece and its source line. answer_sources orders them observed, curated, game files, then the 2023 wiki,
- * and the first three answer names the question carries, so the first piece is the most direct one. No piece means
- * no answer: nothing unsourced reaches the game.
+ * and the first three answer names the question carries, so the first piece is the most direct one. When no page held
+ * every word, the answer says it is only the closest page. No piece means no answer: nothing unsourced reaches the game.
  */
 export function answerFromEvidence(sourced: Sourced): { answer: string; source: string } {
   const piece = sourced.evidence[0];
   if (!piece?.claim.trim()) return NO_ANSWER;
-  return { answer: piece.claim.trim().slice(0, MAX_ANSWER), source: sourceLine(piece) };
+  const lead = sourced.someWords ? "No page matched every word; the closest: " : "";
+  return { answer: `${lead}${piece.claim.trim()}`.slice(0, MAX_ANSWER), source: sourceLine(piece) };
 }
 
 const optional = (v: unknown) => v === undefined || typeof v === "string";
@@ -82,7 +94,8 @@ export async function mcpAnswerSources(options: McpOptions, question: string, li
     const content = (result.content as { type: string; text?: string }[] | undefined) ?? [];
     const pieces = (result.structuredContent as { evidence?: unknown } | undefined)?.evidence;
     const evidence = result.isError !== true && Array.isArray(pieces) && pieces.every(isPiece) ? pieces : [];
-    return { text: content.find((c) => c.type === "text")?.text ?? "", evidence };
+    const text = content.find((c) => c.type === "text")?.text ?? "";
+    return { text, evidence, ...(text.startsWith(SOME_WORDS) ? { someWords: true } : {}) };
   });
 }
 

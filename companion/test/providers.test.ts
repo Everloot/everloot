@@ -112,3 +112,15 @@ test("provider config reads keys from files only and rejects inline keys", () =>
   expect(() => loadProviders(config)).toThrow(/apiKeyFile/);
   expect(loadProviders(join(dir, "missing.json"))).toEqual([]);
 });
+
+test("with a model, the answer credits every piece it read, and a refusal without its full stop is still one", async () => {
+  const wiki = { claim: "Ragnaros is the Firelord.", kind: "lore", licence: "CC-BY-SA-4.0", asOf: "2023-11-13T00:00:00.000Z", source: { url: "https://warcraft.wiki.gg/wiki/Ragnaros" } };
+  const seen = { claim: "Ragnaros drops Eye of Sulfuras.", kind: "observed", licence: "CC BY-SA 4.0", source: { url: "https://everloot.app/database/npcs/11502" }, url: "https://everloot.app/database/npcs/11502" };
+  const sources = async () => ({ text: "- [observed in play] …\n- [lore …] …", evidence: [seen, wiki, seen] });
+  const told = llmEngine({ sources, providers: [{ name: "x", complete: async () => ({ text: "He is the Firelord and drops the Eye.", model: "m" }) }] });
+  expect((await told.answer("who is Ragnaros")).source).toBe("https://everloot.app/database/npcs/11502 (CC BY-SA 4.0) | https://warcraft.wiki.gg/wiki/Ragnaros (CC-BY-SA-4.0, as of 2023-11-13)");
+  for (const refusal of ["Not in the sources", "not in the sources.", "Not in the sources!"]) {
+    const engine = llmEngine({ sources, providers: [{ name: "x", complete: async () => ({ text: refusal, model: "m" }) }] });
+    expect(await engine.answer("q"), refusal).toEqual({ answer: "No sourced answer found.", source: "none" });
+  }
+});
