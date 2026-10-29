@@ -8,6 +8,7 @@
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { AnswerKey, Answer } from "./answer-key.js";
 import type { DB } from "./db.js";
 
 /** What a question is about. The knowledge kinds the release holds, plus the kinds only the game-data files name. */
@@ -26,6 +27,8 @@ export interface Question {
   subject: Subject;
   /** What a good answer needs: the subject's name to resolve to a record, evidence to come back, or both. */
   expects: { resolve: boolean; evidence: boolean };
+  /** The facts a correct answer carries, when the game-data files hold them (`answer-key.ts`). */
+  answer?: Answer;
 }
 
 interface Template { id: string; kinds: readonly SubjectKind[]; ask: (name: string) => string; expects?: Partial<Question["expects"]> }
@@ -205,13 +208,17 @@ export function wikiSubjects(db: DB, perKind: number): Subject[] {
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 /** The bank: every template applied to every subject of its kinds, then the aliases and the long tail. */
-export function buildQuestionBank(subjects: readonly Subject[]): Question[] {
+export function buildQuestionBank(subjects: readonly Subject[], key?: AnswerKey): Question[] {
   const out: Question[] = [];
   const seen = new Set<string>();
   const add = (q: Question) => { if (!seen.has(q.id)) { seen.add(q.id); out.push(q); } };
   for (const t of TEMPLATES) {
     if (t.kinds.includes("alias") || t.kinds.includes("topic")) continue;
-    for (const s of subjects) if (t.kinds.includes(s.kind)) add({ id: `${t.id}:${s.kind}:${slug(s.name)}`, text: t.ask(s.name), template: t.id, subject: s, expects: { resolve: true, evidence: true, ...t.expects } });
+    for (const s of subjects) {
+      if (!t.kinds.includes(s.kind)) continue;
+      const answer = key?.(t.id, s);
+      add({ id: `${t.id}:${s.kind}:${slug(s.name)}`, text: t.ask(s.name), template: t.id, subject: s, expects: { resolve: true, evidence: true, ...t.expects }, ...(answer ? { answer } : {}) });
+    }
   }
   for (const a of INSTANCE_ALIASES) add({ id: `alias:alias:${slug(a.alias)}`, text: a.alias, template: "alias", subject: { kind: "alias", name: a.name }, expects: { resolve: true, evidence: true } });
   for (const t of TOPICS) add({ id: `topic:topic:${slug(t.text)}`, text: t.text, template: "topic", subject: { kind: "topic", name: t.topic }, expects: { resolve: false, evidence: true } });

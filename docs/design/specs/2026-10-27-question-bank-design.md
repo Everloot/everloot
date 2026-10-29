@@ -88,6 +88,42 @@ aliases say whether short forms map at all. Each fix is a normal pull request, a
   mount, talent and instance questions, pages on 97%; questions with no evidence 25 → 20, nineteen of them bosses
   of instances the map keeps behind the spoiler switch.
 
+## The answer key (built 2026-10-28)
+
+Forever's answers move between builds; the questions do not. "What riding skill does Brown Horse need" asks for the
+same field on every build, whatever its value. So the bank pins the question and its field, and the value is read
+again from the game-data files each time the bank is generated (`kb/src/answer-key.ts`). Nothing is typed by hand,
+so nothing goes stale.
+
+Each question the files can answer carries `answer: { facts, from, build }`: the facts a correct answer has to
+contain, the file and field they came from, and the game build of that file. On build 1.60.1.70658, 1,232 of the
+4,434 questions carry one:
+
+| template | subject | facts from |
+|---|---|---|
+| riding-skill | mount | `client-mounts.json` ridingSkill |
+| level | instance | `map.json` entrance minLevel, maxLevel |
+| where-is | instance | `map.json` entrance map, then its zone name |
+| bosses | instance | `client-encounters.json` names for the instance's map |
+| where-is | boss | the instance whose map lists the boss |
+| where-is, flight-to | flight | the node's zone (the zone list, else the zone in the node's own name) |
+| talent-class | talent | `talents/*.json` className, every class that has the name |
+| criteria | achievement | `client-achievements.json` criteria text, leaving out a statistic's criterion that only repeats its title |
+
+A missing file or field gives no answer, never a guess. Wiki subjects and the other templates have none yet: their
+answers live in the knowledge release or in play, not in these files.
+
+**Between builds**, `npm run kb -- question-diff <before.jsonl> <after.jsonl> [--out <report.md>]` compares two
+banks question by question and lists the answers a build changed, added and removed, with both builds named.
+Order inside a list (a boss list, say) is not a change. The "before" bank is generated from the older files
+(`git archive <commit> web/src/data/game-data`, then `question-bank --game-data <that folder>`). Against 70532, the
+70658 bank removed "which class has Piercing Ice" (Mage) and added Arcane Wrath (Mage), which is what the build's
+own change file (`changes/wowf-70630.json`) records; 70634 to 70658 changed none of these answers, and that
+build's change file lists no talent or map changes either.
+
+What this is for: the changed list is what to recheck in game after a patch, and the facts are what an eval of the
+written answer (in game or on the site) checks for. Scoring the answer against them is the next step, not built.
+
 ## Phase 2 (design only): a model in the loop
 
 Run the bank, or a sample of it, through the chat's own planner (`web/src/lib/chat/agent.ts`) with a fixture
@@ -110,4 +146,6 @@ without the question. That is what would feed the bank with the aliases players 
 
 `kb/test/question-bank.test.ts`: subjects from synthetic game-data files (missing files add nothing), the bank's
 templates and stable ids and round trip, wiki subjects by category with the first rule winning, resolution exact /
-search / none / n/a, and the report's totals, gap lists and markdown.
+search / none / n/a, and the report's totals, gap lists and markdown. `kb/test/answer-key.test.ts`: each template's
+facts, field and build from synthetic files, no answer for a missing field or file, and the diff's changed, added and
+removed lists with reordered facts not counted.
