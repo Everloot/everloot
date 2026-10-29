@@ -83,11 +83,12 @@ export function buildFilesIndex(files: GameDataFiles): FilesIndex {
     const level = min !== undefined && max !== undefined ? (min === max ? `level ${min}` : `levels ${min} to ${max}`) : "";
     const zone = zoneName.get(num(r?.uiMapId) ?? -1);
     const bosses = arr(encounters?.[String(id)]);
-    const bossNames = bosses.map((b) => str(rec(b)?.name)).filter(Boolean);
     const url = `${SITE}/database/instances/${segment(id, name)}`;
+    // The count, not the encounters' names: no DATA_POLICY line yet allows game-file encounter names through the API
+    // or MCP (raised with the maintainer 2026-10-29). The page lists them.
     facts.push({
       kind: "instance", name,
-      claim: `${name}: a ${kind}${level ? `, ${level}` : ""}${zone ? `, entered from ${zone}` : ""}${bosses.length ? `; the files list ${bosses.length} encounters${bossNames.length ? `: ${bossNames.join(", ")}` : ""}` : ""}.`,
+      claim: `${name}: a ${kind}${level ? `, ${level}` : ""}${zone ? `, entered from ${zone}` : ""}${bosses.length ? `; the files list ${bosses.length} encounters` : ""}.`,
       url,
     });
     bosses.forEach((b, i) => {

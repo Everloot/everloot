@@ -127,11 +127,16 @@ change file.
 report's last list, "Answers missing from the evidence", names the question and the facts it lacked. That is what
 the model is handed, so a fact missing there is one no model can answer from.
 
-The first run found four gaps in `files-evidence.ts`, all fixed in the same pull request, taking the column from
-82% to 100% of the 1,013 keyed questions (`docs/evals/question-eval-2026-10-29-answer-key.md` is the run after):
+The first run found four gaps in `files-evidence.ts`. Three are fixed in the same pull request, taking the column
+from 82% to 98% of the 1,013 keyed questions (`docs/evals/question-eval-2026-10-29-answer-key.md` is the run after);
+the fourth waits on a policy decision:
 
-- **Boss lists (4% → 100%).** An instance's fact gave the number of encounters but not their names; it names them now.
-  The names were already facts, one per boss.
+- **Boss lists (4%, open).** An instance's fact gives the number of encounters, not their names, so "which bosses
+  are in Shadowfang Keep" cannot be answered from the evidence. Naming them was tried and taken back in review: no
+  DATA_POLICY line allows game-file encounter names through the API or MCP (the policy's game-file section allows
+  the client layer and the race table there; the files evidence of #536 already names each boss in its own fact,
+  also without a line). The maintainer decides whether the files evidence gets a policy line; until then the key
+  keeps the names and the eval shows the gap.
 - **Shared talents (99% → 100%).** Evidence kept one fact per name, so a talent two classes have (Deflection,
   Flurry, Precision, …) came back with one class. It keeps one per fact now.
 - **New zones (94% → 100%).** Flight masters in Riverglades and Mount Hyjal, whose maps the zone list lacks, had no
