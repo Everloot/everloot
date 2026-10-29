@@ -151,11 +151,29 @@ fourth waits on a policy decision:
 What this is for: the changed list is what to recheck in game after a patch; the column says whether the facts reach
 the model. Whether the model's written answer then carries them (in game or on the site) is phase 2.
 
-## Phase 2 (design only): a model in the loop
+## Phase 2 (built 2026-10-29): a model in the loop
 
-Run the bank, or a sample of it, through the chat's own planner (`web/src/lib/chat/agent.ts`) with a fixture
-provider or a cheap model, and score whether the answer cites the evidence and names the page. This is what the
-"cite" column would mean. It costs tokens per run, so it runs on demand, never on every push.
+`npm run kb -- question-answer-eval <bank.jsonl> --db <release> --base-url <OpenAI-compatible URL> --model <name>`
+(`kb/src/answer-eval.ts`): a sample of the questions with an answer key (every k-th, `--sample`, 200 by default),
+each sent with `answer_sources`' evidence under the in-game `/ask` rules (two sentences, plain text, "Not in the
+sources." when they do not answer), and the reply scored against the key. Correct: every fact; partial: some;
+declined: the exact refusal; wrong: none; error: no reply. A reasoning model needs room to answer after it thinks
+(`--max-tokens`, 1500 by default), so an empty reply is an error, never a wrong answer. Facts match as whole words,
+curly or straight apostrophes, a word's plural included. Any local Ollama or vLLM works (`http://localhost:11434/v1`);
+the key, if any, is read from `--key-file`. One call per question, so it runs on demand, never in CI.
+
+Player observations join the evidence when the public corpus is reachable, as they do for in-game `/ask`; the report
+says whether they did. First runs, 60 questions on local models through Ollama on the maintainer's machine, without
+player observations:
+
+| model | correct | declined | wrong | error |
+|---|---|---|---|---|
+| gemma3:4b | 57 | 1 | 2 | 0 |
+| gemma4:12b | 54 | 2 | 0 | 4 (token budget) |
+
+The misses are what to work on: the boss lists the evidence cannot name yet (the 12B model declines, the 4B invents
+an answer), a flight master's zone answered with its continent (Undercity), and a reasoning model's budget.
+Reports: `docs/evals/answer-eval-2026-10-29-gemma3-4b.md`, `-gemma4-12b.md`.
 
 ## Phase 3 (the question ledger)
 

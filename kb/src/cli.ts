@@ -19,6 +19,7 @@ import { writeClientEncounters } from "./client-encounters.js";
 import { writeClientMounts } from "./client-mounts.js";
 import { writeClientLayer } from "./client-layer.js";
 import { writeRaceTable } from "./client-races.js";
+import { evaluateWritten, formatAnswerEval, openAiCompatible, sampleKeyed } from "./answer-eval.js";
 import { diffAnswerKeys, formatAnswerDiff, gameDataAnswerKey } from "./answer-key.js";
 import { buildQuestionBank, gameDataSubjects, parseQuestionBank, serializeQuestionBank, wikiSubjects } from "./question-bank.js";
 import { evaluateBank, formatEvalReport } from "./question-eval.js";
@@ -168,6 +169,10 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
   question-diff <before.jsonl> <after.jsonl> [--out <report.md>] [--max-rows 40]
     (two banks' answers compared by question: which a new build changed, added or removed, with the build each
     came from, at most --max-rows rows per list. Generate the "before" bank from the older game-data files)
+  question-answer-eval <bank.jsonl> --db <public release> --base-url <OpenAI-compatible URL> --model <name> [--key-file <file>] [--sample 200] [--max-tokens 1500] [--game-data ../web/src/data/game-data] [--out docs/evals/answer-eval-<date>.md] [--json <path>]
+    (phase 2: a sample of questions with an answer key, each sent with answer_sources' evidence to the model under the
+    in-game /ask rules, the reply scored against the key: correct, partial, declined, wrong. One model call per
+    question, so it runs on demand. A local Ollama is --base-url http://localhost:11434/v1; a key only from a file)
   question-eval <bank.jsonl> --db <public release> [--game-data ../web/src/data/game-data] [--out docs/evals/question-eval-<date>.md] [--json <path>]
     (runs every question through get_by_name, search and answer_sources with no model, and writes the markdown report:
     what resolves, what has evidence, and the gap lists. Player observations join when EVERLOOT_PUBLIC_CORPUS_URL or
@@ -589,6 +594,31 @@ async function main(): Promise<number> {
       const out = flags.get("out");
       if (out) { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, md); } else process.stdout.write(md);
       console.log(`${diff.changed.length} changed, ${diff.added.length} added, ${diff.removed.length} removed${out ? ` -> ${out}` : ""}`);
+      return 0;
+    }
+    case "question-answer-eval": {
+      const baseUrl = flags.get("base-url")?.trim();
+      const model = flags.get("model")?.trim();
+      if (!args[0] || !baseUrl || !model) break;
+      const release = openExistingReadOnlyDb(requireExistingDbPath(flags, "question-answer-eval"));
+      const keyFile = flags.get("key-file");
+      const key = keyFile ? readFileSync(keyFile, "utf8").trim() : null;
+      const sample = sampleKeyed(parseQuestionBank(readFileSync(args[0], "utf8")), Number(flags.get("sample") || 200));
+      const files = readFilesIndex(flags.get("game-data") || "../web/src/data/game-data");
+      // Player observations join as they do for question-eval and in-game /ask (the public corpus, when reachable).
+      const corpus = await readCorpusRecords(["item_seen", "item_fact", "loot", "npc_sighting", "vendor", "quest", "object_sighting", "instance_entrance", "encounter"]);
+      const ranAt = new Date().toISOString();
+      const report = await evaluateWritten(release, sample, openAiCompatible({ baseUrl, model, key, maxTokens: Number(flags.get("max-tokens") || 1500) }), {
+        model, ranAt, files: files.facts.length ? files : null,
+        facts: corpus ? answerSourcesFactsFromRecords(corpus.records) : null, dataAsOf: corpus?.dataAsOf ?? null,
+      });
+      const out = flags.get("out") || `../docs/evals/answer-eval-${ranAt.slice(0, 10)}.md`;
+      mkdirSync(dirname(out), { recursive: true });
+      writeFileSync(out, formatAnswerEval(report));
+      const json = flags.get("json");
+      if (json) { mkdirSync(dirname(json), { recursive: true }); writeFileSync(json, `${JSON.stringify(report, null, 1)}\n`); }
+      const t = report.totals;
+      console.log(`${report.sampled} questions with ${model}: ${t.correct} correct, ${t.partial} partial, ${t.declined} declined, ${t.wrong} wrong, ${t.error} errors -> ${out}`);
       return 0;
     }
     case "question-eval": {
