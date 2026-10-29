@@ -117,6 +117,11 @@ test("carries: a fact as a whole word or number, any case", () => {
   expect(carries("needs riding skill 175.", "75")).toBe(false);
   expect(carries("Bosses: Rhahk'Zor, Mr. Smite", "mr. smite")).toBe(true);
   expect(carries("Rhahk'Zorn", "Rhahk'Zor")).toBe(false);
+  // A model's curly apostrophe is the files' straight one; a plural carries its word, never a number's.
+  expect(carries("Viscidus waits in Ahn’Qiraj Temple.", "Ahn'Qiraj Temple")).toBe(true);
+  expect(carries("a talent for Balance Druids", "Druid")).toBe(true);
+  expect(carries("riding skill 75s", "75")).toBe(false);
+  expect(carries("Druidic lore", "Druid")).toBe(false);
 });
 
 test("evaluateBank: a question with an answer key is scored on whether its evidence carries every fact", async () => {

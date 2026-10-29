@@ -64,10 +64,18 @@ export async function resolve(db: ReleaseSource, q: Question): Promise<Resolutio
   return (hits.length ? hits : await searchSomeWords(db, q.text, 5)).some((h) => sameName(h.name, q.subject.name)) ? "search" : "none";
 }
 
-/** A fact as a whole word or number in the text, any case: "75" is not found in "175". */
+/** Typographic apostrophes and quotes as the plain ones the game files use: a model writes "Zul’Farrak". */
+const plainQuotes = (s: string) => s.replace(/[‘’ʼ]/g, "'").replace(/[“”]/g, '"');
+
+/**
+ * A fact as a whole word or number in the text, any case, curly or straight apostrophes: "75" is not found in "175".
+ * A word fact may take a plural ending ("Druids" carries "Druid"); a number may not.
+ */
 export function carries(text: string, fact: string): boolean {
-  const escaped = fact.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, "iu").test(text);
+  const plain = plainQuotes(fact);
+  const escaped = plain.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const plural = /\p{L}$/u.test(plain) ? "(?:e?s)?" : "";
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}${plural}(?![\\p{L}\\p{N}])`, "iu").test(plainQuotes(text));
 }
 
 export async function evaluateQuestion(db: ReleaseSource, q: Question, facts: AnswerSourcesFacts | null, dataAsOf: string | null, files: FilesIndex | null = null): Promise<QuestionResult> {
