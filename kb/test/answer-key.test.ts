@@ -82,6 +82,11 @@ test("diffAnswerKeys: a new build's changed, added and removed answers, by quest
   expect(md).toContain("1 changed, 0 added, 0 removed.");
   expect(md).toContain("| what riding skill does Synthetic Horse need | 75 | 150 |");
   expect(md).toContain("## Added (0)\n\nNone.");
+  // A cap keeps each list short and says how many it left out.
+  const capped = formatAnswerDiff(diffAnswerKeys(before, bankOf(gameDataDir({ version: "1.0.0.3", ridingSkill: 150, bosses: ["Synthetic Warden"] }))), { maxRows: 1 });
+  expect(capped).toContain("## Changed (2)");
+  expect(capped.match(/^\| (?!question)/gm)).toHaveLength(2);
+  expect(capped).toContain("…and 1 more (run `question-diff` without --max-rows for all).");
   // A backslash is escaped before the pipe, so neither can end a cell early.
   const odd = formatAnswerDiff({ builds: { before: [], after: [] }, changed: [{ id: "x", text: "a|b", before: ["c\\"], after: ["d\\|e"] }], added: [], removed: [] });
   expect(odd).toContain("| a\\|b | c\\\\ | d\\\\\\|e |");
