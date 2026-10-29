@@ -36,9 +36,9 @@ test("buildFilesIndex: one fact per thing, ids and facts only, the build stamped
   expect(index.extractedAt).toBe("2026-10-27T08:00:00.000Z");
   const byKind = (kind: string) => index.facts.filter((f) => f.kind === kind);
   expect(byKind("zone")).toEqual([{ kind: "zone", name: "Synthetic Forest", claim: "Synthetic Forest: a zone of Synthetic Kingdoms, in the game files.", url: "https://everloot.app/database/zones/1429-synthetic-forest" }]);
-  // Two entrance pins of one instance give one fact; the level, the zone and the encounter count are in it.
+  // Two entrance pins of one instance give one fact; the level, the zone and the encounters in order are in it.
   expect(byKind("instance").map((f) => f.claim)).toEqual([
-    "Synthetic Stockade: a dungeon, levels 17 to 24, entered from Synthetic Forest; the files list 2 encounters.",
+    "Synthetic Stockade: a dungeon, levels 17 to 24, entered from Synthetic Forest; the files list 2 encounters: Synthetic Warden, Synthetic Stockade.",
     "Molten Core: a raid, level 60.",
   ]);
   expect(byKind("instance")[0]!.url).toBe("https://everloot.app/database/instances/34-synthetic-stockade");
