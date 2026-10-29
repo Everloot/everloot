@@ -3,8 +3,32 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { resolveItem } from "../../../web/src/lib/chat/items";
 import { answerMarketQuestion, type MarketDeps } from "../../../web/src/lib/chat/market-question";
 
-/** What the game knows about a question beyond its words: today, the realm the player was on. */
-export interface AskContext { realm?: string }
+/** The player's question just before this one, and what they were told, when this one reads as its follow-up. */
+export interface Earlier { question: string; answer: string }
+
+/** What the game knows about a question beyond its words: the realm the player was on, and the question it follows. */
+export interface AskContext { realm?: string; earlier?: Earlier }
+
+const FOLLOW_ON = /^(?:and|also|what about|how about)\b/i;
+const PRONOUN = /\b(?:he|she|it|they|him|her|them|his|its|their)\b/i;
+
+/**
+ * A question that may lean on the one before it: it opens with "and", "also", "what about" or "how about", or it says
+ * "he" or "it" and capitalises no name. Players type names in lowercase too, so this only makes a candidate:
+ * `sourcedFor` uses the earlier question only when this one's own evidence names nothing.
+ */
+export function readsAsFollowUp(question: string): boolean {
+  const q = question.trim();
+  if (FOLLOW_ON.test(q)) return true;
+  const names = q.split(/\s+/).slice(1).some((w) => /^[A-Z]/.test(w) && w !== "I");
+  return PRONOUN.test(q) && !names;
+}
+
+/** What the lookup reads: the question, and for a follow-up the earlier question, whose names it needs. */
+export function lookupText(question: string, context?: AskContext): string {
+  return context?.earlier ? `${question} (${context.earlier.question})` : question;
+}
+
 export interface AnswerEngine { answer(question: string, context?: AskContext): Promise<{ answer: string; source: string }> }
 
 export const MAX_ANSWER = 600;
@@ -33,6 +57,25 @@ export function sourceLine(piece: Piece): string {
   if (piece.kind === "lore") return `${piece.source.url} (${piece.licence}${asOf})`;
   const label = piece.kind === "files" && piece.source.title ? `${piece.source.title}; ` : "";
   return `${piece.url ?? piece.source.url} (${label}${piece.licence}${asOf})`;
+}
+
+/** The evidence names something the question carries: its first piece is observed, curated or a game-files fact, not only wiki pages. */
+export function namesSomething(sourced: Sourced): boolean {
+  const first = sourced.evidence[0];
+  return !!first && first.kind !== "lore" && !sourced.someWords;
+}
+
+/**
+ * The evidence for a question: its own first. A candidate follow-up whose own evidence names nothing is looked up again
+ * with the question it follows (`leaned`), so "what does he drop" after "where is Edwin VanCleef" finds VanCleef,
+ * while "is there a mailbox in orgrimmar" finds Orgrimmar itself and keeps to it.
+ */
+export async function sourcedFor(
+  question: string, context: AskContext | undefined, sources: (question: string) => Promise<Sourced>,
+): Promise<{ sourced: Sourced; leaned: boolean }> {
+  const alone = await sources(question);
+  if (!context?.earlier || namesSomething(alone)) return { sourced: alone, leaned: false };
+  return { sourced: await sources(lookupText(question, context)), leaned: true };
 }
 
 /** Every piece's source line, once each: what a model's answer, written from all of them, has to credit. */
@@ -138,5 +181,5 @@ export function lazyEngine(build: () => AnswerEngine): AnswerEngine {
 
 /** Answers with no model: the first piece of evidence and its page. With providers configured, the CLI uses llmEngine instead. */
 export function mcpEngine(options: McpOptions): AnswerEngine {
-  return { answer: async (question) => answerFromEvidence(await mcpAnswerSources(options, question, 3)) };
+  return { answer: async (question, context) => answerFromEvidence((await sourcedFor(question, context, (q) => mcpAnswerSources(options, q, 3))).sourced) };
 }

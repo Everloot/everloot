@@ -58,6 +58,10 @@ curated, the current game files' facts, then the 2023 wiki) and writes them into
 under `Interface/AddOns`; they show after the next `/reload`. With no AI provider the answer is the first piece of
 evidence and its page; with one, the provider phrases it from the evidence alone.
 
+A follow-up such as `/ask what does he drop` right after `/ask where is Edwin VanCleef` is looked up with the
+question it follows (asked within 30 minutes, and naming nothing itself), and a provider is told that question and
+its answer. The questions are kept only in the companion's own `answers.json`; the slot addon carries answers.
+
 Explicit item-price questions use `market_value` before search or a model, so they need no AI provider.
 For example, `/ask price 2589 on Nightslayer` asks for that realm's recorded all-house values.
 New addon questions carry the player's realm when none is named; older questions must name one.

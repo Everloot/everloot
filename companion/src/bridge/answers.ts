@@ -2,7 +2,11 @@ import { mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { adler32, luaString } from "./lua";
 
-export interface Answer { id: string; answer: string; source: string; answeredAt: string }
+/**
+ * `question` and `askedAt` stay in the companion's own store, on the player's computer, so a follow-up can lean on
+ * the question before it; the slot addon is written without them.
+ */
+export interface Answer { id: string; answer: string; source: string; answeredAt: string; question?: string; askedAt?: string }
 
 export const ANSWERS_ADDON = "EverlootAnswers";
 // Same interface number as addon/Everloot.toc, so the client loads both without "out of date".
