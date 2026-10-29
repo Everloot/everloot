@@ -1,8 +1,8 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { readAsks } from "./asks";
+import { readAsks, type Ask } from "./asks";
 import { writeAnswersAddon, type Answer } from "./answers";
-import { MAX_ANSWER, type AnswerEngine } from "./engine";
+import { lookupText, MAX_ANSWER, readsAsFollowUp, type AnswerEngine, type Earlier } from "./engine";
 import { readStateFile } from "../state-file";
 
 /** Answers already given, kept in the companion's data folder (the newest 20 go back into the game). */
@@ -23,6 +23,21 @@ export function createAnswerStore(path: string, onRecovery: (message: string) =>
 
 export type AnswerStore = ReturnType<typeof createAnswerStore>;
 
+/** How long after a question the next one can still lean on it. */
+export const FOLLOW_UP_WINDOW_MS = 30 * 60_000;
+
+/**
+ * The question this ask follows, when it reads as a follow-up: the newest one answered before it, asked within the
+ * window. The game's own times are compared, so a question answered late still counts.
+ */
+export function earlierFor(ask: Ask, answered: readonly Answer[]): Earlier | undefined {
+  if (!readsAsFollowUp(ask.question)) return undefined;
+  const last = [...answered].reverse().find((a) => a.id !== ask.id && typeof a.question === "string" && typeof a.askedAt === "string");
+  if (!last) return undefined;
+  const gap = Date.parse(ask.askedAt) - Date.parse(last.askedAt!);
+  return gap >= 0 && gap <= FOLLOW_UP_WINDOW_MS ? { question: last.question!, answer: last.answer } : undefined;
+}
+
 /** Answer every new /ask in one SavedVariables file and rewrite the slot addon. Failures are shown, and retried next time. */
 export async function answerPending(options: {
   svFile: string; addonsDir: string; engine: AnswerEngine; store: AnswerStore; now?: () => Date;
@@ -40,8 +55,12 @@ export async function answerPending(options: {
   let answered = 0;
   for (const ask of pending) {
     try {
-      const { answer, source } = await options.engine.answer(ask.question, ask.realm ? { realm: ask.realm } : undefined);
-      options.store.add({ id: ask.id, answer: answer.slice(0, MAX_ANSWER), source, answeredAt: now().toISOString() });
+      const earlier = earlierFor(ask, options.store.list());
+      const context = { ...(ask.realm ? { realm: ask.realm } : {}), ...(earlier ? { earlier } : {}) };
+      const { answer, source } = await options.engine.answer(ask.question, Object.keys(context).length ? context : undefined);
+      // A follow-up is kept with the question it leaned on, so the next follow-up still carries the first one's names.
+      const kept = earlier ? lookupText(ask.question, { earlier }) : ask.question;
+      options.store.add({ id: ask.id, answer: answer.slice(0, MAX_ANSWER), source, answeredAt: now().toISOString(), question: kept, askedAt: ask.askedAt });
       answered++;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
