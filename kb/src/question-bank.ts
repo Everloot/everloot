@@ -29,6 +29,8 @@ export interface Question {
   expects: { resolve: boolean; evidence: boolean };
   /** The facts a correct answer carries, when the game-data files hold them (`answer-key.ts`). */
   answer?: Answer;
+  /** Set for a question asked in Spanish; absent means English. The names stay as the English client has them. */
+  lang?: "es";
 }
 
 interface Template { id: string; kinds: readonly SubjectKind[]; ask: (name: string) => string; expects?: Partial<Question["expects"]> }
@@ -58,6 +60,34 @@ export const TEMPLATES: readonly Template[] = [
   { id: "alias", kinds: ["alias"], ask: (n) => n },
   { id: "topic", kinds: ["topic"], ask: (n) => n, expects: { resolve: false, evidence: true } },
 ];
+
+/**
+ * The same shapes asked in Spanish, the way a player on the English client types them: the names stay in
+ * English, as the game shows them, and the gamer words players use as they are ("bosses", "dropea", "quest").
+ * Puerto Rican usage first ("dónde queda"). Same template ids, so the answer key applies unchanged.
+ */
+export const TEMPLATES_ES: Readonly<Record<string, (name: string) => string>> = {
+  "where-is": (n) => `dónde queda ${n}`,
+  entrance: (n) => `dónde está la entrada de ${n}`,
+  level: (n) => `de qué nivel es ${n}`,
+  bosses: (n) => `qué bosses hay en ${n}`,
+  drops: (n) => `qué dropea ${n}`,
+  "drops-from": (n) => `dónde dropea ${n}`,
+  sells: (n) => `quién vende ${n}`,
+  worth: (n) => `cuánto vale ${n}`,
+  "what-is": (n) => `qué es ${n}`,
+  "how-get": (n) => `cómo consigo ${n}`,
+  "riding-skill": (n) => `cuánto riding necesito para ${n}`,
+  criteria: (n) => `qué necesito para el achievement ${n}`,
+  "quest-giver": (n) => `quién da la quest ${n}`,
+  "quest-how": (n) => `cómo completo ${n}`,
+  "quest-reward": (n) => `qué recompensa da ${n}`,
+  "profession-level": (n) => `cómo subo ${n}`,
+  "profession-makes": (n) => `qué puedo hacer con ${n}`,
+  "talent-class": (n) => `qué clase tiene ${n}`,
+  "category-best": (n) => `cuáles son los mejores ${n}`,
+  "flight-to": (n) => `cómo vuelo a ${n}`,
+};
 
 /**
  * How players shorten instance names. Each alias expects to resolve to the instance named beside it, by the
@@ -128,6 +158,26 @@ export const TOPICS: readonly { text: string; topic: string }[] = [
   { text: "who is Thrall", topic: "lore" },
   { text: "what happened to Onyxia", topic: "lore" },
   { text: "why is Stratholme in ruins", topic: "lore" },
+];
+
+/** A Spanish long tail, a sample of the same topics as a player would ask them. */
+export const TOPICS_ES: readonly { text: string; topic: string }[] = [
+  { text: "qué es WoW Forever", topic: "forever" },
+  { text: "cuándo sale Forever", topic: "forever" },
+  { text: "cuál es la mejor clase para empezar", topic: "class" },
+  { text: "cómo hago oro en level 60", topic: "gold" },
+  { text: "cuál es la ruta más rápida para subir de 1 a 60", topic: "leveling" },
+  { text: "qué profesiones dan más oro", topic: "profession" },
+  { text: "dónde aprendo riding", topic: "mount" },
+  { text: "cuánto cuesta un mount", topic: "mount" },
+  { text: "cómo llego a Stranglethorn Vale", topic: "travel" },
+  { text: "qué addons debo usar", topic: "addons" },
+  { text: "qué es Everloot", topic: "everloot" },
+  { text: "Everloot lee los datos de mi personaje", topic: "everloot" },
+  { text: "cuánto cuesta Black Lotus", topic: "market" },
+  { text: "qué buffs trae un paladin al raid", topic: "raid" },
+  { text: "necesito llave para Scholomance", topic: "instance" },
+  { text: "quién es Thrall", topic: "lore" },
 ];
 
 /** The committed game-data files this reads; each is optional, so the bank grows as files land. */
@@ -209,23 +259,34 @@ export function wikiSubjects(db: DB, perKind: number): Subject[] {
   return out;
 }
 
-const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+// Accents fold to their letter first, so "qué es" is "que-es", not "qu-es".
+const slug = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
-/** The bank: every template applied to every subject of its kinds, then the aliases and the long tail. */
-export function buildQuestionBank(subjects: readonly Subject[], key?: AnswerKey): Question[] {
+/**
+ * The bank: every template applied to every subject of its kinds, then the aliases and the long tail. With
+ * `spanish`, each also asked in Spanish after the English ones, ids prefixed `es:`; off by default, so the
+ * build-watch diff lists each changed answer once.
+ */
+export function buildQuestionBank(subjects: readonly Subject[], key?: AnswerKey, options: { spanish?: boolean } = {}): Question[] {
   const out: Question[] = [];
   const seen = new Set<string>();
   const add = (q: Question) => { if (!seen.has(q.id)) { seen.add(q.id); out.push(q); } };
-  for (const t of TEMPLATES) {
-    if (t.kinds.includes("alias") || t.kinds.includes("topic")) continue;
-    for (const s of subjects) {
-      if (!t.kinds.includes(s.kind)) continue;
-      const answer = key?.(t.id, s);
-      add({ id: `${t.id}:${s.kind}:${slug(s.name)}`, text: t.ask(s.name), template: t.id, subject: s, expects: { resolve: true, evidence: true, ...t.expects }, ...(answer ? { answer } : {}) });
+  const languages = options.spanish ? (["en", "es"] as const) : (["en"] as const);
+  for (const lang of languages) {
+    const es = lang === "es";
+    for (const t of TEMPLATES) {
+      if (t.kinds.includes("alias") || t.kinds.includes("topic")) continue;
+      const ask = es ? TEMPLATES_ES[t.id] : t.ask;
+      if (!ask) continue;
+      for (const s of subjects) {
+        if (!t.kinds.includes(s.kind)) continue;
+        const answer = key?.(t.id, s);
+        add({ id: `${es ? "es:" : ""}${t.id}:${s.kind}:${slug(s.name)}`, text: ask(s.name), template: t.id, subject: s, expects: { resolve: true, evidence: true, ...t.expects }, ...(answer ? { answer } : {}), ...(es ? { lang } : {}) });
+      }
     }
+    if (!es) for (const a of INSTANCE_ALIASES) add({ id: `alias:alias:${slug(a.alias)}`, text: a.alias, template: "alias", subject: { kind: "alias", name: a.name }, expects: { resolve: true, evidence: true } });
+    for (const t of es ? TOPICS_ES : TOPICS) add({ id: `${es ? "es:" : ""}topic:topic:${slug(t.text)}`, text: t.text, template: "topic", subject: { kind: "topic", name: t.topic }, expects: { resolve: false, evidence: true }, ...(es ? { lang } : {}) });
   }
-  for (const a of INSTANCE_ALIASES) add({ id: `alias:alias:${slug(a.alias)}`, text: a.alias, template: "alias", subject: { kind: "alias", name: a.name }, expects: { resolve: true, evidence: true } });
-  for (const t of TOPICS) add({ id: `topic:topic:${slug(t.text)}`, text: t.text, template: "topic", subject: { kind: "topic", name: t.topic }, expects: { resolve: false, evidence: true } });
   return out;
 }
 

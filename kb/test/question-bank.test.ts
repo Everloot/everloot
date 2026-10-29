@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { expect, test } from "vitest";
 import { openDb } from "../src/db.js";
 import { replaceSourceRows, type EntityInput } from "../src/entities.js";
-import { buildQuestionBank, gameDataSubjects, INSTANCE_ALIASES, parseQuestionBank, serializeQuestionBank, TEMPLATES, TOPICS, wikiSubjects } from "../src/question-bank.js";
+import { buildQuestionBank, gameDataSubjects, INSTANCE_ALIASES, parseQuestionBank, serializeQuestionBank, TEMPLATES, TEMPLATES_ES, TOPICS, TOPICS_ES, wikiSubjects, type Subject } from "../src/question-bank.js";
 import type { AnswerKey } from "../src/answer-key.js";
 import { carries, evaluateBank, formatEvalReport, resolve } from "../src/question-eval.js";
 
@@ -52,6 +52,23 @@ test("buildQuestionBank: every template of a subject's kind, stable ids, then th
   expect(parseQuestionBank(serializeQuestionBank(bank))).toEqual(bank);
   // The same input gives the same bank, in the same order.
   expect(buildQuestionBank([{ kind: "mount", name: "Synthetic Horse", id: "6" }, { kind: "instance", name: "Synthetic Stockade", id: 34 }]).map((q) => q.id).sort()).toEqual(bank.map((q) => q.id).sort());
+});
+
+test("buildQuestionBank with spanish: each template and topic again in Spanish, the names in English, the answer key the same", () => {
+  const subjects: Subject[] = [{ kind: "instance", name: "Synthetic Stockade", id: 34 }];
+  const key: AnswerKey = (template) => (template === "level" ? { facts: ["20"], from: "synthetic", build: "1" } : undefined);
+  expect(buildQuestionBank(subjects, key).some((q) => q.lang)).toBe(false);
+  const bank = buildQuestionBank(subjects, key, { spanish: true });
+  const es = bank.filter((q) => q.lang === "es");
+  expect(es.filter((q) => q.template !== "topic").map((q) => q.template)).toEqual(TEMPLATES.filter((t) => t.kinds.includes("instance")).map((t) => t.id));
+  expect(es.find((q) => q.template === "where-is")).toMatchObject({ id: "es:where-is:instance:synthetic-stockade", text: "dónde queda Synthetic Stockade" });
+  expect(es.find((q) => q.template === "level")?.answer).toEqual(bank.find((q) => q.id === "level:instance:synthetic-stockade")?.answer);
+  expect(es.filter((q) => q.template === "topic")).toHaveLength(TOPICS_ES.length);
+  expect(es.find((q) => q.text === "qué es Everloot")?.id).toBe("es:topic:topic:que-es-everloot");
+  // Every template a subject can have is phrased in Spanish too; the aliases stay English only.
+  for (const t of TEMPLATES) if (t.id !== "alias" && t.id !== "topic") expect(TEMPLATES_ES[t.id], t.id).toBeDefined();
+  expect(es.some((q) => q.template === "alias")).toBe(false);
+  expect(parseQuestionBank(serializeQuestionBank(bank))).toEqual(bank);
 });
 
 const page = (extId: string, name: string, categories: string[], body = `${name} is a thing.`): EntityInput => ({
@@ -141,6 +158,17 @@ test("evaluateBank: a question with an answer key is scored on whether its evide
   expect(md).toContain("| answer in evidence |");
   expect(md).toContain("| all | 3 | 100% | 0% | 0% | 100% | 0% | 0% | 0% | 50% |");
   expect(md).toContain(`- **level** (1): "what level is Synthetic Stockade" lacks Nowhere`);
+  expect(md).not.toContain("## By language");
+});
+
+test("evaluateBank: Spanish questions get their own template rows and a by-language section", async () => {
+  const db = await seed();
+  const bank = buildQuestionBank([{ kind: "instance", name: "Synthetic Stockade", id: 34 }], undefined, { spanish: true }).filter((q) => q.template === "where-is");
+  const report = await evaluateBank(db, bank, null, { release: "test.sqlite", dataAsOf: null, ranAt: "2026-10-29T12:00:00.000Z" });
+  expect(report.byTemplate.map((r) => r.label)).toEqual(["where-is", "where-is (es)"]);
+  expect(report.byLanguage.map((r) => [r.label, r.questions])).toEqual([["en", 1], ["es", 1]]);
+  expect(report.results.find((r) => r.id.startsWith("es:"))?.resolution).toBe("exact");
+  expect(formatEvalReport(report)).toContain("## By language");
 });
 
 test("gameDataSubjects: a statistic the game keeps and a name marked [DNT] are not subjects", () => {
