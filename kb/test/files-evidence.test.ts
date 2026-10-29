@@ -23,7 +23,7 @@ const files = {
   },
   encounters: { build: { version: "1.0.0.70634" }, instances: { "34": [{ id: 1, name: "Synthetic Warden" }, { id: 2, name: "Synthetic Stockade" }] } },
   mounts: { build: { version: "1.0.0.70634" }, mounts: { "6": { name: "Synthetic Horse", spellId: 458, ridingSkill: 75 }, "7": { name: "Synthetic Wolf", spellId: 459 } } },
-  achievements: { build: { version: "1.0.0.70634" }, achievements: { "49": { title: "Storm the Chasm", points: 10, description: "secret text", criteria: [{ text: "secret criterion" }, { text: "another" }] } } },
+  achievements: { build: { version: "1.0.0.70634" }, achievements: { "49": { title: "Storm the Chasm", points: 10, description: "secret text", criteria: [{ text: "secret criterion" }, { text: "another" }] }, "50": { title: "Synthetic victories", points: 0, criteria: [{ text: "secret count" }], statistic: true } } },
   talents: {
     mage: { build: { version: "1.0.0.70634" }, className: "Mage", trees: [{ name: "Fire", nodes: [{ entries: [{ spellId: 9, name: "Synthetic Blast", maxRanks: 5 }] }] }] },
     priest: { build: { version: "1.0.0.70634" }, className: "Priest", trees: [{ name: "Holy", nodes: [{ entries: [{ spellId: 10, name: "Synthetic Blast", maxRanks: 2 }] }] }] },
@@ -54,6 +54,8 @@ test("buildFilesIndex: one fact per thing, ids and facts only, the build stamped
   // The achievement's description and criteria text never leave the page.
   const ach = byKind("achievement")[0]!;
   expect(ach.claim).toBe("Storm the Chasm: an achievement, 10 points, 2 criteria; the criteria text is on its page.");
+  // A statistic is said to be one, not an achievement to earn.
+  expect(byKind("achievement")[1]!.claim).toBe("Synthetic victories: a statistic the game keeps (a counter, not an achievement to earn); the criteria text is on its page.");
   expect(JSON.stringify(index)).not.toContain("secret");
   expect(ach.url).toBe("https://everloot.app/database/achievements/49-storm-the-chasm");
   expect(byKind("talent")).toEqual([

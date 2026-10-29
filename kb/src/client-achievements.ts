@@ -14,6 +14,9 @@ import { CLIENT_LABEL } from "./edges.js";
 
 export const ACHIEVEMENTS_SCHEMA = "everloot.client-achievements/1";
 
+/** `Achievement.Flags` bit 1: the row is a counter the game keeps (a statistic), not an achievement to earn. */
+const ACHIEVEMENT_COUNTER = 1;
+
 const CriterionSchema = z.object({
   text: z.string(),
   /** The amount the tree asks for; where 1, the field is absent. */
@@ -26,6 +29,8 @@ const ClientAchievement = z.object({
   /** The achievement's own text; absent when the files give none. */
   description: z.string().optional(),
   criteria: z.array(CriterionSchema),
+  /** A statistic the game keeps (a counter, `Achievement.Flags` bit 1), not an achievement to earn; absent otherwise. */
+  statistic: z.literal(true).optional(),
 });
 
 export const ClientAchievements = z.object({
@@ -106,6 +111,7 @@ export function buildClientAchievements(snapshotPath: string): ClientAchievement
         points: Number(row.Points ?? 0),
         criteria,
         ...(description ? { description } : {}),
+        ...(Number(row.Flags ?? 0) & ACHIEVEMENT_COUNTER ? { statistic: true } : {}),
       });
     }
   }

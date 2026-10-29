@@ -137,3 +137,16 @@ test("evaluateBank: a question with an answer key is scored on whether its evide
   expect(md).toContain("| all | 3 | 100% | 0% | 0% | 100% | 0% | 0% | 0% | 50% |");
   expect(md).toContain(`- **level** (1): "what level is Synthetic Stockade" lacks Nowhere`);
 });
+
+test("gameDataSubjects: a statistic the game keeps and a name marked [DNT] are not subjects", () => {
+  const dir = mkdtempSync(join(tmpdir(), "kb-bank-stat-"));
+  writeFileSync(join(dir, "client-achievements.json"), JSON.stringify({ achievements: {
+    "49": { title: "Synthetic Feat", points: 10, criteria: [] },
+    "50": { title: "Synthetic victories", points: 0, criteria: [], statistic: true },
+  } }));
+  writeFileSync(join(dir, "client-layer.json"), JSON.stringify({ categories: { skills: [{ id: 164, name: "Synthetic Smithing" }, { id: 999, name: "Test Profession [DNT]" }], classes: [] } }));
+  expect(gameDataSubjects(dir)).toEqual([
+    { kind: "achievement", name: "Synthetic Feat", id: "49" },
+    { kind: "profession", name: "Synthetic Smithing", id: 164 },
+  ]);
+});

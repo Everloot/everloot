@@ -81,7 +81,7 @@ export const NEEDED_FIELDS: Partial<Record<keyof typeof CLIENT_TABLES, readonly 
   ZoneLight: ["MapID", "LightID"],
   ZoneLightPoint: ["ZoneLightID", "Pos"],
   AreaPOI: ["Name_lang", "Pos", "ContinentID", "AreaID"],
-  Achievement: ["Title_lang", "Category", "Points", "IconFileID"],
+  Achievement: ["Title_lang", "Category", "Points", "IconFileID", "Flags"],
   Achievement_Category: ["Name_lang", "Parent"],
   CurrencyCategory: ["Name_lang"],
   TaxiNodes: ["Name_lang", "Pos", "ContinentID"],
