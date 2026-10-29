@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "vitest";
 import { openDb, type DB } from "../src/db.js";
 import { buildFilesIndex } from "../src/files-evidence.js";
-import { createMcpHttpHandler } from "../src/mcp-http-server.js";
+import { createMcpHttpHandler, toolOptionsOf } from "../src/mcp-http-server.js";
 
 const databases: DB[] = [];
 afterEach(() => { for (const db of databases.splice(0)) db.close(); });
@@ -27,4 +27,12 @@ test("the HTTP mount hands the game files' facts to answer_sources, as /api/tool
   expect(evidence[0]!.kind).toBe("files");
   expect(evidence[0]!.claim).toMatch(/^Synthetic Stockade: a dungeon, entered from Synthetic Forest; the files list 1 encounters/);
   expect(result.content[0].text).toContain("[game files, found in game files and unconfirmed] Synthetic Stockade");
+});
+
+test("toolOptionsOf: the loaders only; the mount's token, origins, limits and account tools stay out of the tool layer", () => {
+  const gameData = () => index;
+  const extraTools = () => [];
+  const picked = toolOptionsOf({ bearerToken: "secret", allowedOrigins: ["https://x"], rateLimitPerMinute: 5, maxRequestBodyBytes: 1, extraTools, gameData, recheck: [] } as never);
+  expect(picked).toEqual({ gameData, recheck: [] });
+  expect(JSON.stringify(Object.keys(picked))).not.toContain("bearer");
 });

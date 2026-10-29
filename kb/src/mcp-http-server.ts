@@ -42,9 +42,24 @@ export interface PublicMcpConfig extends ToolOptions {
   extraTools?: (req: Request, body: string) => readonly ExtraTool[] | Promise<readonly ExtraTool[]>;
 }
 
+/**
+ * Every `ToolOptions` key, and only those: `satisfies` fails the build when the knowledge server gains a loader this
+ * list lacks, and the mount's own settings (its bearer token, origins, limits) never reach the tool layer.
+ */
+const TOOL_OPTION_KEYS = {
+  corpus: true, market: true, gameData: true, completion: true, changes: true, ecosystem: true, census: true,
+  coverage: true, settledSummary: true, guilds: true, recheck: true,
+} as const satisfies Record<keyof ToolOptions, true>;
+
+/** The loaders a config carries, picked out of the mount's settings. */
+export function toolOptionsOf(config: ToolOptions): ToolOptions {
+  const picked: Record<string, unknown> = {};
+  for (const key of Object.keys(TOOL_OPTION_KEYS) as (keyof ToolOptions)[]) if (config[key] !== undefined) picked[key] = config[key];
+  return picked as ToolOptions;
+}
+
 export function createPublicMcpServer(config: { db: ReleaseSource } & ToolOptions, extraTools: readonly ExtraTool[] = []) {
-  const { db, ...options } = config;
-  const server = createKnowledgeServer(db, options, extraTools);
+  const server = createKnowledgeServer(config.db, toolOptionsOf(config), extraTools);
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined, enableJsonResponse: true,
   });
