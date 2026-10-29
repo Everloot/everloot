@@ -64,7 +64,7 @@ Resolution: the subject's name met a record exactly, or through search on the qu
 - **boss** (68): Rahuz, Archmage Arugal, Geilhast, Mekgineer Thermaplugg, Mechanical Menagerie, Festering Rotslime, Atal'ai Defenders, Dreamscythe and Weaver, Jammal'an and Ogom, Morphaz and Hazzas, High Inquisitor Whitemane, Warchief Rend Blackhand, …
 - **talent** (68): Vengeance, Ferocity, Primal Bite, Natural Instinct, Improved Shifting Power, Subtlety, Deadly Aspects, Spirit Bond, Summon Hawk, Lethal Attacks, Strider Kick, Lacerating Strikes, …
 - **item_category** (12): Consumables, Containers, Weapons, Jewelry, Reagents, Projectiles, Generic, Recipes, Quivers, Keys, Permanent, WoW Tokens
-- **flight** (8): Stormwind, Grom'gol, Theramore, Summit of Eternity, Rog'mar, Tainted Foothills, Powderfuse Port, Farholde Keep
+- **flight** (8): Stormwind, Grom'gol, Theramore, and five flight masters in held-back zones (names left out, docs/DATA_POLICY.md)
 - **instance** (2): Sunken Temple, Ahn'Qiraj Temple
 - **profession** (1): Test Profession [DNT]
 
