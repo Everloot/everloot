@@ -104,11 +104,19 @@ jobs:
           git -C .. archive HEAD web/src/data/game-data | tar -x -C "$before"
           npm run -s kb -- question-bank --files-only --game-data "$before/web/src/data/game-data" --out "$before/before.jsonl"
           npm run -s kb -- question-bank --files-only --out "$before/after.jsonl"
-          npm run -s kb -- question-diff "$before/before.jsonl" "$before/after.jsonl" --max-rows 40 --out "$before/answers.md"
+          npm run -s kb -- question-diff "$before/before.jsonl" "$before/after.jsonl" --max-rows 25 --out "$before/answers.md"
+          section="$before/section.md"
+          { echo; echo "<details><summary>Answers this build changes (question bank)</summary>"; echo
+            sed -e 's/^# /### /' -e 's/^## /#### /' "$before/answers.md"; echo; echo "</details>"; } > "$section"
           jq -r '.[] | select(.action == "create" or .action == "update") | .bodyFile' "$plan" | while read -r body; do
             [[ "$body" == data/build-watch/out/* && "$body" != *..* && -f "$body" ]] || continue
-            { echo; echo "<details><summary>Answers this build changes (question bank)</summary>"; echo
-              sed -e 's/^# /### /' -e 's/^## /#### /' "$before/answers.md"; echo; echo "</details>"; } >> "$body"
+            # GitHub refuses a body over 65,536 characters and the publish step would fail: the body stays under
+            # 64,000 bytes (a character is at least one), or gets one line in place of the list.
+            if [ $(( $(wc -c < "$body") + $(wc -c < "$section") )) -le 64000 ]; then
+              cat "$section" >> "$body"
+            else
+              printf '\n_The answers this build changes did not fit in this description: run `question-diff` locally (docs/BUILD_WATCH.md, step 7)._\n' >> "$body"
+            fi
           done
       # The index is only a download cache, so it is kept even when the run fails.
       - name: Save the CDN index
