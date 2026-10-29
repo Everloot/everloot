@@ -496,7 +496,7 @@ layers above: which races can be which class, on which faction, and each race's 
   pairs with Blizzard's race and class article and names any pair the two disagree on; neither is preferred.
 - Skyborne, the new race, is announced by Blizzard in its own posts, so its traits are not marked as spoilers.
 
-**Game-file facts in answers.** *Proposed 2026-10-29.* `answer_sources` (the site's chat, the MCP server and
+**Game-file facts in answers.** *Proposed and decided 2026-10-29 by Carlos ("approve").* `answer_sources` (the site's chat, the MCP server and
 in-game `/ask`) answers from the committed game-data files when a question names an instance, boss, zone, flight
 master, mount, achievement or talent the 2023 wiki and player data do not cover. The rules:
 
