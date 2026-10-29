@@ -146,7 +146,9 @@ export function gameDataSubjects(gameDataDir: string): Subject[] {
   const map = asRecord(readJson(join(gameDataDir, "map.json")));
   for (const z of asArray(map?.zones)) { const name = nameOf(z); if (name) push({ kind: "zone", name, id: asRecord(z)?.uiMapId as number }); }
   for (const e of asArray(map?.entrances)) { const name = nameOf(e); if (name) push({ kind: "instance", name, id: asRecord(e)?.mapId as number }); }
-  for (const f of asArray(map?.flightNodes)) { const name = nameOf(f); if (name) push({ kind: "flight", name: name.split(",")[0]!.trim(), id: asRecord(f)?.id as number }); }
+  // A flight master in a zone the map holds back (unreleased) is not a question to ask yet.
+  const heldBack = new Set(asArray(map?.heldBackZones).map((z) => asRecord(z)?.uiMapId));
+  for (const f of asArray(map?.flightNodes)) { const name = nameOf(f); if (name && !heldBack.has(asRecord(f)?.uiMapId)) push({ kind: "flight", name: name.split(",")[0]!.trim(), id: asRecord(f)?.id as number }); }
   const encounters = asRecord(asRecord(readJson(join(gameDataDir, "client-encounters.json")))?.instances);
   for (const [mapId, list] of Object.entries(encounters ?? {})) for (const b of asArray(list)) { const name = nameOf(b); if (name) push({ kind: "boss", name, id: `${mapId}:${asRecord(b)?.id}` }); }
   const mounts = asRecord(asRecord(readJson(join(gameDataDir, "client-mounts.json")))?.mounts);

@@ -30,8 +30,8 @@ export function gameDataAnswerKey(gameDataDir: string): AnswerKey {
   const zoneName = new Map(asArray(map?.zones).map((z) => [asRecord(z)?.uiMapId, text(asRecord(z)?.name)]));
   const entrances = new Map(asArray(map?.entrances).map((e) => [asRecord(e)?.mapId, asRecord(e)!]));
   const flights = new Map(asArray(map?.flightNodes).map((f) => [asRecord(f)?.id, asRecord(f)!]));
-  // A flight node's own name ends in its zone ("Lakeshire, Redridge"); the map's zone list wins when it has the node's map.
-  const flightZone = (f: Record<string, unknown>) => zoneName.get(f.uiMapId) ?? text(String(f.name ?? "").split(",").slice(1).join(","));
+  // Only the released zone list names a node's zone: a node on a map it lacks is in a held-back zone (DATA_POLICY).
+  const flightZone = (f: Record<string, unknown>) => zoneName.get(f.uiMapId);
 
   const encountersFile = readJson(join(gameDataDir, "client-encounters.json"));
   const encounters = asRecord(asRecord(encountersFile)?.instances) ?? {};
@@ -120,8 +120,8 @@ export function diffAnswerKeys(before: readonly Question[], after: readonly Ques
   return diff;
 }
 
-/** Text in a markdown table cell: a backslash first, then the pipe that would end the cell. */
-const cell = (s: string) => s.replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
+/** Text in a markdown table cell: a backslash first, then the pipe that would end the cell, and a line break as a space. */
+const cell = (s: string) => s.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\s+/g, " ");
 const facts = (list: string[]) => (list.length ? list.map(cell).join(", ") : "–");
 
 export function formatAnswerDiff(diff: AnswerDiff): string {

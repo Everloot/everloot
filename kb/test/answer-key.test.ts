@@ -15,7 +15,8 @@ function gameDataDir(o: { version?: string; ridingSkill?: number; bosses?: strin
     source: build(version),
     zones: [{ uiMapId: 1, name: "Synthetic Forest" }],
     entrances: [{ mapId: 34, name: "Synthetic Stockade", uiMapId: 1, minLevel: 20, maxLevel: 24 }, { mapId: 35, name: "Synthetic Vault", uiMapId: 9 }],
-    flightNodes: [{ id: 2, name: "Synthetic Keep, Synthetic Forest", uiMapId: 1 }, { id: 3, name: "Synthetic Port, Synthetic Shore", uiMapId: 77 }],
+    heldBackZones: [{ uiMapId: 77, name: "Synthetic Shore" }],
+    flightNodes: [{ id: 2, name: "Synthetic Keep, Synthetic Forest", uiMapId: 1 }, { id: 3, name: "Synthetic Port, Synthetic Shore", uiMapId: 77 }, { id: 4, name: "Synthetic Camp, Synthetic Wilds", uiMapId: 88 }],
   }));
   writeFileSync(join(dir, "client-encounters.json"), JSON.stringify({ build: build(version), instances: { "34": (o.bosses ?? ["Synthetic Warden", "Synthetic Jailer"]).map((name, i) => ({ id: i + 1, name })) } }));
   writeFileSync(join(dir, "client-mounts.json"), JSON.stringify({ build: build(version), mounts: { "6": { name: "Synthetic Horse", spellId: 458, ridingSkill: o.ridingSkill ?? 75 }, "7": { name: "Synthetic Goat", spellId: 459 } } }));
@@ -37,8 +38,10 @@ test("gameDataAnswerKey: each template the files can answer gets its facts, the 
   expect(answer("bosses:instance:synthetic-stockade")?.facts).toEqual(["Synthetic Warden", "Synthetic Jailer"]);
   expect(answer("where-is:boss:synthetic-warden")?.facts).toEqual(["Synthetic Stockade"]);
   expect(answer("flight-to:flight:synthetic-keep")?.facts).toEqual(["Synthetic Forest"]);
-  // A node whose map is not in the zone list falls back to the zone its own name carries.
-  expect(answer("where-is:flight:synthetic-port")?.facts).toEqual(["Synthetic Shore"]);
+  // A node in a held-back zone is not a question at all; one whose map the zone list lacks has no key, never a guessed zone.
+  expect(bank.some((q) => q.subject.name === "Synthetic Port")).toBe(false);
+  expect(bank.find((q) => q.id === "where-is:flight:synthetic-camp")).toBeDefined();
+  expect(answer("where-is:flight:synthetic-camp")).toBeUndefined();
   // A talent two classes share names both.
   expect(answer("talent-class:talent:synthetic-blast")).toEqual({ facts: ["Mage", "Priest"], from: "talents/*.json className", build: "1.0.0.1" });
   // Criteria text stays on the achievement's page, so no question is keyed to it.

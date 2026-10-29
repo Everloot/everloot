@@ -96,11 +96,12 @@ export function buildFilesIndex(files: GameDataFiles): FilesIndex {
       if (bossName) facts.push({ kind: "boss", name: bossName, claim: `${bossName}: encounter ${i + 1} of ${bosses.length} in ${name}, in the game files.`, url });
     });
   }
+  // A node in a zone the map holds back (unreleased, DATA_POLICY "held-back zones") is left out altogether, name and zone.
+  const heldBack = new Set(arr(map?.heldBackZones).map((z) => num(rec(z)?.uiMapId)));
   for (const f of arr(map?.flightNodes)) {
-    const r = rec(f); const [name = "", ...rest] = str(r?.name).split(",").map((s) => s.trim());
-    if (!name) continue;
-    // A node on a map the zone list lacks (Forever's new zones) still names its zone after the comma.
-    const zone = zoneName.get(num(r?.uiMapId) ?? -1) ?? rest.join(", ");
+    const r = rec(f); const name = str(r?.name).split(",")[0]!.trim();
+    if (!name || heldBack.has(num(r?.uiMapId))) continue;
+    const zone = zoneName.get(num(r?.uiMapId) ?? -1);
     facts.push({ kind: "flight", name, claim: `${name}: a flight master${zone ? ` in ${zone}` : ""}, in the game files.`, url: `${SITE}/map` });
   }
 

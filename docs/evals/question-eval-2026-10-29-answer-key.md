@@ -7,13 +7,13 @@ Resolution: the subject's name met a record exactly, or through search on the qu
 
 | | questions | exact | by search | unresolved | with evidence | with observed | with files | with page | answer in evidence |
 |---|---|---|---|---|---|---|---|---|---|
-| all | 4434 | 65% | 1% | 35% | 100% | 0% | 75% | 97% | 98% |
+| all | 4424 | 65% | 1% | 34% | 100% | 0% | 75% | 97% | 98% |
 
 ## By template
 
 | | questions | exact | by search | unresolved | with evidence | with observed | with files | with page | answer in evidence |
 |---|---|---|---|---|---|---|---|---|---|
-| where-is | 627 | 88% | 0% | 12% | 97% | 0% | 63% | 94% | 100% |
+| where-is | 622 | 88% | 0% | 12% | 97% | 0% | 62% | 94% | 100% |
 | entrance | 85 | 98% | 0% | 2% | 100% | 0% | 42% | 100% | – |
 | level | 191 | 99% | 0% | 1% | 100% | 0% | 47% | 99% | 100% |
 | bosses | 85 | 98% | 0% | 2% | 100% | 0% | 42% | 94% | 4% |
@@ -32,7 +32,7 @@ Resolution: the subject's name met a record exactly, or through search on the qu
 | profession-makes | 13 | 92% | 0% | 8% | 100% | 0% | 0% | 100% | – |
 | talent-class | 450 | 85% | 0% | 15% | 100% | 0% | 100% | 100% | 100% |
 | category-best | 17 | 29% | 0% | 71% | 100% | 0% | 0% | 100% | – |
-| flight-to | 64 | 88% | 0% | 13% | 100% | 0% | 100% | 100% | 100% |
+| flight-to | 59 | 95% | 0% | 5% | 100% | 0% | 100% | 100% | 100% |
 | alias | 20 | 0% | 100% | 0% | 100% | 0% | 90% | 100% | – |
 | topic | 40 | – | – | – | 98% | 0% | 18% | 98% | – |
 
@@ -42,7 +42,7 @@ Resolution: the subject's name met a record exactly, or through search on the qu
 |---|---|---|---|---|---|---|---|---|---|
 | zone | 92 | 100% | 0% | 0% | 100% | 0% | 100% | 100% | – |
 | instance | 100 | 92% | 0% | 8% | 100% | 0% | 100% | 100% | 67% |
-| flight | 128 | 88% | 0% | 13% | 100% | 0% | 100% | 100% | 100% |
+| flight | 118 | 95% | 0% | 5% | 100% | 0% | 100% | 100% | 100% |
 | boss | 624 | 78% | 0% | 22% | 97% | 0% | 76% | 92% | 100% |
 | wiki_instance | 240 | 100% | 0% | 0% | 100% | 0% | 18% | 98% | – |
 | wiki_npc | 120 | 100% | 0% | 0% | 100% | 0% | 7% | 86% | – |
@@ -64,7 +64,7 @@ Resolution: the subject's name met a record exactly, or through search on the qu
 - **boss** (68): Rahuz, Archmage Arugal, Geilhast, Mekgineer Thermaplugg, Mechanical Menagerie, Festering Rotslime, Atal'ai Defenders, Dreamscythe and Weaver, Jammal'an and Ogom, Morphaz and Hazzas, High Inquisitor Whitemane, Warchief Rend Blackhand, …
 - **talent** (68): Vengeance, Ferocity, Primal Bite, Natural Instinct, Improved Shifting Power, Subtlety, Deadly Aspects, Spirit Bond, Summon Hawk, Lethal Attacks, Strider Kick, Lacerating Strikes, …
 - **item_category** (12): Consumables, Containers, Weapons, Jewelry, Reagents, Projectiles, Generic, Recipes, Quivers, Keys, Permanent, WoW Tokens
-- **flight** (8): Stormwind, Grom'gol, Theramore, Summit of Eternity, Rog'mar, Tainted Foothills, Powderfuse Port, Farholde Keep
+- **flight** (3): Stormwind, Grom'gol, Theramore
 - **instance** (2): Sunken Temple, Ahn'Qiraj Temple
 - **profession** (1): Test Profession [DNT]
 

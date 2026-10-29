@@ -96,8 +96,8 @@ again from the game-data files each time the bank is generated (`kb/src/answer-k
 so nothing goes stale.
 
 Each question the files can answer carries `answer: { facts, from, build }`: the facts a correct answer has to
-contain, the file and field they came from, and the game build of that file. On build 1.60.1.70685, 1,013 of the
-4,434 questions carry one:
+contain, the file and field they came from, and the game build of that file. On build 1.60.1.70685, 1,003 of the
+4,424 questions carry one:
 
 | template | subject | facts from |
 |---|---|---|
@@ -106,7 +106,7 @@ contain, the file and field they came from, and the game build of that file. On 
 | where-is | instance | `map.json` entrance map, then its zone name |
 | bosses | instance | `client-encounters.json` names for the instance's map |
 | where-is | boss | the instance whose map lists the boss |
-| where-is, flight-to | flight | the node's zone (the zone list, else the zone in the node's own name) |
+| where-is, flight-to | flight | the node's zone from the released zone list; a node in a held-back zone is no question at all |
 | talent-class | talent | `talents/*.json` className, every class that has the name |
 
 A missing file or field gives no answer, never a guess. Achievement criteria have none on purpose: their text stays
@@ -128,8 +128,8 @@ report's last list, "Answers missing from the evidence", names the question and 
 the model is handed, so a fact missing there is one no model can answer from.
 
 The first run found four gaps in `files-evidence.ts`. Three are fixed in the same pull request, taking the column
-from 82% to 98% of the 1,013 keyed questions (`docs/evals/question-eval-2026-10-29-answer-key.md` is the run after);
-the fourth waits on a policy decision:
+from 82% to 98% of the keyed questions (`docs/evals/question-eval-2026-10-29-answer-key.md` is the run after); the
+fourth waits on a policy decision:
 
 - **Boss lists (4%, open).** An instance's fact gives the number of encounters, not their names, so "which bosses
   are in Shadowfang Keep" cannot be answered from the evidence. Naming them was tried and taken back in review: no
@@ -139,8 +139,10 @@ the fourth waits on a policy decision:
   keeps the names and the eval shows the gap.
 - **Shared talents (99% → 100%).** Evidence kept one fact per name, so a talent two classes have (Deflection,
   Flurry, Precision, …) came back with one class. It keeps one per fact now.
-- **New zones (94% → 100%).** Flight masters in Riverglades and Mount Hyjal, whose maps the zone list lacks, had no
-  zone. They take the zone their node's own name carries, as the answer key does.
+- **Held-back zones (review, 2026-10-29).** Five flight masters sit in zones the map holds back as unreleased. Naming
+  their zone was tried and taken back: DATA_POLICY keeps new zones hidden unless the reader turns spoilers on, and
+  the public MCP tool leaves them out altogether. They are now left out of the files evidence (name and zone; the
+  #536 index had already been naming the nodes), the answer key and the bank.
 - **Achievement criteria** were scored against text the policy keeps on the page; they left the key instead.
 
 What this is for: the changed list is what to recheck in game after a patch; the column says whether the facts reach

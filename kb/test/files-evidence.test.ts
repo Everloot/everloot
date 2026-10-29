@@ -14,7 +14,12 @@ const files = {
     continents: [{ id: 0, name: "Synthetic Kingdoms" }],
     zones: [{ uiMapId: 1429, name: "Synthetic Forest", continentId: 0 }],
     entrances: [{ mapId: 34, name: "Synthetic Stockade", raid: false, uiMapId: 1429, minLevel: 17, maxLevel: 24 }, { mapId: 34, name: "Synthetic Stockade", raid: false, uiMapId: 1429 }, { mapId: 409, name: "Molten Core", raid: true, uiMapId: 9999, minLevel: 60, maxLevel: 60 }],
-    flightNodes: [{ id: 2, name: "Synthetic Keep, Synthetic Forest", uiMapId: 1429 }, { id: 3, name: "Synthetic Port, Synthetic Shore", uiMapId: 2548 }],
+    heldBackZones: [{ uiMapId: 2548, name: "Synthetic Shore" }],
+    flightNodes: [
+      { id: 2, name: "Synthetic Keep, Synthetic Forest", uiMapId: 1429 },
+      { id: 3, name: "Synthetic Port, Synthetic Shore", uiMapId: 2548 },
+      { id: 4, name: "Synthetic Camp, Synthetic Wilds", uiMapId: 77 },
+    ],
   },
   encounters: { build: { version: "1.0.0.70634" }, instances: { "34": [{ id: 1, name: "Synthetic Warden" }, { id: 2, name: "Synthetic Stockade" }] } },
   mounts: { build: { version: "1.0.0.70634" }, mounts: { "6": { name: "Synthetic Horse", spellId: 458, ridingSkill: 75 }, "7": { name: "Synthetic Wolf", spellId: 459 } } },
@@ -38,11 +43,13 @@ test("buildFilesIndex: one fact per thing, ids and facts only, the build stamped
   ]);
   expect(byKind("instance")[0]!.url).toBe("https://everloot.app/database/instances/34-synthetic-stockade");
   expect(byKind("boss").map((f) => f.claim)).toEqual(["Synthetic Warden: encounter 1 of 2 in Synthetic Stockade, in the game files.", "Synthetic Stockade: encounter 2 of 2 in Synthetic Stockade, in the game files."]);
-  // A node on a map the zone list lacks takes the zone its own name carries.
+  // A node in a held-back zone is left out, name and all; one on a map the zone list lacks names no zone.
   expect(byKind("flight")).toEqual([
     { kind: "flight", name: "Synthetic Keep", claim: "Synthetic Keep: a flight master in Synthetic Forest, in the game files.", url: "https://everloot.app/map" },
-    { kind: "flight", name: "Synthetic Port", claim: "Synthetic Port: a flight master in Synthetic Shore, in the game files.", url: "https://everloot.app/map" },
+    { kind: "flight", name: "Synthetic Camp", claim: "Synthetic Camp: a flight master, in the game files.", url: "https://everloot.app/map" },
   ]);
+  expect(JSON.stringify(index)).not.toContain("Synthetic Port");
+  expect(JSON.stringify(index)).not.toContain("Synthetic Shore");
   expect(byKind("mount").map((f) => f.claim)).toEqual(["Synthetic Horse: a mount (id 6), riding skill 75, taught by spell 458, in the game files.", "Synthetic Wolf: a mount (id 7), taught by spell 459, in the game files."]);
   // The achievement's description and criteria text never leave the page.
   const ach = byKind("achievement")[0]!;
