@@ -9,11 +9,11 @@ import { writeCoverage } from "@/lib/coverage-store";
 import { currentSettledWeek, writeSettled } from "@/lib/settled-store";
 
 /**
- * GET /api/cron/snapshot — Vercel Cron (vercel.json) extends the corpus snapshot with new uploads,
+ * GET /api/cron/snapshot — the Worker's Cron Trigger (src/lib/cf-crons.ts, every 10 minutes) extends the corpus snapshot with new uploads,
  * then folds new full auction scans into the market rollup. The market step runs only after the
  * corpus step succeeded; if it fails the corpus snapshot is already current, the response is a 500
  * and the next run retries the same uploads.
- * Vercel sends `Authorization: Bearer $CRON_SECRET`; without the secret configured it refuses to run.
+ * The trigger sends `Authorization: Bearer $CRON_SECRET`; without the secret configured it refuses to run.
  * `?rebuild=1` rebuilds both from empty, which is how a deleted upload leaves them. The market
  * rebuild reads only uploads from the last 62 days (older ones cannot hold a day it keeps), and
  * is also how an unusable market.json is replaced. The completion rollup folds at most a batch of uploads per

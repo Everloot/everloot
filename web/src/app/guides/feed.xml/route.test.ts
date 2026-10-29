@@ -11,7 +11,7 @@ test("empty global feed is RSS with bounded caches, no artificial date or query 
   expect(response.status).toBe(200);
   expect(response.headers.get("Content-Type")).toBe("application/rss+xml; charset=utf-8");
   expect(response.headers.get("Cache-Control")).toBe("public, max-age=300, s-maxage=900");
-  expect(response.headers.get("Vercel-CDN-Cache-Control")).toBe("max-age=900");
+  expect(response.headers.get("CDN-Cache-Control")).toBe("max-age=900");
   const xml = await response.text();
   expect(xml).toContain("<rss");
   expect(xml).not.toMatch(/<item>|pubDate|lastBuildDate/);

@@ -1,12 +1,12 @@
 /**
- * The Worker's stand-in for Vercel's CDN cache (web/scripts/cf-entry.mjs). next.config.js marks the public pages
+ * The Worker's edge cache (web/scripts/cf-entry.mjs). next.config.js marks the public pages
  * that read no cookies with `CDN-Cache-Control` (Next sends `private, no-store` to browsers on dynamic pages, so
- * the CDN-specific header carries the edge lifetime). Vercel's CDN honours it; a Worker's own responses skip
+ * the CDN-specific header carries the edge lifetime). A Worker's own responses skip
  * Cloudflare's cache, so the entry keeps them in the Cache API instead, for the same lifetime.
  *
  * Only a GET without credentials, answered 200 with `CDN-Cache-Control: max-age=N` and no `Set-Cookie`, is kept.
  * The key carries the deployed commit, so a deploy never serves an hour-old page that names script files the new
- * build no longer has (Vercel scopes its cache to a deployment the same way). Browsers get the response's own
+ * build no longer has. Browsers get the response's own
  * headers either way.
  */
 export const ORIGINAL_CACHE_CONTROL = "x-everloot-browser-cache-control";

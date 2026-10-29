@@ -5,7 +5,7 @@ below.
 
 | What | How it ships | Version |
 |---|---|---|
-| The site (`web/`) | Every merge to `main` deploys production on Vercel | none |
+| The site (`web/`) | Every merge to `main` that touches `web/`, `kb/` or `packages/protocol` deploys the Cloudflare Worker through `.github/workflows/deploy-worker.yml`, then warms and checks every sitemap page. Rollback: `npx wrangler rollback` from `web/`, or re-run the workflow on an older commit | none |
 | The addon, tagged (Alpha or stable) | A `addon-v*` tag runs `.github/workflows/release.yml` and creates a GitHub release | `0.3.x` |
 | The addon, nightly | `.github/workflows/nightly.yml` makes a pre-release from `main` when it has changed | `0.3.x-nightly.<date>.<run>` |
 | The desktop app | A `desktop-v*` tag runs `.github/workflows/desktop-release.yml`, which builds Windows, macOS and Linux installers and publishes a GitHub release with `SHA256SUMS` ([`desktop/README.md`](../desktop/README.md#release)) | `0.1.x` |
@@ -116,7 +116,9 @@ on a tag is enough.
 ## Knowledge release (lore archive)
 
 Unchanged: a maintainer builds it with `npm run kb -- snapshot`, checks it with
-`npm run kb -- audit-sources` and publishes it to the site's storage. See
+`npm run kb -- audit-sources` and publishes it to the site's storage. The site serves it from the D1
+database `KNOWLEDGE_D1` (imported from the SQL that `web/scripts/cf-release-d1.mjs` writes), and
+`KNOWLEDGE_RELEASE_SHA256` in `web/wrangler.jsonc` pins which release that is. See
 [`kb/README.md`](../kb/README.md).
 
 ## Bulk export
@@ -137,7 +139,7 @@ protocol (`/schema/api/bulkIndex.json`).
    carries what looks like a local filesystem path, stops it before anything is sent.
 3. Once (owner): a public R2 bucket of its own (for example `everloot-bulk`, never the uploads bucket)
    with a public address such as `data.everloot.app`, a write token scoped to that bucket, and
-   `NEXT_PUBLIC_BULK_URL` set in Vercel. Until it is set, `/docs/api/data-files` says there is no bulk download yet.
+   `NEXT_PUBLIC_BULK_URL` set as a GitHub repository variable (read at build time by the deploy workflow). Until it is set, `/docs/api/data-files` says there is no bulk download yet.
    Add the bucket to the nightly backup mirror's read-only token.
 
 ## One-time repository settings

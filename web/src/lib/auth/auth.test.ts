@@ -215,19 +215,19 @@ test("without BETTER_AUTH_SECRET there is no auth, so rate-limit keys are never 
   }
 });
 
-test("the limiter keys on the Vercel client address first, so a forged or multi-valued X-Forwarded-For shares nothing", async () => {
+test("on the Worker the limiter keys on cf-connecting-ip, so a forged or multi-valued X-Forwarded-For shares nothing", async () => {
   stubBattlenet(thrall);
   const { rateLimitStore } = mapRateLimitStore();
   const db = { users: [], auth_session: [], auth_account: [], auth_verification: [] };
-  const auth = createAuth({ database: memoryAdapter(db), rateLimitStore, env });
+  const auth = createAuth({ database: memoryAdapter(db), rateLimitStore, env: { ...env, EVERLOOT_PLATFORM: "cloudflare" } });
   const statuses: number[] = [];
   // One caller rotating X-Forwarded-For (sometimes a chain) is still one caller.
   for (const xff of ["198.51.100.1", "198.51.100.2", "198.51.100.3, 10.0.0.1", "198.51.100.4"]) {
-    statuses.push((await startSignIn(auth, { "x-vercel-forwarded-for": "203.0.113.9", "x-forwarded-for": xff })).status);
+    statuses.push((await startSignIn(auth, { "cf-connecting-ip": "203.0.113.9", "x-forwarded-for": xff })).status);
   }
   expect(statuses).toEqual([200, 200, 200, 429]);
   // A different caller behind the same proxy chain gets its own bucket.
-  expect((await startSignIn(auth, { "x-vercel-forwarded-for": "203.0.113.10", "x-forwarded-for": "198.51.100.3, 10.0.0.1" })).status).toBe(200);
+  expect((await startSignIn(auth, { "cf-connecting-ip": "203.0.113.10", "x-forwarded-for": "198.51.100.3, 10.0.0.1" })).status).toBe(200);
 });
 
 test("an empty BETTER_AUTH_URL falls back to the site URL", async () => {

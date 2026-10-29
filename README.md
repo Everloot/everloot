@@ -124,7 +124,7 @@ flowchart LR
 | Part | What it does |
 |---|---|
 | [`addon/`](addon/) | The in-game collector (Lua) and the `/ask` command |
-| [`web/`](web/) | everloot.app: the database, tools, map, change tracker, lore archive, upload page and MCP endpoints (Next.js on Vercel) |
+| [`web/`](web/) | everloot.app: the database, tools, map, change tracker, lore archive, upload page and MCP endpoints (Next.js on a Cloudflare Worker) |
 | [`kb/`](kb/) | The knowledge base: lore import, public releases, the game-file extractor and the MCP server (TypeScript, SQLite) |
 | [`companion/`](companion/) | The command-line uploader: sends your file, answers `/ask` in game and writes market prices |
 | [`desktop/`](desktop/) | The Everloot Desktop App: the same jobs as a tray app with an installer |

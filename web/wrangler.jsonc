@@ -11,7 +11,7 @@
   ],
   // The workers.dev host would serve production with no Access in front of it.
   "workers_dev": false,
-  // The schedules in src/lib/cf-crons.ts. Only one host may run them: Vercel's crons are off from the switch on.
+  // The schedules in src/lib/cf-crons.ts (cf-crons.test.ts holds the two lists equal).
   "triggers": { "crons": ["*/10 * * * *", "23 * * * *"] },
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],

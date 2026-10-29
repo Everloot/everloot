@@ -18,7 +18,7 @@ export const metadata: Metadata = pageMetadata({
 });
 
 export default function KeysPage() {
-  // Read at build time; turning the guard on in Vercel takes a redeploy, which rebuilds this page too.
+  // Read at build time; turning the guard on takes a redeploy, which rebuilds this page too.
   const guard = guardOn();
   const builds = savedBuildsOn();
   return (

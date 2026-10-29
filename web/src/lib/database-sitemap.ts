@@ -82,7 +82,7 @@ export function instancePaths(seen: ZoneSightings & { unreachable?: boolean }): 
 }
 
 export function databaseUnavailable(): Response {
-  return Response.json({ error: "Database unavailable" }, { status: 503, headers: { "Cache-Control": "no-store", "Vercel-CDN-Cache-Control": "no-store", "CDN-Cache-Control": "no-store" } });
+  return Response.json({ error: "Database unavailable" }, { status: 503, headers: { "Cache-Control": "no-store", "CDN-Cache-Control": "no-store" } });
 }
 
 /** Pages flip to indexed as uploads roll up; crawlers do not need the list fresher than hourly. */
@@ -90,6 +90,5 @@ export const DATABASE_SITEMAP_HEADERS = {
   "Content-Type": "application/xml; charset=utf-8",
   "Cache-Control": "public, max-age=0, must-revalidate",
   // Next overwrites Cache-Control on dynamic routes, so the CDN reads these instead.
-  "Vercel-CDN-Cache-Control": "max-age=3600, stale-while-revalidate=86400",
   "CDN-Cache-Control": "max-age=3600, stale-while-revalidate=86400",
 };

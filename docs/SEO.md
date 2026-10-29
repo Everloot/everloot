@@ -56,8 +56,8 @@ the owner can do. Written after the 2026-10-17 audit.
   `base-uri 'self'` and `frame-ancestors 'self'`, and a report-only CSP that lists the analytics and ads
   hosts. AdSense supports only a nonce-based CSP, so script, connect and frame sources are not enforced. The
   report-only CSP has no report endpoint yet; violations show in the browser console.
-  The `Access-Control-Allow-Origin: *` seen on pages is added by Vercel for prerendered responses; it is not set in
-  this repo and a header set here could not remove it. Check a preview deployment before trying to narrow it.
+  `Access-Control-Allow-Origin: *` is set in `headers()` in `web/next.config.js` for the two prerendered API
+  routes, `/api/items/categories` and `/api/edges/client-layer`.
 
 ## IndexNow
 
@@ -65,7 +65,7 @@ the owner can do. Written after the 2026-10-17 audit.
   serves it, and every ping names that file as `keyLocation`. No key is committed. Without the variable the file
   is a 404 and nothing is sent.
 - `pingIndexNow(urls)` in `web/src/lib/indexnow.ts` sends nothing for an empty list or another host.
-- `/api/cron/indexnow` runs hourly (`web/vercel.json`, same `CRON_SECRET` auth as the snapshot cron). It submits
+- `/api/cron/indexnow` runs hourly (Cron Trigger `23 * * * *` in `web/wrangler.jsonc`, same `CRON_SECRET` auth as the snapshot cron). It submits
   /changes, its feed and /wow-forever when the changes list has an entry from the last two hours, and sends
   nothing when the list is empty. It decides from the entry count, never from a page answering 200.
 - There is no automatic ping for a newly deployed page. To announce one, send a POST to
@@ -74,13 +74,13 @@ the owner can do. Written after the 2026-10-17 audit.
 
 ## Steps for Carlos
 
-1. **Vercel env var.** Add `INDEXNOW_KEY` (Production). Generate one, for example 32 random hex characters. After
-   the deploy, open `https://everloot.app/indexnow.txt` and confirm it shows the key.
-2. **www redirect.** The site now answers 301 itself when a request reaches it on `www.everloot.app`. A
-   permanent redirect in Vercel Domains as well is fine; after the deploy, `curl -I https://www.everloot.app/about`
-   should show a 301 or 308 to `https://everloot.app/about`.
+1. **Worker secret.** Add `INDEXNOW_KEY` with `npx wrangler secret put INDEXNOW_KEY` from `web/`. Generate one,
+   for example 32 random hex characters. Then open `https://everloot.app/indexnow.txt` and confirm it shows the key.
+2. **www redirect.** `www.everloot.app/*` is a route of the Worker, and the site answers 301 itself when a request
+   reaches it on `www.everloot.app`. After the deploy, `curl -I https://www.everloot.app/about`
+   should show a 301 to `https://everloot.app/about`.
 3. **Google Search Console.** Add the property for `everloot.app`. Either verify by DNS, or set `GSC_VERIFICATION`
-   (the content value of the meta tag) in Vercel. Submit `https://everloot.app/sitemap.xml`,
+   (the content value of the meta tag) as a var in `web/wrangler.jsonc`. Submit `https://everloot.app/sitemap.xml`,
    `https://everloot.app/database-sitemap.xml` and `https://everloot.app/auctions-sitemap.xml`. If the lore
    sitemap was submitted before, remove it: it no longer exists.
 4. **Bing Webmaster Tools.** Add the site, or import it from Search Console. Set `BING_VERIFICATION` if you
@@ -88,8 +88,8 @@ the owner can do. Written after the 2026-10-17 audit.
    works.
 5. **MCP registry.** Publish the public server (`https://everloot.app/mcp/public`) to the official MCP
    registry as `io.github.Everloot/everloot`, then to Glama, Smithery and mcp.so. The server must have
-   `EVERLOOT_MCP_PUBLIC=1` set in Production, or the endpoint answers 404.
-6. **Bot protection.** Check that Vercel's bot protection is not challenging GPTBot, ClaudeBot, PerplexityBot or
-   OAI-SearchBot. The audit saw 200s for all of them.
+   `EVERLOOT_MCP_PUBLIC=1` in the `vars` of `web/wrangler.jsonc`, or the endpoint answers 404.
+6. **Bot protection.** Check that Cloudflare's bot settings for the zone (Security → Bots) do not challenge GPTBot,
+   ClaudeBot, PerplexityBot or OAI-SearchBot. The audit saw 200s for all of them.
 7. **Decided 2026-10-20:** the Warcraft Wiki copies under /lore are noindex and out of the sitemaps; /about names
    R21 Media Group, LLC.

@@ -1,6 +1,6 @@
 /**
  * Prebuild: put the approved knowledge release in web/.release so the /mcp function ships it.
- * The release is gitignored, so a Vercel build fetches it from the private R2 bucket the site already
+ * The release is gitignored, so a Node build fetches it from the private R2 bucket the site already
  * uses, at EVERLOOT_KB_RELEASE_KEY (e.g. knowledge/2026-10-05-everloot-public.sqlite), plus its
  * manifest, and keeps it only if the file's sha256 matches the manifest. Every other outcome leaves
  * no release and lets the build continue: /mcp then answers 503, never an unverified knowledge base.

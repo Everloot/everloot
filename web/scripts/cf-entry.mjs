@@ -1,7 +1,7 @@
 // The Worker's entry point, copied to .open-next/cf-entry.mjs by scripts/cf-bundle-files.mjs (wrangler.jsonc
 // `main`). It serves requests through OpenNext's worker, keeps the pages next.config.js marks for the CDN in the
-// Cache API (src/lib/cf-edge-cache.ts, Vercel's CDN cache in its place), and runs the scheduled jobs
-// (src/lib/cf-crons.ts), which call the same cron routes Vercel calls. OpenNext's Durable Object classes are re-exported.
+// Cache API (src/lib/cf-edge-cache.ts), and runs the scheduled jobs
+// (src/lib/cf-crons.ts), which call the cron routes. OpenNext's Durable Object classes are re-exported.
 import handler from "./worker.js";
 import { cronPaths, cronRequest } from "../src/lib/cf-crons.ts";
 import { edgeCacheKey, edgeCacheable, edgeTtl, forCache, fromCache } from "../src/lib/cf-edge-cache.ts";

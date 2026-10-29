@@ -54,15 +54,15 @@ describe("analyticsConfig", () => {
 
   it("turns PostHog on only for the Production deployment", () => {
     expect(analyticsConfig({ NEXT_PUBLIC_POSTHOG_KEY: PH }).posthogKey).toBeUndefined();
-    expect(analyticsConfig({ NEXT_PUBLIC_POSTHOG_KEY: PH, VERCEL_ENV: "preview" }).posthogKey).toBeUndefined();
-    expect(analyticsConfig({ NEXT_PUBLIC_POSTHOG_KEY: PH, VERCEL_ENV: "production" }).posthogKey).toBe(PH);
+    // VERCEL_ENV, from the old host, no longer counts.
+    expect(analyticsConfig({ NEXT_PUBLIC_POSTHOG_KEY: PH, VERCEL_ENV: "production" }).posthogKey).toBeUndefined();
     // The Cloudflare Worker names its environment EVERLOOT_DEPLOY_ENV.
     expect(analyticsConfig({ NEXT_PUBLIC_POSTHOG_KEY: PH, EVERLOOT_DEPLOY_ENV: "production" }).posthogKey).toBe(PH);
     expect(analyticsConfig({ NEXT_PUBLIC_POSTHOG_KEY: PH, EVERLOOT_DEPLOY_ENV: "preview" }).posthogKey).toBeUndefined();
   });
 
   it("accepts well-formed values", () => {
-    const c = analyticsConfig({ NEXT_PUBLIC_GA_ID: GA, NEXT_PUBLIC_POSTHOG_KEY: PH, NEXT_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com/", NEXT_PUBLIC_CF_BEACON_TOKEN: CF, VERCEL_ENV: "production" });
+    const c = analyticsConfig({ NEXT_PUBLIC_GA_ID: GA, NEXT_PUBLIC_POSTHOG_KEY: PH, NEXT_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com/", NEXT_PUBLIC_CF_BEACON_TOKEN: CF, EVERLOOT_DEPLOY_ENV: "production" });
     expect(c).toEqual({ gaId: GA, posthogKey: PH, posthogHost: "https://us.i.posthog.com", cfBeaconToken: CF });
     expect(needsAnalyticsConsent(c)).toBe(true);
   });

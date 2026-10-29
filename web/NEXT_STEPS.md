@@ -7,7 +7,7 @@ Tight checklist so you don't lose momentum.
 - [ ] `npm install` + `npm run dev` to see the site locally at http://localhost:3000
 - [ ] Click through every page. Open the Auction House, pick a realm and an item, and check the price page.
 - [ ] Pick a domain (see README for ideas) and buy it
-- [ ] Push to GitHub, deploy to Vercel, point the domain
+- [ ] Push to GitHub, deploy the Cloudflare Worker, point the domain
 - [ ] Share the site with 5–10 WoW-playing friends for "does it work / what would you add" feedback
 
 ## Before applying to AdSense (~1–2 weeks of content work)
@@ -28,7 +28,7 @@ AdSense rejects sites that are too thin. You need 5–10 real articles first.
 
 ## After AdSense approval
 
-- [ ] Fill in `NEXT_PUBLIC_ADSENSE_CLIENT` env var on Vercel
+- [ ] Fill in the `NEXT_PUBLIC_ADSENSE_CLIENT` GitHub repository variable (read at build time by the deploy workflow)
 - [ ] Update `public/ads.txt` with your real publisher ID
 - [ ] Add `<ins>` ad units where they make sense:
   - Between hero and tool grid on landing page
@@ -41,7 +41,7 @@ AdSense rejects sites that are too thin. You need 5–10 real articles first.
 When you're ready:
 
 1. Get Blizzard API credentials at https://develop.battle.net
-2. Set `BNET_CLIENT_ID` and `BNET_CLIENT_SECRET` in Vercel env vars
+2. Set `BNET_CLIENT_ID` and `BNET_CLIENT_SECRET` as Worker secrets (`npx wrangler secret put` from `web/`)
 3. Implement `src/app/api/bnet/` routes for:
    - OAuth client-credentials token refresh (cache in-memory or in KV)
    - Auction house item price lookup by realm + item ID

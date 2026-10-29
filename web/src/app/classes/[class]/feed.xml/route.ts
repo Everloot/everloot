@@ -16,7 +16,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ cla
       "Content-Type": "application/rss+xml; charset=utf-8",
       "Cache-Control": "public, max-age=300, s-maxage=900",
       "CDN-Cache-Control": "max-age=900",
-      "Vercel-CDN-Cache-Control": "max-age=900",
     },
   });
 }

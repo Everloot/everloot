@@ -50,7 +50,7 @@ test("successful XML indexes and chunks retain their CDN policy through Next's N
     const out = await effectiveHeaders(path, response);
     expect(out.getHeader("Content-Type"), path).toBe("application/xml; charset=utf-8");
     expect(out.getHeader("Cache-Control"), path).toBe("public, max-age=0, must-revalidate");
-    for (const key of ["Vercel-CDN-Cache-Control", "CDN-Cache-Control"]) {
+    for (const key of ["CDN-Cache-Control"]) {
       expect(out.getHeader(key), path).toBe("max-age=3600, stale-while-revalidate=86400");
     }
   }
@@ -63,7 +63,7 @@ test("unavailable indexes and chunks keep all three no-store headers after stati
     const response = await get();
     expect(response.status, path).toBe(503);
     const out = await effectiveHeaders(path, response);
-    for (const key of ["Cache-Control", "Vercel-CDN-Cache-Control", "CDN-Cache-Control"]) expect(out.getHeader(key), `${path}: ${key}`).toBe("no-store");
+    for (const key of ["Cache-Control", "CDN-Cache-Control"]) expect(out.getHeader(key), `${path}: ${key}`).toBe("no-store");
   }
 });
 
@@ -76,7 +76,7 @@ test("malformed and out-of-range chunks never receive positive CDN caching", asy
       const response = await chunk(get, n);
       expect(response.status, path).toBe(404);
       const out = await effectiveHeaders(path, response);
-      for (const key of ["Vercel-CDN-Cache-Control", "CDN-Cache-Control"]) expect(out.getHeader(key), `${path}: ${key}`).toBeUndefined();
+      for (const key of ["CDN-Cache-Control"]) expect(out.getHeader(key), `${path}: ${key}`).toBeUndefined();
     }
   }
 });
@@ -84,6 +84,6 @@ test("malformed and out-of-range chunks never receive positive CDN caching", asy
 test("sitemap outage 503s tell the CDN not to cache them", () => {
   for (const res of [databaseUnavailable(), auctionsUnavailable()]) {
     expect(res.status).toBe(503);
-    for (const key of ["Cache-Control", "Vercel-CDN-Cache-Control", "CDN-Cache-Control"]) expect(res.headers.get(key), key).toBe("no-store");
+    for (const key of ["Cache-Control", "CDN-Cache-Control"]) expect(res.headers.get(key), key).toBe("no-store");
   }
 });

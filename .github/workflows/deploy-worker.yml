@@ -1,7 +1,6 @@
 name: Deploy the site to Cloudflare Workers
 # Every merge to main that touches the site builds it with OpenNext and deploys the Worker (web/wrangler.jsonc),
-# stamped with the commit (web/scripts/cf-deploy.mjs). Off until the repository variable WORKER_DEPLOY is "1", which
-# is set at the switch from Vercel (docs/2026-10-28-cloudflare-workers-migration.md).
+# stamped with the commit (web/scripts/cf-deploy.mjs). Runs only while the repository variable WORKER_DEPLOY is "1".
 on:
   push:
     branches: [main]
