@@ -228,7 +228,9 @@ export function repairTemplates(rawWikitext: string): string {
     .replace(/\n+$/, "");
 }
 
-const DAMAGE_PATTERNS = [/ for at /, / at standing/, / at {2}/, / {2}standing/, /\w {2}\w/];
+// " for at " is what "for {{cost}} at {{rep}}" leaves, but "for at least" (and most, all, once) is plain English:
+// in the 2026-10-24 release it alone marked 91 pages damaged that were not.
+const DAMAGE_PATTERNS = [/ for at (?!(?:least|most|all|once)\b)/, / at standing/, / at {2}/, / {2}standing/, /\w {2}\w/];
 
 /** How many breakage patterns the converted text shows; 0 means clean. */
 export function countDamage(text: string): number {

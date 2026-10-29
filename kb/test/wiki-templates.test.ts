@@ -64,6 +64,11 @@ test("countDamage counts the known breakage patterns", () => {
   expect(countDamage("sold at  the shop")).toBe(2);
 });
 
+test("'for at least' and its kin are English, not a removed template", () => {
+  for (const text of ["stays hidden for at least one update", "for at most two hours", "for at all", "for at once"]) expect(countDamage(text)).toBe(0);
+  expect(countDamage("purchased for at Honored")).toBe(1);
+});
+
 test("repair keeps blank lines and leading spaces: paragraphs and preformatted text survive", () => {
   const src = "First paragraph.\n\nSecond {{rep|honored}} paragraph.\n\n== History ==\nThird.\n\n Pre line";
   expect(repairTemplates(src)).toBe("First paragraph.\n\nSecond Honored paragraph.\n\n== History ==\nThird.\n\n Pre line");
