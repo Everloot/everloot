@@ -9,14 +9,55 @@ export interface AnswerEngine { answer(question: string, context?: AskContext): 
 
 export const MAX_ANSWER = 600;
 
-/** The first hit's text and its Source line. No source means no answer: nothing unsourced reaches the game. */
-export function answerFromSearch(text: string): { answer: string; source: string } {
-  const lines = text.split("\n");
-  const sourceAt = lines.findIndex((l) => l.startsWith("Source: "));
-  if (sourceAt < 0) return { answer: "No sourced answer found.", source: "none" };
-  const body = lines.slice(0, sourceAt).filter((l) => l.trim() && !/^\[[^\]]+\]/.test(l)).join(" ").trim();
-  return { answer: (body || "No sourced answer found.").slice(0, MAX_ANSWER), source: lines[sourceAt].slice("Source: ".length).trim() };
+/** One piece of answer_sources evidence, as far as the game needs it: the claim, where it is from, and its licence. */
+export interface Piece { claim: string; kind: string; source: { url: string; title?: string }; licence: string; asOf?: string | null; url?: string }
+
+/**
+ * answer_sources for one question: the text a model reads, the pieces as the tool structured them, and whether no page
+ * held every asked word (the tool says so only in its text, so its pieces are the closest pages, not an answer).
+ */
+export interface Sourced { text: string; evidence: Piece[]; someWords?: boolean }
+
+/** The first line answer_sources writes when no page held every asked word (kb/src/search.ts, SOME_WORDS). */
+export const SOME_WORDS = "No page has every word you asked for. Pages with some of them:";
+
+const NO_ANSWER = { answer: "No sourced answer found.", source: "none" };
+
+/**
+ * The in-game source line for a piece, with its licence, as search_knowledge's Source line had it. A wiki excerpt
+ * names the wiki page it quotes (CC BY-SA asks for the source); a game-files fact keeps its label and build
+ * ("found in game files, unconfirmed"); the rest name their everloot.app page.
+ */
+export function sourceLine(piece: Piece): string {
+  const asOf = piece.asOf ? `, as of ${piece.asOf.slice(0, 10)}` : "";
+  if (piece.kind === "lore") return `${piece.source.url} (${piece.licence}${asOf})`;
+  const label = piece.kind === "files" && piece.source.title ? `${piece.source.title}; ` : "";
+  return `${piece.url ?? piece.source.url} (${label}${piece.licence}${asOf})`;
 }
+
+/** Every piece's source line, once each: what a model's answer, written from all of them, has to credit. */
+export function sourceLines(sourced: Sourced): string {
+  return [...new Set(sourced.evidence.map(sourceLine))].join(" | ");
+}
+
+/**
+ * The first piece and its source line. answer_sources orders them observed, curated, game files, then the 2023 wiki,
+ * and the first three answer names the question carries, so the first piece is the most direct one. When no page held
+ * every word, the answer says it is only the closest page. No piece means no answer: nothing unsourced reaches the game.
+ */
+export function answerFromEvidence(sourced: Sourced): { answer: string; source: string } {
+  const piece = sourced.evidence[0];
+  if (!piece?.claim.trim()) return NO_ANSWER;
+  const lead = sourced.someWords ? "No page matched every word; the closest: " : "";
+  return { answer: `${lead}${piece.claim.trim()}`.slice(0, MAX_ANSWER), source: sourceLine(piece) };
+}
+
+const optional = (v: unknown) => v === undefined || typeof v === "string";
+const isPiece = (v: unknown): v is Piece => {
+  const r = v as Partial<Piece> | null;
+  return !!r && typeof r.claim === "string" && typeof r.kind === "string" && typeof r.licence === "string" && typeof r.source?.url === "string"
+    && optional(r.source.title) && optional(r.url) && (r.asOf === null || optional(r.asOf));
+};
 
 type McpOptions = { url: string; token: string | null };
 type McpSession = <T>(options: McpOptions, run: (client: Client) => Promise<T>, signal?: AbortSignal) => Promise<T>;
@@ -43,12 +84,18 @@ const withClient: McpSession = async (options, run, signal) => {
   }
 };
 
-/** The knowledge server's search_knowledge text for one question: hits with their Source lines. */
-export async function mcpSearch(options: McpOptions, question: string, limit: number): Promise<string> {
+/**
+ * The knowledge server's answer_sources for one question: the evidence the site's chat uses, with the game files'
+ * facts for the names it carries. A tool error, or pieces in a shape this does not know, give no evidence.
+ */
+export async function mcpAnswerSources(options: McpOptions, question: string, limit: number): Promise<Sourced> {
   return withClient(options, async (client) => {
-    const result = await client.callTool({ name: "search_knowledge", arguments: { query: question, limit } });
+    const result = await client.callTool({ name: "answer_sources", arguments: { question, limit } });
     const content = (result.content as { type: string; text?: string }[] | undefined) ?? [];
-    return content.find((c) => c.type === "text")?.text ?? "";
+    const pieces = (result.structuredContent as { evidence?: unknown } | undefined)?.evidence;
+    const evidence = result.isError !== true && Array.isArray(pieces) && pieces.every(isPiece) ? pieces : [];
+    const text = content.find((c) => c.type === "text")?.text ?? "";
+    return { text, evidence, ...(text.startsWith(SOME_WORDS) ? { someWords: true } : {}) };
   });
 }
 
@@ -89,7 +136,7 @@ export function lazyEngine(build: () => AnswerEngine): AnswerEngine {
   return { answer: async (question, context) => build().answer(question, context) };
 }
 
-/** Plain search answers: the top hit and its source. With providers configured, the CLI uses llmEngine instead. */
+/** Answers with no model: the first piece of evidence and its page. With providers configured, the CLI uses llmEngine instead. */
 export function mcpEngine(options: McpOptions): AnswerEngine {
-  return { answer: async (question) => answerFromSearch(await mcpSearch(options, question, 1)) };
+  return { answer: async (question) => answerFromEvidence(await mcpAnswerSources(options, question, 3)) };
 }

@@ -10,7 +10,7 @@ import { adler32, luaString } from "../src/bridge/lua";
 import { readAsks } from "../src/bridge/asks";
 import { renderAnswersAddon } from "../src/bridge/answers";
 import { answerPending, createAnswerStore } from "../src/bridge/run";
-import { answerFromSearch, marketValueFrom, mcpMarketValue, siteItemSearch, withMarket, type AnswerEngine } from "../src/bridge/engine";
+import { answerFromEvidence, marketValueFrom, mcpMarketValue, siteItemSearch, withMarket, type AnswerEngine } from "../src/bridge/engine";
 import { FIXTURE_ANSWER, FIXTURE_STRUCTURED, FIXTURE_URL } from "../../web/src/lib/chat/market-fixture";
 import { MARKET_QUERY_BUDGET_MS } from "../../web/src/lib/chat/market-question";
 
@@ -58,13 +58,25 @@ test("the answers addon matches the golden file the Lua 5.1 test loads", () => {
   expect(lua).toBe(readFileSync(FIXTURE, "utf8").replace(/\r\n/g, "\n"));
 });
 
-test("a search result becomes a short answer with its source line", () => {
-  const text = "[lore_page/lore] Thrall\nThrall is a shaman and the Warchief.\nSource: https://warcraft.wiki.gg/wiki/Thrall (CC-BY-SA-4.0, retrieved 2023-11-13)";
-  expect(answerFromSearch(text)).toEqual({
-    answer: "Thrall is a shaman and the Warchief.",
-    source: "https://warcraft.wiki.gg/wiki/Thrall (CC-BY-SA-4.0, retrieved 2023-11-13)",
+test("the first piece of evidence becomes a short answer with its source and licence; no evidence, no answer", () => {
+  const files = {
+    claim: "Deadmines: a dungeon, level 16; the files list 8 encounters.", kind: "files", licence: "Game data © Blizzard Entertainment, Inc.",
+    source: { url: "https://everloot.app/database/download", title: "WoW: Forever game files, build 1.60.1.70685 (Found in game files, unconfirmed)" },
+    url: "https://everloot.app/database/instances/36-deadmines",
+  };
+  const lore = {
+    claim: "The Deadmines is a dungeon under Moonbrook.", kind: "lore", licence: "CC-BY-SA-4.0", asOf: "2023-11-13T00:00:00.000Z",
+    source: { url: "https://warcraft.wiki.gg/wiki/Deadmines", title: "Deadmines" }, url: "https://everloot.app/lore/1-deadmines",
+  };
+  // A game-files fact keeps its label and build with its licence, on its everloot.app page.
+  expect(answerFromEvidence({ text: "", evidence: [files, lore] })).toEqual({
+    answer: files.claim,
+    source: "https://everloot.app/database/instances/36-deadmines (WoW: Forever game files, build 1.60.1.70685 (Found in game files, unconfirmed); Game data © Blizzard Entertainment, Inc.)",
   });
-  expect(answerFromSearch("No results.")).toEqual({ answer: "No sourced answer found.", source: "none" });
+  // A wiki excerpt names the wiki page it quotes and its CC BY-SA licence, not the everloot.app copy.
+  expect(answerFromEvidence({ text: "", evidence: [lore] })).toEqual({ answer: lore.claim, source: "https://warcraft.wiki.gg/wiki/Deadmines (CC-BY-SA-4.0, as of 2023-11-13)" });
+  expect(answerFromEvidence({ text: "No evidence found.", evidence: [] })).toEqual({ answer: "No sourced answer found.", source: "none" });
+  expect(answerFromEvidence({ text: "", evidence: [{ ...lore, claim: "  " }] })).toEqual({ answer: "No sourced answer found.", source: "none" });
 });
 
 test("pending asks are answered once and written into the slot addon", async () => {
@@ -393,4 +405,10 @@ describe("market_value over MCP", () => {
     expect(marketValueFrom({ content: [{ type: "text", text: "text only" }] })).toBeNull();
     expect(marketValueFrom({ structuredContent: FIXTURE_STRUCTURED })).toEqual(FIXTURE_STRUCTURED);
   });
+});
+
+test("a loose match (no page held every word) is said to be only the closest page", () => {
+  const lore = { claim: "The Barrens is a zone.", kind: "lore", licence: "CC-BY-SA-4.0", source: { url: "https://warcraft.wiki.gg/wiki/The_Barrens" } };
+  expect(answerFromEvidence({ text: "", evidence: [lore], someWords: true }).answer).toBe("No page matched every word; the closest: The Barrens is a zone.");
+  expect(answerFromEvidence({ text: "", evidence: [lore] }).answer).toBe("The Barrens is a zone.");
 });

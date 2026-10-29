@@ -127,7 +127,7 @@ describe("the bridge command, started as a real process", () => {
     expect(run.stdout).toMatch(/config\.json/);
     expect(run.stdout).toMatch(/Price questions are answered from the recorded market, without a model\./);
     expect(run.lua).toMatch(/\["ask:3"\] = \{ \["answer"\] = "Could not answer: /);
-    expect(site.since(from).some((r) => r.includes("search_knowledge"))).toBe(false);
+    expect(site.since(from).some((r) => r.includes("answer_sources"))).toBe(false);
   }, 60_000);
 
   test("a token file that cannot be read still stops the bridge before any request", async () => {

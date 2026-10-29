@@ -9,7 +9,10 @@ import { completeWithFallback, ProviderError, type Provider } from "../src/provi
 import { loadProviders } from "../src/providers/config";
 import { llmEngine } from "../src/bridge/llm-engine";
 
-const SEARCH = "[lore_page/lore] Thrall\nThrall is a shaman and the Warchief of the Horde.\nSource: https://warcraft.wiki.gg/wiki/Thrall (CC-BY-SA-4.0, retrieved 2023-11-13)";
+const SOURCED = {
+  text: "- [lore (Warcraft Wiki 2023, may differ in WoW: Forever)] Thrall is a shaman and the Warchief of the Horde.\n  Source: https://warcraft.wiki.gg/wiki/Thrall (CC-BY-SA-4.0, as of 2023-11-13)",
+  evidence: [{ claim: "Thrall is a shaman and the Warchief of the Horde.", kind: "lore", licence: "CC-BY-SA-4.0", asOf: "2023-11-13T00:00:00.000Z", source: { url: "https://warcraft.wiki.gg/wiki/Thrall" }, url: "https://everloot.app/lore/481380-thrall" }],
+};
 
 function fakeAnthropic(reply: () => Promise<unknown>) {
   const create = vi.fn(reply);
@@ -74,21 +77,24 @@ test("the chain tries enabled providers in order and falls through only on provi
 
 test("the LLM engine answers only from sources, names the model, and never calls a model without a source", async () => {
   const complete = vi.fn(async () => ({ text: "Thrall is the Warchief of the Horde.", model: "claude-opus-5-5" }));
-  const engine = llmEngine({ search: async () => SEARCH, providers: [{ name: "anthropic", complete }] });
+  const engine = llmEngine({ sources: async () => SOURCED, providers: [{ name: "anthropic", complete }] });
   expect(await engine.answer("Who is Thrall?")).toEqual({
     answer: "Thrall is the Warchief of the Horde. (answered by claude-opus-5-5)",
-    source: "https://warcraft.wiki.gg/wiki/Thrall (CC-BY-SA-4.0, retrieved 2023-11-13)",
+    // The wiki page it quotes, with the licence, as the in-game source line has always carried it.
+    source: "https://warcraft.wiki.gg/wiki/Thrall (CC-BY-SA-4.0, as of 2023-11-13)",
   });
   const [system, user] = complete.mock.calls[0] as unknown as [string, string];
   expect(system).toMatch(/only the sources/i);
   expect(user).toContain("Who is Thrall?");
+  // The model reads answer_sources' own text, labels included.
   expect(user).toContain("Warchief of the Horde");
-  const fancy = llmEngine({ search: async () => SEARCH, providers: [{ name: "x", complete: async () => ({ text: "Thrall leads the *Horde* in **World of Warcraft**.\n`ok`", model: "m" }) }] });
+  expect(user).toContain("may differ in WoW: Forever");
+  const fancy = llmEngine({ sources: async () => SOURCED, providers: [{ name: "x", complete: async () => ({ text: "Thrall leads the *Horde* in **World of Warcraft**.\n`ok`", model: "m" }) }] });
   expect((await fancy.answer("Who is Thrall?")).answer).toBe("Thrall leads the Horde in World of Warcraft. ok (answered by m)");
-  const unsure = llmEngine({ search: async () => SEARCH, providers: [{ name: "x", complete: async () => ({ text: "Not in the sources.", model: "m" }) }] });
+  const unsure = llmEngine({ sources: async () => SOURCED, providers: [{ name: "x", complete: async () => ({ text: "Not in the sources.", model: "m" }) }] });
   expect(await unsure.answer("Who is Thrall's cat?")).toEqual({ answer: "No sourced answer found.", source: "none" });
   complete.mockClear();
-  const empty = llmEngine({ search: async () => "No results.", providers: [{ name: "anthropic", complete }] });
+  const empty = llmEngine({ sources: async () => ({ text: "No evidence found for that question.", evidence: [] }), providers: [{ name: "anthropic", complete }] });
   expect(await empty.answer("Who is Nobody?")).toEqual({ answer: "No sourced answer found.", source: "none" });
   expect(complete).not.toHaveBeenCalled();
 });
@@ -105,4 +111,16 @@ test("provider config reads keys from files only and rejects inline keys", () =>
   writeFileSync(config, JSON.stringify({ providers: [{ type: "anthropic", apiKey: "sk-inline" }] }));
   expect(() => loadProviders(config)).toThrow(/apiKeyFile/);
   expect(loadProviders(join(dir, "missing.json"))).toEqual([]);
+});
+
+test("with a model, the answer credits every piece it read, and a refusal without its full stop is still one", async () => {
+  const wiki = { claim: "Ragnaros is the Firelord.", kind: "lore", licence: "CC-BY-SA-4.0", asOf: "2023-11-13T00:00:00.000Z", source: { url: "https://warcraft.wiki.gg/wiki/Ragnaros" } };
+  const seen = { claim: "Ragnaros drops Eye of Sulfuras.", kind: "observed", licence: "CC BY-SA 4.0", source: { url: "https://everloot.app/database/npcs/11502" }, url: "https://everloot.app/database/npcs/11502" };
+  const sources = async () => ({ text: "- [observed in play] …\n- [lore …] …", evidence: [seen, wiki, seen] });
+  const told = llmEngine({ sources, providers: [{ name: "x", complete: async () => ({ text: "He is the Firelord and drops the Eye.", model: "m" }) }] });
+  expect((await told.answer("who is Ragnaros")).source).toBe("https://everloot.app/database/npcs/11502 (CC BY-SA 4.0) | https://warcraft.wiki.gg/wiki/Ragnaros (CC-BY-SA-4.0, as of 2023-11-13)");
+  for (const refusal of ["Not in the sources", "not in the sources.", "Not in the sources!"]) {
+    const engine = llmEngine({ sources, providers: [{ name: "x", complete: async () => ({ text: refusal, model: "m" }) }] });
+    expect(await engine.answer("q"), refusal).toEqual({ answer: "No sourced answer found.", source: "none" });
+  }
 });
