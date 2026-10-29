@@ -13,7 +13,8 @@ function gameDataDir(o: { version?: string; ridingSkill?: number; bosses?: strin
   const dir = mkdtempSync(join(tmpdir(), "kb-key-"));
   writeFileSync(join(dir, "map.json"), JSON.stringify({
     source: build(version),
-    zones: [{ uiMapId: 1, name: "Synthetic Forest" }],
+    continents: [{ id: 0, name: "Synthetic Kingdoms" }],
+    zones: [{ uiMapId: 1, name: "Synthetic Forest", continentId: 0 }],
     entrances: [{ mapId: 34, name: "Synthetic Stockade", uiMapId: 1, minLevel: 20, maxLevel: 24 }, { mapId: 35, name: "Synthetic Vault", uiMapId: 9 }],
     heldBackZones: [{ uiMapId: 77, name: "Synthetic Shore" }],
     flightNodes: [{ id: 2, name: "Synthetic Keep, Synthetic Forest", uiMapId: 1 }, { id: 3, name: "Synthetic Port, Synthetic Shore", uiMapId: 77 }, { id: 4, name: "Synthetic Camp, Synthetic Wilds", uiMapId: 88 }],
@@ -22,8 +23,8 @@ function gameDataDir(o: { version?: string; ridingSkill?: number; bosses?: strin
   writeFileSync(join(dir, "client-mounts.json"), JSON.stringify({ build: build(version), mounts: { "6": { name: "Synthetic Horse", spellId: 458, ridingSkill: o.ridingSkill ?? 75 }, "7": { name: "Synthetic Goat", spellId: 459 } } }));
   writeFileSync(join(dir, "client-achievements.json"), JSON.stringify({ build: build(version), achievements: { "49": { title: "Synthetic Feat", criteria: [{ text: "Win once" }, { text: "Win twice" }] }, "50": { title: "Synthetic Count" } } }));
   mkdirSync(join(dir, "talents"));
-  writeFileSync(join(dir, "talents", "mage.json"), JSON.stringify({ build: build(version), className: "Mage", trees: [{ nodes: [{ entries: [{ spellId: 9, name: "Synthetic Blast" }] }] }] }));
-  writeFileSync(join(dir, "talents", "priest.json"), JSON.stringify({ build: build(version), className: "Priest", trees: [{ nodes: [{ entries: [{ spellId: 10, name: "Synthetic Blast" }] }] }] }));
+  writeFileSync(join(dir, "talents", "mage.json"), JSON.stringify({ build: build(version), className: "Mage", trees: [{ name: "Fire", nodes: [{ entries: [{ spellId: 9, name: "Synthetic Blast" }] }] }] }));
+  writeFileSync(join(dir, "talents", "priest.json"), JSON.stringify({ build: build(version), className: "Priest", trees: [{ name: "Holy", nodes: [{ entries: [{ spellId: 10, name: "Synthetic Blast" }] }] }] }));
   return dir;
 }
 
@@ -46,6 +47,9 @@ test("gameDataAnswerKey: each template the files can answer gets its facts, the 
   expect(answer("talent-class:talent:synthetic-blast")).toEqual({ facts: ["Mage", "Priest"], from: "talents/*.json className", build: "1.0.0.1" });
   // Criteria text stays on the achievement's page, so no question is keyed to it.
   expect(answer("criteria:achievement:synthetic-feat")).toBeUndefined();
+  expect(answer("where-is:zone:synthetic-forest")).toEqual({ facts: ["Synthetic Kingdoms"], from: "map.json zones.continentId -> continents.name", build: "1.0.0.1" });
+  expect(answer("entrance:instance:synthetic-stockade")?.facts).toEqual(["Synthetic Forest"]);
+  expect(answer("what-is:talent:synthetic-blast")?.facts).toEqual(["Mage", "Priest", "Fire", "Holy"]);
 });
 
 test("gameDataAnswerKey: a missing field or file gives no answer, never a guess", () => {

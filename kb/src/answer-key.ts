@@ -28,6 +28,8 @@ export function gameDataAnswerKey(gameDataDir: string): AnswerKey {
   const map = asRecord(readJson(join(gameDataDir, "map.json")));
   const mapBuild = versionOf(map);
   const zoneName = new Map(asArray(map?.zones).map((z) => [asRecord(z)?.uiMapId, text(asRecord(z)?.name)]));
+  const continentName = new Map(asArray(map?.continents).map((c) => [asRecord(c)?.id, text(asRecord(c)?.name)]));
+  const zoneContinent = new Map(asArray(map?.zones).map((z) => [asRecord(z)?.uiMapId, continentName.get(asRecord(z)?.continentId)]));
   const entrances = new Map(asArray(map?.entrances).map((e) => [asRecord(e)?.mapId, asRecord(e)!]));
   const flights = new Map(asArray(map?.flightNodes).map((f) => [asRecord(f)?.id, asRecord(f)!]));
   // Only the released zone list names a node's zone: a node on a map it lacks is in a held-back zone (DATA_POLICY).
@@ -40,6 +42,7 @@ export function gameDataAnswerKey(gameDataDir: string): AnswerKey {
 
   // A talent name can sit in more than one class's tree; every class that has it is part of the answer.
   const talentClasses = new Map<string, string[]>();
+  const talentTrees = new Map<string, string[]>();
   let talentBuild: string | null = null;
   const talentsDir = join(gameDataDir, "talents");
   if (existsSync(talentsDir)) {
@@ -50,7 +53,9 @@ export function gameDataAnswerKey(gameDataDir: string): AnswerKey {
       if (!className) continue;
       for (const tree of asArray(cls?.trees)) for (const node of asArray(asRecord(tree)?.nodes)) for (const entry of asArray(asRecord(node)?.entries)) {
         const name = text(asRecord(entry)?.name)?.toLowerCase();
-        if (name) talentClasses.set(name, unique([...(talentClasses.get(name) ?? []), className]));
+        if (!name) continue;
+        talentClasses.set(name, unique([...(talentClasses.get(name) ?? []), className]));
+        talentTrees.set(name, unique([...(talentTrees.get(name) ?? []), text(asRecord(tree)?.name)]));
       }
     }
   }
@@ -72,7 +77,10 @@ export function gameDataAnswerKey(gameDataDir: string): AnswerKey {
         return answer([e?.minLevel, e?.maxLevel].map((n) => (typeof n === "number" ? String(n) : undefined)), "map.json entrances.minLevel/maxLevel", mapBuild);
       }
       case "where-is:instance":
+      case "entrance:instance":
         return answer([zoneName.get(entrances.get(s.id)?.uiMapId)], "map.json entrances.uiMapId -> zones.name", mapBuild);
+      case "where-is:zone":
+        return answer([zoneContinent.get(s.id)], "map.json zones.continentId -> continents.name", mapBuild);
       case "bosses:instance":
         return answer(asArray(encounters[String(s.id)]).map((b) => text(asRecord(b)?.name)), "client-encounters.json instances[mapId].name", versionOf(encountersFile));
       case "where-is:boss":
@@ -84,6 +92,10 @@ export function gameDataAnswerKey(gameDataDir: string): AnswerKey {
       }
       case "talent-class:talent":
         return answer(talentClasses.get(s.name.toLowerCase()) ?? [], "talents/*.json className", talentBuild);
+      case "what-is:talent": {
+        const name = s.name.toLowerCase();
+        return answer([...(talentClasses.get(name) ?? []), ...(talentTrees.get(name) ?? [])], "talents/*.json className and trees.name", talentBuild);
+      }
       // No criteria: their text stays on the achievement's page (docs/DATA_POLICY.md), so no tool answer carries it.
       default:
         return undefined;
