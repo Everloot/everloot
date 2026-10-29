@@ -175,6 +175,30 @@ The misses are what to work on: the boss lists the evidence cannot name yet (the
 an answer), a flight master's zone answered with its continent (Undercity), and a reasoning model's budget.
 Reports: `docs/evals/answer-eval-2026-10-29-gemma3-4b.md`, `-gemma4-12b.md`.
 
+## Questions in Spanish (built 2026-10-29)
+
+Carlos: many Spanish-speaking players run the English client because the Spanish client's names are from a region
+they don't relate to, and ask in Spanish anyway. So the Spanish questions keep the names in English, as the English
+client shows them, and phrase the rest the way a Puerto Rican player types, gamer words included ("qué bosses hay en
+Deadmines", "qué dropea", "dónde queda"). `TEMPLATES_ES` phrases every template, `TOPICS_ES` is a sample of the long
+tail, and the aliases stay English. `question-bank --spanish` adds them after the English ones, ids prefixed `es:`,
+with the same answer key; it is off by default, so the build-watch diff lists each changed answer once. The eval
+gives each Spanish template its own row ("where-is (es)") and adds a by-language section.
+
+First run (8,686 questions): Spanish matched English on resolution (66% exact) and on answer in evidence (98%),
+because a named question is found by its English name. The gap the table did not show was the questions that name
+nothing: "cuánto cuesta un mount" and "dónde aprendo riding" came back with lore that only shared the word "mount" or
+"riding", and 20 unresolved names got evidence that matched "dónde" or "queda". The words that carry those questions
+(cost, learn) are Spanish, and the wiki is English.
+
+So search reads Spanish first (`kb/src/spanish.ts`): a question that reads as Spanish (a word only Spanish questions
+use, or ¿ ¡) loses its filler words and has its asking words glossed into the English the pages use ("cuesta" is
+cost, "aprendo" is learn); names are kept, and a capitalized word after the first counts as a name. English
+questions are never touched: on the rerun every English result is identical. "cuándo sale Forever" now meets the
+launch-date entry, "dónde aprendo riding" the riding trainers, "necesito llave para Scholomance" the key quests, and
+the 20 false matches are gone (`docs/evals/question-eval-2026-10-29-spanish.md` is the rerun). A client set to
+Spanish (esES or esMX names) is not covered: it needs the localized names, which the game files hold per locale.
+
 ## Phase 3 (the question ledger)
 
 **3a, built (same day, Carlos's go):** for each lookup the chat makes through `/api/tools`, one daily usage

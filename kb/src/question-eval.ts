@@ -26,6 +26,8 @@ export interface QuestionResult {
   page: boolean;
   /** For a question with an answer key: the key's facts that no piece of evidence carries. Empty means all are there. */
   missingFacts?: string[];
+  /** Set for a question asked in Spanish. */
+  lang?: "es";
 }
 
 export interface EvalRow { label: string; questions: number; exact: number; search: number; none: number; withEvidence: number; withObserved: number; withFiles: number; withPage: number; withKey: number; keyFound: number }
@@ -39,6 +41,8 @@ export interface EvalReport {
   totals: EvalRow;
   byTemplate: EvalRow[];
   byKind: EvalRow[];
+  /** English and Spanish side by side; one row when the bank is English only. */
+  byLanguage: EvalRow[];
   /** The subjects that did not resolve, per kind, the first few names each: the gap list a wave should close. */
   unresolved: { kind: SubjectKind; count: number; names: string[] }[];
   /** Questions that came back with no evidence at all, the first few per template. */
@@ -88,8 +92,12 @@ export async function evaluateQuestion(db: ReleaseSource, q: Question, facts: An
     evidence: result.evidence.length, evidenceKinds: kinds,
     page: result.evidence.some((e) => Boolean(e.url)),
     ...(q.answer ? { missingFacts: q.answer.facts.filter((f) => !carries(said, f)) } : {}),
+    ...(q.lang ? { lang: q.lang } : {}),
   };
 }
+
+/** A template's row label: a Spanish question gets its own row beside the English one. */
+const templateLabel = (r: QuestionResult) => (r.lang ? `${r.template} (${r.lang})` : r.template);
 
 function fold(label: string, rows: readonly QuestionResult[]): EvalRow {
   return {
@@ -123,18 +131,19 @@ export async function evaluateBank(
   const unresolved = [...groupBy(results.filter((r) => r.resolution === "none"), (r) => r.kind)]
     .map(([kind, rows]) => ({ kind, count: new Set(rows.map((r) => byId.get(r.id)!.subject.name)).size, names: [...new Set(rows.map((r) => byId.get(r.id)!.subject.name))].slice(0, sample) }))
     .sort((a, b) => b.count - a.count);
-  const noEvidence = [...groupBy(results.filter((r) => r.evidence === 0), (r) => r.template)]
+  const noEvidence = [...groupBy(results.filter((r) => r.evidence === 0), templateLabel)]
     .map(([template, rows]) => ({ template, count: rows.length, texts: rows.slice(0, sample).map((r) => byId.get(r.id)!.text) }))
     .sort((a, b) => b.count - a.count);
-  const keyMissing = [...groupBy(results.filter((r) => r.missingFacts?.length), (r) => r.template)]
+  const keyMissing = [...groupBy(results.filter((r) => r.missingFacts?.length), templateLabel)]
     .map(([template, rows]) => ({ template, count: rows.length, examples: rows.slice(0, sample).map((r) => ({ text: byId.get(r.id)!.text, missing: r.missingFacts! })) }))
     .sort((a, b) => b.count - a.count);
   return {
     schema: "everloot.question-eval/1",
     release: meta.release, corpusConnected: facts !== null, dataAsOf: meta.dataAsOf, ranAt: meta.ranAt ?? new Date().toISOString(),
     totals: fold("all", results),
-    byTemplate: [...groupBy(results, (r) => r.template)].map(([t, rows]) => fold(t, rows)),
+    byTemplate: [...groupBy(results, templateLabel)].map(([t, rows]) => fold(t, rows)),
     byKind: [...groupBy(results, (r) => r.kind)].map(([k, rows]) => fold(k, rows)),
+    byLanguage: [...groupBy(results, (r) => r.lang ?? "en")].map(([l, rows]) => fold(l, rows)),
     unresolved, noEvidence, keyMissing, results,
   };
 }
@@ -158,6 +167,7 @@ export function formatEvalReport(report: EvalReport): string {
     "",
     head, rowLine(report.totals),
     "",
+    ...(report.byLanguage.length > 1 ? ["## By language", "", head, ...report.byLanguage.map(rowLine), ""] : []),
     "## By template",
     "",
     head, ...report.byTemplate.map(rowLine),
