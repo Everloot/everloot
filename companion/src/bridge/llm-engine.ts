@@ -1,5 +1,5 @@
 import { completeWithFallback, type Provider } from "../providers/chain";
-import { answerFromEvidence, MAX_ANSWER, sourcedFor, sourceLines, type AnswerEngine, type Sourced } from "./engine";
+import { answerFromEvidence, MAX_ANSWER, playerLine, sourcedFor, sourceLines, type AnswerEngine, type Sourced } from "./engine";
 
 const NOT_FOUND = "Not in the sources.";
 
@@ -23,7 +23,7 @@ export function llmEngine(options: { sources: (question: string) => Promise<Sour
       const grounded = answerFromEvidence(sourced);
       if (grounded.source === "none") return grounded;
       const earlier = leaned && context?.earlier ? `Earlier the player asked: ${context.earlier.question}\nand was told: ${context.earlier.answer}\n\n` : "";
-      const reply = await completeWithFallback(options.providers, SYSTEM, `${earlier}Question: ${question}\n\nSources:\n${sourced.text}`);
+      const reply = await completeWithFallback(options.providers, SYSTEM, `${playerLine(context?.player)}${earlier}Question: ${question}\n\nSources:\n${sourced.text}`);
       const text = plainText(reply.text);
       if (declined(text)) return { answer: "No sourced answer found.", source: "none" };
       return { answer: `${text} (answered by ${reply.model})`.slice(0, MAX_ANSWER), source: sourceLines(sourced) };

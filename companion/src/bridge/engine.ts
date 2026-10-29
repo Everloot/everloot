@@ -6,8 +6,39 @@ import { answerMarketQuestion, type MarketDeps } from "../../../web/src/lib/chat
 /** The player's question just before this one, and what they were told, when this one reads as its follow-up. */
 export interface Earlier { question: string; answer: string }
 
-/** What the game knows about a question beyond its words: the realm the player was on, and the question it follows. */
-export interface AskContext { realm?: string; earlier?: Earlier }
+/** Who asked, as the game said when they asked: the class token ("MAGE"), the level and the zone. Used for that answer only. */
+export interface Player { class?: string; level?: number; zone?: string }
+
+/** What the game knows about a question beyond its words: the realm the player was on, who asked, and the question it follows. */
+export interface AskContext { realm?: string; earlier?: Earlier; player?: Player }
+
+const CLASS_NAMES: Readonly<Record<string, string>> = {
+  WARRIOR: "Warrior", PALADIN: "Paladin", HUNTER: "Hunter", ROGUE: "Rogue", PRIEST: "Priest",
+  SHAMAN: "Shaman", MAGE: "Mage", WARLOCK: "Warlock", DRUID: "Druid",
+};
+
+/** The class as the pages name it, from the game's token; an unknown token names nothing. */
+export const className = (token?: string) => (token ? CLASS_NAMES[token] : undefined);
+
+const HERE = /(?<![\p{L}\p{N}])(?:around here|this zone|here|esta zona|aquí|aqui|acá|aca)(?![\p{L}\p{N}])/iu;
+const MY_CLASS = /(?<![\p{L}\p{N}])(?:my class|mi clase)(?![\p{L}\p{N}])/iu;
+
+/** The question with "here" as the player's zone and "my class" as their class, so the lookup has a name to find. */
+export function withPlayer(question: string, player?: Player): string {
+  let q = question;
+  if (player?.zone) q = q.replace(HERE, player.zone);
+  const cls = className(player?.class);
+  if (cls) q = q.replace(MY_CLASS, cls);
+  return q;
+}
+
+/** One line for a model: who is asking, so "which talents should I take" can be answered for them. Empty when nothing is known. */
+export function playerLine(player?: Player): string {
+  const cls = className(player?.class);
+  if (!cls && !player?.level && !player?.zone) return "";
+  const who = [player?.level ? `level ${player.level}` : "", cls ?? "player"].filter(Boolean).join(" ");
+  return `The player asking is a ${who}${player?.zone ? ` in ${player.zone}` : ""}.\n\n`;
+}
 
 const FOLLOW_ON = /^(?:and|also|what about|how about)\b/i;
 const PRONOUN = /\b(?:he|she|it|they|him|her|them|his|its|their)\b/i;
@@ -73,9 +104,10 @@ export function namesSomething(sourced: Sourced): boolean {
 export async function sourcedFor(
   question: string, context: AskContext | undefined, sources: (question: string) => Promise<Sourced>,
 ): Promise<{ sourced: Sourced; leaned: boolean }> {
-  const alone = await sources(question);
+  const asked = withPlayer(question, context?.player);
+  const alone = await sources(asked);
   if (!context?.earlier || namesSomething(alone)) return { sourced: alone, leaned: false };
-  return { sourced: await sources(lookupText(question, context)), leaned: true };
+  return { sourced: await sources(lookupText(asked, context)), leaned: true };
 }
 
 /** Every piece's source line, once each: what a model's answer, written from all of them, has to credit. */
