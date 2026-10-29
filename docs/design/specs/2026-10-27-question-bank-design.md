@@ -88,6 +88,66 @@ aliases say whether short forms map at all. Each fix is a normal pull request, a
   mount, talent and instance questions, pages on 97%; questions with no evidence 25 → 20, nineteen of them bosses
   of instances the map keeps behind the spoiler switch.
 
+## The answer key (built 2026-10-28)
+
+Forever's answers move between builds; the questions do not. "What riding skill does Brown Horse need" asks for the
+same field on every build, whatever its value. So the bank pins the question and its field, and the value is read
+again from the game-data files each time the bank is generated (`kb/src/answer-key.ts`). Nothing is typed by hand,
+so nothing goes stale.
+
+Each question the files can answer carries `answer: { facts, from, build }`: the facts a correct answer has to
+contain, the file and field they came from, and the game build of that file. On build 1.60.1.70685, 1,003 of the
+4,424 questions carry one:
+
+| template | subject | facts from |
+|---|---|---|
+| riding-skill | mount | `client-mounts.json` ridingSkill |
+| level | instance | `map.json` entrance minLevel, maxLevel |
+| where-is | instance | `map.json` entrance map, then its zone name |
+| bosses | instance | `client-encounters.json` names for the instance's map |
+| where-is | boss | the instance whose map lists the boss |
+| where-is, flight-to | flight | the node's zone from the released zone list; a node in a held-back zone is no question at all |
+| talent-class | talent | `talents/*.json` className, every class that has the name |
+
+A missing file or field gives no answer, never a guess. Achievement criteria have none on purpose: their text stays
+on the achievement's page (docs/DATA_POLICY.md), so no tool answer can carry it. Wiki subjects and the other
+templates have none yet: their answers live in the knowledge release or in play, not in these files.
+
+**Between builds**, `npm run kb -- question-diff <before.jsonl> <after.jsonl> [--out <report.md>]` compares two
+banks question by question and lists the answers a build changed, added and removed, with both builds named.
+Order inside a list (a boss list, say) is not a change. The "before" bank is generated from the older files
+(`git archive <commit> web/src/data/game-data`, then `question-bank --game-data <that folder>`). Against 70532, the
+70658 bank removed "which class has Piercing Ice" (Mage) and added Arcane Wrath (Mage), which is what the build's
+own change file (`changes/wowf-70630.json`) records; 70634 to 70658 changed none of these answers, and that
+build's change file lists no talent or map changes either. 70658 to 70685 changed none, and neither does its
+change file.
+
+**In the eval**, a new column, "answer in evidence": of the questions with an answer key, how many got
+`answer_sources` evidence carrying every fact (a whole word or number, any case: 75 is not found in 175). The
+report's last list, "Answers missing from the evidence", names the question and the facts it lacked. That is what
+the model is handed, so a fact missing there is one no model can answer from.
+
+The first run found four gaps in `files-evidence.ts`. Three are fixed in the same pull request, taking the column
+from 82% to 98% of the keyed questions (`docs/evals/question-eval-2026-10-29-answer-key.md` is the run after); the
+fourth waits on a policy decision:
+
+- **Boss lists (4%, open).** An instance's fact gives the number of encounters, not their names, so "which bosses
+  are in Shadowfang Keep" cannot be answered from the evidence. Naming them was tried and taken back in review: no
+  DATA_POLICY line allows game-file encounter names through the API or MCP (the policy's game-file section allows
+  the client layer and the race table there; the files evidence of #536 already names each boss in its own fact,
+  also without a line). The maintainer decides whether the files evidence gets a policy line; until then the key
+  keeps the names and the eval shows the gap.
+- **Shared talents (99% → 100%).** Evidence kept one fact per name, so a talent two classes have (Deflection,
+  Flurry, Precision, …) came back with one class. It keeps one per fact now.
+- **Held-back zones (review, 2026-10-29).** Five flight masters sit in zones the map holds back as unreleased. Naming
+  their zone was tried and taken back: DATA_POLICY keeps new zones hidden unless the reader turns spoilers on, and
+  the public MCP tool leaves them out altogether. They are now left out of the files evidence (name and zone; the
+  #536 index had already been naming the nodes), the answer key and the bank.
+- **Achievement criteria** were scored against text the policy keeps on the page; they left the key instead.
+
+What this is for: the changed list is what to recheck in game after a patch; the column says whether the facts reach
+the model. Whether the model's written answer then carries them (in game or on the site) is phase 2.
+
 ## Phase 2 (design only): a model in the loop
 
 Run the bank, or a sample of it, through the chat's own planner (`web/src/lib/chat/agent.ts`) with a fixture
@@ -110,4 +170,6 @@ without the question. That is what would feed the bank with the aliases players 
 
 `kb/test/question-bank.test.ts`: subjects from synthetic game-data files (missing files add nothing), the bank's
 templates and stable ids and round trip, wiki subjects by category with the first rule winning, resolution exact /
-search / none / n/a, and the report's totals, gap lists and markdown.
+search / none / n/a, and the report's totals, gap lists and markdown. `kb/test/answer-key.test.ts`: each template's
+facts, field and build from synthetic files, no answer for a missing field or file, and the diff's changed, added and
+removed lists with reordered facts not counted.

@@ -84,6 +84,8 @@ export function buildFilesIndex(files: GameDataFiles): FilesIndex {
     const zone = zoneName.get(num(r?.uiMapId) ?? -1);
     const bosses = arr(encounters?.[String(id)]);
     const url = `${SITE}/database/instances/${segment(id, name)}`;
+    // The count, not the encounters' names: no DATA_POLICY line yet allows game-file encounter names through the API
+    // or MCP (raised with the maintainer 2026-10-29). The page lists them.
     facts.push({
       kind: "instance", name,
       claim: `${name}: a ${kind}${level ? `, ${level}` : ""}${zone ? `, entered from ${zone}` : ""}${bosses.length ? `; the files list ${bosses.length} encounters` : ""}.`,
@@ -94,9 +96,11 @@ export function buildFilesIndex(files: GameDataFiles): FilesIndex {
       if (bossName) facts.push({ kind: "boss", name: bossName, claim: `${bossName}: encounter ${i + 1} of ${bosses.length} in ${name}, in the game files.`, url });
     });
   }
+  // A node in a zone the map holds back (unreleased, DATA_POLICY "held-back zones") is left out altogether, name and zone.
+  const heldBack = new Set(arr(map?.heldBackZones).map((z) => num(rec(z)?.uiMapId)));
   for (const f of arr(map?.flightNodes)) {
     const r = rec(f); const name = str(r?.name).split(",")[0]!.trim();
-    if (!name) continue;
+    if (!name || heldBack.has(num(r?.uiMapId))) continue;
     const zone = zoneName.get(num(r?.uiMapId) ?? -1);
     facts.push({ kind: "flight", name, claim: `${name}: a flight master${zone ? ` in ${zone}` : ""}, in the game files.`, url: `${SITE}/map` });
   }
@@ -188,9 +192,9 @@ export function filesEvidence(question: string, index: FilesIndex | null, limit:
   const out: FilesEvidence[] = [];
   const seen = new Set<string>();
   for (const f of matched) {
-    const key = `${f.kind}|${f.name.toLowerCase()}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
+    // One per thing, not per name: a talent two classes share is two facts, and both are the answer.
+    if (seen.has(f.claim)) continue;
+    seen.add(f.claim);
     out.push({
       claim: f.claim, kind: "files",
       source: { title: `WoW: Forever game files, build ${index.build || "unrecorded"} (${CLIENT_LABEL})`, url: `${SITE}/database/download` },

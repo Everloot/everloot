@@ -14,12 +14,20 @@ const files = {
     continents: [{ id: 0, name: "Synthetic Kingdoms" }],
     zones: [{ uiMapId: 1429, name: "Synthetic Forest", continentId: 0 }],
     entrances: [{ mapId: 34, name: "Synthetic Stockade", raid: false, uiMapId: 1429, minLevel: 17, maxLevel: 24 }, { mapId: 34, name: "Synthetic Stockade", raid: false, uiMapId: 1429 }, { mapId: 409, name: "Molten Core", raid: true, uiMapId: 9999, minLevel: 60, maxLevel: 60 }],
-    flightNodes: [{ id: 2, name: "Synthetic Keep, Synthetic Forest", uiMapId: 1429 }],
+    heldBackZones: [{ uiMapId: 2548, name: "Synthetic Shore" }],
+    flightNodes: [
+      { id: 2, name: "Synthetic Keep, Synthetic Forest", uiMapId: 1429 },
+      { id: 3, name: "Synthetic Port, Synthetic Shore", uiMapId: 2548 },
+      { id: 4, name: "Synthetic Camp, Synthetic Wilds", uiMapId: 77 },
+    ],
   },
   encounters: { build: { version: "1.0.0.70634" }, instances: { "34": [{ id: 1, name: "Synthetic Warden" }, { id: 2, name: "Synthetic Stockade" }] } },
   mounts: { build: { version: "1.0.0.70634" }, mounts: { "6": { name: "Synthetic Horse", spellId: 458, ridingSkill: 75 }, "7": { name: "Synthetic Wolf", spellId: 459 } } },
   achievements: { build: { version: "1.0.0.70634" }, achievements: { "49": { title: "Storm the Chasm", points: 10, description: "secret text", criteria: [{ text: "secret criterion" }, { text: "another" }] } } },
-  talents: { mage: { build: { version: "1.0.0.70634" }, className: "Mage", trees: [{ name: "Fire", nodes: [{ entries: [{ spellId: 9, name: "Synthetic Blast", maxRanks: 5 }] }] }] } },
+  talents: {
+    mage: { build: { version: "1.0.0.70634" }, className: "Mage", trees: [{ name: "Fire", nodes: [{ entries: [{ spellId: 9, name: "Synthetic Blast", maxRanks: 5 }] }] }] },
+    priest: { build: { version: "1.0.0.70634" }, className: "Priest", trees: [{ name: "Holy", nodes: [{ entries: [{ spellId: 10, name: "Synthetic Blast", maxRanks: 2 }] }] }] },
+  },
 };
 
 test("buildFilesIndex: one fact per thing, ids and facts only, the build stamped, no file text", () => {
@@ -35,14 +43,23 @@ test("buildFilesIndex: one fact per thing, ids and facts only, the build stamped
   ]);
   expect(byKind("instance")[0]!.url).toBe("https://everloot.app/database/instances/34-synthetic-stockade");
   expect(byKind("boss").map((f) => f.claim)).toEqual(["Synthetic Warden: encounter 1 of 2 in Synthetic Stockade, in the game files.", "Synthetic Stockade: encounter 2 of 2 in Synthetic Stockade, in the game files."]);
-  expect(byKind("flight")).toEqual([{ kind: "flight", name: "Synthetic Keep", claim: "Synthetic Keep: a flight master in Synthetic Forest, in the game files.", url: "https://everloot.app/map" }]);
+  // A node in a held-back zone is left out, name and all; one on a map the zone list lacks names no zone.
+  expect(byKind("flight")).toEqual([
+    { kind: "flight", name: "Synthetic Keep", claim: "Synthetic Keep: a flight master in Synthetic Forest, in the game files.", url: "https://everloot.app/map" },
+    { kind: "flight", name: "Synthetic Camp", claim: "Synthetic Camp: a flight master, in the game files.", url: "https://everloot.app/map" },
+  ]);
+  expect(JSON.stringify(index)).not.toContain("Synthetic Port");
+  expect(JSON.stringify(index)).not.toContain("Synthetic Shore");
   expect(byKind("mount").map((f) => f.claim)).toEqual(["Synthetic Horse: a mount (id 6), riding skill 75, taught by spell 458, in the game files.", "Synthetic Wolf: a mount (id 7), taught by spell 459, in the game files."]);
   // The achievement's description and criteria text never leave the page.
   const ach = byKind("achievement")[0]!;
   expect(ach.claim).toBe("Storm the Chasm: an achievement, 10 points, 2 criteria; the criteria text is on its page.");
   expect(JSON.stringify(index)).not.toContain("secret");
   expect(ach.url).toBe("https://everloot.app/database/achievements/49-storm-the-chasm");
-  expect(byKind("talent")).toEqual([{ kind: "talent", name: "Synthetic Blast", claim: "Synthetic Blast: a Mage talent in the Fire tree, up to 5 ranks, in the game files.", url: "https://everloot.app/tools/talents/mage" }]);
+  expect(byKind("talent")).toEqual([
+    { kind: "talent", name: "Synthetic Blast", claim: "Synthetic Blast: a Mage talent in the Fire tree, up to 5 ranks, in the game files.", url: "https://everloot.app/tools/talents/mage" },
+    { kind: "talent", name: "Synthetic Blast", claim: "Synthetic Blast: a Priest talent in the Holy tree, up to 2 ranks, in the game files.", url: "https://everloot.app/tools/talents/priest" },
+  ]);
   expect(buildFilesIndex({})).toEqual({ build: "", extractedAt: null, facts: [] });
 });
 
@@ -59,6 +76,8 @@ test("filesEvidence: whole-word mentions, longest names first, one per thing, la
   expect(filesEvidence("Synthetic Forestry", index, 8)).toEqual([]);
   expect(filesEvidence("Synthetic Horse and Synthetic Wolf", index, 1)).toHaveLength(1);
   expect(filesEvidence("Synthetic Horse", null, 8)).toEqual([]);
+  // A name two things share gives both: the talent is the Mage's and the Priest's.
+  expect(filesEvidence("which class has Synthetic Blast", index, 8).map((e) => e.claim.split(":")[1]!.split(" talent")[0])).toEqual([" a Mage", " a Priest"]);
   // A short form names its page here too: "MC" is Molten Core.
   expect(filesEvidence("where is MC", index, 8).map((e) => e.claim)).toEqual(["Molten Core: a raid, level 60."]);
 });
@@ -70,7 +89,7 @@ test("readFilesIndex: the same index from the files on disk, missing files left 
   mkdirSync(join(dir, "talents"));
   writeFileSync(join(dir, "talents", "mage.json"), JSON.stringify(files.talents.mage));
   const index = readFilesIndex(dir);
-  expect(index.facts.map((f) => f.kind)).toEqual(["zone", "instance", "instance", "flight", "mount", "mount", "talent"]);
+  expect(index.facts.map((f) => f.kind)).toEqual(["zone", "instance", "instance", "flight", "flight", "mount", "mount", "talent"]);
   expect(readFilesIndex(mkdtempSync(join(tmpdir(), "kb-files-empty-"))).facts).toEqual([]);
 });
 
