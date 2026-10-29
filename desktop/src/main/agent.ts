@@ -13,8 +13,8 @@ import { NO_SOURCED_ANSWER, type ChatMessage, type ChatProgress, type ChatStep }
  * The agent behind the Chat page. It talks to Everloot's own MCP server and, through the local
  * tools, the player's own save files; nothing else. With a provider in config.json the model runs
  * a tool-use loop over every MCP tool plus the local ones (Anthropic's API or any OpenAI-compatible
- * one: OpenRouter, OpenCode Zen, a local Ollama); with none, the page shows the sourced search hits
- * as they are. Every answer lists the sources the tools returned, and an answer the tools could
+ * one: OpenRouter, OpenCode Zen, a local Ollama); with none, the page shows answer_sources' labelled
+ * evidence as it is. Every answer lists the sources the tools returned, and an answer the tools could
  * not back is said to come from the model's own knowledge. Nothing here touches the game.
  */
 
@@ -73,7 +73,7 @@ export const UNSOURCED = "From general knowledge, not Everloot's data:";
 
 const SYSTEM = [
   "You are Everloot's assistant for World of Warcraft: Forever players, running on the player's own computer.",
-  "Look things up with the tools first; search_knowledge when unsure which record to open. Name the source after each fact as the tools give it.",
+  "Look things up with the tools first. For a question about something by name, answer_sources gathers in one call what Everloot has on it: observed in play, curated, the current game files' facts (unconfirmed) and the 2023 wiki, each labelled. Use search_knowledge when unsure which record to open. Name the source after each fact as the tools give it.",
   "Tools whose names start with my_ read this computer: the player's own save files (my_characters, my_realm_scans) or the Everloot Desktop App's own status (my_app_status). Use them for questions about the player's characters, gold or scans, and about whether the app or its uploads are working.",
   `If the tools have nothing on the question, you may answer from your own knowledge of World of Warcraft, but start that part with "${UNSOURCED}" and never invent a drop rate, price, location or name. If you do not know, say so.`,
   "Keep answers short and concrete. Plain text, no markdown headings.",
@@ -149,11 +149,11 @@ export async function answer(options: AgentOptions): Promise<AgentReply> {
   throw new Error(`config.json: unknown provider type ${entry.type}`);
 }
 
-/** No provider: the top sourced hits, verbatim. */
+/** No provider: answer_sources' evidence for the question, verbatim and labelled. */
 async function plain(o: AgentOptions): Promise<AgentReply> {
-  const hits = await (o.session ?? withMcp)(o.mcp, async (c) => textOf(await c.callTool({ name: "search_knowledge", arguments: { query: o.question, limit: 3 } }, undefined, { signal: o.signal })));
+  const hits = await (o.session ?? withMcp)(o.mcp, async (c) => textOf(await c.callTool({ name: "answer_sources", arguments: { question: o.question, limit: 3 } }, undefined, { signal: o.signal })));
   const sources = sourcesIn(hits);
-  const steps: ChatStep[] = [{ tool: "search_knowledge", input: o.question, chars: hits.length }];
+  const steps: ChatStep[] = [{ tool: "answer_sources", input: o.question, chars: hits.length }];
   if (!sources.length) return { text: NOTHING, model: null, sources: [], steps };
   return { text: hits.trim(), model: null, sources, steps };
 }

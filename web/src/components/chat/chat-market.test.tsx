@@ -75,7 +75,7 @@ test("no key: a price question gets the recorded price, its page and no knowledg
   await say("What is the price of Linen Cloth on Forever?");
   expect(text()).toContain(FIXTURE_ANSWER);
   expect(urls()).toContain("/api/tools/market_value?realm=Forever&itemId=2589");
-  expect(urls().some((u) => u.startsWith("/api/tools/search_knowledge"))).toBe(false);
+  expect(urls().some((u) => u.startsWith("/api/tools/answer_sources"))).toBe(false);
   expect(urls().some((u) => u.startsWith("/database/card/"))).toBe(false);
   expect(text()).toContain("From Everloot");
   expect(container.querySelector('a[href="https://everloot.app/tools/auctions?realm=Forever&item=2589"]')).not.toBeNull();
@@ -102,7 +102,7 @@ test.each([
   expect(urls()).toContain("/api/tools/market_value?realm=Forever&itemId=2589");
   expect(text()).toContain("on Forever, all houses: market 3s 10c");
   expect(urls().some((u) => u.startsWith("https://openrouter.ai/api/v1/chat/completions"))).toBe(false);
-  expect(urls().some((u) => u.startsWith("/schema/mcp/") || u.startsWith("/api/tools/search_knowledge"))).toBe(false);
+  expect(urls().some((u) => u.startsWith("/schema/mcp/") || u.startsWith("/api/tools/answer_sources"))).toBe(false);
 });
 
 test("a canonical name that begins with an article is searched whole and its own price is fetched; a conversational article is dropped by the resolver", async () => {
@@ -144,13 +144,13 @@ test("an unreadable market says so and does not fall back to search or the model
   await render(<ChatClient />);
   await say("price 2589 on Forever");
   expect(text()).toContain("unrecorded, not zero");
-  expect(urls().some((u) => u.startsWith("/api/tools/search_knowledge"))).toBe(false);
+  expect(urls().some((u) => u.startsWith("/api/tools/answer_sources"))).toBe(false);
 });
 
 test("a question that is not about a price keeps its usual search", async () => {
   await render(<ChatClient />);
   await say("Who is Leeroy Jenkins?");
-  expect(urls().some((u) => u.startsWith("/api/tools/search_knowledge"))).toBe(true);
+  expect(urls().some((u) => u.startsWith("/api/tools/answer_sources"))).toBe(true);
   expect(urls().some((u) => u.startsWith("/api/tools/market_value"))).toBe(false);
 });
 

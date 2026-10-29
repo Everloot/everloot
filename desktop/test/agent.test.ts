@@ -39,7 +39,7 @@ test("config entries come without keys, and an inline key is refused", () => {
 test("with no provider the answer is the sourced hits themselves; no source means no answer", async () => {
   const calls: { name: string; args: unknown }[] = [];
   const r = await answer({ mcp: { url: "https://everloot.app/mcp/public", token: null }, entries: [], history: [], question: "what drops bindings", session: fakeSession(calls) });
-  expect(calls).toEqual([{ name: "search_knowledge", args: { query: "what drops bindings", limit: 3 } }]);
+  expect(calls).toEqual([{ name: "answer_sources", args: { question: "what drops bindings", limit: 3 } }]);
   expect(r.model).toBeNull();
   expect(r.sources).toHaveLength(2);
   expect(r.text).toContain("Baron Geddon");

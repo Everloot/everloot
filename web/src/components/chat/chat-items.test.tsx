@@ -77,7 +77,7 @@ test("no key: Linen Cloth opens its own card and drop state, not a similar item'
   await render(<ChatClient />);
   await click(button("Where does Linen Cloth drop?"));
   expect(calls.map((c) => c.url)).toContain("/search/suggest?q=Linen+Cloth&in=item");
-  expect(calls.some((c) => c.url.startsWith("/api/tools/search_knowledge"))).toBe(false);
+  expect(calls.some((c) => c.url.startsWith("/api/tools/answer_sources"))).toBe(false);
   expect(text()).not.toContain("Red Linen Robe");
   expect(text()).toContain("Sell Price 13c");
   expect(text()).toContain("No drops recorded yet");
@@ -127,7 +127,7 @@ test("ordinary questions do not look an item up", async () => {
   await render(<ChatClient />);
   await click(button("What changed in the last build?"));
   expect(calls.some((c) => c.url.startsWith("/search/suggest"))).toBe(false);
-  expect(calls.some((c) => c.url.startsWith("/api/tools/search_knowledge"))).toBe(true);
+  expect(calls.some((c) => c.url.startsWith("/api/tools/answer_sources"))).toBe(true);
 });
 
 test("an older conversation without item references still opens", async () => {

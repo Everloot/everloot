@@ -9,6 +9,8 @@ const KEY = "sk-or-v1-secretsecretsecretsecret1234";
 const PROVIDERS = "everloot.chat.providers.v1";
 const FREE = "/api/chat/free/chat/completions";
 const HIT = "[item] Linen Cloth\nDropped by humanoids.\nMore: https://everloot.app/database/item/2589\nSource: https://warcraft.wiki.gg/wiki/Linen_Cloth (CC-BY-SA-4.0, retrieved 2023-11-13)\n";
+/** answer_sources' text for the same item, as Everloot search reads it. */
+const EVIDENCE = "- [lore (Warcraft Wiki 2023, may differ in WoW: Forever)] Dropped by humanoids.\n  Source: https://warcraft.wiki.gg/wiki/Linen_Cloth (CC-BY-SA-4.0, retrieved 2023-11-13)\n  More: https://everloot.app/database/item/2589";
 
 function sse(events: unknown[]): Response {
   const raw = events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join("") + "data: [DONE]\n\n";
@@ -26,6 +28,7 @@ function api(proxy: "ok" | "limit" = "ok") {
     calls.push({ url, init });
     if (url === "/api/auth/me") return Response.json({ user: null });
     if (url.startsWith("/schema/mcp/")) return Response.json({ title: "T", inputSchema: { type: "object", properties: {} } });
+    if (url.startsWith("/api/tools/answer_sources")) return Response.json({ text: EVIDENCE });
     if (url.startsWith("/api/tools/")) return Response.json({ text: HIT });
     if (url === FREE) {
       if (proxy === "limit") return Response.json({ error: { message: "The free model has reached its limit for now.", code: "free_chat_limit" } }, { status: 429 });
@@ -125,7 +128,7 @@ describe("Everloot (free) on /chat", () => {
     expect(text()).toContain("Everloot search is ready");
     await send("Where does Linen Cloth drop?");
     expect(calls.some((c) => c.url === FREE)).toBe(false);
-    expect(calls.some((c) => c.url.startsWith("/api/tools/search_knowledge"))).toBe(true);
+    expect(calls.some((c) => c.url.startsWith("/api/tools/answer_sources"))).toBe(true);
   });
 
   test("a key the player added takes precedence over the free model", async () => {
