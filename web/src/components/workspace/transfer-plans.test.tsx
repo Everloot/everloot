@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { setTimeout as ioDelay } from "node:timers/promises";
@@ -173,6 +174,14 @@ beforeEach(() => {
     return response;
   }));
   installLocks();
+  // crypto.subtle.digest finishes on Node's thread pool, outside the ticks settle() waits for, so on a busy CI runner a
+  // save could still be part way when a test looked (the transfer-plans flake). The same SHA-256, worked out at once.
+  const digest = crypto.subtle.digest.bind(crypto.subtle);
+  vi.spyOn(crypto.subtle, "digest").mockImplementation(async (algorithm, data) => {
+    if (algorithm !== "SHA-256") return digest(algorithm, data);
+    const bytes = ArrayBuffer.isView(data) ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength) : new Uint8Array(data);
+    return Uint8Array.from(createHash("sha256").update(bytes).digest()).buffer;
+  });
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
