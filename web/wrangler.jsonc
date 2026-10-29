@@ -1,11 +1,18 @@
-// The site on Cloudflare Workers through OpenNext (decision 2026-10-28: move off Vercel after launch).
-// A spike for now: it deploys to everloot-web.<account>.workers.dev, not to everloot.app.
+// The site on Cloudflare Workers through OpenNext (decision 2026-10-28: move off Vercel before the launch).
+// It serves everloot.app and www.everloot.app (docs/2026-10-28-cloudflare-workers-migration.md, "Switch runbook").
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "everloot-web",
   // scripts/cf-entry.mjs, copied here by scripts/cf-bundle-files.mjs: OpenNext's worker plus the scheduled jobs.
   "main": ".open-next/cf-entry.mjs",
-  // No `triggers.crons` until the cutover: Vercel runs the crons until then, and only one host may (src/lib/cf-crons.ts).
+  "routes": [
+    { "pattern": "everloot.app/*", "zone_name": "everloot.app" },
+    { "pattern": "www.everloot.app/*", "zone_name": "everloot.app" }
+  ],
+  // The workers.dev host would serve production with no Access in front of it.
+  "workers_dev": false,
+  // The schedules in src/lib/cf-crons.ts. Only one host may run them: Vercel's crons are off from the switch on.
+  "triggers": { "crons": ["*/10 * * * *", "23 * * * *"] },
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": {
@@ -42,13 +49,12 @@
     { "type": "Text", "globs": ["repo/**/*.md", "repo/**/*.yaml", "repo/**/*.yml", "repo/**/*.json"], "fallthrough": true }
   ],
   "vars": {
-    // web/src/lib/platform.ts: trust cf-connecting-ip, and name the environment for analytics. "preview" keeps
-    // PostHog off until everloot.app moves here; set "production" in the cutover deploy.
+    // web/src/lib/platform.ts: trust cf-connecting-ip, and name the environment for analytics.
     // Workers sets no NODE_ENV, and code that reads it through a variable (secure cookies, the stores' production
     // checks) would take the development path (runtime audit, 10/28).
     "NODE_ENV": "production",
     "EVERLOOT_PLATFORM": "cloudflare",
-    "EVERLOOT_DEPLOY_ENV": "preview",
+    "EVERLOOT_DEPLOY_ENV": "production",
     // Feature switches, as in production. Pages built ahead of time read them during the build too, so
     // scripts/cf-deploy.mjs passes every var except the *_DIR paths to the build.
     "EVERLOOT_DATA_GUARD": "1",

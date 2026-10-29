@@ -3,8 +3,8 @@
  * crons so the two hosts never drift (cf-crons.test.ts). Each run calls the route with the same
  * `Authorization: Bearer $CRON_SECRET` Vercel sends.
  *
- * Only one host may run them: the Worker's `triggers.crons` in wrangler.jsonc stay empty until Vercel's crons are
- * switched off at the cutover (docs/2026-10-28-cloudflare-workers-migration.md).
+ * Only one host may run them: the Worker's `triggers.crons` in wrangler.jsonc start at the cutover, when Vercel's
+ * crons are switched off (docs/2026-10-28-cloudflare-workers-migration.md).
  */
 export const CF_CRONS: Readonly<Record<string, readonly string[]>> = {
   "*/10 * * * *": ["/api/cron/snapshot", "/api/cron/blue"],

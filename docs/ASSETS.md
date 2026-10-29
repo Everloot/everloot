@@ -215,9 +215,9 @@ repeat these steps for a new build or another deployment.
 2. **Private bucket.** Create a second bucket, for example `everloot-game-data`, with **no** public
    address and no CORS. It holds the item facts.
 3. **Upload key.** Create an R2 API token with *Object Read & Write* on those two buckets only. Keep
-   the key id and secret out of git and out of the Vercel project; they are only for the upload.
+   the key id and secret out of git and out of the Worker; they are only for the upload.
 4. **Server read key.** Create a second R2 API token with *Object Read only* on the private bucket
-   only. This one goes into the Vercel project (step 7).
+   only. This one goes into the Worker's secrets (step 7).
 5. **Snapshot.** On a maintainer machine with the game's build available from the CDN, run
    `client-extract --refresh` (above) once for the build, so the snapshot has the item, map art and
    atlas tables.
@@ -253,16 +253,18 @@ repeat these steps for a new build or another deployment.
    the CDN, and files from an earlier run stay. A changed extract goes to a new build folder (a new
    build gives one by itself); to change one in place, delete the folder in the dashboard and purge
    the cache first. Removing anything is done in the dashboard.
-7. **Turn it on.** In the Vercel project for `web/`, set:
+7. **Turn it on.** The site runs as the Cloudflare Worker `everloot-web` (`web/wrangler.jsonc`). Set:
    - `NEXT_PUBLIC_GAME_ASSETS_URL`: the public address plus the build folder, no trailing slash, for
-     example `https://assets.everloot.app/wow_classic_beta-70450-84bea423`. Read at build time.
-   - For item tooltips, server-only (never with a `NEXT_PUBLIC_` prefix): `GAME_DATA_S3_ENDPOINT`
+     example `https://assets.everloot.app/wow_classic_beta-70450-84bea423`. Read at build time, so it is
+     the GitHub repository variable of that name (read by `.github/workflows/deploy-worker.yml`), and the
+     same line in the environment of a deploy by hand (`npm run cf:deploy` from `web/`).
+   - For item tooltips, Worker secrets (`npx wrangler secret put`, never with a `NEXT_PUBLIC_` prefix): `GAME_DATA_S3_ENDPOINT`
      (`https://<account id>.r2.cloudflarestorage.com`), `GAME_DATA_BUCKET` (`everloot-game-data`),
      `GAME_DATA_ACCESS_KEY_ID` and `GAME_DATA_SECRET_ACCESS_KEY` (the read-only key from step 4).
      The server reads `<GAME_DATA_BUCKET>/<build folder>/items.json`, where the build folder is the
      last part of `NEXT_PUBLIC_GAME_ASSETS_URL`, and only for the same build as the manifest.
 
-   Redeploy. Open `/`, `/tools/talents/hunter`, `/database/drops`, `/tools/raid`, `/map` and
+   Redeploy the Worker (rerun the latest "Deploy the site to Cloudflare Workers" run, or deploy by hand). Open `/`, `/tools/talents/hunter`, `/database/drops`, `/tools/raid`, `/map` and
    `/changes`: the icons, pictures, banners and the credit line appear. Pages read the manifest and item files again at most once an
    hour. To turn it off, clear the variables and redeploy.
 8. **Item names.** The category lists and item pages name an item before players do wherever the game
