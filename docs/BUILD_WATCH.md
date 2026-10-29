@@ -34,6 +34,11 @@ A maintainer reviews it. Nothing merges itself.
    coverage score then counts only reports made after the build was seen. A changed `QuestV2` or `UiMap` needs
    the row-level answer, which only the maintainer's two local snapshots give: `npm run kb -- client-diff <old>
    <new> --out diff.json`, then `npm run kb -- recheck-scopes diff.json --since <first seen> --source <build>`.
+7. Adds to the body, folded, the player questions the new build answers differently: the question bank's answer
+   key on main's files and on the new ones (`question-bank --files-only`, then `question-diff --max-rows 25`), a
+   riding skill, a boss list, a talent's classes. That list is what to recheck in game. The step is informational:
+   if it fails, the data is still published, and a body the list would push past GitHub's 65,536-character limit
+   gets one line instead.
 
 Every item from a product with `live: false` carries `spoiler: true` and the body says so. The body
 also states the encrypted block count. No decryption keys are loaded; encrypted blocks are skipped.

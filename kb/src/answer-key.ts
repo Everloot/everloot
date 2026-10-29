@@ -124,7 +124,9 @@ export function diffAnswerKeys(before: readonly Question[], after: readonly Ques
 const cell = (s: string) => s.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\s+/g, " ");
 const facts = (list: string[]) => (list.length ? list.map(cell).join(", ") : "–");
 
-export function formatAnswerDiff(diff: AnswerDiff): string {
+/** The diff as markdown; `maxRows` caps each list (a pull request body has a size limit), saying how many were left out. */
+export function formatAnswerDiff(diff: AnswerDiff, options: { maxRows?: number } = {}): string {
+  const max = options.maxRows ?? Infinity;
   const lines = [
     "# Answer changes between builds",
     "",
@@ -135,7 +137,8 @@ export function formatAnswerDiff(diff: AnswerDiff): string {
     lines.push("", `## ${title} (${rows.length})`, "");
     if (!rows.length) { lines.push("None."); continue; }
     lines.push("| question | before | after |", "|---|---|---|");
-    for (const r of rows) lines.push(`| ${cell(r.text)} | ${facts(r.before)} | ${facts(r.after)} |`);
+    for (const r of rows.slice(0, max)) lines.push(`| ${cell(r.text)} | ${facts(r.before)} | ${facts(r.after)} |`);
+    if (rows.length > max) lines.push("", `…and ${rows.length - max} more (run \`question-diff\` without --max-rows for all).`);
   }
   return `${lines.join("\n")}\n`;
 }

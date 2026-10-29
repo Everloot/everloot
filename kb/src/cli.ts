@@ -160,13 +160,14 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
     build, which the knowledge base already reads and which candidates remain, grouped by site domain.
     Root-listing lookups only, no file content and no keys. Writes <out>/<product>-<build>-<config>-scan.json
     and -scan.md; the report feeds the coverage backlog in docs/2026-10-18-database-taxonomy-research.md)
-  question-bank --db <public release> [--game-data ../web/src/data/game-data] [--per-kind 60] [--out data/question-bank/bank.jsonl]
+  question-bank --db <public release> | --files-only [--game-data ../web/src/data/game-data] [--per-kind 60] [--out data/question-bank/bank.jsonl]
     (the questions players are likely to ask, generated from the game-data files, the release's page titles and a
     hand-written long tail; one JSON line each, with the facts a correct answer carries where the game-data files
-    hold them. Nothing is fetched. See docs/design/specs/2026-10-27-question-bank-design.md)
-  question-diff <before.jsonl> <after.jsonl> [--out <report.md>]
+    hold them. --files-only leaves out the release's titles and needs no --db: the questions the files answer and
+    the long tail, enough for question-diff. Nothing is fetched. See docs/design/specs/2026-10-27-question-bank-design.md)
+  question-diff <before.jsonl> <after.jsonl> [--out <report.md>] [--max-rows 40]
     (two banks' answers compared by question: which a new build changed, added or removed, with the build each
-    came from. Generate the "before" bank from the older game-data files)
+    came from, at most --max-rows rows per list. Generate the "before" bank from the older game-data files)
   question-eval <bank.jsonl> --db <public release> [--game-data ../web/src/data/game-data] [--out docs/evals/question-eval-<date>.md] [--json <path>]
     (runs every question through get_by_name, search and answer_sources with no model, and writes the markdown report:
     what resolves, what has evidence, and the gap lists. Player observations join when EVERLOOT_PUBLIC_CORPUS_URL or
@@ -567,11 +568,12 @@ async function main(): Promise<number> {
       return 0;
     }
     case "question-bank": {
-      const release = openExistingReadOnlyDb(requireExistingDbPath(flags, "question-bank"));
+      const filesOnly = flags.has("files-only");
+      const release = filesOnly ? null : openExistingReadOnlyDb(requireExistingDbPath(flags, "question-bank"));
       const gameData = flags.get("game-data") || "../web/src/data/game-data";
       const perKind = Number(flags.get("per-kind") || 60);
       const out = flags.get("out") || "data/question-bank/bank.jsonl";
-      const subjects = [...gameDataSubjects(gameData), ...wikiSubjects(release, perKind)];
+      const subjects = [...gameDataSubjects(gameData), ...(release ? wikiSubjects(release, perKind) : [])];
       const bank = buildQuestionBank(subjects, gameDataAnswerKey(gameData));
       mkdirSync(dirname(out), { recursive: true });
       writeFileSync(out, serializeQuestionBank(bank));
@@ -583,7 +585,7 @@ async function main(): Promise<number> {
     case "question-diff": {
       if (!args[0] || !args[1]) break;
       const diff = diffAnswerKeys(parseQuestionBank(readFileSync(args[0], "utf8")), parseQuestionBank(readFileSync(args[1], "utf8")));
-      const md = formatAnswerDiff(diff);
+      const md = formatAnswerDiff(diff, { maxRows: Number(flags.get("max-rows") || 40) });
       const out = flags.get("out");
       if (out) { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, md); } else process.stdout.write(md);
       console.log(`${diff.changed.length} changed, ${diff.added.length} added, ${diff.removed.length} removed${out ? ` -> ${out}` : ""}`);
