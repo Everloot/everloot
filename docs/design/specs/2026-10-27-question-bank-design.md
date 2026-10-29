@@ -185,11 +185,18 @@ tail, and the aliases stay English. `question-bank --spanish` adds them after th
 with the same answer key; it is off by default, so the build-watch diff lists each changed answer once. The eval
 gives each Spanish template its own row ("where-is (es)") and adds a by-language section.
 
-First run (`docs/evals/question-eval-2026-10-29-spanish.md`, 8,686 questions): Spanish matches English on resolution
-(66% exact) and on answer in evidence (98%), because a named question is found by its English name. The gap the
-table does not show is the questions that name nothing: "cuánto cuesta un mount" and "dónde aprendo riding" come back
-with lore that only shares the word "mount" or "riding", where the English question gets the patch notes on riding
-costs. The words that carry those questions (cost, learn) are Spanish, and the wiki is English. A client set to
+First run (8,686 questions): Spanish matched English on resolution (66% exact) and on answer in evidence (98%),
+because a named question is found by its English name. The gap the table did not show was the questions that name
+nothing: "cuánto cuesta un mount" and "dónde aprendo riding" came back with lore that only shared the word "mount" or
+"riding", and 20 unresolved names got evidence that matched "dónde" or "queda". The words that carry those questions
+(cost, learn) are Spanish, and the wiki is English.
+
+So search reads Spanish first (`kb/src/spanish.ts`): a question that reads as Spanish (a word only Spanish questions
+use, or ¿ ¡) loses its filler words and has its asking words glossed into the English the pages use ("cuesta" is
+cost, "aprendo" is learn); names are kept, and a capitalized word after the first counts as a name. English
+questions are never touched: on the rerun every English result is identical. "cuándo sale Forever" now meets the
+launch-date entry, "dónde aprendo riding" the riding trainers, "necesito llave para Scholomance" the key quests, and
+the 20 false matches are gone (`docs/evals/question-eval-2026-10-29-spanish.md` is the rerun). A client set to
 Spanish (esES or esMX names) is not covered: it needs the localized names, which the game files hold per locale.
 
 ## Phase 3 (the question ledger)

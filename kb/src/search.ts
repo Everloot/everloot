@@ -2,6 +2,7 @@ import type { GameVersion, Kind } from "./entities.js";
 import type { LoreType } from "./importers/wiki-classify.js";
 import { expandAliases, NAME_ALIASES, withoutArticle } from "./name-aliases.js";
 import { releaseDb, type ReleaseDb, type ReleaseSource } from "./release-db.js";
+import { fromSpanish } from "./spanish.js";
 
 export interface SearchHit {
   id: number;
@@ -155,7 +156,7 @@ function pushOptionFilters(conds: string[], params: unknown[], opts: SearchOptio
 export async function search(source: ReleaseSource, query: string, limit = 10, opts: SearchOptions = {}): Promise<SearchHit[]> {
   const db = releaseDb(source);
   // "where is MC" asks about Molten Core: the short forms players type become the names the pages carry.
-  const { text: raw, expanded } = expandAliases(query.trim());
+  const { text: raw, expanded } = expandAliases(fromSpanish(query.trim()));
   if (!raw) return [];
   const q = contentTerms(raw)
     .map((t) => `"${t}"`)
@@ -229,7 +230,7 @@ export const SOME_WORDS = "No page has every word you asked for. Pages with some
  * word is every word, so `search` has already said all there is. Pick words ("best") are left out.
  */
 export async function searchSomeWords(source: ReleaseSource, query: string, limit = 10, opts: SearchOptions = {}): Promise<SearchHit[]> {
-  const asked = [...new Set(contentTerms(expandAliases(query.trim()).text))];
+  const asked = [...new Set(contentTerms(expandAliases(fromSpanish(query.trim())).text))];
   const terms = asked.filter((t) => !PICK_WORDS.has(t));
   // One word is a new search only when a pick word was dropped from beside it ("best gnome").
   if (terms.length === 0 || (terms.length === 1 && asked.length === 1)) return [];
