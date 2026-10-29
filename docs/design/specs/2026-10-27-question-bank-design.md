@@ -96,7 +96,7 @@ again from the game-data files each time the bank is generated (`kb/src/answer-k
 so nothing goes stale.
 
 Each question the files can answer carries `answer: { facts, from, build }`: the facts a correct answer has to
-contain, the file and field they came from, and the game build of that file. On build 1.60.1.70685, KEYED of the
+contain, the file and field they came from, and the game build of that file. On build 1.60.1.70685, 1,524 of the
 4,424 questions carry one (1,003 before the zone, entrance and talent keys of 2026-10-29):
 
 | template | subject | facts from |
