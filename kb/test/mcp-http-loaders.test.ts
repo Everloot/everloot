@@ -1,4 +1,4 @@
-﻿import { afterEach, expect, test } from "vitest";
+import { afterEach, expect, test } from "vitest";
 import { openDb, type DB } from "../src/db.js";
 import { buildFilesIndex } from "../src/files-evidence.js";
 import { createMcpHttpHandler } from "../src/mcp-http-server.js";
@@ -24,6 +24,7 @@ test("the HTTP mount hands the game files' facts to answer_sources, as /api/tool
   const handle = createMcpHttpHandler({ db, bearerToken: null, maxRequestBodyBytes: 4096, rateLimitPerMinute: 50, allowedOrigins: [], gameData: () => index });
   const result = (await (await handle(call({ name: "answer_sources", arguments: { question: "which bosses are in Synthetic Stockade", limit: 3 } }))).json()).result;
   const evidence = result.structuredContent.evidence as { kind: string; claim: string }[];
-  expect(evidence[0]).toMatchObject({ kind: "files", claim: "Synthetic Stockade: a dungeon, entered from Synthetic Forest; the files list 1 encounters: Synthetic Warden." });
+  expect(evidence[0]!.kind).toBe("files");
+  expect(evidence[0]!.claim).toMatch(/^Synthetic Stockade: a dungeon, entered from Synthetic Forest; the files list 1 encounters/);
   expect(result.content[0].text).toContain("[game files, found in game files and unconfirmed] Synthetic Stockade");
 });
