@@ -29,7 +29,10 @@ export default {
     const failures = [];
     await Promise.all(cronPaths(controller.cron).map(async (path) => {
       const res = await env.WORKER_SELF_REFERENCE.fetch(cronRequest(path, secret));
-      if (!res.ok) failures.push(`${path} answered ${res.status}: ${(await res.text()).slice(0, 300)}`);
+      // Read to the end even on success: a body left unread is cut off when the trigger ends, and the job's own
+      // invocation is then logged as "canceled" although it finished.
+      const body = await res.text();
+      if (!res.ok) failures.push(`${path} answered ${res.status}: ${body.slice(0, 300)}`);
     }));
     if (failures.length) throw new Error(`[cron] ${failures.join("; ")}`);
   },
