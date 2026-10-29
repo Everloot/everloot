@@ -6,7 +6,9 @@ export interface Seen { path: string; method: string; auth: string | null }
 
 const LINEN = [{ type: "item", id: 2589, label: "Linen Cloth", href: "/database/items/2589", quality: 1 }];
 const HIT = "[item] Linen Cloth\nA bolt of cloth.\nSource: Everloot uploads (CC BY-SA 4.0)\n";
-const PIECE = { claim: "Linen Cloth drops from humanoids, 41 sightings.", kind: "observed", source: { url: "https://everloot.app/database/items/2589" }, licence: "CC BY-SA 4.0", asOf: null };
+const PIECE = { claim: "Linen Cloth: A bolt of cloth.", kind: "observed", source: { url: "https://everloot.app/database/items/2589" }, licence: "CC BY-SA 4.0", asOf: null };
+/** answer_sources' own text for PIECE, as a client without the structured answer reads it. */
+const PIECE_TEXT = `- [observed in play] ${PIECE.claim}\n  Source: ${PIECE.source.url} (${PIECE.licence})`;
 
 /**
  * A local stand-in for the site: /mcp and /mcp/public speak enough MCP over JSON for the real client (market_value
@@ -32,7 +34,7 @@ export async function loopbackSite() {
     const result = message.method === "initialize" ? { protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "loopback", version: "1" } }
       : message.params?.name === "market_value" ? { content: [{ type: "text", text: "long text" }], structuredContent: FIXTURE_STRUCTURED }
       : message.method === "tools/list" ? { tools: [] }
-      : message.params?.name === "answer_sources" ? { content: [{ type: "text", text: `- [observed in play] ${PIECE.claim}` }], structuredContent: { evidence: [PIECE], furtherReading: [], dataAsOf: null } }
+      : message.params?.name === "answer_sources" ? { content: [{ type: "text", text: PIECE_TEXT }], structuredContent: { evidence: [PIECE], furtherReading: [], dataAsOf: null } }
       : { content: [{ type: "text", text: HIT }] };
     res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ jsonrpc: "2.0", id: message.id, result }));
   });
