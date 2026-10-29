@@ -149,13 +149,22 @@ export async function answer(options: AgentOptions): Promise<AgentReply> {
   throw new Error(`config.json: unknown provider type ${entry.type}`);
 }
 
+/**
+ * answer_sources' text as the player reads it: a notice on its first line, then the labelled pieces with their indented
+ * Source and More lines; the notes after them are for AI clients. The site's chat reads it the same way
+ * (`evidenceLines` in web/src/lib/chat/agent.ts, which this main process does not import).
+ */
+export function evidenceLines(text: string): string {
+  return text.split("\n").filter((l, i) => /^(?:- |\s+\S)/.test(l) || (i === 0 && l.trim() !== "")).join("\n").trim();
+}
+
 /** No provider: answer_sources' evidence for the question, verbatim and labelled. */
 async function plain(o: AgentOptions): Promise<AgentReply> {
   const hits = await (o.session ?? withMcp)(o.mcp, async (c) => textOf(await c.callTool({ name: "answer_sources", arguments: { question: o.question, limit: 3 } }, undefined, { signal: o.signal })));
   const sources = sourcesIn(hits);
   const steps: ChatStep[] = [{ tool: "answer_sources", input: o.question, chars: hits.length }];
   if (!sources.length) return { text: NOTHING, model: null, sources: [], steps };
-  return { text: hits.trim(), model: null, sources, steps };
+  return { text: evidenceLines(hits), model: null, sources, steps };
 }
 
 /** Runs one tool call for the model, local or MCP, and records it. */
