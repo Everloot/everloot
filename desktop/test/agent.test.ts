@@ -38,11 +38,22 @@ test("config entries come without keys, and an inline key is refused", () => {
 
 test("with no provider the answer is the sourced hits themselves; no source means no answer", async () => {
   const calls: { name: string; args: unknown }[] = [];
-  const r = await answer({ mcp: { url: "https://everloot.app/mcp/public", token: null }, entries: [], history: [], question: "what drops bindings", session: fakeSession(calls) });
-  expect(calls).toEqual([{ name: "search_knowledge", args: { query: "what drops bindings", limit: 3 } }]);
+  const evidence = [
+    "- [observed in play, 3 installs] Thunderfury bindings drop from Baron Geddon, 3 of 41 kills.",
+    "  Source: https://everloot.app/database/items/18563 (CC BY-SA 4.0)",
+    "- [lore (Warcraft Wiki 2023, may differ in WoW: Forever)] Baron Geddon is a boss in Molten Core.",
+    "  Source: https://warcraft.wiki.gg/wiki/Baron_Geddon (CC-BY-SA-4.0, as of 2023-11-13)",
+    "Further reading (links only, nothing fetched): Wowhead https://example.test",
+    'Credit observed facts as "Everloot"; keep each lore source with its text.',
+  ].join("\n");
+  const r = await answer({ mcp: { url: "https://everloot.app/mcp/public", token: null }, entries: [], history: [], question: "what drops bindings", session: fakeSession(calls, evidence) });
+  expect(calls).toEqual([{ name: "answer_sources", args: { question: "what drops bindings", limit: 3 } }]);
   expect(r.model).toBeNull();
   expect(r.sources).toHaveLength(2);
   expect(r.text).toContain("Baron Geddon");
+  // The notes for AI clients stay out of the player's answer.
+  expect(r.text).not.toContain("Credit observed facts");
+  expect(r.text).not.toContain("Further reading");
   const none = await answer({ mcp: { url: "u", token: null }, entries: [], history: [], question: "q", session: fakeSession([], "nothing here") });
   expect(none.text).toMatch(/No sourced answer/);
   expect(none.sources).toEqual([]);

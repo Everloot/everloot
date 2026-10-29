@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import { MY_BUILDS_LINE, MY_BUILDS_REFUSAL } from "../saved-builds";
 import {
-  ACCOUNT_TOOL, answer, answerFree, answerOrigin, callTool, CHAT_TOOLS, FREE_BUDGET, FREE_FALLBACK, FREE_PROVIDER, FREE_TOOLS, loadTools, marketReply, MODEL_STOPPED, NO_SOURCED_ANSWER, pagesIn, readOpenAiStream, searchOnly, signedIn,
+  ACCOUNT_TOOL, answer, answerFree, answerOrigin, evidenceLines, callTool, CHAT_TOOLS, FREE_BUDGET, FREE_FALLBACK, FREE_PROVIDER, FREE_TOOLS, loadTools, marketReply, MODEL_STOPPED, NO_SOURCED_ANSWER, pagesIn, readOpenAiStream, searchOnly, signedIn,
   SMALL_TALK_REPLY, smallTalk, asksForRanking, RANKING_NOTE, sourceLink, sourcesIn, SYSTEM, testKey, TOOL_POLICY, UNSOURCED, type ToolDef,
 } from "./agent";
 import { FIXTURE_ANSWER, FIXTURE_STRUCTURED, FIXTURE_URL } from "./market-fixture";
@@ -17,12 +17,30 @@ function sse(events: unknown[], named = false): Response {
   return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
 }
 
-/** This site's /api/tools endpoint, answering every lookup with HIT. */
+/** answer_sources' text for the same page: a labelled piece, its Source and More lines, then the notes for AI clients. */
+const EVIDENCE = [
+  "- [lore (Warcraft Wiki 2023, may differ in WoW: Forever)] Leeroy Jenkins is a valiant human paladin.",
+  "  Source: https://warcraft.wiki.gg/wiki/Leeroy_Jenkins (CC-BY-SA-4.0, retrieved 2023-11-13)",
+  "  More: https://everloot.app/lore/1-leeroy-jenkins",
+  "Further reading (links only, nothing fetched): Wowhead https://example.test",
+  'Credit observed facts as "Everloot"; keep each lore source with its text.',
+].join("\n");
+
+/** This site's /api/tools endpoint, answering answer_sources with EVIDENCE and every other lookup with HIT. */
 function site(calls: string[]) {
-  return vi.fn(async (url: string) => { calls.push(url); return new Response(JSON.stringify({ text: HIT }), { status: 200 }); }) as unknown as typeof fetch;
+  return vi.fn(async (url: string) => {
+    calls.push(url);
+    return new Response(JSON.stringify({ text: url.startsWith("/api/tools/answer_sources") ? EVIDENCE : HIT }), { status: 200 });
+  }) as unknown as typeof fetch;
 }
 
 const TOOLS: ToolDef[] = [{ name: "search_knowledge", description: "Search", inputSchema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } }];
+
+test("a visitor sees answer_sources' labelled pieces and their links, not the notes for AI clients", () => {
+  expect(evidenceLines(EVIDENCE)).toBe(EVIDENCE.split("\n").slice(0, 3).join("\n"));
+  // A notice on the first line (no page held every word) stays.
+  expect(evidenceLines(`No page has every word.\n${EVIDENCE}`).split("\n")[0]).toBe("No page has every word.");
+});
 
 test("sources are the distinct Source lines in order", () => {
   expect(sourcesIn(HIT + HIT)).toEqual(["https://warcraft.wiki.gg/wiki/Leeroy_Jenkins (CC-BY-SA-4.0, retrieved 2023-11-13)"]);
@@ -380,7 +398,7 @@ describe("the free model (Everloot free)", () => {
     const limited = vi.fn(async () => new Response(JSON.stringify({ error: { message: "The free model has reached its limit for now.", code: "free_chat_limit" } }), { status: 429 }));
     const r = await answerFree({ history: [], question: "who is leeroy\n\nMy note", tools: TOOLS, send: limited as never, site: site(calls) }, "who is leeroy");
     expect(limited).toHaveBeenCalledTimes(1);
-    expect(calls).toEqual(["/api/tools/search_knowledge?query=who+is+leeroy&limit=3"]);
+    expect(calls).toEqual(["/api/tools/answer_sources?question=who+is+leeroy&limit=3"]);
     expect(r.model).toBeNull();
     expect(r.text.split("\n")[0]).toBe(FREE_FALLBACK);
     expect(r.text).toContain("Leeroy Jenkins is a valiant human paladin.");

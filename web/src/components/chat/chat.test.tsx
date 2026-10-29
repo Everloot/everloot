@@ -12,6 +12,8 @@ const MAGE = "33333333-4444-4555-8666-777777777777";
 const KEY = "sk-or-v1-secretsecretsecretsecret1234";
 const PROVIDERS = "everloot.chat.providers.v1";
 const HIT = "[item] Linen Cloth\nDropped by humanoids.\nMore: https://everloot.app/database/item/2589\nSource: https://warcraft.wiki.gg/wiki/Linen_Cloth (CC-BY-SA-4.0, retrieved 2023-11-13)\n";
+/** answer_sources' text for the same item, as the no-key search reads it. */
+const EVIDENCE = "- [lore (Warcraft Wiki 2023, may differ in WoW: Forever)] Dropped by humanoids.\n  Source: https://warcraft.wiki.gg/wiki/Linen_Cloth (CC-BY-SA-4.0, retrieved 2023-11-13)\n  More: https://everloot.app/database/item/2589\nCredit observed facts as \"Everloot\"; keep each lore source with its text.";
 
 const shell: AccountShell = {
   userId: ME, name: "Jaina#1234", handle: "jaina", displayName: "Jaina", status: null, publicProfile: false,
@@ -46,6 +48,7 @@ function api({ signed = true }: { signed?: boolean } = {}) {
     if (url === "/api/auth/me") return Response.json({ user: signed ? { id: ME, name: "Jaina#1234" } : null });
     if (url === "/api/me/shell") return signed ? Response.json(shell) : Response.json({ error: "Sign in first." }, { status: 401 });
     if (url.startsWith("/schema/mcp/")) return Response.json({ title: "T", inputSchema: { type: "object", properties: {} } });
+    if (url.startsWith("/api/tools/answer_sources")) return Response.json({ text: EVIDENCE });
     if (url.startsWith("/api/tools/")) return Response.json({ text: HIT });
     if (url === "https://openrouter.ai/api/v1/key") return Response.json({ data: {} });
     if (url === "https://openrouter.ai/api/v1/models") return Response.json({ data: ROUTER_MODELS });
@@ -203,11 +206,12 @@ describe("the chat page", () => {
     api({ signed: false });
     await render(<ChatClient profiles />);
     await click(button("Where does Linen Cloth drop?"));
-    expect(calls.map((c) => c.url)).toContain("/api/tools/search_knowledge?query=Where+does+Linen+Cloth+drop%3F&limit=3");
+    expect(calls.map((c) => c.url)).toContain("/api/tools/answer_sources?question=Where+does+Linen+Cloth+drop%3F&limit=3");
     expect(text()).toContain("Dropped by humanoids.");
     expect(text()).toContain("From Everloot");
     expect(text()).toContain("Everloot search");
     expect(text()).not.toMatch(/Source: |More: /);
+    expect(text()).not.toContain("Credit observed facts as");
   });
 
   test("an answer the tools did not back is labelled From the model", async () => {
