@@ -14,6 +14,7 @@ import { loadCensus } from "./rollup-compute";
 import { readSettledList } from "./settled-store";
 import { settledKeys } from "../../../kb/src/settled-list";
 import { uploadStore } from "./upload-store";
+import { mcpLedgerMetrics } from "./question-ledger";
 import { mcpToolMetrics, recordUsage } from "./usage-metrics";
 
 /**
@@ -107,6 +108,10 @@ export function createMount(options: { path: string; bearer: boolean }) {
     // Only calls the handler accepted count: unauthenticated, invalid or rate-limited ones return non-2xx.
     if (body !== null && response.status >= 200 && response.status < 300) {
       recordUsage(mcpToolMetrics(body, options.bearer ? "mcp" : "mcp_public"));
+      // The question ledger also reads the answer, for whether each lookup found anything (a JSON answer only).
+      if (response.headers.get("content-type")?.includes("application/json")) {
+        try { recordUsage(mcpLedgerMetrics(body, await response.clone().text())); } catch {}
+      }
     }
     // The licence and credit line travel with every answer, for clients that log headers.
     for (const [name, value] of Object.entries(attributionHeaders())) response.headers.set(name, value);

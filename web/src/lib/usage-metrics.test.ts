@@ -13,6 +13,11 @@ describe("mcpToolMetrics", () => {
     expect(mcpToolMetrics(body, "mcp_public")).toEqual(["mcp_public.search_knowledge", "mcp_public.other"]);
   });
 
+  it("knows every tool the protocol publishes, answer_sources included", () => {
+    const body = JSON.stringify(["answer_sources", "market_value", "talent_tree"].map((name) => ({ jsonrpc: "2.0", method: "tools/call", params: { name } })));
+    expect(mcpToolMetrics(body, "mcp")).toEqual(["mcp.answer_sources", "mcp.market_value", "mcp.talent_tree"]);
+  });
+
   it("ignores malformed bodies", () => {
     expect(mcpToolMetrics("not json", "mcp")).toEqual([]);
   });
