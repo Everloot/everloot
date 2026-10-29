@@ -9,7 +9,10 @@ import { completeWithFallback, ProviderError, type Provider } from "../src/provi
 import { loadProviders } from "../src/providers/config";
 import { llmEngine } from "../src/bridge/llm-engine";
 
-const SEARCH = "[lore_page/lore] Thrall\nThrall is a shaman and the Warchief of the Horde.\nSource: https://warcraft.wiki.gg/wiki/Thrall (CC-BY-SA-4.0, retrieved 2023-11-13)";
+const SOURCED = {
+  text: "- [lore (Warcraft Wiki 2023, may differ in WoW: Forever)] Thrall is a shaman and the Warchief of the Horde.\n  Source: https://warcraft.wiki.gg/wiki/Thrall (CC-BY-SA-4.0, as of 2023-11-13)",
+  evidence: [{ claim: "Thrall is a shaman and the Warchief of the Horde.", kind: "lore", source: { url: "https://warcraft.wiki.gg/wiki/Thrall" }, url: "https://everloot.app/lore/481380-thrall" }],
+};
 
 function fakeAnthropic(reply: () => Promise<unknown>) {
   const create = vi.fn(reply);
@@ -74,21 +77,23 @@ test("the chain tries enabled providers in order and falls through only on provi
 
 test("the LLM engine answers only from sources, names the model, and never calls a model without a source", async () => {
   const complete = vi.fn(async () => ({ text: "Thrall is the Warchief of the Horde.", model: "claude-opus-5-5" }));
-  const engine = llmEngine({ search: async () => SEARCH, providers: [{ name: "anthropic", complete }] });
+  const engine = llmEngine({ sources: async () => SOURCED, providers: [{ name: "anthropic", complete }] });
   expect(await engine.answer("Who is Thrall?")).toEqual({
     answer: "Thrall is the Warchief of the Horde. (answered by claude-opus-5-5)",
-    source: "https://warcraft.wiki.gg/wiki/Thrall (CC-BY-SA-4.0, retrieved 2023-11-13)",
+    source: "https://everloot.app/lore/481380-thrall",
   });
   const [system, user] = complete.mock.calls[0] as unknown as [string, string];
   expect(system).toMatch(/only the sources/i);
   expect(user).toContain("Who is Thrall?");
+  // The model reads answer_sources' own text, labels included.
   expect(user).toContain("Warchief of the Horde");
-  const fancy = llmEngine({ search: async () => SEARCH, providers: [{ name: "x", complete: async () => ({ text: "Thrall leads the *Horde* in **World of Warcraft**.\n`ok`", model: "m" }) }] });
+  expect(user).toContain("may differ in WoW: Forever");
+  const fancy = llmEngine({ sources: async () => SOURCED, providers: [{ name: "x", complete: async () => ({ text: "Thrall leads the *Horde* in **World of Warcraft**.\n`ok`", model: "m" }) }] });
   expect((await fancy.answer("Who is Thrall?")).answer).toBe("Thrall leads the Horde in World of Warcraft. ok (answered by m)");
-  const unsure = llmEngine({ search: async () => SEARCH, providers: [{ name: "x", complete: async () => ({ text: "Not in the sources.", model: "m" }) }] });
+  const unsure = llmEngine({ sources: async () => SOURCED, providers: [{ name: "x", complete: async () => ({ text: "Not in the sources.", model: "m" }) }] });
   expect(await unsure.answer("Who is Thrall's cat?")).toEqual({ answer: "No sourced answer found.", source: "none" });
   complete.mockClear();
-  const empty = llmEngine({ search: async () => "No results.", providers: [{ name: "anthropic", complete }] });
+  const empty = llmEngine({ sources: async () => ({ text: "No evidence found for that question.", evidence: [] }), providers: [{ name: "anthropic", complete }] });
   expect(await empty.answer("Who is Nobody?")).toEqual({ answer: "No sourced answer found.", source: "none" });
   expect(complete).not.toHaveBeenCalled();
 });

@@ -13,7 +13,7 @@ import { homedir } from "node:os";
 import { dirname, join, posix, win32 } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createAnswerStore, answerPending } from "./bridge/run";
-import { lazyEngine, mcpEngine, mcpMarketValue, mcpSearch, siteItemSearch, withMarket } from "./bridge/engine";
+import { lazyEngine, mcpAnswerSources, mcpEngine, mcpMarketValue, siteItemSearch, withMarket } from "./bridge/engine";
 import { llmEngine } from "./bridge/llm-engine";
 import { providersOnDemand } from "./providers/config";
 import { findEverlootFiles } from "./savedvariables";
@@ -85,12 +85,12 @@ async function main(argv: string[]): Promise<void> {
   if (files.length === 0) throw new Error(`No Everloot.lua under ${join(args.game ?? "", "WTF", "Account")}. Log out once so the game writes it.`);
   if (args.command === "bridge") {
     const mcp = { url: args.mcp!, token: readFileSync(args.tokenFile!, "utf8").trim() };
-    // Providers the user enabled in config.json beside the state file; none means plain search answers. They are read
+    // Providers the user enabled in config.json beside the state file; none means answers from the evidence alone. They are read
     // when a question that is not a price one needs them, so a damaged config.json never blocks a price answer.
     const providers = providersOnDemand(join(dirname(statePath), "config.json"));
     // A price question is answered from the recorded market first, with no model; the rest follows the providers.
     const engine = withMarket(
-      lazyEngine(() => providers().length ? llmEngine({ search: (q) => mcpSearch(mcp, q, 3), providers: providers() }) : mcpEngine(mcp)),
+      lazyEngine(() => providers().length ? llmEngine({ sources: (q) => mcpAnswerSources(mcp, q, 6), providers: providers() }) : mcpEngine(mcp)),
       { lookup: (realm, id, signal) => mcpMarketValue(mcp, realm, id, signal), resolveItem: siteItemSearch(args.endpoint) },
     );
     try {

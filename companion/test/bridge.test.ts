@@ -10,7 +10,7 @@ import { adler32, luaString } from "../src/bridge/lua";
 import { readAsks } from "../src/bridge/asks";
 import { renderAnswersAddon } from "../src/bridge/answers";
 import { answerPending, createAnswerStore } from "../src/bridge/run";
-import { answerFromSearch, marketValueFrom, mcpMarketValue, siteItemSearch, withMarket, type AnswerEngine } from "../src/bridge/engine";
+import { answerFromEvidence, marketValueFrom, mcpMarketValue, siteItemSearch, withMarket, type AnswerEngine } from "../src/bridge/engine";
 import { FIXTURE_ANSWER, FIXTURE_STRUCTURED, FIXTURE_URL } from "../../web/src/lib/chat/market-fixture";
 import { MARKET_QUERY_BUDGET_MS } from "../../web/src/lib/chat/market-question";
 
@@ -58,13 +58,14 @@ test("the answers addon matches the golden file the Lua 5.1 test loads", () => {
   expect(lua).toBe(readFileSync(FIXTURE, "utf8").replace(/\r\n/g, "\n"));
 });
 
-test("a search result becomes a short answer with its source line", () => {
-  const text = "[lore_page/lore] Thrall\nThrall is a shaman and the Warchief.\nSource: https://warcraft.wiki.gg/wiki/Thrall (CC-BY-SA-4.0, retrieved 2023-11-13)";
-  expect(answerFromSearch(text)).toEqual({
-    answer: "Thrall is a shaman and the Warchief.",
-    source: "https://warcraft.wiki.gg/wiki/Thrall (CC-BY-SA-4.0, retrieved 2023-11-13)",
-  });
-  expect(answerFromSearch("No results.")).toEqual({ answer: "No sourced answer found.", source: "none" });
+test("the first piece of evidence becomes a short answer with its page; no evidence, no answer", () => {
+  const files = { claim: "Deadmines: a dungeon, level 16; the files list 8 encounters: Rhahk'Zor, Sneed.", kind: "files", source: { url: "https://everloot.app/database/download" }, url: "https://everloot.app/database/instances/36-deadmines" };
+  const lore = { claim: "The Deadmines is a dungeon under Moonbrook.", kind: "lore", source: { url: "https://warcraft.wiki.gg/wiki/Deadmines" } };
+  expect(answerFromEvidence({ text: "", evidence: [files, lore] })).toEqual({ answer: files.claim, source: "https://everloot.app/database/instances/36-deadmines" });
+  // A piece with no page of its own names its source.
+  expect(answerFromEvidence({ text: "", evidence: [lore] })).toEqual({ answer: lore.claim, source: "https://warcraft.wiki.gg/wiki/Deadmines" });
+  expect(answerFromEvidence({ text: "No evidence found.", evidence: [] })).toEqual({ answer: "No sourced answer found.", source: "none" });
+  expect(answerFromEvidence({ text: "", evidence: [{ ...lore, claim: "  " }] })).toEqual({ answer: "No sourced answer found.", source: "none" });
 });
 
 test("pending asks are answered once and written into the slot addon", async () => {

@@ -53,8 +53,10 @@ npx tsx src/cli.ts bridge --game "<World of Warcraft folder>" --mcp https://<hos
 ```
 
 The addon stores `/ask` questions in SavedVariables (written at logout or `/reload`). The bridge
-answers new ones from the Everloot MCP server's `search_knowledge` and writes them into the
-`EverlootAnswers` slot addon under `Interface/AddOns`; they show after the next `/reload`.
+answers new ones from the Everloot MCP server's `answer_sources` (the evidence the site's chat uses: observed,
+curated, the current game files' facts, then the 2023 wiki) and writes them into the `EverlootAnswers` slot addon
+under `Interface/AddOns`; they show after the next `/reload`. With no AI provider the answer is the first piece of
+evidence and its page; with one, the provider phrases it from the evidence alone.
 
 Explicit item-price questions use `market_value` before search or a model, so they need no AI provider.
 For example, `/ask price 2589 on Nightslayer` asks for that realm's recorded all-house values.
