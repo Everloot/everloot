@@ -82,3 +82,8 @@ test("openAiCompatible: an empty reply is an error that says why, never an answe
     .rejects.toThrow("empty reply: the token budget ran out (raise --max-tokens)");
   await expect(openAiCompatible({ baseUrl: "http://x", model: "m", send: reply({ choices: [{ message: { content: "  " } }] }) })("S", "U")).rejects.toThrow("no text in the reply");
 });
+
+test("score: the refusal counts however the model ends it", () => {
+  for (const reply of ["Not in the sources", "not in the sources.", "Not in the sources!"]) expect(score(reply, ["75"]).verdict, reply).toBe("declined");
+  expect(score("It is not in the sources I know of, but maybe 60.", ["75"]).verdict).toBe("wrong");
+});

@@ -159,7 +159,9 @@ declined: the exact refusal; wrong: none; error: no reply. A reasoning model nee
 curly or straight apostrophes, a word's plural included. Any local Ollama or vLLM works (`http://localhost:11434/v1`);
 the key, if any, is read from `--key-file`. One call per question, so it runs on demand, never in CI.
 
-First runs, 60 questions on local models through Ollama on the maintainer's machine:
+Player observations join the evidence when the public corpus is reachable, as they do for in-game `/ask`; the report
+says whether they did. First runs, 60 questions on local models through Ollama on the maintainer's machine, without
+player observations:
 
 | model | correct | declined | wrong | error |
 |---|---|---|---|---|

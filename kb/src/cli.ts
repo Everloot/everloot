@@ -605,8 +605,13 @@ async function main(): Promise<number> {
       const key = keyFile ? readFileSync(keyFile, "utf8").trim() : null;
       const sample = sampleKeyed(parseQuestionBank(readFileSync(args[0], "utf8")), Number(flags.get("sample") || 200));
       const files = readFilesIndex(flags.get("game-data") || "../web/src/data/game-data");
+      // Player observations join as they do for question-eval and in-game /ask (the public corpus, when reachable).
+      const corpus = await readCorpusRecords(["item_seen", "item_fact", "loot", "npc_sighting", "vendor", "quest", "object_sighting", "instance_entrance", "encounter"]);
       const ranAt = new Date().toISOString();
-      const report = await evaluateWritten(release, sample, openAiCompatible({ baseUrl, model, key, maxTokens: Number(flags.get("max-tokens") || 1500) }), { model, ranAt, files: files.facts.length ? files : null });
+      const report = await evaluateWritten(release, sample, openAiCompatible({ baseUrl, model, key, maxTokens: Number(flags.get("max-tokens") || 1500) }), {
+        model, ranAt, files: files.facts.length ? files : null,
+        facts: corpus ? answerSourcesFactsFromRecords(corpus.records) : null, dataAsOf: corpus?.dataAsOf ?? null,
+      });
       const out = flags.get("out") || `../docs/evals/answer-eval-${ranAt.slice(0, 10)}.md`;
       mkdirSync(dirname(out), { recursive: true });
       writeFileSync(out, formatAnswerEval(report));

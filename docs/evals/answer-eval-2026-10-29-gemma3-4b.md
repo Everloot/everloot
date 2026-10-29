@@ -1,6 +1,6 @@
 # Written-answer eval, 2026-10-29
 
-Model `gemma3:4b`, 60 questions with an answer key, each sent with answer_sources' evidence under the in-game /ask rules. Correct: the reply carries every fact of the key; partial: some; declined: the model said the sources do not answer; wrong: none.
+Model `gemma3:4b`, 60 questions with an answer key, each sent with answer_sources' evidence under the in-game /ask rules. Correct: the reply carries every fact of the key; partial: some; declined: the model said the sources do not answer; wrong: none. Player observations not connected: the evidence has no observed pieces, unlike in-game /ask.
 
 ## Totals
 

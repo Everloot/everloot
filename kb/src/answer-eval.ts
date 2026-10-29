@@ -27,6 +27,8 @@ export interface WrittenResult { id: string; template: string; text: string; fac
 export interface AnswerEvalReport {
   schema: "everloot.answer-eval/1";
   model: string;
+  /** Whether player observations joined the evidence, as they do for in-game /ask; without them that layer is unrecorded. */
+  corpusConnected?: boolean;
   ranAt: string;
   sampled: number;
   totals: Record<Verdict, number>;
@@ -70,7 +72,8 @@ export function sampleKeyed(bank: readonly Question[], size: number): Question[]
 export function score(reply: string, facts: readonly string[]): { verdict: Verdict; missing: string[] } {
   const missing = facts.filter((f) => !carries(reply, f));
   if (missing.length === 0) return { verdict: "correct", missing };
-  if (reply.trim() === NOT_FOUND) return { verdict: "declined", missing };
+  // The refusal however the model ends it, as in-game /ask reads it (companion/src/bridge/llm-engine.ts).
+  if (reply.trim().replace(/[.!\s]+$/, "").toLowerCase() === NOT_FOUND.replace(/\.$/, "").toLowerCase()) return { verdict: "declined", missing };
   return { verdict: missing.length < facts.length ? "partial" : "wrong", missing };
 }
 
@@ -98,7 +101,7 @@ export async function evaluateWritten(
   const tally = (rows: readonly WrittenResult[]) => Object.fromEntries(verdicts.map((v) => [v, rows.filter((r) => r.verdict === v).length])) as Record<Verdict, number>;
   const templates = [...new Set(results.map((r) => r.template))];
   return {
-    schema: "everloot.answer-eval/1", model: meta.model, ranAt: meta.ranAt ?? new Date().toISOString(), sampled: results.length,
+    schema: "everloot.answer-eval/1", model: meta.model, corpusConnected: meta.facts != null, ranAt: meta.ranAt ?? new Date().toISOString(), sampled: results.length,
     totals: tally(results),
     byTemplate: templates.map((template) => { const rows = results.filter((r) => r.template === template); return { template, questions: rows.length, ...tally(rows) }; }),
     results,
@@ -116,7 +119,7 @@ export function formatAnswerEval(report: AnswerEvalReport, examples = 15): strin
   return [
     `# Written-answer eval, ${report.ranAt.slice(0, 10)}`,
     "",
-    `Model \`${report.model}\`, ${report.sampled} questions with an answer key, each sent with answer_sources' evidence under the in-game /ask rules. Correct: the reply carries every fact of the key; partial: some; declined: the model said the sources do not answer; wrong: none.`,
+    `Model \`${report.model}\`, ${report.sampled} questions with an answer key, each sent with answer_sources' evidence under the in-game /ask rules. Correct: the reply carries every fact of the key; partial: some; declined: the model said the sources do not answer; wrong: none. Player observations ${report.corpusConnected ? "connected, as for in-game /ask" : "not connected: the evidence has no observed pieces, unlike in-game /ask"}.`,
     "",
     "## Totals",
     "",
