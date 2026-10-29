@@ -120,7 +120,9 @@ export function diffAnswerKeys(before: readonly Question[], after: readonly Ques
   return diff;
 }
 
-const facts = (list: string[]) => (list.length ? list.map((f) => f.replace(/\|/g, "\\|")).join(", ") : "–");
+/** Text in a markdown table cell: a backslash first, then the pipe that would end the cell. */
+const cell = (s: string) => s.replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
+const facts = (list: string[]) => (list.length ? list.map(cell).join(", ") : "–");
 
 export function formatAnswerDiff(diff: AnswerDiff): string {
   const lines = [
@@ -133,7 +135,7 @@ export function formatAnswerDiff(diff: AnswerDiff): string {
     lines.push("", `## ${title} (${rows.length})`, "");
     if (!rows.length) { lines.push("None."); continue; }
     lines.push("| question | before | after |", "|---|---|---|");
-    for (const r of rows) lines.push(`| ${r.text.replace(/\|/g, "\\|")} | ${facts(r.before)} | ${facts(r.after)} |`);
+    for (const r of rows) lines.push(`| ${cell(r.text)} | ${facts(r.before)} | ${facts(r.after)} |`);
   }
   return `${lines.join("\n")}\n`;
 }

@@ -79,4 +79,7 @@ test("diffAnswerKeys: a new build's changed, added and removed answers, by quest
   expect(md).toContain("1 changed, 0 added, 0 removed.");
   expect(md).toContain("| what riding skill does Synthetic Horse need | 75 | 150 |");
   expect(md).toContain("## Added (0)\n\nNone.");
+  // A backslash is escaped before the pipe, so neither can end a cell early.
+  const odd = formatAnswerDiff({ builds: { before: [], after: [] }, changed: [{ id: "x", text: "a|b", before: ["c\\"], after: ["d\\|e"] }], added: [], removed: [] });
+  expect(odd).toContain("| a\\|b | c\\\\ | d\\\\\\|e |");
 });
