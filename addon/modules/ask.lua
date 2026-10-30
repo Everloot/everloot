@@ -60,13 +60,23 @@ function E:Ask(text)
   print("Everloot: question saved. Keep the companion running, then /reload to read the answer.")
 end
 
---- Show each verified answer once; an answered question leaves the queue, a failed checksum stays.
+--- Show each verified answer once; an answered question leaves the queue, a failed checksum stays. A failure the
+--- companion will try again (retry) is shown once and the question stays, so the real answer can still reach it.
 local function showAnswers()
-  if type(EverlootAnswersDB) ~= "table" or type(EverlootDB.asks) ~= "table" then return end
+  if type(EverlootDB.asks) ~= "table" then return end
+  local answers = type(EverlootAnswersDB) == "table" and EverlootAnswersDB or {}
   local waiting = {}
   for _, ask in ipairs(EverlootDB.asks) do
-    local a = EverlootAnswersDB[ask.id]
-    if type(a) == "table" and type(a.answer) == "string" and a.sum == E.Adler32(a.answer) then
+    local a = answers[ask.id]
+    local verified = type(a) == "table" and type(a.answer) == "string" and a.sum == E.Adler32(a.answer)
+    if verified and a.retry == true then
+      if not ask.toldRetry then
+        print("Everloot — " .. ask.question)
+        print("  " .. a.answer)
+        ask.toldRetry = true
+      end
+      waiting[#waiting + 1] = ask
+    elseif verified then
       print("Everloot — " .. ask.question)
       local source = (type(a.source) == "string" and a.source ~= "none") and (" (Source: " .. a.source .. ")") or ""
       print("  " .. a.answer .. source)
@@ -78,6 +88,9 @@ local function showAnswers()
     end
   end
   EverlootDB.asks = waiting
+  if #waiting > 0 then
+    print(string.format("Everloot: %d %s still waiting for an answer. Keep the companion running, then /reload.", #waiting, #waiting == 1 and "question is" or "questions are"))
+  end
 end
 
 SLASH_EVERLOOTASK1 = "/ask"

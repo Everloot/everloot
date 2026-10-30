@@ -6,7 +6,11 @@ import { adler32, luaString } from "./lua";
  * `question` and `askedAt` stay in the companion's own store, on the player's computer, so a follow-up can lean on
  * the question before it; the slot addon is written without them.
  */
-export interface Answer { id: string; answer: string; source: string; answeredAt: string; question?: string; askedAt?: string }
+export interface Answer {
+  id: string; answer: string; source: string; answeredAt: string; question?: string; askedAt?: string;
+  /** A failure the companion tries again: the addon shows it once and keeps the question waiting for the real answer. */
+  retry?: boolean;
+}
 
 export const ANSWERS_ADDON = "EverlootAnswers";
 // Same interface number as addon/Everloot.toc, so the client loads both without "out of date".
@@ -25,7 +29,7 @@ export function renderAnswersAddon(answers: Answer[]): { toc: string; lua: strin
   ].join("\n");
   const rows = answers.map((a) =>
     `  [${luaString(a.id)}] = { ["answer"] = ${luaString(a.answer)}, ["source"] = ${luaString(a.source)}, ` +
-    `["answeredAt"] = ${luaString(a.answeredAt)}, ["sum"] = ${adler32(a.answer)} },`);
+    `["answeredAt"] = ${luaString(a.answeredAt)}, ["sum"] = ${adler32(a.answer)}${a.retry ? `, ["retry"] = true` : ""} },`);
   const lua = [
     "-- Written by the Everloot companion. Do not edit: the next answer replaces this file.",
     "EverlootAnswersDB = {",
