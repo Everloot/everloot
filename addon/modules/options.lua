@@ -11,6 +11,8 @@ E.Options = O
 -- In page order. `command` is the /everloot word; `field` is a top-level EverlootDB key instead of a toggle;
 -- `defaultOff` reads a missing field as off.
 O.ROWS = {
+  { key = "window", label = "Everloot window",
+    text = "The window from the minimap button and /everloot window. It shows what this file holds and records nothing; off leaves recording as it is." },
   { key = "auctions", command = "auctions", label = "Auction scans",
     text = "Scan this house from the Everloot tab at the auction house, one click at a time. Item prices and quantities, never sellers." },
   { key = "scanPrompt", command = "scanprompt", field = true, label = "Scan prompt at the auction house",
