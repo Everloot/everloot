@@ -160,7 +160,7 @@ sources." when they do not answer), and the reply scored against the key. Correc
 declined: the exact refusal; wrong: none; error: no reply. A reasoning model needs room to answer after it thinks
 (`--max-tokens`, 1500 by default), so an empty reply is an error, never a wrong answer. Facts match as whole words,
 curly or straight apostrophes, a word's plural included. Any local Ollama or vLLM works (`http://localhost:11434/v1`);
-the key, if any, is read from `--key-file`. One call per question, so it runs on demand, never in CI.
+the key, if any, is read from `--key-file`. One call per question, so it runs on demand, and once per new game build in the build watch when a capped key is set (docs/BUILD_WATCH.md, step 8); never on pull requests.
 
 Player observations join the evidence when the public corpus is reachable, as they do for in-game `/ask`; the report
 says whether they did. First runs, 60 questions on local models through Ollama on the maintainer's machine, without
