@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import EmailAuthForm from "@/components/EmailAuthForm";
+import SocialSignIn from "@/components/SocialSignIn";
+import { configuredSocialProviders } from "@/lib/auth/social";
 import { signInMethods } from "@/lib/auth/auth";
 import { safeReturnTo } from "@/lib/auth/return-to";
 import { pageMetadata } from "@/lib/seo";
@@ -10,7 +12,7 @@ import { getUser } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  ...pageMetadata({ title: "Make an account", description: "Make a free Everloot account with your email or Battle.net.", path: "/sign-up" }),
+  ...pageMetadata({ title: "Make an account", description: "Make a free Everloot account.", path: "/sign-up" }),
   robots: { index: false, follow: true },
 };
 
@@ -28,6 +30,7 @@ export default async function SignUpPage({ searchParams }: { searchParams?: Prom
           first sign-in makes the account.
         </p>
       )}
+      <SocialSignIn providers={configuredSocialProviders()} returnTo={returnTo ?? undefined} />
       {methods.email
         ? <EmailAuthForm mode="sign-up" returnTo={returnTo ?? undefined} />
         : <p className="text-fg-2">Email sign-up is not open yet.</p>}

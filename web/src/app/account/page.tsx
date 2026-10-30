@@ -6,7 +6,8 @@ import ApiKeys from "@/components/ApiKeys";
 import ChatKeys from "@/components/chat/ChatKeys";
 import { Container, DataTitle } from "@/components/ui";
 import { loadOverview, type AccountOverview } from "@/lib/account-overview";
-import { authV2Enabled, getAuth } from "@/lib/auth/auth";
+import { authV2Enabled, getAuth, signInMethods } from "@/lib/auth/auth";
+import { configuredSocialProviders, type SocialProvider } from "@/lib/auth/social";
 import { isPlaceholderEmail } from "@/lib/auth/battlenet";
 import { signInPath } from "@/lib/auth/return-to";
 import { guardOn } from "@/lib/data-guard";
@@ -54,7 +55,7 @@ async function details() {
   return { email: email && !isPlaceholderEmail(email) ? email : null, methods: accounts.map((a) => a.providerId) };
 }
 
-export default async function AccountPage() {
+export default async function AccountPage({ searchParams }: { searchParams?: Promise<{ linkError?: string | string[] }> }) {
   let account;
   try {
     const user = await getUser();
@@ -69,6 +70,9 @@ export default async function AccountPage() {
   }
   if (!account) redirect(signInPath("/account"));
   const { user, email, methods } = account;
+  const availableLogins: (SocialProvider | "battlenet")[] = authV2Enabled()
+    ? [...(signInMethods().battlenet ? ["battlenet" as const] : []), ...configuredSocialProviders()] : [];
+  const linkError = (await searchParams)?.linkError === "1";
   // The counts are extras: when they cannot be read, the rest of the page still works.
   let overview: AccountOverview | null = null;
   try {
@@ -123,7 +127,8 @@ export default async function AccountPage() {
 
         <section id="integrations" aria-labelledby="integrations-heading" className="scroll-mt-20 space-y-4">
           <h2 id="integrations-heading" className={heading}>Integrations</h2>
-          <Integrations methods={methods} name={user.name} overview={overview} />
+          {linkError && <p role="alert" className="text-sm text-fg">That login could not be linked. Use a provider account with a verified email that is not already linked to another Everloot account.</p>}
+          <Integrations methods={methods} name={user.name} overview={overview} availableLogins={availableLogins} />
         </section>
 
         <section id="keys" aria-labelledby="keys-heading" className="scroll-mt-20 space-y-3">

@@ -3,6 +3,8 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import EmailAuthForm from "@/components/EmailAuthForm";
+import SocialSignIn from "@/components/SocialSignIn";
+import { configuredSocialProviders } from "@/lib/auth/social";
 import { authV2Enabled, signInMethods } from "@/lib/auth/auth";
 import { addAccountState, MAX_DEVICE_ACCOUNTS, profilesOn } from "@/lib/auth/device-accounts";
 import { safeReturnTo } from "@/lib/auth/return-to";
@@ -12,7 +14,7 @@ import { getUser } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  ...pageMetadata({ title: "Sign in", description: "Sign in to your Everloot account with Battle.net or email.", path: "/sign-in" }),
+  ...pageMetadata({ title: "Sign in", description: "Sign in to your Everloot account.", path: "/sign-in" }),
   robots: { index: false, follow: true },
 };
 
@@ -23,6 +25,7 @@ const battlenetButton = "inline-flex items-center justify-center min-h-11 px-4 r
 function signInError(error: string | string[] | undefined): string | null {
   if (typeof error !== "string" || !error) return null;
   switch (error) {
+    case "social": return "That sign-in did not finish. Try again, or use an existing login and link this provider from your account.";
     case "access_denied": return "Battle.net sign-in was cancelled. Try again when you are ready.";
     case "invalid_state": return "That sign-in link is stale. Start again from here.";
     case "server_config": return "Battle.net sign-in is not set up on this site yet.";
@@ -36,7 +39,7 @@ function signInError(error: string | string[] | undefined): string | null {
 // Before an add, GET /api/me/accounts/add gives a session from before the plugin its `_multi-` cookie (else the new
 // sign-in would orphan it) and notes the accounts already here; it comes back with `ready=1`. At 5 accounts the
 // plugin would replace the current one, so the page refuses instead.
-export default async function SignInPage({ searchParams }: { searchParams?: Promise<{ returnTo?: string | string[]; add?: string | string[]; ready?: string | string[]; error?: string | string[] }> }) {
+export default async function SignInPage({ searchParams }: { searchParams?: Promise<{ returnTo?: string | string[]; add?: string | string[]; ready?: string | string[]; error?: string | string[]; flow?: string | string[] }> }) {
   const params = await searchParams;
   let add = params?.add === "1" && authV2Enabled() && profilesOn();
   if (add) {
@@ -61,7 +64,8 @@ export default async function SignInPage({ searchParams }: { searchParams?: Prom
   // After an add through Battle.net the landing page checks whether the same account came back (home page notice).
   const bnetReturn = add && returnTo ? `${returnTo}${returnTo.includes("?") ? "&" : "?"}added=bnet` : returnTo;
   const methods = signInMethods();
-  const errorMessage = signInError(params?.error);
+  const social = configuredSocialProviders();
+  const errorMessage = signInError(params?.flow === "social" && params.error ? "social" : params?.error);
   return (
     <article className="max-w-3xl space-y-6">
       <h1 className="text-3xl font-bold text-fg">{add ? "Add another account" : "Sign in"}</h1>
@@ -70,9 +74,10 @@ export default async function SignInPage({ searchParams }: { searchParams?: Prom
       {methods.battlenet && (
         <p><a href={bnetReturn ? `/api/auth/bnet?returnTo=${encodeURIComponent(bnetReturn)}` : "/api/auth/bnet"} className={battlenetButton}>Sign in with Battle.net</a></p>
       )}
+      <SocialSignIn providers={social} returnTo={returnTo ?? undefined} addAccount={add} />
       {methods.email ? (
         <>
-          {methods.battlenet && <p className="text-sm text-muted">Or with your email:</p>}
+          {(methods.battlenet || social.length > 0) && <p className="text-sm text-muted">Or with your email:</p>}
           <EmailAuthForm mode="sign-in" returnTo={returnTo ?? undefined} />
           <p className="text-sm text-fg-2">
             New here? <Link href={returnTo ? `/sign-up?returnTo=${encodeURIComponent(returnTo)}` : "/sign-up"} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Make an account</Link>
@@ -80,7 +85,7 @@ export default async function SignInPage({ searchParams }: { searchParams?: Prom
             <Link href="/reset-password" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Forgot your password?</Link>
           </p>
         </>
-      ) : !methods.battlenet && <p className="text-fg-2">Sign-in is not available right now.</p>}
+      ) : !methods.battlenet && !social.length && <p className="text-fg-2">Sign-in is not available right now.</p>}
     </article>
   );
 }
