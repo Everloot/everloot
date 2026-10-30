@@ -63,7 +63,7 @@ test("buildFilesIndex: one fact per thing, ids and facts only, the build stamped
     { kind: "talent", name: "Synthetic Blast", claim: "Synthetic Blast: a Mage talent in the Fire tree, up to 5 ranks, in the game files.", url: "https://everloot.app/tools/talents/mage" },
     { kind: "talent", name: "Synthetic Blast", claim: "Synthetic Blast: a Priest talent in the Holy tree, up to 2 ranks, in the game files.", url: "https://everloot.app/tools/talents/priest" },
   ]);
-  expect(buildFilesIndex({})).toEqual({ build: "", extractedAt: null, facts: [] });
+  expect(buildFilesIndex({})).toEqual({ build: "", extractedAt: null, facts: [], zones: {} });
 });
 
 test("filesEvidence: whole-word mentions, longest names first, one per thing, labelled and credited; nothing for an empty index", () => {
