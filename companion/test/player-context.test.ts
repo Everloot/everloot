@@ -4,7 +4,14 @@ import { join } from "node:path";
 import { expect, test } from "vitest";
 import { readAsks } from "../src/bridge/asks";
 import { className, playerLine, sourcedFor, withPlayer, type AskContext } from "../src/bridge/engine";
+import { SYSTEM } from "../src/bridge/llm-engine";
 import { answerPending, createAnswerStore } from "../src/bridge/run";
+import { ANSWER_SYSTEM } from "../../kb/src/answer-eval";
+
+test("the in-game /ask rules and the written-answer eval's are the same words, so the eval scores what players get", () => {
+  expect(ANSWER_SYSTEM).toBe(SYSTEM);
+  expect(SYSTEM).toContain("name the zone first");
+});
 
 const sv = (asks: string) => `EverlootDB = {["version"] = "0.3.4", ["installId"] = "abcd-1234-ef56-7890", ["records"] = {}, ["asks"] = {${asks}}}\n`;
 

@@ -3,10 +3,13 @@ import { answerFromEvidence, MAX_ANSWER, playerLine, sourcedFor, sourceLines, ty
 
 const NOT_FOUND = "Not in the sources.";
 
-const SYSTEM = [
+// Kept word for word with kb/src/answer-eval.ts ANSWER_SYSTEM, which scores answers under these rules.
+export const SYSTEM = [
   "You answer a World of Warcraft: Forever player's question for a small in-game chat window.",
   "Use only the sources in the user message. If they do not answer the question, reply exactly: " + NOT_FOUND,
   "Answer in at most two sentences of plain text, without markdown.",
+  "Lead with what was asked: for where or how to get somewhere, name the zone first.",
+  "Where the sources disagree, prefer players' observations and the game files over the 2023 wiki, which may differ in WoW: Forever.",
 ].join(" ");
 
 /**

@@ -175,6 +175,14 @@ The misses are what to work on: the boss lists the evidence cannot name yet (the
 an answer), a flight master's zone answered with its continent (Undercity), and a reasoning model's budget.
 Reports: `docs/evals/answer-eval-2026-10-29-gemma3-4b.md`, `-gemma4-12b.md`.
 
+Rules tuned on the same 80 questions (half Spanish) with gemma3:4b, after the boss names and the Spanish search:
+76 correct with the first rules; 78 with two more, "for where or how to get somewhere, name the zone first" and
+"prefer players' observations and the game files over the 2023 wiki", which fixed the flight and entrance misses
+(`answer-eval-2026-10-29-gemma3-4b-rules.md`). Asking the model to reply in the question's language was tried and
+dropped: in Spanish the 4B model translated class and tree names ("Druida", "Sagrado") even when told not to, and named
+the wrong class for two talents, down to 57 and then 58 correct. Spanish questions are answered in English, the names
+as the English client shows them, until a stronger model keeps them; a hosted model is the one to retry it with.
+
 ## Questions in Spanish (built 2026-10-29)
 
 Carlos: many Spanish-speaking players run the English client because the Spanish client's names are from a region
