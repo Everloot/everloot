@@ -34,9 +34,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   from the agreed lists, with done, missing and started views and a "remember this character" helper on the browser.
 - Site: `/tools/gold-ledger` reads `Everloot.lua` in the browser, nothing sent: characters, the last 30 days of money
   in and out, this week, categories, receipts and gold history. The published ledgers stay below.
-- Addon, Desktop App and companion: `/ask` carries the asking character's class, level and zone, for that answer only.
-  "here" and "aquí" are looked up as the zone, "my class" and "mi clase" as the class, and a configured model is told
-  who is asking. The queue never leaves the player's computer, and the class and level are not kept.
 
 ### Changed
 - Site and Desktop App: Ollama suggests one small model, `qwen3:4b` (2.5 GB, calls tools), instead of `qwen3:8b`, and
@@ -136,6 +133,27 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   agree. Fishing (the bobber, or an object installs agree is fished) is never a pin. An upload of an event
   that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
   instead of withdrawing the event as a conflict. The map shows none of this yet.
+
+## [0.3.13] - 2026-10-29
+
+Release channel: Alpha
+
+Live-client verification is pending. This is a pre-release for WoW: Forever 1.60.1, not a verified stable build.
+
+### Added
+- `/ask` carries the realm you are on, so a price question such as `/ask price 2589` needs no realm in its words. The
+  Desktop App or companion answers it from the recorded market, with no AI provider needed.
+- `/ask` also carries your character's class, level and zone, for that answer only: "here" (or "aquí") is looked up as
+  your zone and "my class" (or "mi clase") as your class. The question queue never leaves your computer, and your
+  class and level are not kept.
+- Talent plans keep their spend order. A plan from the site or the Desktop App shows the next point only when its
+  order is known; an unordered plan lists the talents you can take without inventing a sequence.
+
+### Changed
+- Price tooltips say the community price is per unit and blends every auction house on the realm. An item whose
+  newest public day is old is marked stale, and a price file the Desktop App or companion has not refreshed for a
+  while is flagged separately.
+- The raid buff data is stamped with game build 1.60.1.70685.
 
 ## [0.3.12] - 2026-10-24
 
