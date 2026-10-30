@@ -2,10 +2,14 @@ name: Game build watch
 # Looks for a new WoW: Forever build twice an hour and, when there is one, opens a pull request with the
 # regenerated game data. Never merges anything. See docs/BUILD_WATCH.md.
 #
-# Three jobs, so no secret is ever in the same job as code that installs packages or parses downloaded files:
-#   watch    read-only token; npm ci, version check, CDN read. Hands its files on as an artifact.
-#   publish  write token (and BUILD_WATCH_TOKEN, only in its push step); runs no npm, no parser.
-#   report   issues only.
+# No write token is ever in the same job as code that installs packages or parses downloaded files:
+#   watch        read-only token; npm ci, version check, CDN read. Hands its files on as an artifact.
+#   publish      write token (and BUILD_WATCH_TOKEN, only in its push step); runs no npm, no parser.
+#   answer-eval  read-only token; npm ci, then the written-answer eval on the new files. Only when the repository
+#                variable ANSWER_EVAL_MODEL is set. Its one secret, ANSWER_EVAL_KEY, is a model API key used for nothing
+#                else and capped at the provider: the one exception to the rule above, accepted at that cap.
+#   answer-note  pull-request comments only; runs no npm, no parser.
+#   report       issues only.
 on:
   schedule:
     # :07 and :37 rather than :00 and :30, when GitHub's scheduler is busiest. Worst case a build is
@@ -222,6 +226,99 @@ jobs:
               gh pr create --base "$BASE" --head "$branch" --title "$title" --body-file "$body"
             fi
             git switch --detach "$start"
+          done
+
+  # How well a model answers players' questions from the new build's files: a sample of the question bank's keyed
+  # questions (English and Spanish), each sent with answer_sources' evidence under the in-game /ask rules, the reply
+  # scored against the files (docs/design/specs/2026-10-27-question-bank-design.md, phase 2). Informational: it never
+  # holds up the data, and a run without the variable skips it.
+  answer-eval:
+    needs: [watch, publish]
+    if: always() && needs.watch.outputs.extracted == 'true' && vars.ANSWER_EVAL_MODEL != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.23.2'
+          cache: npm
+          cache-dependency-path: |
+            kb/package-lock.json
+            web/package-lock.json
+      - run: npm ci
+        working-directory: kb
+      - run: npm ci
+        working-directory: web
+      - uses: actions/download-artifact@v8
+        with:
+          name: build-watch
+      - name: Fetch the approved knowledge release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p kb/data/release
+          gh release download mcp-knowledge-2026-10-05 --repo "$GITHUB_REPOSITORY" --dir kb/data/release
+          echo 'd21bb3c414db9f5f40a3146fe78d0ba3e7071eb083c59003fbf6062bd8ab41eb  kb/data/release/2026-10-05-everloot-public.sqlite' | sha256sum --check
+      - name: Score written answers on the new files
+        working-directory: kb
+        env:
+          ANSWER_EVAL_KEY: ${{ secrets.ANSWER_EVAL_KEY }}
+          BASE_URL: ${{ vars.ANSWER_EVAL_BASE_URL || 'https://openrouter.ai/api/v1' }}
+          MODEL: ${{ vars.ANSWER_EVAL_MODEL }}
+        run: |
+          set -euo pipefail
+          out=data/answer-eval && mkdir -p "$out"
+          key=$(mktemp) && chmod 600 "$key" && printf '%s' "$ANSWER_EVAL_KEY" > "$key"
+          unset ANSWER_EVAL_KEY
+          npm run -s kb -- question-bank --files-only --spanish --out "$out/bank.jsonl"
+          npm run -s kb -- question-answer-eval "$out/bank.jsonl" --db data/release/2026-10-05-everloot-public.sqlite \
+            --base-url "$BASE_URL" --model "$MODEL" --key-file "$key" --sample 60 --out "$out/answer-eval.md"
+          rm -f "$key"
+          cp data/build-watch/out/plan.json "$out/plan.json"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: answer-eval
+          retention-days: 3
+          if-no-files-found: error
+          path: |
+            kb/data/answer-eval/answer-eval.md
+            kb/data/answer-eval/plan.json
+
+  answer-note:
+    needs: answer-eval
+    if: needs.answer-eval.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    steps:
+      # A failed eval reads as success to this job (continue-on-error) but leaves no report: then there is nothing to say.
+      - uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          name: answer-eval
+      - name: Comment the scores on each build's pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          [ -f answer-eval.md ] && [ -f plan.json ] || { echo "no report"; exit 0; }
+          note=$(mktemp)
+          # GitHub refuses a comment over 65,536 characters: the report is cut well under it.
+          { echo "<details><summary>Written answers on this build's files</summary>"; echo
+            head -c 60000 answer-eval.md | sed -e 's/^# /### /' -e 's/^## /#### /'; echo; echo "</details>"; } > "$note"
+          jq -r '.[] | select(.action == "create" or .action == "update") | .branch' plan.json | while read -r branch; do
+            [[ "$branch" =~ ^game-build/[a-z0-9_]+-[0-9]+-[0-9a-f]{8}$ ]] || { echo "refusing odd branch"; continue; }
+            pr=$(gh pr list --repo "$REPO" --head "$branch" --state open --json number --jq '.[0].number // empty')
+            if [ -n "$pr" ]; then gh pr comment "$pr" --repo "$REPO" --body-file "$note"; fi
           done
 
   report:

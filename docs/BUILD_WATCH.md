@@ -39,6 +39,10 @@ A maintainer reviews it. Nothing merges itself.
    riding skill, a boss list, a talent's classes. That list is what to recheck in game. The step is informational:
    if it fails, the data is still published, and a body the list would push past GitHub's 65,536-character limit
    gets one line instead.
+8. When the repository variable `ANSWER_EVAL_MODEL` is set, scores a model's written answers on the new files:
+   60 of the question bank's keyed questions, half asked in Spanish, each sent with `answer_sources`' evidence under
+   the in-game `/ask` rules, the reply checked against the files (`question-answer-eval`). The `answer-note` job
+   posts the result, folded, as a comment on the build's pull request. Informational, like step 7.
 
 Every item from a product with `live: false` carries `spoiler: true` and the body says so. The body
 also states the encrypted block count. No decryption keys are loaded; encrypted blocks are skipped.
@@ -67,10 +71,11 @@ matter if the repository goes quiet.
 
 ## Tokens
 
-The workflow has three jobs so that no secret shares a job with code that installs packages or parses
+The workflow splits its jobs so that no write token shares a job with code that installs packages or parses
 downloaded files. `watch` has a read-only token and no credentials left in the checkout. `publish` runs
 no npm and no parser; it alone has write access, and `BUILD_WATCH_TOKEN` appears only in its push step,
-passed to git for that call. `report` can only write issues. Branches are replaced with `--force-with-lease`.
+passed to git for that call. `report` can only write issues. `answer-eval` (step 8) has a read-only token and one secret,
+`ANSWER_EVAL_KEY`, a model API key used for nothing else, with a monthly spend cap set at the provider: the one that shares a job with `npm ci`, accepted because a leak costs at most that cap. The key goes to a file for the eval's own call. `answer-note` runs no npm and can only comment on pull requests. Branches are replaced with `--force-with-lease`.
 Before committing, `publish` checks the plan's values, accepts only the files the generators write (the
 talents, raid file, `raid.ts`, map, spell values, client digests, changelog entry and `raid_data.lua`), plus `kb/curated/recheck.json`, and requires that
 `raid.ts` changes nothing but its import line.
@@ -91,6 +96,10 @@ next successful scheduled run closes it.
   allows build changes, beta included, the talent catalog and the raid buff table in git) is merged.
 - `kb/lists/build-watch.yaml` follows `wowf`, WoW Forever's own product, with `live: false`. Set `live: true`
   once players can play it, at launch ([LAUNCH_DAY](LAUNCH_DAY.md)).
+- Optional: the written-answer scores (step 8). Create a key used only for this at an OpenAI-compatible provider
+  (OpenRouter by default), set a monthly spend limit on it there, and add it as the repository secret
+  `ANSWER_EVAL_KEY`. Then set the repository variable `ANSWER_EVAL_MODEL` (the provider's model name) and, for a
+  provider other than OpenRouter, `ANSWER_EVAL_BASE_URL`. Without `ANSWER_EVAL_MODEL` the step does not run.
 
 ## Running it locally
 

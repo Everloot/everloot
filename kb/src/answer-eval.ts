@@ -2,8 +2,8 @@
  * The written-answer eval (question bank phase 2): a sample of the bank's questions that carry an answer key, each
  * sent with answer_sources' evidence to a model under the rules in-game /ask gives it, and the reply scored against
  * the key. Any OpenAI-compatible endpoint answers (a local Ollama or vLLM, OpenRouter, a team server); the eval sends
- * the question and the evidence, nothing about a player. It costs a model call per question, so it runs on demand,
- * never in CI (docs/design/specs/2026-10-27-question-bank-design.md, phase 2).
+ * the question and the evidence, nothing about a player. It costs a model call per question, so it runs on demand and,
+ * when a key is set, once per new game build in the build watch, never on pull requests (docs/design/specs/2026-10-27-question-bank-design.md, phase 2).
  */
 import { answerSources, formatAnswerSources, type AnswerSourcesFacts } from "./answer-sources.js";
 import type { FilesIndex } from "./files-evidence.js";
