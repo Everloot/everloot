@@ -277,6 +277,9 @@ test("no ad markup at all without an AdSense client", async () => {
 
 // Reviewed published corpus before adding hero fields: every editorial byte stays unchanged.
 const CORPUS = {
+  "wow-forever-launch-week-checklist-nov-4": "2dcb196a7aa4b047027ca93dc70cbd3738695e66c1f390be415821920d112113",
+  "wow-forever-layering-world-refresh-fixes": "c009712f88aceb6b144045abf0048d6aed008dd0ddac030814384b6ead175a66",
+  "wow-forever-4-month-patch-cadence": "5b7d9982b39d9ae78f77a7fd187f70f88203d2d6a576c6c369cf88e93d9f9ab8",
   "datamined-30-xp-potions-patch-12-1-7-not-forever": "7abd75147282a5dbe7fdb1402272fb6f7c563adaa67e3eff3d38ba0e5d964035",
   "item-names-are-live": "f76f222209e2bd46d5b4fb5ca5836ced6c55ed158016340dfcc6d4c0859782bc",
   "wow-forever-beta-closed-priority-fixes-podcast": "f4a7e82971211c8b3a7942e8be6360dafbb770eddaff55e1c2afd9cf29e09a34",
@@ -293,7 +296,7 @@ const CORPUS = {
   "wow-weekly-forever-name-reservations-zulaman-hallows-end": "64c5c8d7dff54cbeaa1b1030179939e01207d0a92e79b5b59b655e3f4c8815be"
 };
 
-test("all 14 published posts retain their editorial source and survive pages, hub, RSS and sitemap with eight heroes", async () => {
+test("all 17 published posts retain their editorial source and survive pages, hub, RSS and sitemap with eight heroes", async () => {
   const dir = fileURLToPath(new URL("../../../../kb/news/", import.meta.url));
   vi.stubEnv("NEWS_DIR", dir); vi.stubEnv("WIKI_DIR", WIKI);
   vi.stubEnv("NEXT_PUBLIC_ADSENSE_CLIENT", "ca-pub-test");
@@ -310,9 +313,9 @@ test("all 14 published posts retain their editorial source and survive pages, hu
   const hub = renderToStaticMarkup(await NewsHub());
   const rss = await GET().text();
   const sitemap = newsSitemapPaths(news).map((p) => p.path);
-  expect(hub.match(/data-news-post=/g)).toHaveLength(14);
-  expect(rss.match(/<item>/g)).toHaveLength(14);
-  expect(sitemap).toHaveLength(15);
+  expect(hub.match(/data-news-post=/g)).toHaveLength(17);
+  expect(rss.match(/<item>/g)).toHaveLength(17);
+  expect(sitemap).toHaveLength(18);
   expect(hub).not.toContain("data-ad-slot");
   for (const post of posts) {
     const source = readFileSync(join(dir, `${post.slug}.md`), "utf8").replace(/\r\n/g, "\n");
