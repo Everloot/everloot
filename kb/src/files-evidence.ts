@@ -84,16 +84,16 @@ export function buildFilesIndex(files: GameDataFiles): FilesIndex {
     const zone = zoneName.get(num(r?.uiMapId) ?? -1);
     const bosses = arr(encounters?.[String(id)]);
     const url = `${SITE}/database/instances/${segment(id, name)}`;
-    // Encounter names in order (docs/DATA_POLICY.md, "Game-file facts in answers").
-    const names = bosses.map((b) => str(rec(b)?.name)).filter(Boolean);
+    // Encounter names in order (docs/DATA_POLICY.md, "Game-file facts in answers"), each once: the files repeat a boss
+    // per difficulty (Blackfathom Deeps lists 21 rows for 9 names), and which difficulty Forever uses is not known.
+    const names = [...new Set(bosses.map((b) => str(rec(b)?.name)).filter(Boolean))];
     facts.push({
       kind: "instance", name,
-      claim: `${name}: a ${kind}${level ? `, ${level}` : ""}${zone ? `, entered from ${zone}` : ""}${names.length ? `; the files list ${names.length} encounters: ${names.join(", ")}` : ""}.`,
+      claim: `${name}: a ${kind}${level ? `, ${level}` : ""}${zone ? `, entered from ${zone}` : ""}${names.length ? `; the files name ${names.length} ${names.length === 1 ? "boss" : "bosses"}: ${names.join(", ")}` : ""}.`,
       url,
     });
-    bosses.forEach((b, i) => {
-      const bossName = str(rec(b)?.name);
-      if (bossName) facts.push({ kind: "boss", name: bossName, claim: `${bossName}: encounter ${i + 1} of ${bosses.length} in ${name}, in the game files.`, url });
+    names.forEach((bossName, i) => {
+      facts.push({ kind: "boss", name: bossName, claim: `${bossName}: boss ${i + 1} of ${names.length} in ${name}, in the game files.`, url });
     });
   }
   // A node in a zone the map holds back (unreleased, DATA_POLICY "held-back zones") is left out altogether, name and zone.
