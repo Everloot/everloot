@@ -263,6 +263,38 @@ Live-client verification is pending. This is a pre-release for WoW: Forever 1.60
   the census box ticked on its setup screen, or turns it on in Settings; a setup finished before this keeps
   it off. Still never names, guilds, gear or places, and the site shows only totals.
 
+## [desktop-v0.1.8] - 2026-10-30
+
+### Added
+- In-game `/ask` answers from the same evidence the site's chat uses: Everloot's own facts first, then the game
+  files, then the 2023 wiki, each answer with its source and licence. Without an AI provider the answer is the first
+  piece of evidence and its page.
+- `/ask` follows up on the question before it: "what does he drop" after "where is Edwin VanCleef" (within 30
+  minutes) finds VanCleef.
+- `/ask` knows who is asking, for that answer only (with addon 0.3.13): "here" (or "aquí") is your zone and "my class"
+  (or "mi clase") your class, and a model you set up is told your class, level and zone. Neither class nor level is
+  kept.
+- Price questions such as `/ask price 2589` are answered from the recorded market, with no AI provider needed; the
+  realm you asked from fills in a missing one.
+- Chat, Ask and Settings share one Assistant setup: search works with no key, and an optional model is set up in
+  place, each provider linking to its own key page.
+- A new home screen: a status headline, the app's jobs, recent activity and the latest changes in one place, and
+  Settings grouped by what runs, the AI model, the game, startup, census and player pages.
+- Talent plans handed to the addon keep their spend order.
+
+### Changed
+- A model writing an `/ask` answer names the zone first for "where" and "how do I get to" questions, and prefers
+  players' observations and the game files over the 2023 wiki where they disagree.
+- Chat without a model answers from the same evidence, and models are told what it gathers.
+- Ollama suggests one small model, `qwen3:4b`, and says what running a model on your own computer means.
+
+### Fixed
+- Vendor money counts as income, as the addon and the website's ledger count it, so a character's week and
+  categories agree with the site.
+- Updates and uploads recover better: an addon install that can be recovered is kept, upload progress advances only
+  on rows the site accepted, retries and updates are bounded, and installers are written safely.
+- What you have contributed is kept across addon and Desktop App sessions.
+
 ## [desktop-v0.1.7] - 2026-10-24
 
 ### Added

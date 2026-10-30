@@ -2,7 +2,7 @@
   "name": "everloot-desktop",
   "productName": "Everloot Desktop App",
   "license": "AGPL-3.0-only",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "private": true,
   "description": "Everloot Desktop App: uploads the addon's save file after every logout, keeps market prices in game and answers /ask, from the system tray.",
   "homepage": "https://everloot.app",
