@@ -25,7 +25,7 @@ test("the HTTP mount hands the game files' facts to answer_sources, as /api/tool
   const result = (await (await handle(call({ name: "answer_sources", arguments: { question: "which bosses are in Synthetic Stockade", limit: 3 } }))).json()).result;
   const evidence = result.structuredContent.evidence as { kind: string; claim: string }[];
   expect(evidence[0]!.kind).toBe("files");
-  expect(evidence[0]!.claim).toMatch(/^Synthetic Stockade: a dungeon, entered from Synthetic Forest; the files list 1 encounters/);
+  expect(evidence[0]!.claim).toMatch(/^Synthetic Stockade: a dungeon, entered from Synthetic Forest; the files name 1 boss: Synthetic Warden/);
   expect(result.content[0].text).toContain("[game files, found in game files and unconfirmed] Synthetic Stockade");
 });
 

@@ -21,7 +21,8 @@ const files = {
       { id: 4, name: "Synthetic Camp, Synthetic Wilds", uiMapId: 77 },
     ],
   },
-  encounters: { build: { version: "1.0.0.70634" }, instances: { "34": [{ id: 1, name: "Synthetic Warden" }, { id: 2, name: "Synthetic Stockade" }] } },
+  // The files repeat a boss per difficulty; the answer names it once.
+  encounters: { build: { version: "1.0.0.70634" }, instances: { "34": [{ id: 1, name: "Synthetic Warden" }, { id: 2, name: "Synthetic Stockade" }, { id: 3, name: "Synthetic Warden", difficultyId: 198 }] } },
   mounts: { build: { version: "1.0.0.70634" }, mounts: { "6": { name: "Synthetic Horse", spellId: 458, ridingSkill: 75 }, "7": { name: "Synthetic Wolf", spellId: 459 } } },
   achievements: { build: { version: "1.0.0.70634" }, achievements: { "49": { title: "Storm the Chasm", points: 10, description: "secret text", criteria: [{ text: "secret criterion" }, { text: "another" }] }, "50": { title: "Synthetic victories", points: 0, criteria: [{ text: "secret count" }], statistic: true } } },
   talents: {
@@ -38,11 +39,11 @@ test("buildFilesIndex: one fact per thing, ids and facts only, the build stamped
   expect(byKind("zone")).toEqual([{ kind: "zone", name: "Synthetic Forest", claim: "Synthetic Forest: a zone of Synthetic Kingdoms, in the game files.", url: "https://everloot.app/database/zones/1429-synthetic-forest" }]);
   // Two entrance pins of one instance give one fact; the level, the zone and the encounters in order are in it.
   expect(byKind("instance").map((f) => f.claim)).toEqual([
-    "Synthetic Stockade: a dungeon, levels 17 to 24, entered from Synthetic Forest; the files list 2 encounters: Synthetic Warden, Synthetic Stockade.",
+    "Synthetic Stockade: a dungeon, levels 17 to 24, entered from Synthetic Forest; the files name 2 bosses: Synthetic Warden, Synthetic Stockade.",
     "Molten Core: a raid, level 60.",
   ]);
   expect(byKind("instance")[0]!.url).toBe("https://everloot.app/database/instances/34-synthetic-stockade");
-  expect(byKind("boss").map((f) => f.claim)).toEqual(["Synthetic Warden: encounter 1 of 2 in Synthetic Stockade, in the game files.", "Synthetic Stockade: encounter 2 of 2 in Synthetic Stockade, in the game files."]);
+  expect(byKind("boss").map((f) => f.claim)).toEqual(["Synthetic Warden: boss 1 of 2 in Synthetic Stockade, in the game files.", "Synthetic Stockade: boss 2 of 2 in Synthetic Stockade, in the game files."]);
   // A node in a held-back zone is left out, name and all; one on a map the zone list lacks names no zone.
   expect(byKind("flight")).toEqual([
     { kind: "flight", name: "Synthetic Keep", claim: "Synthetic Keep: a flight master in Synthetic Forest, in the game files.", url: "https://everloot.app/map" },
