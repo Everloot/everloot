@@ -279,6 +279,17 @@ Restore the initial logging state at the end and confirm its message. Combat log
 participant in range: never upload, commit or paste them. Rotation, truncation and growth limits are LOG-L01 tests
 on synthetic files, not live measurements.
 
+## 9a. Values the client may hide
+
+Forever can mark a value secret: an addon may hold it but not read it. The addon treats a secret as missing (`E.Readable`, `addon/tests/secret_values_contract.py`), which stops errors but also stops the capture that needed the value. Which values are secret on the live client is unknown. Other Forever addons guard unit GUIDs and names, positions, tooltip text and loot lines.
+
+| Probe | Steps | Expected | If not |
+|---|---|---|---|
+| P-SECRET-1 | Target an NPC outside, then inside a dungeon, in and out of combat. `/dump issecretvalue(UnitGUID("target")), issecretvalue(UnitName("target"))`, and the same for the player's `C_Map.GetPlayerMapPosition` x. | All false, so capture works as designed | If a GUID is secret on ordinary NPCs, the addon no longer errors but NPC, loot and vendor capture record nothing: that capture needs a new design at once. |
+| P-SECRET-2 | `/dump UnitName("player")` | Record what the second value is | Other Forever addons say it is the surname. `players.lua` compares it as a server, so other players could read as another realm and be dropped. `gold.lua` and `gph.lua` key on the first name alone, so two characters could collide. |
+| P-SECRET-3 | Open a class trainer. `/dump C_Trainer and C_Trainer.GetTrainerType()`, `/dump C_TooltipInfo and C_TooltipInfo.GetTrainerService(1)` | Record whether each returns data and holds a spell id | Decides how class-trainer capture can key its rows. |
+| P-SECRET-4 | Play 30 minutes, then `/everloot status` | `npc_sighting`, `loot`, `quest` and `item_seen` rows grow; no Lua errors | The first proof that capture works on the live client. |
+
 ## 10. Restore and wrap-up
 
 1. Log out, close the game, then compare each `Everloot.lua` with its baseline copy. Probe rows are real local

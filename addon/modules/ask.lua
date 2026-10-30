@@ -19,9 +19,9 @@ end
 --- and the zone. They stay in this queue on the player's computer; uploads never carry the queue (docs/DATA_POLICY.md).
 local function currentPlayer()
   local class
-  if UnitClass then class = select(2, UnitClass("player")) end
-  local level = UnitLevel and UnitLevel("player")
-  local zone = GetRealZoneText and GetRealZoneText()
+  if UnitClass then class = E.Readable((select(2, UnitClass("player")))) end
+  local level = UnitLevel and E.Readable(UnitLevel("player"))
+  local zone = GetRealZoneText and E.Readable(GetRealZoneText())
   if type(class) ~= "string" or not class:find("^%u+$") or #class > 20 then class = nil end
   if type(level) ~= "number" or level < 1 or level > 100 or level % 1 ~= 0 then level = nil end
   if type(zone) == "string" then zone = zone:gsub("^%s+", ""):gsub("%s+$", "") end
