@@ -111,10 +111,11 @@ No migration is part of the switch.
 
 ## Smoke list
 
-Run these against `https://everloot.app` with `curl -s -o /dev/null -w "%{http_code} %{url_effective}\n"`
-(add `-L` only where the expected answer is a redirect and you want the target). This is the list used for
-the 2026-10-22 production check after the wave 5 merge; it is repeated here from the owner notes, not
-re-run.
+Run `python scripts/launch_smoke.py` from the repository root (add `--after-switch` once the switch is
+deployed, steps 21 and later). It asks every path below, judges each answer as the table says, prints a
+Markdown table to keep as the step's record and exits 1 when a check fails. It also checks that
+`/database/items/25` shows a name. It needs only Python's standard library, and it never prints the
+IndexNow key. First run: 2026-10-30, all 16 checks passed before the switch.
 
 | Path | Expected |
 |---|---|
