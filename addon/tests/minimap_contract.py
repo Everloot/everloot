@@ -23,7 +23,7 @@ Frame.__index = function(self, key)
   if own then return own end
   return function() end
 end
-function Frame.SetScript(self, script, f) self.scripts[script] = f end
+function Frame.SetScript(self, script, f) self.scripts[script] = f; if script == 'OnEvent' then self.onEvent = f end end
 function Frame.HookScript(self, _, f) table.insert(self.hooks, f) end
 function Frame.SetText(self, t) self.text = t end
 function Frame.GetText(self) return self.text end
@@ -72,7 +72,8 @@ def test_the_button_sits_on_the_minimap_and_opens_the_panel():
     lua = fresh(MINIMAP)
     button = lua.eval("Everloot.Minimap.Button()")
     assert button is not None
-    assert lua.eval("Everloot.Minimap.Button()") is button  # built once
+    lua.globals().button = button
+    assert lua.eval("Everloot.Minimap.Button() == button") is True  # built once
     assert lua.eval("button.parent == Minimap") is True
     # Clicking it opens the panel.
     lua.execute("button.scripts.OnClick(button)")
@@ -92,3 +93,10 @@ def test_the_ask_box_sends_a_question_the_way_the_command_does():
     assert lua.eval("EverlootDB.asks[1].question") == "where does the mage get the frost book?"
     # The box is empty again, so the same question is not sent twice.
     assert lua.eval("Everloot.Options.page.ask:GetText()") == ""
+
+
+if __name__ == "__main__":
+    test_without_a_minimap_the_module_says_so_and_does_not_error()
+    test_the_button_sits_on_the_minimap_and_opens_the_panel()
+    test_the_ask_box_sends_a_question_the_way_the_command_does()
+    print("Lua 5.1 minimap: absent-client fallback, one button, options and ask box")
