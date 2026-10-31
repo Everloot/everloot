@@ -7,7 +7,8 @@ companion, and adds auction prices to item tooltips. It uses only the game's add
 plays the character. Records match the upload contract (`packages/protocol`, see its `schema/records/`) field for
 field.
 
-**Status:** 0.3.10 beta. The automated contract tests pass; the in-client checks in
+**Status:** 0.3.14 Alpha. The automated contract tests pass; live-client rendering of the new Home window,
+crest, fonts and interactions remains unverified. The in-client checks in
 `docs/2026-10-08-beta-client-checklist.md`, `docs/2026-10-18-addon-0.3.2-beta-checklist.md`,
 `docs/2026-10-19-addon-0.3.3-beta-checklist.md` and `docs/2026-10-21-addon-0.3.10-launch-checklist.md` are still open, and the full scan
 (`docs/design/specs/2026-10-16-forever-market-design.md`) has not run in the Forever client.
