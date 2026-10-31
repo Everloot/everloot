@@ -242,8 +242,8 @@ test("the catch-all route hands only the Battle.net callback and the error page 
 test.each([
   ["GET", "/api/auth/get-session"],
   ["POST", "/api/auth/update-user"],
-  ["POST", "/api/auth/sign-in/social"],
   ["POST", "/api/auth/sign-out"],
+  ["POST", "/api/auth/unlink-account"],
   ["GET", "/api/auth/list-accounts"],
   ["POST", "/api/auth/callback/battlenet"],
   ["GET", "/api/auth/callback/github"],
@@ -253,6 +253,24 @@ test.each([
   const response = await (method === "GET" ? allGET : allPOST)(request);
   expect(response.status).toBe(404);
   expect(v2.fake.handler).not.toHaveBeenCalled();
+});
+
+test.each(["google", "microsoft", "twitch", "discord"])("the %s OAuth callback reaches Better Auth", async (provider) => {
+  v2.fake.handler.mockResolvedValue(new Response("handled"));
+  expect(await (await allGET(new Request(`https://everloot.app/api/auth/callback/${provider}?code=c&state=s`))).text()).toBe("handled");
+});
+
+test.each(["/sign-in/social", "/link-social"])("%s only accepts posts from our own origin and stays off with v2", async (path) => {
+  v2.fake.handler.mockResolvedValue(Response.json({ url: "https://discord.com/api/oauth2/authorize" }));
+  const send = (origin?: string) => allPOST(new Request(`https://everloot.app/api/auth${path}`, {
+    method: "POST", headers: origin ? { origin } : {},
+  }));
+  expect((await send("https://evil.example")).status).toBe(403);
+  expect((await send()).status).toBe(403);
+  expect(v2.fake.handler).not.toHaveBeenCalled();
+  expect((await send("https://everloot.app")).status).toBe(200);
+  v2.enabled = false;
+  expect((await send("https://everloot.app")).status).toBe(404);
 });
 
 test("with the flag off the catch-all route is 404", async () => {

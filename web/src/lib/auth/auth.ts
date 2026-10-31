@@ -8,6 +8,7 @@ import { siteUrl } from "@/lib/supabase/server";
 import { battlenetProvider, isPlaceholderEmail } from "./battlenet";
 import { authPool, pgRateLimitStore, type RateLimitStore } from "./db";
 import { emailConfigured, resetText, sendEmail, verificationText } from "./email";
+import { configuredSocialProviders } from "./social";
 
 export function authV2Enabled(env: Record<string, string | undefined> = process.env): boolean {
   return env.EVERLOOT_AUTH_V2 === "1";
@@ -43,6 +44,19 @@ export function createAuth(options: {
     baseURL: env.BETTER_AUTH_URL?.trim() || siteUrl(),
     basePath: "/api/auth",
     trustedOrigins: [siteUrl()],
+    socialProviders: Object.fromEntries(configuredSocialProviders(env).map((provider) => {
+      const prefix = provider.toUpperCase();
+      return [provider, {
+        clientId: env[`${prefix}_CLIENT_ID`]!.trim(),
+        clientSecret: env[`${prefix}_CLIENT_SECRET`]!.trim(),
+        ...(provider === "microsoft" ? {
+          tenantId: "common", prompt: "select_account", disableDefaultScope: true,
+          scope: ["openid", "profile", "email", "User.Read"],
+        } : {}),
+        ...(provider === "google" ? { prompt: "select_account" } : {}),
+        ...(provider === "discord" ? { prompt: "consent" } : {}),
+      }];
+    })),
     // Off until Resend is set up: an account nobody can verify is an account nobody can use.
     emailAndPassword: {
       enabled: emailConfigured(env),
@@ -71,6 +85,13 @@ export function createAuth(options: {
     user: {
       modelName: "users",
       fields: { emailVerified: "email_verified", createdAt: "created_at", updatedAt: "updated_at" },
+      // A provider may return an unverified email. Only Battle.net may use its reserved placeholder;
+      // otherwise someone could reserve a future Battle.net user's address before their first sign-in.
+      validateUserInfo: ({ user, source }) => {
+        if (source.oauth?.providerId !== "battlenet" && typeof user.email === "string" && isPlaceholderEmail(user.email)) {
+          return { error: "reserved_email" };
+        }
+      },
     },
     session: {
       modelName: "auth_session",
@@ -91,7 +112,15 @@ export function createAuth(options: {
       },
       // Battle.net sign-ins are matched by their auth_account row, which the migration's backfill and
       // trigger give every Battle.net user. Linking by email stays off while the email is unverified.
-      accountLinking: { enabled: true },
+      accountLinking: {
+        enabled: true,
+        // Matching emails must be verified on both sides. Battle.net has no email; its reserved
+        // placeholder cannot be registered through email signup. Other providers are never forced trusted.
+        requireLocalEmailVerified: true,
+        trustedProviders: ["battlenet"],
+        // Linking from an authenticated session also works for Battle.net's placeholder address.
+        allowDifferentEmails: true,
+      },
       // The OAuth state lives in a signed cookie: a sign-in start writes no database row.
       storeStateStrategy: "cookie",
     },
