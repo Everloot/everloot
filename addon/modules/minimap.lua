@@ -23,6 +23,8 @@ function M.Button()
     button.icon = icon
   end
   button:SetScript("OnClick", function(_, mouseButton)
+    -- Left: the Everloot window, or the plan workspace when the window is off or has failed this session.
+    if mouseButton ~= "RightButton" and E.Window and E:IsEnabled("window") and not E.Window.failed and E.Window.Toggle() then return end
     if mouseButton ~= "RightButton" and E.Planner then E.Planner.Open()
     elseif E.Options and E.Options.Open then E.Options.Open() end
   end)

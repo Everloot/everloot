@@ -40,6 +40,12 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   from the agreed lists, with done, missing and started views and a "remember this character" helper on the browser.
 - Site: `/tools/gold-ledger` reads `Everloot.lua` in the browser, nothing sent: characters, the last 30 days of money
   in and out, this week, categories, receipts and gold history. The published ledgers stay below.
+- Addon: the Everloot window, from the minimap button or `/everloot window`. Home shows your character, gold on hand
+  and its peak, the money the addon recorded by source, gold per hour with Pause, your professions with their skill
+  and how many rows of each kind your file holds; a value the game does not give is a dash. It is built the first
+  time it opens and registers no events, so an error in it closes the window and recording carries on. The
+  **Everloot window** switch in the settings turns it off. Item tooltips put the Everloot lines under one green
+  "Everloot" header with the crest.
 
 ### Changed
 - Site and Desktop App: Ollama suggests one small model, `qwen3:4b` (2.5 GB, calls tools), instead of `qwen3:8b`, and

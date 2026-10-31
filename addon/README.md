@@ -158,6 +158,20 @@ records and where it goes. A switch that has a `/everloot` command runs that com
 always agree. Changes apply after a reload; the page has a **Reload now** button. A client without the
 game's options API shows the page as a window instead.
 
+## The Everloot window
+
+Left-click the minimap button, or `/everloot window`, for the Everloot window. **Home** shows your character, gold on
+hand, the peak this install has seen and the money the gold module recorded for this character (loot, quests,
+vendors, auctions, flights), the gold per hour session with a Pause button, your professions with their skill and
+the recipe colours the file holds, and how many rows of each kind are in your saved file. A value the game does not
+give is a dash. **Gold** opens the gold per hour window, **Build plan** the plan workspace and **Settings** this page;
+the other items say what to use for now.
+
+The window is built the first time it opens and registers no events, so recording never depends on it. An error
+inside it closes it until `/reload` and `/everloot status` names the error. The **Everloot window** switch on the
+settings page turns it off; the minimap button then opens the plan workspace as before. The crest it uses is
+`media/crest.tga`, which the release zip carries beside the code.
+
 ## Census
 
 On in a new install, which says so once in chat; an install from before the census keeps it off until
@@ -216,7 +230,8 @@ whether it is on and how many characters it holds; `/everloot players off` stops
 
 ### Bring a website plan into the game
 
-Open `/everloot` or left-click its minimap button for the **Talents / Raid** workspace.
+Open `/everloot`, or **Build plan** in the Everloot window, for the **Talents / Raid** workspace. With the window
+off, a left-click on the minimap button opens the workspace instead.
 Right-click the minimap button, or use `/everloot options`, for collection settings.
 `/everloot status` still prints the collector status.
 
@@ -372,7 +387,9 @@ addon/
 │   ├── prices.lua      item tooltips: your latest scan and the companion's community prices
 │   ├── drops.lua       item tooltips: where an item drops, from the public rates in the same file
 │   ├── gph.lua         gold per hour sessions, kept in your file only
-│   └── conveniences.lua  sell greys and repair at a merchant, Collect all at the mailbox; each off until enabled, no records
+│   ├── conveniences.lua  sell greys and repair at a merchant, Collect all at the mailbox; each off until enabled, no records
+│   └── window.lua      the Everloot window: Home from what the file holds; built on first open, no records
+├── media/crest.tga     the crest, 128 px, packaged beside the code
 └── tests/              Lua 5.1 contract tests and their fixtures
 ```
 
