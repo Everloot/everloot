@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+﻿import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -86,7 +86,7 @@ const REGIONS: Region[] = ["us", "eu", "kr", "tw"];
 
 const USAGE = `usage: npm run kb -- <command> --db <path>
   import-wiki <dump.xml|dump.xml.zst> [--limit N]   (reads the dump twice; --limit still costs one full pass;
-    a limited import REPLACES all wiki rows in the target DB — use --db <scratch> for trials)
+    a limited import REPLACES all wiki rows in the target DB â€” use --db <scratch> for trials)
   import-curated [dir=curated]
   blizzard-get <data/wow/...|profile/wow/...> --game retail|classic|classic1x|forever --kind static|dynamic|profile [--region us]
     (path has no leading slash; works unchanged in Git Bash and PowerShell)
@@ -342,7 +342,7 @@ async function main(): Promise<number> {
       }
       const { stored, skipped, dropped } = await importWikiDump(db(), args[0], {
         limit,
-        onProgress: ({ pass, blocks }) => console.error(`pass ${pass}: ${blocks.toLocaleString("en-US")} blocks…`),
+        onProgress: ({ pass, blocks }) => console.error(`pass ${pass}: ${blocks.toLocaleString("en-US")} blocksâ€¦`),
       });
       db().pragma("wal_checkpoint(TRUNCATE)");
       console.log(
@@ -631,7 +631,10 @@ async function main(): Promise<number> {
       const facts = corpus ? answerSourcesFactsFromRecords(corpus.records) : null;
       const ranAt = new Date().toISOString();
       const files = readFilesIndex(flags.get("game-data") || "../web/src/data/game-data");
-      const report = await evaluateBank(release, bank, facts, { release: basename(releasePath), dataAsOf: corpus?.dataAsOf ?? null, ranAt, files: files.facts.length ? files : null });
+      // --limit 3 measures what in-game /ask gets (companion/src/bridge/engine.ts); the default 8 is the MCP tool's.
+      const limit = flags.get("limit") ? Number(flags.get("limit")) : undefined;
+      if (limit !== undefined && !(Number.isInteger(limit) && limit >= 1 && limit <= 25)) throw new Error("--limit takes a whole number from 1 to 25");
+      const report = await evaluateBank(release, bank, facts, { release: basename(releasePath), dataAsOf: corpus?.dataAsOf ?? null, ranAt, files: files.facts.length ? files : null, limit });
       const out = flags.get("out") || `../docs/evals/question-eval-${ranAt.slice(0, 10)}.md`;
       mkdirSync(dirname(out), { recursive: true });
       writeFileSync(out, formatEvalReport(report));
