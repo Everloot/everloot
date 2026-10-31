@@ -1,7 +1,13 @@
 import { getPathMatch } from "next/dist/shared/lib/router/utils/path-match";
 import { describe, expect, test } from "vitest";
 import nextConfig from "../../next.config.js";
+import { PREFIXES, SERVED } from "./build-versions";
 import { crossesDocumentBoundary, documentPathname, isProtectedPath } from "./document-boundary";
+
+// The served version's prefix (/beta before launch, none once Live is served) shows the same pages; another
+// version's prefix shows its notice. Read from the routing table, so the switch at launch changes no test here.
+const underServed = (...paths: string[]) => (PREFIXES[SERVED.id] ? paths.map((p) => `${PREFIXES[SERVED.id]}${p}`) : []);
+const underOthers = (...paths: string[]) => Object.entries(PREFIXES).filter(([id]) => id !== SERVED.id).flatMap(([, prefix]) => paths.map((p) => `${prefix}${p}`));
 
 /** A window with the given address and, unless null, a navigation entry for the document. */
 function fakeWindow(pathname: string, documentUrl: string | null) {
@@ -18,30 +24,30 @@ describe("isProtectedPath", () => {
   });
 
   test("the served version's prefix shows the same pages, so they are protected there too", () => {
-    for (const path of ["/beta/chat", "/beta/account", "/beta/settings"]) expect(isProtectedPath(path), path).toBe(true);
+    for (const path of underServed("/chat", "/account", "/settings")) expect(isProtectedPath(path), path).toBe(true);
   });
 
   test("public pages, look-alike names and the other version's notice page are not", () => {
-    for (const path of ["/", "/beta", "/database/items/2589", "/chatter", "/accounts", "/settings-help", "/ptr/chat", "/sign-in"]) {
+    for (const path of ["/", "/beta", "/database/items/2589", "/chatter", "/accounts", "/settings-help", ...underOthers("/chat"), "/sign-in"]) {
       expect(isProtectedPath(path), path).toBe(false);
     }
   });
 
   test("Plans on this device is protected, under the served prefix too; the other tools and look-alikes are not", () => {
-    for (const path of ["/tools/builds", "/tools/builds/x", "/beta/tools/builds"]) expect(isProtectedPath(path), path).toBe(true);
-    for (const path of ["/tools", "/tools/talents", "/tools/talents/mage", "/tools/buildsx", "/tools/build", "/ptr/tools/builds"]) {
+    for (const path of ["/tools/builds", "/tools/builds/x", ...underServed("/tools/builds")]) expect(isProtectedPath(path), path).toBe(true);
+    for (const path of ["/tools", "/tools/talents", "/tools/talents/mage", "/tools/buildsx", "/tools/build", ...underOthers("/tools/builds")]) {
       expect(isProtectedPath(path), path).toBe(false);
     }
   });
 
   test("Alts on this device is protected too, under the served prefix; look-alikes are not", () => {
-    for (const path of ["/tools/alts", "/tools/alts/x", "/beta/tools/alts"]) expect(isProtectedPath(path), path).toBe(true);
-    for (const path of ["/tools/altsx", "/tools/alt", "/ptr/tools/alts"]) expect(isProtectedPath(path), path).toBe(false);
+    for (const path of ["/tools/alts", "/tools/alts/x", ...underServed("/tools/alts")]) expect(isProtectedPath(path), path).toBe(true);
+    for (const path of ["/tools/altsx", "/tools/alt", ...underOthers("/tools/alts")]) expect(isProtectedPath(path), path).toBe(false);
   });
 
   test("writing a guide is protected, under the served prefix too; the guide pages and look-alikes are not", () => {
-    for (const path of ["/guides/write", "/guides/write/x", "/beta/guides/write"]) expect(isProtectedPath(path), path).toBe(true);
-    for (const path of ["/guides", "/guides/frost-leveling", "/guides/feed.xml", "/guides/writer", "/guides/writ", "/ptr/guides/write"]) {
+    for (const path of ["/guides/write", "/guides/write/x", ...underServed("/guides/write")]) expect(isProtectedPath(path), path).toBe(true);
+    for (const path of ["/guides", "/guides/frost-leveling", "/guides/feed.xml", "/guides/writer", "/guides/writ", ...underOthers("/guides/write")]) {
       expect(isProtectedPath(path), path).toBe(false);
     }
   });
@@ -68,7 +74,7 @@ describe("crossesDocumentBoundary", () => {
   test("staying on the same side does not, nor does a reload of the page being shown", () => {
     expect(crossesDocumentBoundary("/settings", fakeWindow("/settings", "https://everloot.app/chat"))).toBe(false);
     expect(crossesDocumentBoundary("/wiki", fakeWindow("/wiki", "https://everloot.app/"))).toBe(false);
-    expect(crossesDocumentBoundary("/beta/chat", fakeWindow("/beta/chat", "https://everloot.app/chat"))).toBe(false);
+    for (const path of underServed("/chat")) expect(crossesDocumentBoundary(path, fakeWindow(path, "https://everloot.app/chat")), path).toBe(false);
   });
 
   test("without a navigation entry, a page never asks to reload the document it was loaded in", () => {
@@ -117,7 +123,7 @@ describe("Plans on this device's document", () => {
     const strict = (await headersFor("/chat"))["Content-Security-Policy"]!;
     const site = await headersFor("/");
     // Alts on this device holds the same workspace, with the alts' notes, and gets the same policy.
-    for (const path of ["/tools/builds", "/beta/tools/builds", "/tools/alts", "/beta/tools/alts"]) {
+    for (const path of ["/tools/builds", "/tools/alts", ...underServed("/tools/builds", "/tools/alts")]) {
       const got = await headersFor(path);
       expect(got["Content-Security-Policy"], path).toBe(strict);
       // The microphone stays Chat's alone.
@@ -143,7 +149,7 @@ describe("the guide writer's document", () => {
   test("gets the protected pages' policy for a player's private drafts, and the published guides keep the public one", async () => {
     const strict = (await headersFor("/chat"))["Content-Security-Policy"]!;
     const site = await headersFor("/");
-    for (const path of ["/guides/write", "/beta/guides/write"]) {
+    for (const path of ["/guides/write", ...underServed("/guides/write")]) {
       const got = await headersFor(path);
       expect(got["Content-Security-Policy"], path).toBe(strict);
       // The microphone stays Chat's alone.

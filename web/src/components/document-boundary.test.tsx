@@ -5,6 +5,11 @@ import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, expect, test, vi, type Mock } from "vitest";
 import DocumentBoundary from "./DocumentBoundary";
 import OptionalScripts from "./OptionalScripts";
+import { PREFIXES, SERVED } from "@/lib/build-versions";
+
+// The served version's prefix (/beta before launch, none once Live is served) shows the same pages. Read from the
+// routing table, so the switch at launch changes no test here.
+const underServed = (...paths: string[]) => (PREFIXES[SERVED.id] ? paths.map((p) => `${PREFIXES[SERVED.id]}${p}`) : []);
 
 let pathname: string | null = "/";
 vi.mock("next/navigation", () => ({ usePathname: () => pathname }));
@@ -62,12 +67,13 @@ test("a move from the account page to a public page reloads too, without mountin
 });
 
 test("moves on one side of the line, and the served version's prefix, show the page without a reload", async () => {
-  for (const [loadedAt, now] of [["/chat", "/settings"], ["/", "/wiki"], ["/chat", "/beta/chat"]] as const) {
+  const moves: [string, string][] = [["/chat", "/settings"], ["/", "/wiki"], ...underServed("/chat").map((p): [string, string] => ["/chat", p])];
+  for (const [loadedAt, now] of moves) {
     at(loadedAt, now);
     await mount(<DocumentBoundary><Page /></DocumentBoundary>);
     act(() => root?.unmount());
   }
-  expect(mounted).toHaveBeenCalledTimes(3);
+  expect(mounted).toHaveBeenCalledTimes(moves.length);
   expect(reload).not.toHaveBeenCalled();
 });
 
@@ -98,14 +104,14 @@ test("ads and analytics load on public pages only", async () => {
   };
   expect(await shown("/", "/")).toBe(true);
   expect(await shown("/", "/database/items")).toBe(true);
-  for (const path of ["/chat", "/account", "/settings", "/beta/account"]) expect(await shown(path, path), path).toBe(false);
+  for (const path of ["/chat", "/account", "/settings", ...underServed("/account")]) expect(await shown(path, path), path).toBe(false);
   // Not in a protected page's document on its way to a public page, nor when the path is unknown.
   expect(await shown("/chat", "/")).toBe(false);
   expect(await shown("/", null)).toBe(false);
 });
 
 test("Plans on this device loads no ads, analytics or consent banner, and a move to or from it reloads first", async () => {
-  for (const path of ["/tools/builds", "/beta/tools/builds"]) {
+  for (const path of ["/tools/builds", ...underServed("/tools/builds")]) {
     at(path, path);
     const host = await mount(<OptionalScripts><span>scripts</span></OptionalScripts>);
     expect(host.textContent, path).toBe("");
@@ -127,7 +133,7 @@ test("Plans on this device loads no ads, analytics or consent banner, and a move
 });
 
 test("Alts on this device loads no ads, analytics or consent banner, and a move to or from a public page reloads first", async () => {
-  for (const path of ["/tools/alts", "/beta/tools/alts"]) {
+  for (const path of ["/tools/alts", ...underServed("/tools/alts")]) {
     at(path, path);
     const host = await mount(<OptionalScripts><span>scripts</span></OptionalScripts>);
     expect(host.textContent, path).toBe("");
@@ -148,7 +154,7 @@ test("Alts on this device loads no ads, analytics or consent banner, and a move 
 });
 
 test("writing a guide loads no ads, analytics or consent banner beside the drafts, and a move to or from the guides reloads first", async () => {
-  for (const path of ["/guides/write", "/beta/guides/write"]) {
+  for (const path of ["/guides/write", ...underServed("/guides/write")]) {
     at(path, path);
     const host = await mount(<OptionalScripts><span>scripts</span></OptionalScripts>);
     expect(host.textContent, path).toBe("");
