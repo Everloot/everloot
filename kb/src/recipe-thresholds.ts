@@ -13,7 +13,7 @@ import { agreePrices, formatCopper, median, mergeVendorPrices, professionFactsFr
 const ORDER = ["optimal", "medium", "easy", "trivial"] as const;
 type Colour = (typeof ORDER)[number];
 
-export interface RecipeObservation { installId: string; profession: string; recipe: string; rank: number; difficulty: Colour; reagents: Reagent[] }
+export interface RecipeObservation { installId: string; profession: string; recipe: string; recipeId?: number; rank: number; difficulty: Colour; reagents: Reagent[] }
 export interface Range { min: number | null; max: number | null }
 export interface RecipeThresholds {
   profession: string; recipe: string; installs: number; observations: number;
@@ -26,11 +26,15 @@ export function recipeObservationsFromRecords(records: unknown[]): RecipeObserva
   const out: RecipeObservation[] = [];
   for (const raw of records) {
     const r = raw as Record<string, unknown>;
+    // A visible unknown recipe is not evidence the player could learn/craft it at this rank.
+    // Older observations omitted learned and retain their existing interpretation.
+    if (r?.learned === false) continue;
     if (r?.kind !== "recipe_observed" || typeof r.installId !== "string" || typeof r.profession !== "string" ||
       typeof r.recipe !== "string" || typeof r.rank !== "number" || !ORDER.includes(r.difficulty as Colour)) continue;
     const reagents = (Array.isArray(r.reagents) ? r.reagents : []).filter((x): x is Reagent =>
       typeof x?.item === "string" && x.item.trim() !== "" && Number.isInteger(x?.count) && x.count >= 1);
-    out.push({ installId: r.installId, profession: r.profession, recipe: r.recipe, rank: r.rank, difficulty: r.difficulty as Colour, reagents });
+    const identity = Number.isSafeInteger(r.recipeId) && (r.recipeId as number) > 0 ? { recipeId: r.recipeId as number } : {};
+    out.push({ installId: r.installId, profession: r.profession, recipe: r.recipe, ...identity, rank: r.rank, difficulty: r.difficulty as Colour, reagents });
   }
   return out;
 }
@@ -134,6 +138,9 @@ export function inferThresholds(observations: RecipeObservation[]): RecipeThresh
   }
   const out: RecipeThresholds[] = [];
   for (const rows of groups.values()) {
+    // The published ranges and trainer links still use names. Withhold an ambiguous name rather
+    // than combine distinct API recipes into a false agreement or a craft recommendation.
+    if (new Set(rows.flatMap((r) => r.recipeId === undefined ? [] : [r.recipeId])).size > 1) continue;
     const installs = new Set(rows.map((r) => r.installId)).size;
     if (installs < INDEPENDENT_INSTALLS) continue;
     const [yellow, green, grey] = [bound(rows, 1), bound(rows, 2), bound(rows, 3)];

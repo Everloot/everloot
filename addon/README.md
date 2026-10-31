@@ -30,7 +30,16 @@ added, an **Everloot scan** button takes its place. The list of your
 installed addons is off until `/everloot addons on`; it is sent only from the upload page, after
 its preview. `/everloot addons off` stops it and deletes every recorded addon row.
 
-A scan that gets no answer from the auction house in 30 seconds stops and gives the cooldown back.
+A replication scan that cannot start or times out now tries a **partial price sample**, when the client's
+search APIs are available. It reads actual item/commodity search rows for at most 20 browse keys and 40
+requests, paced at least one second apart and within 90 seconds of starting. It stops when the house closes
+or auctions are disabled. Empty attempts refund the cooldown; successful samples retain it. The sample is
+not a full-market snapshot and does not populate the full-scan cache.
+
+Profession observations retain the API's recipe ID and learned flag when available. A client with a
+complete-list reader uses it; otherwise the status explicitly says **filtered recipe list**. The addon never
+changes the player's filters. Up to 500 recipes are read in chunks; reaching that cap is reported. Learning,
+rank and colour changes add fresh observations, and disabling professions stops queued chunks.
 Tooltip prices show the item's newest public observation day separately from when the price file was built,
 and warn when either is old. Community values combine all auction houses on the realm; they are recorded
 asking-price estimates, not live listings or guaranteed sale prices.

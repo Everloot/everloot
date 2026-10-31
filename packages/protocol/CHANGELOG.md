@@ -15,6 +15,9 @@ required, or tightening a limit is a major release.
   without a key, 5,000 with one), and the corpus and client-layer routes and the market rule read in plain words.
 
 ### Added
+- 1.22.0 (record protocol 1.11.0): `recipe_observed` optionally carries the trade-skill API's
+  `recipeId` and boolean `learned` state. Older observations remain valid; an absent learned state
+  is unknown. Recipe identity is separate from `productItemId`; no separate spell ID is inferred.
 - 1.20.0 (record protocol unchanged, 1.10.0): the tool `class_races`, which races can be a class, on which faction,
   and each race's racial traits (name, active or passive, order), read from the committed race table
   (`web/src/data/game-data/races.json`, found in game files, unconfirmed, with the build). Trait descriptions are

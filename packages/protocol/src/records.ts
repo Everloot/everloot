@@ -399,6 +399,10 @@ export const recipeObserved = base.extend({
   rank: z.number().int().min(1).max(500),
   maxRank: z.number().int().min(1).max(500).optional(),
   recipe: z.string().min(1).max(120),
+  /** C_TradeSkillUI recipeID, distinct from the output item ID; absent in older uploads. */
+  recipeId: z.number().int().positive().optional(),
+  /** Whether the window reported this recipe learned; absent means unknown, not false. */
+  learned: z.boolean().optional(),
   difficulty: z.enum(["optimal", "medium", "easy", "trivial"]),
   productItemId: z.number().int().positive().optional(),
   reagents: z.array(z.object({

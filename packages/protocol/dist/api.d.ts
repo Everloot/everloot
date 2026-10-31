@@ -828,6 +828,8 @@ export declare const intakeRequest: z.ZodObject<{
         rank: z.ZodNumber;
         maxRank: z.ZodOptional<z.ZodNumber>;
         recipe: z.ZodString;
+        recipeId: z.ZodOptional<z.ZodNumber>;
+        learned: z.ZodOptional<z.ZodBoolean>;
         difficulty: z.ZodEnum<{
             easy: "easy";
             medium: "medium";
@@ -2051,6 +2053,8 @@ export declare const API_SCHEMAS: {
             rank: z.ZodNumber;
             maxRank: z.ZodOptional<z.ZodNumber>;
             recipe: z.ZodString;
+            recipeId: z.ZodOptional<z.ZodNumber>;
+            learned: z.ZodOptional<z.ZodBoolean>;
             difficulty: z.ZodEnum<{
                 easy: "easy";
                 medium: "medium";
