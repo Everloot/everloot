@@ -18,6 +18,10 @@ collection) or the installed addon list: those stay on your machine. Player rows
 the Desktop App sends them only if you turn on "Send the player pages with the uploads" in its
 settings, and until you do, they stay on your machine like the named data.
 
+Recipe observations can include the profession API's recipe identifier and whether that recipe is learned,
+when the client supplies those values. They remain anonymous profession observations, not a linked
+character's recipe collection. Explicitly unlearned recipes do not establish craftable skill ranges.
+
 **What a Polestar Recorder file holds.** A player who records with the
 [Polestar Recorder](https://github.com/fitzforge/polestar) addon (by fitzforge, GPL-3.0) can upload its
 `Polestar_Recorder.lua` from the website's upload page. Everloot reads the file's format with its own
@@ -143,6 +147,10 @@ is stored with a keyed hash of the address it came from (never the address itsel
 private storage and is never published. A scan also records the scanning character's faction (Alliance
 or Horde) and which auction house it read (Alliance, Horde or neutral), so each house can have its own
 market values, published under the same three-reporter rule; no character, seller or buyer is recorded.
+
+When a player-started full scan cannot use replication, a bounded browse/search fallback may record actual
+listing prices and quantities as partial observations. Browse-summary minimums are never used to invent a
+complete market snapshot or listing distribution. The fallback records no seller or buyer information.
 
 The addon's gold-per-hour sessions (`/everloot gph`) are personal: they stay in your SavedVariables
 file, outside the records an upload reads, and are never sent to the site.

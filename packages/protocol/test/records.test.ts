@@ -3,6 +3,16 @@ import { ALL_RECORD_KINDS, GUILD_KILL_KINDS, parseRecords, parseUpload, PUBLIC_R
 
 const base = { installId: "test-install-1234", capturedAt: "2026-09-29T12:00:00.000Z", eventId: "evt-1" };
 
+test("recipe observations preserve optional API identity and learned state with legacy compatibility", () => {
+  const row = { ...base, kind: "recipe_observed", profession: "Alchemy", rank: 60, recipe: "Potion", difficulty: "optimal", reagents: [] };
+  const result = parseRecords([row, { ...row, recipeId: 2330, learned: false }, { ...row, recipeId: 2330, learned: true }]);
+  expect(result.receipt.rejected).toHaveLength(0);
+  expect(result.records).toEqual([row, { ...row, recipeId: 2330, learned: false }, { ...row, recipeId: 2330, learned: true }]);
+  for (const invalid of [{ recipeId: 0 }, { recipeId: -1 }, { recipeId: 1.5 }, { recipeId: "2330" }, { learned: "false" }, { learned: 0 }]) {
+    expect(parseRecords([{ ...row, ...invalid }]).receipt.rejected).toHaveLength(1);
+  }
+});
+
 describe("intake contract", () => {
   test("all record kinds exist", () => {
     expect(ALL_RECORD_KINDS).toHaveLength(40);

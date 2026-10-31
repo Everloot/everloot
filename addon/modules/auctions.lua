@@ -94,6 +94,186 @@ local function refundWaitingScan()
   scan = nil
 end
 
+-- Blizzard's Forever SendSearchQuery docs explicitly prohibit querying the entire house.
+-- This fallback samples at most 20 browse keys, 40 requests, three pages per query and 90 seconds.
+-- Search results are partial auction_scan observations, never a full auction_snapshot: browse
+-- minPrice/totalQuantity are not a listing distribution, and commodity rows can group sellers.
+local function readable(value)
+  if issecretvalue and issecretvalue(value) then return nil end
+  return value
+end
+
+local function number(value)
+  value = readable(value)
+  if type(value) == "number" and value == value and value >= 0 and value < math.huge then return value end
+end
+
+local function itemKey(value)
+  if type(readable(value)) ~= "table" then return nil end
+  local key = {}
+  for _, field in ipairs({ "itemID", "itemLevel", "itemSuffix", "battlePetSpeciesID" }) do
+    key[field] = number(value[field])
+    if not key[field] then return nil end
+  end
+  if key.itemID < 1 then return nil end
+  return key
+end
+
+local function sameKey(a, b)
+  b = itemKey(b)
+  return b and a.itemID == b.itemID and a.itemLevel == b.itemLevel
+    and a.itemSuffix == b.itemSuffix and a.battlePetSpeciesID == b.battlePetSpeciesID
+end
+
+local function finishFallback(s)
+  if scan ~= s then return end
+  scan = nil
+  if s.stored == 0 then EverlootDB.lastScanAt = s.previousScanAt end
+  say(string.format("partial price sample: stored %d search rows; this is not a full market scan. %s",
+    s.stored, s.stored > 0 and "Upload with the companion." or "The auction house sent no data with usable buyouts. Try again."))
+end
+
+local function nextFallbackItem(s)
+  s.index = s.index + 1
+  s.pages, s.awaiting, s.pending = 0, false, "search"
+  if s.index > #s.keys then finishFallback(s) end
+end
+
+local function storeFallbackItem(s)
+  local key = s.keys[s.index]
+  local n = s.commodity and C_AuctionHouse.GetNumCommoditySearchResults(key.itemID) or C_AuctionHouse.GetNumItemSearchResults(key)
+  n = number(n) or 0
+  local seen = {}
+  for i = 1, math.min(n, 200, 1000 - s.stored) do
+    -- One malformed/secret row must not discard another item's observations.
+    pcall(function()
+      local row = s.commodity and C_AuctionHouse.GetCommoditySearchResultInfo(key.itemID, i) or C_AuctionHouse.GetItemSearchResultInfo(key, i)
+      if type(readable(row)) ~= "table" then return end
+      if s.commodity then
+        if number(row.itemID) ~= key.itemID then return end
+      elseif not sameKey(key, row.itemKey) then return end
+      local count, id = number(row.quantity), number(row.auctionID)
+      local price = number(s.commodity and row.unitPrice or row.buyoutAmount)
+      if not count or count < 1 or count ~= math.floor(count) or not id or seen[id] or not price then return end
+      price = math.floor(s.commodity and price or price / count)
+      if price < 1 then return end
+      seen[id] = true
+      if E:Store("auction_scan", { installId = EverlootDB.installId, capturedAt = s.at,
+        realm = s.realm, itemId = key.itemID, count = count, copper = price, priceBasis = "unit" }) then
+        s.stored = s.stored + 1
+      end
+    end)
+  end
+end
+
+local function fallbackResult(s, event, arg)
+  if not s.awaiting then return end
+  if s.phase == "browse" then
+    if event == "AUCTION_HOUSE_BROWSE_FAILURE" then finishFallback(s); return end
+    if event ~= "AUCTION_HOUSE_BROWSE_RESULTS_UPDATED" and event ~= "AUCTION_HOUSE_BROWSE_RESULTS_ADDED" then return end
+    local results = C_AuctionHouse.GetBrowseResults()
+    for i = 1, math.min(#results, 1000) do
+      local key = itemKey(results[i].itemKey)
+      if key then
+        local identity = string.format("%d:%d:%d:%d", key.itemID, key.itemLevel, key.itemSuffix, key.battlePetSpeciesID)
+        if not s.seen[identity] and #s.keys < 20 then
+          s.seen[identity] = true; s.keys[#s.keys + 1] = key
+        end
+      end
+    end
+    s.awaiting = false
+    if readable(C_AuctionHouse.HasFullBrowseResults()) == false and #s.keys < 20 and s.pages < 3 then
+      s.pending = "moreBrowse"
+    else
+      s.phase, s.index = "search", 0
+      nextFallbackItem(s)
+    end
+  else
+    local key = s.keys[s.index]
+    if s.commodity then
+      if event ~= "COMMODITY_SEARCH_RESULTS_UPDATED" and event ~= "COMMODITY_SEARCH_RESULTS_ADDED" then return end
+      if number(arg) ~= key.itemID then return end
+    else
+      if event ~= "ITEM_SEARCH_RESULTS_UPDATED" and event ~= "ITEM_SEARCH_RESULTS_ADDED" then return end
+      if not sameKey(key, arg) then return end
+    end
+    s.awaiting = false
+    local full
+    if s.commodity then full = readable(C_AuctionHouse.HasFullCommoditySearchResults(key.itemID))
+    else full = readable(C_AuctionHouse.HasFullItemSearchResults(key)) end
+    if full == false and s.pages < 3 and s.requests < 40 then
+      s.pending = "moreSearch"
+    else
+      storeFallbackItem(s)
+      nextFallbackItem(s)
+    end
+  end
+end
+
+local function startFallback(s)
+  s.waiting = false -- a late REPLICATE_ITEM_LIST_UPDATE cannot take over this scan
+  if not (type(C_AuctionHouse.SendBrowseQuery) == "function" and type(C_AuctionHouse.GetBrowseResults) == "function"
+    and type(C_AuctionHouse.HasFullBrowseResults) == "function" and type(C_AuctionHouse.RequestMoreBrowseResults) == "function"
+    and type(C_AuctionHouse.SendSearchQuery) == "function" and type(C_AuctionHouse.GetItemKeyInfo) == "function"
+    and type(C_AuctionHouse.IsThrottledMessageSystemReady) == "function" and type(C_AuctionHouse.GetNumItemSearchResults) == "function"
+    and type(C_AuctionHouse.GetItemSearchResultInfo) == "function" and type(C_AuctionHouse.HasFullItemSearchResults) == "function"
+    and type(C_AuctionHouse.RequestMoreItemSearchResults) == "function" and type(C_AuctionHouse.GetNumCommoditySearchResults) == "function"
+    and type(C_AuctionHouse.GetCommoditySearchResultInfo) == "function" and type(C_AuctionHouse.HasFullCommoditySearchResults) == "function"
+    and type(C_AuctionHouse.RequestMoreCommoditySearchResults) == "function") then
+    refundWaitingScan()
+    return say("the auction house sent no data; price search is unavailable. Try the scan again.")
+  end
+  s.fallback, s.stored, s.requests, s.keys, s.seen = true, 0, 0, {}, {}
+  s.phase, s.pending, s.pages = "browse", "browse", 0
+  local elapsed = 0
+  local function poll()
+    if scan ~= s then return end
+    elapsed = math.max(elapsed + 1, time() - s.startedAt)
+    if not E.auctionHouseOpen or not E:IsEnabled("auctions") or elapsed >= 90 or s.stored >= 1000 then
+      finishFallback(s); return
+    end
+    local ok = pcall(function()
+      if s.awaiting and elapsed - s.sentAt >= 10 then
+        if s.phase == "browse" then finishFallback(s) else nextFallbackItem(s) end
+      end
+      if scan ~= s or not s.pending then return end
+      if s.requests >= 40 then finishFallback(s); return end
+      if readable(C_AuctionHouse.IsThrottledMessageSystemReady()) ~= true then return end
+      local pending = s.pending
+      s.pending, s.awaiting, s.sentAt = nil, true, elapsed
+      s.requests, s.pages = s.requests + 1, s.pages + 1
+      if pending == "browse" then C_AuctionHouse.SendBrowseQuery({ searchString = "", sorts = {} })
+      elseif pending == "moreBrowse" then C_AuctionHouse.RequestMoreBrowseResults()
+      else
+        local key = s.keys[s.index]
+        if pending == "search" then
+          local info = C_AuctionHouse.GetItemKeyInfo(key)
+          if type(readable(info)) ~= "table" or type(readable(info.isCommodity)) ~= "boolean" then
+            nextFallbackItem(s); return
+          end
+          s.commodity = info.isCommodity
+          C_AuctionHouse.SendSearchQuery(key, {}, false)
+        else
+          local full
+          if s.commodity then full = C_AuctionHouse.RequestMoreCommoditySearchResults(key.itemID)
+          else full = C_AuctionHouse.RequestMoreItemSearchResults(key) end
+          -- These APIs return true when already complete, without needing another result event.
+          if readable(full) == true then
+            fallbackResult(s, s.commodity and "COMMODITY_SEARCH_RESULTS_UPDATED" or "ITEM_SEARCH_RESULTS_UPDATED",
+              s.commodity and key.itemID or key)
+          end
+        end
+      end
+    end)
+    if not ok and scan == s then
+      if s.phase == "browse" then finishFallback(s) else nextFallbackItem(s) end
+    end
+    if scan == s then C_Timer.After(1, poll) end
+  end
+  C_Timer.After(1, poll)
+  return say("full scan unavailable; sampling a limited set of search prices. Keep the auction house open.")
+end
+
 --- One replicate row into the scan: "ok", "skip" (no price, bad size) or "incomplete" (data not loaded).
 local function readRow(i)
   local _, _, count, _, _, _, _, _, _, buyout, _, _, _, _, _, _, itemId, hasAllInfo = C_AuctionHouse.GetReplicateItemInfo(i)
@@ -132,7 +312,10 @@ local function finish()
   local ids = {}
   for id in pairs(s.byItem) do ids[#ids + 1] = id end
   table.sort(ids)
-  if #ids == 0 then return say("the scan found no buyouts.") end
+  if #ids == 0 then
+    EverlootDB.lastScanAt = s.previousScanAt
+    return say("the scan found no buyouts.")
+  end
   local parts = math.ceil(#ids / E.SCAN_PART_ITEMS)
   local scanId = EverlootDB.installId .. "-" .. string.format("%.0f", s.startedAt)
   for p = 1, parts do
@@ -203,7 +386,7 @@ local function stepFrom(s)
 end
 
 function E:StartScan()
-  if not (C_AuctionHouse and C_AuctionHouse.ReplicateItems and C_Timer) then return say("full scans need the auction house API.") end
+  if not (C_AuctionHouse and C_Timer and C_Timer.After) then return say("full scans need the auction house API.") end
   if not E:IsEnabled("auctions") then return say("auction scans are off. /everloot auctions on, then /reload.") end
   if not E.auctionHouseOpen then return say("open the auction house first.") end
   if scan then return say("a scan is already running.") end
@@ -220,12 +403,13 @@ function E:StartScan()
   }
   scan = started
   EverlootDB.lastScanAt = time()
-  C_AuctionHouse.ReplicateItems()
-  -- If the house never answers, the scan must not stay "running" and the cooldown is not spent.
+  if not C_AuctionHouse.ReplicateItems or not pcall(C_AuctionHouse.ReplicateItems) then
+    return startFallback(started)
+  end
+  -- If replication never answers, try the bounded partial sample; no usable prices refunds cooldown.
   C_Timer.After(E.SCAN_WAIT_SECONDS, function()
     if scan == started and started.waiting then
-      refundWaitingScan()
-      say("the auction house sent no data. Try the scan again.")
+      startFallback(started)
     end
   end)
   return say("scanning the auction house. Keep it open until the scan reports.")
@@ -291,6 +475,9 @@ local function showPrompt()
 end
 
 local function onFullScanEvent(event, arg1)
+  if scan and not E:IsEnabled("auctions") then
+    if scan.fallback then finishFallback(scan) elseif scan.waiting then refundWaitingScan() else scan = nil end
+  end
   if event == "AUCTION_HOUSE_SHOW" then
     E.auctionHouseOpen = true
     E.auctionHouseKind = auctioneerHouse()
@@ -303,16 +490,25 @@ local function onFullScanEvent(event, arg1)
     E.promptShown = false
     if E.scanPrompt then E.scanPrompt:Hide() end
     if scan then
-      if scan.waiting then refundWaitingScan() else scan = nil end
+      if scan.fallback then finishFallback(scan) elseif scan.waiting then refundWaitingScan() else scan = nil end
       say("scan stopped: the auction house closed.")
     end
   elseif event == "ADDON_LOADED" and arg1 == "Blizzard_AuctionHouseUI" then
     addButton()
     -- The house's window loads on the first visit, possibly after AUCTION_HOUSE_SHOW reached us.
     if E.auctionHouseOpen then showPrompt() end
+  elseif scan and scan.fallback then
+    local s = scan
+    local ok = pcall(fallbackResult, s, event, arg1)
+    if not ok and scan == s then
+      if s.phase == "browse" then finishFallback(s) else nextFallbackItem(s) end
+    end
   elseif event == "REPLICATE_ITEM_LIST_UPDATE" and scan and scan.waiting then
+    local ok, total = pcall(C_AuctionHouse.GetNumReplicateItems)
+    total = ok and number(total)
+    if not total then startFallback(scan); return end
     scan.waiting = false
-    scan.total = C_AuctionHouse.GetNumReplicateItems() or 0
+    scan.total = math.floor(total)
     stepFrom(scan)()
   end
 end
@@ -340,10 +536,13 @@ end)
 
 E:RegisterModule("auctions", function()
   local f = E.frame
-  if C_AuctionHouse and C_AuctionHouse.ReplicateItems then
+  if C_AuctionHouse and (C_AuctionHouse.ReplicateItems or C_AuctionHouse.SendBrowseQuery) then
     if not E.fullScanHooked then
-      for _, event in ipairs({ "AUCTION_HOUSE_SHOW", "AUCTION_HOUSE_CLOSED", "ADDON_LOADED", "REPLICATE_ITEM_LIST_UPDATE" }) do
-        f:RegisterEvent(event)
+      for _, event in ipairs({ "AUCTION_HOUSE_SHOW", "AUCTION_HOUSE_CLOSED", "ADDON_LOADED", "REPLICATE_ITEM_LIST_UPDATE",
+        "AUCTION_HOUSE_BROWSE_RESULTS_UPDATED", "AUCTION_HOUSE_BROWSE_RESULTS_ADDED", "AUCTION_HOUSE_BROWSE_FAILURE",
+        "ITEM_SEARCH_RESULTS_UPDATED", "ITEM_SEARCH_RESULTS_ADDED", "COMMODITY_SEARCH_RESULTS_UPDATED",
+        "COMMODITY_SEARCH_RESULTS_ADDED" }) do
+        pcall(f.RegisterEvent, f, event)
       end
       f:HookScript("OnEvent", function(_, event, arg1) onFullScanEvent(event, arg1) end)
       E.fullScanHooked = true
