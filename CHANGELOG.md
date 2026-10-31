@@ -293,6 +293,12 @@ Live-client verification is pending. This is a pre-release for WoW: Forever 1.60
   the census box ticked on its setup screen, or turns it on in Settings; a setup finished before this keeps
   it off. Still never names, guilds, gear or places, and the site shows only totals.
 
+## [desktop-v0.1.9] - 2026-10-30
+
+### Fixed
+- A failed in-game `/ask` answer is shown once and stays queued. When the retry succeeds, its answer reaches the
+  game instead of being dropped. Use addon 0.3.14 or later to keep retrying questions in the game.
+
 ## [desktop-v0.1.8] - 2026-10-30
 
 ### Added
