@@ -40,12 +40,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   from the agreed lists, with done, missing and started views and a "remember this character" helper on the browser.
 - Site: `/tools/gold-ledger` reads `Everloot.lua` in the browser, nothing sent: characters, the last 30 days of money
   in and out, this week, categories, receipts and gold history. The published ledgers stay below.
-- Addon: the Everloot window, from the minimap button or `/everloot window`. Home shows your character, gold on hand
-  and its peak, the money the addon recorded by source, gold per hour with Pause, your professions with their skill
-  and how many rows of each kind your file holds; a value the game does not give is a dash. It is built the first
-  time it opens and registers no events, so an error in it closes the window and recording carries on. The
-  **Everloot window** switch in the settings turns it off. Item tooltips put the Everloot lines under one green
-  "Everloot" header with the crest.
 
 ### Changed
 - Site and Desktop App: Ollama suggests one small model, `qwen3:4b` (2.5 GB, calls tools), instead of `qwen3:8b`, and
@@ -146,9 +140,29 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
   instead of withdrawing the event as a conflict. The map shows none of this yet.
 
+## [0.3.14] - 2026-10-30
+
+Release channel: Alpha
+
+Live-client verification is pending. This is a pre-release for WoW: Forever 1.60.1, not a verified stable build.
+The new window's layout, fonts, crest texture and interactions still need an in-game check. Disenchanting,
+skinning, pickpocketing, lockboxes, selling greys, repairs and auction-mail collection also remain unverified
+in the live client. Optional convenience helpers stay off until enabled.
+
+### Added
+- An Everloot Home window, opened from the minimap button or `/everloot window`: your character, gold on hand
+  and its peak, recorded money by source, gold per hour with Pause/Resume, professions with skill bars and saved
+  record counts. Missing values show a dash. The window is built on first open; a UI error closes it while
+  recording continues. The **Everloot window** setting turns it off.
+- A dark panel with a bronze game border, game fonts and the Everloot crest. Item tooltips keep their existing
+  price and drop lines under one Everloot header. Other sidebar views open existing panels or say coming soon.
+
 ### Fixed
-- Addon: a value the Forever client marks secret (a unit's GUID or name, a position, a chat line) now counts as
-  missing instead of raising an error that stops the capture, and an uncached item's stand-in name is not recorded.
+- Values the client marks secret (a unit's GUID or name, a position, a chat line) count as missing instead of
+  raising an error that stops capture. An uncached item's stand-in name is no longer recorded.
+- The minimap contract tests now execute in CI, covering the no-minimap fallback, one button and the ask box.
+- A temporary `/ask` failure leaves the question queued for a later answer, shows the failure once and says
+  how many questions are still waiting. A missing answer file no longer hides the waiting count.
 
 ## [0.3.13] - 2026-10-29
 
