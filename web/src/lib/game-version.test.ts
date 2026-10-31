@@ -7,9 +7,9 @@ const dir = join(__dirname, "..", "data", "game-data");
 const read = (file: string) => JSON.parse(readFileSync(join(dir, file), "utf8"));
 
 describe("game versions", () => {
-  test("Live, PTR and Beta, in that order; only Beta is available today", () => {
-    expect(GAME_VERSIONS.map((v) => [v.id, v.available])).toEqual([["live", false], ["ptr", false], ["beta", true]]);
-    expect(CURRENT_VERSION.id).toBe("beta");
+  test("Live, PTR and Beta, in that order; only Live is available since launch", () => {
+    expect(GAME_VERSIONS.map((v) => [v.id, v.available])).toEqual([["live", true], ["ptr", false], ["beta", false]]);
+    expect(CURRENT_VERSION.id).toBe("live");
   });
 
   test("an unavailable version has no build and says why", () => {
@@ -18,7 +18,7 @@ describe("game versions", () => {
       expect(v.product).toBeNull();
       expect(v.note).toBeTruthy();
     }
-    expect(GAME_VERSIONS[0].note).toContain("2026-11-04");
+    expect(GAME_VERSIONS[2].note).toContain("2026-11-04");
   });
 
   test("the label is the short build", () => {
