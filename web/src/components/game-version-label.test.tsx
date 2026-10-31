@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import GameVersionLabel from "./GameVersionLabel";
-import { CURRENT_VERSION } from "@/lib/game-version";
+import { CURRENT_VERSION, GAME_VERSIONS } from "@/lib/game-version";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -30,19 +30,23 @@ test("the button names the version and the menu starts closed", () => {
   expect(menu().hidden).toBe(true);
 });
 
-test("opening lists Live and PTR as disabled and Beta as current with the full build", async () => {
+// Which version is current comes from lib/game-version.ts (Beta before launch, Live after), which its own test pins.
+test("opening lists the unavailable versions as disabled with their note, and the current one with the full build", async () => {
   await act(async () => button().click());
   expect(button().getAttribute("aria-expanded")).toBe("true");
   expect(menu().hidden).toBe(false);
   const rows = [...menu().querySelectorAll("li")];
   expect(rows.map((r) => r.firstElementChild?.textContent)).toEqual(["Live", "PTR", "Beta"]);
-  expect(rows[0].getAttribute("aria-disabled")).toBe("true");
-  expect(rows[0].textContent).toContain("Available at launch, 2026-11-04");
-  expect(rows[1].getAttribute("aria-disabled")).toBe("true");
-  expect(rows[1].textContent).toContain("None running");
-  expect(rows[2].getAttribute("aria-disabled")).toBeNull();
-  expect(rows[2].getAttribute("aria-current")).toBe("true");
-  expect(rows[2].textContent).toContain(CURRENT_VERSION.build!);
+  GAME_VERSIONS.forEach((v, i) => {
+    if (v.id === CURRENT_VERSION.id) {
+      expect(rows[i].getAttribute("aria-disabled"), v.id).toBeNull();
+      expect(rows[i].getAttribute("aria-current"), v.id).toBe("true");
+      expect(rows[i].textContent, v.id).toContain(CURRENT_VERSION.build!);
+    } else {
+      expect(rows[i].getAttribute("aria-disabled"), v.id).toBe("true");
+      expect(rows[i].textContent, v.id).toContain(v.note!);
+    }
+  });
 });
 
 test("Escape closes the menu and returns focus to the button", async () => {
