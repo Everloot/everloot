@@ -161,6 +161,8 @@ in the live client. Optional convenience helpers stay off until enabled.
 - Values the client marks secret (a unit's GUID or name, a position, a chat line) count as missing instead of
   raising an error that stops capture. An uncached item's stand-in name is no longer recorded.
 - The minimap contract tests now execute in CI, covering the no-minimap fallback, one button and the ask box.
+- A temporary `/ask` failure leaves the question queued for a later answer, shows the failure once and says
+  how many questions are still waiting. A missing answer file no longer hides the waiting count.
 
 ## [0.3.13] - 2026-10-29
 
