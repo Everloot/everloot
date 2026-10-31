@@ -1,4 +1,4 @@
-import { authPool, pgRateLimitStore } from "@/lib/auth/db";
+import { withAuthDatabase, pgRateLimitStore } from "@/lib/auth/db";
 import { createFreeChat } from "@/lib/chat/free-chat";
 
 /**
@@ -10,7 +10,9 @@ import { createFreeChat } from "@/lib/chat/free-chat";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const freeChat = createFreeChat({ store: () => pgRateLimitStore(authPool()) });
+const freeChat = createFreeChat({ store: () => ({
+  consume: (key, rule) => withAuthDatabase((pool) => pgRateLimitStore(pool).consume(key, rule)),
+}) });
 
 export function POST(req: Request): Promise<Response> {
   return freeChat.POST(req);

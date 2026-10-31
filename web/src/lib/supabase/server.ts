@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { cookies, headers } from "next/headers";
-import { authV2Enabled, getAuth } from "@/lib/auth/auth";
+import { authV2Enabled, withAuth } from "@/lib/auth/auth";
 
 // Battle.net uses our server-side sessions, not Supabase Auth JWTs. The browser
 // receives an opaque cookie; only its hash is stored in the private sessions table.
@@ -58,7 +58,8 @@ async function sessionHash(): Promise<string | null> {
 
 export async function getUser(): Promise<AccountUser | null> {
   if (authV2Enabled()) {
-    const session = await getAuth().api.getSession({ headers: await headers() });
+    const requestHeaders = await headers();
+    const session = await withAuth((auth) => auth.api.getSession({ headers: requestHeaders }));
     return session ? { id: session.user.id, name: session.user.name } : null;
   }
   const hash = await sessionHash();

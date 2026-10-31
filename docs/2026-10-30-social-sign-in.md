@@ -13,7 +13,10 @@ Register `https://everloot.app/api/auth/callback/<provider>` for each provider. 
 `common` tenant for work, school and personal accounts. Discord requests only `identify email`,
 without bot or server permissions. Providers that supply no email cannot create an account.
 
-The existing `AUTH_DATABASE_URL`, `BETTER_AUTH_SECRET` and accounts migration are still required.
+The accounts migration and `BETTER_AUTH_SECRET` are still required. The Worker uses an
+`AUTH_DB_HYPERDRIVE` binding connected as `everloot_auth`, with query caching disabled so revoked
+sessions cannot be served from a query cache. Each auth operation owns a short-lived pool that
+closes after its work finishes. Node/local runs retain `AUTH_DATABASE_URL` and the CA-pinned pool.
 Email sign-up retains its separate sender requirement. See
 [the account design](design/specs/2026-10-18-accounts-sign-in-design.md) for migration and session rules.
 

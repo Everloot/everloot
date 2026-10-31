@@ -6,7 +6,7 @@ import ApiKeys from "@/components/ApiKeys";
 import ChatKeys from "@/components/chat/ChatKeys";
 import { Container, DataTitle } from "@/components/ui";
 import { loadOverview, type AccountOverview } from "@/lib/account-overview";
-import { authV2Enabled, getAuth, signInMethods } from "@/lib/auth/auth";
+import { authV2Enabled, withAuth, signInMethods } from "@/lib/auth/auth";
 import { configuredSocialProviders, type SocialProvider } from "@/lib/auth/social";
 import { isPlaceholderEmail } from "@/lib/auth/battlenet";
 import { signInPath } from "@/lib/auth/return-to";
@@ -47,10 +47,10 @@ const listed = (parts: string[]) =>
 async function details() {
   if (!authV2Enabled()) return { email: null, methods: ["battlenet"] };
   const requestHeaders = await headers();
-  const [session, accounts] = await Promise.all([
-    getAuth().api.getSession({ headers: requestHeaders }),
-    getAuth().api.listUserAccounts({ headers: requestHeaders }),
-  ]);
+  const [session, accounts] = await withAuth((auth) => Promise.all([
+    auth.api.getSession({ headers: requestHeaders }),
+    auth.api.listUserAccounts({ headers: requestHeaders }),
+  ]));
   const email = session?.user.email;
   return { email: email && !isPlaceholderEmail(email) ? email : null, methods: accounts.map((a) => a.providerId) };
 }
