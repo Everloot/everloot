@@ -15,8 +15,6 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
-- Desktop App: rechecks the newest release before downloading or restarting to update, so an older
-  offer or downloaded installer does not require installing intermediate versions.
 - Addon: profession observations prefer the complete recipe list when available and retain the API's recipe
   identifier and explicit learned state. Repeated observations are keyed by identifier, rank, colour and learned
   state; older clients can still use their filtered list without changing the player's filters. Explicitly
@@ -302,6 +300,13 @@ Live-client verification is pending. This is a pre-release for WoW: Forever 1.60
   off until `/everloot census on`. The Desktop App sends census rows with its uploads when the player leaves
   the census box ticked on its setup screen, or turns it on in Settings; a setup finished before this keeps
   it off. Still never names, guilds, gear or places, and the site shows only totals.
+
+## [desktop-v0.1.10] - 2026-10-31
+
+### Fixed
+- Desktop App: rechecks the newest release before downloading or restarting to update, so an older
+  offer or downloaded installer does not require installing intermediate versions. If the release check
+  fails, the app stays open and offers a retry instead of installing the stale version.
 
 ## [desktop-v0.1.9] - 2026-10-30
 
