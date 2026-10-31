@@ -7,7 +7,7 @@ import { CASCClient, DBDParser, WDCReader } from "@rhyster/wow-casc-dbc";
 import { CLIENT_TABLES, type ExtractedTable } from "./client-snapshot.js";
 
 /** The extraction library and version, recorded in every manifest. Kept equal to kb's pinned dependency (tested). */
-export const CASC_LIBRARY = "@rhyster/wow-casc-dbc@2.16.17";
+export const CASC_LIBRARY = "@rhyster/wow-casc-dbc@2.16.19";
 
 export interface TableRead {
   cKey: string | null;
