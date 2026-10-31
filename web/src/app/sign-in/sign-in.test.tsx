@@ -40,3 +40,24 @@ test("without an error there is no alert", async () => {
   expect(renderToStaticMarkup(await SignInPage(page({ error: "" })))).not.toContain('role="alert"');
   expect(renderToStaticMarkup(await SignInPage(page({ error: ["access_denied"] })))).not.toContain('role="alert"');
 });
+
+test("configured providers appear only with v2, including on sign-up", async () => {
+  vi.stubEnv("DISCORD_CLIENT_ID", "id");
+  vi.stubEnv("DISCORD_CLIENT_SECRET", "secret");
+  vi.stubEnv("GOOGLE_CLIENT_ID", "id-without-secret");
+  vi.stubEnv("EVERLOOT_AUTH_V2", "1");
+  const html = renderToStaticMarkup(await SignInPage(page({ returnTo: "/me" })));
+  expect(html).toContain("Continue with Discord");
+  expect(html).not.toContain("Continue with Google");
+  const { default: SignUpPage } = await import("../sign-up/page");
+  expect(renderToStaticMarkup(await SignUpPage(page()))).toContain("Continue with Discord");
+  vi.stubEnv("EVERLOOT_AUTH_V2", "0");
+  expect(renderToStaticMarkup(await SignInPage(page()))).not.toContain("Continue with Discord");
+});
+
+test("a social callback error is explained without exposing the provider's raw code", async () => {
+  const html = renderToStaticMarkup(await SignInPage(page({ flow: "social", error: "account_not_linked" })));
+  expect(html).toContain("use an existing login and link this provider from your account");
+  expect(html).not.toContain("account_not_linked");
+  expect(html).not.toContain("Battle.net did not finish");
+});

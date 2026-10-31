@@ -172,6 +172,9 @@ E.PriceLines = priceLines
 
 --- The tooltip: price lines, then drop lines. Once the Desktop App's file is in the game and its prices have been
 --- checked, what is missing is said in one grey line; without the file a tooltip carries no Everloot line it has no value for.
+-- The crest's diamond, cut from media/crest.tga (128px), drawn inline before the name.
+local TOOLTIP_HEADER = "|TInterface\\AddOns\\Everloot\\media\\crest:14:14:0:0:128:128:36:92:36:92|t Everloot"
+
 local function addLines(tooltip, itemId)
   local realm = GetRealmName and GetRealmName()
   if type(realm) ~= "string" or realm == "" then return end
@@ -192,6 +195,8 @@ local function addLines(tooltip, itemId)
   end
   for _, line in ipairs(dropLines or {}) do lines[#lines + 1] = line end
   if #missing > 0 then lines[#lines + 1] = { text = "Everloot: " .. table.concat(missing, " · "), r = 0.6, g = 0.6, b = 0.6 } end
+  -- Plain lines under one header: the crest inline and "Everloot" in fel green, only when there is something to show.
+  if #lines > 0 then tooltip:AddLine(TOOLTIP_HEADER, 0.612, 0.941, 0.227) end
   for _, line in ipairs(lines) do tooltip:AddLine(line.text, line.r, line.g, line.b) end
 end
 

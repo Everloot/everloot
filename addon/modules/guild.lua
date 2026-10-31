@@ -87,7 +87,7 @@ local function raidAttendance()
   if not (IsInRaid and IsInRaid()) then return end
   local present = {}
   for i = 1, math.min(GetNumGroupMembers(), 40) do
-    local name = GetRaidRosterInfo and select(1, GetRaidRosterInfo(i))
+    local name = GetRaidRosterInfo and E.Readable((select(1, GetRaidRosterInfo(i))))
     if name then present[#present + 1] = name:gsub("%-.+", "") end
   end
   if #present == 0 then return end

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuth } from "@/lib/auth/auth";
+import { withAuth } from "@/lib/auth/auth";
 import { deviceSessions, profilesOn } from "@/lib/auth/device-accounts";
 import { validId } from "@/lib/saved-builds";
 import { getUser, siteUrl } from "@/lib/supabase/server";
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     if (userId === user.id) return NextResponse.json({ ok: true }, { headers: NO_STORE });
     const target = (await deviceSessions(req.headers)).find((s) => s.userId === userId);
     if (!target) return fail(404, "That account is not signed in on this browser.");
-    const out = await getAuth().api.setActiveSession({ headers: req.headers, body: { sessionToken: target.token }, asResponse: true });
+    const out = await withAuth((auth) => auth.api.setActiveSession({ headers: req.headers, body: { sessionToken: target.token }, asResponse: true }));
     if (!out.ok) return fail(404, "That account is not signed in on this browser.");
     const response = NextResponse.json({ ok: true }, { headers: NO_STORE });
     for (const cookie of out.headers.getSetCookie()) response.headers.append("set-cookie", cookie);

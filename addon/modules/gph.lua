@@ -42,6 +42,7 @@ local function zoneName()
   for _, fn in ipairs({ GetRealZoneText, GetZoneText }) do
     if fn then
       local ok, zone = pcall(fn)
+      zone = E.Readable(zone)
       if ok and type(zone) == "string" and zone ~= "" then return zone end
     end
   end
@@ -177,8 +178,8 @@ local function addZone(s)
 end
 
 local function newSession()
-  local name = UnitName and UnitName("player")
-  local realm = GetRealmName and GetRealmName()
+  local name = UnitName and E.Readable(UnitName("player"))
+  local realm = GetRealmName and E.Readable(GetRealmName())
   local s = {
     v = 1,
     character = type(name) == "string" and name or nil,
@@ -427,7 +428,7 @@ local function onEvent(event, ...)
   end
   local s = running()
   if not s then return end
-  local text = ...
+  local text = E.Readable((...))
   if event == "CHAT_MSG_LOOT" and type(text) == "string" then
     local id, count = ownLoot(text)
     if id then addItem(id, count) end

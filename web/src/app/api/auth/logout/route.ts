@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authV2Enabled, getAuth } from "@/lib/auth/auth";
+import { authV2Enabled, withAuth } from "@/lib/auth/auth";
 import { deviceSessions, profilesOn, sessionCookie } from "@/lib/auth/device-accounts";
 import { revokeSession, siteUrl } from "@/lib/supabase/server";
 
@@ -44,25 +44,26 @@ async function signOutOfBetterAuth(req: Request) {
 // in on this browser, if any, becomes current; `next` tells the page which. Better Auth's own sign-out is never
 // used then: the multi-session plugin's hook on it ends every account on the browser.
 async function endSession(headers: Headers): Promise<{ out: Response; next?: boolean }> {
-  const auth = getAuth();
-  if (!profilesOn()) return { out: await auth.api.signOut({ headers, asResponse: true }) };
-  const session = await auth.api.getSession({ headers, query: { disableRefresh: true } });
-  if (!session) return { out: await expireSessionCookie(new Headers()), next: false };
-  const others = (await deviceSessions(headers)).filter((s) => s.userId !== session.user.id);
-  const out = await auth.api.revokeDeviceSession({ headers, body: { sessionToken: session.session.token }, asResponse: true });
-  if (out.ok) return { out, next: others.length > 0 };
-  // No multi-session cookie for this session (a sixth sign-in, or one from before the plugin): end this session
-  // alone, then make the next account on this browser current.
-  await (await auth.$context).internalAdapter.deleteSession(session.session.token);
-  const set = new Headers();
-  if (others.length > 0) {
-    const next = await auth.api.setActiveSession({ headers, body: { sessionToken: others[0].token }, asResponse: true }).catch(() => null);
-    if (next?.ok) {
-      for (const cookie of next.headers.getSetCookie()) set.append("set-cookie", cookie);
-      return { out: new Response(null, { headers: set }), next: true };
+  return withAuth(async (auth) => {
+    if (!profilesOn()) return { out: await auth.api.signOut({ headers, asResponse: true }) };
+    const session = await auth.api.getSession({ headers, query: { disableRefresh: true } });
+    if (!session) return { out: await expireSessionCookie(new Headers()), next: false };
+    const others = (await deviceSessions(headers)).filter((s) => s.userId !== session.user.id);
+    const out = await auth.api.revokeDeviceSession({ headers, body: { sessionToken: session.session.token }, asResponse: true });
+    if (out.ok) return { out, next: others.length > 0 };
+    // No multi-session cookie for this session (a sixth sign-in, or one from before the plugin): end this session
+    // alone, then make the next account on this browser current.
+    await (await auth.$context).internalAdapter.deleteSession(session.session.token);
+    const set = new Headers();
+    if (others.length > 0) {
+      const next = await auth.api.setActiveSession({ headers, body: { sessionToken: others[0].token }, asResponse: true }).catch(() => null);
+      if (next?.ok) {
+        for (const cookie of next.headers.getSetCookie()) set.append("set-cookie", cookie);
+        return { out: new Response(null, { headers: set }), next: true };
+      }
     }
-  }
-  return { out: await expireSessionCookie(set), next: false };
+    return { out: await expireSessionCookie(set), next: false };
+  });
 }
 
 async function expireSessionCookie(set: Headers): Promise<Response> {

@@ -140,6 +140,7 @@ jobs:
             web/src/data/game-data
             addon/modules/raid_data.lua
             kb/curated/recheck.json
+            web/src/lib/talents/freshness-records.ts
             kb/data/build-watch/out
 
   publish:
@@ -194,14 +195,17 @@ jobs:
               [[ "$f" =~ ^web/src/data/game-data/raid-[0-9.]+\.json$ ]] || { echo "refusing to remove $f"; exit 1; }
               git rm -q -f -- "$f"
             done
-            git add -A -- web/src/data/game-data addon/modules/raid_data.lua kb/curated/recheck.json
+            git add -A -- web/src/data/game-data addon/modules/raid_data.lua kb/curated/recheck.json web/src/lib/talents/freshness-records.ts
             # Only the files the generators write may change, and the recheck scopes the watch adds.
-            allowed='^(web/src/data/game-data/(talents/[a-z]+\.json|raid-[0-9.]+\.json|raid\.ts|map\.json|client-layer\.json|races\.json|client-achievements\.json|client-encounters\.json|client-mounts\.json|spell-values\.json|client-digests\.json|changes/[a-z0-9_]+-[0-9]+\.json)|addon/modules/raid_data\.lua|kb/curated/recheck\.json)$'
+            allowed='^(web/src/data/game-data/(talents/[a-z]+\.json|raid-[0-9.]+\.json|raid\.ts|map\.json|client-layer\.json|races\.json|client-achievements\.json|client-encounters\.json|client-mounts\.json|spell-values\.json|client-digests\.json|changes/[a-z0-9_]+-[0-9]+\.json)|addon/modules/raid_data\.lua|kb/curated/recheck\.json|web/src/lib/talents/freshness-records\.ts)$'
             unexpected=$(git diff --cached --name-only | grep -Ev "$allowed" || true)
             [ -z "$unexpected" ] || { echo "unexpected files in the change:"; echo "$unexpected"; exit 1; }
             # raid.ts may change its import line and nothing else.
             odd=$(git diff --cached -U0 -- web/src/data/game-data/raid.ts | grep -E '^[+-]' | grep -Ev '^(\+\+\+|---)' | grep -Ev '^[+-]import raid from "\./raid-[0-9.]+\.json";$' || true)
             [ -z "$odd" ] || { echo "raid.ts changed beyond its import line:"; echo "$odd"; exit 1; }
+            # The records list may gain one record's import and its name in PUBLISHED_CHANGES, and nothing else.
+            odd=$(git diff --cached -U0 -- web/src/lib/talents/freshness-records.ts | grep -E '^[+-]' | grep -Ev '^(\+\+\+|---)' | grep -Ev '^(\+import [a-z]+[0-9]+ from "@/data/game-data/changes/[a-z0-9_]+-[0-9]+\.json";|[+-]export const PUBLISHED_CHANGES: readonly unknown\[\] = \[[a-z0-9, ]+\];)$' || true)
+            [ -z "$odd" ] || { echo "freshness-records.ts changed beyond one record:"; echo "$odd"; exit 1; }
             if git diff --cached --quiet; then
               echo "$product $build: the files already match $BASE"
             else
@@ -211,7 +215,7 @@ jobs:
             # A branch that exists is replaced only if nobody has pushed to it since we looked.
             if g fetch --quiet origin "$branch" 2>/dev/null; then
               remote=$(git rev-parse FETCH_HEAD)
-              if git diff --quiet FETCH_HEAD HEAD -- web/src/data/game-data addon/modules/raid_data.lua kb/curated/recheck.json; then
+              if git diff --quiet FETCH_HEAD HEAD -- web/src/data/game-data addon/modules/raid_data.lua kb/curated/recheck.json web/src/lib/talents/freshness-records.ts; then
                 echo "$branch is already up to date"
               else
                 g push --force-with-lease="refs/heads/$branch:$remote" origin "$branch"

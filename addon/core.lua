@@ -5,7 +5,7 @@
 Everloot = Everloot or {}
 local E = Everloot
 
-E.VERSION = "0.3.13"
+E.VERSION = "0.3.14"
 E.MAX_ROWS_PER_KIND = 2000
 
 -- Same Adler-32 the companion writes into its slot addons; Lua 5.1 arithmetic only.
@@ -18,8 +18,16 @@ function E.Adler32(s)
   return b * 65536 + a
 end
 
+--- Forever can hand an addon a value it may hold but not read (a unit's GUID or name, a position, a chat line):
+--- parsing or calculating with one raises an error. It reads as missing here, so a caller's missing-field path runs.
+function E.Readable(value)
+  if issecretvalue and issecretvalue(value) then return nil end
+  return value
+end
+
 --- The NPC id in a creature GUID (Creature-0-server-instance-zone-NPCID-spawn); nil for anything else.
 function E.NpcIdFromGuid(guid)
+  guid = E.Readable(guid)
   if type(guid) ~= "string" then return nil end
   local parts = {}
   for p in guid:gmatch("[^-]+") do parts[#parts + 1] = p end
@@ -207,6 +215,8 @@ SlashCmdList["EVERLOOT"] = function(msg)
     print(E:Status())
   elseif (msg == "options" or msg == "settings" or msg == "config") and E.Options then
     E.Options.Open()
+  elseif msg == "window" and E.Window then
+    E.Window.Toggle()
   elseif msg == "version" then
     print("Everloot " .. E.VERSION)
   elseif msg == "selftest" and E.SelfTest then
@@ -275,6 +285,6 @@ SlashCmdList["EVERLOOT"] = function(msg)
       print("Everloot: installed addon list off; all recorded addon rows were deleted from this file. /reload to apply.")
     end
   else
-    print("Everloot commands: /everloot options, /everloot status, /everloot auctions on|off, /everloot scan, /everloot scanprompt on|off, /everloot vendor on|off, /everloot mail on|off, /everloot price [item], /everloot gph [start|pause|stop|reset|show|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], /everloot selftest, /everloot talents, /everloot plan [share code|number], /everloot raid [code], /ask <question>")
+    print("Everloot commands: /everloot window, /everloot options, /everloot status, /everloot auctions on|off, /everloot scan, /everloot scanprompt on|off, /everloot vendor on|off, /everloot mail on|off, /everloot price [item], /everloot gph [start|pause|stop|reset|show|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], /everloot selftest, /everloot talents, /everloot plan [share code|number], /everloot raid [code], /ask <question>")
   end
 end

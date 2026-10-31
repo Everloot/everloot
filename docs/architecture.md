@@ -12,7 +12,7 @@ the **companion** uploads and runs the `/ask` bridge on the player's computer.
 | Companion | `companion/` | The player's computer, beside the game |
 | Everloot Desktop App | `desktop/` | The same jobs as the companion, as a tray app built on its modules |
 | Protocol | `packages/protocol/` | The upload contract, the API response shapes and the MCP tool table. Installed into `web/`, `kb/` and `companion/` from the folder; its `schema/` is read by the addon's contract tests and published for API and MCP clients |
-| Site and APIs | `web/` | The Cloudflare Worker `everloot-web` (`web/wrangler.jsonc`), at everloot.app; every merge to `main` that touches the site deploys production through `.github/workflows/deploy-worker.yml` |
+| Site and APIs | `web/` | The Cloudflare Worker `everloot-web` (`web/wrangler.jsonc`), at everloot.app; every merge to `main` that touches the site deploys production through `.github/workflows/deploy-worker.yml` once the Release checks pass on that commit |
 | Raw uploads | `web/src/lib/upload-store.ts` | Cloudflare R2 (`uploads/<date>/<id>.json`), indexed in Supabase |
 | Public corpus | `web/src/app/api/cron/snapshot` | A Cloudflare Cron Trigger every 10 minutes extends `snapshots/corpus.json` in R2; pages read that one object |
 | Sessions, grants, quotas, waitlist | `supabase/` | Supabase Postgres, server-side only, row-level security on every table |

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authV2Enabled, getAuth } from "@/lib/auth/auth";
+import { authV2Enabled, withAuth } from "@/lib/auth/auth";
 import {
   ADD_FROM_COOKIE, deviceUserIds, hasMultiSessionCookie, MAX_DEVICE_ACCOUNTS, multiSessionCookie, profilesOn,
 } from "@/lib/auth/device-accounts";
@@ -19,7 +19,7 @@ export async function GET(req: Request) {
   if (!profilesOn() || !authV2Enabled()) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const to = (path: string) => NextResponse.redirect(new URL(path, siteUrl()), { status: 303, headers: { "Cache-Control": "private, no-store" } });
   try {
-    const session = await getAuth().api.getSession({ headers: req.headers, query: { disableRefresh: true } });
+    const session = await withAuth((auth) => auth.api.getSession({ headers: req.headers, query: { disableRefresh: true } }));
     if (!session) return to("/sign-in");
     const ids = await deviceUserIds(req.headers, { id: session.user.id, name: session.user.name });
     const response = to("/sign-in?add=1&ready=1");

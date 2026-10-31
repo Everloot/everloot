@@ -126,7 +126,7 @@ describe("the bridge command, started as a real process", () => {
     const run = await bridge(d, tokenIn(d));
     expect(run.stdout).toMatch(/config\.json/);
     expect(run.stdout).toMatch(/Price questions are answered from the recorded market, without a model\./);
-    expect(run.lua).toMatch(/\["ask:3"\] = \{ \["answer"\] = "Could not answer: /);
+    expect(run.lua).toMatch(/\["ask:3"\] = \{ \["answer"\] = "Could not answer yet \(/);
     expect(site.since(from).some((r) => r.includes("answer_sources"))).toBe(false);
   }, 60_000);
 

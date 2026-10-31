@@ -10,7 +10,7 @@ const auth = vi.hoisted(() => ({
 vi.mock("@/lib/supabase/server", () => ({ getUser: vi.fn(), authQuery: vi.fn(), siteUrl: () => "https://everloot.app" }));
 vi.mock("@/lib/auth/auth", () => ({
   authV2Enabled: () => auth.v2,
-  getAuth: () => ({
+  withAuth: (run: (value: unknown) => unknown) => run({
     api: auth.api,
     $context: Promise.resolve({
       secret: "test-secret-at-least-32-characters-long",

@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { differingFiles, GAME_DATA_DIR, generatedFiles, RAID_LUA, RAID_TS, readSiteData, retargetRaidImport, siteBuild, SpellValueTable, spellValuesOf, writeSpellValues } from "../src/build-watch/site-data.js";
+import { addPublishedChange, differingFiles, GAME_DATA_DIR, generatedFiles, RAID_LUA, RAID_TS, readSiteData, RECORDS_TS, retargetRaidImport, siteBuild, SpellValueTable, spellValuesOf, writeSpellValues } from "../src/build-watch/site-data.js";
 import { ClassCatalog, LABEL } from "../src/talents/catalog.js";
 import { commitBuild, node, raid, spellValues, stamp, worldMap } from "./build-watch-fixtures.js";
 
@@ -65,6 +65,47 @@ describe("retargetRaidImport", () => {
   });
 });
 
+describe("addPublishedChange", () => {
+  const write = (text: string) => { mkdirSync(dirname(join(a, RECORDS_TS)), { recursive: true }); writeFileSync(join(a, RECORDS_TS), text); };
+  const records = (names: string[]) => [
+    'import beta70532 from "@/data/game-data/changes/wow_classic_beta-70532.json";',
+    'import wowf70685 from "@/data/game-data/changes/wowf-70685.json";',
+    'import { ChangeEntry } from "../../../../kb/src/build-watch/changes";',
+    "",
+    `export const PUBLISHED_CHANGES: readonly unknown[] = [${names.join(", ")}];`,
+    "",
+  ].join("\n");
+  it("adds one import after the last record's and the name at the end of the list, once", () => {
+    write(records(["beta70532", "wowf70685"]));
+    expect(addPublishedChange(a, "wowf", 70707)).toBe(true);
+    expect(readFileSync(join(a, RECORDS_TS), "utf8")).toBe([
+      'import beta70532 from "@/data/game-data/changes/wow_classic_beta-70532.json";',
+      'import wowf70685 from "@/data/game-data/changes/wowf-70685.json";',
+      'import wowf70707 from "@/data/game-data/changes/wowf-70707.json";',
+      'import { ChangeEntry } from "../../../../kb/src/build-watch/changes";',
+      "",
+      "export const PUBLISHED_CHANGES: readonly unknown[] = [beta70532, wowf70685, wowf70707];",
+      "",
+    ].join("\n"));
+    expect(addPublishedChange(a, "wowf", 70707)).toBe(false);
+  });
+  it("names a product by its last word, as the file does", () => {
+    write(records(["wowf70685"]));
+    addPublishedChange(a, "wow_classic_beta", 70800);
+    expect(readFileSync(join(a, RECORDS_TS), "utf8")).toContain('import beta70800 from "@/data/game-data/changes/wow_classic_beta-70800.json";');
+    expect(readFileSync(join(a, RECORDS_TS), "utf8")).toContain("[wowf70685, beta70800];");
+  });
+  it("keeps a Windows checkout's line endings", () => {
+    write(records(["wowf70685"]).replace(/\n/g, "\r\n"));
+    expect(addPublishedChange(a, "wowf", 70707)).toBe(true);
+    expect(readFileSync(join(a, RECORDS_TS), "utf8")).toContain('wowf-70685.json";\r\nimport wowf70707 from "@/data/game-data/changes/wowf-70707.json";\r\n');
+    expect(readFileSync(join(a, RECORDS_TS), "utf8")).toContain("[wowf70685, wowf70707];\r\n");
+  });
+  it("fails loudly when the list is not there", () => {
+    write('import wowf70685 from "@/data/game-data/changes/wowf-70685.json";\nexport const X = 1;\n');
+    expect(() => addPublishedChange(a, "wowf", 70707)).toThrow("PUBLISHED_CHANGES");
+  });
+});
 describe("differingFiles", () => {
   it("ignores extractedAt and nothing else", () => {
     commitBuild(a, 1, build);

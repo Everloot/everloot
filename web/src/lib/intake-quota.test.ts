@@ -1,4 +1,5 @@
 import { expect, test, vi } from "vitest";
+import { readFileSync } from "node:fs";
 import { createIntakeQuota } from "./intake-quota";
 
 const env = { NODE_ENV: "production", EVERLOOT_PLATFORM: "cloudflare", SUPABASE_URL: "https://example.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "synthetic-service-key" };
@@ -54,6 +55,28 @@ test("in development the mcp scope keeps its own 200-per-IP allowance apart from
   const local = new Request("http://localhost/mcp/public");
   for (let i = 0; i < 200; i++) expect((await quota.mcp(local)).allowed).toBe(true);
   expect((await quota.mcp(local)).allowed).toBe(false);
+  expect((await quota.request(local)).allowed).toBe(true);
+});
+
+test("forms keep the request scope until the form scope migration is applied and flagged, then use their own", async () => {
+  const fetch = vi.fn().mockImplementation(async () => new Response(JSON.stringify([{ allowed: true, retry_after: 0 }])));
+  await createIntakeQuota({ env, fetch }).form(request());
+  const flagged = createIntakeQuota({ env: { ...env, EVERLOOT_FORM_QUOTA_SCOPE: "form" }, fetch });
+  await flagged.request(request());
+  await flagged.form(request());
+  const [before, upload, form] = fetch.mock.calls.map(([, init]) => JSON.parse(init.body));
+  expect(before.p_scope).toBe("request");
+  expect(before.p_key).toBe(upload.p_key);
+  expect(form).toEqual({ p_scope: "form", p_key: expect.stringMatching(/^[a-f0-9]{64}$/) });
+  expect(form.p_key).not.toBe(upload.p_key);
+  await expect(flagged.form(request("spoofed"))).rejects.toThrow();
+});
+
+test("in development the form scope allows 30 an hour per IP and leaves the upload allowance untouched", async () => {
+  const quota = createIntakeQuota({ env: { NODE_ENV: "test", EVERLOOT_FORM_QUOTA_SCOPE: "form" }, now: () => 0 });
+  const local = new Request("http://localhost/api/waitlist");
+  for (let i = 0; i < 30; i++) expect((await quota.form(local)).allowed).toBe(true);
+  expect((await quota.form(local)).allowed).toBe(false);
   expect((await quota.request(local)).allowed).toBe(true);
 });
 
@@ -162,4 +185,16 @@ test("the /64 prefix is computed from any spelling, and IPv4-mapped addresses co
   expect(ipv6Subscriber("::1")).toBe("0:0:0:0::/64");
   expect(ipv6Subscriber("fe80:1:2:3:4:5:6:7")).toBe("fe80:1:2:3::/64");
   expect(ipv6Subscriber("::ffff:203.0.113.5")).toBe("203.0.113.5");
+});
+
+test("the limits in code are the limits the newest quota function enforces, for every scope", () => {
+  const flat = (text: string) => text.replace(/--[^\n]*/g, "").replace(/\s+/g, " ");
+  const sql = flat(readFileSync(new URL("../../../supabase/migrations/20261030120000_form_quota_scope.sql", import.meta.url), "utf8"));
+  const code = flat(readFileSync(new URL("./intake-quota.ts", import.meta.url), "utf8"));
+  for (const [global, perIp, prefix, scope] of [["global", 200, "ip", "request"], ["mcp_global", 200, "mcp", "mcp"], ["api_global", 30, "api", "api"], ["form_global", 30, "form", "form"]] as const) {
+    const limit = { global: 10000, mcp_global: 5000, api_global: 3000, form_global: 2000 }[global];
+    expect(sql, scope).toContain(`keys := array['${global}', '${prefix}:' || p_key]; limits := array[${limit}, ${perIp}];`);
+    expect(code, scope).toContain(`[["${global}", ${limit}], [\`${prefix}:\${value}\`, ${perIp}]]`);
+  }
+  expect(sql).toContain("p_scope not in ('request', 'install', 'mcp', 'api', 'form')");
 });

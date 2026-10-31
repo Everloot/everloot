@@ -1,4 +1,5 @@
 import { Pool } from "pg";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { supabaseCa } from "./supabase-ca";
 
 // Better Auth 1.7 asks a custom store for one atomic check-and-count per request.
@@ -15,9 +16,11 @@ const REFUSED_PARAMS = new Set(["sslmode", "sslcert", "sslkey", "sslrootcert", "
 
 // Never chained to the cause: a URL parse error holds the whole URL, password included.
 const notConfigured = () => new Error("Authentication storage is not configured");
+const logPoolError = (error: Error & { code?: string }) => console.error("Authentication storage connection failed", error.code ?? "no code");
 
 // Created on first use, never at import: the Next build imports route modules.
 export function authPool(): Pool {
+  if (process.env.EVERLOOT_PLATFORM === "cloudflare") throw notConfigured();
   if (pool) return pool;
   const url = process.env.AUTH_DATABASE_URL?.trim();
   if (!url) throw notConfigured();
@@ -36,8 +39,27 @@ export function authPool(): Pool {
   });
   // An idle client's error is emitted on the pool; unheard, it would crash the instance.
   // Only the Postgres error code is logged: the message can carry the host.
-  pool.on("error", (error: Error & { code?: string }) => console.error("Authentication storage connection failed", error.code ?? "no code"));
+  pool.on("error", logPoolError);
   return pool;
+}
+
+/** A Worker socket belongs to the operation that opened it. Hyperdrive keeps the origin pool;
+ * this short-lived pool handles Better Auth's transactions and is closed before the operation returns. */
+export async function withAuthDatabase<T>(run: (pool: Pool) => Promise<T>): Promise<T> {
+  if (process.env.EVERLOOT_PLATFORM !== "cloudflare") return run(authPool());
+  let binding: unknown;
+  try {
+    const env = getCloudflareContext().env;
+    binding = "AUTH_DB_HYPERDRIVE" in env ? env.AUTH_DB_HYPERDRIVE : undefined;
+  } catch { throw notConfigured(); }
+  if (!binding || typeof binding !== "object" || !("connectionString" in binding) || typeof binding.connectionString !== "string") throw notConfigured();
+  const requestPool = new Pool({
+    connectionString: binding.connectionString, max: 1,
+    connectionTimeoutMillis: 5_000, query_timeout: 10_000,
+  });
+  requestPool.on("error", logPoolError);
+  try { return await run(requestPool); }
+  finally { await requestPool.end(); }
 }
 
 const PRUNE_AFTER_MS = 60 * 60 * 1000;

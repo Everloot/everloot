@@ -147,6 +147,32 @@ export function retargetRaidImport(root: string, version: string): boolean {
   return true;
 }
 
+/** Where the site lists the change records it bundles (web/src/lib/talents/freshness-records.ts, PUBLISHED_CHANGES). */
+export const RECORDS_TS = "web/src/lib/talents/freshness-records.ts";
+
+/**
+ * Lists a new build's change record in RECORDS_TS: one import line after the last record's, and its name at the end
+ * of PUBLISHED_CHANGES. The name is the product's last word and the build id (wowf70707, beta70532), as the file
+ * already names them. False when it is listed already; throws when the file has no such list, so a miss is loud.
+ */
+export function addPublishedChange(root: string, product: string, buildId: number): boolean {
+  const path = join(root, RECORDS_TS);
+  const text = readFileSync(path, "utf8");
+  const name = `${product.split("_").pop()}${buildId}`;
+  const eol = text.includes("\r\n") ? "\r\n" : "\n";
+  const imports = [...text.matchAll(/^import [a-z]+[0-9]+ from "@\/data\/game-data\/changes\/[a-z0-9_]+-[0-9]+\.json";(?=\r?$)/gm)];
+  const list = /^(export const PUBLISHED_CHANGES: readonly unknown\[\] = \[)([a-z0-9, ]*)(\];)(?=\r?$)/m.exec(text);
+  if (!imports.length || !list) throw new Error(`${RECORDS_TS} has no change record imports or no PUBLISHED_CHANGES list`);
+  const names = list[2].split(",").map((s) => s.trim()).filter(Boolean);
+  if (names.includes(name)) return false;
+  const last = imports[imports.length - 1];
+  const end = last.index + last[0].length;
+  const line = `import ${name} from "@/data/game-data/changes/${changeFileName(product, buildId)}";`;
+  const withImport = `${text.slice(0, end)}${eol}${line}${text.slice(end)}`;
+  writeFileSync(path, withImport.replace(list[0], `${list[1]}${[...names, name].join(", ")}${list[3]}`));
+  return true;
+}
+
 /** Drops the keys that change on every extraction, so two runs of one build compare equal. */
 const stable = (v: unknown): unknown =>
   Array.isArray(v) ? v.map(stable)

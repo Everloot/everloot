@@ -14,6 +14,12 @@ build that has a zip in the repository. Earlier builds have none.
 
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
+### Fixed
+- Addon and companion: when `/ask` cannot be answered (the companion offline, no model set up), the reason is shown once and
+  the question stays queued, so the retry's answer still reaches the game. Before, the question was dropped and a later answer never
+  appeared. After each `/reload` the addon says how many questions are still waiting. Needs the next addon and Desktop App
+  releases; each half is harmless without the other.
+
 ### Added
 - Site and MCP: racial traits from the game files (build-stamped `races.json`, found in game files, unconfirmed).
   Each class page lists, under "Who can be a {Class}", every race's traits with active or passive and the short
@@ -133,6 +139,30 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   agree. Fishing (the bobber, or an object installs agree is fished) is never a pin. An upload of an event
   that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
   instead of withdrawing the event as a conflict. The map shows none of this yet.
+
+## [0.3.14] - 2026-10-30
+
+Release channel: Alpha
+
+Live-client verification is pending. This is a pre-release for WoW: Forever 1.60.1, not a verified stable build.
+The new window's layout, fonts, crest texture and interactions still need an in-game check. Disenchanting,
+skinning, pickpocketing, lockboxes, selling greys, repairs and auction-mail collection also remain unverified
+in the live client. Optional convenience helpers stay off until enabled.
+
+### Added
+- An Everloot Home window, opened from the minimap button or `/everloot window`: your character, gold on hand
+  and its peak, recorded money by source, gold per hour with Pause/Resume, professions with skill bars and saved
+  record counts. Missing values show a dash. The window is built on first open; a UI error closes it while
+  recording continues. The **Everloot window** setting turns it off.
+- A dark panel with a bronze game border, game fonts and the Everloot crest. Item tooltips keep their existing
+  price and drop lines under one Everloot header. Other sidebar views open existing panels or say coming soon.
+
+### Fixed
+- Values the client marks secret (a unit's GUID or name, a position, a chat line) count as missing instead of
+  raising an error that stops capture. An uncached item's stand-in name is no longer recorded.
+- The minimap contract tests now execute in CI, covering the no-minimap fallback, one button and the ask box.
+- A temporary `/ask` failure leaves the question queued for a later answer, shows the failure once and says
+  how many questions are still waiting. A missing answer file no longer hides the waiting count.
 
 ## [0.3.13] - 2026-10-29
 
@@ -262,6 +292,12 @@ Live-client verification is pending. This is a pre-release for WoW: Forever 1.60
   off until `/everloot census on`. The Desktop App sends census rows with its uploads when the player leaves
   the census box ticked on its setup screen, or turns it on in Settings; a setup finished before this keeps
   it off. Still never names, guilds, gear or places, and the site shows only totals.
+
+## [desktop-v0.1.9] - 2026-10-30
+
+### Fixed
+- A failed in-game `/ask` answer is shown once and stays queued. When the retry succeeds, its answer reaches the
+  game instead of being dropped. Use addon 0.3.14 or later to keep retrying questions in the game.
 
 ## [desktop-v0.1.8] - 2026-10-30
 

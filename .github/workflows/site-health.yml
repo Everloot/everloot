@@ -1,7 +1,9 @@
 name: Site health
-# Every 15 minutes, asks https://everloot.app/api/health (the snapshot cron's freshness and the corpus store). A
-# failure opens one issue labelled site-down, or comments on the open one; the next good check closes it. It is the
-# outside check the host's own dashboards do not give, whichever host serves the site.
+# Every 15 minutes, asks https://everloot.app/api/health (the snapshot cron's freshness and the corpus store), then
+# what players and AI clients use: an item page must show the item's name (it shows "Item 25" when the game build's
+# names are not uploaded), and the public MCP must list its tools (a 429 there means its hourly allowance is used
+# up for everyone). A failure opens one issue labelled site-down, or comments on the open one; the next good check
+# closes it. It is the outside check the host's own dashboards do not give, whichever host serves the site.
 on:
   schedule:
     - cron: "7,22,37,52 * * * *"
@@ -24,31 +26,54 @@ jobs:
           body=$(curl -sS --max-time 30 -w '\n%{http_code}' https://everloot.app/api/health)
           code=$(printf '%s' "$body" | tail -n1)
           printf 'status %s\n%s\n' "$code" "$(printf '%s' "$body" | head -n -1 | head -c 500)"
+          problems=""
+          [ "$code" = 200 ] || problems="/api/health answered HTTP $code"
+          item=$(curl -sS --max-time 30 -w '\n%{http_code}' https://everloot.app/database/items/25)
+          item_code=$(printf '%s' "$item" | tail -n1)
+          title=$(printf '%s' "$item" | grep -o '<title>[^<]*' | head -n1 | sed 's/<title>//')
+          echo "item 25: status $item_code, title: $title"
+          if [ "$item_code" != 200 ]; then
+            problems="$problems${problems:+; }/database/items/25 answered HTTP $item_code"
+          elif [ -z "$title" ] || printf '%s' "$title" | grep -q '^Item 25'; then
+            problems="$problems${problems:+; }/database/items/25 shows no item name (is this build's name file uploaded?)"
+          fi
+          mcp=$(curl -sS --max-time 30 -w '\n%{http_code}' -X POST https://everloot.app/mcp/public \
+            -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' \
+            -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}')
+          mcp_code=$(printf '%s' "$mcp" | tail -n1)
+          echo "mcp tools/list: status $mcp_code"
+          if [ "$mcp_code" = 429 ]; then
+            problems="$problems${problems:+; }/mcp/public answered 429: its hourly allowance is used up"
+          elif [ "$mcp_code" != 200 ] || ! printf '%s' "$mcp" | grep -q '"tools"'; then
+            problems="$problems${problems:+; }/mcp/public tools/list answered HTTP $mcp_code without a tool list"
+          fi
           {
             echo "code=$code"
+            echo "problems=$problems"
             echo "body<<EOF"
             printf '%s' "$body" | head -n -1 | head -c 500
             echo
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
       - name: Open or update the site-down issue
-        if: steps.health.outputs.code != '200'
+        if: steps.health.outputs.problems != ''
         env:
           GH_TOKEN: ${{ github.token }}
           CODE: ${{ steps.health.outputs.code }}
+          PROBLEMS: ${{ steps.health.outputs.problems }}
           BODY: ${{ steps.health.outputs.body }}
         run: |
           gh label create site-down --repo "$GITHUB_REPOSITORY" --color B60205 --description "everloot.app failed its health check" 2>/dev/null || true
           open=$(gh issue list --repo "$GITHUB_REPOSITORY" --label site-down --state open --json number --jq '.[0].number')
-          note=$(printf 'Health check at %s: HTTP %s\n\n```\n%s\n```\n\nRun: %s/%s/actions/runs/%s' "$(date -u +%FT%TZ)" "$CODE" "$BODY" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")
+          note=$(printf 'Health check at %s: %s\n\n/api/health (HTTP %s):\n```\n%s\n```\n\nRun: %s/%s/actions/runs/%s' "$(date -u +%FT%TZ)" "$PROBLEMS" "$CODE" "$BODY" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")
           if [ -n "$open" ]; then
             gh issue comment "$open" --repo "$GITHUB_REPOSITORY" --body "$note"
           else
-            gh issue create --repo "$GITHUB_REPOSITORY" --label site-down --title "everloot.app health check failing (HTTP $CODE)" --body "$note"
+            gh issue create --repo "$GITHUB_REPOSITORY" --label site-down --title "everloot.app health check failing: ${PROBLEMS:0:150}" --body "$note"
           fi
           exit 1
       - name: Close the site-down issue once healthy
-        if: steps.health.outputs.code == '200'
+        if: steps.health.outputs.problems == ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

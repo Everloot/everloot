@@ -334,7 +334,10 @@ async function fetchPublicCorpus(url: string): Promise<{ records: unknown[]; dat
     const corpus = { records: parsed.records, dataAsOf: read.dataAsOf };
     if (corpusCacheMs > 0) corpusCache.set(cacheKey, { at: Date.now(), corpus });
     return corpus;
-  } catch { return null; }
+  } catch (err) {
+    console.warn(`The public corpus could not be read: ${err instanceof Error ? err.message : String(err)}`);
+    return null;
+  }
 }
 
 async function fromPublicCorpus(url: string, render: (records: unknown[]) => string): Promise<string> {
@@ -390,13 +393,20 @@ export function fromTooledUploads<T>(
  * The facts one tool reads, with the corpus time, for a handler that renders more than text. Same
  * sources and memo as fromTooledUploads; null when no source is connected or readable.
  */
+/** Whether a source of player observations is set up, so a null read means it failed rather than that there is none. */
+export const observationsConfigured = (loader?: CorpusLoader): boolean =>
+  Boolean(loader || process.env.EVERLOOT_PUBLIC_CORPUS_URL?.trim() || process.env.EVERLOOT_UPLOADS?.trim());
+
 export async function readTooledFacts<T>(
   tool: ToolName, loader?: CorpusLoader, recheck: readonly RecheckScope[] = [],
 ): Promise<{ facts: T; dataAsOf: string | null } | null> {
   const build = TOOL_FACT_BUILDERS[tool] as (records: unknown[], scopes: readonly RecheckScope[]) => T;
   if (loader) {
     let corpus;
-    try { corpus = await loader(); } catch { return null; }
+    try { corpus = await loader(); } catch (err) {
+      console.warn(`${tool}: player observations could not be read: ${err instanceof Error ? err.message : String(err)}`);
+      return null;
+    }
     if (!corpus) return null;
     return { facts: tooledFacts<T>("loader", corpus, tool, recheck), dataAsOf: typeof corpus.dataAsOf === "string" ? corpus.dataAsOf : null };
   }
@@ -619,7 +629,8 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
       const result = await answerSources(db, args, read?.facts ?? null, read?.dataAsOf ?? null, files);
       // The fallback is said in the text; the structured answer keeps its published shape.
       const { someWords: _someWords, ...structured } = result;
-      return { text: `${formatAnswerSources(result, read !== null)}\n${read ? answerFooter(read.dataAsOf) : MCP_CREDIT}`, structured };
+      const observations = read !== null ? true : observationsConfigured(options.corpus) ? "unreachable" : false;
+      return { text: `${formatAnswerSources(result, observations)}\n${read ? answerFooter(read.dataAsOf) : MCP_CREDIT}`, structured };
     },
     profession_path: (args) => {
       // The same defaults the text handler applies: from 1, to the start when no end is given.

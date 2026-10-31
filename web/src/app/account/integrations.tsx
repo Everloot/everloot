@@ -6,6 +6,8 @@ import { Badge, Card, GET_THE_ADDON } from "@/components/ui";
 import type { AccountOverview } from "@/lib/account-overview";
 import { guardOn } from "@/lib/data-guard";
 import { DESKTOP_KEY_LABEL } from "@/lib/desktop-connect";
+import SocialSignIn from "@/components/SocialSignIn";
+import { PROVIDER_NAMES, type SocialProvider } from "@/lib/auth/social";
 
 const subheading = "text-meta font-semibold text-fg-2";
 const action = "btn min-h-11 px-3 text-sm";
@@ -51,8 +53,12 @@ function Entry({ letters, name, badge, action, children }: { letters?: string; n
  * installed. Claude, ChatGPT and the addon keep nothing per account, so they are only ever Available, with a link to
  * their docs or download; so is the Desktop App while the overview finds no live key of its own.
  */
-export default function Integrations({ methods, name, overview }: { methods: string[]; name: string; overview: AccountOverview | null }) {
+export default function Integrations({ methods, name, overview, availableLogins = [] }: {
+  methods: string[]; name: string; overview: AccountOverview | null; availableLogins?: (SocialProvider | "battlenet")[];
+}) {
   const battlenet = methods.includes("battlenet");
+  const logins = methods.filter((method) => PROVIDER_NAMES[method]);
+  const toLink = availableLogins.filter((provider) => !methods.includes(provider));
   // The name is a BattleTag only when Battle.net is the one way in; otherwise it is the name the account chose.
   const battleTag = battlenet && methods.length === 1 ? name : null;
   // With keys on, no overview means the keys could not be read: say so, and claim nothing about the Desktop App.
@@ -67,15 +73,20 @@ export default function Integrations({ methods, name, overview }: { methods: str
         </Callout>
       )}
 
-      <div className="space-y-2 text-sm">
+      <div id="sign-in-methods" className="scroll-mt-20 space-y-2 text-sm">
         <h3 id="connected-heading" tabIndex={-1} className={subheading}>Connected</h3>
-        {battlenet || live.length > 0 ? (
+        {logins.length > 0 || live.length > 0 ? (
           <ul aria-labelledby="connected-heading" className="grid gap-3 sm:grid-cols-2">
             {battlenet && (
               <Entry letters="BN" name="Battle.net" badge={<Badge tone="neutral">Sign-in</Badge>}>
                 <p className="text-meta text-muted">{battleTag ?? "Linked to your account"}</p>
               </Entry>
             )}
+            {logins.filter((method) => method !== "battlenet").map((method) => (
+              <Entry key={method} letters={PROVIDER_NAMES[method].slice(0, 2)} name={PROVIDER_NAMES[method]} badge={<Badge tone="neutral">Sign-in</Badge>}>
+                <p className="text-meta text-muted">Linked to your account</p>
+              </Entry>
+            ))}
             {live.map((k) => {
               const desktopKey = k.label === DESKTOP_KEY_LABEL;
               const keyName = desktopKey ? "Desktop App key" : k.label || "Unnamed key";
@@ -93,6 +104,14 @@ export default function Integrations({ methods, name, overview }: { methods: str
         {unread && <p className="text-muted">Your keys could not be read right now, so apps that use one are not shown.</p>}
         <KeysRefresh />
       </div>
+
+      {toLink.length > 0 && (
+        <div className="space-y-3 text-sm">
+          <h3 className={subheading}>Link another login</h3>
+          <p className="text-fg-2">Use another provider to sign in to this same Everloot account. Your saved builds and API keys stay here.</p>
+          <SocialSignIn providers={toLink} mode="link" />
+        </div>
+      )}
 
       <div className="space-y-2 text-sm">
         <h3 id="available-heading" className={subheading}>Available</h3>

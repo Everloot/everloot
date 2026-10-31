@@ -100,7 +100,17 @@ export default function PrivacyPage() {
                 publish your named addon records or establish guild officer authority.
               </li>
               <li>
-                <strong>Email account (optional):</strong> if you make an account with
+                  <strong>Other sign-in providers (optional):</strong> if you use Google,
+                  Microsoft, Twitch or Discord, we store that provider&apos;s account ID,
+                  your name, avatar URL, email address and whether the provider verified
+                  the email. We do not keep provider access, refresh or identity tokens.
+                  Matching emails link accounts automatically only when both are verified.
+                  You can also link another login from your signed-in account settings.
+                  Signing in with Discord does not add a bot or grant server permissions.
+                  Sessions work as described above.
+                </li>
+                <li>
+                  <strong>Email account (optional):</strong> if you make an account with
                 your email instead of Battle.net, we store the email, the name you
                 choose and a one-way hash of your password, never the password itself.
                 We use the email only for account mail: the link that confirms it and

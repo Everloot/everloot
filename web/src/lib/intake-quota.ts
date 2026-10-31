@@ -37,7 +37,7 @@ export function createIntakeQuota(opts: {
   const secret = env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   const production = env.NODE_ENV === "production";
 
-  async function consume(scope: "request" | "install" | "mcp" | "api", value: string): Promise<QuotaResult> {
+  async function consume(scope: "request" | "install" | "mcp" | "api" | "form", value: string): Promise<QuotaResult> {
     if (url && secret) {
       const key = createHmac("sha256", secret).update(`${scope}:${value}`).digest("hex");
       const response = await doFetch(`${url.replace(/\/$/, "")}/rest/v1/rpc/consume_intake_quota`, {
@@ -59,6 +59,7 @@ export function createIntakeQuota(opts: {
     const limits: [string, number][] = scope === "request" ? [["global", 10000], [`ip:${value}`, 200]]
       : scope === "mcp" ? [["mcp_global", 5000], [`mcp:${value}`, 200]]
       : scope === "api" ? [["api_global", 3000], [`api:${value}`, 30]]
+      : scope === "form" ? [["form_global", 2000], [`form:${value}`, 30]]
       : [[`install:${value}`, 20]];
     const retryAfter = Math.max(0, ...limits.map(([key, limit]) => {
       const bucket = local.get(key);
@@ -126,6 +127,15 @@ export function createIntakeQuota(opts: {
       } catch {
         return undefined;
       }
+    },
+    /**
+     * The waitlist, the player opt-out and the guild hide form. With EVERLOOT_FORM_QUOTA_SCOPE=form (set only after
+     * 20261030120000_form_quota_scope.sql is applied) they count against their own hourly global and per-IP buckets,
+     * so a burst of form posts cannot turn away uploads; before that, the request scope as before.
+     */
+    async form(req: Request) {
+      if (env.EVERLOOT_FORM_QUOTA_SCOPE === "form") return consume("form", clientIp(req));
+      return consume("request", clientIp(req));
     },
     /**
      * Anonymous bulk reads (the corpus feed and the drop list): their own hourly global and per-IP
