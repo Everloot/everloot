@@ -5,7 +5,7 @@ sentence, kept in `web/src/data/wow-forever.ts` as `LAUNCH` and `LAUNCH_AT`; las
 below are relative to that hour, "L".
 
 This page is the order of work, not the detail. Each step points at the document that holds the detail.
-It was written on 2026-10-23 from what is in the repository and refreshed on 2026-10-31 (addon 0.3.14 Alpha, Desktop App 0.1.9, build 70707 and production receipts). A step marked **[unverified]** has no tested
+It was written on 2026-10-23 from what is in the repository and refreshed on 2026-10-31 (addon 0.3.14 Alpha, Desktop App 0.1.10, build 70707 and production receipts). A step marked **[unverified]** has no tested
 procedure behind it yet; the list of those is at the end.
 
 Two rules for this page and for anything done from it:
@@ -46,7 +46,7 @@ again; it will say so.
 | 4 | Agent / Carlos | Addon 0.3.14 Alpha is released on GitHub and [publicly available on CurseForge](https://www.curseforge.com/wow/addons/everloot/files/9380990), with Download and Install Via App controls verified 2026-10-31. Tagged releases upload the tested archive automatically (`docs/RELEASING.md`). Wago release parity remains unverified. | The listing version matches `/upload`; actual addon installation is checked separately. | Do not duplicate an existing upload. GitHub and `/upload` remain the download fallback. |
 | 5 | Carlos | Run the six-weapon section of [the acceptance card](2026-10-31-launch-acceptance.md) on the current build. Record item IDs, item levels, quality, speed and exact damage lines; the original comparison values came from an older build. | Only observed current-build results may populate `CHECKED_WEAPONS` in `kb/src/assets/weapon-damage.ts`. | Keep the gate empty and the `[?]` damage label until the formula is verified. This is allowed at launch. |
 | 6 | Agent | Done for 70707: uploaded counts-only `coverage-expected.json` for 50 zones and read it back byte for byte. Repeat for a newer launch build using `web/scripts/upload-coverage-expected.ts` and that build's snapshot/report; never publish the report itself. | `/database/coverage` reads the build's expected counts; upload validates snapshot, build and folder. | Keep the missing-denominator state explicit for any build without verified expected counts. |
-| 7 | Carlos | Run [the native and upload acceptance card](2026-10-31-launch-acceptance.md) with Desktop App 0.1.9 and addon 0.3.14. The app lists `_<product>_` folders; actual launch-folder detection remains unverified. | Record install/update, settings retention, tray/reopen and the exact detected folder. | Preserve existing settings and game files; record the actual failure. |
+| 7 | Carlos | Run [the native and upload acceptance card](2026-10-31-launch-acceptance.md) with Desktop App 0.1.10 and addon 0.3.14. The app lists `_<product>_` folders; actual launch-folder detection remains unverified. | Record install/update, settings retention, tray/reopen and the exact detected folder. | Preserve existing settings and game files; record the actual failure. |
 
 ## T-1 day (2026-11-03)
 
@@ -58,7 +58,7 @@ again; it will say so.
 | 11 | Carlos | Confirm the IndexNow key setting and `/indexnow.txt` (`docs/SEO.md`, "IndexNow"). | `https://everloot.app/indexnow.txt` shows the key. | Without it nothing is pinged; the sitemaps still work. |
 | 12 | Agent | Verified 2026-10-31 in Search Console and Bing: all three root sitemaps (`/sitemap.xml`, `/database-sitemap.xml`, `/auctions-sitemap.xml`) plus `/database-sitemap/0.xml` show Success. Bing reports zero errors/warnings. Recheck at launch. | Each engine has read the submitted sitemaps. Discovered URL counts are not indexed-page counts. | Inspect the failing sitemap before resubmitting; do not submit duplicates when already successful. |
 | 13 | Agent | On 2026-11-03, run `python scripts/launch_smoke.py`, save the dated output and check the deployed commit/build against current main. The 2026-10-31 baseline passed all 16 checks. | All checks pass before changing the served version. | Investigate failures before the launch switch. |
-| 13a | Agent | Desktop App 0.1.9 is published for Windows setup/portable, macOS arm64 and Linux, with `SHA256SUMS`; the three-platform publishing workflow passed. Addon 0.3.14 and Desktop 0.1.9 together include `/ask` retry recovery. | Release artifacts exist; native/live-game acceptance is recorded separately on [the acceptance card](2026-10-31-launch-acceptance.md). | A successful package build does not count as an observed install or in-game test. |
+| 13a | Agent | Desktop App 0.1.10 is published for Windows setup/portable, macOS arm64 and Linux, with `SHA256SUMS`; the three-platform publishing workflow passed. Addon 0.3.14 and Desktop 0.1.10 together include `/ask` retry recovery. | Release artifacts exist; native/live-game acceptance is recorded separately on [the acceptance card](2026-10-31-launch-acceptance.md). | A successful package build does not count as an observed install or in-game test. |
 
 ## Launch hour (L = 23:00 UTC; the build may appear earlier or later)
 
@@ -139,7 +139,7 @@ For code: `cd kb && npm test -- --maxWorkers=2 && npm run typecheck`; `cd web &&
 
 - Build 70707 assets, names and expected coverage are live; the form quota scope is isolated from uploads.
 - The HTTP 5xx/429 monitor is enabled. The latest production smoke passed all 16 checks.
-- Addon 0.3.14 Alpha is released and uploaded to CurseForge; Desktop App 0.1.9 installers are published.
+- Addon 0.3.14 Alpha is released and uploaded to CurseForge; Desktop App 0.1.10 installers are published.
 - Build-watch test generation (#586) removed the manual build-pinned test edits. The 70707 update (#582)
   merged after retaining those generated-build tests.
 - Search Console and Bing report Success for all submitted sitemaps. This proves receipt, not indexing.

@@ -1,11 +1,11 @@
-# Launch acceptance: Desktop 0.1.9 and addon 0.3.14
+# Launch acceptance: Desktop 0.1.10 and addon 0.3.14
 
 Record observations here or in a dated private test receipt. Do not include account names, API keys,
 character names, raw save files or combat logs in a public report. Leave unrun cases pending.
 
 ## Before the game is playable
 
-1. Download [Desktop 0.1.9](https://github.com/Everloot/everloot/releases/tag/desktop-v0.1.9) and its
+1. Download [Desktop 0.1.10](https://github.com/Everloot/everloot/releases/tag/desktop-v0.1.10) and its
    `SHA256SUMS`. Compare the chosen file's SHA-256 (`Get-FileHash <file> -Algorithm SHA256` on Windows).
    The checksum proves matching bytes; publisher identity/signing remains a separate readiness question.
 2. Preserve existing settings, queued uploads and game files. For a separate portable test, set
