@@ -5,7 +5,7 @@ sentence, kept in `web/src/data/wow-forever.ts` as `LAUNCH` and `LAUNCH_AT`; las
 below are relative to that hour, "L".
 
 This page is the order of work, not the detail. Each step points at the document that holds the detail.
-It was written on 2026-10-23 from what is in the repository and refreshed on 2026-10-30 (addon 0.3.13, Desktop App 0.1.8, `/ask` and the question bank). A step marked **[unverified]** has no tested
+It was written on 2026-10-23 from what is in the repository and refreshed on 2026-10-31 (addon 0.3.14 Alpha, Desktop App 0.1.9, build 70707 and production receipts). A step marked **[unverified]** has no tested
 procedure behind it yet; the list of those is at the end.
 
 Two rules for this page and for anything done from it:
@@ -14,17 +14,15 @@ Two rules for this page and for anything done from it:
   Where a setting has a name in another document (`docs/ASSETS.md`, `docs/SEO.md`), this page says "the
   asset URL setting" or similar and does not repeat the name. The same rule is why
   `kb/src/build-watch/render.ts` says "the site's asset URL setting" in the pull request body.
-- Nothing merges itself. The build watch never merges, and an agent does not merge, deploy or change
-  Cloudflare, CurseForge or Wago access. Those are Carlos's.
+- The build watch never merges. Maintainer-authorized changes still use protected pull requests and the checked deployment workflow. The Live switch stays draft until players can play; a scheduled preflight does not authorize an early switch.
 
-Owners: **Carlos** needs an account, a key, a setting or the game login. **Agent** can do it from the
-repository and the public site with no secret.
+Owners: **Carlos** supplies account sign-in and real game observations. **Agent** handles repository work, public checks and already-authorized account operations. Keep separately owned authentication activation out of the launch switch.
 
 ## What changes at launch
 
 | What | Today | At launch | Where |
 |---|---|---|---|
-| Build the site shows | Beta: the `wowf` build the layers hold (1.60.1.70685 on 2026-10-30) | Live, the launch build: the same product, read from the same layers | the layers in `web/src/data/game-data/` |
+| Build the site shows | Beta: the `wowf` build the layers hold (1.60.1.70707 on 2026-10-31) | Live, the launch build: the same product, read from the same layers | the layers in `web/src/data/game-data/` |
 | Unprefixed pages (`/`, `/database`, ...) | show Beta | show Live, same URLs | `served` in `web/src/data/build-versions.json` |
 | `/beta/...` | the same pages as unprefixed | the notice "Beta: None running since launch, 2026-11-04" (noindex) | `web/next.config.js` rewrites |
 | `/ptr/...` | the notice "None running" | unchanged | same |
@@ -44,23 +42,23 @@ again; it will say so.
 |---|---|---|---|---|
 | 1 | Agent | Confirm `main` is green and production is on the latest `main` merge. | Release checks green on the latest `main` commit; the deploy-worker run for that SHA is green. | Fix or revert the failing merge before any launch work. |
 | 2 | Agent | Run the production smoke list (below) and keep the output as the "before" record. | Every path in the list answers as stated. | Open an issue for each miss; do not start the switch on a red baseline. |
-| 3 | Carlos | Check Blizzard's version service for `wowf`, WoW: Forever's own product, with `cd kb && npm run kb -- builds-check` (the default asks for `wowf`, `wow_classic_beta` and `wow_classic_era`). `kb/lists/build-watch.yaml` follows `wowf` with `live: false` until players can play (step 20). | The output shows `wowf` and its newest build (1.60.1.70630 on 2026-10-27; the launch build may be newer). | Check again each day; see T-1. |
-| 4 | Carlos | Addon: confirm the CurseForge upload is done and the Wago upload is done or scheduled (target in the readiness notes was about 10/24 for CurseForge; 10/30 for both is the current target, **[unverified]** in the repository). The current zip is 0.3.13, an Alpha released 2026-10-30 (`addon/Everloot.toc`, `CHANGELOG.md`); upload that one. | The listing is public and its version matches the zip on `/upload`. | A zip can always be downloaded from `/upload` and the GitHub release; the listing is not on the critical path for the site. |
-| 5 | Carlos | Weapon damage check: the six-weapon card in the owner notes (also steps 18 to 23 of `docs/2026-10-21-addon-0.3.10-launch-checklist.md`). The result becomes entries in `CHECKED_WEAPONS` in `kb/src/assets/weapon-damage.ts`. | Until it is filled, item pages print `[?] - [?]` and say why. This is allowed at launch. | Leave the array empty. No range is printed. |
-| 6 | Carlos | Upload the counts-only expected-counts file the owner notes call `coverage-expected.json`, so `/database/coverage` has a denominator. The upload procedure is **[unverified]** here. | `/database/coverage` shows an expected count instead of "No expected count". | The page keeps saying it has none. Not a launch blocker. |
-| 7 | Carlos | Confirm the Desktop App finds the launch client's folder. The app lists any `_<product>_` folder under the install root (`desktop/src/main/game-folder.ts`); the launch folder name is **[unverified]**. | The app lists the launch folder on a machine with the launch client. | |
+| 3 | Carlos | Check Blizzard's version service for `wowf`, WoW: Forever's own product, with `cd kb && npm run kb -- builds-check` (the default asks for `wowf`, `wow_classic_beta` and `wow_classic_era`). `kb/lists/build-watch.yaml` follows `wowf` with `live: false` until players can play (step 20). | The output shows `wowf` and its newest build (1.60.1.70707 on 2026-10-31; the launch build may be newer). | Check again each day; see T-1. |
+| 4 | Agent / Carlos | Addon 0.3.14 Alpha is released on GitHub and [publicly available on CurseForge](https://www.curseforge.com/wow/addons/everloot/files/9380990), with Download and Install Via App controls verified 2026-10-31. Tagged releases upload the tested archive automatically (`docs/RELEASING.md`). Wago release parity remains unverified. | The listing version matches `/upload`; actual addon installation is checked separately. | Do not duplicate an existing upload. GitHub and `/upload` remain the download fallback. |
+| 5 | Carlos | Run the six-weapon section of [the acceptance card](2026-10-31-launch-acceptance.md) on the current build. Record item IDs, item levels, quality, speed and exact damage lines; the original comparison values came from an older build. | Only observed current-build results may populate `CHECKED_WEAPONS` in `kb/src/assets/weapon-damage.ts`. | Keep the gate empty and the `[?]` damage label until the formula is verified. This is allowed at launch. |
+| 6 | Agent | Done for 70707: uploaded counts-only `coverage-expected.json` for 50 zones and read it back byte for byte. Repeat for a newer launch build using `web/scripts/upload-coverage-expected.ts` and that build's snapshot/report; never publish the report itself. | `/database/coverage` reads the build's expected counts; upload validates snapshot, build and folder. | Keep the missing-denominator state explicit for any build without verified expected counts. |
+| 7 | Carlos | Run [the native and upload acceptance card](2026-10-31-launch-acceptance.md) with Desktop App 0.1.9 and addon 0.3.14. The app lists `_<product>_` folders; actual launch-folder detection remains unverified. | Record install/update, settings retention, tray/reopen and the exact detected folder. | Preserve existing settings and game files; record the actual failure. |
 
 ## T-1 day (2026-11-03)
 
 | # | Owner | Step | Check and expected result | If it fails |
 |---|---|---|---|---|
 | 8 | Agent | Done 2026-10-30: draft PR #584, "at launch the site serves Live". The beta was WoW: Forever's own product, `wowf`, the one Live is, so Live reads its product and build from the layers as Beta did, and Beta gets no build ("None running since launch"). `served: "live"`. No placeholder: the launch build's data PR sets the build. The tests that named `/beta` as the served prefix now read it from the routing table (#583, merged before launch). | With #583 underneath, the web tests pass on the draft branch. | Keep the branch as a draft. |
-| 9 | Agent | Draft the launch-day `CHANGELOG.md` lines and any pinned post. Copy is for review; nothing is published. | Draft exists in the pull request. | n/a |
-| 10 | Carlos | Check the asset storage and token state before the launch build exists: the upload key still works (a `--dry-run` of the upload script is enough, see step 17 for the command); the Worker has the private bucket settings and the cron secret among its secrets (`npx wrangler secret list` from `web/`) and the asset URL setting is a GitHub repository variable (the names are in `docs/ASSETS.md` and `docs/SEO.md`; do not paste values anywhere). | The dry run lists what it would upload and fails nothing. The settings are present. | Rotate or recreate the key per `docs/ASSETS.md`, "Owner steps for the buckets". |
+| 9 | Agent | Draft exists: `kb/news/everloot-on-wow-forever-launch-day.md` remains a draft (#592 merged). Review facts against the launch build and prepare release-day changelog lines. | Nothing is published until the launch switch is deployed and its checks pass. | Keep the post in draft. |
+| 10 | Agent / Carlos | Check storage access and token expiry for the launch build. The 70707 upload succeeded; its short-lived upload token expires before launch and must not be assumed reusable. A `--dry-run` validates local files, not authentication. Confirm current token expiry and permissions or create a fresh short-lived object read/write token scoped to the two asset buckets when needed; check the Worker's existing private bucket/cron settings and the repository asset URL setting. | Authenticated access succeeds without logging credentials; the settings and build folder agree. | Recreate the scoped upload key per `docs/ASSETS.md`; do not change unrelated bindings or authentication flags. |
 | 11 | Carlos | Confirm the IndexNow key setting and `/indexnow.txt` (`docs/SEO.md`, "IndexNow"). | `https://everloot.app/indexnow.txt` shows the key. | Without it nothing is pinged; the sitemaps still work. |
-| 12 | Carlos | Confirm Search Console and Bing Webmaster Tools have the three sitemaps submitted (`/sitemap.xml`, `/database-sitemap.xml`, `/auctions-sitemap.xml`). | Each shows as read. | Resubmit. |
-| 13 | Agent | Re-run the smoke list. | Same as the T-7 record. | As step 2. |
-| 13a | Agent | Confirm the Desktop App 0.1.8 release is published. In-game `/ask` answers from `answer_sources`, its follow-ups and the asking character's class, level and zone need addon 0.3.13 and Desktop App 0.1.8 (or the companion from `main`). | The `desktop-v0.1.8` GitHub release exists with its installers and `SHA256SUMS`. | Players on 0.1.7 still get answers, without the new ones. |
+| 12 | Agent | Verified 2026-10-31 in Search Console and Bing: all three root sitemaps (`/sitemap.xml`, `/database-sitemap.xml`, `/auctions-sitemap.xml`) plus `/database-sitemap/0.xml` show Success. Bing reports zero errors/warnings. Recheck at launch. | Each engine has read the submitted sitemaps. Discovered URL counts are not indexed-page counts. | Inspect the failing sitemap before resubmitting; do not submit duplicates when already successful. |
+| 13 | Agent | On 2026-11-03, run `python scripts/launch_smoke.py`, save the dated output and check the deployed commit/build against current main. The 2026-10-31 baseline passed all 16 checks. | All checks pass before changing the served version. | Investigate failures before the launch switch. |
+| 13a | Agent | Desktop App 0.1.9 is published for Windows setup/portable, macOS arm64 and Linux, with `SHA256SUMS`; the three-platform publishing workflow passed. Addon 0.3.14 and Desktop 0.1.9 together include `/ask` retry recovery. | Release artifacts exist; native/live-game acceptance is recorded separately on [the acceptance card](2026-10-31-launch-acceptance.md). | A successful package build does not count as an observed install or in-game test. |
 
 ## Launch hour (L = 23:00 UTC; the build may appear earlier or later)
 
@@ -73,7 +71,7 @@ flag is the change that ends that. Do not set it before players can play.
 | 14 | Carlos | Confirm the build watch sees the launch build. `wowf` is already followed: `kb/lists/build-watch.yaml` (`live: false` until L, then `true`, step 20), the `builds-check` default that fills `kb/changes/builds.json`, and `FOREVER_PRODUCTS` in `kb/src/ecosystem.ts` (`docs/ASSETS.md` step 1). If the launch build is on another product id, change those in a pull request; an agent can write it, Carlos reviews and merges. | `npm run kb -- build-watch --dry-run` (needs no GitHub access) writes `kb/data/build-watch/out/dry-run/` with `plan.json` and `pr-body.md` for the launch build. | `--check` decides without reading game files. If the product id is wrong, `builds-check` shows the real one. |
 | 15 | Agent | Watch for the pull request `data(game-data): build <version>`. The workflow polls at minutes 7 and 37 of each hour, so expect it within the hour. `gh pr list --search "game-build in:head"` (branches are `game-build/<product>-<buildId>-<config>`). Read the body: talents, raid buffs, map, spells, client read set, spoiler flags, and the folded "Answers this build changes" list (the question bank's answer key on the old and new files): those answers are what to recheck in game. When the written-answer scores are set up (`docs/BUILD_WATCH.md`, step 8), the PR also gets a comment with them. | A PR exists with a changelog entry in `web/src/data/game-data/changes/`. | `npm run kb -- build-watch --redo` refreshes an open PR. A closed PR is not reopened by the watch. Two failed runs in a row open the issue "Game build watch is failing". |
 | 16 | Carlos | Make the client snapshot for the build, on a machine that can read the CDN: `cd kb && npm run kb -- client-extract --product <product> --refresh`, then `npm run kb -- client-assets data/client/<product>-<build>-<config>.sqlite`. Detail: `docs/ASSETS.md`, "What the extractor makes". | The counts printed (icons, tooltips resolved and unresolved, items, maps, skipped maps, missing frame pieces) are read, not skipped. | The extractor never decrypts; encrypted blocks are skipped and counted. |
-| 17 | Carlos | **Upload before merging.** From `web/`, with the upload key in the environment: `node scripts/upload-game-assets.mjs --snapshot ../kb/data/client/<product>-<build>-<config>.sqlite --dry-run`, then without `--dry-run`; then the names: `npm run kb -- item-names` and `game-names` for the build (usage in `kb/src/cli.ts`) and `web/scripts/upload-item-names.mjs` (`docs/BUILD_WATCH.md`, "Upload before merging"; the exact arguments of the names upload are **[unverified]** here, read the script's header first). Then point the site's asset URL setting (a GitHub repository variable, read at build time) at the new folder. The folder is `<product>-<build>-<config>/` in the public bucket and `<product>-<build>-<config>-private/` in the private one. | The old build's folders are untouched, so the live site keeps working until the merge. | If a merge happens first, production shows "Item 25" for names and the item sitemap is empty until the upload and setting land (this happened with 70532, PR #369 records it). Upload, set the URL, redeploy. |
+| 17 | Agent / Carlos | **Upload before merging.** Extract and upload the new build with `web/scripts/upload-game-assets.mjs`, then upload each names file using `web/scripts/upload-item-names.mjs <names-folder>/<file>.json --folder=<build-folder>` for `item-names`, `quest-names`, `item-set-names` and `spell-names`. Upload that build's expected counts with the coverage uploader. Point the repository asset URL setting at the new folder only after verification. The public and private buckets both use the build prefix; `-private` is the local extraction directory suffix. | For 70707 these steps succeeded, including private coverage byte-for-byte readback. For the launch build, verify manifest, names and a named item page after deploy. | Preserve old folders. Do not merge data whose matching asset folder is unavailable. |
 |
 |
 | 20 | Carlos | Set `live: true` for the product in `kb/lists/build-watch.yaml` once players can play (this ends the spoiler flag for items read from it). | The next build-watch run's PR body no longer says the build is a spoiler. | Revert the one line. |
@@ -94,8 +92,8 @@ No migration is part of the switch.
 | 22 | Agent | Full smoke list (below). | All as stated; `/api/health` says fresh; MCP `tools/list` returns 32 tools with no key. | Triage by path; see "Smoke list". |
 | 23 | Agent | Confirm `/sitemap.xml` and `/database-sitemap.xml` answer 200 and list item pages with names. | `/database-sitemap.xml` is an index, not empty, not 503. | A 503 means upload storage could not be read; check the private bucket settings (Carlos). |
 | 24 | Carlos | Ping the engines: the hourly cron pings IndexNow only when `/changes` has a new entry. For a launch announcement, `docs/SEO.md` gives the manual POST to `https://api.indexnow.org/indexnow`, or add the page to `changeUrlsToPing`. | Accepted by the endpoint. | The sitemaps are the fallback. |
-| 25 | Carlos | Game login: install the addon from CurseForge or `/upload`, `/reload`, `/everloot status`, and run the in-client checks in `docs/2026-10-21-addon-0.3.10-launch-checklist.md`. Then `/ask` with the Desktop App running: `/ask where is the flight master here`, `/ask price 2589`, `/ask which bosses are in Deadmines` then `/ask what does he drop`, and one in Spanish (`/ask dónde queda Deadmines`). Then the combat log probes, section 9 of `docs/2026-10-28-live-client-capability-checklist.md` (can the game's logging be turned on, where the file is, what it holds; never paste it). Record the build and addon version. | Checks pass or the exceptions are written down. | Unchecked event names and API assumptions are listed in that document. |
-| 26 | Carlos | Upload from the website and from the Desktop App with a launch character. | Both accept the rows (no invalid count). Rows show in `/database`. | See the 503 diagnosis in PR #332 (a rejected row is an install id that is not valid text). |
+| 25 | Carlos | When the client is playable, use [the acceptance card](2026-10-31-launch-acceptance.md): addon status/selftest, `/ask` questions, follow-up and Spanish questions, then current-build weapon tooltips. The broader event/API and combat-log probes remain in `docs/2026-10-28-live-client-capability-checklist.md`. Record exact game/addon/Desktop versions. | Record each observed pass/failure; never count source tests as live-game acceptance. | Keep raw captures local and record only the needed redacted result. |
+| 26 | Carlos | Run the acceptance card's website and Desktop upload checks with a launch character. | Both show accepted rows with no invalid rows; recorded data appears after the snapshot refresh. | Record HTTP status, accepted/invalid counts and time; preserve the original save file. |
 | 27 | Agent | Check that the intake accepts the launch realms and build: after step 26, `/api/corpus/public` is reachable and `/database` shows data as of a recent time. | Fresh "Data as of" line. | Open an issue; do not edit intake rules on launch day without review. |
 
 ## T+24 hours
@@ -137,26 +135,28 @@ The same ones CI runs (`.github/workflows/checks.yml`): `python scripts/check_md
 For code: `cd kb && npm test -- --maxWorkers=2 && npm run typecheck`; `cd web && npm test && npm run typecheck
 && npm run lint && npm run build`; the addon tests listed in `docs/2026-10-08-release-checklist.md`.
 
-## Gaps: steps with no tested procedure
+## Verified release state (2026-10-31)
 
-- **The build watch on `wowf`.** The live product id is `wowf`. `kb/lists/build-watch.yaml` follows it in
-  place of the beta, still one product (`docs/BUILD_WATCH.md` says "the site reads one product, so the list
-  has one entry"), with `live: false`. It has run on `wowf` twice: build 70685 (PR #548, merged 10/29) and
-  70707 (PR #582, 10/30). Both PRs needed hand fixes to the build-pinned tests; until the build watch writes
-  those itself, expect the same on the launch build.
-- **Regenerating the layers for the Live build.** The generators exist and the build watch runs them, but
-  the one-snapshot switch (replace Beta's layers with Live's, give Beta a fixed build) has been tested only
-  with the test suite and a preview, never with a second real build.
-- **The asset upload for a new build.** `docs/ASSETS.md` has the commands. The owner notes mention a card
-  for build 70532; it was not found, so the steps above come from the repository docs only.
-- **CurseForge and Wago upload.** Only the readiness notes mention it. No repository doc covers the listing.
-- **Desktop App on the launch client.** The app detects any `_<product>_` folder, so no code change is
-  expected, but nobody has seen it pick up the launch folder, and that folder's name is not known.
-- **Launch realms and build in the intake.** Read from the code, not run against a launch build: the intake
-  keeps no list of builds or realms. A build is any dotted number up to 32 characters (`CLIENT_BUILD` in
-  `packages/protocol/src/records.ts`) and a realm any name of 2 to 60 characters, so a new build's rows are
-  accepted. Tooltip numbers are agreed per build (`kb/src/item-facts.ts`): the launch build's reports count
-  on their own, and a line already agreed on an earlier build keeps its decision. The settled tally skips a build the cron has not listed yet (`web/src/app/api/intake/route.ts`).
-  Treat step 27 as an observation, not a test.
-- **Weapon damage gate, expected counts file, settled-tally migration.** Owned by Carlos; not blockers.
-- **Rollback of the asset URL setting.** Written from how the folders are laid out, not rehearsed.
+- Build 70707 assets, names and expected coverage are live; the form quota scope is isolated from uploads.
+- The HTTP 5xx/429 monitor is enabled. The latest production smoke passed all 16 checks.
+- Addon 0.3.14 Alpha is released and uploaded to CurseForge; Desktop App 0.1.9 installers are published.
+- Build-watch test generation (#586) removed the manual build-pinned test edits. The 70707 update (#582)
+  merged after retaining those generated-build tests.
+- Search Console and Bing report Success for all submitted sitemaps. This proves receipt, not indexing.
+
+## Remaining observations and launch gates
+
+- **Playable game:** keep #584 draft and `live: false` until players can log in. A listed build or the
+  scheduled launch time alone is insufficient. Refresh the draft against current main and the actual launch build.
+- **Native and live-client acceptance:** use [the acceptance card](2026-10-31-launch-acceptance.md).
+  Install/update/recovery, actual folder detection, uploads, `/ask` recovery and the six weapon readings
+  still need observations. The broader capability checklist keeps its own unverified event/API cases.
+- **Wago parity:** the current Wago release remains unverified; the CurseForge 0.3.14 page is public.
+- **New launch build:** 70707 upload proof does not cover a later build; repeat extraction, uploads and checks.
+- **Intake:** no build/realm allowlist is kept, but a real launch upload must still be observed. Record actual
+  accepted/invalid counts and subsequent snapshot freshness rather than assuming compatibility.
+- **Weapon damage:** `CHECKED_WEAPONS` remains empty; no inferred range is published before client validation.
+- **Settled tallies:** retain their separate migration and data-policy gates; verify their current state before any change.
+- **Asset rollback:** old folders are retained; changing the asset URL back remains an unrehearsed recovery step.
+- **Authentication rollout:** database connectivity, provider acceptance and feature activation have a separate
+  owner and their own gates. They are not prerequisites to silently change during the Live switch.
