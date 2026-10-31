@@ -140,8 +140,9 @@ For code: `cd kb && npm test -- --maxWorkers=2 && npm run typecheck`; `cd web &&
 
 - **The build watch on `wowf`.** The live product id is `wowf`. `kb/lists/build-watch.yaml` follows it in
   place of the beta, still one product (`docs/BUILD_WATCH.md` says "the site reads one product, so the list
-  has one entry"), with `live: false`. The first scheduled run after that change is the first on a `wowf`
-  build; until it has run, `build-watch --dry-run` shows what it would do.
+  has one entry"), with `live: false`. It has run on `wowf` twice: build 70685 (PR #548, merged 10/29) and
+  70707 (PR #582, 10/30). Both PRs needed hand fixes to the build-pinned tests; until the build watch writes
+  those itself, expect the same on the launch build.
 - **Regenerating the layers for the Live build.** The generators exist and the build watch runs them, but
   the one-snapshot switch (replace Beta's layers with Live's, give Beta a fixed build) has been tested only
   with the test suite and a preview, never with a second real build.
@@ -150,7 +151,11 @@ For code: `cd kb && npm test -- --maxWorkers=2 && npm run typecheck`; `cd web &&
 - **CurseForge and Wago upload.** Only the readiness notes mention it. No repository doc covers the listing.
 - **Desktop App on the launch client.** The app detects any `_<product>_` folder, so no code change is
   expected, but nobody has seen it pick up the launch folder, and that folder's name is not known.
-- **Launch realms and build in the intake.** No document says what the intake does with a build it has not
-  seen. Treat step 27 as an observation, not a test.
+- **Launch realms and build in the intake.** Read from the code, not run against a launch build: the intake
+  keeps no list of builds or realms. A build is any dotted number up to 32 characters (`CLIENT_BUILD` in
+  `packages/protocol/src/records.ts`) and a realm any name of 2 to 60 characters, so a new build's rows are
+  accepted. Tooltip numbers are agreed per build (`kb/src/item-facts.ts`): the launch build's reports count
+  on their own, and a line already agreed on an earlier build keeps its decision. The settled tally skips a build the cron has not listed yet (`web/src/app/api/intake/route.ts`).
+  Treat step 27 as an observation, not a test.
 - **Weapon damage gate, expected counts file, settled-tally migration.** Owned by Carlos; not blockers.
 - **Rollback of the asset URL setting.** Written from how the folders are laid out, not rehearsed.
