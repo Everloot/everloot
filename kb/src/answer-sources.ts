@@ -192,7 +192,8 @@ export async function answerSources(
 
 const KIND_LABEL: Record<EvidenceKind, string> = { observed: "observed in play", curated: "curated", files: "game files, found in game files and unconfirmed", lore: "lore (Warcraft Wiki 2023, may differ in WoW: Forever)" };
 
-export function formatAnswerSources(result: AnswerSources, corpusConnected: boolean): string {
+/** `corpus`: true when player observations were read, false when none are connected, "unreachable" when the read failed. */
+export function formatAnswerSources(result: AnswerSources, corpus: boolean | "unreachable"): string {
   const lines: string[] = [];
   if (result.someWords) lines.push(SOME_WORDS);
   if (result.evidence.length === 0) lines.push("No evidence found for that question. Nothing here is invented: try other words or an exact name.");
@@ -202,7 +203,8 @@ export function formatAnswerSources(result: AnswerSources, corpusConnected: bool
     // A lore piece's source is the wiki; its page on the site is listed beside it. An observed piece's source already is its page.
     if (e.url && e.url !== e.source.url) lines.push(`  ${moreLine(e.url)}`);
   }
-  if (!corpusConnected) lines.push("Player observations are not connected here, so the observed layer is unrecorded, not empty.");
+  if (corpus === "unreachable") lines.push("Player observations could not be read just now, so the observed layer is unknown for this answer, not empty.");
+  else if (!corpus) lines.push("Player observations are not connected here, so the observed layer is unrecorded, not empty.");
   if (result.furtherReading.length) lines.push(`Further reading (links only, nothing fetched): ${result.furtherReading.map((l) => `${l.site} ${l.url}`).join(" | ")}`);
   lines.push(`Credit observed facts as "${CREDIT_LINE}"; keep each lore source with its text.`);
   return lines.join("\n");
