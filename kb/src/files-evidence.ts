@@ -31,6 +31,8 @@ export interface FilesIndex {
   /** When the files were read. */
   extractedAt: string | null;
   facts: FilesFact[];
+  /** Zone names by map id, the released zones only, so an observed position can name its zone. */
+  zones?: Readonly<Record<number, string>>;
 }
 
 /** The committed game-data files, already parsed; each optional, so the index grows as files land. */
@@ -148,7 +150,7 @@ export function buildFilesIndex(files: GameDataFiles): FilesIndex {
       }
     }
   }
-  return { build, extractedAt, facts };
+  return { build, extractedAt, facts, zones: Object.fromEntries(zoneName) };
 }
 
 const readJson = (path: string): unknown => (existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : undefined);

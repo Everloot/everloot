@@ -17,8 +17,8 @@ local function sample()
   if not (GetInventoryItemLink and GetDetailedItemLevelInfo) then
     return "inventory API unavailable in beta"
   end
-  local name = UnitName and UnitName("player")
-  local realm = GetRealmName and GetRealmName()
+  local name = UnitName and E.Readable(UnitName("player"))
+  local realm = GetRealmName and E.Readable(GetRealmName())
   if not name then return "no player yet" end
   local equipped = {}
   for _, slotName in ipairs(SLOTS) do

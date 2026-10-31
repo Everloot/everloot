@@ -171,6 +171,18 @@ test("evaluateBank: Spanish questions get their own template rows and a by-langu
   expect(formatEvalReport(report)).toContain("## By language");
 });
 
+test("evaluateBank: a limit asks answer_sources for that many pieces, and the report says so", async () => {
+  const db = await seed();
+  const bank = buildQuestionBank([{ kind: "instance", name: "Synthetic Stockade", id: 34 }]);
+  const at = (limit?: number) => evaluateBank(db, bank, null, { release: "test.sqlite", dataAsOf: null, ranAt: "2026-10-30T12:00:00.000Z", limit });
+  const [wide, narrow] = [await at(), await at(1)];
+  expect(wide.limit).toBeUndefined();
+  expect(narrow.limit).toBe(1);
+  expect(Math.max(...narrow.results.map((r) => r.evidence))).toBeLessThanOrEqual(Math.max(...wide.results.map((r) => r.evidence)));
+  expect(formatEvalReport(narrow)).toContain("Release `test.sqlite`, answer_sources limit 1.");
+  expect(formatEvalReport(wide)).toContain("Release `test.sqlite`. Player observations");
+});
+
 test("gameDataSubjects: a statistic the game keeps and a name marked [DNT] are not subjects", () => {
   const dir = mkdtempSync(join(tmpdir(), "kb-bank-stat-"));
   writeFileSync(join(dir, "client-achievements.json"), JSON.stringify({ achievements: {

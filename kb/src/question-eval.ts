@@ -35,6 +35,8 @@ export interface EvalRow { label: string; questions: number; exact: number; sear
 export interface EvalReport {
   schema: "everloot.question-eval/1";
   release: string;
+  /** How many pieces each question asked answer_sources for: 8 by default, 3 is what in-game /ask asks for. */
+  limit?: number;
   corpusConnected: boolean;
   dataAsOf: string | null;
   ranAt: string;
@@ -82,8 +84,8 @@ export function carries(text: string, fact: string): boolean {
   return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}${plural}(?![\\p{L}\\p{N}])`, "iu").test(plainQuotes(text));
 }
 
-export async function evaluateQuestion(db: ReleaseSource, q: Question, facts: AnswerSourcesFacts | null, dataAsOf: string | null, files: FilesIndex | null = null): Promise<QuestionResult> {
-  const result = await answerSources(db, { question: q.text, limit: 8 }, facts, dataAsOf, files);
+export async function evaluateQuestion(db: ReleaseSource, q: Question, facts: AnswerSourcesFacts | null, dataAsOf: string | null, files: FilesIndex | null = null, limit = 8): Promise<QuestionResult> {
+  const result = await answerSources(db, { question: q.text, limit }, facts, dataAsOf, files);
   const kinds = [...new Set(result.evidence.map((e) => e.kind))];
   const said = result.evidence.map((e) => `${e.claim}\n${e.source.title}`).join("\n");
   return {
@@ -122,10 +124,10 @@ function groupBy<K extends string>(rows: readonly QuestionResult[], key: (r: Que
 
 export async function evaluateBank(
   db: ReleaseSource, bank: readonly Question[], facts: AnswerSourcesFacts | null,
-  meta: { release: string; dataAsOf: string | null; ranAt?: string; sampleNames?: number; files?: FilesIndex | null },
+  meta: { release: string; dataAsOf: string | null; ranAt?: string; sampleNames?: number; files?: FilesIndex | null; limit?: number },
 ): Promise<EvalReport> {
   const results: QuestionResult[] = [];
-  for (const q of bank) results.push(await evaluateQuestion(db, q, facts, meta.dataAsOf, meta.files ?? null));
+  for (const q of bank) results.push(await evaluateQuestion(db, q, facts, meta.dataAsOf, meta.files ?? null, meta.limit));
   const byId = new Map(bank.map((q) => [q.id, q]));
   const sample = meta.sampleNames ?? 12;
   const unresolved = [...groupBy(results.filter((r) => r.resolution === "none"), (r) => r.kind)]
@@ -139,7 +141,7 @@ export async function evaluateBank(
     .sort((a, b) => b.count - a.count);
   return {
     schema: "everloot.question-eval/1",
-    release: meta.release, corpusConnected: facts !== null, dataAsOf: meta.dataAsOf, ranAt: meta.ranAt ?? new Date().toISOString(),
+    release: meta.release, ...(meta.limit !== undefined ? { limit: meta.limit } : {}), corpusConnected: facts !== null, dataAsOf: meta.dataAsOf, ranAt: meta.ranAt ?? new Date().toISOString(),
     totals: fold("all", results),
     byTemplate: [...groupBy(results, templateLabel)].map(([t, rows]) => fold(t, rows)),
     byKind: [...groupBy(results, (r) => r.kind)].map(([k, rows]) => fold(k, rows)),
@@ -160,7 +162,7 @@ export function formatEvalReport(report: EvalReport): string {
   const lines = [
     `# Question eval, ${report.ranAt.slice(0, 10)}`,
     "",
-    `Release \`${report.release}\`. Player observations ${report.corpusConnected ? `connected (data as of ${report.dataAsOf ?? "unrecorded"})` : "not connected: the observed layer is unrecorded, not empty"}.`,
+    `Release \`${report.release}\`${report.limit !== undefined ? `, answer_sources limit ${report.limit}` : ""}. Player observations ${report.corpusConnected ? `connected (data as of ${report.dataAsOf ?? "unrecorded"})` : "not connected: the observed layer is unrecorded, not empty"}.`,
     "Resolution: the subject's name met a record exactly, or through search on the question, or not at all. Evidence: what `answer_sources` returned; \"with files\" counts the game files' own facts (ids and facts, unconfirmed). Percentages of resolution are over the questions that expect one. \"Answer in evidence\": of the questions with an answer key (the facts the game-data files say a correct answer carries), how many got evidence carrying every one of them.",
     "",
     "## Totals",

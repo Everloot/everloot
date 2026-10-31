@@ -18,8 +18,16 @@ function E.Adler32(s)
   return b * 65536 + a
 end
 
+--- Forever can hand an addon a value it may hold but not read (a unit's GUID or name, a position, a chat line):
+--- parsing or calculating with one raises an error. It reads as missing here, so a caller's missing-field path runs.
+function E.Readable(value)
+  if issecretvalue and issecretvalue(value) then return nil end
+  return value
+end
+
 --- The NPC id in a creature GUID (Creature-0-server-instance-zone-NPCID-spawn); nil for anything else.
 function E.NpcIdFromGuid(guid)
+  guid = E.Readable(guid)
   if type(guid) ~= "string" then return nil end
   local parts = {}
   for p in guid:gmatch("[^-]+") do parts[#parts + 1] = p end

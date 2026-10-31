@@ -6,7 +6,7 @@ import { recordUsage } from "@/lib/usage-metrics";
 /**
  * POST /api/waitlist — launch notification signups per tool.
  * Stored by `uploadStore`: a Supabase table in production, a gitignored file in dev.
- * Admission uses the same shared per-IP and global request quota as intake, before the body is read.
+ * Admission uses the forms' per-IP and global quota (intakeQuota.form), before the body is read.
  */
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,7 @@ const SLUG = /^[a-z0-9-]{1,60}$/;
 
 export async function POST(req: Request) {
   try {
-    const quota = await intakeQuota.request(req);
+    const quota = await intakeQuota.form(req);
     if (!quota.allowed) {
       return NextResponse.json({ ok: false, error: "rate limited" },
         { status: 429, headers: { "retry-after": String(quota.retryAfter), "cache-control": "no-store" } });

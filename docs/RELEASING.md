@@ -5,7 +5,7 @@ below.
 
 | What | How it ships | Version |
 |---|---|---|
-| The site (`web/`) | Every merge to `main` that touches `web/`, `kb/` or `packages/protocol` deploys the Cloudflare Worker through `.github/workflows/deploy-worker.yml`, then warms and checks every sitemap page. Rollback: `npx wrangler rollback` from `web/`, or re-run the workflow on an older commit | none |
+| The site (`web/`) | Every merge to `main` that touches `web/`, `kb/` or `packages/protocol` deploys the Cloudflare Worker through `.github/workflows/deploy-worker.yml` once the Release checks pass on that commit (a failed check deploys nothing), then warms and checks every sitemap page. Rollback: `npx wrangler rollback` from `web/`, or re-run the workflow on an older commit | none |
 | The addon, tagged (Alpha or stable) | A `addon-v*` tag runs `.github/workflows/release.yml` and creates a GitHub release | `0.3.x` |
 | The addon, nightly | `.github/workflows/nightly.yml` makes a pre-release from `main` when it has changed | `0.3.x-nightly.<date>.<run>` |
 | The desktop app | A `desktop-v*` tag runs `.github/workflows/desktop-release.yml`, which builds Windows, macOS and Linux installers and publishes a GitHub release with `SHA256SUMS` ([`desktop/README.md`](../desktop/README.md#release)) | `0.1.x` |

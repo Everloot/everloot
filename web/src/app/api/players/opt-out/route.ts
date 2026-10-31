@@ -25,7 +25,7 @@ export async function POST(req: Request) {
   const realm = typeof form?.get("realm") === "string" ? (form.get("realm") as string).trim() : "";
   if (!validPlayerName(name) || !validRealm(realm)) return back(req, new URLSearchParams({ error: "invalid", name, realm }).toString());
   try {
-    const admitted = await intakeQuota.request(req);
+    const admitted = await intakeQuota.form(req);
     if (!admitted.allowed) return back(req, new URLSearchParams({ error: "limit", name, realm }).toString());
     await playerStore().suppress(realm, name);
   } catch (err) {

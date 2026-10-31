@@ -75,15 +75,15 @@ flag is the change that ends that. Do not set it before players can play.
 | 16 | Carlos | Make the client snapshot for the build, on a machine that can read the CDN: `cd kb && npm run kb -- client-extract --product <product> --refresh`, then `npm run kb -- client-assets data/client/<product>-<build>-<config>.sqlite`. Detail: `docs/ASSETS.md`, "What the extractor makes". | The counts printed (icons, tooltips resolved and unresolved, items, maps, skipped maps, missing frame pieces) are read, not skipped. | The extractor never decrypts; encrypted blocks are skipped and counted. |
 | 17 | Carlos | **Upload before merging.** From `web/`, with the upload key in the environment: `node scripts/upload-game-assets.mjs --snapshot ../kb/data/client/<product>-<build>-<config>.sqlite --dry-run`, then without `--dry-run`; then the names: `npm run kb -- item-names` and `game-names` for the build (usage in `kb/src/cli.ts`) and `web/scripts/upload-item-names.mjs` (`docs/BUILD_WATCH.md`, "Upload before merging"; the exact arguments of the names upload are **[unverified]** here, read the script's header first). Then point the site's asset URL setting (a GitHub repository variable, read at build time) at the new folder. The folder is `<product>-<build>-<config>/` in the public bucket and `<product>-<build>-<config>-private/` in the private one. | The old build's folders are untouched, so the live site keeps working until the merge. | If a merge happens first, production shows "Item 25" for names and the item sitemap is empty until the upload and setting land (this happened with 70532, PR #369 records it). Upload, set the URL, redeploy. |
 | 18 | Agent | Complete the switch branch from step 8 with the real build: the Live `product` and `build`, Beta's fixed build, `served: "live"`, regenerated layers (the same generators the build watch uses, `web/src/data/game-data/README.md`). If the build-watch PR already holds the regenerated layers, rebase on it instead of regenerating. | In `web/`: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build` pass. `game-version.test.ts` and `build-versions.test.ts` pass, which proves the layers, the Live entry and `served` agree. | Do not merge with a failing agreement test. |
-| 19 | Carlos | Merge in this order: the build-watch data PR, then the switch PR (or one combined PR). Each merge deploys production through the deploy-worker workflow (`.github/workflows/deploy-worker.yml`). | The workflow run for the merge SHA is green, including the step that warms and checks every sitemap page. | Rollback: see the next section. |
+| 19 | Carlos | Merge in this order: the build-watch data PR, then the switch PR (or one combined PR). Each merge deploys production through the deploy-worker workflow (`.github/workflows/deploy-worker.yml`) once the Release checks pass on `main`, about ten minutes after the merge; when the second merge lands before the first one's checks finish, only the second deploys, with both. | The workflow run for the latest merge SHA is green, including the step that warms and checks every sitemap page. | Rollback: see the next section. |
 | 20 | Carlos | Set `live: true` for the product in `kb/lists/build-watch.yaml` once players can play (this ends the spoiler flag for items read from it). | The next build-watch run's PR body no longer says the build is a spoiler. | Revert the one line. |
 | 21 | Agent | Smoke the site after the deploy (list below), plus the switch checks: `/` shows the Live label in the header; `/beta` shows the notice with Beta's build and `noindex, follow`; `/ptr` shows "None running"; `/game-version/beta` still answers 308 to `/beta`; a known item page shows a name, not "Item N". | Each as stated. | Rollback. |
 
 ### Rolling back the switch
 
 The switch is a code change. Rolling back is reverting the switch PR (and the data PR if the data is the
-problem) and letting the deploy-worker workflow deploy `main`, or `npx wrangler rollback` from `web/` to the
-previous Worker version (Carlos). The old build's asset folders are never deleted by the upload, so the asset URL setting can be
+problem) and letting the deploy-worker workflow deploy `main` after its checks pass (about ten minutes), or
+`npx wrangler rollback` from `web/` to the previous Worker version (Carlos), which is immediate. The old build's asset folders are never deleted by the upload, so the asset URL setting can be
 pointed back at them. The release database and the layers are committed files, so a revert restores them.
 No migration is part of the switch.
 
@@ -111,10 +111,11 @@ No migration is part of the switch.
 
 ## Smoke list
 
-Run these against `https://everloot.app` with `curl -s -o /dev/null -w "%{http_code} %{url_effective}\n"`
-(add `-L` only where the expected answer is a redirect and you want the target). This is the list used for
-the 2026-10-22 production check after the wave 5 merge; it is repeated here from the owner notes, not
-re-run.
+Run `python scripts/launch_smoke.py` from the repository root (add `--after-switch` once the switch is
+deployed, steps 21 and later). It asks every path below, judges each answer as the table says, prints a
+Markdown table to keep as the step's record and exits 1 when a check fails. It also checks that
+`/database/items/25` shows a name. It needs only Python's standard library, and it never prints the
+IndexNow key. First run: 2026-10-30, all 16 checks passed before the switch.
 
 | Path | Expected |
 |---|---|
@@ -140,8 +141,9 @@ For code: `cd kb && npm test -- --maxWorkers=2 && npm run typecheck`; `cd web &&
 
 - **The build watch on `wowf`.** The live product id is `wowf`. `kb/lists/build-watch.yaml` follows it in
   place of the beta, still one product (`docs/BUILD_WATCH.md` says "the site reads one product, so the list
-  has one entry"), with `live: false`. The first scheduled run after that change is the first on a `wowf`
-  build; until it has run, `build-watch --dry-run` shows what it would do.
+  has one entry"), with `live: false`. It has run on `wowf` twice: build 70685 (PR #548, merged 10/29) and
+  70707 (PR #582, 10/30). Both PRs needed hand fixes to the build-pinned tests; until the build watch writes
+  those itself, expect the same on the launch build.
 - **Regenerating the layers for the Live build.** The generators exist and the build watch runs them, but
   the one-snapshot switch (replace Beta's layers with Live's, give Beta a fixed build) has been tested only
   with the test suite and a preview, never with a second real build.
@@ -150,7 +152,11 @@ For code: `cd kb && npm test -- --maxWorkers=2 && npm run typecheck`; `cd web &&
 - **CurseForge and Wago upload.** Only the readiness notes mention it. No repository doc covers the listing.
 - **Desktop App on the launch client.** The app detects any `_<product>_` folder, so no code change is
   expected, but nobody has seen it pick up the launch folder, and that folder's name is not known.
-- **Launch realms and build in the intake.** No document says what the intake does with a build it has not
-  seen. Treat step 27 as an observation, not a test.
+- **Launch realms and build in the intake.** Read from the code, not run against a launch build: the intake
+  keeps no list of builds or realms. A build is any dotted number up to 32 characters (`CLIENT_BUILD` in
+  `packages/protocol/src/records.ts`) and a realm any name of 2 to 60 characters, so a new build's rows are
+  accepted. Tooltip numbers are agreed per build (`kb/src/item-facts.ts`): the launch build's reports count
+  on their own, and a line already agreed on an earlier build keeps its decision. The settled tally skips a build the cron has not listed yet (`web/src/app/api/intake/route.ts`).
+  Treat step 27 as an observation, not a test.
 - **Weapon damage gate, expected counts file, settled-tally migration.** Owned by Carlos; not blockers.
 - **Rollback of the asset URL setting.** Written from how the folders are laid out, not rehearsed.
