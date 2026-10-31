@@ -61,6 +61,8 @@
     // The public MCP and market prices count against their own hourly global bucket (5,000), not the uploads'
     // 10,000 (src/lib/intake-quota.ts). Its "mcp" scope is in 20261019120000_data_guard.sql, which production runs.
     "EVERLOOT_MCP_QUOTA_SCOPE": "mcp",
+    // Forms use their own allowance after 20261030120000_form_quota_scope.sql is applied.
+    "EVERLOOT_FORM_QUOTA_SCOPE": "form",
     "EVERLOOT_MCP_PUBLIC": "1",
     "EVERLOOT_PLAYER_PAGES": "1",
     "EVERLOOT_SAVED_BUILDS": "1",
