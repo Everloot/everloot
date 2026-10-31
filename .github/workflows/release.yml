@@ -52,6 +52,22 @@ jobs:
             SHA256SUMS
             release-notes.md
           if-no-files-found: error
+  curseforge:
+    needs: [build, publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: release
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Upload the tested archive to CurseForge
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+        run: python scripts/upload-curseforge.py "${GITHUB_REF_NAME#addon-v}"
   publish:
     needs: build
     runs-on: ubuntu-latest
