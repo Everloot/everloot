@@ -15,6 +15,8 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
+- Desktop App: rechecks the newest release before downloading or restarting to update, so an older
+  offer or downloaded installer does not require installing intermediate versions.
 - Addon: profession observations prefer the complete recipe list when available and retain the API's recipe
   identifier and explicit learned state. Repeated observations are keyed by identifier, rank, colour and learned
   state; older clients can still use their filtered list without changing the player's filters. Explicitly

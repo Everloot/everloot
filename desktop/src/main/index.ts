@@ -249,12 +249,22 @@ if (!app.requestSingleInstanceLock()) {
   const messageBox = (options: Electron.MessageBoxOptions) => (win ? dialog.showMessageBox(win, options) : dialog.showMessageBox(options));
   // Windows installs download the update here, checked against SHA256SUMS, and install it on restart.
   ipcMain.handle("updateDownload", async () => {
-    const u = update;
-    if (!u?.newer || !u.installable || !u.downloadUrl || !u.sumsUrl || updateProgress.stage === "downloading") return;
-    if (downloaded?.version === u.latest) { updateProgress = { stage: "ready", percent: 100, error: null }; broadcast(); return; }
+    if (!update?.newer || !update.installable || updateProgress.stage === "downloading") return;
     updateProgress = { stage: "downloading", percent: 0, error: null };
     broadcast();
     try {
+      // The offer may have sat in the tray for days. Skip superseded releases before downloading.
+      const u = await checkForUpdates(app.getVersion(), fetch, process.platform, Boolean(process.env.PORTABLE_EXECUTABLE_FILE));
+      update = u.latest ? u : null;
+      if (!u.newer || !u.installable || !u.downloadUrl || !u.sumsUrl) {
+        downloaded = null;
+        updateProgress = { stage: "idle", percent: 0, error: null };
+        broadcast();
+        return;
+      }
+      if (downloaded?.version === u.latest) { updateProgress = { stage: "ready", percent: 100, error: null }; broadcast(); return; }
+      downloaded = null;
+      broadcast();
       const path = await downloadUpdate({ url: u.downloadUrl, sumsUrl: u.sumsUrl, version: u.latest ?? undefined, dir: join(data, "updates"), onProgress: (percent) => { updateProgress = { stage: "downloading", percent, error: null }; broadcast(); } });
       downloaded = { path, version: u.latest! };
       updateProgress = { stage: "ready", percent: 100, error: null };
@@ -266,6 +276,21 @@ if (!app.requestSingleInstanceLock()) {
   // Restart asks first, waits for a running upload or price refresh to finish, then hands over to the installer.
   ipcMain.handle("updateRestart", async () => {
     if (!downloaded || updateProgress.stage !== "ready") return false;
+    // A newer release may have appeared while this verified installer waited for a restart.
+    try {
+      const u = await checkForUpdates(app.getVersion(), fetch, process.platform, Boolean(process.env.PORTABLE_EXECUTABLE_FILE));
+      update = u.latest ? u : null;
+      if (!u.newer || !u.installable || u.latest !== downloaded.version) {
+        downloaded = null;
+        updateProgress = { stage: "idle", percent: 0, error: null };
+        broadcast();
+        return false;
+      }
+    } catch (err) {
+      updateProgress = { stage: "failed", percent: 0, error: err instanceof Error ? err.message : String(err) };
+      broadcast();
+      return false;
+    }
     const busy = JOBS.filter((j) => engine.snapshot().jobs[j].state === "running");
     const answer = await messageBox({
       type: "question",
