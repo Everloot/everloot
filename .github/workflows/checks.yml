@@ -33,6 +33,8 @@ jobs:
         run: python scripts/test_check_changes_files.py
       - name: The Discord bridge maps posts, issues and feeds correctly
         run: python scripts/test_discord_bridge.py
+      - name: The launch smoke list judges each answer correctly
+        run: python scripts/test_launch_smoke.py
       # Game data for a new build blanks every item name until that build's asset folder is uploaded, so a pull
       # request that changes the client layer waits for the folder. Other pull requests skip the network call.
       - name: New game data has its asset folder uploaded
