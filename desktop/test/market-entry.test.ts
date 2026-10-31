@@ -1,4 +1,4 @@
-﻿import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
@@ -143,7 +143,7 @@ describe("the Ask job", () => {
     const status = await jobs.deps.ask(file);
     expect(status).toMatch(/^answered 1, failed 1 \(config\.json: /);
     expect(jobs.answerStore.list().map((a) => a.id)).toEqual(["ask:3"]);
-    expect(written(d)).toContain('["ask:4"] = { ["answer"] = "Could not answer: ');
+    expect(written(d)).toContain('["ask:4"] = { ["answer"] = "Could not answer yet (');
     expect(site.since(from).some((r) => r.includes("search_knowledge"))).toBe(false);
   });
 

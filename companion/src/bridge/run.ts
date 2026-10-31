@@ -66,7 +66,7 @@ export async function answerPending(options: {
       answered++;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      failures.push({ id: ask.id, answer: `Could not answer: ${message}`.slice(0, MAX_ANSWER), source: "none", answeredAt: now().toISOString() });
+      failures.push({ id: ask.id, answer: `Could not answer yet (${message}). It is tried again while the companion runs.`.slice(0, MAX_ANSWER), source: "none", answeredAt: now().toISOString(), retry: true });
     }
   }
   writeAnswersAddon(options.addonsDir, [...options.store.list(), ...failures]);

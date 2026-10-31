@@ -14,6 +14,12 @@ build that has a zip in the repository. Earlier builds have none.
 
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
+### Fixed
+- Addon and companion: when `/ask` cannot be answered (the companion offline, no model set up), the reason is shown once and
+  the question stays queued, so the retry's answer still reaches the game. Before, the question was dropped and a later answer never
+  appeared. After each `/reload` the addon says how many questions are still waiting. Needs the next addon and Desktop App
+  releases; each half is harmless without the other.
+
 ### Added
 - Site and MCP: racial traits from the game files (build-stamped `races.json`, found in game files, unconfirmed).
   Each class page lists, under "Who can be a {Class}", every race's traits with active or passive and the short
