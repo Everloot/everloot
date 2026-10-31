@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ suppress: vi.fn(), request: vi.fn(), revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
 vi.mock("@/lib/player-store", () => ({ playerStore: () => ({ suppress: mocks.suppress }) }));
-vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { request: mocks.request } }));
+vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { form: mocks.request } }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath, revalidateTag: mocks.revalidateTag }));
 
 import { POST } from "./route";
