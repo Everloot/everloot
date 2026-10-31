@@ -117,11 +117,12 @@ end
 
 --- This character's opaque key, class token and level, or nil, reason.
 function C.Identity()
-  local guid = call("UnitGUID", "player")
+  local guid = E.Readable(call("UnitGUID", "player"))
   if type(guid) ~= "string" or guid == "" then return nil, "no player id" end
   local _, token = call("UnitClass", "player")
+  token = E.Readable(token)
   if type(token) ~= "string" or not token:find("^%a+$") or #token < 2 or #token > 20 then return nil, "no class" end
-  local level = tonumber(call("UnitLevel", "player"))
+  local level = tonumber(E.Readable(call("UnitLevel", "player")))
   if not level or level < 1 then return nil, "no level" end
   return hex8(E.Adler32((EverlootDB.installId or "") .. ":" .. guid)), token, math.min(100, math.floor(level))
 end

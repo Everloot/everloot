@@ -110,9 +110,9 @@ assert(drop:find('Everloot drop: NPC 61 · 1%.2%% %(1 of 80 loot windows%) · 3 
 assert(drop:find('Everloot: no price on Forever yet') and not drop:find('Everloot market'), drop)
 assert(tooltipFor(2770):find('Everloot drop: object 1731 · 96%.8%% %(300 of 310 loot windows%) · 6 installs'))
 
--- Neither: one grey line names both gaps; no number is shown that the file does not hold.
+-- Neither: one grey line under the header names both gaps; no number is shown that the file does not hold.
 local none, lines = tooltipFor(424242)
-assert(none == 'Everloot: no price on Forever yet · no drop source reported by 3 installs' and lines == 1, none)
+assert(none:match('|t Everloot\\nEverloot: no price on Forever yet · no drop source reported by 3 installs$') and lines == 2, none)
 assert(not tooltipFor(258):find('Everloot drop'), '258 does not match 2589: rows are matched whole')
 """)
 

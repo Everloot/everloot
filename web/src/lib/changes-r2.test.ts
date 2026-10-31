@@ -5,6 +5,7 @@ import builds from "../../../kb/changes/builds.json";
 import manual from "../../../kb/curated/manual-changes.json";
 import type { BlueStore } from "../../../kb/src/blue-posts";
 import { latestForeverBuild } from "./changes-facts";
+import { compareGameBuilds } from "./talents/freshness";
 
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
@@ -12,15 +13,18 @@ const bundled = () => groupAnnouncements([...buildTimeline((posts as unknown as 
 it("withholds the unverified source seed rather than publishing unsupported claims", () => {
   expect(manual.entries).toEqual([]);
 });
-it("retains current wowf 70707 as the latest Forever build with live posts and on fallback", async () => {
+// The newest WoW: Forever build the build list holds, so a new build changes no line here.
+const newestForever = builds.builds.filter((b) => b.product === "wowf").map((b) => b.version).sort((x, y) => compareGameBuilds(y, x) ?? 0)[0];
+it("retains the newest wowf build as the latest Forever build with live posts and on fallback", async () => {
+  expect(newestForever).toMatch(/^1\.60\.1\.\d+$/);
   vi.stubEnv("R2_ACCOUNT_ID", "");
   const fallback = await loadTimeline();
-  expect(latestForeverBuild(fallback)?.version).toBe("1.60.1.70707");
+  expect(latestForeverBuild(fallback)?.version).toBe(newestForever);
   configure();
   vi.stubGlobal("fetch", vi.fn(async () => Response.json({ posts: [] })));
   const live = await loadTimeline();
   expect(live.filter((e) => e.type === "build")).toEqual(fallback.filter((e) => e.type === "build"));
-  expect(latestForeverBuild(live)?.version).toBe("1.60.1.70707");
+  expect(latestForeverBuild(live)?.version).toBe(newestForever);
 });
 function configure() {
   for (const key of ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET"]) vi.stubEnv(key, "test");

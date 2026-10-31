@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     return back(req, new URLSearchParams({ error: "invalid", guild, realm }).toString());
   }
   try {
-    const admitted = await intakeQuota.request(req);
+    const admitted = await intakeQuota.form(req);
     if (!admitted.allowed) return back(req, new URLSearchParams({ error: "limit", guild, realm }).toString());
     await playerStore().suppressGuild(realm, guild);
   } catch (err) {

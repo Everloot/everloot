@@ -1,14 +1,14 @@
 name: Deploy the site to Cloudflare Workers
-# Every merge to main that touches the site builds it with OpenNext and deploys the Worker (web/wrangler.jsonc),
-# stamped with the commit (web/scripts/cf-deploy.mjs). Runs only while the repository variable WORKER_DEPLOY is "1".
+# A merge to main deploys the Worker (web/wrangler.jsonc) once the Release checks pass on that commit, built with
+# OpenNext and stamped with the commit (web/scripts/cf-deploy.mjs). A commit whose checks fail is not deployed; one
+# whose checks a newer merge cancelled is deployed by the newer merge's run. A commit that changes nothing the site
+# reads since the live one is skipped. Runs only while the repository variable WORKER_DEPLOY is "1". A manual run
+# deploys the commit it is run on, without waiting for checks.
 on:
-  push:
+  workflow_run:
+    workflows: ["Release checks"]
+    types: [completed]
     branches: [main]
-    paths:
-      - "web/**"
-      - "kb/**"
-      - "packages/protocol/**"
-      - ".github/workflows/deploy-worker.yml"
   workflow_dispatch:
 permissions:
   contents: read
@@ -17,12 +17,40 @@ concurrency:
   cancel-in-progress: false
 jobs:
   deploy:
-    if: vars.WORKER_DEPLOY == '1'
+    # Only a push to main in this repository: a pull request from a fork's own "main" branch also completes the checks.
+    if: >-
+      vars.WORKER_DEPLOY == '1' && (github.event_name == 'workflow_dispatch' || (
+        github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_repository.full_name == github.repository))
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SHA }}
+          fetch-depth: 0
+      # The live commit is the one the footer's Source link names. A commit the live one already includes is not
+      # deployed over it, and a newer one that changes nothing under the site's paths is skipped. When the live commit
+      # cannot be read or is not in the history, the commit is deployed.
+      - name: Decide whether this commit changes the site
+        id: site
+        run: |
+          live=$(curl -sS --max-time 30 https://everloot.app/ | grep -o 'github.com/Everloot/everloot/tree/[0-9a-f]\{40\}' | head -n1 | sed 's#.*/##' || true)
+          deploy=true
+          if [ "$GITHUB_EVENT_NAME" = workflow_run ] && [ -n "$live" ] && git cat-file -e "$live^{commit}" 2>/dev/null; then
+            if git merge-base --is-ancestor "$SHA" "$live"; then
+              echo "The site serves $live, which already includes $SHA."
+              deploy=false
+            elif git merge-base --is-ancestor "$live" "$SHA" && git diff --quiet "$live" "$SHA" -- web kb packages/protocol .github/workflows/deploy-worker.yml; then
+              echo "Nothing under web/, kb/ or packages/protocol changed between $live and $SHA."
+              deploy=false
+            fi
+          fi
+          echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@v7
+        if: steps.site.outputs.deploy == 'true'
         with:
           node-version: '22.23.2'
           cache: npm
@@ -31,12 +59,16 @@ jobs:
             kb/package-lock.json
             web/package-lock.json
       - run: npm ci && npm run build
+        if: steps.site.outputs.deploy == 'true'
         working-directory: packages/protocol
       - run: npm ci
+        if: steps.site.outputs.deploy == 'true'
         working-directory: kb
       - run: npm ci
+        if: steps.site.outputs.deploy == 'true'
         working-directory: web
       - name: Build and deploy the Worker
+        if: steps.site.outputs.deploy == 'true'
         working-directory: web
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -55,5 +87,6 @@ jobs:
         run: npm run cf:deploy
       # Fills the edge cache for the new version and fails the run if any page in the sitemap does not answer 200.
       - name: Warm and check the pages
+        if: steps.site.outputs.deploy == 'true'
         working-directory: web
-        run: node scripts/cf-warm.mjs https://everloot.app "$GITHUB_SHA"
+        run: node scripts/cf-warm.mjs https://everloot.app "$SHA"

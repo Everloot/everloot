@@ -44,7 +44,7 @@ function store(path: string): unknown {
 
 const SWITCHES = ["EVERLOOT_PROFILES", "EVERLOOT_SAVED_BUILDS", "EVERLOOT_DATA_GUARD", "EVERLOOT_PLAYER_PAGES"];
 const switches = (on: boolean) => SWITCHES.forEach((name) => vi.stubEnv(name, on ? "1" : "0"));
-const render = async () => renderToStaticMarkup(await AccountPage());
+const render = async () => renderToStaticMarkup(await AccountPage({}));
 
 /** One of the Integrations lists, by its heading: "" when the list is not there. */
 const list = (html: string, id: "connected" | "available") => new RegExp(`<ul aria-labelledby="${id}-heading"[^>]*>(.*?)</ul>`).exec(html)?.[1] ?? "";
@@ -72,7 +72,7 @@ afterEach(() => { vi.unstubAllEnvs(); });
 
 test("signed out: the page sends the visitor to sign in and reads nothing else", async () => {
   auth.getUser.mockResolvedValue(null);
-  await expect(AccountPage()).rejects.toThrow("NEXT_REDIRECT /sign-in?returnTo=%2Faccount");
+  await expect(AccountPage({})).rejects.toThrow("NEXT_REDIRECT /sign-in?returnTo=%2Faccount");
   expect(auth.authQuery).not.toHaveBeenCalled();
 });
 
@@ -248,13 +248,12 @@ test("Integrations: when the keys cannot be read, it says so and claims nothing 
   expect(list(html, "available")).toContain("Claude");
 });
 
-test("Integrations: with no Battle.net sign-in and no live key, Connected says so instead of an empty list", () => {
+test("Integrations: an email login appears as connected even without Battle.net or a live key", () => {
   const keys = { live: 0, requests: 0, desktop: false, liveKeys: [] };
   const html = renderToStaticMarkup(
     <Integrations methods={["credential"]} name="Jaina" overview={{ memberSince: null, profile: null, characters: null, builds: null, keys }} />,
   );
-  expect(html).toMatch(/<h3 id="connected-heading"[^>]*>Connected<\/h3><p[^>]*>Nothing is connected to your account\.<\/p>/);
-  expect(list(html, "connected")).toBe("");
+  expect(list(html, "connected")).toContain("Email and password");
   expect(html).not.toContain("Battle.net");
   expect(html).not.toContain("Don&#x27;t recognise");
   expect(list(html, "available")).toContain("Everloot Desktop App");

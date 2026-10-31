@@ -13,7 +13,7 @@ import { parseVersions, type VersionRow } from "../builds.js";
 import { readClientDigests, writeClientDigests, type ClientDigests } from "./client-digests.js";
 import { buildChangeEntry } from "./diff.js";
 import {
-  differingFiles, GAME_DATA_DIR, generatedFiles, RAID_TS, raidFiles, readSiteData, retargetRaidImport, siteBuild,
+  addPublishedChange, differingFiles, GAME_DATA_DIR, generatedFiles, RAID_TS, raidFiles, readSiteData, RECORDS_TS, retargetRaidImport, siteBuild,
   writeChangeEntry, writeSpellValues, type SpellValueTable,
 } from "./site-data.js";
 import { branchFor, decide, olderOpen, titleFor, type Action, type PrRef } from "./plan.js";
@@ -143,13 +143,14 @@ async function watchProduct(cfg: WatchConfig["products"][number], prs: PrRef[], 
     const action = got.build.buildConfig === row.buildConfig ? first : decide(cfg.product, committed, ident(got.build), prs, decideOpts);
     if (action.kind !== "create" && action.kind !== "update") return { ...idle(action), version: got.build.version, buildId: got.build.buildId };
 
-    // A dry run writes into a scratch tree, with raid.ts copied in so its import can be retargeted too.
+    // A dry run writes into a scratch tree, with raid.ts and the records list copied in so they can be edited too.
     const root = resolve(opts.dryRun ? join(opts.outDir, "dry-run", "tree") : opts.repoRoot);
     if (opts.dryRun) {
       rmSync(root, { recursive: true, force: true });
-      if (existsSync(join(opts.repoRoot, RAID_TS))) {
-        mkdirSync(dirname(join(root, RAID_TS)), { recursive: true });
-        copyFileSync(join(opts.repoRoot, RAID_TS), join(root, RAID_TS));
+      for (const file of [RAID_TS, RECORDS_TS]) {
+        if (!existsSync(join(opts.repoRoot, file))) continue;
+        mkdirSync(dirname(join(root, file)), { recursive: true });
+        copyFileSync(join(opts.repoRoot, file), join(root, file));
       }
     }
     // The previous build's raid file and any class that left the build must not survive next to the new files.
@@ -178,6 +179,8 @@ async function watchProduct(cfg: WatchConfig["products"][number], prs: PrRef[], 
     const bodyFile = join(opts.outDir, cfg.product, "pr-body.md");
     writeFileSync(bodyFile, `${body}\n`);
     const entryPath = writeChangeEntry(root, entry);
+    // The site bundles the record only once it is listed; the web tests fail until it is.
+    const listed = existsSync(join(root, RECORDS_TS)) ? addPublishedChange(root, cfg.product, got.build.buildId) : false;
     // Moved zones and entrances put their pins and entrances to recheck (kb/curated/recheck.json).
     const recheck = addRecheckScopes(resolve(opts.repoRoot), root, scopesFromEntry(entry));
 
@@ -187,7 +190,7 @@ async function watchProduct(cfg: WatchConfig["products"][number], prs: PrRef[], 
     return {
       product: cfg.product, action: action.kind, ...("number" in action ? { pr: action.number } : {}),
       version: got.build.version, buildId: got.build.buildId, branch, title: titleFor(got.build.version),
-      paths: [...files, rel(entryPath), ...(importChanged ? [RAID_TS] : []), ...(recheck ? [RECHECK_FILE] : [])], remove, bodyFile,
+      paths: [...files, rel(entryPath), ...(importChanged ? [RAID_TS] : []), ...(listed ? [RECORDS_TS] : []), ...(recheck ? [RECHECK_FILE] : [])], remove, bodyFile,
       summary: `${terminalSummary(entry)}${differing ? `\nregenerated files differing from the committed ones (extractedAt ignored): ${differing.length ? differing.join(", ") : "none"}` : ""}`,
       ...(differing ? { differing } : {}),
     };
