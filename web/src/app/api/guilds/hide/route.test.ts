@@ -5,7 +5,7 @@ vi.mock("@/lib/player-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/player-store")>()),
   playerStore: () => ({ suppressGuild: mocks.suppressGuild }),
 }));
-vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { request: mocks.request } }));
+vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { form: mocks.request } }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath, revalidateTag: mocks.revalidateTag, unstable_cache: <T,>(fn: T) => fn }));
 
 import { POST } from "./route";

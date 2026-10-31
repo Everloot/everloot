@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+﻿import { expect, test } from "vitest";
 import { answerSources, answerSourcesFactsFromRecords, formatAnswerSources, furtherReading, type AnswerSourcesFacts } from "../src/answer-sources.js";
 import { openDb } from "../src/db.js";
 import { SOME_WORDS } from "../src/search.js";
@@ -64,6 +64,27 @@ test("a known NPC name gives its agreed position; a name that only part of a wor
   expect(pin).toMatchObject({ kind: "observed", support: 3, source: { url: "https://everloot.app/database/npcs/456" } });
   expect(pin.claim).toContain("map 141 at 41, 61");
   expect(result.evidence.some((e) => e.claim.includes("Peacebloom"))).toBe(false);
+});
+
+test("a position names its zone when the game files have it, and keeps the map id when they do not", async () => {
+  const files = { build: "1.60.1.70707", extractedAt: null, facts: [], zones: { 141: "Teldrassil" } };
+  const named = await answerSources(await seed(), { question: "Where is the Forest Spider?", limit: 3 }, facts(), null, files);
+  expect(named.evidence.find((e) => e.claim.startsWith("Forest Spider was seen"))!.claim).toBe("Forest Spider was seen in Teldrassil at 41, 61.");
+  const unnamed = await answerSources(await seed(), { question: "Where is the Forest Spider?", limit: 3 }, facts(), null, { ...files, zones: {} });
+  expect(unnamed.evidence.find((e) => e.claim.startsWith("Forest Spider was seen"))!.claim).toBe("Forest Spider was seen on map 141 at 41, 61.");
+});
+
+test("a name with nothing agreed yet is noted after every piece that answers, and never takes an answer's place", async () => {
+  // Three installs agree on the item's name, and none has looted it: a known item with no drop source yet.
+  const records: unknown[] = ["install-a", "install-b", "install-c"].map((installId, i) => (
+    { ...base, installId, eventId: `hammer-${i}`, kind: "item_seen", itemId: 17182, name: "Doomhammer", quality: "legendary" }
+  ));
+  const parsed = parseRecords(records);
+  expect(parsed.receipt.rejected).toEqual([]);
+  const result = await answerSources(await seed(), { question: "Did Thrall carry the Doomhammer?", limit: 2 }, answerSourcesFactsFromRecords(parsed.records), null);
+  expect(result.evidence.slice(0, 2).map((e) => e.kind).sort()).toEqual(["curated", "lore"]);
+  expect(result.evidence).toHaveLength(3);
+  expect(result.evidence[2]).toMatchObject({ kind: "observed", claim: expect.stringContaining("Doomhammer is a known item; no drop source has reached three installs yet") });
 });
 
 test("nothing found is said plainly, never invented; without the corpus, lore still answers and the text says observations are unrecorded", async () => {

@@ -39,16 +39,23 @@ describe("game version routing", () => {
     expect(versionHref(byId("ptr"), "/database/items/2589")).toBe("/ptr/database/items/2589");
   });
 
+  // Every prefixed version but the served one; read from the table, so the switch at launch changes no test here.
   test("a version without the snapshot answers with its notice, never another version's pages", async () => {
-    expect(WITHOUT_SNAPSHOT.map((v) => v.id)).toEqual(["ptr"]);
-    expect(await served("/ptr")).toBe("/game-version/ptr");
-    expect(await served("/ptr/database/items/2589")).toBe("/game-version/ptr");
+    expect(WITHOUT_SNAPSHOT.map((v) => v.id)).toEqual(Object.keys(PREFIXES).filter((id) => id !== SERVED.id));
+    expect(WITHOUT_SNAPSHOT.map((v) => v.id)).toContain("ptr");
+    for (const v of WITHOUT_SNAPSHOT) {
+      expect(await served(PREFIXES[v.id]!)).toBe(`/game-version/${v.id}`);
+      expect(await served(`${PREFIXES[v.id]}/database/items/2589`)).toBe(`/game-version/${v.id}`);
+    }
   });
 
-  test("the served version's prefix shows the same pages", async () => {
-    expect(await served("/beta")).toBe("/");
-    expect(await served("/beta/database/items/2589")).toBe("/database/items/2589");
-    expect(await served("/beta/lore/npcs")).toBe("/lore/browse/npcs");
+  test("the served version's prefix, while it has one, shows the same pages", async () => {
+    const prefix = PREFIXES[SERVED.id];
+    if (prefix) {
+      expect(await served(prefix)).toBe("/");
+      expect(await served(`${prefix}/database/items/2589`)).toBe("/database/items/2589");
+      expect(await served(`${prefix}/lore/npcs`)).toBe("/lore/browse/npcs");
+    }
     // Unprefixed addresses are untouched, including ones that only start with a prefix's letters.
     expect(await served("/database/items/2589")).toBe("/database/items/2589");
     expect(await served("/betamax")).toBe("/betamax");

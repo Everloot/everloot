@@ -1,7 +1,7 @@
 import { beforeEach, expect, test, vi } from "vitest";
 
 const deps = vi.hoisted(() => ({ request: vi.fn(), putWaitlist: vi.fn() }));
-vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { request: deps.request } }));
+vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { form: deps.request } }));
 vi.mock("@/lib/upload-store", () => ({ uploadStore: { putWaitlist: deps.putWaitlist } }));
 
 import { POST } from "./route";

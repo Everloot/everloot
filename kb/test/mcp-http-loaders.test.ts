@@ -29,6 +29,27 @@ test("the HTTP mount hands the game files' facts to answer_sources, as /api/tool
   expect(result.content[0].text).toContain("[game files, found in game files and unconfirmed] Synthetic Stockade");
 });
 
+test("answer_sources says when player observations could not be read, apart from when none are connected", async () => {
+  const db = openDb(":memory:");
+  databases.push(db);
+  const ask = async (corpus?: () => Promise<never>) => {
+    const handle = createMcpHttpHandler({ db, bearerToken: null, maxRequestBodyBytes: 4096, rateLimitPerMinute: 50, allowedOrigins: [], ...(corpus ? { corpus } : {}) });
+    return (await (await handle(call({ name: "answer_sources", arguments: { question: "which bosses are in Synthetic Stockade", limit: 3 } }))).json()).result.content[0].text as string;
+  };
+  const failed = await ask(async () => { throw new Error("store down"); });
+  expect(failed).toContain("Player observations could not be read just now, so the observed layer is unknown for this answer, not empty.");
+  expect(failed).not.toContain("not connected here");
+  const previous = { url: process.env.EVERLOOT_PUBLIC_CORPUS_URL, uploads: process.env.EVERLOOT_UPLOADS };
+  delete process.env.EVERLOOT_PUBLIC_CORPUS_URL;
+  delete process.env.EVERLOOT_UPLOADS;
+  try {
+    expect(await ask()).toContain("Player observations are not connected here");
+  } finally {
+    if (previous.url !== undefined) process.env.EVERLOOT_PUBLIC_CORPUS_URL = previous.url;
+    if (previous.uploads !== undefined) process.env.EVERLOOT_UPLOADS = previous.uploads;
+  }
+});
+
 test("toolOptionsOf: the loaders only; the mount's token, origins, limits and account tools stay out of the tool layer", () => {
   const gameData = () => index;
   const extraTools = () => [];

@@ -277,6 +277,7 @@ test("no ad markup at all without an AdSense client", async () => {
 
 // Reviewed published corpus before adding hero fields: every editorial byte stays unchanged.
 const CORPUS = {
+  "wow-forever-beta-stats-8-million-characters": "3ed6fba6a5fccda62da5aeff728a9ba9b3207d0781bece4539460eeb6a0f33bf",
   "wow-forever-launch-week-checklist-nov-4": "2dcb196a7aa4b047027ca93dc70cbd3738695e66c1f390be415821920d112113",
   "wow-forever-layering-world-refresh-fixes": "c009712f88aceb6b144045abf0048d6aed008dd0ddac030814384b6ead175a66",
   "wow-forever-4-month-patch-cadence": "5b7d9982b39d9ae78f77a7fd187f70f88203d2d6a576c6c369cf88e93d9f9ab8",
@@ -296,7 +297,7 @@ const CORPUS = {
   "wow-weekly-forever-name-reservations-zulaman-hallows-end": "64c5c8d7dff54cbeaa1b1030179939e01207d0a92e79b5b59b655e3f4c8815be"
 };
 
-test("all 17 published posts retain their editorial source and survive pages, hub, RSS and sitemap with eight heroes", async () => {
+test("all 18 published posts retain their editorial source and survive pages, hub, RSS and sitemap with nine heroes", async () => {
   const dir = fileURLToPath(new URL("../../../../kb/news/", import.meta.url));
   vi.stubEnv("NEWS_DIR", dir); vi.stubEnv("WIKI_DIR", WIKI);
   vi.stubEnv("NEXT_PUBLIC_ADSENSE_CLIENT", "ca-pub-test");
@@ -305,7 +306,7 @@ test("all 17 published posts retain their editorial source and survive pages, hu
   const posts = publishedPosts(news);
   const slugs = Object.keys(CORPUS).sort();
   expect(posts.map((p) => p.slug).sort()).toEqual(slugs);
-  expect(posts.filter((p) => p.hero)).toHaveLength(8);
+  expect(posts.filter((p) => p.hero)).toHaveLength(9);
   const { default: NewsArticle, generateStaticParams } = await import("./[slug]/page");
   const { default: NewsHub } = await import("./page");
   const { GET } = await import("./feed.xml/route");
@@ -313,9 +314,9 @@ test("all 17 published posts retain their editorial source and survive pages, hu
   const hub = renderToStaticMarkup(await NewsHub());
   const rss = await GET().text();
   const sitemap = newsSitemapPaths(news).map((p) => p.path);
-  expect(hub.match(/data-news-post=/g)).toHaveLength(17);
-  expect(rss.match(/<item>/g)).toHaveLength(17);
-  expect(sitemap).toHaveLength(18);
+  expect(hub.match(/data-news-post=/g)).toHaveLength(18);
+  expect(rss.match(/<item>/g)).toHaveLength(18);
+  expect(sitemap).toHaveLength(19);
   expect(hub).not.toContain("data-ad-slot");
   for (const post of posts) {
     const source = readFileSync(join(dir, `${post.slug}.md`), "utf8").replace(/\r\n/g, "\n");

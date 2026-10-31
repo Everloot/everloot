@@ -3,11 +3,11 @@
  "label": "found in game files, unconfirmed",
  "build": {
   "product": "wowf",
-  "buildId": 70685,
-  "version": "1.60.1.70685",
-  "buildConfig": "002a8047a7c3a53de5e981936db76cce",
-  "definitions": "835e08f21237",
-  "extractedAt": "2026-10-29T00:00:19.551Z"
+  "buildId": 70707,
+  "version": "1.60.1.70707",
+  "buildConfig": "7feb61f3c994bcb168526b8db521514a",
+  "definitions": "a3840427a39e",
+  "extractedAt": "2026-10-30T15:48:39.935Z"
  },
  "classId": 8,
  "className": "Mage",
@@ -73,19 +73,18 @@
    {"id":105799,"x":2220,"y":5130,"row":5,"col":2,"kind":"single","maxRanks":3,"entries":[{"definitionId":135329,"spellId":15058,"name":"Arcane Instability","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":25,"scope":"tree","gateGroupId":11584,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12730}}},
    {"id":105800,"x":2220,"y":4530,"row":4,"col":2,"kind":"single","maxRanks":5,"entries":[{"definitionId":135330,"spellId":11232,"name":"Arcane Mind","maxRanks":5}],"prereqs":[],"unlock":{"spentRequired":{"amount":20,"scope":"tree","gateGroupId":11585,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12731}}},
    {"id":105801,"x":1620,"y":4530,"row":4,"col":1,"kind":"single","maxRanks":1,"entries":[{"definitionId":135331,"spellId":12043,"name":"Presence of Mind","maxRanks":1}],"prereqs":[],"unlock":{"spentRequired":{"amount":20,"scope":"tree","gateGroupId":11585,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12731}}},
-   {"id":105802,"x":2820,"y":2130,"row":0,"col":3,"kind":"single","maxRanks":2,"entries":[{"definitionId":135332,"spellId":400588,"name":"Missile Barrage","maxRanks":2}],"prereqs":[],"unlock":{}},
+   {"id":105802,"x":2220,"y":2130,"row":0,"col":2,"kind":"single","maxRanks":2,"entries":[{"definitionId":135332,"spellId":28574,"name":"Arcane Resilience","maxRanks":2}],"prereqs":[],"unlock":{}},
    {"id":105803,"x":2220,"y":3930,"row":3,"col":2,"kind":"single","maxRanks":3,"entries":[{"definitionId":135333,"spellId":18462,"name":"Arcane Meditation","maxRanks":3}],"prereqs":[{"nodeId":105810,"rule":"any"}],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11586,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12732}}},
    {"id":105804,"x":1620,"y":3930,"row":3,"col":1,"kind":"single","maxRanks":2,"entries":[{"definitionId":135334,"spellId":11255,"name":"Improved Counterspell","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11586,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12732}}},
    {"id":105805,"x":1020,"y":3930,"row":3,"col":0,"kind":"single","maxRanks":2,"entries":[{"definitionId":135335,"spellId":11252,"name":"Arcane Shielding","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11586,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12732}}},
    {"id":105806,"x":2820,"y":3330,"row":2,"col":3,"kind":"single","maxRanks":1,"entries":[{"definitionId":135336,"spellId":400574,"name":"Arcane Blast","maxRanks":1}],"prereqs":[],"unlock":{"spentRequired":{"amount":10,"scope":"tree","gateGroupId":11587,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12733}}},
    {"id":105807,"x":1620,"y":3330,"row":2,"col":1,"kind":"single","maxRanks":3,"entries":[{"definitionId":135337,"spellId":11242,"name":"Arcane Impact","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":10,"scope":"tree","gateGroupId":11587,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12733}}},
    {"id":105808,"x":1020,"y":3330,"row":2,"col":0,"kind":"single","maxRanks":2,"entries":[{"definitionId":135338,"spellId":11247,"name":"Arcane Geometry","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":10,"scope":"tree","gateGroupId":11587,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12733}}},
-   {"id":105809,"x":2820,"y":2730,"row":1,"col":3,"kind":"single","maxRanks":2,"entries":[{"definitionId":135339,"spellId":28574,"name":"Arcane Resilience","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11581,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12734}}},
+   {"id":105809,"x":2820,"y":2730,"row":1,"col":3,"kind":"single","maxRanks":2,"entries":[{"definitionId":135339,"spellId":400588,"name":"Missile Barrage","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11581,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12734}}},
    {"id":105810,"x":2220,"y":2730,"row":1,"col":2,"kind":"single","maxRanks":5,"entries":[{"definitionId":135340,"spellId":11213,"name":"Arcane Concentration","maxRanks":5}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11581,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12734}}},
    {"id":105811,"x":1620,"y":2730,"row":1,"col":1,"kind":"single","maxRanks":2,"entries":[{"definitionId":135341,"spellId":29441,"name":"Magic Absorption","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11581,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12734}}},
    {"id":105812,"x":1020,"y":2730,"row":1,"col":0,"kind":"single","maxRanks":2,"entries":[{"definitionId":135342,"spellId":11210,"name":"Arcane Subtlety","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11581,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12734}}},
-   {"id":105813,"x":2220,"y":2130,"row":0,"col":2,"kind":"single","maxRanks":5,"entries":[{"definitionId":135343,"spellId":11237,"name":"Improved Channeling","maxRanks":5}],"prereqs":[],"unlock":{}},
-   {"id":105814,"x":1620,"y":2130,"row":0,"col":1,"kind":"single","maxRanks":5,"entries":[{"definitionId":135344,"spellId":11222,"name":"Arcane Focus","maxRanks":5}],"prereqs":[],"unlock":{}},
+   {"id":105813,"x":1620,"y":2130,"row":0,"col":1,"kind":"single","maxRanks":5,"entries":[{"definitionId":135343,"spellId":11237,"name":"Improved Channeling","maxRanks":5}],"prereqs":[],"unlock":{}},
    {"id":105815,"x":1020,"y":2130,"row":0,"col":0,"kind":"single","maxRanks":2,"entries":[{"definitionId":135345,"spellId":6057,"name":"Wand Specialization","maxRanks":2}],"prereqs":[],"unlock":{}},
    {"id":113627,"x":2820,"y":3930,"row":3,"col":3,"kind":"single","maxRanks":1,"entries":[{"definitionId":145958,"spellId":1326079,"name":"Arcane Wrath","maxRanks":1}],"prereqs":[{"nodeId":105806,"rule":"any"}],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11586,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12732}}}
   ]},
@@ -93,7 +92,7 @@
    {"id":105781,"x":5620,"y":5730,"row":6,"col":1,"kind":"single","maxRanks":1,"entries":[{"definitionId":135311,"spellId":11129,"name":"Combustion","maxRanks":1}],"prereqs":[{"nodeId":105784,"rule":"any"}],"unlock":{"spentRequired":{"amount":30,"scope":"unconfirmed","gateGroupId":11588,"currencyId":3820,"traitTreeId":1112}}},
    {"id":105782,"x":6220,"y":5130,"row":5,"col":2,"kind":"single","maxRanks":3,"entries":[{"definitionId":135312,"spellId":11124,"name":"Fire Power","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":25,"scope":"tree","gateGroupId":11589,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12735}}},
    {"id":105783,"x":6220,"y":4530,"row":4,"col":2,"kind":"single","maxRanks":1,"entries":[{"definitionId":135313,"spellId":11113,"name":"Blast Wave","maxRanks":1}],"prereqs":[],"unlock":{"spentRequired":{"amount":20,"scope":"tree","gateGroupId":11590,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12736}}},
-   {"id":105784,"x":5620,"y":4530,"row":4,"col":1,"kind":"single","maxRanks":5,"entries":[{"definitionId":135314,"spellId":11115,"name":"Critical Mass","maxRanks":5}],"prereqs":[],"unlock":{"spentRequired":{"amount":20,"scope":"tree","gateGroupId":11590,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12736}}},
+   {"id":105784,"x":5620,"y":4530,"row":4,"col":1,"kind":"single","maxRanks":3,"entries":[{"definitionId":135314,"spellId":11115,"name":"Critical Mass","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":20,"scope":"tree","gateGroupId":11590,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12736}}},
    {"id":105785,"x":6820,"y":3930,"row":3,"col":3,"kind":"single","maxRanks":3,"entries":[{"definitionId":135315,"spellId":29074,"name":"Master of Elements","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11591,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12737}}},
    {"id":105786,"x":6220,"y":3930,"row":3,"col":2,"kind":"single","maxRanks":1,"entries":[{"definitionId":135316,"spellId":400624,"name":"Heating Up","maxRanks":1}],"prereqs":[{"nodeId":105790,"rule":"any"}],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11591,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12737}}},
    {"id":105787,"x":5620,"y":3930,"row":3,"col":1,"kind":"single","maxRanks":2,"entries":[{"definitionId":135317,"spellId":11094,"name":"Improved Fire Ward","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11591,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12737}}},
@@ -104,9 +103,9 @@
    {"id":105792,"x":6220,"y":2730,"row":1,"col":2,"kind":"single","maxRanks":3,"entries":[{"definitionId":135322,"spellId":11103,"name":"Impact","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11593,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12739}}},
    {"id":105793,"x":5620,"y":2730,"row":1,"col":1,"kind":"single","maxRanks":2,"entries":[{"definitionId":135323,"spellId":11100,"name":"Flame Throwing","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11593,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12739}}},
    {"id":105794,"x":5020,"y":2730,"row":1,"col":0,"kind":"single","maxRanks":5,"entries":[{"definitionId":135324,"spellId":11119,"name":"Ignite","maxRanks":5}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11593,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12739}}},
-   {"id":105795,"x":6220,"y":2130,"row":0,"col":2,"kind":"single","maxRanks":5,"entries":[{"definitionId":135325,"spellId":11069,"name":"Improved Fireball","maxRanks":5}],"prereqs":[],"unlock":{}},
-   {"id":105796,"x":5620,"y":2130,"row":0,"col":1,"kind":"single","maxRanks":3,"entries":[{"definitionId":135326,"spellId":18459,"name":"Incineration","maxRanks":3}],"prereqs":[],"unlock":{}},
-   {"id":105797,"x":5020,"y":2130,"row":0,"col":0,"kind":"single","maxRanks":2,"entries":[{"definitionId":135327,"spellId":11078,"name":"Improved Fire Blast","maxRanks":2}],"prereqs":[],"unlock":{}}
+   {"id":105795,"x":6220,"y":2130,"row":0,"col":2,"kind":"single","maxRanks":5,"entries":[{"definitionId":135325,"spellId":11069,"name":"Accelerant","maxRanks":5}],"prereqs":[],"unlock":{}},
+   {"id":105796,"x":5620,"y":2130,"row":0,"col":1,"kind":"single","maxRanks":5,"entries":[{"definitionId":135326,"spellId":18459,"name":"Incineration","maxRanks":5}],"prereqs":[],"unlock":{}},
+   {"id":105797,"x":6820,"y":3330,"row":2,"col":3,"kind":"single","maxRanks":2,"entries":[{"definitionId":135327,"spellId":11078,"name":"Improved Fire Blast","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":10,"scope":"tree","gateGroupId":11592,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12738}}}
   ]},
   {"id":11601,"name":"Frost","order":2,"nodes":[
    {"id":105762,"x":9680,"y":5730,"row":6,"col":1,"kind":"single","maxRanks":1,"entries":[{"definitionId":135292,"spellId":11426,"name":"Ice Barrier","maxRanks":1}],"prereqs":[{"nodeId":105766,"rule":"any"}],"unlock":{"spentRequired":{"amount":30,"scope":"unconfirmed","gateGroupId":11595,"currencyId":3820,"traitTreeId":1112}}},
@@ -124,7 +123,7 @@
    {"id":105775,"x":10280,"y":2730,"row":1,"col":2,"kind":"single","maxRanks":2,"entries":[{"definitionId":135305,"spellId":11165,"name":"Improved Frost Nova","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11600,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12744}}},
    {"id":105776,"x":10880,"y":2730,"row":1,"col":3,"kind":"single","maxRanks":3,"entries":[{"definitionId":135306,"spellId":11175,"name":"Permafrost","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11600,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12744}}},
    {"id":105777,"x":9080,"y":2730,"row":1,"col":0,"kind":"single","maxRanks":5,"entries":[{"definitionId":135307,"spellId":11207,"name":"Ice Shards","maxRanks":5}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11600,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12744}}},
-   {"id":105778,"x":10280,"y":2130,"row":0,"col":2,"kind":"single","maxRanks":3,"entries":[{"definitionId":135308,"spellId":29438,"name":"Elemental Precision","maxRanks":3}],"prereqs":[],"unlock":{}},
+   {"id":105778,"x":10280,"y":2130,"row":0,"col":2,"kind":"single","maxRanks":3,"entries":[{"definitionId":135308,"spellId":29438,"name":"Precision","maxRanks":3}],"prereqs":[],"unlock":{}},
    {"id":105779,"x":9680,"y":2130,"row":0,"col":1,"kind":"single","maxRanks":5,"entries":[{"definitionId":135309,"spellId":11070,"name":"Improved Frostbolt","maxRanks":5}],"prereqs":[],"unlock":{}},
    {"id":105780,"x":9080,"y":2130,"row":0,"col":0,"kind":"single","maxRanks":2,"entries":[{"definitionId":135310,"spellId":11189,"name":"Frost Warding","maxRanks":2}],"prereqs":[],"unlock":{}}
   ]}

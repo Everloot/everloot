@@ -3,10 +3,13 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
+import clientLayer from "../src/data/game-data/client-layer.json";
 import { bucketProblems, checkCoverageUpload, committedBuild, liveFolderProblems, publishCoverage, snapshotProblems } from "./upload-coverage-expected";
 
-const build = { product: "wowf", buildId: 70685, buildConfig: "002a8047a7c3a53de5e981936db76cce" };
-const FOLDER = "wowf-70685-002a8047";
+// The committed build, read from the layer, so a new build's pull request changes no line here.
+const { product, buildId, buildConfig, version } = clientLayer.build;
+const build = { product, buildId, buildConfig };
+const FOLDER = `${product}-${buildId}-${buildConfig.slice(0, 8)}`;
 const AS_OF = "2026-10-22T18:00:00.000Z";
 const expected = () => ({ version: 1, dataAsOf: AS_OF, zones: [{ zone: "1429", types: { quest: 4 }, fields: { quest: { title: 2, level: 2 } } }] });
 const report = (over: Record<string, unknown> = {}) => ({ version: 1, dataAsOf: AS_OF, connected: true, clientConnected: true, rows: [], expected: expected(), plateau: null, ...over });
@@ -14,6 +17,8 @@ const check = (raw: unknown, rep: unknown = report(), folder = FOLDER) => checkC
 
 test("the committed client layer is the current build, not the old 70450 one", () => {
   expect(committedBuild()).toMatchObject(build);
+  expect(build.product).toBe("wowf");
+  expect(build.buildId).toBeGreaterThan(70450);
 });
 
 test("a counts-only file from a connected report of the current build passes, and is sent as it parsed", () => {
@@ -66,12 +71,12 @@ test("the client snapshot must be the committed build's, by its manifest, name a
   const snap = (name: string, meta: Record<string, unknown>, body = "sqlite") => {
     const path = join(dir, name);
     writeFileSync(path, body);
-    writeFileSync(`${path}.manifest.json`, JSON.stringify({ ...build, version: "1.60.1.70685", sha256: createHash("sha256").update(body).digest("hex"), ...meta }));
+    writeFileSync(`${path}.manifest.json`, JSON.stringify({ ...build, version, sha256: createHash("sha256").update(body).digest("hex"), ...meta }));
     return path;
   };
   expect(snapshotProblems(snap(`${FOLDER}.sqlite`, {}), build)).toEqual([]);
   expect(snapshotProblems(snap("wow_classic_beta-70450-84bea423.sqlite", { product: "wow_classic_beta", buildId: 70450, buildConfig: "84bea423aaaaaaaa" }), build)).toEqual([
-    "the client snapshot is build wow_classic_beta-70450-84bea423, the committed client layer is wowf-70685-002a8047",
+    `the client snapshot is build wow_classic_beta-70450-84bea423, the committed client layer is ${FOLDER}`,
   ]);
   expect(snapshotProblems(snap(`${FOLDER}.sqlite`, { sha256: "0".repeat(64) }), build)).toEqual(["the client snapshot does not match its manifest's sha256"]);
   expect(snapshotProblems(join(dir, "missing.sqlite"), build)).toEqual(["the client snapshot has no manifest beside it"]);

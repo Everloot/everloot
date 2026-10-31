@@ -66,6 +66,38 @@ printed = {}
 Everloot:InitModules()
 assert(not string.find(table.concat(printed, '\\n'), 'Warchief'), 'an answer is shown once')
 """)
+# A failure the companion will try again is shown once, and the question waits for the real answer; old answers
+# without the retry flag are handled as before. The player is told how many questions still wait.
+lua.execute(f"""
+EverlootDB.asks = {{}}
+EverlootAnswersDB = {{}}
+SLASH_ASK('Where is Gnomeregan?')
+retried = EverlootDB.asks[1].id
+EverlootAnswersDB = {{ [retried] = {{ answer = "Could not answer yet (offline).", source = "none", answeredAt = "x", sum = {adler32("Could not answer yet (offline).")}, retry = true }} }}
+printed = {{}}
+Everloot:InitModules()
+local said = table.concat(printed, '\\n')
+assert(string.find(said, 'Could not answer yet', 1, true), 'the failure is shown: ' .. said)
+assert(#EverlootDB.asks == 1 and EverlootDB.asks[1].id == retried, 'the question stays for the retry')
+assert(string.find(said, '1 question is still waiting', 1, true), 'the wait is said: ' .. said)
+printed = {{}}
+Everloot:InitModules()
+said = table.concat(printed, '\\n')
+assert(not string.find(said, 'Could not answer yet', 1, true), 'the failure is shown once: ' .. said)
+assert(string.find(said, 'still waiting', 1, true), 'the wait is said again')
+EverlootAnswersDB = {{ [retried] = {{ answer = "Dun Morogh.", source = "everloot.app", answeredAt = "x", sum = {adler32("Dun Morogh.")} }} }}
+printed = {{}}
+Everloot:InitModules()
+said = table.concat(printed, '\\n')
+assert(string.find(said, 'Dun Morogh.', 1, true) and #EverlootDB.asks == 0, 'the retried answer reaches the player: ' .. said)
+assert(not string.find(said, 'still waiting', 1, true), 'nothing waits now')
+-- Without the answers addon loaded at all, the waiting questions are still counted.
+SLASH_ASK('Who sells Linen Cloth?')
+EverlootAnswersDB = nil
+printed = {{}}
+Everloot:InitModules()
+assert(string.find(table.concat(printed, '\\n'), '1 question is still waiting', 1, true) and #EverlootDB.asks == 1)
+""")
 # A full queue refuses the new question and keeps every waiting one: an unanswered question is never dropped to
 # make room, because its answer could then never be matched.
 lua.execute("""

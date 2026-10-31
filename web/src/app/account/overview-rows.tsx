@@ -3,9 +3,9 @@ import { CLASS_TEXT } from "@/components/talents/TalentTreeView";
 import { Facts, type Fact } from "@/components/ui";
 import type { AccountOverview } from "@/lib/account-overview";
 import { KEYS_PER_ACCOUNT } from "@/lib/api-keys";
+import { PROVIDER_NAMES } from "@/lib/auth/social";
 
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
-const methodNames: Record<string, string> = { battlenet: "Battle.net", credential: "Email and password" };
 const count = (n: number) => n.toLocaleString("en-US");
 const day = (iso: string) => new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
 
@@ -17,7 +17,7 @@ export default function OverviewRows({ name, methods, overview }: { name: string
   const battlenetOnly = methods.length === 1 && methods[0] === "battlenet";
   const items: Fact[] = [
     { label: battlenetOnly ? "BattleTag" : "Account name", value: name },
-    { label: "Signs in with", value: methods.map((m) => methodNames[m] ?? m).join(", ") },
+    { label: "Signs in with", value: methods.map((m) => PROVIDER_NAMES[m] ?? m).join(", ") },
   ];
   if (overview) {
     const { memberSince, profile, characters, builds, keys } = overview;

@@ -3,8 +3,14 @@ import { getPathMatch } from "next/dist/shared/lib/router/utils/path-match";
 import { matchHas } from "next/dist/shared/lib/router/utils/prepare-destination";
 import { expect, test } from "vitest";
 import nextConfig from "../next.config.js";
+import { PREFIXES, SERVED } from "./lib/build-versions";
 import { CHAT_PROVIDERS } from "./lib/chat/providers";
 import { isProtectedPath } from "./lib/document-boundary";
+
+// The served version's prefix (/beta before launch, none once Live is served) shows the same pages; another
+// version's prefix shows its notice. Read from the routing table, so the switch at launch changes no test here.
+const underServed = (...paths: string[]) => (PREFIXES[SERVED.id] ? paths.map((p) => `${PREFIXES[SERVED.id]}${p}`) : []);
+const underOthers = (...paths: string[]) => Object.entries(PREFIXES).filter(([id]) => id !== SERVED.id).flatMap(([, prefix]) => paths.map((p) => `${prefix}${p}`));
 
 test("the internal browse route redirects to its public address, and the rewrite serves that address", async () => {
   expect(await nextConfig.redirects!()).toContainEqual({ source: "/lore/browse/:type(npcs|items|quests|zones|spells)", destination: "/lore/:type", permanent: true });
@@ -100,8 +106,8 @@ async function headersFor(path: string): Promise<Record<string, string>> {
 
 const directives = (csp: string) => Object.fromEntries(csp.split(/;\s*/).map((d) => { const [name, ...values] = d.trim().split(/\s+/); return [name, values]; }));
 
-const PROTECTED = ["/chat", "/account", "/settings", "/chat/anything", "/beta/chat", "/beta/account", "/beta/settings"];
-const PUBLIC = ["/", "/database/items/2589", "/chatter", "/accounts", "/settings-help", "/beta", "/beta/wiki", "/ptr/chat", "/sign-in"];
+const PROTECTED = ["/chat", "/account", "/settings", "/chat/anything", ...underServed("/chat", "/account", "/settings")];
+const PUBLIC = ["/", "/database/items/2589", "/chatter", "/accounts", "/settings-help", "/beta", "/beta/wiki", ...underOthers("/chat"), "/sign-in"];
 
 test("the pages that hold chat keys and the account enforce the strict policy; every other page keeps the public one", async () => {
   const site = await headersFor("/");
@@ -139,7 +145,7 @@ const features = (policy: string) => Object.fromEntries(policy.split(/,\s*/).map
 test("Chat may ask for the microphone (dictation); every other page, the account and settings included, may not", async () => {
   const site = features((await headersFor("/"))["Permissions-Policy"]!);
   expect(site["microphone"]).toBe("()");
-  for (const path of ["/chat", "/chat/anything", "/beta/chat", "/beta/chat/anything"]) {
+  for (const path of ["/chat", "/chat/anything", ...underServed("/chat", "/chat/anything")]) {
     const got = await headersFor(path);
     expect(features(got["Permissions-Policy"]!), path).toEqual({ ...site, microphone: "(self)" });
     // One header, not a second spelling of it.
@@ -147,7 +153,7 @@ test("Chat may ask for the microphone (dictation); every other page, the account
     // The strict policy those pages get is unchanged.
     expect(got["Content-Security-Policy"], path).toBe((await headersFor("/account"))["Content-Security-Policy"]);
   }
-  for (const path of ["/", "/account", "/settings", "/beta/account", "/beta/settings", "/ptr/chat", "/chatter", "/beta", "/beta/wiki", "/database/items/2589", "/sign-in"]) {
+  for (const path of ["/", "/account", "/settings", ...underServed("/account", "/settings"), ...underOthers("/chat"), "/chatter", "/beta", "/beta/wiki", "/database/items/2589", "/sign-in"]) {
     expect(features((await headersFor(path))["Permissions-Policy"]!), path).toEqual(site);
   }
 });

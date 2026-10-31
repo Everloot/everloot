@@ -121,7 +121,16 @@ test("an engine failure is reported to the player, not hidden", async () => {
   const engine = { answer: vi.fn(async () => { throw new Error("MCP unavailable"); }) };
   const store = createAnswerStore(join(dir, "answers.json"));
   expect(await answerPending({ svFile: sv, addonsDir: join(dir, "AddOns"), engine, store })).toEqual({ answered: 0, failed: 1 });
-  expect(readFileSync(join(dir, "AddOns", "EverlootAnswers", "EverlootAnswers.lua"), "utf8")).toContain("Could not answer: MCP unavailable");
+  const lua = readFileSync(join(dir, "AddOns", "EverlootAnswers", "EverlootAnswers.lua"), "utf8");
+  expect(lua).toContain("Could not answer yet (MCP unavailable). It is tried again while the companion runs.");
+  // Marked for the retry, so the addon keeps the question waiting; a real answer carries no flag.
+  expect(lua).toMatch(/\["ask:9"\] = \{.*\["retry"\] = true \},/);
+  // The next pass tries again and, once it answers, the flag is gone.
+  engine.answer.mockImplementation(async () => ({ answer: "Warchief.", source: "everloot.app" }) as never);
+  expect(await answerPending({ svFile: sv, addonsDir: join(dir, "AddOns"), engine, store })).toEqual({ answered: 1, failed: 0 });
+  const after = readFileSync(join(dir, "AddOns", "EverlootAnswers", "EverlootAnswers.lua"), "utf8");
+  expect(after).toContain("Warchief.");
+  expect(after).not.toContain("retry");
 });
 
 

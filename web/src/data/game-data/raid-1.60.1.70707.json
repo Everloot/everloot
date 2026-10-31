@@ -2,7 +2,7 @@
  "schema": "everloot.web-raid-data/1",
  "label": "Found in game files, unconfirmed",
  "source": "everloot.raid-buffs/2 and everloot.talent-catalog, trimmed to ids, names and scope",
- "build": "1.60.1.70685",
+ "build": "1.60.1.70707",
  "notFound": [
   "blessing-of-sanctuary"
  ],

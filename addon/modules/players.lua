@@ -151,17 +151,18 @@ local function read(unit, newLevel)
   -- so a client that answers with the server would drop every player. A unit on another realm
   -- carries a realm that is not ours, and that is the only thing that makes it another realm.
   local name, unitRealm = UnitName(unit, true)
-  local ourRealm = GetRealmName()
-  local _, ourServer = UnitName("player")
+  name, unitRealm = E.Readable(name), E.Readable(unitRealm)
+  local ourRealm = E.Readable(GetRealmName())
+  local ourServer = E.Readable((select(2, UnitName("player"))))
   local anotherRealm = unitRealm and unitRealm ~= "" and unitRealm ~= ourRealm and unitRealm ~= ourServer
   if not token(name, NAME, 2, 48) or anotherRealm then return true end
-  local level = tonumber(newLevel) or UnitLevel(unit)
+  local level = tonumber(E.Readable(newLevel)) or E.Readable(UnitLevel(unit))
   if type(level) ~= "number" or level < 1 or level > MAX_LEVEL then return false end
-  local _, race = UnitRace(unit)
-  local _, class = UnitClass(unit)
-  local realm = realmOf(GetRealmName())
+  local race = E.Readable((select(2, UnitRace(unit))))
+  local class = E.Readable((select(2, UnitClass(unit))))
+  local realm = realmOf(ourRealm)
   if not token(race, RACE, 2, 24) or not token(class, CLASS, 3, 16) or not realm then return true end
-  local guild = GetGuildInfo(unit)
+  local guild = E.Readable((GetGuildInfo(unit)))
   if not token(guild, GUILD, 2, 96) then guild = nil end
   keep(name, realm, race, class, math.floor(level), guild)
   return true
@@ -170,10 +171,10 @@ end
 --- A player unit you see. Skips yourself, creatures and anything read too recently. A roster change reads
 --- the whole group at once (`burst`): that is at most 40 players, and each is then left alone for 10 minutes.
 local function seen(unit, burst)
-  if not active or not UnitIsPlayer(unit) then return end
-  local guid = UnitGUID(unit)
+  if not active or not E.Readable(UnitIsPlayer(unit)) then return end
+  local guid = E.Readable(UnitGUID(unit))
   if not guid then return end
-  if not selfGuid then selfGuid = UnitGUID("player") end
+  if not selfGuid then selfGuid = E.Readable(UnitGUID("player")) end
   if guid == selfGuid then return end
   local now = GetTime()
   local last = readAt[guid]
@@ -196,7 +197,7 @@ end
 --- Your own character. PLAYER_LEVEL_UP passes the new level before UnitLevel has it.
 local function recordSelf(newLevel)
   if not active then return end
-  selfGuid = UnitGUID("player")
+  selfGuid = E.Readable(UnitGUID("player"))
   read("player", newLevel)
 end
 

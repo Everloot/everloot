@@ -10,11 +10,12 @@ local E = Everloot
 
 local function mapPosition()
   if C_Map and C_Map.GetPlayerMapPosition and C_Map.GetBestMapForUnit then
-    local mapId = C_Map.GetBestMapForUnit("player")
+    local mapId = E.Readable(C_Map.GetBestMapForUnit("player"))
     if not mapId then return nil end
     local pos = C_Map.GetPlayerMapPosition(mapId, "player")
-    if not pos then return { mapId = mapId } end
-    return { mapId = mapId, x = pos.x * 100, y = pos.y * 100 }
+    local x, y = pos and E.Readable(pos.x), pos and E.Readable(pos.y)
+    if not x or not y then return { mapId = mapId } end
+    return { mapId = mapId, x = x * 100, y = y * 100 }
   end
   return nil
 end
@@ -23,12 +24,14 @@ local npcIdFromGuid = E.NpcIdFromGuid
 
 -- The object id in a game object GUID (GameObject-0-server-instance-zone-ID-spawn); nil for anything else.
 local function objectIdFromGuid(guid)
+  guid = E.Readable(guid)
   return type(guid) == "string" and tonumber(guid:match("^GameObject%-%d+%-%d+%-%d+%-%d+%-(%d+)%-")) or nil
 end
 
 -- True for an item GUID (Item-server-0-id): a disenchanted item or an opened container. The GUID does not hold
 -- the item's id; see itemIdFromGuid.
 local function isItemGuid(guid)
+  guid = E.Readable(guid)
   return type(guid) == "string" and guid:find("^Item%-") ~= nil
 end
 
@@ -78,8 +81,8 @@ local function targetSighting(unit)
   local guid = UnitGUID(unit)
   local npcId = npcIdFromGuid(guid)
   if not npcId then return end
-  local name = UnitName(unit)
-  local level = UnitLevel(unit)
+  local name = E.Readable(UnitName(unit))
+  local level = E.Readable(UnitLevel(unit))
   if not name or not level or level < 1 then return end
   local where = mapPosition()
   if not where or not where.x or not where.y then return end
@@ -88,8 +91,8 @@ local function targetSighting(unit)
   local seenKey = npcId .. ":" .. where.mapId .. ":" .. math.floor(where.x + 0.5) .. ":" .. math.floor(where.y + 0.5)
   if EverlootDB.targetSeen[seenKey] then return end
   local reaction = "neutral"
-  if UnitIsFriend("player", unit) then reaction = "friendly"
-  elseif UnitCanAttack("player", unit) then reaction = "hostile" end
+  if E.Readable(UnitIsFriend("player", unit)) then reaction = "friendly"
+  elseif E.Readable(UnitCanAttack("player", unit)) then reaction = "hostile" end
   local creatureType, rank = creatureTraits(unit)
   local stored = E:Store("npc_sighting", {
     installId = EverlootDB.installId,
@@ -150,7 +153,7 @@ local function interactionSighting(role)
     local ok, repairs = pcall(CanMerchantRepair)
     if ok and repairs then role = "repair" end
   end
-  local name, level = UnitName(unit), UnitLevel(unit)
+  local name, level = E.Readable(UnitName(unit)), E.Readable(UnitLevel(unit))
   if type(name) ~= "string" or name == "" or type(level) ~= "number" or level < 1 or level > 100 then return end
   local where = mapPosition()
   if not where or not where.x or not where.y then return end
@@ -158,8 +161,8 @@ local function interactionSighting(role)
   local seenKey = npcId .. ":" .. (role or "") .. ":" .. where.mapId
   if EverlootDB.interactionSeen[seenKey] then return end
   local reaction = "neutral"
-  if UnitIsFriend("player", unit) then reaction = "friendly"
-  elseif UnitCanAttack("player", unit) then reaction = "hostile" end
+  if E.Readable(UnitIsFriend("player", unit)) then reaction = "friendly"
+  elseif E.Readable(UnitCanAttack("player", unit)) then reaction = "hostile" end
   local creatureType, rank = creatureTraits(unit)
   local stored = E:Store("npc_sighting", {
     installId = EverlootDB.installId,
@@ -326,7 +329,8 @@ local function rememberItem(itemId)
   if not GetItemInfo then return end
   local name, _, quality = GetItemInfo(itemId)
   local label = QUALITY[quality]
-  if not name or not label then return end
+  -- An item the client has not cached yet answers with a stand-in name, which is not the item's name.
+  if not name or not label or name:find("^Item %d+$") then return end
   E:Store("item_seen", {
     installId = EverlootDB.installId,
     capturedAt = date("!%Y-%m-%dT%H:%M:%SZ"),
@@ -349,6 +353,7 @@ end
 -- The copper in loot slot i when it is the coin slot, read from the slot's text; nil for an item slot or a text
 -- that holds no amount.
 local function slotCopper(i, text)
+  text = E.Readable(text)
   local slotType = GetLootSlotType and select(2, pcall(GetLootSlotType, i))
   if slotType ~= (Enum and Enum.LootSlotType and Enum.LootSlotType.Money or LOOT_SLOT_MONEY or 2) or type(text) ~= "string" then
     return nil

@@ -28,8 +28,8 @@ local function playerMoney()
 end
 
 local function identity()
-  local name = UnitName and UnitName("player")
-  local realm = GetRealmName and GetRealmName()
+  local name = UnitName and E.Readable(UnitName("player"))
+  local realm = GetRealmName and E.Readable(GetRealmName())
   if type(name) ~= "string" or name == "" then return nil end
   if type(realm) ~= "string" or #realm < 2 then return nil end
   return name, realm

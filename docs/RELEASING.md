@@ -5,7 +5,7 @@ below.
 
 | What | How it ships | Version |
 |---|---|---|
-| The site (`web/`) | Every merge to `main` that touches `web/`, `kb/` or `packages/protocol` deploys the Cloudflare Worker through `.github/workflows/deploy-worker.yml`, then warms and checks every sitemap page. Rollback: `npx wrangler rollback` from `web/`, or re-run the workflow on an older commit | none |
+| The site (`web/`) | Every merge to `main` that touches `web/`, `kb/` or `packages/protocol` deploys the Cloudflare Worker through `.github/workflows/deploy-worker.yml` once the Release checks pass on that commit (a failed check deploys nothing), then warms and checks every sitemap page. Rollback: `npx wrangler rollback` from `web/`, or re-run the workflow on an older commit | none |
 | The addon, tagged (Alpha or stable) | A `addon-v*` tag runs `.github/workflows/release.yml` and creates a GitHub release | `0.3.x` |
 | The addon, nightly | `.github/workflows/nightly.yml` makes a pre-release from `main` when it has changed | `0.3.x-nightly.<date>.<run>` |
 | The desktop app | A `desktop-v*` tag runs `.github/workflows/desktop-release.yml`, which builds Windows, macOS and Linux installers and publishes a GitHub release with `SHA256SUMS` ([`desktop/README.md`](../desktop/README.md#release)) | `0.1.x` |
@@ -57,10 +57,16 @@ The workflow then:
 4. creates the GitHub release with the zip and a `SHA256SUMS` file attached. The notes are the
    changelog section followed by GitHub's generated list of pull requests since the previous
    `addon-v*` tag.
+5. uploads that same tested archive to CurseForge project `1762765`, for Forever `1.60.1`.
+   The `CF_API_KEY` repository secret authenticates the upload. The exact changelog line
+   `Release channel: Alpha` selects Alpha there too; otherwise the file is a Release.
+   Nightlies stay on GitHub only. CurseForge approval may take time after upload.
 
 Only the last job holds `contents: write`; the build and test job is read only. If a run fails,
 fix the cause, delete the tag (`git push --delete origin addon-v<version>` and `git tag -d`), and tag
-again. Then upload the same zip to CurseForge by hand.
+again. If only the CurseForge job fails, inspect the project's Files page before retrying:
+an interrupted response can still mean the upload succeeded. Do not recreate an already published
+GitHub release or re-upload an existing CurseForge file. The upload command prints the file ID on success.
 
 ## Nightly
 
