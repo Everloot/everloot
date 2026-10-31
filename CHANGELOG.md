@@ -134,6 +134,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
   instead of withdrawing the event as a conflict. The map shows none of this yet.
 
+### Fixed
+- Addon: a value the Forever client marks secret (a unit's GUID or name, a position, a chat line) now counts as
+  missing instead of raising an error that stops the capture, and an uncached item's stand-in name is not recorded.
+
 ## [0.3.13] - 2026-10-29
 
 Release channel: Alpha

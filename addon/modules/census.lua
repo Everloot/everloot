@@ -111,12 +111,12 @@ end
 
 --- A player unit you see. Skips yourself, hidden levels ("??") and anything with a missing field.
 local function seen(unit, via)
-  if not active or not UnitIsPlayer(unit) then return end
-  local guid = UnitGUID(unit)
+  if not active or not E.Readable(UnitIsPlayer(unit)) then return end
+  local guid = E.Readable(UnitGUID(unit))
   if not guid then return end
-  if not selfGuid then selfGuid = UnitGUID("player") end
+  if not selfGuid then selfGuid = E.Readable(UnitGUID("player")) end
   if guid == selfGuid then return end
-  local level = UnitLevel(unit)
+  local level = E.Readable(UnitLevel(unit))
   if type(level) ~= "number" or level < 1 or level > MAX_LEVEL then return end
   local on = currentDay()
   local row = today.census_seen[guid]
@@ -125,9 +125,9 @@ local function seen(unit, via)
     return
   end
   if type(guid) ~= "string" or not guid:find(GUID) then return end
-  local _, race = UnitRace(unit)
-  local _, class = UnitClass(unit)
-  local faction = factionOf(UnitFactionGroup(unit))
+  local race = E.Readable((select(2, UnitRace(unit))))
+  local class = E.Readable((select(2, UnitClass(unit))))
+  local faction = factionOf(E.Readable((UnitFactionGroup(unit))))
   if not token(race, RACE, 2, 24) or not token(class, CLASS, 3, 16) or not faction then return end
   append("census_seen", {
     installId = EverlootDB.installId,
@@ -145,14 +145,14 @@ end
 --- Your own character. PLAYER_LEVEL_UP passes the new level before UnitLevel has it.
 local function recordSelf(newLevel)
   if not active then return end
-  local guid = UnitGUID("player")
+  local guid = E.Readable(UnitGUID("player"))
   if type(guid) ~= "string" or not guid:find(GUID) then return end
   selfGuid = guid
-  local level = tonumber(newLevel) or UnitLevel("player")
-  local _, race = UnitRace("player")
-  local _, class = UnitClass("player")
-  local faction = factionOf(UnitFactionGroup("player"))
-  local realm = realmOf(GetRealmName())
+  local level = tonumber(E.Readable(newLevel)) or E.Readable(UnitLevel("player"))
+  local race = E.Readable((select(2, UnitRace("player"))))
+  local class = E.Readable((select(2, UnitClass("player"))))
+  local faction = factionOf(E.Readable((UnitFactionGroup("player"))))
+  local realm = realmOf(E.Readable(GetRealmName()))
   if type(level) ~= "number" or level < 1 or level > MAX_LEVEL then return end
   if not token(race, RACE, 2, 24) or not token(class, CLASS, 3, 16) or not faction or not realm then return end
   local on = currentDay()
