@@ -8,7 +8,7 @@ const state = vi.hoisted(() => ({
   requestCookie: "",
   setCookie: undefined as unknown as ReturnType<typeof import("vitest").vi.fn>,
 }));
-vi.mock("@/lib/auth/auth", () => ({ authV2Enabled: () => true, getAuth: () => state.auth }));
+vi.mock("@/lib/auth/auth", () => ({ authV2Enabled: () => true, withAuth: (run: (auth: unknown) => unknown) => run(state.auth) }));
 vi.mock("next/headers", () => ({
   headers: async () => new Headers({ cookie: state.requestCookie }),
   cookies: async () => ({ set: state.setCookie, get: () => undefined }),

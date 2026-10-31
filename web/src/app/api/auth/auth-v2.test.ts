@@ -19,7 +19,7 @@ const v2 = vi.hoisted(() => {
     },
   };
 });
-vi.mock("@/lib/auth/auth", () => ({ authV2Enabled: () => v2.enabled, getAuth: () => v2.fake }));
+vi.mock("@/lib/auth/auth", () => ({ authV2Enabled: () => v2.enabled, withAuth: (run: (auth: typeof v2.fake) => unknown) => run(v2.fake) }));
 vi.mock("next/headers", () => ({
   headers: async () => new Headers({ cookie: "everloot.session_token=t" }),
   cookies: async () => ({ get: (name: string) => (name === "everloot_session" && v2.v1Token ? { value: v2.v1Token } : undefined) }),

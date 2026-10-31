@@ -9,7 +9,7 @@ vi.mock("next/navigation", () => ({ redirect: (to: string) => { throw new Error(
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 // The list itself is the client's; Integrations uses the module's Remove access and refresh as they are.
 vi.mock("@/components/ApiKeys", async (importOriginal) => ({ ...await importOriginal<typeof import("@/components/ApiKeys")>(), default: () => <div>api keys</div> }));
-vi.mock("@/lib/auth/auth", () => ({ authV2Enabled: () => false, getAuth: () => { throw new Error("unused"); } }));
+vi.mock("@/lib/auth/auth", () => ({ authV2Enabled: () => false, withAuth: () => { throw new Error("unused"); } }));
 const auth = vi.hoisted(() => ({ getUser: vi.fn(), authQuery: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ getUser: auth.getUser, authQuery: auth.authQuery, siteUrl: () => "https://everloot.app" }));
 

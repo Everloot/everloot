@@ -2,7 +2,7 @@ import { createHmac } from "node:crypto";
 import type { DeviceAccount } from "@/lib/account-shell-types";
 import { shortName } from "@/lib/profiles";
 import { authQuery, type AccountUser } from "@/lib/supabase/server";
-import { authV2Enabled, getAuth } from "./auth";
+import { authV2Enabled, withAuth } from "./auth";
 
 // The accounts signed in on one browser, for the account switcher
 // (docs/design/specs/2026-10-20-account-shell-design.md, "Account switching").
@@ -22,7 +22,7 @@ export interface DeviceSession { token: string; userId: string; name: string }
  */
 export async function deviceSessions(headers: Headers): Promise<DeviceSession[]> {
   if (!authV2Enabled()) return [];
-  const sessions = await getAuth().api.listDeviceSessions({ headers });
+  const sessions = await withAuth((auth) => auth.api.listDeviceSessions({ headers }));
   return sessions.map(({ session, user }) => ({ token: session.token, userId: user.id, name: user.name }));
 }
 
@@ -37,7 +37,7 @@ export async function deviceUserIds(headers: Headers, current: AccountUser): Pro
  * (`<token>.<base64 HMAC-SHA256 with the auth secret>`, URL-encoded), with the session cookie's attributes.
  */
 export async function multiSessionCookie(token: string) {
-  const context = await getAuth().$context;
+  const context = await withAuth((auth) => auth.$context);
   const { name, attributes } = context.authCookies.sessionToken;
   const signature = createHmac("sha256", context.secret).update(token).digest("base64");
   return { name: `${name}_multi-${token.toLowerCase()}`, value: `${token}.${signature}`, attributes: cookieOptions(attributes) };
@@ -45,7 +45,7 @@ export async function multiSessionCookie(token: string) {
 
 /** The session cookie's name and attributes, to delete it. */
 export async function sessionCookie() {
-  const { name, attributes } = (await getAuth().$context).authCookies.sessionToken;
+  const { name, attributes } = (await withAuth((auth) => auth.$context)).authCookies.sessionToken;
   return { name, attributes: cookieOptions(attributes) };
 }
 
@@ -68,7 +68,7 @@ const hasCookie = (headers: Headers, name: string) =>
  * no multi-session cookie (GET /api/me/accounts/add sets it), `signed-out`, or `ready`.
  */
 export async function addAccountState(headers: Headers): Promise<"signed-out" | "full" | "needs-cookie" | "ready"> {
-  const session = await getAuth().api.getSession({ headers, query: { disableRefresh: true } });
+  const session = await withAuth((auth) => auth.api.getSession({ headers, query: { disableRefresh: true } }));
   if (!session) return "signed-out";
   const ids = await deviceUserIds(headers, { id: session.user.id, name: session.user.name });
   if (ids.length >= MAX_DEVICE_ACCOUNTS) return "full";

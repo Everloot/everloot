@@ -6,7 +6,7 @@ import { genericOAuth, multiSession } from "better-auth/plugins";
 import type { Pool } from "pg";
 import { siteUrl } from "@/lib/supabase/server";
 import { battlenetProvider, isPlaceholderEmail } from "./battlenet";
-import { authPool, pgRateLimitStore, type RateLimitStore } from "./db";
+import { authPool, pgRateLimitStore, withAuthDatabase, type RateLimitStore } from "./db";
 import { emailConfigured, resetText, sendEmail, verificationText } from "./email";
 import { configuredSocialProviders } from "./social";
 
@@ -171,7 +171,13 @@ export function createAuth(options: {
 let auth: ReturnType<typeof createAuth> | undefined;
 
 // Built on first use, never at import: the Next build imports route modules.
-export function getAuth() {
+function getAuth() {
   auth ??= createAuth({ database: authPool(), rateLimitStore: pgRateLimitStore(authPool()) });
   return auth;
+}
+
+/** Every Worker operation owns its auth instance and database sockets. Node keeps its process pool. */
+export async function withAuth<T>(run: (auth: ReturnType<typeof createAuth>) => Promise<T>): Promise<T> {
+  if (process.env.EVERLOOT_PLATFORM !== "cloudflare") return run(getAuth());
+  return withAuthDatabase((pool) => run(createAuth({ database: pool, rateLimitStore: pgRateLimitStore(pool) })));
 }

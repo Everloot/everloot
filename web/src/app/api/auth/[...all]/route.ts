@@ -1,4 +1,4 @@
-import { authV2Enabled, getAuth } from "@/lib/auth/auth";
+import { authV2Enabled, withAuth } from "@/lib/auth/auth";
 import { siteUrl } from "@/lib/supabase/server";
 import { SOCIAL_PROVIDERS } from "@/lib/auth/social";
 
@@ -28,12 +28,12 @@ const notFound = () => new Response(null, { status: 404 });
 export async function GET(request: Request) {
   const { pathname } = new URL(request.url);
   if (!authV2Enabled() || !(PUBLIC_GET_PATHS.has(pathname) || RESET_LINK.test(pathname))) return notFound();
-  return getAuth().handler(request);
+  return withAuth((auth) => auth.handler(request));
 }
 
 export async function POST(request: Request) {
   if (!authV2Enabled() || !PUBLIC_POST_PATHS.has(new URL(request.url).pathname)) return notFound();
   // Only our own pages post these forms.
   if (request.headers.get("origin") !== siteUrl()) return Response.json({ error: "Invalid origin" }, { status: 403 });
-  return getAuth().handler(request);
+  return withAuth((auth) => auth.handler(request));
 }

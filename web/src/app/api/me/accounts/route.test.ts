@@ -10,7 +10,7 @@ const auth = vi.hoisted(() => ({
   api: { listDeviceSessions: vi.fn(), setActiveSession: vi.fn() },
 }));
 vi.mock("@/lib/supabase/server", () => ({ getUser: auth.getUser, authQuery: auth.authQuery, siteUrl: () => "https://everloot.app" }));
-vi.mock("@/lib/auth/auth", () => ({ authV2Enabled: () => auth.v2, getAuth: () => ({ api: auth.api }) }));
+vi.mock("@/lib/auth/auth", () => ({ authV2Enabled: () => auth.v2, withAuth: (run: (value: { api: typeof auth.api }) => unknown) => run({ api: auth.api }) }));
 
 import { GET } from "./route";
 import { POST } from "./switch/route";

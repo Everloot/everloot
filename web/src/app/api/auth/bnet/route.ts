@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { authV2Enabled, getAuth } from "@/lib/auth/auth";
+import { authV2Enabled, withAuth } from "@/lib/auth/auth";
 import { RETURN_COOKIE, safeReturnTo } from "@/lib/auth/return-to";
 import { siteUrl } from "@/lib/supabase/server";
 
@@ -53,9 +53,9 @@ async function startBetterAuthSignIn(req: Request, callbackURL: string) {
     const value = req.headers.get(name);
     if (value) headers.set(name, value);
   }
-  const start = await getAuth().handler(new Request(`${process.env.BETTER_AUTH_URL?.trim() || siteUrl()}/api/auth/sign-in/social`, {
+  const start = await withAuth((auth) => auth.handler(new Request(`${process.env.BETTER_AUTH_URL?.trim() || siteUrl()}/api/auth/sign-in/social`, {
     method: "POST", headers, body: JSON.stringify({ provider: "battlenet", callbackURL }),
-  }));
+  })));
   const { url } = await start.json().catch(() => ({})) as { url?: string };
   if (!start.ok || !url) return NextResponse.json({ error: "Battle.net sign-in is unavailable" }, { status: start.ok ? 503 : start.status });
   const response = NextResponse.redirect(url);
