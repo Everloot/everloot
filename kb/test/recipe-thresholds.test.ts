@@ -4,6 +4,23 @@ import { formatThresholds, handleRecipeThresholds, inferThresholds, recipeFactsF
 const obs = (installId: string, rank: number, difficulty: string, recipe = "Lesser Healing Potion") =>
   ({ kind: "recipe_observed", installId, profession: "Alchemy", recipe, rank, difficulty, reagents: [] });
 
+test("unlearned recipes cannot supply learned rank evidence", () => {
+  const legacy = obs("a", 50, "optimal");
+  const learned = { ...obs("b", 60, "medium"), learned: true };
+  expect(recipeObservationsFromRecords([legacy, learned, { ...obs("c", 1, "optimal"), learned: false }]))
+    .toEqual(recipeObservationsFromRecords([legacy, learned]));
+});
+
+test("different API IDs sharing a name cannot agree as one recipe", () => {
+  const records = [
+    { ...obs("a", 50, "optimal"), recipeId: 2330 },
+    { ...obs("b", 60, "medium"), recipeId: 2330 },
+    { ...obs("c", 55, "medium"), recipeId: 2331 },
+  ];
+  expect(inferThresholds(recipeObservationsFromRecords(records))).toEqual([]);
+  expect(inferThresholds(recipeObservationsFromRecords(records.map((row) => ({ ...row, recipeId: 2330 }))))).toHaveLength(1);
+});
+
 test("colours seen at different ranks narrow each threshold to a range once three installs agree", () => {
   const records = [
     obs("install-a", 50, "optimal"),

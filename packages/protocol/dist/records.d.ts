@@ -484,6 +484,8 @@ export declare const recipeObserved: z.ZodObject<{
     rank: z.ZodNumber;
     maxRank: z.ZodOptional<z.ZodNumber>;
     recipe: z.ZodString;
+    recipeId: z.ZodOptional<z.ZodNumber>;
+    learned: z.ZodOptional<z.ZodBoolean>;
     difficulty: z.ZodEnum<{
         easy: "easy";
         medium: "medium";
@@ -1310,6 +1312,8 @@ export declare const recordSchemas: {
         rank: z.ZodNumber;
         maxRank: z.ZodOptional<z.ZodNumber>;
         recipe: z.ZodString;
+        recipeId: z.ZodOptional<z.ZodNumber>;
+        learned: z.ZodOptional<z.ZodBoolean>;
         difficulty: z.ZodEnum<{
             easy: "easy";
             medium: "medium";
@@ -1942,6 +1946,8 @@ export declare const anyRecord: z.ZodDiscriminatedUnion<[z.ZodObject<{
     rank: z.ZodNumber;
     maxRank: z.ZodOptional<z.ZodNumber>;
     recipe: z.ZodString;
+    recipeId: z.ZodOptional<z.ZodNumber>;
+    learned: z.ZodOptional<z.ZodBoolean>;
     difficulty: z.ZodEnum<{
         easy: "easy";
         medium: "medium";

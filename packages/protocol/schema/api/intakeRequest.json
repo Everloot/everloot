@@ -2237,6 +2237,14 @@
                 "minLength": 1,
                 "maxLength": 120
               },
+              "recipeId": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "learned": {
+                "type": "boolean"
+              },
               "difficulty": {
                 "type": "string",
                 "enum": [

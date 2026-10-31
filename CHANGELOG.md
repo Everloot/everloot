@@ -15,6 +15,14 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
+- Addon: profession observations prefer the complete recipe list when available and retain the API's recipe
+  identifier and explicit learned state. Repeated observations are keyed by identifier, rank, colour and learned
+  state; older clients can still use their filtered list without changing the player's filters. Explicitly
+  unlearned recipes and conflicting recipe identities cannot establish craftable skill ranges.
+  Turning profession collection off also stops an in-progress chunked read.
+- Addon: when a player-started replication scan cannot run or times out, a bounded browse/search fallback can
+  collect actual listing prices as a clearly labelled partial sample. It obeys query throttling, stops when the
+  house closes or collection is disabled, and never constructs a full-market snapshot from browse summaries.
 - Addon and companion: when `/ask` cannot be answered (the companion offline, no model set up), the reason is shown once and
   the question stays queued, so the retry's answer still reaches the game. Before, the question was dropped and a later answer never
   appeared. After each `/reload` the addon says how many questions are still waiting. Needs the next addon and Desktop App

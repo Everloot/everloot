@@ -3,6 +3,9 @@
 The mock follows the signatures in Blizzard's own API documentation for build 1.60.1.70450
 (C_TradeSkillUI, C_Item, ProfessionInfo, TradeSkillRecipeInfo, CraftingRecipeSchematic) and the
 trainer globals as Blizzard's trainer window calls them.
+The optional GetAllRecipeIDs capability is tested separately: clients without it must retain
+the filtered reader. Field types: Gethe/wow-ui-source 172a387, Blizzard_APIDocumentationGenerated/
+TradeSkillUITypesDocumentation.lua (TradeSkillRecipeInfo.recipeID and learned).
 """
 import re
 from pathlib import Path
@@ -283,6 +286,109 @@ fire('TRADE_SKILL_SHOW')
 assert(#forbidden == 0, 'forbidden call: ' .. table.concat(forbidden, ','))
 """)
 
+# The complete list is independent of search/learned filters; identity is the API recipe ID.
+lua.execute("""
+C_Item = { GetItemNameByID = function() return 'Herb' end }
+child = { professionID = 171, professionName = 'Alchemy', skillLevel = 100, maxSkillLevel = 150 }
+local all = { 7101, 7102 }
+local learned = false
+local recipeName = 'Same Name'
+local colour = 0
+local allCalls, filteredCalls = 0, 0
+C_TradeSkillUI = {
+ GetChildProfessionInfo = function() return child end,
+ GetBaseProfessionInfo = function() return child end,
+ GetAllRecipeIDs = function() allCalls = allCalls + 1; return all end,
+ GetFilteredRecipeIDs = function() filteredCalls = filteredCalls + 1; return { 7101 } end,
+ GetRecipeInfo = function(id) return { recipeID = id, name = recipeName, relativeDifficulty = colour, learned = learned } end,
+ GetRecipeSchematic = function() return { reagentSlotSchematics = {} } end,
+}
+local function rows() return EverlootDB.records.recipe_observed end
+local count = #rows()
+fire('TRADE_SKILL_SHOW')
+assert(#rows() == count + 2, 'all IDs include filtered-out recipes and same-name IDs stay distinct')
+assert(allCalls == 1 and filteredCalls == 0, 'prefer the complete list without touching filters')
+assert(rows()[count + 1].recipeId == 7101 and rows()[count + 2].recipeId == 7102)
+assert(rows()[count + 1].learned == false, 'unlearned is a boolean, not missing')
+recipeName = 'Localized Name'
+fire('TRADE_SKILL_LIST_UPDATE')
+assert(#rows() == count + 2, 'localization does not change recipe identity')
+learned = true
+fire('NEW_RECIPE_LEARNED')
+assert(#rows() == count + 4 and rows()[#rows()].learned == true, 'learning at the same rank and colour adds a row')
+colour = 1
+fire('TRADE_SKILL_LIST_UPDATE')
+assert(#rows() == count + 6, 'a new difficulty at the same rank adds a row')
+child.skillLevel = 101
+fire('TRADE_SKILL_LIST_UPDATE')
+assert(#rows() == count + 8, 'a new rank still adds rows')
+-- A bad optional learned value stays unknown; it must never become true or false by truthiness.
+learned = 'false'
+fire('TRADE_SKILL_LIST_UPDATE')
+assert(#rows() == count + 10 and rows()[#rows()].learned == nil)
+local secret = {}
+issecretvalue = function(value) return value == secret end
+learned = secret
+fire('TRADE_SKILL_LIST_UPDATE')
+assert(#rows() == count + 10, 'secret learned is the same unknown state')
+all = { 0, -1, 1.5, math.huge, 9007199254740992, '7101', secret, 7101 }
+child.skillLevel = 102
+local getInfo = C_TradeSkillUI.GetRecipeInfo
+local invalidCalls = 0
+C_TradeSkillUI.GetRecipeInfo = function(id) if id ~= 7101 then invalidCalls = invalidCalls + 1; return nil end; return getInfo(id) end
+fire('TRADE_SKILL_LIST_UPDATE')
+assert(invalidCalls == 0, 'invalid list ID reached API')
+assert(#rows() == count + 11 and rows()[#rows()].recipeId == 7101)
+issecretvalue = nil
+-- Missing, throwing or invalid complete-list APIs fall back honestly to the filtered list.
+for _, mode in ipairs({ 'missing', 'throws', 'invalid' }) do
+ if mode == 'missing' then C_TradeSkillUI.GetAllRecipeIDs = nil
+ else C_TradeSkillUI.GetAllRecipeIDs = function() if mode == 'throws' then error('not ready') end; return false end end
+ child.skillLevel = child.skillLevel + 1
+ fire('TRADE_SKILL_LIST_UPDATE')
+ assert(Everloot:Status():find('filtered recipe list', 1, true), Everloot:Status())
+end
+assert(filteredCalls == 3)
+-- Complete-list-only clients need no filtered reader.
+C_TradeSkillUI.GetFilteredRecipeIDs = nil
+C_TradeSkillUI.GetAllRecipeIDs = function() allCalls = allCalls + 1; return { 7101 } end
+child.skillLevel = 106
+fire('TRADE_SKILL_LIST_UPDATE')
+assert(rows()[#rows()].rank == 106)
+fire('TRADE_SKILL_CLOSE')
+local closedCalls = allCalls
+fire('NEW_RECIPE_LEARNED')
+assert(allCalls == closedCalls, 'learning while closed cannot open or read a profession')
+""")
+
+# Turning the module off stops an already chunked read and refuses later window events.
+lua.execute("""
+local function rows() return EverlootDB.records.recipe_observed or {} end
+local pending = {}
+C_Timer = { After = function(_, fn) pending[#pending + 1] = fn end }
+C_TradeSkillUI.GetAllRecipeIDs = function()
+ local ids = {}; for i = 1, 110 do ids[i] = 8000 + i end; return ids
+end
+C_TradeSkillUI.GetRecipeInfo = function(id) return { name = 'Recipe ' .. id, relativeDifficulty = 0, learned = true } end
+C_TradeSkillUI.GetRecipeSchematic = function() return { outputItemID = 1, reagentSlotSchematics = {} } end
+local before = #rows()
+fire('TRADE_SKILL_SHOW')
+table.remove(pending, 1)()
+assert(#rows() == before + 50, 'the first chunk records before disabling')
+EverlootDB.toggles.professions = false
+while #pending > 0 do table.remove(pending, 1)() end
+assert(#rows() == before + 50, 'disabling stops pending chunks')
+fire('TRADE_SKILL_SHOW')
+fire('NEW_RECIPE_LEARNED')
+while #pending > 0 do table.remove(pending, 1)() end
+assert(#rows() == before + 50, 'disabled window events cannot collect')
+EverlootDB.toggles.professions = true
+fire('TRADE_SKILL_SHOW')
+while #pending > 0 do table.remove(pending, 1)() end
+assert(#rows() == before + 110, 'reenabling collects the remaining recipes')
+fire('TRADE_SKILL_CLOSE')
+""")
+
 # A client with none of the modern API loads the module and says so.
 lua2 = LuaRuntime()
 lua2.execute("""
@@ -306,7 +412,7 @@ assert(Everloot:Count('recipe_observed') == 0 and Everloot:Count('trainer_seen')
 
 # Display and read only: the professions module calls nothing that crafts, learns, trains, buys or posts, and
 # the only C_TradeSkillUI functions it names are these five readers. Source files outside tests are scanned.
-READERS = {"GetBaseProfessionInfo", "GetChildProfessionInfo", "GetFilteredRecipeIDs", "GetRecipeInfo", "GetRecipeSchematic"}
+READERS = {"GetBaseProfessionInfo", "GetChildProfessionInfo", "GetAllRecipeIDs", "GetFilteredRecipeIDs", "GetRecipeInfo", "GetRecipeSchematic"}
 professions = (root / "modules" / "professions.lua").read_text(encoding="utf-8")
 code = "\n".join(line.split("--")[0] for line in professions.splitlines())
 named = set(re.findall(r"\b(?:T|C_TradeSkillUI)\.(\w+)", code))
