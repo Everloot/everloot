@@ -1,4 +1,4 @@
 {
-  "served": "beta",
+  "served": "live",
   "prefixes": { "ptr": "/ptr", "beta": "/beta" }
 }
