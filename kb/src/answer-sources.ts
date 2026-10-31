@@ -97,8 +97,15 @@ function loreEvidence(hit: SearchHit, url: string | undefined): Evidence {
 
 const pct = (rate: number) => `${Math.round(rate * 1000) / 10}%`;
 
-function observedEvidence(question: string, facts: AnswerSourcesFacts, dataAsOf: string | null): Evidence[] {
+/**
+ * What players observed about the names in the question: `found` holds the facts, `gaps` the names that have no
+ * agreed fact yet ("unrecorded, not zero"), which answer nothing on their own and go after every other piece.
+ */
+function observedEvidence(
+  question: string, facts: AnswerSourcesFacts, dataAsOf: string | null, zones: Readonly<Record<number, string>> = {},
+): { found: Evidence[]; gaps: Evidence[] } {
   const out: Evidence[] = [];
+  const gaps: Evidence[] = [];
   const itemNames = agreedNames(facts.items.names.map((n) => ({ installId: n.installId, id: n.itemId, name: n.name })), ITEM_AGREEMENT);
   for (const [itemId, name] of itemNames) {
     if (!mentions(question, name)) continue;
@@ -111,7 +118,7 @@ function observedEvidence(question: string, facts: AnswerSourcesFacts, dataAsOf:
       });
     }
     if (page.drops.length === 0) {
-      out.push({
+      gaps.push({
         claim: `${name} is a known item; no drop source has reached three installs yet, which is unrecorded, not zero.`,
         kind: "observed", source: { title: `${name} on Everloot`, url }, licence: LICENCE, asOf: dataAsOf, support: ITEM_AGREEMENT,
       });
@@ -124,19 +131,20 @@ function observedEvidence(question: string, facts: AnswerSourcesFacts, dataAsOf:
     const url = `${SITE}/database/npcs/${npcId}`;
     for (const pin of page.pins.slice(0, 3)) {
       out.push({
-        claim: `${name} was seen on map ${pin.mapId} at ${pin.x}, ${pin.y}.`,
+        claim: zones[pin.mapId] ? `${name} was seen in ${zones[pin.mapId]} at ${pin.x}, ${pin.y}.` : `${name} was seen on map ${pin.mapId} at ${pin.x}, ${pin.y}.`,
         kind: "observed", source: { title: `${name} on Everloot`, url }, licence: LICENCE, asOf: dataAsOf, support: pin.reporters,
       });
     }
     if (page.pins.length === 0) {
-      out.push({
+      gaps.push({
         claim: `${name} is a known NPC; no position has reached three installs yet.`,
         kind: "observed", source: { title: `${name} on Everloot`, url }, licence: LICENCE, asOf: dataAsOf, support: WORLD_AGREEMENT,
       });
     }
   }
   // An observed fact's source is its page on the site, named only once three installs agree on the name.
-  return out.map((e) => ({ ...e, url: e.source.url }));
+  const withPage = (e: Evidence) => ({ ...e, url: e.source.url });
+  return { found: out.map(withPage), gaps: gaps.map(withPage) };
 }
 
 /** Search links on other sites, built from the question. Links only: nothing is fetched. */
@@ -175,17 +183,20 @@ export async function answerSources(
   db: ReleaseSource, args: { question: string; limit: number }, facts: AnswerSourcesFacts | null, dataAsOf: string | null, files: FilesIndex | null = null,
 ): Promise<AnswerSources> {
   const question = args.question.trim();
-  const observed = facts ? observedEvidence(question, facts, dataAsOf) : [];
+  const { found: observed, gaps } = facts ? observedEvidence(question, facts, dataAsOf, files?.zones) : { found: [], gaps: [] };
   const { hits: found, some } = await knowledgeHits(db, question, args.limit);
   const pages = await loreUrls(db, found);
   const hits = found.map((hit) => loreEvidence(hit, pages.get(hit.id)));
   const curated = hits.filter((e) => e.kind === "curated");
   const lore = hits.filter((e) => e.kind === "lore");
   // What the game-data files say about the things the question names: ids and facts, labelled unconfirmed.
-  // Observed facts first, then Everloot's own, then the files (current build), then the 2023 wiki.
+  // Observed facts first, then Everloot's own, then the files (current build), then the 2023 wiki. Observed and files
+  // facts about the question's names are all kept; curated and wiki pages fill what the limit leaves. Last, a note for
+  // each name nothing agreed is known about yet, so an answer says unrecorded rather than leaving it out.
   const fromFiles: Evidence[] = filesEvidence(question, files, args.limit);
   const named = observed.length + fromFiles.length;
-  const evidence = [...observed, ...curated, ...fromFiles, ...lore].slice(0, Math.max(args.limit, named));
+  const fill = new Set([...curated, ...lore].slice(0, Math.max(0, args.limit - named)));
+  const evidence = [...observed, ...curated.filter((e) => fill.has(e)), ...fromFiles, ...lore.filter((e) => fill.has(e)), ...gaps];
   // Observed and files facts answer the question's own names, so only an answer of fallback pages alone is marked.
   return { evidence, furtherReading: furtherReading(question), dataAsOf, ...(some && named === 0 ? { someWords: true as const } : {}) };
 }
