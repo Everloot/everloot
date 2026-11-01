@@ -1,3 +1,5 @@
+const { createHash } = require("node:crypto");
+const { readdirSync, readFileSync } = require("node:fs");
 const path = require("node:path");
 const versions = require("./src/data/build-versions.json");
 const protectedPaths = require("./src/data/protected-paths.json");
@@ -62,9 +64,19 @@ const securityHeaders = [
   { key: "Content-Security-Policy-Report-Only", value: reportOnlyCsp },
 ];
 
+// The addon zips the site serves, keyed by site path, with the size and SHA-256 of the files themselves. The Worker
+// serves public/ as static assets and has no copy to read when it rebuilds a page each hour, so /addon and the home
+// page take these from the build (lib/addon-release.ts builtDownloads).
+const downloadsDir = path.join(__dirname, "public", "downloads");
+const downloads = Object.fromEntries(readdirSync(downloadsDir).filter((name) => name.endsWith(".zip")).map((name) => {
+  const bytes = readFileSync(path.join(downloadsDir, name));
+  return [`/downloads/${name}`, { size: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") }];
+}));
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  env: { EVERLOOT_DOWNLOADS: JSON.stringify(downloads) },
   // Native module: required at runtime from web/node_modules, never bundled.
   serverExternalPackages: ["better-sqlite3"],
   // The approved knowledge release ships inside the /mcp function only (copied to web/.release, never committed).
@@ -72,10 +84,6 @@ const nextConfig = {
     // The protocol's JSON Schema files, served by /schema/<file>.json from the installed package.
     // Brackets are glob characters in these keys, so the segment is escaped (as the Next docs show).
     "/schema/\\[\\.\\.\\.path\\]": ["./node_modules/@everloot/protocol/schema/**"],
-    // /addon hashes the zip it serves when it is rebuilt each hour (the key also matches /addons, which costs ~1 MB).
-    "/addon": ["./public/downloads/*.zip"],
-    // The signed-in home falls back to the landing page per request (a stale cookie), whose download button hashes it too.
-    "/home": ["./public/downloads/*.zip"],
     "/mcp": ["./.release/*.sqlite", "./.release/*.manifest.json"],
     "/mcp/public": ["./.release/*.sqlite", "./.release/*.manifest.json"],
     // Keys match by substring, so this one covers /api/tools/[tool], the tools' plain-HTTP route.

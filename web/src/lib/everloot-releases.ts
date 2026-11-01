@@ -3,11 +3,12 @@
 // offered, and the `addon-vX.Y.Z` that matches the zip the site serves gives its release date.
 // Desktop pre-releases and all drafts are skipped. The exact served addon version can be an Alpha.
 // Nightly tags never match an addon-vX.Y.Z tag. GITHUB_TOKEN is optional. Nothing here throws:
-// when GitHub cannot be read, the page links the releases page instead.
+// when GitHub cannot be read, the page keeps its last good copy, or links the releases page when built without one.
 
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { builtDownloads } from "./addon-release";
 import { REPO_URL } from "./source";
 
 const RELEASES_API = "https://api.github.com/repos/Everloot/everloot/releases?per_page=100";
@@ -109,9 +110,14 @@ export function addonReleaseFor(list: unknown[] | null, version: string): Everlo
   return found ? shape(found.release, found.version) : null;
 }
 
-/** Size and SHA-256 of a file the site serves from web/public, worked out from the file itself. */
+/**
+ * Size and SHA-256 of a file the site serves from web/public, worked out from the file itself: by next.config.js
+ * when the site was built (builtDownloads), or here.
+ */
 export function servedFile(path: string, root = join(process.cwd(), "public")): { size: number; sha256: string } | null {
   try {
+    const built = builtDownloads()?.[path];
+    if (built) return built;
     const bytes = readFileSync(join(root, path));
     return { size: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") };
   } catch {
