@@ -17,6 +17,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 ### Fixed
 - Desktop App: the tray menu is replaced only when one of its lines changes, not on every status update (each percent
   of an update download was one), so a menu the player has open is not swapped out under them.
+- Desktop App and companion: after an upload, the character-link step skips a save file that has no link rows instead
+  of parsing it a second time, so a logout is back to two full parses of the save (the heavy synthetic save's longest
+  pause drops from about 620 to 380 ms in the quick benchmark).
 - Addon: login and `/reload` print one line (version, modules on and off, any that could not start, any paused
   collection) instead of the full status; `/everloot status` still lists everything. Without the Desktop App's price
   file, the first item tooltip says once per install in chat where community prices come from. `/ask` names the
