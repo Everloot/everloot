@@ -9,7 +9,7 @@ PATTERN = re.compile(
     r"R21-Brain|_secrets|Users[\\/]+carli|\.t3[\\/]+worktrees|[\\/]\.r21[\\/]|projects[\\/]+everloot"
     r"|r21digital|\b[a-z]{20}\.supabase\.(?:co|in)\b"
     r"|\b(?:user|postgres|everloot_auth)\.[a-z]{20}\b|\bref[ :=`(]+[a-z]{20}\b|project/[a-z]{20}\b"
-    r"|\b(?:project_ref|projectRef|project_id|SUPABASE_PROJECT_ID|SUPABASE_PROJECT_REF)[\s:=\"'`]+[a-z]{20}\b"
+    r"|\b(?:project_ref|projectRef|project_id|projectId|SUPABASE_PROJECT_ID|SUPABASE_PROJECT_REF)[\s:=\"'`]+[a-z]{20}\b"
     r"|\b[a-z]{20}\.pooler\.supabase\.com\b",
     re.IGNORECASE,
 )
