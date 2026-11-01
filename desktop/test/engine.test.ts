@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { createEngine, type EngineDeps } from "../src/main/engine";
+import { onReconnect } from "../src/main/online";
 import { defaultSettings, mergeSettings } from "../src/main/settings";
 
 beforeEach(() => vi.useFakeTimers());
@@ -316,6 +317,61 @@ test("a wake from sleep runs nothing for a job that is fine, paused, switched of
   engine.recover();
   await vi.advanceTimersByTimeAsync(60 * 60_000);
   expect(deps.upload).toHaveBeenCalledTimes(5);
+});
+
+test("Pause then Resume after the retries ran out starts a fresh round of them", async () => {
+  const { deps, engine } = await exhausted();
+  engine.setPaused(true);
+  engine.setPaused(false);
+  await vi.advanceTimersByTimeAsync(0);
+  expect(deps.upload).toHaveBeenCalledTimes(5);
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(deps.upload).toHaveBeenCalledTimes(6);
+  await vi.advanceTimersByTimeAsync(5 * 60_000);
+  expect(deps.upload).toHaveBeenCalledTimes(7);
+  await vi.advanceTimersByTimeAsync(15 * 60_000);
+  expect(deps.upload).toHaveBeenCalledTimes(8);
+  await vi.advanceTimersByTimeAsync(60 * 60_000);
+  expect(deps.upload).toHaveBeenCalledTimes(8);
+});
+
+test("the network coming back gives a job that ran out of retries one more round; staying offline runs nothing", async () => {
+  const { deps, engine } = await exhausted();
+  let online = false;
+  const stop = onReconnect(() => online, () => engine.recover(), 30_000);
+  await vi.advanceTimersByTimeAsync(24 * 60 * 60_000);
+  expect(deps.upload).toHaveBeenCalledTimes(4);
+  online = true;
+  await vi.advanceTimersByTimeAsync(30_000);
+  expect(deps.upload).toHaveBeenCalledTimes(5);
+  // Still online: the round goes on by its own timers, no extra run per check.
+  await vi.advanceTimersByTimeAsync(59_999);
+  expect(deps.upload).toHaveBeenCalledTimes(5);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(deps.upload).toHaveBeenCalledTimes(6);
+  await vi.advanceTimersByTimeAsync(80 * 60_000);
+  expect(deps.upload).toHaveBeenCalledTimes(8);
+  stop();
+  online = false; await vi.advanceTimersByTimeAsync(30_000);
+  online = true; await vi.advanceTimersByTimeAsync(30_000);
+  expect(deps.upload).toHaveBeenCalledTimes(8);
+});
+
+test("the network coming back waits out a 429 that is still running", async () => {
+  const { deps, engine } = await exhausted();
+  deps.upload.mockRejectedValueOnce(limited(10 * 60_000));
+  engine.recover();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(deps.upload).toHaveBeenCalledTimes(5);
+  let online = true;
+  onReconnect(() => online, () => engine.recover(), 30_000);
+  online = false; await vi.advanceTimersByTimeAsync(30_000);
+  online = true; await vi.advanceTimersByTimeAsync(30_000);
+  expect(deps.upload).toHaveBeenCalledTimes(5);
+  await vi.advanceTimersByTimeAsync(10 * 60_000 - 60_000 - 1);
+  expect(deps.upload).toHaveBeenCalledTimes(5);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(deps.upload).toHaveBeenCalledTimes(6);
 });
 
 test("a wake from sleep during an old session's upload runs nothing more", async () => {

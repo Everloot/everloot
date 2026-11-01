@@ -33,7 +33,7 @@ export interface Engine {
   stop(): void;
   /** Upload now and friends: a failure here gets the full round of retries again, a 429's wait still first. */
   runNow(job: Job): Promise<void>;
-  /** The system woke, and the network usually with it: a job that ran out of retries gets one more round. */
+  /** The system woke or the network came back: a job that ran out of retries gets one more round. */
   recover(): void;
   setPaused(paused: boolean): void;
   snapshot(): EngineState;
@@ -247,10 +247,11 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
       state.paused = paused;
       log("info", paused ? "Paused" : "Resumed");
       emit();
-      // A logout while paused was skipped; catch up on it now. Upload brings prices along.
+      // A logout while paused was skipped; catch up on it now, with a full round of retries as Upload now gets.
+      // Upload brings prices along.
       if (!resumed || !settings) return;
-      if (settings.upload) void run("upload"); else if (settings.prices) void run("prices");
-      if (settings.ask.enabled) void run("ask");
+      if (settings.upload) void run("upload", true); else if (settings.prices) void run("prices", true);
+      if (settings.ask.enabled) void run("ask", true);
     },
     snapshot,
     log: (level, text) => { log(level, text); emit(); },
