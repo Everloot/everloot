@@ -102,9 +102,9 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
           trail={trail}
           title={title}
           meta={[
-            "Quest", !facts.unreachable && page.level !== null ? `Level ${page.level}` : null, named ? <span className="tabular-nums">ID {page.questId}</span> : null,
+            "Quest", !facts.unreachable && page.level !== null ? `Level ${page.level}` : null, named ? <span key="id" className="tabular-nums">ID {page.questId}</span> : null,
             // A title from the wiki carries the quiet unconfirmed marker; its source is a tooltip, never a printed label.
-            wikiTitle ? <Badge tone="files">{`${GAME_NAME_TITLE.wiki.toLowerCase()}, unconfirmed`}</Badge> : null,
+            wikiTitle ? <Badge key="wiki" tone="files">{`${GAME_NAME_TITLE.wiki.toLowerCase()}, unconfirmed`}</Badge> : null,
           ]}
         />
         <EntityTop

@@ -272,7 +272,7 @@ export default async function ItemPage(props: Props) {
           title={title}
           quality={shownQuality}
           icon={<EntityIcon src={tip?.icon} unconfirmed={!confirmed} />}
-          meta={[category?.class?.label, subclassLabel, name ? <span className="tabular-nums">ID {itemId}</span> : null]}
+          meta={[category?.class?.label, subclassLabel, name ? <span key="id" className="tabular-nums">ID {itemId}</span> : null]}
         />
         {isDevelopmentItemName(name?.name) && (
           <p className="mt-2 text-meta text-fg-2">The game files mark this as a development item: a test, placeholder or retired entry. The item lists leave it out unless asked.</p>
