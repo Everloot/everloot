@@ -6,7 +6,8 @@ vi.mock("@/lib/supabase/server", () => ({ getUser: auth.getUser, authQuery: auth
 const store = vi.hoisted(() => ({ loadCensus: vi.fn() }));
 vi.mock("@/lib/upload-store", () => ({ uploadStore: { loadCensus: store.loadCensus } }));
 
-import { POST } from "./route";
+import { GET, POST } from "./route";
+import { DELETE } from "./[id]/route";
 import { POST as MAKE_CODE } from "../link-codes/route";
 
 const SECRET = "k".repeat(40);
@@ -210,5 +211,94 @@ describe("making a code", () => {
     const res = await makeCode();
     expect(res.status).toBe(429);
     expect((await res.json()).error).toContain("10 codes");
+  });
+});
+
+describe("the owner's list", () => {
+  const OTHER_ID = "9c0d7e3a-1b2c-4d5e-8f90-a1b2c3d4e5f6";
+  const own = {
+    id: LINK_ID, name: "Thrallina", realm: "Forever Pioneer", race: "Orc", class: "SHAMAN", faction: "Horde", level: 24,
+    status: "linked", linked_at: "2026-10-21T18:00:00+00:00", last_upload_at: "2026-10-21T18:00:00+00:00",
+  };
+  const list = () => GET();
+  const unlink = (id: string, headers: Record<string, string> = { origin: "https://everloot.app" }) =>
+    DELETE(new Request(`https://everloot.app/api/me/characters/links/${id}`, { method: "DELETE", headers }), { params: Promise.resolve({ id }) });
+
+  test("with the switch off, listing and unlinking are 404 and nothing is read", async () => {
+    vi.stubEnv("EVERLOOT_CHARACTER_LINKS", "");
+    expect((await list()).status).toBe(404);
+    expect((await unlink(LINK_ID)).status).toBe(404);
+    expect(auth.getUser).not.toHaveBeenCalled();
+    expect(auth.authQuery).not.toHaveBeenCalled();
+  });
+
+  test("the list is the session's own links only, with no hash, key or other account, and is never cached", async () => {
+    // Whatever the database sends back, only the listed columns leave.
+    auth.authQuery.mockResolvedValueOnce([{ ...own, link_key: "a".repeat(64), completion_ref: "b".repeat(64), user_id: USER.id }, { ...own, id: OTHER_ID, status: "frozen" }]);
+    const res = await list();
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
+    const body = await res.json();
+    expect(body.links).toEqual([own, { ...own, id: OTHER_ID, status: "frozen" }]);
+    const [path] = auth.authQuery.mock.calls[0];
+    expect(path).toContain(`user_id=eq.${USER.id}`);
+    expect(path).toContain("select=id,name,realm,race,class,faction,level,status,linked_at,last_upload_at&");
+    for (const secret of ["link_key", "completion_ref", "user_id", "a".repeat(64)]) expect(JSON.stringify(body)).not.toContain(secret);
+  });
+
+  test("a character with no catalog or completion data lists normally; nothing is counted", async () => {
+    auth.authQuery.mockResolvedValueOnce([own]);
+    const body = await (await list()).json();
+    expect(Object.keys(body.links[0]).sort()).toEqual(Object.keys(own).sort());
+  });
+
+  test("signed out the list is 401; an API key is never read for it", async () => {
+    auth.getUser.mockResolvedValue(null);
+    const res = await list();
+    expect(res.status).toBe(401);
+    expect((await res.json()).signIn).toBe("/sign-in?returnTo=%2Faccount");
+    expect(auth.authQuery).not.toHaveBeenCalled();
+  });
+
+  test("storage failing is a 503, never an empty list", async () => {
+    auth.authQuery.mockRejectedValueOnce(new Error("down"));
+    expect((await list()).status).toBe(503);
+  });
+
+  test("unlinking goes through unlink_character for the session's account", async () => {
+    auth.authQuery.mockResolvedValueOnce(true);
+    const res = await unlink(LINK_ID);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
+    expect(await res.json()).toEqual({ unlinked: LINK_ID });
+    expect(auth.authQuery.mock.calls).toEqual([["rpc/unlink_character", expect.objectContaining({ method: "POST" })]]);
+    expect(JSON.parse(auth.authQuery.mock.calls[0][1].body)).toEqual({ p_user_id: USER.id, p_id: LINK_ID });
+    // Only the link: no build label or saved build is touched.
+    expect(sentToDatabase()).not.toMatch(/build/);
+  });
+
+  test("another account's link answers exactly as an unknown one: 404", async () => {
+    auth.authQuery.mockResolvedValueOnce(false);
+    const foreign = await unlink(OTHER_ID);
+    const notAnId = await unlink("not-an-id");
+    expect(foreign.status).toBe(404);
+    expect(notAnId.status).toBe(404);
+    expect(await foreign.json()).toEqual(await notAnId.json());
+    expect(auth.authQuery).toHaveBeenCalledOnce();
+  });
+
+  test("unlinking needs this site's Origin and a session: no Origin, another site or an API key alone is 403, signed out 401", async () => {
+    expect((await unlink(LINK_ID, {})).status).toBe(403);
+    expect((await unlink(LINK_ID, { origin: "https://evil.example" })).status).toBe(403);
+    expect((await unlink(LINK_ID, { authorization: `Bearer ${KEY}` })).status).toBe(403);
+    expect(auth.authQuery).not.toHaveBeenCalled();
+    auth.getUser.mockResolvedValue(null);
+    expect((await unlink(LINK_ID)).status).toBe(401);
+    expect(auth.authQuery).not.toHaveBeenCalled();
+  });
+
+  test("storage failing while unlinking is a 503", async () => {
+    auth.authQuery.mockRejectedValueOnce(new Error("down"));
+    expect((await unlink(LINK_ID)).status).toBe(503);
   });
 });

@@ -42,6 +42,17 @@ test("signed in, the page names the account, says what the key does and offers C
   expect(html).toContain(">Cancel</button>");
 });
 
+test("with character links on, the page says the key also sends the link codes typed in game; off, it does not", async () => {
+  auth.getUser.mockResolvedValue({ id: "u1", name: "Volvik#1234" });
+  expect(renderToStaticMarkup(await page(query))).not.toContain("/everloot link");
+  vi.stubEnv("EVERLOOT_CHARACTER_LINKS", "1");
+  try {
+    expect(renderToStaticMarkup(await page(query))).toContain("Codes you type with <code>/everloot link</code> in game are sent to your account");
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});
+
 test("an account error says so instead of failing", async () => {
   auth.getUser.mockRejectedValue(new Error("db down"));
   expect(renderToStaticMarkup(await page(query))).toContain("Your account is unavailable right now");

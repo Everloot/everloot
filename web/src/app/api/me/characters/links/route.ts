@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { recordSchemas } from "@everloot/protocol";
 import { censusAgrees, LINK_ROWS_PER_REQUEST, LINKS_PER_ACCOUNT, type LinkRow } from "@/lib/character-links";
-import { fail, linkAccount, NO_STORE, redeemLink, unavailable, type LinkRefusal } from "@/lib/character-links-store";
+import { fail, linkAccount, linkSession, listLinks, NO_STORE, redeemLink, unavailable, type LinkRefusal } from "@/lib/character-links-store";
 import { characterSecret } from "@/lib/census-intake";
 import { uploadStore } from "@/lib/upload-store";
 
@@ -14,6 +14,21 @@ import { uploadStore } from "@/lib/upload-store";
  * own result; after a storage failure the remaining rows are marked to send again. 404 until EVERLOOT_CHARACTER_LINKS=1.
  */
 export const dynamic = "force-dynamic";
+
+/**
+ * GET /api/me/characters/links: the signed-in account's own links, for its owner's list. Session only, never an API
+ * key. Each link's name, realm, race, class, faction, level, status (linked or frozen) and dates; never its keyed
+ * hashes, and nothing about another account, not even which one also linked a frozen character.
+ */
+export async function GET() {
+  try {
+    const account = await linkSession();
+    if (account instanceof Response) return account;
+    return NextResponse.json({ links: await listLinks(account) }, { headers: NO_STORE });
+  } catch {
+    return unavailable();
+  }
+}
 
 type Result =
   | { index: number; status: "linked" | "frozen"; name: string; realm: string; message: string }

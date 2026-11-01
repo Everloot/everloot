@@ -34,6 +34,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   releases; each half is harmless without the other.
 
 ### Added
+- Addon, Desktop App and site, behind `EVERLOOT_CHARACTER_LINKS` (off): `/everloot link <code>` writes one link row
+  for the character you are playing, with a code made on the account page. The Desktop App, signed in, sends it only
+  to the account's own link endpoint; uploads never carry link rows. The account page lists your linked characters,
+  linked or frozen, and unlinks them. A link is a claim from the addon file, not proof of ownership.
 - Desktop App: a new app release shows within the hour instead of the next day. The sidebar shows **Update to X**:
   one click downloads it and checks it against the release's checksum, and the next click restarts into it. The
   Overview offers the same, the tray item opens the update panel, and a notification says so once per version while
