@@ -14,6 +14,7 @@ import { accountKeyForSite } from "./account";
 import { backupSavedVariables } from "./backups";
 import type { EngineDeps } from "./engine";
 import { refreshMarket } from "./market";
+import { saveFacts } from "./save-facts";
 
 /**
  * The engine's jobs, built on the companion's own functions so the app sends and writes exactly
@@ -65,7 +66,7 @@ export function companionJobs(dataFolder: string, current: () => Settings): { de
         lazyEngine(() => providers().length ? llmEngine({ sources: (q) => mcpAnswerSources(mcp, q, 3), providers: providers() }) : mcpEngine(mcp)),
         { lookup: (realm, id, signal) => mcpMarketValue(mcp, realm, id, signal), resolveItem: siteItemSearch(s.endpoint), realmChoices: s.market.realms },
       );
-      const r = await answerPending({ svFile: file, addonsDir: addonsDir(), engine, store: answerStore });
+      const r = await answerPending({ svFile: file, asks: saveFacts(file).asks, addonsDir: addonsDir(), engine, store: answerStore });
       let how: string;
       try { how = providers().length ? providers().map((p) => p.name).join(" > ") : "plain search"; }
       catch (err) { how = `config.json: ${err instanceof Error ? err.message : String(err)}`; }

@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { fetchRealmPrices, readRealms, writePricesAddon, type DropRow, type DropSources, type RealmPrices } from "../../../companion/src/prices";
+import { fetchRealmPrices, writePricesAddon, type DropRow, type DropSources, type RealmPrices } from "../../../companion/src/prices";
 import { validRealm } from "../../../packages/protocol/src/realm";
 import type { RealmSummary } from "../shared/types";
 import { charactersFromFiles } from "./characters";
+import { saveFacts } from "./save-facts";
 
 /** The companion's cap on realms in one prices file. */
 export const MAX_REALMS = 20;
@@ -59,9 +60,10 @@ export function suggestedRealms(characters: string[], own: string[], followed: s
 export function ownRealms(svFiles: string[]): string[] {
   const names: string[] = [];
   for (const file of svFiles) {
-    let text: string;
-    try { text = readFileSync(file, "utf8"); } catch { continue; }
-    for (const realm of readRealms(text)) if (!names.some((n) => realmKey(n) === realmKey(realm))) names.push(realm);
+    let realms: string[];
+    // A file that cannot be read is skipped; one that does not parse still fails, as it always did.
+    try { realms = saveFacts(file).realms; } catch (err) { if (typeof (err as { code?: unknown }).code === "string") continue; throw err; }
+    for (const realm of realms) if (!names.some((n) => realmKey(n) === realmKey(realm))) names.push(realm);
   }
   return names;
 }

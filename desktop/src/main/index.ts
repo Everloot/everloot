@@ -1,8 +1,7 @@
 import { BrowserWindow, Notification, app, clipboard, dialog, ipcMain, net, powerMonitor, screen, session, shell } from "electron";
-import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { readAsks } from "../../../companion/src/bridge/asks";
 import { loadProviders } from "../../../companion/src/providers/config";
 import type { AddonInfo, AppState, AskInfo, Job, MarketInfo, PriceLookup, Settings } from "../shared/types";
 import { JOBS } from "../shared/types";
@@ -20,11 +19,12 @@ import { createEngine } from "./engine";
 import { connectInBrowser } from "./connect";
 import { allowedExternal } from "./external";
 import { candidateRoots, detectGameFolders, foreverSuggestion, realFs, resolvePickedFolder } from "./game-folder";
-import { newestScans, readScanAges, staleScans, summarizeFiles } from "./inspect";
+import { newestScans, staleScans, summarizeFiles } from "./inspect";
 import { onReconnect } from "./online";
 import { companionJobs } from "./jobs";
 import { loginItemOptions } from "./login-item";
 import { characterRealms, itemIdFrom, listRealms, ownRealms, priceRows, readPricesFile, suggestedRealms } from "./market";
+import { saveFacts } from "./save-facts";
 import { loadSettings, mergeSettings, saveSettings } from "./settings";
 import { allowedPermission, fromAppPage } from "./sender";
 import { createTray } from "./tray";
@@ -75,17 +75,9 @@ if (!app.requestSingleInstanceLock()) {
   let updateProgress: AppState["updateProgress"] = { stage: "idle", percent: 0, error: null };
   /** The verified installer, once downloaded, and the version it installs. */
   let downloaded: { path: string; version: string } | null = null;
-  // Scan ages come from parsing each account file; remembered per file size and write time so a broadcast stays cheap.
-  const scanMemo = new Map<string, { key: string; scans: ReturnType<typeof readScanAges> }>();
+  // Scan ages come from parsing each account file once per write (saveFacts), so a broadcast stays cheap.
   const allScans = () => engine.snapshot().files.flatMap((f) => {
-    try {
-      const st = statSync(f), key = `${st.mtimeMs}:${st.size}`;
-      const hit = scanMemo.get(f);
-      if (hit && hit.key === key) return hit.scans;
-      const scans = readScanAges(readFileSync(f, "utf8"));
-      scanMemo.set(f, { key, scans });
-      return scans;
-    } catch { return []; }
+    try { return saveFacts(f).scans; } catch { return []; }
   });
   const chat = createChat(data, () => settings, localTools({
     characters: () => charactersFromFiles(engine.snapshot().files),
@@ -456,7 +448,7 @@ if (!app.requestSingleInstanceLock()) {
   });
   handle("askInfo", (): AskInfo => {
     const pending = engine.snapshot().files.map((file) => {
-      try { return { file, asks: readAsks(readFileSync(file, "utf8")) }; } catch { return { file, asks: [] }; }
+      try { return { file, asks: saveFacts(file).asks }; } catch { return { file, asks: [] }; }
     });
     let providers: string[] = [], providerError: string | null = null;
     try { providers = loadProviders(join(data, "config.json")).map((p) => p.name); }
