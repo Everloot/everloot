@@ -50,9 +50,13 @@ function problemOf(status: number, said: string): string {
 }
 
 export async function sendLinks(file: string, options: LinkSendOptions): Promise<LinkSendResult> {
-  const parsed = parseEverlootLua(readFileSync(file, "utf8"));
-  const receiptKey = linkReceiptKey(parsed.installId, options.endpoint);
   const result: LinkSendResult = { linked: [], frozen: [], refused: [], waiting: 0, problem: null };
+  const text = readFileSync(file, "utf8");
+  // Link rows sit under their kind's name in the file. Without it there is nothing to send, and the upload that runs
+  // first has already parsed this file once; a second full parse of a large save is the slowest step of a logout.
+  if (!LINK_KINDS.some((kind) => text.includes(kind))) return result;
+  const parsed = parseEverlootLua(text);
+  const receiptKey = linkReceiptKey(parsed.installId, options.endpoint);
   const rows: { eventId: string; record: unknown }[] = [];
   const bad: string[] = [];
   for (const r of parsed.records) {
