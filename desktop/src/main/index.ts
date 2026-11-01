@@ -23,6 +23,7 @@ import { candidateRoots, detectGameFolders, foreverSuggestion, realFs, resolvePi
 import { newestScans, readScanAges, staleScans, summarizeFiles } from "./inspect";
 import { onReconnect } from "./online";
 import { companionJobs } from "./jobs";
+import { loginItemOptions } from "./login-item";
 import { itemIdFrom, listRealms, ownRealms, priceRows, readPricesFile } from "./market";
 import { loadSettings, mergeSettings, saveSettings } from "./settings";
 import { allowedPermission, fromAppPage } from "./sender";
@@ -164,8 +165,8 @@ if (!app.requestSingleInstanceLock()) {
   const changes = cached(15 * 60 * 1000, () => fetchChanges(settings.endpoint), () => settings.endpoint);
 
   const applyLoginItem = () => {
-    if (process.platform === "linux") return; // no login item API there; the AppImage can be added by hand
-    app.setLoginItemSettings({ openAtLogin: settings.launchAtLogin, args: ["--hidden"] });
+    const options = loginItemOptions(process.platform, settings.launchAtLogin, process.env.PORTABLE_EXECUTABLE_FILE);
+    if (options) app.setLoginItemSettings(options);
   };
 
   const show = (page?: string) => {

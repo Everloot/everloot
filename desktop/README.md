@@ -122,7 +122,7 @@ Set `EVERLOOT_DATA_DIR` to a scratch folder to keep a development run away from 
 | `src/shared/providers.ts` | The provider presets the Chat page offers: base URLs, key shapes, the curated models and their data notes |
 | `src/main/window-state.ts`, `json-file.ts` | The window's remembered size and place; JSON files read with a byte order mark allowed |
 | `src/shared/website.ts` | The site pages the sidebar links to, and their address with the source tag |
-| `src/main/settings.ts`, `game-folder.ts`, `updates.ts`, `external.ts` | Settings file, where the game is, the release check, the browser allow-list |
+| `src/main/settings.ts`, `game-folder.ts`, `updates.ts`, `external.ts`, `login-item.ts` | Settings file, where the game is, the release check, the browser allow-list, the start-at-sign-in entry (the portable exe names itself, not its temporary folder) |
 | `src/preload.ts` | The only bridge the page can call (`window.everloot`) |
 | `src/renderer/` | The window: one page, no framework, the site's colours; `format.ts` holds the text helpers, tested without the DOM |
 | `src/shared/types.ts` | Shapes both sides use |
