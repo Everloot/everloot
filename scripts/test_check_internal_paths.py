@@ -29,6 +29,11 @@ assert offending_lines("the reference implementation and user.name in git config
 assert offending_lines("project_ref: abcdefghijklmnopqrst") == [1]
 assert offending_lines('project_ref = "abcdefghijklmnopqrst"') == [1]
 assert offending_lines("SUPABASE_PROJECT_ID=abcdefghijklmnopqrst") == [1]
+assert offending_lines("SUPABASE_PROJECT_REF=abcdefghijklmnopqrst") == [1]
+assert offending_lines('  projectRef: "abcdefghijklmnopqrst",') == [1]
+assert offending_lines('project_id = "abcdefghijklmnopqrst"') == [1]
+assert offending_lines("SUPABASE_PROJECT_REF= and projectRef: <project-ref> and project_id = \"everloot\"") == []
+assert offending_lines("project_id = \"your-project-ref-here\"") == []
 assert offending_lines("host abcdefghijklmnopqrst.pooler.supabase.com") == [1]
 assert offending_lines("project_ref: <project-ref> and SUPABASE_PROJECT_ID= and aws-0-us-east-1.pooler.supabase.com") == []
 # Generic example paths in docs and tests are fine.
@@ -38,4 +43,4 @@ assert offending_lines('parseArgs(["watch", "--game", "C:/Games/WoW"]) and "C:\\
 assert not skipped("web/package-lock.json")
 assert not skipped("package-lock.json")
 assert skipped("scripts/check_internal_paths.py")
-print("check_internal_paths: 29 cases pass")
+print("check_internal_paths: 34 cases pass")
