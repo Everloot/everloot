@@ -1,7 +1,6 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { ImageResponse } from "next/og";
 import { tokens } from "@/design/tokens";
+import { FONTS } from "@/lib/og-card";
 
 // Social preview for shared links: the wordmark and the site's title on the dark canvas.
 // Wording mirrors the layout metadata; no figures, so it can never overstate the data.
@@ -9,14 +8,8 @@ export const alt = "Everloot — WoW: Forever database, guild tracker and tools"
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-// The image is prerendered at build, so the fonts are read from the geist package then.
-const fonts = join(process.cwd(), "node_modules/geist/dist/fonts/geist-sans");
-
+// The fonts are bundled (og-card), so the image still draws on the Worker if the prerendered copy is gone.
 export default async function OpenGraphImage() {
-  const [bold, regular] = await Promise.all([
-    readFile(join(fonts, "Geist-Bold.ttf")),
-    readFile(join(fonts, "Geist-Regular.ttf")),
-  ]);
   const c = tokens.dark;
   return new ImageResponse(
     (
@@ -38,10 +31,7 @@ export default async function OpenGraphImage() {
     ),
     {
       ...size,
-      fonts: [
-        { name: "Geist", data: bold, weight: 700, style: "normal" },
-        { name: "Geist", data: regular, weight: 400, style: "normal" },
-      ],
+      fonts: [...FONTS],
     },
   );
 }

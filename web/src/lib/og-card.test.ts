@@ -17,12 +17,16 @@ let cwd = "";
 let empty = "";
 let raidCard: typeof import("@/app/tools/raid/card/route").GET;
 let talentCard: typeof import("@/app/tools/talents/[class]/card/route").GET;
+let siteImage: typeof import("@/app/opengraph-image").default;
+let twitterImage: typeof import("@/app/twitter-image").default;
 beforeAll(async () => {
   cwd = process.cwd();
   empty = mkdtempSync(join(tmpdir(), "og-card-"));
   process.chdir(empty);
   raidCard = (await import("@/app/tools/raid/card/route")).GET;
   talentCard = (await import("@/app/tools/talents/[class]/card/route")).GET;
+  siteImage = (await import("@/app/opengraph-image")).default;
+  twitterImage = (await import("@/app/twitter-image")).default;
 });
 afterAll(() => {
   process.chdir(cwd);
@@ -50,4 +54,10 @@ test("a raid plan's card, and the planner's own without a raid, draw without rea
   slots[1] = { class: "priest", tree: 2 };
   await expectPng(await raidCard(new Request(`https://everloot.app/tools/raid/card?c=${encodeURIComponent(encodeRaid({ size: 10, build: CURRENT_BUILD, slots }))}`)));
   await expectPng(await raidCard(new Request("https://everloot.app/tools/raid/card")));
+});
+
+// The site-wide image is prerendered at build, but if that copy is lost the Worker draws it, with no files to read.
+test("the site-wide preview, and X's copy of it, draw without reading a file", async () => {
+  await expectPng(await siteImage());
+  await expectPng(await twitterImage());
 });

@@ -10,7 +10,8 @@ import regularUrl from "../../node_modules/geist/dist/fonts/geist-sans/Geist-Reg
 export const CARD_SIZE = { width: 1200, height: 630 };
 
 const fromDataUrl = (url: string) => Buffer.from(url.slice(url.indexOf(",") + 1), "base64");
-const FONTS = [
+/** Geist bold and regular, bundled, for every social image (the site-wide one included). */
+export const FONTS = [
   { name: "Geist", data: fromDataUrl(boldUrl), weight: 700, style: "normal" },
   { name: "Geist", data: fromDataUrl(regularUrl), weight: 400, style: "normal" },
 ] as const;
