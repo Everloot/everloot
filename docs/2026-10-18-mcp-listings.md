@@ -193,7 +193,7 @@ its own: the release checks build the package and fail if the emitted files diff
 committed (`git diff --exit-code -- dist schema`).
 
 Sync from production only. A preview deployment of a merged branch does not serve the MCP endpoint at
-all: `everloot-web-git-<branch>-r21digital.vercel.app/mcp/public` answers 404, because a preview has
+all: `everloot-web-git-<branch>-<team>.vercel.app/mcp/public` answers 404, because a preview has
 none of the production environment. That is the other way a resubmission ends up behaving differently
 in review than locally, and here it fails loudly instead of quietly serving an old schema.
 

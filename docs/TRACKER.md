@@ -37,7 +37,7 @@ Rows: 75.
 | `ops.stored_rollups` | Corpus snapshot | on everloot.app | The Worker's Cron Trigger every 10 minutes extends snapshots/corpus.json in R2 with uploads it has not seen. Pages read that one object. ?rebuild=1 (with CRON_SECRET) rebuilds from empty after a deletion. |
 | `ops.dns` | everloot.app DNS | on everloot.app | The apex and www records in Cloudflare are proxied, and the Worker routes everloot.app/* and www.everloot.app/* serve them; www answers a 301 to the apex. |
 | `ops.worker_deploy` | Worker deploys | on everloot.app | A push to main that touches web/, kb/ or packages/protocol, once the Release checks pass on it, builds the site with OpenNext and deploys the everloot-web Worker (.github/workflows/deploy-worker.yml), then fetches every sitemap page and fails on any that does not answer 200. |
-| `ops.supabase` | Supabase + R2 storage | on everloot.app | Intake writes the raw upload to R2 bucket everloot-uploads and one index row to Supabase everloot (ref uinmowrmyckklpbwzqhn); the waitlist is a Supabase table. Pages read the indexed objects. Proven end to end on everloot.app 2026-10-04. |
+| `ops.supabase` | Supabase + R2 storage | on everloot.app | Intake writes the raw upload to R2 bucket everloot-uploads and one index row to Supabase everloot; the waitlist is a Supabase table. Pages read the indexed objects. Proven end to end on everloot.app 2026-10-04. |
 
 ## Next
 
