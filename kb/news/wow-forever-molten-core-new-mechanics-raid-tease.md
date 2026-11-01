@@ -53,7 +53,7 @@ Molten Core is not on that list, and none of the posts we cite gives it a date o
 
 ![Everloot's Molten Core page: raid, level 60, difficulties listed in the files as 40 Player and 20 Player, an unconfirmed entrance in Burning Steppes, and the start of a boss list marked unconfirmed](/news/figures/wow-forever-molten-core-new-mechanics-raid-tease/molten-core-instance-page.webp "Molten Core on Everloot before launch: the files list the bosses and difficulties, and players confirm them.")
 
-![Everloot's raid builder with a 10-player raid: one Protection Warrior, three healers and six damage dealers in two groups, with coverage showing 17 of 33 raid buffs and 13 of 13 debuffs, and the buffs still missing](/news/figures/wow-forever-molten-core-new-mechanics-raid-tease/raid-builder-10-player.webp "A sample 10-player raid in the raid builder, with the buffs it still lacks listed under Coverage.")
+![Everloot's raid builder, drawn as text without game art, with a 10-player raid: one Protection Warrior, three healers and six damage dealers in two groups, with coverage showing 17 of 33 raid buffs and 13 of 13 debuffs, and the buffs still missing](/news/figures/wow-forever-molten-core-new-mechanics-raid-tease/raid-builder-10-player.webp "A sample 10-player raid in the raid builder, with the buffs it still lacks listed under Coverage.")
 
 ## What it means for players
 - Old boss guides for Molten Core may not apply. Expect to relearn fights.

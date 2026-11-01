@@ -50,7 +50,7 @@ Raids don't open in launch week. Barrow Deeps, Hyjal Summit and Onyxia's Lair un
 
 ![The "Before launch" list on Everloot's WoW: Forever page: name reservations, picking a ruleset, setting a language, planning talents, installing the addon and the launch time, each linked to a Blizzard post](/news/figures/wow-forever-launch-week-checklist-nov-4/before-launch-list.webp "Everloot's WoW: Forever page on November 1: each dated step links the Blizzard post it comes from.")
 
-![The Everloot talent calculator for the Paladin: Holy, Protection and Retribution trees side by side, 51 points left at level 60, with Set 1 and Set 2 tabs](/news/figures/wow-forever-launch-week-checklist-nov-4/paladin-talent-calculator.webp "The talent calculator with an empty Paladin build: 51 points at level 60 and two talent sets.")
+![The Everloot talent calculator for the Paladin, drawn as text without game art: Holy, Protection and Retribution trees side by side with each talent named in its box, 51 points left at level 60, and Set 1 and Set 2 tabs](/news/figures/wow-forever-launch-week-checklist-nov-4/paladin-talent-calculator.webp "The talent calculator with an empty Paladin build: 51 points at level 60 and two talent sets.")
 
 *News recap. Everloot has no addon data yet; launch is when it starts.*
 

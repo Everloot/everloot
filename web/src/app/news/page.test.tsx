@@ -281,7 +281,7 @@ test("no ad markup at all without an AdSense client", async () => {
 // Reviewed published corpus before adding hero fields: every editorial byte stays unchanged.
 const CORPUS = {
   "wow-forever-beta-stats-8-million-characters": "ae65aa7c21bafe46634a0984087cbd138a64eb4c9f2eb73833ef87cb27d81313",
-  "wow-forever-launch-week-checklist-nov-4": "0a8a6b12698edf7c28ce97398d31b783411fb5fd9b801b2d7db8e5584e93b5d6",
+  "wow-forever-launch-week-checklist-nov-4": "29b8cdfaa1923c08cfd18f65b16ec211ea64edfa4759d94341357283f928bfac",
   "wow-forever-layering-world-refresh-fixes": "c009712f88aceb6b144045abf0048d6aed008dd0ddac030814384b6ead175a66",
   "wow-forever-4-month-patch-cadence": "5b7d9982b39d9ae78f77a7fd187f70f88203d2d6a576c6c369cf88e93d9f9ab8",
   "datamined-30-xp-potions-patch-12-1-7-not-forever": "7abd75147282a5dbe7fdb1402272fb6f7c563adaa67e3eff3d38ba0e5d964035",
@@ -291,8 +291,8 @@ const CORPUS = {
   "wow-forever-beta-over-endgame-question": "2140d316d578b43684c8a306c135aba9a36434301b9687fdf1f3454f206f49a8",
   "wow-forever-character-creation-opens-tomorrow-checklist": "f73c200327bd9fdbd8b0c15066727329d83e5f7b8d3a94c57b7ee2823513d847",
   "wow-forever-journey-episode-1-norway": "132576ceda1e06c3c133f56e71c619c519e185b843b51fd37152c49e270166c8",
-  "wow-forever-molten-core-new-mechanics-raid-tease": "359f18ac04f2f84e9b8fe6c3450c954a0fc0498722db5435413503268b92e550",
-  "wow-forever-racial-changes-character-creation": "dc06cc907b6a4fc4351ea250a353c7231d74944191126fae3d4d6dd2112e7b40",
+  "wow-forever-molten-core-new-mechanics-raid-tease": "b6818e0676dd755c7ce02576c7ce4cbad5a5c610c44f25210c1ebb57d94e8d4a",
+  "wow-forever-racial-changes-character-creation": "a8edd37f4b05ec0b872304ac49493f7bea5c3c12eaa4cf2480dc1e552a84e742",
   "wow-forever-restricted-name-bug-fix": "345eae53307068917a95ed036ae00665f4d11f1961e5b36fb2d0b2fd289f0a0d",
   "wow-forever-name-reservations-how-to-reserve": "e6ef0ebd510cc478ff17bea1667f8d82d41601739f92ceeca652487219b48e53",
   "wow-forever-two-part-names-explained": "f2eabd19f8208c26f142f6dbee7365c89f83963e348fccde73eaebb935cd296e",

@@ -45,9 +45,9 @@ Race also decides your class options. Blizzard's [launch guide](https://news.bli
 - **Your class next.** Each class has a page under [classes](/classes) and a tree in the [talent calculator](/tools/talents), so you can plan the build that goes with your race.
 - **Who picks what.** From launch, the [census](/census) counts characters by race, class, level and faction from players' uploads. It counts nothing from the beta.
 
-![Everloot's table of Alliance races and the classes each can play, with Human Hunter, Dwarf Shaman and Gnome Priest marked New, above a table of each race's active and passive traits](/news/figures/wow-forever-racial-changes-character-creation/alliance-races-and-traits.webp "Alliance races, classes and traits on Everloot's WoW: Forever page. The trait names come from the game files and are unconfirmed.")
+![Everloot's text table of Alliance races and the classes each can play, with Human Hunter, Dwarf Shaman and Gnome Priest marked New, above a table of each race's active and passive traits](/news/figures/wow-forever-racial-changes-character-creation/alliance-races-and-traits.webp "Alliance races, classes and traits on Everloot's WoW: Forever page. The trait names come from the game files and are unconfirmed.")
 
-![Everloot's table of Horde races and the classes each can play, with Orc Mage, Troll Warlock and Undead Paladin marked New, above a table of each race's active and passive traits](/news/figures/wow-forever-racial-changes-character-creation/horde-races-and-traits.webp "Horde races, classes and traits on Everloot's WoW: Forever page, from build 1.60.1.70707.")
+![Everloot's text table of Horde races and the classes each can play, with Orc Mage, Troll Warlock and Undead Paladin marked New, above a table of each race's active and passive traits](/news/figures/wow-forever-racial-changes-character-creation/horde-races-and-traits.webp "Horde races, classes and traits on Everloot's WoW: Forever page, from build 1.60.1.70707.")
 
 *News recap. Everloot has no addon data on racials yet.*
 

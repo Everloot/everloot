@@ -23,8 +23,6 @@ The [class pages](/classes) and the [talent calculator](/tools/talents) use the 
 
 The [changes timeline](/changes) lists the build the site is reading and Blizzard's posts. Pages for Beta now say that Beta is no longer running.
 
-![The Everloot database page for Linen Cloth: item level, sell price and the recipes that use it, from the game files, with drop sources and map positions still empty](/news/figures/everloot-on-wow-forever-launch-day/linen-cloth-item-page.webp "An item page before launch: the game files fill the top, players fill the drop sources and map positions.")
-
 ## What fills in as people play
 
 Some details aren't in the game files: which enemy drops an item, what a vendor sells, where a rare spawns, what an auction costs. Everloot only shows those after three different installs report the same thing. Until then, a page says it has no data rather than guessing. If nobody has recorded something, the page says unrecorded. A zero only appears when it was measured. The [methodology page](/methodology) explains how reports become facts.
@@ -38,7 +36,7 @@ The rest of the site follows the same rule:
 - **The census.** The [census](/census) keeps only race, class, level and faction, never a name, and counts nothing from the beta. A count shows once it covers at least 10 characters reported by at least 3 installs from at least 3 addresses, and it is rounded to the nearest 5.
 - **Guilds.** A boss kill counts for a guild on the [guild ladder](/guilds) once two installs report the same guild and boss. The kill is dated by the earliest report.
 
-![The Everloot world map of the Eastern Kingdoms with the game art turned off: zone names, flight paths and dungeon entrances, and a sidebar where vendors, trainers, herbs and ore all read 0, waiting for player uploads](/news/figures/everloot-on-wow-forever-launch-day/map-waiting-for-uploads.webp "The world map before launch: flight paths and entrances come from the files; vendors, trainers and gathering spots wait for uploads.")
+![The Everloot world map of the Eastern Kingdoms drawn without game art: zone names, flight paths, flight masters as triangles and dungeon and raid entrances as dots and squares, and a sidebar where vendors, trainers, quest givers, herbs, ore and chests all read 0, waiting for player uploads](/news/figures/everloot-on-wow-forever-launch-day/map-waiting-for-uploads.webp "The world map before launch: flight paths and entrances come from the files; vendors, trainers and gathering spots wait for uploads.")
 
 ## Helping it fill faster
 
