@@ -14,6 +14,11 @@ sources:
   - title: "IGN: The Big World of Warcraft Forever Interview"
     url: https://in.ign.com/world-of-warcraft-forever/275475/the-big-world-of-warcraft-forever-interview-blizzard-reveals-its-plan-for-the-next-great-mmo
 status: published
+hero:
+  src: /news/heroes/wow-forever-4-month-patch-cadence/wow-forever-4-month-patch-cadence-clean.webp
+  alt: "Everloot card: Patch cadence, Oct 30, 2026. Aiming for a 4-month patch cadence. PvP seasons will also run 4 months, and some content will unlock between major patches. The plan: ~4 mo: Between major patches; ~3: Major patches a year; 4 mo: PvP season length; 8–10 wk: Season of Discovery patches, felt too fast. Footer: per Blizzard to IGN, fan recap, not affiliated, everloot.app."
+  thumb: /news/heroes/wow-forever-4-month-patch-cadence/wow-forever-4-month-patch-cadence-card.webp
+  share: /news/heroes/wow-forever-4-month-patch-cadence/wow-forever-4-month-patch-cadence-share.png
 ---
 
 **TL;DR:** WoW: Forever is targeting a major patch about every 4 months, roughly three a year, Principal Game Designer Kris Zierhut told [IGN](https://in.ign.com/world-of-warcraft-forever/275475/the-big-world-of-warcraft-forever-interview-blizzard-reveals-its-plan-for-the-next-great-mmo). PvP seasons will also run 4 months, and some content will unlock between major patches.

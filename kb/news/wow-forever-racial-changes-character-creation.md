@@ -12,6 +12,11 @@ sources:
   - title: "Wowhead: More Racial Ability Tuning on WoW: Forever (Blizzard additions, Oct 27)"
     url: https://www.wowhead.com/news/more-racial-ability-tuning-on-wow-forever-383602
 status: published
+hero:
+  src: /news/heroes/wow-forever-racial-changes-character-creation/wow-forever-racial-changes-character-creation-clean.webp
+  alt: "Everloot card: Racials, Oct 27, 2026. Dwarves get hit, Tauren run faster. Blizzard's final racial pass changes five races as character creation opens. Racial changes: 1%: Human crit, was 2%; 1%: Dwarf hit, Artisan's Precision; 60%: Tauren Plainsrunning, was 30%; +5%: Orc Command, Warlock and Hunter pet damage; 1 hr: Skyborne buff at Ley Lines. Footer: per Blizzard's development notes, fan recap, not affiliated, everloot.app."
+  thumb: /news/heroes/wow-forever-racial-changes-character-creation/wow-forever-racial-changes-character-creation-card.webp
+  share: /news/heroes/wow-forever-racial-changes-character-creation/wow-forever-racial-changes-character-creation-share.png
 ---
 
 **TL;DR:** Blizzard's final racial pass for WoW: Forever changes five races as character creation opens today, Oct 27, at 1 PM AZ. Humans drop to 1% crit, Dwarves trade crit damage for 1% hit, Orcs get Command back, Tauren Plainsrunning doubles to 60% but skips mounts, and Skyborne get a 1-hour bonus for using their abilities at Ley Lines.

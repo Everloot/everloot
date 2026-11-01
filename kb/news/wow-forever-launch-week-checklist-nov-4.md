@@ -14,6 +14,11 @@ sources:
   - title: "MMORPG.com: Blizzard Prepares Us All For WoW: Forever's Global Launch"
     url: https://www.mmorpg.com/news/blizzard-prepares-us-all-for-world-of-warcraft-forevers-global-launch-with-a-new-in-depth-guide-2000139221
 status: published
+hero:
+  src: /news/heroes/wow-forever-launch-week-checklist-nov-4/wow-forever-launch-week-checklist-nov-4-clean.webp
+  alt: "Everloot card: Launch, Oct 30, 2026. Launches Nov 4: your launch-week checklist. Your first login asks for an Experience Preset. Blizzard says to start with Enhanced if unsure. At launch: 1–60: Eastern Kingdoms and Kalimdor; 1,000+: New quests; 9: New five-player dungeons, levels 13–60; 3:00 PM: Pacific, Nov 4, per Wowhead. Footer: per Blizzard's launch guide, fan recap, not affiliated, everloot.app."
+  thumb: /news/heroes/wow-forever-launch-week-checklist-nov-4/wow-forever-launch-week-checklist-nov-4-card.webp
+  share: /news/heroes/wow-forever-launch-week-checklist-nov-4/wow-forever-launch-week-checklist-nov-4-share.png
 ---
 
 **TL;DR:** Blizzard published its global launch guide for WoW: Forever, which launches November 4. Before then: install it through Battle.net, make sure you can log in, agree on a ruleset and faction with friends, and have backup names ready. Your first login asks for an Experience Preset, and Blizzard says to start with Enhanced if unsure.

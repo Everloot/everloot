@@ -14,6 +14,11 @@ sources:
   - title: "Wowhead: The WoW: Forever Podcast Episode 6 (Tech and Community Building)"
     url: https://www.wowhead.com/forever/news/the-wow-forever-podcast-episode-6-now-available-tech-and-community-building-383648
 status: published
+hero:
+  src: /news/heroes/wow-forever-layering-world-refresh-fixes/wow-forever-layering-world-refresh-fixes-clean.webp
+  alt: "Everloot card: Layering, Oct 30, 2026. Fewer forced world refreshes at launch. Joining a group won't instantly move you to a new layer. You'll get a pop-up and a time window instead. What changes: Pop-up: On group join, not an instant move; Rarer: Forced refreshes, than in the Beta; Stays: Zone-to-zone layering, for now; As in Beta: Big world PvP at launch. Footer: per the WoW: Forever Podcast, fan recap, not affiliated, everloot.app."
+  thumb: /news/heroes/wow-forever-layering-world-refresh-fixes/wow-forever-layering-world-refresh-fixes-card.webp
+  share: /news/heroes/wow-forever-layering-world-refresh-fixes/wow-forever-layering-world-refresh-fixes-share.png
 ---
 
 **TL;DR:** At launch, joining a group in WoW: Forever won't instantly move you to a new layer. You'll get a pop-up and a time window instead. Blizzard says forced world refreshes will be much rarer than in the Beta, but zone-to-zone layering stays for now.
