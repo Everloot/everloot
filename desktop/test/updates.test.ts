@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { checkForUpdates, compareVersions, downloadFor, newestDesktopRelease, releaseNotes, updateFrom } from "../src/main/updates";
+import { checkForUpdates, compareVersions, downloadFor, fetchReleases, newestDesktopRelease, releaseNotes, updateFrom } from "../src/main/updates";
 import { allowedExternal } from "../src/main/external";
 import { PROVIDER_PRESETS } from "../src/shared/providers";
 
@@ -37,6 +37,29 @@ test("a check says whether something newer exists and never downloads", async ()
   expect(await checkForUpdates("0.1.0", empty as unknown as typeof fetch)).toMatchObject({ latest: null, newer: false });
   const down = vi.fn(async () => new Response("", { status: 503 }));
   await expect(checkForUpdates("0.1.0", down as unknown as typeof fetch)).rejects.toThrow(/503/);
+});
+
+test("the release list reads further pages until both the app and the addon have a release", async () => {
+  // GitHub lists newest first, 100 at most per page: a run of addon releases and nightlies can push the app's release to a later page.
+  const busy = Array.from({ length: 100 }, (_, i) => i % 2 ? { tag_name: `addon-v0.4.${i}` } : { tag_name: `nightly-2026110${i}`, prerelease: true });
+  const pages = [busy, [{ tag_name: "desktop-v0.2.0", html_url: "u" }, { tag_name: "addon-v0.3.0" }], [{ tag_name: "desktop-v0.1.0" }]];
+  const send = vi.fn(async (url: string) => new Response(JSON.stringify(pages[Number(new URL(url).searchParams.get("page")) - 1] ?? []), { status: 200 }));
+  expect(await fetchReleases(send as unknown as typeof fetch)).toHaveLength(102);
+  expect(send).toHaveBeenCalledTimes(2);
+  expect(await checkForUpdates("0.1.0", send as unknown as typeof fetch)).toMatchObject({ latest: "0.2.0", newer: true });
+  expect(send.mock.calls[0][0]).toMatch(/per_page=100&page=1$/);
+
+  // Both found on the first page, or a short page: one request. A list that never has them stops after five pages.
+  const both = vi.fn(async () => new Response(JSON.stringify([{ tag_name: "desktop-v0.2.0" }, { tag_name: "addon-v0.3.0" }]), { status: 200 }));
+  await fetchReleases(both as unknown as typeof fetch);
+  expect(both).toHaveBeenCalledTimes(1);
+  const endless = vi.fn(async () => new Response(JSON.stringify(busy), { status: 200 }));
+  expect(await fetchReleases(endless as unknown as typeof fetch)).toHaveLength(500);
+  expect(endless).toHaveBeenCalledTimes(5);
+
+  // Any page that fails fails the check, as one failed request always has.
+  const flaky = vi.fn(async (url: string) => url.endsWith("page=1") ? new Response(JSON.stringify(busy), { status: 200 }) : new Response("", { status: 502 }));
+  await expect(fetchReleases(flaky as unknown as typeof fetch)).rejects.toThrow(/502/);
 });
 
 test("the page may open a browser only to https on the project's own hosts", () => {

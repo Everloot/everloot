@@ -8,11 +8,22 @@ export const RELEASES_PAGE = "https://github.com/Everloot/everloot/releases";
 /** The newest published `desktop-vX.Y.Z` release among the list GitHub returns. */
 export const newestDesktopRelease = (releases: unknown) => newestRelease(releases, "desktop-v");
 
-/** Reads the release list once and says whether a newer app or addon exists. It never downloads anything. */
+/**
+ * Reads GitHub's release list, newest first, a page of 100 at a time, until it holds a published app
+ * release and a published addon release, a page comes back short, or five pages are read. Addon
+ * releases and nightlies can otherwise push the app's own release off the first page. It never downloads anything.
+ */
 export async function fetchReleases(send: typeof fetch = fetch, userAgent = "everloot-desktop"): Promise<unknown> {
-  const res = await send(RELEASES_API, { headers: { accept: "application/vnd.github+json", "user-agent": userAgent }, signal: AbortSignal.timeout(15_000) });
-  if (!res.ok) throw new Error(`GitHub answered ${res.status}`);
-  return res.json();
+  const all: unknown[] = [];
+  for (let page = 1; page <= 5; page++) {
+    const res = await send(`${RELEASES_API}&page=${page}`, { headers: { accept: "application/vnd.github+json", "user-agent": userAgent }, signal: AbortSignal.timeout(15_000) });
+    if (!res.ok) throw new Error(`GitHub answered ${res.status}`);
+    const list: unknown = await res.json();
+    if (!Array.isArray(list)) return page === 1 ? list : all;
+    all.push(...list);
+    if (list.length < 100 || (newestDesktopRelease(all) && newestRelease(all, "addon-v"))) break;
+  }
+  return all;
 }
 
 /**

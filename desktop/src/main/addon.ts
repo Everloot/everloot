@@ -5,7 +5,7 @@ import { unzipSync } from "fflate";
 
 /** The collector addon's folder under Interface/AddOns, and the zip's top folder. */
 export const ADDON_FOLDER = "Everloot";
-export const RELEASES_API = "https://api.github.com/repos/Everloot/everloot/releases?per_page=30";
+export const RELEASES_API = "https://api.github.com/repos/Everloot/everloot/releases?per_page=100";
 const RELEASE_DOWNLOADS = "https://github.com/Everloot/everloot/releases/download";
 
 /** `## Version:` from the installed addon's TOC, or null when the addon is not there. */
