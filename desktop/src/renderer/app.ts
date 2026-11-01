@@ -1,6 +1,6 @@
 import { accountOf as account } from "../main/engine";
 import { diagnostics } from "../shared/diagnostics";
-import { ago, clock, companionStatus, copyLabel, esc, gold, kb, msg, JOB_NAMES, sparkline, statusText, when, type CompanionState } from "./format";
+import { ago, clock, companionStatus, copyLabel, esc, gold, kb, msg, JOB_NAMES, savedNote, setupAddonLine, sparkline, statusText, when, type CompanionState } from "./format";
 import { NO_SOURCED_ANSWER, type AddonInfo, type AppState, type AskInfo, type BackupInfo, type ChangeItem, type CharacterRow, type CharactersInfo, type ChatInfo, type ChatProgress, type EverlootApi, type PriceLookup, type FileSummary, type GameFolderCandidate, type Job, type JobStatus, type MarketInfo, type MoneyDay } from "../shared/types";
 import { PROVIDER_PRESETS, assistantSource, keptModelPick, manualModelShown, presetFor, removalNotice, type ModelChoice, type ProviderKind } from "../shared/providers";
 import { inkOn } from "../../../web/src/lib/chat/catalogue";
@@ -29,6 +29,8 @@ let candidates: GameFolderCandidate[] = [];
 let chosenFolder: string | null = null;
 /** The census line on the welcome screen, ticked until the player unticks it. */
 let censusChoice = true;
+/** The welcome screen's addon check for the picked folder: the installed version (null: not there) and what Install did ("!" starts an error). */
+let setupAddon: { folder: string; installed: string | null; note: string } | null = null;
 /** The welcome screen's "I agree to the Terms of Use and Privacy Policy" box. */
 let agreed = false;
 /** A browser sign-in is waiting for everloot.app. */
@@ -121,6 +123,10 @@ function welcome(): string {
           <span class="grow"><span class="mono">${esc(c.product)}</span> <span class="muted">${c.files ? `${c.files} account file(s) with Everloot data` : c.hasAccounts ? "no Everloot data yet" : "never played here yet"}</span><br><span class="muted mono small">${esc(c.folder)}</span></span></label>`).join("")}</div>`
     : `<p class="muted">No World of Warcraft folder was found in the usual places. Browse to the folder that holds <code>WTF</code>, for example <code>World of Warcraft\\_classic_era_</code>.</p>`;
   const custom = chosenFolder && !candidates.some((c) => c.folder === chosenFolder) ? `<p class="mono fg2">${esc(chosenFolder)}</p>` : "";
+  const a = setupAddon?.folder === chosenFolder ? setupAddon : null;
+  const line = setupAddonLine(a?.installed);
+  const addon = (line ? `<p class="fg2 small">${esc(line)} <button type="button" class="btn small" id="setupInstallAddon" ${busy ? "disabled" : ""}>${busy === "setupAddon" ? "Installing…" : "Install the addon"}</button></p>` : "")
+    + (a?.note ? `<p role="status" class="${a.note.startsWith("!") ? "error" : "ok"} small">${esc(a.note.replace(/^!/, ""))}</p>` : "");
   const signedIn = state?.account.signedIn;
   return `<div class="welcome">
     <div class="brand"><img src="logo.png" alt=""><h1>Set up Everloot Desktop App</h1></div>
@@ -148,7 +154,7 @@ function welcome(): string {
     </section>
     <section class="panel">
       <h2>Which game folder?</h2>
-      ${list}${custom}
+      ${list}${custom}${addon}
       <div class="row"><button type="button" class="btn" id="browse">Browse…</button><button type="button" class="btn" id="redetect">Look again</button></div>
     </section>
     <label class="agree"><input type="checkbox" id="agree" ${agreed ? "checked" : ""}> I agree to the ${ext("https://everloot.app/terms", "Terms of Use")} and ${ext("https://everloot.app/privacy", "Privacy Policy")}.</label>
@@ -742,7 +748,7 @@ function upload(s: AppState): string {
     </section>
     <section class="panel"><div class="row between"><h2>Backups</h2><button type="button" class="btn" id="openBackups" ${(data.backups ?? []).length ? "" : "disabled"}>Open folder</button></div>
       ${backups.length ? `<div class="tablewrap"><table><thead><tr><th>Account</th><th>Taken</th><th class="num">Size</th><th></th></tr></thead><tbody>${backups}</tbody></table></div>` : '<p class="muted">No backup yet. One is kept after each upload.</p>'}
-      <p class="muted small">A copy of <code>Everloot.lua</code> as it was uploaded, the newest ten per account. Restore while logged out; the file you replace is backed up first.</p>
+      <p class="muted small">A copy of <code>Everloot.lua</code> as it was uploaded, the newest ten per account. Restore with the game closed; the file you replace is backed up first.</p>
       ${flash ? `<p class="${flash.startsWith("!") ? "error" : "ok"} small">${esc(flash.replace(/^!/, ""))}</p>` : ""}
     </section>
   </div>`;
@@ -1147,6 +1153,17 @@ async function detect(): Promise<void> {
   candidates = await api.detectGameFolders();
   if (!chosenFolder && candidates[0]) chosenFolder = candidates[0].folder;
   render();
+  void checkSetupAddon();
+}
+
+/** Looks for the addon in the folder the welcome screen has picked; a check that fails shows nothing. */
+async function checkSetupAddon(): Promise<void> {
+  const folder = chosenFolder;
+  if (!folder) return;
+  const installed = await api.setupAddon(folder).catch(() => undefined);
+  if (installed === undefined || folder !== chosenFolder) return;
+  setupAddon = { folder, installed, note: setupAddon?.folder === folder ? setupAddon.note : "" };
+  render();
 }
 
 /** After a provider changes while Ask is open, its summary is read again so the old chain or error does not linger. */
@@ -1320,7 +1337,7 @@ async function onClick(ev: MouseEvent): Promise<void> {
     const folder = await api.pickGameFolder();
     if (!folder) return;
     if (state!.settings.consentedAt) { (main.querySelector("#gameFolder") as HTMLInputElement).value = folder; draftDirty = true; }
-    else { chosenFolder = folder; render(); }
+    else { chosenFolder = folder; render(); void checkSetupAddon(); }
     return;
   }
   if (t.id === "pickToken") { const f = await api.pickTokenFile(); if (f) { (main.querySelector("#tokenFile") as HTMLInputElement).value = f; draftDirty = true; } return; }
@@ -1353,6 +1370,15 @@ async function onClick(ev: MouseEvent): Promise<void> {
     catch (e) { flash = `!${msg(e)}`; }
     busy = "";
     await load("addon");
+    return;
+  }
+  if (t.id === "setupInstallAddon" && setupAddon) {
+    const target = setupAddon;
+    busy = "setupAddon"; target.note = ""; render();
+    try { const r = await api.setupInstallAddon(target.folder); target.installed = r.version; target.note = `Installed the Everloot addon ${r.version}. If the game is open, restart it.`; }
+    catch (e) { target.note = `!${msg(e)}`; }
+    busy = "";
+    render();
     return;
   }
   if (t.id === "buildsSync") { state = await api.buildsSync(); await load("addon"); return; }
@@ -1440,7 +1466,7 @@ async function onChange(ev: Event): Promise<void> {
     void load("market");
     return;
   }
-  if (el.name === "folder") { chosenFolder = el.value; render(); return; }
+  if (el.name === "folder") { chosenFolder = el.value; render(); void checkSetupAddon(); return; }
   if (el.form && el.form.id !== "chatForm" && el.form.id !== "providerForm") draftDirty = true;
 }
 main.addEventListener("input", (ev) => {
@@ -1523,15 +1549,20 @@ async function onSubmit(ev: SubmitEvent): Promise<void> {
     sendChat(question).catch(failed);
     return;
   }
+  let note = "Saved.";
   if (form.id === "settings") {
-    state = await api.saveSettings({ gameFolder: text("gameFolder") || null, endpoint: text("endpoint"), launchAtLogin: f.get("launchAtLogin") === "on", startInTray: f.get("startInTray") === "on", census: f.get("census") === "on", players: f.get("players") === "on" });
+    const endpoint = text("endpoint");
+    state = await api.saveSettings({ gameFolder: text("gameFolder") || null, endpoint, launchAtLogin: f.get("launchAtLogin") === "on", startInTray: f.get("startInTray") === "on", census: f.get("census") === "on", players: f.get("players") === "on" });
+    note = savedNote({ endpoint }, state.settings);
   } else if (form.id === "askForm") {
-    state = await api.saveSettings({ ask: { ...state!.settings.ask, mcpUrl: text("mcpUrl"), tokenFile: text("tokenFile") || null } });
+    const mcpUrl = text("mcpUrl");
+    state = await api.saveSettings({ ask: { ...state!.settings.ask, mcpUrl, tokenFile: text("tokenFile") || null } });
+    note = savedNote({ mcpUrl }, state.settings);
   }
   draftDirty = false;
   render();
   const saved = main.querySelector("#saved");
-  if (saved) saved.textContent = "Saved.";
+  if (saved) { saved.textContent = note.replace(/^!/, ""); saved.className = note.startsWith("!") ? "error" : "muted"; }
 }
 
 void (async () => {

@@ -9,7 +9,7 @@ import { JOBS } from "../shared/types";
 import { reportDiagnostics } from "../shared/diagnostics";
 import { presetFor, type ProviderKind } from "../shared/providers";
 import { accountInfo, signIn, signOut } from "./account";
-import { listBackups, restoreBackup } from "./backups";
+import { gameRunning, listBackups, restoreBackup } from "./backups";
 import { createBuildsSync } from "./builds";
 import { compareVersions, installAddon, installedAddonVersion, newestAddonRelease, slotAddons } from "./addon";
 import { fetchChanges } from "./changes";
@@ -23,6 +23,7 @@ import { candidateRoots, detectGameFolders, foreverSuggestion, realFs, resolvePi
 import { newestScans, readScanAges, staleScans, summarizeFiles } from "./inspect";
 import { onReconnect } from "./online";
 import { companionJobs } from "./jobs";
+import { loginItemOptions } from "./login-item";
 import { itemIdFrom, listRealms, ownRealms, priceRows, readPricesFile } from "./market";
 import { loadSettings, mergeSettings, saveSettings } from "./settings";
 import { allowedPermission, fromAppPage } from "./sender";
@@ -164,8 +165,8 @@ if (!app.requestSingleInstanceLock()) {
   const changes = cached(15 * 60 * 1000, () => fetchChanges(settings.endpoint), () => settings.endpoint);
 
   const applyLoginItem = () => {
-    if (process.platform === "linux") return; // no login item API there; the AppImage can be added by hand
-    app.setLoginItemSettings({ openAtLogin: settings.launchAtLogin, args: ["--hidden"] });
+    const options = loginItemOptions(process.platform, settings.launchAtLogin, process.env.PORTABLE_EXECUTABLE_FILE);
+    if (options) app.setLoginItemSettings(options);
   };
 
   const show = (page?: string) => {
@@ -394,11 +395,14 @@ if (!app.requestSingleInstanceLock()) {
     if (typeof file !== "string") throw new Error("Not a backup");
     const entry = listBackups(data).find((b) => b.file === file);
     if (!entry) throw new Error("That backup is gone");
+    // The game rewrites the file when it logs out or exits; a check that cannot answer still leaves the choice to the player.
+    const running = await gameRunning();
+    if (running) throw new Error("Close World of Warcraft first, then restore.");
     const options: Electron.MessageBoxOptions = {
       type: "warning", buttons: ["Restore", "Cancel"], defaultId: 1, cancelId: 1,
       title: "Restore a backup",
       message: `Put the ${entry.account} save file back to ${new Date(entry.at).toLocaleString()}?`,
-      detail: "Do this while logged out: the game rewrites the file on logout and would undo the restore. The file as it is now is backed up first, so you can go back.",
+      detail: `${running === null ? "The app could not check whether World of Warcraft is running. Close it first" : "Keep the game closed until this is done"}: the game rewrites the file when it exits and would undo the restore. The file as it is now is backed up first, so you can go back.`,
     };
     const r = win ? await dialog.showMessageBox(win, options) : await dialog.showMessageBox(options);
     if (r.response !== 0) return null;
@@ -449,6 +453,19 @@ if (!app.requestSingleInstanceLock()) {
     if (!dir) throw new Error("Pick the game folder first");
     if (typeof version !== "string" || !/^\d+\.\d+\.\d+$/.test(version)) throw new Error("Not a version");
     return installAddon({ version, endpoint: settings.endpoint, addonsDir: dir });
+  });
+  // The setup screen, before Start saves a folder: whether the picked folder has the addon (read from disk, nothing is
+  // fetched until the player presses Install), and its Install button, the same checksum-checked install as the Addon page.
+  const pickedAddonsDir = (folder: unknown) => {
+    if (settings.consentedAt || typeof folder !== "string" || !realFs.isDir(folder)) throw new Error("Pick the game folder first");
+    return join(folder, "Interface", "AddOns");
+  };
+  handle("setupAddon", (_e, folder: unknown) => installedAddonVersion(pickedAddonsDir(folder)));
+  handle("setupInstallAddon", async (_e, folder: unknown) => {
+    const dir = pickedAddonsDir(folder);
+    const latest = newestAddonRelease(await releases());
+    if (!latest) throw new Error("No addon release was found. Install it later on the Addon page.");
+    return installAddon({ version: latest.version, endpoint: settings.endpoint, addonsDir: dir });
   });
   handle("changes", () => changes());
   handle("charactersInfo", () => charactersFromFiles(engine.snapshot().files));

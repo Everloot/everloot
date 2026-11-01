@@ -303,6 +303,10 @@ export interface EverlootApi {
   /** Reads the saved builds from everloot.app with the account key and writes the EverlootBuilds slot addon. */
   buildsSync(): Promise<AppState>;
   installAddon(version: string): Promise<{ version: string; files: number }>;
+  /** Setup only, before Start saves a folder: the addon version in the picked game folder, or null when it is not there. Read from disk; nothing is fetched. */
+  setupAddon(folder: string): Promise<string | null>;
+  /** Setup only: installs the newest addon release into the picked game folder, checked against SHA256SUMS like installAddon. */
+  setupInstallAddon(folder: string): Promise<{ version: string; files: number }>;
   changes(): Promise<ChangeItem[]>;
   charactersInfo(): Promise<CharactersInfo>;
   chatInfo(): Promise<ChatInfo>;

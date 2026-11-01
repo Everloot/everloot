@@ -1,4 +1,4 @@
-import type { AppState, Job, JobState, JobStatus } from "../shared/types";
+import type { AppState, Job, JobState, JobStatus, Settings } from "../shared/types";
 
 /** The renderer's text helpers; no DOM, so they are tested on their own. */
 
@@ -19,6 +19,22 @@ export const gold = (copper: number | null) => {
 };
 // IPC wraps a thrown error as "Error invoking remote method 'x': Error: ..."; the page shows only the reason.
 export const msg = (e: unknown) => (e instanceof Error ? e.message : String(e)).replace(/^Error invoking remote method '[^']*': /, "").replace(/^(?:Type)?Error: /, "");
+
+/**
+ * What Settings says after Save. The app keeps the old value of a field it refuses (a site address that
+ * is not http or https) and saves the rest; the page names that field instead of saying "Saved.".
+ * "!" starts an error.
+ */
+export function savedNote(sent: { endpoint?: string; mcpUrl?: string }, saved: Settings): string {
+  const refused = [
+    sent.endpoint !== undefined && sent.endpoint.replace(/\/+$/, "") !== saved.endpoint ? "Site" : null,
+    sent.mcpUrl !== undefined && sent.mcpUrl !== saved.ask.mcpUrl ? "Private MCP server" : null,
+  ].filter(Boolean);
+  return refused.length ? `!${refused.join(" and ")} was not saved: it needs an http:// or https:// address, so the old one is kept. Everything else was saved.` : "Saved.";
+}
+
+/** The setup screen's line about the addon in the picked folder: null while that is not known yet, or when it is there. */
+export const setupAddonLine = (installed: string | null | undefined) => (installed === null ? "The Everloot addon is not in this folder yet. The game records nothing for the app to upload without it." : null);
 
 /** What an answer's Copy button says: how the last press went, on that answer only, until the feedback runs out. */
 export const copyLabel = (index: number, copied: { index: number; label: string } | null) => (copied?.index === index ? copied.label : "Copy");

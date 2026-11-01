@@ -27,9 +27,11 @@ a download.
 
 On first run the app shows what leaves your computer, finds your World of Warcraft folder (or you
 browse to the folder of your game version that holds `WTF`, under `World of Warcraft`), and
-runs nothing until you press **Start**. WoW: Forever's `_forever_` folder is offered first. If the app
-reads another client's folder beside it (the closed beta, a classic realm), Overview and Settings offer
-**Use Forever** in one click, or **Keep this folder**; the app never switches on its own.
+runs nothing until you press **Start**. If that folder has no Everloot addon yet, it says so and offers
+**Install the addon**, the same checksum-checked install as the Addon page. WoW: Forever's `_forever_`
+folder is offered first. If the app reads another client's folder beside it (the closed beta, a classic
+realm), Overview and Settings offer **Use Forever** in one click, or **Keep this folder**; the app never
+switches on its own.
 
 ## What it does
 
@@ -78,9 +80,9 @@ after that.
 
 The app shares its data folder with the command line (`%APPDATA%\Everloot`,
 `~/Library/Application Support/Everloot`, `~/.config/everloot`): `sent.json` for confirmed events,
-`answers.json`, `settings.json`, `chat.json`, an `updates/` folder with a downloaded Windows update until it is installed (the next start deletes it), a `backups/` folder with the newest ten copies of each
-account's `Everloot.lua` before upload attempts, including while offline (the Upload page lists them and can restore one while you are
-logged out; the file it replaces is backed up first), and the optional `config.json` for `/ask` model providers (same
+`answers.json`, `settings.json` (a damaged one is moved aside to `settings.json.corrupt-<id>` rather than saved over), `chat.json`, an `updates/` folder with a downloaded Windows update until it is installed (the next start deletes it), a `backups/` folder with the newest ten copies of each
+account's `Everloot.lua` before upload attempts, including while offline (the Upload page lists them and can restore one with the game closed,
+and says so instead while World of Warcraft is running; the file it replaces is backed up first), and the optional `config.json` for `/ask` model providers (same
 format and same rules as the [companion README](../companion/README.md#providers-design-sections-6465):
 keys come from a file named by `apiKeyFile`, never from the config itself).
 
@@ -122,7 +124,7 @@ Set `EVERLOOT_DATA_DIR` to a scratch folder to keep a development run away from 
 | `src/shared/providers.ts` | The provider presets the Chat page offers: base URLs, key shapes, the curated models and their data notes |
 | `src/main/window-state.ts`, `json-file.ts` | The window's remembered size and place; JSON files read with a byte order mark allowed |
 | `src/shared/website.ts` | The site pages the sidebar links to, and their address with the source tag |
-| `src/main/settings.ts`, `game-folder.ts`, `updates.ts`, `external.ts` | Settings file, where the game is, the release check, the browser allow-list |
+| `src/main/settings.ts`, `game-folder.ts`, `updates.ts`, `external.ts`, `login-item.ts` | Settings file, where the game is, the release check, the browser allow-list, the start-at-sign-in entry (the portable exe names itself, not its temporary folder) |
 | `src/preload.ts` | The only bridge the page can call (`window.everloot`) |
 | `src/renderer/` | The window: one page, no framework, the site's colours; `format.ts` holds the text helpers, tested without the DOM |
 | `src/shared/types.ts` | Shapes both sides use |

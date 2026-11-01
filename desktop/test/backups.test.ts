@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
-import { backupSavedVariables, listBackups, restoreBackup } from "../src/main/backups";
+import { backupSavedVariables, gameRunning, listBackups, restoreBackup, type RunCommand } from "../src/main/backups";
 
 const dirs: string[] = [];
 const dir = () => { const d = mkdtempSync(join(tmpdir(), "everloot-backups-")); dirs.push(d); return d; };
@@ -85,4 +85,36 @@ test("restore refuses files outside the backups folder and accounts that are not
   writeFileSync(other, "x");
   expect(() => restoreBackup(other, data, [sv])).toThrow(/OTHER/);
   expect(existsSync(sv)).toBe(false);
+});
+
+/** A fake process list: answers each command with the given exit code and output, and records what was asked. */
+const fake = (code: number, stdout = "") => { const calls: string[][] = []; const run: RunCommand = async (cmd, args) => { calls.push([cmd, ...args]); return { code, stdout }; }; return { run, calls }; };
+
+test("a running World of Warcraft client is seen on Windows, and a list without one is not", async () => {
+  const running = fake(0, '"WowClassic.exe","18244","Console","1","1,402,112 K"\r\n');
+  expect(await gameRunning("win32", running.run)).toBe(true);
+  expect(running.calls[0][0]).toBe("tasklist");
+  expect(await gameRunning("win32", fake(0, '"Wow.exe","1","Console","1","900,000 K"').run)).toBe(true);
+  expect(await gameRunning("win32", fake(0, '"WowClassicB.exe","1","Console","1","900,000 K"').run)).toBe(true);
+  // Other programs named Wow-something are not the game: the WowUp addon manager in the tray, the voice proxy.
+  expect(await gameRunning("win32", fake(0, '"WowUp.exe","7","Console","1","90,000 K"\r\n"WowVoiceProxy.exe","8","Console","1","9,000 K"').run)).toBe(false);
+  // tasklist says so in the system's language and still exits 0.
+  expect(await gameRunning("win32", fake(0, "INFO: No tasks are running which match the specified criteria.\r\n").run)).toBe(false);
+});
+
+test("macOS and Linux ask pgrep, whose exit code says whether the game runs", async () => {
+  expect(await gameRunning("darwin", fake(0, "4242\n").run)).toBe(true);
+  expect(await gameRunning("darwin", fake(1).run)).toBe(false);
+  expect(await gameRunning("linux", fake(1).run)).toBe(false);
+  const mac = fake(1);
+  await gameRunning("darwin", mac.run);
+  expect(mac.calls[0][0]).toBe("pgrep");
+});
+
+test("when the check cannot answer, it says it does not know instead of failing", async () => {
+  const broken: RunCommand = async () => { throw new Error("spawn tasklist ENOENT"); };
+  expect(await gameRunning("win32", broken)).toBeNull();
+  expect(await gameRunning("darwin", fake(2).run)).toBeNull();
+  expect(await gameRunning("win32", fake(1).run)).toBeNull();
+  expect(await gameRunning("freebsd", fake(0).run)).toBeNull();
 });
