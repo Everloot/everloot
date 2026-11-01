@@ -1,10 +1,11 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { TABLES, CURRENT_BUILD } from "@/data/game-data/raid";
 import nextConfig from "../../next.config.js";
 import { latestAddonRelease } from "./addon-release";
+import { servedFile } from "./everloot-releases";
 import { trailFor } from "./breadcrumbs";
 import { CHAT_PROVIDERS } from "./chat/providers";
 import { raidTalentFacts } from "./raid-facts";
@@ -25,6 +26,21 @@ test("the newest addon zip wins by version number, not by name order", () => {
 
 test("the real downloads folder yields a release", () => {
   expect(latestAddonRelease()?.version).toMatch(/^\d+\.\d+\.\d+$/);
+});
+
+test("the build lists every served zip with the size and SHA-256 of the file itself", () => {
+  const built = JSON.parse(nextConfig.env!.EVERLOOT_DOWNLOADS!) as Record<string, { size: number; sha256: string }>;
+  const release = latestAddonRelease()!;
+  expect(built[release.downloadPath]).toEqual(servedFile(release.downloadPath));
+  expect(Object.keys(built)).toHaveLength(readdirSync(join(process.cwd(), "public", "downloads")).filter((name) => name.endsWith(".zip")).length);
+  // Where the folder cannot be read, the list stands in for it.
+  vi.stubEnv("EVERLOOT_DOWNLOADS", JSON.stringify(built));
+  try {
+    expect(latestAddonRelease(join(tmpdir(), "no-such-folder"))).toEqual(release);
+    expect(servedFile(release.downloadPath, join(tmpdir(), "no-such-folder"))).toEqual(built[release.downloadPath]);
+  } finally {
+    vi.unstubAllEnvs();
+  }
 });
 
 test("breadcrumbs go from Home to the page and never through /tools", () => {

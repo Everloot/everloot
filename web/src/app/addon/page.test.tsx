@@ -1,6 +1,10 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, expect, test, vi } from "vitest";
+import nextConfig from "../../../next.config.js";
 import { latestAddonRelease } from "@/lib/addon-release";
 import { servedFile } from "@/lib/everloot-releases";
 
@@ -38,7 +42,7 @@ async function render(answer: () => Promise<Response>) {
   return renderToStaticMarkup(await AddonPage());
 }
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
 test("the download is clearly labelled Alpha with live-client checks pending", async () => {
   const html = await render(() => Promise.resolve(Response.json(releases)));
@@ -96,12 +100,35 @@ test("install steps, the upload page, privacy, data policy and source are linked
   }
 });
 
-test("when GitHub cannot be read the addon still downloads and the app points at the releases page", async () => {
+test("at build, when GitHub cannot be read the addon still downloads and the app points at the releases page", async () => {
+  vi.stubEnv("NEXT_PHASE", "phase-production-build");
   const html = await render(() => Promise.reject(new Error("offline")));
   expect(html).toContain(`href="${addon.downloadPath}"`);
   expect(visible(html)).toContain("could not be loaded right now");
   expect(html).toContain('href="https://github.com/Everloot/everloot/releases"');
   expect(html).not.toContain("DesktopApp-");
+});
+
+test("an hourly rebuild with GitHub down throws, so the cache keeps serving the last good page", async () => {
+  await expect(render(() => Promise.resolve(new Response("limited", { status: 403 })))).rejects.toThrow("keep the last good page");
+});
+
+test("rebuilt without the repository's files, as on the Worker, the page offers the zip with the size and checksum from the build", async () => {
+  const empty = mkdtempSync(join(tmpdir(), "worker-"));
+  try {
+    vi.spyOn(process, "cwd").mockReturnValue(empty);
+    // Without the build's list there is nothing to read: what the Worker rendered before.
+    expect(latestAddonRelease()).toBeNull();
+    vi.stubEnv("EVERLOOT_DOWNLOADS", nextConfig.env!.EVERLOOT_DOWNLOADS);
+    const html = await render(() => Promise.resolve(Response.json(releases)));
+    expect(html).toContain(`href="${addon.downloadPath}"`);
+    expect(visible(html)).toContain(`Download addon ${addon.version} (.zip, `);
+    expect(html).toContain(served.sha256);
+    expect(html).toContain(`href="${DL}/addon-v${addon.version}/SHA256SUMS"`);
+    expect(visible(html)).not.toContain("not available on this site");
+  } finally {
+    rmSync(empty, { recursive: true, force: true });
+  }
 });
 
 test("the old gold per hour address lands on a section that says where the calculator went", async () => {
@@ -128,6 +155,7 @@ test("the addon and the Desktop App each carry a SoftwareApplication with the ve
     expect(JSON.stringify(app)).not.toMatch(/aggregateRating|ratingValue/);
   }
   // Without the release list, only the addon the site serves is described.
+  vi.stubEnv("NEXT_PHASE", "phase-production-build");
   const offline = await render(() => Promise.reject(new Error("offline")));
   expect(blocks(offline).filter((b) => b["@type"] === "SoftwareApplication").map((a) => a.name)).toEqual(["Everloot addon"]);
 });

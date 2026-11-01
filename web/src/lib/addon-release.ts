@@ -10,13 +10,24 @@ export interface AddonRelease {
 const NAME = /^Everloot-(\d+)\.(\d+)\.(\d+)\.zip$/;
 
 /**
+ * The zips in public/downloads with their size and SHA-256, keyed by site path, as next.config.js worked them out
+ * from the files when the site was built. The Worker serves public/ as static assets, so a page it rebuilds can
+ * neither list nor read them. Null outside a Next build (tests, scripts), where the folder itself is read.
+ */
+export function builtDownloads(): Record<string, { size: number; sha256: string }> | null {
+  const json = process.env.EVERLOOT_DOWNLOADS;
+  return json ? JSON.parse(json) : null;
+}
+
+/**
  * The newest addon zip that the site actually serves. The upload page and its structured data both read this,
  * so the version and the download link cannot disagree with the file, or with each other.
  */
 export function latestAddonRelease(dir = join(process.cwd(), "public", "downloads")): AddonRelease | null {
   let files: string[];
   try {
-    files = readdirSync(dir);
+    const built = builtDownloads();
+    files = built ? Object.keys(built).map((path) => path.replace(/^\/downloads\//, "")) : readdirSync(dir);
   } catch {
     return null;
   }

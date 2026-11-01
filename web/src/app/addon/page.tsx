@@ -48,6 +48,9 @@ export default async function AddonPage() {
   const zipHref = `/downloads/${encodeURIComponent(zipName)}`;
   const served = addon ? servedFile(zipHref) : null;
   const releases = await fetchReleases();
+  // A failed refresh throws so the cache keeps serving the last good page; only the build, which has no
+  // earlier page, renders the fallback.
+  if (!releases && process.env.NEXT_PHASE !== "phase-production-build") throw new Error("GitHub unavailable: keep the last good page");
   const addonRelease = addon ? addonReleaseFor(releases, addon.version) : null;
   const addonSums = served && addonRelease?.files.some((file) =>
     file.name === zipName && file.size === served.size && file.sha256 === served.sha256,
