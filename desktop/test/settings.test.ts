@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
@@ -83,4 +83,20 @@ test("the census starts on for a new setup and stays off for one finished before
   expect(loadSettings(path).settings.census).toBe(true);
   writeFileSync(path, JSON.stringify({ consentedAt: "2026-10-18T00:00:00Z", census: true }));
   expect(loadSettings(path).settings.census).toBe(true);
+});
+
+test("a damaged settings file is kept under its own name, so the next Save does not write over it", () => {
+  const d = dir(), path = join(d, "settings.json");
+  writeFileSync(path, '{ "gameFolder": "D:\\Games\\WoW", oops');
+  const loaded = loadSettings(path);
+  expect(loaded.settings).toEqual(defaultSettings());
+  const kept = readdirSync(d).filter((n) => n.startsWith("settings.json.corrupt-"));
+  expect(kept).toHaveLength(1);
+  expect(loaded.error).toContain(kept[0]);
+  saveSettings(path, mergeSettings(loaded.settings, { gameFolder: "E:/WoW/_classic_era_" }));
+  expect(readFileSync(join(d, kept[0]), "utf8")).toBe('{ "gameFolder": "D:\\Games\\WoW", oops');
+  // A second damaged file gets a name of its own.
+  writeFileSync(path, "[1,2]");
+  expect(loadSettings(path).error).toMatch(/settings\.json\.corrupt-/);
+  expect(readdirSync(d).filter((n) => n.startsWith("settings.json.corrupt-"))).toHaveLength(2);
 });

@@ -1,5 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { basename, dirname } from "node:path";
 import { readJsonFile } from "./json-file";
 import type { Settings } from "../shared/types";
 
@@ -60,18 +61,27 @@ export function mergeSettings(base: Settings, patch: unknown): Settings {
 
 export interface LoadedSettings { settings: Settings; error: string | null }
 
-/** Reads settings.json. A missing file is the defaults; a damaged one is the defaults plus an error to show. */
+/**
+ * Reads settings.json. A missing file is the defaults; a damaged one is the defaults plus an error to
+ * show, and is moved aside to `settings.json.corrupt-<id>` first (as sent.json and answers.json are),
+ * so the next Save does not write over what the player had.
+ */
 export function loadSettings(path: string): LoadedSettings {
   if (!existsSync(path)) return { settings: defaultSettings(), error: null };
   try {
     const parsed: unknown = readJsonFile(path);
-    if (!parsed || typeof parsed !== "object") throw new Error("not an object");
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new SyntaxError("not an object");
     // A setup finished before the census switch agreed to a list without it: the census stays off until the player turns it on.
     const agreedBefore = !("census" in parsed) && Boolean((parsed as { consentedAt?: unknown }).consentedAt);
     const base = agreedBefore ? { ...defaultSettings(), census: false } : defaultSettings();
     return { settings: mergeSettings(base, parsed), error: null };
   } catch (err) {
-    return { settings: defaultSettings(), error: `settings.json could not be read (${err instanceof Error ? err.message : String(err)}); using defaults` };
+    let kept = "";
+    // Only a file that read but is not settings; one the system would not let the app read is left alone.
+    if (err instanceof SyntaxError) {
+      try { const backup = `${path}.corrupt-${randomUUID()}`; renameSync(path, backup); kept = `; the damaged file is kept as ${basename(backup)}`; } catch { /* left in place */ }
+    }
+    return { settings: defaultSettings(), error: `settings.json could not be read (${err instanceof Error ? err.message : String(err)}); using defaults${kept}` };
   }
 }
 

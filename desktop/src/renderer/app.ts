@@ -1,6 +1,6 @@
 import { accountOf as account } from "../main/engine";
 import { diagnostics } from "../shared/diagnostics";
-import { ago, clock, companionStatus, copyLabel, esc, gold, kb, msg, JOB_NAMES, sparkline, statusText, when, type CompanionState } from "./format";
+import { ago, clock, companionStatus, copyLabel, esc, gold, kb, msg, JOB_NAMES, savedNote, sparkline, statusText, when, type CompanionState } from "./format";
 import { NO_SOURCED_ANSWER, type AddonInfo, type AppState, type AskInfo, type BackupInfo, type ChangeItem, type CharacterRow, type CharactersInfo, type ChatInfo, type ChatProgress, type EverlootApi, type PriceLookup, type FileSummary, type GameFolderCandidate, type Job, type JobStatus, type MarketInfo, type MoneyDay } from "../shared/types";
 import { PROVIDER_PRESETS, assistantSource, keptModelPick, manualModelShown, presetFor, removalNotice, type ModelChoice, type ProviderKind } from "../shared/providers";
 import { inkOn } from "../../../web/src/lib/chat/catalogue";
@@ -1523,15 +1523,20 @@ async function onSubmit(ev: SubmitEvent): Promise<void> {
     sendChat(question).catch(failed);
     return;
   }
+  let note = "Saved.";
   if (form.id === "settings") {
-    state = await api.saveSettings({ gameFolder: text("gameFolder") || null, endpoint: text("endpoint"), launchAtLogin: f.get("launchAtLogin") === "on", startInTray: f.get("startInTray") === "on", census: f.get("census") === "on", players: f.get("players") === "on" });
+    const endpoint = text("endpoint");
+    state = await api.saveSettings({ gameFolder: text("gameFolder") || null, endpoint, launchAtLogin: f.get("launchAtLogin") === "on", startInTray: f.get("startInTray") === "on", census: f.get("census") === "on", players: f.get("players") === "on" });
+    note = savedNote({ endpoint }, state.settings);
   } else if (form.id === "askForm") {
-    state = await api.saveSettings({ ask: { ...state!.settings.ask, mcpUrl: text("mcpUrl"), tokenFile: text("tokenFile") || null } });
+    const mcpUrl = text("mcpUrl");
+    state = await api.saveSettings({ ask: { ...state!.settings.ask, mcpUrl, tokenFile: text("tokenFile") || null } });
+    note = savedNote({ mcpUrl }, state.settings);
   }
   draftDirty = false;
   render();
   const saved = main.querySelector("#saved");
-  if (saved) saved.textContent = "Saved.";
+  if (saved) { saved.textContent = note.replace(/^!/, ""); saved.className = note.startsWith("!") ? "error" : "muted"; }
 }
 
 void (async () => {
