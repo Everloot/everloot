@@ -133,7 +133,7 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
   return (
     <Container width="data">
       <article>
-        <EntityHeader trail={trail} title={title} meta={["NPC", zone?.name, named ? <span className="tabular-nums">ID {npcId}</span> : null]} />
+        <EntityHeader trail={trail} title={title} meta={["NPC", zone?.name, named ? <span key="id" className="tabular-nums">ID {npcId}</span> : null]} />
         <EntityTop
           box={(firstPin && zone && <MapThumb pin={firstPin} zone={zone.name} art={art?.smallUrl ?? art?.url ?? null} />) || (
             <TooltipFrame name={title} label={`${title}, as players saw it`}>

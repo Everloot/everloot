@@ -1,11 +1,18 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "nextjs", "typescript", "jsx-a11y"],
-  "categories": { "correctness": "off" },
+  "plugins": [
+    "react",
+    "nextjs",
+    "typescript",
+    "jsx-a11y"
+  ],
+  "categories": {
+    "correctness": "off"
+  },
   "rules": {
     "react-hooks/rules-of-hooks": "error",
     "react-hooks/exhaustive-deps": "warn",
-    "react/jsx-key": "warn",
+    "react/jsx-key": "error",
     "react/no-children-prop": "error",
     "react/no-danger-with-children": "error",
     "react/no-direct-mutation-state": "error",
@@ -38,7 +45,25 @@
     "jsx-a11y/aria-unsupported-elements": "warn",
     "jsx-a11y/role-has-required-aria-props": "warn",
     "jsx-a11y/role-supports-aria-props": "warn",
-    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "ignoreRestSiblings": true }]
+    "no-unused-vars": [
+      "warn",
+      {
+        "argsIgnorePattern": "^_",
+        "ignoreRestSiblings": true
+      }
+    ],
+    "react/display-name": "error",
+    "react/jsx-no-comment-textnodes": "error",
+    "react/no-find-dom-node": "error",
+    "react/no-is-mounted": "error",
+    "react/no-render-return-value": "error",
+    "react/no-string-refs": "error",
+    "react/require-render-return": "error"
   },
-  "ignorePatterns": [".next/**", ".open-next/**", "node_modules/**", "public/**"]
+  "ignorePatterns": [
+    ".next/**",
+    ".open-next/**",
+    "node_modules/**",
+    "public/**"
+  ]
 }

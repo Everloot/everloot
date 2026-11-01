@@ -10,7 +10,7 @@
     "prebuild": "node scripts/fetch-release.mjs",
     "build": "next build",
     "start": "next start",
-    "lint": "oxlint --max-warnings 9",
+    "lint": "oxlint --max-warnings 5",
     "test": "vitest run",
     "sample-release": "tsx scripts/sample-release.ts",
     "export-bulk": "tsx scripts/export-bulk.ts",
