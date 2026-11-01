@@ -11,8 +11,10 @@ import { loadItemSeen } from "@/lib/item-seen";
 import { pageMetadata } from "@/lib/seo";
 import { loadShownNames } from "@/lib/shown-item-names";
 import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
-import { hasClassContext, parseClassContext, withClassContext, withoutClassContext } from "@/lib/class-context";
+import { classLabel, hasClassContext, parseClassContext, withClassContext, withoutClassContext } from "@/lib/class-context";
 import ClassContextChip from "@/components/classes/ClassContextChip";
+import { classUse } from "@/lib/class-gear";
+import { CLIENT_CLASS_GEAR } from "@/data/game-data/client-class-gear";
 import GameIcon from "@/components/game/GameIcon";
 import Badge, { UNCONFIRMED_TITLE } from "@/components/ui/Badge";
 import { Container, DataTable, DataTitle, FilterBar, filledColumns, QUALITY_TEXT, ResultStrip, qualityOf, type FilterControl, type SparseColumn } from "@/components/ui";
@@ -109,11 +111,14 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   }
   const { cls, sub, q } = r;
   // A class context from a class hub rides on every link of the list, never on its breadcrumb or canonical. It narrows
-  // nothing: which items a class can use is not in any source we read (docs/sources, class proficiency).
+  // the list to what the class can use by the game files (lib/class-gear.ts): its proficiencies, at its level when the
+  // context gives one, and each item's class mask. An item the files say nothing about stays, counted.
   const read = parseClassContext(search);
   const context = read.ok ? read.context : null;
   const link = (classSlug?: string, subclassSlug?: string, query?: Partial<CategoryQuery>) => withClassContext(itemsHref(classSlug, subclassSlug, query), context);
-  const base = cls ? filterItems(T, { classId: cls.id, subclassId: sub?.id }) : T.items;
+  const usable = context ? classUse(CLIENT_CLASS_GEAR, context.classSlug, context.level) : null;
+  const fits = (row: ItemRow) => !usable || usable(row) !== "no";
+  const base = (cls ? filterItems(T, { classId: cls.id, subclassId: sub?.id }) : T.items).filter(fits);
   const [{ agreed, matched, showsTip }, seen] = await Promise.all([loadShownNames(), loadItemSeen()]);
   const nameOf = (id: number) => agreed.get(id) ?? matched?.names.get(id)?.name;
   // The game file name, icon and tooltip facts only for items players reported (3 installs) or the item name rule
@@ -139,7 +144,9 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   const gone = (id: number) => unnamed.has(id) || (!q.dev && leftovers.has(id));
   const pool = base.filter((row) => !gone(row[0]));
   const held = q.dev ? rows.filter((row) => leftovers.has(row[0])).length : listItems(base, { ...q, dev: true }, ctx).filter((row) => !unnamed.has(row[0])).length - rows.length;
-  const hiddenIn = (classId?: number, subclassId?: number) => T.items.reduce((n, row) => n + Number((classId === undefined || (row[1] === classId && (subclassId === undefined || row[2] === subclassId))) && gone(row[0])), 0);
+  const hiddenIn = (classId?: number, subclassId?: number) => T.items.reduce((n, row) => n + Number((classId === undefined || (row[1] === classId && (subclassId === undefined || row[2] === subclassId))) && (gone(row[0]) || !fits(row))), 0);
+  // The rows a class context keeps without the files deciding, for the line under the chip.
+  const undecided = usable ? rows.reduce((n, row) => n + Number(usable(row) === "unknown"), 0) : 0;
   const pages = Math.max(1, Math.ceil(rows.length / ITEMS_PER_PAGE));
   if (q.page > pages) notFound();
   const shown = rows.slice((q.page - 1) * ITEMS_PER_PAGE, q.page * ITEMS_PER_PAGE);
@@ -305,7 +312,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
       ))}
       <Link href={link(cls?.slug, sub?.slug)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Clear filters</Link>
     </div>
-  ) : <p className="py-4 text-cell text-fg-2">No items in this category.</p>;
+  ) : <p className="py-4 text-cell text-fg-2">{context ? `No items in this category a ${classLabel(context.classSlug)} can use${context.level !== undefined ? ` by level ${context.level}` : ""}.` : "No items in this category."}</p>;
 
   return (
     <Container width="data">
@@ -321,7 +328,10 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
         <ClassContextChip read={read} here={withoutClassContext(itemsHref(cls?.slug, sub?.slug), search)}>
           {context && (
             <span>
-              {`The list is the same for every class${context.role ? " and role" : ""}: which items a class can use is not in our data yet.`}
+              <Badge tone="files" />{" "}
+              {`Only items a ${classLabel(context.classSlug)} can use${context.level !== undefined ? ` by level ${context.level}` : ""}: weapon and armor types from the class's proficiencies and each item's class restriction, found in game files, unconfirmed.`}
+              {undecided > 0 && ` ${plural(undecided)} the files do not decide for a class (rings, relics, items with no class data) ${undecided === 1 ? "is" : "are"} kept.`}
+              {context.role && " The role does not change the list."}
               {context.level !== undefined && !q.req && (
                 <>
                   {" "}
