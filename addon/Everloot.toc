@@ -23,6 +23,7 @@ modules\talents.lua
 modules\completion.lua
 modules\census.lua
 modules\players.lua
+modules\link.lua
 modules\selftest.lua
 modules\plan.lua
 modules\raid_data.lua
