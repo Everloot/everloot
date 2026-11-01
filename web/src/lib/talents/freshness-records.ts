@@ -80,3 +80,6 @@ export function classTalentChanges(entries: readonly unknown[], classId: number)
   steps.sort((a, b) => compareGameBuilds(a.build, b.build) ?? 0);
   return { classId, steps, unplaced };
 }
+
+/** One class's changes in the published records, for code that is handed the reader rather than the records. */
+export const publishedClassChanges = (classId: number): ClassTalentChanges => classTalentChanges(PUBLISHED_CHANGES, classId);

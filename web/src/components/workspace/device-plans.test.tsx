@@ -6,7 +6,8 @@ import AccountControls, { ACCOUNT_CHANGED_EVENT } from "@/components/AccountCont
 import { NEWEST_VERSION, WORKSPACE_VERSION, bucketKey, withWorkspaceLock, type LocalPlan, type Owner, type PlayerWorkspace } from "@/lib/player-workspace";
 import { V3_BUCKET_TEXT } from "@/lib/player-workspace.fixture";
 import { FIXTURE_PLAN_ID, V2_ALT_TEXT, V2_BUCKET_TEXT } from "@/lib/player-workspace.fixture";
-import DevicePlans from "./DevicePlans";
+import type { BuildStep, TalentChange } from "@/lib/talents/freshness";
+import DevicePlans, { type PlanTrees } from "./DevicePlans";
 import LocalPlanSave from "./LocalPlanSave";
 
 // The header's sign-out refreshes the route; here that refresh does nothing, as it changes no client state either.
@@ -341,6 +342,43 @@ test("spend orders show as saved, and the page says they are checked against the
 test("the page is left out of search, as /me is", async () => {
   const { metadata } = await import("@/app/tools/builds/page");
   expect(metadata.robots).toEqual({ index: false, follow: false });
+});
+
+/** The Mage tree on `build`, with change records stepping back from it; MAGE is made on 70450 and spends in 90001. */
+function mageTrees(build: string, steps: BuildStep[]): PlanTrees {
+  return { mage: { tree: { classId: 8, classSlug: "mage", build }, changes: { classId: 8, steps, unplaced: 0 } } };
+}
+const step = (build: string, previous: string, talents: TalentChange[] = []): BuildStep =>
+  ({ build, previous, readable: true, baseline: false, spoiler: false, classChanged: false, talents, pointLevels: [], limits: [] });
+const removed = (nodeId: number): TalentChange => ({ build: "1.60.1.70500", nodeId, name: `Talent ${nodeId}`, spoiler: false, kind: "removed" });
+
+test("each plan shows the game build it was made on; one made on an older build whose talents changed says so and links to the calculator", async () => {
+  seed(ANON, [plan()]);
+  const before = localStorage.getItem(bucketKey(ANON));
+  await render(<DevicePlans trees={mageTrees("1.60.1.70500", [step("1.60.1.70500", "1.60.1.70450", [removed(90001)])])} />);
+  const frost = item("Frost")!;
+  expect(frost.textContent).toContain("game build 1.60.1.70450");
+  expect(frost.textContent).toContain("Made on an older game build: the game files changed 1 of its talents since. Open in the current calculator");
+  const link = [...frost.querySelectorAll("a")].find((a) => a.textContent === "Open in the current calculator");
+  expect(link?.getAttribute("href")).toBe(`/tools/talents/mage#plan=${MAGE}&order=${PLANNED}`);
+  // The note only reads: the stored plan keeps its code and build.
+  expect(localStorage.getItem(bucketKey(ANON))).toBe(before);
+});
+
+test("no note when the plan is on the tree's build, or the records show none of its talents changed; an unknown history says only that", async () => {
+  seed(ANON, [plan()]);
+  await render(<DevicePlans trees={mageTrees("1.60.1.70450", [])} />);
+  expect(item("Frost")?.textContent).toContain("game build 1.60.1.70450");
+  expect(text()).not.toContain("older game build");
+
+  await act(async () => root.render(<DevicePlans trees={mageTrees("1.60.1.70500", [step("1.60.1.70500", "1.60.1.70450", [removed(99999)])])} />));
+  await settle();
+  expect(text()).not.toContain("older game build");
+
+  await act(async () => root.render(<DevicePlans trees={mageTrees("1.60.1.70500", [])} />));
+  await settle();
+  expect(item("Frost")?.textContent).toContain("Made on an older game build; whether its talents changed since is not known.");
+  expect(text()).not.toContain("changed 1 of its talents");
 });
 
 test("pasted text that is not a plan, or a plan of two classes, says why and saves nothing", async () => {
