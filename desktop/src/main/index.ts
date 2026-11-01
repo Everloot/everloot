@@ -29,7 +29,7 @@ import { loadSettings, mergeSettings, saveSettings } from "./settings";
 import { allowedPermission, fromAppPage } from "./sender";
 import { createTray } from "./tray";
 import { checkForUpdates, fetchReleases, updateFrom } from "./updates";
-import { downloadUpdate, pruneInstallers, runInstaller } from "./self-update";
+import { downloadUpdate, failedAttempt, forgetAttempt, pruneInstallers, recordAttempt, runInstaller } from "./self-update";
 import { fitWindow, readWindowState, writeWindowState } from "./window-state";
 
 /** The same folder the command line uses (`companion/src/cli.ts` defaultStatePath), so both share sent.json. */
@@ -339,9 +339,11 @@ if (!app.requestSingleInstanceLock()) {
     if (answer.response !== 0) return false;
     for (let i = 0; i < 120 && JOBS.some((j) => engine.snapshot().jobs[j].state === "running"); i++) await new Promise((r) => setTimeout(r, 500));
     // The app quits only once the installer has started; if it cannot start, the app stays open and says so.
+    recordAttempt(join(data, "updates"), downloaded.version);
     try {
       await runInstaller(downloaded.path);
     } catch (err) {
+      forgetAttempt(join(data, "updates"));
       downloaded = null;
       updateProgress = { stage: "failed", percent: 0, error: `the installer did not start (${err instanceof Error ? err.message : String(err)})` };
       broadcast();
@@ -530,6 +532,12 @@ if (!app.requestSingleInstanceLock()) {
     applyLoginItem();
     // The installer that brought this version, and older ones, are no longer needed.
     pruneInstallers(join(data, "updates"), app.getVersion());
+    // An installer that ran but left this version in place: said once, and the update row offers it again.
+    const missed = failedAttempt(join(data, "updates"), app.getVersion());
+    if (missed) {
+      updateProgress = { stage: "failed", percent: 0, error: `the installer for ${missed} ran, but ${app.getVersion()} is still installed. Try again, or download it from the release page` };
+      engine.log("error", `The update to ${missed} did not install; ${app.getVersion()} is still installed.`);
+    }
     engine.start(settings);
     // A laptop that slept through the last retry would otherwise wait for the next logout.
     powerMonitor.on("resume", () => engine.recover());

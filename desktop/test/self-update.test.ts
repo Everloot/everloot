@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { open } from "node:fs/promises";
 import { afterEach, expect, test, vi } from "vitest";
-import { canInstallInPlace, downloadUpdate, pruneInstallers, runInstaller } from "../src/main/self-update";
+import { canInstallInPlace, downloadUpdate, failedAttempt, forgetAttempt, pruneInstallers, recordAttempt, runInstaller } from "../src/main/self-update";
 
 vi.mock("node:fs/promises", async (importOriginal) => {
   const fs = await importOriginal<typeof import("node:fs/promises")>();
@@ -301,4 +301,26 @@ test("installers this version has caught up with are deleted at start; a newer o
   // A development build (not X.Y.Z) and a missing folder delete nothing and do not throw.
   expect(pruneInstallers(d, "dev")).toEqual([]);
   expect(pruneInstallers(join(d, "missing"), "0.1.10")).toEqual([]);
+});
+
+test("the next start says when the installer ran but the old version is still installed, once", () => {
+  const d = join(dir(), "updates");
+  expect(failedAttempt(d, "0.1.11")).toBeNull();
+  recordAttempt(d, "0.1.12");
+  // The prune of caught-up installers leaves the note alone.
+  expect(pruneInstallers(d, "0.1.11")).toEqual([]);
+  expect(failedAttempt(d, "0.1.11")).toBe("0.1.12");
+  expect(failedAttempt(d, "0.1.11")).toBeNull();
+  // The update installed: nothing to say, and the note is gone.
+  recordAttempt(d, "0.1.12");
+  expect(failedAttempt(d, "0.1.12")).toBeNull();
+  expect(readdirSync(d)).toEqual([]);
+  // An installer that never started is forgotten at once.
+  recordAttempt(d, "0.1.12");
+  forgetAttempt(d);
+  expect(failedAttempt(d, "0.1.11")).toBeNull();
+  // A damaged note says nothing and is removed.
+  writeFileSync(join(d, "last-attempt.json"), "{");
+  expect(failedAttempt(d, "0.1.11")).toBeNull();
+  expect(readdirSync(d)).toEqual([]);
 });

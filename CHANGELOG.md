@@ -38,7 +38,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   one click downloads it and checks it against the release's checksum, and the next click restarts into it. The
   Overview offers the same, the tray item opens the update panel, and a notification says so once per version while
   the window is not in front. Where the app cannot install itself (macOS, Linux, the portable exe), the button opens
-  the download.
+  the download. If the installer runs but the old version is still there at the next start, the app says so once
+  instead of offering the same update again unexplained.
 - Site and MCP: racial traits from the game files (build-stamped `races.json`, found in game files, unconfirmed).
   Each class page lists, under "Who can be a {Class}", every race's traits with active or passive and the short
   text; `/wow-forever` adds a trait table per faction. New MCP tool `class_races` (protocol 1.20.0): the races that
