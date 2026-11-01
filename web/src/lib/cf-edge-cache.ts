@@ -11,18 +11,35 @@
  */
 export const ORIGINAL_CACHE_CONTROL = "x-everloot-browser-cache-control";
 
-/** Whether a request may be answered from, or stored in, the shared cache. */
+/**
+ * Headers Next's router sends for a React Server Components payload instead of HTML. The Cache API ignores
+ * `Vary`, so a request carrying any of them (or `_rsc`) bypasses the shared cache: an RSC payload can never be
+ * stored under the HTML page's key, nor the HTML served to the router.
+ */
+const RSC_HEADERS = ["rsc", "next-router-state-tree", "next-router-prefetch", "next-router-segment-prefetch", "next-url"];
+
+/**
+ * Whether a request may be answered from, or stored in, the shared cache. Requests carrying a Cookie still may:
+ * next.config.js marks only pages that read no cookies for the CDN, and a response that sets one is never kept.
+ */
 export function edgeCacheable(req: Request): boolean {
-  return req.method === "GET" && !req.headers.has("authorization") && !req.headers.get("range");
+  if (req.method !== "GET" || req.headers.has("authorization") || req.headers.get("range")) return false;
+  if (RSC_HEADERS.some((h) => req.headers.has(h))) return false;
+  const url = new URL(req.url);
+  if (url.searchParams.has("_rsc")) return false;
+  // A name search on an item list is one-off text: caching it only fills the cache with keys nobody repeats.
+  if (ITEM_LIST_PATH.test(url.pathname) && url.searchParams.getAll("q").some((v) => v.trim() !== "")) return false;
+  return true;
 }
 
 /**
- * The query parameters the item lists read (categoryQuery and itemsHref in src/lib/items.ts, the class context in
- * src/lib/class-context.ts), plus Next's `_rsc` so a router payload never shares a key with the HTML page.
+ * The query parameters the item lists read: categoryQuery in src/lib/items.ts and the class context
+ * (class, level, role) in src/lib/class-context.ts. cf-edge-cache.test.ts checks every parameter the pages' own
+ * links write survives the key. (`q` is listed for completeness; a non-empty q is never cached.)
  */
-const ITEM_LIST_PARAMS = new Set([
+export const ITEM_LIST_PARAMS: ReadonlySet<string> = new Set([
   "q", "slot", "quality", "src", "skill", "crafted", "reagent", "set", "seen", "ilvl", "req", "bind", "dev", "unnamed", "sort", "page",
-  "level", "role", "_rsc",
+  "class", "level", "role",
 ]);
 const ITEM_LIST_PATH = /^\/database\/items(?:\/[a-z][a-z0-9-]*(?:\/[^/]+)?)?\/?$/;
 
