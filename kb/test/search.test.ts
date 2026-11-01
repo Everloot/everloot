@@ -229,7 +229,7 @@ test("the exact lookup reads the name_norm index, narrowed by kind", async () =>
   const exactSql = seen.find((s) => s.includes("name_norm IN"));
   expect(exactSql).toBeDefined();
   expect(exactSql).not.toContain("replace(");
-  const plan = db.prepare(`EXPLAIN QUERY PLAN ${exactSql}`).all("kel thuzad", "kel thuzad", "lore_page") as { detail: string }[];
+  const plan = db.prepare(`EXPLAIN QUERY PLAN ${exactSql}`).all("kel thuzad", "kel thuzad", "lore_page", "Testing-only content") as { detail: string }[];
   expect(plan.map((p) => p.detail).join("\n")).toMatch(/USING INDEX entities_name_norm \(name_norm=\? AND kind=\?\)/);
 });
 
@@ -279,4 +279,23 @@ test("a one-word query has no fallback: any word is every word", async () => {
   const db = await seed();
   expect(await searchSomeWords(db, "Thunderfury")).toEqual([]);
   expect(await searchSomeWords(db, "where is xyznothinghere")).toEqual([]);
+});
+
+test("the wiki's testing-only pages are left out of search, the rest still appear", async () => {
+  const db = openDb(":memory:");
+  const testing = { data: { categories: ["Testing-only content"], type: "quest" } };
+  await replaceSourceRows(db, "warcraft-wiki-2023", ["lore_page"], [
+    row("516836", "Omar's Test Quest", "Get Omar some cloth: Linen Cloth.", testing),
+    row("470301", "Linen Cloth", "Linen Cloth is a cloth dropped by humanoids.", { data: { categories: ["Cloth"], type: "item" } }),
+    row("37455", "Bolt of Linen Cloth", "Made from Linen Cloth."),
+  ]);
+  const names = (hits: { name: string }[]) => hits.map((h) => h.name);
+  expect(names(await search(db, "Linen Cloth"))).toEqual(["Linen Cloth", "Bolt of Linen Cloth"]);
+  expect(names(await search(db, "Linen Cloth", 10, { kinds: ["lore_page"] }))).not.toContain("Omar's Test Quest");
+  // Asked for by name, through every search path: the exact-name pull and the some-words fallback.
+  expect(await search(db, "Omar's Test Quest")).toEqual([]);
+  expect(await search(db, "omar s test quest")).toEqual([]);
+  expect(names(await searchSomeWords(db, "Omar cloth")).sort()).toEqual(["Bolt of Linen Cloth", "Linen Cloth"]);
+  // The page stays in the archive: its own page and an exact lookup still find it.
+  expect(names(await getByName(db, "Omar's Test Quest"))).toEqual(["Omar's Test Quest"]);
 });

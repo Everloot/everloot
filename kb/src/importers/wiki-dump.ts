@@ -2,7 +2,7 @@ import { createReadStream } from "node:fs";
 import wtf from "wtf_wikipedia";
 import type { DB } from "../db.js";
 import { replaceSourceRows, type EntityInput } from "../entities.js";
-import { classify, type Facets, type LoreType } from "./wiki-classify.js";
+import { classify, TESTING_ONLY, type Facets, type LoreType } from "./wiki-classify.js";
 import { extractInfobox, type Infobox } from "./wiki-infobox.js";
 import { countDamage, repairTemplates } from "./wiki-templates.js";
 import { parsePages, type WikiPage } from "./wiki-xml.js";
@@ -26,6 +26,14 @@ export interface ConvertedPage {
 }
 
 /**
+ * The wiki's {{Testing}} banner (also written {{testing}} or {{Testing|type=forever}}) puts a page in
+ * Category:Testing-only content. The converter drops templates and so never sees that category. Only a
+ * banner in the lead, before the first heading, counts: lower down it marks one section of a real page.
+ */
+const TESTING_BANNER = /\{\{\s*[Tt]esting\s*(?:\||\}\})/;
+const lead = (wikitext: string) => wikitext.split(/^==/m, 1)[0];
+
+/**
  * Wikitext -> plain text. The infobox is read from the raw text (the converter would drop it), the
  * inline templates we know are rendered to words, then the generic converter removes the rest.
  */
@@ -33,7 +41,9 @@ export function wikitextToText(wikitext: string): ConvertedPage {
   const infobox = extractInfobox(wikitext);
   const doc = wtf(repairTemplates(wikitext));
   const text = doc.text().trim();
-  return { text, categories: doc.categories(), infobox, damaged: countDamage(text) > 0 };
+  const categories = doc.categories();
+  if (TESTING_BANNER.test(lead(wikitext)) && !categories.includes(TESTING_ONLY)) categories.push(TESTING_ONLY);
+  return { text, categories, infobox, damaged: countDamage(text) > 0 };
 }
 
 /** What a stored row's `data` column holds. */

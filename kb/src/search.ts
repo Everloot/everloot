@@ -1,5 +1,5 @@
 import type { GameVersion, Kind } from "./entities.js";
-import type { LoreType } from "./importers/wiki-classify.js";
+import { TESTING_ONLY, type LoreType } from "./importers/wiki-classify.js";
 import { expandAliases, NAME_ALIASES, withoutArticle } from "./name-aliases.js";
 import { releaseDb, type ReleaseDb, type ReleaseSource } from "./release-db.js";
 import { fromSpanish } from "./spanish.js";
@@ -137,7 +137,11 @@ async function nameNormSql(db: ReleaseDb): Promise<string> {
   return has ? "e.name_norm" : NORM_SQL;
 }
 
-/** SearchOptions currently exposes only kinds, versions and types: no sourceId/sources/excluded-kinds/publishable filters exist. */
+/**
+ * SearchOptions currently exposes only kinds, versions and types: no sourceId/sources/excluded-kinds/publishable filters exist.
+ * Every search also leaves out the wiki's testing-only pages, which no player is asking about; they stay
+ * reachable by id and by exact name (getEntity, getDocument, getByName).
+ */
 function pushOptionFilters(conds: string[], params: unknown[], opts: SearchOptions): void {
   if (opts.kinds?.length) {
     conds.push(`e.kind IN (${opts.kinds.map(() => "?").join(",")})`);
@@ -151,6 +155,8 @@ function pushOptionFilters(conds: string[], params: unknown[], opts: SearchOptio
     conds.push(`json_extract(e.data, '$.type') IN (${opts.types.map(() => "?").join(",")})`);
     params.push(...opts.types);
   }
+  conds.push(`NOT EXISTS (SELECT 1 FROM json_each(e.data, '$.categories') WHERE value = ?)`);
+  params.push(TESTING_ONLY);
 }
 
 export async function search(source: ReleaseSource, query: string, limit = 10, opts: SearchOptions = {}): Promise<SearchHit[]> {
