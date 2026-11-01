@@ -243,6 +243,7 @@ test("cards name the publishers a post cites, mark an unconfirmed post with the 
   post("lead", "2026-10-26", ["tags: [datamine, unconfirmed]", "sources:", '  - title: "Wowhead: a story"', "    url: https://www.wowhead.com/news/1"]);
   post("cited", "2026-10-25", ["tags: [wow-forever]", "sources:", '  - title: "Blizzard: an article"', "    url: https://news.blizzard.com/a", '  - title: "Blizzard forums: a thread"', "    url: https://us.forums.blizzard.com/en/wow/t/x/1"]);
   post("plain", "2026-10-24", ["tags: [site]"]);
+  post("blue", "2026-10-23", ["tags: [blue-post, forever]"]);
   vi.stubEnv("NEWS_DIR", dir); vi.stubEnv("WIKI_DIR", WIKI);
   const { default: NewsHub } = await import("./page");
   const hub = renderToStaticMarkup(await NewsHub());
@@ -255,6 +256,8 @@ test("cards name the publishers a post cites, mark an unconfirmed post with the 
   expect(card("lead")).toMatch(/<span data-news-chip="true" title="Unconfirmed" class="[^"]*border-dashed border-edge">Datamine<span class="sr-only">, unconfirmed<\/span><\/span>/);
   expect(card("cited")).toMatch(/<span data-news-chip="true" class="[^"]*border-line">WoW forever<\/span>/);
   expect(hub).not.toContain(">Wow forever<");
+  // Everloot's post about a Blizzard post is not itself a blue post.
+  expect(card("blue")).toMatch(/<span data-news-chip="true" class="[^"]*border-line">About a blue post<\/span>/);
 });
 
 test("news mounts no ads, including a CSS-hidden rail, with an AdSense client configured", async () => {

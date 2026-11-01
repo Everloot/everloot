@@ -150,6 +150,14 @@ test("an empty realm or house shows the meter at its count, says why, and is not
   expect(alliance).toContain('data-agreement="0"');
 });
 
+test("with no realm public yet, the hub says when it last checked, not that it was updated", async () => {
+  store.loadMarket.mockResolvedValue({ state: emptyMarket(), dataAsOf: new Date(today.getTime() - 4 * 60_000).toISOString() });
+  const words = text(await hub({}));
+  expect(words).toContain("No realm has public prices yet");
+  expect(words).toContain("Checked 4 min ago");
+  expect(words).not.toContain("Updated");
+});
+
 test("an item page shows its value, a 60-day chart, each house, the other realms, its age and a Dataset", async () => {
   const html = renderToStaticMarkup(await RealmItemPage(item("forever", "2589")));
   const words = text(html);

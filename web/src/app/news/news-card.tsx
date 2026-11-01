@@ -12,6 +12,8 @@ type CardPost = Pick<NewsPost, "slug" | "title" | "summary" | "published" | "tag
 
 const chipLabel = (tags: string[]): string | null => {
   const tag = tags.find((t) => t !== "news-recap") ?? tags[0];
+  // A "blue post" is a Blizzard staff post; Everloot writes about one, so the chip must not read as one.
+  if (tag === "blue-post") return "About a blue post";
   // "wow-forever" reads "WoW forever", not "Wow forever".
   return tag ? (tag.charAt(0).toUpperCase() + tag.slice(1).replace(/-/g, " ")).replace(/\bwow\b/gi, "WoW") : null;
 };
