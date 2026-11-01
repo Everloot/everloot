@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
-import { mkdirSync, renameSync, rmSync } from "node:fs";
+import { mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
 import { open } from "node:fs/promises";
 import { join } from "node:path";
-import { checksumFor } from "./addon";
+import { checksumFor, compareVersions } from "./addon";
 
 /**
  * The app updating itself, on Windows installs only: the new installer is downloaded into the data
@@ -137,6 +137,25 @@ export async function downloadUpdate(options: {
   }
   options.onProgress?.(100);
   return target;
+}
+
+/**
+ * Deletes the installers in the updates folder that this version has caught up with (its own and
+ * older ones) and any partial download left by a crash, so each update does not leave another
+ * ~110 MB behind. A newer installer and any other file stay. A file still locked by the installer
+ * that just ran is left for the next start. Returns the names deleted.
+ */
+export function pruneInstallers(dir: string, current: string): string[] {
+  let names: string[];
+  try { names = readdirSync(dir); } catch { return []; }
+  const gone: string[] = [];
+  for (const name of names) {
+    const part = name.endsWith(".part");
+    const m = INSTALLER_NAME.exec(part ? name.slice(0, -5) : name);
+    if (!m || (!part && compareVersions(m[1], current) > 0)) continue;
+    try { rmSync(join(dir, name), { force: true }); gone.push(name); } catch { /* still in use; next start */ }
+  }
+  return gone;
 }
 
 /**
