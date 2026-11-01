@@ -11,7 +11,7 @@ import { presetFor, type ProviderKind } from "../shared/providers";
 import { accountInfo, signIn, signOut } from "./account";
 import { listBackups, restoreBackup } from "./backups";
 import { createBuildsSync } from "./builds";
-import { compareVersions, installAddon, installedAddonVersion, newestRelease, slotAddons } from "./addon";
+import { compareVersions, installAddon, installedAddonVersion, newestAddonRelease, slotAddons } from "./addon";
 import { fetchChanges } from "./changes";
 import { charactersFromFiles } from "./characters";
 import { createChat } from "./chat";
@@ -147,7 +147,7 @@ if (!app.requestSingleInstanceLock()) {
     if (!dir) return;
     try {
       const installed = installedAddonVersion(dir);
-      const latest = newestRelease(await releases(), "addon-v");
+      const latest = newestAddonRelease(await releases());
       if (installed && latest && latest.version !== addonNoticed && compareVersions(latest.version, installed) > 0) {
         addonNoticed = latest.version;
         notify("Everloot addon update", `${latest.version} is out (you run ${installed}). Open the Addon page to update.`, "addon");
@@ -429,7 +429,7 @@ if (!app.requestSingleInstanceLock()) {
     const dir = addonsDir();
     const local = { addonsDir: dir, installed: dir ? installedAddonVersion(dir) : null, slots: dir ? slotAddons(dir) : { prices: false, answers: false, builds: false } };
     try {
-      const latest = newestRelease(await releases(), "addon-v");
+      const latest = newestAddonRelease(await releases());
       return { ...local, latest, newer: Boolean(latest && local.installed && compareVersions(latest.version, local.installed) > 0), error: null };
     } catch (err) { return { ...local, latest: null, newer: false, error: err instanceof Error ? err.message : String(err) }; }
   });
