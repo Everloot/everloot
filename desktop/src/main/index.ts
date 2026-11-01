@@ -9,7 +9,7 @@ import { JOBS } from "../shared/types";
 import { reportDiagnostics } from "../shared/diagnostics";
 import { presetFor, type ProviderKind } from "../shared/providers";
 import { accountInfo, signIn, signOut } from "./account";
-import { listBackups, restoreBackup } from "./backups";
+import { gameRunning, listBackups, restoreBackup } from "./backups";
 import { createBuildsSync } from "./builds";
 import { compareVersions, installAddon, installedAddonVersion, newestAddonRelease, slotAddons } from "./addon";
 import { fetchChanges } from "./changes";
@@ -395,11 +395,14 @@ if (!app.requestSingleInstanceLock()) {
     if (typeof file !== "string") throw new Error("Not a backup");
     const entry = listBackups(data).find((b) => b.file === file);
     if (!entry) throw new Error("That backup is gone");
+    // The game rewrites the file when it logs out or exits; a check that cannot answer still leaves the choice to the player.
+    const running = await gameRunning();
+    if (running) throw new Error("Close World of Warcraft first, then restore.");
     const options: Electron.MessageBoxOptions = {
       type: "warning", buttons: ["Restore", "Cancel"], defaultId: 1, cancelId: 1,
       title: "Restore a backup",
       message: `Put the ${entry.account} save file back to ${new Date(entry.at).toLocaleString()}?`,
-      detail: "Do this while logged out: the game rewrites the file on logout and would undo the restore. The file as it is now is backed up first, so you can go back.",
+      detail: `${running === null ? "The app could not check whether World of Warcraft is running. Close it first" : "Keep the game closed until this is done"}: the game rewrites the file when it exits and would undo the restore. The file as it is now is backed up first, so you can go back.`,
     };
     const r = win ? await dialog.showMessageBox(win, options) : await dialog.showMessageBox(options);
     if (r.response !== 0) return null;
