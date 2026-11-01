@@ -115,6 +115,7 @@ Markdown table to keep as the step's record and exits 1 when a check fails. It a
 `/database/items/25` shows a name. It needs only Python's standard library, and it never prints the
 IndexNow key. First run: 2026-10-30, all 16 checks passed before the switch. On 2026-11-01 the `/addon` and
 `/upload` download checks were added (18 checks); `/addon` failed then, showing its "not available" fallback.
+Later that day the talent build and raid plan link preview cards were added (20 checks); both answered 500 then.
 
 | Path | Expected |
 |---|---|
@@ -126,6 +127,7 @@ IndexNow key. First run: 2026-10-30, all 16 checks passed before the switch. On 
 | `/api/health` | 200, fresh within 30 minutes; 503 when stale or storage cannot be read |
 | `/addon`, `/upload` | 200, a link to the served addon zip; `/addon` also links a Desktop App installer; neither shows the "not available" or "could not be loaded" fallback |
 | `/indexnow.txt` | 200 with the key, if the IndexNow setting exists |
+| `/tools/talents/mage/card?a=<code>&b=-`, `/tools/raid/card?c=<code>` | 200, `image/png`: the link previews of a shared build and a raid plan, drawn on each request |
 | MCP: POST `tools/list` to `https://everloot.app/mcp/public` | 32 tools (counted 2026-10-30), no key (`docs/SEO.md` names that endpoint; the endpoint answers 404 unless the public MCP switch is set in Production) |
 | MCP: `tools/call` `answer_sources` with "which bosses are in Deadmines" | The first piece is the game files' fact, labelled *found in game files, unconfirmed* with the build, naming the bosses once each |
 
