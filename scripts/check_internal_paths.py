@@ -1,12 +1,13 @@
-"""Fail when a tracked file names the maintainer's private workspace, secrets folder or a personal
-machine path. Run from the repository root: python scripts/check_internal_paths.py"""
+"""Fail when a tracked file names the maintainer's private workspace, secrets folder, a personal
+machine path, the maintainer's company domain or a real Supabase project host. Run from the repository root: python scripts/check_internal_paths.py"""
 import re
 import subprocess
 import sys
 
 # This file is the one place the patterns are written down, so it is the one file not checked.
 PATTERN = re.compile(
-    r"R21-Brain|_secrets|Users[\\/]+carli|\.t3[\\/]+worktrees|[\\/]\.r21[\\/]|projects[\\/]+everloot",
+    r"R21-Brain|_secrets|Users[\\/]+carli|\.t3[\\/]+worktrees|[\\/]\.r21[\\/]|projects[\\/]+everloot"
+    r"|r21digital|\b[a-z]{20}\.supabase\.co\b",
     re.IGNORECASE,
 )
 SKIP = {"scripts/check_internal_paths.py", "scripts/test_check_internal_paths.py"}

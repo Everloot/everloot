@@ -14,6 +14,12 @@ assert offending_lines("c:\\users\\carli\\x and C:/Users/Carli/y") == [1]
 assert offending_lines("d:/r21-brain/projects") == [1]
 assert offending_lines("e.g. from %USERPROFILE%\\.r21\\everloot-r2-backup.env") == [1]
 assert offending_lines("cd projects/everloot/web") == [1]
+# The maintainer's company domain and real Supabase project hosts.
+assert offending_lines("see everloot-web-git-x-r21digital.vercel.app") == [1]
+assert offending_lines("mail Someone@R21Digital.com") == [1]
+assert offending_lines("SUPABASE_URL=https://abcdefghijklmnopqrst.supabase.co") == [1]
+assert offending_lines("SUPABASE_URL=https://YOUR-PROJECT.supabase.co") == []
+assert offending_lines("https://<project-ref>.supabase.co and supabase.com/docs") == []
 # Generic example paths in docs and tests are fine.
 assert offending_lines('{ "apiKeyFile": "C:/Users/<you>/keys/anthropic.txt" }') == []
 assert offending_lines('parseArgs(["watch", "--game", "C:/Games/WoW"]) and "C:\\\\Users\\\\p\\\\AppData"') == []
@@ -21,4 +27,4 @@ assert offending_lines('parseArgs(["watch", "--game", "C:/Games/WoW"]) and "C:\\
 assert not skipped("web/package-lock.json")
 assert not skipped("package-lock.json")
 assert skipped("scripts/check_internal_paths.py")
-print("check_internal_paths: 13 cases pass")
+print("check_internal_paths: 18 cases pass")
