@@ -4,48 +4,66 @@ slug: shadowfang-keep
 title: Shadowfang Keep
 type: dungeon
 binds: { entrance: shadowfang-keep, zone: 1421 }
-summary: A fortress in Silverpine Forest seized by the mad archmage Arugal and the worgen he brought into the world. Most players who go there are Horde, sent by the Forsaken.
+summary: A keep in Silverpine Forest that the mad archmage Arugal took from Baron Silverlaine with the worgen he summoned. Its entrance is on the hill above Pyrewood Village.
 categories: [dungeons, eastern-kingdoms, silverpine-forest]
 origin: original
 adaptedFrom: []
 sources:
-  - { title: "Explore the New Dungeons of World of Warcraft: Forever (Blizzard news)", url: "https://worldofwarcraft.blizzard.com/en-us/news/24301455", checkedOn: 2026-10-20 }
-  - { title: "Explore the New Dungeons of World of Warcraft: Forever (forum post)", url: "https://us.forums.blizzard.com/en/wow/t/explore-the-new-dungeons-of-world-of-warcraft-forever/2387658", checkedOn: 2026-10-20 }
+  - { title: "Explore the New Dungeons of World of Warcraft: Forever (Blizzard news)", url: "https://worldofwarcraft.blizzard.com/en-us/news/24301455", checkedOn: 2026-11-01 }
+  - { title: "Explore the New Dungeons of World of Warcraft: Forever (forum post)", url: "https://us.forums.blizzard.com/en/wow/t/explore-the-new-dungeons-of-world-of-warcraft-forever/2387658", checkedOn: 2026-11-01 }
+  - { title: "Everloot map: dungeon entrances and flight points (game files, build 1.60.1.70707)", url: "https://everloot.app/map", checkedOn: 2026-11-01 }
+  - { title: "Everloot database: instance page, level, entrance and encounters (game files, build 1.60.1.70707)", url: "https://everloot.app/database/instances/33-shadowfang-keep", checkedOn: 2026-11-01 }
+  - { title: "Shadowfang Keep (lore page, Warcraft Wiki)", url: "https://everloot.app/lore/43950-shadowfang-keep", checkedOn: 2026-11-01 }
+  - { title: "Arugal (lore page, Warcraft Wiki)", url: "https://everloot.app/lore/420872-arugal", checkedOn: 2026-11-01 }
 status: draft
 reviewed: null
 ---
 
 ## Overview
 
-Shadowfang Keep stands on a hill above Pyrewood Village in Silverpine Forest. It was once the seat of Baron
-Silverlaine. Now it belongs to Archmage Arugal and the worgen he called into the world, and its halls are full
-of them, along with the restless dead of the old household.
+Shadowfang Keep stands on a high bluff above Pyrewood Village in southern Silverpine Forest. It was once the seat of
+Baron Silverlaine. Archmage Arugal took it with his worgen, whom he called his children, and the ghosts of the
+Baron's household still walk its halls.
 
-Silverpine lies between the Forsaken's home in Tirisfal and the human lands to the south, so most of the
-players who come here are Horde. The keep is a climb from the gate to the top of its tallest tower, and Arugal
-waits at the end of it.
+The keep takes its name from Arugal's worgen.
 
 ## Getting there
 
-The entrance is in {zone:1421}, at the keep's gate on the hill above Pyrewood. The game files place the
-Sepulcher's flight point in the same zone, and it is the closest one by a long way. Alliance players have the
-longer road, usually up from Hillsbrad Foothills to the south and through Forsaken country.
+The entrance is in {zone:1421}, at the keep above Pyrewood. [Find it on the map](/map?zone=1421&x=44.7&y=67.8). The
+Sepulcher's flight point, in the same zone, is the nearest in the game files; the next nearest are much further
+away.
 
 ## History
 
-When the Scourge spread across Lordaeron, the wizards of Dalaran looked for anything that might hold it back.
-Arugal's answer was to summon the worgen, wolf-like beasts from another world, and set them against the
-undead. He could not control them. The worgen turned on the people of Silverpine as readily as on the
-Scourge, and their curse began to spread. Arugal could not face what he had done. He went mad, came to see the
-worgen as his children, and took Shadowfang Keep as a home for them.
+When the Scourge swept over Lordaeron, Arugal looked for a way to hold it back. Using the research of the mage Ur,
+he summoned the worgen and set them against the undead. They turned the tide, then turned on the Gilnean soldiers
+too, and he could not control them.
 
-Two prisoners are held in the courtyard, one for each faction: Deathstalker Adamant, a Forsaken agent, and
-Sorcerer Ashcrombe, a human mage. Whichever one a group frees offers to help it onward. Forsaken quest givers
-at the Sepulcher and in Undercity want Arugal dead and the fate of their own agents sent into the keep
-explained.
+The worgen overran the keep and killed Baron Silverlaine and his family. Broken by what he had done, Arugal took the
+worgen as his children, moved into the keep and gave it its name. From there he spread the curse through Silverpine.
 
 ## In WoW: Forever
 
-Blizzard has not announced anything specific to Shadowfang Keep for WoW: Forever yet. The entrance is in the
-current beta build's game files. The bosses, loot and quests on this page fill in from those files and from
-what players record once they play.
+Everloot's record of Blizzard's posts, through 2026-10-23, has nothing about Shadowfang Keep for WoW: Forever.
+Nothing here is confirmed for Forever yet.
+
+The level, the entrance and the encounters come from the game files Everloot reads, build 1.60.1.70707. They are
+found in the game files and not confirmed in the game. The list of encounters is on
+[the database page](/database/instances/33-shadowfang-keep); which of them you meet in Forever, and in what order,
+is not known.
+
+Once players with the Everloot addon zone in and [upload their data](/upload), this page shows the entrance they
+agree on, and each boss they report with its kills and when it was last seen. Loot and quests are not known for
+Forever yet, so this page lists none.
+
+## Before you go
+
+### Editor to confirm
+
+- Proposed: Check the level in this page's facts before you form a group. It is the one level the game files give,
+  not a range, and it is not confirmed in the game.
+- Proposed: Fly to the Sepulcher, the nearest flight point in the game files, and make your way to the keep above
+  Pyrewood.
+- Proposed: The game files list more than one difficulty for Shadowfang Keep.
+  [The database page](/database/instances/33-shadowfang-keep) shows them, with the encounters. Which difficulties
+  Forever opens is not known, so do not plan a run around one yet.

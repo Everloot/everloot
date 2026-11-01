@@ -4,48 +4,67 @@ slug: blackfathom-deeps
 title: Blackfathom Deeps
 type: dungeon
 binds: { entrance: blackfathom-deeps, zone: 1440 }
-summary: A sunken night elf temple on the Ashenvale coast, now held by naga and the Twilight's Hammer cult. Both factions have quests there, from Auberdine for the Alliance and Zoram'gar Outpost for the Horde.
+summary: A drowned temple to Elune on the Ashenvale coast, where the Twilight's Hammer cult tends the hydra Aku'mai. Its entrance is on the Zoram Strand.
 categories: [dungeons, kalimdor, ashenvale]
 origin: original
 adaptedFrom: []
 sources:
-  - { title: "Explore the New Dungeons of World of Warcraft: Forever (Blizzard news)", url: "https://worldofwarcraft.blizzard.com/en-us/news/24301455", checkedOn: 2026-10-20 }
-  - { title: "Explore the New Dungeons of World of Warcraft: Forever (forum post)", url: "https://us.forums.blizzard.com/en/wow/t/explore-the-new-dungeons-of-world-of-warcraft-forever/2387658", checkedOn: 2026-10-20 }
+  - { title: "Explore the New Dungeons of World of Warcraft: Forever (Blizzard news)", url: "https://worldofwarcraft.blizzard.com/en-us/news/24301455", checkedOn: 2026-11-01 }
+  - { title: "Explore the New Dungeons of World of Warcraft: Forever (forum post)", url: "https://us.forums.blizzard.com/en/wow/t/explore-the-new-dungeons-of-world-of-warcraft-forever/2387658", checkedOn: 2026-11-01 }
+  - { title: "Everloot map: dungeon entrances and flight points (game files, build 1.60.1.70707)", url: "https://everloot.app/map", checkedOn: 2026-11-01 }
+  - { title: "Everloot database: instance page, level, entrance and encounters (game files, build 1.60.1.70707)", url: "https://everloot.app/database/instances/48-blackfathom-deeps", checkedOn: 2026-11-01 }
+  - { title: "Blackfathom Deeps (lore page, Warcraft Wiki)", url: "https://everloot.app/lore/334679-blackfathom-deeps", checkedOn: 2026-11-01 }
+  - { title: "Aku'mai (lore page, Warcraft Wiki)", url: "https://everloot.app/lore/174174-aku-mai", checkedOn: 2026-11-01 }
+  - { title: "Twilight Lord Kelris (lore page, Warcraft Wiki)", url: "https://everloot.app/lore/93686-twilight-lord-kelris", checkedOn: 2026-11-01 }
 status: draft
 reviewed: null
 ---
 
 ## Overview
 
-Blackfathom Deeps is a ruined temple on the coast of Ashenvale, much of it under the sea. The night elves once
-worshipped their moon goddess Elune there. The temple was broken and drowned long ago, and for ages it was
-left to the water. Now naga, satyrs and the Twilight's Hammer have moved in. The cult serves the Old Gods,
-and in the deepest part of the temple it tends Aku'mai, a monstrous beast it treats as a gift from its
-masters.
+Blackfathom Deeps is a temple to the moon goddess Elune on the coast of Ashenvale, much of it now under water. It
+was thought lost in the Sundering. Ages later the Twilight's Hammer, a cult that serves the Old Gods, was drawn
+there by whispers and bad dreams. In the deepest part of the temple it tends Aku'mai, a hydra it treats as a gift
+from its masters.
 
-Large parts of the dungeon are flooded, so a run means a good deal of swimming between dry ledges. Both
-factions come here at about the same point in their travels, and both have quest givers nearby who want
-something from the temple.
+Naga have moved into the flooded halls as well.
 
 ## Getting there
 
-The entrance is on the Zoram Strand, on the northwestern coast of {zone:1440}, inside a ruin standing in
-the shallows. The game files place the Horde's Zoram'gar Outpost flight point on the same shore, and it is the
-closest one. Alliance players usually come south from Auberdine in {zone:1439} or west from Astranaar.
+The entrance is on the Zoram Strand, on the northwestern coast of {zone:1440}.
+[Find it on the map](/map?zone=1440&x=16.5&y=11). Zoram'gar Outpost's flight point is the nearest in the game files.
 
 ## History
 
-The temple fell when the ancient night elf empire was destroyed and the land around it was torn apart. The
-naga who now swim its halls descend from night elves who were lost beneath the sea in that same disaster.
-The Twilight's Hammer arrived later, drawn by what sleeps below, under the command of Twilight Lord Kelris.
+The night elves built the temple on the western edge of ancient Kalimdor. When the Sundering tore the land apart, it
+sank beneath the sea and was left to the water.
 
-Each faction has its own reasons to go in. In Auberdine, night elf scholars want to understand the
-corruption spreading from the deeps. At Zoram'gar Outpost, the Horde's people have their own business with
-the cult and with Aku'mai. A member of the Argent Dawn waits inside the dungeon and asks either faction for
-Kelris's head.
+Long after, the corruption of an Old God seeped up from below and fouled the temple's moonwell. Aku'mai rose and
+made the ruins its lair, and the cult came to be near it. Twilight Lord Kelris, who led the cult there, believed the
+hydra was a sign of the Old Gods' return, and fed it his own followers to make it grow.
 
 ## In WoW: Forever
 
-Blizzard has not announced anything specific to Blackfathom Deeps for WoW: Forever yet. The entrance is in
-the current beta build's game files. The bosses, loot and quests on this page fill in from those files and
-from what players record once they play.
+Everloot's record of Blizzard's posts, through 2026-10-23, has nothing about Blackfathom Deeps for WoW: Forever.
+Nothing here is confirmed for Forever yet.
+
+The level, the entrance and the encounters come from the game files Everloot reads, build 1.60.1.70707. They are
+found in the game files and not confirmed in the game. The list of encounters is on
+[the database page](/database/instances/48-blackfathom-deeps); which of them you meet in Forever, and in what order,
+is not known.
+
+Once players with the Everloot addon zone in and [upload their data](/upload), this page shows the entrance they
+agree on, and each boss they report with its kills and when it was last seen. Loot and quests are not known for
+Forever yet, so this page lists none.
+
+## Before you go
+
+### Editor to confirm
+
+- Proposed: Check the level in this page's facts before you form a group. It is the one level the game files give,
+  not a range, and it is not confirmed in the game.
+- Proposed: Fly to Zoram'gar Outpost, the nearest flight point in the game files, and make your way to the Zoram
+  Strand.
+- Proposed: The game files list more than one difficulty for Blackfathom Deeps, and encounters for each.
+  [The database page](/database/instances/48-blackfathom-deeps) shows both. Which difficulties Forever opens is not
+  known, so do not plan a run around one yet.

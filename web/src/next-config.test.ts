@@ -56,7 +56,7 @@ test("every route that reads the wiki pages carries them in its bundle", () => {
   const keyFor = (route: string) => Object.keys(includes).find((key) => picomatch(key, { dot: true, contains: true })(route));
   // The wiki pages are read from kb/wiki at request time, so a route that lists or shows them needs the
   // folder in its own bundle. Without it the route answers 500 in production while the tests pass.
-  for (const route of ["/wiki/route", "/wiki/[slug]/route", "/sitemap.xml/route", "/guides/route", "/guides/[slug]/route"]) {
+  for (const route of ["/wiki/route", "/wiki/[slug]/route", "/sitemap.xml/route", "/guides/route", "/guides/[slug]/route", "/database/instances/[instance]/route"]) {
     const key = keyFor(route);
     expect(key, route).toBeDefined();
     expect(includes[key!], route).toContain("../kb/wiki/*.md");
