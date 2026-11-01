@@ -1,14 +1,19 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { ImageResponse } from "next/og";
 import { tokens, type CLASSES } from "@/design/tokens";
 import type { Showcase } from "@/lib/character-showcase";
+// The cards are drawn on each request on the Worker, which has no node_modules to read, so the bundler inlines
+// the fonts' bytes (`?inline`, next.config.js). The package's exports hide its font files, hence the path.
+import boldUrl from "../../node_modules/geist/dist/fonts/geist-sans/Geist-Bold.ttf?inline";
+import regularUrl from "../../node_modules/geist/dist/fonts/geist-sans/Geist-Regular.ttf?inline";
 
 /** Size every per-route social card shares with the site-wide one. */
 export const CARD_SIZE = { width: 1200, height: 630 };
 
-// Read from the geist package when the image is prerendered at build.
-const fonts = join(process.cwd(), "node_modules/geist/dist/fonts/geist-sans");
+const fromDataUrl = (url: string) => Buffer.from(url.slice(url.indexOf(",") + 1), "base64");
+const FONTS = [
+  { name: "Geist", data: fromDataUrl(boldUrl), weight: 700, style: "normal" },
+  { name: "Geist", data: fromDataUrl(regularUrl), weight: 400, style: "normal" },
+] as const;
 
 export interface CardBar { name: string; value: string; fraction: number; /** The bar's own colour; the card's by default. */ color?: string }
 
@@ -18,7 +23,6 @@ export interface CardBar { name: string; value: string; fraction: number; /** Th
  * below: no game art.
  */
 export async function renderBuildCard(card: { label: string; title: string; color: string; subtitle: string; groups: { heading: string; bars: CardBar[] }[] }): Promise<ImageResponse> {
-  const [bold, regular] = await Promise.all([readFile(join(fonts, "Geist-Bold.ttf")), readFile(join(fonts, "Geist-Regular.ttf"))]);
   const c = tokens.dark;
   return new ImageResponse(
     (
@@ -52,7 +56,7 @@ export async function renderBuildCard(card: { label: string; title: string; colo
         <div style={{ fontSize: 24, marginTop: "auto", paddingTop: 24, color: c.muted }}>everloot.app</div>
       </div>
     ),
-    { ...CARD_SIZE, fonts: [{ name: "Geist", data: bold, weight: 700, style: "normal" }, { name: "Geist", data: regular, weight: 400, style: "normal" }] },
+    { ...CARD_SIZE, fonts: [...FONTS] },
   );
 }
 
@@ -71,7 +75,6 @@ export function fittedTitle(title: string): { fontSize: number; lines: number } 
  * (fittedTitle); without it the title is drawn at full size as it is.
  */
 export async function renderCard(card: { label: string; title: string; subtitle: string; fit?: boolean }): Promise<ImageResponse> {
-  const [bold, regular] = await Promise.all([readFile(join(fonts, "Geist-Bold.ttf")), readFile(join(fonts, "Geist-Regular.ttf"))]);
   const c = tokens.dark;
   const fit = card.fit ? fittedTitle(card.title) : null;
   return new ImageResponse(
@@ -88,7 +91,7 @@ export async function renderCard(card: { label: string; title: string; subtitle:
         <div style={{ fontSize: 28, marginTop: 56, color: c.muted }}>everloot.app</div>
       </div>
     ),
-    { ...CARD_SIZE, fonts: [{ name: "Geist", data: bold, weight: 700, style: "normal" }, { name: "Geist", data: regular, weight: 400, style: "normal" }] },
+    { ...CARD_SIZE, fonts: [...FONTS] },
   );
 }
 

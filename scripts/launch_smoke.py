@@ -45,6 +45,14 @@ def judge_ok(status: int, _headers: dict, _text: str) -> str | None:
     return None if status == 200 else f"answered {status}"
 
 
+def judge_png(status: int, headers: dict, _text: str) -> str | None:
+    """A link preview card: the picture itself, not an error page."""
+    if status != 200:
+        return f"answered {status}"
+    kind = headers.get("content-type", "")
+    return None if kind.split(";")[0].strip() == "image/png" else f"is {kind or 'untyped'}, not image/png"
+
+
 def judge_notice(status: int, _headers: dict, text: str) -> str | None:
     """A version page with nothing running: 200, the notice, kept out of search results."""
     if status != 200:
@@ -167,6 +175,9 @@ def checks(after_switch: bool) -> list[tuple[str, str, dict | None, object]]:
         ("/addon", "/addon", None, judge_downloads(desktop=True)),
         ("/upload", "/upload", None, judge_downloads(desktop=False)),
         ("/indexnow.txt", "/indexnow.txt", None, judge_indexnow),
+        # The link previews of a shared talent build and a raid plan, drawn on each request (500 on the Worker until 11/01).
+        ("talent build card", "/tools/talents/mage/card?a=EL1-mage-0-1.60.1.70707-MTA1ODE1OjE&b=-", None, judge_png),
+        ("raid plan card", "/tools/raid/card?c=ELR1-10-1.60.1.70707-MTM1Mg", None, judge_png),
         ("MCP tools/list", "/mcp/public", {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}, judge_tools(MCP_TOOLS)),
         ("MCP answer_sources: which bosses are in Deadmines", "/mcp/public",
          {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "answer_sources", "arguments": {"question": "which bosses are in Deadmines", "limit": 3}}},

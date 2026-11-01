@@ -105,9 +105,6 @@ const nextConfig = {
     "/sitemap.xml": ["../kb/wiki/*.md", "../kb/wiki/categories.yaml", "../kb/news/*.md", "../kb/guides/*.md"],
     "/lore/browse/[type]": ["./.release/*.sqlite", "./.release/*.manifest.json"],
     "/lore/coverage": ["./.release/*.sqlite", "./.release/*.manifest.json"],
-    // The build-link previews draw their card on each request, so they read the Geist fonts at run time.
-    "/tools/raid/card": ["./node_modules/geist/dist/fonts/geist-sans/Geist-{Bold,Regular}.ttf"],
-    "/tools/talents/\\[class\\]/card": ["./node_modules/geist/dist/fonts/geist-sans/Geist-{Bold,Regular}.ttf"],
   },
   // /lore/[slug] already owns one dynamic segment under /lore, so the browse pages live at
   // /lore/browse/<type> and are served at the short URL. afterFiles rewrites run before dynamic routes.
@@ -198,6 +195,10 @@ const nextConfig = {
     config.resolve.extensionAlias = { ...config.resolve.extensionAlias, ".js": [".js", ".ts", ".tsx"] };
     // kb/src imports packages that a build installs only under web/node_modules.
     config.resolve.modules = [...(config.resolve.modules ?? ["node_modules"]), path.join(__dirname, "node_modules")];
+    // `import x from "./file.ttf?inline"` is the file's bytes as a data: URL inside the bundle (lib/og-card.tsx): the
+    // Worker has no node_modules to read when it draws a link preview. https://webpack.js.org/guides/asset-modules/
+    // It is `asset` told to inline every file: Next's own asset filename setting is not valid on `asset/inline`.
+    config.module.rules.push({ resourceQuery: /^\?inline$/, type: "asset", parser: { dataUrlCondition: () => true } });
     // Webpack's build cache treats a package under node_modules as unchanged while its version stays the same.
     // The protocol is packed from ../packages/protocol, so a change without a version bump came out of the
     // previous build's cache (production served stale tool lists twice). Its files are checked instead.
