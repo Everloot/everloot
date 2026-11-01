@@ -26,7 +26,7 @@ import { itemIdFrom, listRealms, ownRealms, priceRows, readPricesFile } from "./
 import { loadSettings, mergeSettings, saveSettings } from "./settings";
 import { createTray } from "./tray";
 import { checkForUpdates, fetchReleases, updateFrom } from "./updates";
-import { downloadUpdate, runInstaller } from "./self-update";
+import { downloadUpdate, pruneInstallers, runInstaller } from "./self-update";
 import { fitWindow, readWindowState, writeWindowState } from "./window-state";
 
 /** The same folder the command line uses (`companion/src/cli.ts` defaultStatePath), so both share sent.json. */
@@ -478,6 +478,8 @@ if (!app.requestSingleInstanceLock()) {
       show, runNow: (job) => void engine.runNow(job), setPaused: (p) => engine.setPaused(p), openExternal: (url) => { if (allowedExternal(url)) void shell.openExternal(url); }, quit: () => { quitting = true; app.quit(); },
     });
     applyLoginItem();
+    // The installer that brought this version, and older ones, are no longer needed.
+    pruneInstallers(join(data, "updates"), app.getVersion());
     engine.start(settings);
     // A laptop that slept through the last retry would otherwise wait for the next logout.
     powerMonitor.on("resume", () => engine.recover());

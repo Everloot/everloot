@@ -76,7 +76,7 @@ after that.
 
 The app shares its data folder with the command line (`%APPDATA%\Everloot`,
 `~/Library/Application Support/Everloot`, `~/.config/everloot`): `sent.json` for confirmed events,
-`answers.json`, `settings.json`, `chat.json`, a `backups/` folder with the newest ten copies of each
+`answers.json`, `settings.json`, `chat.json`, an `updates/` folder with a downloaded Windows update until it is installed (the next start deletes it), a `backups/` folder with the newest ten copies of each
 account's `Everloot.lua` before upload attempts, including while offline (the Upload page lists them and can restore one while you are
 logged out; the file it replaces is backed up first), and the optional `config.json` for `/ask` model providers (same
 format and same rules as the [companion README](../companion/README.md#providers-design-sections-6465):
