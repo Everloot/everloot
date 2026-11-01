@@ -4,7 +4,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { LAUNCH } from "@/data/wow-forever";
 import { POSTS, RULESETS, RULESETS_POST } from "@/data/wow-forever-launch";
 import { postPath } from "@/lib/changes";
-import { RACE_TABLE } from "@/lib/race-traits";
+import { RACE_TABLE, RACIAL_NOTES } from "@/lib/race-traits";
 
 vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a>,
@@ -81,4 +81,14 @@ test("each faction's racial traits sit under its race table, by name with active
   for (const trait of ["Blood Fury", "War Stomp", "Will to Survive", "Shadowmeld", "Skysight", "Read Leyline"]) expect(text, trait).toContain(trait);
   expect(text.match(/found in game files, unconfirmed/gi)).toHaveLength(1);
   expect(text).toContain(RACE_TABLE.build.version);
+});
+
+test("the race tables show Forever's final racials from Blizzard's October 26 notes, not the traits it removed", async () => {
+  const races = section(await at("2026-10-28T12:00:00Z"), "races");
+  const text = visible(races);
+  // "Earth Fury (2% increased critical strike damage and healing) removed." / "Savage removed (1% increased critical strike chance)."
+  for (const gone of ["Earth Fury", "Savage"]) expect(text, gone).not.toContain(gone);
+  for (const added of ["Artisan's Precision", "Command"]) expect(text, added).toContain(added);
+  expect(races).toContain(`href="${RACIAL_NOTES.sourceUrl}"`);
+  expect(text).toContain("Updated 26 October");
 });

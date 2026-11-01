@@ -5,7 +5,7 @@ import { CLASSES, LAUNCH, longDate, NEW_COMBOS, RACES } from "@/data/wow-forever
 import { DATES, POSTS, RULESETS, RULESETS_POST, hasLaunched, windowAt, type BluePostRef } from "@/data/wow-forever-launch";
 import { latestBuildLine } from "@/lib/changes-facts";
 import { loadTimeline, postPath } from "@/lib/changes";
-import { RACE_TABLE, traitsFor, type RaceTrait } from "@/lib/race-traits";
+import { RACE_TABLE, RACIAL_NOTES, traitsFor, type RaceTrait } from "@/lib/race-traits";
 import { pageMetadata } from "@/lib/seo";
 import JsonLd from "@/components/JsonLd";
 import { videoGamePageJsonLd } from "@/lib/jsonld";
@@ -252,7 +252,9 @@ export default async function WowForeverPage() {
               Source: <a href={RACES.sourceUrl} rel="noopener" className={link}>{RACES.sourceName}, {RACES.sourceTitle}</a>, published{" "}
               <time dateTime={RACES.published}>{longDate(RACES.published)}</time>. Checked on{" "}
               <time dateTime={RACES.checkedOn}>{longDate(RACES.checkedOn)}</time>. Racial traits found in game files,
-              unconfirmed, build {RACE_TABLE.build.version}. How many characters play each
+              unconfirmed, build {RACE_TABLE.build.version}, with Blizzard&apos;s final racial changes from{" "}
+              <a href={RACIAL_NOTES.sourceUrl} rel="noopener" className={link}>{RACIAL_NOTES.sourceName}, {RACIAL_NOTES.sourceTitle}</a>, published{" "}
+              <time dateTime={RACIAL_NOTES.published}>{longDate(RACIAL_NOTES.published)}</time>. How many characters play each
               combination: the <Link href="/census" className={link}>census</Link>.
             </p>
           </div>

@@ -36,6 +36,7 @@ import { WORLD_MAP_DATA } from "./world-map-file.js";
 import { CLIENT_EDGES, CLIENT_LAYER, CLIENT_TAXONOMY } from "./client-layer-file.js";
 import { RACE_TABLE } from "./client-races-file.js";
 import { handleClassRaces } from "./class-races-tool.js";
+import { withRacialNotes } from "./racial-notes.js";
 import { categoryOf, handleItemCategories, itemCategoriesStructured } from "./item-taxonomy.js";
 import { entityRelationsStructured, handleEntityRelations, observedEdgesFromRecords, type Edge } from "./edges.js";
 import type { DB } from "./db.js";
@@ -703,7 +704,7 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
     },
     talent_tree: (args) => handleTalentTree(args),
     talent_plan: (args) => handleTalentPlan(args),
-    class_races: (args) => handleClassRaces(args, RACE_TABLE),
+    class_races: (args) => handleClassRaces(args, withRacialNotes(RACE_TABLE)),
     collection_gap: (args) => readPageIn("collection_gap", (facts: ReturnType<typeof collectionFactsFromRecords>) => {
       const page = collectionGap(args.collection, args.ownerInstallId, facts);
       const url = page.groups.length ? collectionsUrl({ collection: args.collection, install: args.ownerInstallId }) : undefined;
