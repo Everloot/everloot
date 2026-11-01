@@ -78,6 +78,8 @@ const sideFoot = document.getElementById("side-foot")!;
 const updatePop = document.getElementById("updatePop")!;
 /** Whether the update popover is open. */
 let updateOpen = false;
+/** The update notification asked for the popover before the first state arrived. */
+let updateAsked = false;
 
 const ext = (url: string, text: string) => `<button type="button" class="link" data-open="${esc(url)}">${esc(text)}</button>`;
 
@@ -192,7 +194,7 @@ function overview(s: AppState): string {
     <div class="head"><h1>Overview</h1><span class="sub">${e.files.length ? `Watching ${e.files.length} account file(s)` : "Not watching a game folder"}${e.paused ? " · paused" : ""}</span></div>
     ${s.notice ? `<p class="callout error">${icon("alert")}<span>${esc(s.notice)}</span></p>` : ""}
     ${foreverCallout(s)}
-    ${s.update?.newer && s.update.url ? `<p class="callout fg2">${icon("upload")}<span>Everloot Desktop App ${esc(s.update.latest ?? "")} is out; you run ${esc(s.version)}. ${ext(s.update.url, "Download it")} and install over this one; your settings stay.</span></p>` : ""}
+    ${updateCallout(s)}
     ${!e.files.length && s.settings.gameFolder ? `<p class="callout fg2">${icon("log")}<span>No <code>Everloot.lua</code> under <span class="mono">${esc(s.settings.gameFolder)}</span> yet. Log out once in the game so it writes the file.</span></p>` : ""}
     <section class="hero" data-state="${status.state}" aria-labelledby="heroTitle">
       <div class="hero-body">
@@ -1006,12 +1008,10 @@ function renderSide(s: AppState): void {
     + group("companion", "Companion", pages(["upload", "market", "ask", "addon", "changes", "log"]))
     + group("web", "On everloot.app", web);
   const e = s.engine;
-  // Ready to install: Restart gets its own row, the clearest thing in the footer.
-  const ready = s.update?.newer && s.updateProgress.stage === "ready";
   const acct = s.account.signedIn
     ? `<button type="button" class="account-btn" id="accountBtn" title="Signed in to everloot.app">${PERSON}<span class="acct-text"><b>Signed in</b><span>key …${esc(s.account.hint ?? "")}</span></span></button>`
     : `<button type="button" class="account-btn" id="accountBtn">${PERSON}<span class="acct-text"><b>Sign in</b><span>everloot.app</span></span></button>`;
-  sideFoot.innerHTML = `${acct}${ready ? `<button type="button" class="restart-btn" id="updateRestart" title="Restart to install ${esc(s.update!.latest ?? "")}">${ARROW}Restart to update</button>` : ""}<div class="foot-row"><button type="button" data-page="settings" ${page === "settings" ? 'aria-current="page"' : ""}>${GEAR}Settings</button><button type="button" class="foot-icon" id="reportBug" aria-label="Report a bug" title="Report a bug">${BUG}</button>${updateButton(s)}</div>
+  sideFoot.innerHTML = `${acct}${updateRow(s)}<div class="foot-row"><button type="button" data-page="settings" ${page === "settings" ? 'aria-current="page"' : ""}>${GEAR}Settings</button><button type="button" class="foot-icon" id="reportBug" aria-label="Report a bug" title="Report a bug">${BUG}</button>${updateButton(s)}</div>
     <div class="foot-line"><span>${e.files.length ? `Watching ${e.files.length} file(s)` : "Not watching"}${e.paused ? " · paused" : ""}</span><span>v${esc(s.version)}</span></div>`;
   if (refocus) side.querySelector<HTMLElement>(refocus)?.focus({ preventScroll: true });
 }
@@ -1020,16 +1020,39 @@ const PERSON = icon("account");
 const BUG = icon("bug");
 
 /**
- * The footer's update button: an arrow while an update is out, the percentage while it downloads,
- * and a Restart pill once it is ready to install.
+ * While an update is out, its own row is the clearest thing in the footer: one click downloads it and
+ * checks it against the release's checksum, the percentage shows while it downloads, and the next
+ * click restarts into it. Where the app cannot install itself, the row opens the download.
  */
-function updateButton(s: AppState): string {
+function updateRow(s: AppState): string {
   const up = s.update?.newer ? s.update : null;
   if (!up) return "";
   const p = s.updateProgress;
-  // Ready: the Restart row above the footer takes over; the arrow stays to reopen what changed.
-  const label = p.stage === "downloading" ? `Downloading update ${p.percent}%` : `Update ${esc(up.latest ?? "")} available`;
-  return `<button type="button" class="update-btn${p.stage === "downloading" ? " busy" : ""}" id="updateBtn" aria-expanded="${updateOpen}" aria-controls="updatePop" aria-label="${label}" title="${label}">${p.stage === "downloading" ? `<span class="pct">${p.percent}</span>` : ARROW}</button>`;
+  const v = esc(up.latest ?? "");
+  if (!up.installable) return `<button type="button" class="restart-btn" id="updateDownloadPage" data-open="${esc(up.downloadUrl ?? up.url ?? "")}">${ARROW}Download ${v}</button>`;
+  if (p.stage === "ready") return `<button type="button" class="restart-btn" id="updateRestart" title="Restart to install ${v}">${ARROW}Restart to update</button>`;
+  if (p.stage === "downloading") return `<button type="button" class="restart-btn busy" id="updateNow" disabled>Downloading ${v}… ${p.percent}%</button>`;
+  return `<button type="button" class="restart-btn" id="updateNow" title="Download ${v}, check it and install it on restart">${ARROW}${p.stage === "failed" ? "Update failed, try again" : `Update to ${v}`}</button>`;
+}
+
+/** The arrow beside Settings opens what the new version changed. */
+function updateButton(s: AppState): string {
+  const up = s.update?.newer ? s.update : null;
+  if (!up) return "";
+  const label = `What's new in ${esc(up.latest ?? "")}`;
+  return `<button type="button" class="update-btn" id="updateBtn" aria-expanded="${updateOpen}" aria-controls="updatePop" aria-label="${label}" title="${label}">${ARROW}</button>`;
+}
+
+/** The Overview says so too, with the same one-click update. */
+function updateCallout(s: AppState): string {
+  const up = s.update?.newer ? s.update : null;
+  if (!up || !(up.installable || up.url)) return "";
+  const p = s.updateProgress;
+  const action = !up.installable ? `${ext(up.downloadUrl ?? up.url!, "Download it")} and install over this one`
+    : p.stage === "ready" ? `<button type="button" class="link" id="updateRestartCallout">Restart to update</button>`
+      : p.stage === "downloading" ? `Downloading, ${p.percent}%`
+        : `<button type="button" class="link" id="updateNowCallout">Update now</button>`;
+  return `<p class="callout fg2">${icon("upload")}<span>Everloot Desktop App ${esc(up.latest ?? "")} is out; you run ${esc(s.version)}. ${action}; your settings stay.</span></p>`;
 }
 
 const ARROW = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -1139,7 +1162,12 @@ async function load(p: Page): Promise<void> {
 let reload: ReturnType<typeof setTimeout> | undefined;
 const PAGE_IDS = new Set<string>(PAGES.map((p) => p.id));
 // A tray entry or a notification asks for a page. A settings draft in progress is not thrown away for it.
-api.onNavigate((p) => { if (PAGE_IDS.has(p) && !draftDirty && state?.settings.consentedAt) void go(p as Page); });
+api.onNavigate((p) => {
+  // The update notification and the tray's update item open the update panel over whatever page is showing.
+  // A window opened for it may not have its first state yet; the panel opens once it does.
+  if (p === "update") { if (!state) updateAsked = true; else if (state.update?.newer) toggleUpdate(true); return; }
+  if (PAGE_IDS.has(p) && !draftDirty && state?.settings.consentedAt) void go(p as Page);
+});
 
 api.onState((s) => {
   state = s;
@@ -1246,8 +1274,8 @@ async function onClick(ev: MouseEvent): Promise<void> {
   const el = ev.target as HTMLElement;
   if (el.closest("#updateBtn")) { toggleUpdate(!updateOpen); return; }
   if (el.closest("#updateLater")) { toggleUpdate(false); return; }
-  if (el.closest("#updateGet")) { await api.updateDownload(); return; }
-  if (el.closest("#updateRestart, #updateRestartPop")) { await api.updateRestart(); return; }
+  if (el.closest("#updateGet, #updateNow, #updateNowCallout")) { await api.updateDownload(); return; }
+  if (el.closest("#updateRestart, #updateRestartPop, #updateRestartCallout")) { await api.updateRestart(); return; }
   if (el.closest("#accountBtn, [data-account]")) {
     if (page !== "settings") await go("settings");
     const panel = main.querySelector<HTMLElement>("#account");
@@ -1569,5 +1597,6 @@ void (async () => {
   state = await api.state();
   if (!state.settings.consentedAt) await detect();
   render();
+  if (updateAsked && state.update?.newer) toggleUpdate(true);
   void load(page);
 })();
