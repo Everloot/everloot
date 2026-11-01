@@ -46,6 +46,15 @@ test("the folder kept over the Forever suggestion is remembered, and cleared by 
   expect(mergeSettings(kept, { keptGameFolder: null }).keptGameFolder).toBeNull();
 });
 
+test("dismissed realm suggestions are kept when a patch only changes the followed realms, and cleaned like them", () => {
+  const s = mergeSettings(defaultSettings(), { market: { realms: ["Doomhowl"], dismissed: [" Forever ", "forever", 7, "x"] } });
+  expect(s.market).toEqual({ realms: ["Doomhowl"], dismissed: ["Forever", "forever"] });
+  expect(mergeSettings(s, { market: { realms: [] } }).market).toEqual({ realms: [], dismissed: ["Forever", "forever"] });
+  expect(defaultSettings().market).toEqual({ realms: [], dismissed: [] });
+  // A settings file from before the suggestion has no list: it starts empty.
+  expect(mergeSettings(defaultSettings(), { market: { realms: ["Doomhowl"] } }).market.dismissed).toEqual([]);
+});
+
 test("settings round-trip through the file, written whole", () => {
   const path = join(dir(), "nested", "settings.json");
   const s = mergeSettings(defaultSettings(), { gameFolder: "D:/Games/WoW/_anniversary_", consentedAt: "2026-10-18T00:00:00.000Z" });

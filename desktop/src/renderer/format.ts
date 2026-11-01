@@ -21,6 +21,15 @@ export const gold = (copper: number | null) => {
 export const msg = (e: unknown) => (e instanceof Error ? e.message : String(e)).replace(/^Error invoking remote method '[^']*': /, "").replace(/^(?:Type)?Error: /, "");
 
 /**
+ * The settings patch for an answer to the suggestion of the player's character realms. Follow appends them to the
+ * followed realms, so they behave like realms followed by hand (after the ones already followed, inside the cap,
+ * removable). Either answer remembers them, so the same realms are not suggested again.
+ */
+export function answerSuggestion(market: Settings["market"], suggested: string[], follow: boolean): { market: Settings["market"] } {
+  return { market: { realms: follow ? [...market.realms, ...suggested] : market.realms, dismissed: [...market.dismissed, ...suggested] } };
+}
+
+/**
  * What Settings says after Save. The app keeps the old value of a field it refuses (a site address that
  * is not http or https) and saves the rest; the page names that field instead of saying "Saved.".
  * "!" starts an error.

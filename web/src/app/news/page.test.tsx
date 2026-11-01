@@ -368,3 +368,20 @@ test("Related mixed items keep authored destinations and CTA while draft and unk
   expect(html).toContain("Draft and");
   expect(html).toContain("Try:");
 });
+
+test("a figure draws a lazy image at its fixed size with its alt text and an optional caption; one the check refuses draws nothing", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "news-figures-"));
+  writeFileSync(join(dir, "figures.md"), ["---", "slug: figures", "title: Figures", "summary: A post with figures.", "author: Everloot Team", "published: 2026-10-25", "status: published", "---", "Before the map.", "", '![The zone map with the camps marked](/news/figures/figures/map.webp "Where the camps are")', "", "![A camp at dusk](/news/figures/figures/camp.webp)", "", "![Elsewhere](https://example.com/a.webp)", "", "![](/news/figures/figures/no-alt.webp)", "", "After the map."].join("\n"));
+  vi.stubEnv("NEWS_DIR", dir); vi.stubEnv("WIKI_DIR", WIKI);
+  const { default: NewsArticle } = await import("./[slug]/page");
+  const html = renderToStaticMarkup(await NewsArticle({ params: Promise.resolve({ slug: "figures" }) }));
+  const figures = html.match(/<figure data-news-figure[^]*?<\/figure>/g) ?? [];
+  expect(figures).toHaveLength(2);
+  expect(figures[0]).toMatch(/<img src="\/news\/figures\/figures\/map\.webp" alt="The zone map with the camps marked" width="1600" height="900" loading="lazy" decoding="async"/);
+  expect(figures[0]).toMatch(/<figcaption[^>]*>Where the camps are<\/figcaption>/);
+  expect(figures[1]).toContain('alt="A camp at dusk"');
+  expect(figures[1]).not.toContain("<figcaption");
+  for (const refused of ["example.com", "no-alt", "Elsewhere"]) expect(html).not.toContain(refused);
+  expect(html.indexOf("Before the map.")).toBeLessThan(html.indexOf("map.webp"));
+  expect(html.indexOf("camp.webp")).toBeLessThan(html.indexOf("After the map."));
+});

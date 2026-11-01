@@ -58,7 +58,7 @@ test("the sparkline needs two points, escapes its dates and spans the box", () =
 
 const settings = (over: Partial<Settings> = {}): Settings => ({
   gameFolder: "C:/Games/WoW/_classic_era_", keptGameFolder: null, endpoint: "https://everloot.app", upload: true, prices: true, census: true, players: false,
-  ask: { enabled: false, mcpUrl: "", tokenFile: null }, market: { realms: [] }, consentedAt: "2026-10-01T00:00:00Z", launchAtLogin: false, startInTray: false, ...over,
+  ask: { enabled: false, mcpUrl: "", tokenFile: null }, market: { realms: [], dismissed: [] }, consentedAt: "2026-10-01T00:00:00Z", launchAtLogin: false, startInTray: false, ...over,
 });
 const engine = (jobs: Partial<Record<"upload" | "prices" | "ask", JobState>> = {}, over: Partial<EngineState> = {}): Pick<EngineState, "files" | "jobs" | "log" | "paused"> => {
   const job = (state: JobState) => ({ state, message: state === "error" ? "boom" : "", at: null });

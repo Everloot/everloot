@@ -34,6 +34,12 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   releases; each half is harmless without the other.
 
 ### Added
+- Desktop App: a new app release shows within the hour instead of the next day. The sidebar shows **Update to X**:
+  one click downloads it and checks it against the release's checksum, and the next click restarts into it. The
+  Overview offers the same, the tray item opens the update panel, and a notification says so once per version while
+  the window is not in front. Where the app cannot install itself (macOS, Linux, the portable exe), the button opens
+  the download. If the installer runs but the old version is still there at the next start, the app says so once
+  instead of offering the same update again unexplained.
 - Site and MCP: racial traits from the game files (build-stamped `races.json`, found in game files, unconfirmed).
   Each class page lists, under "Who can be a {Class}", every race's traits with active or passive and the short
   text; `/wow-forever` adds a trait table per faction. New MCP tool `class_races` (protocol 1.20.0): the races that
@@ -55,6 +61,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   in and out, this week, categories, receipts and gold history. The published ledgers stay below.
 
 ### Changed
+- Desktop App: the Market page offers to follow your characters' realms (read from the save file on this computer)
+  in one click, and the Overview does too while the game has no prices. Nothing is requested for those realms until
+  you press Follow; then they are followed realms like any other, and No thanks keeps the offer away. The Overview says
+  what `/ask` does and links to the Ask page.
 - Site and Desktop App: Ollama suggests one small model, `qwen3:4b` (2.5 GB, calls tools), instead of `qwen3:8b`, and
   says what running a model on your own computer means: private and free, slower, and it uses your memory while it
   answers. The free cloud models stay the first choice.

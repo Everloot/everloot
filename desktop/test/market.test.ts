@@ -3,7 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
 import { writePricesAddon } from "../../companion/src/prices";
-import { fetchDropSources, itemIdFrom, listRealms, mergeRealms, ownRealms, priceRows, readDropsBlock, readPricesFile, refreshMarket } from "../src/main/market";
+import { answerSuggestion } from "../src/renderer/format";
+import { mergeSettings, defaultSettings } from "../src/main/settings";
+import { characterRealms, fetchDropSources, itemIdFrom, listRealms, mergeRealms, ownRealms, priceRows, readDropsBlock, readPricesFile, refreshMarket, suggestedRealms } from "../src/main/market";
 
 const dirs: string[] = [];
 const dir = () => { const d = mkdtempSync(join(tmpdir(), "everloot-market-")); dirs.push(d); return d; };
@@ -14,6 +16,65 @@ test("own scans come first, followed realms fill in, duplicates by case drop, an
   expect(merged).toEqual([{ realm: "Nightslayer", source: "scan" }, { realm: "Dreamscythe", source: "followed" }, { realm: "Doomhowl", source: "followed" }]);
   const many = mergeRealms([], Array.from({ length: 25 }, (_, i) => `Realm${i}`));
   expect(many).toHaveLength(20);
+});
+
+/** One account file with only the gold rows the addon writes on login: no auction scan, nothing followed. */
+const charactersOnly = (d: string) => {
+  const sv = join(d, "Everloot.lua");
+  writeFileSync(sv, `EverlootDB = { ["version"] = "0.3.3", ["installId"] = "x", ["records"] = { ["gold_snapshot"] = {
+    { ["character"] = "Arthas", ["realm"] = "Forever", ["capturedAt"] = "2026-10-18T10:00:00Z", ["currentCopper"] = 100, ["peakCopper"] = 100 },
+    { ["character"] = "Jaina", ["realm"] = "forever", ["capturedAt"] = "2026-10-18T10:00:00Z", ["currentCopper"] = 100, ["peakCopper"] = 100 },
+    { ["character"] = "Thrall", ["realm"] = "Bad<Realm>", ["capturedAt"] = "2026-10-18T10:00:00Z", ["currentCopper"] = 100, ["peakCopper"] = 100 } } } }`);
+  return sv;
+};
+const pricesFor = (asked: string[]) => vi.fn(async (url: string) => {
+  if (url.includes("/api/rollups/drops")) return new Response("", { status: 503 });
+  const realm = new URL(url).searchParams.get("realm")!;
+  asked.push(realm);
+  return new Response(JSON.stringify({ ok: true, dataAsOf: "2026-10-18", realm, fields: [], items: [[1, 10, 9, 11, 5, "2026-10-17", 3]] }));
+}) as unknown as typeof fetch;
+
+test("a character's realm is only suggested: nothing is fetched or written for it before the player follows", async () => {
+  const d = dir();
+  const sv = charactersOnly(d);
+  // One name per realm, and a name the site would refuse (failing the whole refresh once followed) is left out.
+  expect(characterRealms([sv, join(d, "missing.lua")])).toEqual(["Forever"]);
+  const settings = defaultSettings();
+  expect(suggestedRealms(characterRealms([sv]), ownRealms([sv]), settings.market.realms, settings.market.dismissed)).toEqual(["Forever"]);
+  const asked: string[] = [];
+  const r = await refreshMarket({ svFiles: [sv], followed: settings.market.realms, addonsDir: join(d, "AddOns"), endpoint: "https://everloot.app", send: pricesFor(asked) });
+  expect(asked).toEqual([]);
+  expect(r.realms).toEqual([]);
+  expect(readPricesFile(join(d, "AddOns"))?.realms ?? []).toEqual([]);
+});
+
+test("after Follow the character's realm is fetched and written like any followed realm, and no longer suggested", async () => {
+  const d = dir();
+  const sv = charactersOnly(d);
+  const before = mergeSettings(defaultSettings(), { market: { realms: ["Doomhowl"] } });
+  const after = mergeSettings(before, answerSuggestion(before.market, ["Forever"], true));
+  // Appended after the realms already followed, so the cap drops it first, as for a realm followed by hand.
+  expect(after.market.realms).toEqual(["Doomhowl", "Forever"]);
+  const asked: string[] = [];
+  const r = await refreshMarket({ svFiles: [sv], followed: after.market.realms, addonsDir: join(d, "AddOns"), endpoint: "https://everloot.app", send: pricesFor(asked) });
+  expect(asked).toEqual(["Doomhowl", "Forever"]);
+  expect(r.realms.map((x) => [x.realm, x.source])).toEqual([["Doomhowl", "followed"], ["Forever", "followed"]]);
+  expect(readPricesFile(join(d, "AddOns"))!.realms.map((x) => x.realm)).toEqual(["doomhowl", "forever"]);
+  // Unfollowed later, it stays answered: the suggestion does not come back.
+  const unfollowed = mergeSettings(after, { market: { realms: ["Doomhowl"] } });
+  expect(suggestedRealms(characterRealms([sv]), [], unfollowed.market.realms, unfollowed.market.dismissed)).toEqual([]);
+});
+
+test("a dismissed suggestion is not shown again and fetches nothing; a new character's realm still is", () => {
+  const s = mergeSettings(defaultSettings(), answerSuggestion(defaultSettings().market, ["Forever"], false));
+  expect(s.market).toEqual({ realms: [], dismissed: ["Forever"] });
+  expect(suggestedRealms(["forever"], [], s.market.realms, s.market.dismissed)).toEqual([]);
+  expect(suggestedRealms(["Forever", "Skull Rock"], [], s.market.realms, s.market.dismissed)).toEqual(["Skull Rock"]);
+});
+
+test("realms already scanned or followed are not suggested, whatever the case", () => {
+  expect(suggestedRealms(["Nightslayer", "doomhowl", "Forever"], ["nightslayer"], ["Doomhowl"], [])).toEqual(["Forever"]);
+  expect(suggestedRealms(["Nightslayer"], ["Nightslayer"], [], [])).toEqual([]);
 });
 
 test("the realm list comes from the site's market endpoint without a realm", async () => {

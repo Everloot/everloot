@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fetchRealmPrices, readRealms, writePricesAddon, type DropRow, type DropSources, type RealmPrices } from "../../../companion/src/prices";
+import { validRealm } from "../../../packages/protocol/src/realm";
 import type { RealmSummary } from "../shared/types";
+import { charactersFromFiles } from "./characters";
 
 /** The companion's cap on realms in one prices file. */
 export const MAX_REALMS = 20;
@@ -32,6 +34,25 @@ export function mergeRealms(own: string[], followed: string[]): { realm: string;
   for (const r of own) add(r, "scan");
   for (const r of followed) add(r, "followed");
   return out.slice(0, MAX_REALMS);
+}
+
+/**
+ * Realms of the player's own characters, from the rows the addon writes on each login (GetRealmName()).
+ * Read on this computer only, to suggest them on the Market page; nothing is fetched for them unless the
+ * player follows them. Only names the site accepts: once followed, one it refuses would fail the whole refresh.
+ */
+export function characterRealms(svFiles: string[]): string[] {
+  const names: string[] = [];
+  for (const { realm } of charactersFromFiles(svFiles).characters) {
+    if (validRealm(realm) && !names.some((n) => realmKey(n) === realmKey(realm))) names.push(realm.trim());
+  }
+  return names;
+}
+
+/** Character realms to suggest: not scanned, not followed, and not answered (followed or dismissed) before. */
+export function suggestedRealms(characters: string[], own: string[], followed: string[], dismissed: string[]): string[] {
+  const taken = new Set([...own, ...followed, ...dismissed].map(realmKey));
+  return characters.filter((r) => !taken.has(realmKey(r)));
 }
 
 /** Realms named in the player's own auction scans across every account file. */

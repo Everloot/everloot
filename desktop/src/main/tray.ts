@@ -41,7 +41,11 @@ export function createTray(iconPath: string, actions: TrayActions): { update(sta
         { label: jobLine(state, "prices"), enabled: false },
         { label: jobLine(state, "ask"), enabled: false },
         ...(reminder ? [{ label: reminder, click: () => actions.show("market") }] : []),
-        ...(state.update?.newer && state.update.url ? [{ label: `Update Everloot Desktop App to ${state.update.latest}`, click: () => actions.openExternal(state.update!.url!) }] : []),
+        // Where the app can install the update itself, the item opens its update panel; elsewhere the download page.
+        ...(state.update?.newer && (state.update.installable || state.update.url) ? [{
+          label: state.updateProgress.stage === "ready" ? `Restart to update to ${state.update.latest}` : `Update Everloot Desktop App to ${state.update.latest}`,
+          click: () => (state.update!.installable ? actions.show("update") : actions.openExternal(state.update!.url!)),
+        }] : []),
         { type: "separator" as const },
         { label: "Open Everloot Desktop App", click: () => actions.show() },
         { label: "Ask Everloot…", click: () => actions.show("chat") },
@@ -51,7 +55,7 @@ export function createTray(iconPath: string, actions: TrayActions): { update(sta
         { type: "separator" },
         { label: "Quit", click: () => actions.quit() },
       ]));
-      tray.setToolTip(paused ? "Everloot Desktop App (paused)" : "Everloot Desktop App");
+      tray.setToolTip(`Everloot Desktop App${paused ? " (paused)" : ""}${state.update?.newer ? ` · update ${state.update.latest} available` : ""}`);
     },
     destroy: () => tray.destroy(),
   };

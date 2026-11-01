@@ -36,7 +36,7 @@ describe("a price question in /ask", () => {
     writeFileSync(file, `EverlootDB = {["version"] = "0.3.4", ["installId"] = "abcd-1234-ef56-7890", ["records"] = {}, ["asks"] = {${asks}}}\n`);
     return file;
   };
-  const settingsFor = (d: string, realms: string[] = []) => ({ ...defaultSettings(), gameFolder: d, endpoint: "https://everloot.app", market: { realms } });
+  const settingsFor = (d: string, realms: string[] = []) => ({ ...defaultSettings(), gameFolder: d, endpoint: "https://everloot.app", market: { realms, dismissed: [] } });
   const written = (d: string) => readFileSync(join(d, "Interface", "AddOns", "EverlootAnswers", "EverlootAnswers.lua"), "utf8");
 
   test("is answered from market_value without the search engine or a model, then shown once", async () => {

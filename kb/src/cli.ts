@@ -69,7 +69,7 @@ import { checkGuides } from "./guides/check.js";
 import { CHOOSER_FILES, checkClassChooser } from "./guides/class-chooser.js";
 import { GUIDES_DIR, loadGuideCheckContext, readClassChooserFiles, readGuideFiles } from "./guides/data.js";
 import { checkNews } from "./news/check.js";
-import { NEWS_DIR, publishedWikiSlugs, readNewsPosts } from "./news/data.js";
+import { figureSize, NEWS_DIR, publishedWikiSlugs, readNewsPosts } from "./news/data.js";
 import { checkWiki } from "./wiki/check.js";
 import { loadCategories, loadKnownData, loadPrivatePathPattern, readWikiPages, WIKI_DIR } from "./wiki/data.js";
 
@@ -254,7 +254,8 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
     the index bar for published pages, private paths and AI credits. Exits 1 on any problem. See wiki/README.md)
   news-check [--dir <kb>/news]
     (the news posts' check: front matter, slugs, dates, [[links]] against the published wiki pages, tokens, the
-    prose bar for published posts, private paths and AI credits. Exits 1 on any problem. See news/README.md)
+    prose bar for published posts, figures and their committed files, private paths and AI credits. Exits 1 on any
+    problem. See news/README.md)
   guide-check [--dir <kb>/guides] [--previous <folder>]
     (the guides' check: front matter, review and history, codes and spend orders against the site's talent
     trees, sections, sources, links and tokens. --previous is a copy of kb/guides from before the change, such
@@ -942,7 +943,7 @@ async function main(): Promise<number> {
     }
     case "news-check": {
       const dir = flags.get("dir") || NEWS_DIR;
-      const result = checkNews(readNewsPosts(dir), { wikiPages: publishedWikiSlugs(), privatePaths: loadPrivatePathPattern(), today: new Date().toISOString().slice(0, 10) });
+      const result = checkNews(readNewsPosts(dir), { wikiPages: publishedWikiSlugs(), privatePaths: loadPrivatePathPattern(), today: new Date().toISOString().slice(0, 10), figureSize });
       for (const p of result.problems) console.error(`${p.file}${p.line ? `:${p.line}` : ""}: ${p.message}`);
       const published = result.posts.filter((p) => p.fm.status === "published").length;
       console.log(`${result.posts.length} posts (${published} published, ${result.posts.length - published} draft), ${result.problems.length} problems`);
