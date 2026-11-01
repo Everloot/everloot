@@ -7,7 +7,7 @@ const state: AppState = {
   settings: {
     gameFolder: "D:\\Games\\World of Warcraft\\_classic_era_", keptGameFolder: null, endpoint: "https://everloot.app", upload: true, census: true, players: false, prices: true,
     ask: { enabled: true, mcpUrl: "https://everloot.app/mcp", tokenFile: "C:\\Users\\carlos\\secret\\token.txt" },
-    market: { realms: ["Nightslayer"] }, consentedAt: "2026-10-18T00:00:00Z", launchAtLogin: false, startInTray: true,
+    market: { realms: ["Nightslayer"], dismissed: [] }, consentedAt: "2026-10-18T00:00:00Z", launchAtLogin: false, startInTray: true,
   },
   engine: {
     files: ["D:\\Games\\World of Warcraft\\_classic_era_\\WTF\\Account\\ACC\\SavedVariables\\Everloot.lua"],
