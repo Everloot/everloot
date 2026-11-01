@@ -15,6 +15,11 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
+- Addon: login and `/reload` print one line (version, modules on and off, any that could not start, any paused
+  collection) instead of the full status; `/everloot status` still lists everything. Without the Desktop App's price
+  file, the first item tooltip says once per install in chat where community prices come from. `/ask` names the
+  Everloot Desktop App (with Ask turned on) instead of the companion, and a question still unanswered a load after it was
+  written says once that no answer arrived and what to do.
 - Addon: profession observations prefer the complete recipe list when available and retain the API's recipe
   identifier and explicit learned state. Repeated observations are keyed by identifier, rank, colour and learned
   state; older clients can still use their filtered list without changing the player's filters. Explicitly

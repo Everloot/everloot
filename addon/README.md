@@ -20,7 +20,9 @@ Download the zip from everloot.app/addon, or build it from the repository root:
     python scripts/package-addon.py
 
 That writes `web/public/downloads/Everloot-<version>.zip`. Extract `Everloot/` into the Forever
-client's `Interface/AddOns/`, `/reload`, then run `/everloot status`. Auction capture is on in a new
+client's `Interface/AddOns/`, `/reload`, then run `/everloot status`. Login and `/reload` print one line (the
+version, how many modules are on and off, any that could not start and any paused collection); `/everloot status`
+lists every module and row count. Auction capture is on in a new
 install (`/everloot auctions off` turns it off). At the auction house, open the **Everloot** tab after
 Blizzard's tabs and click **Scan this house** (or type `/everloot scan`) for a full scan: at most one every 15 minutes, read in chunks, summarised per item,
 and the last three scans per realm kept. Nothing scans without that click. The tab shows the cooldown,
@@ -46,7 +48,9 @@ asking-price estimates, not live listings or guaranteed sale prices.
 Below the prices, the tooltip shows where the item drops when three installs looted the source: each rate as
 drops of loot windows, with its installs and the date of the uploads behind it, from the drop rates the Desktop
 App writes into the same `EverlootPrices` file. Once that file is in the game, a missing price or drop source is
-said in one grey line; nothing is written to your SavedVariables. `addon/tests/drops_contract.py` holds the rules.
+said in one grey line; nothing is written to your SavedVariables. Without the file, tooltips carry no community line,
+and the first item tooltip says once per install, in chat, that community prices come from the Everloot Desktop App
+(everloot.app/addon). `addon/tests/drops_contract.py` holds the rules.
 Nothing in the addon calls a buy, bid or post API; `addon/tests/market_contract.py` traps them.
 
 ### Ask about an item's price
@@ -59,6 +63,8 @@ Nothing in the addon calls a buy, bid or post API; `addon/tests/market_contract.
   An item name works when Everloot can resolve it uniquely. Otherwise, the answer asks for an item id.
 - Keep the Desktop App running with Ask enabled. `/reload` or log out to write the question; after the
   app processes it, `/reload` again to load the answer. This is a file bridge, not live in-game internet access.
+  If a later load still has no answer for a question, the addon says once that no answer arrived and to open the
+  Desktop App with Ask turned on (everloot.app/addon), then `/reload`. The question stays saved until it is answered.
 - Price questions need no AI model key. Answers identify the realm, all-house scope, recorded values,
   observation day and missing data. A missing local cache row does not prove the website lacks a price;
   the local community file holds at most 2,000 items. Full history is on everloot.app/tools/auctions.

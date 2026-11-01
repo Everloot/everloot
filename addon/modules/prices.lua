@@ -178,6 +178,12 @@ local TOOLTIP_HEADER = "|TInterface\\AddOns\\Everloot\\media\\crest:14:14:0:0:12
 local function addLines(tooltip, itemId)
   local realm = GetRealmName and GetRealmName()
   if type(realm) ~= "string" or realm == "" then return end
+  -- Without the file the tooltip stays quiet, so the first item tooltip says once per install, in chat, where
+  -- community prices come from. A line in every tooltip would repeat it forever to players who never install the app.
+  if type(EverlootPricesDB) ~= "table" and not EverlootDB.priceFileHint then
+    EverlootDB.priceFileHint = true
+    print("Everloot: community prices in item tooltips come from the Everloot Desktop App (everloot.app/addon), which writes them into the game; until then tooltips show only your own auction scans. /everloot price [item] says what Everloot has for an item.")
+  end
   local lines, entry = priceLines(realm, itemId)
   local dropLines, dropNote = E:DropLines(itemId)
   local missing = {}
@@ -271,5 +277,5 @@ E:RegisterModule("prices", function()
     end)
     E.pricesHooked = true
   end
-  return "ready (prices in item tooltips; community prices after the companion writes them and /reload)"
+  return "ready (prices in item tooltips; community prices after the Everloot Desktop App writes them and /reload)"
 end)
