@@ -445,7 +445,7 @@ function assistantSetup(c: ChatInfo | undefined, where: "chat" | "ask" | "settin
     ${where === "chat" ? "" : `<p class="muted small">${ASSISTANT_COST}</p>`}
     ${c && pickOpen ? providerForm(c, note) : note}`;
   return where === "settings"
-    ? `<section class="panel set-sec" id="assistant" aria-labelledby="assistantTitle"><div class="set-lead"><h2 id="assistantTitle">Assistant</h2>${opener}</div><div class="set-body">${body}</div></section>`
+    ? `<section class="panel set-sec" id="assistant" tabindex="-1" aria-labelledby="assistantTitle"><div class="set-lead"><h2 id="assistantTitle">Assistant</h2>${opener}</div><div class="set-body">${body}</div></section>`
     : `<section class="panel assistant" id="assistant" aria-labelledby="assistantTitle"><div class="row between"><h2 id="assistantTitle">Assistant</h2>${opener}</div>${body}</section>`;
 }
 
@@ -970,39 +970,42 @@ function settings(s: AppState): string {
   return `<div class="page settings">
     <div class="head"><h1>Settings</h1></div>
     ${flash ? `<p role="status" class="${flash.startsWith("!") ? "error" : "ok"} small">${esc(flash.replace(/^!/, ""))}</p>` : ""}
+    <nav class="settings-index" aria-label="Settings sections">
+      <a id="accountSectionLink" href="#account">Account</a><a id="companionSectionLink" href="#companion">Companion</a><a id="assistantSectionLink" href="#assistant">Assistant</a><a id="sharingSectionLink" href="#sharing">Sharing</a><a id="appSectionLink" href="#app-settings">App</a>
+    </nav>
     ${accountPanel(s)}
-    <section class="panel set-sec"><div class="set-lead"><h2>What runs</h2></div><div class="set-body">${jobs}</div></section>
-    ${assistant(c, "settings")}
-    <form id="settings" autocomplete="off">
-      <section class="panel set-sec"><div class="set-lead"><h2>Game</h2></div><div class="set-body">
+    <section class="panel set-sec" id="companion" tabindex="-1" aria-labelledby="companionTitle"><div class="set-lead"><h2 id="companionTitle">Companion</h2></div><div class="set-body">
         <div class="field"><label for="gameFolder">Game folder <span class="hint">the product folder that holds <code>WTF</code>: for WoW: Forever, <code>World of Warcraft\\_forever_</code></span></label>
           ${foreverCallout(s)}
-          <div class="row"><input class="grow" type="text" id="gameFolder" name="gameFolder" value="${esc(st.gameFolder ?? "")}"><button type="button" class="btn" id="browse">Browse…</button></div></div>
-      </div></section>
-      <section class="panel set-sec"><div class="set-lead"><h2>Startup</h2></div><div class="set-body">
-        ${s.platform === "linux" ? "" : `<label class="switch"><input type="checkbox" name="launchAtLogin" ${st.launchAtLogin ? "checked" : ""}> Start when I sign in</label>`}
-        <label class="switch"><input type="checkbox" name="startInTray" ${st.startInTray ? "checked" : ""}> Start in the tray without a window</label>
-      </div></section>
-      <section class="panel set-sec"><div class="set-lead"><h2>Census</h2></div><div class="set-body">
-        <label class="switch"><input type="checkbox" name="census" ${st.census ? "checked" : ""}> Send census counts with the uploads</label>
-        <p class="muted small">The race, class, level and faction of your characters and of players the addon sees. Never names, guilds, gear or places; the site shows only totals. Off keeps them in <code>Everloot.lua</code>; <code>/everloot census off</code> in the game stops recording and deletes them.</p>
-      </div></section>
-      <section class="panel set-sec"><div class="set-lead"><h2>Player pages</h2></div><div class="set-body">
-        <label class="switch"><input type="checkbox" name="players" ${st.players ? "checked" : ""}> Send the player pages with the uploads</label>
-        <p class="muted small">The name, realm, race, class, level and guild of the players the addon saw, so a page can be found by name. Off keeps them in <code>Everloot.lua</code>; <code>/everloot players off</code> in the game stops recording and deletes them.</p>
-      </div></section>
-      ${s.runRecords ? `<section class="panel set-sec"><div class="set-lead"><h2>Boss pulls</h2></div><div class="set-body">
+          <div class="row"><input class="grow" type="text" id="gameFolder" name="gameFolder" form="settings" value="${esc(st.gameFolder ?? "")}"><button type="button" class="btn" id="browse">Browse…</button></div></div>
+      <div class="set-subgroup"><h3>Startup</h3>
+        ${s.platform === "linux" ? "" : `<label class="switch"><input type="checkbox" name="launchAtLogin" form="settings" ${st.launchAtLogin ? "checked" : ""}> Start when I sign in</label>`}
+        <label class="switch"><input type="checkbox" name="startInTray" form="settings" ${st.startInTray ? "checked" : ""}> Start in the tray without a window</label>
+      </div>
+      <div class="set-subgroup"><h3>What runs</h3>${jobs}</div>
+    </div></section>
+    ${assistant(c, "settings")}
+    <section class="panel set-sec" id="sharing" tabindex="-1" aria-labelledby="sharingTitle"><div class="set-lead"><h2 id="sharingTitle">Sharing</h2></div><div class="set-body">
+      <div class="set-subgroup"><h3>Census</h3>
+        <label class="switch"><input type="checkbox" name="census" form="settings" aria-describedby="censusDescription" ${st.census ? "checked" : ""}> Send census counts with the uploads</label>
+        <p class="muted small" id="censusDescription">The race, class, level and faction of your characters and of players the addon sees. Never names, guilds, gear or places; the site shows only totals. Off keeps them in <code>Everloot.lua</code>; <code>/everloot census off</code> in the game stops recording and deletes them.</p>
+      </div>
+      <div class="set-subgroup"><h3>Player pages</h3>
+        <label class="switch"><input type="checkbox" name="players" form="settings" aria-describedby="playersDescription" ${st.players ? "checked" : ""}> Send the player pages with the uploads</label>
+        <p class="muted small" id="playersDescription">The name, realm, race, class, level and guild of the players the addon saw, so a page can be found by name. Off keeps them in <code>Everloot.lua</code>; <code>/everloot players off</code> in the game stops recording and deletes them.</p>
+      </div>
+      ${s.runRecords ? `<div class="set-subgroup"><h3>Boss pulls</h3>
         <p class="muted small">After each boss pull, the names, realms, classes and roles of your group and the damage meter's totals. They go with the uploads; the site keeps them privately for a year, shows them nowhere and deletes any character someone hides. <code>/everloot pulls off</code> in the game stops recording and deletes them.</p>
-      </div></section>` : ""}
-      <details class="panel set-sec"><summary><h2>Advanced</h2></summary>
-        <div class="field"><label for="endpoint">Site <span class="hint">change only to test against another deployment</span></label><input type="url" id="endpoint" name="endpoint" value="${esc(st.endpoint)}"></div>
-      </details>
-      <div class="row set-save"><button type="submit" class="btn btn-primary">Save</button><span class="muted" id="saved"></span></div>
-    </form>
-    <section class="panel set-sec"><div class="set-lead"><h2>This app</h2></div><div class="set-body">
+      </div>` : ""}
+    </div></section>
+    <section class="panel set-sec" id="app-settings" tabindex="-1" aria-labelledby="appSettingsTitle"><div class="set-lead"><h2 id="appSettingsTitle">App</h2></div><div class="set-body">
       <p class="fg2">Everloot ${esc(s.version)} · AGPL-3.0-only · ${ext("https://github.com/Everloot/everloot/tree/main/desktop", "source")} · ${ext("https://discord.gg/9CKsbHTRu3", "Discord")}</p>
       <div class="row"><button type="button" class="btn" id="updates">Check for updates</button></div>
+      <details class="set-advanced"><summary><span>Advanced</span></summary>
+        <div class="field"><label for="endpoint">Site <span class="hint">change only to test against another deployment</span></label><input type="url" id="endpoint" name="endpoint" form="settings" value="${esc(st.endpoint)}"></div>
+      </details>
     </div></section>
+    <form id="settings" class="row set-save" autocomplete="off"><button type="submit" class="btn btn-primary">Save</button><span class="muted" id="saved" role="status"></span></form>
     ${dataPanel(s)}
   </div>`;
 }
@@ -1719,7 +1722,8 @@ async function onChange(ev: Event): Promise<void> {
   if (el.form && el.form.id !== "chatForm" && el.form.id !== "providerForm") draftDirty = true;
 }
 main.addEventListener("input", (ev) => {
-  const f = (ev.target as HTMLElement).closest("form");
+  const target = ev.target as HTMLInputElement;
+  const f = target.form ?? target.closest("form");
   if (f && f.id !== "chatForm" && f.id !== "providerForm") draftDirty = true;
   if (f?.id === "priceForm") priceEdits++;
 });

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui";
 import { PROFILE_LIMITS, shellChanged } from "@/lib/profiles";
 import type { ProfileSettings } from "@/lib/account-shell";
 
-const box = "h-4 w-4 accent-accent";
+const box = "h-4 w-4 shrink-0 accent-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent";
 
 /** Handle, display name, and whether /u/<handle> is public and what it shows. */
 export default function ProfileForm({ profile, accountName }: { profile: ProfileSettings; accountName: string }) {
@@ -43,34 +43,34 @@ export default function ProfileForm({ profile, accountName }: { profile: Profile
   }
 
   return (
-    <form onSubmit={submit} aria-label="Profile" className="grid max-w-3xl gap-3 sm:grid-cols-2">
-      <label className="block space-y-1 text-sm">
-        <span className="block text-muted">Handle</span>
+    <form onSubmit={submit} aria-label="Profile" className="grid min-w-0 gap-x-4 gap-y-5 sm:grid-cols-2">
+      <label className="block min-w-0 space-y-2 text-sm">
+        <span className="block text-fg-2">Handle</span>
         <Input name="handle" defaultValue={profile.handle ?? ""} maxLength={PROFILE_LIMITS.handleMax} autoComplete="off" spellCheck={false}
           pattern="@?[A-Za-z0-9][A-Za-z0-9\-]{1,22}[A-Za-z0-9]" placeholder="3 to 24 letters, numbers or hyphens" />
         <span className="block text-xs text-muted">Your address: /u/handle. Up to 5 changes a day.</span>
       </label>
-      <label className="block space-y-1 text-sm">
-        <span className="block text-muted">Display name (optional)</span>
+      <label className="block min-w-0 space-y-2 text-sm">
+        <span className="block text-fg-2">Display name (optional)</span>
         <Input name="displayName" defaultValue={profile.displayName ?? ""} maxLength={PROFILE_LIMITS.displayName} autoComplete="off" placeholder={accountName} />
       </label>
-      <fieldset className="space-y-2 text-sm sm:col-span-2">
+      <fieldset className="min-w-0 space-y-3 rounded-control border border-line bg-panel p-4 text-sm sm:col-span-2">
         <legend className="sr-only">Public profile</legend>
         <label className="flex items-center gap-2 text-fg">
-          <input type="checkbox" name="publicProfile" className={box} checked={isPublic} onChange={(e) => setPublic(e.target.checked)} />
+          <input type="checkbox" name="publicProfile" aria-describedby="profile-sharing-description" className={box} checked={isPublic} onChange={(e) => setPublic(e.target.checked)} />
           Public profile
         </label>
-        <p className="text-xs text-muted">Off: nobody else sees anything. On: anyone can open your profile and sees only what you tick below. Never your BattleTag or email.</p>
-        <div className="flex flex-wrap gap-x-5 gap-y-2 pl-6">
-          <label className="flex items-center gap-2 text-fg-2"><input type="checkbox" name="showCharacters" className={box} defaultChecked={profile.showCharacters} />Characters</label>
-          <label className="flex items-center gap-2 text-fg-2"><input type="checkbox" name="showBuilds" className={box} defaultChecked={profile.showBuilds} />Shared builds</label>
-          <label className="flex items-center gap-2 text-fg-2"><input type="checkbox" name="showStatus" className={box} defaultChecked={profile.showStatus} />Status</label>
+        <p id="profile-sharing-description" className="text-sm leading-relaxed text-fg-2">Off: nobody else sees anything. On: anyone can open your profile and sees only what you tick below. Never your BattleTag or email.</p>
+        <div className="grid gap-x-5 gap-y-1 border-t border-line pt-2 sm:grid-cols-3">
+          <label className="flex min-h-11 items-center gap-2 text-fg-2"><input type="checkbox" name="showCharacters" className={box} defaultChecked={profile.showCharacters} />Characters</label>
+          <label className="flex min-h-11 items-center gap-2 text-fg-2"><input type="checkbox" name="showBuilds" className={box} defaultChecked={profile.showBuilds} />Shared builds</label>
+          <label className="flex min-h-11 items-center gap-2 text-fg-2"><input type="checkbox" name="showStatus" className={box} defaultChecked={profile.showStatus} />Status</label>
         </div>
       </fieldset>
-      <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-3 sm:col-span-2">
         <button type="submit" className="btn btn-primary min-h-11 px-4 text-sm" disabled={busy} aria-busy={busy}>Save profile</button>
-        {saved && <p role="status" className="text-sm text-fg-2">Saved.</p>}
-        {error && <p role="alert" className="text-sm text-fg">{error}</p>}
+        {saved && <p role="status" className="text-sm text-accent">Saved.</p>}
+        {error && <p role="alert" className="w-full rounded-control border border-edge bg-panel px-3 py-2 text-sm text-fg [overflow-wrap:anywhere]">{error}</p>}
       </div>
     </form>
   );
