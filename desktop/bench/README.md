@@ -56,6 +56,10 @@ parsed on every load. The hourly price refresh parsed each file even when nothin
 
 After the change it is `uploadFile` plus one shared parse. A reload of the same file costs 0.04 ms.
 
+The realm suggestions added to the Overview and Market page later brought a full parse back to each reload
+(`characterRealms`, about 165 ms at heavy in a quick run). They now come from the same shared parse: 0.02 ms per
+reload, for about 6 ms more per write at heavy (26 ms at extreme), the cost of summarizing the characters.
+
 Not changed, each parsing on its own:
 
 - The Upload page parses 4 times once per write (`summarizeFiles`, cached afterwards): 804–1,156 ms at heavy.
