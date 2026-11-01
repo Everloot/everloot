@@ -1,4 +1,4 @@
-import { BrowserWindow, Notification, app, clipboard, dialog, ipcMain, net, powerMonitor, screen, shell } from "electron";
+import { BrowserWindow, Notification, app, clipboard, dialog, ipcMain, net, powerMonitor, screen, session, shell } from "electron";
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -25,6 +25,7 @@ import { onReconnect } from "./online";
 import { companionJobs } from "./jobs";
 import { itemIdFrom, listRealms, ownRealms, priceRows, readPricesFile } from "./market";
 import { loadSettings, mergeSettings, saveSettings } from "./settings";
+import { allowedPermission, fromAppPage } from "./sender";
 import { createTray } from "./tray";
 import { checkForUpdates, fetchReleases, updateFrom } from "./updates";
 import { downloadUpdate, pruneInstallers, runInstaller } from "./self-update";
@@ -178,6 +179,7 @@ if (!app.requestSingleInstanceLock()) {
   };
 
   const windowPath = join(data, "window.json");
+  const pagePath = join(__dirname, "renderer", "index.html");
   function createWindow(): void {
     const bounds = fitWindow(readWindowState(windowPath), screen.getAllDisplays().map((d) => d.workArea));
     win = new BrowserWindow({
@@ -188,7 +190,7 @@ if (!app.requestSingleInstanceLock()) {
       autoHideMenuBar: true,
       webPreferences: { preload: join(__dirname, "preload.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: true },
     });
-    win.loadFile(join(__dirname, "renderer", "index.html"));
+    win.loadFile(pagePath);
     win.once("ready-to-show", () => { win?.show(); });
     // The size and place come back next time; written a moment after the last drag, and on close.
     let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -211,10 +213,17 @@ if (!app.requestSingleInstanceLock()) {
     return r.canceled ? null : r.filePaths[0] ?? null;
   };
 
-  ipcMain.handle("state", () => appState());
+  /** Every call from the page goes through here: only the bundled page, at the top of the window, is answered. */
+  const handle = (channel: string, listener: Parameters<typeof ipcMain.handle>[1]) =>
+    ipcMain.handle(channel, (e, ...args) => {
+      if (!fromAppPage(e.senderFrame, pagePath)) throw new Error(`${channel} is only answered for the app's own page`);
+      return listener(e, ...args);
+    });
+
+  handle("state", () => appState());
   /** The settings the engine reads at start; a change to any of them restarts it, anything else does not. */
   const engineInputs = (s: Settings) => JSON.stringify([s.gameFolder, s.endpoint, s.upload, s.prices, s.ask, s.consentedAt]);
-  ipcMain.handle("saveSettings", (_e, patch: unknown) => {
+  handle("saveSettings", (_e, patch: unknown) => {
     const before = settings;
     const next = mergeSettings(settings, patch);
     // Written first: a save that fails (data folder read-only or full) changes nothing and the page hears why.
@@ -228,20 +237,20 @@ if (!app.requestSingleInstanceLock()) {
     else broadcast();
     return appState();
   });
-  ipcMain.handle("detectGameFolders", () => detectGameFolders(candidateRoots({ platform: process.platform, env: process.env, home: homedir() }), realFs));
-  ipcMain.handle("pickGameFolder", async () => { const p = await pick({ title: "Pick the game folder that holds WTF", properties: ["openDirectory"] }); return p && resolvePickedFolder(p, realFs); });
-  ipcMain.handle("pickTokenFile", () => pick({ title: "Pick the file that holds your MCP token", properties: ["openFile"] }));
-  ipcMain.handle("runNow", (_e, job: unknown) => { if (JOBS.includes(job as Job)) return engine.runNow(job as Job); });
-  ipcMain.handle("setPaused", (_e, paused: unknown) => engine.setPaused(paused === true));
-  ipcMain.handle("openDataFolder", () => shell.openPath(data).then(() => undefined));
-  ipcMain.handle("openAddonsFolder", () => { const dir = addonsDir(); return dir && existsSync(dir) ? shell.openPath(dir).then(() => undefined) : undefined; });
-  ipcMain.handle("openConfig", () => {
+  handle("detectGameFolders", () => detectGameFolders(candidateRoots({ platform: process.platform, env: process.env, home: homedir() }), realFs));
+  handle("pickGameFolder", async () => { const p = await pick({ title: "Pick the game folder that holds WTF", properties: ["openDirectory"] }); return p && resolvePickedFolder(p, realFs); });
+  handle("pickTokenFile", () => pick({ title: "Pick the file that holds your MCP token", properties: ["openFile"] }));
+  handle("runNow", (_e, job: unknown) => { if (JOBS.includes(job as Job)) return engine.runNow(job as Job); });
+  handle("setPaused", (_e, paused: unknown) => engine.setPaused(paused === true));
+  handle("openDataFolder", () => shell.openPath(data).then(() => undefined));
+  handle("openAddonsFolder", () => { const dir = addonsDir(); return dir && existsSync(dir) ? shell.openPath(dir).then(() => undefined) : undefined; });
+  handle("openConfig", () => {
     const config = join(data, "config.json");
     // A starter file with no providers, so the editor opens on the documented shape.
     if (!existsSync(config)) writeFileSync(config, JSON.stringify({ providers: [] }, null, 2) + "\n");
     return shell.openPath(config).then(() => undefined);
   });
-  ipcMain.handle("openExternal", (_e, url: unknown) => {
+  handle("openExternal", (_e, url: unknown) => {
     if (typeof url !== "string" || !allowedExternal(url)) return false;
     void shell.openExternal(url);
     return true;
@@ -249,7 +258,7 @@ if (!app.requestSingleInstanceLock()) {
   // A check from Settings also refreshes the sidebar's update button.
   const messageBox = (options: Electron.MessageBoxOptions) => (win ? dialog.showMessageBox(win, options) : dialog.showMessageBox(options));
   // Windows installs download the update here, checked against SHA256SUMS, and install it on restart.
-  ipcMain.handle("updateDownload", async () => {
+  handle("updateDownload", async () => {
     if (!update?.newer || !update.installable || updateProgress.stage === "downloading") return;
     updateProgress = { stage: "downloading", percent: 0, error: null };
     broadcast();
@@ -275,7 +284,7 @@ if (!app.requestSingleInstanceLock()) {
     broadcast();
   });
   // Restart asks first, waits for a running upload or price refresh to finish, then hands over to the installer.
-  ipcMain.handle("updateRestart", async () => {
+  handle("updateRestart", async () => {
     if (!downloaded || updateProgress.stage !== "ready") return false;
     // A newer release may have appeared while this verified installer waited for a restart.
     try {
@@ -322,7 +331,7 @@ if (!app.requestSingleInstanceLock()) {
     return true;
   });
   // The bug report opens GitHub's form with the version and the page's diagnostics filled in, or copies them.
-  ipcMain.handle("reportBug", async (_e, diag: unknown) => {
+  handle("reportBug", async (_e, diag: unknown) => {
     const text = typeof diag === "string" ? reportDiagnostics(diag) : "";
     const answer = await messageBox({
       type: "info",
@@ -339,7 +348,7 @@ if (!app.requestSingleInstanceLock()) {
     void shell.openExternal(`https://github.com/Everloot/everloot/issues/new?${q}`);
     return "opened";
   });
-  ipcMain.handle("accountSignIn", async (_e, key: unknown) => {
+  handle("accountSignIn", async (_e, key: unknown) => {
     if (typeof key !== "string") throw new Error("Paste the key first.");
     await signIn(data, settings.endpoint, key);
     void builds.signedIn();
@@ -348,7 +357,7 @@ if (!app.requestSingleInstanceLock()) {
   // Browser sign-in: one at a time; a second press stops the first. The key it brings is checked and kept
   // the same way as a pasted one, then the window comes back to the front.
   let connecting: AbortController | null = null;
-  ipcMain.handle("accountConnect", async () => {
+  handle("accountConnect", async () => {
     connecting?.abort();
     const mine = new AbortController();
     connecting = mine;
@@ -365,23 +374,23 @@ if (!app.requestSingleInstanceLock()) {
       if (connecting === mine) connecting = null;
     }
   });
-  ipcMain.handle("accountConnectCancel", () => { connecting?.abort(); });
-  ipcMain.handle("accountSignOut", () => {
+  handle("accountConnectCancel", () => { connecting?.abort(); });
+  handle("accountSignOut", () => {
     signOut(data);
     builds.signedOut();
     return appState();
   });
-  ipcMain.handle("checkForUpdates", async () => {
+  handle("checkForUpdates", async () => {
     const check = await checkForUpdates(app.getVersion(), fetch, process.platform, Boolean(process.env.PORTABLE_EXECUTABLE_FILE));
     update = check.latest ? check : null;
     broadcast();
     return check;
   });
 
-  ipcMain.handle("uploadInfo", () => summarizeFiles(engine.snapshot().files, join(data, "sent.json"), settings.endpoint));
-  ipcMain.handle("backups", () => listBackups(data));
-  ipcMain.handle("openBackupsFolder", () => { const dir = join(data, "backups"); return existsSync(dir) ? shell.openPath(dir).then(() => undefined) : undefined; });
-  ipcMain.handle("restoreBackup", async (_e, file: unknown) => {
+  handle("uploadInfo", () => summarizeFiles(engine.snapshot().files, join(data, "sent.json"), settings.endpoint));
+  handle("backups", () => listBackups(data));
+  handle("openBackupsFolder", () => { const dir = join(data, "backups"); return existsSync(dir) ? shell.openPath(dir).then(() => undefined) : undefined; });
+  handle("restoreBackup", async (_e, file: unknown) => {
     if (typeof file !== "string") throw new Error("Not a backup");
     const entry = listBackups(data).find((b) => b.file === file);
     if (!entry) throw new Error("That backup is gone");
@@ -395,7 +404,7 @@ if (!app.requestSingleInstanceLock()) {
     if (r.response !== 0) return null;
     return restoreBackup(file, data, engine.snapshot().files);
   });
-  ipcMain.handle("marketInfo", async (): Promise<MarketInfo> => {
+  handle("marketInfo", async (): Promise<MarketInfo> => {
     const files = engine.snapshot().files;
     const scans = newestScans(allScans());
     const dir = addonsDir();
@@ -408,7 +417,7 @@ if (!app.requestSingleInstanceLock()) {
       return { ...base, known: [], dataAsOf: null, error: err instanceof Error ? err.message : String(err) };
     }
   });
-  ipcMain.handle("marketLookup", (_e, text: unknown): PriceLookup => {
+  handle("marketLookup", (_e, text: unknown): PriceLookup => {
     const itemId = typeof text === "string" ? itemIdFrom(text.slice(0, 500)) : null;
     if (itemId === null) return { itemId, rows: [], note: "Give an item id, or paste an item link from game chat." };
     const dir = addonsDir();
@@ -417,7 +426,7 @@ if (!app.requestSingleInstanceLock()) {
     const rows = priceRows(file, itemId).map(({ realm, dataAsOf, market, min, historical, quantity, day, reporters }) => ({ realm, dataAsOf, market, min, historical, quantity, day, reporters }));
     return { itemId, rows, note: rows.length ? null : "This item is not in the game's price file. Each realm's file keeps the 2,000 items with the most units listed, so a public price may still be on the website; a day is public once three reporters scanned it." };
   });
-  ipcMain.handle("askInfo", (): AskInfo => {
+  handle("askInfo", (): AskInfo => {
     const pending = engine.snapshot().files.map((file) => {
       try { return { file, asks: readAsks(readFileSync(file, "utf8")) }; } catch { return { file, asks: [] }; }
     });
@@ -426,7 +435,7 @@ if (!app.requestSingleInstanceLock()) {
     catch (err) { providerError = err instanceof Error ? err.message : String(err); }
     return { pending, answers: jobs.answerStore.list().slice().reverse(), providers, providerError };
   });
-  ipcMain.handle("addonInfo", async (): Promise<AddonInfo> => {
+  handle("addonInfo", async (): Promise<AddonInfo> => {
     const dir = addonsDir();
     const local = { addonsDir: dir, installed: dir ? installedAddonVersion(dir) : null, slots: dir ? slotAddons(dir) : { prices: false, answers: false, builds: false } };
     try {
@@ -434,32 +443,32 @@ if (!app.requestSingleInstanceLock()) {
       return { ...local, latest, newer: Boolean(latest && local.installed && compareVersions(latest.version, local.installed) > 0), error: null };
     } catch (err) { return { ...local, latest: null, newer: false, error: err instanceof Error ? err.message : String(err) }; }
   });
-  ipcMain.handle("buildsSync", async () => { await builds.sync(); return appState(); });
-  ipcMain.handle("installAddon", async (_e, version: unknown) => {
+  handle("buildsSync", async () => { await builds.sync(); return appState(); });
+  handle("installAddon", async (_e, version: unknown) => {
     const dir = addonsDir();
     if (!dir) throw new Error("Pick the game folder first");
     if (typeof version !== "string" || !/^\d+\.\d+\.\d+$/.test(version)) throw new Error("Not a version");
     return installAddon({ version, endpoint: settings.endpoint, addonsDir: dir });
   });
-  ipcMain.handle("changes", () => changes());
-  ipcMain.handle("charactersInfo", () => charactersFromFiles(engine.snapshot().files));
+  handle("changes", () => changes());
+  handle("charactersInfo", () => charactersFromFiles(engine.snapshot().files));
 
-  ipcMain.handle("chatInfo", () => chat.info());
-  ipcMain.handle("chatSend", (e, text: unknown) => (typeof text === "string" ? chat.send(text, (p) => { if (!e.sender.isDestroyed()) e.sender.send("chatProgress", p); }) : chat.info()));
-  ipcMain.handle("chatClear", () => chat.clear());
-  ipcMain.handle("chatStop", () => chat.stop());
-  ipcMain.handle("chatSetProvider", (_e, raw: unknown) => {
+  handle("chatInfo", () => chat.info());
+  handle("chatSend", (e, text: unknown) => (typeof text === "string" ? chat.send(text, (p) => { if (!e.sender.isDestroyed()) e.sender.send("chatProgress", p); }) : chat.info()));
+  handle("chatClear", () => chat.clear());
+  handle("chatStop", () => chat.stop());
+  handle("chatSetProvider", (_e, raw: unknown) => {
     const c = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
     if (!presetFor(String(c.kind))) throw new Error("Pick a provider");
     const str = (v: unknown) => (typeof v === "string" ? v.slice(0, 2000) : undefined);
     return chat.setProvider({ kind: c.kind as ProviderKind, key: str(c.key), model: str(c.model), baseUrl: str(c.baseUrl) });
   });
-  ipcMain.handle("chatRemoveProvider", (_e, kind: unknown) => chat.removeProvider(presetFor(String(kind)) ? (kind as ProviderKind) : undefined));
-  ipcMain.handle("chatUseModel", (_e, kind: unknown, model: unknown) => {
+  handle("chatRemoveProvider", (_e, kind: unknown) => chat.removeProvider(presetFor(String(kind)) ? (kind as ProviderKind) : undefined));
+  handle("chatUseModel", (_e, kind: unknown, model: unknown) => {
     if (!presetFor(String(kind)) || typeof model !== "string") throw new Error("Pick a model");
     return chat.useModel(kind as ProviderKind, model.slice(0, 200));
   });
-  ipcMain.handle("chatModels", (_e, kind: unknown) => (presetFor(String(kind)) ? chat.models(kind as ProviderKind) : null));
+  handle("chatModels", (_e, kind: unknown) => (presetFor(String(kind)) ? chat.models(kind as ProviderKind) : null));
 
 
   // A stray rejection or exception becomes a line on the Log page instead of Electron's dialog; the jobs keep running.
@@ -475,6 +484,9 @@ if (!app.requestSingleInstanceLock()) {
   app.on("window-all-closed", () => { /* stay in the tray */ });
 
   void app.whenReady().then(() => {
+    // The page asks for no camera, microphone, location or web notifications; it only copies text.
+    session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => callback(allowedPermission(permission)));
+    session.defaultSession.setPermissionCheckHandler((_wc, permission) => allowedPermission(permission));
     tray = createTray(join(__dirname, process.platform === "darwin" ? "trayTemplate.png" : "tray.png"), {
       show, runNow: (job) => void engine.runNow(job), setPaused: (p) => engine.setPaused(p), openExternal: (url) => { if (allowedExternal(url)) void shell.openExternal(url); }, quit: () => { quitting = true; app.quit(); },
     });

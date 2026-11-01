@@ -39,6 +39,14 @@
     "copyright": "AGPL-3.0-only, Everloot contributors",
     "asar": true,
     "npmRebuild": false,
+    "electronFuses": {
+      "runAsNode": false,
+      "enableCookieEncryption": true,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "onlyLoadAppFromAsar": true,
+      "resetAdHocDarwinSignature": true
+    },
     "files": [
       "dist/**",
       "package.json"

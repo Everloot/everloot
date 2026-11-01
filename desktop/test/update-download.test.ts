@@ -34,7 +34,9 @@ const release = (version: string) => ({
     name, browser_download_url: `https://github.com/Everloot/everloot/releases/download/desktop-v${version}/${name}`,
   })),
 });
-const call = async (name: string) => h.handlers.get(name)!();
+// Calls arrive as they would from the bundled page at the top of the window.
+const fromPage = { senderFrame: { url: new URL("../src/main/renderer/index.html", import.meta.url).href, parent: null } };
+const call = async (name: string, event: unknown = fromPage) => h.handlers.get(name)!(event);
 const state = async () => await call("state") as import("../src/shared/types").AppState;
 let send: ReturnType<typeof vi.fn>;
 
@@ -123,4 +125,12 @@ test("restart stays open when the fresh release check fails", async () => {
   expect(await call("updateRestart")).toBe(false);
   expect(h.install).not.toHaveBeenCalled();
   expect((await state()).updateProgress).toMatchObject({ stage: "failed", error: expect.stringContaining("503") });
+});
+
+test("a call from anything but the app's page is refused before the handler runs", async () => {
+  await call("checkForUpdates");
+  const other = { senderFrame: { url: "https://everloot.app/", parent: null } };
+  await expect(call("updateDownload", other)).rejects.toThrow("only answered for the app's own page");
+  await expect(call("updateDownload", { senderFrame: null })).rejects.toThrow("only answered for the app's own page");
+  expect(h.download).not.toHaveBeenCalled();
 });
