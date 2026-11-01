@@ -93,6 +93,8 @@ const nextConfig = {
     "/search": ["./.release/*.sqlite", "./.release/*.manifest.json"],
     // The wiki's pages are read from kb/wiki when a page is rebuilt (the key covers /wiki and /wiki/[slug]).
     "/wiki": ["../kb/wiki/*.md", "../kb/wiki/categories.yaml"],
+    // An instance's database page links the published wiki page that binds it, so it reads them too.
+    "/database/instances/\\[instance\\]": ["../kb/wiki/*.md", "../kb/wiki/categories.yaml"],
     // The news posts are read from kb/news the same way (the key covers /news, /news/[slug] and /news/feed.xml);
     // a post's [[links]] read the wiki pages too.
     "/news": ["../kb/news/*.md", "../kb/wiki/*.md", "../kb/wiki/categories.yaml"],

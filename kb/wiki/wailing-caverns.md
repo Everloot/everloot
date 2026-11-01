@@ -9,9 +9,10 @@ categories: [dungeons, kalimdor, the-barrens]
 origin: original
 adaptedFrom: []
 sources:
-  - { title: "Explore the New Dungeons of World of Warcraft: Forever (Blizzard news)", url: "https://worldofwarcraft.blizzard.com/en-us/news/24301455", checkedOn: 2026-10-20 }
-  - { title: "Explore the New Dungeons of World of Warcraft: Forever (forum post)", url: "https://us.forums.blizzard.com/en/wow/t/explore-the-new-dungeons-of-world-of-warcraft-forever/2387658", checkedOn: 2026-10-20 }
-  - { title: "Everloot map: dungeon entrances and flight points (game files, build 1.60.1.70634)", url: "https://everloot.app/map", checkedOn: 2026-10-27 }
+  - { title: "Explore the New Dungeons of World of Warcraft: Forever (Blizzard news)", url: "https://worldofwarcraft.blizzard.com/en-us/news/24301455", checkedOn: 2026-11-01 }
+  - { title: "Explore the New Dungeons of World of Warcraft: Forever (forum post)", url: "https://us.forums.blizzard.com/en/wow/t/explore-the-new-dungeons-of-world-of-warcraft-forever/2387658", checkedOn: 2026-11-01 }
+  - { title: "Everloot map: dungeon entrances and flight points (game files, build 1.60.1.70707)", url: "https://everloot.app/map", checkedOn: 2026-11-01 }
+  - { title: "Everloot database: instance page, level, entrance and encounters (game files, build 1.60.1.70707)", url: "https://everloot.app/database/instances/43-wailing-caverns", checkedOn: 2026-11-01 }
   - { title: "Wailing Caverns (lore page, Warcraft Wiki)", url: "https://everloot.app/lore/78912-wailing-caverns", checkedOn: 2026-10-27 }
   - { title: "Druids of the Fang (lore page, Warcraft Wiki)", url: "https://everloot.app/lore/88349-druids-of-the-fang", checkedOn: 2026-10-27 }
   - { title: "Naralex (lore page, Warcraft Wiki)", url: "https://everloot.app/lore/196921-naralex", checkedOn: 2026-10-27 }
@@ -30,8 +31,8 @@ spread into the caves; the animals there turned deviate, and most of his followe
 
 ## Getting there
 
-The entrance lies in {zone:1413}, southwest of the Crossroads. The Crossroads flight point is the nearest in the game
-files.
+The entrance lies in {zone:1413}, southwest of the Crossroads. [Find it on the map](/map?zone=1413&x=47.7&y=35). The
+Crossroads flight point is the nearest in the game files.
 
 ## History
 
@@ -41,15 +42,24 @@ handful who escaped the taint are still trying to bring him back.
 
 ## In WoW: Forever
 
-Everloot's record of Blizzard's posts, through 2026-10-23, has nothing about the Wailing Caverns for WoW: Forever. The
-entrance and the level in this page's facts come from the current build's game files and are not confirmed in the
-game. Its bosses are listed here once players report them.
+Everloot's record of Blizzard's posts, through 2026-10-23, has nothing about the Wailing Caverns for WoW: Forever.
+Nothing here is confirmed for Forever yet.
+
+The level, the entrance and the encounters come from the game files Everloot reads, build 1.60.1.70707. They are
+found in the game files and not confirmed in the game. The list of encounters is on
+[the database page](/database/instances/43-wailing-caverns); which of them you meet in Forever, and in what order,
+is not known.
+
+Once players with the Everloot addon zone in and [upload their data](/upload), this page shows the entrance they
+agree on, and each boss they report with its kills and when it was last seen. Loot and quests are not known for
+Forever yet, so this page lists none.
 
 ## Before you go
 
 ### Editor to confirm
 
-- Proposed: check the level in this page's facts and go with a group around it. It is the level the game files
-  give, not yet confirmed in the game.
-- Proposed: fly to the Crossroads and head southwest to the entrance.
-- Proposed: agree on a route through the caves before the first pull.
+- Proposed: Check the level in this page's facts before you form a group. It is the one level the game files give,
+  not a range, and it is not confirmed in the game.
+- Proposed: Fly to the Crossroads, the nearest flight point in the game files, and head southwest to the entrance.
+- Proposed: Read the encounters on [the database page](/database/instances/43-wailing-caverns) with your group, so
+  nobody is surprised by a name. Treat the list as a guide to what may be there, not a promise.
