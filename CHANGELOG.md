@@ -15,6 +15,8 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
+- Desktop App: the tray menu is replaced only when one of its lines changes, not on every status update (each percent
+  of an update download was one), so a menu the player has open is not swapped out under them.
 - Addon: login and `/reload` print one line (version, modules on and off, any that could not start, any paused
   collection) instead of the full status; `/everloot status` still lists everything. Without the Desktop App's price
   file, the first item tooltip says once per install in chat where community prices come from. `/ask` names the
