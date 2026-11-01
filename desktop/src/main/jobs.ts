@@ -4,6 +4,7 @@ import { answerPending, createAnswerStore } from "../../../companion/src/bridge/
 import { lazyEngine, mcpAnswerSources, mcpEngine, mcpMarketValue, siteItemSearch, withMarket } from "../../../companion/src/bridge/engine";
 import { llmEngine } from "../../../companion/src/bridge/llm-engine";
 import { providersOnDemand } from "../../../companion/src/providers/config";
+import { linkSummary, sendLinks } from "../../../companion/src/link-sender";
 import { findEverlootFiles } from "../../../companion/src/savedvariables";
 import { createSentState } from "../../../companion/src/sent-state";
 import { uploadFile } from "../../../companion/src/uploader";
@@ -39,7 +40,14 @@ export function companionJobs(dataFolder: string, current: () => Settings): { de
       const settled = (build: string | undefined) => appSettledList({ folder: dataFolder, endpoint, build });
       const r = await uploadFile(file, { endpoint, state, census: current().census, players: current().players, settled });
       const rejected = r.rejected ? `; the site turned away ${r.rejected} ${r.rejected === 1 ? "row, which stays unsent and goes" : "rows, which stay unsent and go"} again next run` : "";
-      return `sent ${r.sent} new events in ${r.batches} batch(es)${rejected}; skipped ${r.skipped} already settled; kept ${r.heldNamed} named, ${r.heldAddons} installed-addon, ${r.heldCensus} census and ${r.heldLegacy} legacy rows here${backup}`;
+      // Codes typed with /everloot link go to the account's own link endpoint with the account key, never with the
+      // upload. A link that fails never fails the upload; its rows go again next run.
+      let links = "";
+      try {
+        const said = linkSummary(await sendLinks(file, { endpoint, key: accountKeyForSite(dataFolder, endpoint), state }));
+        if (said) links = `; ${said}`;
+      } catch (err) { links = `; character links not sent: ${err instanceof Error ? err.message : String(err)}`; }
+      return `sent ${r.sent} new events in ${r.batches} batch(es)${rejected}; skipped ${r.skipped} already settled; kept ${r.heldNamed} named, ${r.heldAddons} installed-addon, ${r.heldCensus} census and ${r.heldLegacy} legacy rows here${links}${backup}`;
     },
     async prices(files) {
       const s = current();

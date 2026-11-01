@@ -164,7 +164,7 @@ function E:Status()
     "collection_catalog", "collection_owned", "auction_scan", "auction_snapshot", "recipe_seen", "recipe_observed", "trainer_seen", "price_seen",
     "gold_snapshot", "money_event", "addon_seen", "map_bounds", "talent_snapshot",
     "achievement_catalog", "reputation_catalog", "title_catalog", "quest_chain_catalog",
-    "achievement_owned", "reputation_owned", "title_owned", "quest_owned", "census_self", "census_seen", "player_seen" }) do
+    "achievement_owned", "reputation_owned", "title_owned", "quest_owned", "census_self", "census_seen", "player_seen", "character_link" }) do
     lines[#lines + 1] = string.format("  rows %s: %d", kind, self:Count(kind))
   end
   return table.concat(lines, "\n")
@@ -226,6 +226,8 @@ SlashCmdList["EVERLOOT"] = function(msg)
   msg = msg and msg:lower():gsub("^%s+", "") or ""
   local gph = msg:match("^gph%f[%s%z]%s*(.-)%s*$")
   if gph and E.GphCommand then return E.GphCommand(gph) end
+  local link = msg:match("^link%f[%s%z]%s*(.-)%s*$")
+  if link and E.Link then return E.Link.Command(link) end
   if msg == "" and E.Planner then
     E.Planner.Open()
   elseif msg == "status" or msg == "" then
@@ -302,6 +304,6 @@ SlashCmdList["EVERLOOT"] = function(msg)
       print("Everloot: installed addon list off; all recorded addon rows were deleted from this file. /reload to apply.")
     end
   else
-    print("Everloot commands: /everloot window, /everloot options, /everloot status, /everloot auctions on|off, /everloot scan, /everloot scanprompt on|off, /everloot vendor on|off, /everloot mail on|off, /everloot price [item], /everloot gph [start|pause|stop|reset|show|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], /everloot selftest, /everloot talents, /everloot plan [share code|number], /everloot raid [code], /ask <question>")
+    print("Everloot commands: /everloot window, /everloot options, /everloot status, /everloot auctions on|off, /everloot scan, /everloot scanprompt on|off, /everloot vendor on|off, /everloot mail on|off, /everloot price [item], /everloot gph [start|pause|stop|reset|show|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], /everloot link [code|clear], /everloot selftest, /everloot talents, /everloot plan [share code|number], /everloot raid [code], /ask <question>")
   end
 end

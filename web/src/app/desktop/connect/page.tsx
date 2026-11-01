@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import DesktopConnect from "@/components/DesktopConnect";
 import { signInPath } from "@/lib/auth/return-to";
+import { characterLinksOn } from "@/lib/character-links";
 import { connectPath, parseConnectRequest } from "@/lib/desktop-connect";
 import { pageMetadata } from "@/lib/seo";
 import { getUser } from "@/lib/supabase/server";
@@ -38,5 +39,5 @@ export default async function DesktopConnectPage({ searchParams }: { searchParam
     );
   }
   if (!user) redirect(signInPath(connectPath(request)));
-  return <DesktopConnect request={request} name={user.name} />;
+  return <DesktopConnect request={request} name={user.name} links={characterLinksOn()} />;
 }

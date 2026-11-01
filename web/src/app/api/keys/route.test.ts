@@ -63,6 +63,27 @@ test("with saved builds on, a key can also read its owner's builds; otherwise th
   expect(await (await GET(call("GET"))).json()).toMatchObject({ ownScope: true });
 });
 
+test("with character links on, the Desktop App's key may also send link codes; no other key, and never with the switch off", async () => {
+  auth.authQuery.mockResolvedValue([{ key_ref: KEY_ID, refusal: null }]);
+  await POST(call("POST", "", { label: DESKTOP, builds: true, links: true }));
+  expect(JSON.parse(auth.authQuery.mock.calls[0][1].body)).not.toHaveProperty("p_scopes");
+  vi.stubEnv("EVERLOOT_CHARACTER_LINKS", "1");
+  await POST(call("POST", "", { label: DESKTOP, links: true }));
+  expect(JSON.parse(auth.authQuery.mock.calls[1][1].body).p_scopes).toEqual(["read:public", "link:own"]);
+  vi.stubEnv("EVERLOOT_SAVED_BUILDS", "1");
+  await POST(call("POST", "", { label: DESKTOP, builds: true, links: true }));
+  expect(JSON.parse(auth.authQuery.mock.calls[2][1].body).p_scopes).toEqual(["read:public", "read:own", "link:own"]);
+  await POST(call("POST", "", { label: DESKTOP, builds: true, links: "yes" }));
+  expect(JSON.parse(auth.authQuery.mock.calls[3][1].body).p_scopes).toEqual(["read:public", "read:own"]);
+  // Before the expiry migration the older call still makes other keys; they never get link:own from it.
+  auth.authQuery.mockImplementation(async (path: string) => {
+    if (path.includes(",purpose")) throw storageFailed(400);
+    return path.startsWith("api_keys?") ? [] : [{ key_ref: KEY_ID, refusal: null }];
+  });
+  expect((await POST(call("POST", "", { label: "bot", builds: true, links: true }))).status).toBe(201);
+  expect(JSON.parse(auth.authQuery.mock.calls.at(-1)![1].body)).toMatchObject({ p_label: "bot", p_scopes: ["read:public", "read:own"] });
+});
+
 test("a sixth live key is refused, and so is an eleventh key made in one day", async () => {
   auth.authQuery.mockResolvedValue([{ key_ref: null, refusal: "live_limit" }]);
   const res = await POST(call("POST", "", { label: DESKTOP }));

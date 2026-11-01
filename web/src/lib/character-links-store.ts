@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { hashKey, KEY_PATTERN, presentedKey } from "./api-keys";
 import { signInPath } from "./auth/return-to";
-import { characterLinksOn, completionRef, linkCodeHash, linkKey, linkRealmKey, newLinkCode, type LinkRow } from "./character-links";
+import { characterLinksOn, completionRef, linkCodeHash, linkKey, LINKS_PER_ACCOUNT, linkRealmKey, newLinkCode, type LinkRow } from "./character-links";
 import { rulesetOf } from "./player-pages";
 import { authQuery, getUser, siteUrl } from "./supabase/server";
 
@@ -55,6 +55,34 @@ export async function redeemLink(userId: string, row: LinkRow, secret: string, c
   return { id: result.link_ref, status: result.link_status };
 }
 
+/** One of the account's own links, as its owner's list shows it. No key, hash, code or other account. */
+export interface OwnLink {
+  id: string; name: string; realm: string; race: string; class: string; faction: "Alliance" | "Horde"; level: number;
+  status: "linked" | "frozen"; linked_at: string; last_upload_at: string;
+}
+const OWN_LINK_COLUMNS = "id,name,realm,race,class,faction,level,status,linked_at,last_upload_at";
+
+/** The account's links, oldest first. Only these columns are read, so nothing else can leave by mistake. */
+export async function listLinks(userId: string): Promise<OwnLink[]> {
+  const rows = await authQuery<OwnLink[]>(
+    `character_links?select=${OWN_LINK_COLUMNS}&user_id=eq.${encodeURIComponent(userId)}&order=linked_at.asc,id.asc&limit=${LINKS_PER_ACCOUNT}`,
+  );
+  if (!Array.isArray(rows)) throw new Error("Invalid links response");
+  return rows.map((r) => ({
+    id: r.id, name: r.name, realm: r.realm, race: r.race, class: r.class, faction: r.faction, level: r.level,
+    status: r.status === "linked" ? "linked" : "frozen", linked_at: r.linked_at, last_upload_at: r.last_upload_at,
+  }));
+}
+
+/**
+ * Unlinks one of the account's characters through `unlink_character`: the link and its visibility go. False when the
+ * account has no link with that id, another account's included. Another account's frozen link of the character stays
+ * frozen.
+ */
+export async function unlinkCharacter(userId: string, id: string): Promise<boolean> {
+  return (await authQuery<boolean>("rpc/unlink_character", { method: "POST", body: JSON.stringify({ p_user_id: userId, p_id: id }) })) === true;
+}
+
 /** The account behind a key with link:own, or why not. */
 export async function linkAccountForKey(token: string): Promise<{ ok: true; userId: string } | { ok: false; refusal: "unknown_key" | "no_scope" }> {
   if (!KEY_PATTERN.test(token)) return { ok: false, refusal: "unknown_key" };
@@ -91,5 +119,16 @@ export async function linkAccount(req: Request, keys: boolean): Promise<string |
   if (req.headers.get("origin") !== siteUrl()) return fail(403, "Invalid origin");
   const user = await getUser();
   if (!user) return NextResponse.json({ error: "Sign in to link a character.", signIn: signInPath("/account") }, { status: 401, headers: NO_STORE });
+  return user.id;
+}
+
+/**
+ * For reads: 404 with the switch off, 401 signed out, otherwise the account id. The session only: an API key is
+ * never read here, so a key cannot list an account's links. A read changes nothing, so no Origin is needed.
+ */
+export async function linkSession(): Promise<string | Response> {
+  if (!characterLinksOn()) return fail(404, "Not found");
+  const user = await getUser();
+  if (!user) return NextResponse.json({ error: "Sign in to see your linked characters.", signIn: signInPath("/account") }, { status: 401, headers: NO_STORE });
   return user.id;
 }

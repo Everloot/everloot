@@ -242,6 +242,22 @@ whether it is on and how many characters it holds; `/everloot players off` stops
   uploader never send them. The site
   drops them until the owner has turned the player pages on.
 
+## Linking a character
+
+`/everloot link <code>` links the character you are playing to your everloot.app account. The site shows the
+code (`EL-7K3Q-9P`) to a signed-in player; it works once, for 15 minutes. Nothing happens without the command.
+
+- **What a row holds** (`character_link`): the code, your character's name, realm, race, class, level, faction
+  and GUID, and the completion key for it. Only your own character is read.
+- **Sending**: after `/reload` or logout, the Everloot Desktop App, signed in with permission to link
+  characters, sends the row to your account's link endpoint and nowhere else. Uploads never carry it. The site
+  keeps a keyed hash in place of the GUID.
+- **What a link is**: a claim made from this file, not proof that you own the character. If another account
+  links the same character, both links are frozen.
+- A new code on the same character replaces its row; at most 10 rows are kept. `/everloot link` says how many
+  there are and `/everloot link clear` deletes them.
+  `addon/tests/link_contract.py` lists every call the command may make.
+
 ## Talents, selftest and the plan panel
 
 ### Bring a website plan into the game

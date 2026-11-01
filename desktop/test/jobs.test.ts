@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -207,4 +207,70 @@ ${row(3, 43)}
   } finally {
     vi.unstubAllGlobals();
   }
+});
+
+describe("character link codes in the upload job", () => {
+  const linkFile = (d: string) => {
+    const file = join(d, "Everloot.lua");
+    writeFileSync(file, `EverlootDB = {
+["version"] = "0.3.14",
+["installId"] = "abcd-1234-ef56-7890",
+["records"] = {
+["character_link"] = {
+{["eventId"] = "character_link:1", ["capturedAt"] = "2026-11-01T18:00:00Z", ["code"] = "EL-7K3Q-9P", ["name"] = "Thrallina", ["realm"] = "Forever Pioneer", ["race"] = "Orc", ["class"] = "SHAMAN", ["level"] = 24, ["faction"] = "Horde", ["guid"] = "Player-4395-0A1B2C3D", ["completionKey"] = "0a1b2c3d"},
+},
+["loot"] = {
+{["eventId"] = "epoch:1", ["capturedAt"] = "2026-10-09T00:00:00Z", ["sourceNpcId"] = 42, ["sourceEvidence"] = "loot-api", ["items"] = {{["itemId"] = 5, ["count"] = 1}}},
+},
+},
+}
+`);
+    return file;
+  };
+  const site = () => {
+    const calls: { url: string; auth: string | null; body: string }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/api/coverage/settled")) return new Response(null, { status: 404 });
+      calls.push({ url, auth: new Headers(init?.headers).get("authorization"), body: String(init?.body) });
+      const records = JSON.parse(String(init?.body)).records as { kind: string }[];
+      if (url.endsWith("/api/me/characters/links")) {
+        return Response.json({ results: [{ index: 0, status: "linked", name: "Thrallina", realm: "Forever Pioneer", message: "Linked." }] });
+      }
+      return Response.json({ ok: true, persisted: true, uploadId: "u-1", accepted: records.map((r, index) => ({ index, kind: r.kind })), rejected: [] });
+    }));
+    return calls;
+  };
+
+  test("signed in, the code goes to the link endpoint with the key, and the upload carries neither", async () => {
+    const d = dir();
+    const data = join(d, "data");
+    const key = `evl_${"ab".repeat(32)}`;
+    mkdirSync(data, { recursive: true });
+    writeFileSync(join(data, ACCOUNT_KEY_FILE), key);
+    writeKeyOrigin(data, "https://everloot.app");
+    const calls = site();
+    try {
+      const said = await companionJobs(data, () => ({ ...defaultSettings(), endpoint: "https://everloot.app" })).deps.upload(linkFile(d));
+      expect(said).toContain("linked Thrallina of Forever Pioneer");
+      expect(calls.map((c) => new URL(c.url).pathname)).toEqual(["/api/intake", "/api/me/characters/links"]);
+      expect(calls[0].auth).toBeNull();
+      for (const secret of ["character_link", "Player-4395", "EL-7K3Q-9P", key]) expect(calls[0].body).not.toContain(secret);
+      expect(calls[1].auth).toBe(`Bearer ${key}`);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  test("signed out, nothing goes to the link endpoint and the status says how to send it", async () => {
+    const d = dir();
+    const calls = site();
+    try {
+      const said = await companionJobs(join(d, "data"), () => ({ ...defaultSettings(), endpoint: "https://everloot.app" })).deps.upload(linkFile(d));
+      expect(said).toMatch(/1 link code waits: Sign in/);
+      expect(calls.map((c) => new URL(c.url).pathname)).toEqual(["/api/intake"]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });
