@@ -8,7 +8,7 @@ import { Container, PageHeader, SectionHeading } from "@/components/ui";
 import { classLabel, contextLinks, type ContextDestination, type ContextLink } from "@/lib/class-context";
 import { classGuides, classRaces, hubIndexable } from "@/lib/class-hub";
 import { guideHref } from "@/lib/guides";
-import { RACE_TABLE, traitsFor } from "@/lib/race-traits";
+import { RACE_TABLE, RACIAL_NOTES, traitsFor } from "@/lib/race-traits";
 import { pageMetadata } from "@/lib/seo";
 import { TALENT_CLASSES, isTalentClass } from "@/lib/talents/catalogs";
 import type { GuideActivity, GuideRole } from "../../../../../kb/src/guides/guide";
@@ -149,7 +149,9 @@ export default async function ClassHubPage({ params }: Params) {
           </div>
           <p className="mt-3 text-sm text-muted">
             {races.some((f) => f.races.some((r) => r.isNew)) && <><span className="font-semibold text-accent">New</span> marks the combinations Blizzard names as new in WoW: Forever. </>}
-            {`Racial traits found in game files, unconfirmed, build ${RACE_TABLE.build.version}. `}
+            {`Racial traits found in game files, unconfirmed, build ${RACE_TABLE.build.version}, with Blizzard's final racial changes from `}
+            <a href={RACIAL_NOTES.sourceUrl} rel="noopener" className={LINK}>{`${RACIAL_NOTES.sourceName}, ${RACIAL_NOTES.sourceTitle}`}</a>
+            {". "}
             <Link href="/wow-forever#races" className={LINK}>Every race and class</Link>
           </p>
         </section>

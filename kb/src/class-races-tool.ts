@@ -1,11 +1,13 @@
 import { GAME_DATA_CREDIT, TALENT_CLASSES, type McpToolArgs, type TalentClass } from "@everloot/protocol";
 import { RACE_FACTIONS, type RaceTable } from "./client-races.js";
+import { RACIAL_NOTES, type NotedTrait } from "./racial-notes.js";
 import { classUrl, moreLine } from "./page-urls.js";
 
 /**
  * class_races: who can be a class, per faction, with each race's racial traits, from the committed race table
  * (web/src/data/game-data/races.json). Game-file data, found in game files, unconfirmed; the answer carries the
- * build and ends with Blizzard's credit. Trait descriptions are game text and stay on the class page.
+ * build and ends with Blizzard's credit. Trait descriptions are game text and stay on the class page. The server
+ * passes the table with Blizzard's later racial pass applied (racial-notes.ts); the answer then names those notes.
  */
 
 type Answer = { text: string; structured: object };
@@ -40,6 +42,8 @@ export function handleClassRaces(args: McpToolArgs<"class_races">, table: RaceTa
     lines.push(f.faction);
     for (const r of f.races) lines.push(`  ${r.name}: ${r.traits.map((t) => `${t.name} (${t.kind})`).join(", ") || "no traits listed"}`);
   }
+  const noted = table.races.some((r) => r.traits.some((t) => (t as NotedTrait).fromNotes));
+  if (noted) lines.push(`Racial changes from ${RACIAL_NOTES.sourceName}, ${RACIAL_NOTES.sourceTitle}: ${RACIAL_NOTES.sourceUrl}`);
   const url = classUrl(slug);
   lines.push(moreLine(url), GAME_DATA_CREDIT);
   return {
