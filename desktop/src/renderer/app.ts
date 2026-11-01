@@ -992,6 +992,7 @@ function settings(s: AppState): string {
     <section class="panel set-sec"><div class="set-lead"><h2>This app</h2></div><div class="set-body">
       <p class="fg2">Everloot Desktop App ${esc(s.version)} · AGPL-3.0-only · ${ext("https://github.com/Everloot/everloot/tree/main/desktop", "source")} · ${ext("https://discord.gg/9CKsbHTRu3", "Discord")}</p>
       <p class="muted small">Data folder: <span class="mono">${esc(s.dataFolder)}</span> <button type="button" class="link" id="openData">open</button></p>
+      <p class="muted small">Uninstalling keeps this folder, with your keys, chat and save backups in it. Quit the app and delete it to remove them.</p>
       <div class="row"><button type="button" class="btn" id="updates">Check for updates</button></div>
     </div></section>
   </div>`;

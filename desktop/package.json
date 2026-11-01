@@ -16,6 +16,7 @@
     "start": "npm run build && electron .",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "bench": "node bench/run.mjs",
     "icons": "node scripts/icons.mjs",
     "pack": "npm run build && electron-builder --publish never"
   },

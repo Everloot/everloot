@@ -96,6 +96,14 @@ test("pending asks are answered once and written into the slot addon", async () 
   expect(engine.answer).toHaveBeenCalledTimes(1);
 });
 
+test("asks the caller already read are answered without reading the save file again", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "everloot-bridge-"));
+  const engine = { answer: vi.fn(async () => ({ answer: "Warchief.", source: "wiki" })) };
+  const store = createAnswerStore(join(dir, "answers.json"));
+  const asks = [{ id: "ask:1", question: "Thrall", askedAt: "2026-10-09T00:00:00Z" }];
+  expect(await answerPending({ svFile: join(dir, "missing.lua"), asks, addonsDir: join(dir, "AddOns"), engine, store })).toEqual({ answered: 1, failed: 0 });
+});
+
 test("an answered question still waiting in game gets its answer rewritten, with no new model call", async () => {
   // The addon keeps a question queued when its checksum fails; rewriting the slot addon heals it.
   const dir = mkdtempSync(join(tmpdir(), "everloot-bridge-"));

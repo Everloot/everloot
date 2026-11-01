@@ -15,7 +15,7 @@ const base: AppState = {
   version: "0.1.11", platform: "win32", dataFolder: "D:\\data", notice: null, foreverFolder: null,
   settings: {
     gameFolder: null, keptGameFolder: null, endpoint: "https://everloot.app", upload: true, census: true, players: false, prices: true,
-    ask: { enabled: false, mcpUrl: "https://everloot.app/mcp", tokenFile: "" }, market: { realms: [] }, consentedAt: "2026-10-18T00:00:00Z", launchAtLogin: false, startInTray: true,
+    ask: { enabled: false, mcpUrl: "https://everloot.app/mcp", tokenFile: "" }, market: { realms: [], dismissed: [] }, consentedAt: "2026-10-18T00:00:00Z", launchAtLogin: false, startInTray: true,
   },
   engine: { files: [], jobs: { upload: job, prices: job, ask: job }, log: [], paused: false },
   update: null, updateProgress: { stage: "idle", percent: 0, error: null }, staleScans: [], account: { signedIn: false, hint: null },

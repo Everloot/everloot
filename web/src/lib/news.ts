@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { clampText } from "../../../kb/src/text-safety";
-import { parsePost, PostFrontMatter } from "../../../kb/src/news/post";
+import { parsePost, postFigure, PostFrontMatter } from "../../../kb/src/news/post";
 import { inlineText, type Block } from "../../../kb/src/wiki/page";
 
 /**
@@ -60,9 +60,16 @@ export const hubIndexable = (news: Map<string, NewsPost>): boolean => publishedP
 /** The search snippet: the summary, cut to the length a result shows. */
 export const postDescription = (post: Pick<NewsPost, "summary">): string => clampText(post.summary, 160);
 
-/** The post's own prose as plain text, each token standing in as one word; the feed's description reads its opening. */
+/**
+ * The post's own prose as plain text, each token standing in as one word; the feed's description reads its opening.
+ * A figure reads as its caption, or its alt text without one; a block with an image the page cannot draw reads as nothing.
+ */
 export function postText(blocks: Block[]): string {
-  return blocks.flatMap((b) => (b.type === "paragraph" ? [inlineText(b.inline)] : b.type === "list" ? b.items.map((i) => inlineText(i)) : [])).join(" ");
+  return blocks.flatMap((b) => {
+    const figure = postFigure(b);
+    if (figure) return "figure" in figure ? [figure.figure.caption ?? figure.figure.alt] : [];
+    return b.type === "paragraph" ? [inlineText(b.inline)] : b.type === "list" ? b.items.map((i) => inlineText(i)) : [];
+  }).join(" ");
 }
 
 /** The sitemap's news entries: the hub once it is indexed, then each post dated by the day it last changed. */
