@@ -35,3 +35,15 @@ test("the browser gets the page's own Cache-Control back from a cached copy", as
   expect(served.headers.has("x-everloot-browser-cache-control")).toBe(false);
   expect(await served.text()).toBe("<html></html>");
 });
+
+test("on the item lists, parameters the page never reads do not split the cache, and order does not matter", () => {
+  const key = (u: string) => edgeCacheKey(new Request(u), "abc1234").url;
+  const plain = key("https://everloot.app/database/items/weapons");
+  expect(key("https://everloot.app/database/items/weapons?utm_source=x&cb=123")).toBe(plain);
+  expect(key("https://everloot.app/database/items?quality=epic&slot=head")).toBe(key("https://everloot.app/database/items?slot=head&quality=epic&fbclid=z"));
+  expect(key("https://everloot.app/database/items/weapons/one-handed-swords?page=2&x=1")).toBe("https://everloot.app/database/items/weapons/one-handed-swords?page=2&__edge_build=abc1234");
+  // Router payloads keep their own key.
+  expect(key("https://everloot.app/database/items/weapons?_rsc=abc")).not.toBe(plain);
+  // Item pages and other routes keep the query as it came.
+  expect(key("https://everloot.app/search?q=thrall&x=1")).toBe("https://everloot.app/search?q=thrall&x=1&__edge_build=abc1234");
+});

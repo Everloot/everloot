@@ -16,9 +16,28 @@ export function edgeCacheable(req: Request): boolean {
   return req.method === "GET" && !req.headers.has("authorization") && !req.headers.get("range");
 }
 
-/** The cache key: the URL plus the build, so each deploy starts with an empty cache. */
+/**
+ * The query parameters the item lists read (categoryQuery and itemsHref in src/lib/items.ts, the class context in
+ * src/lib/class-context.ts), plus Next's `_rsc` so a router payload never shares a key with the HTML page.
+ */
+const ITEM_LIST_PARAMS = new Set([
+  "q", "slot", "quality", "src", "skill", "crafted", "reagent", "set", "seen", "ilvl", "req", "bind", "dev", "unnamed", "sort", "page",
+  "level", "role", "_rsc",
+]);
+const ITEM_LIST_PATH = /^\/database\/items(?:\/[a-z][a-z0-9-]*(?:\/[^/]+)?)?\/?$/;
+
+/**
+ * The cache key: the URL plus the build, so each deploy starts with an empty cache. On the item lists, parameters
+ * the page never reads (utm tags, cache busters bots add) are dropped and the rest sorted, so they cannot mint
+ * an unbounded number of misses that each render the whole list (about 550 ms of CPU).
+ */
 export function edgeCacheKey(req: Request, build: string): Request {
   const url = new URL(req.url);
+  if (ITEM_LIST_PATH.test(url.pathname)) {
+    const kept = [...url.searchParams].filter(([k]) => ITEM_LIST_PARAMS.has(k));
+    kept.sort(([a, x], [b, y]) => (a === b ? (x < y ? -1 : x > y ? 1 : 0) : a < b ? -1 : 1));
+    url.search = new URLSearchParams(kept).toString();
+  }
   url.searchParams.set("__edge_build", build || "unknown");
   return new Request(url.toString(), { method: "GET" });
 }
