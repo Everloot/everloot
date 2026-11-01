@@ -1,0 +1,13 @@
+{
+  "name": "everloot-news-hero",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "type": "module",
+  "description": "Renders the Everloot cards used as news post heroes.",
+  "scripts": {
+    "render": "node render.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.64.1"
+  }
+}

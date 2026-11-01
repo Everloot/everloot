@@ -14,6 +14,11 @@ sources:
   - title: "Wowhead: WoW: Forever content release roadmap"
     url: https://www.wowhead.com/forever/guide/content-release-roadmap
 status: published
+hero:
+  src: /news/heroes/wow-forever-character-creation-opens-tomorrow-checklist/wow-forever-character-creation-opens-tomorrow-checklist-clean.webp
+  alt: "Everloot card: Checklist, Oct 26, 2026. Character creation opens tomorrow. Up to 3 characters total across all rulesets until November 3. Install the client today. Start times: 1:00 PM PDT: North America, Oct 27; 18:00 CET: Europe, Oct 27; 07:00: Korea and Taiwan, Oct 28, local; 3: Characters total, all rulesets. Footer: per Blizzard, fan recap, not affiliated, everloot.app."
+  thumb: /news/heroes/wow-forever-character-creation-opens-tomorrow-checklist/wow-forever-character-creation-opens-tomorrow-checklist-card.webp
+  share: /news/heroes/wow-forever-character-creation-opens-tomorrow-checklist/wow-forever-character-creation-opens-tomorrow-checklist-share.png
 ---
 
 **TL;DR:** WoW: Forever character creation opens tomorrow, Tuesday, October 27, at 1:00 PM PDT (18:00 CET in Europe). Eligible players can make up to 3 characters total across all rulesets until November 3. Install the client today so you are not downloading while the best names go.

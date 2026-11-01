@@ -16,6 +16,11 @@ sources:
   - title: "Blizzard: World of Warcraft: Forever Goes Live Globally November 4!"
     url: https://news.blizzard.com/en-us/article/24315820/world-of-warcraft-forever-goes-live-globally-november-4
 status: published
+hero:
+  src: /news/heroes/wow-forever-molten-core-new-mechanics-raid-tease/wow-forever-molten-core-new-mechanics-raid-tease-clean.webp
+  alt: "Everloot card: Raids, Oct 26, 2026. Molten Core gets new mechanics, plus 3 boss teases. Molten Core will not be the raid you solved in 2004. Expect to relearn fights. From the podcast: Barrow Deeps: Manage a damage buff that has a cost; Spider pair: Nuthals is \"super excited for\" them; Hyjal Summit: Undead crocolisk, two phases; Later: Barrow Deeps and Hyjal, not at launch. Footer: per the WoW: Forever Podcast, fan recap, not affiliated, everloot.app."
+  thumb: /news/heroes/wow-forever-molten-core-new-mechanics-raid-tease/wow-forever-molten-core-new-mechanics-raid-tease-card.webp
+  share: /news/heroes/wow-forever-molten-core-new-mechanics-raid-tease/wow-forever-molten-core-new-mechanics-raid-tease-share.png
 ---
 
 **TL;DR:** Molten Core will not be the raid you solved in 2004. On the WoW: Forever Podcast, Senior Game Designer Josh "Aggrend" Greenfield said the old raid gets new mechanics, and Lead Encounter Designer Michael Nuthals teased three new bosses from the 10- and 20-player raids. Those new raids open December 9; Blizzard hasn't dated Molten Core.

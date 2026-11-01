@@ -300,7 +300,7 @@ const CORPUS = {
   "wow-weekly-forever-name-reservations-zulaman-hallows-end": "64c5c8d7dff54cbeaa1b1030179939e01207d0a92e79b5b59b655e3f4c8815be"
 };
 
-test("all 18 published posts retain their editorial source and survive pages, hub, RSS and sitemap with nine heroes", async () => {
+test("all 18 published posts retain their editorial source and survive pages, hub, RSS and sitemap, every one with a hero", async () => {
   const dir = fileURLToPath(new URL("../../../../kb/news/", import.meta.url));
   vi.stubEnv("NEWS_DIR", dir); vi.stubEnv("WIKI_DIR", WIKI);
   vi.stubEnv("NEXT_PUBLIC_ADSENSE_CLIENT", "ca-pub-test");
@@ -309,7 +309,7 @@ test("all 18 published posts retain their editorial source and survive pages, hu
   const posts = publishedPosts(news);
   const slugs = Object.keys(CORPUS).sort();
   expect(posts.map((p) => p.slug).sort()).toEqual(slugs);
-  expect(posts.filter((p) => p.hero)).toHaveLength(9);
+  expect(posts.filter((p) => p.hero)).toHaveLength(18);
   const { default: NewsArticle, generateStaticParams } = await import("./[slug]/page");
   const { default: NewsHub } = await import("./page");
   const { GET } = await import("./feed.xml/route");
