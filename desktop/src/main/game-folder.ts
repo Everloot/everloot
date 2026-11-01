@@ -42,6 +42,9 @@ export function candidateRoots(os: OsInfo): string[] {
 }
 
 const isProductName = (name: string) => /^_[a-z0-9_]+_$/i.test(name);
+/** WoW: Forever's product folder: the client the addon is built for. */
+export const FOREVER = "_forever_";
+const lastName = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?? "";
 
 function countFiles(folder: string, fs: FsLike): { files: number; hasAccounts: boolean } {
   const accounts = join(folder, "WTF", "Account");
@@ -50,10 +53,11 @@ function countFiles(folder: string, fs: FsLike): { files: number; hasAccounts: b
 }
 
 /**
- * Product folders (`_classic_era_`, `_anniversary_`, `_classic_beta_`, ...) under the given roots,
- * plus any root that is itself a product folder. Ranked by how many account files already hold
- * Everloot data, then by whether the game has been played there at all (WTF/Account exists), so
- * the folder the player actually uses comes first and a fresh install still has something to pick.
+ * Product folders (`_forever_`, `_classic_era_`, `_classic_beta_`, ...) under the given roots,
+ * plus any root that is itself a product folder. WoW: Forever comes first, since the addon is built
+ * for it; the rest are ranked by how many account files already hold Everloot data, then by whether
+ * the game has been played there at all (WTF/Account exists), so a beta or other client with old
+ * data is still offered but is not the default.
  */
 export function detectGameFolders(roots: string[], fs: FsLike): GameFolderCandidate[] {
   const seen = new Set<string>();
@@ -69,7 +73,19 @@ export function detectGameFolders(roots: string[], fs: FsLike): GameFolderCandid
     if (isProductName(rootName) || fs.isDir(join(root, "WTF"))) consider(root, rootName);
     for (const name of fs.readdir(root)) if (isProductName(name) && fs.isDir(join(root, name))) consider(join(root, name), name);
   }
-  return found.sort((a, b) => b.files - a.files || Number(b.hasAccounts) - Number(a.hasAccounts) || a.product.localeCompare(b.product));
+  const forever = (c: GameFolderCandidate) => Number(c.product.toLowerCase() === FOREVER);
+  return found.sort((a, b) => forever(b) - forever(a) || b.files - a.files || Number(b.hasAccounts) - Number(a.hasAccounts) || a.product.localeCompare(b.product));
+}
+
+/**
+ * The `_forever_` folder beside the chosen one, when the chosen folder is another client (the closed
+ * beta, a classic realm) and the player has not chosen to keep it; null otherwise. The page offers it
+ * in one click and never switches by itself, since the folder decides which save files are read.
+ */
+export function foreverSuggestion(current: string | null, kept: string | null, fs: FsLike): string | null {
+  if (!current || lastName(current).toLowerCase() === FOREVER || (kept && kept === current)) return null;
+  const sibling = join(current, "..", FOREVER);
+  return fs.isDir(sibling) ? sibling : null;
 }
 
 /**

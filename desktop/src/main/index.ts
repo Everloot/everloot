@@ -19,7 +19,7 @@ import { localTools } from "./local-tools";
 import { createEngine } from "./engine";
 import { connectInBrowser } from "./connect";
 import { allowedExternal } from "./external";
-import { candidateRoots, detectGameFolders, realFs, resolvePickedFolder } from "./game-folder";
+import { candidateRoots, detectGameFolders, foreverSuggestion, realFs, resolvePickedFolder } from "./game-folder";
 import { newestScans, readScanAges, staleScans, summarizeFiles } from "./inspect";
 import { onReconnect } from "./online";
 import { companionJobs } from "./jobs";
@@ -110,7 +110,7 @@ if (!app.requestSingleInstanceLock()) {
     onChange: () => broadcast(),
     log: (level, text) => engine.log(level, text),
   });
-  const appState = (): AppState => ({ version: app.getVersion(), platform: process.platform, dataFolder: data, notice: loaded.error, settings, engine: engine.snapshot(), update, updateProgress, staleScans: staleScans(allScans()), account: accountInfo(data), builds: builds.status() });
+  const appState = (): AppState => ({ version: app.getVersion(), platform: process.platform, dataFolder: data, notice: loaded.error, settings, foreverFolder: foreverSuggestion(settings.gameFolder, settings.keptGameFolder, realFs), engine: engine.snapshot(), update, updateProgress, staleScans: staleScans(allScans()), account: accountInfo(data), builds: builds.status() });
   const broadcast = () => {
     const s = appState();
     win?.webContents.send("state", s);

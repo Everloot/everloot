@@ -7,6 +7,8 @@ export const JOBS: Job[] = ["upload", "prices", "ask"];
 export interface Settings {
   /** The product folder (the one holding WTF/), or null before setup. */
   gameFolder: string | null;
+  /** The folder the player chose to keep when the page suggested WoW: Forever's folder instead; null otherwise. */
+  keptGameFolder: string | null;
   endpoint: string;
   upload: boolean;
   prices: boolean;
@@ -247,6 +249,8 @@ export interface AppState {
   /** A problem reading settings.json at start, shown once on the page; null otherwise. */
   notice: string | null;
   settings: Settings;
+  /** WoW: Forever's folder, when the chosen game folder is another client installed beside it; null otherwise. */
+  foreverFolder: string | null;
   engine: EngineState;
   /** The desktop release check made once at start; null until it ran or when it could not reach GitHub. */
   update: UpdateCheck | null;
