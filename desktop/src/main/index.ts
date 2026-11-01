@@ -1,4 +1,4 @@
-import { BrowserWindow, Notification, app, clipboard, dialog, ipcMain, powerMonitor, screen, shell } from "electron";
+import { BrowserWindow, Notification, app, clipboard, dialog, ipcMain, net, powerMonitor, screen, shell } from "electron";
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -21,6 +21,7 @@ import { connectInBrowser } from "./connect";
 import { allowedExternal } from "./external";
 import { candidateRoots, detectGameFolders, realFs, resolvePickedFolder } from "./game-folder";
 import { newestScans, readScanAges, staleScans, summarizeFiles } from "./inspect";
+import { onReconnect } from "./online";
 import { companionJobs } from "./jobs";
 import { itemIdFrom, listRealms, ownRealms, priceRows, readPricesFile } from "./market";
 import { loadSettings, mergeSettings, saveSettings } from "./settings";
@@ -483,6 +484,8 @@ if (!app.requestSingleInstanceLock()) {
     engine.start(settings);
     // A laptop that slept through the last retry would otherwise wait for the next logout.
     powerMonitor.on("resume", () => engine.recover());
+    // So would a Wi-Fi drop at logout that comes back without a sleep.
+    onReconnect(() => net.isOnline(), () => engine.recover());
     // Windows passes the login item's args; macOS does not, but says whether this launch came from login.
     const hidden = process.argv.includes("--hidden") || (process.platform === "darwin" && app.getLoginItemSettings().wasOpenedAtLogin);
     if (!settings.consentedAt || !(hidden && settings.startInTray)) createWindow();
