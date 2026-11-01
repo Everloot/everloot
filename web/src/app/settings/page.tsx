@@ -21,8 +21,9 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
-const heading = "text-cell font-semibold text-fg";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent";
+const heading = "scroll-mt-20 text-base font-semibold text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent";
+const sectionLink = "inline-flex min-h-11 items-center rounded-control px-3 text-fg-2 transition-colors hover:bg-panel hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 /** The player's profile, status and characters, with links to their keys and the Desktop App. */
 export default async function SettingsPage() {
@@ -47,7 +48,7 @@ export default async function SettingsPage() {
     {
       key: "name", header: "Name",
       cell: (c) => (
-        <span className="inline-flex min-w-0 items-center gap-2">
+        <span className="inline-flex min-w-0 max-w-full flex-wrap items-center gap-2 [overflow-wrap:anywhere]">
           {buildsEnabled
             ? <Link href={`/me/characters/${c.id}`} className={`min-w-0 hover:underline ${CLASS_TEXT[c.classSlug] ?? "text-fg"}`}>{c.name}</Link>
             : <span className={`min-w-0 ${CLASS_TEXT[c.classSlug] ?? "text-fg"}`}>{c.name}</span>}
@@ -66,35 +67,38 @@ export default async function SettingsPage() {
   return (
     <Container>
       <DataTitle title="Settings" meta={shell.handle ? `@${shell.handle}` : "No handle yet"} />
-      <nav aria-label="Settings sections" className="mb-6 flex flex-wrap gap-x-4 gap-y-1 border-b border-line pb-2 text-meta">
-        <a href="#profile" className="text-fg-2 hover:text-accent">Profile</a>
-        <a href="#status" className="text-fg-2 hover:text-accent">Status</a>
-        <a href="#characters" className="text-fg-2 hover:text-accent">Characters</a>
-        <a href="#more" className="text-fg-2 hover:text-accent">More</a>
+      <nav aria-label="Settings sections" className="mb-8 flex flex-wrap gap-1 border-b border-line pb-3 text-sm">
+        <a href="#profile" className={sectionLink}>Profile</a>
+        <a href="#status" className={sectionLink}>Status</a>
+        <a href="#characters" className={sectionLink}>Characters</a>
+        <a href="#more" className={sectionLink}>Account</a>
       </nav>
-      <div className="space-y-8">
-        <section aria-labelledby="profile" className="scroll-mt-20 space-y-2">
-          <h2 id="profile" className={heading}>Profile</h2>
+      <div className="max-w-3xl space-y-8 [overflow-wrap:anywhere]">
+        <section aria-labelledby="profile" className="min-w-0 space-y-4 border-b border-line pb-8">
+          <h2 id="profile" tabIndex={-1} className={heading}>Profile</h2>
           <ProfileForm profile={profile} accountName={shell.displayName} />
           {profile.publicProfile && profile.handle && (
             <p className="text-sm text-fg-2">Your public profile: <Link href={`/u/${profile.handle}`} className={link}>/u/{profile.handle}</Link></p>
           )}
         </section>
 
-        <section aria-labelledby="status" className="scroll-mt-20 space-y-2">
-          <h2 id="status" className={heading}>Status</h2>
+        <section aria-labelledby="status" className="min-w-0 space-y-4 border-b border-line pb-8">
+          <h2 id="status" tabIndex={-1} className={heading}>Status</h2>
           <StatusForm status={profile.status} />
         </section>
 
-        <section aria-labelledby="characters" className="scroll-mt-20 space-y-2">
-          <h2 id="characters" className={heading}>Characters</h2>
+        <section aria-labelledby="characters" className="min-w-0 space-y-4 border-b border-line pb-8">
+          <h2 id="characters" tabIndex={-1} className={heading}>Characters</h2>
           <DataTable
             dense
             caption="Your characters"
             columns={columns}
             rows={shell.characters}
             rowKey={(c) => c.id}
-            meta={(c) => [className(c.classSlug), c.realm].filter(Boolean).join(" · ")}
+            meta={(c) => <>
+              <p>{[className(c.classSlug), c.realm].filter(Boolean).join(" · ")}</p>
+              <MainCharacterButton characterId={c.id} main={c.id === shell.mainCharacterId} name={c.name} />
+            </>}
             empty={<p className="px-3 py-4 text-cell text-muted">No characters yet.</p>}
           />
           <p className="text-sm text-fg-2">
@@ -103,13 +107,13 @@ export default async function SettingsPage() {
           </p>
         </section>
 
-        <section aria-labelledby="more" className="scroll-mt-20 space-y-2">
-          <h2 id="more" className={heading}>More</h2>
-          <ul className="space-y-1 text-sm">
-            <li><Link href="/account" className={link}>Your account</Link> <span className="text-fg-2">overview, data and privacy</span></li>
-            <li><Link href="/account#keys" className={link}>API keys</Link></li>
-            <li><Link href="/account#chat-keys" className={link}>Assistant setup</Link></li>
-            <li><Link href="/addon" className={link}>Desktop App and addon</Link></li>
+        <section aria-labelledby="more" className="min-w-0 space-y-4">
+          <h2 id="more" tabIndex={-1} className={heading}>Account</h2>
+          <ul className="divide-y divide-line text-sm">
+            <li className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3 first:pt-0"><Link href="/account" className={link}>Your account</Link> <span className="text-fg-2">overview, data and privacy</span></li>
+            <li className="py-3"><Link href="/account#keys" className={link}>API keys</Link></li>
+            <li className="py-3"><Link href="/account#chat-keys" className={link}>Assistant setup</Link></li>
+            <li className="py-3"><Link href="/addon" className={link}>Desktop App and addon</Link></li>
           </ul>
         </section>
       </div>

@@ -88,6 +88,20 @@ test("before anything is saved: the defaults, private and with no handle", async
   expect(html).not.toContain('href="/u/');
 });
 
+test("section links land on labelled, keyboard-focusable headings and sharing consent keeps its explanation", async () => {
+  const html = renderToStaticMarkup(await SettingsPage());
+  for (const [id, label] of [["profile", "Profile"], ["status", "Status"], ["characters", "Characters"], ["more", "Account"]]) {
+    expect(html).toContain(`href="#${id}"`);
+    expect(html).toContain(`aria-labelledby="${id}"`);
+    expect(html).toMatch(new RegExp(`<h2 id="${id}" tabindex="-1"[^>]*>${label}</h2>`));
+  }
+  const sharingControl = html.match(/<input[^>]*name="publicProfile"[^>]*>/)?.[0];
+  expect(sharingControl).toContain('aria-describedby="profile-sharing-description"');
+  expect(html).toMatch(/<p id="profile-sharing-description"[^>]*>Off: nobody else sees anything\. On: anyone can open your profile and sees only what you tick below\. Never your BattleTag or email\.<\/p>/);
+  const phoneCharacter = html.match(/<div class="text-cell-2 text-muted sm:hidden">([\s\S]*?)<\/div>/)?.[1];
+  expect(phoneCharacter).toContain('aria-label="Make Jaina your main"');
+});
+
 test("disabled saved builds leaves characters visible without links to unavailable pages", async () => {
   vi.stubEnv("EVERLOOT_SAVED_BUILDS", "0");
   const html = renderToStaticMarkup(await SettingsPage());

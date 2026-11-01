@@ -43,28 +43,28 @@ export default function StatusForm({ status }: { status: AccountStatus | null })
   }
 
   return (
-    <form onSubmit={submit} aria-label="Status" className="grid max-w-3xl gap-3 sm:grid-cols-[6rem_minmax(0,1fr)_10rem]">
-      <label className="block space-y-1 text-sm">
-        <span className="block text-muted">Emoji</span>
+    <form onSubmit={submit} aria-label="Status" className="grid min-w-0 gap-x-4 gap-y-5 sm:grid-cols-[6rem_minmax(0,1fr)_10rem]">
+      <label className="block min-w-0 space-y-2 text-sm">
+        <span className="block text-fg-2">Emoji</span>
         <Input name="emoji" defaultValue={status?.emoji ?? ""} maxLength={16} autoComplete="off" />
       </label>
-      <label className="block space-y-1 text-sm">
-        <span className="block text-muted">What are you up to?</span>
+      <label className="block min-w-0 space-y-2 text-sm">
+        <span className="block text-fg-2">What are you up to?</span>
         <Input name="text" defaultValue={status?.text ?? ""} maxLength={PROFILE_LIMITS.statusText} autoComplete="off" />
       </label>
-      <label className="block space-y-1 text-sm">
-        <span className="block text-muted">Clear after</span>
-        <select name="clearAfter" defaultValue={status?.clearsAt ? KEEP : "never"} className="min-h-11 w-full rounded-control border border-edge bg-canvas px-3 text-base text-fg">
+      <label className="block min-w-0 space-y-2 text-sm">
+        <span className="block text-fg-2">Clear after</span>
+        <select name="clearAfter" defaultValue={status?.clearsAt ? KEEP : "never"} className="min-h-11 w-full min-w-0 rounded-control border border-edge bg-canvas px-3 text-base text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
           {status?.clearsAt && <option value={KEEP}>Keep current</option>}
           {CLEAR_AFTER.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
       </label>
-      <div className="flex flex-wrap items-center gap-2 sm:col-span-3">
+      <div className="flex min-w-0 flex-wrap items-center gap-3 sm:col-span-3">
         <button type="submit" className="btn btn-primary min-h-11 px-4 text-sm" disabled={busy} aria-busy={busy}>Set status</button>
         {status && <button type="button" className="btn min-h-11 px-4 text-sm" disabled={busy} onClick={() => void send({ emoji: null, text: null, clearsAt: null }, "Status cleared.")}>Clear status</button>}
         {status?.clearsAt && <p className="text-xs text-muted">Clears <time dateTime={status.clearsAt}>{status.clearsAt.slice(0, 16).replace("T", " ")} UTC</time></p>}
-        {saved && <p role="status" className="text-sm text-fg-2">{saved}</p>}
-        {error && <p role="alert" className="text-sm text-fg">{error}</p>}
+        {saved && <p role="status" className="text-sm text-accent">{saved}</p>}
+        {error && <p role="alert" className="w-full rounded-control border border-edge bg-panel px-3 py-2 text-sm text-fg [overflow-wrap:anywhere]">{error}</p>}
       </div>
     </form>
   );
