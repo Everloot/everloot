@@ -11,7 +11,11 @@ packages=()
 for arg in "$@"; do
   case "$arg" in
     --skip-build) build=0 ;;
-    *) arg="${arg%/}"; while [ "${arg%/}" != "$arg" ]; do arg="${arg%/}"; done; packages+=("$arg") ;;
+    *)
+      # Normalize ./web, web/ and ././web// to web so the web build step still matches.
+      while [ "${arg#./}" != "$arg" ]; do arg="${arg#./}"; done
+      while [ "${arg%/}" != "$arg" ]; do arg="${arg%/}"; done
+      packages+=("$arg") ;;
   esac
 done
 [ ${#packages[@]} -eq 0 ] && packages=(packages/protocol web kb companion desktop)
