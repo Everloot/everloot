@@ -97,6 +97,32 @@ EverlootAnswersDB = nil
 printed = {{}}
 Everloot:InitModules()
 assert(string.find(table.concat(printed, '\\n'), '1 question is still waiting', 1, true) and #EverlootDB.asks == 1)
+assert(not string.find(table.concat(printed, '\\n'), 'no answer arrived', 1, true), 'the first load only wrote the question to the file')
+""")
+# The player is never left waiting in silence. A question with nothing at all for it after a second load (the first
+# only wrote it to the file) says once that no answer arrived and names the Desktop App with Ask turned on, then
+# keeps waiting for its answer. A retry or a failed checksum means the app is answering, so those are not counted.
+lua.execute("""
+local all = table.concat(printed, '\\n')
+assert(not string.find(all, 'companion', 1, true), 'players are not told about a companion: ' .. all)
+printed = {}
+SLASH_ASK('Who sells Mageweave?')
+assert(string.find(printed[1], 'question saved', 1, true) and string.find(printed[1], 'Everloot Desktop App (with Ask turned on)', 1, true), printed[1])
+printed = {}
+Everloot:InitModules()
+local said = table.concat(printed, '\\n')
+assert(string.find(said, 'no answer arrived for 1 question.', 1, true), 'the question from before the last load is overdue: ' .. said)
+assert(string.find(said, 'Everloot Desktop App (with Ask turned on)', 1, true) and string.find(said, 'everloot.app/addon', 1, true) and string.find(said, '/reload', 1, true), said)
+assert(string.find(said, '2 questions are still waiting', 1, true) and #EverlootDB.asks == 2, 'both still wait: ' .. said)
+printed = {}
+Everloot:InitModules()
+said = table.concat(printed, '\\n')
+assert(string.find(said, 'no answer arrived for 1 question.', 1, true), 'the newer question is told once on its second load: ' .. said)
+printed = {}
+Everloot:InitModules()
+said = table.concat(printed, '\\n')
+assert(not string.find(said, 'no answer arrived', 1, true) and string.find(said, '2 questions are still waiting', 1, true), 'said once each: ' .. said)
+assert(not string.find(said, 'companion', 1, true), said)
 """)
 # A full queue refuses the new question and keeps every waiting one: an unanswered question is never dropped to
 # make room, because its answer could then never be matched.

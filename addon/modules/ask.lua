@@ -43,7 +43,7 @@ function E:Ask(text)
   -- A waiting question is only removed by its answer, so a full queue turns the new question away: dropping
   -- the oldest would lose a question whose answer the companion may be about to write.
   if #EverlootDB.asks >= MAX_PENDING then
-    print(string.format("Everloot: %d questions are already waiting for answers, so this one was not added. Keep the companion running and /reload to read the answers, then ask again.", MAX_PENDING))
+    print(string.format("Everloot: %d questions are already waiting for answers, so this one was not added. Keep the Everloot Desktop App (with Ask turned on) running and /reload to read the answers, then ask again.", MAX_PENDING))
     return
   end
   EverlootDB.askCounter = (EverlootDB.askCounter or 0) + 1
@@ -57,15 +57,17 @@ function E:Ask(text)
     level = level,
     zone = zone,
   })
-  print("Everloot: question saved. Keep the companion running, then /reload to read the answer.")
+  print("Everloot: question saved. Keep the Everloot Desktop App (with Ask turned on) running, then /reload to read the answer.")
 end
 
 --- Show each verified answer once; an answered question leaves the queue, a failed checksum stays. A failure the
 --- companion will try again (retry) is shown once and the question stays, so the real answer can still reach it.
+--- A question with nothing at all for it is counted per load. The first load after asking only writes it to the
+--- file, so from the second on no answer means the Desktop App did not answer: that is said once, with what to do.
 local function showAnswers()
   if type(EverlootDB.asks) ~= "table" then return end
   local answers = type(EverlootAnswersDB) == "table" and EverlootAnswersDB or {}
-  local waiting = {}
+  local waiting, unanswered = {}, 0
   for _, ask in ipairs(EverlootDB.asks) do
     local a = answers[ask.id]
     local verified = type(a) == "table" and type(a.answer) == "string" and a.sum == E.Adler32(a.answer)
@@ -83,13 +85,23 @@ local function showAnswers()
     else
       if type(a) == "table" then
         print("Everloot: the answer to \"" .. ask.question .. "\" failed its checksum and was not shown.")
+      else
+        ask.loads = (ask.loads or 0) + 1
+        if ask.loads >= 2 and not ask.toldNoAnswer then
+          unanswered = unanswered + 1
+          ask.toldNoAnswer = true
+        end
       end
       waiting[#waiting + 1] = ask
     end
   end
   EverlootDB.asks = waiting
+  if unanswered > 0 then
+    print(string.format("Everloot: no answer arrived for %d %s. Answers come from the Everloot Desktop App (with Ask turned on), which you can get at everloot.app/addon: open it on this computer, then /reload. Your %s saved until answered.",
+      unanswered, unanswered == 1 and "question" or "questions", unanswered == 1 and "question stays" or "questions stay"))
+  end
   if #waiting > 0 then
-    print(string.format("Everloot: %d %s still waiting for an answer. Keep the companion running, then /reload.", #waiting, #waiting == 1 and "question is" or "questions are"))
+    print(string.format("Everloot: %d %s still waiting for an answer. Keep the Everloot Desktop App (with Ask turned on) running, then /reload.", #waiting, #waiting == 1 and "question is" or "questions are"))
   end
 end
 

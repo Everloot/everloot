@@ -75,11 +75,18 @@ for file in ["core.lua", "modules/auctions.lua", "modules/prices.lua", "modules/
     lua.execute((root / file).read_text(encoding="utf-8"))
 
 # Without the Desktop App's file a tooltip carries no Everloot line: nothing to show, and nothing to nag about.
+# The first item tooltip says once per install, in chat, where community prices come from.
 lua.execute("""
 Everloot.frame.onEvent(nil, 'ADDON_LOADED', 'Everloot')
 Everloot:InitModules()
 assert(#tooltipCalls == 1, 'one tooltip hook for prices and drops')
+printed = {}
 assert(tooltipFor(2589) == '', 'no file, no line')
+assert(#printed == 1 and string.find(printed[1], 'Everloot Desktop App (everloot.app/addon)', 1, true), 'the first tooltip points to the app once: ' .. table.concat(printed, ' | '))
+assert(tooltipFor(765) == '' and #printed == 1, 'the second tooltip says nothing more')
+Everloot.frame.onEvent(nil, 'ADDON_LOADED', 'Everloot')
+printed = {}
+assert(tooltipFor(2589) == '' and #printed == 0, 'nor after a reload: once per install')
 svBefore = serialize(EverlootDB)
 """)
 
@@ -182,4 +189,11 @@ svAfter = serialize(EverlootDB)
 """)
 sv_before, sv_after = lua.eval("svBefore"), lua.eval("svAfter")
 assert sv_before == sv_after, "showing prices and drops writes nothing to SavedVariables"
+# With the file in the game, an install that has not had the pointer never gets it: there is nothing to explain.
+lua.execute("""
+EverlootDB.priceFileHint = nil
+printed = {}
+tooltipFor(2589)
+assert(#printed == 0 and EverlootDB.priceFileHint == nil, table.concat(printed, ' | '))
+""")
 print(f"drops_contract: ok (SavedVariables +0 bytes; 5,000-row drops block {drop_bytes:,} bytes, ~{drop_kb:.0f} KB Lua memory)")

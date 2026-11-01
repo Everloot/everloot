@@ -170,6 +170,23 @@ function E:Status()
   return table.concat(lines, "\n")
 end
 
+--- The one line said at login and /reload: how many modules run, any that could not start and any paused
+--- collection. The full list stays behind /everloot status, so chat is not filled on every load.
+function E:LoginLine()
+  local on, off, failed = 0, 0, {}
+  for _, m in ipairs(modules) do
+    if m.ok then on = on + 1
+    elseif self:IsEnabled(m.name) then failed[#failed + 1] = m.name
+    else off = off + 1 end
+  end
+  local text = string.format("Everloot %s: %d modules on, %d off", E.VERSION, on, off)
+  if #failed > 0 then text = text .. "; could not start: " .. table.concat(failed, ", ") end
+  local paused = 0
+  for _ in pairs(EverlootDB and EverlootDB.paused or {}) do paused = paused + 1 end
+  if paused > 0 then text = text .. string.format("; %d %s paused at capacity", paused, paused == 1 and "collection" or "collections") end
+  return text .. ". /everloot status for details."
+end
+
 frame:RegisterEvent("ADDON_LOADED")
 frame:SetScript("OnEvent", function(_, event, arg1)
   if event == "ADDON_LOADED" and arg1 == "Everloot" then
@@ -184,7 +201,7 @@ frame:SetScript("OnEvent", function(_, event, arg1)
     EverlootDB.version = E.VERSION
     EverlootDB.clientBuild = clientBuild()
     E:InitModules()
-    print(E:Status())
+    print(E:LoginLine())
     -- Said once per install, so a player never records other players without having been told.
     if EverlootDB.toggles.census and not EverlootDB.censusNotice then
       print("Everloot: census on. It records the race, class, level and faction of your characters and of players you target, mouse over or group with. Never their names, guilds, gear or where they are. It stays in this file unless the Everloot Desktop App, if you allowed the census there, or the everloot.app upload page sends it. /everloot census off stops it and deletes the rows.")
