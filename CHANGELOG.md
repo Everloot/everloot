@@ -15,11 +15,6 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
-- Desktop App: the tray menu is replaced only when one of its lines changes, not on every status update (each percent
-  of an update download was one), so a menu the player has open is not swapped out under them.
-- Desktop App and companion: after an upload, the character-link step skips a save file that has no link rows instead
-  of parsing it a second time, so a logout is back to two full parses of the save (the heavy synthetic save's longest
-  pause drops from about 620 to 380 ms in the quick benchmark).
 - Addon: login and `/reload` print one line (version, modules on and off, any that could not start, any paused
   collection) instead of the full status; `/everloot status` still lists everything. Without the Desktop App's price
   file, the first item tooltip says once per install in chat where community prices come from. `/ask` names the
@@ -314,6 +309,15 @@ Live-client verification is pending. This is a pre-release for WoW: Forever 1.60
   off until `/everloot census on`. The Desktop App sends census rows with its uploads when the player leaves
   the census box ticked on its setup screen, or turns it on in Settings; a setup finished before this keeps
   it off. Still never names, guilds, gear or places, and the site shows only totals.
+
+## [desktop-v0.1.13] - 2026-11-01
+
+### Fixed
+- Desktop App and companion: after an upload, the character-link step skips a save file that has no link rows instead
+  of parsing it a second time, so a logout is back to two full parses of the save (the heavy synthetic save's longest
+  pause drops from about 620 to 380 ms in the quick benchmark).
+- Desktop App: the tray menu is replaced only when one of its lines changes, not on every status update (each percent
+  of an update download was one), so a menu the player has open is not swapped out under them.
 
 ## [desktop-v0.1.12] - 2026-11-01
 
