@@ -1,6 +1,6 @@
 import { accountOf as account } from "../main/engine";
 import { diagnostics } from "../shared/diagnostics";
-import { ago, clock, companionStatus, copyLabel, esc, gold, kb, msg, JOB_NAMES, savedNote, setupAddonLine, sparkline, statusText, when, type CompanionState } from "./format";
+import { ago, answerSuggestion, clock, companionStatus, copyLabel, esc, gold, kb, msg, JOB_NAMES, savedNote, setupAddonLine, sparkline, statusText, when, type CompanionState } from "./format";
 import { NO_SOURCED_ANSWER, type AddonInfo, type AppState, type AskInfo, type BackupInfo, type ChangeItem, type CharacterRow, type CharactersInfo, type ChatInfo, type ChatProgress, type EverlootApi, type PriceLookup, type FileSummary, type GameFolderCandidate, type Job, type JobStatus, type MarketInfo, type MoneyDay } from "../shared/types";
 import { PROVIDER_PRESETS, assistantSource, keptModelPick, manualModelShown, presetFor, removalNotice, type ModelChoice, type ProviderKind } from "../shared/providers";
 import { inkOn } from "../../../web/src/lib/chat/catalogue";
@@ -209,8 +209,8 @@ function overview(s: AppState): string {
         <div class="sec-head"><h2>Jobs</h2></div>
         <div class="jobs">
           ${job("upload", "Upload", dot(up), up.state === "ok" ? "OK" : up.state === "error" ? "Failed" : up.state === "off" ? "Off" : up.state === "running" ? "Running" : "Waiting", `${last(up)}${askWhy("upload", s)}`)}
-          ${job("market", "Market prices", dot(pr), data.market ? `${data.market.last.length} realm(s)` : pr.state === "off" ? "Off" : pr.state === "running" ? "Running" : "Waiting", `${data.market?.scans[0] ? `your last scan ${ago(data.market.scans[0].at)}` : last(pr)}${askWhy("prices", s)}`)}
-          ${job("ask", "/ask", dot(ask), ask.state === "off" ? "Off" : ask.state === "error" ? "Failed" : ask.state === "running" ? "Running" : "On", `${ask.at ? last(ask) : s.settings.ask.enabled ? "waiting" : "turn on in Ask"}${askWhy("ask", s)}`)}
+          ${job("market", "Market prices", dot(pr), data.market ? `${data.market.last.length} realm(s)` : pr.state === "off" ? "Off" : pr.state === "running" ? "Running" : "Waiting", `${data.market?.scans[0] ? `your last scan ${ago(data.market.scans[0].at)}` : last(pr)}${suggestionLine(data.market)}${askWhy("prices", s)}`)}
+          ${job("ask", "/ask", dot(ask), ask.state === "off" ? "Off" : ask.state === "error" ? "Failed" : ask.state === "running" ? "Running" : "On", `${ask.at ? last(ask) : s.settings.ask.enabled ? "waiting" : 'answers questions you type in game with <code>/ask</code> · <button type="button" class="link" data-page="ask">turn on in Ask</button>'}${askWhy("ask", s)}`)}
           ${job("addon", "Addon", "", addonLine, `${addon?.slots.prices ? "prices file in game" : "no prices file yet"}${addon && (!addon.installed || addon.newer) ? ` · <button type="button" class="link" data-page="addon">${addon.installed ? "update" : "install"}</button>` : ""}`)}
         </div>
       </div>
@@ -775,6 +775,7 @@ function market(s: AppState): string {
       <p class="muted small">From the prices file in your game, the same numbers your tooltips show. In game, <code>/everloot price [item]</code> prints them in chat, anywhere in the world. Charts, every realm and item names are on the site.</p>
     </section>
     <p class="fg2">Community market values written into <code>EverlootPrices</code> so item tooltips show them after <code>/reload</code>. Realms from your own auction scans are always included; pick more below, the way TSM lets you pick realms, except the values are Everloot's own: a day counts once three reporters scanned it. Refreshed after each upload and every hour.</p>
+    ${realmSuggestion(m)}
     <section class="panel"><div class="row between"><h2>Realms to carry into the game</h2><span class="muted small">${m?.dataAsOf ? `site data as of ${when(m.dataAsOf)}` : ""}</span></div>
       ${checks}
       <div class="row"><input type="text" id="realmAdd" class="grow" placeholder="Add a realm by name" maxlength="60"><button type="button" class="btn" id="realmAddBtn">Follow</button></div>
@@ -792,6 +793,18 @@ function market(s: AppState): string {
         : '<p class="muted">Nothing written yet.</p>'}
     </section>
   </div>`;
+}
+
+/** The Market page's offer to follow the player's character realms. Nothing is fetched for them before Follow. */
+function realmSuggestion(m: MarketInfo | undefined): string {
+  if (!m?.suggested.length) return "";
+  return `<p class="callout fg2">${icon("market")}<span>Follow your characters' realms: <b>${esc(m.suggested.join(", "))}</b>. Their community prices then go into your tooltips like any realm you follow; nothing is asked of everloot.app for them until you press Follow. <button type="button" class="btn btn-primary" data-suggestion="follow">Follow</button> <button type="button" class="link" data-suggestion="dismiss">No thanks</button></span></p>`;
+}
+
+/** The Overview's short version, only while the game has no prices at all. */
+function suggestionLine(m: MarketInfo | undefined): string {
+  if (!m?.suggested.length || m.last.length || m.inGame?.length) return "";
+  return ` · no prices yet; follow your characters' realms (${esc(m.suggested.join(", "))}) <button type="button" class="link" data-suggestion="follow">Follow</button>`;
 }
 
 /** The last lookup on the Market page: each realm's row from the game's prices file, and the site's full history. */
@@ -1329,7 +1342,12 @@ async function onClick(ev: MouseEvent): Promise<void> {
     return;
   }
   if (t.dataset.run) { void api.runNow(t.dataset.run as Job); return; }
-  if (t.dataset.unfollow) { const gone = t.dataset.unfollow.toLowerCase(); state = await api.saveSettings({ market: { realms: state!.settings.market.realms.filter((r) => r.toLowerCase() !== gone) } }); void load("market"); return; }
+  if (t.dataset.suggestion) {
+    state = await api.saveSettings(answerSuggestion(state!.settings.market, data.market?.suggested ?? [], t.dataset.suggestion === "follow"));
+    void load(page);
+    return;
+  }
+  if (t.dataset.unfollow) { const gone = t.dataset.unfollow.toLowerCase(); state = await api.saveSettings({ market: { ...state!.settings.market, realms: state!.settings.market.realms.filter((r) => r.toLowerCase() !== gone) } }); void load("market"); return; }
   if (t.id === "pause") { await api.setPaused(!state!.engine.paused); return; }
   if (t.id === "chatStop") { await api.chatStop(); return; }
   if (t.id === "chatClear") { copied = null; data.chat = await api.chatClear(); render(); return; }
@@ -1359,7 +1377,7 @@ async function onClick(ev: MouseEvent): Promise<void> {
     const input = main.querySelector("#realmAdd") as HTMLInputElement;
     const name = input.value.trim();
     if (!name) return;
-    state = await api.saveSettings({ market: { realms: [...state!.settings.market.realms, name] } });
+    state = await api.saveSettings({ market: { ...state!.settings.market, realms: [...state!.settings.market.realms, name] } });
     input.value = "";
     void load("market");
     return;
@@ -1462,7 +1480,7 @@ async function onChange(ev: Event): Promise<void> {
   if (el.dataset.realm) {
     const realm = el.dataset.realm;
     const current = state!.settings.market.realms.filter((r) => r.toLowerCase() !== realm.toLowerCase());
-    state = await api.saveSettings({ market: { realms: el.checked ? [...current, realm] : current } });
+    state = await api.saveSettings({ market: { ...state!.settings.market, realms: el.checked ? [...current, realm] : current } });
     void load("market");
     return;
   }

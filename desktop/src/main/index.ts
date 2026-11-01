@@ -24,7 +24,7 @@ import { newestScans, readScanAges, staleScans, summarizeFiles } from "./inspect
 import { onReconnect } from "./online";
 import { companionJobs } from "./jobs";
 import { loginItemOptions } from "./login-item";
-import { itemIdFrom, listRealms, ownRealms, priceRows, readPricesFile } from "./market";
+import { characterRealms, itemIdFrom, listRealms, ownRealms, priceRows, readPricesFile, suggestedRealms } from "./market";
 import { loadSettings, mergeSettings, saveSettings } from "./settings";
 import { allowedPermission, fromAppPage } from "./sender";
 import { createTray } from "./tray";
@@ -413,7 +413,9 @@ if (!app.requestSingleInstanceLock()) {
     const scans = newestScans(allScans());
     const dir = addonsDir();
     const inGame = dir ? readPricesFile(dir)?.realms ?? null : null;
-    const base = { own: ownRealms(files), followed: settings.market.realms, last: jobs.lastMarket(), scans, inGame };
+    const own = ownRealms(files);
+    const suggested = suggestedRealms(characterRealms(files), own, settings.market.realms, settings.market.dismissed);
+    const base = { own, followed: settings.market.realms, suggested, last: jobs.lastMarket(), scans, inGame };
     try {
       const k = await knownRealms();
       return { ...base, known: k.realms, dataAsOf: k.dataAsOf, error: null };
