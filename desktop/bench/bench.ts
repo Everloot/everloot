@@ -3,7 +3,7 @@
  * Run with `npm run bench` (bench/run.mjs bundles this file with call counters around the parser and sent.json state).
  * Everything here is synthetic and lives in a temp folder; nothing is sent anywhere.
  */
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { cpus, tmpdir, totalmem } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
@@ -16,6 +16,7 @@ import { createEngine } from "../src/main/engine";
 import { confirmedCounts, readScanAges, staleScans, summarizeFiles } from "../src/main/inspect";
 import { companionJobs } from "../src/main/jobs";
 import { ownRealms } from "../src/main/market";
+import { saveFacts } from "../src/main/save-facts";
 import { defaultSettings } from "../src/main/settings";
 import type { Settings } from "../src/shared/types";
 import { SCENARIOS, syntheticSave, syntheticSent } from "./synthetic";
@@ -86,18 +87,10 @@ async function cycles(scenario: (typeof SCENARIOS)[number], steadyRuns: number):
     // The app's own settle times: a write is picked up by the real file watcher, as after a logout.
     const engine = createEngine(jobs.deps, { rescanMs: 1e9, pricesEveryMs: 1e9 });
     let emits = 0;
-    // index.ts: `allScans` behind every broadcast, remembered per file size and write time.
-    const scanMemo = new Map<string, { key: string; scans: ReturnType<typeof readScanAges> }>();
+    // index.ts: `allScans` behind every broadcast.
     engine.onChange((s) => {
       emits++;
-      staleScans(s.files.flatMap((f) => {
-        const st = statSync(f), key = `${st.mtimeMs}:${st.size}`;
-        const hit = scanMemo.get(f);
-        if (hit && hit.key === key) return hit.scans;
-        const scans = readScanAges(readFileSync(f, "utf8"));
-        scanMemo.set(f, { key, scans });
-        return scans;
-      }));
+      staleScans(s.files.flatMap((f) => { try { return saveFacts(f).scans; } catch { return []; } }));
     });
     const settled = (before: (string | null)[]) => new Promise<void>((resolve, reject) => {
       const t0 = Date.now();
@@ -173,7 +166,7 @@ async function main(): Promise<void> {
     ]);
     rmSync(root, { recursive: true, force: true });
   }
-  say(table(["size", "file", "records", "parseEverlootLua (upload job)", "parseEverlootTable", "readRealms (prices job)", "readAsks (ask job)", "readScanAges (broadcast)", "summarizeCharacters", "ownRealms, read + parse (Overview / Market page)", "charactersFromFiles (Characters page)"], rows));
+  say(table(["size", "file", "records", "parseEverlootLua (upload job)", "parseEverlootTable", "readRealms (prices job)", "readAsks (ask job)", "readScanAges (broadcast)", "summarizeCharacters", "ownRealms (Overview / Market page reload, same file)", "charactersFromFiles (Characters page)"], rows));
 
   say("\n### One logout, as the engine runs it (upload, then prices; ask beside it)\n");
   say("First run = every row is new (an install's first upload), started as at launch. Steady = the next logouts, 20 new rows each, started by the real file watcher after the app's settle times; p50 / p95 across runs. The site is a local stub that answers at once.\n");

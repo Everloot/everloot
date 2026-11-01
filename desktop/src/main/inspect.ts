@@ -10,6 +10,11 @@ import type { FileSummary, ScanAge } from "../shared/types";
 export function readScanAges(text: string): ScanAge[] {
   let db: Record<string, unknown>;
   try { db = parseEverlootTable(text); } catch { return []; }
+  return scanAgesIn(db);
+}
+
+/** As readScanAges, from a table already parsed. */
+export function scanAgesIn(db: Record<string, unknown>): ScanAge[] {
   const scans = db.lastScans;
   if (!scans || typeof scans !== "object") return [];
   const out: ScanAge[] = [];
