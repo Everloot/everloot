@@ -185,6 +185,7 @@ function overview(s: AppState): string {
   return `<div class="page">
     <div class="head"><h1>Overview</h1><span class="sub">${e.files.length ? `Watching ${e.files.length} account file(s)` : "Not watching a game folder"}${e.paused ? " · paused" : ""}</span></div>
     ${s.notice ? `<p class="callout error">${icon("alert")}<span>${esc(s.notice)}</span></p>` : ""}
+    ${foreverCallout(s)}
     ${s.update?.newer && s.update.url ? `<p class="callout fg2">${icon("upload")}<span>Everloot Desktop App ${esc(s.update.latest ?? "")} is out; you run ${esc(s.version)}. ${ext(s.update.url, "Download it")} and install over this one; your settings stay.</span></p>` : ""}
     ${!e.files.length && s.settings.gameFolder ? `<p class="callout fg2">${icon("log")}<span>No <code>Everloot.lua</code> under <span class="mono">${esc(s.settings.gameFolder)}</span> yet. Log out once in the game so it writes the file.</span></p>` : ""}
     <section class="hero" data-state="${status.state}" aria-labelledby="heroTitle">
@@ -946,7 +947,8 @@ function settings(s: AppState): string {
     ${assistant(c, "settings")}
     <form id="settings" autocomplete="off">
       <section class="panel set-sec"><div class="set-lead"><h2>Game</h2></div><div class="set-body">
-        <div class="field"><label for="gameFolder">Game folder <span class="hint">the product folder that holds <code>WTF</code>, like <code>World of Warcraft\\_classic_era_</code></span></label>
+        <div class="field"><label for="gameFolder">Game folder <span class="hint">the product folder that holds <code>WTF</code>: for WoW: Forever, <code>World of Warcraft\\_forever_</code></span></label>
+          ${foreverCallout(s)}
           <div class="row"><input class="grow" type="text" id="gameFolder" name="gameFolder" value="${esc(st.gameFolder ?? "")}"><button type="button" class="btn" id="browse">Browse…</button></div></div>
       </div></section>
       <section class="panel set-sec"><div class="set-lead"><h2>Startup</h2></div><div class="set-body">
@@ -1194,6 +1196,12 @@ function paintCopy(): void {
 const toast = document.getElementById("toast")!;
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 /** A short note in the same corner, for things that went right. */
+/** Offers WoW: Forever's folder when the game folder is another client beside it (the closed beta, a classic realm). */
+function foreverCallout(s: AppState): string {
+  if (!s.foreverFolder || !s.settings.gameFolder) return "";
+  return `<p class="callout fg2">${icon("alert")}<span>Everloot is built for WoW: Forever, and it is installed at <span class="mono">${esc(s.foreverFolder)}</span>. The app reads <span class="mono">${esc(s.settings.gameFolder)}</span> now. <button type="button" class="btn btn-primary" id="useForever">Use Forever</button> <button type="button" class="link" id="keepFolder">Keep this folder</button></span></p>`;
+}
+
 function notice(text: string): void {
   toast.textContent = text;
   toast.classList.add("info");
@@ -1317,6 +1325,15 @@ async function onClick(ev: MouseEvent): Promise<void> {
   }
   if (t.id === "pickToken") { const f = await api.pickTokenFile(); if (f) { (main.querySelector("#tokenFile") as HTMLInputElement).value = f; draftDirty = true; } return; }
   if (t.id === "redetect") { chosenFolder = null; await detect(); return; }
+  // Saves only the folder choice; with unsaved Settings edits the page is not redrawn, so the field and callout are updated here.
+  if (t.id === "useForever" && state?.foreverFolder) {
+    const folder = state.foreverFolder;
+    state = await api.saveSettings({ gameFolder: folder });
+    const input = main.querySelector("#gameFolder") as HTMLInputElement | null;
+    if (input) input.value = folder;
+    t.closest(".callout")?.remove(); render(); return;
+  }
+  if (t.id === "keepFolder" && state?.settings.gameFolder) { state = await api.saveSettings({ keptGameFolder: state.settings.gameFolder }); t.closest(".callout")?.remove(); render(); return; }
   if (t.id === "start" && chosenFolder) { state = await api.saveSettings({ gameFolder: chosenFolder, census: censusChoice, consentedAt: new Date().toISOString() }); void go("overview"); return; }
   if (t.id === "openConfig") { void api.openConfig(); return; }
   if (t.id === "openData") { void api.openDataFolder(); return; }

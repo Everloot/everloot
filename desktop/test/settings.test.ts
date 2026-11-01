@@ -38,6 +38,14 @@ test("a patch changes only known keys and keeps the old value for a bad one", ()
   expect(mergeSettings(merged, { gameFolder: null, ask: { tokenFile: null } })).toMatchObject({ gameFolder: null, ask: { tokenFile: null, enabled: true } });
 });
 
+test("the folder kept over the Forever suggestion is remembered, and cleared by null", () => {
+  expect(defaultSettings().keptGameFolder).toBeNull();
+  const kept = mergeSettings(defaultSettings(), { keptGameFolder: "C:/WoW/_classic_beta_" });
+  expect(kept.keptGameFolder).toBe("C:/WoW/_classic_beta_");
+  expect(mergeSettings(kept, { upload: false }).keptGameFolder).toBe("C:/WoW/_classic_beta_");
+  expect(mergeSettings(kept, { keptGameFolder: null }).keptGameFolder).toBeNull();
+});
+
 test("settings round-trip through the file, written whole", () => {
   const path = join(dir(), "nested", "settings.json");
   const s = mergeSettings(defaultSettings(), { gameFolder: "D:/Games/WoW/_anniversary_", consentedAt: "2026-10-18T00:00:00.000Z" });

@@ -8,6 +8,7 @@ export const DEFAULT_ENDPOINT = "https://everloot.app";
 export function defaultSettings(): Settings {
   return {
     gameFolder: null,
+    keptGameFolder: null,
     endpoint: DEFAULT_ENDPOINT,
     upload: true,
     prices: true,
@@ -39,6 +40,7 @@ export function mergeSettings(base: Settings, patch: unknown): Settings {
     : base.market.realms;
   return {
     gameFolder: "gameFolder" in p ? (p.gameFolder === null ? null : str(p.gameFolder) ?? base.gameFolder) : base.gameFolder,
+    keptGameFolder: "keptGameFolder" in p ? (p.keptGameFolder === null ? null : str(p.keptGameFolder) ?? base.keptGameFolder) : base.keptGameFolder,
     endpoint: isHttp(p.endpoint) ? p.endpoint.replace(/\/+$/, "") : base.endpoint,
     upload: bool(p.upload, base.upload),
     prices: bool(p.prices, base.prices),
