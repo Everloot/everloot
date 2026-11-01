@@ -165,9 +165,13 @@ export default async function ItemPage(props: Props) {
     { key: "show", header: "", cell: (p) => { const href = pinLink(p.mapId, p.x, p.y); return href ? <Link href={href} className={LINK}>Show on the map</Link> : null; } },
   ];
 
-  const related = [...rel("part_of_set"), ...rel("same_icon")];
+  // A development leftover sharing an icon ("Monster - Item, Flower - White") stays out, as it does in the item lists.
+  const icons = new Set(rel("same_icon").map((e) => e.toId));
+  const iconEdges = edges.client.filter((o) => !(o.rel === "same_icon" && icons.has(o.toId) && o.fromId !== itemId && isDevelopmentItemName(shownItemName(o.fromId, agreed, matched?.names)?.name)));
+  const sharers = (e: Edge) => iconEdges.filter((o) => o.rel === "same_icon" && o.toId === e.toId && o.fromId !== itemId).map((o) => o.fromId);
+  const related = [...rel("part_of_set"), ...rel("same_icon").filter((e) => sharers(e).length > 0)];
   // Items sharing an icon file are named, and shown with their icon, only under the item name rule.
-  const sameIcon = related.filter((e) => e.rel === "same_icon").flatMap((e) => edges.client.filter((o) => o.rel === "same_icon" && o.toId === e.toId && o.fromId !== itemId).map((o) => o.fromId));
+  const sameIcon = related.filter((e) => e.rel === "same_icon").flatMap(sharers);
   const iconNamed = [...new Set(sameIcon)].filter((id) => shownItemName(id, agreed, matched?.names)).slice(0, 12);
   const iconTips = iconNamed.length ? await loadItemTips(assets ?? await loadSiteAssets(), iconNamed.filter(showsTip)) : new Map<number, { icon: string | null }>();
   const itemName = (id: number) => shownItemName(id, agreed, matched?.names)?.name;
@@ -204,7 +208,7 @@ export default async function ItemPage(props: Props) {
           caption={`Items related to ${title}`}
           columns={[
             { key: "what", header: "Relation", nowrap: true, cell: (e: Edge) => (e.rel === "same_icon" ? "Same icon" : "Part of set") },
-            { key: "target", header: "With", cell: (e: Edge) => (e.rel === "same_icon" ? <SameIcon edge={e} self={itemId} client={edges.client} itemName={itemName} itemIcon={(id) => iconTips.get(id)?.icon ?? undefined} /> : <RelationTarget edge={e} rel={e.rel} client={edges.client} nameOf={nameFor} gameName={gameName} />) },
+            { key: "target", header: "With", cell: (e: Edge) => (e.rel === "same_icon" ? <SameIcon edge={e} self={itemId} client={iconEdges} itemName={itemName} itemIcon={(id) => iconTips.get(id)?.icon ?? undefined} /> : <RelationTarget edge={e} rel={e.rel} client={edges.client} nameOf={nameFor} gameName={gameName} />) },
           ]}
           rows={related}
           rowKey={(e) => `${e.rel}-${e.toId}`}
@@ -239,7 +243,8 @@ export default async function ItemPage(props: Props) {
     dropSources: page.drops.length,
     mapPositions: page.pins.length,
     vendors: rel("sold_by").length,
-    recipes: rel("created_by").length + rel("reagent_for").length,
+    recipes: rel("created_by").length,
+    uses: rel("reagent_for").length,
     nameFrom: confirmed ? "players" : name?.source === "wiki" ? "wiki" : name?.source === "files" ? "files" : "none",
     lastSeen: newestSeen,
     now,

@@ -227,7 +227,8 @@ export async function browseView({ slug, search }: { slug: string | null; search
           trail={trail}
           meta={state && (
             <Facts items={[
-              updated !== null ? <>Updated <TimeAgo at={updated} renderedAt={now.getTime()} /></> : "Update time unrecorded",
+              // With no prices to show, the time says when the rollup was last read, not that anything changed.
+              updated !== null ? <>{rows.length ? "Updated" : "Checked"} <TimeAgo at={updated} renderedAt={now.getTime()} /></> : "Update time unrecorded",
               ...(slug && board ? [`${count(board.reporters, "reporter")} this week`] : []),
               ...(!slug && realmWide.length ? [count(realmWide.length, "realm")] : []),
             ]} />

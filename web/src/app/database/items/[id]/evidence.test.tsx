@@ -49,3 +49,13 @@ test("the page offers the record as text for an assistant and as JSON", async ()
   expect(page).toContain('href="/api/tooltip/item/2770"');
   expect(page).toContain("Raw JSON");
 });
+
+test("a development leftover sharing the icon stays out of the related items, and is not counted as unnamed", async () => {
+  // Peacebloom (2447) shares icon file 133939 with 2779, 3421, 3422, 3423, 19294 and 21123.
+  const seen = (itemId: number, name: string) => ["a", "b", "c"].map((i) => ({ kind: "item_seen", installId: `install-${i}`, eventId: `seen-${itemId}-${i}`, itemId, name, capturedAt: "2026-10-10T00:00:00.000Z" }));
+  store.loadCorpus.mockResolvedValue({ uploads: 3, dataAsOf: "2026-10-10T00:00:00.000Z", records: [...seen(3421, "Simple Wildflowers"), ...seen(21123, "Monster - Item, Flower - White")] });
+  const page = await render("2447");
+  expect(page).toContain("Simple Wildflowers");
+  expect(page).not.toContain("Monster - Item");
+  expect(page).toContain("4 items with no name yet");
+});
