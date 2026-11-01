@@ -89,6 +89,13 @@ and says so instead while World of Warcraft is running; the file it replaces is 
 format and same rules as the [companion README](../companion/README.md#providers-design-sections-6465):
 keys come from a file named by `apiKeyFile`, never from the config itself).
 
+Everything stays on this computer when you uninstall the app: the installer leaves the data folder in place, so a
+reinstall picks up where you left off. That includes your everloot.app key (`everloot-key.txt`), any model keys the
+Assistant setup saved, `chat.json` and the `backups/` copies of your save files (gold, gear, guild and the rest the
+addon records). The keys are plain files, protected by your user account like the rest of the folder, because the
+command line reads the same files. To remove it all, quit the app and delete the data folder (Settings shows where it is
+and opens it).
+
 ## Run it from source
 
 ```

@@ -65,6 +65,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   in one click, and the Overview does too while the game has no prices. Nothing is requested for those realms until
   you press Follow; then they are followed realms like any other, and No thanks keeps the offer away. The Overview says
   what `/ask` does and links to the Ask page.
+- Desktop App: Settings and the README say that uninstalling keeps the data folder, with the account and model keys,
+  chat and save backups in it, that the keys are plain files protected by the user account, and how to remove it all.
 - Site and Desktop App: Ollama suggests one small model, `qwen3:4b` (2.5 GB, calls tools), instead of `qwen3:8b`, and
   says what running a model on your own computer means: private and free, slower, and it uses your memory while it
   answers. The free cloud models stay the first choice.
