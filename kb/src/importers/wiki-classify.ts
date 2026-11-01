@@ -16,6 +16,13 @@ export interface Facets {
   faction: string[];
 }
 
+/**
+ * The wiki's category for subjects that existed only on the alpha, beta or PTR ("Omar's Test Quest",
+ * "Placeholder Item"). Its {{Testing}} banner adds it, so the importer records it (see wiki-dump.ts) and
+ * search leaves these pages out. They stay in the archive and keep their own page.
+ */
+export const TESTING_ONLY = "Testing-only content";
+
 /** Every facet key, in the order the manifest and the site list them. */
 export const FACET_KEYS = ["expansion", "profession", "class", "race", "zone", "faction"] as const;
 
