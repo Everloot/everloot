@@ -20,6 +20,12 @@ assert offending_lines("mail Someone@R21Digital.com") == [1]
 assert offending_lines("SUPABASE_URL=https://abcdefghijklmnopqrst.supabase.co") == [1]
 assert offending_lines("SUPABASE_URL=https://YOUR-PROJECT.supabase.co") == []
 assert offending_lines("https://<project-ref>.supabase.co and supabase.com/docs") == []
+assert offending_lines("db host abcdefghijklmnopqrst.supabase.in") == [1]
+assert offending_lines("pooler user user.abcdefghijklmnopqrst") == [1]
+assert offending_lines("Supabase everloot (ref abcdefghijklmnopqrst)") == [1]
+assert offending_lines("https://supabase.com/dashboard/project/abcdefghijklmnopqrst/settings") == [1]
+assert offending_lines("project/<project-ref> and ref <project-ref> and user.<project-ref>") == []
+assert offending_lines("the reference implementation and user.name in git config") == []
 # Generic example paths in docs and tests are fine.
 assert offending_lines('{ "apiKeyFile": "C:/Users/<you>/keys/anthropic.txt" }') == []
 assert offending_lines('parseArgs(["watch", "--game", "C:/Games/WoW"]) and "C:\\\\Users\\\\p\\\\AppData"') == []
@@ -27,4 +33,4 @@ assert offending_lines('parseArgs(["watch", "--game", "C:/Games/WoW"]) and "C:\\
 assert not skipped("web/package-lock.json")
 assert not skipped("package-lock.json")
 assert skipped("scripts/check_internal_paths.py")
-print("check_internal_paths: 18 cases pass")
+print("check_internal_paths: 24 cases pass")

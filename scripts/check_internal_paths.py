@@ -7,7 +7,8 @@ import sys
 # This file is the one place the patterns are written down, so it is the one file not checked.
 PATTERN = re.compile(
     r"R21-Brain|_secrets|Users[\\/]+carli|\.t3[\\/]+worktrees|[\\/]\.r21[\\/]|projects[\\/]+everloot"
-    r"|r21digital|\b[a-z]{20}\.supabase\.co\b",
+    r"|r21digital|\b[a-z]{20}\.supabase\.(?:co|in)\b"
+    r"|\b(?:user|postgres|everloot_auth)\.[a-z]{20}\b|\bref[ :=`(]+[a-z]{20}\b|project/[a-z]{20}\b",
     re.IGNORECASE,
 )
 SKIP = {"scripts/check_internal_paths.py", "scripts/test_check_internal_paths.py"}
