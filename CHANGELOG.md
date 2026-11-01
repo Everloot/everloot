@@ -306,6 +306,33 @@ Live-client verification is pending. This is a pre-release for WoW: Forever 1.60
   the census box ticked on its setup screen, or turns it on in Settings; a setup finished before this keeps
   it off. Still never names, guilds, gear or places, and the site shows only totals.
 
+## [desktop-v0.1.11] - 2026-11-01
+
+### Fixed
+- Desktop App: the Addon page and the update notice offer the newest addon release, an Alpha included, which is
+  what the download page serves. They offered 0.3.10, and installing it failed its checksum.
+- Desktop App: WoW: Forever's `_forever_` folder is offered first when the app looks for the game. If the app reads
+  another client's folder beside it, such as the closed beta, Overview and Settings offer **Use Forever** in one
+  click, or **Keep this folder**. The app never switches on its own.
+- Desktop App: an upload that ran out of retries tries again when the network comes back, without waiting for the
+  next logout. Pause then Resume starts a fresh round of retries.
+- Desktop App: the update check reads past GitHub's first page of releases, so a run of addon releases can no longer
+  hide the newest app release.
+- Desktop App: the installers that earlier in-app updates left in the data folder's `updates/` are deleted at start
+  (about 110 MB each).
+- Desktop App: "Start when I sign in" works from the portable exe; it registered a temporary folder before.
+- Desktop App: Restore refuses while World of Warcraft is running, since the game would overwrite the restored file
+  when it logs out. A damaged `settings.json` is moved aside instead of saved over, and Save names a field it
+  refused instead of saying "Saved.".
+
+### Added
+- Desktop App: the setup screen says when the chosen game folder has no Everloot addon and offers to install it, with
+  the same checksum check as the Addon page.
+
+### Security
+- Desktop App: the window grants no browser permission except writing to the clipboard, the main process answers
+  only the app's own page, and the packaged app cannot be started as plain Node or with Node debugging flags.
+
 ## [desktop-v0.1.10] - 2026-10-31
 
 ### Fixed
