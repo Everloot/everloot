@@ -27,9 +27,11 @@ a download.
 
 On first run the app shows what leaves your computer, finds your World of Warcraft folder (or you
 browse to the folder of your game version that holds `WTF`, under `World of Warcraft`), and
-runs nothing until you press **Start**. WoW: Forever's `_forever_` folder is offered first. If the app
-reads another client's folder beside it (the closed beta, a classic realm), Overview and Settings offer
-**Use Forever** in one click, or **Keep this folder**; the app never switches on its own.
+runs nothing until you press **Start**. If that folder has no Everloot addon yet, it says so and offers
+**Install the addon**, the same checksum-checked install as the Addon page. WoW: Forever's `_forever_`
+folder is offered first. If the app reads another client's folder beside it (the closed beta, a classic
+realm), Overview and Settings offer **Use Forever** in one click, or **Keep this folder**; the app never
+switches on its own.
 
 ## What it does
 

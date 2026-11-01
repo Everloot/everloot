@@ -454,6 +454,19 @@ if (!app.requestSingleInstanceLock()) {
     if (typeof version !== "string" || !/^\d+\.\d+\.\d+$/.test(version)) throw new Error("Not a version");
     return installAddon({ version, endpoint: settings.endpoint, addonsDir: dir });
   });
+  // The setup screen, before Start saves a folder: whether the picked folder has the addon (read from disk, nothing is
+  // fetched until the player presses Install), and its Install button, the same checksum-checked install as the Addon page.
+  const pickedAddonsDir = (folder: unknown) => {
+    if (settings.consentedAt || typeof folder !== "string" || !realFs.isDir(folder)) throw new Error("Pick the game folder first");
+    return join(folder, "Interface", "AddOns");
+  };
+  handle("setupAddon", (_e, folder: unknown) => installedAddonVersion(pickedAddonsDir(folder)));
+  handle("setupInstallAddon", async (_e, folder: unknown) => {
+    const dir = pickedAddonsDir(folder);
+    const latest = newestAddonRelease(await releases());
+    if (!latest) throw new Error("No addon release was found. Install it later on the Addon page.");
+    return installAddon({ version: latest.version, endpoint: settings.endpoint, addonsDir: dir });
+  });
   handle("changes", () => changes());
   handle("charactersInfo", () => charactersFromFiles(engine.snapshot().files));
 

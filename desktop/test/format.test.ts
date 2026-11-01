@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { EngineState, JobState, Settings } from "../src/shared/types";
-import { ago, companionStatus, copyLabel, esc, gold, kb, msg, savedNote, sparkline, statusText } from "../src/renderer/format";
+import { ago, companionStatus, copyLabel, esc, gold, kb, msg, savedNote, setupAddonLine, sparkline, statusText } from "../src/renderer/format";
 
 test("gold reads as gold, silver and copper, with the dash for unknown", () => {
   expect(gold(null)).toBe("–");
@@ -136,4 +136,11 @@ test("Saved names a field the app refused and kept the old value of", () => {
   expect(savedNote({ mcpUrl: "https://everloot.app/mcp" }, saved)).toBe("Saved.");
   expect(savedNote({ endpoint: "ftp://everloot.app" }, saved)).toBe("!Site was not saved: it needs an http:// or https:// address, so the old one is kept. Everything else was saved.");
   expect(savedNote({ mcpUrl: "everloot.app/mcp" }, saved)).toMatch(/^!Private MCP server was not saved/);
+});
+
+test("setup mentions the addon only once the picked folder is known to lack it", () => {
+  expect(setupAddonLine(null)).toMatch(/^The Everloot addon is not in this folder yet/);
+  expect(setupAddonLine("0.4.2")).toBeNull();
+  // Not checked yet, or the check failed: say nothing rather than guess.
+  expect(setupAddonLine(undefined)).toBeNull();
 });

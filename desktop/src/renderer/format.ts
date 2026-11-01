@@ -33,6 +33,9 @@ export function savedNote(sent: { endpoint?: string; mcpUrl?: string }, saved: S
   return refused.length ? `!${refused.join(" and ")} was not saved: it needs an http:// or https:// address, so the old one is kept. Everything else was saved.` : "Saved.";
 }
 
+/** The setup screen's line about the addon in the picked folder: null while that is not known yet, or when it is there. */
+export const setupAddonLine = (installed: string | null | undefined) => (installed === null ? "The Everloot addon is not in this folder yet. The game records nothing for the app to upload without it." : null);
+
 /** What an answer's Copy button says: how the last press went, on that answer only, until the feedback runs out. */
 export const copyLabel = (index: number, copied: { index: number; label: string } | null) => (copied?.index === index ? copied.label : "Copy");
 
