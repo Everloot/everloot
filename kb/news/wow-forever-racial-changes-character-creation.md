@@ -4,20 +4,22 @@ title: "WoW: Forever Racial Changes: Dwarves Get Hit, Tauren Run Faster"
 summary: "Blizzard's final racial pass for WoW: Forever lands as character creation opens Oct 27. Humans lose crit, Dwarves gain 1% hit, Orcs get Command back, Tauren Plainsrunning doubles, Skyborne get reworked."
 author: Everloot Team
 published: 2026-10-27
-updated: 2026-10-28
+updated: 2026-11-01
 tags: [blue-post, forever]
 sources:
   - title: "Blizzard forums: WoW Forever Beta Development Notes – Updated 26 October (racial pass)"
     url: https://eu.forums.blizzard.com/en/wow/t/wow-forever-beta-development-notes-%E2%80%93-updated-26-october/631316/7
   - title: "Wowhead: More Racial Ability Tuning on WoW: Forever (Blizzard additions, Oct 27)"
     url: https://www.wowhead.com/news/more-racial-ability-tuning-on-wow-forever-383602
+  - title: "Blizzard: Return to Azeroth in World of Warcraft: Forever"
+    url: https://news.blizzard.com/en-gb/article/24315643/return-to-azeroth-in-world-of-warcraft-forever
 status: published
 ---
 
 **TL;DR:** Blizzard's final racial pass for WoW: Forever changes five races as character creation opens today, Oct 27, at 1 PM AZ. Humans drop to 1% crit, Dwarves trade crit damage for 1% hit, Orcs get Command back, Tauren Plainsrunning doubles to 60% but skips mounts, and Skyborne get a 1-hour bonus for using their abilities at Ley Lines.
 
 ## What Blizzard changed
-Per the [October 26 development notes](https://eu.forums.blizzard.com/en/wow/t/wow-forever-beta-development-notes-%E2%80%93-updated-26-october/631316/7), the team put racial identity first, so some races will be "slightly more effective than others at certain combat roles." Weapon specialization racials stay gone so future loot tables aren't judged by "required" weapon types.
+Blizzard said it had heard two complaints about the beta racials: some new traits felt too generic, and some were objectively stronger than others. Per the [October 26 development notes](https://eu.forums.blizzard.com/en/wow/t/wow-forever-beta-development-notes-%E2%80%93-updated-26-october/631316/7), the team put racial identity first, so some races will be "slightly more effective than others at certain combat roles." Where generic racials had replaced role- or class-focused ones, those changes are rolled back. Weapon specialization racials stay gone so future loot tables aren't judged by "required" weapon types.
 
 - **Human:** Ruthless drops to 1% crit (was 2%). [The Human Spirit](/database/spells/20598) now gives 10% Spirit (was 5%).
 - **Dwarf:** Earth Fury is removed. New Artisan's Precision gives 1% hit with spells and attacks. Dwarves start in [Dun Morogh](/database/zones/1426-dun-morogh).
@@ -33,7 +35,19 @@ Blizzard added more changes to the same notes a day later, [as Wowhead reported]
 - **Skyborne:** the Charged and Attuned buffs persist through death but are removed when you enter a raid.
 
 ## What it means at character creation
-If you were holding a Human or Orc slot for the crit, that edge is now smaller or gone. Dwarf casters and melee get the hit racial. Tauren are the clear pick for running around on foot while leveling, but not for mounted travel. Remember the 3-character cap is shared across all rulesets.
+If you were holding a Human or Orc slot for the crit, that edge is now smaller or gone. Dwarf casters and melee get the hit racial. Tauren are the clear pick for running around on foot while leveling, but not for mounted travel. Orc Warlocks and Hunters get their pet bonus back. Remember the 3-character cap is shared across all rulesets.
+
+Race also decides your class options. Blizzard's [launch guide](https://news.blizzard.com/en-gb/article/24315643/return-to-azeroth-in-world-of-warcraft-forever) names six combinations that original World of Warcraft didn't have: Human Hunter, Dwarf Shaman and Gnome Priest for the Alliance, and Orc Mage, Troll Warlock and Undead Paladin for the Horde. Skyborne can be Druids, Hunters, Rogues and Warriors on either side; Alliance Skyborne can also be Mages, and Horde Skyborne can also be Shaman. Skyborne need the Heroic Pack or higher.
+
+## What Everloot shows
+- **Who can be what.** The race and class tables on [WoW: Forever on Everloot](/wow-forever) mark every playable pair for both factions and flag the six new ones.
+- **Trait names, with a caveat.** The same tables list each race's traits as read from the game files of build 1.60.1.70707, marked unconfirmed. They still name Earth Fury for Dwarves and Savage for Orcs, which Blizzard's notes remove. Until players confirm the traits in game, go by Blizzard's notes.
+- **Your class next.** Each class has a page under [classes](/classes) and a tree in the [talent calculator](/tools/talents), so you can plan the build that goes with your race.
+- **Who picks what.** From launch, the [census](/census) counts characters by race, class, level and faction from players' uploads. It counts nothing from the beta.
+
+![Everloot's text table of Alliance races and the classes each can play, with Human Hunter, Dwarf Shaman and Gnome Priest marked New, above a table of each race's active and passive traits](/news/figures/wow-forever-racial-changes-character-creation/alliance-races-and-traits.webp "Alliance races, classes and traits on Everloot's WoW: Forever page. The trait names come from the game files and are unconfirmed.")
+
+![Everloot's text table of Horde races and the classes each can play, with Orc Mage, Troll Warlock and Undead Paladin marked New, above a table of each race's active and passive traits](/news/figures/wow-forever-racial-changes-character-creation/horde-races-and-traits.webp "Horde races, classes and traits on Everloot's WoW: Forever page, from build 1.60.1.70707.")
 
 *News recap. Everloot has no addon data on racials yet.*
 

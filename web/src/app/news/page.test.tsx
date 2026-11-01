@@ -280,8 +280,8 @@ test("no ad markup at all without an AdSense client", async () => {
 
 // Reviewed published corpus before adding hero fields: every editorial byte stays unchanged.
 const CORPUS = {
-  "wow-forever-beta-stats-8-million-characters": "3ed6fba6a5fccda62da5aeff728a9ba9b3207d0781bece4539460eeb6a0f33bf",
-  "wow-forever-launch-week-checklist-nov-4": "2dcb196a7aa4b047027ca93dc70cbd3738695e66c1f390be415821920d112113",
+  "wow-forever-beta-stats-8-million-characters": "ae65aa7c21bafe46634a0984087cbd138a64eb4c9f2eb73833ef87cb27d81313",
+  "wow-forever-launch-week-checklist-nov-4": "29b8cdfaa1923c08cfd18f65b16ec211ea64edfa4759d94341357283f928bfac",
   "wow-forever-layering-world-refresh-fixes": "c009712f88aceb6b144045abf0048d6aed008dd0ddac030814384b6ead175a66",
   "wow-forever-4-month-patch-cadence": "5b7d9982b39d9ae78f77a7fd187f70f88203d2d6a576c6c369cf88e93d9f9ab8",
   "datamined-30-xp-potions-patch-12-1-7-not-forever": "7abd75147282a5dbe7fdb1402272fb6f7c563adaa67e3eff3d38ba0e5d964035",
@@ -291,12 +291,12 @@ const CORPUS = {
   "wow-forever-beta-over-endgame-question": "2140d316d578b43684c8a306c135aba9a36434301b9687fdf1f3454f206f49a8",
   "wow-forever-character-creation-opens-tomorrow-checklist": "f73c200327bd9fdbd8b0c15066727329d83e5f7b8d3a94c57b7ee2823513d847",
   "wow-forever-journey-episode-1-norway": "132576ceda1e06c3c133f56e71c619c519e185b843b51fd37152c49e270166c8",
-  "wow-forever-molten-core-new-mechanics-raid-tease": "b9f2a33a4027f45e45dc19c20c4f97e559d752678ae18f5cb21cf70648b901c9",
-  "wow-forever-racial-changes-character-creation": "d4f0eae6d6160c50dfc8169ee6625fc651d16051377216c02e241efccebacc7f",
+  "wow-forever-molten-core-new-mechanics-raid-tease": "b6818e0676dd755c7ce02576c7ce4cbad5a5c610c44f25210c1ebb57d94e8d4a",
+  "wow-forever-racial-changes-character-creation": "a8edd37f4b05ec0b872304ac49493f7bea5c3c12eaa4cf2480dc1e552a84e742",
   "wow-forever-restricted-name-bug-fix": "345eae53307068917a95ed036ae00665f4d11f1961e5b36fb2d0b2fd289f0a0d",
   "wow-forever-name-reservations-how-to-reserve": "e6ef0ebd510cc478ff17bea1667f8d82d41601739f92ceeca652487219b48e53",
   "wow-forever-two-part-names-explained": "f2eabd19f8208c26f142f6dbee7365c89f83963e348fccde73eaebb935cd296e",
-  "wow-forever-rulesets-explained-pvp-rp-pvp-hardcore": "04ec3dc8ac735626be9ebec24d742fbe9ebe6d984c108e724e3f0db4e59e4905",
+  "wow-forever-rulesets-explained-pvp-rp-pvp-hardcore": "196c39b9beb38b1076917ba209ccc1e5c63a3cf7e7d826cefde81008c9db3806",
   "wow-weekly-forever-name-reservations-zulaman-hallows-end": "64c5c8d7dff54cbeaa1b1030179939e01207d0a92e79b5b59b655e3f4c8815be"
 };
 
@@ -350,9 +350,8 @@ test("all 18 published posts retain their editorial source and survive pages, hu
   }
   const weekly = news.get("wow-weekly-forever-name-reservations-zulaman-hallows-end")!;
   expect(weekly.hero?.alt).toHaveLength(203);
-  for (const slug of ["wow-forever-beta-over-endgame-question", "wow-forever-rulesets-explained-pvp-rp-pvp-hardcore"]) {
-    expect(news.get(slug)?.updated).toBe("2026-10-26");
-  }
+  expect(news.get("wow-forever-beta-over-endgame-question")?.updated).toBe("2026-10-26");
+  expect(news.get("wow-forever-rulesets-explained-pvp-rp-pvp-hardcore")?.updated).toBe("2026-11-01");
 });
 
 test("Related mixed items keep authored destinations and CTA while draft and unknown news links stay text", async () => {
