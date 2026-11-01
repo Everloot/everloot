@@ -95,6 +95,9 @@ test("a running World of Warcraft client is seen on Windows, and a list without 
   expect(await gameRunning("win32", running.run)).toBe(true);
   expect(running.calls[0][0]).toBe("tasklist");
   expect(await gameRunning("win32", fake(0, '"Wow.exe","1","Console","1","900,000 K"').run)).toBe(true);
+  expect(await gameRunning("win32", fake(0, '"WowClassicB.exe","1","Console","1","900,000 K"').run)).toBe(true);
+  // Other programs named Wow-something are not the game: the WowUp addon manager in the tray, the voice proxy.
+  expect(await gameRunning("win32", fake(0, '"WowUp.exe","7","Console","1","90,000 K"\r\n"WowVoiceProxy.exe","8","Console","1","9,000 K"').run)).toBe(false);
   // tasklist says so in the system's language and still exits 0.
   expect(await gameRunning("win32", fake(0, "INFO: No tasks are running which match the specified criteria.\r\n").run)).toBe(false);
 });

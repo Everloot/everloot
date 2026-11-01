@@ -50,13 +50,13 @@ const runCommand: RunCommand = (cmd, args) => new Promise((resolve, reject) => {
 export async function gameRunning(platform: string = process.platform, run: RunCommand = runCommand): Promise<boolean | null> {
   try {
     if (platform === "win32") {
-      // Wow.exe, WowClassic.exe and their PTR and beta builds (WowClassicT.exe, WowB.exe, ...).
+      // Wow.exe, WowClassic.exe and their PTR and beta builds (WowClassicT.exe, WowB.exe, ...); not WowUp.exe or WowVoiceProxy.exe.
       const r = await run("tasklist", ["/FI", "IMAGENAME eq Wow*", "/FO", "CSV", "/NH"]);
-      return r.code === 0 ? /^"Wow[^"]*\.exe"/im.test(r.stdout) : null;
+      return r.code === 0 ? /^"Wow(?:Classic)?[BT]?\.exe"/im.test(r.stdout) : null;
     }
     if (platform === "darwin" || platform === "linux") {
       // macOS: the game's binary inside its .app; Linux: the Windows exe under Wine or Proton.
-      const r = await run("pgrep", ["-f", platform === "darwin" ? "World of Warcraft[^/]*\\.app/Contents/MacOS/" : "Wow[A-Za-z]*\\.exe"]);
+      const r = await run("pgrep", ["-f", platform === "darwin" ? "World of Warcraft[^/]*\\.app/Contents/MacOS/" : "(^|[\\\\/])Wow(Classic)?[BT]?\\.exe"]);
       return r.code === 0 ? true : r.code === 1 ? false : null;
     }
     return null;
