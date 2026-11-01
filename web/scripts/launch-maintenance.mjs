@@ -4,7 +4,8 @@ import { AwsClient } from "aws4fetch";
 import pg from "pg";
 
 // The production project ref comes from the environment so it is not published; unset fails closed.
-const REF = process.env.EVERLOOT_SUPABASE_REF;
+const RAW_REF = process.env.EVERLOOT_SUPABASE_REF;
+const REF = RAW_REF?.trim();
 const UPLOAD_ID = "1d694078-785b-4812-8466-69fcf7c8670b";
 const UPLOAD_FILTER = `uploads?id=eq.${UPLOAD_ID}&install_id=eq.e2e-test-20261004`;
 const WAITLIST_FILTER = "waitlist?email=eq.e2e-test%40everloot.app&tool_slug=eq.e2e-test";
@@ -50,7 +51,10 @@ export async function cleanupTestData({ rest, r2 }) {
 async function main() {
   const action = process.env.EVERLOOT_MAINTENANCE_ACTION;
   if (!['preflight', 'apply-schema-and-cleanup', 'apply-intake-quota'].includes(action)) throw new Error("An explicit maintenance action is required");
-  if (!REF) throw new Error("EVERLOOT_SUPABASE_REF is not set");
+  if (!REF) throw new Error("EVERLOOT_SUPABASE_REF is not set or is only whitespace");
+  if (REF !== RAW_REF || !/^[a-z0-9]{20}$/.test(REF)) {
+    throw new Error("EVERLOOT_SUPABASE_REF must be the bare 20-character project ref with no spaces");
+  }
   if (new URL(process.env.SUPABASE_URL).hostname !== `${REF}.supabase.co` || process.env.R2_BUCKET !== "everloot-uploads") {
     throw new Error("Maintenance target does not match Everloot production");
   }
