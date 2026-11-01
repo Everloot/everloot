@@ -7,6 +7,8 @@ export const JOBS: Job[] = ["upload", "prices", "ask"];
 export interface Settings {
   /** The product folder (the one holding WTF/), or null before setup. */
   gameFolder: string | null;
+  /** The folder the player chose to keep when the page suggested WoW: Forever's folder instead; null otherwise. */
+  keptGameFolder: string | null;
   endpoint: string;
   upload: boolean;
   prices: boolean;
@@ -15,8 +17,12 @@ export interface Settings {
   /** Player pages go with the uploads: the name, realm, race, class, level and guild of the players seen. Off by default. */
   players: boolean;
   ask: { enabled: boolean; mcpUrl: string; tokenFile: string | null };
-  /** Realms to keep prices for beyond the ones in the player's own scans (TSM-style realm picks). */
-  market: { realms: string[] };
+  /**
+   * `realms`: realms to keep prices for beyond the ones in the player's own scans (TSM-style realm picks).
+   * `dismissed`: realms of the player's characters the Market page already suggested and the player answered
+   * (Follow or Not now), so they are not suggested again. Character realms are never fetched on their own.
+   */
+  market: { realms: string[]; dismissed: string[] };
   /** ISO time the player pressed Start on the welcome screen; null until then. Nothing runs before. */
   consentedAt: string | null;
   launchAtLogin: boolean;
@@ -88,6 +94,11 @@ export interface MarketInfo {
   /** Realms named in the player's own scans. */
   own: string[];
   followed: string[];
+  /**
+   * Realms of the player's own characters (from the addon's rows) to offer as a one-click follow: not scanned,
+   * not followed, not dismissed. Read on this computer; nothing is fetched for them until the player follows.
+   */
+  suggested: string[];
   /** Realms the site has public values for, when it answered. */
   known: string[];
   dataAsOf: string | null;
@@ -247,6 +258,8 @@ export interface AppState {
   /** A problem reading settings.json at start, shown once on the page; null otherwise. */
   notice: string | null;
   settings: Settings;
+  /** WoW: Forever's folder, when the chosen game folder is another client installed beside it; null otherwise. */
+  foreverFolder: string | null;
   engine: EngineState;
   /** The desktop release check made once at start; null until it ran or when it could not reach GitHub. */
   update: UpdateCheck | null;
@@ -299,6 +312,10 @@ export interface EverlootApi {
   /** Reads the saved builds from everloot.app with the account key and writes the EverlootBuilds slot addon. */
   buildsSync(): Promise<AppState>;
   installAddon(version: string): Promise<{ version: string; files: number }>;
+  /** Setup only, before Start saves a folder: the addon version in the picked game folder, or null when it is not there. Read from disk; nothing is fetched. */
+  setupAddon(folder: string): Promise<string | null>;
+  /** Setup only: installs the newest addon release into the picked game folder, checked against SHA256SUMS like installAddon. */
+  setupInstallAddon(folder: string): Promise<{ version: string; files: number }>;
   changes(): Promise<ChangeItem[]>;
   charactersInfo(): Promise<CharactersInfo>;
   chatInfo(): Promise<ChatInfo>;

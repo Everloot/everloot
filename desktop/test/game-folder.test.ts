@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { candidateRoots, detectGameFolders, resolvePickedFolder, type FsLike } from "../src/main/game-folder";
+import { candidateRoots, detectGameFolders, foreverSuggestion, resolvePickedFolder, type FsLike } from "../src/main/game-folder";
 
 /** A fake tree: directories map to their entries, files are listed with a leading "file:". */
 function fakeFs(tree: Record<string, string[]>): FsLike {
@@ -66,4 +66,27 @@ test("each OS looks where Battle.net and Wine put the game", () => {
   const linux = candidateRoots({ platform: "linux", env: {}, home: "/home/p" });
   expect(linux.some((r) => r.includes(".wine"))).toBe(true);
   expect(linux.some((r) => r.includes("Games/battlenet"))).toBe(true);
+});
+
+test("WoW: Forever comes first, even before a folder that already has Everloot data", () => {
+  // The addon is built for Forever only, so a beta or another classic folder with old data is the wrong default.
+  const root = "C:/Program Files (x86)/World of Warcraft";
+  const t = tree(root);
+  t[root] = [...t[root], "_forever_"];
+  t[`${root}/_forever_`] = ["WTF"]; t[`${root}/_forever_/WTF`] = [];
+  const found = detectGameFolders([root], fakeFs(t));
+  expect(found.map((c) => c.product)).toEqual(["_forever_", "_classic_era_", "_anniversary_", "_retail_", "_classic_beta_"]);
+});
+
+test("a game folder beside an installed WoW: Forever gets Forever suggested, until the player keeps their own", () => {
+  const root = "C:/Program Files (x86)/World of Warcraft";
+  const fs = fakeFs({ [root]: ["_classic_beta_", "_forever_"], [`${root}/_classic_beta_`]: ["WTF"], [`${root}/_forever_`]: ["Interface"] });
+  const beta = `${root}/_classic_beta_`;
+  expect(foreverSuggestion(beta, null, fs)?.replace(/\\/g, "/")).toBe(`${root}/_forever_`);
+  expect(foreverSuggestion(`${beta}/`, null, fs)?.replace(/\\/g, "/")).toBe(`${root}/_forever_`);
+  // Already on Forever, kept on purpose, no Forever beside it, or no folder yet: nothing to suggest.
+  expect(foreverSuggestion(`${root}/_forever_`, null, fs)).toBeNull();
+  expect(foreverSuggestion(beta, beta, fs)).toBeNull();
+  expect(foreverSuggestion("D:/Other/_classic_era_", null, fs)).toBeNull();
+  expect(foreverSuggestion(null, null, fs)).toBeNull();
 });

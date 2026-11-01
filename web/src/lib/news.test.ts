@@ -84,3 +84,29 @@ test("a hero is optional and checked", async () => {
   expect(PostFrontMatter.safeParse({ ...base, hero: { src: "/a.webp", alt: "A", share: "not a path" } }).success).toBe(false);
   expect(PostFrontMatter.safeParse({ ...base, hero: { src: "/a.png" } }).success).toBe(false);
 });
+
+test("a figure needs alt text and an image in the post's own figures folder; its caption is optional", async () => {
+  const { postFigure } = await import("../../../kb/src/news/post");
+  const { parsePage } = await import("../../../kb/src/wiki/page");
+  const block = (line: string) => parsePage(`---\nslug: x\n---\n${line}\n`).blocks[0];
+  const src = "/news/figures/test-post/map.webp";
+  expect(postFigure(block(`![The map](${src} "Where the camps are")`), "test-post")).toEqual({ figure: { src, alt: "The map", caption: "Where the camps are" } });
+  expect(postFigure(block(`![The map](${src})`), "test-post")).toEqual({ figure: { src, alt: "The map" } });
+  expect(postFigure(block(`![ ](${src} "Caption")`), "test-post")).toEqual({ problem: expect.stringContaining("needs alt text") });
+  for (const foreign of ["https://example.com/map.webp", "/news/heroes/map.webp", "/news/figures/other/map.webp", "/news/figures/test-post/../map.webp", "/news/figures/test-post/map.png"]) {
+    expect(postFigure(block(`![The map](${foreign})`), "test-post"), foreign).toEqual({ problem: expect.stringContaining("this post's folder") });
+  }
+  expect(postFigure(block(`Look at ![The map](${src}) here.`), "test-post")).toEqual({ problem: expect.stringContaining("a paragraph of its own") });
+  expect(postFigure(block("Plain words with a [link](/changes)."), "test-post")).toBeNull();
+});
+
+test("the text reads a figure as its caption or alt text, and the feed carries the summary, not the body's figures", async () => {
+  const { parsePage } = await import("../../../kb/src/wiki/page");
+  const blocks = parsePage(["---", "slug: x", "---", "Intro.", "", '![The map](/news/figures/x/map.webp "Where the camps are")', "", "![The camp](/news/figures/x/camp.webp)", "", "![Bad](https://example.com/a.webp)"].join("\n")).blocks;
+  expect(postText(blocks)).toBe("Intro. Where the camps are The camp");
+  const post = publishedPost(loadNews(FIXTURES), "test-post")!;
+  const xml = renderNewsFeed([{ ...post, blocks: [...post.blocks, ...blocks] }], { baseUrl: "https://everloot.app", now: new Date("2026-10-26") });
+  expect(xml).not.toContain("<img");
+  expect(xml).not.toContain("figures");
+  expect(xml).toContain(`<description>${post.summary}</description>`);
+});

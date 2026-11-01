@@ -243,6 +243,7 @@ test("cards name the publishers a post cites, mark an unconfirmed post with the 
   post("lead", "2026-10-26", ["tags: [datamine, unconfirmed]", "sources:", '  - title: "Wowhead: a story"', "    url: https://www.wowhead.com/news/1"]);
   post("cited", "2026-10-25", ["tags: [wow-forever]", "sources:", '  - title: "Blizzard: an article"', "    url: https://news.blizzard.com/a", '  - title: "Blizzard forums: a thread"', "    url: https://us.forums.blizzard.com/en/wow/t/x/1"]);
   post("plain", "2026-10-24", ["tags: [site]"]);
+  post("blue", "2026-10-23", ["tags: [blue-post, forever]"]);
   vi.stubEnv("NEWS_DIR", dir); vi.stubEnv("WIKI_DIR", WIKI);
   const { default: NewsHub } = await import("./page");
   const hub = renderToStaticMarkup(await NewsHub());
@@ -255,6 +256,8 @@ test("cards name the publishers a post cites, mark an unconfirmed post with the 
   expect(card("lead")).toMatch(/<span data-news-chip="true" title="Unconfirmed" class="[^"]*border-dashed border-edge">Datamine<span class="sr-only">, unconfirmed<\/span><\/span>/);
   expect(card("cited")).toMatch(/<span data-news-chip="true" class="[^"]*border-line">WoW forever<\/span>/);
   expect(hub).not.toContain(">Wow forever<");
+  // Everloot's post about a Blizzard post is not itself a blue post.
+  expect(card("blue")).toMatch(/<span data-news-chip="true" class="[^"]*border-line">About a blue post<\/span>/);
 });
 
 test("news mounts no ads, including a CSS-hidden rail, with an AdSense client configured", async () => {
@@ -365,4 +368,21 @@ test("Related mixed items keep authored destinations and CTA while draft and unk
   expect(html).toContain("Missing and");
   expect(html).toContain("Draft and");
   expect(html).toContain("Try:");
+});
+
+test("a figure draws a lazy image at its fixed size with its alt text and an optional caption; one the check refuses draws nothing", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "news-figures-"));
+  writeFileSync(join(dir, "figures.md"), ["---", "slug: figures", "title: Figures", "summary: A post with figures.", "author: Everloot Team", "published: 2026-10-25", "status: published", "---", "Before the map.", "", '![The zone map with the camps marked](/news/figures/figures/map.webp "Where the camps are")', "", "![A camp at dusk](/news/figures/figures/camp.webp)", "", "![Elsewhere](https://example.com/a.webp)", "", "![](/news/figures/figures/no-alt.webp)", "", "After the map."].join("\n"));
+  vi.stubEnv("NEWS_DIR", dir); vi.stubEnv("WIKI_DIR", WIKI);
+  const { default: NewsArticle } = await import("./[slug]/page");
+  const html = renderToStaticMarkup(await NewsArticle({ params: Promise.resolve({ slug: "figures" }) }));
+  const figures = html.match(/<figure data-news-figure[^]*?<\/figure>/g) ?? [];
+  expect(figures).toHaveLength(2);
+  expect(figures[0]).toMatch(/<img src="\/news\/figures\/figures\/map\.webp" alt="The zone map with the camps marked" width="1600" height="900" loading="lazy" decoding="async"/);
+  expect(figures[0]).toMatch(/<figcaption[^>]*>Where the camps are<\/figcaption>/);
+  expect(figures[1]).toContain('alt="A camp at dusk"');
+  expect(figures[1]).not.toContain("<figcaption");
+  for (const refused of ["example.com", "no-alt", "Elsewhere"]) expect(html).not.toContain(refused);
+  expect(html.indexOf("Before the map.")).toBeLessThan(html.indexOf("map.webp"));
+  expect(html.indexOf("camp.webp")).toBeLessThan(html.indexOf("After the map."));
 });

@@ -34,6 +34,12 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   releases; each half is harmless without the other.
 
 ### Added
+- Desktop App: a new app release shows within the hour instead of the next day. The sidebar shows **Update to X**:
+  one click downloads it and checks it against the release's checksum, and the next click restarts into it. The
+  Overview offers the same, the tray item opens the update panel, and a notification says so once per version while
+  the window is not in front. Where the app cannot install itself (macOS, Linux, the portable exe), the button opens
+  the download. If the installer runs but the old version is still there at the next start, the app says so once
+  instead of offering the same update again unexplained.
 - Site and MCP: racial traits from the game files (build-stamped `races.json`, found in game files, unconfirmed).
   Each class page lists, under "Who can be a {Class}", every race's traits with active or passive and the short
   text; `/wow-forever` adds a trait table per faction. New MCP tool `class_races` (protocol 1.20.0): the races that
@@ -55,6 +61,12 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   in and out, this week, categories, receipts and gold history. The published ledgers stay below.
 
 ### Changed
+- Desktop App: the Market page offers to follow your characters' realms (read from the save file on this computer)
+  in one click, and the Overview does too while the game has no prices. Nothing is requested for those realms until
+  you press Follow; then they are followed realms like any other, and No thanks keeps the offer away. The Overview says
+  what `/ask` does and links to the Ask page.
+- Desktop App: Settings and the README say that uninstalling keeps the data folder, with the account and model keys,
+  chat and save backups in it, that the keys are plain files protected by the user account, and how to remove it all.
 - Site and Desktop App: Ollama suggests one small model, `qwen3:4b` (2.5 GB, calls tools), instead of `qwen3:8b`, and
   says what running a model on your own computer means: private and free, slower, and it uses your memory while it
   answers. The free cloud models stay the first choice.
@@ -305,6 +317,33 @@ Live-client verification is pending. This is a pre-release for WoW: Forever 1.60
   off until `/everloot census on`. The Desktop App sends census rows with its uploads when the player leaves
   the census box ticked on its setup screen, or turns it on in Settings; a setup finished before this keeps
   it off. Still never names, guilds, gear or places, and the site shows only totals.
+
+## [desktop-v0.1.11] - 2026-11-01
+
+### Fixed
+- Desktop App: the Addon page and the update notice offer the newest addon release, an Alpha included, which is
+  what the download page serves. They offered 0.3.10, and installing it failed its checksum.
+- Desktop App: WoW: Forever's `_forever_` folder is offered first when the app looks for the game. If the app reads
+  another client's folder beside it, such as the closed beta, Overview and Settings offer **Use Forever** in one
+  click, or **Keep this folder**. The app never switches on its own.
+- Desktop App: an upload that ran out of retries tries again when the network comes back, without waiting for the
+  next logout. Pause then Resume starts a fresh round of retries.
+- Desktop App: the update check reads past GitHub's first page of releases, so a run of addon releases can no longer
+  hide the newest app release.
+- Desktop App: the installers that earlier in-app updates left in the data folder's `updates/` are deleted at start
+  (about 110 MB each).
+- Desktop App: "Start when I sign in" works from the portable exe; it registered a temporary folder before.
+- Desktop App: Restore refuses while World of Warcraft is running, since the game would overwrite the restored file
+  when it logs out. A damaged `settings.json` is moved aside instead of saved over, and Save names a field it
+  refused instead of saying "Saved.".
+
+### Added
+- Desktop App: the setup screen says when the chosen game folder has no Everloot addon and offers to install it, with
+  the same checksum check as the Addon page.
+
+### Security
+- Desktop App: the window grants no browser permission except writing to the clipboard, the main process answers
+  only the app's own page, and the packaged app cannot be started as plain Node or with Node debugging flags.
 
 ## [desktop-v0.1.10] - 2026-10-31
 

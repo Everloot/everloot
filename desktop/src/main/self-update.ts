@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
-import { mkdirSync, renameSync, rmSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { open } from "node:fs/promises";
 import { join } from "node:path";
-import { checksumFor } from "./addon";
+import { checksumFor, compareVersions } from "./addon";
 
 /**
  * The app updating itself, on Windows installs only: the new installer is downloaded into the data
@@ -137,6 +137,51 @@ export async function downloadUpdate(options: {
   }
   options.onProgress?.(100);
   return target;
+}
+
+/**
+ * Deletes the installers in the updates folder that this version has caught up with (its own and
+ * older ones) and any partial download left by a crash, so each update does not leave another
+ * ~110 MB behind. A newer installer and any other file stay. A file still locked by the installer
+ * that just ran is left for the next start. Returns the names deleted.
+ */
+export function pruneInstallers(dir: string, current: string): string[] {
+  let names: string[];
+  try { names = readdirSync(dir); } catch { return []; }
+  const gone: string[] = [];
+  for (const name of names) {
+    const part = name.endsWith(".part");
+    const m = INSTALLER_NAME.exec(part ? name.slice(0, -5) : name);
+    if (!m || (!part && compareVersions(m[1], current) > 0)) continue;
+    try { rmSync(join(dir, name), { force: true }); gone.push(name); } catch { /* still in use; next start */ }
+  }
+  return gone;
+}
+
+const ATTEMPT = "last-attempt.json";
+
+/** Notes the version the installer is about to put in place, so the next start can tell whether it did. */
+export function recordAttempt(dir: string, version: string): void {
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, ATTEMPT), JSON.stringify({ version }));
+}
+
+/** Drops the note when the installer did not even start; the app stays open and says so itself. */
+export function forgetAttempt(dir: string): void {
+  rmSync(join(dir, ATTEMPT), { force: true });
+}
+
+/**
+ * At start: the version the last update tried to install when this app is still older than it, so a
+ * silent installer failure is said instead of the same offer coming back unexplained. The note is
+ * removed whatever it says, so it is reported once.
+ */
+export function failedAttempt(dir: string, current: string): string | null {
+  let note: unknown;
+  try { note = JSON.parse(readFileSync(join(dir, ATTEMPT), "utf8")); } catch { note = null; }
+  forgetAttempt(dir);
+  const version = note && typeof note === "object" ? (note as { version?: unknown }).version : null;
+  return typeof version === "string" && compareVersions(version, current) > 0 ? version : null;
 }
 
 /**

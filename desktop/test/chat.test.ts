@@ -40,7 +40,7 @@ test("Chat sends the account key to the site it was checked against", async () =
 
 test("Chat gives the agent the site for item names and the followed realms to suggest, nothing it could choose from", async () => {
   mockAnswer.mockResolvedValueOnce(reply("ok"));
-  await createChat(dir(), () => settings({ market: { realms: ["Forever", "Nightslayer"] } })).send("price 2589");
+  await createChat(dir(), () => settings({ market: { realms: ["Forever", "Nightslayer"], dismissed: [] } })).send("price 2589");
   expect(mockAnswer.mock.calls[0][0]).toMatchObject({ site: "https://example.test", realms: ["Forever", "Nightslayer"] });
 });
 

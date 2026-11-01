@@ -2,7 +2,7 @@
   "name": "everloot-desktop",
   "productName": "Everloot Desktop App",
   "license": "AGPL-3.0-only",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "private": true,
   "description": "Everloot Desktop App: uploads the addon's save file after every logout, keeps market prices in game and answers /ask, from the system tray.",
   "homepage": "https://everloot.app",
@@ -16,6 +16,7 @@
     "start": "npm run build && electron .",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "bench": "node bench/run.mjs",
     "icons": "node scripts/icons.mjs",
     "pack": "npm run build && electron-builder --publish never"
   },
@@ -39,6 +40,14 @@
     "copyright": "AGPL-3.0-only, Everloot contributors",
     "asar": true,
     "npmRebuild": false,
+    "electronFuses": {
+      "runAsNode": false,
+      "enableCookieEncryption": true,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "onlyLoadAppFromAsar": true,
+      "resetAdHocDarwinSignature": true
+    },
     "files": [
       "dist/**",
       "package.json"

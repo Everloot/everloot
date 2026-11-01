@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { zipSync } from "fflate";
 import { afterEach, expect, test, vi } from "vitest";
-import { checksumFor, extractAddon, installAddon, installedAddonVersion, newestRelease, safeAddonEntries, slotAddons } from "../src/main/addon";
+import { checksumFor, extractAddon, installAddon, installedAddonVersion, newestAddonRelease, newestRelease, safeAddonEntries, slotAddons } from "../src/main/addon";
 
 // renameSync passes through to the real one unless a test makes a rename fail, the way an antivirus lock or the running game would.
 vi.mock("node:fs", async (importOriginal) => {
@@ -140,6 +140,18 @@ test("the newest release with the prefix wins; the other prefix, drafts and pre-
   expect(newestRelease(releases, "addon-v")).toEqual({ version: "0.3.10", url: "a3310" });
   expect(newestRelease(releases, "desktop-v")).toEqual({ version: "0.4.0", url: "d" });
   expect(newestRelease(releases, "nothing-v")).toBeNull();
+});
+
+test("the addon offered is the newest tagged one, Alpha included, as the download page serves it; nightlies and drafts are not", () => {
+  // An Alpha addon release is a GitHub pre-release; nightlies are pre-releases under their own tag.
+  const releases = [
+    { tag_name: "nightly-20261101.1", html_url: "n", prerelease: true },
+    { tag_name: "addon-v0.3.15", html_url: "draft", draft: true },
+    { tag_name: "addon-v0.3.14", html_url: "alpha", prerelease: true },
+    { tag_name: "addon-v0.3.10", html_url: "a3310" },
+  ];
+  expect(newestAddonRelease(releases)).toEqual({ version: "0.3.14", url: "alpha" });
+  expect(newestAddonRelease([{ tag_name: "addon-v0.3.10", html_url: "a3310" }])).toEqual({ version: "0.3.10", url: "a3310" });
 });
 
 test("an install verifies the zip against the release's SHA256SUMS and refuses a mismatch", async () => {

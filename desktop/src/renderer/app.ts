@@ -1,6 +1,6 @@
 import { accountOf as account } from "../main/engine";
 import { diagnostics } from "../shared/diagnostics";
-import { ago, clock, companionStatus, copyLabel, esc, gold, kb, msg, JOB_NAMES, sparkline, statusText, when, type CompanionState } from "./format";
+import { ago, answerSuggestion, clock, companionStatus, copyLabel, esc, gold, kb, msg, JOB_NAMES, savedNote, setupAddonLine, sparkline, statusText, when, type CompanionState } from "./format";
 import { NO_SOURCED_ANSWER, type AddonInfo, type AppState, type AskInfo, type BackupInfo, type ChangeItem, type CharacterRow, type CharactersInfo, type ChatInfo, type ChatProgress, type EverlootApi, type PriceLookup, type FileSummary, type GameFolderCandidate, type Job, type JobStatus, type MarketInfo, type MoneyDay } from "../shared/types";
 import { PROVIDER_PRESETS, assistantSource, keptModelPick, manualModelShown, presetFor, removalNotice, type ModelChoice, type ProviderKind } from "../shared/providers";
 import { inkOn } from "../../../web/src/lib/chat/catalogue";
@@ -29,6 +29,8 @@ let candidates: GameFolderCandidate[] = [];
 let chosenFolder: string | null = null;
 /** The census line on the welcome screen, ticked until the player unticks it. */
 let censusChoice = true;
+/** The welcome screen's addon check for the picked folder: the installed version (null: not there) and what Install did ("!" starts an error). */
+let setupAddon: { folder: string; installed: string | null; note: string } | null = null;
 /** The welcome screen's "I agree to the Terms of Use and Privacy Policy" box. */
 let agreed = false;
 /** A browser sign-in is waiting for everloot.app. */
@@ -76,6 +78,8 @@ const sideFoot = document.getElementById("side-foot")!;
 const updatePop = document.getElementById("updatePop")!;
 /** Whether the update popover is open. */
 let updateOpen = false;
+/** The update notification asked for the popover before the first state arrived. */
+let updateAsked = false;
 
 const ext = (url: string, text: string) => `<button type="button" class="link" data-open="${esc(url)}">${esc(text)}</button>`;
 
@@ -121,6 +125,10 @@ function welcome(): string {
           <span class="grow"><span class="mono">${esc(c.product)}</span> <span class="muted">${c.files ? `${c.files} account file(s) with Everloot data` : c.hasAccounts ? "no Everloot data yet" : "never played here yet"}</span><br><span class="muted mono small">${esc(c.folder)}</span></span></label>`).join("")}</div>`
     : `<p class="muted">No World of Warcraft folder was found in the usual places. Browse to the folder that holds <code>WTF</code>, for example <code>World of Warcraft\\_classic_era_</code>.</p>`;
   const custom = chosenFolder && !candidates.some((c) => c.folder === chosenFolder) ? `<p class="mono fg2">${esc(chosenFolder)}</p>` : "";
+  const a = setupAddon?.folder === chosenFolder ? setupAddon : null;
+  const line = setupAddonLine(a?.installed);
+  const addon = (line ? `<p class="fg2 small">${esc(line)} <button type="button" class="btn small" id="setupInstallAddon" ${busy ? "disabled" : ""}>${busy === "setupAddon" ? "Installing…" : "Install the addon"}</button></p>` : "")
+    + (a?.note ? `<p role="status" class="${a.note.startsWith("!") ? "error" : "ok"} small">${esc(a.note.replace(/^!/, ""))}</p>` : "");
   const signedIn = state?.account.signedIn;
   return `<div class="welcome">
     <div class="brand"><img src="logo.png" alt=""><h1>Set up Everloot Desktop App</h1></div>
@@ -148,7 +156,7 @@ function welcome(): string {
     </section>
     <section class="panel">
       <h2>Which game folder?</h2>
-      ${list}${custom}
+      ${list}${custom}${addon}
       <div class="row"><button type="button" class="btn" id="browse">Browse…</button><button type="button" class="btn" id="redetect">Look again</button></div>
     </section>
     <label class="agree"><input type="checkbox" id="agree" ${agreed ? "checked" : ""}> I agree to the ${ext("https://everloot.app/terms", "Terms of Use")} and ${ext("https://everloot.app/privacy", "Privacy Policy")}.</label>
@@ -185,7 +193,8 @@ function overview(s: AppState): string {
   return `<div class="page">
     <div class="head"><h1>Overview</h1><span class="sub">${e.files.length ? `Watching ${e.files.length} account file(s)` : "Not watching a game folder"}${e.paused ? " · paused" : ""}</span></div>
     ${s.notice ? `<p class="callout error">${icon("alert")}<span>${esc(s.notice)}</span></p>` : ""}
-    ${s.update?.newer && s.update.url ? `<p class="callout fg2">${icon("upload")}<span>Everloot Desktop App ${esc(s.update.latest ?? "")} is out; you run ${esc(s.version)}. ${ext(s.update.url, "Download it")} and install over this one; your settings stay.</span></p>` : ""}
+    ${foreverCallout(s)}
+    ${updateCallout(s)}
     ${!e.files.length && s.settings.gameFolder ? `<p class="callout fg2">${icon("log")}<span>No <code>Everloot.lua</code> under <span class="mono">${esc(s.settings.gameFolder)}</span> yet. Log out once in the game so it writes the file.</span></p>` : ""}
     <section class="hero" data-state="${status.state}" aria-labelledby="heroTitle">
       <div class="hero-body">
@@ -202,8 +211,8 @@ function overview(s: AppState): string {
         <div class="sec-head"><h2>Jobs</h2></div>
         <div class="jobs">
           ${job("upload", "Upload", dot(up), up.state === "ok" ? "OK" : up.state === "error" ? "Failed" : up.state === "off" ? "Off" : up.state === "running" ? "Running" : "Waiting", `${last(up)}${askWhy("upload", s)}`)}
-          ${job("market", "Market prices", dot(pr), data.market ? `${data.market.last.length} realm(s)` : pr.state === "off" ? "Off" : pr.state === "running" ? "Running" : "Waiting", `${data.market?.scans[0] ? `your last scan ${ago(data.market.scans[0].at)}` : last(pr)}${askWhy("prices", s)}`)}
-          ${job("ask", "/ask", dot(ask), ask.state === "off" ? "Off" : ask.state === "error" ? "Failed" : ask.state === "running" ? "Running" : "On", `${ask.at ? last(ask) : s.settings.ask.enabled ? "waiting" : "turn on in Ask"}${askWhy("ask", s)}`)}
+          ${job("market", "Market prices", dot(pr), data.market ? `${data.market.last.length} realm(s)` : pr.state === "off" ? "Off" : pr.state === "running" ? "Running" : "Waiting", `${data.market?.scans[0] ? `your last scan ${ago(data.market.scans[0].at)}` : last(pr)}${suggestionLine(data.market)}${askWhy("prices", s)}`)}
+          ${job("ask", "/ask", dot(ask), ask.state === "off" ? "Off" : ask.state === "error" ? "Failed" : ask.state === "running" ? "Running" : "On", `${ask.at ? last(ask) : s.settings.ask.enabled ? "waiting" : 'answers questions you type in game with <code>/ask</code> · <button type="button" class="link" data-page="ask">turn on in Ask</button>'}${askWhy("ask", s)}`)}
           ${job("addon", "Addon", "", addonLine, `${addon?.slots.prices ? "prices file in game" : "no prices file yet"}${addon && (!addon.installed || addon.newer) ? ` · <button type="button" class="link" data-page="addon">${addon.installed ? "update" : "install"}</button>` : ""}`)}
         </div>
       </div>
@@ -741,7 +750,7 @@ function upload(s: AppState): string {
     </section>
     <section class="panel"><div class="row between"><h2>Backups</h2><button type="button" class="btn" id="openBackups" ${(data.backups ?? []).length ? "" : "disabled"}>Open folder</button></div>
       ${backups.length ? `<div class="tablewrap"><table><thead><tr><th>Account</th><th>Taken</th><th class="num">Size</th><th></th></tr></thead><tbody>${backups}</tbody></table></div>` : '<p class="muted">No backup yet. One is kept after each upload.</p>'}
-      <p class="muted small">A copy of <code>Everloot.lua</code> as it was uploaded, the newest ten per account. Restore while logged out; the file you replace is backed up first.</p>
+      <p class="muted small">A copy of <code>Everloot.lua</code> as it was uploaded, the newest ten per account. Restore with the game closed; the file you replace is backed up first.</p>
       ${flash ? `<p class="${flash.startsWith("!") ? "error" : "ok"} small">${esc(flash.replace(/^!/, ""))}</p>` : ""}
     </section>
   </div>`;
@@ -768,6 +777,7 @@ function market(s: AppState): string {
       <p class="muted small">From the prices file in your game, the same numbers your tooltips show. In game, <code>/everloot price [item]</code> prints them in chat, anywhere in the world. Charts, every realm and item names are on the site.</p>
     </section>
     <p class="fg2">Community market values written into <code>EverlootPrices</code> so item tooltips show them after <code>/reload</code>. Realms from your own auction scans are always included; pick more below, the way TSM lets you pick realms, except the values are Everloot's own: a day counts once three reporters scanned it. Refreshed after each upload and every hour.</p>
+    ${realmSuggestion(m)}
     <section class="panel"><div class="row between"><h2>Realms to carry into the game</h2><span class="muted small">${m?.dataAsOf ? `site data as of ${when(m.dataAsOf)}` : ""}</span></div>
       ${checks}
       <div class="row"><input type="text" id="realmAdd" class="grow" placeholder="Add a realm by name" maxlength="60"><button type="button" class="btn" id="realmAddBtn">Follow</button></div>
@@ -785,6 +795,18 @@ function market(s: AppState): string {
         : '<p class="muted">Nothing written yet.</p>'}
     </section>
   </div>`;
+}
+
+/** The Market page's offer to follow the player's character realms. Nothing is fetched for them before Follow. */
+function realmSuggestion(m: MarketInfo | undefined): string {
+  if (!m?.suggested.length) return "";
+  return `<p class="callout fg2">${icon("market")}<span>Follow your characters' realms: <b>${esc(m.suggested.join(", "))}</b>. Their community prices then go into your tooltips like any realm you follow; nothing is asked of everloot.app for them until you press Follow. <button type="button" class="btn btn-primary" data-suggestion="follow">Follow</button> <button type="button" class="link" data-suggestion="dismiss">No thanks</button></span></p>`;
+}
+
+/** The Overview's short version, only while the game has no prices at all. */
+function suggestionLine(m: MarketInfo | undefined): string {
+  if (!m?.suggested.length || m.last.length || m.inGame?.length) return "";
+  return ` · no prices yet; follow your characters' realms (${esc(m.suggested.join(", "))}) <button type="button" class="link" data-suggestion="follow">Follow</button>`;
 }
 
 /** The last lookup on the Market page: each realm's row from the game's prices file, and the site's full history. */
@@ -946,7 +968,8 @@ function settings(s: AppState): string {
     ${assistant(c, "settings")}
     <form id="settings" autocomplete="off">
       <section class="panel set-sec"><div class="set-lead"><h2>Game</h2></div><div class="set-body">
-        <div class="field"><label for="gameFolder">Game folder <span class="hint">the product folder that holds <code>WTF</code>, like <code>World of Warcraft\\_classic_era_</code></span></label>
+        <div class="field"><label for="gameFolder">Game folder <span class="hint">the product folder that holds <code>WTF</code>: for WoW: Forever, <code>World of Warcraft\\_forever_</code></span></label>
+          ${foreverCallout(s)}
           <div class="row"><input class="grow" type="text" id="gameFolder" name="gameFolder" value="${esc(st.gameFolder ?? "")}"><button type="button" class="btn" id="browse">Browse…</button></div></div>
       </div></section>
       <section class="panel set-sec"><div class="set-lead"><h2>Startup</h2></div><div class="set-body">
@@ -969,6 +992,7 @@ function settings(s: AppState): string {
     <section class="panel set-sec"><div class="set-lead"><h2>This app</h2></div><div class="set-body">
       <p class="fg2">Everloot Desktop App ${esc(s.version)} · AGPL-3.0-only · ${ext("https://github.com/Everloot/everloot/tree/main/desktop", "source")} · ${ext("https://discord.gg/9CKsbHTRu3", "Discord")}</p>
       <p class="muted small">Data folder: <span class="mono">${esc(s.dataFolder)}</span> <button type="button" class="link" id="openData">open</button></p>
+      <p class="muted small">Uninstalling keeps this folder, with your keys, chat and save backups in it. Quit the app and delete it to remove them.</p>
       <div class="row"><button type="button" class="btn" id="updates">Check for updates</button></div>
     </div></section>
   </div>`;
@@ -998,12 +1022,10 @@ function renderSide(s: AppState): void {
     + group("companion", "Companion", pages(["upload", "market", "ask", "addon", "changes", "log"]))
     + group("web", "On everloot.app", web);
   const e = s.engine;
-  // Ready to install: Restart gets its own row, the clearest thing in the footer.
-  const ready = s.update?.newer && s.updateProgress.stage === "ready";
   const acct = s.account.signedIn
     ? `<button type="button" class="account-btn" id="accountBtn" title="Signed in to everloot.app">${PERSON}<span class="acct-text"><b>Signed in</b><span>key …${esc(s.account.hint ?? "")}</span></span></button>`
     : `<button type="button" class="account-btn" id="accountBtn">${PERSON}<span class="acct-text"><b>Sign in</b><span>everloot.app</span></span></button>`;
-  sideFoot.innerHTML = `${acct}${ready ? `<button type="button" class="restart-btn" id="updateRestart" title="Restart to install ${esc(s.update!.latest ?? "")}">${ARROW}Restart to update</button>` : ""}<div class="foot-row"><button type="button" data-page="settings" ${page === "settings" ? 'aria-current="page"' : ""}>${GEAR}Settings</button><button type="button" class="foot-icon" id="reportBug" aria-label="Report a bug" title="Report a bug">${BUG}</button>${updateButton(s)}</div>
+  sideFoot.innerHTML = `${acct}${updateRow(s)}<div class="foot-row"><button type="button" data-page="settings" ${page === "settings" ? 'aria-current="page"' : ""}>${GEAR}Settings</button><button type="button" class="foot-icon" id="reportBug" aria-label="Report a bug" title="Report a bug">${BUG}</button>${updateButton(s)}</div>
     <div class="foot-line"><span>${e.files.length ? `Watching ${e.files.length} file(s)` : "Not watching"}${e.paused ? " · paused" : ""}</span><span>v${esc(s.version)}</span></div>`;
   if (refocus) side.querySelector<HTMLElement>(refocus)?.focus({ preventScroll: true });
 }
@@ -1012,16 +1034,39 @@ const PERSON = icon("account");
 const BUG = icon("bug");
 
 /**
- * The footer's update button: an arrow while an update is out, the percentage while it downloads,
- * and a Restart pill once it is ready to install.
+ * While an update is out, its own row is the clearest thing in the footer: one click downloads it and
+ * checks it against the release's checksum, the percentage shows while it downloads, and the next
+ * click restarts into it. Where the app cannot install itself, the row opens the download.
  */
-function updateButton(s: AppState): string {
+function updateRow(s: AppState): string {
   const up = s.update?.newer ? s.update : null;
   if (!up) return "";
   const p = s.updateProgress;
-  // Ready: the Restart row above the footer takes over; the arrow stays to reopen what changed.
-  const label = p.stage === "downloading" ? `Downloading update ${p.percent}%` : `Update ${esc(up.latest ?? "")} available`;
-  return `<button type="button" class="update-btn${p.stage === "downloading" ? " busy" : ""}" id="updateBtn" aria-expanded="${updateOpen}" aria-controls="updatePop" aria-label="${label}" title="${label}">${p.stage === "downloading" ? `<span class="pct">${p.percent}</span>` : ARROW}</button>`;
+  const v = esc(up.latest ?? "");
+  if (!up.installable) return `<button type="button" class="restart-btn" id="updateDownloadPage" data-open="${esc(up.downloadUrl ?? up.url ?? "")}">${ARROW}Download ${v}</button>`;
+  if (p.stage === "ready") return `<button type="button" class="restart-btn" id="updateRestart" title="Restart to install ${v}">${ARROW}Restart to update</button>`;
+  if (p.stage === "downloading") return `<button type="button" class="restart-btn busy" id="updateNow" disabled>Downloading ${v}… ${p.percent}%</button>`;
+  return `<button type="button" class="restart-btn" id="updateNow" title="Download ${v}, check it and install it on restart">${ARROW}${p.stage === "failed" ? "Update failed, try again" : `Update to ${v}`}</button>`;
+}
+
+/** The arrow beside Settings opens what the new version changed. */
+function updateButton(s: AppState): string {
+  const up = s.update?.newer ? s.update : null;
+  if (!up) return "";
+  const label = `What's new in ${esc(up.latest ?? "")}`;
+  return `<button type="button" class="update-btn" id="updateBtn" aria-expanded="${updateOpen}" aria-controls="updatePop" aria-label="${label}" title="${label}">${ARROW}</button>`;
+}
+
+/** The Overview says so too, with the same one-click update. */
+function updateCallout(s: AppState): string {
+  const up = s.update?.newer ? s.update : null;
+  if (!up || !(up.installable || up.url)) return "";
+  const p = s.updateProgress;
+  const action = !up.installable ? `${ext(up.downloadUrl ?? up.url!, "Download it")} and install over this one`
+    : p.stage === "ready" ? `<button type="button" class="link" id="updateRestartCallout">Restart to update</button>`
+      : p.stage === "downloading" ? `Downloading, ${p.percent}%`
+        : `<button type="button" class="link" id="updateNowCallout">Update now</button>`;
+  return `<p class="callout fg2">${icon("upload")}<span>Everloot Desktop App ${esc(up.latest ?? "")} is out; you run ${esc(s.version)}. ${action}; your settings stay.</span></p>`;
 }
 
 const ARROW = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -1131,7 +1176,12 @@ async function load(p: Page): Promise<void> {
 let reload: ReturnType<typeof setTimeout> | undefined;
 const PAGE_IDS = new Set<string>(PAGES.map((p) => p.id));
 // A tray entry or a notification asks for a page. A settings draft in progress is not thrown away for it.
-api.onNavigate((p) => { if (PAGE_IDS.has(p) && !draftDirty && state?.settings.consentedAt) void go(p as Page); });
+api.onNavigate((p) => {
+  // The update notification and the tray's update item open the update panel over whatever page is showing.
+  // A window opened for it may not have its first state yet; the panel opens once it does.
+  if (p === "update") { if (!state) updateAsked = true; else if (state.update?.newer) toggleUpdate(true); return; }
+  if (PAGE_IDS.has(p) && !draftDirty && state?.settings.consentedAt) void go(p as Page);
+});
 
 api.onState((s) => {
   state = s;
@@ -1144,6 +1194,17 @@ api.onState((s) => {
 async function detect(): Promise<void> {
   candidates = await api.detectGameFolders();
   if (!chosenFolder && candidates[0]) chosenFolder = candidates[0].folder;
+  render();
+  void checkSetupAddon();
+}
+
+/** Looks for the addon in the folder the welcome screen has picked; a check that fails shows nothing. */
+async function checkSetupAddon(): Promise<void> {
+  const folder = chosenFolder;
+  if (!folder) return;
+  const installed = await api.setupAddon(folder).catch(() => undefined);
+  if (installed === undefined || folder !== chosenFolder) return;
+  setupAddon = { folder, installed, note: setupAddon?.folder === folder ? setupAddon.note : "" };
   render();
 }
 
@@ -1194,6 +1255,12 @@ function paintCopy(): void {
 const toast = document.getElementById("toast")!;
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 /** A short note in the same corner, for things that went right. */
+/** Offers WoW: Forever's folder when the game folder is another client beside it (the closed beta, a classic realm). */
+function foreverCallout(s: AppState): string {
+  if (!s.foreverFolder || !s.settings.gameFolder) return "";
+  return `<p class="callout fg2">${icon("alert")}<span>Everloot is built for WoW: Forever, and it is installed at <span class="mono">${esc(s.foreverFolder)}</span>. The app reads <span class="mono">${esc(s.settings.gameFolder)}</span> now. <button type="button" class="btn btn-primary" id="useForever">Use Forever</button> <button type="button" class="link" id="keepFolder">Keep this folder</button></span></p>`;
+}
+
 function notice(text: string): void {
   toast.textContent = text;
   toast.classList.add("info");
@@ -1221,8 +1288,8 @@ async function onClick(ev: MouseEvent): Promise<void> {
   const el = ev.target as HTMLElement;
   if (el.closest("#updateBtn")) { toggleUpdate(!updateOpen); return; }
   if (el.closest("#updateLater")) { toggleUpdate(false); return; }
-  if (el.closest("#updateGet")) { await api.updateDownload(); return; }
-  if (el.closest("#updateRestart, #updateRestartPop")) { await api.updateRestart(); return; }
+  if (el.closest("#updateGet, #updateNow, #updateNowCallout")) { await api.updateDownload(); return; }
+  if (el.closest("#updateRestart, #updateRestartPop, #updateRestartCallout")) { await api.updateRestart(); return; }
   if (el.closest("#accountBtn, [data-account]")) {
     if (page !== "settings") await go("settings");
     const panel = main.querySelector<HTMLElement>("#account");
@@ -1304,7 +1371,12 @@ async function onClick(ev: MouseEvent): Promise<void> {
     return;
   }
   if (t.dataset.run) { void api.runNow(t.dataset.run as Job); return; }
-  if (t.dataset.unfollow) { const gone = t.dataset.unfollow.toLowerCase(); state = await api.saveSettings({ market: { realms: state!.settings.market.realms.filter((r) => r.toLowerCase() !== gone) } }); void load("market"); return; }
+  if (t.dataset.suggestion) {
+    state = await api.saveSettings(answerSuggestion(state!.settings.market, data.market?.suggested ?? [], t.dataset.suggestion === "follow"));
+    void load(page);
+    return;
+  }
+  if (t.dataset.unfollow) { const gone = t.dataset.unfollow.toLowerCase(); state = await api.saveSettings({ market: { ...state!.settings.market, realms: state!.settings.market.realms.filter((r) => r.toLowerCase() !== gone) } }); void load("market"); return; }
   if (t.id === "pause") { await api.setPaused(!state!.engine.paused); return; }
   if (t.id === "chatStop") { await api.chatStop(); return; }
   if (t.id === "chatClear") { copied = null; data.chat = await api.chatClear(); render(); return; }
@@ -1312,11 +1384,20 @@ async function onClick(ev: MouseEvent): Promise<void> {
     const folder = await api.pickGameFolder();
     if (!folder) return;
     if (state!.settings.consentedAt) { (main.querySelector("#gameFolder") as HTMLInputElement).value = folder; draftDirty = true; }
-    else { chosenFolder = folder; render(); }
+    else { chosenFolder = folder; render(); void checkSetupAddon(); }
     return;
   }
   if (t.id === "pickToken") { const f = await api.pickTokenFile(); if (f) { (main.querySelector("#tokenFile") as HTMLInputElement).value = f; draftDirty = true; } return; }
   if (t.id === "redetect") { chosenFolder = null; await detect(); return; }
+  // Saves only the folder choice; with unsaved Settings edits the page is not redrawn, so the field and callout are updated here.
+  if (t.id === "useForever" && state?.foreverFolder) {
+    const folder = state.foreverFolder;
+    state = await api.saveSettings({ gameFolder: folder });
+    const input = main.querySelector("#gameFolder") as HTMLInputElement | null;
+    if (input) input.value = folder;
+    t.closest(".callout")?.remove(); render(); return;
+  }
+  if (t.id === "keepFolder" && state?.settings.gameFolder) { state = await api.saveSettings({ keptGameFolder: state.settings.gameFolder }); t.closest(".callout")?.remove(); render(); return; }
   if (t.id === "start" && chosenFolder) { state = await api.saveSettings({ gameFolder: chosenFolder, census: censusChoice, consentedAt: new Date().toISOString() }); void go("overview"); return; }
   if (t.id === "openConfig") { void api.openConfig(); return; }
   if (t.id === "openData") { void api.openDataFolder(); return; }
@@ -1325,7 +1406,7 @@ async function onClick(ev: MouseEvent): Promise<void> {
     const input = main.querySelector("#realmAdd") as HTMLInputElement;
     const name = input.value.trim();
     if (!name) return;
-    state = await api.saveSettings({ market: { realms: [...state!.settings.market.realms, name] } });
+    state = await api.saveSettings({ market: { ...state!.settings.market, realms: [...state!.settings.market.realms, name] } });
     input.value = "";
     void load("market");
     return;
@@ -1336,6 +1417,15 @@ async function onClick(ev: MouseEvent): Promise<void> {
     catch (e) { flash = `!${msg(e)}`; }
     busy = "";
     await load("addon");
+    return;
+  }
+  if (t.id === "setupInstallAddon" && setupAddon) {
+    const target = setupAddon;
+    busy = "setupAddon"; target.note = ""; render();
+    try { const r = await api.setupInstallAddon(target.folder); target.installed = r.version; target.note = `Installed the Everloot addon ${r.version}. If the game is open, restart it.`; }
+    catch (e) { target.note = `!${msg(e)}`; }
+    busy = "";
+    render();
     return;
   }
   if (t.id === "buildsSync") { state = await api.buildsSync(); await load("addon"); return; }
@@ -1419,11 +1509,11 @@ async function onChange(ev: Event): Promise<void> {
   if (el.dataset.realm) {
     const realm = el.dataset.realm;
     const current = state!.settings.market.realms.filter((r) => r.toLowerCase() !== realm.toLowerCase());
-    state = await api.saveSettings({ market: { realms: el.checked ? [...current, realm] : current } });
+    state = await api.saveSettings({ market: { ...state!.settings.market, realms: el.checked ? [...current, realm] : current } });
     void load("market");
     return;
   }
-  if (el.name === "folder") { chosenFolder = el.value; render(); return; }
+  if (el.name === "folder") { chosenFolder = el.value; render(); void checkSetupAddon(); return; }
   if (el.form && el.form.id !== "chatForm" && el.form.id !== "providerForm") draftDirty = true;
 }
 main.addEventListener("input", (ev) => {
@@ -1506,20 +1596,26 @@ async function onSubmit(ev: SubmitEvent): Promise<void> {
     sendChat(question).catch(failed);
     return;
   }
+  let note = "Saved.";
   if (form.id === "settings") {
-    state = await api.saveSettings({ gameFolder: text("gameFolder") || null, endpoint: text("endpoint"), launchAtLogin: f.get("launchAtLogin") === "on", startInTray: f.get("startInTray") === "on", census: f.get("census") === "on", players: f.get("players") === "on" });
+    const endpoint = text("endpoint");
+    state = await api.saveSettings({ gameFolder: text("gameFolder") || null, endpoint, launchAtLogin: f.get("launchAtLogin") === "on", startInTray: f.get("startInTray") === "on", census: f.get("census") === "on", players: f.get("players") === "on" });
+    note = savedNote({ endpoint }, state.settings);
   } else if (form.id === "askForm") {
-    state = await api.saveSettings({ ask: { ...state!.settings.ask, mcpUrl: text("mcpUrl"), tokenFile: text("tokenFile") || null } });
+    const mcpUrl = text("mcpUrl");
+    state = await api.saveSettings({ ask: { ...state!.settings.ask, mcpUrl, tokenFile: text("tokenFile") || null } });
+    note = savedNote({ mcpUrl }, state.settings);
   }
   draftDirty = false;
   render();
   const saved = main.querySelector("#saved");
-  if (saved) saved.textContent = "Saved.";
+  if (saved) { saved.textContent = note.replace(/^!/, ""); saved.className = note.startsWith("!") ? "error" : "muted"; }
 }
 
 void (async () => {
   state = await api.state();
   if (!state.settings.consentedAt) await detect();
   render();
+  if (updateAsked && state.update?.newer) toggleUpdate(true);
   void load(page);
 })();

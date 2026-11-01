@@ -43,7 +43,7 @@ describe("the key", () => {
 describe("the page's four lines", () => {
   const base: ItemSummaryInput = {
     identity: "One-Hand sword · Legendary · Requires level 60",
-    dropSources: 0, mapPositions: 0, vendors: 0, recipes: 0, nameFrom: "none", lastSeen: null, now: NOW,
+    dropSources: 0, mapPositions: 0, vendors: 0, recipes: 0, uses: 0, nameFrom: "none", lastSeen: null, now: NOW,
   };
 
   test("an item nobody has reported says so, in four lines", () => {
@@ -68,6 +68,11 @@ describe("the page's four lines", () => {
 
   test("a vendor and a recipe are named when they are known", () => {
     expect(itemSummary({ ...base, vendors: 2, recipes: 1 })[2]).toBe("2 vendors sell it, and 1 recipe makes it.");
+  });
+
+  test("a reagent says recipes use it, not that they make it", () => {
+    expect(itemSummary({ ...base, uses: 19 })[2]).toBe("19 recipes use it.");
+    expect(itemSummary({ ...base, recipes: 1, uses: 1 })[2]).toBe("1 recipe makes it, and 1 recipe uses it.");
   });
 
   test("the name says where it came from", () => {

@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import type { BackupInfo } from "../shared/types";
@@ -30,6 +31,38 @@ export function backupSavedVariables(file: string, dataFolder: string, keep = BA
 }
 
 
+/** Runs a command and resolves with its exit code and output; a command that cannot start or times out rejects. Injected so tests need no real processes. */
+export type RunCommand = (cmd: string, args: string[]) => Promise<{ code: number; stdout: string }>;
+
+const runCommand: RunCommand = (cmd, args) => new Promise((resolve, reject) => {
+  execFile(cmd, args, { timeout: 10_000, windowsHide: true }, (err, stdout) => {
+    // A non-zero exit is an answer (pgrep: no match); no number means it never ran or was killed.
+    if (err && typeof err.code !== "number") reject(err);
+    else resolve({ code: err ? Number(err.code) : 0, stdout: String(stdout) });
+  });
+});
+
+/**
+ * Whether a World of Warcraft client is running: true, false, or null when this computer cannot say
+ * (no tasklist or pgrep, a timeout, another system). The game rewrites Everloot.lua when it logs out
+ * or exits, so a restore while it runs would be undone. Never throws.
+ */
+export async function gameRunning(platform: string = process.platform, run: RunCommand = runCommand): Promise<boolean | null> {
+  try {
+    if (platform === "win32") {
+      // Wow.exe, WowClassic.exe and their PTR and beta builds (WowClassicT.exe, WowB.exe, ...); not WowUp.exe or WowVoiceProxy.exe.
+      const r = await run("tasklist", ["/FI", "IMAGENAME eq Wow*", "/FO", "CSV", "/NH"]);
+      return r.code === 0 ? /^"Wow(?:Classic)?[BT]?\.exe"/im.test(r.stdout) : null;
+    }
+    if (platform === "darwin" || platform === "linux") {
+      // macOS: the game's binary inside its .app; Linux: the Windows exe under Wine or Proton.
+      const r = await run("pgrep", ["-f", platform === "darwin" ? "World of Warcraft[^/]*\\.app/Contents/MacOS/" : "(^|[\\\\/])Wow(Classic)?[BT]?\\.exe"]);
+      return r.code === 0 ? true : r.code === 1 ? false : null;
+    }
+    return null;
+  } catch { return null; }
+}
+
 const safeAccount = (account: string) => account.replace(/[^A-Za-z0-9#_-]/g, "_");
 const sameBytes = (a: string, b: string) => statSync(a).size === statSync(b).size && readFileSync(a).equals(readFileSync(b));
 
@@ -46,8 +79,8 @@ export function listBackups(dataFolder: string): BackupInfo[] {
 /**
  * Copies a backup back over the live Everloot.lua of the same account. The file it replaces is
  * backed up first, so a restore can itself be undone. Only files inside the backups folder are
- * accepted, and only for an account the app is watching. The player does this logged out: the
- * game rewrites the file on logout and would overwrite the restore otherwise.
+ * accepted, and only for an account the app is watching. The caller checks first that the game
+ * is closed (gameRunning): it rewrites the file on logout and would overwrite the restore otherwise.
  */
 export function restoreBackup(backupFile: string, dataFolder: string, watchedFiles: string[], now = new Date()): string {
   const dir = resolve(dataFolder, "backups");

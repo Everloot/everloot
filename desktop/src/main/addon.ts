@@ -5,7 +5,7 @@ import { unzipSync } from "fflate";
 
 /** The collector addon's folder under Interface/AddOns, and the zip's top folder. */
 export const ADDON_FOLDER = "Everloot";
-export const RELEASES_API = "https://api.github.com/repos/Everloot/everloot/releases?per_page=30";
+export const RELEASES_API = "https://api.github.com/repos/Everloot/everloot/releases?per_page=100";
 const RELEASE_DOWNLOADS = "https://github.com/Everloot/everloot/releases/download";
 
 /** `## Version:` from the installed addon's TOC, or null when the addon is not there. */
@@ -34,13 +34,19 @@ export function compareVersions(a: string, b: string): number {
   return 0;
 }
 
-/** The newest published `<prefix>X.Y.Z` release in GitHub's list. Drafts, pre-releases and other tags are skipped. */
-export function newestRelease(releases: unknown, prefix: string): { version: string; url: string } | null {
+/**
+ * The addon release to offer: the newest `addon-vX.Y.Z`, an Alpha (published as a GitHub pre-release)
+ * included, which is what the download page serves. Nightlies have their own tag and stay out.
+ */
+export const newestAddonRelease = (releases: unknown) => newestRelease(releases, "addon-v", true);
+
+/** The newest published `<prefix>X.Y.Z` release in GitHub's list. Drafts and other tags are skipped, and pre-releases unless asked for. */
+export function newestRelease(releases: unknown, prefix: string, includePrereleases = false): { version: string; url: string } | null {
   if (!Array.isArray(releases)) return null;
   const re = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\d+\\.\\d+\\.\\d+)$`);
   let best: { version: string; url: string } | null = null;
   for (const r of releases as Release[]) {
-    if (r.draft || r.prerelease || typeof r.tag_name !== "string") continue;
+    if (r.draft || (r.prerelease && !includePrereleases) || typeof r.tag_name !== "string") continue;
     const m = re.exec(r.tag_name);
     if (!m) continue;
     const url = typeof r.html_url === "string" ? r.html_url : `https://github.com/Everloot/everloot/releases/tag/${r.tag_name}`;

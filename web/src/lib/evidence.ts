@@ -39,9 +39,10 @@ export interface ItemSummaryInput {
   dropSources: number;
   /** Map positions with three installs agreeing. */
   mapPositions: number;
-  /** Vendors seen selling it, and recipes that make it. */
+  /** Vendors seen selling it, recipes that make it, and recipes that use it as a reagent. */
   vendors: number;
   recipes: number;
+  uses: number;
   /** Where the name on the page came from. */
   nameFrom: NameFrom;
   /** The newest last-seen date among the observed relations, if any. */
@@ -73,6 +74,7 @@ export function itemSummary(i: ItemSummaryInput): string[] {
   const known: string[] = [];
   if (i.vendors > 0) known.push(`${plural(i.vendors, "vendor sells", "vendors sell")} it`);
   if (i.recipes > 0) known.push(`${plural(i.recipes, "recipe makes", "recipes make")} it`);
+  if (i.uses > 0) known.push(`${plural(i.uses, "recipe uses", "recipes use")} it`);
   bullets.push(known.length ? `${known.join(", and ")}.` : "No vendor or recipe is known to carry it yet.");
 
   bullets.push(

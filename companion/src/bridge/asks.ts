@@ -23,7 +23,12 @@ export const MAX_QUESTION = 500;
 
 /** Questions the addon stored with /ask. Anything malformed or oversized is skipped, never guessed. */
 export function readAsks(savedVariables: string): Ask[] {
-  const asks = parseEverlootTable(savedVariables).asks;
+  return asksIn(parseEverlootTable(savedVariables));
+}
+
+/** As readAsks, from a table already parsed. */
+export function asksIn(db: Record<string, unknown>): Ask[] {
+  const asks = db.asks;
   if (!Array.isArray(asks)) return [];
   return asks.flatMap((row) => {
     const r = row as Record<string, unknown>;

@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
@@ -38,6 +38,23 @@ test("a patch changes only known keys and keeps the old value for a bad one", ()
   expect(mergeSettings(merged, { gameFolder: null, ask: { tokenFile: null } })).toMatchObject({ gameFolder: null, ask: { tokenFile: null, enabled: true } });
 });
 
+test("the folder kept over the Forever suggestion is remembered, and cleared by null", () => {
+  expect(defaultSettings().keptGameFolder).toBeNull();
+  const kept = mergeSettings(defaultSettings(), { keptGameFolder: "C:/WoW/_classic_beta_" });
+  expect(kept.keptGameFolder).toBe("C:/WoW/_classic_beta_");
+  expect(mergeSettings(kept, { upload: false }).keptGameFolder).toBe("C:/WoW/_classic_beta_");
+  expect(mergeSettings(kept, { keptGameFolder: null }).keptGameFolder).toBeNull();
+});
+
+test("dismissed realm suggestions are kept when a patch only changes the followed realms, and cleaned like them", () => {
+  const s = mergeSettings(defaultSettings(), { market: { realms: ["Doomhowl"], dismissed: [" Forever ", "forever", 7, "x"] } });
+  expect(s.market).toEqual({ realms: ["Doomhowl"], dismissed: ["Forever", "forever"] });
+  expect(mergeSettings(s, { market: { realms: [] } }).market).toEqual({ realms: [], dismissed: ["Forever", "forever"] });
+  expect(defaultSettings().market).toEqual({ realms: [], dismissed: [] });
+  // A settings file from before the suggestion has no list: it starts empty.
+  expect(mergeSettings(defaultSettings(), { market: { realms: ["Doomhowl"] } }).market.dismissed).toEqual([]);
+});
+
 test("settings round-trip through the file, written whole", () => {
   const path = join(dir(), "nested", "settings.json");
   const s = mergeSettings(defaultSettings(), { gameFolder: "D:/Games/WoW/_anniversary_", consentedAt: "2026-10-18T00:00:00.000Z" });
@@ -75,4 +92,20 @@ test("the census starts on for a new setup and stays off for one finished before
   expect(loadSettings(path).settings.census).toBe(true);
   writeFileSync(path, JSON.stringify({ consentedAt: "2026-10-18T00:00:00Z", census: true }));
   expect(loadSettings(path).settings.census).toBe(true);
+});
+
+test("a damaged settings file is kept under its own name, so the next Save does not write over it", () => {
+  const d = dir(), path = join(d, "settings.json");
+  writeFileSync(path, '{ "gameFolder": "D:\\Games\\WoW", oops');
+  const loaded = loadSettings(path);
+  expect(loaded.settings).toEqual(defaultSettings());
+  const kept = readdirSync(d).filter((n) => n.startsWith("settings.json.corrupt-"));
+  expect(kept).toHaveLength(1);
+  expect(loaded.error).toContain(kept[0]);
+  saveSettings(path, mergeSettings(loaded.settings, { gameFolder: "E:/WoW/_classic_era_" }));
+  expect(readFileSync(join(d, kept[0]), "utf8")).toBe('{ "gameFolder": "D:\\Games\\WoW", oops');
+  // A second damaged file gets a name of its own.
+  writeFileSync(path, "[1,2]");
+  expect(loadSettings(path).error).toMatch(/settings\.json\.corrupt-/);
+  expect(readdirSync(d).filter((n) => n.startsWith("settings.json.corrupt-"))).toHaveLength(2);
 });
