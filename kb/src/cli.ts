@@ -17,6 +17,7 @@ import { formatScanReport, loadManifest, scanBuild } from "./client-scan.js";
 import { writeClientAchievements } from "./client-achievements.js";
 import { writeClientEncounters } from "./client-encounters.js";
 import { writeClientMounts } from "./client-mounts.js";
+import { writeClientClassGear } from "./client-class-gear.js";
 import { writeClientLayer } from "./client-layer.js";
 import { writeRaceTable } from "./client-races.js";
 import { evaluateWritten, formatAnswerEval, openAiCompatible, sampleKeyed } from "./answer-eval.js";
@@ -192,6 +193,7 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
     (every boss encounter the game files list per instance, from DungeonEncounter, one build-stamped file the
     instance pages merge with player reports player-first. Pages only, as above)
   client-mounts <snapshot.sqlite> [--out ../web/src/data/game-data/client-mounts.json]
+  client-class-gear <snapshot.sqlite> [--out ../web/src/data/game-data/client-class-gear.json]
     (every mount the game files list with its spell and riding skill, one build-stamped file the collections tool
     shows beside player uploads player-first. Pages only, as above)
   item-names <snapshot.sqlite> --wiki <knowledge base or release .sqlite> [--ledger data/item-names/ledger.json] [--out data/assets]
@@ -684,6 +686,13 @@ async function main(): Promise<number> {
       const path = flags.get("out") || "../web/src/data/game-data/client-mounts.json";
       const table = writeClientMounts(args[0], path);
       console.log(`${table.build.product} ${table.build.version}: ${Object.keys(table.mounts).length} mounts -> ${path}`);
+      return 0;
+    }
+    case "client-class-gear": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-class-gear.json";
+      const table = writeClientClassGear(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${Object.keys(table.classes).length} classes, ${Object.keys(table.restricted).length} class-restricted items -> ${path}`);
       return 0;
     }
     case "client-diff": {
