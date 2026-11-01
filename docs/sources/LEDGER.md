@@ -72,7 +72,7 @@ Open-source projects read as references, none of their code in this repository:
 
 ## Infrastructure and placeholders, not data sources
 
-Services the site runs on or signs in with: Cloudflare (the Worker that serves everloot.app), Supabase (`uinmowrmyckklpbwzqhn.supabase.co`), Cloudflare R2 (`<account>.r2.cloudflarestorage.com`,
+Services the site runs on or signs in with: Cloudflare (the Worker that serves everloot.app), Supabase (`<project-ref>.supabase.co`), Cloudflare R2 (`<account>.r2.cloudflarestorage.com`,
 `acct.r2.cloudflarestorage.com` in tests), Battle.net OAuth (`oauth.battle.net`, sign-in identity only), Google AdSense (`pagead2.googlesyndication.com`), the MCP client origins
 (`chatgpt.com`, `chat.openai.com`, `claude.ai`, `perplexity.ai`). Placeholders in tests and examples:
 `example.test`, `example.supabase.co`, `everloot.example`, `api.example`, `sb.example`, `sb.test`,

@@ -73,7 +73,7 @@ export const BRIDGE_PLAN: readonly PlanItem[] = [
 
   { id: "ops.dns", status: "live", name: "everloot.app DNS", done: "The apex and www records in Cloudflare are proxied, and the Worker routes everloot.app/* and www.everloot.app/* serve them; www answers a 301 to the apex.", proof: "deployed" },
   { id: "ops.worker_deploy", status: "live", name: "Worker deploys", done: "A push to main that touches web/, kb/ or packages/protocol, once the Release checks pass on it, builds the site with OpenNext and deploys the everloot-web Worker (.github/workflows/deploy-worker.yml), then fetches every sitemap page and fails on any that does not answer 200.", proof: "deployed" },
-  { id: "ops.supabase", status: "live", name: "Supabase + R2 storage", done: "Intake writes the raw upload to R2 bucket everloot-uploads and one index row to Supabase everloot (ref uinmowrmyckklpbwzqhn); the waitlist is a Supabase table. Pages read the indexed objects. Proven end to end on everloot.app 2026-10-04.", proof: "deployed" },
+  { id: "ops.supabase", status: "live", name: "Supabase + R2 storage", done: "Intake writes the raw upload to R2 bucket everloot-uploads and one index row to Supabase everloot; the waitlist is a Supabase table. Pages read the indexed objects. Proven end to end on everloot.app 2026-10-04.", proof: "deployed" },
   { id: "ops.adsense", status: "waiting", name: "AdSense", done: "Carlos's account. Consent banner already on the site." },
   { id: "ops.beta_guild", status: "waiting", name: "Beta character in a guild", done: "two raid nights before 2026-10-21. Hakoovak is not this character." },
   { id: "ops.hero_shot", status: "waiting", name: "Hero screenshot", done: "a real beta screenshot replaces the empty hero" },
