@@ -95,6 +95,26 @@ def judge_indexnow(status: int, _headers: dict, text: str) -> str | None:
     return None if text.strip() else "is empty"
 
 
+DOWNLOAD_FAILURES = ("not available on this site right now", "could not be loaded right now")
+
+
+def judge_downloads(desktop: bool):
+    """A download page links the served addon zip and, on /addon, a Desktop App installer; the fallback that
+    sends players to GitHub instead counts as a miss (src/app/addon/page.tsx)."""
+    def judge(status: int, _headers: dict, text: str) -> str | None:
+        if status != 200:
+            return f"answered {status}"
+        failed = [phrase for phrase in DOWNLOAD_FAILURES if phrase in text]
+        if failed:
+            return f'says "{failed[0]}"'
+        if not re.search(r'href="/downloads/Everloot-[0-9.]+\.zip"', text):
+            return "links no addon zip"
+        if desktop and not re.search(r'href="https://github\.com/Everloot/everloot/releases/download/desktop-v[0-9.]+/', text):
+            return "links no Desktop App installer"
+        return None
+    return judge
+
+
 def mcp_payload(text: str) -> dict | None:
     """The JSON-RPC answer, whether the endpoint sent plain JSON or one server-sent event."""
     for chunk in [text, *[line[5:] for line in text.splitlines() if line.startswith("data:")]]:
@@ -144,6 +164,8 @@ def checks(after_switch: bool) -> list[tuple[str, str, dict | None, object]]:
         ("/game-version/ptr", "/game-version/ptr", None, judge_redirect("/ptr")),
         ("/api/health", "/api/health", None, judge_health),
         ("/database/items/25", "/database/items/25", None, judge_named_item(25)),
+        ("/addon", "/addon", None, judge_downloads(desktop=True)),
+        ("/upload", "/upload", None, judge_downloads(desktop=False)),
         ("/indexnow.txt", "/indexnow.txt", None, judge_indexnow),
         ("MCP tools/list", "/mcp/public", {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}, judge_tools(MCP_TOOLS)),
         ("MCP answer_sources: which bosses are in Deadmines", "/mcp/public",

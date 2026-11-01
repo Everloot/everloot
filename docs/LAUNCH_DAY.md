@@ -113,7 +113,8 @@ Run `python scripts/launch_smoke.py` from the repository root (add `--after-swit
 deployed, steps 21 and later). It asks every path below, judges each answer as the table says, prints a
 Markdown table to keep as the step's record and exits 1 when a check fails. It also checks that
 `/database/items/25` shows a name. It needs only Python's standard library, and it never prints the
-IndexNow key. First run: 2026-10-30, all 16 checks passed before the switch.
+IndexNow key. First run: 2026-10-30, all 16 checks passed before the switch. On 2026-11-01 the `/addon` and
+`/upload` download checks were added (18 checks); `/addon` failed then, showing its "not available" fallback.
 
 | Path | Expected |
 |---|---|
@@ -123,6 +124,7 @@ IndexNow key. First run: 2026-10-30, all 16 checks passed before the switch.
 | `/game-version/beta`, `/game-version/ptr` | 308 to `/beta`, `/ptr` |
 | `/sitemap.xml`, `/database-sitemap.xml` | 200 |
 | `/api/health` | 200, fresh within 30 minutes; 503 when stale or storage cannot be read |
+| `/addon`, `/upload` | 200, a link to the served addon zip; `/addon` also links a Desktop App installer; neither shows the "not available" or "could not be loaded" fallback |
 | `/indexnow.txt` | 200 with the key, if the IndexNow setting exists |
 | MCP: POST `tools/list` to `https://everloot.app/mcp/public` | 32 tools (counted 2026-10-30), no key (`docs/SEO.md` names that endpoint; the endpoint answers 404 unless the public MCP switch is set in Production) |
 | MCP: `tools/call` `answer_sources` with "which bosses are in Deadmines" | The first piece is the game files' fact, labelled *found in game files, unconfirmed* with the build, naming the bosses once each |

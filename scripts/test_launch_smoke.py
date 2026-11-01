@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from launch_smoke import (  # noqa: E402
-    checks, judge_deadmines, judge_health, judge_named_item, judge_notice, judge_redirect, judge_tools, mcp_payload,
+    checks, judge_deadmines, judge_downloads, judge_health, judge_named_item, judge_notice, judge_redirect, judge_tools, mcp_payload,
 )
 
 # A version page with nothing running needs the notice and noindex; before the switch /beta is any 200 page.
@@ -31,6 +31,17 @@ assert judge_health(200, {}, "<html>") == "is not JSON"
 # An item page must be named: "Item 25" means the build's names are not uploaded.
 assert judge_named_item(25)(200, {}, "<title>Worn Shortsword – WoW Forever item · Everloot</title>") is None
 assert "no item name" in judge_named_item(25)(200, {}, "<title>Item 25 · Everloot</title>")
+
+# A download page links the zip (and on /addon an installer); the GitHub fallback is a miss.
+zip_link = '<a href="/downloads/Everloot-0.3.14.zip">'
+installer = '<a href="https://github.com/Everloot/everloot/releases/download/desktop-v0.1.10/Everloot-Setup.exe">'
+assert judge_downloads(desktop=True)(200, {}, zip_link + installer) is None
+assert judge_downloads(desktop=False)(200, {}, zip_link) is None
+assert judge_downloads(desktop=True)(200, {}, zip_link) == "links no Desktop App installer"
+assert judge_downloads(desktop=False)(200, {}, "<p>Download</p>") == "links no addon zip"
+assert "not available" in judge_downloads(desktop=False)(200, {}, zip_link + "The addon download is not available on this site right now.")
+assert "could not be loaded" in judge_downloads(desktop=True)(200, {}, zip_link + installer + "The download list could not be loaded right now.")
+assert judge_downloads(desktop=False)(404, {}, "") == "answered 404"
 
 # The MCP answers plain JSON or one server-sent event; the tool count is exact, and a 429 says why.
 tools = {"jsonrpc": "2.0", "id": 1, "result": {"tools": [{"name": f"t{i}"} for i in range(32)]}}
