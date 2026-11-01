@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
-import DevicePlans from "@/components/workspace/DevicePlans";
+import DevicePlans, { type PlanTrees } from "@/components/workspace/DevicePlans";
 import TransferPlans from "@/components/workspace/TransferPlans";
 import { Container, PageHeader } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import { savedBuildsOn } from "@/lib/saved-builds";
+import { TALENT_CLASSES, loadCatalog } from "@/lib/talents/catalogs";
+import { publishedClassChanges } from "@/lib/talents/freshness-records";
 import { pageMetadata } from "@/lib/seo";
 
 const TITLE = "Plans on this device";
@@ -17,7 +19,15 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function DevicePlansPage() {
+/** Each class's tree build and change records, for the plans' notes; the trees themselves stay on the server. */
+async function planTrees(): Promise<PlanTrees> {
+  return Object.fromEntries(await Promise.all(TALENT_CLASSES.map(async (slug) => {
+    const { classId, classSlug, build } = await loadCatalog(slug);
+    return [slug, { tree: { classId, classSlug, build }, changes: publishedClassChanges(classId) }] as const;
+  })));
+}
+
+export default async function DevicePlansPage() {
   // With saved builds on, a signed-in player can save the plans kept signed out to the account, when they ask.
   const transfer = savedBuildsOn();
   return (
@@ -28,7 +38,7 @@ export default function DevicePlansPage() {
         trail={trailFor("/tools/builds")!}
       />
       {transfer && <TransferPlans />}
-      <DevicePlans />
+      <DevicePlans trees={await planTrees()} />
     </Container>
   );
 }

@@ -2,6 +2,7 @@ import { GAME_DATA_CREDIT, type McpToolDef } from "@everloot/protocol";
 import { z } from "zod";
 import type { ExtraTool } from "../../../kb/src/mcp-server";
 import { describeBuilds } from "@/components/builds/describe";
+import { publishedClassChanges } from "@/lib/talents/freshness-records";
 import { presentedKey } from "./api-keys";
 import { guardOn } from "./data-guard";
 import { MY_BUILDS, MY_BUILDS_LINE, MY_BUILDS_REFUSAL, savedBuildsOn, SLUG_PATTERN, type AccountBuilds, type SavedBuild } from "./saved-builds";
@@ -72,7 +73,7 @@ export async function answerMyBuilds(data: AccountBuilds, args: Args, site = sit
   const character = (b: SavedBuild) => (b.characterId && characters.get(b.characterId)) || null;
 
   if (!args.slug) {
-    const facts = await describeBuilds(data.builds);
+    const facts = await describeBuilds(data.builds, publishedClassChanges);
     const builds = data.builds.map((b) => ({
       slug: b.slug, name: b.name, class: b.classSlug, title: facts.get(b.id)?.title ?? b.classSlug, character: character(b),
       active: b.active, gameBuild: b.gameBuild, olderBuild: facts.get(b.id)?.older ?? false, newerBuild: facts.get(b.id)?.newer ?? false,

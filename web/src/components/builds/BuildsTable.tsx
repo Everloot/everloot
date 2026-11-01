@@ -8,21 +8,30 @@ const NEWER = "Made on a newer game build than the calculator's tree, which has 
 
 /**
  * Saved builds in the site's dense table: name, how the build reads, the game build it was made on (with the
- * quiet marker when that is older or newer than the tree), the short link and the actions. On a phone the name
+ * quiet marker when that is older or newer than the tree, and under the name what changed in its talents since an
+ * older one), the short link and the actions. On a phone the name
  * carries the rest in one line.
  */
 export default function BuildsTable({ builds, facts, caption, onCharacterPage = false }: {
   builds: SavedBuild[]; facts: Map<string, BuildFacts>; caption: string; onCharacterPage?: boolean;
 }) {
-  const fact = (b: SavedBuild) => facts.get(b.id) ?? { title: b.classSlug, older: false, newer: false };
+  const fact = (b: SavedBuild) => facts.get(b.id) ?? { title: b.classSlug, older: false, newer: false, note: null };
   const columns: Column<SavedBuild>[] = [
     {
       key: "name", header: "Name",
       cell: (b) => (
-        <span className="inline-flex min-w-0 items-center gap-2">
-          <a href={editPath(b)} className="min-w-0 text-fg hover:text-accent [overflow-wrap:anywhere]">{b.name}</a>
-          {onCharacterPage && b.active && <Badge tone="neutral">Active</Badge>}
-        </span>
+        <>
+          <span className="inline-flex min-w-0 items-center gap-2">
+            <a href={editPath(b)} className="min-w-0 text-fg hover:text-accent [overflow-wrap:anywhere]">{b.name}</a>
+            {onCharacterPage && b.active && <Badge tone="neutral">Active</Badge>}
+          </span>
+          {/* The build is shown as saved: opening it lists each change, and nothing here re-stamps it. */}
+          {fact(b).note && (
+            <span className="block text-cell-2 text-fg-2">
+              {fact(b).note} <a href={editPath(b)} className="underline decoration-edge underline-offset-4 hover:text-accent">Open in the current calculator</a>
+            </span>
+          )}
+        </>
       ),
     },
     { key: "build", header: "Build", nowrap: true, cell: (b) => <span className="text-fg-2">{fact(b).title}</span> },

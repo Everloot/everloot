@@ -345,7 +345,7 @@ describe("offering the transfer", () => {
     seed(ANON, [FROST]);
     const { default: Page } = await import("@/app/tools/builds/page");
     vi.stubEnv("EVERLOOT_SAVED_BUILDS", "");
-    await act(async () => root.render(<Page />));
+    await act(async () => root.render(await Page()));
     await settle();
     expect(text()).toContain("No account needed, and nothing is uploaded.");
     expect(text()).not.toContain("saved while signed out, so");
@@ -353,7 +353,7 @@ describe("offering the transfer", () => {
     await act(async () => root.unmount());
     root = createRoot(container);
     vi.stubEnv("EVERLOOT_SAVED_BUILDS", "1");
-    await act(async () => root.render(<Page />));
+    await act(async () => root.render(await Page()));
     await settle();
     expect(text()).toContain("No account needed, and nothing is uploaded unless you save plans to your account.");
     expect(text()).toContain("1 plan on this device was saved while signed out, so it is not in your account.");
