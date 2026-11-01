@@ -75,8 +75,11 @@ website and desktop provider credentials remain separate.
 The tray menu shows each job's last result, a reminder when a realm's last full scan is older
 than a day, the newer app release when there is one, and Upload now, Refresh prices now, Pause and Quit.
 Closing the window keeps the app in the tray. The window opens where you left it, at the same
-size, unless that screen is gone. The release checks (app and addon) run at start, after the first Start, and once a day
-after that.
+size, unless that screen is gone. The release checks (app and addon) run at start, after the first Start, every hour
+and when the window is opened. A newer app shows as **Update to X** in the sidebar and on the Overview, and once per
+version as a notification while the window is not in front. On a Windows install one click downloads it and checks
+it against the release's `SHA256SUMS`, and **Restart to update** installs it; if the old version is still there at the
+next start, the app says the update failed. Elsewhere the button opens the download.
 
 The app shares its data folder with the command line (`%APPDATA%\Everloot`,
 `~/Library/Application Support/Everloot`, `~/.config/everloot`): `sent.json` for confirmed events,
