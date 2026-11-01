@@ -1,5 +1,5 @@
 import type { ReleaseNote, UpdateCheck } from "../shared/types";
-import { compareVersions, newestRelease, RELEASES_API } from "./addon";
+import { compareVersions, newestAddonRelease, newestRelease, RELEASES_API } from "./addon";
 import { canInstallInPlace } from "./self-update";
 
 export { compareVersions };
@@ -10,7 +10,7 @@ export const newestDesktopRelease = (releases: unknown) => newestRelease(release
 
 /**
  * Reads GitHub's release list, newest first, a page of 100 at a time, until it holds a published app
- * release and a published addon release, a page comes back short, or five pages are read. Addon
+ * release and an addon release (an Alpha counts), a page comes back short, or five pages are read. Addon
  * releases and nightlies can otherwise push the app's own release off the first page. It never downloads anything.
  */
 export async function fetchReleases(send: typeof fetch = fetch, userAgent = "everloot-desktop"): Promise<unknown> {
@@ -21,7 +21,7 @@ export async function fetchReleases(send: typeof fetch = fetch, userAgent = "eve
     const list: unknown = await res.json();
     if (!Array.isArray(list)) return page === 1 ? list : all;
     all.push(...list);
-    if (list.length < 100 || (newestDesktopRelease(all) && newestRelease(all, "addon-v"))) break;
+    if (list.length < 100 || (newestDesktopRelease(all) && newestAddonRelease(all))) break;
   }
   return all;
 }
