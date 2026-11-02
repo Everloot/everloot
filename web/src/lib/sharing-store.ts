@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { CloudConfig } from "./upload-store";
 import { publicRecords, namedRecord, type CorpusState } from "../../../kb/src/corpus";
 import { authorizeRecord, type PublicationState, type PublicationGrant } from "../../../kb/src/publication";
+import { readAllRows } from "./postgrest-pages";
 
 const grantSchema = z.object({
   tokenHash: z.string().regex(/^[a-f0-9]{64}$/), installId: z.string().min(8).max(128),
@@ -36,14 +37,10 @@ export function createSharingStore(opts: { cloud: CloudConfig | null; localDir: 
   }
   async function list(table: string): Promise<unknown[]> {
     requireStorage();
+    // A list the pages cannot show to be complete is an error, so the corpus is withheld rather than published past it.
     if (opts.cloud) {
-      const rows: unknown[] = [];
-      for (let offset = 0; ; offset += 1000) {
-        const part: unknown = await (await request(`${table}?select=*&order=${table === "publication_grants" ? "token_hash" : "realm,character"}&limit=1000&offset=${offset}`)).json();
-        if (!Array.isArray(part)) throw new Error("Invalid publication state");
-        rows.push(...part);
-        if (part.length < 1000) return rows;
-      }
+      return readAllRows((offset) => request(`${table}?select=*&order=${table === "publication_grants" ? "token_hash" : "realm,character"}&limit=1000&offset=${offset}`,
+        { headers: { Prefer: "count=exact" } }));
     }
     let names: string[];
     try { names = await readdir(folder(table === "publication_grants" ? "grants" : "suppressions")); }

@@ -26,7 +26,7 @@ const status: AppStatus = {
 const tools = (data: Partial<Parameters<typeof localTools>[0]> = {}) =>
   localTools({ characters: () => info, scans: () => [], followed: () => [], status: () => status, ...data }, () => NOW);
 
-const run = (name: string, data?: Partial<Parameters<typeof localTools>[0]>) => tools(data).find((t) => t.name === name)!.run({});
+const run = async (name: string, data?: Partial<Parameters<typeof localTools>[0]>) => tools(data).find((t) => t.name === name)!.run({});
 
 test("gold reads as gold, silver and copper", () => {
   expect(gold(1234_56_78)).toBe("1,234g 56s");
@@ -35,21 +35,21 @@ test("gold reads as gold, silver and copper", () => {
   expect(gold(null)).toBe("unknown");
 });
 
-test("my_characters lists gold, the week, gear and progress with the local source", () => {
-  const out = run("my_characters");
+test("my_characters lists gold, the week, gear and progress with the local source", async () => {
+  const out = await run("my_characters");
   expect(out).toContain("Volvik-Nightslayer: 1,234g 56s; peak 2,000g 0s; last 7 days earned 20g 0s, spent 35g 0s, net -15g 0s; item level 61 over 15 slots; spent by category all time: repairs 50g 0s, auction 100g 0s");
   expect(out).toContain("Volvik-Nightslayer: level 60 Warrior, 12 achievements (3 in progress), 2 of 20 reputations exalted, 1 titles");
   expect(out.trim().split("\n").at(-1)).toBe(`Source: ${LOCAL_SOURCE}`);
 });
 
-test("with no characters the tool says so instead of an empty result", () => {
-  const out = run("my_characters", { characters: () => ({ characters: [], progress: [], talents: [] }) });
+test("with no characters the tool says so instead of an empty result", async () => {
+  const out = await run("my_characters", { characters: () => ({ characters: [], progress: [], talents: [] }) });
   expect(out).toMatch(/No characters in the account files yet/);
   expect(out).toContain(`Source: ${LOCAL_SOURCE}`);
 });
 
-test("my_realm_scans gives each realm's last scan as a date and an age, plus the followed realms", () => {
-  const out = run("my_realm_scans", {
+test("my_realm_scans gives each realm's last scan as a date and an age, plus the followed realms", async () => {
+  const out = await run("my_realm_scans", {
     scans: () => [{ realm: "Nightslayer", at: "2026-10-19T05:30:00Z" }, { realm: "Doomhowl", at: "2026-10-15T08:00:00Z" }, { realm: "Dreamscythe", at: null }],
     followed: () => ["Doomhowl", "Maladath"],
   });
@@ -60,11 +60,11 @@ test("my_realm_scans gives each realm's last scan as a date and an age, plus the
     "Realms followed for the prices file: Doomhowl, Maladath",
     `Source: ${LOCAL_SOURCE}`,
   ]);
-  expect(run("my_realm_scans")).toMatch(/No auction scans in the account files yet/);
+  expect(await run("my_realm_scans")).toMatch(/No auction scans in the account files yet/);
 });
 
-test("my_app_status says what runs, what failed and why, the addon and app versions, with the app's own source", () => {
-  expect(run("my_app_status").split("\n")).toEqual([
+test("my_app_status says what runs, what failed and why, the addon and app versions, with the app's own source", async () => {
+  expect((await run("my_app_status")).split("\n")).toEqual([
     "Everloot Desktop App 0.1.0",
     "Game folder: ~\\Games\\_classic_era_, watching 1 account file",
     "Upload: ok at 2026-10-19T07:00:00Z, 3 records sent",
@@ -76,7 +76,7 @@ test("my_app_status says what runs, what failed and why, the addon and app versi
     "  2026-10-19T07:01:00Z prices: HTTP 503 from everloot.app writing ~\\x",
     `Source: ${STATUS_SOURCE}`,
   ]);
-  const bare = run("my_app_status", { status: () => ({ ...status, gameFolder: null, files: 0, paused: true, addonInstalled: null, update: null, errors: [] }) });
+  const bare = await run("my_app_status", { status: () => ({ ...status, gameFolder: null, files: 0, paused: true, addonInstalled: null, update: null, errors: [] }) });
   expect(bare).toContain("Everloot Desktop App 0.1.0, paused from the tray");
   expect(bare).toContain("Game folder: not set");
   expect(bare).toContain("Addon: not installed");

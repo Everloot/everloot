@@ -144,6 +144,10 @@ cannot change it; no handle, account id or key appears in the HTML.
 
 **S4.** Owner attaches a label to a link (ADR compatibility step 1). The page lists that label's shared builds.
 Tests: no automatic match by name; unshared builds never appear; unlink keeps the builds.
+Built (2026-11-02) behind its own switch, `EVERLOOT_SHOWCASE_BUILDS`, which also needs `EVERLOOT_SHOWCASE` and
+`EVERLOOT_SAVED_BUILDS`: the pages can go live without its migration, `20261102120000_build_label_links.sql`. To turn
+it on: apply that migration, run the readback at its end, accept a policy line for planned builds (the S3 policy says
+talents are not shown), then set the switch. SQL checks: `supabase/tests/build_label_links.sql`.
 
 **S5.** The ADR's Step 2, widened from completion to these categories. Protocol changes: add the completion
 `characterKey` to `talent_snapshot`; new `profession_owned` (characterKey, profession, rank, maxRank) from

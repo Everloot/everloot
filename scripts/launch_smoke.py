@@ -145,12 +145,14 @@ def judge_tools(expected: int):
 
 
 def judge_deadmines(status: int, _headers: dict, text: str) -> str | None:
-    """The first piece is the game files' fact, naming each boss once."""
+    """The first piece is the game files' fact, naming each boss once. A caveat line before the pieces is skipped."""
     if status != 200:
         return f"answered {status}"
     content = ((mcp_payload(text) or {}).get("result") or {}).get("content") or []
     answer = content[0].get("text", "") if content and isinstance(content[0], dict) else ""
-    first = answer.split("\n- ")[0]
+    # The pieces are the lines starting "- "; anything before the first is the answer's caveat, not a piece.
+    pieces = re.split(r"(?m)^- ", answer)[1:]
+    first = pieces[0] if pieces else ""
     if "game files" not in first or "Deadmines" not in first:
         return "the first piece is not the game files' Deadmines fact"
     names = re.search(r"bosses: ([^.]*)", first)

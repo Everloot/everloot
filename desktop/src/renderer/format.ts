@@ -66,6 +66,12 @@ export const JOB_NAMES: Record<Job, string> = { upload: "Upload", prices: "Marke
 const ORDER: Job[] = ["upload", "prices", "ask"];
 const list = (jobs: Job[]) => { const n = jobs.map((j) => JOB_NAMES[j]); return n.length < 3 ? n.join(" and ") : `${n.slice(0, -1).join(", ")} and ${n[n.length - 1]}`; };
 
+/** The restart dialog's footer: the running jobs the app lets finish before it closes. */
+export function restartWait(engine: Pick<AppState["engine"], "jobs">): string {
+  const running = ORDER.filter((j) => engine.jobs[j].state === "running");
+  return running.length ? `It waits for the ${list(running)} ${running.length === 1 ? "job" : "jobs"} to finish first.` : "Nothing is running right now.";
+}
+
 /**
  * What the app is doing, truthfully. Checked in this order: no consent, no game folder, paused, any failure,
  * any job running, everything off, else waiting. "ok" describes a last run, so it counts as waiting, not as healthy.
