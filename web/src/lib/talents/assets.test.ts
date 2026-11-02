@@ -133,6 +133,9 @@ const SHOWS_ART = new Set([
   "web/src/lib/wiki-names.ts",
   // The coverage score's expected counts (coverage-expected.json, counts only) sit beside the names in the private bucket.
   "web/src/lib/coverage-compute.ts",
+  // The tools index's card icons, and the class, profession and faction icons Plans and Alts on this device draw
+  // (read on the server by the two pages through workspace-icons.ts, passed to the client as URLs).
+  "web/src/app/tools/page.tsx", "web/src/app/tools/builds/page.tsx", "web/src/app/tools/alts/page.tsx", "web/src/lib/workspace-icons.ts",
 ]);
 
 test("nothing outside the pages that show the art can read the asset URL or the manifest modules", () => {

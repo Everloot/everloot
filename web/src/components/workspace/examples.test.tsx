@@ -3,11 +3,11 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import AltPlanner from "@/app/tools/alts/AltPlanner";
-import { WORKSPACE_VERSION, bucketKey, type LocalAlt, type LocalPlan, type Owner, type PlayerWorkspace } from "@/lib/player-workspace";
+import { WORKSPACE_LIMITS, WORKSPACE_VERSION, bucketKey, withWorkspaceLock, type DeviceStorage, type LocalAlt, type LocalPlan, type Owner, type PlayerWorkspace } from "@/lib/player-workspace";
 import { loadCatalog } from "@/lib/talents/catalogs";
 import { isLegal, pointsSpent } from "@/lib/talents/rules";
 import { decodeBuild, resolveBuild } from "@/lib/talents/share";
-import { EXAMPLE_ALTS, EXAMPLE_PLAN_SPECS, examplePlans, examplesKey, type ExamplePlan } from "@/lib/workspace-examples";
+import { EXAMPLE_ALTS, EXAMPLE_PLAN_SPECS, copyExampleAlts, copyExamplePlans, examplePlans, examplesKey, type ExamplePlan } from "@/lib/workspace-examples";
 import DevicePlans from "./DevicePlans";
 
 // The examples Plans and Alts on this device show a visitor with nothing saved: built from the real talent catalogs,
@@ -155,5 +155,54 @@ describe("the example alts", () => {
     expect(localStorage.getItem(examplesKey("alts"))).toBe("hidden");
     expect(localStorage.getItem(examplesKey("builds"))).toBeNull();
     expect(localStorage.getItem(bucketKey(ANON))).toBeNull();
+  });
+});
+
+describe("copying the examples", () => {
+  const plans = (n: number) => Array.from({ length: n }, (_, i) => ({ ...plan, id: id(100 + i) }));
+  /** This browser's localStorage, refusing every write as a full one does. */
+  const full = (): DeviceStorage => ({
+    getItem: (key) => localStorage.getItem(key),
+    setItem: () => { throw new DOMException("full", "QuotaExceededError"); },
+    removeItem: (key) => localStorage.removeItem(key),
+  });
+
+  test("the alts and their plans are saved together or not at all: one plan short of room, nothing is saved", async () => {
+    seed(plans(WORKSPACE_LIMITS.plans - 1));
+    const before = localStorage.getItem(bucketKey(ANON));
+    await render(<AltPlanner examplePlans={examples} />);
+    await click(button("Copy to my device", section("Example alts")!));
+    expect(localStorage.getItem(bucketKey(ANON))).toBe(before);
+    expect(container.textContent).toContain("Nothing was changed.");
+  });
+
+  test("a full storage saves none of them", () => {
+    seed([], []);
+    const before = localStorage.getItem(bucketKey(ANON));
+    expect(copyExampleAlts(full(), ANON, EXAMPLE_ALTS, examples)).toMatchObject({ ok: false, error: "full" });
+    expect(copyExamplePlans(full(), ANON, examples)).toMatchObject({ ok: false, error: "full" });
+    expect(localStorage.getItem(bucketKey(ANON))).toBe(before);
+  });
+
+  test("two requests made before either is saved copy the plans once", async () => {
+    const results = await Promise.all([1, 2].map(() => withWorkspaceLock(() => copyExamplePlans(localStorage, ANON, examples))));
+    expect(results.map((r) => r.ok)).toEqual([true, false]);
+    expect(results[1]).toMatchObject({ error: "changed" });
+    expect(stored()?.plans).toHaveLength(examples.length);
+  });
+
+  test("two requests made before either is saved copy the alts once", async () => {
+    const results = await Promise.all([1, 2].map(() => withWorkspaceLock(() => copyExampleAlts(localStorage, ANON, EXAMPLE_ALTS, examples))));
+    expect(results.map((r) => r.ok)).toEqual([true, false]);
+    expect(stored()?.alts).toHaveLength(EXAMPLE_ALTS.length);
+    expect(stored()?.plans).toHaveLength(examples.length);
+  });
+
+  test("a plan saved in another tab after the examples showed stops the copy", async () => {
+    await render(<DevicePlans examples={examples} />);
+    seed([plan]);
+    await click(button("Copy to my device", section("Example plans")!));
+    expect(stored()?.plans.map((p) => p.id)).toEqual([plan.id]);
+    expect(container.textContent).toContain("saved in another tab, so the examples were not copied");
   });
 });

@@ -1,5 +1,7 @@
-import { saveAlt } from "./alt-workspace";
-import { savePlan, type DeviceStorage, type Faction, type Failure, type Owner } from "./player-workspace";
+import {
+  ALT_PROFESSIONS, hiddenFrom, update,
+  type DeviceStorage, type Faction, type Failure, type LocalAlt, type LocalPlan, type Owner, type WriteResult,
+} from "./player-workspace";
 import { add, pointsAtLevel, pointsSpent } from "./talents/rules";
 import { encodeBuild } from "./talents/share";
 import type { TalentClassSlug } from "./talents/catalogs";
@@ -7,7 +9,7 @@ import type { Ranks, TalentCatalog } from "./talents/types";
 
 // The examples Plans on this device and Alts on this device show while a visitor has nothing saved: what the pages
 // look like filled in. They are made up and say so, and are never written to storage unless the visitor presses
-// Copy to my device, which saves them through the workspace's own checked writes. Hiding them is remembered in this
+// Copy to my device, which saves them in one of the workspace's own checked writes. Hiding them is remembered in this
 // browser, as the map's sidebar is.
 
 /** A sample talent plan: a real share code, built here from the class's catalog with the calculator's own rules. */
@@ -75,29 +77,42 @@ export const EXAMPLE_ALTS: ExampleAlt[] = [
   { name: "Example Priest", realm: "Example Realm", classSlug: "priest", faction: "alliance", level: 25, professions: ["Alchemy", "Herbalism"], notes: "An example alt.", plans: ["priest"] },
 ];
 
-/** Saves the example plans, as new plans, through the workspace's checked write. Run it holding the workspace lock.
- *  Returns each example's key with the id it was saved under, or the first failure (plans saved before it stay). */
-export function copyExamplePlans(storage: DeviceStorage | null, owner: Owner, plans: ExamplePlan[]): { ok: true; ids: Map<string, string> } | Failure {
-  const ids = new Map<string, string>();
-  for (const plan of plans) {
-    const result = savePlan(storage, owner, { name: plan.name, notes: plan.notes, classSlug: plan.classSlug, codes: [plan.code, null], orders: [null, null] });
-    if (!result.ok) return result;
-    ids.set(plan.key, result.plan.id);
-  }
-  return { ok: true, ids };
+/** Why a copy was refused: another tab saved plans or alts here after the examples were shown. */
+const ALREADY = (what: "plans" | "alts"): Failure => ({
+  ok: false, error: "changed",
+  message: `This device has ${what} now, saved in another tab, so the examples were not copied. Nothing was changed.`,
+});
+
+const newPlan = (plan: ExamplePlan, now: Date): LocalPlan => ({
+  id: crypto.randomUUID(), name: plan.name, classSlug: plan.classSlug, code: plan.code, code2: null, order: null, order2: null,
+  notes: plan.notes, updatedAt: now.toISOString(), boundTo: null,
+});
+
+/** Saves the example plans, as new plans, in one checked write (update): all of them or, on any failure, none. Run it
+ *  holding the workspace lock. A device that shows a plan by then (one saved in another tab while this one waited for
+ *  the lock) gets none, so two requests never copy them twice. */
+export function copyExamplePlans(storage: DeviceStorage | null, owner: Owner, plans: ExamplePlan[], now = new Date()): WriteResult {
+  return update(storage, owner, (workspace) => {
+    const hidden = hiddenFrom(storage, owner, workspace);
+    if (workspace.plans.some((p) => !hidden.has(p.id))) return ALREADY("plans");
+    return { ...workspace, plans: [...workspace.plans, ...plans.map((p) => newPlan(p, now))] };
+  });
 }
 
-/** Saves the example alts and the example plans they use. Run it holding the workspace lock. */
-export function copyExampleAlts(storage: DeviceStorage | null, owner: Owner, alts: ExampleAlt[], plans: ExamplePlan[]): { ok: true } | Failure {
-  const used = plans.filter((p) => alts.some((a) => a.plans.includes(p.key)));
-  const copied = copyExamplePlans(storage, owner, used);
-  if (!copied.ok) return copied;
-  for (const alt of alts) {
-    const planIds = alt.plans.flatMap((key) => copied.ids.get(key) ?? []);
-    const result = saveAlt(storage, owner, { ...alt, planIds });
-    if (!result.ok) return result;
-  }
-  return { ok: true };
+/** Saves the example alts and the example plans they use, in one checked write (update): all of them or, on any
+ *  failure (the plan limit, a full storage), none. Run it holding the workspace lock. A device that has an alt by
+ *  then gets none, so two requests never copy them twice. */
+export function copyExampleAlts(storage: DeviceStorage | null, owner: Owner, alts: ExampleAlt[], plans: ExamplePlan[], now = new Date()): WriteResult {
+  return update(storage, owner, (workspace) => {
+    if (workspace.alts.length > 0) return ALREADY("alts");
+    const saved = new Map(plans.filter((p) => alts.some((a) => a.plans.includes(p.key))).map((p) => [p.key, newPlan(p, now)]));
+    const newAlts = alts.map(({ plans: keys, ...alt }): LocalAlt => ({
+      id: crypto.randomUUID(), ...alt, professions: ALT_PROFESSIONS.filter((p) => alt.professions.includes(p)),
+      planIds: keys.flatMap((key) => saved.get(key)?.id ?? []),
+      provenance: { source: "manual", fileRecordAt: null, fileDetails: [] }, updatedAt: now.toISOString(),
+    }));
+    return { ...workspace, plans: [...workspace.plans, ...saved.values()], alts: newAlts };
+  });
 }
 
 /** Where hiding a page's examples is remembered in this browser. */
