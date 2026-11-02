@@ -22,9 +22,9 @@ const primary = html.match(/<nav aria-label="Primary"[^>]*>([\s\S]*?)<\/nav>/)?.
 // The bar's own items carry the underline class; the Tools menu's links do not.
 const topItems = () => [...primary.matchAll(/<(?:a|button) [^>]*class="[^"]*border-b-2[^"]*"[^>]*>([^<]+)/g)].map((m) => m[1].trim());
 
-test("the top bar has six items in the spec's order", () => {
-  expect(topItems()).toEqual(["Database", "Tools", "Map", "Changes", "Lore", "Docs"]);
-  expect(PRIMARY.map((l) => l.href)).toEqual(["/database", "/map", "/changes", "/lore", "/docs"]);
+test("the top bar has seven items in the spec's order, Ask after Tools", () => {
+  expect(topItems()).toEqual(["Database", "Tools", "Ask", "Map", "Changes", "Lore", "Docs"]);
+  expect(PRIMARY.map((l) => l.href)).toEqual(["/database", "/chat", "/map", "/changes", "/lore", "/docs"]);
 });
 
 test("no bracket labels", () => {

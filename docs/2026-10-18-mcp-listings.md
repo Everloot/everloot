@@ -13,6 +13,12 @@ descriptions from #248 (plain "public player data" instead of the internal corpu
 says what it holds). The text below is the 32-tool version. ChatGPT approved 1.0.1 with the older descriptions; the
 owner submits the update from the OpenAI Platform plugins page once #248 is deployed, then the same text to Claude.
 
+**Publication verified, 2026-11-02:** version 1.0.1 was approved but unpublished. The owner-authorized publication
+completed, and the refreshed dashboard reports "Listed publicly". Reconnecting the MCP discovered 32 current tools:
+31 current definitions are published; `guild_board` retains its earlier published definition while its update needs
+further review. Do not describe all 32 updated definitions as approved. The portal scans MCP updates separately from
+the plugin metadata package; a new metadata ZIP is not needed merely to discover tool changes.
+
 Use the same words everywhere, so the listings match the site and each other.
 
 | Field | Text |
@@ -37,13 +43,16 @@ Use the same words everywhere, so the listings match the site and each other.
 
 ### Long description
 
-> Everloot answers questions about World of Warcraft: Forever from two sources it names on every
-> answer: the Warcraft Wiki archive (CC BY-SA 4.0, with the article each fact came from) and what
-> players reported through the Everloot addon. A player-reported fact (a drop rate, a vendor's price, a
+> Everloot answers questions about World of Warcraft: Forever using the Warcraft Wiki archive
+> (CC BY-SA 4.0, with article attribution), game-file records labelled unconfirmed with their build,
+> and observations players reported through the Everloot addon. Archive lore is historical background,
+> not confirmation of Forever gameplay. A player-reported fact (a drop rate, a vendor's price, a
 > quest's rewards, where an NPC stands, which recipe turns yellow) is stated only once three separate
 > installs reported it, and the answer says how many did and when the data was last updated. Nothing
 > is scraped from other sites and no fact is guessed: when something is not recorded yet, the tool says
 > so instead of making a number up.
+> Player-observed coverage is limited before launch. A tool's presence does not mean its requested
+> data has been recorded; missing observations remain unrecorded, not zero.
 >
 > 32 read-only tools: search the lore archive, open one record, look up an item, NPC, object, quest or
 > vendor, find what is near a spot on the map, follow relations (dropped by, sold by, reagent for),

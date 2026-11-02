@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { UPLOAD_LIMITS, type RecordKind } from "@everloot/protocol";
-import { parseEverlootLua } from "../../web/src/lib/sv-parse";
+import { parseEverlootLua, type EverlootFile } from "../../web/src/lib/sv-parse";
 import { prepareUpload, sendBatches, type BatchReceipt } from "../../web/src/lib/upload-batches";
 import { settledSkip, type SettledList } from "../../kb/src/settled-list";
 import { receiptKeyForSite, type SentState } from "./sent-state";
@@ -21,6 +21,18 @@ export interface UploadOptions {
   settled?: SettledList | null | ((build: string | undefined) => Promise<SettledList | null>);
   /** How long one batch may take, its answer included, before it counts as failed. One minute by default. */
   timeoutMs?: number;
+  /**
+   * Reads the file, as `parseEverlootLua(readFileSync(file, "utf8"))` does by default, with the same errors. It may
+   * leave out the records `sent` names as sent already (the Desktop App parses off its main thread and takes only the
+   * rest across). Every record it returns is still checked against the sent state here. `eventIds` lists every
+   * record's event id in the file (null for a record without one), the ones left out too: upload history keeps those.
+   */
+  read?: (file: string, sent: (installId: string, eventId: string) => boolean) => Promise<EverlootFile & { eventIds: ReadonlyArray<string | null> }>;
+  /**
+   * Whether another save file carries this file's install id. Upload history is cut to the events still in the file
+   * after each read, so two files with one install id would cut each other's; while this says yes, it is kept whole.
+   */
+  sharesInstall?: (installId: string) => boolean | Promise<boolean>;
 }
 
 /** Installed addon lists go only from the upload page, after its preview; the companion never sends them. */
@@ -154,8 +166,19 @@ export interface UploadResult { sent: number; batches: number; skipped: number; 
  * The census stays here too unless `census` is set.
  */
 export async function uploadFile(file: string, options: UploadOptions): Promise<UploadResult> {
-  const parsed = parseEverlootLua(readFileSync(file, "utf8"));
+  const keys = new Map<string, string>();
+  const sent = (installId: string, eventId: string) => {
+    let key = keys.get(installId);
+    if (key === undefined) { key = receiptKeyForSite(installId, options.endpoint); keys.set(installId, key); }
+    return options.state.has(key, eventId);
+  };
+  const read = options.read ? await options.read(file, sent) : null;
+  const parsed = read ?? parseEverlootLua(readFileSync(file, "utf8"));
   const receiptKey = receiptKeyForSite(parsed.installId, options.endpoint);
+  if (!(await options.sharesInstall?.(parsed.installId))) {
+    const ids = read ? read.eventIds : parsed.records.map((r) => r.eventId);
+    options.state.keepOnly(receiptKey, new Set(ids.filter((id): id is string => typeof id === "string")));
+  }
   const unsent = parsed.records.filter((r) => typeof r.eventId !== "string" || !options.state.has(receiptKey, r.eventId));
   const held = (r: Record<string, unknown>) => !options.census && CENSUS.has(String(r.kind));
   const heldCensus = unsent.filter(held).length;

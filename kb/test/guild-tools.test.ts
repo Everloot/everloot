@@ -82,6 +82,21 @@ test("without a guild reader the two ladder tools are not listed, and guild_boar
   expect(unknown.isError).toBe(true);
 });
 
+test("guild_board drops a character the publication check removed, though the corpus time and record count stay the same", async () => {
+  const roster = (members: string[]): unknown[] => ["a", "b"].map((installId) => ({
+    installId, kind: "guild_snapshot", claimToken: "x".repeat(16), guildName: "Night Watch", realm: "Forever Pioneer",
+    members: members.map((name) => ({ name, rank: "Officer", level: 60, class: "Mage" })),
+  }));
+  const reads = [roster(["Ada", "Brann"]), roster(["Brann"])];
+  const c = await client({ corpus: async () => ({ records: reads.length > 1 ? reads.shift()! : reads[0]!, dataAsOf: AS_OF }) });
+  const ask = () => c.callTool({ name: "guild_board", arguments: { guildName: "Night Watch", realm: "Forever Pioneer" } });
+  const before = await ask();
+  expect(JSON.stringify(before)).toContain("Ada");
+  const after = await ask();
+  expect(JSON.stringify(after)).toContain("Brann");
+  expect(JSON.stringify(after)).not.toContain("Ada");
+});
+
 test("guild_search lists guilds by the start of the name, under its output schema", async () => {
   const c = await client({ corpus, guilds: reader });
   const answer = await c.callTool({ name: "guild_search", arguments: { query: "night" } });

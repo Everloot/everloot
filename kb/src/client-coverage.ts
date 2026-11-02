@@ -16,7 +16,8 @@ export const NEEDED_FIELDS: Partial<Record<keyof typeof CLIENT_TABLES, readonly 
   ItemClass: ["ClassID", "ClassName_lang"],
   ItemSubClass: ["ClassID", "SubClassID", "DisplayName_lang", "VerboseName_lang"],
   ItemSet: ["Name_lang", "ItemID"],
-  SkillLineAbility: ["SkillLine", "Spell", "ClassMask"],
+  // The profession pages (client-recipes) read the skill ranks of each recipe.
+  SkillLineAbility: ["SkillLine", "Spell", "ClassMask", "MinSkillLineRank", "TrivialSkillLineRankLow", "TrivialSkillLineRankHigh"],
   // What each class can equip (client-class-gear): weapon and armor skill lines, who has them from what level, and
   // what their proficiency spells allow.
   SkillLine: ["CategoryID"], SkillRaceClassInfo: ["SkillID", "ClassMask", "MinLevel"], ChrClasses: ["Filename"],

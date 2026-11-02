@@ -18,6 +18,12 @@ export function createSentState(path: string, onRecovery: (message: string) => v
     value !== null && typeof value === "object" && !Array.isArray(value) &&
     Object.values(value).every((ids) => Array.isArray(ids) && ids.every((id) => typeof id === "string")), onRecovery);
   for (const [install, ids] of Object.entries(raw ?? {})) sent.set(install, new Set(ids));
+  const save = () => {
+    mkdirSync(dirname(path), { recursive: true });
+    // Write then rename, so a crash never leaves a half-written state file.
+    writeFileSync(`${path}.tmp`, JSON.stringify(Object.fromEntries([...sent].map(([k, v]) => [k, [...v]]))));
+    renameSync(`${path}.tmp`, path);
+  };
   return {
     has(install: string, eventId: string): boolean {
       return sent.get(install)?.has(eventId) ?? false;
@@ -26,10 +32,21 @@ export function createSentState(path: string, onRecovery: (message: string) => v
       const ids = sent.get(install) ?? new Set<string>();
       for (const id of eventIds) ids.add(id);
       sent.set(install, ids);
-      mkdirSync(dirname(path), { recursive: true });
-      // Write then rename, so a crash never leaves a half-written state file.
-      writeFileSync(`${path}.tmp`, JSON.stringify(Object.fromEntries([...sent].map(([k, v]) => [k, [...v]]))));
-      renameSync(`${path}.tmp`, path);
+      save();
+    },
+    /**
+     * Forgets this install's ids that are no longer in its save file. The addon drops rows it has
+     * replaced (census days, player pages), and a row that left the file can never be sent again, so
+     * without this the file grows for as long as the game is played. Returns how many were dropped.
+     */
+    keepOnly(install: string, inFile: ReadonlySet<string>): number {
+      const ids = sent.get(install);
+      if (!ids) return 0;
+      const before = ids.size;
+      for (const id of ids) if (!inFile.has(id)) ids.delete(id);
+      const dropped = before - ids.size;
+      if (dropped) save();
+      return dropped;
     },
   };
 }
