@@ -60,7 +60,7 @@ and request a written reply from the account's email address.
 ### Draft email (not sent)
 
 ```text
-Subject: Permission request: cached CurseForge data on a non-commercial, open-source WoW site
+Subject: Permission request: cached CurseForge data on a free, open-source WoW site
 
 Hello,
 
@@ -79,7 +79,8 @@ We would like written permission to do the following for addons listed on that p
 - fetch this through the API at most once a day, store only the latest values, and show the date
   they were read;
 - credit CurseForge next to the data and link back for every addon;
-- never host or mirror files, never show ads, and charge nothing.
+- never host or mirror files, and charge nothing. (The site carries Google AdSense units on some
+  pages; none would sit beside or use the CurseForge data, and the Desktop App shows no ads.)
 
 That works out to a few hundred addons, with one request per addon or one search page per day.
 
