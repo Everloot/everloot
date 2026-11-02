@@ -17,8 +17,8 @@ sources:
   - { title: "Searing Blade (lore page, Warcraft Wiki)", url: "https://everloot.app/lore/269935-searing-blade", checkedOn: 2026-10-27 }
   - { title: "Burning Blade clan (lore page, Warcraft Wiki)", url: "https://everloot.app/lore/539948-burning-blade-clan", checkedOn: 2026-10-27 }
   - { title: "Orgrimmar (lore page, Warcraft Wiki)", url: "https://everloot.app/lore/279316-orgrimmar", checkedOn: 2026-10-27 }
-status: draft
-reviewed: null
+status: published
+reviewed: { by: Carlos, on: 2026-11-02 }
 ---
 
 ## Overview
@@ -58,11 +58,9 @@ Forever yet, so this page lists none.
 
 ## Before you go
 
-### Editor to confirm
-
-- Proposed: Check the level in this page's facts before you form a group. The game files give a level, not a range,
+- Check the level in this page's facts before you form a group. The game files give a level, not a range,
   and the game has not confirmed it.
-- Proposed: If you play Alliance, the entrance is inside the Horde's capital. Plan how you will get through
+- If you play Alliance, the entrance is inside the Horde's capital. Plan how you will get through
   Orgrimmar before you invite anyone.
-- Proposed: Go through the encounters on [the database page](/database/instances/389-ragefire-chasm) with your group
+- Go through the encounters on [the database page](/database/instances/389-ragefire-chasm) with your group
   before you go in. Treat the list as what may be there, not a promise.
