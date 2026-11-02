@@ -52,6 +52,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Desktop App: the Upload page reads the save parse the jobs and other pages share, instead of parsing each account
   file four more times after every write (about 0.8–1.2 s on a large save). It shows the same counts and the same
   errors the upload would give.
+- Desktop App: the save file is parsed on a background thread, so a logout on a large save no longer freezes the app
+  while it is read: the longest pause per logout on a 14 MB save went from about 300 ms to about 100 ms. The upload,
+  prices and /ask jobs, the pages and the chat read what that thread found. If it cannot start or stops, the app reads
+  the file as before and says so once on the Log page.
 - Site and Desktop App: Ollama suggests one small model, `qwen3:4b` (2.5 GB, calls tools), instead of `qwen3:8b`, and
   says what running a model on your own computer means: private and free, slower, and it uses your memory while it
   answers. The free cloud models stay the first choice.

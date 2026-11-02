@@ -1,5 +1,5 @@
 import { BrowserWindow, Notification, app, clipboard, dialog, ipcMain, net, powerMonitor, screen, session, shell } from "electron";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { loadProviders } from "../../../companion/src/providers/config";
@@ -23,7 +23,8 @@ import { onReconnect } from "./online";
 import { companionJobs } from "./jobs";
 import { loginItemOptions } from "./login-item";
 import { characterRealms, itemIdFrom, listRealms, ownRealms, priceRows, readPricesFile, suggestedRealms } from "./market";
-import { charactersFromFiles, saveFacts } from "./save-facts";
+import { charactersFromFiles, onFacts, peekFacts, readyFacts, saveFacts } from "./save-facts";
+import { useSaveReader } from "./save-reader";
 import { loadSettings, mergeSettings, saveSettings } from "./settings";
 import { allowedPermission, fromAppPage } from "./sender";
 import { createTray } from "./tray";
@@ -65,6 +66,8 @@ if (!app.requestSingleInstanceLock()) {
   const jobs = companionJobs(data, () => settings);
   loaded.error = [loaded.error, ...jobs.notices].filter(Boolean).join("\n") || null;
   const engine = createEngine(jobs.deps);
+  // The account files are parsed on a worker thread; its bundle is read with fs, which reads inside app.asar.
+  useSaveReader({ code: () => readFileSync(join(__dirname, "parse-worker.cjs"), "utf8"), log: (text) => engine.log("error", text) });
   let win: BrowserWindow | null = null;
   let tray: ReturnType<typeof createTray> | null = null;
   let quitting = false;
@@ -74,13 +77,15 @@ if (!app.requestSingleInstanceLock()) {
   let updateProgress: AppState["updateProgress"] = { stage: "idle", percent: 0, error: null };
   /** The verified installer, once downloaded, and the version it installs. */
   let downloaded: { path: string; version: string } | null = null;
-  // Scan ages come from parsing each account file once per write (saveFacts), so a broadcast stays cheap.
+  // Scan ages come from parsing each account file once per write (saveFacts). The pages call readyFacts first, so the
+  // parse is the save reader's, off the main thread.
   const allScans = () => engine.snapshot().files.flatMap((f) => {
     try { return saveFacts(f).scans; } catch { return []; }
   });
+  const knownScans = () => engine.snapshot().files.flatMap((f) => peekFacts(f)?.scans ?? []);
   const chat = createChat(data, () => settings, localTools({
-    characters: () => charactersFromFiles(engine.snapshot().files),
-    scans: () => newestScans(allScans()),
+    characters: async () => { const files = engine.snapshot().files; await readyFacts(files); return charactersFromFiles(files); },
+    scans: async () => { await readyFacts(engine.snapshot().files); return newestScans(allScans()); },
     followed: () => settings.market.realms,
     status: () => {
       const e = engine.snapshot();
@@ -103,13 +108,16 @@ if (!app.requestSingleInstanceLock()) {
     onChange: () => broadcast(),
     log: (level, text) => engine.log(level, text),
   });
-  const appState = (): AppState => ({ version: app.getVersion(), platform: process.platform, dataFolder: data, notice: loaded.error, settings, foreverFolder: foreverSuggestion(settings.gameFolder, settings.keptGameFolder, realFs), engine: engine.snapshot(), update, updateProgress, staleScans: staleScans(allScans()), account: accountInfo(data), builds: builds.status() });
+  const appState = (): AppState => ({ version: app.getVersion(), platform: process.platform, dataFolder: data, notice: loaded.error, settings, foreverFolder: foreverSuggestion(settings.gameFolder, settings.keptGameFolder, realFs), engine: engine.snapshot(), update, updateProgress, staleScans: staleScans(knownScans()), account: accountInfo(data), builds: builds.status() });
   const broadcast = () => {
     const s = appState();
     win?.webContents.send("state", s);
     tray?.update(s);
   };
   engine.onChange(broadcast);
+  // The state push never parses: it shows the last facts read, and pushes again when the save reader has a new write's.
+  engine.onChange((s) => { void readyFacts(s.files); });
+  onFacts(() => broadcast());
 
   // Three system notifications only: answers landed in the game (so the player knows to /reload),
   // a newer addon exists, and a newer app exists (each once per version). Nothing else interrupts.
@@ -386,7 +394,11 @@ if (!app.requestSingleInstanceLock()) {
     return check;
   });
 
-  handle("uploadInfo", () => summarizeFiles(engine.snapshot().files, join(data, "sent.json"), settings.endpoint));
+  handle("uploadInfo", async () => {
+    const files = engine.snapshot().files;
+    await readyFacts(files);
+    return summarizeFiles(files, join(data, "sent.json"), settings.endpoint);
+  });
   handle("backups", () => listBackups(data));
   handle("openBackupsFolder", () => { const dir = join(data, "backups"); return existsSync(dir) ? shell.openPath(dir).then(() => undefined) : undefined; });
   handle("restoreBackup", async (_e, file: unknown) => {
@@ -408,6 +420,7 @@ if (!app.requestSingleInstanceLock()) {
   });
   handle("marketInfo", async (): Promise<MarketInfo> => {
     const files = engine.snapshot().files;
+    await readyFacts(files);
     const scans = newestScans(allScans());
     const dir = addonsDir();
     const inGame = dir ? readPricesFile(dir)?.realms ?? null : null;
@@ -430,8 +443,10 @@ if (!app.requestSingleInstanceLock()) {
     const rows = priceRows(file, itemId).map(({ realm, dataAsOf, market, min, historical, quantity, day, reporters }) => ({ realm, dataAsOf, market, min, historical, quantity, day, reporters }));
     return { itemId, rows, note: rows.length ? null : "This item is not in the game's price file. Each realm's file keeps the 2,000 items with the most units listed, so a public price may still be on the website; a day is public once three reporters scanned it." };
   });
-  handle("askInfo", (): AskInfo => {
-    const pending = engine.snapshot().files.map((file) => {
+  handle("askInfo", async (): Promise<AskInfo> => {
+    const files = engine.snapshot().files;
+    await readyFacts(files);
+    const pending = files.map((file) => {
       try { return { file, asks: saveFacts(file).asks }; } catch { return { file, asks: [] }; }
     });
     let providers: string[] = [], providerError: string | null = null;
@@ -468,7 +483,11 @@ if (!app.requestSingleInstanceLock()) {
     return installAddon({ version: latest.version, endpoint: settings.endpoint, addonsDir: dir });
   });
   handle("changes", () => changes());
-  handle("charactersInfo", () => charactersFromFiles(engine.snapshot().files));
+  handle("charactersInfo", async () => {
+    const files = engine.snapshot().files;
+    await readyFacts(files);
+    return charactersFromFiles(files);
+  });
 
   handle("chatInfo", () => chat.info());
   handle("chatSend", (e, text: unknown) => (typeof text === "string" ? chat.send(text, (p) => { if (!e.sender.isDestroyed()) e.sender.send("chatProgress", p); }) : chat.info()));

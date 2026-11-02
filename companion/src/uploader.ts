@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { UPLOAD_LIMITS, type RecordKind } from "@everloot/protocol";
-import { parseEverlootLua } from "../../web/src/lib/sv-parse";
+import { parseEverlootLua, type EverlootFile } from "../../web/src/lib/sv-parse";
 import { prepareUpload, sendBatches, type BatchReceipt } from "../../web/src/lib/upload-batches";
 import { settledSkip, type SettledList } from "../../kb/src/settled-list";
 import { receiptKeyForSite, type SentState } from "./sent-state";
@@ -21,6 +21,12 @@ export interface UploadOptions {
   settled?: SettledList | null | ((build: string | undefined) => Promise<SettledList | null>);
   /** How long one batch may take, its answer included, before it counts as failed. One minute by default. */
   timeoutMs?: number;
+  /**
+   * Reads the file, as `parseEverlootLua(readFileSync(file, "utf8"))` does by default, with the same errors. It may
+   * leave out the records `sent` names as sent already (the Desktop App parses off its main thread and takes only the
+   * rest across). Every record it returns is still checked against the sent state here.
+   */
+  read?: (file: string, sent: (installId: string, eventId: string) => boolean) => Promise<EverlootFile>;
 }
 
 /** Installed addon lists go only from the upload page, after its preview; the companion never sends them. */
@@ -154,7 +160,13 @@ export interface UploadResult { sent: number; batches: number; skipped: number; 
  * The census stays here too unless `census` is set.
  */
 export async function uploadFile(file: string, options: UploadOptions): Promise<UploadResult> {
-  const parsed = parseEverlootLua(readFileSync(file, "utf8"));
+  const keys = new Map<string, string>();
+  const sent = (installId: string, eventId: string) => {
+    let key = keys.get(installId);
+    if (key === undefined) { key = receiptKeyForSite(installId, options.endpoint); keys.set(installId, key); }
+    return options.state.has(key, eventId);
+  };
+  const parsed = options.read ? await options.read(file, sent) : parseEverlootLua(readFileSync(file, "utf8"));
   const receiptKey = receiptKeyForSite(parsed.installId, options.endpoint);
   const unsent = parsed.records.filter((r) => typeof r.eventId !== "string" || !options.state.has(receiptKey, r.eventId));
   const held = (r: Record<string, unknown>) => !options.census && CENSUS.has(String(r.kind));

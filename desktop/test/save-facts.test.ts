@@ -7,6 +7,7 @@ import { summarizeCharacters } from "../src/main/characters";
 import { summarizeFiles, summarizeSavedVariables } from "../src/main/inspect";
 import { characterRealms, ownRealms } from "../src/main/market";
 import { charactersFromFiles, saveFacts } from "../src/main/save-facts";
+import { BROKEN, CHARACTERS, DB, NO_INSTALL, UPLOAD_TEXTS, save } from "./save-fixtures";
 
 // Counts the parses; the parser itself is the real one.
 vi.mock("../../web/src/lib/sv-parse", async (importOriginal) => {
@@ -18,9 +19,6 @@ const dirs: string[] = [];
 const dir = () => { const d = mkdtempSync(join(tmpdir(), "everloot-facts-")); dirs.push(d); return d; };
 afterEach(() => { for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true }); });
 
-const save = (realm: string) => `EverlootDB = { ["version"] = "0.3.14", ["installId"] = "x", ["records"] = {},
-  ["lastScans"] = { ["${realm}"] = { ["at"] = "2026-10-18T00:00:00Z" } },
-  ["asks"] = { { ["id"] = "ask:1", ["question"] = "Thrall", ["askedAt"] = "2026-10-18T00:00:00Z" } } }`;
 
 test("one parse per write serves the realms, the scan ages and the pending asks", () => {
   const parse = vi.mocked(svParse.parseEverlootTable);
@@ -49,16 +47,11 @@ test("a broken file still fails the realm read each time it is asked; a missing 
   expect(ownRealms([join(d, "missing.lua")])).toEqual([]);
 });
 
-const gold = (character: string, realm: string, copper: number) =>
-  `{ ["character"] = "${character}", ["realm"] = "${realm}", ["capturedAt"] = "2026-10-18T10:00:00Z", ["currentCopper"] = ${copper}, ["peakCopper"] = ${copper} }`;
 
 test("the Overview, the Market page and the Characters page take the characters from the same parse, richest first", () => {
   const table = vi.mocked(svParse.parseEverlootTable), lua = vi.mocked(svParse.parseEverlootLua);
   const sv = join(dir(), "Everloot.lua");
-  const text = `EverlootDB = { ["version"] = "0.3.14", ["installId"] = "x", ["records"] = {
-    ["gold_snapshot"] = { ${gold("Arthas", "Doomhowl", 10)}, ${gold("Jaina", "Nightslayer", 900)}, ${gold("Arthas", "Doomhowl", 50)} },
-    ["money_event"] = { { ["character"] = "Thrall", ["realm"] = "Skull Rock", ["capturedAt"] = "2026-10-18T10:00:00Z", ["category"] = "loot", ["copper"] = 5 } } },
-    ["lastScans"] = { ["Nightslayer"] = { ["at"] = "2026-10-18T00:00:00Z" } } }`;
+  const text = CHARACTERS;
   writeFileSync(sv, text);
   table.mockClear(); lua.mockClear();
   // The order the Characters page lists them in.
@@ -78,35 +71,18 @@ test("the Overview, the Market page and the Characters page take the characters 
 test("a file the Characters page skips shows no character and suggests no realm, and a broken one fails neither", () => {
   const d = dir();
   const noInstall = join(d, "a.lua"), broken = join(d, "b.lua");
-  writeFileSync(noInstall, `EverlootDB = { ["version"] = "0.3.14", ["records"] = { ["gold_snapshot"] = { ${gold("Arthas", "Doomhowl", 10)} } } }`);
-  writeFileSync(broken, `EverlootDB = { ["version"] = `);
+  writeFileSync(noInstall, NO_INSTALL);
+  writeFileSync(broken, BROKEN);
   expect(characterRealms([noInstall, broken, join(d, "missing.lua")])).toEqual([]);
   expect(charactersFromFiles([noInstall, broken, join(d, "missing.lua")])).toEqual({ characters: [], progress: [], talents: [] });
 });
 
-const DB = `EverlootDB = { ["version"] = "0.3.3", ["installId"] = "inst-1", ["clientBuild"] = "1.60.1.70450",
-  ["records"] = { ["loot"] = { { ["sourceNpcId"] = 7 }, { ["sourceNpcId"] = 8 } }, ["npc_sighting"] = { { ["npcId"] = 1 } }, ["drop"] = {} },
-  ["asks"] = { { ["id"] = "ask:inst-1:1", ["question"] = "what drops bindings", ["askedAt"] = "2026-10-18T00:00:00Z" } },
-  ["lastScans"] = { ["Nightslayer"] = { ["at"] = "2026-10-18T00:00:00Z" }, ["Doomhowl"] = { ["at"] = "2026-10-19T00:00:00Z" } } }`;
 
 test("the Upload page reads the shared parse and shows what the upload's own parser shows, refusals included", () => {
   const d = dir();
   const sent = join(d, "sent.json");
   writeFileSync(sent, JSON.stringify({ "inst-1": ["a", "b"] }));
-  const texts = {
-    whole: DB,
-    "semicolon and comment after": `-- saved\n${DB};\n-- end\n`,
-    "text after": `${DB}\nprint("x")`,
-    "text before": `x = 1\n${DB}`,
-    "no installId": `EverlootDB = { ["version"] = "0.3.3", ["records"] = {} }`,
-    "records not a table": `EverlootDB = { ["version"] = "0.3.3", ["installId"] = "i", ["records"] = "no" }`,
-    "group not a list": `EverlootDB = { ["version"] = "0.3.3", ["installId"] = "i", ["records"] = { ["loot"] = 5 } }`,
-    "a non-row": `EverlootDB = { ["version"] = "0.3.3", ["installId"] = "i", ["records"] = { ["loot"] = { 5 } } }`,
-    "rows beside the groups": `EverlootDB = { ["version"] = "0.3.3", ["installId"] = "i", ["records"] = { { ["a"] = 1 }, ["loot"] = { { ["b"] = 1 } } } }`,
-    "empty records": `EverlootDB = { ["version"] = "0.3.3", ["installId"] = "inst-1", ["records"] = {} }`,
-    "empty table": `EverlootDB = {}`,
-    broken: `EverlootDB = { ["version"] = `,
-  };
+  const texts = UPLOAD_TEXTS;
   const confirmedFor = (id: string) => (id === "inst-1" ? 2 : 0);
   for (const [name, text] of Object.entries(texts)) {
     const file = join(d, `${name}.lua`);
