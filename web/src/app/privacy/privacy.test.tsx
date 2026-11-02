@@ -133,7 +133,9 @@ test("the boss pulls item shows once the site collects them, and says what the d
   vi.stubEnv("EVERLOOT_PULL_SUMMARIES", "1");
   try {
     const on = renderToStaticMarkup(<PrivacyPage />).replace(/&#x27;|&apos;/g, "'");
-    const said = on.replace(/<[^>]+>/g, "").replace(/\s+/g, " ");
+    let said = on;
+    for (let prev = ""; prev !== said;) { prev = said; said = said.replace(/<[^>]*>/g, ""); }
+    said = said.replace(/\s+/g, " ");
     expect(on).toContain('id="boss-pulls"');
     expect(on).toContain('href="/players/opt-out"');
     for (const claim of [

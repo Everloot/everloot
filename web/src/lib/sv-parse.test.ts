@@ -117,3 +117,15 @@ test("census rows become intake records in the census wire shape, field for fiel
       guid: "Player-4242-00000001", race: "Scourge", class: "PRIEST", level: 30, faction: "Horde", via: "mouseover" },
   ]);
 });
+
+test("parseEverlootTable reads around extra text, and says what parseEverlootLua would refuse", () => {
+  const db = `EverlootDB = { version = "0.3.3", installId = "i", records = {} }`;
+  const check = { extra: "unset" as string | null };
+  expect(parseEverlootTable(`${db};\n-- end\n`, check).version).toBe("0.3.3");
+  expect(check.extra).toBeNull();
+  expect(parseEverlootTable(`${db}\nprint("x")`, check).installId).toBe("i");
+  expect(check.extra).toMatch(/^extra text after EverlootDB/);
+  expect(() => parseEverlootLua(`${db}\nprint("x")`)).toThrow(check.extra!);
+  parseEverlootTable(`x = 1\n${db}`, check);
+  expect(check.extra).toBe("extra text before EverlootDB");
+});

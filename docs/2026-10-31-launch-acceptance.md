@@ -1,11 +1,11 @@
-# Launch acceptance: Desktop 0.1.10 and addon 0.3.14
+# Launch acceptance: Desktop 0.1.14 and addon 0.3.15
 
 Record observations here or in a dated private test receipt. Do not include account names, API keys,
 character names, raw save files or combat logs in a public report. Leave unrun cases pending.
 
 ## Before the game is playable
 
-1. Download [Desktop 0.1.10](https://github.com/Everloot/everloot/releases/tag/desktop-v0.1.10) and its
+1. Download [Desktop 0.1.14](https://github.com/Everloot/everloot/releases/tag/desktop-v0.1.14) and its
    `SHA256SUMS`. Compare the chosen file's SHA-256 (`Get-FileHash <file> -Algorithm SHA256` on Windows).
    The checksum proves matching bytes; publisher identity/signing remains a separate readiness question.
 2. Preserve existing settings, queued uploads and game files. For a separate portable test, set
@@ -21,7 +21,9 @@ character names, raw save files or combat logs in a public report. Leave unrun c
 
 ## When the client is playable
 
-Record date/time, full game build, realm, addon version and Desktop version. Use addon 0.3.14 or later.
+Record date/time, full game build, realm, addon version and Desktop version. Use addon 0.3.15 or later.
+These versions are the released baseline checked on November 2. Record any newer release used; passing this
+card on another build does not establish acceptance on the launch build.
 
 | Check | Action | Expected observation | Actual result |
 |---|---|---|---|

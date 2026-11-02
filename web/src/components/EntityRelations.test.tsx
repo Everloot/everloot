@@ -38,10 +38,10 @@ test("relations are grouped and linked where a page exists; observed rows count 
   expect(html).not.toContain("Dropped by");
 });
 
-test("a spell's own relations name its profession and link to the profession pages", () => {
+test("a spell's own relations name its profession and link to that profession's page", () => {
   const html = renderToStaticMarkup(<EntityRelations kind="spell" id={2660} observed={[]} client={edges} />);
   expect(html).toContain("Profession");
-  expect(html).toContain('href="/tools/professions"');
+  expect(html).toContain('href="/tools/professions/blacksmithing"');
   expect(html).toContain(">Blacksmithing<");
 });
 

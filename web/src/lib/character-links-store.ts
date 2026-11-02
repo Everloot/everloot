@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { hashKey, KEY_PATTERN, presentedKey } from "./api-keys";
 import { signInPath } from "./auth/return-to";
 import { characterLinksOn, completionRef, linkCodeHash, linkKey, LINKS_PER_ACCOUNT, linkRealmKey, newLinkCode, type LinkRow } from "./character-links";
-import { characterPath, showcaseOn } from "./character-showcase";
+import { characterPath, showcaseBuildsOn, showcaseOn } from "./character-showcase";
 import { DEFAULT_RULESET, rulesetOf } from "./player-pages";
+import { SLUG_PATTERN } from "./saved-builds";
 import { authQuery, getUser, siteUrl } from "./supabase/server";
 
 // Server side of character links: every write goes through the security definer functions in
@@ -60,23 +61,34 @@ export async function redeemLink(userId: string, row: LinkRow, secret: string, c
 export interface OwnLink {
   id: string; name: string; realm: string; race: string; class: string; faction: "Alliance" | "Horde"; level: number;
   status: "linked" | "frozen"; linked_at: string; last_upload_at: string;
-  /** Only with EVERLOOT_SHOWCASE=1: whether the character's public page is on, and its address. */
-  page?: { public: boolean; path: string };
+  /**
+   * Only with EVERLOOT_SHOWCASE=1: whether the character's public page is on, and its address. `label` only with
+   * EVERLOOT_SHOWCASE_BUILDS=1 as well: the build label whose shared builds the page lists, or null for none.
+   */
+  page?: { public: boolean; path: string; label?: { id: string; name: string } | null };
 }
 const OWN_LINK_COLUMNS = "id,name,realm,race,class,faction,level,status,linked_at,last_upload_at";
 /** With the showcase on, the list also reads each link's ruleset and page switch. */
 const SHOWCASE_COLUMNS = "ruleset,character_visibility(page_public)";
+/** With planned builds on, also the label attached to each link (build_characters.link_id). */
+const LABEL_COLUMNS = "build_characters(id,name)";
+
+type Embedded<T> = T | T[] | null | undefined;
+const one = <T>(e: Embedded<T>): T | undefined => (Array.isArray(e) ? e[0] : e ?? undefined);
 
 type ListedRow = Omit<OwnLink, "page"> & {
   ruleset?: string;
   // PostgREST embeds the one-to-one visibility row as an object; older versions send a one-row array.
-  character_visibility?: { page_public?: unknown } | Array<{ page_public?: unknown }> | null;
+  character_visibility?: Embedded<{ page_public?: unknown }>;
+  // A link has at most one label (a unique index), sent as an object or a one-row array.
+  build_characters?: Embedded<{ id?: unknown; name?: unknown }>;
 };
 
 /** The account's links, oldest first. Only these columns are read, so nothing else can leave by mistake. */
 export async function listLinks(userId: string): Promise<OwnLink[]> {
   const showcase = showcaseOn();
-  const columns = showcase ? `${OWN_LINK_COLUMNS},${SHOWCASE_COLUMNS}` : OWN_LINK_COLUMNS;
+  const labels = showcaseBuildsOn();
+  const columns = [OWN_LINK_COLUMNS, ...(showcase ? [SHOWCASE_COLUMNS] : []), ...(labels ? [LABEL_COLUMNS] : [])].join(",");
   const rows = await authQuery<ListedRow[]>(
     `character_links?select=${columns}&user_id=eq.${encodeURIComponent(userId)}&order=linked_at.asc,id.asc&limit=${LINKS_PER_ACCOUNT}`,
   );
@@ -87,8 +99,14 @@ export async function listLinks(userId: string): Promise<OwnLink[]> {
       status: r.status === "linked" ? "linked" : "frozen", linked_at: r.linked_at, last_upload_at: r.last_upload_at,
     };
     if (!showcase) return link;
-    const visibility = Array.isArray(r.character_visibility) ? r.character_visibility[0] : r.character_visibility;
-    return { ...link, page: { public: visibility?.page_public === true, path: characterPath(r.ruleset ?? DEFAULT_RULESET, r.realm, r.name) } };
+    const page: NonNullable<OwnLink["page"]> = {
+      public: one(r.character_visibility)?.page_public === true, path: characterPath(r.ruleset ?? DEFAULT_RULESET, r.realm, r.name),
+    };
+    if (labels) {
+      const label = one(r.build_characters);
+      page.label = label && typeof label.id === "string" && typeof label.name === "string" ? { id: label.id, name: label.name } : null;
+    }
+    return { ...link, page };
   });
 }
 
@@ -119,6 +137,39 @@ export async function publicCharacter(ruleset: string, realmSlug: string, name: 
     name: r.name, realm: r.realm, race: r.race, class: r.class, faction: r.faction, level: r.level,
     linkedAt: r.linked_at, lastUploadAt: r.last_upload_at,
   };
+}
+
+/** A planned build on a public page, as `public_character_builds` returns it: never its codes, notes or owner. */
+export interface PlannedBuild { name: string; slug: string; updatedAt: string }
+
+/**
+ * The shared builds under the label the character's owner attached, through `public_character_builds`, which asks
+ * everything `public_character` asks: a page that is a 404 has none. Rows of any other shape are dropped.
+ */
+export async function publicCharacterBuilds(ruleset: string, realmSlug: string, name: string): Promise<PlannedBuild[]> {
+  const rows = await authQuery<Array<Record<string, unknown>>>("rpc/public_character_builds", {
+    method: "POST", body: JSON.stringify({ p_ruleset: ruleset, p_realm_slug: realmSlug, p_name: name }),
+  });
+  if (!Array.isArray(rows)) throw new Error("Invalid builds response");
+  return rows.flatMap((r) => {
+    if (typeof r.name !== "string" || typeof r.slug !== "string" || !SLUG_PATTERN.test(r.slug)) return [];
+    if (typeof r.updated_at !== "string" || Number.isNaN(Date.parse(r.updated_at))) return [];
+    return [{ name: r.name, slug: r.slug, updatedAt: r.updated_at }];
+  });
+}
+
+export type LabelRefusal = "not_found" | "frozen" | "class_mismatch";
+
+/**
+ * Attaches one of the account's build labels to one of its links through `attach_build_label`, or with `labelId` null
+ * takes the link's label off. Null when done. Nothing is ever attached without this call: no match by name.
+ */
+export async function attachBuildLabel(userId: string, linkId: string, labelId: string | null): Promise<LabelRefusal | null> {
+  const refusal = await authQuery<string | null>("rpc/attach_build_label", {
+    method: "POST", body: JSON.stringify({ p_user_id: userId, p_link_id: linkId, p_label_id: labelId }),
+  });
+  if (refusal === null || refusal === "not_found" || refusal === "frozen" || refusal === "class_mismatch") return refusal;
+  throw new Error("Invalid label response");
 }
 
 /** The page address of one of the account's links, or null when the account has no link with that id. */

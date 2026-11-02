@@ -5,6 +5,7 @@ import type { AccountShell, ShellCharacter } from "@/lib/account-shell-types";
 import { signInPath } from "@/lib/auth/return-to";
 import { answer, answerFree, FREE_TOOLS, loadTools, marketReply, searchOnly, signedIn, type ChatProgress, type ToolDef } from "@/lib/chat/agent";
 import { ITEM_FOUND, itemQuery, resolveItem, type ItemRef } from "@/lib/chat/items";
+import { handOver, takeHandoff } from "@/lib/chat/handoff";
 import { chatProvider } from "@/lib/chat/providers";
 import { providerStorage } from "@/lib/chat/provider-session";
 import {
@@ -18,6 +19,7 @@ import { crossesDocumentBoundary } from "@/lib/document-boundary";
 import { askPrefill, validCharacterId } from "@/lib/profiles";
 import type { AccountBuilds, SavedBuild } from "@/lib/saved-builds";
 import ChatLibrary, { type ConversationPatch } from "./ChatLibrary";
+import ChatWelcome, { WELCOME, type ChatIcons } from "./ChatWelcome";
 import Composer from "./Composer";
 import ConversationRail from "./ConversationRail";
 import { AssistantMessage, UserMessage } from "./Message";
@@ -26,7 +28,7 @@ import SaveToProject, { type SaveRequest } from "./SaveToProject";
 import { useWorkspace } from "./useWorkspace";
 import WorkspaceRail, { type LocalChat } from "./WorkspaceRail";
 
-export const SUGGESTIONS = ["Where does Linen Cloth drop?", "Plan a level 40 Fury warrior", "What changed in the last build?", "What sells best on my realm?"];
+export const SUGGESTIONS = WELCOME.map((s) => s.text);
 export const KEYS_PATH = "/account#chat-keys";
 
 interface Characters { characters: ShellCharacter[]; builds: SavedBuild[] }
@@ -79,8 +81,10 @@ function viewIn(search: string): View {
  * `freeChat` (EVERLOOT_FREE_CHAT_KEY, EVERLOOT_FREE_CHAT_CF_*) names the providers of Everloot (free), the built-in
  * model a visitor without a key of their own gets by default; empty while it is off. A key the player added always comes first.
  */
-export default function ChatClient({ savedBuilds = false, profiles = false, workspace = false, freeChat = [] }: {
+export default function ChatClient({ savedBuilds = false, profiles = false, workspace = false, freeChat = [], icons }: {
   savedBuilds?: boolean; profiles?: boolean; workspace?: boolean; freeChat?: string[];
+  /** The suggestion cards' game icons, from the asset manifest. */
+  icons?: ChatIcons;
 }) {
   const freeOn = freeChat.length > 0;
   const [providers, setProviders] = useState<SavedProvider[]>([]);
@@ -230,11 +234,27 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `characters` is memoised in a ref
   }, [signed, savedBuilds, profiles, accountId]);
 
-  // From the home's Ask box: /chat?q=<question>&character=<id>. The character becomes the context chip. With a key
+  // From the signed-in home's form: /chat?q=<question>&character=<id>. The character becomes the context chip. With a key
   // ready, or the free model on, the question is sent at once; otherwise it waits in the box. The URL drops both so a reload does not resend.
+  // From the public home's Ask box: the question arrives in this tab's storage (lib/chat/handoff.ts), read once, and waits in
+  // the box for Send. Its no-JavaScript form, /chat?ask=, is moved there and the page reloaded on a clean entry,
+  // because Next's history state keeps the old address's search even after replaceState; without storage it waits in
+  // the box from memory instead.
   useEffect(() => {
     if (!ready || signed === null || prefilled.current) return;
     const params = new URLSearchParams(window.location.search);
+    if (params.has("ask")) {
+      prefilled.current = true;
+      const asked = (params.get("ask") ?? "").trim().slice(0, 2000);
+      if (handOver(asked)) { window.location.replace(window.location.pathname); return; }
+      // No storage in this tab: the question waits in the box from memory, and the entry is replaced with no state,
+      // so neither the address nor the history keeps it.
+      window.history.replaceState(null, "", window.location.pathname);
+      if (asked) { setDraft(asked); box.current?.focus(); }
+      return;
+    }
+    const handed = takeHandoff();
+    if (handed) { prefilled.current = true; setDraft(handed); box.current?.focus(); return; }
     const q = (params.get("q") ?? "").trim().slice(0, 2000);
     const characterId = params.get("character");
     if (!q && !characterId) return;
@@ -763,11 +783,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
               onScroll={(e) => { const t = e.currentTarget; stick.current = t.scrollHeight - t.scrollTop - t.clientHeight < 80; }}>
               <div className="mx-auto w-full max-w-reading px-4 py-6">
                 {empty ? (
-                  <div className="flex min-h-[50vh] flex-col items-center justify-center gap-6 text-center">
-                    <h2 className="text-2xl font-semibold text-fg">What do you want to know about WoW: Forever?</h2>
-                    <ul aria-label="Suggestions" className="flex max-w-xl flex-wrap justify-center gap-2">
-                      {SUGGESTIONS.map((s) => <li key={s}><button type="button" className="btn min-h-9 px-3 text-sm" disabled={unknown} onClick={() => void ask(s)}>{s}</button></li>)}
-                    </ul>
+                  <ChatWelcome icons={icons} disabled={unknown} onAsk={(s) => void ask(s)}>
                     {inAccount && !meta.projectId && meta.revision === 0 && (
                       <div role="radiogroup" aria-label="Keep this chat in" className="flex flex-wrap items-center justify-center gap-3 text-sm text-fg-2">
                         <span>Keep this chat in</span>
@@ -779,7 +795,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
                         ))}
                       </div>
                     )}
-                  </div>
+                  </ChatWelcome>
                 ) : (
                   <div role="log" aria-label="Conversation" aria-relevant="additions" className="space-y-6">
                     {messages.map((m, i) => m.role === "user"

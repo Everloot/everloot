@@ -2,6 +2,7 @@ import Link from "next/link";
 import { GAME_DATA_CREDIT } from "@everloot/protocol";
 import { CLIENT_SKILLS } from "../../../kb/src/client-layer-file";
 import { CLIENT_LABEL, edgesFrom, entityLabel, evidenceLabel, groupByRel, type Edge, type EdgeKind, type Rel } from "../../../kb/src/edges";
+import { professionHrefById } from "@/lib/professions";
 import { zoneByMapId, zoneHref } from "@/lib/zones";
 import GameIcon from "./game/GameIcon";
 import Badge, { UNCONFIRMED_TITLE } from "./ui/Badge";
@@ -20,7 +21,7 @@ function hrefFor(kind: EdgeKind, id: number, rel: Rel): string | null {
     const zone = zoneByMapId(id);
     return zone ? zoneHref(zone.mapId, zone.name) : null;
   }
-  if (kind === "skill") return "/tools/professions";
+  if (kind === "skill") return professionHrefById(id) ?? "/tools/professions";
   return null;
 }
 

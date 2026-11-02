@@ -17,6 +17,7 @@ import { writeClientEncounters } from "../client-encounters.js";
 import { writeClientMounts } from "../client-mounts.js";
 import { writeClientClassGear } from "../client-class-gear.js";
 import { writeClientClassSpells } from "../client-class-spells.js";
+import { writeClientRecipes } from "../client-recipes.js";
 import { writeCatalogs } from "../client-catalog.js";
 import { writeClientLayer } from "../client-layer.js";
 import { writeRaceTable } from "../client-races.js";
@@ -79,6 +80,7 @@ export async function extractFromCdn(product: string, region: string, curatedPat
         writeClientMounts(snapshot, join(root, GAME_DATA_DIR, "client-mounts.json"));
         writeClientClassGear(snapshot, join(root, GAME_DATA_DIR, "client-class-gear.json"));
         writeClientClassSpells(snapshot, join(root, GAME_DATA_DIR, "client-class-spells.json"));
+        writeClientRecipes(snapshot, join(root, GAME_DATA_DIR, "client-recipes.json"));
       },
       dispose: () => rmSync(work, { recursive: true, force: true }),
       encryptedTables: manifest.tables.map((t) => ({ table: t.table, blocks: t.encryptedBlocks })),
