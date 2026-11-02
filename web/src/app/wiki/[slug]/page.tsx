@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { unstable_noStore as noStore } from "next/cache";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import JsonLd from "@/components/JsonLd";
@@ -86,6 +87,8 @@ export default async function WikiArticle(props: { params: Promise<{ slug: strin
   const dungeon = isDungeonType(page.type);
   const facts = dungeon ? await loadDungeonFacts(page) : null;
   const records = facts ? await loadDungeonRecords(facts.row) : null;
+  // A build-time or transient storage failure must not persist as an hour-long page response.
+  if (facts?.unreachable || records?.unavailable) noStore();
   const art = facts ? loadingArt(await loadSiteAssets(), facts.row.instanceMapId) : null;
   const blocks = bound ? DATA_BLOCKS[page.type] : [];
   const path = wikiHref(page.slug);

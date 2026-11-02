@@ -108,6 +108,7 @@ export function DungeonRecordedFacts({ records }: { records: DungeonRecords }) {
   if (records.unavailable) return <p className="mt-8 text-sm text-warning">Player reports are unavailable. Recorded loot and quests are unknown until storage is back.</p>;
   return (
     <div className="mt-12 space-y-10">
+      <p className="text-meta text-muted">Corpus snapshot: {records.dataAsOf ? dayLabel(records.dataAsOf) : "date unrecorded"}. Recorded observations may be from earlier builds.</p>
       <section aria-labelledby="recorded-loot">
         <SectionHeading id="recorded-loot" note="Public loot observations from NPCs players confirmed for these bosses. These are recorded loot windows, not a complete loot table, and are not separated by difficulty.">Recorded boss loot</SectionHeading>
         {records.loot.length ? <ul className="space-y-2 text-sm text-fg-2">{records.loot.map((drop) => (
