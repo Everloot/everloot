@@ -12,7 +12,11 @@ test("the empty chat welcomes with a heading, a decorative Glint and four questi
   const cards = [...html.matchAll(/<button type="button"[^>]*>([\s\S]*?)<\/button>/g)];
   expect(cards).toHaveLength(WELCOME.length);
   // Each card's name is its question alone: the icon is hidden from screen readers.
-  for (const [i, c] of cards.entries()) expect(c[1].replace(/<[^>]+>/g, "").replace(/[<>]/g, "")).toBe(WELCOME[i].text);
+  for (const [i, c] of cards.entries()) {
+    let name = c[1];
+    for (let prev = ""; prev !== name;) { prev = name; name = name.replace(/<[^>]*>/g, ""); }
+    expect(name).toBe(WELCOME[i].text);
+  }
 });
 
 test("a card shows the game icon when the page has one, and the drawn glyph without it", () => {
