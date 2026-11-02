@@ -34,6 +34,8 @@ import VendorPage from "@/app/database/vendors/[id]/page";
 import ChangesPage from "@/app/changes/page";
 import WowForeverPage from "@/app/wow-forever/page";
 import LorePage from "@/app/lore/page";
+import InstancesPage from "@/app/database/instances/page";
+import ZonesPage from "@/app/database/zones/page";
 
 /** The wide-screen banner's markup: from its start to the end of its caption. */
 const onBanner = (html: string) => html.slice(html.indexOf("data-banner"), html.indexOf("</p>", html.indexOf("data-banner-credit")));
@@ -72,6 +74,8 @@ const pages: [string, () => Promise<ReactNode>][] = [
   ["vendor", () => VendorPage({ params: Promise.resolve({ id: "1" }) })],
   ["changes", () => ChangesPage({ searchParams: Promise.resolve({}) })],
   ["wow-forever", () => WowForeverPage()],
+  ["instances", () => InstancesPage()],
+  ["zones", () => ZonesPage()],
 ];
 const render = async (page: () => Promise<ReactNode>) => renderToStaticMarkup(await page());
 
@@ -245,6 +249,25 @@ test("map: each dungeon's loading screen beside its entrance in the list", async
   const html = await render(() => ContinentMapPage({ params: Promise.resolve({ continent: "eastern-kingdoms" }), searchParams: Promise.resolve({}) }));
   expect(html).toMatch(/<li class="flex items-center gap-3"><img src="[^"]*loading\/9036-small\.webp" alt="" aria-hidden="true"[^>]*><span class="min-w-0"><span class="text-fg">Deadmines<\/span>/);
   expect(html).not.toMatch(/data-game-credit|data-source-line/);
+});
+
+test("dungeons and raids: each one's own loading screen, small, before its name; a held-back one gets none", async () => {
+  vi.stubEnv("NEXT_PUBLIC_GAME_ASSETS_URL", BASE);
+  vi.stubGlobal("fetch", bucket({ ...siteManifest, loadingScreens: { ...siteManifest.loadingScreens, "409": { ...siteManifest.loadingScreens["409"], heldBack: true } } }));
+  const html = await render(() => InstancesPage());
+  expect(html).toMatch(/<img src="[^"]*loading\/9249-small\.webp" alt="" aria-hidden="true" width="48" height="28" loading="lazy"[^>]*><a href="\/database\/instances\/249-onyxia-s-lair"/);
+  expect(html).not.toContain("loading/9409");
+  expect(html).toMatch(/<h1[^>]*>Dungeons and raids<\/h1>/);
+  expect(html).not.toMatch(/data-page-banner|data-game-credit/);
+});
+
+test("zones: each zone's own map picture, small, before its name; held-back zones are not listed", async () => {
+  vi.stubEnv("NEXT_PUBLIC_GAME_ASSETS_URL", BASE);
+  vi.stubGlobal("fetch", bucket());
+  const html = await render(() => ZonesPage());
+  expect(html).toMatch(/<img src="[^"]*maps\/1429-small\.webp" alt="" aria-hidden="true" width="42" height="28" loading="lazy"[^>]*><a href="\/database\/zones\/1429-elwynn-forest"/);
+  expect(html).not.toContain("maps/2548");
+  expect(html).not.toMatch(/data-page-banner|data-game-credit/);
 });
 
 test("changes: a compact title row like the database lists, no loading-screen banner and no credit block (it is site-wide)", async () => {
