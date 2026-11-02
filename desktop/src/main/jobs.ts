@@ -40,8 +40,16 @@ export function companionJobs(dataFolder: string, current: () => Settings): { de
       try { backupSavedVariables(file, dataFolder); backup = "; backup kept"; } catch (err) { backup = `; backup failed: ${err instanceof Error ? err.message : String(err)}`; }
       // The settled list is kept beside sent.json and refreshed once a day.
       const settled = (build: string | undefined) => appSettledList({ folder: dataFolder, endpoint, build });
+      // Two accounts' files can carry one install id (a copied WTF folder). Their upload history is kept whole while
+      // another file has the same id, so neither cuts the other's. After readyFacts this reads the reader's parse; a
+      // file that cannot be read or parsed has no id to share.
+      const sharesInstall = async (installId: string) => {
+        const others = findEverlootFiles(current().gameFolder ?? "").filter((f) => f !== file);
+        await readyFacts(others);
+        return others.some((f) => { try { return saveFacts(f).upload.installId === installId; } catch { return false; } });
+      };
       // The save reader parses the file off the main thread and hands over only the rows still unsent.
-      const r = await uploadFile(file, { endpoint, state, census: current().census, players: current().players, settled, read: readForUpload });
+      const r = await uploadFile(file, { endpoint, state, census: current().census, players: current().players, settled, read: readForUpload, sharesInstall });
       // A list for a build the game has moved on from is never read again.
       pruneSettledLists(dataFolder);
       const rejected = r.rejected ? `; the site turned away ${r.rejected} ${r.rejected === 1 ? "row, which stays unsent and goes" : "rows, which stay unsent and go"} again next run` : "";

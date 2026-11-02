@@ -163,7 +163,9 @@ test("an upload through the reader sends, skips, holds and marks sent exactly wh
 test("the upload's read throws what parseEverlootLua(readFileSync(file)) throws", async () => {
   reader();
   const d = dir();
-  const onMain = (file: string) => () => Promise.resolve(svParse.parseEverlootLua(readFileSync(file, "utf8")));
+  // A read that succeeds also lists every record's event id, the ones it left out too.
+  const onMain = (file: string) => () => Promise.resolve(svParse.parseEverlootLua(readFileSync(file, "utf8")))
+    .then((p) => ({ ...p, eventIds: p.records.map((r) => (typeof r.eventId === "string" ? r.eventId : null)) }));
   for (const [name, text] of Object.entries({ ...UPLOAD_TEXTS, "no install": NO_INSTALL })) {
     const file = join(d, `${name}.lua`);
     writeFileSync(file, text);

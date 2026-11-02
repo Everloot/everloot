@@ -102,6 +102,21 @@ test("an upload drops the receipts of rows the addon has replaced", async () => 
   expect(JSON.parse(readFileSync(path, "utf8"))).toEqual({ "abcd-1234-ef56-7890": ["epoch:2"] });
 });
 
+test("an upload keeps the history whole while another file shares the install id", async () => {
+  const file = join(root, "Everloot.lua");
+  writeFileSync(file, `EverlootDB = { version = "0.3.14", installId = "abcd-1234-ef56-7890", records = { loot = {
+    { eventId = "epoch:2", capturedAt = "2026-10-27T00:00:00Z", sourceNpcId = 42, sourceEvidence = "loot-api", items = { { itemId = 5, count = 1 } } },
+  } } }`);
+  const path = join(root, "sent.json");
+  createSentState(path).add("abcd-1234-ef56-7890", ["epoch:1", "epoch:2"]);
+  const asked: string[] = [];
+  const sharesInstall = (installId: string) => { asked.push(installId); return true; };
+  await uploadFile(file, { endpoint: "https://everloot.app", state: createSentState(path), fetch: vi.fn() as unknown as typeof fetch, sharesInstall });
+  expect(asked).toEqual(["abcd-1234-ef56-7890"]);
+  // epoch:1 is the other file's row: it stays sent.
+  expect(JSON.parse(readFileSync(path, "utf8"))).toEqual({ "abcd-1234-ef56-7890": ["epoch:1", "epoch:2"] });
+});
+
 test("delete empties the data folder, keeps the folder, and leaves the game folder alone", () => {
   const dir = join(root, "data");
   const game = join(root, "World of Warcraft", "_forever_");
