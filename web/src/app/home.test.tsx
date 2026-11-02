@@ -68,3 +68,13 @@ test("the panel shows a post that arrived from two regions once", async () => {
     expect(timeline.some((e) => e.id === copy.id)).toBe(false);
   }
 });
+test("the hero asks: a GET form to /chat whose question goes in q, the one primary button there", () => {
+  const hero = html.slice(html.indexOf('id="hero-title"'), html.indexOf('id="whats-new"'));
+  const form = hero.match(/<form [^>]*>/)?.[0] ?? "";
+  for (const attr of ['action="/chat"', 'method="get"', 'role="search"', 'aria-label="Ask Everloot"']) expect(form).toContain(attr);
+  const input = hero.match(/<input id="home-ask"[^>]*>/)?.[0] ?? "";
+  expect(input).toContain('name="q"');
+  expect(input).toContain('required=""');
+  expect(hero).toMatch(/<label for="home-ask" class="sr-only">/);
+  expect(hero.match(/btn-primary/g)).toHaveLength(1);
+});

@@ -121,6 +121,8 @@ const SHOWS_ART = new Set([
   "web/src/app/database/quests/page.tsx",
   // The site-wide credit (footer → /methodology#credits): reads only the manifest's build and label, no art.
   "web/src/app/methodology/page.tsx",
+  // The chat's suggestion cards: the warrior and Tailoring icons, as the home page shows the class and profession icons.
+  "web/src/app/chat/page.tsx",
   // The item names shown from the game files and the Warcraft Wiki: read for the item pages, and by the sitemap
   // only to know whether a category has enough names to list.
   "web/src/lib/shown-item-names.ts", "web/src/app/sitemap.ts", "web/scripts/upload-item-names.mjs",

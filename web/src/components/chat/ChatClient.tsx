@@ -18,6 +18,7 @@ import { crossesDocumentBoundary } from "@/lib/document-boundary";
 import { askPrefill, validCharacterId } from "@/lib/profiles";
 import type { AccountBuilds, SavedBuild } from "@/lib/saved-builds";
 import ChatLibrary, { type ConversationPatch } from "./ChatLibrary";
+import ChatWelcome, { WELCOME, type ChatIcons } from "./ChatWelcome";
 import Composer from "./Composer";
 import ConversationRail from "./ConversationRail";
 import { AssistantMessage, UserMessage } from "./Message";
@@ -26,7 +27,7 @@ import SaveToProject, { type SaveRequest } from "./SaveToProject";
 import { useWorkspace } from "./useWorkspace";
 import WorkspaceRail, { type LocalChat } from "./WorkspaceRail";
 
-export const SUGGESTIONS = ["Where does Linen Cloth drop?", "Plan a level 40 Fury warrior", "What changed in the last build?", "What sells best on my realm?"];
+export const SUGGESTIONS = WELCOME.map((s) => s.text);
 export const KEYS_PATH = "/account#chat-keys";
 
 interface Characters { characters: ShellCharacter[]; builds: SavedBuild[] }
@@ -79,8 +80,10 @@ function viewIn(search: string): View {
  * `freeChat` (EVERLOOT_FREE_CHAT_KEY, EVERLOOT_FREE_CHAT_CF_*) names the providers of Everloot (free), the built-in
  * model a visitor without a key of their own gets by default; empty while it is off. A key the player added always comes first.
  */
-export default function ChatClient({ savedBuilds = false, profiles = false, workspace = false, freeChat = [] }: {
+export default function ChatClient({ savedBuilds = false, profiles = false, workspace = false, freeChat = [], icons }: {
   savedBuilds?: boolean; profiles?: boolean; workspace?: boolean; freeChat?: string[];
+  /** The suggestion cards' game icons, from the asset manifest. */
+  icons?: ChatIcons;
 }) {
   const freeOn = freeChat.length > 0;
   const [providers, setProviders] = useState<SavedProvider[]>([]);
@@ -763,11 +766,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
               onScroll={(e) => { const t = e.currentTarget; stick.current = t.scrollHeight - t.scrollTop - t.clientHeight < 80; }}>
               <div className="mx-auto w-full max-w-reading px-4 py-6">
                 {empty ? (
-                  <div className="flex min-h-[50vh] flex-col items-center justify-center gap-6 text-center">
-                    <h2 className="text-2xl font-semibold text-fg">What do you want to know about WoW: Forever?</h2>
-                    <ul aria-label="Suggestions" className="flex max-w-xl flex-wrap justify-center gap-2">
-                      {SUGGESTIONS.map((s) => <li key={s}><button type="button" className="btn min-h-9 px-3 text-sm" disabled={unknown} onClick={() => void ask(s)}>{s}</button></li>)}
-                    </ul>
+                  <ChatWelcome icons={icons} disabled={unknown} onAsk={(s) => void ask(s)}>
                     {inAccount && !meta.projectId && meta.revision === 0 && (
                       <div role="radiogroup" aria-label="Keep this chat in" className="flex flex-wrap items-center justify-center gap-3 text-sm text-fg-2">
                         <span>Keep this chat in</span>
@@ -779,7 +778,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
                         ))}
                       </div>
                     )}
-                  </div>
+                  </ChatWelcome>
                 ) : (
                   <div role="log" aria-label="Conversation" aria-relevant="additions" className="space-y-6">
                     {messages.map((m, i) => m.role === "user"
