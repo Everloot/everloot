@@ -5,7 +5,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import * as svParse from "../../web/src/lib/sv-parse";
 import { summarizeCharacters } from "../src/main/characters";
 import { characterRealms, ownRealms } from "../src/main/market";
-import { saveFacts } from "../src/main/save-facts";
+import { charactersFromFiles, saveFacts } from "../src/main/save-facts";
 
 // Counts the parses; the parser itself is the real one.
 vi.mock("../../web/src/lib/sv-parse", async (importOriginal) => {
@@ -51,7 +51,7 @@ test("a broken file still fails the realm read each time it is asked; a missing 
 const gold = (character: string, realm: string, copper: number) =>
   `{ ["character"] = "${character}", ["realm"] = "${realm}", ["capturedAt"] = "2026-10-18T10:00:00Z", ["currentCopper"] = ${copper}, ["peakCopper"] = ${copper} }`;
 
-test("the Overview and Market page take character realms from the same parse, richest character first", () => {
+test("the Overview, the Market page and the Characters page take the characters from the same parse, richest first", () => {
   const table = vi.mocked(svParse.parseEverlootTable), lua = vi.mocked(svParse.parseEverlootLua);
   const sv = join(dir(), "Everloot.lua");
   const text = `EverlootDB = { ["version"] = "0.3.14", ["installId"] = "x", ["records"] = {
@@ -67,15 +67,18 @@ test("the Overview and Market page take character realms from the same parse, ri
   for (let i = 0; i < 3; i++) {
     expect(characterRealms([sv])).toEqual(listed);
     expect(ownRealms([sv])).toEqual(["Nightslayer"]);
+    // The Characters page and the chat's my_characters read the same parse.
+    expect(charactersFromFiles([sv]).characters.map((c) => c.character)).toEqual(["Jaina", "Arthas", "Thrall"]);
   }
   expect(table).toHaveBeenCalledTimes(1);
   expect(lua).not.toHaveBeenCalled();
 });
 
-test("a file the Characters page skips suggests no realm, and a broken one does not fail the suggestions", () => {
+test("a file the Characters page skips shows no character and suggests no realm, and a broken one fails neither", () => {
   const d = dir();
   const noInstall = join(d, "a.lua"), broken = join(d, "b.lua");
   writeFileSync(noInstall, `EverlootDB = { ["version"] = "0.3.14", ["records"] = { ["gold_snapshot"] = { ${gold("Arthas", "Doomhowl", 10)} } } }`);
   writeFileSync(broken, `EverlootDB = { ["version"] = `);
   expect(characterRealms([noInstall, broken, join(d, "missing.lua")])).toEqual([]);
+  expect(charactersFromFiles([noInstall, broken, join(d, "missing.lua")])).toEqual({ characters: [], progress: [], talents: [] });
 });

@@ -46,7 +46,7 @@ export function characterRealms(svFiles: string[]): string[] {
   for (const file of svFiles) {
     let realms: string[];
     // A file that cannot be read or parsed suggests nothing, as on the Characters page.
-    try { realms = saveFacts(file).characterRealms; } catch { continue; }
+    try { realms = (saveFacts(file).characters?.characters ?? []).map((c) => c.realm); } catch { continue; }
     for (const realm of realms) if (validRealm(realm) && !names.some((n) => realmKey(n) === realmKey(realm))) names.push(realm.trim());
   }
   return names;
