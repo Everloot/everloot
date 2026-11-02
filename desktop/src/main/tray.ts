@@ -27,7 +27,7 @@ export function jobLine(state: AppState, job: Job): string {
 
 export function createTray(iconPath: string, actions: TrayActions): { update(state: AppState): void; destroy(): void } {
   const tray = new Tray(nativeImage.createFromPath(iconPath));
-  tray.setToolTip("Everloot Desktop App");
+  tray.setToolTip("Everloot");
   tray.on("click", () => actions.show());
   tray.on("double-click", () => actions.show());
   // Replacing the menu while it is open can close it on Windows, and state pushes come often (each percent of a
@@ -48,11 +48,11 @@ export function createTray(iconPath: string, actions: TrayActions): { update(sta
         ...(reminder ? [{ label: reminder, click: () => actions.show("market") }] : []),
         // Where the app can install the update itself, the item opens its update panel; elsewhere the download page.
         ...(state.update?.newer && (state.update.installable || state.update.url) ? [{
-          label: state.updateProgress.stage === "ready" ? `Restart to update to ${state.update.latest}` : `Update Everloot Desktop App to ${state.update.latest}`,
+          label: state.updateProgress.stage === "ready" ? `Restart to update to ${state.update.latest}` : `Update Everloot to ${state.update.latest}`,
           click: () => { const u = current?.update; if (u?.installable) actions.show("update"); else if (u?.url) actions.openExternal(u.url); },
         }] : []),
         { type: "separator" },
-        { label: "Open Everloot Desktop App", click: () => actions.show() },
+        { label: "Open Everloot", click: () => actions.show() },
         { label: "Ask Everloot…", click: () => actions.show("chat") },
         { label: "Upload now", enabled: state.settings.upload && watching > 0 && !paused, click: () => actions.runNow("upload") },
         { label: "Refresh prices now", enabled: state.settings.prices && watching > 0 && !paused, click: () => actions.runNow("prices") },
@@ -62,7 +62,7 @@ export function createTray(iconPath: string, actions: TrayActions): { update(sta
       ];
       const signature = JSON.stringify(items.map((i) => [i.type ?? "", i.label ?? "", i.enabled ?? true]));
       if (signature !== shown) { shown = signature; tray.setContextMenu(Menu.buildFromTemplate(items)); }
-      const tooltip = `Everloot Desktop App${paused ? " (paused)" : ""}${state.update?.newer ? ` · update ${state.update.latest} available` : ""}`;
+      const tooltip = `Everloot${paused ? " (paused)" : ""}${state.update?.newer ? ` · update ${state.update.latest} available` : ""}`;
       if (tooltip !== tip) { tip = tooltip; tray.setToolTip(tooltip); }
     },
     destroy: () => tray.destroy(),

@@ -76,10 +76,13 @@ The tray menu shows each job's last result, a reminder when a realm's last full 
 than a day, the newer app release when there is one, and Upload now, Refresh prices now, Pause and Quit.
 Closing the window keeps the app in the tray. The window opens where you left it, at the same
 size, unless that screen is gone. The release checks (app and addon) run at start, after the first Start, every hour
-and when the window is opened. A newer app shows as **Update to X** in the sidebar and on the Overview, and once per
-version as a notification while the window is not in front. On a Windows install one click downloads it and checks
-it against the release's `SHA256SUMS`, and **Restart to update** installs it; if the old version is still there at the
-next start, the app says the update failed. Elsewhere the button opens the download.
+and when the window is opened. A newer app shows as a round arrow beside Settings and on the Overview, and once per
+version as a notification while the window is not in front. The arrow opens what the new version changed. On a
+Windows install one click there downloads it and checks it against the release's `SHA256SUMS` while a ring fills
+around the arrow; the arrow then turns into a restart, which asks in the app's own dialog and installs it. If the
+old version is still there at the next start, the app says the update failed. Elsewhere the panel opens the download.
+The installer names the app **Everloot** in the Start menu, on the desktop and in Apps. The product name, install
+folder and release file names (`Everloot-DesktopApp-*`) stay as they were, so an update installs over the old version.
 
 The app shares its data folder with the command line (`%APPDATA%\Everloot`,
 `~/Library/Application Support/Everloot`, `~/.config/everloot`): `sent.json` for confirmed events,

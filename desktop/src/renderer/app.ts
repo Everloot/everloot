@@ -137,7 +137,7 @@ function welcome(): string {
     + (a?.note ? `<p role="status" class="${a.note.startsWith("!") ? "error" : "ok"} small">${esc(a.note.replace(/^!/, ""))}</p>` : "");
   const signedIn = state?.account.signedIn;
   return `<div class="welcome">
-    <div class="brand"><img src="logo.png" alt=""><h1>Set up Everloot Desktop App</h1></div>
+    <div class="brand"><img src="logo.png" alt=""><h1>Set up Everloot</h1></div>
     <section class="panel signin" aria-label="Your everloot.app account">
       ${signedIn
         ? `<p class="ok">Signed in to everloot.app <span class="muted small">key …${esc(state?.account.hint ?? "")}</span></p>`
@@ -997,7 +997,7 @@ function settings(s: AppState): string {
       <div class="row set-save"><button type="submit" class="btn btn-primary">Save</button><span class="muted" id="saved"></span></div>
     </form>
     <section class="panel set-sec"><div class="set-lead"><h2>This app</h2></div><div class="set-body">
-      <p class="fg2">Everloot Desktop App ${esc(s.version)} · AGPL-3.0-only · ${ext("https://github.com/Everloot/everloot/tree/main/desktop", "source")} · ${ext("https://discord.gg/9CKsbHTRu3", "Discord")}</p>
+      <p class="fg2">Everloot ${esc(s.version)} · AGPL-3.0-only · ${ext("https://github.com/Everloot/everloot/tree/main/desktop", "source")} · ${ext("https://discord.gg/9CKsbHTRu3", "Discord")}</p>
       <div class="row"><button type="button" class="btn" id="updates">Check for updates</button></div>
     </div></section>
     ${dataPanel(s)}
@@ -1078,7 +1078,7 @@ function renderSide(s: AppState): void {
   const acct = s.account.signedIn
     ? `<button type="button" class="account-btn" id="accountBtn" title="Signed in to everloot.app">${PERSON}<span class="acct-text"><b>Signed in</b><span>key …${esc(s.account.hint ?? "")}</span></span></button>`
     : `<button type="button" class="account-btn" id="accountBtn">${PERSON}<span class="acct-text"><b>Sign in</b><span>everloot.app</span></span></button>`;
-  sideFoot.innerHTML = `${acct}${updateRow(s)}<div class="foot-row"><button type="button" data-page="settings" ${page === "settings" ? 'aria-current="page"' : ""}>${GEAR}Settings</button><button type="button" class="foot-icon" id="reportBug" aria-label="Report a bug" title="Report a bug">${BUG}</button>${updateButton(s)}</div>
+  sideFoot.innerHTML = `${acct}<div class="foot-row"><button type="button" data-page="settings" ${page === "settings" ? 'aria-current="page"' : ""}>${GEAR}Settings</button><button type="button" class="foot-icon" id="reportBug" aria-label="Report a bug" title="Report a bug">${BUG}</button>${updateButton(s)}</div>
     <div class="foot-line"><span>${e.files.length ? `Watching ${e.files.length} file(s)` : "Not watching"}${e.paused ? " · paused" : ""}</span><span>v${esc(s.version)}</span></div>`;
   paintBars(sideFoot);
   if (refocus) side.querySelector<HTMLElement>(refocus)?.focus({ preventScroll: true });
@@ -1086,22 +1086,6 @@ function renderSide(s: AppState): void {
 
 const PERSON = icon("account");
 const BUG = icon("bug");
-
-/**
- * While an update is out, its own row is the clearest thing in the footer: one click downloads it and
- * checks it against the release's checksum, the percentage shows while it downloads, and the next
- * click restarts into it. Where the app cannot install itself, the row opens the download.
- */
-function updateRow(s: AppState): string {
-  const up = s.update?.newer ? s.update : null;
-  if (!up) return "";
-  const p = s.updateProgress;
-  const v = esc(up.latest ?? "");
-  if (!up.installable) return `<button type="button" class="restart-btn" id="updateDownloadPage" data-open="${esc(up.downloadUrl ?? up.url ?? "")}">${ARROW}Download ${v}</button>`;
-  if (p.stage === "ready") return `<button type="button" class="restart-btn" id="updateRestart" title="Restart to install ${v}">${ARROW}Restart to update</button>`;
-  if (p.stage === "downloading") return downloadBar(v, p.percent);
-  return `<button type="button" class="restart-btn" id="updateNow" title="Download ${v}, check it and install it on restart">${ARROW}${p.stage === "failed" ? "Update failed, try again" : `Update to ${v}`}</button>`;
-}
 
 /** The download fills its row as it goes; the width is set from data-w after render (the CSP allows no inline styles). */
 function downloadBar(v: string, percent: number): string {
@@ -1112,12 +1096,26 @@ function paintBars(root: ParentNode): void {
   for (const el of root.querySelectorAll<HTMLElement>("[data-w]")) el.style.width = `${el.dataset.w}%`;
 }
 
-/** The arrow beside Settings opens what the new version changed. */
+/** Restart runs the update once it is downloaded and checked. */
+const updateReady = (s: AppState) => Boolean(s.update?.newer && s.update.installable && s.updateProgress.stage === "ready");
+
+/**
+ * The one update control, beside Settings. While an update is out, the arrow opens what the new version changed and
+ * its download; a ring fills around it while it downloads; once the download is checked, it turns into a restart,
+ * which opens the restart dialog. It keeps one id, so a re-render keeps the focus on it.
+ */
 function updateButton(s: AppState): string {
   const up = s.update?.newer ? s.update : null;
   if (!up) return "";
-  const label = `What's new in ${esc(up.latest ?? "")}`;
-  return `<button type="button" class="update-btn" id="updateBtn" aria-expanded="${updateOpen}" aria-controls="updatePop" aria-label="${label}" title="${label}">${ARROW}</button>`;
+  const p = s.updateProgress;
+  const v = esc(up.latest ?? "");
+  if (updateReady(s)) return `<button type="button" class="update-btn ready" id="updateBtn" aria-haspopup="dialog" aria-label="Restart to install ${v}" title="Restart to install ${v}">${RESTART}</button>`;
+  const downloading = up.installable && p.stage === "downloading";
+  const label = downloading ? `Downloading ${v}, ${p.percent}%` : p.stage === "failed" ? `The update to ${v} failed. Open it to try again` : `What's new in ${v}`;
+  // The ring is drawn with SVG attributes, not inline styles, which the CSP refuses.
+  const ring = downloading ? `<svg class="ring" viewBox="0 0 36 36" aria-hidden="true"><circle class="ring-track" cx="18" cy="18" r="16" pathLength="100"/><circle class="ring-fill" cx="18" cy="18" r="16" pathLength="100" stroke-dasharray="${p.percent} 100"/></svg>` : "";
+  const cls = downloading ? " downloading" : p.stage === "failed" ? " failed" : "";
+  return `<button type="button" class="update-btn${cls}" id="updateBtn" aria-expanded="${updateOpen}" aria-controls="updatePop" aria-label="${label}" title="${label}">${ring}${ARROW}</button>`;
 }
 
 /** The Overview says so too, with the same one-click update. */
@@ -1129,10 +1127,13 @@ function updateCallout(s: AppState): string {
     : p.stage === "ready" ? `<button type="button" class="link" id="updateRestartCallout">Restart to update</button>`
       : p.stage === "downloading" ? `Downloading, ${p.percent}%`
         : `<button type="button" class="link" id="updateNowCallout">Update now</button>`;
-  return `<p class="callout fg2">${icon("upload")}<span>Everloot Desktop App ${esc(up.latest ?? "")} is out; you run ${esc(s.version)}. ${action}; your settings stay.</span></p>`;
+  return `<p class="callout fg2">${icon("upload")}<span>Everloot ${esc(up.latest ?? "")} is out; you run ${esc(s.version)}. ${action}; your settings stay.</span></p>`;
 }
 
-const ARROW = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const ARROW = `<svg class="arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const RESTART = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4.6h-4.6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+/** The Everloot mark, as the sidebar draws it. */
+const MARK = `<svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" class="mark-bg"/><path d="M32 12 52 32 32 52 12 32Z" fill="none" stroke="currentColor" stroke-width="5" stroke-linejoin="round"/></svg>`;
 const NOTES_SHOWN = 8;
 
 /** The update popover: the new version, what its release lists as changed, and this system's download. */
@@ -1173,9 +1174,9 @@ function renderUpdate(s: AppState): void {
 /** Restart asks in the app's own dialog: what happens, what stays, and which running job it waits for. */
 function restartDialog(s: AppState): string {
   const off = restarting ? " disabled" : "";
-  return `<div class="confirm-head"><h2 id="rsTitle">Restart to update?</h2><div class="muted small">Everloot Desktop App ${esc(s.update?.latest ?? "")} · you run ${esc(s.version)}</div></div>
+  return `<div class="confirm-head brand-head">${MARK}<div><h2 id="rsTitle">Restart to update?</h2><div class="muted small">Everloot ${esc(s.update?.latest ?? "")} · you run ${esc(s.version)}</div></div></div>
     <div class="confirm-body"><p>The app closes, installs the update and opens again in a few seconds.</p><p class="fg2">Your settings, characters, chat and backups stay in the data folder. The game and its save files are not touched.</p></div>
-    <div class="confirm-foot"><span class="muted small">${esc(restartWait(s.engine))}</span><div class="row"><button type="button" class="btn" id="restartCancel"${off}>Not now</button><button type="button" class="btn btn-primary" id="restartGo"${off}>${restarting ? "Restarting…" : "Restart and update"}</button></div></div>`;
+    <div class="confirm-foot"><span class="muted small">${esc(restartWait(s.engine))}</span><div class="row"><button type="button" class="btn" id="restartCancel"${off}>Not now</button><button type="button" class="btn btn-primary btn-icon" id="restartGo"${off}>${RESTART}${restarting ? "Restarting…" : "Restart and update"}</button></div></div>`;
 }
 
 function renderRestart(s: AppState): void {
@@ -1458,10 +1459,10 @@ main.addEventListener("submit", (ev) => { onSubmit(ev).catch(failed); });
 
 async function onClick(ev: MouseEvent): Promise<void> {
   const el = ev.target as HTMLElement;
-  if (el.closest("#updateBtn")) { toggleUpdate(!updateOpen); return; }
+  if (el.closest("#updateBtn")) { if (state && updateReady(state)) openRestart(); else toggleUpdate(!updateOpen); return; }
   if (el.closest("#updateLater")) { toggleUpdate(false); return; }
-  if (el.closest("#updateGet, #updateNow, #updateNowCallout")) { await api.updateDownload(); return; }
-  if (el.closest("#updateRestart, #updateRestartPop, #updateRestartCallout")) { openRestart(); return; }
+  if (el.closest("#updateGet, #updateNowCallout")) { await api.updateDownload(); return; }
+  if (el.closest("#updateRestartPop, #updateRestartCallout")) { openRestart(); return; }
   if (el.closest("#restartCancel")) { closeRestart(); return; }
   if (el.closest("#wipeOpen")) { openWipe(); return; }
   if (el.closest("#wipeCancel")) { closeWipe(); return; }

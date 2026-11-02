@@ -149,7 +149,7 @@ if (!app.requestSingleInstanceLock()) {
       broadcast();
       if (update.latest !== desktopNoticed && !win?.isFocused()) {
         desktopNoticed = update.latest;
-        notify("Everloot Desktop App update", update.installable
+        notify("Everloot update", update.installable
           ? `${update.latest} is out (you run ${update.current}). Click to update; your settings stay.`
           : `${update.latest} is out (you run ${update.current}). Click to download it.`, "update");
       }
@@ -207,7 +207,7 @@ if (!app.requestSingleInstanceLock()) {
     const bounds = fitWindow(readWindowState(windowPath), screen.getAllDisplays().map((d) => d.workArea));
     win = new BrowserWindow({
       ...bounds, minWidth: 760, minHeight: 540,
-      title: "Everloot Desktop App",
+      title: "Everloot",
       backgroundColor: "#0E0F0D",
       show: false,
       autoHideMenuBar: true,
@@ -390,7 +390,7 @@ if (!app.requestSingleInstanceLock()) {
       defaultId: 0,
       cancelId: 2,
       title: "Report a bug",
-      message: "Report a bug in Everloot Desktop App",
+      message: "Report a bug in Everloot",
       detail: "Opens a bug report on GitHub with the app version and these diagnostics filled in: your settings (where the token file is, never the token), the files watched, each job's last state and the last log lines, with your user folder hidden. You read and edit it before sending; it needs a GitHub account. Or copy the diagnostics and post them in the Discord #bug-reports channel.",
     });
     if (answer.response === 1) { clipboard.writeText(text); return "copied"; }

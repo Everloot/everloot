@@ -112,12 +112,23 @@ p { margin: 0; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* The update button beside Settings, and its popover: what changed in the new version, and the download. */
-.side-foot .update-btn { flex: none; display: grid; place-items: center; width: 36px; padding: 0; border-radius: var(--radius); border: 1px solid rgb(var(--accent)); background: rgb(var(--accent) / 0.14); color: rgb(var(--accent)); }
+.side-foot .update-btn { position: relative; flex: none; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border-radius: 50%; border: 1px solid rgb(var(--accent)); background: rgb(var(--accent) / 0.14); color: rgb(var(--accent)); }
 .side-foot .update-btn svg { width: 18px; height: 18px; }
 .side-foot .update-btn:hover, .side-foot .update-btn[aria-expanded="true"] { background: rgb(var(--accent) / 0.26); color: rgb(var(--accent)); }
-.side-foot .restart-btn { justify-content: center; background: rgb(var(--accent)); color: rgb(var(--accent-ink)); font-weight: 600; border-radius: 9999px; }
-.side-foot .restart-btn:hover { background: rgb(var(--accent)); color: rgb(var(--accent-ink)); filter: brightness(1.08); }
-.side-foot .restart-btn svg { width: 16px; height: 16px; }
+/* Downloading: a ring fills around a smaller arrow, from the top, clockwise. */
+.side-foot .update-btn.downloading { border-color: transparent; background: rgb(var(--accent) / 0.08); }
+.side-foot .update-btn.downloading .arrow { width: 14px; height: 14px; }
+.side-foot .update-btn .ring { position: absolute; top: -1px; left: -1px; width: calc(100% + 2px); height: calc(100% + 2px); transform: rotate(-90deg); fill: none; stroke-width: 2.5; }
+.ring-track { stroke: rgb(var(--accent) / 0.22); }
+.ring-fill { stroke: rgb(var(--accent)); stroke-linecap: round; transition: stroke-dasharray 240ms linear; }
+.side-foot .update-btn.failed { border-color: rgb(var(--danger)); background: rgb(var(--danger) / 0.12); color: rgb(var(--danger)); }
+/* Ready: a solid restart, the one control in the footer that asks for a click. */
+.side-foot .update-btn.ready, .side-foot .update-btn.ready:hover { background: rgb(var(--accent)); color: rgb(var(--accent-ink)); }
+.side-foot .update-btn.ready:hover { filter: brightness(1.08); }
+@media (prefers-reduced-motion: no-preference) {
+  .side-foot .update-btn.ready { animation: update-ready 1.8s ease-out 3; }
+}
+@keyframes update-ready { from { box-shadow: 0 0 0 0 rgb(var(--accent) / 0.55); } to { box-shadow: 0 0 0 10px rgb(var(--accent) / 0); } }
 /* While the update downloads, its row fills from the left, with the percentage at the end. */
 .dl-bar { position: relative; overflow: hidden; flex: 1 1 auto; display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 14px; border-radius: 9999px; border: 1px solid rgb(var(--accent) / 0.55); background: rgb(var(--accent) / 0.08); color: rgb(var(--fg)); font-weight: 600; font-variant-numeric: tabular-nums; cursor: progress; }
 .dl-fill { position: absolute; inset: 0 auto 0 0; width: 0; overflow: hidden; background: rgb(var(--accent) / 0.3); transition: width 240ms linear; }
@@ -148,6 +159,11 @@ p { margin: 0; }
 .confirm-body p + p { margin-top: 8px; }
 .confirm-foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; padding: 14px 22px; border-top: 1px solid rgb(var(--line)); background: rgb(var(--canvas)); }
 .confirm-foot .row { margin-left: auto; }
+/* The restart dialog carries the Everloot mark and a line of the accent along its top. */
+#restartDlg { border-top: 3px solid rgb(var(--accent)); }
+.brand-head { display: flex; align-items: center; gap: 14px; }
+.brand-head .mark { width: 40px; height: 40px; }
+.btn-icon svg { width: 16px; height: 16px; flex: none; }
 @media (prefers-reduced-motion: no-preference) {
   .confirm[open] { animation: confirm-in 160ms ease-out; }
   .confirm[open]::backdrop { animation: confirm-fade 160ms ease-out; }

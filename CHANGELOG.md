@@ -46,6 +46,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   in and out, this week, categories, receipts and gold history. The published ledgers stay below.
 
 ### Changed
+- Desktop App: the app calls itself Everloot: in its window, tray, notifications and dialogs, and in the Start menu,
+  the desktop shortcut and Apps once it updates. An update now has one small round button beside Settings instead of
+  a second one above it. It opens what changed, fills a ring while the update downloads, and turns into a restart
+  once it is ready. The restart dialog carries the Everloot mark.
 - Site and Desktop App: Ollama suggests one small model, `qwen3:4b` (2.5 GB, calls tools), instead of `qwen3:8b`, and
   says what running a model on your own computer means: private and free, slower, and it uses your memory while it
   answers. The free cloud models stay the first choice.
