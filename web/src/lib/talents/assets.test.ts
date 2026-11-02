@@ -131,6 +131,8 @@ const SHOWS_ART = new Set([
   "web/src/lib/site-card.ts", "web/src/lib/item-icons.ts",
   // The same names and quest titles for the entity tokens on a wiki page.
   "web/src/lib/wiki-names.ts",
+  // Dungeon wiki pages show loading-screen art under the approved page-banner extension.
+  "web/src/app/wiki/[slug]/page.tsx", "web/src/app/wiki/dungeon-facts.tsx",
   // The coverage score's expected counts (coverage-expected.json, counts only) sit beside the names in the private bucket.
   "web/src/lib/coverage-compute.ts",
 ]);
