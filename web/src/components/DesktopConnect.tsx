@@ -9,9 +9,10 @@ const secondary = "inline-flex items-center justify-center min-h-11 px-4 rounded
 
 /**
  * The confirm step: Connect makes a key named "Everloot Desktop App" (with the saved-builds permission when
- * that feature is on), seals it to the app and sends the browser back to the app on this computer.
+ * that feature is on, and permission to send character link codes while character links are on), seals it to the
+ * app and sends the browser back to the app on this computer.
  */
-export default function DesktopConnect({ request, name }: { request: ConnectRequest; name: string }) {
+export default function DesktopConnect({ request, name, links = false }: { request: ConnectRequest; name: string; links?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<"connected" | "cancelled" | null>(null);
@@ -20,7 +21,7 @@ export default function DesktopConnect({ request, name }: { request: ConnectRequ
     setBusy(true);
     setError(null);
     try {
-      const response = await fetch("/api/keys", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ label: DESKTOP_KEY_LABEL, builds: true }) });
+      const response = await fetch("/api/keys", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ label: DESKTOP_KEY_LABEL, builds: true, ...(links ? { links: true } : {}) }) });
       const result = await response.json();
       if (!response.ok || typeof result.token !== "string") throw new Error(result.error ?? "That did not work. Try again.");
       const sealed = await sealForDesktop(result.token, request);
@@ -44,6 +45,7 @@ export default function DesktopConnect({ request, name }: { request: ConnectRequ
       <ul className="list-disc pl-5 space-y-1 text-sm text-fg-2">
         <li>Chat and the in-game <code>/ask</code> count against your account, with a higher limit.</li>
         <li>Your saved talent builds sync into the game.</li>
+        {links && <li>Codes you type with <code>/everloot link</code> in game are sent to your account, to link those characters.</li>}
         <li>It gets a key named <b>Everloot Desktop App</b>. You can revoke it any time on <Link href="/account" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">your account</Link>. Uploads never carry it, and the app never sees your Battle.net password.</li>
       </ul>
       {done === "connected" ? (

@@ -181,6 +181,11 @@ Missing: which item classes and subclasses a skill line or proficiency spell all
 names to item subclass names would be a guess and is not done. **Partial**: a "usable by this class" filter waits
 for a wave that reads `SpellEquippedItems`.
 
+Update 2026-11-01 (build 1.60.1.70707): `SpellEquippedItems` is read. `kb/src/client-class-gear.ts` joins skill line →
+proficiency spell (a `SpellEffect` of type 60, so Parry and Block, which only ask for a weapon, stay out) → item class
+and subclass, with `MinLevel` and `ItemSparse.AllowableClass`, no name matching. The item list narrows to it under a
+class context, labelled unconfirmed; types no proficiency names, and items with no class data, are kept.
+
 ## Trainer spells
 
 - **In the files.** Each class has 3 or 4 class-only skill lines (category 7). The readable rows of

@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import {
-  buildTaxonomy, categoryOf, filterItems, handleItemCategories, QUALITIES, resolveClass, resolveLegacyClass, resolveSubclass, slotOf, slugify, type Taxonomy,
+  buildTaxonomy, categoryOf, filterItems, handleItemCategories, itemCategoriesStructured, QUALITIES, resolveClass, resolveLegacyClass, resolveSubclass, slotOf, slugify, type Taxonomy,
 } from "../src/item-taxonomy.js";
 
 type Rows = Map<number, Record<string, unknown>>;
@@ -108,6 +108,26 @@ test("the categories answer: the tree, one item's path, or a filtered list, each
   expect(list).toContain("item 16916 · Cloth · Chest · Epic");
   expect(handleItemCategories({ class: "dragons" }, t, build)).toContain("No item class dragons");
   expect(handleItemCategories({ class: "weapon" }, t, build)).toContain("Weapons: 1 item");
+});
+
+test("slot and quality without a class say they were not applied, instead of answering the whole tree as if they were", () => {
+  const t = buildTaxonomy(tables());
+  const build = "1.60.1.70450";
+  const NOTE = "Slot and quality filter within a class; add class to use them.";
+  for (const args of [{ slot: "chest" }, { quality: "epic" }, { slot: "chest", quality: "epic" }]) {
+    const text = handleItemCategories(args, t, build);
+    expect(text.startsWith(`${NOTE}\nItem categories`), JSON.stringify(args)).toBe(true);
+  }
+  expect(handleItemCategories({}, t, build)).not.toContain(NOTE);
+  expect(handleItemCategories({ class: "armor", slot: "chest" }, t, build)).not.toContain(NOTE);
+});
+
+test("the structured answer takes the same class slugs as the text, the singular one included", () => {
+  const t = buildTaxonomy(tables());
+  const out = itemCategoriesStructured({ class: "weapon" }, t, "1.60.1.70450") as { error?: string; items?: { itemId: number }[]; total?: number };
+  expect(out.error).toBeUndefined();
+  expect(out.items!.map((i) => i.itemId)).toEqual([19019]);
+  expect(out.total).toBe(1);
 });
 
 test("the quality slugs are the protocol's ITEM_QUALITY_SLUGS, in Enum.ItemQuality order", async () => {

@@ -70,8 +70,8 @@ export interface ContextLink { key: ContextDestination; label: string; href: str
  * Where a class context leads: its hub, the class's talent calculator, then the spell, item, raid, profession and
  * dungeon pages. Each link carries the part of the context its page reads: the hub all of it; the calculator its
  * class; the spell, item, raid and profession pages all of it, which they show and keep on their own links (the
- * spell list also narrows to the class's talent catalog); the dungeon list nothing yet. A link never holds a value
- * its page would ignore.
+ * spell list also narrows to the class's talent catalog, the item list to what the class can use); the dungeon list
+ * nothing yet. A link never holds a value its page would ignore.
  */
 export function contextLinks(ctx: ClassContext): ContextLink[] {
   return [

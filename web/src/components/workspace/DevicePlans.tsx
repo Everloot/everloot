@@ -9,7 +9,9 @@ import {
   orderState, previewImport, readPlanText, readWorkspace, sameOwner, savePlan, sentPlans, withWorkspaceLock,
   type Failure, type ImportPreview, type LocalPlan, type Owner, type PlanText, type ReadResult,
 } from "@/lib/player-workspace";
+import { codeFreshness, savedPlanNote, type ClassTalentChanges, type TreeBuild } from "@/lib/talents/freshness";
 import { planHash, replacePlanHash } from "@/lib/talents/import";
+import { decodeBuild } from "@/lib/talents/share";
 import { useWorkspaceOwner } from "./LocalPlanSave";
 
 // /tools/builds: the plans kept in this browser (lib/player-workspace.ts) for whoever is signed in now, or for
@@ -30,6 +32,23 @@ const day = (at: string) => new Date(at).toLocaleDateString("en-US", { month: "s
 
 /** The calculator's address for a plan: both sets, each with its order, in the fragment that never reaches the server. */
 const openPath = (plan: LocalPlan) => `/tools/talents/${plan.classSlug}${planHash(plan.code, plan.code2, plan.order, plan.order2)}`;
+
+/** Each class's tree build and talent change records, by class slug, read on the server (tools/builds/page.tsx), so
+ *  that a plan says when it was made on an older build and what changed since without the page carrying the trees. */
+export type PlanTrees = Record<string, { tree: TreeBuild; changes: ClassTalentChanges }>;
+
+/** The game build a plan's first set was made on, as its share code carries it; null when the code does not read. */
+function madeOn(code: string): string | null {
+  const decoded = decodeBuild(code);
+  return decoded.ok ? decoded.build.build : null;
+}
+
+/** What changed in a plan's talents since the build it was made on, when that is older than the tree; else null. */
+function freshnessNote(plan: LocalPlan, trees: PlanTrees | undefined): string | null {
+  const known = trees && Object.hasOwn(trees, plan.classSlug) ? trees[plan.classSlug] : null;
+  if (!known) return null;
+  return savedPlanNote([plan.code, plan.code2].map((code) => (code ? codeFreshness(known.tree, known.changes, code) : null)));
+}
 
 /** What each set's token says about its spend order. The calculator checks the order against the tree on opening. */
 function setsLine(codes: [string, string | null], orders: [string | null, string | null]): string {
@@ -60,7 +79,7 @@ function dropSent() {
   if (hash !== window.location.hash) window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}${hash}`);
 }
 
-export default function DevicePlans() {
+export default function DevicePlans({ trees }: { trees?: PlanTrees } = {}) {
   const [state, retry] = useWorkspaceOwner();
   const owner = state.status === "ready" ? state.owner : null;
   // The plan the calculator sent, read from the address once, and the owner it was first shown to. It is offered to
@@ -95,12 +114,12 @@ export default function DevicePlans() {
           Who is signed in here changed, so the plan from the calculator was not saved. To keep it, go back to the calculator and press Save on this device again.
         </p>
       )}
-      <Bucket key={bucketKey(state.owner)} owner={state.owner} sent={offered} onSentDone={() => { setSent(null); dropSent(); }} />
+      <Bucket key={bucketKey(state.owner)} owner={state.owner} trees={trees} sent={offered} onSentDone={() => { setSent(null); dropSent(); }} />
     </>
   );
 }
 
-function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | null; onSentDone: () => void }) {
+function Bucket({ owner, trees, sent, onSentDone }: { owner: Owner; trees?: PlanTrees; sent: PlanText | null; onSentDone: () => void }) {
   const [read, setRead] = useState<ReadResult | null>(null);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<{ text: string; alert: boolean; inUse?: boolean; focus?: boolean } | null>(null);
@@ -174,6 +193,7 @@ function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | nu
               <PlanItem
                 key={plan.id}
                 plan={plan}
+                note={freshnessNote(plan, trees)}
                 onEdit={async (edit) => {
                   const result = await withWorkspaceLock(() => editPlan(deviceStorage(), owner, plan.id, edit));
                   if (result.ok) { after(result, `Saved "${result.plan.name}".`); return null; }
@@ -196,8 +216,10 @@ function Bucket({ owner, sent, onSentDone }: { owner: Owner; sent: PlanText | nu
   );
 }
 
-function PlanItem({ plan, onEdit, onCopy, onDelete, onCopied }: {
+function PlanItem({ plan, note, onEdit, onCopy, onDelete, onCopied }: {
   plan: LocalPlan;
+  /** What changed in its talents since an older game build (savedPlanNote); null when nothing to say. */
+  note: string | null;
   /** Null when it saved, else why not. */
   onEdit: (edit: { name: string; notes: string }) => Promise<string | null>;
   onCopy: () => void;
@@ -210,8 +232,10 @@ function PlanItem({ plan, onEdit, onCopy, onDelete, onCopied }: {
     <li className="space-y-2 py-4">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h3 className="min-w-0 font-semibold text-fg [overflow-wrap:anywhere]">{plan.name}</h3>
-        <span className="text-meta text-muted">{className(plan.classSlug)} · updated {day(plan.updatedAt)}</span>
+        <span className="text-meta text-muted">{className(plan.classSlug)}{madeOn(plan.code) && ` · game build ${madeOn(plan.code)}`} · updated {day(plan.updatedAt)}</span>
       </div>
+      {/* The plan stays as it was saved: opening it shows the calculator's report, and nothing here re-stamps it. */}
+      {note && <p className="text-sm text-fg-2">{note} <a href={openPath(plan)} className="underline decoration-edge underline-offset-4 hover:text-accent">Open in the current calculator</a></p>}
       <p className="text-sm text-fg-2">{setsLine([plan.code, plan.code2], [plan.order, plan.order2])}</p>
       {plan.notes && <p className="whitespace-pre-line text-sm text-fg-2 [overflow-wrap:anywhere]">{plan.notes}</p>}
       <div className="flex flex-wrap items-center gap-x-1">

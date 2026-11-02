@@ -8,7 +8,7 @@ import { CLIENT_TABLES, readClientManifest, readClientMeta, readClientRows, type
 
 /** The columns later steps read, per table (relation edges, item taxonomy, objects, the icon manifest). */
 export const NEEDED_FIELDS: Partial<Record<keyof typeof CLIENT_TABLES, readonly string[]>> = {
-  ItemSparse: ["Display_lang", "OverallQualityID"],
+  ItemSparse: ["Display_lang", "OverallQualityID", "AllowableClass"],
   Item: ["ClassID", "SubclassID", "InventoryType", "IconFileDataID"],
   SpellName: ["Name_lang"],
   SpellMisc: ["SpellID", "SpellIconFileDataID"],
@@ -16,7 +16,11 @@ export const NEEDED_FIELDS: Partial<Record<keyof typeof CLIENT_TABLES, readonly 
   ItemClass: ["ClassID", "ClassName_lang"],
   ItemSubClass: ["ClassID", "SubClassID", "DisplayName_lang", "VerboseName_lang"],
   ItemSet: ["Name_lang", "ItemID"],
-  SkillLineAbility: ["SkillLine", "Spell"],
+  SkillLineAbility: ["SkillLine", "Spell", "ClassMask"],
+  // What each class can equip (client-class-gear): weapon and armor skill lines, who has them from what level, and
+  // what their proficiency spells allow.
+  SkillLine: ["CategoryID"], SkillRaceClassInfo: ["SkillID", "ClassMask", "MinLevel"], ChrClasses: ["Filename"],
+  SpellEquippedItems: ["SpellID", "EquippedItemClass", "EquippedItemSubclass"],
   SpellItemEnchantment: ["Name_lang"],
   SpellReagents: ["SpellID", "Reagent", "ReagentCount"],
   AreaTable: ["AreaName_lang", "ContinentID", "ParentAreaID"],

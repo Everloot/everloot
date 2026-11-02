@@ -7,6 +7,7 @@ import { longDate } from "@/data/wow-forever";
 import { trailFor } from "@/lib/breadcrumbs";
 import { couldBeBluePost, loadTimeline, postPathForUrl } from "@/lib/changes";
 import { newsArticleJsonLd } from "@/lib/jsonld";
+import { FIGURE_SIZE, postFigure } from "../../../../../kb/src/news/post";
 import { bodyForPage, lastChanged, loadNews, newsHref, postDescription, publishedPost, publishedPosts, readingMinutes, relatedPosts, sourceNames } from "@/lib/news";
 import { pageMetadata } from "@/lib/seo";
 import { NewsCard } from "../news-card";
@@ -120,9 +121,19 @@ export default async function NewsArticle(props: { params: Promise<{ slug: strin
             <Prose>
               {body.blocks.map((b, i) => {
                 const heading = headings.find((h) => h.i === i);
-                return heading
-                  ? <h2 key={i} id={heading.id} className="scroll-mt-24 !mt-10 text-[22px] font-semibold leading-snug text-fg sm:text-[24px]">{heading.label}</h2>
-                  : <WikiBlock key={i} block={b} ctx={ctx} />;
+                if (heading) return <h2 key={i} id={heading.id} className="scroll-mt-24 !mt-10 text-[22px] font-semibold leading-snug text-fg sm:text-[24px]">{heading.label}</h2>;
+                // A figure the check refuses (see kb/src/news/post postFigure) is left out rather than drawn as a broken link.
+                const figure = postFigure(b, post.slug);
+                if (!figure) return <WikiBlock key={i} block={b} ctx={ctx} />;
+                if (!("figure" in figure)) return null;
+                const { src, alt, caption } = figure.figure;
+                return (
+                  <figure key={i} data-news-figure className="!mt-8">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- the check holds every figure to FIGURE_SIZE, so the frame is known. */}
+                    <img src={src} alt={alt} width={FIGURE_SIZE.width} height={FIGURE_SIZE.height} loading="lazy" decoding="async" className="aspect-video h-auto w-full rounded-card border border-line object-cover" />
+                    {caption && <figcaption className="mt-2 text-sm leading-snug text-muted">{caption}</figcaption>}
+                  </figure>
+                );
               })}
             </Prose>
           </div>

@@ -34,6 +34,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   releases; each half is harmless without the other.
 
 ### Added
+- Addon, Desktop App and site, behind `EVERLOOT_CHARACTER_LINKS` (off): `/everloot link <code>` writes one link row
+  for the character you are playing, with a code made on the account page. The Desktop App, signed in, sends it only
+  to the account's own link endpoint; uploads never carry link rows. The account page lists your linked characters,
+  linked or frozen, and unlinks them. A link is a claim from the addon file, not proof of ownership.
 - Site and MCP: racial traits from the game files (build-stamped `races.json`, found in game files, unconfirmed).
   Each class page lists, under "Who can be a {Class}", every race's traits with active or passive and the short
   text; `/wow-forever` adds a trait table per faction. New MCP tool `class_races` (protocol 1.20.0): the races that
@@ -305,6 +309,46 @@ Live-client verification is pending. This is a pre-release for WoW: Forever 1.60
   off until `/everloot census on`. The Desktop App sends census rows with its uploads when the player leaves
   the census box ticked on its setup screen, or turns it on in Settings; a setup finished before this keeps
   it off. Still never names, guilds, gear or places, and the site shows only totals.
+
+## [desktop-v0.1.14] - 2026-11-02
+
+### Changed
+- Desktop App: opening the Overview or the Market page no longer reads every save file again to suggest your
+  characters' realms. The suggestions come from the read the app already makes when the file changes (about 165 ms
+  to under 1 ms per open on a large test save).
+- Desktop App: the Characters page and the chat's lookup of your characters work the same way (about 170 to 2 ms on
+  a large test save). The last seven days, the 30-day chart and the latest receipts still count up to the moment you
+  open the page.
+
+## [desktop-v0.1.13] - 2026-11-01
+
+### Fixed
+- Desktop App and companion: after an upload, the character-link step skips a save file that has no link rows instead
+  of parsing it a second time, so a logout is back to two full parses of the save (the heavy synthetic save's longest
+  pause drops from about 620 to 380 ms in the quick benchmark).
+- Desktop App: the tray menu is replaced only when one of its lines changes, not on every status update (each percent
+  of an update download was one), so a menu the player has open is not swapped out under them.
+
+## [desktop-v0.1.12] - 2026-11-01
+
+### Added
+- Desktop App: a new app release shows within the hour instead of the next day. The sidebar shows **Update to X**:
+  one click downloads it and checks it against the release's checksum, and the next click restarts into it. The
+  Overview offers the same, the tray item opens the update panel, and a notification says so once per version while
+  the window is not in front. Where the app cannot install itself (macOS, Linux, the portable exe), the button opens
+  the download. If the installer runs but the old version is still there at the next start, the app says so once
+  instead of offering the same update again unexplained.
+
+### Changed
+- Desktop App: the Market page offers to follow your characters' realms (read from the save file on this computer)
+  in one click, and the Overview does too while the game has no prices. Nothing is requested for those realms until
+  you press Follow; then they are followed realms like any other, and No thanks keeps the offer away. The Overview says
+  what `/ask` does and links to the Ask page.
+- Desktop App: Settings and the README say that uninstalling keeps the data folder, with the account and model keys,
+  chat and save backups in it, that the keys are plain files protected by the user account, and how to remove it all.
+- Desktop App: a logout reads each save file once for its realms, scan ages and pending `/ask` questions, instead of
+  once for each, which roughly halves the longest pause after a logout with a large save (722 to 391 ms on a 14 MB
+  synthetic save, measured with the new `npm run bench`).
 
 ## [desktop-v0.1.11] - 2026-11-01
 

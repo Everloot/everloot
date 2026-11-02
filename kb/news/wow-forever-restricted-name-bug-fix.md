@@ -11,6 +11,11 @@ sources:
   - title: "Blizzard forums (EU): Overly Restrictive Name Check and Fix Incoming - 28 October"
     url: https://eu.forums.blizzard.com/en/wow/t/overly-restrictive-name-check-and-fix-incoming-28-october/638147
 status: published
+hero:
+  src: /news/heroes/wow-forever-restricted-name-bug-fix/wow-forever-restricted-name-bug-fix-clean.webp
+  alt: "Everloot card: Names, Oct 28, 2026. Rejected names get a retry. A bug made the restricted-name check far too strict. The fix goes in with each region's next realm restart. Name check bug: \"con\": Names containing it were blocked; Next restart: When the fix ships, in each region; Retry: Any name told it is restricted; 3: Character slots, shared across rulesets. Footer: per Blizzard, fan recap, not affiliated, everloot.app."
+  thumb: /news/heroes/wow-forever-restricted-name-bug-fix/wow-forever-restricted-name-bug-fix-card.webp
+  share: /news/heroes/wow-forever-restricted-name-bug-fix/wow-forever-restricted-name-bug-fix-share.png
 ---
 
 **TL;DR:** Blizzard confirmed a bug made WoW: Forever's restricted-name check far too strict during name reservations. Names containing "con" were blocked, for example. The fix goes in with the next realm restart in each region. After that, try again any name that got the "That name is restricted" message.

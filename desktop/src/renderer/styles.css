@@ -115,11 +115,10 @@ p { margin: 0; }
 .side-foot .update-btn { flex: none; display: grid; place-items: center; width: 36px; padding: 0; border-radius: var(--radius); border: 1px solid rgb(var(--accent)); background: rgb(var(--accent) / 0.14); color: rgb(var(--accent)); }
 .side-foot .update-btn svg { width: 18px; height: 18px; }
 .side-foot .update-btn:hover, .side-foot .update-btn[aria-expanded="true"] { background: rgb(var(--accent) / 0.26); color: rgb(var(--accent)); }
-.side-foot .update-btn.busy { border-style: dashed; }
-.side-foot .update-btn .pct { font-size: var(--fs-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
 .side-foot .restart-btn { justify-content: center; background: rgb(var(--accent)); color: rgb(var(--accent-ink)); font-weight: 600; border-radius: 9999px; }
 .side-foot .restart-btn:hover { background: rgb(var(--accent)); color: rgb(var(--accent-ink)); filter: brightness(1.08); }
 .side-foot .restart-btn svg { width: 16px; height: 16px; }
+.side-foot .restart-btn.busy, .side-foot .restart-btn.busy:hover { background: rgb(var(--accent) / 0.14); color: rgb(var(--accent)); border: 1px dashed rgb(var(--accent)); filter: none; cursor: progress; font-variant-numeric: tabular-nums; }
 .update-pop { position: fixed; left: calc(var(--rail) + 12px); bottom: 12px; z-index: 40; width: min(400px, calc(100vw - var(--rail) - 24px)); max-height: calc(100vh - 24px); display: flex; flex-direction: column; gap: 10px; padding: 16px 18px; border-radius: 12px; border: 1px solid rgb(var(--edge)); background: rgb(var(--panel)); box-shadow: 0 16px 48px rgb(0 0 0 / 0.45); overscroll-behavior: contain; }
 .update-pop[hidden] { display: none; }
 .update-pop h3 { font-size: var(--fs-body); font-weight: 600; margin: 0 0 6px; }

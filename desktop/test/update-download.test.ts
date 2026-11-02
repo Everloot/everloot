@@ -1,3 +1,6 @@
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 const h = vi.hoisted(() => ({
@@ -39,6 +42,9 @@ const fromPage = { senderFrame: { url: new URL("../src/main/renderer/index.html"
 const call = async (name: string, event: unknown = fromPage) => h.handlers.get(name)!(event);
 const state = async () => await call("state") as import("../src/shared/types").AppState;
 let send: ReturnType<typeof vi.fn>;
+// The app keeps its files under EVERLOOT_DATA_DIR; without it, it would use the real profile on this machine.
+let data: string;
+const note = () => join(data, "updates", "last-attempt.json");
 
 beforeEach(async () => {
   vi.resetModules();
@@ -48,9 +54,11 @@ beforeEach(async () => {
   vi.spyOn(process, "on").mockReturnValue(process);
   send = vi.fn(async () => new Response(JSON.stringify([release("0.1.8")])));
   vi.stubGlobal("fetch", send);
+  data = mkdtempSync(join(tmpdir(), "everloot-update-data-"));
+  vi.stubEnv("EVERLOOT_DATA_DIR", data);
   await import("../src/main/index");
 });
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); rmSync(data, { recursive: true, force: true }); });
 
 test("download refreshes an old offer and skips directly to the newest release", async () => {
   await call("checkForUpdates");
@@ -116,6 +124,17 @@ test("restart still installs a verified installer that is the latest release", a
   await call("updateDownload");
   expect(await call("updateRestart")).toBe(true);
   expect(h.install).toHaveBeenCalledWith("verified-installer.exe");
+  // The next start compares this note with its own version.
+  expect(JSON.parse(readFileSync(note(), "utf8"))).toEqual({ version: "0.1.8" });
+});
+
+test("an installer that does not start leaves no note and says so", async () => {
+  await call("checkForUpdates");
+  await call("updateDownload");
+  h.install.mockRejectedValueOnce(new Error("spawn EACCES"));
+  expect(await call("updateRestart")).toBe(false);
+  expect(existsSync(note())).toBe(false);
+  expect((await state()).updateProgress).toMatchObject({ stage: "failed", error: expect.stringContaining("EACCES") });
 });
 
 test("restart stays open when the fresh release check fails", async () => {

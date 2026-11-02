@@ -1,8 +1,7 @@
 import { BrowserWindow, Notification, app, clipboard, dialog, ipcMain, net, powerMonitor, screen, session, shell } from "electron";
-import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { readAsks } from "../../../companion/src/bridge/asks";
 import { loadProviders } from "../../../companion/src/providers/config";
 import type { AddonInfo, AppState, AskInfo, Job, MarketInfo, PriceLookup, Settings } from "../shared/types";
 import { JOBS } from "../shared/types";
@@ -13,23 +12,23 @@ import { gameRunning, listBackups, restoreBackup } from "./backups";
 import { createBuildsSync } from "./builds";
 import { compareVersions, installAddon, installedAddonVersion, newestAddonRelease, slotAddons } from "./addon";
 import { fetchChanges } from "./changes";
-import { charactersFromFiles } from "./characters";
 import { createChat } from "./chat";
 import { localTools } from "./local-tools";
 import { createEngine } from "./engine";
 import { connectInBrowser } from "./connect";
 import { allowedExternal } from "./external";
 import { candidateRoots, detectGameFolders, foreverSuggestion, realFs, resolvePickedFolder } from "./game-folder";
-import { newestScans, readScanAges, staleScans, summarizeFiles } from "./inspect";
+import { newestScans, staleScans, summarizeFiles } from "./inspect";
 import { onReconnect } from "./online";
 import { companionJobs } from "./jobs";
 import { loginItemOptions } from "./login-item";
-import { itemIdFrom, listRealms, ownRealms, priceRows, readPricesFile } from "./market";
+import { characterRealms, itemIdFrom, listRealms, ownRealms, priceRows, readPricesFile, suggestedRealms } from "./market";
+import { charactersFromFiles, saveFacts } from "./save-facts";
 import { loadSettings, mergeSettings, saveSettings } from "./settings";
 import { allowedPermission, fromAppPage } from "./sender";
 import { createTray } from "./tray";
 import { checkForUpdates, fetchReleases, updateFrom } from "./updates";
-import { downloadUpdate, pruneInstallers, runInstaller } from "./self-update";
+import { downloadUpdate, failedAttempt, forgetAttempt, pruneInstallers, recordAttempt, runInstaller } from "./self-update";
 import { fitWindow, readWindowState, writeWindowState } from "./window-state";
 
 /** The same folder the command line uses (`companion/src/cli.ts` defaultStatePath), so both share sent.json. */
@@ -75,17 +74,9 @@ if (!app.requestSingleInstanceLock()) {
   let updateProgress: AppState["updateProgress"] = { stage: "idle", percent: 0, error: null };
   /** The verified installer, once downloaded, and the version it installs. */
   let downloaded: { path: string; version: string } | null = null;
-  // Scan ages come from parsing each account file; remembered per file size and write time so a broadcast stays cheap.
-  const scanMemo = new Map<string, { key: string; scans: ReturnType<typeof readScanAges> }>();
+  // Scan ages come from parsing each account file once per write (saveFacts), so a broadcast stays cheap.
   const allScans = () => engine.snapshot().files.flatMap((f) => {
-    try {
-      const st = statSync(f), key = `${st.mtimeMs}:${st.size}`;
-      const hit = scanMemo.get(f);
-      if (hit && hit.key === key) return hit.scans;
-      const scans = readScanAges(readFileSync(f, "utf8"));
-      scanMemo.set(f, { key, scans });
-      return scans;
-    } catch { return []; }
+    try { return saveFacts(f).scans; } catch { return []; }
   });
   const chat = createChat(data, () => settings, localTools({
     characters: () => charactersFromFiles(engine.snapshot().files),
@@ -120,8 +111,8 @@ if (!app.requestSingleInstanceLock()) {
   };
   engine.onChange(broadcast);
 
-  // Two system notifications only: answers landed in the game (so the player knows to /reload),
-  // and a newer addon exists (once per run). Nothing else interrupts.
+  // Three system notifications only: answers landed in the game (so the player knows to /reload),
+  // a newer addon exists, and a newer app exists (each once per version). Nothing else interrupts.
   const notify = (title: string, body: string, page: string) => {
     if (!Notification.isSupported()) return;
     const n = new Notification({ title, body, silent: true });
@@ -136,13 +127,22 @@ if (!app.requestSingleInstanceLock()) {
     const m = /^answered (\d+)/.exec(ask.message);
     if (m && Number(m[1]) > 0) notify("Everloot answered in game", `${m[1]} answer(s) written. Type /reload to read them.`, "ask");
   });
-  // The desktop release check at start is a line on the Overview and in the tray, never a notification.
+  // A newer app shows in the sidebar, on the Overview and in the tray, and once per version as a
+  // notification unless the window is in front; clicking it opens the update panel.
+  let desktopNoticed: string | null = null;
   const desktopUpdateLine = async () => {
     try {
       const check = updateFrom(await releases(), app.getVersion(), process.platform, Boolean(process.env.PORTABLE_EXECUTABLE_FILE));
       update = check.latest ? check : null;
-      if (update?.newer) broadcast();
-    } catch { update = null; }
+      if (!update?.newer) return;
+      broadcast();
+      if (update.latest !== desktopNoticed && !win?.isFocused()) {
+        desktopNoticed = update.latest;
+        notify("Everloot Desktop App update", update.installable
+          ? `${update.latest} is out (you run ${update.current}). Click to update; your settings stay.`
+          : `${update.latest} is out (you run ${update.current}). Click to download it.`, "update");
+      }
+    } catch { /* offline: keep what the last check found */ }
   };
   let addonNoticed: string | null = null;
   const addonUpdateNotice = async () => {
@@ -157,8 +157,18 @@ if (!app.requestSingleInstanceLock()) {
       }
     } catch { /* offline; the Addon page will say so */ }
   };
-  /** Both release checks; at start, after the first Start, and once a day. */
-  const checkReleases = () => { if (settings.consentedAt) { void addonUpdateNotice(); void desktopUpdateLine(); } };
+  /**
+   * Both release checks; at start, after the first Start, every hour and when the window is opened
+   * (the release list is cached for ten minutes). The installer that just updated the app is still
+   * running at the first start and cannot be deleted then, so the prune runs here again, though not
+   * while a download is writing its `.part` file.
+   */
+  const checkReleases = () => {
+    if (!settings.consentedAt) return;
+    void addonUpdateNotice();
+    void desktopUpdateLine();
+    if (updateProgress.stage !== "downloading") pruneInstallers(join(data, "updates"), app.getVersion());
+  };
 
   const releases = cached(10 * 60 * 1000, () => fetchReleases(fetch, `everloot-desktop/${app.getVersion()}`));
   const knownRealms = cached(10 * 60 * 1000, () => listRealms(settings.endpoint), () => settings.endpoint);
@@ -170,6 +180,7 @@ if (!app.requestSingleInstanceLock()) {
   };
 
   const show = (page?: string) => {
+    checkReleases();
     if (!win) createWindow();
     else { if (win.isMinimized()) win.restore(); win.show(); win.focus(); }
     if (page && win) {
@@ -319,9 +330,11 @@ if (!app.requestSingleInstanceLock()) {
     if (answer.response !== 0) return false;
     for (let i = 0; i < 120 && JOBS.some((j) => engine.snapshot().jobs[j].state === "running"); i++) await new Promise((r) => setTimeout(r, 500));
     // The app quits only once the installer has started; if it cannot start, the app stays open and says so.
+    recordAttempt(join(data, "updates"), downloaded.version);
     try {
       await runInstaller(downloaded.path);
     } catch (err) {
+      forgetAttempt(join(data, "updates"));
       downloaded = null;
       updateProgress = { stage: "failed", percent: 0, error: `the installer did not start (${err instanceof Error ? err.message : String(err)})` };
       broadcast();
@@ -413,7 +426,9 @@ if (!app.requestSingleInstanceLock()) {
     const scans = newestScans(allScans());
     const dir = addonsDir();
     const inGame = dir ? readPricesFile(dir)?.realms ?? null : null;
-    const base = { own: ownRealms(files), followed: settings.market.realms, last: jobs.lastMarket(), scans, inGame };
+    const own = ownRealms(files);
+    const suggested = suggestedRealms(characterRealms(files), own, settings.market.realms, settings.market.dismissed);
+    const base = { own, followed: settings.market.realms, suggested, last: jobs.lastMarket(), scans, inGame };
     try {
       const k = await knownRealms();
       return { ...base, known: k.realms, dataAsOf: k.dataAsOf, error: null };
@@ -432,7 +447,7 @@ if (!app.requestSingleInstanceLock()) {
   });
   handle("askInfo", (): AskInfo => {
     const pending = engine.snapshot().files.map((file) => {
-      try { return { file, asks: readAsks(readFileSync(file, "utf8")) }; } catch { return { file, asks: [] }; }
+      try { return { file, asks: saveFacts(file).asks }; } catch { return { file, asks: [] }; }
     });
     let providers: string[] = [], providerError: string | null = null;
     try { providers = loadProviders(join(data, "config.json")).map((p) => p.name); }
@@ -510,6 +525,12 @@ if (!app.requestSingleInstanceLock()) {
     applyLoginItem();
     // The installer that brought this version, and older ones, are no longer needed.
     pruneInstallers(join(data, "updates"), app.getVersion());
+    // An installer that ran but left this version in place: said once, and the update row offers it again.
+    const missed = failedAttempt(join(data, "updates"), app.getVersion());
+    if (missed) {
+      updateProgress = { stage: "failed", percent: 0, error: `the installer for ${missed} ran, but ${app.getVersion()} is still installed. Try again, or download it from the release page` };
+      engine.log("error", `The update to ${missed} did not install; ${app.getVersion()} is still installed.`);
+    }
     engine.start(settings);
     // A laptop that slept through the last retry would otherwise wait for the next logout.
     powerMonitor.on("resume", () => engine.recover());
@@ -520,8 +541,8 @@ if (!app.requestSingleInstanceLock()) {
     if (!settings.consentedAt || !(hidden && settings.startInTray)) createWindow();
     broadcast();
     checkReleases();
-    // The app sits in the tray for weeks; look again once a day.
-    setInterval(checkReleases, 24 * 60 * 60 * 1000);
+    // The app sits in the tray for weeks; look again every hour, so a release shows up the same day.
+    setInterval(checkReleases, 60 * 60 * 1000);
     // Saved builds once at start, then every 15 minutes; each turn does nothing without a key.
     void builds.tick();
     builds.start();

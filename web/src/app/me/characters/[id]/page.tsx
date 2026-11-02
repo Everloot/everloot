@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import BuildsTable from "@/components/builds/BuildsTable";
 import CharacterForm from "@/components/builds/CharacterForm";
 import { className, describeBuilds } from "@/components/builds/describe";
+import { publishedClassChanges } from "@/lib/talents/freshness-records";
 import { CLASS_TEXT } from "@/components/talents/TalentTreeView";
 import { Container, DataTitle, EmptyState } from "@/components/ui";
 import { signInPath } from "@/lib/auth/return-to";
@@ -38,7 +39,7 @@ export default async function CharacterPage({ params }: Params) {
   const character = data.characters.find((c) => c.id === id);
   if (!character) notFound();
   const builds = data.builds.filter((b) => b.characterId === id);
-  const facts = await describeBuilds(builds);
+  const facts = await describeBuilds(builds, publishedClassChanges);
 
   return (
     <Container>

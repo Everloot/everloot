@@ -126,7 +126,7 @@ export default function Page() {
       </List>
 
       <Callout kind="note">
-        <p>Before WoW: Forever launches on 4 November 2026, and until 3 installs loot the same source, there are few or no public drop rates and the answer can be an empty list. The empty output below is what an empty answer gives; the rows shown after it are placeholders, so you can see the shape.</p>
+        <p>Drop rates come only from loot players record from WoW: Forever&apos;s launch on 4 November 2026, and a source has no public drop rate until 3 installs loot it, so the answer can be an empty list. The empty output below is what an empty answer gives; the rows shown after it are placeholders, so you can see the shape.</p>
       </Callout>
 
       <H2 id="steps">Steps</H2>

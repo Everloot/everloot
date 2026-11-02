@@ -17,6 +17,7 @@ import { formatScanReport, loadManifest, scanBuild } from "./client-scan.js";
 import { writeClientAchievements } from "./client-achievements.js";
 import { writeClientEncounters } from "./client-encounters.js";
 import { writeClientMounts } from "./client-mounts.js";
+import { writeClientClassGear } from "./client-class-gear.js";
 import { writeClientLayer } from "./client-layer.js";
 import { writeRaceTable } from "./client-races.js";
 import { evaluateWritten, formatAnswerEval, openAiCompatible, sampleKeyed } from "./answer-eval.js";
@@ -69,7 +70,7 @@ import { checkGuides } from "./guides/check.js";
 import { CHOOSER_FILES, checkClassChooser } from "./guides/class-chooser.js";
 import { GUIDES_DIR, loadGuideCheckContext, readClassChooserFiles, readGuideFiles } from "./guides/data.js";
 import { checkNews } from "./news/check.js";
-import { NEWS_DIR, publishedWikiSlugs, readNewsPosts } from "./news/data.js";
+import { figureSize, NEWS_DIR, publishedWikiSlugs, readNewsPosts } from "./news/data.js";
 import { checkWiki } from "./wiki/check.js";
 import { loadCategories, loadKnownData, loadPrivatePathPattern, readWikiPages, WIKI_DIR } from "./wiki/data.js";
 
@@ -192,6 +193,7 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
     (every boss encounter the game files list per instance, from DungeonEncounter, one build-stamped file the
     instance pages merge with player reports player-first. Pages only, as above)
   client-mounts <snapshot.sqlite> [--out ../web/src/data/game-data/client-mounts.json]
+  client-class-gear <snapshot.sqlite> [--out ../web/src/data/game-data/client-class-gear.json]
     (every mount the game files list with its spell and riding skill, one build-stamped file the collections tool
     shows beside player uploads player-first. Pages only, as above)
   item-names <snapshot.sqlite> --wiki <knowledge base or release .sqlite> [--ledger data/item-names/ledger.json] [--out data/assets]
@@ -254,7 +256,8 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
     the index bar for published pages, private paths and AI credits. Exits 1 on any problem. See wiki/README.md)
   news-check [--dir <kb>/news]
     (the news posts' check: front matter, slugs, dates, [[links]] against the published wiki pages, tokens, the
-    prose bar for published posts, private paths and AI credits. Exits 1 on any problem. See news/README.md)
+    prose bar for published posts, figures and their committed files, private paths and AI credits. Exits 1 on any
+    problem. See news/README.md)
   guide-check [--dir <kb>/guides] [--previous <folder>]
     (the guides' check: front matter, review and history, codes and spend orders against the site's talent
     trees, sections, sources, links and tokens. --previous is a copy of kb/guides from before the change, such
@@ -685,6 +688,13 @@ async function main(): Promise<number> {
       console.log(`${table.build.product} ${table.build.version}: ${Object.keys(table.mounts).length} mounts -> ${path}`);
       return 0;
     }
+    case "client-class-gear": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-class-gear.json";
+      const table = writeClientClassGear(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${Object.keys(table.classes).length} classes, ${Object.keys(table.restricted).length} class-restricted items -> ${path}`);
+      return 0;
+    }
     case "client-diff": {
       if (args.length < 2) break;
       const diff = diffSnapshots(args[0], args[1]);
@@ -942,7 +952,7 @@ async function main(): Promise<number> {
     }
     case "news-check": {
       const dir = flags.get("dir") || NEWS_DIR;
-      const result = checkNews(readNewsPosts(dir), { wikiPages: publishedWikiSlugs(), privatePaths: loadPrivatePathPattern(), today: new Date().toISOString().slice(0, 10) });
+      const result = checkNews(readNewsPosts(dir), { wikiPages: publishedWikiSlugs(), privatePaths: loadPrivatePathPattern(), today: new Date().toISOString().slice(0, 10), figureSize });
       for (const p of result.problems) console.error(`${p.file}${p.line ? `:${p.line}` : ""}: ${p.message}`);
       const published = result.posts.filter((p) => p.fm.status === "published").length;
       console.log(`${result.posts.length} posts (${published} published, ${result.posts.length - published} draft), ${result.problems.length} problems`);

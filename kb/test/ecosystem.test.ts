@@ -263,4 +263,12 @@ describe("handleEcosystemProjects", () => {
   test("an empty board says so and does not invent rows", () => {
     expect(handleEcosystemProjects(view, { board: "rising", limit: 10 }, NOW)).toMatch(/^No projects match/);
   });
+  test("an empty installed board says it needs install counts from players, which start at launch", () => {
+    const none = buildView(reg, snapshot({ alpha: metrics(), beta: metrics() }), null, NOW, FOREVER);
+    const before = handleEcosystemProjects(none, { board: "installed", limit: 10 }, NOW);
+    expect(before).toMatch(/^No projects on this board yet\. It ranks projects by install counts from players' Everloot uploads, and those start at launch \(2026-11-04 23:00 UTC\)\./);
+    expect(before).not.toContain("unavailable right now");
+    const after = handleEcosystemProjects(none, { board: "installed", limit: 10 }, new Date("2026-11-10T00:00:00Z"));
+    expect(after).toMatch(/^No projects on this board yet\. It ranks projects by install counts from players' Everloot uploads, and no project has 3 reporting installs yet\./);
+  });
 });
