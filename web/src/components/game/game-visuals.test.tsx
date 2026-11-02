@@ -270,6 +270,14 @@ test("zones: each zone's own map picture, small, before its name; held-back zone
   expect(html).not.toMatch(/data-page-banner|data-game-credit/);
 });
 
+test("zones: a listed zone whose map picture is held back keeps its name and gets no picture", async () => {
+  vi.stubEnv("NEXT_PUBLIC_GAME_ASSETS_URL", BASE);
+  vi.stubGlobal("fetch", bucket({ ...siteManifest, maps: { ...siteManifest.maps, "1429": { ...siteManifest.maps["1429"], heldBack: true } } }));
+  const html = await render(() => ZonesPage());
+  expect(html).toMatch(/<a href="\/database\/zones\/1429-elwynn-forest"[^>]*>Elwynn Forest<\/a>/);
+  expect(html).not.toContain("maps/1429");
+});
+
 test("changes: a compact title row like the database lists, no loading-screen banner and no credit block (it is site-wide)", async () => {
   vi.stubEnv("NEXT_PUBLIC_GAME_ASSETS_URL", BASE);
   vi.stubGlobal("fetch", bucket());
