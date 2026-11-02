@@ -219,12 +219,17 @@ async function main(): Promise<void> {
       const hit = time(quick ? 3 : 10, 1, () => summarizeFiles([f], sentPath, "https://everloot.app"));
       urow.push([n.toLocaleString("en-US"), `${ms(hit.p50)} / ${ms(hit.p95)}`]);
     }
-    const missRuns: number[] = [];
+    const missRuns: number[] = [], afterPush: number[] = [];
     for (let i = 0; i < (quick ? 2 : 5); i++) {
       writeFileSync(f, syntheticSave(SCENARIOS[1], i + 1));
       const t = performance.now(); summarizeFiles([f], join(root, "sent-10000.json"), "https://everloot.app"); missRuns.push(performance.now() - t);
+      // In the app the state push after the write has read the file already; the page then takes that parse.
+      writeFileSync(f, syntheticSave(SCENARIOS[1], i + 101));
+      saveFacts(f);
+      const u = performance.now(); summarizeFiles([f], join(root, "sent-10000.json"), "https://everloot.app"); afterPush.push(performance.now() - u);
     }
-    say(`After a write (cache miss: parseEverlootLua + three parseEverlootTable): ${ms(pct(missRuns, 50))} / ${ms(pct(missRuns, 95))} ms.\n`);
+    say(`After a write, read first by the page (one shared parseEverlootTable): ${ms(pct(missRuns, 50))} / ${ms(pct(missRuns, 95))} ms.\n`);
+    say(`After a write the state push already read (the app's order): ${ms(pct(afterPush, 50))} / ${ms(pct(afterPush, 95))} ms.\n`);
     say(table(["sent.json event ids", "a later open or state push (cache hit, sent.json read again)"], urow));
     rmSync(root, { recursive: true, force: true });
   }

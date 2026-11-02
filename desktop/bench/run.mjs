@@ -28,7 +28,7 @@ const probe = {
     b.onLoad({ filter: /[\\/]web[\\/]src[\\/]lib[\\/]sv-parse\.ts$/ }, (args) => ({
       loader: "ts",
       contents: wrap(readFileSync(args.path, "utf8"), ["parseEverlootLua", "parseEverlootTable"], ["parseEverlootLua", "parseEverlootTable"].map((n) =>
-        `export function ${n}(text: string) { const t = performance.now(); try { return __orig_${n}(text); } finally { (globalThis as any).__benchProbe?.("${n}", performance.now() - t); } }`).join("\n")),
+        `export function ${n}(text: string, ...rest: any[]) { const t = performance.now(); try { return (__orig_${n} as any)(text, ...rest); } finally { (globalThis as any).__benchProbe?.("${n}", performance.now() - t); } }`).join("\n")),
     }));
     b.onLoad({ filter: /[\\/]companion[\\/]src[\\/]sent-state\.ts$/ }, (args) => ({
       loader: "ts",
