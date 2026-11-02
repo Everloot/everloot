@@ -13,7 +13,9 @@ import { WORLD_MAP } from "@/lib/world-map";
 import { zoneByMapId, zoneHref } from "@/lib/zones";
 import { slugify } from "../../../../../kb/src/lore-slug";
 import { PREP_SECTION } from "../../../../../kb/src/wiki/page";
-import { ADVICE_NOTE, DungeonBosses, DungeonGlance } from "../dungeon-facts";
+import { ADVICE_NOTE, DungeonBosses, DungeonGlance, DungeonLoadingArt, DungeonRecordedFacts } from "../dungeon-facts";
+import { loadingArt, loadSiteAssets } from "@/lib/game-assets";
+import { loadDungeonRecords } from "@/lib/wiki-dungeon-records";
 import { WikiBlock, type TextContext } from "../wiki-text";
 
 // Pages change only with a deploy, but their data blocks will draw on player uploads, so each page is
@@ -83,6 +85,8 @@ export default async function WikiArticle(props: { params: Promise<{ slug: strin
   const bound = isBound(page);
   const dungeon = isDungeonType(page.type);
   const facts = dungeon ? await loadDungeonFacts(page) : null;
+  const records = facts ? await loadDungeonRecords(facts.row) : null;
+  const art = facts ? loadingArt(await loadSiteAssets(), facts.row.instanceMapId) : null;
   const blocks = bound ? DATA_BLOCKS[page.type] : [];
   const path = wikiHref(page.slug);
   const trail = [...trailFor("/wiki")!, { name: page.title, path }];
@@ -99,6 +103,7 @@ export default async function WikiArticle(props: { params: Promise<{ slug: strin
         />
 
         {facts && <DungeonGlance facts={facts} />}
+        <DungeonLoadingArt art={art} />
         {bound && !dungeon && (
           <Card as="section" aria-labelledby="at-a-glance" className="mb-8">
             <div data-wiki-placeholder="infobox">
@@ -118,6 +123,7 @@ export default async function WikiArticle(props: { params: Promise<{ slug: strin
         </Prose>
 
         {facts && <DungeonBosses facts={facts} />}
+        {records && <DungeonRecordedFacts records={facts?.unreachable ? { ...records, loot: [], quests: [], unavailable: true } : records} />}
 
         {blocks.length > 0 && (
           <section aria-labelledby="database-blocks" data-wiki-placeholder="blocks" className="mt-12">

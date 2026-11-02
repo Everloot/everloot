@@ -5,7 +5,7 @@ sentence, kept in `web/src/data/wow-forever.ts` as `LAUNCH` and `LAUNCH_AT`; las
 below are relative to that hour, "L".
 
 This page is the order of work, not the detail. Each step points at the document that holds the detail.
-It was written on 2026-10-23 from what is in the repository and refreshed on 2026-10-31 (addon 0.3.14 Alpha, Desktop App 0.1.10, build 70707 and production receipts). A step marked **[unverified]** has no tested
+It was written on 2026-10-23 from what is in the repository and refreshed on 2026-11-02 (addon 0.3.15 Alpha, Desktop App 0.1.14, build 70707 and production receipts). A step marked **[unverified]** has no tested
 procedure behind it yet; the list of those is at the end.
 
 Two rules for this page and for anything done from it:
@@ -17,6 +17,10 @@ Two rules for this page and for anything done from it:
 - The build watch never merges. Maintainer-authorized changes still use protected pull requests and the checked deployment workflow. The Live switch stays draft until players can play; a scheduled preflight does not authorize an early switch.
 
 Owners: **Carlos** supplies account sign-in and real game observations. **Agent** handles repository work, public checks and already-authorized account operations. Keep separately owned authentication activation out of the launch switch.
+
+The [ChatGPT readiness check](2026-11-02-chatgpt-launch-readiness.md) records directory publication, the remaining
+guild-tool review, the public tool-contract command, traffic baseline and quota decision. Recheck its in-app
+prompt table before launch and at T+1 hour. Endpoint tests alone do not establish ChatGPT answer quality.
 
 ## What changes at launch
 
