@@ -42,6 +42,9 @@ const MARKS: Record<string, { viewBox: string; mark: ReactNode }> = {
 /** Google's own "G" file, served from the site (no Google script or request). */
 export const GOOGLE_G = "/brand/google/g-logo.svg";
 
+/** Whether the provider has a mark here (Battle.net and email do not). */
+export const hasProviderLogo = (provider: string) => provider === "google" || Object.hasOwn(MARKS, provider);
+
 /** The provider's mark at `size` px, decorative (the button or row names the provider). Null for a provider without one. */
 export default function ProviderLogo({ provider, size = 18 }: { provider: string; size?: number }) {
   if (provider === "google") {

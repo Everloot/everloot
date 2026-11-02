@@ -54,7 +54,8 @@ licence. Rules and takedown contact:
 
 ### Sign-in provider marks
 
-The sign-in buttons (`web/src/components/SocialSignIn.tsx`) show each provider's logo, copied unchanged from the provider's own kit on 2026-11-02 and served from our site (no provider
+The sign-in buttons (`web/src/components/SocialSignIn.tsx`) and the linked sign-ins on `/account`
+(`web/src/app/account/integrations.tsx`) show each provider's logo, copied unchanged from the provider's own kit on 2026-11-02 and served from our site (no provider
 script or request). The marks stay their owners' trademarks; they are not ours and are outside our AGPL and CC
 BY-SA licences. They name the provider on its own sign-in button and never suggest that it endorses Everloot.
 

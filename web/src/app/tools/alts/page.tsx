@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Container, PageHeader } from "@/components/ui";
+import { Container } from "@/components/ui";
+import YourEverlootHeader from "@/components/YourEverloot";
 import { trailFor } from "@/lib/breadcrumbs";
 import { loadSiteAssets } from "@/lib/game-assets";
 import { pageMetadata } from "@/lib/seo";
@@ -25,7 +26,8 @@ export default async function AltsPage() {
   const icons = workspaceIcons(await loadSiteAssets());
   return (
     <Container>
-      <PageHeader
+      <YourEverlootHeader
+        current="/tools/alts"
         title={TITLE}
         lede="Your characters and the plans each uses, kept in this browser. No account needed, and nothing is uploaded. Add them by hand, or read them from your addon's Everloot.lua; the file stays on this page."
         trail={trailFor("/tools/alts")!}

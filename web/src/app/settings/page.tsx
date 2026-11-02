@@ -6,7 +6,8 @@ import MainCharacterButton from "@/components/settings/MainCharacterButton";
 import ProfileForm from "@/components/settings/ProfileForm";
 import StatusForm from "@/components/settings/StatusForm";
 import { CLASS_TEXT } from "@/components/talents/TalentTreeView";
-import { Badge, Container, DataTable, DataTitle, type Column } from "@/components/ui";
+import { Badge, Container, DataTable, type Column } from "@/components/ui";
+import YourEverlootHeader from "@/components/YourEverloot";
 import type { AccountShell, ShellCharacter } from "@/lib/account-shell-types";
 import { loadAccountShell, readProfile, toSettings, type ProfileSettings } from "@/lib/account-shell";
 import { signInPath } from "@/lib/auth/return-to";
@@ -34,7 +35,7 @@ export default async function SettingsPage() {
   } catch {
     return (
       <Container>
-        <DataTitle title="Settings" />
+        <YourEverlootHeader current="/settings" title="Settings" />
         <p role="alert" className="text-fg-2">Your settings are unavailable right now. Try again in a minute.</p>
       </Container>
     );
@@ -65,7 +66,7 @@ export default async function SettingsPage() {
 
   return (
     <Container>
-      <DataTitle title="Settings" meta={shell.handle ? `@${shell.handle}` : "No handle yet"} />
+      <YourEverlootHeader current="/settings" title="Settings" meta={shell.handle ? `@${shell.handle}` : "No handle yet"} />
       <nav aria-label="Settings sections" className="mb-6 flex flex-wrap gap-x-4 gap-y-1 border-b border-line pb-2 text-meta">
         <a href="#profile" className="text-fg-2 hover:text-accent">Profile</a>
         <a href="#status" className="text-fg-2 hover:text-accent">Status</a>
