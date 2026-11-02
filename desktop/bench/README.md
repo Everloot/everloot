@@ -19,7 +19,10 @@
   stub site that answers at once. After the first run, each logout is a new file write: the real file watcher picks it
   up after the app's settle times (5 s upload, 2 s ask). Every state push does what `index.ts`'s broadcast does with
   the save file (the scan ages behind `staleScans`). "Longest event-loop stall" is the largest gap between ticks of a
-  1 ms timer while the jobs run. It includes everything synchronous, not only parsing.
+  1 ms timer while the jobs run. It includes everything synchronous, not only parsing. Each size runs twice: "main"
+  is the app before the save reader (every parse on the main thread, the push reading `saveFacts`), "worker" is the
+  app now (the push peeks at the last facts, and `run.mjs` bundles `src/main/parse-worker.ts` as the app ships it,
+  without the counters, so the parses counted are the main thread's only).
 - **sent.json.** One install's receipts with 10k, 100k and 1M event ids in the addon's id format.
 - **Machine.** A 12-core desktop CPU on Windows 11, Node 22. Run-to-run noise on this machine is about ±25%: one
   heavy parse measured between 180 and 290 ms (p50) across three full runs. No real save file was available, so every
@@ -72,6 +75,38 @@ The pages that parsed on their own now read the shared parse too:
   the summary that depends on the file is kept per write, and the last seven days, the 30 days and the receipts are
   worked out at each call.
 
+### The save reader (worker thread)
+
+The parses above now run on one worker thread (`src/main/save-reader.ts`, `src/main/parse-worker.ts`). It sends back
+the facts the pages and jobs read (0.19 MB serialized at heavy, 1–2 ms to take on the main thread) and, for the
+upload, each record's event id (0.74 MB, under 1 ms), then only the rows still unsent. Taking the whole parse back
+would cost 42–51 ms at heavy and about 250 ms at extreme.
+
+Longest event-loop stall per steady logout, p50 / p95 (quick runs, 2 logouts each), main thread parses in brackets:
+
+| size | before (main) | after (worker) | before, loaded machine | after, loaded machine |
+| --- | --- | --- | --- | --- |
+| small | 31 / 36 (2) | 17 / 18 (0) | 51 / 54 (2) | 17 / 18 (0) |
+| heavy | 295 / 332 (2) | 89 / 114 (0) | 402 / 478 (2) | 109 / 215 (0) |
+| extreme | 1,455 / 1,569 (2) | 365 / 386 (0) | 1,948 / 2,630 (2) | 422 / 512 (0) |
+
+The first two columns are from a run where one heavy parse took 172 ms (p50), close to this machine's usual. The last
+two are from a run while other programs kept the CPU at 90–100%, where the same parse took 314 ms. The first run
+predates one change: the upload now yields a turn after the unsent rows arrive, so their deserialization and the
+upload's checks are no longer one block. No quiet run was possible after it.
+
+Heavy is near the 100 ms line but not reliably under it. What is left is not parsing:
+
+- the upload's own checks. Rows it keeps here (named, census without the switch, rows the schema refuses) are never
+  marked sent, so each logout takes them across again and `prepareUpload` validates them again: 6,751 rows at heavy,
+  45–60 ms. In the synthetic heavy save 4,303 of them are rows the schema refuses, which a real save should rarely
+  have, so a real heavy save would spend less here;
+- `sendLinks` reads the whole file to look for link rows (16–54 ms at heavy, about 80 ms at extreme);
+- the backup's compare and copy (6–21 ms at heavy).
+
+The first upload of an install still takes every row across (about 42 ms to deserialize at heavy) and validates them
+all; it happens once.
+
 ### F11: sent.json
 
 | event ids | file | load at launch | save after one batch | Upload page read |
@@ -97,12 +132,16 @@ main-process page reload behind it (the `ownRealms` parse above), and the F12 ch
 
 ## Recommendation, ranked
 
-1. **F12: over the threshold. A partial fix is in this branch.** A heavy logout blocked the main thread for about
+1. **F12: over the threshold; mostly fixed.** A heavy logout blocked the main thread for about
    1.1 s of parsing and stalled for 0.7 s at once. Sharing one parse per write (`src/main/save-facts.ts`) halves the
    parse time and removes the page-reload parses. That brings small saves under 100 ms per logout. Heavy saves are
    still above it, because one parse of a 14 MB file takes 200–300 ms by itself. Next steps, in order:
    - give the Upload page's `summarizeFiles` and the Characters page the same shared parse (done);
-   - move the remaining parses to a worker thread, which is the only change that gets a heavy save under 100 ms.
+   - move the remaining parses to a worker thread (done: no parse is left on the main thread, and the heavy stall
+     went from about 300 ms to about 90–110 ms);
+   - to get heavy reliably under 100 ms: stop validating the rows the upload keeps here on every logout (run
+     `prepareUpload` for them in the worker, or remember per event id that a row was kept), and let the worker answer
+     whether the file holds link rows instead of `sendLinks` reading it.
 2. **F11: no fix warranted.** At a plausible 3-month size, sent.json loads in 20–45 ms and saves in about 10 ms, far
    under 200 ms. If it ever matters, the safe cap is to keep only the ids still present in that install's save file
    after each upload: rows that left the file can never be sent again.

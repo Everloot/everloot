@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const outfile = join(tmpdir(), `everloot-bench-${process.pid}.cjs`);
+const workerFile = join(tmpdir(), `everloot-bench-worker-${process.pid}.cjs`);
 
 /** Renames `export function name(` to a private one and exports a timed wrapper under the old name. */
 function wrap(source, names, wrapper) {
@@ -43,14 +44,17 @@ export function createSentState(path: string, onRecovery?: (message: string) => 
   },
 };
 
-await build({
+const node = {
   bundle: true, platform: "node", format: "cjs", target: "node22", external: ["electron"], logLevel: "warning",
   alias: { zod: join(root, "..", "web", "node_modules", "zod") },
-  entryPoints: [join(root, "bench", "bench.ts")], outfile, plugins: [probe],
-});
+};
+await build({ ...node, entryPoints: [join(root, "bench", "bench.ts")], outfile, plugins: [probe] });
+// The save reader's worker as the app ships it, without the counters: its parses are not the main thread's.
+await build({ ...node, entryPoints: [join(root, "src", "main", "parse-worker.ts")], outfile: workerFile });
 try {
-  const r = spawnSync(process.execPath, [outfile, ...process.argv.slice(2)], { stdio: "inherit" });
+  const r = spawnSync(process.execPath, [outfile, ...process.argv.slice(2)], { stdio: "inherit", env: { ...process.env, EVERLOOT_BENCH_WORKER: workerFile } });
   process.exitCode = r.status ?? 1;
 } finally {
   rmSync(outfile, { force: true });
+  rmSync(workerFile, { force: true });
 }

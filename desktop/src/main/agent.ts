@@ -171,7 +171,7 @@ async function plain(o: AgentOptions): Promise<AgentReply> {
 async function runTool(mcp: Client, local: LocalTool[], name: string, input: Record<string, unknown>, steps: ChatStep[], sources: string[], signal?: AbortSignal): Promise<string> {
   let out: string;
   const mine = local.find((t) => t.name === name);
-  try { out = mine ? mine.run(input) : textOf(await mcp.callTool({ name, arguments: input }, undefined, { signal })); }
+  try { out = mine ? await mine.run(input) : textOf(await mcp.callTool({ name, arguments: input }, undefined, { signal })); }
   catch (err) { out = `Tool error: ${err instanceof Error ? err.message : String(err)}`; }
   // Stopped: the loop ends here rather than sending the model another round.
   signal?.throwIfAborted();
