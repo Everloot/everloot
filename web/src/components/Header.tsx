@@ -11,9 +11,10 @@ import { TOOL_GROUPS, toolGroups } from "@/data/tools";
 
 type NavLink = { label: string; href: string };
 
-/** The top bar: six items, Tools opening the grouped menu below. */
+/** The top bar: seven items, Tools opening the grouped menu below. Ask is the chat, also listed in the menu. */
 export const PRIMARY: NavLink[] = [
   { label: "Database", href: "/database" },
+  { label: "Ask", href: "/chat" },
   { label: "Map", href: "/map" },
   { label: "Changes", href: "/changes" },
   { label: "Lore", href: "/lore" },
@@ -23,7 +24,8 @@ export const PRIMARY: NavLink[] = [
 // The Tools menu lives in data/tools.ts so the home page lists the same groups.
 export { TOOL_GROUPS };
 
-const TOOL_HREFS = [...TOOL_GROUPS.flatMap((g) => g.links.map((l) => l.href)), "/guilds"];
+// A menu entry that is also in the bar (Ask) marks the bar item current, not Tools.
+const TOOL_HREFS = [...TOOL_GROUPS.flatMap((g) => g.links.map((l) => l.href)), "/guilds"].filter((href) => !PRIMARY.some((l) => l.href === href));
 
 const isCurrent = (path: string, href: string) => path === href || path.startsWith(`${href}/`);
 

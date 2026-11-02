@@ -22,6 +22,7 @@ import { hasContent, publicZones, zoneContents, zoneHref } from "@/lib/zones";
 import { loadNews, newsSitemapPaths } from "@/lib/news";
 import { wikiSitemapPaths } from "@/lib/wiki";
 import { LEGACY_PERKS } from "@/data/game-data/legacy-perks";
+import { CLIENT_PROFESSIONS, professionHref, RECIPES_EXTRACTED_AT } from "@/lib/professions";
 
 // Rendered per request, as the database and auctions sitemaps are: built ahead of time it reflects only what the
 // build could read (the Cloudflare build has no storage keys, so item names, zones and dungeons were missing).
@@ -74,7 +75,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }))).flat();
   const guideRoutes: { path: string; lastModified?: Date }[] = indexedGuides.length ? [{ path: "/guides" }, ...indexedGuides.map((g) => ({ path: guideHref(g.slug), lastModified: g.reviewed ? new Date(g.reviewed.on) : undefined }))] : [];
   const classRoutes = classesIndexable(guides) ? ["/classes", ...TALENT_CLASSES.filter((slug) => classHubIndexable(slug, guides)).map((slug) => `/classes/${slug}`)] : [];
-  const paths = [...new Set([...staticRoutes, ...rankingRoutes, ...talentRoutes, ...classRoutes, ...itemRoutes, ...zoneRoutes, ...instanceRoutes, ...catalogRoutes, ...tools.filter((tool) => tool.status !== "coming-soon").map(toolHref), ...allDocsPages().map((page) => page.href)])];
+  // Each profession the game files list, with its recipes.
+  const professionRoutes = CLIENT_PROFESSIONS.map((p) => professionHref(p.slug));
+  const paths = [...new Set([...staticRoutes, ...rankingRoutes, ...talentRoutes, ...professionRoutes, ...classRoutes, ...itemRoutes, ...zoneRoutes, ...instanceRoutes, ...catalogRoutes, ...tools.filter((tool) => tool.status !== "coming-soon").map(toolHref), ...allDocsPages().map((page) => page.href)])];
 
   const timeline = await loadTimeline();
   const newestChange = timeline[0]?.at;
@@ -91,6 +94,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     if (path.startsWith("/database/items")) return new Date(CLIENT_LAYER.build.extractedAt);
     if (path === "/tools/raid" || path === "/tools/talents" || path.startsWith("/tools/talents/")) return TALENT_DATA_EXTRACTED_AT;
     if (path === "/tools/legacy") return new Date(LEGACY_PERKS.build.extractedAt);
+    if (path.startsWith("/tools/professions/")) return RECIPES_EXTRACTED_AT;
     if (path === "/wow-forever") return new Date(LAUNCH.checkedOn);
     return undefined;
   };

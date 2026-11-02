@@ -161,6 +161,69 @@ test("with player pages off, the census says nothing about looking up players", 
   expect(page).not.toContain('href="/players/opt-out"');
 });
 
+const filtered = async (search: Record<string, string>) => renderToStaticMarkup(await CensusPage({ searchParams: Promise.resolve(search) }));
+
+test("every row of the census tables links to the census filtered to it, in the chosen window", async () => {
+  store.loadCensus.mockResolvedValue(corpus(RECORDS));
+  const page = await html("launch");
+  expect(page).toContain('href="/census?faction=horde&amp;window=launch"');
+  expect(page).toContain('href="/census?race=troll&amp;window=launch"');
+  expect(page).toContain('href="/census?class=hunter&amp;window=launch"');
+  expect(page).toContain('href="/census?level=60&amp;window=launch"');
+  expect(page).toContain('aria-label="Census filters"');
+});
+
+test("filtered to a race: its count and share, then by class, and no day-by-day trend", async () => {
+  store.loadCensus.mockResolvedValue(corpus(RECORDS));
+  const page = await filtered({ race: "troll", window: "launch" });
+  const words = text(page);
+  expect(words).toContain("About 30 characters, 21% of all characters counted.");
+  // Every Troll is a Priest, so the Priest cell would be the Troll count minus zeros: the grid hides it, and so does the filter.
+  expect(words).toMatch(/Troll: by class .*Priest not enough reports/);
+  // Level is not crossed with race, so there is no split by level band.
+  expect(words).not.toContain("by level band");
+  expect(page).toContain('href="/census?race=troll&amp;class=priest&amp;window=launch"');
+  expect(page).not.toContain('aria-labelledby="trend"');
+  // The window tabs keep the filter.
+  expect(page).toMatch(/<a href="\/census\?race=troll"/);
+});
+
+test("a filter with no published total says so and lists the parts without a share; the ruleset says what it means", async () => {
+  store.loadCensus.mockResolvedValue(corpus(RECORDS));
+  const words = text(await filtered({ faction: "alliance", class: "hunter", ruleset: "forever" }));
+  expect(words).toContain("The census does not publish one total for this combination");
+  expect(words).toMatch(/Alliance Hunter: by race .*Human 40 /);
+  expect(words).not.toMatch(/Alliance Hunter: by race .*Share/);
+  expect(words).toContain("Ruleset: every realm counts as Forever until realms are mapped to rulesets.");
+});
+
+test("the race menu lists Skyborne under either faction filter", async () => {
+  store.loadCensus.mockResolvedValue(corpus(RECORDS));
+  expect(await filtered({ faction: "horde" })).toContain('href="/census?faction=horde&amp;race=skyborne"');
+  expect(await filtered({ faction: "alliance" })).toContain('href="/census?faction=alliance&amp;race=skyborne"');
+});
+
+test("a level band with any other filter says it is too fine to publish and shows no number", async () => {
+  store.loadCensus.mockResolvedValue(corpus(RECORDS));
+  const searches: Record<string, string>[] = [{ level: "60", faction: "alliance" }, { level: "60", race: "human" }, { level: "60", class: "warrior" }];
+  for (const search of searches) {
+    const page = await filtered(search);
+    expect(text(page), JSON.stringify(search)).toContain("This is too fine to publish.");
+    expect(page, JSON.stringify(search)).not.toContain('aria-labelledby="by-');
+    expect(text(page), JSON.stringify(search)).not.toMatch(/About \d+ characters,/);
+  }
+  // A level band alone is a published cell.
+  expect(text(await filtered({ level: "20-29" }))).toMatch(/About \d+ characters, \d+% of all characters counted\./);
+});
+
+test("a filtered page shows no number the unfiltered census hides", async () => {
+  store.loadCensus.mockResolvedValue(corpus(RECORDS));
+  // Gnome Mage is 4 characters: hidden on the census, and still hidden however it is reached.
+  const words = text(await filtered({ race: "gnome" }));
+  expect(words).toMatch(/Mage not enough reports/);
+  expect(text(await filtered({ race: "gnome", class: "mage" }))).toContain("Gnome Mage: not enough reports.");
+});
+
 test("the page has its own title, description and canonical", () => {
   expect(metadata.title).toBe("WoW Forever Census: Races, Classes and Levels");
   expect(metadata.description).toContain("10 characters");

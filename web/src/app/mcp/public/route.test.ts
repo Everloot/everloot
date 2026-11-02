@@ -12,10 +12,11 @@ import { openDb } from "../../../../../kb/src/db";
 import { replaceSourceRows } from "../../../../../kb/src/entities";
 import { snapshot } from "../../../../../kb/src/snapshot";
 
-const deps = vi.hoisted(() => ({ mcp: vi.fn(), loadCorpus: vi.fn() }));
+const deps = vi.hoisted(() => ({ mcp: vi.fn(), loadCorpus: vi.fn(), recordUsage: vi.fn() }));
 const changeFixtures = vi.hoisted(() => ({ entries: [] as import("@/lib/changes").ChangeEntry[] }));
 vi.mock("@/lib/changes", () => ({ loadTimeline: async () => changeFixtures.entries }));
 vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { mcp: deps.mcp } }));
+vi.mock("@/lib/usage-metrics", async (original) => ({ ...(await original<typeof import("@/lib/usage-metrics")>()), recordUsage: deps.recordUsage }));
 vi.mock("@/lib/upload-store", () => ({ uploadStore: { loadCorpus: deps.loadCorpus } }));
 
 let release = "";
@@ -30,6 +31,7 @@ beforeAll(async () => {
 });
 beforeEach(() => {
   deps.mcp.mockReset().mockResolvedValue({ allowed: true, retryAfter: 0 });
+  deps.recordUsage.mockReset();
   deps.loadCorpus.mockReset().mockResolvedValue({ uploads: 0, records: [], dataAsOf: "2026-10-10T06:30:00.000Z" });
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); });
@@ -87,8 +89,10 @@ test("a spent quota is 429 with retry-after; a quota outage fails closed", async
   const limited = await POST(initialize());
   expect(limited.status).toBe(429);
   expect(limited.headers.get("retry-after")).toBe("90");
+  expect(deps.recordUsage).toHaveBeenCalledWith("mcp_public.http_rate_limited");
   deps.mcp.mockRejectedValueOnce(new Error("Quota storage unavailable"));
   expect((await POST(initialize())).status).toBe(503);
+  expect(deps.recordUsage).toHaveBeenCalledWith("mcp_public.http_unavailable");
 });
 
 test("every answer carries the licence and credit line in its headers", async () => {

@@ -9,7 +9,12 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { playerPagesOn } from "@/lib/player-pages";
 import { guildsOn } from "@/lib/guild-switch";
 import { PLAYER_PAGE_SHOWS } from "../players/player-view";
-import { Card, Container, DataTable, EmptyState, Explainer, Input, LinkTabs, PageHeader, SectionHeading, type Column } from "@/components/ui";
+import {
+  Card, Container, DataTable, EmptyState, Explainer, FilterBar, Input, LinkTabs, PageHeader, SectionHeading, type Column, type FilterControl,
+} from "@/components/ui";
+import {
+  activeDims, censusHref, filterCensus, parseCensusFilter, type CensusDim, type CensusFilter, type FilteredCensus,
+} from "@/lib/census-filter";
 import {
   CENSUS_CLASSES, CENSUS_RACES, FACTIONS, HIDDEN_LABEL, HIDDEN_MEANING, LEVEL_BANDS, type CensusCount, type CensusView, type CensusWindow,
 } from "../../../../kb/src/census";
@@ -33,14 +38,22 @@ function Count({ count }: { count: CensusCount }) {
   return count === null ? <span className="text-muted">{HIDDEN_LABEL}</span> : <>{number(count)}</>;
 }
 
-type Row = { key: string; label: string; count: CensusCount };
+type Row = { key: string; label: string; count: CensusCount; href?: string };
 
-/** One slice: a row per group with its count and its share of the window's characters. */
-function CountTable({ id, title, item, rows, total }: { id: string; title: string; item: string; rows: Row[]; total: number }) {
+/**
+ * One slice: a row per group with its count and its share of `total` (the window's characters, or the filter's
+ * count; no share column when that is hidden). A row with an `href` links to the census filtered to it.
+ */
+function CountTable({ id, title, item, rows, total }: { id: string; title: string; item: string; rows: Row[]; total: number | null }) {
   const columns: Column<Row>[] = [
-    { key: "label", header: item, cell: (row) => <span className="font-medium">{row.label}</span> },
-    { key: "count", header: "Characters", numeric: true, cell: (row) => <Count count={row.count} /> },
     {
+      key: "label", header: item,
+      cell: (row) => row.href ? <Link href={row.href} className={`${link} font-medium`}>{row.label}</Link> : <span className="font-medium">{row.label}</span>,
+    },
+    { key: "count", header: "Characters", numeric: true, cell: (row) => <Count count={row.count} /> },
+  ];
+  if (total !== null) {
+    columns.push({
       key: "share",
       header: "Share",
       cell: (row) => row.count !== null && (
@@ -51,8 +64,8 @@ function CountTable({ id, title, item, rows, total }: { id: string; title: strin
           </div>
         </div>
       ),
-    },
-  ];
+    });
+  }
   return (
     <section aria-labelledby={id}>
       <SectionHeading id={id}>{title}</SectionHeading>
@@ -127,9 +140,72 @@ function LookUpPlayer({ players, guilds }: { players: boolean; guilds: boolean }
 }
 
 const WINDOWS = [
-  { id: "week", label: "Last 7 days", href: "/census" },
-  { id: "launch", label: "Since launch", href: "/census?window=launch" },
+  { id: "week", label: "Last 7 days" },
+  { id: "launch", label: "Since launch" },
 ] as const;
+
+const BY_TITLE: Record<CensusDim, [title: string, item: string]> = {
+  faction: ["By faction", "Faction"], race: ["By race", "Race"], class: ["By class", "Class"], level: ["By level band", "Level band"],
+};
+
+/** The filter menus: each choice is a link that keeps the other filters and the window. */
+function filterControls(f: CensusFilter, chosen: "week" | "launch"): FilterControl[] {
+  const href = (over: Partial<CensusFilter>) => censusHref({ ...f, ...over }, chosen);
+  const menu = (key: CensusDim, label: string, all: string, options: { label: string; value: string }[]): FilterControl => ({
+    type: "menu", key, label,
+    options: [
+      { label: all, href: href({ [key]: undefined }), on: f[key] === undefined, reset: true },
+      ...options.map((o) => ({ label: o.label, href: href({ [key]: o.value }), on: f[key] === o.value })),
+    ],
+  });
+  // Skyborne is one race name on both sides, so the race menu lists it once. The faction goes first: deduplicating
+  // first would keep only the Horde entry, and an Alliance filter would then drop it.
+  const sided = CENSUS_RACES.filter((r) => !f.faction || r.faction === f.faction);
+  const races = sided.filter((r, i) => sided.findIndex((x) => x.token === r.token) === i);
+  return [
+    menu("faction", "Faction", "Both", FACTIONS.map((x) => ({ label: x, value: x }))),
+    menu("race", "Race", "All races", races.map((r) => ({ label: r.name, value: r.token }))),
+    menu("class", "Class", "All classes", CENSUS_CLASSES.map((c) => ({ label: c.name, value: c.token }))),
+    menu("level", "Level", "All levels", LEVEL_BANDS.map((b) => ({ label: b.label, value: b.id }))),
+  ];
+}
+
+const NOTE: Record<NonNullable<FilteredCensus["note"]>, string> = {
+  impossible: "No character can be that combination, so there is nothing to count.",
+  "both-sides": "Skyborne play on both sides with different classes, so the census counts each side apart and never adds them up. Pick a side.",
+  "no-total": "The census does not publish one total for this combination, only the parts below. Adding them up would not be a count: a hidden part could be anything.",
+  "too-fine": "This is too fine to publish. The census counts level bands on their own only, not by faction, race or class, so that a hidden count can't be worked out from the others. Remove a filter.",
+};
+
+/** The census under filters: the one published count for the whole filter, then each split it leaves open. */
+function Filtered({ view: v, window: w }: { view: FilteredCensus; window: CensusWindow }) {
+  const total = v.headline?.count ?? null;
+  return (
+    <div className="space-y-12">
+      <section aria-labelledby="filtered" className="space-y-3">
+        <SectionHeading id="filtered">{v.label}</SectionHeading>
+        {v.headline && (
+          <p className="max-w-[65ch] text-lg text-fg-2">
+            {total === null
+              ? <>{v.label}: {HIDDEN_LABEL}.</>
+              : <>About {number(total)} characters{w.characters ? <>, {percent(total, w.characters)} of all characters counted</> : null}.</>}
+          </p>
+        )}
+        {v.note && <p className="max-w-[65ch] text-fg-2">{NOTE[v.note]}</p>}
+      </section>
+      {v.breakdowns.map((b) => (
+        <CountTable
+          key={b.by}
+          id={`by-${b.by}`}
+          title={`${v.label}: ${BY_TITLE[b.by][0].toLowerCase()}`}
+          item={BY_TITLE[b.by][1]}
+          total={total}
+          rows={b.rows}
+        />
+      ))}
+    </div>
+  );
+}
 
 /** The census counting rule, word for word as the page has always stated it. */
 const ruleOf = (view: CensusView) =>
@@ -161,8 +237,11 @@ function Headline({ view, window: w }: { view: CensusView; window: CensusWindow 
   );
 }
 
-export default async function CensusPage({ searchParams }: { searchParams?: Promise<{ window?: string }> }) {
-  const chosen = (await searchParams)?.window === "launch" ? "launch" : "week";
+export default async function CensusPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
+  const search = (await searchParams) ?? {};
+  const chosen = search.window === "launch" ? "launch" : "week";
+  const filter = parseCensusFilter(search);
+  const filtering = activeDims(filter).length > 0;
   const { view, unreachable, dataAsOf } = await loadCensus();
   const w = view?.windows[chosen];
   const ready = !unreachable && view && w;
@@ -193,17 +272,30 @@ export default async function CensusPage({ searchParams }: { searchParams?: Prom
               {view.launched && (
                 <LinkTabs
                   label="Census window"
-                  tabs={WINDOWS.map((option) => ({ href: option.href, label: option.label, current: option.id === chosen }))}
+                  tabs={WINDOWS.map((option) => ({ href: censusHref(filter, option.id), label: option.label, current: option.id === chosen }))}
                 />
               )}
               <Headline view={view} window={w} />
+              {!w.collecting && (
+                <FilterBar
+                  label="Census filters"
+                  controls={filterControls(filter, chosen)}
+                  active={activeDims(filter).length}
+                  clearHref={censusHref({ ruleset: filter.ruleset }, chosen)}
+                />
+              )}
+              {filter.ruleset && (
+                <p className="text-cell text-muted">Ruleset: every realm counts as Forever until realms are mapped to rulesets.</p>
+              )}
             </div>
 
-            {!w.collecting && (
+            {!w.collecting && filtering && <Filtered view={filterCensus(w, filter, chosen)} window={w} />}
+
+            {!w.collecting && !filtering && (
               <>
-                <CountTable id="factions" title="Factions" item="Faction" total={w.characters!} rows={FACTIONS.map((f) => ({ key: f, label: f, count: w.factions.find((x) => x.faction === f)!.count }))} />
-                <CountTable id="classes" title="Classes" item="Class" total={w.characters!} rows={w.classes.map((c) => ({ key: c.class, label: CLASS_NAME.get(c.class)!, count: c.count }))} />
-                <CountTable id="races" title="Races" item="Race" total={w.characters!} rows={w.races.map((r) => ({ key: `${r.faction}/${r.race}`, label: `${RACE_NAME.get(r.race)} (${r.faction})`, count: r.count }))} />
+                <CountTable id="factions" title="Factions" item="Faction" total={w.characters!} rows={FACTIONS.map((f) => ({ key: f, label: f, count: w.factions.find((x) => x.faction === f)!.count, href: censusHref({ ...filter, faction: f }, chosen) }))} />
+                <CountTable id="classes" title="Classes" item="Class" total={w.characters!} rows={w.classes.map((c) => ({ key: c.class, label: CLASS_NAME.get(c.class)!, count: c.count, href: censusHref({ ...filter, class: c.class }, chosen) }))} />
+                <CountTable id="races" title="Races" item="Race" total={w.characters!} rows={w.races.map((r) => ({ key: `${r.faction}/${r.race}`, label: `${RACE_NAME.get(r.race)} (${r.faction})`, count: r.count, href: censusHref({ ...filter, race: r.race, faction: r.race === "Skyborne" ? r.faction : undefined }, chosen) }))} />
                 <section aria-labelledby="grid" className="space-y-6">
                   <SectionHeading
                     id="grid"
@@ -213,12 +305,12 @@ export default async function CensusPage({ searchParams }: { searchParams?: Prom
                   </SectionHeading>
                   {FACTIONS.slice().reverse().map((f) => <RaceClassGrid key={f} faction={f} window={w} />)}
                 </section>
-                <CountTable id="levels" title="Level bands" item="Level band" total={w.characters!} rows={LEVEL_BANDS.map((b) => ({ key: b.id, label: b.label, count: w.levels.find((l) => l.band === b.id)!.count }))} />
+                <CountTable id="levels" title="Level bands" item="Level band" total={w.characters!} rows={LEVEL_BANDS.map((b) => ({ key: b.id, label: b.label, count: w.levels.find((l) => l.band === b.id)!.count, href: censusHref({ ...filter, level: b.id }, chosen) }))} />
               </>
             )}
 
             {/* The trend comes from the 7-day window, so it shows once that window has numbers, whichever window is chosen. */}
-            {!view.windows.week.collecting && (
+            {!view.windows.week.collecting && !filtering && (
               <section aria-labelledby="trend">
                 <SectionHeading id="trend" note="Characters active each UTC day, under the same rule.">The last 7 days, day by day</SectionHeading>
                 <DataTable
