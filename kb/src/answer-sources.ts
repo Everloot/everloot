@@ -169,7 +169,9 @@ async function knowledgeHits(db: ReleaseSource, question: string, limit: number)
   const add = (hits: SearchHit[]) => { for (const hit of hits) if (!seen.has(hit.id) && out.length < limit) { seen.add(hit.id); out.push(hit); } };
   add(await search(db, question, limit));
   const names = question.match(/\p{Lu}[\p{L}'-]+(?:\s+\p{Lu}[\p{L}'-]+)*/gu) ?? [];
-  for (const name of names) if (name.length >= 3) add(await search(db, name, 3));
+  // A standalone asking word or game name is not another entity in the question. Searching "What"
+  // alone falls back to that literal word and introduces unrelated book and quest pages.
+  for (const name of names) if (name.length >= 3 && !/^(?:who|what|which|where|when|why|how|show|tell|please|qué|quién|dónde|cómo|wow|forever|world|warcraft)$/iu.test(name)) add(await search(db, name, 3));
   if (out.length) return { hits: out, some: false };
   add(await searchSomeWords(db, question, limit));
   return { hits: out, some: out.length > 0 };
@@ -188,7 +190,12 @@ export async function answerSources(
   const pages = await loreUrls(db, found);
   const hits = found.map((hit) => loreEvidence(hit, pages.get(hit.id)));
   const curated = hits.filter((e) => e.kind === "curated");
-  const lore = hits.filter((e) => e.kind === "lore");
+  const loreHits = hits.filter((e) => e.kind === "lore");
+  // Once a question names an article we found, keep that context instead of unrelated pages that
+  // happen to mention it (a dungeon's musical or pet-battle edition, for example). Broad questions
+  // without an exact named article keep their explicitly marked search fallback.
+  const directLore = loreHits.filter((e) => mentions(question, e.source.title));
+  const lore = directLore.length ? directLore : loreHits;
   // What the game-data files say about the things the question names: ids and facts, labelled unconfirmed.
   // Observed facts first, then Everloot's own, then the files (current build), then the 2023 wiki. Observed and files
   // facts about the question's names are all kept; curated and wiki pages fill what the limit leaves. Last, a note for
@@ -208,6 +215,7 @@ export function formatAnswerSources(result: AnswerSources, corpus: boolean | "un
   const lines: string[] = [];
   if (result.someWords) lines.push(SOME_WORDS);
   if (result.evidence.length === 0) lines.push("No evidence found for that question. Nothing here is invented: try other words or an exact name.");
+  if (result.evidence.some((e) => e.kind === "lore")) lines.push("Archive lore is historical context, not confirmation of Forever gameplay. Do not infer recorded gameplay facts from it. Game-file facts remain unconfirmed; missing observations remain unrecorded.");
   for (const e of result.evidence) {
     const support = e.support !== undefined ? `, ${e.support} installs` : "";
     lines.push(`- [${KIND_LABEL[e.kind]}${support}] ${e.claim}\n  Source: ${e.source.url} (${e.licence}${e.asOf ? `, as of ${e.asOf.slice(0, 10)}` : ""})`);
