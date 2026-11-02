@@ -3,10 +3,18 @@ import { answerOrigin, NO_SOURCED_ANSWER, sourceLink } from "@/lib/chat/agent";
 import type { ChatMessage } from "@/lib/chat/store";
 import ItemResult from "./ItemResult";
 
-const link = "underline underline-offset-4 hover:text-accent break-all";
-
 /** An everloot.app page as its path, which says what it is: /database/item/2589. */
 const pagePath = (url: string) => url.replace(/^https:\/\/(?:www\.)?everloot\.app/, "") || "/";
+
+const KINDS: [RegExp, string][] = [
+  [/^\/database\/items?\//, "Item"], [/^\/database\/npcs?\//, "NPC"], [/^\/database\/quests?\//, "Quest"],
+  [/^\/database\/objects?\//, "Object"], [/^\/database\/spells?\//, "Spell"], [/^\/database\/zones?\//, "Zone"],
+  [/^\/lore\//, "Lore"], [/^\/changes(?:\/|$)/, "Change"], [/^\/tools\//, "Tool"],
+];
+/** What an Everloot page is, from its path: Item, NPC, Quest… */
+export const pageKind = (path: string) => KINDS.find(([re]) => re.test(path))?.[1] ?? "Page";
+
+const card = "flex min-h-11 min-w-0 flex-col justify-center rounded-control border border-line bg-panel px-3 py-1.5 transition-colors hover:border-accent";
 
 /** Search-only replies are the tools' raw hits; their Source and More lines are shown as links instead. */
 function shownText(m: ChatMessage): string {
@@ -46,16 +54,28 @@ export function AssistantMessage({ m, copied, onCopy, onChoose = () => {}, onSav
       <div ref={body} className="whitespace-pre-wrap break-words leading-7 text-fg">{shownText(m)}</div>
       {m.item && <ItemResult item={m.item} onChoose={onChoose} onSave={onSaveItem} />}
       {everloot && (
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs text-fg-2">
-          <span className="rounded-full border border-accent px-2 text-accent">From Everloot</span>
-          {pages.map((p) => <a key={p} href={p} className={link}>{pagePath(p)}</a>)}
-          {cited.length > 0 && (
-            <span>
-              Cited:{" "}
-              {cited.map((c, i) => (
-                <span key={c.href}>{i > 0 && ", "}<a href={c.href} target="_blank" rel="noopener noreferrer" className={link}>{c.label}</a></span>
+        <div className="space-y-2 text-xs text-fg-2">
+          <span className="inline-block rounded-full border border-accent px-2 text-accent">From Everloot</span>
+          {/* The pages behind the answer as cards: what each is, and its path. Cited sources open in a new tab. */}
+          {(pages.length > 0 || cited.length > 0) && (
+            <ul aria-label="Sources" className="grid gap-2 sm:grid-cols-2">
+              {pages.map((p) => (
+                <li key={p} className="flex">
+                  <a href={p} className={`${card} w-full`}>
+                    <span className="font-mono text-muted">{pageKind(pagePath(p))}</span>{" "}
+                    <span className="break-all text-fg">{pagePath(p)}</span>
+                  </a>
+                </li>
               ))}
-            </span>
+              {cited.map((c) => (
+                <li key={c.href} className="flex">
+                  <a href={c.href} target="_blank" rel="noopener noreferrer" className={`${card} w-full`}>
+                    <span className="font-mono text-muted">Cited<span className="sr-only"> (opens in a new tab)</span></span>{" "}
+                    <span className="break-all text-fg">{c.label}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       )}

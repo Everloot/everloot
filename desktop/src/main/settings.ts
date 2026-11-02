@@ -20,6 +20,7 @@ export function defaultSettings(): Settings {
     consentedAt: null,
     launchAtLogin: false,
     startInTray: true,
+    dataNoticeDismissed: false,
   };
 }
 
@@ -56,6 +57,7 @@ export function mergeSettings(base: Settings, patch: unknown): Settings {
     consentedAt: "consentedAt" in p ? (p.consentedAt === null ? null : str(p.consentedAt) ?? base.consentedAt) : base.consentedAt,
     launchAtLogin: bool(p.launchAtLogin, base.launchAtLogin),
     startInTray: bool(p.startInTray, base.startInTray),
+    dataNoticeDismissed: bool(p.dataNoticeDismissed, base.dataNoticeDismissed),
   };
 }
 

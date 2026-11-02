@@ -98,6 +98,9 @@ export default async function GuildPage(props: Params) {
 
           <section aria-labelledby="roster" className="space-y-6">
             <SectionHeading id="roster">Roster</SectionHeading>
+            {board && loaded.namesWithheld && (
+              <p className="text-sm text-fg-2">The officers&apos; roster is not shown right now: it could not be checked against the characters who asked to be hidden.</p>
+            )}
             {officerRoster.length > 0 && (
               <div className="space-y-2">
                 <h3 className="text-cell font-medium text-fg">Published by the officers{board?.memberCount ? ` (${number(board.memberCount)} members)` : ""}</h3>
