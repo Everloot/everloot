@@ -7,8 +7,9 @@ vi.mock("next/link", () => ({
 }));
 vi.mock("next/navigation", () => ({ redirect: (to: string) => { throw new Error(`NEXT_REDIRECT ${to}`); } }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers({ cookie: "everloot.session_token=s" }) }));
-const auth = vi.hoisted(() => ({ getUser: vi.fn(), state: vi.fn() }));
+const auth = vi.hoisted(() => ({ getUser: vi.fn(), state: vi.fn(), assets: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ getUser: auth.getUser, siteUrl: () => "https://everloot.app" }));
+vi.mock("@/lib/game-assets", () => ({ loadSiteAssets: auth.assets, launchArt: () => null }));
 vi.mock("@/lib/auth/device-accounts", async () => ({
   addAccountState: auth.state,
   MAX_DEVICE_ACCOUNTS: 5,
@@ -26,6 +27,7 @@ beforeEach(() => {
   vi.stubEnv("EVERLOOT_PROFILES", "1");
   auth.getUser.mockReset().mockResolvedValue({ id: "u1", name: "Thrall#1" });
   auth.state.mockReset().mockResolvedValue("ready");
+  auth.assets.mockReset().mockResolvedValue(null);
 });
 afterEach(() => { vi.unstubAllEnvs(); });
 
@@ -39,6 +41,8 @@ test("Add another account keeps the signed-in account on the page and comes back
 test("a session with no multi-session cookie goes to get one first, once", async () => {
   auth.state.mockResolvedValue("needs-cookie");
   await expect(SignInPage(add())).rejects.toThrow("NEXT_REDIRECT /api/me/accounts/add");
+  // The redirect does not wait for the panel's art.
+  expect(auth.assets).not.toHaveBeenCalled();
   // Back with ready=1 and still none: no loop, and no sign-in that would orphan the account.
   const html = renderToStaticMarkup(await SignInPage(add({ ready: "1" })));
   expect(html).toContain("Adding an account is unavailable right now.");

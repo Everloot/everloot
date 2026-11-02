@@ -25,7 +25,10 @@ The site ships [Leaflet](https://leafletjs.com/) 1.9.4 (BSD-2-Clause, Volodymyr 
 ## Media
 
 The site self-hosts the Geist and Geist Mono fonts by Vercel (SIL Open Font License 1.1) from the
-`geist` npm package. The favicon
+`geist` npm package, and Google Sans Medium (Latin subset, SIL Open Font License 1.1, copyright 2025 The Google
+Sans Project Authors) for the Sign in with Google button only, from the
+[Google Fonts css2 API](https://fonts.googleapis.com/css2?family=Google+Sans:wght@500), as
+`web/public/brand/google/GoogleSans-Medium-latin.woff2` with its licence in `web/public/brand/google/OFL.txt`. The favicon
 (`web/src/app/icon.svg`) and the social card (`web/src/app/opengraph-image.tsx`) are our own. The
 addon uses an icon from the game client (`Interface\Icons\INV_Misc_Coin_02`) by path; no game art
 is included in this repository.
@@ -48,6 +51,23 @@ the map layer (zone rectangles, continents and instances, entrance points) may b
 marked game-data files with a README saying it is Blizzard's and outside our
 licence. Rules and takedown contact:
 [`docs/DATA_POLICY.md`](docs/DATA_POLICY.md).
+
+### Sign-in provider marks
+
+The sign-in buttons (`web/src/components/SocialSignIn.tsx`) show each provider's logo, copied unchanged from the provider's own kit on 2026-11-02 and served from our site (no provider
+script or request). The marks stay their owners' trademarks; they are not ours and are outside our AGPL and CC
+BY-SA licences. They name the provider on its own sign-in button and never suggest that it endorses Everloot.
+
+| Mark | Source | Terms we follow | In this repository |
+|---|---|---|---|
+| Google "G" | [Sign in with Google button bundle](https://developers.google.com/static/identity/images/signin-assets.zip), file `Android + Web/SVG/Dark/Theme=Dark, Show text=Yes, Shape=Pill, Platform=Android+Web.svg`, cropped to the logo (the button outline and the text removed; the logo's paths, gradient and filters unchanged) | [Sign in with Google branding guidelines](https://developers.google.com/identity/branding-guidelines): the dark theme's colours, Google Sans Medium, its spacing, an approved label, the current "G" unaltered | `web/public/brand/google/g-logo.svg` |
+| Microsoft logo | [`ms-symbollockup_mssymbol_19.svg`](https://learn.microsoft.com/en-us/entra/identity-platform/media/howto-add-branding-in-apps/ms-symbollockup_mssymbol_19.svg) | [Sign in with Microsoft branding guidelines](https://learn.microsoft.com/en-us/entra/identity-platform/howto-add-branding-in-apps): the logo unaltered, "Sign in with Microsoft", the dark-theme button | `web/src/components/ProviderLogo.tsx` |
+| Twitch Glitch | [Twitch brand package](https://brand.twitch.com/uploads/Twitch-Brand.zip), file `Twitch Logos/02. Glitch/01. Twitch Purple/glitch_flat_purple.svg` | Logo Usage Guidelines (Speedrun Edition) v3.0, in the same package: core palette, no stretching, effects or low-contrast colours; [Twitch trademark guidelines](https://legal.twitch.com/en/legal/trademark/) | `web/src/components/ProviderLogo.tsx` |
+| Discord symbol | [Discord brand assets](https://discord.com/branding), the Blurple symbol ([`Discord-Symbol-Blurple.svg`](https://cdn.discordapp.com/assets/content/a736b95923ddbc155e828651c92471292e40727655d770a06cec89c48ba0b41f.zip)) | The same page: the logo not edited, recoloured, distorted or reconfigured, digital use only, no implied sponsorship | `web/src/components/ProviderLogo.tsx` |
+
+Google and the Google logo are trademarks of Google LLC. Microsoft and the Microsoft logo are trademarks of the
+Microsoft group of companies. Twitch and the Glitch logo are trademarks of Twitch Interactive, Inc. Discord and the
+Discord logo are trademarks of Discord Inc. Battle.net's button has no logo: Blizzard publishes no licence for one.
 
 ## Dependencies
 
