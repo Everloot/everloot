@@ -6,6 +6,29 @@ import { safeReturnTo } from "@/lib/auth/return-to";
 import { AUTH_BUTTON } from "./AuthShell";
 import ProviderLogo from "./ProviderLogo";
 
+const FOCUS = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+
+/**
+ * Google and Microsoft set how their sign-in buttons look, so theirs are not Everloot's pill. Google's is the dark
+ * theme of the Sign in with Google guidelines: #131314 fill, 1 px #8E918F stroke, #E3E3E3 Google Sans Medium 14/20,
+ * 12 px before the logo and after the text, 10 px between, the "G" at 20 px; wider than the bundled asset with the
+ * logo kept at the start and the text centred, as Google's own button does. Microsoft's follows its dark-theme
+ * asset: #2F2F2F, white Segoe UI Semibold 15 px, the 21 px logo 12 px in, 41 px tall, square corners. Each keeps
+ * one of its approved labels whatever the page, so "Opening …" shows below the buttons instead of in them.
+ */
+const BRANDED: Partial<Record<string, { button: string; logo: number; label: string }>> = {
+  google: {
+    button: `grid h-10 w-full grid-cols-[20px_minmax(0,1fr)_20px] items-center gap-[10px] rounded-full border border-[#8E918F] bg-[#131314] px-3 text-[14px] font-medium leading-5 text-[#E3E3E3] [font-family:Google_Sans,Roboto,Arial,sans-serif] disabled:cursor-wait ${FOCUS}`,
+    logo: 20,
+    label: "Continue with Google",
+  },
+  microsoft: {
+    button: `grid h-[41px] w-full grid-cols-[21px_minmax(0,1fr)_21px] items-center gap-3 bg-[#2F2F2F] px-3 text-[15px] font-semibold text-[#FFFFFF] [font-family:Segoe_UI,system-ui,sans-serif] disabled:cursor-wait ${FOCUS}`,
+    logo: 21,
+    label: "Sign in with Microsoft",
+  },
+};
+
 /** The same OAuth controls for sign-in, sign-up and linking from an existing account. */
 export default function SocialSignIn({ providers, returnTo, mode = "sign-in", addAccount = false }: {
   providers: readonly (SocialProvider | "battlenet")[];
@@ -44,15 +67,21 @@ export default function SocialSignIn({ providers, returnTo, mode = "sign-in", ad
   return (
     <div className="w-full space-y-3">
       <div className="grid gap-2" aria-label={mode === "link" ? "Link a sign-in method" : "Other ways to sign in"}>
-        {providers.map((provider) => (
-          <button key={provider} type="button" className={`${AUTH_BUTTON} disabled:cursor-wait`} disabled={busy !== null}
-            aria-busy={busy === provider} onClick={() => start(provider)}>
-            <ProviderLogo provider={provider} />
-            <span>{busy === provider ? `Opening ${PROVIDER_NAMES[provider]}…`
-              : `${mode === "link" ? "Link" : "Continue with"} ${PROVIDER_NAMES[provider]}`}</span>
-          </button>
-        ))}
+        {providers.map((provider) => {
+          const brand = BRANDED[provider];
+          return (
+            <button key={provider} type="button" className={brand?.button ?? `${AUTH_BUTTON} disabled:cursor-wait`} disabled={busy !== null}
+              aria-busy={busy === provider} onClick={() => start(provider)}>
+              <ProviderLogo provider={provider} size={brand?.logo} />
+              <span className={brand ? "truncate text-center" : undefined}>
+                {brand?.label ?? `${mode === "link" ? "Link" : "Continue with"} ${PROVIDER_NAMES[provider]}`}
+              </span>
+              {brand && <span aria-hidden="true" />}
+            </button>
+          );
+        })}
       </div>
+      {busy && <p role="status" className="text-sm text-fg-2">Opening {PROVIDER_NAMES[busy]}…</p>}
       {error && <p role="alert" className="text-sm text-fg">{error}</p>}
     </div>
   );

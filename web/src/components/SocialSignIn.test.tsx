@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { readFileSync } from "node:fs";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -56,14 +57,49 @@ test("retrying an add-account sign-in keeps its add-account context", async () =
   expect(JSON.parse(String(fetcher.mock.calls[0][1].body)).errorCallbackURL).toBe("/sign-in?flow=social&returnTo=%2F&add=1&ready=1");
 });
 
-test("each button carries its provider's logo and keeps it while the pending label shows", async () => {
+test("each button carries its provider's logo and keeps it, and its label, while the sign-in opens", async () => {
   vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => {})));
   await act(async () => root.render(<SocialSignIn providers={["google", "microsoft", "twitch", "discord"]} />));
   const buttons = [...container.querySelectorAll("button")];
-  expect(buttons.map((b) => b.querySelector("svg")?.getAttribute("data-provider-logo"))).toEqual(["google", "microsoft", "twitch", "discord"]);
-  expect(buttons.every((b) => b.querySelector("svg")?.getAttribute("aria-hidden") === "true")).toBe(true);
+  expect(buttons.map((b) => b.querySelector("[data-provider-logo]")?.getAttribute("data-provider-logo"))).toEqual(["google", "microsoft", "twitch", "discord"]);
+  expect(buttons.every((b) => b.querySelector("[data-provider-logo]")?.getAttribute("aria-hidden") === "true")).toBe(true);
+  expect(buttons.map((b) => b.textContent)).toEqual(["Continue with Google", "Sign in with Microsoft", "Continue with Twitch", "Continue with Discord"]);
   await act(async () => buttons[1].click());
-  expect(buttons[1].textContent).toBe("Opening Microsoft…");
+  expect(buttons[1].textContent).toBe("Sign in with Microsoft");
   expect(buttons[1].getAttribute("aria-busy")).toBe("true");
   expect(buttons[1].querySelector('[data-provider-logo="microsoft"]')).not.toBeNull();
+  expect(container.querySelector('[role="status"]')?.textContent).toBe("Opening Microsoft…");
+});
+
+test("Google's button is the dark theme of its guidelines, with Google's own G served from the site", async () => {
+  await act(async () => root.render(<SocialSignIn providers={["google"]} mode="link" />));
+  const button = container.querySelector("button")!;
+  // Google's approved wording even where the other providers say "Link".
+  expect(button.textContent).toBe("Continue with Google");
+  for (const rule of ["bg-[#131314]", "border-[#8E918F]", "text-[#E3E3E3]", "[font-family:Google_Sans,", "text-[14px]", "leading-5", "font-medium", "h-10", "rounded-full", "px-3", "gap-[10px]"]) {
+    expect(button.className).toContain(rule);
+  }
+  expect(button.className).not.toMatch(/(^| )btn( |$)/);
+  const logo = button.querySelector("img")!;
+  expect(logo.getAttribute("src")).toBe("/brand/google/g-logo.svg");
+  expect([logo.getAttribute("width"), logo.getAttribute("height"), logo.getAttribute("alt")]).toEqual(["20", "20", ""]);
+});
+
+test("Microsoft's button follows its dark-theme asset", async () => {
+  await act(async () => root.render(<SocialSignIn providers={["microsoft"]} />));
+  const button = container.querySelector("button")!;
+  for (const rule of ["bg-[#2F2F2F]", "text-[#FFFFFF]", "[font-family:Segoe_UI,", "text-[15px]", "font-semibold", "h-[41px]", "px-3", "gap-3"]) {
+    expect(button.className).toContain(rule);
+  }
+  expect(button.className).not.toContain("rounded");
+  expect(button.querySelector("svg")?.getAttribute("width")).toBe("21");
+});
+
+test("the G is Google's bundled logo cropped from its dark button, with no button or text left in it", () => {
+  const svg = readFileSync("public/brand/google/g-logo.svg", "utf8");
+  expect(svg).toMatch(/^<svg width="20" height="20" viewBox="12 10 20 20"/);
+  // The G's outline from Google's Sign in with Google bundle (Android + Web, Dark, Pill).
+  expect(svg).toContain('<path d="M31.3987 18.1814H21.9849V22.0445H27.3598');
+  expect(svg).not.toContain("#131314");
+  expect(svg).not.toContain("#E3E3E3");
 });
