@@ -87,6 +87,7 @@ for (const name of MCP_TOOL_NAMES) {
       if (!parsed.success) throw new Error(`Output schema mismatch at ${parsed.error.issues[0]?.path.join(".") || "root"}`);
     }
     if (!result.content?.some((part: { type: string; text?: string }) => part.type === "text" && part.text)) throw new Error("No text fallback");
+    if (name === "answer_sources" && result.structuredContent.evidence.some((piece: { kind: string; source: { title: string } }) => piece.kind === "lore" && piece.source.title !== "Deadmines")) throw new Error("Dungeon answer includes unrelated archive pages");
     if (name === "talent_tree") {
       const build = result.structuredContent?.build;
       if (typeof build !== "string") throw new Error("No current talent build");
