@@ -17,6 +17,11 @@ export interface Suppression { realm: string; character: string }
 export interface PublicationState { grants: PublicationGrant[]; suppressions: Suppression[] }
 
 const clean = (s: string) => s.trim().toLowerCase();
+/**
+ * A realm as an opt-out matches it, however it was spelled: the rule of public.link_realm_key (lower case, the curly
+ * apostrophe as a straight one, any run of spaces and hyphens as one space). The opt-out form stores realms this way.
+ */
+const realmKey = (s: string) => s.toLowerCase().replace(/’/g, "'").replace(/[\s-]+/g, " ").trim();
 
 /** Schema-valid names and install strings never confer authority. Grants are server-issued. */
 export function authorizeRecord(row: IntakeRecord, hashes: string[], state: PublicationState, now: Date): IntakeRecord | null {
@@ -28,7 +33,7 @@ export function authorizeRecord(row: IntakeRecord, hashes: string[], state: Publ
     ("guildName" in row ? g.subjectType === "guild" && clean(g.subject) === clean(row.guildName) :
       "character" in row ? g.subjectType === "character" && clean(g.subject) === clean(row.character) : g.subjectType === "install"));
   if (!allowed) return null;
-  const suppressed = (name: string, realm: string) => state.suppressions.some((s) => clean(s.realm) === clean(realm) && clean(s.character) === clean(name));
+  const suppressed = (name: string, realm: string) => state.suppressions.some((s) => realmKey(s.realm) === realmKey(realm) && clean(s.character) === clean(name));
   if ("character" in row && suppressed(row.character, row.realm)) return null;
   if (row.kind === "loot_award" && suppressed(row.recipient, row.realm)) return null;
   if (row.kind === "guild_snapshot") {
