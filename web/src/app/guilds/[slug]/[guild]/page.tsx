@@ -3,11 +3,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, Container, DataTable, PageHeader, SectionHeading, type Column } from "@/components/ui";
 import { dataAgeLabel } from "@/lib/data-age";
-import { factionLabel, guildPath, guildsOn, hideGuildPath, loadGuildPage } from "@/lib/guilds";
-import { playerPath, rulesetOf } from "@/lib/player-pages";
+import { factionLabel, guildPath, guildsOn, hideGuildPath, loadGuildPage, type GuildMember } from "@/lib/guilds";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
-import type { AgreedKill, GuildProgress, SeenMember } from "../../../../../../kb/src/guilds";
+import type { AgreedKill, GuildProgress } from "../../../../../../kb/src/guilds";
 import { className, classText } from "../../../players/player-view";
 import { day, guildRobots, link, number, Progress, sourceLabel } from "../../parts";
 
@@ -37,20 +36,25 @@ const killColumns: Column<AgreedKill>[] = [
   { key: "source", header: "Reported by", nowrap: true, cell: (k) => sourceLabel(k.source) },
 ];
 
-const seenColumns: Column<SeenMember>[] = [
-  { key: "name", header: "Name", cell: (p) => <Link href={playerPath({ ruleset: rulesetOf(p.realm), realm: p.realm, name: p.name })} className={`${link} font-medium`}>{p.name}</Link> },
-  { key: "class", header: "Class", nowrap: true, cell: (p) => <span className={classText(p.class)}>{className(p.class)}</span> },
-  { key: "level", header: "Level", numeric: true, cell: (p) => p.level },
-  { key: "seen", header: "Last seen", numeric: true, cell: (p) => <span className="font-mono tabular-nums">{p.lastSeen}</span> },
-];
+const none = <span className="text-muted">–</span>;
 
-type OfficerMember = { name: string; rank: string; level: number; className: string };
-const officerColumns: Column<OfficerMember>[] = [
-  { key: "name", header: "Name", cell: (m) => <span className="font-medium">{m.name}</span> },
-  { key: "rank", header: "Rank", cell: (m) => m.rank },
-  { key: "level", header: "Level", numeric: true, cell: (m) => m.level },
-  { key: "class", header: "Class", nowrap: true, cell: (m) => m.className },
-];
+function memberColumns(withAlts: boolean): Column<GuildMember>[] {
+  return [
+    { key: "name", header: "Name", cell: (m) => (m.path ? <Link href={m.path} className={`${link} font-medium`}>{m.name}</Link> : <span className="font-medium">{m.name}</span>) },
+    { key: "class", header: "Class", nowrap: true, cell: (m) => <span className={classText(m.class)}>{className(m.class)}</span> },
+    { key: "level", header: "Level", numeric: true, cell: (m) => m.level },
+    { key: "rank", header: "Rank", cell: (m) => m.rank ?? none },
+    { key: "seen", header: "Last seen", numeric: true, cell: (m) => (m.lastSeen ? <span className="font-mono tabular-nums">{m.lastSeen}</span> : none) },
+    ...(withAlts ? [{
+      key: "alts", header: "Alts",
+      cell: (m: GuildMember) => (m.alts.length
+        ? <span className="flex flex-wrap gap-x-2">{m.alts.map((a) => <Link key={a.path} href={a.path} className={`${link} ${classText(a.class)}`}>{a.name} ({a.level})</Link>)}</span>
+        : none),
+    }] : []),
+  ];
+}
+
+const memberMeta = (m: GuildMember) => [`${m.level} ${className(m.class)}`, m.rank, m.lastSeen ? `seen ${m.lastSeen}` : null].filter(Boolean).join(" · ");
 
 export default async function GuildPage(props: Params) {
   if (!guildsOn()) notFound();
@@ -67,11 +71,17 @@ export default async function GuildPage(props: Params) {
       </Container>
     );
   }
-  const { page, board } = loaded;
+  const { page, board, members } = loaded;
   const { summary, ranks } = page;
   const faction = factionLabel(summary.faction);
   const lastActivity = [summary.latestKillAt?.slice(0, 10), summary.lastSeen].filter((d): d is string => Boolean(d)).sort().at(-1);
   const officerRoster = board?.roster ?? [];
+  // The officers' count when they published one; otherwise how many characters the page lists, said as what it is.
+  const memberCount = board?.memberCount
+    ? `${number(board.memberCount)} ${board.memberCount === 1 ? "member" : "members"}`
+    : officerRoster.length ? `${number(officerRoster.length)} on the officers' roster`
+    : members.length ? `${number(members.length)} ${members.length === 1 ? "character" : "characters"} seen` : null;
+  const withAlts = members.some((m) => m.alts.length > 0);
 
   return (
     <Container width="data">
@@ -82,6 +92,7 @@ export default async function GuildPage(props: Params) {
           lede={`${faction ? `${faction} guild` : "Guild"} on ${summary.realm}`}
           meta={
             <span className="flex flex-wrap gap-x-4 gap-y-1">
+              {memberCount && <span>{memberCount}</span>}
               {ranks && <span>Rank {ranks.realm} on the realm and {ranks.overall} overall in {ranks.instanceName}</span>}
               {lastActivity && <span>Last activity {lastActivity}</span>}
               <span>{dataAgeLabel(loaded.dataAsOf)}</span>
@@ -89,6 +100,13 @@ export default async function GuildPage(props: Params) {
           }
         />
         <div className="space-y-10">
+          {page.progression.length > 0 && (
+            <ul aria-label="Progression summary" className="flex flex-wrap gap-x-8 gap-y-2 text-cell">
+              {page.progression.map((p) => (
+                <li key={p.instanceMapId} className="flex items-center gap-3"><span className="text-fg-2">{p.instanceName}</span><Progress killed={p.killed} bosses={p.bosses} /></li>
+              ))}
+            </ul>
+          )}
           <section aria-labelledby="progression" className="space-y-3">
             <SectionHeading id="progression" note="A kill counts once two members' uploads report it, or when the guild's officers publish it.">Progression</SectionHeading>
             {page.progression.length === 0
@@ -96,22 +114,19 @@ export default async function GuildPage(props: Params) {
               : <div className="grid gap-4 md:grid-cols-2 lg:gap-6">{page.progression.map((p) => <InstanceCard key={p.instanceMapId} progress={p} />)}</div>}
           </section>
 
-          <section aria-labelledby="roster" className="space-y-6">
-            <SectionHeading id="roster">Roster</SectionHeading>
-            {officerRoster.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-cell font-medium text-fg">Published by the officers{board?.memberCount ? ` (${number(board.memberCount)} members)` : ""}</h3>
-                <DataTable dense caption="The officers' published roster" columns={officerColumns} rows={officerRoster} rowKey={(m) => m.name} meta={(m) => `${m.rank} · ${m.level} ${m.className}`} />
-              </div>
+          <section aria-labelledby="roster" className="space-y-3">
+            <SectionHeading id="roster" note={members.length > 0 ? `${number(members.length)} listed` : undefined}>Members</SectionHeading>
+            {members.length > 0 && (
+              <>
+                <p className="text-sm text-fg-2">
+                  {officerRoster.length > 0 ? "Ranks come from the roster the officers published. " : ""}
+                  {page.seenRoster.length > 0 ? `Last seen is the day the addon saw the character in this guild (${number(page.seenRoster.length)} seen). ` : ""}
+                  {officerRoster.length === 0 ? "Not a member list from the game." : ""}
+                </p>
+                <DataTable dense caption="Members of this guild" columns={memberColumns(withAlts)} rows={members} rowKey={(m) => `${m.realm}/${m.name}`} meta={memberMeta} />
+              </>
             )}
-            {page.seenRoster.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-cell font-medium text-fg">Seen in this guild ({number(page.seenRoster.length)})</h3>
-                <p className="text-sm text-fg-2">Characters the addon saw in this guild. Not a member list from the game.</p>
-                <DataTable dense caption="Characters seen in this guild" columns={seenColumns} rows={page.seenRoster} rowKey={(p) => `${p.realm}/${p.name}`} meta={(p) => `${p.level} ${className(p.class)} · ${p.lastSeen}`} />
-              </div>
-            )}
-            {officerRoster.length === 0 && page.seenRoster.length === 0 && (
+            {members.length === 0 && (
               <p className="text-sm text-fg-2">
                 {summary.membersSeen === null ? "Characters seen in guilds are not shown on this site yet." : "No character has been seen in this guild yet."}
               </p>
