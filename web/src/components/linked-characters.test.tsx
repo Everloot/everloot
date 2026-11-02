@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import LinkedCharacters, { FROZEN_TEXT, type ListedLink } from "./LinkedCharacters";
+import LinkedCharacters, { FROZEN_TEXT, PAGE_TEXT, type ListedLink } from "./LinkedCharacters";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -110,4 +110,40 @@ test("a link already gone (unlinked in another tab) reads the list again instead
   await click(`Unlink ${LINK.name}`);
   await click("Unlink");
   expect(container.textContent).toContain("No linked characters yet.");
+});
+
+test("without the showcase there is no page switch; with it a linked character's page goes public and private, and a frozen one has none", async () => {
+  api([{ links: [LINK] }]);
+  await show();
+  expect(container.textContent).not.toContain("Public page");
+  await act(async () => root.unmount());
+  root = createRoot(container);
+
+  const PATH = "/characters/forever/forever-pioneer/thrallina";
+  const lists = [
+    { links: [{ ...LINK, page: { public: false, path: PATH } }, { ...FROZEN, page: { public: false, path: "/characters/forever/forever-pioneer/jainara" } }] },
+    { links: [{ ...LINK, page: { public: true, path: PATH } }] },
+  ];
+  const sent: Array<{ url: string; body: unknown }> = [];
+  let read = 0;
+  vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+    if (init?.method === "POST") {
+      sent.push({ url, body: JSON.parse(String(init.body)) });
+      return Response.json({ id: LINK.id, page_public: true });
+    }
+    return Response.json(lists[Math.min(read++, lists.length - 1)]);
+  });
+  await show();
+  expect(container.textContent).toContain("Public page: off");
+  expect(container.textContent).toContain(PAGE_TEXT);
+  expect(container.textContent!.match(/Public page:/g)).toHaveLength(1);
+  expect(container.querySelector(`a[href="${PATH}"]`)).toBeNull();
+  await click("Make it public");
+  expect(sent).toEqual([{ url: `/api/me/characters/links/${LINK.id}/visibility`, body: { page_public: true } }]);
+  expect(container.textContent).toContain("Public page: on");
+  expect(container.querySelector(`a[href="${PATH}"]`)?.textContent).toBe("View the page");
+  expect(container.querySelector(`a[href="${PATH}/card-square.png"]`)?.textContent).toBe("Download card");
+  // Never a search switch: indexing is not offered yet.
+  expect(Array.from(container.querySelectorAll("button, input"), (b) => b.textContent ?? "").join(" ")).not.toMatch(/index|search/i);
+  expect(container.textContent!.toLowerCase()).not.toContain("verified");
 });

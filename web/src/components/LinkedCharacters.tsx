@@ -7,6 +7,8 @@ import CopyButton from "@/components/ui/CopyButton";
 export interface ListedLink {
   id: string; name: string; realm: string; race: string; class: string; faction: string; level: number;
   status: "linked" | "frozen"; linked_at: string; last_upload_at: string;
+  /** Listed only while the character pages are on (EVERLOOT_SHOWCASE=1). */
+  page?: { public: boolean; path: string };
 }
 type State = { status: "loading" } | { status: "signed-out" } | { status: "off" } | { status: "error"; message: string } | { status: "ready"; links: ListedLink[] };
 
@@ -19,6 +21,9 @@ const CODE_MINUTES = 15;
 /** The game's tokens as words: SHAMAN is Shaman, NightElf is Night Elf, Scourge is Undead. */
 const words = (token: string) => token === "Scourge" ? "Undead"
   : token.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+
+/** What a public character page shows, said next to its switch. */
+export const PAGE_TEXT = "The public page shows this character's name, level, race, class, faction and realm, and the day it was last sent. Never your BattleTag or account. Search engines are asked not to index it.";
 
 /**
  * What a frozen link says to its owner. It tells them another account linked the character too, and nothing about
@@ -85,6 +90,24 @@ export default function LinkedCharacters() {
     }
   }
 
+  async function setPublic(link: ListedLink, on: boolean) {
+    setBusy(link.id);
+    setSaid(null);
+    try {
+      const response = await fetch(`/api/me/characters/links/${encodeURIComponent(link.id)}/visibility`, {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ page_public: on }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error ?? "That did not work. Try again.");
+      setSaid(on ? `${link.name}'s page is public.` : `${link.name}'s page is private again.`);
+      await load();
+    } catch (e) {
+      setSaid(e instanceof Error ? e.message : "That did not work. Try again.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   if (state.status === "off") return null;
   if (state.status === "loading") return <p className="text-sm text-fg-2">Loading your linked characters…</p>;
   if (state.status === "signed-out") return <p className="text-sm text-fg-2"><a href="/sign-in" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Sign in</a> to link your characters.</p>;
@@ -96,7 +119,7 @@ export default function LinkedCharacters() {
       <p className="text-sm text-fg-2">
         Link a character by typing a code on it in game. A link says that a character typed a code from this account in its
         Everloot addon file; it is not checked with Blizzard. Linked characters are private: nothing about them is shown
-        to anyone else.
+        to anyone else{state.links.some((l) => l.page) ? " unless you make a character's page public" : ""}.
       </p>
       <div className="space-y-2">
         <button type="button" className={primary} onClick={() => void makeCode()} disabled={busy !== null}>{busy === "code" ? "Making a code…" : "Make a link code"}</button>
@@ -123,6 +146,29 @@ export default function LinkedCharacters() {
               </div>
               <p className="text-fg-2">Linked {day(link.linked_at)}, last sent {day(link.last_upload_at)}.</p>
               {link.status === "frozen" && <p className="text-fg">{FROZEN_TEXT}</p>}
+              {link.status === "linked" && link.page && (
+                <div className="space-y-2">
+                  <p className="text-fg-2">{PAGE_TEXT}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-fg">Public page: {link.page.public ? "on" : "off"}</span>
+                    <button
+                      type="button"
+                      className={button}
+                      aria-label={link.page.public ? `Make ${link.name}'s page private` : `Make ${link.name}'s page public`}
+                      onClick={() => void setPublic(link, !link.page!.public)}
+                      disabled={busy !== null}
+                    >
+                      {busy === link.id ? "Saving…" : link.page.public ? "Make it private" : "Make it public"}
+                    </button>
+                    {link.page.public && (
+                      <>
+                        <a href={link.page.path} className={button}>View the page</a>
+                        <a href={`${link.page.path}/card-square.png`} download={`${link.name.toLowerCase()}-card.png`} className={button}>Download card</a>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
               {confirm === link.id ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-fg">Unlink {link.name}? Your saved builds stay.</span>
