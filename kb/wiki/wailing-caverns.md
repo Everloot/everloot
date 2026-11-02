@@ -16,8 +16,8 @@ sources:
   - { title: "Wailing Caverns (lore page, Warcraft Wiki)", url: "https://everloot.app/lore/78912-wailing-caverns", checkedOn: 2026-10-27 }
   - { title: "Druids of the Fang (lore page, Warcraft Wiki)", url: "https://everloot.app/lore/88349-druids-of-the-fang", checkedOn: 2026-10-27 }
   - { title: "Naralex (lore page, Warcraft Wiki)", url: "https://everloot.app/lore/196921-naralex", checkedOn: 2026-10-27 }
-status: draft
-reviewed: null
+status: published
+reviewed: { by: Carlos, on: 2026-11-02 }
 ---
 
 ## Overview
@@ -41,8 +41,8 @@ against anyone who would wake him. One of his last loyal disciples, Muyoh, is st
 
 ## In WoW: Forever
 
-Everloot's record of Blizzard's posts, through 2026-10-23, has nothing about the Wailing Caverns for WoW: Forever.
-Nothing here is confirmed for Forever yet.
+The history above is background lore, not a report of a run in Forever. Use the file-derived facts below as
+preparation; they do not establish which encounters or difficulties are available in the live game.
 
 The level, the entrance and the encounters come from the game files Everloot reads, build 1.60.1.70707, and are not
 confirmed in the game. [The database page](/database/instances/43-wailing-caverns) lists the encounters; which of them
@@ -54,10 +54,11 @@ Forever yet, so this page lists none.
 
 ## Before you go
 
-### Editor to confirm
+Check the level and entrance in the facts before forming a group. Treat game-file entries as unconfirmed until
+players report them from Forever.
 
-- Proposed: Check the level in this page's facts before you form a group. The game files give a level, not a range,
-  and the game has not confirmed it.
-- Proposed: Fly to the Crossroads, the nearest flight point in the game files, and head southwest to the entrance.
-- Proposed: Go through the encounters on [the database page](/database/instances/43-wailing-caverns) with your group
-  before you go in. Treat the list as what may be there, not a promise.
+Use the entrance's map link to plan a route that your faction can reach. Check which flight points your character
+has unlocked rather than assuming the closest one is available to you.
+
+Read the encounter list with your group before setting out. It describes what the files contain, not a tested
+route or a promise that a particular difficulty is open. Boss tactics, loot and quests still need player evidence.
