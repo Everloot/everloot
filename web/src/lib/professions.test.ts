@@ -44,3 +44,11 @@ test("recipeItemIds: made and used items, once each", () => {
     recipe(2, 1, 2, { reagents: [{ itemId: 20, count: 1 }] }),
   ]).sort((a, b) => a - b)).toEqual([10, 20]);
 });
+
+test("every profession page's description fits a search result (160 characters)", async () => {
+  const { generateMetadata } = await import("@/app/tools/professions/[profession]/page");
+  for (const p of CLIENT_PROFESSIONS) {
+    const m = await generateMetadata({ params: Promise.resolve({ profession: p.slug }) });
+    expect(String(m.description).length, p.slug).toBeLessThanOrEqual(160);
+  }
+});

@@ -38,7 +38,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   return {
     ...pageMetadata({
       title: `WoW Forever ${p.name} Recipes`,
-      description: `All ${p.recipes.length} ${p.name} recipes in the WoW: Forever game files, with what each makes, its reagents and the skill where it turns yellow and grey, plus the paths players upload.`,
+      description: `All ${p.recipes.length} ${p.name} recipes in the WoW: Forever game files: what each makes, its reagents and where it turns yellow and grey, plus player paths.`,
       path: professionHref(p.slug),
     }),
     keywords: [`wow forever ${p.name.toLowerCase()}`, `wow forever ${p.name.toLowerCase()} recipes`, `wow forever ${p.name.toLowerCase()} leveling`],
