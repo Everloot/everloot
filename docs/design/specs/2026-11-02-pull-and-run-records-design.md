@@ -144,7 +144,7 @@ On the server:
 
 - **Not in the upload object.** Upload objects in R2 are the record of truth and are never rewritten, and the corpus
   snapshot folds them. A hidden character could not be deleted from either. So intake writes `pull_summary` rows to
-  their own tables (`supabase/migrations/20261102120000_pull_summaries.sql`): `pull_summaries` (the row without its
+  their own tables (`supabase/migrations/20261102130000_pull_summaries.sql`): `pull_summaries` (the row without its
   members) and `pull_members` (one row per member, keyed by `link_realm_key(realm)` and the lower-case name, as
   `character_suppressions` and `players` are). `kb/src/corpus.ts` leaves the kind out of the corpus as well.
   `instance_run` has no names and stays in the upload object, private like `talent_snapshot`.
@@ -207,7 +207,7 @@ pull request adds it there as the item `#boss-pulls`, shown only while `EVERLOOT
   values left out; pets, creatures and strangers named like a member; the caps; deletion on off; and a schema check
   of every row.
 - `packages/protocol`: the three changes above, `PULL_KINDS`, rules, tests; `dist/` and `schema/` regenerated.
-- `supabase/migrations/20261102120000_pull_summaries.sql` and `supabase/tests/pull_summaries.sql`: the pull tables,
+- `supabase/migrations/20261102130000_pull_summaries.sql` and `supabase/tests/pull_summaries.sql`: the pull tables,
   insert, forget, the hide trigger and retention.
 - `web`: `lib/pull-summaries.ts` (switch, checks) and `lib/pull-store.ts` (Supabase, and a memory store with the same
   rules); intake writes pull rows there and stores timing and runs with the upload; the hide form deletes from the
@@ -292,7 +292,7 @@ Before an addon release carries this, in order:
 
 1. Run the live probes in section 8 (P-ENC-1, P-DM-1 to P-DM-4, P-ROLE-1, P-RESET-1) on the Forever client and write
    the results into the live client checklist.
-2. Apply `supabase/migrations/20261102120000_pull_summaries.sql` in the Supabase SQL editor, and check it with
+2. Apply `supabase/migrations/20261102130000_pull_summaries.sql` in the Supabase SQL editor, and check it with
    `supabase/tests/pull_summaries.sql` on a disposable database.
 3. Set `EVERLOOT_PULL_SUMMARIES=1` for the Worker (`web/wrangler.jsonc` vars) and deploy. The `/privacy` item, the
    upload page's wording and intake storage switch on together.

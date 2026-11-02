@@ -2,7 +2,7 @@ import { linkRealmKey } from "./character-links";
 import { PULL_KEPT_DAYS, type PullUpsert } from "./pull-summaries";
 
 /**
- * Where pull summaries live: Supabase in production (the functions in 20261102120000_pull_summaries.sql), and a map
+ * Where pull summaries live: Supabase in production (the functions in 20261102130000_pull_summaries.sql), and a map
  * in memory in development, which follows the same rules and forgets everything on restart. A write is one batched
  * call per upload.
  */

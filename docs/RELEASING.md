@@ -76,7 +76,7 @@ The release pull request that ships it sets the switch to `true`, after the step
 
 | Switch | What it holds back | Before setting it to `true` |
 |---|---|---|
-| `E.RUN_RECORDS` | Boss pull timing on `encounter`, `instance_run` and the `pulls` module (`pull_summary`) | The live probes in section 8 of `docs/design/specs/2026-11-02-pull-and-run-records-design.md`; `supabase/migrations/20261102120000_pull_summaries.sql` applied; `EVERLOOT_PULL_SUMMARIES=1` deployed for the Worker |
+| `E.RUN_RECORDS` | Boss pull timing on `encounter`, `instance_run` and the `pulls` module (`pull_summary`) | The live probes in section 8 of `docs/design/specs/2026-11-02-pull-and-run-records-design.md`; `supabase/migrations/20261102130000_pull_summaries.sql` applied; `EVERLOOT_PULL_SUMMARIES=1` deployed for the Worker |
 
 ## Nightly
 

@@ -1,5 +1,5 @@
 -- Run after 20261007070647_verified_publication.sql, 20261021130000_players.sql, 20261021190000_character_links.sql,
--- 20261022160000_players_realm_key.sql and 20261102120000_pull_summaries.sql on a disposable local PostgreSQL
+-- 20261022160000_players_realm_key.sql and 20261102130000_pull_summaries.sql on a disposable local PostgreSQL
 -- database that has the roles anon, authenticated and service_role.
 begin;
 
