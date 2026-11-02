@@ -148,6 +148,14 @@ For code: `cd kb && npm test -- --maxWorkers=2 && npm run typecheck`; `cd web &&
   merged after retaining those generated-build tests.
 - Search Console and Bing report Success for all submitted sitemaps. This proves receipt, not indexing.
 
+## Release state added 2026-11-01
+
+- The Worker serves the knowledge release from D1 `everloot-knowledge-2026-11-01` (`KNOWLEDGE_RELEASE_SHA256`
+  `6bcd2797…`), deployed with #658. Rollback: revert #658 to point back at `everloot-knowledge-2026-10-24`,
+  which is kept in D1, then run the checked deployment.
+- The public smoke list (`scripts/launch_smoke.py`) has 20 checks, adding `/addon`, `/upload` and the talent
+  build and raid plan card checks to the 16 of 2026-10-31.
+
 ## Remaining observations and launch gates
 
 - **Playable game:** keep #584 draft and `live: false` until players can log in. A listed build or the
