@@ -55,6 +55,14 @@ test("the game file recipes show in skill brackets, labelled, with the item and 
   expect(html).toContain('data-badge="files"');
 });
 
+test("on a phone the recipe tables scroll sideways instead of hiding what a recipe makes and takes", async () => {
+  store.loadCorpus.mockResolvedValue(empty);
+  const html = await render();
+  const recipes = html.slice(html.indexOf('data-skill-group="1"'));
+  expect(recipes).toContain("overflow-x-auto");
+  expect(recipes).not.toContain("hidden sm:table-cell");
+});
+
 test("an unknown profession is a 404", async () => {
   store.loadCorpus.mockResolvedValue(empty);
   await expect(render("riding")).rejects.toThrow("NEXT_NOT_FOUND");

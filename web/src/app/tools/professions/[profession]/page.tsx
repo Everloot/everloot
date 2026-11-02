@@ -195,7 +195,6 @@ export default async function ProfessionPage(props: Props) {
                 columns={columns}
                 rows={g.recipes}
                 rowKey={(r) => String(r.spellId)}
-                meta={(r) => [r.yellow && `Yellow ${r.yellow}`, r.grey && `Grey ${r.grey}`].filter(Boolean).join(" · ")}
               />
             </section>
           ))}
