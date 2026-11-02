@@ -11,6 +11,7 @@ vi.mock("./CookieConsent", () => ({ CookiePreferencesButton: () => <button type=
 
 import Footer from "./Footer";
 import { NON_AFFILIATION, TRADEMARK_LINE } from "@/lib/jsonld";
+import { LAUNCH_AT } from "@/data/wow-forever";
 
 afterEach(() => { vi.unstubAllEnvs(); });
 
@@ -120,9 +121,14 @@ test("Glint perches on the footer's edge as a labelled button, his drawing hidde
   expect(markup).toMatch(/data-footer-glint[\s\S]*aria-live="polite"/);
 });
 
-test("says when the beta ends and when the game launches", () => {
-  const t = text();
-  // The beta's last day has passed, so the sentence is in the past; the launch is still ahead.
-  expect(t).toContain("The beta ran until October 23, 2026");
-  expect(t).toContain("the game launches November 4, 2026");
+test("says when the beta ended and when the game launches, and from the launch instant that it launched", () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  try {
+    vi.setSystemTime(new Date(Date.parse(LAUNCH_AT) - 1));
+    expect(text()).toContain("The beta ran until October 23, 2026, and the game launches November 4, 2026.");
+    vi.setSystemTime(new Date(LAUNCH_AT));
+    expect(text()).toContain("The beta ran until October 23, 2026, and the game launched on November 4, 2026.");
+  } finally {
+    vi.useRealTimers();
+  }
 });
