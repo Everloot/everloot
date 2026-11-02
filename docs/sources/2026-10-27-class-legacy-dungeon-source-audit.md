@@ -200,6 +200,12 @@ class context, labelled unconfirmed; types no proficiency names, and items with 
   for a trainer list. A trainer list needs a reviewed capture of class trainer windows (an addon change and a data
   policy decision), not another table.
 
+Update 2026-11-01 (build 1.60.1.70707): `kb/src/client-class-spells.ts` writes each class's spells on its category 7
+skill lines (`SkillLineAbility` with its `ClassMask`, `SkillRaceClassInfo` for the line's classes; 322 to 578 per
+class). Mounts, Companions, Engraving and Runes are category 7 lines every class has: a spell on them counts only when
+its own mask names a class. The spell list narrows to these and the talent catalog's spells under a class context,
+labelled unconfirmed; a spell on no class line is left out. No learn level, no trainer.
+
 ## Boss names and NPC identity
 
 - **In the files.** `DungeonEncounter` has 264 readable rows for the 25 original instance maps, all named, with map,
