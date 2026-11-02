@@ -30,8 +30,16 @@ function farmQuery(search: Search): FarmQuery | null {
   return { ...(category ? { category: category as FarmCategory } : {}), ...(level ? { level } : {}) };
 }
 
-/** Where an old tab's link goes now (`?category=herbs` → Herbalism), or null. */
-const moved = (search: Search) => (typeof search.category === "string" ? MOVED_CATEGORIES[search.category]?.href ?? null : null);
+/**
+ * Where an old tab's link goes now (`?category=herbs` → Herbalism), or null. A malformed level is a 404 like on
+ * the page itself (null here, then `farmQuery` rejects it); a valid one goes along where the destination filters by it.
+ */
+function moved(search: Search): string | null {
+  const to = typeof search.category === "string" ? MOVED_CATEGORIES[search.category] : undefined;
+  const level = range(search, "level");
+  if (!to || level === null) return null;
+  return `${listHref(to.path, to.levels ? [[to.levels, rangeParam(level)]] : [])}${to.hash ? `#${to.hash}` : ""}`;
+}
 
 const href = (q: FarmQuery) => listHref(META.path, [["category", q.category], ["level", rangeParam(q.level)]]);
 const filters = (q: FarmQuery) => Number(Boolean(q.category)) + Number(Boolean(q.level));

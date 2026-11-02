@@ -11,7 +11,7 @@ import { objectSightingRowsFromRecords, type ObjectSpawnRow } from "../../../kb/
 import { worldFactsFromRecords, type WorldFacts } from "../../../kb/src/world-pages";
 import { RECHECK_SCOPES } from "./recheck-scopes";
 import { lootWindowsFromRecords, rollupDrops, type RollupResult } from "./rollups";
-import { uploadStore, type CensusRead } from "./upload-store";
+import { uploadStore, type CensusRead, type Corpus } from "./upload-store";
 
 export interface CorpusStats {
   uploads: number;
@@ -65,8 +65,9 @@ function corpusKey(corpus: { uploads: number; records: readonly unknown[]; dataA
   return `${corpus.uploads}|${corpus.dataAsOf ?? ""}|${corpus.records.length}`;
 }
 
-async function loadAggregates(): Promise<AggregateSet | null> {
-  const corpus = await uploadStore.loadCorpus();
+/** `read` is a corpus the caller already loaded, so a page that needs the records too reads the store once. */
+async function loadAggregates(read?: Corpus): Promise<AggregateSet | null> {
+  const corpus = read ?? await uploadStore.loadCorpus();
   if (corpus.unreachable) return null;
   const key = corpusKey(corpus);
   if (memoized === null || memoized.key !== key) {
@@ -100,8 +101,8 @@ async function loadAggregates(): Promise<AggregateSet | null> {
 }
 
 /** Every stored upload, loot windows pulled out, rolled up. */
-export async function computeRollups(): Promise<RollupResult & { stats: CorpusStats }> {
-  const agg = await loadAggregates();
+export async function computeRollups(read?: Corpus): Promise<RollupResult & { stats: CorpusStats }> {
+  const agg = await loadAggregates(read);
   if (!agg) return { rates: [], measuredZeros: [], rejected: [], stats: UNREAD };
   return {
     rates: agg.drops.rates,
@@ -125,8 +126,8 @@ export async function loadItemFacts(): Promise<ItemFacts & { unreachable: boolea
 }
 
 /** NPC, quest, and vendor rows from the same uploads. */
-export async function loadWorldFacts(): Promise<WorldFacts & { unreachable: boolean }> {
-  const agg = await loadAggregates();
+export async function loadWorldFacts(read?: Corpus): Promise<WorldFacts & { unreachable: boolean }> {
+  const agg = await loadAggregates(read);
   if (!agg) return { npcs: [], quests: [], vendors: [], unreachable: true };
   return { ...agg.world, unreachable: false };
 }

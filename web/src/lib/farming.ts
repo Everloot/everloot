@@ -16,14 +16,15 @@ export type FarmCategory = (typeof FARM_CATEGORIES)[number]["slug"];
 
 /**
  * The farming page's old tabs and where each lives now: gathering on its profession's page, the dungeons in the
- * dungeon and raid index. The page sends an old `?category=` link there.
+ * dungeon and raid index. The page sends an old `?category=` link there. `levels` names the parameter a page
+ * filters mob levels by (leather and cloth come from mob areas, which have levels), so the link's `level` goes along.
  */
-export const MOVED_CATEGORIES: Record<string, { label: string; href: string }> = {
-  herbs: { label: "Herbs", href: "/tools/professions/herbalism#gather" },
-  ore: { label: "Ore", href: "/tools/professions/mining#gather" },
-  leather: { label: "Skins and leather", href: "/tools/professions/skinning#gather" },
-  cloth: { label: "Cloth", href: "/tools/professions/tailoring#gather" },
-  dungeons: { label: "Dungeons", href: "/database/instances" },
+export const MOVED_CATEGORIES: Record<string, { label: string; path: string; hash?: string; levels?: string }> = {
+  herbs: { label: "Herbs", path: "/tools/professions/herbalism", hash: "gather" },
+  ore: { label: "Ore", path: "/tools/professions/mining", hash: "gather" },
+  leather: { label: "Skins and leather", path: "/tools/professions/skinning", hash: "gather", levels: "mobs" },
+  cloth: { label: "Cloth", path: "/tools/professions/tailoring", hash: "gather", levels: "mobs" },
+  dungeons: { label: "Dungeons", path: "/database/instances" },
 };
 
 /** Trade Goods (item class 7) subclasses that make a mob a cloth or leather farm. */

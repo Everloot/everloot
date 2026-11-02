@@ -65,17 +65,36 @@ test("the tabs are gold and reputation with their counts, like the auction house
   expect(tabs).not.toContain("category=herbs");
 });
 
-test("the old tabs' links go to where each now lives", async () => {
+test("the old tabs' links go to where each now lives, keeping a level range where the new page filters by it", async () => {
   const to = {
     herbs: "/tools/professions/herbalism#gather", ore: "/tools/professions/mining#gather", leather: "/tools/professions/skinning#gather",
     cloth: "/tools/professions/tailoring#gather", dungeons: "/database/instances",
   };
   for (const [category, href] of Object.entries(to)) {
-    await expect(html(FarmingPage(search({ category, level: "1-10" }))), category).rejects.toThrow(`NEXT_REDIRECT ${href}`);
+    await expect(html(FarmingPage(search({ category }))), category).rejects.toThrow(`NEXT_REDIRECT ${href}`);
+  }
+  // Leather and cloth come from mob areas with levels, so the range goes along as the mob level (`level` there is the
+  // class context's); herb and ore spots and the
+  // dungeon list have no level filter, so it is left off there.
+  const withLevel = {
+    herbs: "/tools/professions/herbalism#gather", ore: "/tools/professions/mining#gather",
+    leather: "/tools/professions/skinning?mobs=11-20#gather", cloth: "/tools/professions/tailoring?mobs=11-20#gather",
+    dungeons: "/database/instances",
+  };
+  for (const [category, href] of Object.entries(withLevel)) {
+    await expect(html(FarmingPage(search({ category, level: "11-20" }))), category).rejects.toThrow(`NEXT_REDIRECT ${href}`);
   }
   // And the page points there too.
   const page = await html(FarmingPage(search()));
   for (const href of Object.values(to)) expect(page).toContain(`href="${href}"`);
+});
+
+test("an old tab's link with a malformed level is a 404, not a redirect", async () => {
+  for (const category of ["herbs", "ore", "leather", "cloth", "dungeons"]) {
+    for (const level of ["garbage", "20-10", "0"]) {
+      await expect(html(FarmingPage(search({ category, level }))), `${category} ${level}`).rejects.toThrow("NEXT_NOT_FOUND");
+    }
+  }
 });
 
 test("with no uploads gold shows the empty state with the meter, and invents nothing", async () => {

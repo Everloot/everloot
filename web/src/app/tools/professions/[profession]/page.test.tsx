@@ -7,6 +7,18 @@ vi.mock("@/lib/upload-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/upload-store")>()),
   uploadStore: { loadCorpus: store.loadCorpus },
 }));
+// The rollup readers run for real unless a test makes one of them fail, so a page can see one read fail and another work.
+const fail = vi.hoisted(() => ({ world: false, rollups: false }));
+vi.mock("@/lib/rollup-compute", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/rollup-compute")>();
+  return {
+    ...real,
+    loadWorldFacts: async (...args: Parameters<typeof real.loadWorldFacts>) =>
+      fail.world ? { npcs: [], quests: [], vendors: [], unreachable: true } : real.loadWorldFacts(...args),
+    computeRollups: async (...args: Parameters<typeof real.computeRollups>) =>
+      fail.rollups ? { rates: [], measuredZeros: [], rejected: [], stats: { uploads: 0, lootWindows: 0, records: 0, unreachable: true, dataAsOf: null } } : real.computeRollups(...args),
+  };
+});
 vi.mock("@/lib/game-assets", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/game-assets")>()),
   loadSiteAssets: async () => null,
@@ -36,7 +48,7 @@ const render = async (profession = "alchemy", search: Record<string, string> = {
   renderToStaticMarkup(await ProfessionPage({ params: Promise.resolve({ profession }), searchParams: Promise.resolve(search) }));
 const empty = { uploads: 0, records: [], dataAsOf: "2026-10-10T00:00:00.000Z" };
 
-beforeEach(() => store.loadCorpus.mockReset());
+beforeEach(() => { store.loadCorpus.mockReset(); fail.world = false; fail.rollups = false; });
 
 test("the game file recipes show in skill brackets, labelled, with the item and its reagents", async () => {
   store.loadCorpus.mockResolvedValue(empty);
@@ -160,4 +172,90 @@ test("Skinning lists the zones whose mobs dropped leather, from the same rule as
   expect(leather).toContain("Where to farm leather");
   expect(leather).toMatch(/href="\/database\/zones\/1411-[^"]*"/);
   expect(leather).toContain("Looted mobs");
+});
+
+// The rollups are memoized by upload count, record count and date, so each corpus below gets its own date.
+let stamp = 0;
+const corpusOf = (records: unknown[]) => ({ uploads: 3, records, dataAsOf: `2026-10-11T00:00:${String(stamp++ % 60).padStart(2, "0")}.000Z` });
+const mob = (installs: string[], npcId: number, name: string, level: number, mapId: number, itemId: number) => installs.flatMap((installId) => [
+  { installId, eventId: `${installId}:${npcId}:s`, capturedAt: "2026-10-10T00:00:00.000Z", kind: "npc_sighting", positionKind: "npc", npcId, name, mapId, x: 40, y: 60, level, reaction: "hostile" },
+  { installId, eventId: `${installId}:${npcId}:l`, capturedAt: "2026-10-10T00:00:00.000Z", kind: "loot", sourceEvidence: "loot-api", sourceNpcId: npcId, items: [{ itemId, count: 1 }] },
+]);
+const herb = (installs: string[]) => installs.map((installId, i) => ({
+  kind: "loot", eventId: `${installId}:h${i}`, installId, capturedAt: "2026-10-10T00:00:00.000Z", sourceEvidence: "loot-api",
+  sourceObjectId: 1617, gatherKind: "herb", lootType: "gather", mapId: 1429, x: 40 + i * 0.1, y: 60, items: [{ itemId: 765, count: 1 }],
+}));
+const zonesIn = (part: string | null) => [...(part ?? "").matchAll(/href="\/database\/zones\/(\d+)-/g)].map((m) => Number(m[1]));
+// Linen Cloth (2589) from a level 15 mob in Elwynn Forest (1429), Light Leather (2318) from a level 5 mob in Durotar (1411).
+const clothAndLeather = () => corpusOf([...mob(three, 500, "Defias Bandit", 15, 1429, 2589), ...mob(three, 600, "Mottled Boar", 5, 1411, 2318)]);
+
+test("Tailoring and First Aid list the same cloth zones; Skinning lists the leather ones", async () => {
+  store.loadCorpus.mockResolvedValue(clothAndLeather());
+  const tailoring = section(await render("tailoring"), "cloth");
+  const firstAid = section(await render("first-aid"), "cloth");
+  expect(tailoring).toContain("Where to farm cloth");
+  expect(zonesIn(tailoring)).toEqual([1429]);
+  // The same section, apart from the page's own links in the level menu.
+  expect(firstAid?.replaceAll("/first-aid", "/tailoring")).toEqual(tailoring);
+  expect(zonesIn(section(await render("skinning"), "leather"))).toEqual([1411]);
+});
+
+test("the mob-backed gathering pages read the corpus once", async () => {
+  for (const profession of ["skinning", "tailoring", "first-aid", "herbalism"]) {
+    store.loadCorpus.mockReset().mockResolvedValue(clothAndLeather());
+    await render(profession);
+    expect(store.loadCorpus, profession).toHaveBeenCalledTimes(1);
+  }
+});
+
+test("one or two installs place nothing: gathering zones need 3", async () => {
+  for (const installs of [three.slice(0, 1), three.slice(0, 2)]) {
+    store.loadCorpus.mockResolvedValue(corpusOf([...herb(installs), ...mob(installs, 500, "Defias Bandit", 15, 1429, 2589)]));
+    const herbs = section(await render("herbalism"), "herb")!;
+    expect(herbs, `${installs.length} herb`).toContain("No herb zones yet");
+    expect(herbs).not.toContain("<table");
+    for (const profession of ["tailoring", "first-aid"]) {
+      const cloth = section(await render(profession), "cloth")!;
+      expect(cloth, `${installs.length} ${profession}`).toContain("No cloth zones yet");
+      expect(cloth).not.toContain("<table");
+    }
+  }
+});
+
+test("a mob level range from the URL filters the leather and cloth zones, and the menu keeps the other parameters", async () => {
+  store.loadCorpus.mockResolvedValue(clothAndLeather());
+  // `level` belongs to the class context and filters nothing.
+  const mid = await render("tailoring", { from: "5", mobs: "11-20", class: "mage", level: "3" });
+  expect(zonesIn(section(mid, "cloth"))).toEqual([1429]);
+  expect(section(mid, "cloth")).toContain('href="/tools/professions/tailoring?from=5&amp;class=mage&amp;level=3&amp;mobs=1-10#gather"');
+  expect(section(mid, "cloth")).toContain('href="/tools/professions/tailoring?from=5&amp;class=mage&amp;level=3#gather"');
+  const low = section(await render("first-aid", { mobs: "1-10" }), "cloth")!;
+  expect(low).toContain("Nothing here for levels 1-10.");
+  expect(low).not.toContain("No cloth zones yet");
+  expect(zonesIn(section(await render("skinning", { mobs: "1-10" }), "leather"))).toEqual([1411]);
+  // A malformed range is a 404 where the page filters by mob level; elsewhere the parameter means nothing.
+  for (const profession of ["skinning", "tailoring", "first-aid"]) {
+    for (const mobs of ["garbage", "20-10"]) await expect(render(profession, { mobs }), `${profession} ${mobs}`).rejects.toThrow("NEXT_NOT_FOUND");
+  }
+  expect(section(await render("herbalism", { mobs: "garbage" }), "herb")).not.toBeNull();
+});
+
+test("when the corpus reads but the world facts or the rollups do not, the section says storage is unreachable", async () => {
+  for (const which of ["world", "rollups"] as const) {
+    fail.world = which === "world";
+    fail.rollups = which === "rollups";
+    store.loadCorpus.mockResolvedValue(clothAndLeather());
+    for (const [profession, kind] of [["tailoring", "cloth"], ["first-aid", "cloth"], ["skinning", "leather"]]) {
+      const part = section(await render(profession), kind)!;
+      expect(part, `${which} ${profession}`).toContain("Storage unreachable");
+      expect(part).not.toContain("zones yet");
+      expect(part).not.toContain("<table");
+    }
+  }
+  // The corpus itself down: the same message, and the herb section too.
+  fail.world = false; fail.rollups = false;
+  store.loadCorpus.mockResolvedValue({ uploads: 0, records: [], unreachable: true });
+  for (const [profession, kind] of [["tailoring", "cloth"], ["herbalism", "herb"]]) {
+    expect(section(await render(profession), kind), profession).toContain("Storage unreachable");
+  }
 });
