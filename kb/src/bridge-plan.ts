@@ -34,7 +34,7 @@ export const BRIDGE_PLAN: readonly PlanItem[] = [
   { id: "mcp.get_entity", status: "live", name: "Fetch one record by id", done: "stdio tool on everloot-knowledge", proof: "code" },
   { id: "mcp.get_by_name", status: "live", name: "Exact-name lookup", done: "stdio tool on everloot-knowledge", proof: "code" },
   { id: "mcp.everloot_plan", status: "live", name: "This tracker, as a tool", done: "a client can ask what is live, next, waiting, or shape-only", proof: "code" },
-  { id: "mcp.http_local", status: "live", name: "Local HTTP MCP", done: "POST /mcp on 127.0.0.1. Same server as stdio. Not reachable by ChatGPT yet.", proof: "code" },
+  { id: "mcp.http_local", status: "live", name: "Local HTTP MCP", done: "POST /mcp on 127.0.0.1. Same server as stdio. Local only: ChatGPT connects to the public mount (mcp.public_https).", proof: "code" },
   { id: "site.home", status: "live", name: "Public home", done: "https://everloot.app", proof: "deployed" },
   { id: "site.upload", status: "live", name: "Upload + intake", done: "/upload and /api/intake. Persists when Supabase is connected.", proof: "deployed" },
   { id: "site.drops", status: "live", name: "Drop rollups", done: "public when 3 independent installs agree", proof: "deployed" },
@@ -68,7 +68,7 @@ export const BRIDGE_PLAN: readonly PlanItem[] = [
   { id: "ops.stored_rollups", status: "live", name: "Corpus snapshot", done: "The Worker's Cron Trigger every 10 minutes extends snapshots/corpus.json in R2 with uploads it has not seen. Pages read that one object. ?rebuild=1 (with CRON_SECRET) rebuilds from empty after a deletion.", proof: "deployed" },
   { id: "app.uploader", status: "next", name: "Desktop uploader", done: "companion/ upload and watch send only unconfirmed events after logout, named data held on the machine; tested against a local server. Done when it runs against a real Forever WTF folder and ships as a signed build (ops.signing).", proof: "code" },
   { id: "app.companion", status: "next", name: "In-game companion", done: "File bridge: /ask stores the question; companion bridge answers from the MCP server into the EverlootAnswers addon, shown after /reload when its Adler-32 verifies. Providers enabled in config.json (Anthropic, or any OpenAI-compatible endpoint including a local model) answer from the top search results, falling back down the chain; with none enabled the answer is the top search result. Done when it works in the Forever client.", proof: "code" },
-  { id: "mcp.chatgpt_directory", status: "next", name: "ChatGPT apps directory", done: "submit the same MCP server the day submissions open", proof: "none" },
+  { id: "mcp.chatgpt_directory", status: "live", name: "ChatGPT apps directory", done: "approved on 2026-11-02 (version 1.0.1, with the tool descriptions it was submitted with); it uses https://everloot.app/mcp/public with no sign-in", proof: "public" },
   { id: "mcp.subscription_signin", status: "next", name: "Subscription sign-in", done: "ChatGPT or Claude subscription unlocks the companion. API keys stay the fallback.", proof: "none" },
 
   { id: "ops.dns", status: "live", name: "everloot.app DNS", done: "The apex and www records in Cloudflare are proxied, and the Worker routes everloot.app/* and www.everloot.app/* serve them; www answers a 301 to the apex.", proof: "deployed" },
