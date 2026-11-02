@@ -238,14 +238,19 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
   // ready, or the free model on, the question is sent at once; otherwise it waits in the box. The URL drops both so a reload does not resend.
   // From the public home's Ask box: the question arrives in this tab's storage (lib/chat/handoff.ts), read once, and waits in
   // the box for Send. Its no-JavaScript form, /chat?ask=, is moved there and the page reloaded on a clean entry,
-  // because Next's history state keeps the old address's search even after replaceState.
+  // because Next's history state keeps the old address's search even after replaceState; without storage it waits in
+  // the box from memory instead.
   useEffect(() => {
     if (!ready || signed === null || prefilled.current) return;
     const params = new URLSearchParams(window.location.search);
     if (params.has("ask")) {
       prefilled.current = true;
-      if (handOver(params.get("ask") ?? "")) window.location.replace(window.location.pathname);
-      else window.history.replaceState(null, "", window.location.pathname);
+      const asked = (params.get("ask") ?? "").trim().slice(0, 2000);
+      if (handOver(asked)) { window.location.replace(window.location.pathname); return; }
+      // No storage in this tab: the question waits in the box from memory, and the entry is replaced with no state,
+      // so neither the address nor the history keeps it.
+      window.history.replaceState(null, "", window.location.pathname);
+      if (asked) { setDraft(asked); box.current?.focus(); }
       return;
     }
     const handed = takeHandoff();

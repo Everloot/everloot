@@ -174,6 +174,19 @@ describe("Everloot (free) on /chat", () => {
     expect(textarea().value).toBe("");
   });
 
+  test("with no storage in the tab, ?ask= waits in the box and leaves no trace in the address or history", async () => {
+    api();
+    window.history.replaceState(null, "", `/chat?ask=${encodeURIComponent("Where does Linen Cloth drop?")}`);
+    const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("blocked"); });
+    await render(<ChatClient freeChat={["Groq"]} />);
+    setItem.mockRestore();
+    expect(textarea().value).toBe("Where does Linen Cloth drop?");
+    expect(document.activeElement).toBe(textarea());
+    expect(window.location.search).toBe("");
+    expect(JSON.stringify(window.history.state ?? null)).not.toContain("Linen");
+    expect(calls.some((c) => c.url === FREE || c.url.startsWith("/api/tools/"))).toBe(false);
+  });
+
   test("while the free model is off, the page is as before: search, no mode menu, no proxy", async () => {
     api();
     await render(<ChatClient />);
