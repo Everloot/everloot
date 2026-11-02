@@ -23,6 +23,11 @@ test("links the four verified social profiles on desktop and mobile", () => {
     expect(markup.split(`href="${href}"`).length - 1, href).toBe(2);
   }
 });
+test("the group links are at least 24 pixels wide, so the one-letter X link is tappable", () => {
+  const links = html().match(/<a [^>]*>X<\/a>/g) ?? [];
+  expect(links.length).toBeGreaterThan(0);
+  for (const link of links) expect(link).toContain("min-w-6");
+});
 const text = () => html().replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ");
 
 function sourceHref(): string | undefined {
