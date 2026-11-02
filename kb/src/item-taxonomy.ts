@@ -156,7 +156,7 @@ export function itemCategoriesStructured(
       })),
     };
   }
-  const cls = resolveClass(t, args.class);
+  const cls = resolveClass(t, args.class) ?? resolveLegacyClass(t, args.class);
   if (!cls) return { ...base, error: `No item class ${args.class} in build ${build}.` };
   const sub = args.subclass === undefined ? null : resolveSubclass(t, cls.id, args.subclass);
   if (args.subclass !== undefined && !sub) return { ...base, error: `No subclass ${args.subclass} under ${cls.name} in build ${build}.` };
