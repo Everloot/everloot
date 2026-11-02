@@ -333,7 +333,7 @@ Live-client verification is pending. This is a pre-release for WoW: Forever 1.60
   the census box ticked on its setup screen, or turns it on in Settings; a setup finished before this keeps
   it off. Still never names, guilds, gear or places, and the site shows only totals.
 
-## [desktop-v0.1.16] - 2026-11-02
+## [desktop-v0.1.16] - 2026-11-03
 
 ### Changed
 - Desktop App: the app is called Everloot in its window, tray, notifications and dialogs. After this update, the Start
