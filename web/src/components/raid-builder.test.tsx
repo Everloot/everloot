@@ -111,6 +111,15 @@ test("the nine classes sit in a palette above the groups, with how many each has
   expect(container.querySelector("[data-raid-summary]")!.textContent).toBe("1 of 20 filled · 0 tanks, 0 healers, 1 damage");
 });
 
+test("each slot's accessible name contains the words it shows, so voice control can say them", async () => {
+  await render();
+  await dragTo(tile("Mage"), slot(0));
+  for (const i of [0, 1]) {
+    const shown = slot(i).textContent!.replace(/^\+ /, "").trim().toLowerCase();
+    expect(label(i)!.toLowerCase().replace(/,/g, "")).toContain(shown);
+  }
+});
+
 test("dragging a class onto a slot fills it, onto a filled slot replaces it, and says so", async () => {
   await render();
   await dragTo(tile("Mage"), slot(2));
@@ -132,7 +141,7 @@ test("dragging a member moves it, swaps with a filled slot, and the trash or off
   await dragTo(tile("Warrior"), slot(0));
   await dragTo(tile("Druid"), slot(1));
   await dragTo(slot(0), slot(7));
-  expect(label(0)).toBe("Group 1, slot 1: empty");
+  expect(label(0)).toBe("Group 1, slot 1: empty, add");
   expect(label(7)).toBe("Group 2, slot 3: Warrior, any tree");
   expect(status()).toBe("Moved Warrior, any tree to group 2, slot 3.");
   await dragTo(slot(7), slot(1));
@@ -140,10 +149,10 @@ test("dragging a member moves it, swaps with a filled slot, and the trash or off
   expect(label(7)).toBe("Group 2, slot 3: Druid, any tree");
   expect(status()).toBe("Swapped Warrior, any tree with Druid, any tree.");
   await dragTo(slot(7), container.querySelector("[data-drop-trash]"));
-  expect(label(7)).toBe("Group 2, slot 3: empty");
+  expect(label(7)).toBe("Group 2, slot 3: empty, add");
   expect(status()).toBe("Removed Druid, any tree from group 2, slot 3.");
   await dragTo(slot(1), document.body);
-  expect(label(1)).toBe("Group 1, slot 2: empty");
+  expect(label(1)).toBe("Group 1, slot 2: empty, add");
   // Undo puts the last one back.
   await click([...container.querySelectorAll("button")].find((b) => b.textContent === "Undo")!);
   expect(label(1)).toBe("Group 1, slot 2: Warrior, any tree");
@@ -159,12 +168,12 @@ test("Escape cancels a drag, and a press that does not move is a click, not a dr
   await key("Escape");
   expect(container.querySelector("[data-drag-ghost]")).toBeNull();
   await pointer("pointerup", window, 40, 40);
-  expect(label(4)).toBe("Group 1, slot 5: empty");
+  expect(label(4)).toBe("Group 1, slot 5: empty, add");
   expect(status()).toBe("Drag cancelled.");
   await pointer("pointerdown", tile("Hunter"), 10, 10);
   await pointer("pointerup", window, 11, 11);
   expect(container.querySelector("[data-drag-ghost]")).toBeNull();
-  expect(label(4)).toBe("Group 1, slot 5: empty");
+  expect(label(4)).toBe("Group 1, slot 5: empty, add");
 });
 
 test("a finger drags after holding still; a swipe before that scrolls instead", async () => {
@@ -175,7 +184,7 @@ test("a finger drags after holding still; a swipe before that scrolls instead", 
   await pointer("pointermove", window, 10, 60, "touch");
   await act(async () => { vi.advanceTimersByTime(500); });
   await pointer("pointerup", window, 10, 60, "touch");
-  expect(label(3)).toBe("Group 1, slot 4: empty");
+  expect(label(3)).toBe("Group 1, slot 4: empty, add");
   await pointer("pointerdown", tile("Shaman"), 10, 10, "touch");
   await act(async () => { vi.advanceTimersByTime(300); });
   await pointer("pointermove", window, 10, 60, "touch");
@@ -253,7 +262,7 @@ test("the class context chip's links hold the raid as it is after an add, an und
   // Undo from the keyboard with the link focused: copying it or a modified click must not bring the undone raid back.
   removeContext()!.focus();
   await act(async () => { removeContext()!.dispatchEvent(new KeyboardEvent("keydown", { key: "z", ctrlKey: true, bubbles: true, cancelable: true })); });
-  expect(label(0)).toBe("Group 1, slot 1: empty");
+  expect(label(0)).toBe("Group 1, slot 1: empty, add");
   expect(removeContext()!.getAttribute("href")).toBe("/tools/raid");
   await click(slot(0));
   expect(removeContext()!.getAttribute("href")).toBe(raidAddress(mage));

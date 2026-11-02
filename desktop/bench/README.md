@@ -63,7 +63,10 @@ reload, for about 6 ms more per write at heavy (26 ms at extreme), the cost of s
 Not changed, each parsing on its own:
 
 - The Upload page parses 4 times once per write (`summarizeFiles`, cached afterwards): 804–1,156 ms at heavy.
-- The Characters page and the chat's `my_characters` tool parse on every call: 234–258 ms at heavy.
+- The Characters page and the chat's `my_characters` tool parsed on every call: 234–258 ms at heavy. They now read
+  the shared parse too (`charactersFromFiles`, about 2 ms at heavy and 11 ms at extreme in a quick run): the part of
+  the summary that depends on the file is kept per write, and the last seven days, the 30 days and the receipts are
+  worked out at each call.
 
 ### F11: sent.json
 

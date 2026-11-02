@@ -228,6 +228,7 @@ Execution on 2026-10-18, using the maintainer's existing accounts:
 - Claude, ChatGPT and Grok: custom connections created and real tool calls completed successfully.
 - Claude directory: listing draft prepared; all-tool verification and final submission still pending.
 - ChatGPT directory: business publisher verified, Everloot project and plugin draft created, portable package accepted. Domain verification and final submission still pending.
+- ChatGPT directory, 2026-11-02: OpenAI emailed that the plugin submission (version 1.0.1) is approved. That version carries the tool descriptions it was submitted with, before the 32-tool list above.
 - Grok Bot marketplace: form prepared; final submission still pending.
 
 The portable OpenAI package is in [`integrations/openai/`](../integrations/openai/). The reviewer demo is a recording of the actual ChatGPT connector test conversation at `/review/everloot-chatgpt-demo.mp4`. A connected custom server and a public marketplace approval are separate states. This document does not claim approval before a platform reports it.

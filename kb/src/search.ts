@@ -138,14 +138,29 @@ async function nameNormSql(db: ReleaseDb): Promise<string> {
 }
 
 /**
+ * The condition for a kind filter. The entities table's kind check has no `object`, so the pfQuest importer stores objects as
+ * `npc` rows with the ext id `object:<id>` (importers/pfquest.ts); kind "object" asks for those rows.
+ */
+const OBJECT_ROWS = (alias: string) => `(${alias}kind = 'npc' AND ${alias}ext_id LIKE 'object:%')`;
+function kindFilter(alias: string, kinds: readonly Kind[]): { sql: string; params: Kind[] } {
+  const stored = kinds.filter((k) => k !== "object");
+  const parts = [
+    ...(stored.length ? [`${alias}kind IN (${stored.map(() => "?").join(",")})`] : []),
+    ...(kinds.includes("object") ? [OBJECT_ROWS(alias)] : []),
+  ];
+  return { sql: parts.length > 1 ? `(${parts.join(" OR ")})` : parts[0]!, params: stored };
+}
+
+/**
  * SearchOptions currently exposes only kinds, versions and types: no sourceId/sources/excluded-kinds/publishable filters exist.
  * Every search also leaves out the wiki's testing-only pages, which no player is asking about; they stay
  * reachable by id and by exact name (getEntity, getDocument, getByName).
  */
 function pushOptionFilters(conds: string[], params: unknown[], opts: SearchOptions): void {
   if (opts.kinds?.length) {
-    conds.push(`e.kind IN (${opts.kinds.map(() => "?").join(",")})`);
-    params.push(...opts.kinds);
+    const kinds = kindFilter("e.", opts.kinds);
+    conds.push(kinds.sql);
+    params.push(...kinds.params);
   }
   if (opts.versions?.length) {
     conds.push(`e.game_version IN (${opts.versions.map(() => "?").join(",")})`);
@@ -310,9 +325,10 @@ export async function getDocument(source: ReleaseSource, id: number): Promise<(S
 /** Exact full-name match (case-insensitive), optionally narrowed to one kind. */
 export async function getByName(source: ReleaseSource, name: string, kind?: Kind): Promise<SearchHit[]> {
   const db = releaseDb(source);
-  const cond = kind ? "AND kind = ?" : "";
+  const kinds = kind ? kindFilter("", [kind]) : null;
+  const cond = kinds ? `AND ${kinds.sql}` : "";
   const exact = async (n: string) => {
-    const params = kind ? [n, kind] : [n];
+    const params = kinds ? [n, ...kinds.params] : [n];
     const rows = await db.all<EntityRow>(`SELECT ${ROW_BY_ID} FROM entities WHERE name = ? COLLATE NOCASE ${cond} ORDER BY id`, ...params);
     return rows.map(toHit);
   };
