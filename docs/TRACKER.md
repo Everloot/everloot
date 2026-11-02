@@ -3,8 +3,8 @@
 Generated from `kb/src/bridge-plan.ts`. Edit that file, then regenerate this page.
 The MCP tool `everloot_plan` returns the same text.
 
-Hakoovak (US / Moon Guard) is Carlos's own character, sent so two reference pages
-could be opened on a real name. It is not a fixture and not the Forever beta character.
+Two reference links open a page on the maintainer's own character, so the page shape
+could be read on a real name. It is not a fixture and not the Forever beta character.
 
 Order: one server. Each product tool is one MCP tool on that server. A ChatGPT
 subscription connects to the public HTTPS mount and uses its own model. Closed
@@ -24,7 +24,7 @@ Rows: 75.
 | `mcp.get_entity` | Fetch one record by id | code + tests | stdio tool on everloot-knowledge |
 | `mcp.get_by_name` | Exact-name lookup | code + tests | stdio tool on everloot-knowledge |
 | `mcp.everloot_plan` | This tracker, as a tool | code + tests | a client can ask what is live, next, waiting, or shape-only |
-| `mcp.http_local` | Local HTTP MCP | code + tests | POST /mcp on 127.0.0.1. Same server as stdio. Not reachable by ChatGPT yet. |
+| `mcp.http_local` | Local HTTP MCP | code + tests | POST /mcp on 127.0.0.1. Same server as stdio. Local only: ChatGPT connects to the public mount (mcp.public_https). |
 | `site.home` | Public home | on everloot.app | https://everloot.app |
 | `site.upload` | Upload + intake | on everloot.app | /upload and /api/intake. Persists when Supabase is connected. |
 | `site.drops` | Drop rollups | on everloot.app | public when 3 independent installs agree |
@@ -35,6 +35,7 @@ Rows: 75.
 | `ops.health` | Snapshot health | on everloot.app | /api/health reports snapshot age from signed R2 metadata: fresh within 30 minutes, otherwise 503. Age is not proof of complete indexing. |
 | `ops.quotas` | Shared intake quotas | on everloot.app | Supabase counters: 20 uploads per install, 200 requests per IP and 10,000 globally per hour; the public MCP and market prices count against their own 5,000. Production fails closed. Install IDs still do not prove different people. |
 | `ops.stored_rollups` | Corpus snapshot | on everloot.app | The Worker's Cron Trigger every 10 minutes extends snapshots/corpus.json in R2 with uploads it has not seen. Pages read that one object. ?rebuild=1 (with CRON_SECRET) rebuilds from empty after a deletion. |
+| `mcp.chatgpt_directory` | ChatGPT apps directory | public client | approved on 2026-11-02 (version 1.0.1, with the tool descriptions it was submitted with); it uses https://everloot.app/mcp/public with no sign-in |
 | `ops.dns` | everloot.app DNS | on everloot.app | The apex and www records in Cloudflare are proxied, and the Worker routes everloot.app/* and www.everloot.app/* serve them; www answers a 301 to the apex. |
 | `ops.worker_deploy` | Worker deploys | on everloot.app | A push to main that touches web/, kb/ or packages/protocol, once the Release checks pass on it, builds the site with OpenNext and deploys the everloot-web Worker (.github/workflows/deploy-worker.yml), then fetches every sitemap page and fails on any that does not answer 200. |
 | `ops.supabase` | Supabase + R2 storage | on everloot.app | Intake writes the raw upload to R2 bucket everloot-uploads and one index row to Supabase everloot (ref uinmowrmyckklpbwzqhn); the waitlist is a Supabase table. Pages read the indexed objects. Proven end to end on everloot.app 2026-10-04. |
@@ -65,7 +66,6 @@ Rows: 75.
 | `tool.simc` | SimulationCraft sidecar | not built | run the GPL-3.0 forever branch as its own process once it can sim. Report comes back through MCP. Do not paste the C++ into this repo. |
 | `app.uploader` | Desktop uploader | code + tests | companion/ upload and watch send only unconfirmed events after logout, named data held on the machine; tested against a local server. Done when it runs against a real Forever WTF folder and ships as a signed build (ops.signing). |
 | `app.companion` | In-game companion | code + tests | File bridge: /ask stores the question; companion bridge answers from the MCP server into the EverlootAnswers addon, shown after /reload when its Adler-32 verifies. Providers enabled in config.json (Anthropic, or any OpenAI-compatible endpoint including a local model) answer from the top search results, falling back down the chain; with none enabled the answer is the top search result. Done when it works in the Forever client. |
-| `mcp.chatgpt_directory` | ChatGPT apps directory | not built | submit the same MCP server the day submissions open |
 | `mcp.subscription_signin` | Subscription sign-in | not built | ChatGPT or Claude subscription unlocks the companion. API keys stay the fallback. |
 
 ## Waiting on Carlos
@@ -73,7 +73,7 @@ Rows: 75.
 | Id | Name | Done when |
 |---|---|---|
 | `ops.adsense` | AdSense | Carlos's account. Consent banner already on the site. |
-| `ops.beta_guild` | Beta character in a guild | two raid nights before 2026-10-21. Hakoovak is not this character. |
+| `ops.beta_guild` | Beta character in a guild | two raid nights before 2026-10-21. The reference character is not this character. |
 | `ops.hero_shot` | Hero screenshot | a real beta screenshot replaces the empty hero |
 | `ops.curseforge` | CurseForge pack | staged around 2026-10-24 |
 | `ops.signing` | Windows code signing | publisher is likely R21 Media Group LLC |
@@ -92,7 +92,7 @@ Rows: 75.
 | `ref.gaming_tools` | gaming.tools/wow | page shape: a path that recalculates. Price it from our uploads. |
 | `ref.wow_professions` | wow-professions.com | page shape: a Forever door and a TomTom pin. Do not copy their routes. |
 | `ref.missing_mounts` | missingmounts.com | page shape: missing list, vendor-ready pile separated. Data comes from uploads. |
-| `ref.simple_armory` | simplearmory.com | page shape: character URL, owned versus missing. Hakoovak was only a real name to open the page. |
+| `ref.simple_armory` | simplearmory.com | page shape: character URL, owned versus missing. The character was only a real name to open the page. |
 | `ref.data_for_azeroth` | dataforazeroth.com | page shape: character page. Not a rankings product. |
 | `ref.wowauctions` | wowauctions.net | page shape: realm, then item, then price history. |
 | `ref.ask_mr_robot` | askmrrobot.com | page shape: one gear optimizer. Their lists stay theirs. |

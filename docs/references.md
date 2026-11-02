@@ -4,9 +4,9 @@ Carlos sent these as inspirations. They say what a page should feel like. They a
 Access rules stay in `docs/sources/source-catalog.md`. If this file and that catalogue disagree, the
 catalogue wins.
 
-**Character in two of the links:** US / Moon Guard / Hakoovak is Carlos's own character, sent so
-those pages could be opened on a real name. It is not a fixture in the app and not the Forever
-beta character.
+**Character pages:** two of the sites below were read on the maintainer's own character, so those
+pages could be opened on a real name. The character links are not kept here. That character is not a
+fixture in the app and not the Forever beta character.
 
 Checked the same night. `everloot.app` was on Cloudflare nameservers (`jonah` / `veronica`) and the
 apex did not answer HTTP.
@@ -18,8 +18,8 @@ apex did not answer HTTP.
 | [Pengu's Midnight Profession Sheet](https://docs.google.com/spreadsheets/d/1OiEL8gl3v0ccxl-NZjRudOPCO9tcEWryK6ScX4PNnu8/edit?gid=0#gid=0) | One profession bible: leveling path, knowledge points, treasures, first crafts, rep rewards, and a link out to a tree calculator. Cover tabs named Alchemy, Blacksmithing, Enchanting, Engineering, Inscription, Jewelcrafting, Leatherworking, Tailoring, Cooking. | Pengu's numbers or cell text. It is a Midnight retail sheet, still marked in development. |
 | [gaming.tools/wow](https://gaming.tools/wow/) | The same profession path, but it recalculates: skip trainer-only recipes, racial bonus, recipes that grant more than one skill point, recursive reagents, a shopping list, and a cost from auction prices. | Retail or Classic AH prices. Forever gold is farmed. Price a path only from our own uploads. |
 | [Missing Mounts](https://www.missingmounts.com/) | Start with server + name, or Battle.net login. Then the missing list, grouped by expansion and source, with a separate pile for mounts a vendor will already sell because reputation is high enough. | Their catalog. Forever has no profile namespace yet, so this view waits on the collector. |
-| [Simple Armory](https://simplearmory.com/#/) · [Hakoovak mounts](https://simplearmory.com/#/us/moon-guard/hakoovak/collectable/mounts/) | A character URL with a collectable category, owned versus missing, no account required when the armory is public. | Scraping the armory. Same blocker as above. |
-| [Data for Azeroth](https://www.dataforazeroth.com/) · [Hakoovak](https://www.dataforazeroth.com/characters/US/Moon%20Guard/Hakoovak) | Character page plus a collection leaderboard. The homepage was behind a bot check tonight, so the character page was not read. | Their leaderboard data. Rankings are not the product. forever.raider.io already exists. |
+| [Simple Armory](https://simplearmory.com/#/) | A character URL with a collectable category, owned versus missing, no account required when the armory is public. | Scraping the armory. Same blocker as above. |
+| [Data for Azeroth](https://www.dataforazeroth.com/) | Character page plus a collection leaderboard. The homepage was behind a bot check tonight, so the character page was not read. | Their leaderboard data. Rankings are not the product. forever.raider.io already exists. |
 | [WoWAuctions](https://www.wowauctions.net/) | Realm first, then item. Price history, a heatmap of cheap hours, crafting profit, cross-realm compare. Free, ads, no login. | Their price database. Auction history comes from the player's own AH browsing, uploaded on purpose. |
 | [tbc.rtw.dev](https://tbc.rtw.dev/) | A calculator-and-guides front door. The title read "TBC Classic Tools". The page body did not render, so the tool list is unread. | Anything from the unread page. Open it in a browser before borrowing a layout. |
 | [Icy Veins](https://www.icy-veins.com/) | A class grid as the front door, a news rail, and a weekly to-do. They already run a Forever vertical. | Their guides. Catalogue row is `link`. `/terms` blocked a bot. |

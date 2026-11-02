@@ -65,7 +65,7 @@ export default function Page() {
       </Steps>
 
       <Callout kind="note">
-        <p>Questions about drop rates, prices, vendors and quest details are answered only from what players have uploaded, and little has been uploaded yet. WoW: Forever launches on 4 November 2026. The tools answer &quot;unrecorded&quot; instead of a number, and Claude relays that. These questions start to work as players report and three installs agree.</p>
+        <p>Questions about drop rates, prices, vendors and quest details are answered only from what players have uploaded since WoW: Forever launched on 4 November 2026. Where too little has been uploaded, the tools answer &quot;unrecorded&quot; instead of a number, and Claude relays that. These questions start to work as players report and three installs agree.</p>
       </Callout>
 
       <H2 id="check">Check your work</H2>

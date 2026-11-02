@@ -55,6 +55,7 @@ const NAMES: Record<string, string> = {
   "/tools/builds": "Plans on this device",
   "/tools/alts": "Alts on this device",
   "/tools/raid": "Raid builder",
+  "/tools/legacy": "Legacy perks",
   "/tools/collections": "Collection gap",
   "/tools/guild-board": "Guild board",
   "/tools/auctions": "Auction House",

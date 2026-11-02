@@ -98,7 +98,7 @@ export default function Page() {
       </Steps>
 
       <Callout kind="note">
-        <p>Before WoW: Forever launches on 4 November 2026, and until players report a page, its card request returns the 404 above. Your links still work as plain links, and cards start to appear as players upload and three installs agree.</p>
+        <p>Players report pages from WoW: Forever&apos;s launch on 4 November 2026, and until a page is reported, its card request returns the 404 above. Your links still work as plain links, and cards start to appear as players upload and three installs agree.</p>
       </Callout>
 
       <H2 id="check">Check your work</H2>

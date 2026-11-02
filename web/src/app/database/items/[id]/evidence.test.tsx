@@ -43,11 +43,22 @@ test("an item nobody reported says so rather than staying silent", async () => {
 });
 
 test("the page offers the record as text for an assistant and as JSON", async () => {
-  store.loadCorpus.mockResolvedValue({ uploads: 0, dataAsOf: "2026-10-10T00:00:00.000Z", records: [] });
+  store.loadCorpus.mockResolvedValue({
+    uploads: 3, dataAsOf: "2026-10-10T00:00:00.000Z",
+    records: ["a", "b", "c"].map((i) => loot(`install-${i}`, 299, 2770)),
+  });
   const page = await render("2770");
   expect(page).toContain("Copy for AI");
   expect(page).toContain('href="/api/tooltip/item/2770"');
   expect(page).toContain("Raw JSON");
+});
+
+test("an item nobody reported links no JSON: the tooltip API answers 404 for it", async () => {
+  store.loadCorpus.mockResolvedValue({ uploads: 0, dataAsOf: "2026-10-10T00:00:00.000Z", records: [] });
+  const page = await render("2770");
+  expect(page).toContain("Copy for AI");
+  expect(page).not.toContain("/api/tooltip/item/2770");
+  expect(page).not.toContain("Raw JSON");
 });
 
 test("a development leftover sharing the icon stays out of the related items, and is not counted as unnamed", async () => {

@@ -3,8 +3,10 @@ import { SOCIAL_PROFILES } from "@/lib/social";
 import { CONTACT_EMAIL, DISCORD_INVITE, OPERATOR, SITE_BLURB } from "@/lib/jsonld";
 import { deployedSha, REPO_URL, sourceUrl } from "@/lib/source";
 import { BETA, LAUNCH, longDate } from "@/data/wow-forever";
+import { hasLaunched } from "@/data/wow-forever-launch";
 import { CookiePreferencesButton } from "./CookieConsent";
 import FooterGlint from "./glint/FooterGlint";
+import LaunchTense from "./LaunchTense";
 
 /** `plain` marks a same-origin file the router should not prefetch, such as a feed. */
 type Item = { label: string; href: string; external?: boolean; plain?: boolean };
@@ -60,7 +62,7 @@ const LEGAL: Item[] = [
 const groupItems = (group: (typeof GROUPS)[number]): Item[] =>
   group.title === "Data and API" ? [...group.items, { label: "Source", href: sourceUrl(), external: true }] : group.items;
 
-const itemClass = "inline-flex min-h-8 items-center text-meta text-fg-2 hover:text-accent transition-colors md:min-h-6";
+const itemClass = "inline-flex min-h-8 min-w-6 items-center text-meta text-fg-2 hover:text-accent transition-colors md:min-h-6";
 const legalClass = "inline-flex min-h-6 items-center hover:text-accent transition-colors";
 const iconClass = "inline-flex h-8 w-8 items-center justify-center rounded-control text-fg-2 hover:text-accent transition-colors";
 
@@ -79,7 +81,7 @@ function FooterLink({ item, className = itemClass }: { item: Item; className?: s
 export default function Footer() {
   const now = new Date();
   const year = now.getFullYear();
-  // Once the beta's last day has passed (UTC), the sentence says so; the launch sentence stays until it happens.
+  // Once the beta's last day has passed (UTC), the sentence says so; from the launch instant it says the game launched.
   const betaOver = now.toISOString().slice(0, 10) > BETA.endsOn;
   const sha = deployedSha();
   return (
@@ -139,7 +141,7 @@ export default function Footer() {
         <div className="space-y-0.5 pb-3 text-xs leading-relaxed text-muted">
           {/* The site's own clock: the beta the data comes from, and the launch it is for. */}
           <p data-site-dates>
-            The beta {betaOver ? "ran" : "runs"} until {longDate(BETA.endsOn)}, and the game launches {longDate(LAUNCH.date)}.
+            The beta {betaOver ? "ran" : "runs"} until {longDate(BETA.endsOn)}, and the game <LaunchTense launchedAtRender={hasLaunched(now)} /> {longDate(LAUNCH.date)}.
           </p>
           <SiteCredit />
           <p>
