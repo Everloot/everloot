@@ -90,6 +90,18 @@ test("the sections come in order, each with an anchor in the page's nav", async 
   expect(html).toMatch(/<section id="integrations" aria-labelledby="integrations-heading"[^>]*><h2 id="integrations-heading"[^>]*>Integrations<\/h2>/);
 });
 
+test("character links on: a Linked characters section after Profile, in the nav and in Data and privacy; off, none", async () => {
+  expect(await render()).not.toContain("characters-heading");
+  vi.stubEnv("EVERLOOT_CHARACTER_LINKS", "1");
+  const html = await render();
+  expect(html).toMatch(/<section id="characters" aria-labelledby="characters-heading"[^>]*><h2 id="characters-heading"[^>]*>Linked characters<\/h2>/);
+  expect(html).toContain('<a href="#characters" class="text-fg-2 hover:text-accent">Linked characters</a>');
+  expect(html.indexOf('<section id="profile"')).toBeLessThan(html.indexOf('<section id="characters"'));
+  expect(html.indexOf('<section id="characters"')).toBeLessThan(html.indexOf('<section id="integrations"'));
+  expect(html).toContain("the characters you linked");
+  expect(html).toContain('Unlink a character <a href="#characters"');
+});
+
 test("switches off: Profile has nothing to show, so it and its nav link go and its sentence moves into Overview", async () => {
   switches(false);
   const html = await render();

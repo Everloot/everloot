@@ -8,7 +8,7 @@ import { slugify } from "../../../kb/src/lore-slug";
 import type { PageType } from "../../../kb/src/wiki/page";
 import type { WorldMapData } from "../../../kb/src/world-map-data";
 import { instanceHref, instanceRows, levelLabel, loadSightings, type InstanceRow } from "./instances";
-import type { WikiPage } from "./wiki";
+import { loadWiki, publishedPages, type WikiPage } from "./wiki";
 import { WORLD_MAP } from "./world-map";
 import type { ZoneSightings } from "./zones";
 
@@ -53,4 +53,16 @@ export function dungeonFacts(
 export async function loadDungeonFacts(page: Pick<WikiPage, "type" | "binds">): Promise<DungeonFacts | null> {
   if (boundInstance(page) === null) return null;
   return dungeonFacts(page, await loadSightings());
+}
+
+/**
+ * The published dungeon or raid page that binds this instance, for the "Prepare" link on its database page. A draft gets
+ * no link, and a wiki that cannot be read means no link, never a failed page.
+ */
+export function prepPage(instanceMapId: number, data: Pick<WorldMapData, "entrances"> = WORLD_MAP): WikiPage | null {
+  try {
+    return publishedPages(loadWiki()).find((p) => boundInstance(p, data) === instanceMapId) ?? null;
+  } catch {
+    return null;
+  }
 }

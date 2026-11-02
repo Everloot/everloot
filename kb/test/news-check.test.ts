@@ -1,9 +1,9 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { checkNews, MIN_POST_WORDS, type NewsCheckContext, type NewsFile } from "../src/news/check.js";
-import { publishedWikiSlugs, readNewsPosts } from "../src/news/data.js";
+import { figureSize, publishedWikiSlugs, readNewsPosts } from "../src/news/data.js";
 import { loadPrivatePathPattern } from "../src/wiki/data.js";
 import { parsePost, PostFrontMatter } from "../src/news/post.js";
 
@@ -78,6 +78,46 @@ test("the committed posts pass, and a folder's README is not a post", () => {
   writeFileSync(join(dir, "README.md"), "# not a post");
   writeFileSync(join(dir, "launch-week.md"), `${FRONT}\n\n${PROSE}\n`);
   expect(readNewsPosts(dir).map((f) => f.path)).toEqual(["news/launch-week.md"]);
-  const committed = checkNews(readNewsPosts(), { ...ctx, wikiPages: publishedWikiSlugs(), today: new Date().toISOString().slice(0, 10) });
+  const committed = checkNews(readNewsPosts(), { ...ctx, wikiPages: publishedWikiSlugs(), today: new Date().toISOString().slice(0, 10), figureSize });
   expect(committed.problems).toEqual([]);
+});
+
+const FIG = "/news/figures/launch-week/map.webp";
+
+test("a figure is its own paragraph with alt text and a .webp in the post's figures folder, at 1600x900", () => {
+  const sizes: Record<string, { width: number; height: number }> = { [FIG]: { width: 1600, height: 900 }, "/news/figures/launch-week/small.webp": { width: 800, height: 450 } };
+  const c = { ...ctx, figureSize: (src: string) => sizes[src] ?? null };
+  const withBody = (body: string) => messages([file(`${FRONT}\n\n${PROSE}\n\n${body}\n`)], c);
+  expect(withBody(`![The zone map](${FIG} "Where the camps are")`)).toEqual([]);
+  expect(withBody(`![The zone map](${FIG})`)).toEqual([]);
+  expect(withBody(`![](${FIG} "A caption is not alt text")`)).toEqual([expect.stringContaining("needs alt text")]);
+  expect(withBody("![A map](https://example.com/map.webp)")).toEqual([expect.stringContaining("must be a .webp file in this post's folder, /news/figures/launch-week/")]);
+  expect(withBody("![A map](/news/figures/other-post/map.webp)")).toEqual([expect.stringContaining("this post's folder")]);
+  expect(withBody("![A map](/news/figures/launch-week/map.png)")).toEqual([expect.stringContaining("this post's folder")]);
+  expect(withBody(`See ![A map](${FIG}) here.`)).toEqual([expect.stringContaining("a paragraph of its own")]);
+  expect(withBody(`- ![A map](${FIG})`)).toEqual([expect.stringContaining("a paragraph of its own")]);
+  expect(withBody("![A map](/news/figures/launch-week/missing.webp)")).toEqual([expect.stringContaining("is not a WebP file committed at web/public/news/figures/launch-week/missing.webp")]);
+  expect(withBody("![A map](/news/figures/launch-week/small.webp)")).toEqual([expect.stringContaining("is 800x450; a figure is 1600x900")]);
+  // A figure's words are not prose: a post of figures alone is short.
+  expect(messages([file(`${FRONT}\n\n![${PROSE}](${FIG} "${PROSE}")\n`)], c)).toContainEqual(expect.stringContaining("this one has 0"));
+});
+
+test("a figure's size is read from its WebP header, lossy, lossless or extended", () => {
+  const dir = mkdtempSync(join(tmpdir(), "figures-"));
+  mkdirSync(join(dir, "news"));
+  const webp = (chunk: string, fill: (b: Buffer) => void) => {
+    const b = Buffer.alloc(30);
+    b.write("RIFF", 0, "latin1");
+    b.write("WEBP", 8, "latin1");
+    b.write(chunk, 12, "latin1");
+    fill(b);
+    return b;
+  };
+  writeFileSync(join(dir, "news", "lossy.webp"), webp("VP8 ", (b) => { b.writeUInt16LE(1600, 26); b.writeUInt16LE(900, 28); }));
+  writeFileSync(join(dir, "news", "lossless.webp"), webp("VP8L", (b) => b.writeUInt32LE((1599 | (899 << 14)) >>> 0, 21)));
+  writeFileSync(join(dir, "news", "extended.webp"), webp("VP8X", (b) => { b.writeUIntLE(1599, 24, 3); b.writeUIntLE(899, 27, 3); }));
+  writeFileSync(join(dir, "news", "fake.webp"), "not an image");
+  for (const name of ["lossy", "lossless", "extended"]) expect(figureSize(`/news/${name}.webp`, dir)).toEqual({ width: 1600, height: 900 });
+  expect(figureSize("/news/fake.webp", dir)).toBeNull();
+  expect(figureSize("/news/missing.webp", dir)).toBeNull();
 });

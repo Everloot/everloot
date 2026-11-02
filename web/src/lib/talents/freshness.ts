@@ -113,6 +113,10 @@ export interface PointLevelChange {
   levelAfter: number | null;
 }
 
+/** What the comparison needs of the tree on screen: a whole catalog will do, or just these, for a page's browser code
+ *  that lists plans of every class without carrying their trees. */
+export type TreeBuild = Pick<TalentCatalog, "classId" | "classSlug" | "build">;
+
 export interface PlanFreshness {
   /** The plan's build against the tree's: the same, older, newer (a build this site does not show, or no longer
    *  does), or unknown when either cannot be read or compared. */
@@ -143,7 +147,7 @@ function askedPoints(ranks: Ranks): Map<number, number> {
 
 /** What the records show changed in a plan's talents since `madeOn`, the build its code carries. `askedRanks` are
  *  the ranks the code asked for, before the tree on screen placed them, so a removed talent still counts. */
-export function planFreshness(catalog: TalentCatalog, changes: ClassTalentChanges, madeOn: string, askedRanks: Ranks): PlanFreshness {
+export function planFreshness(catalog: TreeBuild, changes: ClassTalentChanges, madeOn: string, askedRanks: Ranks): PlanFreshness {
   const treeBuild = catalog.build;
   const order = compareGameBuilds(madeOn, treeBuild);
   const relation = order === null ? "unknown" : order < 0 ? "older" : order > 0 ? "newer" : "same";
@@ -202,13 +206,31 @@ export function planFreshness(catalog: TalentCatalog, changes: ClassTalentChange
 
 /** The freshness of the plan a share code carries; null when the code does not read or is for another class
  *  (the calculator's import report says why). */
-export function codeFreshness(catalog: TalentCatalog, changes: ClassTalentChanges, code: string): PlanFreshness | null {
+export function codeFreshness(catalog: TreeBuild, changes: ClassTalentChanges, code: string): PlanFreshness | null {
   const decoded = decodeBuild(code);
   if (!decoded.ok || decoded.build.classSlug !== catalog.classSlug) return null;
   return planFreshness(catalog, changes, decoded.build.build, decoded.build.ranks);
 }
 
 // ---- words ------------------------------------------------------------------------------------
+
+/** A saved plan's freshness in a list of plans, as one sentence: said only when a set was made on an older game build
+ *  and the records show a change to its talents or point levels, or cannot say whether there was one. Null when no set
+ *  is older, or the records show nothing changed. It counts and never names, so a spoiler build's talents stay hidden
+ *  whatever the reader's setting; opening the plan lists the changes. One entry per set, null for a set that does not
+ *  read. It describes the plan; nothing here changes it. */
+export function savedPlanNote(sets: readonly (PlanFreshness | null)[]): string | null {
+  const older = sets.filter((f): f is PlanFreshness => f?.relation === "older");
+  if (older.length === 0) return null;
+  const talents = new Set(older.flatMap((f) => f.touched.map((t) => t.nodeId))).size;
+  const levels = older.some((f) => f.pointLevels.length > 0);
+  if (talents > 0 || levels) {
+    const what = [talents > 0 && `${talents} of its talents`, levels && "the levels talent points arrive at"].filter(Boolean).join(" and ");
+    return `Made on an older game build: the game files changed ${what} since.`;
+  }
+  if (older.some((f) => f.changed === null)) return "Made on an older game build; whether its talents changed since is not known.";
+  return null;
+}
 
 const plural = (n: number, one: string) => `${n} ${n === 1 ? one : `${one}s`}`;
 const readable = (build: string) => compareGameBuilds(build, build) === 0;

@@ -17,8 +17,12 @@ export interface Settings {
   /** Player pages go with the uploads: the name, realm, race, class, level and guild of the players seen. Off by default. */
   players: boolean;
   ask: { enabled: boolean; mcpUrl: string; tokenFile: string | null };
-  /** Realms to keep prices for beyond the ones in the player's own scans (TSM-style realm picks). */
-  market: { realms: string[] };
+  /**
+   * `realms`: realms to keep prices for beyond the ones in the player's own scans (TSM-style realm picks).
+   * `dismissed`: realms of the player's characters the Market page already suggested and the player answered
+   * (Follow or Not now), so they are not suggested again. Character realms are never fetched on their own.
+   */
+  market: { realms: string[]; dismissed: string[] };
   /** ISO time the player pressed Start on the welcome screen; null until then. Nothing runs before. */
   consentedAt: string | null;
   launchAtLogin: boolean;
@@ -90,6 +94,11 @@ export interface MarketInfo {
   /** Realms named in the player's own scans. */
   own: string[];
   followed: string[];
+  /**
+   * Realms of the player's own characters (from the addon's rows) to offer as a one-click follow: not scanned,
+   * not followed, not dismissed. Read on this computer; nothing is fetched for them until the player follows.
+   */
+  suggested: string[];
   /** Realms the site has public values for, when it answered. */
   known: string[];
   dataAsOf: string | null;

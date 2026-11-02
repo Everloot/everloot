@@ -1,11 +1,12 @@
-import { CLIENT_BUILD, parseRecords, PROTOCOL_VERSION, sharingCategory, UPLOAD_LIMITS, UPLOAD_SOURCES, type SharingCategory } from "@everloot/protocol";
+import { CLIENT_BUILD, LINK_KINDS, parseRecords, PROTOCOL_VERSION, sharingCategory, UPLOAD_LIMITS, UPLOAD_SOURCES, type SharingCategory } from "@everloot/protocol";
 import { recorderSession } from "./polestar-recorder";
 
 export type SharingChoices = Partial<Record<SharingCategory, boolean>>;
 export interface BatchReceipt { ok: boolean; persisted?: boolean; uploadId?: string; accepted?: { index: number; kind: string }[]; rejected?: { index: number; reason: string }[]; error?: string }
 export interface UploadSession {
   batches: string[]; next: number; receipts: BatchReceipt[];
-  counts: Record<string, number>; held: { legacy: number; named: number; invalid: number };
+  /** `links`: character_link rows, which go only to the account's own link endpoint, never in an upload. */
+  counts: Record<string, number>; held: { legacy: number; named: number; invalid: number; links: number };
   /** The installed addons this upload sends, one "Title (FolderName)" per folder, for the preview. */
   addons: string[];
   /** Distinct characters in the census rows this upload sends: players seen, and your own. */
@@ -44,7 +45,7 @@ export function prepareUpload(payload: unknown, sharing: SharingChoices, grantTo
   if (envelope.records.length > UPLOAD_LIMITS.recordsPerFile) throw new Error(`This file is too large. Keep the original and split it into files of at most ${UPLOAD_LIMITS.recordsPerFile.toLocaleString("en-US")} records.`);
   if (grantTokens.length > UPLOAD_LIMITS.grantTokensMax || grantTokens.some((token) => !/^[a-f0-9]{64}$/.test(token))) throw new Error("Verification grants must be 64 lowercase hexadecimal characters, one per line (at most four).");
   const parsed = parseRecords(envelope.records);
-  const held = { legacy: 0, named: 0, invalid: parsed.receipt.rejected.length };
+  const held = { legacy: 0, named: 0, invalid: parsed.receipt.rejected.length, links: 0 };
   const counts: Record<string, number> = {};
   const addons = new Map<string, string>();
   const census: { kind: string; guid?: unknown }[] = [];
@@ -52,6 +53,8 @@ export function prepareUpload(payload: unknown, sharing: SharingChoices, grantTo
   const groups: string[] = [];
   const skipped: string[] = [];
   for (const record of parsed.records) {
+    // A link row carries a GUID and a live code: it never goes to intake, whatever else is chosen.
+    if (LINK_KINDS.includes(record.kind)) { held.links++; continue; }
     if (!record.eventId) { held.legacy++; continue; }
     const category = sharingCategory(record);
     if (category && !sharing[category]) { held.named++; continue; }

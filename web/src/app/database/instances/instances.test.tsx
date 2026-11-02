@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test, vi } from "vitest";
@@ -52,4 +53,29 @@ test("with storage down, an instance's page lists the bosses the game files give
   const list = renderToStaticMarkup(await InstancesPage());
   const col = [...list.matchAll(/<th[^>]*>(.*?)<\/th>/g)].map((m) => text(m[1]!).replace(/\|/g, "")).indexOf("Bosses");
   expect(cells(list, "/database/instances/409-molten-core")[col]).toMatch(/unconfirmed\|11$/);
+});
+
+test("an instance's page links its prep page only when a published wiki page binds it; a draft gets no link", async () => {
+  vi.stubEnv("WIKI_DIR", fileURLToPath(new URL("../../../test/wiki", import.meta.url)));
+  try {
+    const page = async (segment: string) => renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: segment }) }));
+    // The published fixture binds the Deadmines; the draft fixture binds Ragefire Chasm.
+    expect(await page("36-deadmines")).toContain('<a href="/wiki/test-dungeon">Prepare for this dungeon</a>');
+    const draft = await page("389-ragefire-chasm");
+    expect(draft).not.toContain("Prepare for this");
+    expect(draft).not.toContain("/wiki/");
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});
+
+test("with the wiki unreadable, an instance's page still renders, with no prep link", async () => {
+  vi.stubEnv("WIKI_DIR", fileURLToPath(new URL("./no-such-wiki", import.meta.url)));
+  try {
+    const html = renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: "36-deadmines" }) }));
+    expect(html).toContain("Bosses");
+    expect(html).not.toContain("Prepare for this");
+  } finally {
+    vi.unstubAllEnvs();
+  }
 });

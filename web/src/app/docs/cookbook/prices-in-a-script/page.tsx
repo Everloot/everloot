@@ -7,7 +7,7 @@ import Link from "next/link";
 
 export const metadata: Metadata = pageMetadata({
   title: "Market prices in a script",
-  description: "Read Forever market values from JavaScript or Python with no installs, list the realms that have prices, and handle the empty answer before launch.",
+  description: "Read Forever market values from JavaScript or Python with no installs, list the realms that have prices, and handle the answer for a realm with no prices.",
   path: "/docs/cookbook/prices-in-a-script",
 });
 
@@ -151,7 +151,7 @@ export default function Page() {
       </List>
 
       <Callout kind="note">
-        <p>Before WoW: Forever launches on 4 November 2026, and until 3 reporters scan an item on a realm, no realm has public prices and the scripts print the empty-answer message in step 3. The output in step 4 uses placeholder values, so you can see its shape.</p>
+        <p>Prices come only from scans players make from WoW: Forever&apos;s launch on 4 November 2026, and a realm has no public prices until 3 reporters scan an item on it. Until then the scripts print the empty-answer message in step 3. The output in step 4 uses placeholder values, so you can see its shape.</p>
       </Callout>
 
       <H2 id="steps">Steps</H2>

@@ -16,7 +16,7 @@ export function defaultSettings(): Settings {
     census: true,
     players: false,
     ask: { enabled: false, mcpUrl: `${DEFAULT_ENDPOINT}/mcp`, tokenFile: null },
-    market: { realms: [] },
+    market: { realms: [], dismissed: [] },
     consentedAt: null,
     launchAtLogin: false,
     startInTray: true,
@@ -36,9 +36,9 @@ export function mergeSettings(base: Settings, patch: unknown): Settings {
   const p = (patch && typeof patch === "object" ? patch : {}) as Record<string, unknown>;
   const ask = (p.ask && typeof p.ask === "object" ? p.ask : {}) as Record<string, unknown>;
   const market = (p.market && typeof p.market === "object" ? p.market : {}) as Record<string, unknown>;
-  const realms = Array.isArray(market.realms)
-    ? [...new Set(market.realms.filter((r): r is string => typeof r === "string").map((r) => r.trim()).filter((r) => r.length >= 2 && r.length <= 60))].slice(0, 20)
-    : base.market.realms;
+  const list = (v: unknown, fallback: string[], max: number) => Array.isArray(v)
+    ? [...new Set(v.filter((r): r is string => typeof r === "string").map((r) => r.trim()).filter((r) => r.length >= 2 && r.length <= 60))].slice(0, max)
+    : fallback;
   return {
     gameFolder: "gameFolder" in p ? (p.gameFolder === null ? null : str(p.gameFolder) ?? base.gameFolder) : base.gameFolder,
     keptGameFolder: "keptGameFolder" in p ? (p.keptGameFolder === null ? null : str(p.keptGameFolder) ?? base.keptGameFolder) : base.keptGameFolder,
@@ -52,7 +52,7 @@ export function mergeSettings(base: Settings, patch: unknown): Settings {
       mcpUrl: isHttp(ask.mcpUrl) ? ask.mcpUrl : base.ask.mcpUrl,
       tokenFile: "tokenFile" in ask ? (ask.tokenFile === null ? null : str(ask.tokenFile) ?? base.ask.tokenFile) : base.ask.tokenFile,
     },
-    market: { realms },
+    market: { realms: list(market.realms, base.market.realms, 20), dismissed: list(market.dismissed, base.market.dismissed, 100) },
     consentedAt: "consentedAt" in p ? (p.consentedAt === null ? null : str(p.consentedAt) ?? base.consentedAt) : base.consentedAt,
     launchAtLogin: bool(p.launchAtLogin, base.launchAtLogin),
     startInTray: bool(p.startInTray, base.startInTray),

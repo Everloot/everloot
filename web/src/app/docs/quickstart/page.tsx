@@ -137,8 +137,8 @@ export default function Page() {
         />
       </div>
       <P>
-        A card shows only for a page players have reported, once 3 installs agree. Until then, and before WoW: Forever
-        launches on 4 November 2026, a link gets no card and works as a plain link. More on{" "}
+        A card shows only for a page players have reported, once 3 installs agree. Reports start with WoW: Forever&apos;s
+        launch on 4 November 2026. Until then a link gets no card and works as a plain link. More on{" "}
         <Link href="/docs/tooltips" className={docLink}>Embeddable tooltips</Link>.
       </P>
 

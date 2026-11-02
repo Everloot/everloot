@@ -5,6 +5,7 @@
  * Everything is re-checked on the way in, so a hand-edited JSON file cannot widen a limit.
  */
 
+import { CENSUS_LAUNCH } from "./census.js";
 import { INDEPENDENT_INSTALLS } from "./drop-rollup.js";
 import { clampText, isoTime, safeHttpUrl } from "./text-safety.js";
 
@@ -505,6 +506,12 @@ export function handleEcosystemProjects(view: EcosystemView | null, args: Ecosys
   const age = view.refreshedAt ? `GitHub data refreshed ${view.refreshedAt.slice(0, 16).replace("T", " ")} UTC.` : "GitHub data not refreshed yet.";
   const lines: string[] = [];
   const shown = pickEcosystemRows(view, args, now);
+  if (shown.length === 0 && args.board === "installed" && !buildBoards(view, now).find((b) => b.id === "installed")!.rows.length) {
+    const why = now.getTime() < Date.parse(CENSUS_LAUNCH)
+      ? `those start at launch (${CENSUS_LAUNCH.slice(0, 16).replace("T", " ")} UTC).`
+      : `no project has ${INDEPENDENT_INSTALLS} reporting installs yet.${view.installsAvailable ? "" : " Install counts are unavailable right now."}`;
+    return `No projects on this board yet. It ranks projects by install counts from players' Everloot uploads, and ${why} ${age}`;
+  }
   if (shown.length === 0) {
     return `No projects match. ${age}${view.installsAvailable ? "" : " Install counts are unavailable right now."}`;
   }

@@ -1,5 +1,9 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { expect, test } from "vitest";
 import { summarizeCharacters } from "../src/main/characters";
+import { charactersFromFiles } from "../src/main/save-facts";
 
 const SV = `EverlootDB = { ["version"] = "0.3.3", ["installId"] = "x", ["records"] = {
   ["gold_snapshot"] = { { ["character"] = "Arthas", ["realm"] = "Nightslayer", ["capturedAt"] = "2026-10-17T10:00:00Z", ["currentCopper"] = 1500000, ["peakCopper"] = 2000000 }, { ["character"] = "Arthas", ["realm"] = "Nightslayer", ["capturedAt"] = "2026-10-18T10:00:00Z", ["currentCopper"] = 1700000, ["peakCopper"] = 2000000 } },
@@ -68,4 +72,18 @@ test("a long gold history is thinned to at most sixty points, keeping the first 
 
 test("a file with no character data gives empty lists, not an error", () => {
   expect(summarizeCharacters(`EverlootDB = { ["version"] = "0.3.3", ["installId"] = "x", ["records"] = {} }`)).toEqual({ characters: [], progress: [], talents: [] });
+});
+
+test("the Characters page reads the shared parse and still dates the week, the 30 days and the receipts at each call", () => {
+  const d = mkdtempSync(join(tmpdir(), "everloot-characters-"));
+  try {
+    const sv = join(d, "Everloot.lua");
+    writeFileSync(sv, SV);
+    // The day of the money rows, then 8 days later (the week empties) and 40 days later (the 30 days do too).
+    const nows = ["2026-10-18T12:00:00Z", "2026-10-26T12:00:00Z", "2026-11-27T12:00:00Z", "2026-10-18T12:00:00Z"].map(Date.parse);
+    for (const now of nows) expect(charactersFromFiles([sv], now)).toEqual(summarizeCharacters(SV, now));
+    expect(charactersFromFiles([sv], nows[0]).characters[0].week).toEqual({ earned: 1400, spent: 0 });
+    expect(charactersFromFiles([sv], nows[1]).characters[0].week).toEqual({ earned: 0, spent: 0 });
+    expect(charactersFromFiles([sv, join(d, "missing.lua")], nows[0]).characters).toHaveLength(1);
+  } finally { rmSync(d, { recursive: true, force: true }); }
 });

@@ -242,6 +242,22 @@ whether it is on and how many characters it holds; `/everloot players off` stops
   uploader never send them. The site
   drops them until the owner has turned the player pages on.
 
+## Linking a character
+
+`/everloot link <code>` links the character you are playing to your everloot.app account. The site shows the
+code (`EL-7K3Q-9P`) to a signed-in player; it works once, for 15 minutes. Nothing happens without the command.
+
+- **What a row holds** (`character_link`): the code, your character's name, realm, race, class, level, faction
+  and GUID, and the completion key for it. Only your own character is read.
+- **Sending**: after `/reload` or logout, the Everloot Desktop App, signed in with permission to link
+  characters, sends the row to your account's link endpoint and nowhere else. Uploads never carry it. The site
+  keeps a keyed hash in place of the GUID.
+- **What a link is**: a claim made from this file, not proof that you own the character. If another account
+  links the same character, both links are frozen.
+- A new code on the same character replaces its row; at most 10 rows are kept. `/everloot link` says how many
+  there are and `/everloot link clear` deletes them.
+  `addon/tests/link_contract.py` lists every call the command may make.
+
 ## Talents, selftest and the plan panel
 
 ### Bring a website plan into the game
@@ -345,30 +361,13 @@ For the example code above, `O1p-AABCC` is both points in 90001, then 90002, the
 
 The contract tests run the Lua in real Lua 5.1 through `lupa`:
 
-    python -m pip install lupa==2.6
-    python addon/tests/event_identity.py
-    python addon/tests/collection_contract.py
-    python addon/tests/map_positions_contract.py
-    python addon/tests/item_facts_contract.py
-    python addon/tests/auction_contract.py
-    python addon/tests/auction_tab_contract.py
-    python addon/tests/options_contract.py
-    python addon/tests/gold_contract.py
-    python addon/tests/ask_contract.py
-    python addon/tests/recipes_contract.py
-    python addon/tests/answers_contract.py
-    python addon/tests/addons_contract.py
-    python addon/tests/mapbounds_contract.py
-    python addon/tests/market_contract.py
-    python addon/tests/scan_prompt_contract.py
-    python addon/tests/gph_contract.py
-    python addon/tests/talents_contract.py
-    python addon/tests/plan_contract.py
-    python addon/tests/raid_contract.py
-    python addon/tests/completion_contract.py
-    python addon/tests/census_contract.py
-    python addon/tests/players_contract.py
-    python addon/tests/conveniences_contract.py
+    python -m pip install lupa==2.6 jsonschema==4.25.1
+    python addon/tests/run_all.py
+
+`run_all.py` holds the one list of tests that pull-request checks, releases and nightlies all run, and fails
+if a test script in `addon/tests/` is missing from it. Run one test on its own with
+`python addon/tests/<name>.py`. The two planner tests, `raid_plan_contract.py` and `planner_contract.py`, run as their
+own CI step.
 
 Run them from the repository root. CI also rebuilds the zip. For a version that is not released yet it
 fails if the zip differs from the one committed in `web/public/downloads/`, so commit the rebuilt zip

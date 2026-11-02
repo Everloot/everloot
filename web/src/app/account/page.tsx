@@ -4,12 +4,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import ApiKeys from "@/components/ApiKeys";
 import ChatKeys from "@/components/chat/ChatKeys";
+import LinkedCharacters from "@/components/LinkedCharacters";
 import { Container, DataTitle } from "@/components/ui";
 import { loadOverview, type AccountOverview } from "@/lib/account-overview";
 import { authV2Enabled, withAuth, signInMethods } from "@/lib/auth/auth";
 import { configuredSocialProviders, type SocialProvider } from "@/lib/auth/social";
 import { isPlaceholderEmail } from "@/lib/auth/battlenet";
 import { signInPath } from "@/lib/auth/return-to";
+import { characterLinksOn } from "@/lib/character-links";
 import { guardOn } from "@/lib/data-guard";
 import { playerPagesOn } from "@/lib/player-pages";
 import { profilesOn } from "@/lib/profiles";
@@ -31,9 +33,10 @@ const heading = "text-cell font-semibold text-fg";
 const section = "scroll-mt-20 space-y-2";
 
 // The Profile section only renders when it holds more than its one sentence; the nav lists what renders.
-const sections = (withProfile: boolean) => [
+const sections = (withProfile: boolean, withLinks: boolean) => [
   { id: "overview", label: "Overview" },
   ...(withProfile ? [{ id: "profile", label: "Profile" }] : []),
+  ...(withLinks ? [{ id: "characters", label: "Linked characters" }] : []),
   { id: "integrations", label: "Integrations" },
   { id: "keys", label: "API keys" },
   { id: "chat-keys", label: "Assistant setup" },
@@ -84,6 +87,7 @@ export default async function AccountPage({ searchParams }: { searchParams?: Pro
     guardOn() && "your API keys with a daily count of their requests",
     savedBuildsOn() && "your saved builds and characters",
     profilesOn() && "your profile",
+    characterLinksOn() && "the characters you linked",
   ].filter((part): part is string => typeof part === "string");
   const withProfile = Boolean(email || profile || profilesOn() || methods.includes("credential"));
   const privateNote = (
@@ -97,7 +101,7 @@ export default async function AccountPage({ searchParams }: { searchParams?: Pro
     <Container width="reading">
       <DataTitle title="Your account" />
       <nav aria-label="Account sections" className="mb-6 flex flex-wrap gap-x-4 gap-y-1 border-b border-line pb-2 text-meta">
-        {sections(withProfile).map((s) => <a key={s.id} href={`#${s.id}`} className="text-fg-2 hover:text-accent">{s.label}</a>)}
+        {sections(withProfile, characterLinksOn()).map((s) => <a key={s.id} href={`#${s.id}`} className="text-fg-2 hover:text-accent">{s.label}</a>)}
       </nav>
 
       <div className="space-y-8">
@@ -122,6 +126,13 @@ export default async function AccountPage({ searchParams }: { searchParams?: Pro
               {profilesOn() && <li><Link href="/settings" className={link}>Edit your handle, display name and status</Link></li>}
               {methods.includes("credential") && <li><Link href="/reset-password" className={link}>Change your password</Link></li>}
             </ul>
+          </section>
+        )}
+
+        {characterLinksOn() && (
+          <section id="characters" aria-labelledby="characters-heading" className="scroll-mt-20 space-y-3">
+            <h2 id="characters-heading" className={heading}>Linked characters</h2>
+            <LinkedCharacters />
           </section>
         )}
 
@@ -154,6 +165,7 @@ export default async function AccountPage({ searchParams }: { searchParams?: Pro
             {guardOn() && <li>Revoke or delete API keys <a href="#keys" className={link}>above</a>.</li>}
             {savedBuildsOn() && <li>Delete saved builds and characters on <Link href="/me" className={link}>My builds</Link>.</li>}
             {profilesOn() && <li>Change your profile or make it private on <Link href="/settings" className={link}>Settings</Link>.</li>}
+            {characterLinksOn() && <li>Unlink a character <a href="#characters" className={link}>above</a>.</li>}
             {playerPagesOn() && <li>Hide a character&apos;s public player page with the <Link href="/players/opt-out" className={link}>hide form</Link>.</li>}
             <li>
               To delete your account and everything tied to it, email{" "}

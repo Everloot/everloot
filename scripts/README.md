@@ -15,5 +15,6 @@ Repository-level tools. Site-specific maintainer scripts are in `web/scripts/`.
 | `generate-snapshot.ps1` | Builds a public knowledge release from a source database (wraps `npm run kb -- snapshot`). |
 | `issue-publication-grant.ts` | Maintainer-only: issues a scoped publication grant after an officer's authority was verified out of band. |
 | `cleanup-test-data.ps1` | Maintainer-only: runs the launch maintenance preflight or cleanup against production configuration. |
+| `news-hero/` | Renders the Everloot cards (type and data, no Blizzard material) used as news post heroes. See its README. |
 
 Run the Python ones from the repository root.

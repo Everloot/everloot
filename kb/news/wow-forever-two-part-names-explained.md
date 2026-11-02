@@ -12,6 +12,11 @@ sources:
   - title: "Blizzard: WoW: Forever Early Name Reservations Are Now Live"
     url: https://news.blizzard.com/en-gb/article/24303866/world-of-warcraft-forever-early-name-reservations-are-now-live
 status: published
+hero:
+  src: /news/heroes/wow-forever-two-part-names-explained/wow-forever-two-part-names-explained-clean.webp
+  alt: "Everloot card: Names, Oct 29, 2026. Names now have two parts. A first name and a second name. Only the full pair has to be unique in your region. How it works: First + second: Two names per character; Region: Where the full pair must be unique; Oct 27–Nov 3: Early name reservations; 3: Characters total, all rulesets. Footer: per Blizzard, fan recap, not affiliated, everloot.app."
+  thumb: /news/heroes/wow-forever-two-part-names-explained/wow-forever-two-part-names-explained-card.webp
+  share: /news/heroes/wow-forever-two-part-names-explained/wow-forever-two-part-names-explained-share.png
 ---
 
 **TL;DR:** Every WoW: Forever character gets two names, a first name and a second name, and only the full pair has to be unique in your region. Someone else taking your favorite first name doesn't lock you out. Early name reservations run until November 3, ahead of launch on November 4.
