@@ -7,14 +7,11 @@ platform's page on the day you submit, these portals change.
 
 ## What every listing says
 
-**Next submission, prepared only (wave 6, 2026-10-25; updated 2026-10-27):** the public catalogue becomes **32 tools** once
-`EVERLOOT_GUILDS` is on (PR #427): `guild_search` ("Find a guild by the start of its name") and `guild_rankings`
-("Guild ladder for one raid or dungeon") join the list, and `guild_board` gains the ladder side. `class_races`
-("Races that can be a class, with their racial traits", protocol 1.20.0) is listed with or without the switch. With
-the switch off the live endpoint serves 30, so submit only after the switch is on and `/api/tools/guild_search`
-answers 200. Use the exact titles and descriptions from `packages/protocol/src/mcp.ts` (protocol 1.20.0), and
-change the tool count in the long description below to 32, adding racial traits to its list. Wave 5 (`item_page`, `coverage` wording) is folded
-into this one. ChatGPT 1.0.1 and Claude are In review with the older descriptions: this lane submits nothing.
+**Next submission, ready (wave 6, checked 2026-11-02):** the live endpoint serves **32 tools** (`tools/list` on
+`https://everloot.app/mcp/public`, 2026-11-02), with `guild_search`, `guild_rankings` and `class_races`, and the
+descriptions from #248 (plain "public player data" instead of the internal corpus wording, and a `gold_ledger` that
+says what it holds). The text below is the 32-tool version. ChatGPT approved 1.0.1 with the older descriptions; the
+owner submits the update from the OpenAI Platform plugins page once #248 is deployed, then the same text to Claude.
 
 Use the same words everywhere, so the listings match the site and each other.
 
@@ -35,7 +32,7 @@ Use the same words everywhere, so the listings match the site and each other.
 | Website | `https://everloot.app` |
 | Source | `https://github.com/Everloot/everloot` (AGPL-3.0-only) |
 | Icon | `web/public/icon-512.png` and `icon-64.png`, rendered from the site icon (`https://everloot.app/icon-512.png`) |
-| Reads or writes | Reads only. Every tool carries `readOnlyHint: true` and a `title` (checked against the live endpoint on 2026-10-20: 28 tools, all annotated). |
+| Reads or writes | Reads only. Every tool carries `readOnlyHint: true` and a `title` (checked against the live endpoint on 2026-10-20: 28 tools, all annotated; 32 tools live on 2026-11-02). |
 | Data handling | Our own API. No personal health data, no sponsored content, no conversation data collected. |
 
 ### Long description
@@ -48,11 +45,13 @@ Use the same words everywhere, so the listings match the site and each other.
 > is scraped from other sites and no fact is guessed: when something is not recorded yet, the tool says
 > so instead of making a number up.
 >
-> 28 read-only tools: search the lore archive, open one record, look up an item, NPC, object, quest or
+> 32 read-only tools: search the lore archive, open one record, look up an item, NPC, object, quest or
 > vendor, find what is near a spot on the map, follow relations (dropped by, sold by, reagent for),
-> browse item categories, plan a profession, read recipe skill ranges, check auction history and market
-> values, a gold ledger, a guild board, achievement, reputation, title and quest progress, Blizzard's
-> latest posts and builds, and the addon ecosystem.
+> browse item categories, plan a profession, read recipe skill ranges, read talent trees and talent
+> share codes, list the races each class can be with their racial traits, check auction history and
+> market values, a gold ledger, find a guild, a guild's board and guild ladders for raids and dungeons,
+> collection, achievement, reputation, title and quest progress, database coverage and population,
+> Blizzard's latest posts and builds, the addon ecosystem and Everloot's own build tracker.
 > Game-file facts are labelled "found in game files, unconfirmed" with their build. Data is CC BY-SA 4.0
 > with a credit line in every answer; the code is open source. No account, no key, no sign-in wall.
 
@@ -106,7 +105,7 @@ by default; some get a human review. Escalations: `mcp-review@anthropic.com`.
 Portal steps and what to paste, in order:
 
 1. **Connection**: `https://everloot.app/mcp/public`.
-2. **Tools**: sync from the server. Nothing should be flagged (title and `readOnlyHint` on all 28).
+2. **Tools**: sync from the server. Nothing should be flagged (title and `readOnlyHint` on all 32).
 3. **Listing**: name `Everloot` (≤100), the ≤200 one-liner, the long description, categories, documentation
    `https://everloot.app/docs/mcp`, privacy `https://everloot.app/privacy`, support `hello@everloot.app`,
    icon `icon-512.png`, slug `everloot` (permanent).
@@ -142,7 +141,7 @@ page. Submission requirements:
 - The server already answers the two tools OpenAI's [connector contract](https://developers.openai.com/api/docs/mcp)
   calls by name, `search` (results with `id`, `title`, `url`) and `fetch` (`id`, `title`, `text`, `url`,
   `metadata`), as structured content with the same JSON in the text block, so ChatGPT's connectors, deep
-  research and company knowledge work against it without a special build. The 25 other tools stay listed
+  research and company knowledge work against it without a special build. The 30 other tools stay listed
   beside them for clients that read the full tool list.
 - One MCP server per plugin; ours is `https://everloot.app/mcp/public`, connection type "no
   authentication" (it is a public server, so that is the right value).
