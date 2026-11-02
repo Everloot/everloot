@@ -62,7 +62,7 @@ const LEGAL: Item[] = [
 const groupItems = (group: (typeof GROUPS)[number]): Item[] =>
   group.title === "Data and API" ? [...group.items, { label: "Source", href: sourceUrl(), external: true }] : group.items;
 
-const itemClass = "inline-flex min-h-8 items-center text-meta text-fg-2 hover:text-accent transition-colors md:min-h-6";
+const itemClass = "inline-flex min-h-8 min-w-6 items-center text-meta text-fg-2 hover:text-accent transition-colors md:min-h-6";
 const legalClass = "inline-flex min-h-6 items-center hover:text-accent transition-colors";
 const iconClass = "inline-flex h-8 w-8 items-center justify-center rounded-control text-fg-2 hover:text-accent transition-colors";
 
