@@ -1,5 +1,6 @@
 import { describePlayer } from "@/app/players/player-view";
 import { CLASSES } from "@/design/tokens";
+import { realmSlug } from "@/lib/player-pages";
 
 /**
  * The character showcase (docs/design/2026-11-01-character-showcase-plan.md): one character's page, published by
@@ -11,6 +12,14 @@ import { CLASSES } from "@/design/tokens";
 /** The owner's switch for the showcase pages and their cards. Off, every one of them is a 404. */
 export function showcaseOn(env: Record<string, string | undefined> = process.env): boolean {
   return env.EVERLOOT_SHOWCASE === "1";
+}
+
+/**
+ * A linked character's public page: /characters/<ruleset>/<realm>/<name>, slugged as the player pages are. A
+ * separate address from /players, because a link never adds data to a sighting page (identity ADR).
+ */
+export function characterPath(ruleset: string, realm: string, name: string): string {
+  return `/characters/${ruleset}/${encodeURIComponent(realmSlug(realm))}/${encodeURIComponent(name.toLowerCase())}`;
 }
 
 /** A section older than this says it may be out of date. */
