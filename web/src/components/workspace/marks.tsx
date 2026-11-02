@@ -78,5 +78,5 @@ export function ClassIconWithLevel({ slug, level, icons }: { slug: string | null
 
 /** The "Example" marker every example carries, so a sample is never read as the visitor's own. */
 export function ExampleTag() {
-  return <span className="inline-flex h-5 items-center rounded-full border border-warning px-2 font-mono text-[11px] uppercase tracking-wide text-warning">Example</span>;
+  return <span className="inline-flex h-5 items-center rounded-full border border-warning px-2 text-xs font-medium text-warning">Example</span>;
 }
