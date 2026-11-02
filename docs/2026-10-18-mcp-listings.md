@@ -13,6 +13,12 @@ descriptions from #248 (plain "public player data" instead of the internal corpu
 says what it holds). The text below is the 32-tool version. ChatGPT approved 1.0.1 with the older descriptions; the
 owner submits the update from the OpenAI Platform plugins page once #248 is deployed, then the same text to Claude.
 
+**Publication verified, 2026-11-02:** version 1.0.1 was approved but unpublished. The owner-authorized publication
+completed, and the refreshed dashboard reports "Listed publicly". Reconnecting the MCP discovered 32 current tools:
+31 current definitions are published; `guild_board` retains its earlier published definition while its update needs
+further review. Do not describe all 32 updated definitions as approved. The portal scans MCP updates separately from
+the plugin metadata package; a new metadata ZIP is not needed merely to discover tool changes.
+
 Use the same words everywhere, so the listings match the site and each other.
 
 | Field | Text |
