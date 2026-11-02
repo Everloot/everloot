@@ -227,8 +227,11 @@ export interface RankedRow extends LadderRow {
   ranks: { world: number; ruleset: number; faction: number | null };
 }
 
-/** The first guild in the view to kill a boss, by the day the members' uploads agree on; null before anyone has. */
-export interface BossFirst { encounterId: number; name: string; first: { key: string; guildName: string; realm: string; killedAt: string } | null }
+/**
+ * The first guilds in the view to kill a boss: a kill counts only at a time two members' installs report it within
+ * FIRST_KILL_WINDOW_MS of each other, and guilds with the same earliest time share the first. Empty before anyone has.
+ */
+export interface BossFirst { encounterId: number; name: string; killedAt: string | null; guilds: { key: string; guildName: string; realm: string }[] }
 
 export interface LadderView {
   /** The instances with an agreed kill, newest tier first. */
@@ -312,16 +315,25 @@ function standings(progress: readonly GuildProgress[], instanceMapId: number): (
   };
 }
 
-/** Each boss of the instance with the first guild among `rows` to kill it. Officers' kills carry no day and never count as first. */
+/**
+ * Each boss of the instance with the first guilds among `rows` to kill it, in name order whatever order `rows` come
+ * in. Only a kill two installs back at one time counts (BossProgress.occurredAt), so reports of different kills a week
+ * apart never add up to an early first. The ladder itself still counts a kill once two installs report the boss at all.
+ * Officers' kills carry no time and never count as first.
+ */
 export function bossFirsts(instance: InstanceDef, rows: readonly GuildProgress[]): BossFirst[] {
   return instance.bosses.map((boss) => {
-    let first: BossFirst["first"] = null;
+    let killedAt: string | null = null;
+    let guilds: BossFirst["guilds"] = [];
     for (const r of rows) {
-      const b = r.list.find((x) => x.encounterId === boss.encounterId);
-      if (!b?.killedAt) continue;
-      if (!first || b.killedAt < first.killedAt) first = { key: r.key, guildName: r.guildName, realm: r.realm, killedAt: b.killedAt };
+      const at = r.list.find((x) => x.encounterId === boss.encounterId)?.occurredAt;
+      if (!at) continue;
+      const guild = { key: r.key, guildName: r.guildName, realm: r.realm };
+      if (killedAt === null || at < killedAt) { killedAt = at; guilds = [guild]; }
+      else if (at === killedAt) guilds.push(guild);
     }
-    return { encounterId: boss.encounterId, name: boss.name, first };
+    guilds.sort((a, b) => a.guildName.localeCompare(b.guildName) || a.realm.localeCompare(b.realm) || a.key.localeCompare(b.key));
+    return { encounterId: boss.encounterId, name: boss.name, killedAt, guilds };
   });
 }
 

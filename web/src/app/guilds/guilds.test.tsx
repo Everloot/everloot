@@ -137,7 +137,13 @@ test("each ladder row carries its world, ruleset and faction rank, a boss strip 
 
 test("the ruleset filter keeps the realms of that ruleset and ignores a malformed one", async () => {
   on();
+  // Every guild is on one ruleset, so the ladder offers no ruleset menu until the address picks one.
+  const plain = await hub();
+  expect(plain).not.toContain("Every ruleset");
+  expect(plain).not.toContain("ruleset=");
+  expect(plain).toContain("Every realm");
   const forever = await hub({ ruleset: "forever" });
+  expect(forever).toContain("Every ruleset");
   expect(forever).toContain(">Night Watch</a>");
   expect(forever).toContain('href="/guilds?ruleset=forever"');
   const other = await hub({ ruleset: "hardcore" });
@@ -146,6 +152,41 @@ test("the ruleset filter keeps the realms of that ruleset and ignores a malforme
   const { parseLadderQuery } = await import("@/lib/guilds");
   expect(parseLadderQuery({ ruleset: "<script>" })).toEqual({});
   expect(parseLadderQuery({ ruleset: "Forever" })).toEqual({ ruleset: "forever" });
+});
+
+test("a first kill needs two installs on one kill: reports a week apart never beat a kill two installs saw together", async () => {
+  const { bossFirsts } = await import("@/lib/guilds");
+  const { agreedKills, guildKey, guildProgression } = await import("../../../../kb/src/guilds");
+  const mc = { instanceMapId: 409, name: "Molten Core", instanceType: "raid" as const, tier: 2, bosses: [{ encounterId: 663, name: "Lucifron" }] };
+  const rows = [
+    kill("a", "Ashen", 663, "Lucifron", "2026-12-09T20:00:00Z"), kill("b", "Ashen", 663, "Lucifron", "2026-12-16T20:00:00Z"),
+    kill("c", "Bastion", 663, "Lucifron", "2026-12-10T20:00:00Z"), kill("d", "Bastion", 663, "Lucifron", "2026-12-10T20:03:00Z"),
+  ] as Parameters<typeof agreedKills>[0];
+  const progress = guildProgression(agreedKills(rows, new Date("2026-12-20T00:00:00Z"), [mc]), [mc]);
+  // Both guilds have the boss on the ladder; only Bastion's kill is one two installs saw.
+  expect(progress.map((p) => [p.guildName, p.killed])).toEqual([["Ashen", 1], ["Bastion", 1]]);
+  expect(bossFirsts(mc, progress)).toEqual([
+    { encounterId: 663, name: "Lucifron", killedAt: "2026-12-10T20:00:00.000Z", guilds: [{ key: guildKey("Forever Pioneer", "Bastion"), guildName: "Bastion", realm: "Forever Pioneer" }] },
+  ]);
+});
+
+test("guilds with the same first-kill time share the first, in name order whatever the input order", async () => {
+  on();
+  const { bossFirsts } = await import("@/lib/guilds");
+  const { agreedKills, guildProgression } = await import("../../../../kb/src/guilds");
+  const mc = { instanceMapId: 409, name: "Molten Core", instanceType: "raid" as const, tier: 2, bosses: [{ encounterId: 663, name: "Lucifron" }] };
+  const at = "2026-10-20T20:00:00Z";
+  const rows = [kill("a", "Zephyr", 663, "Lucifron", at), kill("b", "Zephyr", 663, "Lucifron", at), kill("c", "Anvil", 663, "Lucifron", at), kill("d", "Anvil", 663, "Lucifron", at)] as Parameters<typeof agreedKills>[0];
+  const progress = guildProgression(agreedKills(rows, new Date(AS_OF), [mc]), [mc]);
+  const forward = bossFirsts(mc, progress);
+  expect(bossFirsts(mc, [...progress].reverse())).toEqual(forward);
+  expect(forward[0]!.guilds.map((g) => g.guildName)).toEqual(["Anvil", "Zephyr"]);
+  holder.records = [...world, ...rows];
+  const html = await hub();
+  const firsts = html.slice(html.indexOf("First kills in Molten Core"));
+  expect(firsts).toContain(">Anvil</a>");
+  expect(firsts).toContain(">Zephyr</a>");
+  expect(firsts).toContain("Joint");
 });
 
 test("a hidden guild leaves the ladder and the first kills", async () => {

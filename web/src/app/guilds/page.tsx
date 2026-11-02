@@ -56,14 +56,21 @@ const ladderColumns: Column<RankedRow>[] = [
   { key: "seen", header: "Members seen", numeric: true, cell: (r) => (r.membersSeen === null ? <span className="text-muted">Not counted</span> : number(r.membersSeen)) },
 ];
 
+const firstNames = (b: BossFirst) => b.guilds.map((g) => g.guildName).join(", ") + (b.guilds.length > 1 ? " (joint)" : "");
+
 const firstColumns: Column<BossFirst>[] = [
   { key: "boss", header: "Boss", cell: (b) => <span className="font-medium">{b.name}</span> },
   {
     key: "guild", header: "First kill",
-    cell: (b) => (b.first ? <Link href={guildPath(b.first.realm, b.first.guildName)} className={link}>{b.first.guildName}</Link> : <span className="text-muted">Not yet</span>),
+    cell: (b) => (b.guilds.length === 0 ? <span className="text-muted">Not yet</span> : (
+      <span className="flex flex-wrap items-baseline gap-x-2">
+        {b.guilds.map((g) => <Link key={g.key} href={guildPath(g.realm, g.guildName)} className={link}>{g.guildName}</Link>)}
+        {b.guilds.length > 1 && <span className="text-cell-2 text-muted">Joint</span>}
+      </span>
+    )),
   },
-  { key: "realm", header: "Realm", cell: (b) => b.first?.realm ?? "" },
-  { key: "day", header: "Day", numeric: true, cell: (b) => <span className="font-mono tabular-nums">{day(b.first?.killedAt ?? null)}</span> },
+  { key: "realm", header: "Realm", cell: (b) => [...new Set(b.guilds.map((g) => g.realm))].join(", ") },
+  { key: "day", header: "Day", numeric: true, cell: (b) => <span className="font-mono tabular-nums">{day(b.killedAt)}</span> },
 ];
 
 const searchColumns: Column<GuildSummary>[] = [
@@ -93,13 +100,15 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
       type: "menu", key: "instance", label: ladder.instance.name,
       options: ladder.instances.map((i) => ({ label: i.name, href: href({ instance: i.instanceMapId, realm: undefined }), on: i.instanceMapId === ladder.instance!.instanceMapId })),
     },
-    {
-      type: "menu", key: "ruleset", label: query.ruleset ? rulesetLabel(query.ruleset) : "Ruleset",
+    // While every guild is on one ruleset (player rows are all "forever" for now) the menu would only repeat it; it
+    // shows once there are two, or when the address picks one, so the choice can be cleared.
+    ...(ladder.rulesets.length > 1 || query.ruleset ? [{
+      type: "menu" as const, key: "ruleset", label: query.ruleset ? rulesetLabel(query.ruleset) : "Ruleset",
       options: [
         { label: "Every ruleset", href: href({ ruleset: undefined }), on: !query.ruleset, reset: true },
         ...ladder.rulesets.map((r) => ({ label: rulesetLabel(r), href: href({ ruleset: r, realm: undefined }), on: query.ruleset === r })),
       ],
-    },
+    }] : []),
     {
       type: "menu", key: "realm", label: query.realm ?? "Realm",
       options: [
@@ -173,10 +182,10 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
               </section>
               {ladder.total > 0 && (
                 <section aria-labelledby="firsts" className="space-y-3">
-                  <SectionHeading id="firsts" note="The first guild in this view to kill each boss, on the day its members' uploads agree on. Officers' kills carry no day.">
+                  <SectionHeading id="firsts" note="The first guild in this view to kill each boss: two members' uploads have to report the same kill within an hour of each other. Guilds with the same time share it. Officers' kills carry no day.">
                     First kills
                   </SectionHeading>
-                  <DataTable dense caption={`First kills in ${ladder.instance.name}`} columns={firstColumns} rows={ladder.firsts} rowKey={(b) => String(b.encounterId)} meta={(b) => (b.first ? `${b.first.guildName} · ${day(b.first.killedAt)}` : "Not yet")} />
+                  <DataTable dense caption={`First kills in ${ladder.instance.name}`} columns={firstColumns} rows={ladder.firsts} rowKey={(b) => String(b.encounterId)} meta={(b) => (b.guilds.length ? `${firstNames(b)} · ${day(b.killedAt)}` : "Not yet")} />
                 </section>
               )}
             </>
