@@ -110,6 +110,18 @@ test("the categories answer: the tree, one item's path, or a filtered list, each
   expect(handleItemCategories({ class: "weapon" }, t, build)).toContain("Weapons: 1 item");
 });
 
+test("slot and quality without a class say they were not applied, instead of answering the whole tree as if they were", () => {
+  const t = buildTaxonomy(tables());
+  const build = "1.60.1.70450";
+  const NOTE = "Slot and quality filter within a class; add class to use them.";
+  for (const args of [{ slot: "chest" }, { quality: "epic" }, { slot: "chest", quality: "epic" }]) {
+    const text = handleItemCategories(args, t, build);
+    expect(text.startsWith(`${NOTE}\nItem categories`), JSON.stringify(args)).toBe(true);
+  }
+  expect(handleItemCategories({}, t, build)).not.toContain(NOTE);
+  expect(handleItemCategories({ class: "armor", slot: "chest" }, t, build)).not.toContain(NOTE);
+});
+
 test("the structured answer takes the same class slugs as the text, the singular one included", () => {
   const t = buildTaxonomy(tables());
   const out = itemCategoriesStructured({ class: "weapon" }, t, "1.60.1.70450") as { error?: string; items?: { itemId: number }[]; total?: number };
