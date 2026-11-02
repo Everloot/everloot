@@ -60,9 +60,13 @@ The realm suggestions added to the Overview and Market page later brought a full
 (`characterRealms`, about 165 ms at heavy in a quick run). They now come from the same shared parse: 0.02 ms per
 reload, for about 6 ms more per write at heavy (26 ms at extreme), the cost of summarizing the characters.
 
-Not changed, each parsing on its own:
+The pages that parsed on their own now read the shared parse too:
 
-- The Upload page parses 4 times once per write (`summarizeFiles`, cached afterwards): 804–1,156 ms at heavy.
+- The Upload page parsed 4 times once per write (`summarizeFiles`, cached afterwards): 804–1,156 ms at heavy. It now
+  takes the record counts from the shared parse too. `parseEverlootTable` reports the text around the assignment that
+  `parseEverlootLua` would refuse, and the counts apply the same checks, so the page shows the upload's own errors. After
+  a write the state push has read already, the page costs 1–5 ms at heavy in a quick run. Opened first, it pays the one
+  shared parse (about 255 ms).
 - The Characters page and the chat's `my_characters` tool parsed on every call: 234–258 ms at heavy. They now read
   the shared parse too (`charactersFromFiles`, about 2 ms at heavy and 11 ms at extreme in a quick run): the part of
   the summary that depends on the file is kept per write, and the last seven days, the 30 days and the receipts are
@@ -97,7 +101,7 @@ main-process page reload behind it (the `ownRealms` parse above), and the F12 ch
    1.1 s of parsing and stalled for 0.7 s at once. Sharing one parse per write (`src/main/save-facts.ts`) halves the
    parse time and removes the page-reload parses. That brings small saves under 100 ms per logout. Heavy saves are
    still above it, because one parse of a 14 MB file takes 200–300 ms by itself. Next steps, in order:
-   - give the Upload page's `summarizeFiles` and the Characters page the same shared parse;
+   - give the Upload page's `summarizeFiles` and the Characters page the same shared parse (done);
    - move the remaining parses to a worker thread, which is the only change that gets a heavy save under 100 ms.
 2. **F11: no fix warranted.** At a plausible 3-month size, sent.json loads in 20–45 ms and saves in about 10 ms, far
    under 200 ms. If it ever matters, the safe cap is to keep only the ids still present in that install's save file

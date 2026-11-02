@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
 import * as svParse from "../../web/src/lib/sv-parse";
 import { summarizeCharacters } from "../src/main/characters";
+import { summarizeFiles, summarizeSavedVariables } from "../src/main/inspect";
 import { characterRealms, ownRealms } from "../src/main/market";
 import { charactersFromFiles, saveFacts } from "../src/main/save-facts";
 
@@ -81,4 +82,50 @@ test("a file the Characters page skips shows no character and suggests no realm,
   writeFileSync(broken, `EverlootDB = { ["version"] = `);
   expect(characterRealms([noInstall, broken, join(d, "missing.lua")])).toEqual([]);
   expect(charactersFromFiles([noInstall, broken, join(d, "missing.lua")])).toEqual({ characters: [], progress: [], talents: [] });
+});
+
+const DB = `EverlootDB = { ["version"] = "0.3.3", ["installId"] = "inst-1", ["clientBuild"] = "1.60.1.70450",
+  ["records"] = { ["loot"] = { { ["sourceNpcId"] = 7 }, { ["sourceNpcId"] = 8 } }, ["npc_sighting"] = { { ["npcId"] = 1 } }, ["drop"] = {} },
+  ["asks"] = { { ["id"] = "ask:inst-1:1", ["question"] = "what drops bindings", ["askedAt"] = "2026-10-18T00:00:00Z" } },
+  ["lastScans"] = { ["Nightslayer"] = { ["at"] = "2026-10-18T00:00:00Z" }, ["Doomhowl"] = { ["at"] = "2026-10-19T00:00:00Z" } } }`;
+
+test("the Upload page reads the shared parse and shows what the upload's own parser shows, refusals included", () => {
+  const d = dir();
+  const sent = join(d, "sent.json");
+  writeFileSync(sent, JSON.stringify({ "inst-1": ["a", "b"] }));
+  const texts = {
+    whole: DB,
+    "semicolon and comment after": `-- saved\n${DB};\n-- end\n`,
+    "text after": `${DB}\nprint("x")`,
+    "text before": `x = 1\n${DB}`,
+    "no installId": `EverlootDB = { ["version"] = "0.3.3", ["records"] = {} }`,
+    "records not a table": `EverlootDB = { ["version"] = "0.3.3", ["installId"] = "i", ["records"] = "no" }`,
+    "group not a list": `EverlootDB = { ["version"] = "0.3.3", ["installId"] = "i", ["records"] = { ["loot"] = 5 } }`,
+    "a non-row": `EverlootDB = { ["version"] = "0.3.3", ["installId"] = "i", ["records"] = { ["loot"] = { 5 } } }`,
+    "rows beside the groups": `EverlootDB = { ["version"] = "0.3.3", ["installId"] = "i", ["records"] = { { ["a"] = 1 }, ["loot"] = { { ["b"] = 1 } } } }`,
+    "empty records": `EverlootDB = { ["version"] = "0.3.3", ["installId"] = "inst-1", ["records"] = {} }`,
+    "empty table": `EverlootDB = {}`,
+    broken: `EverlootDB = { ["version"] = `,
+  };
+  const confirmedFor = (id: string) => (id === "inst-1" ? 2 : 0);
+  for (const [name, text] of Object.entries(texts)) {
+    const file = join(d, `${name}.lua`);
+    writeFileSync(file, text);
+    const { file: _f, writtenAt: _w, bytes: _b, ...shown } = summarizeFiles([file], sent)[0];
+    expect(shown, name).toEqual(summarizeSavedVariables(text, confirmedFor));
+  }
+  expect(summarizeFiles([join(d, "whole.lua")], sent)[0]).toMatchObject({ ok: true, records: 3, confirmed: 2, pendingAsks: 1, scanRealms: ["Nightslayer", "Doomhowl"] });
+});
+
+test("after a logout the Upload page costs no parse of its own: the jobs' parse serves it", () => {
+  const table = vi.mocked(svParse.parseEverlootTable), lua = vi.mocked(svParse.parseEverlootLua);
+  const d = dir();
+  const sv = join(d, "Everloot.lua"), sent = join(d, "sent.json");
+  writeFileSync(sv, DB);
+  table.mockClear(); lua.mockClear();
+  // The state push after the write reads the file first.
+  expect(ownRealms([sv])).toEqual(["Nightslayer", "Doomhowl"]);
+  for (let i = 0; i < 3; i++) expect(summarizeFiles([sv], sent)[0]).toMatchObject({ ok: true, records: 3 });
+  expect(table).toHaveBeenCalledTimes(1);
+  expect(lua).not.toHaveBeenCalled();
 });

@@ -49,6 +49,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Desktop App: Restart to update asks in the app's own dialog instead of a Windows message box, and names the
   running job it waits for. While the update downloads, its sidebar row and the update panel fill as a progress bar
   with the percentage.
+- Desktop App: the Upload page reads the save parse the jobs and other pages share, instead of parsing each account
+  file four more times after every write (about 0.8–1.2 s on a large save). It shows the same counts and the same
+  errors the upload would give.
 - Site and Desktop App: Ollama suggests one small model, `qwen3:4b` (2.5 GB, calls tools), instead of `qwen3:8b`, and
   says what running a model on your own computer means: private and free, slower, and it uses your memory while it
   answers. The free cloud models stay the first choice.
