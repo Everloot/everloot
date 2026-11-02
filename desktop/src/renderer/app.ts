@@ -1,7 +1,7 @@
 import { accountOf as account } from "../main/engine";
 import { diagnostics } from "../shared/diagnostics";
 import { ago, answerSuggestion, clock, companionStatus, copyLabel, esc, gold, kb, msg, JOB_NAMES, restartWait, savedNote, setupAddonLine, sparkline, statusText, when, type CompanionState } from "./format";
-import { NO_SOURCED_ANSWER, type AddonInfo, type AppState, type AskInfo, type BackupInfo, type ChangeItem, type CharacterRow, type CharactersInfo, type ChatInfo, type ChatProgress, type EverlootApi, type PriceLookup, type FileSummary, type GameFolderCandidate, type Job, type JobStatus, type MarketInfo, type MoneyDay } from "../shared/types";
+import { JOBS, NO_SOURCED_ANSWER, type AddonInfo, type AppState, type AskInfo, type BackupInfo, type ChangeItem, type CharacterRow, type CharactersInfo, type ChatInfo, type ChatProgress, type DataPart, type DataUsage, type EverlootApi, type PriceLookup, type FileSummary, type GameFolderCandidate, type Job, type JobStatus, type MarketInfo, type MoneyDay } from "../shared/types";
 import { PROVIDER_PRESETS, assistantSource, keptModelPick, manualModelShown, presetFor, removalNotice, type ModelChoice, type ProviderKind } from "../shared/providers";
 import { inkOn } from "../../../web/src/lib/chat/catalogue";
 import { WEBSITE_LINKS, websiteUrl } from "../shared/website";
@@ -69,7 +69,7 @@ let copied: { index: number; label: string } | null = null;
 let copiedTimer: ReturnType<typeof setTimeout> | undefined;
 /** The Market page's last price lookup; null before the first. */
 let priceLookup: PriceLookup | null = null;
-const data: { upload?: FileSummary[]; backups?: BackupInfo[]; market?: MarketInfo; ask?: AskInfo; addon?: AddonInfo; changes?: ChangeItem[]; changesError?: string; characters?: CharactersInfo; chat?: ChatInfo } = {};
+const data: { upload?: FileSummary[]; backups?: BackupInfo[]; market?: MarketInfo; ask?: AskInfo; addon?: AddonInfo; changes?: ChangeItem[]; changesError?: string; characters?: CharactersInfo; chat?: ChatInfo; usage?: DataUsage } = {};
 
 const main = document.getElementById("app")!;
 const side = document.getElementById("side")!;
@@ -81,6 +81,9 @@ let updateOpen = false;
 /** The update notification asked for the popover before the first state arrived. */
 let updateAsked = false;
 const restartDlg = document.getElementById("restartDlg") as HTMLDialogElement;
+const wipeDlg = document.getElementById("wipeDlg") as HTMLDialogElement;
+/** Delete my local data: asking, deleting, or showing what another program kept open. */
+let wipe: { stage: "ask" | "deleting" | "left"; left: string[]; error: string } = { stage: "ask", left: [], error: "" };
 /** Restart was confirmed and the app is handing over to the installer. */
 let restarting = false;
 
@@ -198,6 +201,7 @@ function overview(s: AppState): string {
     ${s.notice ? `<p class="callout error">${icon("alert")}<span>${esc(s.notice)}</span></p>` : ""}
     ${foreverCallout(s)}
     ${updateCallout(s)}
+    ${dataNotice()}
     ${!e.files.length && s.settings.gameFolder ? `<p class="callout fg2">${icon("log")}<span>No <code>Everloot.lua</code> under <span class="mono">${esc(s.settings.gameFolder)}</span> yet. Log out once in the game so it writes the file.</span></p>` : ""}
     <section class="hero" data-state="${status.state}" aria-labelledby="heroTitle">
       <div class="hero-body">
@@ -994,12 +998,58 @@ function settings(s: AppState): string {
     </form>
     <section class="panel set-sec"><div class="set-lead"><h2>This app</h2></div><div class="set-body">
       <p class="fg2">Everloot Desktop App ${esc(s.version)} · AGPL-3.0-only · ${ext("https://github.com/Everloot/everloot/tree/main/desktop", "source")} · ${ext("https://discord.gg/9CKsbHTRu3", "Discord")}</p>
-      <p class="muted small">Data folder: <span class="mono">${esc(s.dataFolder)}</span> <button type="button" class="link" id="openData">open</button></p>
-      <p class="muted small">Uninstalling keeps this folder, with your keys, chat and save backups in it. Quit the app and delete it to remove them.</p>
       <div class="row"><button type="button" class="btn" id="updates">Check for updates</button></div>
     </div></section>
+    ${dataPanel(s)}
   </div>`;
 }
+
+const DATA_PARTS: { part: DataPart; label: string; what: string }[] = [
+  { part: "backups", label: "Backups", what: "a copy of each account's Everloot.lua before an upload; the oldest go first" },
+  { part: "updates", label: "Update downloads", what: "deleted once the update is installed" },
+  { part: "chat", label: "Chat history", what: "Chat's conversation and the in-game /ask answers; older messages are dropped" },
+  { part: "uploads", label: "Upload history", what: "which events the site has confirmed, for the rows still in Everloot.lua" },
+  { part: "settings", label: "Settings and keys", what: "these settings, your everloot.app key and the model keys you added" },
+  { part: "other", label: "Other", what: "files from an interrupted write, or kept from a damaged one" },
+];
+
+/** What the data folder holds and what leaves this computer, with the button that empties the folder. */
+function dataPanel(s: AppState): string {
+  const u = data.usage;
+  const rows = DATA_PARTS.map((r) => `<tr><td><b>${r.label}</b><div class="muted small">${esc(r.what)}</div></td><td class="num">${u ? kb(u.parts[r.part]) : "…"}</td></tr>`).join("");
+  const st = s.settings;
+  return `<section class="panel set-sec" id="data" tabindex="-1"><div class="set-lead"><h2>Data on this computer</h2></div><div class="set-body">
+      <p class="fg2">The data folder holds <b>${u ? kb(u.total) : "…"}</b>: <span class="mono">${esc(s.dataFolder)}</span> <button type="button" class="link" id="openData">Open data folder</button></p>
+      <div class="tablewrap"><table><tbody>${rows}</tbody></table></div>
+      <h3>What goes to everloot.app</h3>
+      <ul class="plain fg2 small">
+        <li>Anonymous observations from <code>Everloot.lua</code>: drops, vendors, recipes, spawns, auction scans. No character or account name.</li>
+        <li>${st.census ? "Census counts: the race, class, level and faction of your characters and of players the addon sees. Never names, guilds, gear or places; the site shows only totals." : "Census counts are off; they stay in <code>Everloot.lua</code>."}</li>
+        ${st.players ? "<li>Player pages: the name, realm, race, class, level and guild of the players the addon saw.</li>" : ""}
+        <li>Your everloot.app key, when you are signed in, goes with Chat and the in-game <code>/ask</code>. Uploads never carry it.</li>
+      </ul>
+      <h3>What stays here</h3>
+      <ul class="plain fg2 small">
+        <li>Guild, gear, gold, collection and your installed addon list.</li>
+        <li>Your settings, chat, upload history and backups, in the data folder.</li>
+      </ul>
+      <p class="small fg2">If you configure a model for Chat, it receives your questions and any local character details it uses to answer. Rules: ${ext("https://everloot.app/privacy", "everloot.app/privacy")}</p>
+      <p class="muted small">Uninstalling keeps this folder, with your keys, chat and save backups in it. Delete my local data empties it; the command-line tool uses the same folder.</p>
+      <div class="row"><button type="button" class="btn btn-danger" id="wipeOpen">Delete my local data…</button></div>
+    </div></section>`;
+}
+
+/** Shown once on the Overview when the data folder passes DATA_NOTICE_BYTES (main/data-folder.ts); dismissing it is kept in settings. */
+function dataNotice(): string {
+  const u = data.usage;
+  if (!u?.notice) return "";
+  return `<p class="callout fg2">${icon("alert")}<span>The app's data folder holds ${kb(u.total)}. The largest part is ${esc(biggestPart(u))}. <button type="button" class="link" id="dataNoticeOpen">See what is in it</button> · <button type="button" class="link" id="dataNoticeDismiss">Dismiss</button></span></p>`;
+}
+
+const biggestPart = (u: DataUsage) => {
+  const top = DATA_PARTS.reduce((a, b) => (u.parts[b.part] > u.parts[a.part] ? b : a));
+  return top.label.toLowerCase();
+};
 
 // ---------- render and data ----------
 
@@ -1151,6 +1201,77 @@ function closeRestart(): void {
   if (restartDlg.open) restartDlg.close();
 }
 
+/** What Delete my local data removes, what it leaves, and what is running that it must wait for. */
+function wipeDialog(s: AppState): string {
+  const off = wipe.stage === "deleting" ? " disabled" : "";
+  const keys = websiteUrl(s.settings.endpoint, "/docs/api/keys#your-keys");
+  const key = s.account.signedIn
+    ? `<li>Your everloot.app key on this computer (…${esc(s.account.hint ?? "")}). It still works until you revoke it on everloot.app: ${ext(keys, "manage keys")}.</li>`
+    : "";
+  if (wipe.stage === "left") {
+    return `<div class="confirm-head"><h2 id="wpTitle">Some files were not deleted</h2><div class="muted small mono">${esc(s.dataFolder)}</div></div>
+      <div class="confirm-body"><p>Another program has these open: <span class="mono">${esc(wipe.left.join(", "))}</span>. Close it and try again, or start over now and delete them yourself from the data folder.</p>
+      <p class="fg2">Everything else is gone, and the app has stopped its jobs.</p>${wipe.error ? `<p class="error small">${esc(wipe.error)}</p>` : ""}</div>
+      <div class="confirm-foot"><span></span><div class="row"><button type="button" class="btn" id="wipeRelaunch">Start over now</button><button type="button" class="btn btn-primary" id="wipeGo">Try again</button></div></div>`;
+  }
+  const running = JOBS.filter((j) => s.engine.jobs[j].state === "running");
+  const busyLine = running.length ? `${running.map((j) => JOB_NAMES[j]).join(" and ")} ${running.length === 1 ? "is" : "are"} running; wait for ${running.length === 1 ? "it" : "them"} to finish.`
+    : data.chat?.busy ? "Chat is answering; wait for it to finish."
+      : s.updateProgress.stage === "downloading" ? "An update is downloading; wait for it to finish."
+        : s.builds.state === "running" ? "Saved builds are syncing; wait a moment." : "";
+  return `<div class="confirm-head"><h2 id="wpTitle">Delete your local data?</h2><div class="muted small mono">${esc(s.dataFolder)}${data.usage ? ` · ${kb(data.usage.total)}` : ""}</div></div>
+    <div class="confirm-body"><p>The app empties its data folder and starts over on the setup screen. This goes:</p>
+      <ul class="plain fg2">
+        <li>Your settings, and the model keys you added for Chat</li>
+        ${key}
+        <li>Upload history: the next upload sends what is in <code>Everloot.lua</code> again, and the site skips what it already has</li>
+        <li>Backups of <code>Everloot.lua</code></li>
+        <li>Chat history and <code>/ask</code> answers</li>
+        <li>Downloaded updates</li>
+      </ul>
+      <p class="fg2">The command-line tool uses the same folder, so it loses its upload history and settings too. The game folder, the addon and your <code>Everloot.lua</code> files are not touched.</p>
+      ${wipe.error ? `<p class="error small">${esc(wipe.error)}</p>` : ""}</div>
+    <div class="confirm-foot"><span class="muted small">${esc(busyLine)}</span><div class="row"><button type="button" class="btn" id="wipeCancel"${off}>Cancel</button><button type="button" class="btn btn-danger-fill" id="wipeGo"${off || (busyLine ? " disabled" : "")}>${wipe.stage === "deleting" ? "Deleting…" : "Delete and start over"}</button></div></div>`;
+}
+
+function renderWipe(s: AppState): void {
+  if (!wipeDlg.open) return;
+  const focused = document.activeElement?.id;
+  wipeDlg.innerHTML = wipeDialog(s);
+  if (focused) document.getElementById(focused)?.focus();
+}
+
+function openWipe(): void {
+  if (!state || wipeDlg.open) return;
+  wipe = { stage: "ask", left: [], error: "" };
+  wipeDlg.innerHTML = wipeDialog(state);
+  wipeDlg.showModal();
+  // Cancel takes the focus: the safe choice is the one Enter presses.
+  wipeDlg.querySelector<HTMLElement>("#wipeCancel")?.focus();
+}
+
+/** Once deleting has begun the dialog stays: the jobs are stopped and the app must start over. */
+function closeWipe(): void {
+  if (wipe.stage !== "ask") return;
+  if (wipeDlg.open) wipeDlg.close();
+  document.getElementById("wipeOpen")?.focus();
+}
+
+async function runWipe(): Promise<void> {
+  if (!state) return;
+  const was = wipe.stage;
+  wipe = { ...wipe, stage: "deleting", error: "" };
+  renderWipe(state);
+  try {
+    // On success the app starts over and this window goes with it.
+    const left = await api.deleteLocalData();
+    wipe = { stage: "left", left, error: "" };
+  } catch (e) {
+    wipe = { ...wipe, stage: was, error: msg(e) };
+  }
+  renderWipe(state);
+}
+
 function toggleUpdate(open: boolean): void {
   updateOpen = open;
   if (state) { renderSide(state); renderUpdate(state); }
@@ -1166,6 +1287,7 @@ function render(): void {
   renderSide(state);
   renderUpdate(state);
   renderRestart(state);
+  renderWipe(state);
   // Unsaved fields on Settings or Ask are not rebuilt; the Assistant panel beside them still moves.
   if ((page === "settings" || page === "ask") && draftDirty) { renderAssistant(); return; }
   const s = state;
@@ -1208,8 +1330,11 @@ function render(): void {
 
 async function load(p: Page): Promise<void> {
   try {
-    if (p === "overview") { [data.addon, data.changes] = await Promise.all([api.addonInfo(), api.changes().catch((e) => { data.changesError = msg(e); return undefined; })]); data.market = await api.marketInfo(); }
-    else if (p === "chat" || p === "settings") { data.chat = await api.chatInfo(); for (const own of data.chat.providers) loadModels(own.kind); }
+    if (p === "overview") { [data.addon, data.changes, data.usage] = await Promise.all([api.addonInfo(), api.changes().catch((e) => { data.changesError = msg(e); return undefined; }), api.dataUsage().catch(() => undefined)]); data.market = await api.marketInfo(); }
+    else if (p === "chat" || p === "settings") {
+      if (p === "settings") data.usage = await api.dataUsage();
+      data.chat = await api.chatInfo(); for (const own of data.chat.providers) loadModels(own.kind);
+    }
     else if (p === "ask") { [data.ask, data.chat] = await Promise.all([api.askInfo(), api.chatInfo()]); for (const own of data.chat.providers) loadModels(own.kind); }
     else if (p === "characters") data.characters = await api.charactersInfo();
     else if (p === "upload") [data.upload, data.backups] = await Promise.all([api.uploadInfo(), api.backups()]);
@@ -1338,6 +1463,23 @@ async function onClick(ev: MouseEvent): Promise<void> {
   if (el.closest("#updateGet, #updateNow, #updateNowCallout")) { await api.updateDownload(); return; }
   if (el.closest("#updateRestart, #updateRestartPop, #updateRestartCallout")) { openRestart(); return; }
   if (el.closest("#restartCancel")) { closeRestart(); return; }
+  if (el.closest("#wipeOpen")) { openWipe(); return; }
+  if (el.closest("#wipeCancel")) { closeWipe(); return; }
+  if (el.closest("#wipeGo") && wipe.stage !== "deleting") { await runWipe(); return; }
+  if (el.closest("#wipeRelaunch")) { await api.relaunch(); return; }
+  if (el.closest("#dataNoticeOpen")) {
+    await go("settings");
+    const panel = main.querySelector<HTMLElement>("#data");
+    panel?.scrollIntoView({ block: "start" });
+    panel?.focus();
+    return;
+  }
+  if (el.closest("#dataNoticeDismiss")) {
+    state = await api.saveSettings({ dataNoticeDismissed: true });
+    if (data.usage) data.usage = { ...data.usage, notice: false };
+    render();
+    return;
+  }
   if (el.closest("#restartGo") && !restarting) {
     restarting = true;
     if (state) renderRestart(state);
@@ -1580,6 +1722,9 @@ main.addEventListener("input", (ev) => {
 // Escape or a click on the dimmed backdrop closes the restart dialog, unless the restart is already under way.
 restartDlg.addEventListener("cancel", (ev) => { ev.preventDefault(); if (!restarting) closeRestart(); });
 restartDlg.addEventListener("click", (ev) => { if (ev.target === restartDlg && !restarting) closeRestart(); });
+// The same for Delete my local data, until deleting has begun.
+wipeDlg.addEventListener("cancel", (ev) => { ev.preventDefault(); closeWipe(); });
+wipeDlg.addEventListener("click", (ev) => { if (ev.target === wipeDlg) closeWipe(); });
 // Escape closes the update popover from anywhere.
 document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && updateOpen) { ev.preventDefault(); toggleUpdate(false); } });
 main.addEventListener("keydown", (ev) => {

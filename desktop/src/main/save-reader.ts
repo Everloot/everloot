@@ -141,8 +141,11 @@ export function readFacts(file: string): Promise<{ key: string; facts: SaveFacts
  * and the ones the upload keeps here (never marked sent), not the whole file. A read or parse error is thrown as
  * parseEverlootLua(readFileSync(file)) throws it.
  */
-export async function readForUpload(file: string, sent: (installId: string, eventId: string) => boolean): Promise<EverlootFile> {
-  const onMain = () => parseEverlootLua(readFileSync(file, "utf8"));
+export async function readForUpload(file: string, sent: (installId: string, eventId: string) => boolean): Promise<EverlootFile & { eventIds: Array<string | null> }> {
+  const onMain = () => {
+    const parsed = parseEverlootLua(readFileSync(file, "utf8"));
+    return { ...parsed, eventIds: parsed.records.map((r) => (typeof r.eventId === "string" ? r.eventId : null)) };
+  };
   const head = await ask({ op: "upload", file });
   if (!head) return onMain();
   if (!head.ok) throw fromWire(head.error);
@@ -155,5 +158,5 @@ export async function readForUpload(file: string, sent: (installId: string, even
   if (!rows.ok) throw fromWire(rows.error);
   // Taking the rows off the message is a turn of its own; the upload's checks over them run in the next one.
   await new Promise((resolve) => setImmediate(resolve));
-  return { version, installId, ...(clientBuild !== undefined ? { clientBuild } : {}), records: rows.value as Array<Record<string, unknown>> };
+  return { version, installId, ...(clientBuild !== undefined ? { clientBuild } : {}), records: rows.value as Array<Record<string, unknown>>, eventIds };
 }
