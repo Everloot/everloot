@@ -15,14 +15,15 @@ Rules this plan keeps (from [DATA_POLICY](../DATA_POLICY.md), the
 [public-character policy draft](2026-11-01-public-character-policy-draft.md)):
 
 - A named public number about a character comes only from that character's linked owner, with their switch on.
-  Nothing from `/who`, inspect or other players' sightings feeds a score or a profile.
+  Nothing from `/who`, inspect or other players' sightings feeds a score or a profile. Another uploader's pull
+  summary can only confirm a kill the owner's own row reports (3.3); it never adds points by itself.
 - The census stays aggregate: counts only, same thresholds and rounding as today.
 - Nothing is copied from Raider.io, Warcraft Logs, WoWProgress or any other site, including their formulas. The
   Everloot Score is our own, published in full.
 - No number from Blizzard is shown unless Blizzard published it and we cite it.
 
-Parallel work this plan does not redesign: pull and run timing with per-pull summaries (opt-in), and a realm to
-ruleset map. Both are **in progress** in other pull requests; where this plan needs them it says so.
+Parallel work this plan does not redesign: pull and run timing with per-pull summaries (PR #697; on by default for
+the uploader since Carlos's 2026-11-02 decision), and a realm to ruleset map (PR #689). Both are **in progress** in other pull requests; where this plan needs them it says so.
 
 ## 1. What exists today
 
@@ -120,10 +121,12 @@ Our rows have two levels of trust, so v1 keeps them apart:
 
 | Number | From | Can a forged save file inflate it? | Ranked? |
 | --- | --- | --- | --- |
-| **Progress score** | Raid and dungeon boss kills that other installs corroborate (3.3) | Only with other installs reporting the same kill at the same time | Yes, after the owner's switch |
+| **Progress score** | Raid and dungeon boss kills where another uploader's pull summary puts the character in the group (3.3) | Only if an install the character does not control also lists it in that pull | Yes, on its own board, after the owner's switch |
 | **Completion score** | The character's own achievement, reputation, title and quest rows | Yes: the rows can be written by hand (ADR, policy draft) | On a board labelled "self-reported", or not at all (decision D3) |
 
-The profile shows both and their sum as "Everloot Score", with the breakdown one click away.
+The profile shows both and their sum as "Everloot Score", with the breakdown one click away. The sum is
+profile-only: no board ranks it (D3). The Progress board ranks Progress only, and the Completion board ranks
+Completion only, labelled "self-reported".
 
 ### 3.2 Formula
 
@@ -133,7 +136,7 @@ entry has 3 installs, as the site already requires for public facts.
 | Part | Counts | Points |
 | --- | --- | --- |
 | Raid | Each distinct raid boss killed in the current season, corroborated, once per boss and difficulty | 10 × tier number. Tier 1 is the first raid tier (opening 2026-12-09), tier 2 the next, and so on. The tier list is a curated file the owner signs off |
-| Dungeon | Each distinct dungeon boss killed, corroborated, once per boss and difficulty | 1, or 3 for a dungeon's final boss |
+| Dungeon | Each distinct dungeon boss killed, corroborated, once per boss and difficulty | 1, or 3 for a dungeon's final boss once the curated final-boss list exists; until then every dungeon boss is 1 |
 | Achievements | Achievements with `completed` and `earnedByMe` not false, on the agreed catalog | The catalog's `points` ÷ 10, rounded down per character total |
 | Reputations | Factions at Exalted (`reaction` 8) on the agreed catalog; renown factions excluded | 10 each |
 | Titles | Titles on the agreed catalog | 5 each |
@@ -143,6 +146,10 @@ entry has 3 installs, as the site already requires for public facts.
 
 Progress score = Raid + Dungeon. Completion score = Achievements + Reputations + Titles + Quests.
 
+**Final bosses.** `instanceDefs()` (`kb/src/guilds.ts`) lists encounters in id order, which cannot say which boss
+is last. The final-boss list is a curated file, reviewed with the raid tier list; until it exists, every dungeon
+boss scores 1.
+
 Worked example (made-up numbers, for the arithmetic only): a character with 4 corroborated tier-1 raid bosses, 12
 dungeon bosses including 3 final bosses, 410 achievement points, 2 Exalted factions, 1 title and 180 quests scores
 Raid 40, Dungeon 9 + 9 = 18, so Progress 58; Achievements 41, Reputations 20, Titles 5, Quests 7, so Completion 73.
@@ -151,12 +158,17 @@ Everloot Score 131.
 **Seasons.** Progress resets when a new raid tier opens; the old season's board is frozen and stays readable.
 Completion never resets. Whether to keep a lifetime Progress board too is decision D2.
 
-**Per account.** Account score = the best Everloot Score among the account's linked, unfrozen characters in one
-ruleset. The account's record (every distinct boss any alt killed) shows on the profile but is not ranked, so
-having many alts does not beat playing one well. A bonus for alts is decision D4.
+**Per account.** Account Progress = the best Progress among the account's characters that have `ranked_score`
+on, in one ruleset (D4: best character only, no alt bonus). There are two aggregates. The **public** one (the
+account's number on a board, and its record of every distinct boss) counts only characters with `page_public`
+and `show_alts` on, and drops a character at once when it is switched off, hidden, frozen or unlinked. A private
+alt never changes a public number. The **private** one counts every linked, unfrozen character and shows only to
+the signed-in owner.
 
-**Rulesets.** Scores are per ruleset. Until the realm map lands, `rulesetOf()` returns `"forever"` for every realm
-(`web/src/lib/player-pages.ts`), so v1 has one ruleset.
+**Rulesets.** Scores are per ruleset. Player, guild and link addresses use `rulesetOf()`
+(`web/src/lib/player-pages.ts`), which returns `"forever"` for every realm. The realm map (PR #689) groups Auction
+House prices only; moving player rows to their ruleset needs its own migration of the stored rows, so v1 has one
+ruleset.
 
 ### 3.3 Anti-gaming rules
 
@@ -166,19 +178,26 @@ kill, 10 characters for a census count.
 1. **Only linked characters, with their switch on.** Unfrozen, not hidden through the hide form, and a new
    `ranked_score` flag on `character_visibility`, default false. Turning it off removes the character from every
    board on the next request.
-2. **A kill counts only when corroborated.** The character's own kill row (new, section 8) matches either
-   (a) at least 2 other installs, from at least 2 other addresses, whose anonymous `encounter` rows report a
-   successful kill of the same `encounterId` and difficulty within 10 minutes of it; or (b) a `guild_kill` agreed
-   by 2 installs for the character's own synced guild, same encounter, same day. Uncorroborated kills still show on
-   the owner's profile, labelled "not corroborated", and score nothing. Assumption: enough group members run the
-   addon for 5-player dungeons; if not, dungeon points will be thin early, which is the honest result.
+2. **A kill counts only when another uploader saw the character there.** The character's own kill row (new,
+   section 9, P2) counts when at least 1 other install, from another address, uploaded a `pull_summary` (pull
+   and run records, PR #697) for the same `encounterId` and difficulty within 10 minutes that lists this character
+   in the group and ends in a kill. Anonymous `encounter` rows from other installs, or a same-day `guild_kill`,
+   show that the kill happened, not that this character was in it: on their own they label the kill "reported,
+   not confirmed" on the owner's profile and score nothing. The score matches pulls itself and does not use
+   `agreedKills()`, which merges reports across dates and difficulties. Assumption: enough group members run the
+   addon with pull summaries on; if not, Progress is thin early, which is the honest result. Pull summaries are on
+   by default for the uploader (Carlos, 2026-11-02, following the Warcraft Logs model in section 8).
 3. **The boss must be on the agreed list.** Bosses come from `instanceDefs()` (`kb/src/guilds.ts`), the 3-install
    agreed instance facts the guild ladder already uses.
 4. **Census agreement.** The link row's race, class and faction already must match the census at link time (ADR).
    A character must also be at the level band its kills require (a raid kill at level 20 is dropped).
 5. **No contested sources.** Rows from an install id that the ADR's D9 marks contested do not count.
-6. **Dates.** Nothing before launch (`CENSUS_LAUNCH`), nothing dated after the server's clock, and the
-   30-days-back rule the player rows use (`PLAYER_DAYS_BACK`).
+6. **Dates.** Nothing before launch (`CENSUS_LAUNCH`) and nothing dated after the server's clock. Three
+   separate rules, not one: **intake** accepts a `kill_owned` row up to 60 days old at its first sync (the save
+   file's window), so a late first sync loses nothing; **score eligibility** is the season window, so the nightly
+   recompute never turns a season into a rolling month; **retention** keeps kill and pull evidence for the
+   season plus 1 year (Carlos, 2026-11-02: 1 year to start, reviewed after season 1). The player rows'
+   30-days-back rule (`PLAYER_DAYS_BACK`) stays theirs and does not apply here.
 7. **Completion sanity.** A completion total above the agreed catalog's total, an achievement earned before launch,
    or a catalog entry fewer than 3 installs agree on scores nothing. Outliers are held for review, not shown.
 8. **One character, one account.** A second claim freezes both (ADR D0, accepted 2026-10-28).
@@ -222,8 +241,8 @@ contract), **Capture** (needs a new addon record).
 | Guilds | Progression ladder | `guildLadder()` | `RankTable` | Now; fills from 2026-12-09 |
 | Guilds | First kills timeline | Agreed kill times | New small SVG timeline | 2026-12-09 |
 | Guilds | Most members seen | Players table, hidden guilds out | `RankTable` | Now |
-| Players | Everloot Score, overall and by class, race, faction | `character_scores`, `ranked_score` on | `RankTable`, score histogram (new) | Links |
-| Players | Completion (self-reported) | same | same | Links, if D3 allows |
+| Players | Progress score, overall and by class, race, faction | `character_scores`, `ranked_score` on | `RankTable`, score histogram (new) | Links |
+| Players | Completion, labelled self-reported (D3) | same | same | Links |
 | Players | Rarest achievements (share of reporting characters) | `achievement_owned` rollup, counts only, 10-character rule | `ShareBar` | Links (owned rows need the sync consent) |
 | Dungeons | Fastest runs by dungeon | Timing records (in progress) | `RankTable` | Capture |
 | PvP | Honor, rank, kills | Nothing yet | — | Capture, after a client probe of the honor calls (PROBE-01) |
@@ -237,9 +256,13 @@ SVG, and move `WeeklyChart`, `StackedWeeks` and `ShareBar` to `web/src/component
 board becomes their second caller. New: a histogram (score spread) and a timeline (first kills), both small SVGs in
 the same style. Each chart has a table of the same numbers under it for screen readers and copying.
 
-**Filters.** Ruleset (after the map), faction, class, race, level band, week. A filter either picks cells that are
-already published, as `RankingFilterKey` does today, or runs the whole rollup on the filtered rows with its own
-thresholds. Never a sum of rounded parts.
+**Filters.** Ruleset (after the map), faction, class, race, level band, week. A filter only picks cells that are
+already published in the unfiltered rollup, as `RankingFilterKey` does today. It never reruns the rollup with its
+own thresholds: a filtered total next to the unfiltered one bounds a hidden cell. Example from the review of this
+plan, reproduced with `kb/src/census.ts`: with 100 Orcs, 10 Tauren and 1 Troll, the global view publishes 110 and
+Orc 100 and hides the rest; a Tauren filter that publishes its own total of 10 bounds the Trolls below 10. Filters
+on their own rollup wait for complementary suppression across every exposed filter and total, the same review as
+the cube below. Never a sum of rounded parts.
 
 **Drill-down into the census.** Clicking Trolls on the race board opens `/census?race=Troll` (and `&ruleset=` once
 the map lands). v1 of that page highlights the Troll row and shows its class split, which the race × class grid
@@ -321,15 +344,25 @@ Every public piece maps to the [public-character policy draft](2026-11-01-public
 | Main and alts on a profile | Main: owner picks; alts: new `show_alts`, off | Switch off | Hidden characters drop out | Frozen characters drop out |
 | Login names (Twitch, Discord) | New per-login switch, off | Switch off | — | — |
 | Member on a guild page | `show_guild` | Switch off | Hidden guild: whole page gone | — |
-| Census, population boards, boss kills | Census opt-in in the addon (`/everloot census on`) | Turn it off in the addon | Counts only; nothing to hide | — |
+| Census and population boards | Census opt-in in the addon (`/everloot census on`); the uploader's census permission gates census rows | Turn it off in the addon | Counts only; nothing to hide | — |
+| Anonymous boss kills, pull timing, runs | The addon's World recording (open-world module), on by default; census does not gate them | Turn World recording off | No names in them | — |
+| Named pull summaries (group members, role, totals) | On by default for the uploader (Carlos, 2026-11-02); upload page and Desktop App, after the preview | `/everloot pulls off` deletes the rows | Hidden characters are dropped at intake; public only through a ranked board (D1) and a per-character hide | Frozen characters never rank |
 | Addon usage | Addon list opt-in | Turn it off | Counts only | — |
 
 Linking alts together publicly says that two characters are the same person. That is the most sensitive thing on
 the profile, so it is its own switch, never implied by `page_public`. Accepting this plan's public pieces needs a
 DATA_POLICY "Rankings" section, the ranking contract the ADR asks for in its section 5, and a matching paragraph on
 /privacy. It also changes one line of the showcase plan: its risks say "no rankings are built on showcase data".
-This plan ranks only corroborated kills, which do not rest on the showcase's self-reported rows, but the owner has to
-accept that change (D1).
+This plan ranks Progress on kills another uploader's pull summary confirms, which do not rest on the showcase's
+self-reported rows; Completion has its own board labelled self-reported, and the combined total is never ranked.
+Carlos accepted that change on 2026-11-02 (D1, D3).
+
+**Other players' names.** The 2026-10-30 combat-log design said no other player's name would be stored. Carlos
+changed that on 2026-11-02 to follow the Warcraft Logs model: whoever uploads sends the whole group, and the
+protection is a per-character hide, like Warcraft Logs' hidden character parses
+(https://www.warcraftlogs.com/help/hiding-characters). Its privacy policy says uploaded logs are public by design
+(https://www.warcraftlogs.com/help/privacy). Before an addon release carries it: a DATA_POLICY.md change, a /privacy
+paragraph, the upload preview's wording, and hides applied at intake.
 
 ## 9. Phases
 
@@ -341,9 +374,10 @@ it waits on a decision, flag flip or applied migration. Showcase stages are name
 | P0 | Hub v2 with what exists: population total and level spread, boss kills and wipes, guild and addon boards in the rail | M | Nothing | Review only |
 | P1 | Census drill-down `?race=` and `?class=` on published cells; race and class boards link to it | S | Nothing | Review only |
 | P2 | Addon: record the player's own kills, lockouts and guild locally from the first post-launch release (below) | M | Timing PR for the shared pull hooks | Release |
-| P3 | Ruleset filter on census, rankings and ladder | S | Realm map PR | Review only |
+| P3 | Ruleset filter on census, rankings and ladder | S | Realm map PR #689; census and ladder also need the player-row migration (3.2) | Review only |
 | P4 | Links and identity pages | — | Showcase S2, S3 | Policy draft decisions, D8 |
-| P5 | Profile v2: main from a link, alts switch, login switches, completion visual (owner preview) | M | P4; migration for `main_link_id`, `show_alts`, login switches | D4, D5 |
+| P4a | Social sign-in on: provider apps and callbacks, `BETTER_AUTH_SECRET`, accounts migration check, the acceptance list in `docs/2026-10-30-social-sign-in.md`, then `EVERLOOT_AUTH_V2=1` | M | Built behind the flag; look redesigned in PR #686 | Carlos: provider keys, acceptance run |
+| P5 | Profile v2: main from a link, alts switch, login switches, completion visual (owner preview) | M | P4, P4a; migration for `main_link_id`, `show_alts`, login switches | D4, D5 |
 | P6 | Own-row sync including kills and guild; score computed, owner preview only, `/methodology/score` | L | Showcase S5; P2 data | D2, D9 |
 | P7 | Public score boards and score on character pages | M | Showcase S6; P6; ranking contract; DATA_POLICY section | D1, D3; `ranked_score` migration |
 | P8 | Guild profile upgrades: boss grid, timeline, linked members | M | P0 timeline; linked members need P6 | D6 |
@@ -363,8 +397,8 @@ consent (S5) exists:
   come from the in-progress timing PR; this row does not add its own.
 - `lockout_owned`: the showcase plan's S5 kind (instance, difficulty, bosses killed, reset), recorded at every reset.
 - The character's own guild name and date for the owner sync.
-- Nothing about other players. The anonymous `encounter` row stays as it is, so corroboration keeps working for
-  installs that never link.
+- `kill_owned` holds only the player's own kill. Other players reach the server through the timing PR's pull
+  summaries (section 8), which are what confirm attendance (3.3). The anonymous `encounter` row stays as it is.
 
 The save file keeps 60 days of `kill_owned` rows (assumption; size to be checked against the upload limits in
 `UPLOAD_LIMITS`). A protocol change follows CONTRIBUTING: build `packages/protocol`, reinstall it in `web`, `kb` and
@@ -372,26 +406,34 @@ The save file keeps 60 days of `kill_owned` rows (assumption; size to be checked
 
 ## 10. Owner decisions
 
-| # | Decision | Recommendation |
+Carlos decided all ten on 2026-11-02, as recommended, with D1 and D9 sharpened by the review of this plan and by
+his combat-data decisions the same day.
+
+| # | Decision | Decided |
 | --- | --- | --- |
-| D1 | Accept ranking named characters on corroborated kills, which changes the showcase plan's "no rankings" line and needs the ADR's ranking contract | Accept, with the rules in 3.3 |
-| D2 | Score weights, tier list, season reset, lifetime board | The table in 3.2; seasons reset Progress; a frozen lifetime board later |
-| D3 | Completion score: own "self-reported" board, profile only, or merged into the rank | Profile and a separately labelled board, never merged into the Progress rank |
+| D1 | Ranking named characters, which changes the showcase plan's "no rankings" line and needs the ADR's ranking contract | Accepted. Progress ranks kills another uploader's pull summary confirms (3.3); reported-only kills score nothing |
+| D2 | Score weights, tier list, season reset, lifetime board | The table in 3.2; seasons reset Progress; a frozen lifetime board later. Final-boss weight waits for the curated list |
+| D3 | Completion score: own board, profile only, or merged | Profile, plus its own board labelled self-reported. Never merged into the Progress rank; the combined total is profile-only |
 | D4 | Account score: best character only, or best plus an alt bonus | Best character only |
-| D5 | Alts on profiles and guild pages | Own switch, off by default |
+| D5 | Alts on profiles and guild pages | Own switch (`show_alts`), off by default |
 | D6 | A guild score from members' scores | Not in v1; the ladder stays kill-based |
-| D7 | Census drill-down: aggregate only, or named lists filtered by race | Aggregate only |
-| D8 | CurseForge: link only, or ask Overwolf in writing for display rights | Link only; ask only if the board needs downloads |
-| D9 | P2 addon capture: which release, and `kill_owned` retention | First release after launch, 60 days |
+| D7 | Census drill-down: aggregate only, or named lists | Aggregate only, on already-published cells (section 4) |
+| D8 | CurseForge: link only, or ask Overwolf | Link only |
+| D9 | P2 addon capture: which release, and retention | First release after launch; the save file keeps 60 days; the server keeps evidence for the season plus 1 year |
 | D10 | Login names on profiles (Twitch, Discord) | Per-login switch, off by default |
+
+Combat data (PR #697), Carlos 2026-11-02: pull timing and run records on by default; named pull summaries on by
+default for the uploader, also from the Desktop App; roles guessed when the game shows none, labelled "inferred";
+1 year retention to start (section 8).
 
 ## 11. Risks
 
 - **Thin corroboration.** Early on, few group members may run the addon, so many real kills will not count. The
   board says how many kills were not corroborated rather than lowering the bar.
-- **Collusion.** Three friends with three installs could corroborate kills they did not get, at the same 10-minute
-  window. The address rule and the boss list raise the cost; an operator can drop a group's rows. Worth a review
-  queue for sudden jumps.
+- **Collusion.** One friend's install could list a character in a pull it was not in. The summary must match the
+  boss, difficulty and 10-minute window of a real kill and come from another address, and the boss must be on the
+  agreed list; an operator can drop a group's rows. Worth a review queue for sudden jumps and for confirmations that
+  always come from the same install.
 - **Client calls unverified.** `ENCOUNTER_END` works (the `encounter` rows exist); `GetSavedInstanceInfo`,
   `GetGuildInfo` for the sync, the completion calls and any honor call on Forever are PROBE-01 items. A missing call
   means "not supported yet", never zero.
