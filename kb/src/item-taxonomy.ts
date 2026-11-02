@@ -178,7 +178,9 @@ export function handleItemCategories(
     return end([`Item ${args.item}: ${[path, c.slot?.name, c.quality?.name].filter(Boolean).join(", ")} (${stamp})`]);
   }
   if (args.class === undefined) {
-    const lines = [`Item categories (${stamp})`];
+    // Slot and quality narrow one class's list; on their own they would filter the whole tree, so say they were not used.
+    const unused = args.slot !== undefined || args.quality !== undefined;
+    const lines = [...(unused ? ["Slot and quality filter within a class; add class to use them."] : []), `Item categories (${stamp})`];
     for (const c of t.classes.filter((x) => x.items > 0)) {
       lines.push(`${c.label} (${c.slug}): ${plural(c.items)}`);
       for (const s of t.subclasses.filter((x) => x.classId === c.id && x.items > 0)) lines.push(`  ${s.name ?? `subclass ${s.id}`} (${s.slug}): ${plural(s.items)}`);
