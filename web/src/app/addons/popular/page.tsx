@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { dataAgeLabel } from "@/lib/data-age";
-import { loadPopularAddons } from "@/lib/rollup-compute";
+import { loadAddonLeaderboard } from "@/lib/rollup-compute";
 import { loadEcosystem } from "@/lib/ecosystem";
 import { addonGithubSummary, type AddonGithubSummaryResult } from "@/lib/addon-github";
 import { initials } from "@/lib/addon-board";
@@ -132,7 +132,7 @@ const columns = (reportingInstalls: number): Column<LeaderRow>[] => [
 ];
 
 export default async function PopularAddonsPage() {
-  const { addons, reportingInstalls, trends, unreachable, dataAsOf } = await loadPopularAddons();
+  const { addons, reportingInstalls, trends, unreachable, dataAsOf } = await loadAddonLeaderboard();
   const { projects } = await loadEcosystem();
   const repos = liveRepos(addons, projects);
   const results = await Promise.all(repos.map((repo) => addonGithubSummary(repo)));
@@ -185,8 +185,11 @@ export default async function PopularAddonsPage() {
           </p>
           <p>
             Share is the installs that had the addon loaded, out of every install that reported its addons. The counts are
-            all-time. Week compares the rank with the board as it stood seven days earlier; New means the addon was not
-            listed then. The 8-week line is the share at the end of each week, from the week the addon was first listed.
+            all-time. Week compares the rank with the board as it stood seven days earlier; New means the addon had no
+            published point then. The 8-week line is the share at the end of each week. A past week is shown only when
+            the change since then is three installs or more, both in installs reporting and in installs running the
+            addon, so no week can be subtracted from another to single out one or two installs. Early on, most weeks
+            stay blank.
           </p>
           <p>
             Stars and the latest release come from GitHub, for addons whose repository has been checked by hand. Everloot

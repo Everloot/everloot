@@ -64,6 +64,10 @@ test("with no board a week earlier there is no movement, not a column of New", (
 test("a rate-limited live read is reported, a missing repository is not", () => {
   expect(rateLimited({ a: { status: "unavailable", rateLimited: true } })).toBe(true);
   expect(rateLimited({ a: { status: "missing" }, b: { status: "unavailable", rateLimited: false } })).toBe(false);
+  // The repository was read but its release hit the limit: the notice shows too.
+  const data = { repo: "someone/curated", url: "https://github.com/someone/curated", stars: 5, release: null };
+  expect(rateLimited({ a: { status: "partial", data, rateLimited: true } })).toBe(true);
+  expect(rateLimited({ a: { status: "partial", data, rateLimited: false } })).toBe(false);
 });
 
 test("the sparkline needs two listed weeks and skips the weeks before the addon was listed", () => {

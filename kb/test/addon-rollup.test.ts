@@ -135,23 +135,103 @@ test("a version is listed only when three installs report it, highest version fi
   expect(JSON.stringify(addons)).not.toContain("9.9-private");
 });
 
-test("the trend holds each week's share and the rank a week earlier, with the three-install rule on every week", () => {
+const WEEK_MS = 7 * 86_400_000;
+/** The end of week i of `weeks`, the last one at AS_OF: the cut-off each published point is read at. */
+const weekEnd = (i: number, weeks: number) => new Date(Date.parse(AS_OF) - (weeks - 1 - i) * WEEK_MS);
+/** A time inside week i of `weeks`, a day before its end. */
+const inWeek = (i: number, weeks: number) => new Date(weekEnd(i, weeks).getTime() - 86_400_000).toISOString();
+
+test("loaded counts growing one install a week publish nothing but today", () => {
+  // The review's case: three installs, the addon loaded on one, then two, then all three.
   const rows = [
-    // Bagnon: three installs two weeks back.
-    ...["a", "b", "c"].map((id) => seen(id, "Bagnon", "2026-10-02T00:00:00Z")),
-    // Questie: two installs two weeks back, the third and fourth this week, so it overtakes Bagnon.
-    seen("a", "Questie", "2026-10-02T00:00:00Z"), seen("b", "Questie", "2026-10-02T00:00:00Z"),
-    seen("c", "Questie", "2026-10-15T00:00:00Z"), seen("d", "Questie", "2026-10-15T00:00:00Z"),
+    ...["a", "b", "c"].map((id) => seen(id, "Questie", inWeek(0, 3), false)),
+    seen("a", "Questie", inWeek(0, 3)), seen("b", "Questie", inWeek(1, 3)), seen("c", "Questie", inWeek(2, 3)),
   ];
-  const trends = addonTrends(rows, AS_OF, 3);
-  expect(Object.keys(trends).sort()).toEqual(["Bagnon", "Questie"]);
-  // Weeks end 2026-10-03, 10-10 and 10-17 (12:00 UTC).
-  expect(trends.Bagnon).toEqual({ shares: [1, 1, 0.75], previousRank: 1 });
-  expect(trends.Questie).toEqual({ shares: [null, null, 1], previousRank: null });
+  expect(addonTrends(rows, AS_OF, 3)).toEqual({ Questie: { shares: [null, null, 1], previousRank: null } });
 });
 
-test("an addon listed now but not a week ago has no previous rank; no weeks means no trend", () => {
+test("weeks that add three installs at a time are published, with the rank a week earlier", () => {
+  const rows = [
+    // Bagnon: three installs in week 0 and three more in week 1.
+    ...["a", "b", "c"].map((id) => seen(id, "Bagnon", inWeek(0, 3))),
+    ...["d", "e", "f"].map((id) => seen(id, "Bagnon", inWeek(1, 3))),
+    // Questie: on the week 1 installs, then on three new ones in week 2, so it overtakes Bagnon.
+    ...["d", "e", "f"].map((id) => seen(id, "Questie", inWeek(1, 3))),
+    ...["g", "h", "i"].map((id) => seen(id, "Questie", inWeek(2, 3))),
+  ];
+  const trends = addonTrends(rows, AS_OF, 3);
+  expect(trends.Bagnon).toEqual({ shares: [1, 1, 6 / 9], previousRank: 1 });
+  expect(trends.Questie).toEqual({ shares: [null, 0.5, 6 / 9], previousRank: 2 });
+});
+
+test("a week that adds one or two reporting installs is hidden for every addon", () => {
+  const rows = [
+    ...["a", "b", "c", "d", "e", "f"].map((id) => seen(id, "Bagnon", inWeek(0, 3))),
+    // One new install in week 2: week 1 and today differ by one install, so week 1 cannot be shown.
+    seen("g", "Bagnon", inWeek(2, 3)),
+  ];
+  expect(addonTrends(rows, AS_OF, 3).Bagnon).toEqual({ shares: [null, null, 1], previousRank: null });
+});
+
+test("no rows or no weeks means no trend", () => {
   expect(addonTrends([], AS_OF)).toEqual({});
-  const rows = ["a", "b", "c"].map((id) => seen(id, "Questie", "2026-10-16T00:00:00Z"));
-  expect(addonTrends(rows, AS_OF, 2).Questie).toEqual({ shares: [null, 1], previousRank: null });
+  expect(addonTrends(["a", "b", "c"].map((id) => seen(id, "Questie")), AS_OF, 0)).toEqual({});
+});
+
+/** A small seeded generator, so a failing case can be replayed. */
+function random(seed: number) {
+  return () => ((seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648) / 2_147_483_648);
+}
+
+test("from the published history, no count or change below three installs can be worked out", () => {
+  const weeks = 6;
+  let pastPoints = 0;
+  for (let seed = 1; seed <= 200; seed++) {
+    const rand = random(seed);
+    const rows: AddonSeenRow[] = [];
+    const installs = 3 + Math.floor(rand() * 25);
+    for (let n = 0; n < installs; n++) {
+      const joined = Math.floor(rand() * weeks);
+      for (const name of ["Questie", "Bagnon", "Details", "WeakAuras"]) {
+        if (rand() < 0.6) rows.push(seen(`i${n}`, name, inWeek(joined, weeks), false));
+        if (rand() < 0.5) rows.push(seen(`i${n}`, name, inWeek(joined + Math.floor(rand() * (weeks - joined)), weeks)));
+      }
+    }
+    const trends = addonTrends(rows, AS_OF, weeks);
+    // The reader's best case: the reporting installs at every week end are known.
+    const boards = Array.from({ length: weeks }, (_, i) => rollupAllAddons(rows, weekEnd(i, weeks)));
+    const published = (name: string) => trends[name].shares.flatMap((share, i) => (share === null ? [] : [i]));
+    const weeksShown = new Set(Object.keys(trends).flatMap(published));
+    for (const i of weeksShown) {
+      const gap = boards[weeks - 1].reportingInstalls - boards[i].reportingInstalls;
+      expect(gap === 0 || gap >= 3, `seed ${seed}: reporting installs at week ${i}`).toBe(true);
+    }
+    for (const [name, trend] of Object.entries(trends)) {
+      pastPoints += published(name).length - 1;
+      const loaded = published(name).map((i) => {
+        const truth = boards[i].addons.find((a) => a.name === name)!;
+        expect(trend.shares[i], `seed ${seed}: ${name} week ${i}`).toBeCloseTo(truth.share, 12);
+        return Math.round(trend.shares[i]! * boards[i].reportingInstalls);
+      });
+      for (let i = 0; i < loaded.length - 1; i++) {
+        expect(loaded[i], `seed ${seed}: ${name} loaded`).toBeGreaterThanOrEqual(3);
+        for (let j = i + 1; j < loaded.length; j++) {
+          const change = loaded[j] - loaded[i];
+          expect(change === 0 || change >= 3, `seed ${seed}: ${name} change ${loaded[i]} to ${loaded[j]}`).toBe(true);
+        }
+      }
+    }
+  }
+  // The rule leaves something to check: plenty of past points are published.
+  expect(pastPoints).toBeGreaterThan(100);
+});
+
+test("the history is one pass over the rows: 100,000 rows take under 300 ms", () => {
+  const rows: AddonSeenRow[] = [];
+  for (let n = 0; n < 100_000; n++) {
+    rows.push(seen(`i${n % 5000}`, `Addon${n % 40}`, new Date(Date.parse(AS_OF) - (n % 56) * 86_400_000).toISOString(), n % 3 !== 0));
+  }
+  const started = performance.now();
+  addonTrends(rows, AS_OF);
+  expect(performance.now() - started).toBeLessThan(300);
 });

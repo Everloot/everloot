@@ -181,9 +181,9 @@ test("a tracked addon shows its GitHub stars and release from the snapshot, with
 
 test("week movement and the 8-week line come from the board as it stood each week", async () => {
   store.loadCorpus.mockResolvedValue(corpus([
-    // Bagnon: listed two weeks before the data time. Questie: listed only this week, and now ahead.
+    // Bagnon: listed two weeks before the data time. Questie: on four new installs this week, and now ahead.
     ...["install-aaa", "install-bbb", "install-ccc"].map((id) => seen(id, "Bagnon", "Bagnon", "2026-10-02T08:00:00.000Z")),
-    ...["install-aaa", "install-bbb", "install-ccc", "install-ddd"].map((id) => seen(id, "Questie", "Questie", "2026-10-16T08:00:00.000Z")),
+    ...["install-ddd", "install-eee", "install-fff", "install-ggg"].map((id) => seen(id, "Questie", "Questie", "2026-10-16T08:00:00.000Z")),
   ]));
   const page = await html();
   const rows = page.slice(page.indexOf("<tbody")).split("<tr").slice(1);
@@ -193,6 +193,22 @@ test("week movement and the 8-week line come from the board as it stood each wee
   expect(rows[1]).toContain("Bagnon");
   expect(rows[1]).toContain("places down");
   expect(rows[1]).toContain("data-sparkline");
+});
+
+test("a history that would show the loaded count growing one install at a time is not drawn", async () => {
+  // Three installs report Questie from the start; it is loaded on one, then two, then all three.
+  const ids = ["install-aaa", "install-bbb", "install-ccc"];
+  store.loadCorpus.mockResolvedValue(corpus([
+    ...ids.map((id) => seen(id, "Questie", "Questie", "2026-10-01T08:00:00.000Z", false)),
+    seen(ids[0], "Questie", "Questie", "2026-10-02T08:00:00.000Z"),
+    seen(ids[1], "Questie", "Questie", "2026-10-09T08:00:00.000Z"),
+    seen(ids[2], "Questie", "Questie", "2026-10-16T08:00:00.000Z"),
+  ]));
+  const page = await html();
+  expect(page).toContain("3 of 3");
+  expect(page).not.toContain("data-sparkline");
+  expect(page).not.toContain("places");
+  expect(page).not.toContain(">New<");
 });
 
 test("in the first listed week nothing claims to be new", async () => {

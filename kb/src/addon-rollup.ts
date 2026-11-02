@@ -161,29 +161,85 @@ const WEEK_MS = 7 * 86_400_000;
 export interface AddonTrend {
   /**
    * The share as the leaderboard stood at the end of each of the last weeks, oldest first, the last one at `asOf`.
-   * Null for a week the addon was not listed yet (fewer than three installs had reported it).
+   * Null for a week that is not published: see addonTrends for when that is.
    */
   shares: (number | null)[];
-  /** The addon's rank on the board as it stood a week before `asOf`, or null when it was not listed then. */
+  /** The addon's rank a week before `asOf` among the addons published then, or null when its point then is not published. */
   previousRank: number | null;
+}
+
+/** For each week end, how many of the times fall on or before it. Every time is at or before the last week end. */
+function cumulative(times: Iterable<number>, ends: number[]): number[] {
+  const counts = ends.map(() => 0);
+  for (const at of times) counts[Math.max(0, Math.ceil((at - ends[0]) / WEEK_MS))]++;
+  for (let i = 1; i < counts.length; i++) counts[i] += counts[i - 1];
+  return counts;
+}
+
+/**
+ * Walking back from the newest point, which is always kept, the points whose count differs from the
+ * last kept one by nothing or by three or more. Counts only grow, so any two kept points then differ by 0 or 3+.
+ */
+function keptPoints(counts: number[], eligible: (i: number) => boolean): Set<number> {
+  const last = counts.length - 1;
+  const kept = new Set([last]);
+  let ref = counts[last];
+  for (let i = last - 1; i >= 0; i--) {
+    const gap = ref - counts[i];
+    if (eligible(i) && (gap === 0 || gap >= INDEPENDENT_INSTALLS)) {
+      kept.add(i);
+      ref = counts[i];
+    }
+  }
+  return kept;
 }
 
 /**
  * The board as it stood at the end of each of the last `weeks` weeks, by addon folder name, for the addons
- * listed at `asOf`. Each week is the same all-time count cut off at that week's end, so the three-install rule
- * holds for every point, and a week before the first upload has no listed addons.
+ * listed at `asOf`. Each week is the same all-time count cut off at that week's end, read in one pass over the rows.
+ *
+ * Two published points can be subtracted, so a past point is published only when the difference is itself a
+ * group of three: the reporting installs at a published week end differ from today's and from every other
+ * published week's by 0 or 3+, and so does the addon's loaded count, which is 3+ at each published point.
+ * Whatever a reader works out from the shares, the ranks or which points are missing, is then about at least
+ * three installs at once. Early on most points stay hidden; that is the honest result.
  */
 export function addonTrends(rows: AddonSeenRow[], asOf: string | Date = new Date(), weeks = 8): Record<string, AddonTrend> {
+  if (weeks < 1) return {};
   const end = new Date(asOf).getTime();
-  const boards = Array.from({ length: weeks }, (_, i) => {
-    const listed = rollupAllAddons(rows, new Date(end - (weeks - 1 - i) * WEEK_MS)).addons.filter((a) => a.public);
-    return new Map(listed.map((a, rank) => [a.name, { share: a.share, rank: rank + 1 }]));
-  });
+  const ends = Array.from({ length: weeks }, (_, i) => end - (weeks - 1 - i) * WEEK_MS);
+  const firstReport = new Map<string, number>();
+  const byName = new Map<string, { reported: Map<string, number>; loaded: Map<string, number> }>();
+  const earliest = (map: Map<string, number>, id: string, at: number) => map.set(id, Math.min(map.get(id) ?? at, at));
+  for (const row of rows) {
+    const at = Date.parse(row.capturedAt);
+    if (!Number.isFinite(at) || at > end) continue;
+    earliest(firstReport, row.installId, at);
+    if (OWN_ADDONS.has(row.name)) continue;
+    const entry = byName.get(row.name) ?? { reported: new Map(), loaded: new Map() };
+    earliest(entry.reported, row.installId, at);
+    if (row.loaded) earliest(entry.loaded, row.installId, at);
+    byName.set(row.name, entry);
+  }
+  const reporting = cumulative(firstReport.values(), ends);
+  const boardWeeks = keptPoints(reporting, () => true);
+  const listed = [...byName]
+    .map(([name, e]) => ({ name, installs: cumulative(e.reported.values(), ends), loaded: cumulative(e.loaded.values(), ends) }))
+    .filter((a) => a.installs[weeks - 1] >= INDEPENDENT_INSTALLS)
+    .map((a) => ({ ...a, kept: keptPoints(a.loaded, (i) => boardWeeks.has(i) && a.loaded[i] >= INDEPENDENT_INSTALLS) }));
+  // The rank a week earlier, among the addons whose point then is published, ordered as the board orders them.
+  const before = weeks - 2;
+  const previous = new Map(
+    before < 0 ? [] : listed
+      .filter((a) => a.kept.has(before))
+      .sort((a, b) => b.loaded[before] - a.loaded[before] || b.installs[before] - a.installs[before] || a.name.localeCompare(b.name))
+      .map((a, i) => [a.name, i + 1]),
+  );
   const trends: Record<string, AddonTrend> = {};
-  for (const name of boards[weeks - 1]?.keys() ?? []) {
-    trends[name] = {
-      shares: boards.map((board) => board.get(name)?.share ?? null),
-      previousRank: weeks > 1 ? boards[weeks - 2].get(name)?.rank ?? null : null,
+  for (const a of listed) {
+    trends[a.name] = {
+      shares: ends.map((_, i) => (a.kept.has(i) ? a.loaded[i] / reporting[i] : null)),
+      previousRank: previous.get(a.name) ?? null,
     };
   }
   return trends;

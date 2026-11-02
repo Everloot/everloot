@@ -82,7 +82,7 @@ export function leaderRows(
     const curated = curatedAddon(addon.name)?.source ?? null;
     const repo = curated?.repo ?? project?.repo ?? null;
     const fromLive = curated ? live[curated.repo] : undefined;
-    const facts = snapshotFacts(project) ?? (fromLive?.status === "ok" ? fromLive.data : null);
+    const facts = snapshotFacts(project) ?? (fromLive?.status === "ok" || fromLive?.status === "partial" ? fromLive.data : null);
     return {
       rank,
       name: addon.name,
@@ -106,7 +106,7 @@ export function leaderRows(
 
 /** True when a live read failed because GitHub's hourly limit ran out. */
 export function rateLimited(live: Readonly<Record<string, AddonGithubSummaryResult>>): boolean {
-  return Object.values(live).some((r) => r.status === "unavailable" && r.rateLimited);
+  return Object.values(live).some((r) => (r.status === "unavailable" || r.status === "partial") && r.rateLimited);
 }
 
 export const SPARK = { width: 64, height: 18 } as const;
