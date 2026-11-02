@@ -114,17 +114,52 @@ describe("the Supabase store", () => {
 
   test("the hidden characters are read from the opt-out table, a thousand rows a page, keyed however the realm was spelled", async () => {
     const page = Array.from({ length: 1000 }, (_, i) => ({ realm: "forever pioneer", character: `name${i}` }));
-    const pages = [page, [{ realm: "Forever-Pioneer", character: "Ada" }]];
-    const send = vi.fn(async () => new Response(JSON.stringify(pages.shift() ?? []), { status: 200 }));
+    const pages = [{ rows: page, range: "0-999/1001" }, { rows: [{ realm: "Forever-Pioneer", character: "Ada" }], range: "1000-1000/1001" }];
+    const send = vi.fn(async () => {
+      const next = pages.shift()!;
+      return new Response(JSON.stringify(next.rows), { status: 206, headers: { "content-range": next.range } });
+    });
     const hidden = await createCloudPlayerStore("https://db.example/", "service-key", send as unknown as typeof fetch).hiddenPlayers();
     expect(send).toHaveBeenCalledTimes(2);
     const [url, init] = send.mock.calls[1] as unknown as [string, RequestInit];
     expect(url).toBe("https://db.example/rest/v1/character_suppressions?select=realm,character&order=realm,character&limit=1000&offset=1000");
     expect(new Headers(init.headers).get("authorization")).toBe("Bearer service-key");
+    expect(new Headers(init.headers).get("prefer")).toBe("count=exact");
     expect(hidden.size).toBe(1001);
     expect(hidden.has(playerHideKey("Forever Pioneer", "ada"))).toBe(true);
     const failed = vi.fn(async () => new Response("", { status: 503 }));
     await expect(createCloudPlayerStore("https://db.example", "k", failed as unknown as typeof fetch).hiddenPlayers()).rejects.toThrow(/unavailable/);
+  });
+
+  test("a hide list the pages cannot show to be complete is an error, never a shorter list", async () => {
+    const hiddenFrom = (...responses: (() => Response)[]) => {
+      const send = vi.fn(async () => responses.shift()!());
+      return createCloudPlayerStore("https://db.example", "k", send as unknown as typeof fetch).hiddenPlayers();
+    };
+    const rows = (n: number, from = 0) => JSON.stringify(Array.from({ length: n }, (_, i) => ({ realm: "forever pioneer", character: `n${from + i}` })));
+    const part = (body: string, range: string | null) => () => new Response(body, { status: 206, headers: range ? { "content-range": range } : {} });
+    // A short page before the end: the read goes on from the rows it got, not from the next thousand.
+    const short = [part(rows(500), "0-499/700"), part(rows(200, 500), "500-699/700")];
+    const send = vi.fn(async () => short.shift()!());
+    expect((await createCloudPlayerStore("https://db.example", "k", send as unknown as typeof fetch).hiddenPlayers()).size).toBe(700);
+    expect((send.mock.calls[1] as unknown as [string])[0]).toMatch(/offset=500$/);
+    // One row of two, then nothing: the server stopped short.
+    await expect(hiddenFrom(part(rows(1), "0-0/2"), part("[]", "*/2"))).rejects.toThrow(/before their count/);
+    // A later page fails.
+    await expect(hiddenFrom(part(rows(1000), "0-999/1500"), () => new Response("", { status: 500 }))).rejects.toThrow(/unavailable/);
+    // No count, or a count that does not fit the rows.
+    await expect(hiddenFrom(part(rows(3), null))).rejects.toThrow(/count missing/);
+    await expect(hiddenFrom(part(rows(3), "0-2/*"))).rejects.toThrow(/count missing/);
+    await expect(hiddenFrom(part(rows(3), "0-1/3"))).rejects.toThrow(/match their range/);
+    // An empty table is complete.
+    expect((await hiddenFrom(() => new Response("[]", { status: 200, headers: { "content-range": "*/0" } }))).size).toBe(0);
+  });
+
+  test("the whole hide list has one deadline: a read that runs past it fails", async () => {
+    const hang = vi.fn((_url: string, init: RequestInit) => new Promise<Response>((_, reject) => {
+      init.signal!.addEventListener("abort", () => reject(init.signal!.reason));
+    }));
+    await expect(createCloudPlayerStore("https://db.example", "k", hang as unknown as typeof fetch, 20).hiddenPlayers()).rejects.toThrow();
   });
 
   test("production without Supabase settings has no store instead of a silent one", () => {

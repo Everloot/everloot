@@ -1,6 +1,7 @@
 import { guildKey } from "../../../kb/src/guilds";
 import { linkRealmKey } from "./character-links";
 import { DEFAULT_RULESET, realmSlug, type Player, type PlayerUpsert } from "./player-pages";
+import { readAllRows } from "./postgrest-pages";
 
 /**
  * Where the player rows live: Supabase in production (the functions in 20261021130000_players.sql and
@@ -56,7 +57,10 @@ const toPlayer = (row: Stored, ruleset: string): Player => ({
 });
 const toGuild = (row: StoredGuild): GuildHit => ({ realm: row.realm, guild: row.guild, members: Number(row.members), lastSeen: row.last_seen });
 
-export function createCloudPlayerStore(url: string, key: string, doFetch: typeof fetch = fetch): PlayerStore {
+/** How long the whole hide list may take to read, every page together. Past it, the read fails and pages withhold names. */
+export const HIDDEN_READ_MS = 5_000;
+
+export function createCloudPlayerStore(url: string, key: string, doFetch: typeof fetch = fetch, hiddenReadMs = HIDDEN_READ_MS): PlayerStore {
   async function rpc<T>(fn: string, body: unknown): Promise<T> {
     const response = await doFetch(`${url.replace(/\/$/, "")}/rest/v1/rpc/${fn}`, {
       method: "POST", cache: "no-store", signal: AbortSignal.timeout(10_000),
@@ -68,15 +72,16 @@ export function createCloudPlayerStore(url: string, key: string, doFetch: typeof
     return (text ? JSON.parse(text) : null) as T;
   }
   // character_suppressions is read as a table, as the publication check already reads it (the server's key may
-  // select it since 20261007070647_verified_publication.sql), a thousand rows a request.
-  async function suppressions(offset: number): Promise<{ realm: string; character: string }[]> {
-    const response = await doFetch(`${url.replace(/\/$/, "")}/rest/v1/character_suppressions?select=realm,character&order=realm,character&limit=1000&offset=${offset}`, {
-      cache: "no-store", signal: AbortSignal.timeout(10_000), headers: { apikey: key, authorization: `Bearer ${key}` },
-    });
-    if (!response.ok) throw new Error(`Player storage unavailable (${response.status})`);
-    const rows: unknown = await response.json();
-    if (!Array.isArray(rows)) throw new Error("Invalid hidden characters");
-    return rows as { realm: string; character: string }[];
+  // select it since 20261007070647_verified_publication.sql), a thousand rows a request, every page under one deadline.
+  async function suppressions(): Promise<{ realm: string; character: string }[]> {
+    const signal = AbortSignal.timeout(hiddenReadMs);
+    return await readAllRows(async (offset) => {
+      const response = await doFetch(`${url.replace(/\/$/, "")}/rest/v1/character_suppressions?select=realm,character&order=realm,character&limit=1000&offset=${offset}`, {
+        cache: "no-store", signal, headers: { apikey: key, authorization: `Bearer ${key}`, prefer: "count=exact" },
+      });
+      if (!response.ok) throw new Error(`Player storage unavailable (${response.status})`);
+      return response;
+    }) as { realm: string; character: string }[];
   }
   return {
     async upsert(rows) {
@@ -106,12 +111,7 @@ export function createCloudPlayerStore(url: string, key: string, doFetch: typeof
       return new Set(Array.isArray(rows) ? rows.map((row) => guildHideKey(row.realm_key, row.guild_key)) : []);
     },
     async hiddenPlayers() {
-      const out = new Set<string>();
-      for (let offset = 0; ; offset += 1000) {
-        const rows = await suppressions(offset);
-        for (const row of rows) out.add(playerHideKey(row.realm, row.character));
-        if (rows.length < 1000) return out;
-      }
+      return new Set((await suppressions()).map((row) => playerHideKey(row.realm, row.character)));
     },
   };
 }
