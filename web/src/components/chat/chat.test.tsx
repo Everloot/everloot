@@ -168,7 +168,7 @@ describe("the chat page", () => {
     expect(calls.map((c) => c.url)).toContain("/api/tools/get_by_name?name=Linen+Cloth");
     expect(text()).toContain("Humanoids drop it.");
     expect(text()).toContain("From Everloot");
-    expect(container.querySelector('a[href="https://everloot.app/database/item/2589"]')?.textContent).toBe("/database/item/2589");
+    expect(container.querySelector('a[href="https://everloot.app/database/item/2589"]')?.textContent).toBe("Item /database/item/2589");
     expect(text()).not.toContain("CC-BY-SA");
     expect(container.querySelector('select[aria-label="Model"]')).not.toBeNull();
     expect(keyOnlyToProvider()).toBe(2);
@@ -191,7 +191,7 @@ describe("the chat page", () => {
     expect(Array.from(rail().querySelectorAll("li button")).map((b) => b.textContent)).toContain("Where does Linen Cloth drop?");
 
     await click(Array.from(rail().querySelectorAll("button")).find((b) => b.textContent === "New chat"));
-    expect(text()).toContain("What do you want to know about WoW: Forever?");
+    expect(text()).toContain("See where it comes from.");
     expect(text()).not.toContain("Humanoids drop it.");
 
     await click(Array.from(rail().querySelectorAll("li button")).find((b) => b.textContent === "Where does Linen Cloth drop?"));
@@ -230,7 +230,7 @@ describe("the chat page", () => {
     expect(text()).toContain("Humanoids drop it.");
     await act(async () => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "O", ctrlKey: true, shiftKey: true })); });
     await settle();
-    expect(text()).toContain("What do you want to know about WoW: Forever?");
+    expect(text()).toContain("See where it comes from.");
   });
 });
 

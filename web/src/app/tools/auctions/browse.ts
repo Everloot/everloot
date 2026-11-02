@@ -2,6 +2,7 @@ import type { AuctionHouse } from "@everloot/protocol";
 import { QUALITIES, resolveClass, resolveSubclass, slotOf, type ItemClass, type ItemRow, type ItemSubclass } from "../../../../../kb/src/item-taxonomy";
 import { CLIENT_TAXONOMY as T } from "@/lib/items";
 import { houseParam, houseSlug, priceMove, type MarketRow, type Move } from "@/lib/auction-house";
+import { rulesetParam, type RulesetSlug } from "@/lib/realms";
 
 /**
  * The Auction House's browse view: the category tree (the game's own: class, then subclass, then slot for
@@ -24,6 +25,8 @@ export interface AhQuery {
   /** Name contains, or an item id. */
   q?: string;
   house: AuctionHouse | null;
+  /** The ruleset tab on the all-realms page; absent is every realm. */
+  ruleset?: RulesetSlug;
   cls?: ItemClass;
   sub?: ItemSubclass;
   slot?: string;
@@ -52,6 +55,8 @@ const levelsParam = (r?: { min: number; max: number }) => (r ? (r.min === r.max 
 export function ahQuery(search: Search): AhQuery | null {
   const house = houseParam(one(search, "house"));
   if (house === undefined) return null;
+  const ruleset = rulesetParam(one(search, "ruleset"));
+  if (ruleset === undefined) return null;
   const clsSlug = one(search, "class"), subSlug = one(search, "sub"), slot = one(search, "slot"), quality = one(search, "quality");
   const cls = clsSlug === undefined ? undefined : resolveClass(T, clsSlug);
   if (cls === null || (subSlug !== undefined && !cls)) return null;
@@ -69,7 +74,7 @@ export function ahQuery(search: Search): AhQuery | null {
   if (page !== undefined && !/^[1-9]\d{0,4}$/.test(page)) return null;
   const q = one(search, "q")?.trim().slice(0, 60);
   return {
-    ...(q ? { q } : {}), house,
+    ...(q ? { q } : {}), house, ...(ruleset ? { ruleset } : {}),
     ...(cls ? { cls } : {}), ...(sub ? { sub } : {}), ...(slot ? { slot } : {}), ...(quality ? { quality } : {}),
     ...(lvl ? { lvl } : {}), ...(moved ? { moved: true } : {}),
     ...(sorted ? { sort: { key: sorted[2] as AhSort, desc: sorted[1] === "-" } } : {}),
@@ -82,6 +87,7 @@ export function ahHref(path: string, q: Partial<AhQuery>): string {
   const params = new URLSearchParams();
   if (q.q) params.set("q", q.q);
   if (q.house) params.set("house", houseSlug(q.house));
+  if (q.ruleset) params.set("ruleset", q.ruleset);
   if (q.cls) params.set("class", q.cls.slug);
   if (q.cls && q.sub) params.set("sub", q.sub.slug);
   if (q.cls && q.sub && q.slot) params.set("slot", q.slot);
@@ -94,7 +100,7 @@ export function ahHref(path: string, q: Partial<AhQuery>): string {
   return s ? `${path}?${s}` : path;
 }
 
-/** How many filters are on (the house, the sort and the page are not filters). */
+/** How many filters are on (the house, the ruleset tab, the sort and the page are not filters). */
 export const activeFilters = (q: AhQuery) =>
   Number(Boolean(q.q)) + Number(Boolean(q.cls)) + Number(Boolean(q.quality)) + Number(Boolean(q.lvl)) + Number(Boolean(q.moved));
 

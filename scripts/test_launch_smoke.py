@@ -71,4 +71,10 @@ assert judge_deadmines(200, {}, sources(good)) is None
 assert "more than once" in judge_deadmines(200, {}, sources(good.replace("Rhahk'Zor, Sneed", "Sneed, Sneed")))
 assert "not the game files" in judge_deadmines(200, {}, sources("- [lore] Welcome to the Deadmines: a song\n- [game files] Deadmines: ..."))
 
+# Since #707 a dungeon answer can open with a caveat line about archive lore; the first piece is still the fact.
+caveat = "Archive lore is historical context, not confirmation of Forever gameplay.\n"
+assert judge_deadmines(200, {}, sources(caveat + good)) is None
+assert "not the game files" in judge_deadmines(200, {}, sources(caveat + "- [lore] Welcome to the Deadmines: a song\n- [game files] Deadmines: ..."))
+assert "not the game files" in judge_deadmines(200, {}, sources(caveat))
+
 print("launch_smoke: all tests passed")

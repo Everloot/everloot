@@ -1,8 +1,9 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync, type Stats } from "node:fs";
 import { parseEverlootLua } from "../../../web/src/lib/sv-parse";
 import { readAsks } from "../../../companion/src/bridge/asks";
 import { parseEverlootTable } from "../../../web/src/lib/sv-parse";
 import { readRealms } from "../../../companion/src/prices";
+import { saveFacts, scanAgesIn, type SaveFacts } from "./save-facts";
 import { receiptKeyForSite } from "../../../companion/src/sent-state";
 import type { FileSummary, ScanAge } from "../shared/types";
 
@@ -11,18 +12,6 @@ export function readScanAges(text: string): ScanAge[] {
   let db: Record<string, unknown>;
   try { db = parseEverlootTable(text); } catch { return []; }
   return scanAgesIn(db);
-}
-
-/** As readScanAges, from a table already parsed. */
-export function scanAgesIn(db: Record<string, unknown>): ScanAge[] {
-  const scans = db.lastScans;
-  if (!scans || typeof scans !== "object") return [];
-  const out: ScanAge[] = [];
-  for (const [realm, v] of Object.entries(scans as Record<string, unknown>)) {
-    const at = v && typeof v === "object" && typeof (v as { at?: unknown }).at === "string" ? (v as { at: string }).at : null;
-    if (realm.trim().length >= 2) out.push({ realm: realm.trim(), at });
-  }
-  return out.sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""));
 }
 
 export function summarizeSavedVariables(text: string, confirmedFor: (installId: string) => number): Omit<FileSummary, "file" | "writtenAt" | "bytes"> {
@@ -54,26 +43,26 @@ export function confirmedCounts(sentPath: string, endpoint = "https://everloot.a
   return (installId) => { const ids = sent?.[receiptKeyForSite(installId, endpoint)]; return Array.isArray(ids) ? ids.length : 0; };
 }
 
-/** One parse per file write: the summary is remembered by size and mtime, only the confirmed count is live. */
-const memo = new Map<string, { key: string; summary: Omit<FileSummary, "file" | "writtenAt" | "bytes" | "confirmed">; installId: string | null }>();
-
+/**
+ * The Upload page: what summarizeSavedVariables gives for each file, from the parse saveFacts keeps per write (the jobs
+ * and the other pages read the same one); only the confirmed count is read live, from sent.json.
+ */
 export function summarizeFiles(files: string[], sentPath: string, endpoint = "https://everloot.app"): FileSummary[] {
   const confirmedFor = confirmedCounts(sentPath, endpoint);
+  const failed = (file: string, st: Stats | null, err: unknown): FileSummary => ({
+    file, writtenAt: st ? st.mtime.toISOString() : null, bytes: st ? st.size : 0, ...summarizeSavedVariables("", () => 0), ok: false, error: err instanceof Error ? err.message : String(err),
+  });
   return files.map((file) => {
-    let st: ReturnType<typeof statSync>;
-    try { st = statSync(file); }
-    catch (err) { return { file, writtenAt: null, bytes: 0, ...summarizeSavedVariables("", () => 0), ok: false, error: err instanceof Error ? err.message : String(err) }; }
-    const key = `${st.mtimeMs}:${st.size}`;
-    let hit = memo.get(file);
-    if (!hit || hit.key !== key) {
-      let text = "";
-      try { text = readFileSync(file, "utf8"); } catch (err) { return { file, writtenAt: st.mtime.toISOString(), bytes: st.size, ...summarizeSavedVariables("", () => 0), ok: false, error: err instanceof Error ? err.message : String(err) }; }
-      let installId: string | null = null;
-      const { confirmed: _confirmed, ...summary } = summarizeSavedVariables(text, (id) => { installId = id; return 0; });
-      hit = { key, summary, installId };
-      memo.set(file, hit);
-    }
-    return { file, writtenAt: st.mtime.toISOString(), bytes: st.size, ...hit.summary, confirmed: hit.installId ? confirmedFor(hit.installId) : 0 };
+    let st: Stats;
+    try { st = statSync(file); } catch (err) { return failed(file, null, err); }
+    let facts: SaveFacts;
+    try { facts = saveFacts(file); } catch (err) { return failed(file, st, err); }
+    const { installId, error, ...upload } = facts.upload;
+    if (error) return failed(file, st, error);
+    return {
+      file, writtenAt: st.mtime.toISOString(), bytes: st.size, ok: true, error: null, ...upload,
+      confirmed: installId ? confirmedFor(installId) : 0, pendingAsks: facts.asks.length, scanRealms: facts.realms, scans: facts.scans,
+    };
   });
 }
 

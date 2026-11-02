@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { emptySettledList, encodeIds } from "../../kb/src/settled-list";
 import * as bridge from "../../companion/src/bridge/engine";
+import { createSentState, receiptKeyForSite } from "../../companion/src/sent-state";
 import { FIXTURE_STRUCTURED, FIXTURE_URL } from "../../web/src/lib/chat/market-fixture";
 import { ACCOUNT_KEY_FILE, writeKeyOrigin } from "../src/main/account";
 import { companionJobs } from "../src/main/jobs";
@@ -26,6 +27,38 @@ test.each(["https://other.test", "http://everloot.app", "https://everloot.app"])
     await companionJobs(d, () => ({ ...defaultSettings(), endpoint, gameFolder: d })).deps.ask(file);
     expect(engine.mock.calls[0][0].token).toBe(endpoint === "https://everloot.app" ? key : null);
   } finally { engine.mockRestore(); }
+});
+
+test("an upload keeps the history whole while another account's file has the same install id", async () => {
+  const d = dir();
+  const account = (name: string, installId: string, eventId: string) => {
+    const folder = join(d, "WTF", "Account", name, "SavedVariables");
+    mkdirSync(folder, { recursive: true });
+    const file = join(folder, "Everloot.lua");
+    writeFileSync(file, `EverlootDB = { version = "0.3.14", installId = "${installId}", records = { loot = {
+    { eventId = "${eventId}", capturedAt = "2026-10-27T00:00:00Z", sourceNpcId = 42, sourceEvidence = "loot-api", items = { { itemId = 5, count = 1 } } },
+  } } }`);
+    return file;
+  };
+  const settings = () => ({ ...defaultSettings(), gameFolder: d });
+  const data = join(d, "data");
+  const key = receiptKeyForSite("abcd-1234-ef56-7890", settings().endpoint);
+  const history = () => JSON.parse(readFileSync(join(data, "sent.json"), "utf8"))[key];
+  const a = account("A", "abcd-1234-ef56-7890", "epoch:2");
+  // The other account's file is a copy: the same install id, and a row of its own.
+  account("B", "abcd-1234-ef56-7890", "epoch:1");
+  mkdirSync(data, { recursive: true });
+  createSentState(join(data, "sent.json")).add(key, ["epoch:1", "epoch:2"]);
+  vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("offline"); }));
+  try {
+    // Both rows are sent already, so nothing goes; only the history is in question.
+    await companionJobs(data, settings).deps.upload(a).catch(() => undefined);
+    expect(history()).toEqual(["epoch:1", "epoch:2"]);
+    // Once the other file has its own id, the history is cut to this file's rows.
+    account("B", "ffff-0000-ffff-0000", "epoch:1");
+    await companionJobs(data, settings).deps.upload(a).catch(() => undefined);
+    expect(history()).toEqual(["epoch:2"]);
+  } finally { vi.unstubAllGlobals(); }
 });
 
 describe("a price question in /ask", () => {

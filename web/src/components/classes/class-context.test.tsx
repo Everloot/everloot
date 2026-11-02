@@ -13,6 +13,7 @@ vi.mock("next/navigation", async () => {
   const subscribe = (fn: () => void) => { window.addEventListener("popstate", fn); return () => window.removeEventListener("popstate", fn); };
   return {
     notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
+    redirect: (to: string) => { throw new Error(`NEXT_REDIRECT ${to}`); },
     useSearchParams: () => new URLSearchParams(useSyncExternalStore(subscribe, () => window.location.search, () => window.location.search)),
     usePathname: () => window.location.pathname,
   };
@@ -54,6 +55,7 @@ import RaidLinkPage from "@/app/tools/raid/r/[code]/page";
 import { CURRENT_BUILD } from "@/data/game-data/raid";
 import { emptySlots, encodeRaid } from "@/lib/raid";
 import ProfessionsPage from "@/app/tools/professions/page";
+import ProfessionPage from "@/app/tools/professions/[profession]/page";
 import { CLASS_CONTEXT_SLOT, type ClassContext, type ContextRead } from "@/lib/class-context";
 import { loadCatalog } from "@/lib/talents/catalogs";
 import { CLIENT_CLASS_SPELLS } from "@/data/game-data/client-class-spells";
@@ -381,21 +383,25 @@ describe("the spell list", () => {
 });
 
 describe("the profession hubs", () => {
-  const page = async (search: Record<string, string>) => renderToStaticMarkup(await ProfessionsPage({ searchParams: Promise.resolve(search) }));
+  const hub = async (search: Record<string, string>) => renderToStaticMarkup(await ProfessionsPage({ searchParams: Promise.resolve(search) }));
+  const page = async (search: Record<string, string>) =>
+    renderToStaticMarkup(await ProfessionPage({ params: Promise.resolve({ profession: "tailoring" }), searchParams: Promise.resolve(search) }));
 
-  test("a class context is a chip and nothing more: the paths are the same, and the page's links and form keep it", async () => {
-    files.professions = [{ key: "Tailoring", name: "Tailoring", icon: "https://assets.test/tailoring.png" }, { key: "Alchemy", name: "Alchemy", icon: "https://assets.test/alchemy.png" }];
-    const withContext = await page({ profession: "Tailoring", from: "1", to: "75", class: "mage", level: "25" });
-    const plain = await page({ profession: "Tailoring", from: "1", to: "75" });
+  test("a class context is a chip and nothing more: the paths are the same, and the pages' links and form keep it", async () => {
+    const withContext = await page({ from: "1", to: "75", class: "mage", level: "25" });
+    const plain = await page({ from: "1", to: "75" });
     expect(withContext).toContain('href="/classes/mage?level=25"');
-    // The cross keeps the profession and the skill range.
-    expect(withContext).toContain('href="/tools/professions?profession=Tailoring&amp;from=1&amp;to=75"');
+    // The cross keeps the skill range.
+    expect(withContext).toContain('href="/tools/professions/tailoring?from=1&amp;to=75"');
     // The profession picker and the form carry the context on.
-    expect(withContext).toContain('href="/tools/professions?profession=Alchemy&amp;from=1&amp;to=75&amp;class=mage&amp;level=25"');
+    expect(withContext).toContain('href="/tools/professions/alchemy?class=mage&amp;level=25"');
     expect(withContext).toMatch(/<input[^>]*name="class"[^>]*value="mage"/);
     expect(withContext).toMatch(/<input[^>]*name="level"[^>]*value="25"/);
     // Nothing else says anything about the class: no skill-up claim for a Mage.
     expect(visible(withContext, "[data-class-context]")).toBe(visible(plain));
     expect(plain).not.toContain("data-class-context");
+    // The hub's cards keep it, and the old form's address goes to the profession's page with it.
+    expect(await hub({ class: "mage", level: "25" })).toContain('href="/tools/professions/alchemy?class=mage&amp;level=25"');
+    await expect(hub({ profession: "Tailoring", class: "mage", level: "25" })).rejects.toThrow("NEXT_REDIRECT /tools/professions/tailoring?class=mage&level=25");
   });
 });

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import ChatClient from "@/components/chat/ChatClient";
 import { freeChatNames } from "@/lib/chat/free-chat";
+import { classAndProfessionIcons, loadSiteAssets } from "@/lib/game-assets";
 import { chatWorkspaceOn } from "@/lib/chat/workspace";
 import { profilesOn } from "@/lib/profiles";
 import { savedBuildsOn } from "@/lib/saved-builds";
@@ -11,14 +12,20 @@ const description = "Ask about WoW: Forever in plain words. Everloot's search fi
 
 export const metadata: Metadata = pageMetadata({ title: TITLE, description, path: "/chat" });
 
+// The suggestion cards' icons come from the asset manifest, like the home page's, and load only from the asset bucket the page's policy allows.
+const allowed = (url: string | undefined) => (url && /^https:\/\/assets\.everloot\.app\//.test(url) ? url : undefined);
+
 // No ad slot here: the page is a conversation. It fills the screen under the header (ChatClient is fixed there),
 // with no footer; the optional model is set up on /account#chat-keys. The workspace switch and the free model's providers
 // (only their names, never a key) are read at build time, so the page stays static; private projects and chats are fetched by the browser.
-export default function ChatPage() {
+export default async function ChatPage() {
+  const icons = classAndProfessionIcons(await loadSiteAssets());
+  const warrior = allowed(icons.classes.find((c) => c.key === "warrior")?.icon);
+  const tailoring = allowed(icons.professions.find((p) => p.key === "Tailoring")?.icon);
   return (
     <>
       <h1 className="sr-only">{TITLE}</h1>
-      <ChatClient savedBuilds={savedBuildsOn()} profiles={profilesOn()} workspace={chatWorkspaceOn()} freeChat={freeChatNames()} />
+      <ChatClient savedBuilds={savedBuildsOn()} profiles={profilesOn()} workspace={chatWorkspaceOn()} freeChat={freeChatNames()} icons={{ warrior, tailoring }} />
     </>
   );
 }

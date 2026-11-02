@@ -25,6 +25,16 @@ test("only a live, install/realm/guild-scoped grant publishes the roster", () =>
 test("member opt-out removes the name from rosters even under another live officer grant", () => {
   expect(authorizeRecord(row, [hash], { ...state, suppressions: [{ realm: "moon guard", character: "thrall" }] }, now)).toBeNull();
 });
+test("a member opt-out reaches the roster however the realm is spelled, as the opt-out form stores it", () => {
+  const realm = "Kael’thas";
+  const spelled = parseRecords([{ ...(row as object), realm, members: [{ name: "Thrall", rank: "Officer", level: 60, class: "Shaman", lastOnlineDays: 0 }] }]).records[0];
+  const live = { ...state, grants: [{ ...grant, realm }] };
+  expect(authorizeRecord(spelled, [hash], live, now)).not.toBeNull();
+  // public.link_realm_key stores the straight apostrophe, and a hyphen as a space.
+  expect(authorizeRecord(spelled, [hash], { ...live, suppressions: [{ realm: "kael'thas", character: "thrall" }] }, now)).toBeNull();
+  expect(authorizeRecord(parseRecords([{ ...(row as object), realm: "Moon-Guard" }]).records[0], [hash],
+    { grants: [{ ...grant, realm: "Moon-Guard" }], suppressions: [{ realm: "moon guard", character: "thrall" }] }, now)).toBeNull();
+});
 test("gold requires its own verified character/category scope", () => {
   const gold = parseRecords([{ kind: "gold_snapshot", installId: "install-one", eventId: "epoch:2",
     capturedAt: "2026-10-07T00:00:00Z", character: "Thrall", realm: "Moon Guard", currentCopper: 50, peakCopper: 50 }]).records[0];
