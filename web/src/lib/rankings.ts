@@ -2,6 +2,7 @@ import {
   CENSUS_CLASSES, CENSUS_LAUNCH, CENSUS_MIN_CHARACTERS, CENSUS_MIN_INSTALLS, CENSUS_MIN_REPORTERS, CENSUS_RACES, FACTIONS, rollupCensus,
   type CensusCount, type CensusRow, type CensusWindow, type Faction,
 } from "../../../kb/src/census";
+import { censusHref } from "./census-filter";
 import type { JsonLd } from "./jsonld";
 import { absoluteUrl } from "./seo";
 import { uploadStore, type CensusRead } from "./upload-store";
@@ -251,6 +252,64 @@ export function rankingView(def: RankingDef, weeks: RankingWeek[], search: Searc
     weeksWithNumbers: weeks.filter((w) => !w.window.collecting).length,
     series: top.map((r) => ({ key: r.key, label: r.label, classToken: r.classToken, faction: r.faction, points: perWeek.map((m) => m.get(r.key) ?? null) })),
   };
+}
+
+/**
+ * The census filtered to what a ranking row counts, with the ranking's own filters. The census counts the last 7
+ * days, not the ISO week, so its number can differ from the row's.
+ */
+export function censusHrefOf(slug: RankingSlug, row: RankRow, q: RankingQuery = {}): string {
+  if (slug === "classes") return censusHref({ class: row.key });
+  if (slug === "factions") return censusHref({ faction: row.faction });
+  const race = row.key.split("/")[1];
+  // A race names its side only where it needs one: Skyborne is on both.
+  return censusHref({ race, faction: race === "Skyborne" ? row.faction : undefined, class: q.class });
+}
+
+/** The hub's headline numbers, from the week the rankings show and the week before it. */
+export interface HubMetrics {
+  week: RankingWeek;
+  characters: CensusCount;
+  /** Characters against the week before, from the two rounded counts; null without a week before with numbers. */
+  change: { by: number; share: number | null } | null;
+  installs: number;
+  /**
+   * The class or classes ranked first among those with a published count (more than one on a tie). A hidden class
+   * is not ranked, so it could be larger: this is the leading published class, not always the most played.
+   */
+  leadingClasses: RankRow[];
+  /** Whether any class is hidden that week, so a larger class could be among them. */
+  classHidden: boolean;
+}
+
+export function hubMetrics(views: readonly RankingView[]): HubMetrics | null {
+  const classes = views.find((v) => v.def.slug === "classes");
+  const week = classes?.week;
+  if (!classes || !week) return null;
+  const now = week.window.characters;
+  const before = classes.previous?.window.characters ?? null;
+  return {
+    week,
+    characters: now,
+    change: now !== null && before !== null ? { by: now - before, share: before ? (now - before) / before : null } : null,
+    installs: week.window.installs,
+    leadingClasses: classes.rows.filter((r) => r.rank === 1),
+    classHidden: classes.rows.some((r) => r.rank === null),
+  };
+}
+
+/** Characters counted each week the rankings show, oldest first; null while a week is collecting. */
+export const weeklyCharacters = (weeks: readonly RankingWeek[]): { week: RankingWeek; count: CensusCount }[] =>
+  weeks.map((w) => ({ week: w, count: w.window.collecting ? null : w.window.characters }));
+
+export interface Mover { def: RankingDef; row: RankRow; href: string }
+
+/** The rows that moved most against last week, over every ranking: the largest rank change first, then the larger share. */
+export function topMovers(views: readonly RankingView[], n = 5): Mover[] {
+  return views
+    .flatMap((v) => v.rows.filter((r) => typeof r.change === "object" && r.change !== null).map((row) => ({ def: v.def, row, href: censusHrefOf(v.def.slug, row, v.query) })))
+    .sort((a, b) => (b.row.change as { by: number }).by - (a.row.change as { by: number }).by || (b.row.share ?? 0) - (a.row.share ?? 0) || a.row.label.localeCompare(b.row.label))
+    .slice(0, n);
 }
 
 /** Search engines index a ranking only unfiltered and with at least 10 ranked rows. */
