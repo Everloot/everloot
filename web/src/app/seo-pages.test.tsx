@@ -6,7 +6,7 @@ import { beforeEach, expect, test, vi } from "vitest";
 vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a>,
 }));
-vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NOT_FOUND"); }, permanentRedirect: () => {}, usePathname: () => mocks.path }));
+vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NOT_FOUND"); }, permanentRedirect: () => {}, usePathname: () => mocks.path, useRouter: () => ({ push: () => {} }) }));
 vi.mock("@/components/CookieConsent", () => ({ CookiePreferencesButton: () => null }));
 vi.mock("./upload/UploadClient", () => ({ default: () => null }));
 vi.mock("@/lib/rollup-compute", () => ({

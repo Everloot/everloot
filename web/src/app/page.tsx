@@ -5,6 +5,7 @@ import TrackedDownload from "@/components/TrackedDownload";
 import JsonLd from "@/components/JsonLd";
 import GlintHero from "@/components/glint/GlintHero";
 import LoreSearchForm from "@/components/LoreSearchForm";
+import HomeAsk from "@/components/HomeAsk";
 import { AgreementMeter, Banner, Card, CodeBlock, SectionHeading, type Agreement } from "@/components/ui";
 import { TOOL_GROUPS, tools, toolHref } from "@/data/tools";
 import { CLASSES } from "@/design/tokens";
@@ -98,8 +99,9 @@ export default async function Home() {
           <p className="mt-4 max-w-[40ch] text-lg text-fg-2 sm:mt-6">
             The open WoW: Forever database, written by the addons of the people who play it.
           </p>
-          <div className="mt-6 flex flex-wrap gap-3 sm:mt-8">
-            <Link href="/database" className="btn btn-primary">Browse the database</Link>
+          <div className="mt-6 sm:mt-8"><HomeAsk /></div>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link href="/database" className="btn">Browse the database</Link>
             <Link href="/tools/talents" className="btn">Plan a talent build</Link>
           </div>
         </Banner>

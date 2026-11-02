@@ -35,6 +35,9 @@ import ChangesPage from "@/app/changes/page";
 import WowForeverPage from "@/app/wow-forever/page";
 import LorePage from "@/app/lore/page";
 
+// The home page's ask box uses the app router; these renders have none mounted.
+vi.mock("next/navigation", async (importOriginal) => ({ ...(await importOriginal<typeof import("next/navigation")>()), useRouter: () => ({ push: () => {} }) }));
+
 /** The wide-screen banner's markup: from its start to the end of its caption. */
 const onBanner = (html: string) => html.slice(html.indexOf("data-banner"), html.indexOf("</p>", html.indexOf("data-banner-credit")));
 /** The banner's one-line caption, tiny and quiet in the corner; the full credit with the build is at the foot of the page. */
