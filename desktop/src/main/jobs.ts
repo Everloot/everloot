@@ -13,6 +13,7 @@ import { appSettledList } from "../../../web/src/lib/settled-cache";
 import type { RealmSummary, Settings } from "../shared/types";
 import { accountKeyForSite } from "./account";
 import { backupSavedVariables } from "./backups";
+import { pruneSettledLists } from "./data-folder";
 import type { EngineDeps } from "./engine";
 import { refreshMarket } from "./market";
 import { readyFacts, saveFacts } from "./save-facts";
@@ -41,6 +42,8 @@ export function companionJobs(dataFolder: string, current: () => Settings): { de
       const settled = (build: string | undefined) => appSettledList({ folder: dataFolder, endpoint, build });
       // The save reader parses the file off the main thread and hands over only the rows still unsent.
       const r = await uploadFile(file, { endpoint, state, census: current().census, players: current().players, settled, read: readForUpload });
+      // A list for a build the game has moved on from is never read again.
+      pruneSettledLists(dataFolder);
       const rejected = r.rejected ? `; the site turned away ${r.rejected} ${r.rejected === 1 ? "row, which stays unsent and goes" : "rows, which stay unsent and go"} again next run` : "";
       // Codes typed with /everloot link go to the account's own link endpoint with the account key, never with the
       // upload. A link that fails never fails the upload; its rows go again next run.

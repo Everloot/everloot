@@ -38,7 +38,7 @@ export function createSentState(path: string, onRecovery?: (message: string) => 
   const t = performance.now();
   const s = __orig_createSentState(path, onRecovery);
   (globalThis as any).__benchProbe?.("sent.load", performance.now() - t);
-  return { has: s.has, add(install: string, ids: string[]) { const t0 = performance.now(); try { s.add(install, ids); } finally { (globalThis as any).__benchProbe?.("sent.add", performance.now() - t0); } } };
+  return { has: s.has, keepOnly: s.keepOnly, add(install: string, ids: string[]) { const t0 = performance.now(); try { s.add(install, ids); } finally { (globalThis as any).__benchProbe?.("sent.add", performance.now() - t0); } } };
 }`),
     }));
   },

@@ -27,6 +27,8 @@ export interface Settings {
   consentedAt: string | null;
   launchAtLogin: boolean;
   startInTray: boolean;
+  /** The player closed the Overview's note that the data folder has grown past DATA_NOTICE_BYTES; it is not shown again. */
+  dataNoticeDismissed: boolean;
 }
 
 export type JobState = "off" | "idle" | "running" | "ok" | "error";
@@ -66,6 +68,11 @@ export interface UpdateProgress { stage: "idle" | "downloading" | "ready" | "fai
 
 /** One dated copy of an account's Everloot.lua in the data folder, kept after each upload. */
 export interface BackupInfo { file: string; account: string; at: string; bytes: number }
+
+/** The parts of the data folder, as Settings breaks them down. */
+export type DataPart = "backups" | "updates" | "chat" | "uploads" | "settings" | "other";
+/** The data folder's size in bytes, in total and per part; `notice` is set once it passes the Overview's threshold. */
+export interface DataUsage { total: number; parts: Record<DataPart, number>; notice: boolean }
 
 /** What one account's Everloot.lua holds, for the Upload page. Nothing here leaves the machine. */
 export interface FileSummary {
@@ -280,6 +287,16 @@ export interface EverlootApi {
   runNow(job: Job): Promise<void>;
   setPaused(paused: boolean): Promise<void>;
   openDataFolder(): Promise<void>;
+  /** The data folder's size, in total and per part. */
+  dataUsage(): Promise<DataUsage>;
+  /**
+   * Empties the data folder once the window's dialog has asked, then starts the app over on its welcome screen.
+   * Refused while a job, a chat answer, an update download or a builds sync is running. Resolves with the entries
+   * that could not be deleted; the app then stays open until `relaunch`.
+   */
+  deleteLocalData(): Promise<string[]>;
+  /** Starts the app over after `deleteLocalData` left something behind; does nothing otherwise. */
+  relaunch(): Promise<void>;
   /** Opens the game's Interface/AddOns folder in the file manager. */
   openAddonsFolder(): Promise<void>;
   openConfig(): Promise<void>;

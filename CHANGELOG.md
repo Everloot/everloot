@@ -21,6 +21,13 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   releases; each half is harmless without the other.
 
 ### Added
+- Desktop App: Settings has a "Data on this computer" section. It shows how big the data folder is and what takes the
+  space (backups, update downloads, chat, upload history, settings and keys), says what goes to everloot.app and what
+  stays here, and opens the folder. "Delete my local data" asks in the app's own dialog, then empties the folder the
+  command line shares and starts the app over on its setup screen; the game folder and `Everloot.lua` are not touched.
+  The Overview says once when the folder passes 500 MB. Upload history now keeps only the events still in each
+  account's `Everloot.lua`, and cached settled lists not refreshed for a week are deleted, so neither grows for as
+  long as the game is played.
 - Desktop App and site, behind `EVERLOOT_CHARACTER_LINKS` (off): the addon's `/everloot link <code>` (0.3.15) writes one
   link row for the character you are playing, with a code made on the account page. The Desktop App, signed in, sends it only
   to the account's own link endpoint; uploads never carry link rows. The account page lists your linked characters,

@@ -168,6 +168,7 @@ export async function uploadFile(file: string, options: UploadOptions): Promise<
   };
   const parsed = options.read ? await options.read(file, sent) : parseEverlootLua(readFileSync(file, "utf8"));
   const receiptKey = receiptKeyForSite(parsed.installId, options.endpoint);
+  options.state.keepOnly(receiptKey, new Set(parsed.records.flatMap((r) => (typeof r.eventId === "string" ? [r.eventId] : []))));
   const unsent = parsed.records.filter((r) => typeof r.eventId !== "string" || !options.state.has(receiptKey, r.eventId));
   const held = (r: Record<string, unknown>) => !options.census && CENSUS.has(String(r.kind));
   const heldCensus = unsent.filter(held).length;
