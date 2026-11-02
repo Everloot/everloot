@@ -72,7 +72,7 @@ export function RulesetSummaryTable({ rows, now, names, href }: { rows: RulesetS
     {
       key: "updated", header: "Last scan", nowrap: true,
       cell: (r) => (!r.mapped ? <span className="text-muted">Not mapped yet</span>
-        : !r.items ? <span className="text-muted">No scans yet</span>
+        : !r.items ? <span className="text-muted">No public prices yet</span>
         : r.updatedAt !== null ? <TimeAgo at={r.updatedAt} renderedAt={now.getTime()} /> : <span className="text-muted">Over a week ago</span>),
     },
     {

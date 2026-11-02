@@ -7,14 +7,14 @@ vi.mock("../data/realms", async (importOriginal) => ({ ...(await importOriginal<
 const { boardsByRuleset, houseCounts, realmBoards, rulesetSummaries } = await import("./auction-house");
 const { playerPath } = await import("./player-pages");
 const { createCloudPlayerStore, createMemoryPlayerStore } = await import("./player-store");
-const { DEFAULT_RULESET, realmInfo, rulesetOf } = await import("./realms");
+const { DEFAULT_RULESET, realmInfo, realmRuleset } = await import("./realms");
 
 test("with the map empty every realm is forever, and nothing is guessed", () => {
   for (const realm of ["Forever", "Mal'Ganis", "Some PvP Realm", "", "  "]) {
-    expect(rulesetOf(realm)).toBe(DEFAULT_RULESET);
+    expect(realmRuleset(realm)).toBe(DEFAULT_RULESET);
     expect(realmInfo(realm)).toBeNull();
   }
-  expect(playerPath({ ruleset: rulesetOf("Forever Pioneer"), realm: "Forever Pioneer", name: "Thrallina" })).toBe("/players/forever/forever-pioneer/thrallina");
+  expect(playerPath({ ruleset: realmRuleset("Forever Pioneer"), realm: "Forever Pioneer", name: "Thrallina" })).toBe("/players/forever/forever-pioneer/thrallina");
 });
 
 const now = new Date("2026-11-10T12:00:00.000Z");

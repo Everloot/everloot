@@ -93,5 +93,16 @@ test("with realms mapped, a tab shows its realms only, keeps the house, and its 
   // Mapped but no scans yet: the message says so, not that the ruleset is unmapped.
   const normal = text(await hub({ ruleset: "normal" }));
   expect(normal).toContain("No public prices on Normal realms yet");
-  expect(normal).toContain("No scans yet");
+  expect(normal).toContain("No public prices yet");
+});
+
+test("the summary's price movers are named in the same corpus read as the results", async () => {
+  map.realms = [{ name: "Mal'Ganis", ruleset: "pvp", region: "us" }];
+  const weekAgo = new Date(today.getTime() - 7 * 86_400_000);
+  const at = (when: Date, realm: string, items: number[][]) => scans(realm, items).map((r) => ({ ...r, eventId: `${r.eventId}:${when.getTime()}`, scanId: `${r.scanId}-${when.getTime()}`, capturedAt: when.toISOString() }));
+  const moving = foldMarket(emptyMarket(), [...at(weekAgo, "Mal'Ganis", [[2589, 100, 100]]), ...at(today, "Mal'Ganis", [[2589, 200, 200]])], today);
+  store.loadMarket.mockResolvedValue({ state: moving, dataAsOf: today.toISOString() });
+  const html = await hub({});
+  expect(text(html)).toContain("+100%");
+  expect(store.loadCorpus).toHaveBeenCalledTimes(1);
 });

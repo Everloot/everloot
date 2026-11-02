@@ -2,7 +2,7 @@ import { REALMS, RULESET_SLUGS, type RealmEntry, type Region, type RulesetSlug }
 
 /**
  * The realm map (../data/realms.ts) as the pages read it: which ruleset and region a realm is on. A realm the map
- * does not list answers null here and "forever" from `rulesetOf`, the one view every realm had before launch.
+ * does not list answers null here and "forever" from `realmRuleset`, the one view every realm had before launch.
  */
 
 export const DEFAULT_RULESET = "forever";
@@ -36,8 +36,12 @@ export function realmInfo(realm: string): RealmInfo | null {
   return MAP.get(realmMapKey(realm)) ?? null;
 }
 
-/** The ruleset a realm belongs to: the map's, else "forever". Never a guess. */
-export function rulesetOf(realm: string): string {
+/**
+ * The ruleset a realm's prices are grouped under: the map's, else "forever". Never a guess. Player, guild and
+ * character-link addresses do not read this; they stay on "forever" (player-pages `rulesetOf`) until a migration
+ * moves the stored rows, so mapping a realm never splits a player into two rows.
+ */
+export function realmRuleset(realm: string): string {
   return realmInfo(realm)?.ruleset ?? DEFAULT_RULESET;
 }
 

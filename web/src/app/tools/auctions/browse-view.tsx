@@ -87,18 +87,28 @@ export async function browseView({ slug, search }: { slug: string | null; search
 
   // Names and levels for every row only when a filter or sort reads them; otherwise just the page's.
   const wide = Boolean(q.q || q.lvl) || WIDE_SORTS.includes(q.sort?.key as AhSort);
+
+  // The ruleset tabs and their summary, counted on the realm-wide blend (every house) so they do not change with the house tab.
+  const summaries = state && !slug ? rulesetSummaries(state, now) : [];
+  // The summary is the unfiltered first page's; a search or filter shows only its results.
+  const summaryRows = activeFilters(q) || q.page > 1 ? [] : ruleset ? summaries.filter((r) => r.ruleset === ruleset) : summaries;
+  // The summary's movers are named in the same read as the results, so the page reads the corpus once.
+  const moveIds = summaryRows.flatMap((r) => r.moves.map((m) => m.row.value.itemId));
+  const withMoves = (ids: number[]) => [...new Set([...ids, ...moveIds])];
+
   let tips = new Map<number, ItemTip>();
   let names = new Map<number, string>();
   if (wide) {
-    tips = (await itemArt(allIds)).tips;
-    names = await auctionNames(allIds, tips);
+    const ids = withMoves(allIds);
+    tips = (await itemArt(ids)).tips;
+    names = await auctionNames(ids, tips);
   }
   const results = browseRows(rows, q, { now, name: (id) => names.get(id), levels: (id) => tips.get(id) });
   const pages = Math.max(1, Math.ceil(results.length / AH_PER_PAGE));
   if (q.page > pages) notFound();
   const shown = results.slice((q.page - 1) * AH_PER_PAGE, q.page * AH_PER_PAGE);
   if (!wide) {
-    const ids = shown.map((b) => b.row.value.itemId);
+    const ids = withMoves(shown.map((b) => b.row.value.itemId));
     tips = (await itemArt(ids)).tips;
     names = await auctionNames(ids, tips);
   }
@@ -118,17 +128,11 @@ export async function browseView({ slug, search }: { slug: string | null; search
     ...HOUSES.map((h) => ({ href: here({ house: h }), label: <>{h}<HouseCount n={counts.get(h) ?? 0} /></>, current: q.house === h })),
   ];
 
-  // The ruleset tabs and their summary, counted on the realm-wide blend (every house) so they do not change with the house tab.
-  const summaries = state && !slug ? rulesetSummaries(state, now) : [];
   const rulesetTabs = summaries.flatMap(({ ruleset: r, items }) => (isRulesetSlug(r)
     ? [{ href: here({ ruleset: r }), label: RULESET_LABEL[r], count: items, current: ruleset === r }]
     : []));
   const mapped = mappedRulesets();
   const laterRulesets = [...AFTER_LAUNCH].filter((r) => !mapped.has(r));
-  // The summary is the unfiltered first page's; a search or filter shows only its results.
-  const summaryRows = activeFilters(q) || q.page > 1 ? [] : ruleset ? summaries.filter((r) => r.ruleset === ruleset) : summaries;
-  const moveIds = [...new Set(summaryRows.flatMap((r) => r.moves.map((m) => m.row.value.itemId)))];
-  const moveNames = moveIds.length ? await auctionNames(moveIds, (await itemArt(moveIds)).tips) : new Map<number, string>();
 
   const inCat = rows.filter((r) => inCategory(r.value.itemId, q));
   const qualityCount = new Map<number, number>();
@@ -266,7 +270,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
             />
             {summaryRows.length > 0 && (
               <div className="mt-3 mb-4">
-                <RulesetSummaryTable rows={summaryRows} now={now} names={moveNames} href={(r) => here({ ruleset: r })} />
+                <RulesetSummaryTable rows={summaryRows} now={now} names={names} href={(r) => here({ ruleset: r })} />
               </div>
             )}
           </>

@@ -4,7 +4,7 @@ import {
   TRIM_FACTOR, TRIM_MIN_DAYS, formatCopper, houseKey, itemListings, itemMarket, parseHouse, validRealm,
   type ItemDays, type MarketState, type MarketValue, type PublicDay, type RealmDays,
 } from "../../../kb/src/market";
-import { AFTER_LAUNCH, DEFAULT_RULESET, RULESET_SLUGS, isRulesetSlug, mappedRulesets, rulesetOf, type RulesetSlug } from "./realms";
+import { AFTER_LAUNCH, DEFAULT_RULESET, RULESET_SLUGS, isRulesetSlug, mappedRulesets, realmRuleset, type RulesetSlug } from "./realms";
 
 /**
  * The Auction House pages' view of the market rollup (kb/src/market.ts): realms, the rows each one
@@ -110,7 +110,7 @@ function realmBoard(state: MarketState, key: string, now: Date, house: AuctionHo
   const stored: RealmDays | undefined = house ? state.houses?.[houseKey(key, house)] : state.realms[key];
   const name = state.realms[key]?.name ?? stored?.name;
   if (!stored || !name || !validRealm(name)) return null;
-  const realm: RealmRef = { key, name, slug: realmSlug(name), ruleset: rulesetOf(name) };
+  const realm: RealmRef = { key, name, slug: realmSlug(name), ruleset: realmRuleset(name) };
   const reporters = new Set<string>();
   let realmUpdated: number | null = null;
   const rows: MarketRow[] = [];

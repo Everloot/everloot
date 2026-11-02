@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { REALMS } from "../data/realms";
 import { RULESETS } from "../data/wow-forever-launch";
-import { DEFAULT_RULESET, RULESET_SLUGS, realmInfo, realmMap, realmMapKey, rulesetOf, rulesetParam } from "./realms";
+import { DEFAULT_RULESET, RULESET_SLUGS, realmInfo, realmMap, realmMapKey, realmRuleset, rulesetParam } from "./realms";
 
 // These tests read the realm map as committed, so they hold before and after it is filled. ./realms-empty.test.ts
 // pins the map empty and checks that everything behaves as before the map existed.
@@ -27,7 +27,7 @@ test("one key for a realm's spellings: the game's, a typed one, the URL's and th
 
 test("a realm the map does not list is forever, never a guess", () => {
   for (const realm of ["No Such Realm Everloot", "", "  "]) {
-    expect(rulesetOf(realm)).toBe(DEFAULT_RULESET);
+    expect(realmRuleset(realm)).toBe(DEFAULT_RULESET);
     expect(realmInfo(realm)).toBeNull();
   }
 });

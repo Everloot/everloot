@@ -13,8 +13,9 @@ vi.mock("../data/realms", async (importOriginal) => ({
 }));
 
 const { boardsByRuleset, houseCounts, onRuleset, realmBoards, rulesetSummaries } = await import("./auction-house");
-const { realmInfo, rulesetOf } = await import("./realms");
+const { realmInfo, realmRuleset } = await import("./realms");
 const { createCloudPlayerStore, createMemoryPlayerStore } = await import("./player-store");
+const { playerPath, rulesetOf } = await import("./player-pages");
 
 const now = new Date("2026-11-10T12:00:00.000Z");
 const at = (daysAgo: number) => new Date(now.getTime() - daysAgo * 86_400_000).toISOString();
@@ -31,11 +32,11 @@ const state = foldMarket(emptyMarket(), [
 ], now);
 
 test("a listed realm gets its ruleset and region under any spelling; an unlisted one stays forever", () => {
-  expect(rulesetOf("Mal'Ganis")).toBe("pvp");
-  expect(rulesetOf("mal'ganis")).toBe("pvp");
-  expect(rulesetOf("argent-dawn")).toBe("normal");
+  expect(realmRuleset("Mal'Ganis")).toBe("pvp");
+  expect(realmRuleset("mal'ganis")).toBe("pvp");
+  expect(realmRuleset("argent-dawn")).toBe("normal");
   expect(realmInfo("Nightfall")).toEqual({ ruleset: "pvp", region: "eu" });
-  expect(rulesetOf("Forever")).toBe("forever");
+  expect(realmRuleset("Forever")).toBe("forever");
   expect(realmInfo("Forever")).toBeNull();
 });
 
@@ -66,18 +67,23 @@ test("each ruleset's summary counts its own realms, says when it is mapped but e
   expect(byRuleset.forever).toMatchObject({ mapped: true, realms: 1, items: 1 });
 });
 
-test("the player store writes each realm's rows under its ruleset, and reads them back there", async () => {
+test("mapping a realm leaves player, guild and link addresses on forever, so no player is split into two rows", async () => {
   const calls: Record<string, unknown>[] = [];
   const doFetch = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
     calls.push(JSON.parse(String(init?.body)));
-    return new Response("", { status: 200 });
+    return new Response("[]", { status: 200 });
   }) as unknown as typeof fetch;
   const row = (name: string, realm: string) => ({ name, realm, race: "Orc", class: "SHAMAN", level: 24, seen: "2026-11-05" });
-  await createCloudPlayerStore("https://db.example", "key", doFetch).upsert([row("Aa", "Mal'Ganis"), row("Bb", "Forever"), row("Cc", "Nightfall")]);
-  expect(calls.map((c) => [c.p_ruleset, (c.p_rows as { name: string }[]).map((r) => r.name)])).toEqual([["pvp", ["Aa", "Cc"]], ["forever", ["Bb"]]]);
+  const cloud = createCloudPlayerStore("https://db.example", "key", doFetch);
+  await cloud.upsert([row("Aa", "Mal'Ganis"), row("Bb", "Forever"), row("Cc", "Nightfall")]);
+  await cloud.guildMembers("Mal'Ganis", "the guild");
+  expect(calls.map((c) => c.p_ruleset)).toEqual(["forever", "forever"]);
+  expect((calls[0]!.p_rows as { name: string }[]).map((r) => r.name)).toEqual(["Aa", "Bb", "Cc"]);
+  expect(rulesetOf("Mal'Ganis")).toBe("forever");
+  expect(playerPath({ ruleset: rulesetOf("Mal'Ganis"), realm: "Mal'Ganis", name: "Thrallina" })).toBe("/players/forever/mal'ganis/thrallina");
 
   const memory = createMemoryPlayerStore(() => now);
   await memory.upsert([row("Thrallina", "Mal'Ganis")]);
-  expect(await memory.get("forever", "malganis", "thrallina")).toBeNull();
-  expect((await memory.get("pvp", "mal'ganis", "thrallina"))?.ruleset).toBe("pvp");
+  expect((await memory.get("forever", "mal'ganis", "thrallina"))?.ruleset).toBe("forever");
+  expect(await memory.get("pvp", "mal'ganis", "thrallina")).toBeNull();
 });

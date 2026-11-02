@@ -1,6 +1,6 @@
 import { guildKey } from "../../../kb/src/guilds";
 import { linkRealmKey } from "./character-links";
-import { realmSlug, rulesetOf, type Player, type PlayerUpsert } from "./player-pages";
+import { DEFAULT_RULESET, realmSlug, type Player, type PlayerUpsert } from "./player-pages";
 
 /**
  * Where the player rows live: Supabase in production (the functions in 20261021130000_players.sql and
@@ -61,13 +61,7 @@ export function createCloudPlayerStore(url: string, key: string, doFetch: typeof
   }
   return {
     async upsert(rows) {
-      // One call per ruleset the batch touches: one call while the realm map is empty and every realm is "forever".
-      const byRuleset = new Map<string, PlayerUpsert[]>();
-      for (const row of rows) {
-        const ruleset = rulesetOf(row.realm);
-        byRuleset.set(ruleset, [...(byRuleset.get(ruleset) ?? []), row]);
-      }
-      for (const [ruleset, batch] of byRuleset) await rpc("upsert_players", { p_ruleset: ruleset, p_rows: batch });
+      if (rows.length) await rpc("upsert_players", { p_ruleset: DEFAULT_RULESET, p_rows: rows });
     },
     async get(ruleset, realm, name) {
       const rows = await rpc<Stored[]>("get_player", { p_ruleset: ruleset, p_realm_slug: realm, p_name: name });
@@ -75,14 +69,13 @@ export function createCloudPlayerStore(url: string, key: string, doFetch: typeof
     },
     async search(prefix) {
       const rows = await rpc<Stored[]>("search_players", { p_prefix: prefix, p_limit: SEARCH_LIMIT });
-      return Array.isArray(rows) ? rows.map((row) => toPlayer(row, rulesetOf(row.realm))) : [];
+      return Array.isArray(rows) ? rows.map((row) => toPlayer(row, DEFAULT_RULESET)) : [];
     },
     async suppress(realm, name) { await rpc("suppress_player", { p_realm: realm, p_name: name }); },
     async prune() { await rpc("prune_players", {}); },
     async guildMembers(realm, guild) {
-      const ruleset = rulesetOf(realm);
-      const rows = await rpc<Stored[]>("guild_members", { p_ruleset: ruleset, p_realm_key: linkRealmKey(realm), p_guild_key: guild });
-      return Array.isArray(rows) ? rows.map((row) => toPlayer(row, ruleset)) : [];
+      const rows = await rpc<Stored[]>("guild_members", { p_ruleset: DEFAULT_RULESET, p_realm_key: linkRealmKey(realm), p_guild_key: guild });
+      return Array.isArray(rows) ? rows.map((row) => toPlayer(row, DEFAULT_RULESET)) : [];
     },
     async searchGuilds(prefix) {
       const rows = await rpc<StoredGuild[]>("search_guilds", { p_prefix: prefix, p_limit: SEARCH_LIMIT });
@@ -109,7 +102,7 @@ export function createMemoryPlayerStore(now: () => Date = () => new Date()): Pla
         const k = key(r.realm, r.name);
         const old = rows.get(k);
         if (hidden.has(k) || (old && old.lastSeen > r.seen)) continue;
-        rows.set(k, { name: r.name, realm: r.realm, ruleset: rulesetOf(r.realm), race: r.race, class: r.class, level: r.level, guild: r.guild ?? old?.guild ?? null, lastSeen: r.seen });
+        rows.set(k, { name: r.name, realm: r.realm, ruleset: DEFAULT_RULESET, race: r.race, class: r.class, level: r.level, guild: r.guild ?? old?.guild ?? null, lastSeen: r.seen });
       }
     },
     async get(ruleset, realm, name) {
