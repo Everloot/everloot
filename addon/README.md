@@ -103,7 +103,10 @@ and the bosses' creature ids when the client sends them, and with `ENCOUNTER_STA
 many seconds it took. Each dungeon or raid run with a boss pull is one `instance_run` row: when you entered and left,
 the first pull, the last kill, pulls, kills and wipes, and the bosses killed. A run survives a reload, a corpse run or a
 trip out; it ends after 30 minutes outside, in another instance, at the game's reset line, or when a boss it already
-killed is pulled again. No names (`docs/design/specs/2026-11-02-pull-and-run-records-design.md`). None of these has run in the Forever client yet. The quest-log calls (`GetQuestLogTitle`, `C_QuestLog.GetQuestTagInfo`)
+killed is pulled again; only time outside counts toward the 30 minutes. No names
+(`docs/design/specs/2026-11-02-pull-and-run-records-design.md`). The start, length and runs, like the boss pulls below,
+wait on `E.RUN_RECORDS` in `core.lua`: off until the release that ships them, so a nightly writes encounter rows as
+before. None of these has run in the Forever client yet. The quest-log calls (`GetQuestLogTitle`, `C_QuestLog.GetQuestTagInfo`)
 have not been tried in the Forever client; a call that is missing or returns something unexpected records
 nothing for that field. The site shows each value only after 3 installs agree.
 
@@ -248,7 +251,8 @@ whether it is on and how many characters it holds; `/everloot players off` stops
 
 ## Boss pulls
 
-Off until `/everloot pulls on` (then `/reload`). After each boss pull in a dungeon or raid it writes one `pull_summary`
+Not in any build until `E.RUN_RECORDS` is on (`docs/RELEASING.md`, "Release gates"). Then it is on by default, new
+install or upgraded, and says so once in chat. After each boss pull in a dungeon or raid it writes one `pull_summary`
 row: the boss, kill or wipe, how long it took, and for each member of your group their name, class, role and the
 damage done, healing done, damage taken and deaths that the game's own damage meter (`C_DamageMeter`) shows.
 `/everloot pulls` says whether it is on and how many pulls it holds; `/everloot pulls off` stops it at once and deletes
@@ -264,9 +268,12 @@ every row.
   lists every call the module may make.
 - **Size**: about 150 bytes a member. At most 200 pulls and 2,000 member entries in the file (about 300 KB); then it
   pauses like every other kind.
-- **Sending**: only from the upload page, which counts the rows first. The Desktop App and the command-line uploader
-  never send them. The site stores them privately and shows them nowhere until a policy for showing players exists.
-  None of this has run in the Forever client yet.
+- **Matching**: a meter line goes to a member by `isLocalPlayer`, then GUID. A line whose GUID is readable but not in
+  the group (a pet, a creature, a stranger) is ignored; the name is used only when the GUID is hidden and the class
+  agrees, and two lines for one member leave that total out.
+- **Sending**: from the upload page, which counts the rows first, or the Desktop App; the command-line uploader never
+  sends them. The site keeps them privately for a year in their own tables, shows them nowhere, and deletes any
+  character someone hides on the site's hide form. None of this has run in the Forever client yet.
 
 ## Linking a character
 
@@ -421,7 +428,7 @@ addon/
 │   ├── completion.lua  achievements, reputation, titles, quest chains: catalogs and your progress; off until enabled
 │   ├── census.lua      race, class, level and faction of your characters and players you see; on in a new install
 │   ├── players.lua     name, realm, race, class, level and guild of your characters and players you see; off until enabled
-│   ├── pulls.lua       each boss pull: your group's names, classes, roles and damage meter totals; off until enabled
+│   ├── pulls.lua       each boss pull: your group's names, classes, roles and damage meter totals; on once released
 │   ├── selftest.lua    /everloot selftest and /everloot talents
 │   ├── plan.lua        share code reader and the display-only plan panel
 │   ├── raid_data.lua   raid buff list generated from web/src/data/game-data/raid-*.json

@@ -38,7 +38,7 @@ export function companionJobs(dataFolder: string, current: () => Settings): { de
       try { backupSavedVariables(file, dataFolder); backup = "; backup kept"; } catch (err) { backup = `; backup failed: ${err instanceof Error ? err.message : String(err)}`; }
       // The settled list is kept beside sent.json and refreshed once a day.
       const settled = (build: string | undefined) => appSettledList({ folder: dataFolder, endpoint, build });
-      const r = await uploadFile(file, { endpoint, state, census: current().census, players: current().players, settled });
+      const r = await uploadFile(file, { endpoint, state, census: current().census, players: current().players, pulls: true, settled });
       const rejected = r.rejected ? `; the site turned away ${r.rejected} ${r.rejected === 1 ? "row, which stays unsent and goes" : "rows, which stay unsent and go"} again next run` : "";
       // Codes typed with /everloot link go to the account's own link endpoint with the account key, never with the
       // upload. A link that fails never fails the upload; its rows go again next run.

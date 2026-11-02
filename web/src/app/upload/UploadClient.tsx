@@ -28,8 +28,11 @@ async function loadSettled(build: unknown): Promise<SettledList | null> {
   } catch { return null; }
 }
 
-/** `playerPages`: the site collects player rows. Off, the server drops them, and the preview says so. */
-export default function UploadClient({ playerPages = false }: { playerPages?: boolean } = {}) {
+/**
+ * `playerPages`: the site collects player rows. `pullSummaries`: it collects pull summaries. Off, the server drops
+ * them, and the preview says so.
+ */
+export default function UploadClient({ playerPages = false, pullSummaries = false }: { playerPages?: boolean; pullSummaries?: boolean } = {}) {
   const [payload, setPayload] = useState<unknown>(null);
   const [settled, setSettled] = useState<SettledList | null>(null);
   const [choices, setChoices] = useState<SharingChoices>({});
@@ -171,8 +174,11 @@ export default function UploadClient({ playerPages = false }: { playerPages?: bo
             : <p className="mt-1 text-fg-2">Everloot does not collect player rows yet, so the server drops these. They stay in your file.</p>}
         </div>}
         {(prepared.value.counts.pull_summary ?? 0) > 0 && <div className="mt-3 text-sm text-fg-2">
-          <p>Boss pulls in this upload: {prepared.value.counts.pull_summary.toLocaleString("en-US")}, recorded because you ran <code>/everloot pulls on</code>.</p>
-          <p className="mt-1 text-fg-2">Each row holds the boss, kill or wipe and how long it took, and for each member of your group their name, class, role and the damage, healing, damage taken and deaths the game&apos;s damage meter showed. Everloot keeps them private: no page shows them, and they are not in the public data.</p>
+          <p>Boss pulls in this upload: {prepared.value.counts.pull_summary.toLocaleString("en-US")}. The addon records them unless you turn them off with <code>/everloot pulls off</code>, which also deletes them from your file.</p>
+          <p className="mt-1 text-fg-2">Each row holds the boss, kill or wipe and how long it took, and for each member of your group their name, realm, class, role and the damage, healing, damage taken and deaths the game&apos;s damage meter showed.</p>
+          {pullSummaries
+            ? <p className="mt-1 text-fg-2">Everloot keeps them privately for a year: no page shows them, and they are not in the public data. Characters whose owners hid them are left out, and anyone can <a className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg" href="/players/opt-out">hide a character</a>, which deletes it from every stored pull.</p>
+            : <p className="mt-1 text-fg-2">Everloot does not collect boss pulls yet, so the server drops these. They stay in your file.</p>}
         </div>}
         {prepared.value.skipped.length > 0 && <p className="mt-3 text-sm text-fg-2">
           Skipped {prepared.value.skipped.length.toLocaleString("en-US")} already settled: {prepared.value.skipped.length === 1 ? "this row repeats a fact" : "these rows repeat facts"} at least five installs agree on, with no other report for 14 days, so Everloot does not need {prepared.value.skipped.length === 1 ? "it" : "them"} again. {prepared.value.skipped.length === 1 ? "It stays" : "They stay"} in your file.

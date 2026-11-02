@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import PrivacyPage from "./page";
 
 const html = renderToStaticMarkup(<PrivacyPage />).replace(/&#x27;|&apos;/g, "'");
@@ -126,4 +126,26 @@ test("the data policy says the same about the census", () => {
     "never published row by row",
     "at least 10 characters reported by at least 3 installs",
   ]) expect(policy).toContain(claim);
+});
+
+test("the boss pulls item shows once the site collects them, and says what the data policy says", () => {
+  expect(html).not.toContain('id="boss-pulls"');
+  vi.stubEnv("EVERLOOT_PULL_SUMMARIES", "1");
+  try {
+    const on = renderToStaticMarkup(<PrivacyPage />).replace(/&#x27;|&apos;/g, "'");
+    const said = on.replace(/<[^>]+>/g, "").replace(/\s+/g, " ");
+    expect(on).toContain('id="boss-pulls"');
+    expect(on).toContain('href="/players/opt-out"');
+    for (const claim of [
+      "each member of your group by name and realm", "never reads their gear, guild, position or chat", "/everloot pulls off",
+      "from the upload page, after a preview, or from the Everloot Desktop App", "privately for a year", "show them nowhere",
+      "deleted from every stored pull and left out of later uploads",
+    ]) expect(said).toContain(claim);
+    for (const claim of [
+      "each member of your group by name and realm", "never reads their gear, talents, guild, position or chat", "/everloot pulls off",
+      "keeps each one for a year after it was received", "deleted from every stored pull at once", "the command-line uploader never sends them",
+    ]) expect(policy).toContain(claim);
+  } finally {
+    vi.unstubAllEnvs();
+  }
 });

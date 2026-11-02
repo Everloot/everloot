@@ -1,4 +1,4 @@
--- Everloot pull summaries: each group member's numbers for each boss pull. Off until /everloot pulls on.
+-- Everloot pull summaries: each group member's numbers for each boss pull. On by default; /everloot pulls off.
 --
 -- One pull_summary row per boss pull in a dungeon or raid (ENCOUNTER_START to ENCOUNTER_END): the encounter, kill or
 -- wipe, its length, and for each member of your group their name, class, role and four totals: damage done, healing
@@ -13,15 +13,25 @@
 -- Role: the group role the game shows (UnitGroupRolesAssigned) as roleSource "assigned"; when the group has none, the
 -- larger of healing and damage done as roleSource "inferred" (healer or damage; a tank is never inferred).
 --
--- This module reads other players' names, so it is off by default like players.lua. It reads nothing else about
--- them: no gear, talents, guild, position or chat. The contract test fails if this file names a call that could, and
--- lists every game call it may make. /everloot pulls off deletes every row it wrote.
+-- Meter lines are matched to the group by isLocalPlayer, then by GUID. A line whose GUID is readable but not in the
+-- group (a pet, a guardian, a creature, a stranger) is never matched by name, so a pet named like a player cannot
+-- take the player's totals. The name is used only when the client hides the GUID, and then only for a name one member
+-- has and a class that agrees; two lines for one member leave that total out.
+--
+-- This module reads other players' names, as Warcraft Logs does for whoever uploads: on by default, said once per
+-- install, and every character can be hidden on the site, which then drops it at upload and deletes it from storage.
+-- It reads nothing else about them: no gear, talents, guild, position or chat. The contract test fails if this file
+-- names a call that could, and lists every game call it may make. /everloot pulls off deletes every row it wrote.
+--
+-- Nothing here loads until E.RUN_RECORDS is true (core.lua): builds made before that release, nightlies included,
+-- have no pulls module, no switch and no command.
 --
 -- Load and size: one meter read per pull, after combat. About 150 bytes a member: a 5-player pull is under 1 KB,
 -- a 40-player one about 6 KB. At most 200 rows and 2,000 member entries in the file (about 300 KB); past either,
 -- collection pauses, as every kind does, until the file is uploaded.
 
 local E = Everloot
+if not E.RUN_RECORDS then return end
 local PL = {}
 E.Pulls = PL
 
@@ -125,15 +135,27 @@ local function readMeter(byGuid, byName, members)
     local ok, session = pcall(meter.GetCombatSessionFromType, current, meterType(field))
     if ok and type(session) == "table" and type(session.combatSources) == "table" then
       seconds = seconds or whole(session.durationSeconds, 0, 86400)
+      local matched = {}
       for _, source in ipairs(session.combatSources) do
         if type(source) == "table" then
           local member
           if E.Readable(source.isLocalPlayer) == true then
             for _, m in ipairs(members) do if m.self then member = m end end
           end
-          member = member or byGuid[E.Readable(source.sourceGUID) or ""] or byName[E.Readable(source.name) or ""] or nil
+          local guid = E.Readable(source.sourceGUID)
+          if not member and type(guid) == "string" and guid ~= "" then
+            member = byGuid[guid]   -- a readable GUID outside the group is never matched by name
+          elseif not member then
+            member = byName[E.Readable(source.name) or ""] or nil
+            local class = E.Readable(source.classFilename)
+            if member and type(class) == "string" and class ~= member.class then member = nil end
+          end
           local amount = whole(source.totalAmount, 0, field == "deaths" and 1000 or MAX_AMOUNT)
-          if member and amount then member[field] = amount end
+          if member and amount then
+            -- Two lines for one member: which one is theirs is unknown, so the total is left out.
+            if matched[member] then member[field] = nil else member[field] = amount end
+            matched[member] = true
+          end
         end
       end
     end
@@ -219,7 +241,7 @@ end
 --- One line for /everloot pulls.
 function PL.StatusLine()
   if not E:IsEnabled("pulls") then return "Everloot pulls: off. /everloot pulls on starts it." end
-  return string.format("Everloot pulls: %s. %d boss pulls kept (at most %d). Nothing leaves this file except from the everloot.app upload page, after its preview.",
+  return string.format("Everloot pulls: %s. %d boss pulls kept (at most %d). They leave this file only from the everloot.app upload page, after its preview, or the Everloot Desktop App.",
     active and "on" or "on after /reload", E:Count("pull_summary"), MAX_ROWS)
 end
 

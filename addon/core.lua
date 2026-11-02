@@ -7,6 +7,10 @@ local E = Everloot
 
 E.VERSION = "0.3.15"
 E.MAX_ROWS_PER_KIND = 2000
+-- Boss pull timing, dungeon and raid runs, and pull summaries (docs/design/specs/2026-11-02-pull-and-run-records-design.md).
+-- Off in every build made from this file, nightlies included: openworld.lua then writes encounter rows as before and
+-- pulls.lua does not load. The release that ships them sets this to true (docs/RELEASING.md, "Release gates").
+E.RUN_RECORDS = false
 
 -- Same Adler-32 the companion writes into its slot addons; Lua 5.1 arithmetic only.
 function E.Adler32(s)
@@ -47,7 +51,7 @@ end
 local defaults = {
   version = E.VERSION,
   installId = nil,
-  toggles = { openworld = true, guild = true, gear = true, auctions = true, gold = true, addons = false, talents = true, completion = false, census = true, players = false, pulls = false },
+  toggles = { openworld = true, guild = true, gear = true, auctions = true, gold = true, addons = false, talents = true, completion = false, census = true, players = false, pulls = true },
   records = {},
 }
 
@@ -187,6 +191,9 @@ function E:LoginLine()
   return text .. ". /everloot status for details."
 end
 
+-- What pull summaries hold and where they go, said once per install and again on /everloot pulls on.
+local PULLS_TEXT = "After each boss pull in a dungeon or raid it records your group: each member's name, class and role, and the damage, healing, damage taken and deaths the game's own damage meter shows, with the boss, kill or wipe and how long it took. Never their gear, guild, position or chat. The everloot.app upload page, after its preview, or the Everloot Desktop App sends it; the site keeps it privately for a year, shows it nowhere yet, and anyone can have a character hidden."
+
 frame:RegisterEvent("ADDON_LOADED")
 frame:SetScript("OnEvent", function(_, event, arg1)
   if event == "ADDON_LOADED" and arg1 == "Everloot" then
@@ -206,6 +213,11 @@ frame:SetScript("OnEvent", function(_, event, arg1)
     if EverlootDB.toggles.census and not EverlootDB.censusNotice then
       print("Everloot: census on. It records the race, class, level and faction of your characters and of players you target, mouse over or group with. Never their names, guilds, gear or where they are. It stays in this file unless the Everloot Desktop App, if you allowed the census there, or the everloot.app upload page sends it. /everloot census off stops it and deletes the rows.")
       EverlootDB.censusNotice = true
+    end
+    -- Pull summaries name the group, so they are announced once per install too, in the builds that carry them.
+    if E.Pulls and EverlootDB.toggles.pulls and not EverlootDB.pullsNotice then
+      print("Everloot: boss pulls on. " .. PULLS_TEXT .. " /everloot pulls off stops it and deletes the rows.")
+      EverlootDB.pullsNotice = true
     end
   end
 end)
@@ -280,16 +292,19 @@ SlashCmdList["EVERLOOT"] = function(msg)
     end
   elseif msg == "players" and E.Players then
     print(E.Players.StatusLine())
+  elseif (msg == "pulls" or msg == "pulls on" or msg == "pulls off") and not E.Pulls then
+    print("Everloot: boss pulls are not in this build yet.")
   elseif msg == "pulls on" or msg == "pulls off" then
     EverlootDB.toggles.pulls = (msg == "pulls on")
     if EverlootDB.toggles.pulls then
-      print("Everloot: pulls on. After each boss pull in a dungeon or raid it records your group: each member's name, class and role, and the damage, healing, damage taken and deaths the game's own damage meter shows, with the boss, kill or wipe and how long it took. Never their gear, guild, position or chat. It is sent only from the everloot.app upload page, after its preview, and the site does not show it. /reload to apply.")
+      EverlootDB.pullsNotice = true
+      print("Everloot: pulls on. " .. PULLS_TEXT .. " /reload to apply.")
     else
       -- Turning it off withdraws what it wrote: every pull summary is deleted from this file.
       if E.Pulls then E.Pulls.Withdraw() end
       print("Everloot: pulls off; all pull summaries were deleted from this file.")
     end
-  elseif msg == "pulls" and E.Pulls then
+  elseif msg == "pulls" then
     print(E.Pulls.StatusLine())
   elseif msg == "scanprompt on" or msg == "scanprompt off" then
     EverlootDB.scanPrompt = (msg == "scanprompt on")
@@ -315,6 +330,6 @@ SlashCmdList["EVERLOOT"] = function(msg)
       print("Everloot: installed addon list off; all recorded addon rows were deleted from this file. /reload to apply.")
     end
   else
-    print("Everloot commands: /everloot window, /everloot options, /everloot status, /everloot auctions on|off, /everloot scan, /everloot scanprompt on|off, /everloot vendor on|off, /everloot mail on|off, /everloot price [item], /everloot gph [start|pause|stop|reset|show|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], /everloot pulls [on|off], /everloot link [code|clear], /everloot selftest, /everloot talents, /everloot plan [share code|number], /everloot raid [code], /ask <question>")
+    print("Everloot commands: /everloot window, /everloot options, /everloot status, /everloot auctions on|off, /everloot scan, /everloot scanprompt on|off, /everloot vendor on|off, /everloot mail on|off, /everloot price [item], /everloot gph [start|pause|stop|reset|show|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], " .. (E.Pulls and "/everloot pulls [on|off], " or "") .. "/everloot link [code|clear], /everloot selftest, /everloot talents, /everloot plan [share code|number], /everloot raid [code], /ask <question>")
   end
 end

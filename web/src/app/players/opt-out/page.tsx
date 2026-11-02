@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { pageMetadata } from "@/lib/seo";
 import { playerPagesOn } from "@/lib/player-pages";
+import { pullSummariesOn } from "@/lib/pull-summaries";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,7 @@ const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v
 const field = "w-full min-h-11 rounded-lg border border-edge bg-canvas px-3 text-fg placeholder:text-muted";
 
 export default async function OptOutPage(props: { searchParams: Promise<{ name?: string | string[]; realm?: string | string[]; done?: string | string[]; error?: string | string[] }> }) {
-  if (!playerPagesOn()) notFound();
+  if (!playerPagesOn() && !pullSummariesOn()) notFound();
   const params = await props.searchParams;
   const done = first(params.done) === "1";
   const error = first(params.error);
@@ -28,7 +29,7 @@ export default async function OptOutPage(props: { searchParams: Promise<{ name?:
         <h1 className="text-3xl font-bold text-fg tracking-tight">Hide a character</h1>
         <p className="text-sm text-fg-2">
           Enter the character&apos;s name and realm. Its page and its search result are removed, and Everloot does not
-          keep it again if the addon sees it later. You do not need an account, and we do not ask who you are, so the
+          keep it again if the addon sees it later.{pullSummariesOn() && " Its numbers in boss pulls other players uploaded are deleted too, and later uploads leave it out."} You do not need an account, and we do not ask who you are, so the
           hide takes effect as soon as you send it. To undo it, email{" "}
           <a className={link} href="mailto:hello@everloot.app">hello@everloot.app</a>.
         </p>

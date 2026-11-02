@@ -859,8 +859,9 @@ export declare const pullMember: z.ZodObject<{
     deaths: z.ZodOptional<z.ZodNumber>;
 }, z.core.$strip>;
 /**
- * One boss pull with each group member's totals from the game's own damage meter. Names other players, so it is
- * off in the addon until `/everloot pulls on`, sent only from the upload page, and never part of the public corpus.
+ * One boss pull with each group member's totals from the game's own damage meter. Names other players, as Warcraft
+ * Logs does for whoever uploads: on in the addon until `/everloot pulls off`, sent from the upload page or the Desktop
+ * App, kept out of the upload object and the public corpus, and stored where a hidden character can be deleted.
  */
 export declare const pullSummary: z.ZodObject<{
     installId: z.ZodString;
@@ -898,7 +899,7 @@ export declare const pullSummary: z.ZodObject<{
         deaths: z.ZodOptional<z.ZodNumber>;
     }, z.core.$strip>>;
 }, z.core.$strip>;
-/** The pull summary kind. Named, so never in the public corpus; stored with the upload for later rollups. */
+/** The pull summary kind. Named, so never in an upload object or the public corpus; intake writes it to its own tables. */
 export declare const PULL_KINDS: readonly string[];
 /**
  * The guild kill kind. Stored with the upload, never served raw: it is not on the public corpus allowlist, and

@@ -10,6 +10,8 @@ import { authorizeRecord, sharingCategory, type PublicationGrant } from "../../.
 import { isPlayerRow, playerDateProblem, playerPagesOn, playerStoreProblem, playerUpsert, PLAYERS_PER_UPLOAD, type PlayerUpsert } from "@/lib/player-pages";
 import { playerStore } from "@/lib/player-store";
 import { isLinkRow } from "@/lib/character-links";
+import { isPullRow, pullProblem, pullSummariesOn, pullUpsert, type PullUpsert } from "@/lib/pull-summaries";
+import { pullStore } from "@/lib/pull-store";
 import { guildKillProblem, guildsOn, hiddenGuildsForIntake, isGuildKillRow } from "@/lib/guilds";
 import { censusDailyCap } from "../../../../../kb/src/census-rows";
 import { isRecorderInstall } from "../../../../../kb/src/recorder-installs";
@@ -106,6 +108,10 @@ export async function POST(req: Request) {
   const playersOn = playerPagesOn();
   const players: PlayerUpsert[] = [];
   const playerInstalls = new Set<string>();
+  // Pull summaries name the whole group, so they never go into the upload object or the corpus: with their switch on
+  // they are written to the pull tables, where a hidden character is skipped and can later be deleted. Off, dropped.
+  const pullsOn = pullSummariesOn();
+  const pulls: PullUpsert[] = [];
   const grantHashes = new Set<string>();
   const scanRealms = new Set<string>();
   // Past settling (docs/design/specs/2026-10-21-coverage-plateau-design.md, section 4): a row whose every field matches
@@ -174,6 +180,15 @@ export async function POST(req: Request) {
       players.push(upsert); playerInstalls.add(row.installId); accepted.push(receipt.accepted[i]);
       continue;
     }
+    if (isPullRow(row)) {
+      const problem = !pullsOn ? "Pull summaries are not collected yet." : pullProblem(row, new Date());
+      if (problem) {
+        receipt.rejected.push({ index: receipt.accepted[i].index, reason: problem });
+        continue;
+      }
+      pulls.push(pullUpsert(row)); playerInstalls.add(row.installId); accepted.push(receipt.accepted[i]);
+      continue;
+    }
     if (isCensusRow(row)) {
       // The GUID never reaches storage: it becomes a keyed hash and the server's own event id here.
       const dateProblem = censusDateProblem(row.capturedAt, new Date());
@@ -220,7 +235,7 @@ export async function POST(req: Request) {
     authorized.push(row); accepted.push(receipt.accepted[i]);
   }
   const stored: StoredUpload = { ...upload, records: authorized }; receipt.accepted = accepted;
-  if (!authorized.length && !players.length && !tallied.length) return NextResponse.json({ ok: false, ...receipt }, { status: 422 });
+  if (!authorized.length && !players.length && !pulls.length && !tallied.length) return NextResponse.json({ ok: false, ...receipt }, { status: 422 });
   // Attribution comes from the accepted records, never from the first raw row.
   const installs = new Set([...stored.records.map((r) => r.installId), ...tallied.map((t) => t.row.installId), ...playerInstalls]);
   if (installs.size !== 1) {
@@ -257,7 +272,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, persisted: false, uploadId, error: "storage could not be confirmed — keep the file and retry in a moment", ...receipt }, { status: 503 });
     }
   }
-  // Nothing else to keep: player rows live in their table, and tallied rows are counted.
+  if (pulls.length) {
+    try {
+      await pullStore().insert(pulls);
+    } catch (err) {
+      console.error(`upload ${uploadId}: pull write failed`, err);
+      return NextResponse.json({ ok: false, persisted: false, uploadId, error: "storage could not be confirmed — keep the file and retry in a moment", ...receipt }, { status: 503 });
+    }
+  }
+  // Nothing else to keep: player and pull rows live in their tables, and tallied rows are counted.
   if (!authorized.length) return NextResponse.json({ ok: true, uploadId, persisted: true, ...(tallied.length ? { settled: tallied.length } : {}), ...receipt });
   // The market and the completion lists count installs behind one address once; only a keyed hash of the
   // address is kept, in the private upload object, and it is never published. Recorder uploads keep it too, so

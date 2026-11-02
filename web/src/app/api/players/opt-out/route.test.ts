@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ suppress: vi.fn(), request: vi.fn(), revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
+const mocks = vi.hoisted(() => ({ suppress: vi.fn(), forget: vi.fn(), request: vi.fn(), revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
 vi.mock("@/lib/player-store", () => ({ playerStore: () => ({ suppress: mocks.suppress }) }));
+vi.mock("@/lib/pull-store", () => ({ pullStore: () => ({ forget: mocks.forget }) }));
 vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { form: mocks.request } }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath, revalidateTag: mocks.revalidateTag }));
 
@@ -15,6 +16,7 @@ const where = (r: Response) => new URL(r.headers.get("location")!).search;
 beforeEach(() => {
   vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
   mocks.suppress.mockReset().mockResolvedValue(undefined);
+  mocks.forget.mockReset().mockResolvedValue(undefined);
   mocks.request.mockReset().mockResolvedValue({ allowed: true, retryAfter: 0 });
   mocks.revalidatePath.mockReset();
   mocks.revalidateTag.mockReset();
@@ -55,4 +57,18 @@ test("the same limits as every other write apply, and a storage failure says so"
   expect(where(await POST(form({ name: "Thrallina", realm: "Forever Pioneer" })))).toContain("error=storage");
   expect(mocks.revalidateTag).not.toHaveBeenCalled();
   expect(mocks.revalidatePath).not.toHaveBeenCalled();
+});
+
+test("with pull summaries on, the hide also deletes the character from the stored pulls, even with the player pages off", async () => {
+  expect(mocks.forget).not.toHaveBeenCalled();
+  await POST(form({ name: "Thrallina", realm: "Forever Pioneer" }));
+  expect(mocks.forget).not.toHaveBeenCalled();
+  vi.stubEnv("EVERLOOT_PULL_SUMMARIES", "1");
+  vi.stubEnv("EVERLOOT_PLAYER_PAGES", "");
+  expect(where(await POST(form({ name: "Thrallina", realm: "Forever Pioneer" })))).toBe("?done=1");
+  expect(mocks.suppress).toHaveBeenLastCalledWith("Forever Pioneer", "Thrallina");
+  expect(mocks.forget).toHaveBeenCalledWith("Forever Pioneer", "Thrallina");
+  mocks.forget.mockRejectedValue(new Error("down"));
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  expect(where(await POST(form({ name: "Thrallina", realm: "Forever Pioneer" })))).toContain("error=storage");
 });

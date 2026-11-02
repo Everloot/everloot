@@ -5,6 +5,8 @@ import { pruneKeys } from "@/lib/api-keys";
 import { guardOn } from "@/lib/data-guard";
 import { playerPagesOn } from "@/lib/player-pages";
 import { playerStore } from "@/lib/player-store";
+import { pullSummariesOn } from "@/lib/pull-summaries";
+import { pullStore } from "@/lib/pull-store";
 import { writeCoverage } from "@/lib/coverage-store";
 import { currentSettledWeek, writeSettled } from "@/lib/settled-store";
 
@@ -43,6 +45,10 @@ export async function GET(req: Request) {
     // Player rows not seen for 90 days are deleted. Only with the player pages on, once their table exists.
     if (playerPagesOn()) {
       try { await playerStore().prune(); } catch (err) { console.error("player retention failed", err); }
+    }
+    // Pull summaries are kept a year after they were received. Only with their switch on, once their tables exist.
+    if (pullSummariesOn()) {
+      try { await pullStore().prune(); } catch (err) { console.error("pull retention failed", err); }
     }
     // The market has its own watermark, so a failure here leaves the corpus snapshot current
     // and the next run retries the same uploads.

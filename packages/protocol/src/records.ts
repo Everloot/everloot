@@ -713,8 +713,9 @@ export const pullMember = z.object({
 }).refine((m) => (m.role === undefined) === (m.roleSource === undefined), { message: RULES.pull_summary[0] });
 
 /**
- * One boss pull with each group member's totals from the game's own damage meter. Names other players, so it is
- * off in the addon until `/everloot pulls on`, sent only from the upload page, and never part of the public corpus.
+ * One boss pull with each group member's totals from the game's own damage meter. Names other players, as Warcraft
+ * Logs does for whoever uploads: on in the addon until `/everloot pulls off`, sent from the upload page or the Desktop
+ * App, kept out of the upload object and the public corpus, and stored where a hidden character can be deleted.
  */
 export const pullSummary = base.extend({
   kind: z.literal("pull_summary"),
@@ -734,7 +735,7 @@ export const pullSummary = base.extend({
   message: RULES.encounter[0],
 });
 
-/** The pull summary kind. Named, so never in the public corpus; stored with the upload for later rollups. */
+/** The pull summary kind. Named, so never in an upload object or the public corpus; intake writes it to its own tables. */
 export const PULL_KINDS: readonly string[] = ["pull_summary"];
 
 

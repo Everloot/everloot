@@ -111,13 +111,16 @@ describe("uploading", () => {
     expect(api.bodies[0].records.map((r) => r.kind)).toEqual(["loot"]);
   });
 
-  test("pull summaries never leave from here, whatever the player allowed: they name the whole group", async () => {
-    const pull = { kind: "pull_summary", lua: `["eventId"] = "epoch:701", ["capturedAt"] = "2026-11-02T12:00:00Z", ["encounterId"] = 1144, ["name"] = "Rhahk'zor", ["instanceMapId"] = 36, ["success"] = true, ["members"] = {{["name"] = "Thrallina", ["class"] = "SHAMAN"}}` };
-    const { file, state } = workspace(luaFile([loot(1), pull]));
-    const api = intake();
-    const result = await uploadFile(file, { endpoint: "https://everloot.example", fetch: api.send, state, census: true, players: true });
-    expect(result).toMatchObject({ sent: 1, invalid: 0 });
-    expect(api.bodies[0].records.map((r) => r.kind)).toEqual(["loot"]);
+  test("pull summaries go only when the Desktop App asks: the command-line uploader sends no named kind", async () => {
+    const pull = { kind: "pull_summary", lua: `["eventId"] = "epoch:701", ["capturedAt"] = "2026-11-02T12:00:00Z", ["encounterId"] = 1144, ["name"] = "Rhahk'zor", ["instanceMapId"] = 36, ["realm"] = "Forever", ["success"] = true, ["members"] = {{["name"] = "Thrallina", ["class"] = "SHAMAN"}}` };
+    const cli = workspace(luaFile([loot(1), pull]));
+    const held = intake();
+    expect(await uploadFile(cli.file, { endpoint: "https://everloot.example", fetch: held.send, state: cli.state, census: true, players: true })).toMatchObject({ sent: 1, invalid: 0 });
+    expect(held.bodies[0].records.map((r) => r.kind)).toEqual(["loot"]);
+    const app = workspace(luaFile([loot(1), pull]));
+    const sent = intake();
+    expect(await uploadFile(app.file, { endpoint: "https://everloot.example", fetch: sent.send, state: app.state, pulls: true })).toMatchObject({ sent: 2, invalid: 0 });
+    expect(sent.bodies[0].records.map((r) => r.kind)).toEqual(["loot", "pull_summary"]);
   });
 
   test("the census never leaves from here: the upload page counts it first", async () => {

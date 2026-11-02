@@ -4,6 +4,7 @@ import { pageMetadata } from "@/lib/seo";
 import { latestAddonRelease } from "@/lib/addon-release";
 import { REPO_URL } from "@/lib/source";
 import { playerPagesOn } from "@/lib/player-pages";
+import { pullSummariesOn } from "@/lib/pull-summaries";
 import { Card, Container, PageHeader, SectionHeading } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import UploadClient from "./UploadClient";
@@ -70,7 +71,7 @@ export default function UploadPage() {
           What Everloot publishes and what it refuses is written down in the{" "}
           <a className={link} href={`${REPO_URL}/blob/main/docs/DATA_POLICY.md`} rel="noopener">data policy</a>.
         </p>
-        <UploadClient playerPages={playerPagesOn()} />
+        <UploadClient playerPages={playerPagesOn()} pullSummaries={pullSummariesOn()} />
       </div>
     </Container>
   );

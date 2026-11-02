@@ -4,9 +4,12 @@ Pull timing, instance runs and pull summaries (docs/design/specs/2026-11-02-pull
 
 - openworld.lua (anonymous, on by default): ENCOUNTER_START gives the encounter row its start and length; a run is
   zoning in to leaving for 30 minutes, another instance or a reset, and a run with boss pulls is one instance_run row.
-- pulls.lua (named, off by default): after each boss pull, once combat ends, one pull_summary row with each group
-  member's name, class, role and the game damage meter's totals. It never registers a combat log event, reads the
-  meter only out of combat, leaves out what the client hides, and /everloot pulls off deletes its rows.
+- pulls.lua (named, on by default, said once per install): after each boss pull, once combat ends, one pull_summary
+  row with each group member's name, class, role and the game damage meter's totals. It never registers a combat log
+  event, reads the meter only out of combat, leaves out what the client hides, matches a meter line to a member by
+  GUID whenever the GUID is readable, and /everloot pulls off deletes its rows.
+- Both wait on E.RUN_RECORDS in core.lua. Off (every build until the release that ships them, nightlies included),
+  encounter rows are written as before and nothing new is registered, recorded or offered.
 
 Every row is checked in the shape the upload sends, against the protocol's JSON Schema.
 """
@@ -22,6 +25,8 @@ toc = (root / "Everloot.toc").read_text(encoding="utf-8")
 assert "modules\\pulls.lua" in toc, "the pulls module must be in the TOC"
 assert toc.index("modules\\pulls.lua") > toc.index("modules\\openworld.lua"), "openworld loads first, so its run id is current"
 source = (root / "modules" / "pulls.lua").read_text(encoding="utf-8")
+core = (root / "core.lua").read_text(encoding="utf-8")
+assert re.search(r"^E\.RUN_RECORDS = (true|false)$", core, re.M), "core.lua sets E.RUN_RECORDS to a plain true or false"
 openworld = (root / "modules" / "openworld.lua").read_text(encoding="utf-8")
 
 # --- Neither file listens to the combat log: Forever restricts it, and Everloot must not register it ---
@@ -116,12 +121,15 @@ end
 """
 
 
-def fresh(saved="nil", files=("core.lua", "modules/openworld.lua", "modules/pulls.lua")):
+def fresh(saved="nil", files=("core.lua", "modules/openworld.lua", "modules/pulls.lua"), released=True):
+    """`released` is the build the release ships: E.RUN_RECORDS set before the modules load, as core.lua would."""
     lua = LuaRuntime()
     lua.execute(WORLD)
     lua.execute(f"EverlootDB = {saved}")
     for file in files:
         lua.execute((root / file).read_text(encoding="utf-8"))
+        if file == "core.lua":
+            lua.execute(f"Everloot.RUN_RECORDS = {'true' if released else 'false'}")
     lua.execute("""
 Everloot.frame.onEvent(nil,'ADDON_LOADED','Everloot')
 function event(name, ...) for _, hook in ipairs(Everloot.frame.hooks or {}) do hook(nil, name, ...) end end
@@ -137,8 +145,34 @@ end
     return lua
 
 
+# --- Before the release: nothing new is registered, recorded or offered, and encounter rows are as before ---
+lua = fresh(files=("core.lua", "modules/openworld.lua", "modules/pulls.lua", "modules/options.lua"), released=False)
+lua.execute("""
+assert(Everloot.RUN_RECORDS == false and Everloot.Pulls == nil, 'no pulls module before the release')
+assert(not registered.ENCOUNTER_START and not registered.CHAT_MSG_SYSTEM and not registered.PLAYER_REGEN_ENABLED, 'no new events')
+assert(registered.ENCOUNTER_END, 'encounter rows as before')
+units.party1 = { guid = 'Player-4242-00000002', name = 'Tankie', class = 'WARRIOR', role = 'TANK' }
+sessions[0] = { durationSeconds = 60, combatSources = { source('Player-4242-00000002', 'Tankie', 20000) } }
+zone(DEADMINES)
+pull(1144, 'Rhahk\\'zor', 60, 1)
+zone(OUTSIDE); NOW_T = NOW_T + 4000; zone(OUTSIDE)
+local e = rows('encounter')[1]
+assert(e and e.encounterId == 1144 and e.startedAt == nil and e.durationSeconds == nil and e.runId == nil, 'the encounter row has no new field')
+assert(EverlootDB.run == nil and EverlootDB.pullStart == nil and #rows('instance_run') == 0, 'no run')
+assert(#rows('pull_summary') == 0 and meterReads == 0, 'no pull summary and no meter read')
+assert(not string.find(Everloot:Status(), '  pulls: ', 1, true), 'no pulls module in the status')
+for _, line in ipairs(printed) do assert(not string.find(line, 'boss pulls on', 1, true), 'no notice') end
+SlashCmdList.EVERLOOT('pulls on')
+assert(string.find(printed[#printed], 'not in this build', 1, true), printed[#printed])
+SlashCmdList.EVERLOOT('help')
+assert(not string.find(printed[#printed], '/everloot pulls', 1, true), 'the command list does not offer it')
+for _, r in ipairs(Everloot.Options.ROWS) do assert(r.key ~= 'pulls', 'the settings page does not offer it') end
+""")
+counts = check_all(lua)
+assert counts.get("encounter") == 1 and "instance_run" not in counts and "pull_summary" not in counts, counts
+
 # --- Pull timing: start and length on the anonymous encounter row ---
-lua = fresh()
+lua = fresh(files=("core.lua", "modules/openworld.lua"))
 lua.execute("""
 assert(registered.ENCOUNTER_START and registered.ENCOUNTER_END and registered.CHAT_MSG_SYSTEM, 'openworld listens to the pull and the reset line')
 assert(not registered.COMBAT_LOG_EVENT_UNFILTERED, 'no combat log')
@@ -234,20 +268,67 @@ assert(#rows('instance_run') == before)
 counts = check_all(lua)
 assert counts.get("instance_run") == 4 and "pull_summary" not in counts, counts
 
-# --- pulls.lua: off by default, nothing registered, nothing read ---
+# --- A long stay inside is not time away: a reload or relog there keeps the run; leaving starts the 30 minutes ---
+lua = fresh(files=("core.lua", "modules/openworld.lua"))
+lua.execute("""
+zone(DEADMINES)
+local id = EverlootDB.run.id
+pull(1144, 'Rhahk\\'zor', 60, 1)
+NOW_T = NOW_T + 1900                -- 31 minutes inside after the kill
+reload(); event('PLAYER_ENTERING_WORLD', false, true)
+assert(EverlootDB.run.id == id and #rows('instance_run') == 0, 'a reload after a long stay inside keeps the run')
+NOW_T = NOW_T + 7200
+event('PLAYER_LEAVING_WORLD'); reload(); event('PLAYER_ENTERING_WORLD', true, false)
+assert(EverlootDB.run.id == id and EverlootDB.run.leftAt == nil, 'a relog inside keeps it too')
+pull(1145, 'Sneed', 40, 1)
+NOW_T = NOW_T + 1900
+zone(OUTSIDE)
+local left = NOW_T
+assert(EverlootDB.run.leftAt == left and #rows('instance_run') == 0, 'leaving after a long stay starts the wait, it does not end the run')
+NOW_T = NOW_T + 1000
+zone(DEADMINES)
+assert(EverlootDB.run.id == id and EverlootDB.run.leftAt == nil, 'back within 30 minutes of leaving: the same run')
+NOW_T = NOW_T + 1900
+zone(OUTSIDE); left = NOW_T
+NOW_T = NOW_T + 1801
+zone(OUTSIDE)
+local r = rows('instance_run')[1]
+assert(r and r.runId == id and r.endReason == 'left' and r.kills == 2 and #rows('instance_run') == 1, 'gone 30 minutes after leaving: the run ends')
+assert(r.leftAt == date('!%Y-%m-%dT%H:%M:%SZ', left), 'it left when you zoned out, not at the last kill')
+""")
+check_all(lua)
+
+# --- pulls.lua: on by default for a new install and an upgraded one, said once ---
 lua = fresh()
 lua.execute("""
-assert(EverlootDB.toggles.pulls == false, 'pulls is off by default')
-assert(string.find(Everloot:Status(), 'pulls: off by toggle', 1, true))
+assert(EverlootDB.toggles.pulls == true, 'pulls is on by default')
+assert(string.find(Everloot:Status(), 'pulls: ready', 1, true), Everloot:Status())
+local notices, said = 0, nil
+for _, line in ipairs(printed) do if string.find(line, 'boss pulls on', 1, true) then notices = notices + 1; said = line end end
+assert(notices == 1 and string.find(said, 'name, class and role', 1, true) and string.find(said, 'Desktop App', 1, true)
+  and string.find(said, 'hidden', 1, true) and string.find(said, '/everloot pulls off', 1, true), tostring(said))
+reload()
+notices = 0
+for _, line in ipairs(printed) do if string.find(line, 'boss pulls on', 1, true) then notices = notices + 1 end end
+assert(notices == 1, 'said once per install, not on every reload')
 units.party1 = { guid = 'Player-4242-00000002', name = 'Tankie', class = 'WARRIOR', role = 'TANK' }
 zone(DEADMINES); pull(1144, 'Rhahk\\'zor', 60, 1)
-assert(#rows('pull_summary') == 0 and meterReads == 0, 'off: no row and no meter read')
+assert(#rows('pull_summary') == 1, 'on: a row')
+SlashCmdList.EVERLOOT('pulls off')
+assert(EverlootDB.toggles.pulls == false and #rows('pull_summary') == 0)
+reload()
+assert(string.find(Everloot:Status(), 'pulls: off by toggle', 1, true))
+local reads = meterReads
+pull(1145, 'Sneed', 60, 1)
+assert(#rows('pull_summary') == 0 and meterReads == reads, 'off: no row and no meter read')
 SlashCmdList.EVERLOOT('pulls')
 assert(string.find(printed[#printed], 'pulls: off', 1, true))
 """)
-# An install from before this module keeps it off.
+# An install from before this module gets it on too, and is told.
 lua = fresh("{ installId = 'abcd-1234', toggles = { openworld = true, census = true, players = true }, records = {} }")
-lua.execute("assert(EverlootDB.toggles.pulls == false, 'an upgraded install starts with pulls off')")
+lua.execute("""
+assert(EverlootDB.toggles.pulls == true and EverlootDB.pullsNotice == true, 'an upgraded install starts with pulls on, and is told')
+""")
 
 # --- On: a dungeon pull, read after combat, roles assigned and inferred, hidden values left out ---
 lua = fresh()
@@ -255,7 +336,7 @@ lua.execute("""
 SlashCmdList.EVERLOOT('pulls on')
 local said = printed[#printed]
 assert(string.find(said, 'name, class and role', 1, true) and string.find(said, 'upload page', 1, true)
-  and string.find(said, 'Never their gear, guild, position or chat', 1, true), said)
+  and string.find(said, 'Never their gear, guild, position or chat', 1, true) and string.find(said, '/reload', 1, true), said)
 reload()
 assert(registered.ENCOUNTER_START and registered.PLAYER_REGEN_ENABLED and not registered.COMBAT_LOG_EVENT_UNFILTERED)
 assert(string.find(Everloot:Status(), 'pulls: ready', 1, true), Everloot:Status())
@@ -354,14 +435,48 @@ assert(#rows('pull_summary') == 0, 'off at once, before the reload')
 """)
 check_all(lua)
 
-# The settings page lists the switch, off for a new install.
+# --- Meter lines and the group: a readable GUID outside the group never takes a member's totals by name ---
+lua = fresh()
+lua.execute("""
+units.party1 = { guid = 'Player-4242-00000002', name = 'Tankie', class = 'WARRIOR', role = 'TANK' }
+units.party2 = { guid = 'Player-4242-00000003', name = 'Healz', class = 'PRIEST', role = 'HEALER' }
+units.party3 = { guid = 'Player-4242-00000004', name = 'Grom', class = 'ROGUE', role = 'DAMAGER' }
+units.party4 = { guid = 'Player-4242-00000005', name = 'Wolfie', class = 'HUNTER', role = 'DAMAGER' }
+local hiddenGuid = 'meter-secret'                               -- the meter hides this line's GUID; the roster's is readable
+secret[hiddenGuid] = true
+sessions[0] = { durationSeconds = 60, combatSources = {
+  source('Player-4242-00000002', 'Tankie', 20000),
+  source('Pet-0-4242-0-0-299-0100000001', 'Tankie', 999999),            -- a pet named like the tank: its own GUID
+  source('Creature-0-4242-0-0-299-0000000001', 'Grom', 888888),         -- a creature named like a member
+  source('Player-4242-00000099', 'Grom', 777777),                       -- a stranger with a member's name
+  source('Player-4242-00000004', 'Grom', 41000),
+  source(hiddenGuid, 'Healz', 3000, { classFilename = 'PRIEST' }),      -- the GUID is hidden: matched by name and class
+  source(nil, 'Wolfie', 12000, { classFilename = 'HUNTER' }),
+  source(nil, 'Wolfie', 500, { classFilename = 'HUNTER' }),             -- two lines for one name: neither is trusted
+} }
+sessions[2] = { durationSeconds = 60, combatSources = {
+  source(nil, 'Healz', 25000, { classFilename = 'WARRIOR' }),           -- no GUID and the wrong class: not Healz
+} }
+zone(DEADMINES); pull(1144, 'Rhahk\\'zor', 60, 1)
+local by = {}
+for _, m in ipairs(rows('pull_summary')[1].members) do by[m.name] = m end
+assert(by.Tankie.damageDone == 20000, 'the pet line does not overwrite the tank: ' .. tostring(by.Tankie.damageDone))
+assert(by.Grom.damageDone == 41000, 'neither the creature nor the stranger takes the member total: ' .. tostring(by.Grom.damageDone))
+assert(by.Healz.damageDone == 3000, 'a hidden GUID falls back to the name')
+assert(by.Healz.healingDone == nil, 'a line whose class disagrees is not the member')
+assert(by.Wolfie.damageDone == nil, 'two unidentified lines for one member leave the total out')
+""")
+check_all(lua)
+
+# The settings page lists the switch, on for a new install.
 lua = fresh(files=("core.lua", "modules/openworld.lua", "modules/pulls.lua", "modules/options.lua"))
 lua.execute("""
 local row
 for _, r in ipairs(Everloot.Options.ROWS) do if r.key == 'pulls' then row = r end end
-assert(row and row.command == 'pulls' and not Everloot.Options.IsOn(row), 'the settings page has the pulls switch, off')
+assert(row and row.command == 'pulls' and Everloot.Options.IsOn(row), 'the settings page has the pulls switch, on')
 """)
 
-print("Lua 5.1 pulls: encounter rows carry start and length; runs survive corpse runs and reloads and end on leaving, "
-      "another instance or a reset; pull summaries are off by default, read the damage meter only after combat, "
-      "leave hidden totals out, cap at 200 rows and 2,000 members, and off deletes them")
+print("Lua 5.1 pulls: nothing new before the release gate; encounter rows carry start and length; runs survive corpse "
+      "runs, reloads and long stays inside and end 30 minutes after leaving, in another instance or at a reset; pull "
+      "summaries are on by default and said once, read the damage meter only after combat, match by GUID first, leave "
+      "hidden or ambiguous totals out, cap at 200 rows and 2,000 members, and off deletes them")

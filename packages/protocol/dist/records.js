@@ -629,8 +629,9 @@ export const pullMember = z.object({
     deaths: z.number().int().min(0).max(1000).optional(),
 }).refine((m) => (m.role === undefined) === (m.roleSource === undefined), { message: RULES.pull_summary[0] });
 /**
- * One boss pull with each group member's totals from the game's own damage meter. Names other players, so it is
- * off in the addon until `/everloot pulls on`, sent only from the upload page, and never part of the public corpus.
+ * One boss pull with each group member's totals from the game's own damage meter. Names other players, as Warcraft
+ * Logs does for whoever uploads: on in the addon until `/everloot pulls off`, sent from the upload page or the Desktop
+ * App, kept out of the upload object and the public corpus, and stored where a hidden character can be deleted.
  */
 export const pullSummary = base.extend({
     kind: z.literal("pull_summary"),
@@ -649,7 +650,7 @@ export const pullSummary = base.extend({
 }).refine((r) => (r.startedAt === undefined) === (r.durationSeconds === undefined), {
     message: RULES.encounter[0],
 });
-/** The pull summary kind. Named, so never in the public corpus; stored with the upload for later rollups. */
+/** The pull summary kind. Named, so never in an upload object or the public corpus; intake writes it to its own tables. */
 export const PULL_KINDS = ["pull_summary"];
 // --- Guild kills: a boss kill credited to the player's own guild (docs/design/specs/2026-10-24-guild-board-design.md) ---
 // Written by the players module on ENCOUNTER_END with success, when the game shows the player a guild. The row

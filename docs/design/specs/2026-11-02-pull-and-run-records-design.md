@@ -1,8 +1,9 @@
 # Pull timing, dungeon runs and per-player pull totals
 
 **Date:** 2026-11-02
-**Status:** built in a draft pull request; nothing ships until the owner decides the points in section 9 and an addon
-release carries it. No public page, rollup or API serves these rows.
+**Status:** built in a draft pull request; the owner decided section 9 on 2026-11-02. Nothing is recorded until an addon
+release sets `E.RUN_RECORDS` (section 6), and nothing named is kept until the site's `EVERLOOT_PULL_SUMMARIES` switch is
+on. No public page, rollup or API serves these rows.
 **Builds on:** the [combat log tracking design](2026-10-30-combat-log-tracking-design.md) (its phase 0 is section 3a
 here), the [player pages design](2026-10-20-player-pages-design.md) (the consent model for named rows) and the
 [live client checklist](../../2026-10-28-live-client-capability-checklist.md) (sections 7 and 9).
@@ -77,7 +78,8 @@ Run boundaries:
 - **Starts** on `PLAYER_ENTERING_WORLD` into a dungeon or raid when no run is open, or the open one is for another
   instance or difficulty.
 - **Continues** through a `/reload`, a relog inside, a corpse run or a trip out: zoning back into the same instance and
-  difficulty within 30 minutes of leaving is the same run.
+  difficulty within 30 minutes of leaving is the same run. Only time outside counts: a reload or relog after any stay
+  inside, however long, is the same run.
 - **Ends** when the player has been out for more than 30 minutes (written at the next loading screen), enters another
   instance, the game prints `<instance> has been reset.`, or a boss the run already killed is pulled again (a reset the
   addon could not read). A run with no boss pull writes nothing.
@@ -86,10 +88,11 @@ About 450 bytes a row. A player farming 50 dungeon runs a week adds about 22 KB.
 kind, then collection pauses) bounds it at about 0.9 MB.
 
 Not covered: the run of a group member who joined late (their run starts when they zone in); two copies of the same
-instance within 30 minutes without a reset line or a repeated boss would join into one run. The `runId` on each
+instance within 30 minutes without a reset line or a repeated boss would join into one run; a player who logs out
+inside and logs back in there days later, in a new copy, continues the old run until a killed boss is pulled again. The `runId` on each
 encounter row lets the site split a run later if needed.
 
-### 3c. `pull_summary` (new, named, off by default)
+### 3c. `pull_summary` (new, named, on by default)
 
 One row per boss pull, written by the new `pulls` module (`addon/modules/pulls.lua`).
 
@@ -112,8 +115,10 @@ Each member:
 
 When it reads: at `ENCOUNTER_END` if the player is out of combat, else at the next `PLAYER_REGEN_ENABLED`. A new
 `ENCOUNTER_START` before that drops the pending pull, because its totals would be mixed. Members are matched to meter
-lines by `isLocalPlayer`, then GUID, then name (a name two members share matches by GUID only). Creatures and players
-outside the group are ignored.
+lines by `isLocalPlayer`, then GUID. A line whose GUID is readable but not in the group (a pet, a guardian, a creature,
+a stranger) is ignored, so a pet named like a player cannot take the player's totals. The name is used only when the
+client hides the line's GUID, and then only for a name one member has and a class (`classFilename`) that agrees. Two
+lines that land on one member leave that total out: which one is theirs is unknown.
 
 Size: about 150 bytes a member, so under 1 KB for a 5-player pull and about 6 KB for 40. The module keeps at most 200
 rows and 2,000 member entries (about 300 KB), then pauses like every other kind until the file is uploaded and
@@ -121,37 +126,59 @@ trimmed. One row stays far below the 600 KB upload batch.
 
 ## 4. Privacy and consent
 
-Other group members' names with their numbers are personal data about people who did not install Everloot. The new
-rows follow the existing consent model:
+Other group members' names with their numbers are personal data about people who did not install Everloot. The owner
+decided on 2026-11-02 to follow Warcraft Logs: whoever uploads sends the whole group, and the protection is per
+character, as in its [character hiding](https://www.warcraftlogs.com/help/hiding-characters). This replaces the combat
+log design's (2026-10-30) line "no other player's name is stored or sent by Everloot" for pull summaries.
 
 | What | Default | Leaves the computer | Off |
 |---|---|---|---|
 | `encounter` start and length, `instance_run` | On with `openworld`, like `encounter` and `instance_entrance` today. No names. | Upload page, Desktop App, command-line uploader. | `openworld` switch. |
-| `pull_summary` | **Off** in every install, new or upgraded (`defaults.toggles.pulls = false`). | **Only** from the everloot.app upload page, which counts the rows and says what they hold before sending. The Desktop App and the command-line uploader never send them, whatever the player allowed there (`companion/src/uploader.ts`). | `/everloot pulls off` or the settings switch: stops at once and deletes every row. |
+| `pull_summary` | **On** in every install, new or upgraded (`defaults.toggles.pulls = true`), said once in chat per install (`EverlootDB.pullsNotice`). | The everloot.app upload page, after its preview counts the rows and says what they hold, and the Desktop App (`pulls: true` in `desktop/src/main/jobs.ts`). The command-line uploader never sends them: it sends no named kind at all, census and player rows included, and staying consistent with that was simpler than a new flag. | `/everloot pulls off` or the settings switch: stops at once and deletes every row. |
 
-Turning it on prints what it records and where it goes. The module reads nothing about another player beyond name,
-realm, class, group role and the meter's totals: no gear, talents, guild, position or chat.
-`addon/tests/pulls_contract.py` lists every game call the module may make and fails on any other, as
-`players_contract.py` does.
+The module reads nothing about another player beyond name, realm, class, group role and the meter's totals: no gear,
+talents, guild, position or chat. `addon/tests/pulls_contract.py` lists every game call the module may make and fails
+on any other, as `players_contract.py` does.
 
-On the server, `pull_summary` and `instance_run` are stored with the upload and served nowhere: they are not on the
-public corpus allowlist, so the corpus API, the bulk export and the MCP tools never return them. Public display waits
-on the owner's public-character policy (`docs/design/specs/2026-10-28-owned-character-identity.md`); any later rollup
-must at least apply the player pages' hide list before showing a name.
+On the server:
 
-The combat log design (2026-10-30) said "no other player's name is stored or sent by Everloot". That line was written
-for the combat log feature. `pull_summary` is a deliberate exception behind its own opt-in switch, and the owner has to
-accept it (section 9).
+- **Not in the upload object.** Upload objects in R2 are the record of truth and are never rewritten, and the corpus
+  snapshot folds them. A hidden character could not be deleted from either. So intake writes `pull_summary` rows to
+  their own tables (`supabase/migrations/20261102120000_pull_summaries.sql`): `pull_summaries` (the row without its
+  members) and `pull_members` (one row per member, keyed by `link_realm_key(realm)` and the lower-case name, as
+  `character_suppressions` and `players` are). `kb/src/corpus.ts` leaves the kind out of the corpus as well.
+  `instance_run` has no names and stays in the upload object, private like `talent_snapshot`.
+- **Hidden characters.** Anyone can hide a character with the hide form (`/players/opt-out`), without an account. The
+  insert function skips every member in `character_suppressions` and does not write a pull left with none. Hiding
+  deletes that character's member rows and every pull left empty: the form calls `forget_pull_member`, and a trigger
+  on `character_suppressions` does the same for every hide however it is recorded (a verified owner's opt-out, a row
+  the owner adds by hand). Every member is stored with a realm (the row's when the member has none), and a row without
+  one is refused, so a hide always finds it.
+- **Retention.** One year after the site received the pull (`prune_pull_summaries`, run by the snapshot cron). A row
+  dated more than a year back is refused at intake.
+- **Served nowhere.** Not on a page, in the corpus API, the bulk export or the MCP tools. Public display waits on the
+  owner's public-character policy (`docs/design/specs/2026-10-28-owned-character-identity.md`) and must leave hidden
+  characters out.
+- **Switch.** `EVERLOOT_PULL_SUMMARIES=1`. Off, intake drops the rows with "Pull summaries are not collected yet." and
+  they stay in the player's file, as player rows did before the player pages.
 
-Draft data-policy lines, for the owner, not yet in `docs/DATA_POLICY.md`:
+The data policy (`docs/DATA_POLICY.md`, "Boss pulls and runs" and "Group numbers in boss pulls") says this, and the
+upload page's preview says what the rows hold, how to stop them, that the site keeps them privately for a year and
+that anyone can hide a character.
 
-> **Boss pulls and runs.** Inside dungeons and raids the addon records how long each boss pull took, kill or wipe,
-> and each run: when you entered and left, the first pull, the last kill and how many bosses died. No names.
->
-> **Group numbers.** Off until you turn on `/everloot pulls on`. After each boss pull it records each member of your
-> group by name, with their class, role and the damage, healing, damage taken and deaths the game's own damage meter
-> showed. It is sent only from the upload page, after its preview, and Everloot does not show it anywhere until a
-> policy for showing players is published. `/everloot pulls off` deletes it from your file.
+Proposed `/privacy` paragraph. The live page already describes the addon's records (census, player pages), so this
+pull request adds it there as the item `#boss-pulls`, shown only while `EVERLOOT_PULL_SUMMARIES` is on, and the page's
+"Last updated" date moves to 2 November 2026 with it:
+
+> **Boss pulls (on for uploaders, private):** after each boss pull in a dungeon or raid, the addon records each member
+> of your group by name and realm, with their class, their role (the group role the game shows, or a guess from their
+> healing and damage, marked as a guess) and the damage, healing, damage taken and deaths the game's own damage meter
+> showed, with the boss, kill or wipe and how long it took. It never reads their gear, guild, position or chat. It is
+> on in the addon, which says so once in chat; `/everloot pulls off` stops it and deletes those rows from your file.
+> You send them from the upload page, after a preview, or from the Everloot Desktop App. We keep them privately for a
+> year after we receive them and show them nowhere; they are not in the public records. The players they name have
+> not been asked. Anyone can have a character hidden, without an account, on the hide form: it is deleted from every
+> stored pull and left out of later uploads.
 
 ## 5. SavedVariables budget
 
@@ -164,16 +191,30 @@ Draft data-policy lines, for the owner, not yet in `docs/DATA_POLICY.md`:
 
 ## 6. What was built
 
+- **Release gate.** `E.RUN_RECORDS` in `addon/core.lua`, `false` on `main`. While it is false the nightly and any
+  tagged build behave as before this design: `openworld.lua` registers neither `ENCOUNTER_START` nor
+  `CHAT_MSG_SYSTEM`, writes no run and adds no field to `encounter`, and `pulls.lua` returns before it defines
+  anything, so there is no module, settings row or `/everloot pulls` command. A gate was chosen over moving the Lua
+  into a second pull request: the site, protocol and addon stay one reviewed change, the nightly cannot pick the code
+  up by accident, and turning it on is one reviewed line in the release pull request (`docs/RELEASING.md`, "Release
+  gates").
 - `addon/modules/openworld.lua`: `ENCOUNTER_START`, `CHAT_MSG_SYSTEM`; start, length and run on `encounter`;
   `instance_run`; `Everloot.CurrentRunId()`.
-- `addon/modules/pulls.lua`, the `pulls` toggle (off), `/everloot pulls [on|off]`, a settings row, status lines.
-- `addon/tests/pulls_contract.py`: timing across a reload, corpse runs, every end reason, the off-by-default
-  behaviour, reads only after combat, hidden values left out, the caps, deletion on off, and a schema check of every
-  row.
+- `addon/modules/pulls.lua`, the `pulls` toggle (on), the once-per-install notice, `/everloot pulls [on|off]`, a
+  settings row, status lines.
+- `addon/tests/pulls_contract.py`: the gate off and on; timing across a reload, corpse runs, long stays inside then a
+  reload, a relog and a departure, every end reason; on by default and said once; reads only after combat; hidden
+  values left out; pets, creatures and strangers named like a member; the caps; deletion on off; and a schema check
+  of every row.
 - `packages/protocol`: the three changes above, `PULL_KINDS`, rules, tests; `dist/` and `schema/` regenerated.
-- `web`: intake stores the new kinds (tests); the upload page preview explains pull summaries; the public corpus test
-  names both kinds as private.
-- `companion`: the uploader never sends `pull_summary`.
+- `supabase/migrations/20261102120000_pull_summaries.sql` and `supabase/tests/pull_summaries.sql`: the pull tables,
+  insert, forget, the hide trigger and retention.
+- `web`: `lib/pull-summaries.ts` (switch, checks) and `lib/pull-store.ts` (Supabase, and a memory store with the same
+  rules); intake writes pull rows there and stores timing and runs with the upload; the hide form deletes from the
+  pulls; the snapshot cron prunes them; the upload page preview explains them; `/privacy` has the item above behind the
+  switch. Tests for each, including a hide before and after an upload.
+- `companion`: the uploader sends `pull_summary` only with `pulls: true`, which the Desktop App sets; the Desktop App's
+  settings say so.
 
 No addon version bump, no zip, no release.
 
@@ -236,15 +277,24 @@ Add to the live client checklist, section 7:
 If P-DM-1 or P-DM-2 fails, `pull_summary` rows hold the group and assigned roles only, and `/everloot status` says the
 meter is missing. The timing and run rows do not depend on the meter.
 
-## 9. Owner decisions before an addon release carries this
+## 9. Owner decisions (2026-11-02) and what a release needs
 
-1. **Accept named pull summaries as an opt-in exception** to the combat log design's "no other player's name" line,
-   and approve the draft data-policy lines in section 4 (or reword them) for `docs/DATA_POLICY.md`.
-2. **Duration and runs on by default.** They are anonymous like `encounter` and `instance_entrance`; confirm they stay
-   under the `openworld` switch rather than a new one.
-3. **Desktop App path for pull summaries.** This build sends them only from the upload page. Allowing the Desktop App
-   later (like the player pages switch) is a separate choice.
-4. **Server retention.** Pull summaries are stored privately with each upload and never served. Decide how long they
-   are kept before a public-character policy exists, and whether a hidden character's rows are dropped at intake.
-5. **Inferred roles.** Healer when healing is larger than damage, else damage, labelled `inferred`. Confirm the label
-   is enough, or ask for no inference at all.
+Decided:
+
+1. **Named pull summaries** follow Warcraft Logs: on by default for the uploader, the whole group, protection by
+   per-character hiding (section 4). The data policy lines are in `docs/DATA_POLICY.md`.
+2. **Duration and runs** are on by default under the `openworld` (World) switch.
+3. **Desktop App** sends pull summaries, like the upload page. The command-line uploader does not (section 4).
+4. **Server retention** is one year. A hidden character's rows are dropped at intake and deleted from storage.
+5. **Inferred roles** stay, labelled `inferred`.
+
+Before an addon release carries this, in order:
+
+1. Run the live probes in section 8 (P-ENC-1, P-DM-1 to P-DM-4, P-ROLE-1, P-RESET-1) on the Forever client and write
+   the results into the live client checklist.
+2. Apply `supabase/migrations/20261102120000_pull_summaries.sql` in the Supabase SQL editor, and check it with
+   `supabase/tests/pull_summaries.sql` on a disposable database.
+3. Set `EVERLOOT_PULL_SUMMARIES=1` for the Worker (`web/wrangler.jsonc` vars) and deploy. The `/privacy` item, the
+   upload page's wording and intake storage switch on together.
+4. In the release pull request, set `E.RUN_RECORDS = true` in `addon/core.lua` with the version bump, changelog and
+   zip (`docs/RELEASING.md`). Until then no nightly or tagged build records any of this.

@@ -15,6 +15,11 @@ export interface UploadOptions {
   /** The player allowed the player pages in the Desktop App; without it they wait for the upload page. */
   players?: boolean;
   /**
+   * Send pull summaries. The Desktop App sets it: the addon's own switch (`/everloot pulls off`) is the player's choice,
+   * as on the upload page. The command-line uploader does not, so it sends no named kind at all.
+   */
+  pulls?: boolean;
+  /**
    * The settled list for the file's build (`/api/coverage/settled`), or a function that loads it for a build. Rows
    * whose fact is settled are left out and marked handled; without a list, or for another build, nothing is skipped.
    */
@@ -35,7 +40,7 @@ const CENSUS = new Set<string>(["census_self", "census_seen"]);
 /** Named player rows go only from the upload page too, which says what they are first. */
 const PLAYERS: RecordKind = "player_seen";
 
-/** Pull summaries name everyone in the group: like the addon list, they go only from the upload page, never from here. */
+/** Pull summaries name everyone in the group: they go from the upload page, or from here only with `pulls`. */
 const PULLS: RecordKind = "pull_summary";
 
 /** An answer past the largest request the intake takes is not a receipt. */
@@ -164,7 +169,7 @@ export async function uploadFile(file: string, options: UploadOptions): Promise<
   const heldCensus = unsent.filter(held).length;
   const heldPlayer = (r: Record<string, unknown>) => !options.players && r.kind === PLAYERS;
   const heldPlayers = unsent.filter(heldPlayer).length;
-  const records = unsent.filter((r) => r.kind !== ADDON_LIST && r.kind !== PULLS && !heldPlayer(r) && !held(r));
+  const records = unsent.filter((r) => r.kind !== ADDON_LIST && (options.pulls || r.kind !== PULLS) && !heldPlayer(r) && !held(r));
   const list = typeof options.settled === "function" ? await options.settled(parsed.clientBuild) : options.settled;
   const session = prepareUpload({ addonVersion: parsed.version, clientBuild: parsed.clientBuild, records }, {}, [], undefined, settledSkip(list, parsed.clientBuild));
   // A settled row is handled: it is not weighed again next time, whether or not the rest is sent.

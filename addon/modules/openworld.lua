@@ -576,7 +576,10 @@ end
 --     another instance, the game says it was reset (CHAT_MSG_SYSTEM, the game's own INSTANCE_RESET_SUCCESS line,
 --     never a player's chat), or a boss the run already killed is pulled again. A corpse run, a reload or a trip out
 --     to a vendor does not end it. A run with no boss pull writes nothing; one with pulls writes one instance_run row.
---     A run still open when you stop playing is written at the next loading screen after the 30 minutes.
+--     A run still open when you stop playing is written at the next loading screen after the 30 minutes. The 30
+--     minutes count only from leaving: time spent inside, however long, never ends the run.
+--   * All of this, and the pulls module, waits on E.RUN_RECORDS (core.lua): off, this file listens to neither
+--     ENCOUNTER_START nor CHAT_MSG_SYSTEM and writes encounter rows exactly as before.
 local RUN_GAP = 1800
 local MAX_PULL_SECONDS = 86400
 
@@ -603,12 +606,14 @@ end
 
 --- PLAYER_ENTERING_WORLD: start, continue, pause or end the run.
 local function runWorld()
+  if not E.RUN_RECORDS then return end
   local now = time()
   local info = instanceInfo()
   local mapId = info and (info.instanceType == "party" or info.instanceType == "raid") and whole(info.instanceMapId, 1, MAX_ID)
   local run = type(EverlootDB.run) == "table" and EverlootDB.run or nil
   if run then
-    local away = now - (run.leftAt or run.lastSeen or now)
+    -- Only time outside counts: a long stay inside followed by a /reload or a relog there is the same run.
+    local away = run.leftAt and now - run.leftAt or 0
     if mapId and mapId == run.instanceMapId and run.difficulty == whole(info.difficulty, 0, 255) and away <= RUN_GAP then
       run.leftAt, run.lastSeen = nil, now
       return
@@ -645,6 +650,7 @@ end
 
 --- CHAT_MSG_SYSTEM: the game's "<instance> has been reset." for the run you left ends it.
 local function runReset(text)
+  if not E.RUN_RECORDS then return end
   local run = EverlootDB.run
   text = E.Readable(text)
   if type(run) ~= "table" or not run.leftAt or not run.name or type(text) ~= "string" or type(INSTANCE_RESET_SUCCESS) ~= "string" then return end
@@ -659,6 +665,7 @@ end
 
 -- ENCOUNTER_START: encounterID, encounterName, difficultyID, groupSize. Only the start time is kept.
 local function encounterStart(encounterId)
+  if not E.RUN_RECORDS then return end
   encounterId = whole(encounterId, 1, MAX_ID)
   if not encounterId then return end
   local info = instanceInfo()
@@ -689,26 +696,28 @@ local function encounterEnd(encounterId, name, difficulty, size, success, units)
     end
   end
   local now = time()
-  local start = EverlootDB.pullStart
-  EverlootDB.pullStart = nil
-  local startedAt
-  if type(start) == "table" and start.encounterId == encounterId and type(start.at) == "number"
-    and now >= start.at and now - start.at <= MAX_PULL_SECONDS then
-    startedAt = start.at
-  end
   size = whole(size, 1, 40)
-  local run = runFor(instanceMapId, encounterId)
-  if run then
-    run.pulls = run.pulls + 1
-    run.lastSeen = now
-    run.firstPull = run.firstPull or startedAt or now
-    if size and size > (run.size or 0) then run.size = size end
-    if success then
-      run.kills = run.kills + 1
-      run.lastKill = now
-      if #run.killed < 40 then run.killed[#run.killed + 1] = encounterId end
-    else
-      run.wipes = run.wipes + 1
+  local startedAt, run
+  if E.RUN_RECORDS then
+    local start = EverlootDB.pullStart
+    EverlootDB.pullStart = nil
+    if type(start) == "table" and start.encounterId == encounterId and type(start.at) == "number"
+      and now >= start.at and now - start.at <= MAX_PULL_SECONDS then
+      startedAt = start.at
+    end
+    run = runFor(instanceMapId, encounterId)
+    if run then
+      run.pulls = run.pulls + 1
+      run.lastSeen = now
+      run.firstPull = run.firstPull or startedAt or now
+      if size and size > (run.size or 0) then run.size = size end
+      if success then
+        run.kills = run.kills + 1
+        run.lastKill = now
+        if #run.killed < 40 then run.killed[#run.killed + 1] = encounterId end
+      else
+        run.wipes = run.wipes + 1
+      end
     end
   end
   E:Store("encounter", {
@@ -766,8 +775,11 @@ E:RegisterModule("openworld", function()
   for event in pairs(WINDOW_ROLES) do pcall(function() f:RegisterEvent(event) end) end
   for _, event in ipairs({ "PLAYER_INTERACTION_MANAGER_FRAME_SHOW", "UNIT_SPELLCAST_SENT", "UNIT_SPELLCAST_FAILED",
     "UNIT_SPELLCAST_FAILED_QUIET", "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_INTERRUPTED", "LOOT_CLOSED", "VIGNETTE_MINIMAP_UPDATED", "VIGNETTES_UPDATED", "PLAYER_LEAVING_WORLD",
-    "PLAYER_ENTERING_WORLD", "ENCOUNTER_START", "ENCOUNTER_END", "CHAT_MSG_SYSTEM" }) do
+    "PLAYER_ENTERING_WORLD", "ENCOUNTER_END" }) do
     pcall(function() f:RegisterEvent(event) end)
+  end
+  if E.RUN_RECORDS then
+    for _, event in ipairs({ "ENCOUNTER_START", "CHAT_MSG_SYSTEM" }) do pcall(function() f:RegisterEvent(event) end) end
   end
   f:HookScript("OnEvent", function(_, event, arg1, arg2, arg3, arg4, arg5, arg6)
     if event == "PLAYER_TARGET_CHANGED" then targetSighting("target")

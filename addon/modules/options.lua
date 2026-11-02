@@ -39,9 +39,12 @@ O.ROWS = {
     text = "Each installed addon's name and version. Sent only from the upload page. Off deletes its rows." },
   { key = "players", command = "players", label = "Player pages",
     text = "Name, realm, race, class, level and guild of characters you see, for the site's player pages. Off deletes its rows." },
-  { key = "pulls", command = "pulls", label = "Boss pulls",
-    text = "After each boss pull: your group's names, classes, roles and the game's damage meter totals. Sent only from the upload page. Off deletes its rows." },
 }
+-- Only in the builds that carry the pulls module (E.RUN_RECORDS in core.lua).
+if E.Pulls then
+  O.ROWS[#O.ROWS + 1] = { key = "pulls", command = "pulls", label = "Boss pulls",
+    text = "After each boss pull: your group's names, classes, roles and the game's damage meter totals. Sent from the upload page or the Desktop App. Off deletes its rows." }
+end
 
 function O.IsOn(row)
   if row.field then
