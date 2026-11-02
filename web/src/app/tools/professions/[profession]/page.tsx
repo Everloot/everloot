@@ -5,7 +5,7 @@ import AdSlot from "@/components/AdSlot";
 import EmailCapture from "@/components/EmailCapture";
 import ClassContextChip from "@/components/classes/ClassContextChip";
 import GameIcon from "@/components/game/GameIcon";
-import { Badge, Card, Container, Contribute, DataTable, Disclosure, EmptyState, Field, PageHeader, QUALITY_TEXT, SectionHeading, qualityOf, type Column } from "@/components/ui";
+import { Badge, Card, Container, Contribute, DataTable, Disclosure, EmptyState, Field, FilterBar, PageHeader, QUALITY_TEXT, SectionHeading, qualityOf, type Column } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import { classContextParams, parseClassContext, withoutClassContext } from "@/lib/class-context";
 import { dataAgeLabel } from "@/lib/data-age";
@@ -17,7 +17,14 @@ import { loadShownNames } from "@/lib/shown-item-names";
 import { STORAGE_UNREACHABLE, uploadStore } from "@/lib/upload-store";
 import { formatCopper, handleProfessionPath } from "../../../../../../kb/src/profession-path";
 import { handleRecipeThresholds, pathFactsFromRecords, recipeThresholdsStructured, type Range } from "../../../../../../kb/src/recipe-thresholds";
+import { farmingAreas, gatherAreas, GATHERING, inLevels } from "@/lib/farming";
+import { computeRollups, loadWorldFacts } from "@/lib/rollup-compute";
+import { npcRows } from "@/lib/world-lists";
+import { publicZones } from "@/lib/zones";
+import { objectSpawnRowsFromRecords } from "../../../../../../kb/src/object-spawns";
 import { LINK } from "../../../database/entity";
+import { LEVEL_BRACKETS, listHref, range, rangeParam } from "../../../database/list-parts";
+import FarmAreaTable from "../../farming-routes/area-table";
 import ProfessionPicker from "../picker";
 
 export const dynamic = "force-dynamic";
@@ -63,6 +70,13 @@ export default async function ProfessionPage(props: Props) {
   const fromSkill = skill(one(searchParams.from), 1);
   const toSkill = skill(one(searchParams.to), 75);
   const path = professionHref(p.slug);
+  // Leather and cloth come from mob areas, which have levels: `?mobs=11-20` filters them (an old
+  // `/tools/farming-routes?category=cloth&level=11-20` lands here with it). `level` is the class context's, not this.
+  // A malformed range is a 404, as on the farming page.
+  const gather = GATHERING[p.slug];
+  const mobFarm = gather?.source === "leather" || gather?.source === "cloth" ? gather.source : null;
+  const level = mobFarm ? range(searchParams, "mobs") : undefined;
+  if (level === null) notFound();
 
   const [corpus, assets, shown, spellNames] = await Promise.all([
     uploadStore.loadCorpus(), loadSiteAssets(), loadShownNames(), loadSpellNames(CLIENT_LAYER.build.version),
@@ -81,6 +95,22 @@ export default async function ProfessionPage(props: Props) {
   const byRecipe = new Map(agreed.map((t) => [t.recipe.trim().toLowerCase(), t]));
   const reports = facts.sightings.length + facts.observations.length;
   const pending = !corpus.unreachable && reports === 0;
+
+  // Where to gather, for the gathering professions and the ones that use cloth: from the same uploads, at 3 installs.
+  // The mob areas reuse the corpus read above; any read that fails makes the section say storage is unreachable.
+  const gathered = !gather || corpus.unreachable ? { rows: [], all: 0, down: corpus.unreachable === true }
+    : !mobFarm
+      ? (() => { const rows = gatherAreas(objectSpawnRowsFromRecords(corpus.records), gather.source as "herb" | "ore", publicZones()); return { rows, all: rows.length, down: false }; })()
+      : await (async () => {
+        const [world, rollups] = await Promise.all([loadWorldFacts(corpus), computeRollups(corpus)]);
+        const down = world.unreachable || rollups.stats.unreachable;
+        const all = down ? [] : farmingAreas(npcRows(world, rollups.rates), rollups.rates)[mobFarm];
+        return { rows: level ? all.filter((a) => inLevels(a, level)) : all, all: all.length, down };
+      })();
+  const gatherRows = gathered.rows;
+  // The level menu's links keep the page's other parameters and land back on the section.
+  const levelHref = (l?: { min: number; max: number }) =>
+    `${listHref(path, [...Object.keys(searchParams).filter((k) => k !== "mobs").map((k): [string, string] => [k, one(searchParams[k])]), ["mobs", rangeParam(l)]])}#gather`;
 
   const spellName = (id: number) => spellNames?.names.get(id);
   const players = (r: RecipeView) => { const n = spellName(r.spellId); return n ? byRecipe.get(n.trim().toLowerCase()) : undefined; };
@@ -199,6 +229,34 @@ export default async function ProfessionPage(props: Props) {
             </section>
           ))}
         </section>
+
+        {gather && (
+          <section id="gather" aria-labelledby="prof-gather" className="space-y-3" data-gather={gather.source}>
+            <SectionHeading id="prof-gather" as="h2">{gather.source === "herb" || gather.source === "ore" ? `Where to gather ${gather.noun}` : `Where to farm ${gather.noun}`}</SectionHeading>
+            <p className="text-meta text-fg-2">{gather.how}</p>
+            {mobFarm && (
+              <FilterBar
+                label={`Where to farm ${gather.noun} filters`}
+                active={Number(Boolean(level))}
+                clearHref={levelHref(undefined)}
+                controls={[{
+                  type: "menu", key: "mobs", label: "Mob level",
+                  options: [{ label: "Any level", href: levelHref(undefined), on: !level, reset: true }, ...LEVEL_BRACKETS.map((b) => ({
+                    label: `${b.min}–${b.max}`, href: levelHref(b), on: level?.min === b.min && level?.max === b.max,
+                  }))],
+                }]}
+              />
+            )}
+            {gathered.down
+              ? <p className="text-cell text-fg-2" role="status">{STORAGE_UNREACHABLE}</p>
+              : gatherRows.length
+                ? <FarmAreaTable areas={gatherRows} backing={gather.source === "herb" || gather.source === "ore" ? "nodes" : "mobs"} caption={`Where to ${gather.source === "herb" || gather.source === "ore" ? "gather" : "farm"} ${gather.noun}: ${gatherRows.length}`} />
+                : level && gathered.all > 0 ? <p data-empty-state className="py-3 text-cell text-fg-2">{`Nothing here for levels ${rangeParam(level)}.`}</p>
+                : <EmptyState message={gather.source === "herb" || gather.source === "ore"
+                  ? `No ${gather.noun} zones yet: a zone shows once 3 installs gather from the same spot there.`
+                  : `No ${gather.noun} zones yet: a zone shows once 3 players upload loot from the same mobs there.`} />}
+          </section>
+        )}
 
         <section aria-labelledby="prof-path" className="space-y-4">
           <SectionHeading id="prof-path" as="h2">Leveling path from player uploads</SectionHeading>
