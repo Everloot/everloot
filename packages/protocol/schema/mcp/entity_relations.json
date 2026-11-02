@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/entity_relations.json",
   "title": "How an item, NPC, spell or quest connects to others",
-  "description": "Every typed relation of one entity, both directions: dropped by, sold by, reward from, located in (player-observed, listed where 3 installs agree, with the install count and last seen), and created by, reagent for, part of set, same icon (found in game files, unconfirmed, with the build they came from). Ids are the game's own. Reads Everloot's current authorized public corpus and the committed client layer.",
+  "description": "Every typed relation of one entity, both directions: dropped by, sold by, reward from, located in (player-observed, listed where 3 installs agree, with the install count and last seen), and created by, reagent for, part of set, same icon (found in game files, unconfirmed, with the build they came from). Ids are the game's own. Reads Everloot's public player data and the game-file relations of the current build.",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false
