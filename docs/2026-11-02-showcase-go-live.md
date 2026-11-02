@@ -10,9 +10,11 @@ What the two switches do:
 |---|---|---|
 | off | off | Today. The link and page routes answer 404; /account has no Linked characters section. |
 | on | on | /account lists linked characters with Make a link code, Unlink and Public page on/off. `/characters/...` shows a character whose owner turned its page on, with two share images. `/showcase/character` shows the sample page (noindex, with its sample banner). |
+| off | on | The link routes answer 404, so no new link can be made. Pages and cards of characters **already linked** with their page on **still show**: `/characters/...` checks only `EVERLOOT_SHOWCASE`. |
+| on | off | Links can be made and managed on /account; every public page and card answers 404. |
 
-Only a strict `1` turns a switch on. With links off and the showcase on, the pages still answer 404 (no link can
-exist), so the order of the two lines does not matter.
+Only a strict `1` turns a switch on. Before the first link exists the order of the two lines does not matter. After
+that, **turning off `EVERLOOT_SHOWCASE` is what takes the public pages down**; turning off links alone does not.
 
 ## Before
 
@@ -59,6 +61,9 @@ select check_name, ok from (values
       to_regprocedure('public.public_character(text, text, text)'),
       to_regprocedure('public.link_account_for_key(text)'),
       to_regprocedure('public.take_link_code(uuid)')]) f where f is not null), false)),
+  ('the server can read the link and visibility tables directly',
+    coalesce((select bool_and(has_table_privilege('service_role', t, 'SELECT')) from unnest(array[
+      to_regclass('public.character_links'), to_regclass('public.character_visibility')]) t), false)),
   ('API keys may carry link:own',
     coalesce((select pg_get_constraintdef(oid) like '%link:own%' from pg_constraint
       where conrelid = to_regclass('public.api_keys') and conname = 'api_keys_scopes_check'), false))
@@ -66,7 +71,11 @@ select check_name, ok from (values
 ```
 
 Tested on a disposable Postgres 17: all `t` with every migration applied, all `f` on an empty database, and `f` on
-the two access rows after a stray grant to `anon` or `authenticated`.
+the two access rows after a stray grant to `anon` or `authenticated`. The row "the server can read the link and
+visibility tables directly" was added after review and has not been run yet: it must turn `f` after
+`revoke select on public.character_links from service_role;` (and the same for `character_visibility`), since the
+owner list and the visibility controls read those tables directly, not only through the functions. Run that
+revoke-and-readback once on a disposable database before go-live, then grant it back.
 
 ## The go-live PR
 
@@ -118,8 +127,13 @@ If 3 to 5 fail, roll back.
 
 ## Rollback
 
-- **At once (owner):** from `web/`, `npx wrangler rollback` to the Worker version before the go-live deploy. Then
-  revert the go-live PR, so the next merge does not turn it back on.
+- **Before the go-live deploy (owner):** from `web/`, `npx wrangler deployments list` and write down the current
+  Worker **version ID** in the go-live PR. That is the version to go back to.
+- **At once (owner):** from `web/`, `npx wrangler rollback <that version ID>`. A bare `npx wrangler rollback` goes
+  to the version just before the current one, which still has both switches on if anything was deployed after
+  go-live. ([Wrangler commands](https://developers.cloudflare.com/workers/wrangler/commands/workers/).) Then check
+  that a public page, its `card.png` and `/api/me/characters/link-codes` all answer 404, and revert the go-live PR,
+  so the next merge does not turn it back on.
 - **What it leaves:** links and their page switches stay in the database, unread. Pages, cards and link routes
   answer 404 and /account hides the section. Turning the switches on again brings every page back as its owner
   left it. Nothing needs deleting.
