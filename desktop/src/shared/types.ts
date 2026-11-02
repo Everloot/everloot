@@ -287,7 +287,7 @@ export interface EverlootApi {
   checkForUpdates(): Promise<UpdateCheck>;
   /** Downloads the update to install on restart (Windows installs); progress arrives with the state. */
   updateDownload(): Promise<void>;
-  /** Asks to restart, then installs the downloaded update; false when the player chose Not now. */
+  /** Installs the downloaded update once the window's dialog has asked; false when it cannot (a newer release, a failed check or installer). */
   updateRestart(): Promise<boolean>;
   /** Offers a GitHub bug report with these diagnostics, or copies them. */
   reportBug(diagnostics: string): Promise<"opened" | "copied" | null>;
