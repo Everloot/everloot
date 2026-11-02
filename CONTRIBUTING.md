@@ -68,9 +68,6 @@ If CI says a commit is not signed off, fix the last commit with `git commit --am
 or several with `git rebase --signoff main`, then force-push your branch. Commits from GitHub's own
 bots, such as Dependabot, are exempt: a bot cannot certify anything.
 
-Commits and pull requests name people only. Leave out co-author lines and "generated with"
-footers that credit an AI tool; CI rejects them.
-
 ### Pull request titles
 
 Title a pull request `type(scope): plain sentence`. The title becomes the line in the release notes,
