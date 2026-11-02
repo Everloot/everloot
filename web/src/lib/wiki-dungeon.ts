@@ -66,3 +66,17 @@ export function prepPage(instanceMapId: number, data: Pick<WorldMapData, "entran
     return null;
   }
 }
+
+/** Every published dungeon or raid page by the instance it binds, for the dungeon list's Guide column; empty when the wiki cannot be read. */
+export function prepPages(data: Pick<WorldMapData, "entrances"> = WORLD_MAP): Map<number, WikiPage> {
+  const out = new Map<number, WikiPage>();
+  try {
+    for (const p of publishedPages(loadWiki())) {
+      const id = boundInstance(p, data);
+      if (id !== null && !out.has(id)) out.set(id, p);
+    }
+  } catch {
+    // No wiki: no links, never a failed page.
+  }
+  return out;
+}

@@ -104,10 +104,12 @@ export default async function ProfessionsPage(props: { searchParams: Promise<Sea
               the colour ranges their profession windows showed, and a cost per craft from agreed prices.
             </p>
           </Disclosure>
-          <Disclosure summary="Does the hub plan farming routes?">
+          <Disclosure summary="Where do I gather materials?">
             <p>
-              Farming routes are planned, not built. When they exist, a route will say where to farm and the hub
-              what the materials cost.
+              On the profession&apos;s page: Herbalism and Mining list the zones where players gathered herbs and ore,
+              Skinning the zones whose mobs dropped leather, and Tailoring and First Aid the zones whose mobs dropped cloth.
+              Each zone shows once 3 installs agree. Gold and reputation farming are on the{" "}
+              <Link href="/tools/farming-routes" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">farming page</Link>.
             </p>
           </Disclosure>
         </section>

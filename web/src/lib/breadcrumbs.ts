@@ -61,7 +61,7 @@ const NAMES: Record<string, string> = {
   "/tools/auctions": "Auction House",
   "/tools/gold-ledger": "Gold ledger",
   "/tools/professions": "Profession hubs",
-  "/tools/farming-routes": "Farming routes",
+  "/tools/farming-routes": "Farming",
   "/docs": "Docs",
 };
 

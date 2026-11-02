@@ -17,7 +17,13 @@ import { loadShownNames } from "@/lib/shown-item-names";
 import { STORAGE_UNREACHABLE, uploadStore } from "@/lib/upload-store";
 import { formatCopper, handleProfessionPath } from "../../../../../../kb/src/profession-path";
 import { handleRecipeThresholds, pathFactsFromRecords, recipeThresholdsStructured, type Range } from "../../../../../../kb/src/recipe-thresholds";
+import { farmingAreas, gatherAreas, GATHERING } from "@/lib/farming";
+import { computeRollups, loadWorldFacts } from "@/lib/rollup-compute";
+import { npcRows } from "@/lib/world-lists";
+import { publicZones } from "@/lib/zones";
+import { objectSpawnRowsFromRecords } from "../../../../../../kb/src/object-spawns";
 import { LINK } from "../../../database/entity";
+import FarmAreaTable from "../../farming-routes/area-table";
 import ProfessionPicker from "../picker";
 
 export const dynamic = "force-dynamic";
@@ -81,6 +87,16 @@ export default async function ProfessionPage(props: Props) {
   const byRecipe = new Map(agreed.map((t) => [t.recipe.trim().toLowerCase(), t]));
   const reports = facts.sightings.length + facts.observations.length;
   const pending = !corpus.unreachable && reports === 0;
+
+  // Where to gather, for the gathering professions and the ones that use cloth: from the same uploads, at 3 installs.
+  const gather = GATHERING[p.slug];
+  const gatherRows = !gather || corpus.unreachable ? []
+    : gather.source === "herb" || gather.source === "ore"
+      ? gatherAreas(objectSpawnRowsFromRecords(corpus.records), gather.source, publicZones())
+      : await (async () => {
+        const [world, { rates }] = await Promise.all([loadWorldFacts(), computeRollups()]);
+        return world.unreachable ? [] : farmingAreas(npcRows(world, rates), rates)[gather.source as "leather" | "cloth"];
+      })();
 
   const spellName = (id: number) => spellNames?.names.get(id);
   const players = (r: RecipeView) => { const n = spellName(r.spellId); return n ? byRecipe.get(n.trim().toLowerCase()) : undefined; };
@@ -199,6 +215,20 @@ export default async function ProfessionPage(props: Props) {
             </section>
           ))}
         </section>
+
+        {gather && (
+          <section id="gather" aria-labelledby="prof-gather" className="space-y-3" data-gather={gather.source}>
+            <SectionHeading id="prof-gather" as="h2">{gather.source === "herb" || gather.source === "ore" ? `Where to gather ${gather.noun}` : `Where to farm ${gather.noun}`}</SectionHeading>
+            <p className="text-meta text-fg-2">{gather.how}</p>
+            {corpus.unreachable
+              ? <p className="text-cell text-fg-2" role="status">{STORAGE_UNREACHABLE}</p>
+              : gatherRows.length
+                ? <FarmAreaTable areas={gatherRows} backing={gather.source === "herb" || gather.source === "ore" ? "nodes" : "mobs"} caption={`Where to ${gather.source === "herb" || gather.source === "ore" ? "gather" : "farm"} ${gather.noun}: ${gatherRows.length}`} />
+                : <EmptyState message={gather.source === "herb" || gather.source === "ore"
+                  ? `No ${gather.noun} zones yet: a zone shows once 3 installs gather from the same spot there.`
+                  : `No ${gather.noun} zones yet: a zone shows once 3 players upload loot from the same mobs there.`} />}
+          </section>
+        )}
 
         <section aria-labelledby="prof-path" className="space-y-4">
           <SectionHeading id="prof-path" as="h2">Leveling path from player uploads</SectionHeading>

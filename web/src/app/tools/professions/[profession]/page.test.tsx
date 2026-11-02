@@ -123,3 +123,41 @@ test("the path on the page routes through steps derived from colours and trainer
   });
   expect(await render("alchemy", { from: "1", to: "11" })).toContain("1–11  Lesser Healing Potion  10 crafts × 1");
 });
+
+const three = ["install-aaaa", "install-bbbb", "install-cccc"];
+const section = (html: string, kind: string) => { const at = html.indexOf(`data-gather="${kind}"`); return at < 0 ? null : html.slice(at, html.indexOf("</section>", at)); };
+
+test("Herbalism lists the zones where 3 installs gathered from the same herb spot; Mining has none yet and says so", async () => {
+  // Silverleaf (object 1617) opened as an herb in Elwynn Forest (1429), at the same spot by three installs.
+  store.loadCorpus.mockResolvedValue({
+    uploads: 3, dataAsOf: "2026-10-10T00:00:00.000Z",
+    records: three.map((installId, i) => ({
+      kind: "loot", eventId: `g${i}`, installId, capturedAt: "2026-10-10T00:00:00.000Z", sourceEvidence: "loot-api",
+      sourceObjectId: 1617, gatherKind: "herb", lootType: "gather", mapId: 1429, x: 40 + i * 0.1, y: 60, items: [{ itemId: 765, count: 1 }],
+    })),
+  });
+  const herbs = section(await render("herbalism"), "herb")!;
+  expect(herbs).toContain("Where to gather herb");
+  expect(herbs).toMatch(/href="\/database\/zones\/1429-[^"]*"/);
+  expect(herbs).toContain("Spots");
+  const ore = section(await render("mining"), "ore")!;
+  expect(ore).toContain("No ore zones yet");
+  expect(ore).not.toContain("<table");
+  // A profession that gathers nothing has no such section.
+  expect(await render("alchemy")).not.toContain("data-gather");
+});
+
+test("Skinning lists the zones whose mobs dropped leather, from the same rule as the farming page", async () => {
+  const base = (installId: string, n: string) => ({ installId, eventId: `${installId}${n}`, capturedAt: "2026-10-10T00:00:00.000Z" });
+  store.loadCorpus.mockResolvedValue({
+    uploads: 3, dataAsOf: "2026-10-10T00:00:00.000Z",
+    records: three.flatMap((i) => [
+      { ...base(i, "s"), kind: "npc_sighting", positionKind: "npc", npcId: 600, name: "Mottled Boar", mapId: 1411, x: 40, y: 60, level: 5, reaction: "hostile" },
+      { ...base(i, "l"), kind: "loot", sourceEvidence: "loot-api", sourceNpcId: 600, items: [{ itemId: 2318, count: 1 }] },
+    ]),
+  });
+  const leather = section(await render("skinning"), "leather")!;
+  expect(leather).toContain("Where to farm leather");
+  expect(leather).toMatch(/href="\/database\/zones\/1411-[^"]*"/);
+  expect(leather).toContain("Looted mobs");
+});
