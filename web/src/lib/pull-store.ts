@@ -12,23 +12,31 @@ export interface PullStore {
   insert(rows: PullUpsert[]): Promise<void>;
   /** Hide a character from the pulls: delete its member rows and every pull left with none, and skip it from then on. */
   forget(realm: string, name: string): Promise<void>;
-  /** Delete every pull received more than a year ago. */
+  /** Delete every pull received more than a year ago. Nothing to do, and no error, where the pull tables were never made. */
   prune(): Promise<void>;
 }
 
 export function createCloudPullStore(url: string, key: string, doFetch: typeof fetch = fetch): PullStore {
-  async function rpc(fn: string, body: unknown): Promise<void> {
+  /** Calls a function; with `absentOk`, PostgREST's answer that it has no such function (PGRST202) is not an error. */
+  async function rpc(fn: string, body: unknown, absentOk = false): Promise<void> {
     const response = await doFetch(`${url.replace(/\/$/, "")}/rest/v1/rpc/${fn}`, {
       method: "POST", cache: "no-store", signal: AbortSignal.timeout(10_000),
       headers: { apikey: key, authorization: `Bearer ${key}`, "content-type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (!response.ok) throw new Error(`Pull storage unavailable (${response.status})`);
+    if (response.ok) return;
+    if (absentOk && response.status === 404) {
+      const said = (await response.json().catch(() => null)) as { code?: unknown } | null;
+      if (said?.code === "PGRST202") return;
+    }
+    throw new Error(`Pull storage unavailable (${response.status})`);
   }
   return {
     async insert(rows) { if (rows.length) await rpc("insert_pull_summaries", { p_rows: rows }); },
     async forget(realm, name) { await rpc("forget_pull_member", { p_realm: realm, p_name: name }); },
-    async prune() { await rpc("prune_pull_summaries", {}); },
+    // Retention runs whether or not the site collects, so rows kept while it did still go after a year; before the
+    // migration there is no such function, and so nothing to delete.
+    async prune() { await rpc("prune_pull_summaries", {}, true); },
   };
 }
 

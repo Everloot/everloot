@@ -984,9 +984,9 @@ function settings(s: AppState): string {
         <label class="switch"><input type="checkbox" name="players" ${st.players ? "checked" : ""}> Send the player pages with the uploads</label>
         <p class="muted small">The name, realm, race, class, level and guild of the players the addon saw, so a page can be found by name. Off keeps them in <code>Everloot.lua</code>; <code>/everloot players off</code> in the game stops recording and deletes them.</p>
       </div></section>
-      <section class="panel set-sec"><div class="set-lead"><h2>Boss pulls</h2></div><div class="set-body">
+      ${s.runRecords ? `<section class="panel set-sec"><div class="set-lead"><h2>Boss pulls</h2></div><div class="set-body">
         <p class="muted small">After each boss pull, the names, realms, classes and roles of your group and the damage meter's totals. They go with the uploads; the site keeps them privately for a year, shows them nowhere and deletes any character someone hides. <code>/everloot pulls off</code> in the game stops recording and deletes them.</p>
-      </div></section>
+      </div></section>` : ""}
       <details class="panel set-sec"><summary><h2>Advanced</h2></summary>
         <div class="field"><label for="endpoint">Site <span class="hint">change only to test against another deployment</span></label><input type="url" id="endpoint" name="endpoint" value="${esc(st.endpoint)}"></div>
       </details>

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { mergeCensusRows } from "../../../../../kb/src/census-rows";
 
@@ -577,14 +578,35 @@ describe("pull timing, runs and pull summaries in an upload", () => {
   });
   afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
-  test("with the switch off, timing and runs are stored in the upload and pull summaries are dropped with the reason", async () => {
+  test("with the switch off, an upload gets main's answer: encounter rows as before, the new kinds unknown", async () => {
     const POST = await freshPost();
     const body = await (await POST(request({ addonVersion: "0.3.16", records: [encounter, run, pull] }))).json();
     expect(body).toMatchObject({ ok: true, persisted: true });
-    expect(body.accepted.map((a: { kind: string }) => a.kind)).toEqual(["encounter", "instance_run"]);
-    expect(store.putUpload.mock.calls[0]![2].records).toEqual([encounter, run]);
-    expect(body.rejected).toEqual([{ index: 2, reason: "Pull summaries are not collected yet." }]);
+    expect(body).not.toHaveProperty("runRecords");
+    expect(body.accepted).toEqual([{ index: 0, kind: "encounter" }]);
+    const { startedAt: _s, durationSeconds: _d, runId: _r, ...before } = encounter;
+    expect(store.putUpload.mock.calls[0]![2].records).toEqual([before]);
+    expect(body.rejected).toEqual([{ index: 1, reason: "unknown kind: instance_run" }, { index: 2, reason: "unknown kind: pull_summary" }]);
     expect(stored()).toEqual([]);
+  });
+
+  test("with the switch off, the same rows get the receipt and stored records main's parser gave them", async () => {
+    // The protocol's fixture: rows and what main's own build answered for them (packages/protocol/test/fixtures).
+    const fixtures = new URL("../../../../../packages/protocol/test/fixtures/", import.meta.url);
+    const inputs = JSON.parse(readFileSync(new URL("run-records-off.inputs.json", fixtures), "utf8"));
+    const main = JSON.parse(readFileSync(new URL("run-records-off.main.json", fixtures), "utf8"));
+    const POST = await freshPost();
+    const body = await (await POST(request({ addonVersion: "0.3.15", records: inputs }))).json();
+    expect(body).toMatchObject({ ok: true, persisted: true });
+    expect({ accepted: body.accepted, rejected: body.rejected }).toEqual(main.upload.receipt);
+    expect(Object.keys(body).sort()).toEqual(["accepted", "ok", "persisted", "rejected", "uploadId"]);
+    expect(store.putUpload.mock.calls[0]![2].records).toEqual(main.upload.upload.records);
+    // On, the expanded contract: a malformed start is refused, the timing survives, the new kinds are read.
+    vi.stubEnv("EVERLOOT_PULL_SUMMARIES", "1");
+    const on = await (await (await freshPost())(request({ addonVersion: "0.3.15", records: inputs }))).json();
+    expect(on.runRecords).toBe(true);
+    expect(on.rejected.map((r: { index: number }) => r.index)).toEqual([2, 3, 4]);
+    expect(store.putUpload.mock.calls[1]![2].records[1]).toMatchObject({ startedAt: "2026-11-02T12:00:00Z", durationSeconds: 75 });
   });
 
   test("with the switch on, pull summaries go to the pull tables, never into the upload object", async () => {
@@ -642,6 +664,17 @@ describe("pull timing, runs and pull summaries in an upload", () => {
     expect(memberNames()).toEqual([["Myself"]]);
   });
 
+  test("a verified owner's opt-out, which keeps the realm only lower-cased, still leaves the character out of later pulls", async () => {
+    vi.stubEnv("EVERLOOT_PULL_SUMMARIES", "1");
+    // lib/sharing-store.ts records 'forever-pioneer' / 'thrallina'; the upload spells the realm 'Forever Pioneer'.
+    await pulls.store.forget("forever-pioneer", "thrallina");
+    const POST = await freshPost();
+    const pioneer = { ...pull, realm: "Forever Pioneer" };
+    const body = await (await POST(request({ addonVersion: "0.3.16", records: [pioneer, { ...pioneer, eventId: "epoch:9", members: [pull.members[1]] }] }))).json();
+    expect(body).toMatchObject({ ok: true, persisted: true });
+    expect(memberNames()).toEqual([["Myself"]]);
+  });
+
   test("hiding a character after the upload deletes it from the stored pulls, and later uploads leave it out", async () => {
     vi.stubEnv("EVERLOOT_PULL_SUMMARIES", "1");
     const POST = await freshPost();
@@ -659,12 +692,13 @@ describe("pull timing, runs and pull summaries in an upload", () => {
   });
 
   test("a run whose counts do not add up, or a member with a role but no source, is refused with the rule", async () => {
+    vi.stubEnv("EVERLOOT_PULL_SUMMARIES", "1");
     const POST = await freshPost();
     const body = await (await POST(request({ addonVersion: "0.3.16", records: [
       { ...run, kills: 3 }, { ...pull, members: [{ name: "Thrallina", class: "SHAMAN", role: "healer" }] }, canonicalLoot,
     ] }))).json();
     expect(body.accepted.map((a: { kind: string }) => a.kind)).toEqual(["loot"]);
-    expect(body.rejected.map((r: { index: number }) => r.index)).toEqual([0, 1]);
+    expect(body.rejected.map((r: { index: number; reason: string }) => r.reason)).toEqual(["kills and wipes add up to pulls", "role and roleSource come together"]);
   });
 });
 

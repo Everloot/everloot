@@ -5,7 +5,8 @@
 --
 -- These rows are not in the upload objects or the corpus snapshot: they live here, so a hidden character can be
 -- deleted from them. A member is one row in pull_members, keyed the way character_suppressions and the players table
--- key a character (public.link_realm_key, lower-case name). A hidden character is refused on write, and hiding a
+-- key a character (public.link_realm_key, lower-case name). A hidden character is refused on write, whichever spelling of
+-- the realm the hide was recorded under (a verified owner's opt-out keeps the realm only lower-cased), and hiding a
 -- character deletes its member rows, whichever form recorded the hide (the trigger below). A pull left with no
 -- member is deleted with its last one. Every pull is deleted a year after it was received. Nothing reads these
 -- tables for a page yet.
@@ -58,7 +59,7 @@ begin
     if exists (
       select 1 from jsonb_array_elements(r->'members') m
       where not exists (select 1 from public.character_suppressions s
-        where s.realm = public.link_realm_key(m->>'realm') and s.character = lower(m->>'name'))
+        where public.link_realm_key(s.realm) = public.link_realm_key(m->>'realm') and s.character = lower(m->>'name'))
     ) then
       insert into public.pull_summaries (install_id, event_id, captured_at, summary)
         values (r->>'installId', r->>'eventId', (r->>'capturedAt')::timestamptz, r->'summary')
@@ -70,7 +71,7 @@ begin
         select pull, public.link_realm_key(m->>'realm'), lower(m->>'name'), m
         from jsonb_array_elements(r->'members') m
         where not exists (select 1 from public.character_suppressions s
-          where s.realm = public.link_realm_key(m->>'realm') and s.character = lower(m->>'name'))
+          where public.link_realm_key(s.realm) = public.link_realm_key(m->>'realm') and s.character = lower(m->>'name'))
         on conflict do nothing;
       written := written + 1;
     end if;

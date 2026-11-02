@@ -364,6 +364,7 @@ export declare const intakeReceipt: z.ZodObject<{
         kind: z.ZodOptional<z.ZodString>;
         reason: z.ZodOptional<z.ZodString>;
     }, z.core.$strip>>;
+    runRecords: z.ZodOptional<z.ZodLiteral<true>>;
 }, z.core.$loose>;
 /** POST /api/intake, 4xx or 503: refused; `accepted` and `rejected` say why when the envelope parsed. */
 export declare const intakeRefused: z.ZodObject<{
@@ -381,6 +382,7 @@ export declare const intakeRefused: z.ZodObject<{
         kind: z.ZodOptional<z.ZodString>;
         reason: z.ZodOptional<z.ZodString>;
     }, z.core.$strip>>>;
+    runRecords: z.ZodOptional<z.ZodLiteral<true>>;
 }, z.core.$strip>;
 /** POST /api/intake request body: the envelope, with the sharing choices and grants the upload page adds. */
 export declare const intakeRequest: z.ZodObject<{
@@ -2378,6 +2380,7 @@ export declare const API_SCHEMAS: {
             kind: z.ZodOptional<z.ZodString>;
             reason: z.ZodOptional<z.ZodString>;
         }, z.core.$strip>>;
+        runRecords: z.ZodOptional<z.ZodLiteral<true>>;
     }, z.core.$loose>;
     readonly intakeRefused: z.ZodObject<{
         ok: z.ZodLiteral<false>;
@@ -2394,6 +2397,7 @@ export declare const API_SCHEMAS: {
             kind: z.ZodOptional<z.ZodString>;
             reason: z.ZodOptional<z.ZodString>;
         }, z.core.$strip>>>;
+        runRecords: z.ZodOptional<z.ZodLiteral<true>>;
     }, z.core.$strip>;
     readonly healthResponse: z.ZodObject<{
         ok: z.ZodBoolean;

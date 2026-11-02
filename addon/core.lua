@@ -8,8 +8,10 @@ local E = Everloot
 E.VERSION = "0.3.15"
 E.MAX_ROWS_PER_KIND = 2000
 -- Boss pull timing, dungeon and raid runs, and pull summaries (docs/design/specs/2026-11-02-pull-and-run-records-design.md).
--- Off in every build made from this file, nightlies included: openworld.lua then writes encounter rows as before and
--- pulls.lua does not load. The release that ships them sets this to true (docs/RELEASING.md, "Release gates").
+-- Off in every build made from this file, nightlies included: openworld.lua then writes encounter rows as before,
+-- pulls.lua does not load, and the saved file, /everloot status and every command read exactly as before
+-- (addon/tests/pulls_contract.py compares them with main's). The release that ships them sets this to true
+-- (docs/RELEASING.md, "Release gates").
 E.RUN_RECORDS = false
 
 -- Same Adler-32 the companion writes into its slot addons; Lua 5.1 arithmetic only.
@@ -51,7 +53,7 @@ end
 local defaults = {
   version = E.VERSION,
   installId = nil,
-  toggles = { openworld = true, guild = true, gear = true, auctions = true, gold = true, addons = false, talents = true, completion = false, census = true, players = false, pulls = true },
+  toggles = { openworld = true, guild = true, gear = true, auctions = true, gold = true, addons = false, talents = true, completion = false, census = true, players = false },
   records = {},
 }
 
@@ -155,6 +157,9 @@ function E:InitModules()
   end
 end
 
+-- Counted in /everloot status only in the builds that write them.
+local RUN_KINDS = { instance_run = true, pull_summary = true }
+
 function E:Status()
   local lines = { "Everloot " .. E.VERSION .. " (" .. (EverlootDB and EverlootDB.installId or "?") .. ")" }
   for kind in pairs(EverlootDB and EverlootDB.paused or {}) do
@@ -169,7 +174,7 @@ function E:Status()
     "gold_snapshot", "money_event", "addon_seen", "map_bounds", "talent_snapshot",
     "achievement_catalog", "reputation_catalog", "title_catalog", "quest_chain_catalog",
     "achievement_owned", "reputation_owned", "title_owned", "quest_owned", "census_self", "census_seen", "player_seen", "character_link", "pull_summary" }) do
-    lines[#lines + 1] = string.format("  rows %s: %d", kind, self:Count(kind))
+    if E.RUN_RECORDS or not RUN_KINDS[kind] then lines[#lines + 1] = string.format("  rows %s: %d", kind, self:Count(kind)) end
   end
   return table.concat(lines, "\n")
 end
@@ -204,6 +209,8 @@ frame:SetScript("OnEvent", function(_, event, arg1)
     if upgraded and EverlootDB.toggles.census == nil then EverlootDB.toggles.census = false end
     -- A toggle added after this file was created takes its default: off-by-default stays off.
     for k, v in pairs(defaults.toggles) do if EverlootDB.toggles[k] == nil then EverlootDB.toggles[k] = v end end
+    -- Pull summaries are on by default, in the builds that carry them; the others write no switch for them.
+    if E.Pulls and EverlootDB.toggles.pulls == nil then EverlootDB.toggles.pulls = true end
     if not EverlootDB.installId then EverlootDB.installId = newInstallId() end
     EverlootDB.version = E.VERSION
     EverlootDB.clientBuild = clientBuild()
@@ -292,19 +299,17 @@ SlashCmdList["EVERLOOT"] = function(msg)
     end
   elseif msg == "players" and E.Players then
     print(E.Players.StatusLine())
-  elseif (msg == "pulls" or msg == "pulls on" or msg == "pulls off") and not E.Pulls then
-    print("Everloot: boss pulls are not in this build yet.")
-  elseif msg == "pulls on" or msg == "pulls off" then
+  elseif E.Pulls and (msg == "pulls on" or msg == "pulls off") then
     EverlootDB.toggles.pulls = (msg == "pulls on")
     if EverlootDB.toggles.pulls then
       EverlootDB.pullsNotice = true
       print("Everloot: pulls on. " .. PULLS_TEXT .. " /reload to apply.")
     else
       -- Turning it off withdraws what it wrote: every pull summary is deleted from this file.
-      if E.Pulls then E.Pulls.Withdraw() end
+      E.Pulls.Withdraw()
       print("Everloot: pulls off; all pull summaries were deleted from this file.")
     end
-  elseif msg == "pulls" then
+  elseif E.Pulls and msg == "pulls" then
     print(E.Pulls.StatusLine())
   elseif msg == "scanprompt on" or msg == "scanprompt off" then
     EverlootDB.scanPrompt = (msg == "scanprompt on")

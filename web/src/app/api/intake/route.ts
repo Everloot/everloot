@@ -64,8 +64,13 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ ok: false, error: "body must be JSON" }, { status: 400 });
   }
-  const parsed = parseUpload(payload);
-  const receipt = parsed.receipt;
+  // Pull timing, runs and pull summaries are read only with their switch on. Off, intake parses as it did before them
+  // (`runRecords: false`): an encounter row keeps only its old fields and the two new kinds are unknown, so every
+  // upload gets the answer it got then. On, every receipt says so, which is how an uploader knows to send them.
+  const pullsOn = pullSummariesOn();
+  const parsed = parseUpload(payload, { runRecords: pullsOn });
+  const receipt: typeof parsed.receipt & { runRecords?: true } = parsed.receipt;
+  if (pullsOn) receipt.runRecords = true;
   if (!parsed.ok || parsed.upload.records.length === 0) {
     return NextResponse.json({ ok: false, ...receipt }, { status: 422 });
   }
@@ -108,9 +113,8 @@ export async function POST(req: Request) {
   const playersOn = playerPagesOn();
   const players: PlayerUpsert[] = [];
   const playerInstalls = new Set<string>();
-  // Pull summaries name the whole group, so they never go into the upload object or the corpus: with their switch on
-  // they are written to the pull tables, where a hidden character is skipped and can later be deleted. Off, dropped.
-  const pullsOn = pullSummariesOn();
+  // Pull summaries name the whole group, so they never go into the upload object or the corpus: they are written to
+  // the pull tables, where a hidden character is skipped and can later be deleted. They parse only with the switch on.
   const pulls: PullUpsert[] = [];
   const grantHashes = new Set<string>();
   const scanRealms = new Set<string>();
@@ -181,7 +185,7 @@ export async function POST(req: Request) {
       continue;
     }
     if (isPullRow(row)) {
-      const problem = !pullsOn ? "Pull summaries are not collected yet." : pullProblem(row, new Date());
+      const problem = pullProblem(row, new Date());
       if (problem) {
         receipt.rejected.push({ index: receipt.accepted[i].index, reason: problem });
         continue;

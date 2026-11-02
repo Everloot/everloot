@@ -1,4 +1,4 @@
-import { recordSchemas, uploadPayload, type IntakeRecord, type RecordKind, type StoredRecord, type UploadSource } from "./records.js";
+import { encounterEndBeforeRuns, recordSchemas, RUN_RECORD_KINDS, uploadPayload, type IntakeRecord, type RecordKind, type StoredRecord, type UploadSource } from "./records.js";
 import { ACCEPTED_MAJORS, protocolMajor } from "./version.js";
 
 export interface AcceptedRecord {
@@ -51,10 +51,25 @@ function ownKindOf(raw: unknown): unknown {
 }
 
 /**
+ * `runRecords: false` parses as intake did before pull timing, runs and pull summaries: `encounter` rows without their
+ * timing fields, and `instance_run` and `pull_summary` as unknown kinds. Intake passes it while the site's
+ * `EVERLOOT_PULL_SUMMARIES` switch is off. Everything else reads the whole contract.
+ */
+export interface ParseOptions { runRecords?: boolean }
+
+function schemaFor(kind: string, options: ParseOptions) {
+  if (options.runRecords === false) {
+    if (kind === "encounter") return encounterEndBeforeRuns;
+    if (RUN_RECORD_KINDS.includes(kind)) return undefined;
+  }
+  return recordSchemas[kind as RecordKind];
+}
+
+/**
  * Parse every record against its own kind schema, keeping the parsed value and the original
  * index. Only own `kind` keys name a schema: inherited or prototype keys are unknown kinds.
  */
-export function parseRecords(records: readonly unknown[]): ParsedRecords {
+export function parseRecords(records: readonly unknown[], options: ParseOptions = {}): ParsedRecords {
   const parsed: IntakeRecord[] = [];
   const accepted: AcceptedRecord[] = [];
   const rejected: RejectedRecord[] = [];
@@ -62,7 +77,7 @@ export function parseRecords(records: readonly unknown[]): ParsedRecords {
     const kind = ownKindOf(raw);
     const schema =
       typeof kind === "string" && Object.hasOwn(recordSchemas, kind)
-        ? recordSchemas[kind as RecordKind]
+        ? schemaFor(kind, options)
         : undefined;
     if (!schema) {
       rejected.push({ index, reason: `unknown kind: ${String(kind)}` });
@@ -86,14 +101,14 @@ const envelopeRefused = (reason: string): ParsedUpload => ({ ok: false, receipt:
  * rows were all rejected still returns an upload with zero records — callers decide what that means.
  * An envelope from a protocol major the server no longer accepts is refused whole.
  */
-export function parseUpload(payload: unknown): ParsedUpload {
+export function parseUpload(payload: unknown, options: ParseOptions = {}): ParsedUpload {
   const parsed = uploadPayload.safeParse(payload);
   if (!parsed.success) return envelopeRefused("payload needs addonVersion + records[1..2000]");
   const { addonVersion, clientBuild, protocol, source } = parsed.data;
   if (protocol !== undefined && !ACCEPTED_MAJORS.includes(protocolMajor(protocol) ?? -1)) {
     return envelopeRefused(`protocol ${protocol} is not supported; update the addon or uploader`);
   }
-  const { records, receipt } = parseRecords(parsed.data.records);
+  const { records, receipt } = parseRecords(parsed.data.records, options);
   return { ok: true, upload: { addonVersion, ...(clientBuild ? { clientBuild } : {}), ...(source ? { source } : {}), records }, receipt };
 }
 

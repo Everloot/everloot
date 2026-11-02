@@ -41,16 +41,24 @@ export type ParsedUpload = {
     receipt: ValidationResult;
 };
 /**
+ * `runRecords: false` parses as intake did before pull timing, runs and pull summaries: `encounter` rows without their
+ * timing fields, and `instance_run` and `pull_summary` as unknown kinds. Intake passes it while the site's
+ * `EVERLOOT_PULL_SUMMARIES` switch is off. Everything else reads the whole contract.
+ */
+export interface ParseOptions {
+    runRecords?: boolean;
+}
+/**
  * Parse every record against its own kind schema, keeping the parsed value and the original
  * index. Only own `kind` keys name a schema: inherited or prototype keys are unknown kinds.
  */
-export declare function parseRecords(records: readonly unknown[]): ParsedRecords;
+export declare function parseRecords(records: readonly unknown[], options?: ParseOptions): ParsedRecords;
 /**
  * Parse an upload envelope. `ok` means the envelope itself parsed, so a valid envelope whose
  * rows were all rejected still returns an upload with zero records — callers decide what that means.
  * An envelope from a protocol major the server no longer accepts is refused whole.
  */
-export declare function parseUpload(payload: unknown): ParsedUpload;
+export declare function parseUpload(payload: unknown, options?: ParseOptions): ParsedUpload;
 /**
  * Validate an upload: every record is checked against its kind schema.
  * Implausible data is rejected with a reason; nothing is stored here.

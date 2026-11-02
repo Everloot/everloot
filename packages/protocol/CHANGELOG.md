@@ -24,7 +24,10 @@ required, or tightening a limit is a major release.
   `instance_run`, one anonymous dungeon or raid run (entered and left, first pull and last kill, pulls, kills, wipes,
   killed encounters, end reason); and `pull_summary` (`PULL_KINDS`), one boss pull with each group member's name,
   class, role with its source (`assigned` or `inferred`) and the game damage meter's damage done, healing done, damage
-  taken and deaths. MCP tools are unchanged.
+  taken and deaths. MCP tools are unchanged. `parseRecords` and `parseUpload` take `{ runRecords: false }`, which parses
+  as 1.22.0 did (`encounter` through `encounterEndBeforeRuns`, the two new kinds unknown); the site passes it while
+  `EVERLOOT_PULL_SUMMARIES` is off, and adds `runRecords: true` to `intakeReceipt` and `intakeRefused` only while it is
+  on. `RUN_RECORD_KINDS` names the two new kinds.
 - 1.22.0 (record protocol 1.11.0): `recipe_observed` optionally carries the trade-skill API's
   `recipeId` and boolean `learned` state. Older observations remain valid; an absent learned state
   is unknown. Recipe identity is separate from `productItemId`; no separate spell ID is inferred.

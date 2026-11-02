@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { readFileSync } from "node:fs";
 import { ALL_RECORD_KINDS, GUILD_KILL_KINDS, parseRecords, parseUpload, PUBLIC_RECORD_KINDS, sharingCategory, validateUpload } from "../src/index.js";
 
 const base = { installId: "test-install-1234", capturedAt: "2026-09-29T12:00:00.000Z", eventId: "evt-1" };
@@ -699,5 +700,24 @@ describe("protocol version on the envelope", () => {
 
   test("a protocol that is not x.y.z fails the envelope", () => {
     expect(parseUpload(payload("one")).ok).toBe(false);
+  });
+});
+
+describe("run records off: parsing as before pull timing", () => {
+  // Same rows, two parsers: `run-records-off.main.json` is what main's own build (packages/protocol/dist at 73fd5f9b)
+  // returned for `run-records-off.inputs.json`. With `{ runRecords: false }` this build must return exactly that.
+  const inputs = JSON.parse(readFileSync(new URL("./fixtures/run-records-off.inputs.json", import.meta.url), "utf8")) as unknown[];
+  const main = JSON.parse(readFileSync(new URL("./fixtures/run-records-off.main.json", import.meta.url), "utf8"));
+
+  test("parseRecords and parseUpload give main's records and receipts, row for row", () => {
+    expect(JSON.parse(JSON.stringify(parseRecords(inputs, { runRecords: false })))).toEqual(main.records);
+    expect(JSON.parse(JSON.stringify(parseUpload({ addonVersion: "0.3.15", records: inputs }, { runRecords: false })))).toEqual(main.upload);
+  });
+
+  test("the whole contract differs only on the new fields and kinds", () => {
+    const full = parseRecords(inputs);
+    expect(full.receipt.accepted.map((a) => a.index)).toEqual([0, 1, 5, 6, 7]);
+    expect(full.receipt.rejected.map((r) => r.index)).toEqual([2, 3, 4]);
+    expect(full.records[1]).toMatchObject({ startedAt: "2026-11-02T12:00:00Z", durationSeconds: 75, runId: "0123456789abcdef" });
   });
 });

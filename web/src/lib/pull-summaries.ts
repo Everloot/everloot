@@ -4,9 +4,11 @@ import { linkRealmKey } from "./character-links";
 /**
  * Pull summaries: each group member's damage meter totals for one boss pull, named, as the uploader's addon recorded
  * them (docs/design/specs/2026-11-02-pull-and-run-records-design.md). Everything here is off until
- * EVERLOOT_PULL_SUMMARIES=1. With it unset, intake drops pull_summary rows and nothing reads or writes their tables.
- * With it on, intake writes them to the pull tables (lib/pull-store.ts), never to the upload object or the corpus,
- * so a hidden character can be deleted from them. Nothing shows them.
+ * EVERLOOT_PULL_SUMMARIES=1. With it unset, intake parses as it did before pull timing (`runRecords: false`), so
+ * pull_summary and instance_run are unknown kinds, and nothing writes the pull tables; only the cron's retention
+ * still runs, so rows kept while it was on go after their year. With it on, intake writes them to the pull tables
+ * (lib/pull-store.ts), never to the upload object or the corpus, so a hidden character can be deleted from them.
+ * Nothing shows them.
  */
 
 export type PullRow = Extract<IntakeRecord, { kind: "pull_summary" }>;

@@ -134,7 +134,7 @@ log design's (2026-10-30) line "no other player's name is stored or sent by Ever
 | What | Default | Leaves the computer | Off |
 |---|---|---|---|
 | `encounter` start and length, `instance_run` | On with `openworld`, like `encounter` and `instance_entrance` today. No names. | Upload page, Desktop App, command-line uploader. | `openworld` switch. |
-| `pull_summary` | **On** in every install, new or upgraded (`defaults.toggles.pulls = true`), said once in chat per install (`EverlootDB.pullsNotice`). | The everloot.app upload page, after its preview counts the rows and says what they hold, and the Desktop App (`pulls: true` in `desktop/src/main/jobs.ts`). The command-line uploader never sends them: it sends no named kind at all, census and player rows included, and staying consistent with that was simpler than a new flag. | `/everloot pulls off` or the settings switch: stops at once and deletes every row. |
+| `pull_summary` | **On** in every install, new or upgraded (`toggles.pulls` set to true at load in the builds that carry the module), said once in chat per install (`EverlootDB.pullsNotice`). | The everloot.app upload page, after its preview counts the rows and says what they hold, and the Desktop App (`pulls: true` in `desktop/src/main/jobs.ts`). The command-line uploader never sends them: it sends no named kind at all, census and player rows included, and staying consistent with that was simpler than a new flag. | `/everloot pulls off` or the settings switch: stops at once and deletes every row. |
 
 The module reads nothing about another player beyond name, realm, class, group role and the meter's totals: no gear,
 talents, guild, position or chat. `addon/tests/pulls_contract.py` lists every game call the module may make and fails
@@ -152,15 +152,29 @@ On the server:
   insert function skips every member in `character_suppressions` and does not write a pull left with none. Hiding
   deletes that character's member rows and every pull left empty: the form calls `forget_pull_member`, and a trigger
   on `character_suppressions` does the same for every hide however it is recorded (a verified owner's opt-out, a row
-  the owner adds by hand). Every member is stored with a realm (the row's when the member has none), and a row without
-  one is refused, so a hide always finds it.
-- **Retention.** One year after the site received the pull (`prune_pull_summaries`, run by the snapshot cron). A row
-  dated more than a year back is refused at intake.
+  the owner adds by hand). Both sides compare `link_realm_key` of the realm, never the realm as stored: a verified
+  owner's opt-out keeps it only lower-cased (`forever-pioneer`), and a later upload spelling it `Forever Pioneer` must
+  still leave the character out. Every member is stored with a realm (the row's when the member has none), and a row
+  without one is refused, so a hide always finds it.
+- **Retention.** One year after the site received the pull (`prune_pull_summaries`, run by the snapshot cron on every
+  run, whether or not the switch below is on, so turning collection off never keeps what was collected). Before the
+  migration PostgREST has no such function (PGRST202) and the cron treats that as nothing to prune. A row dated more
+  than a year back is refused at intake.
 - **Served nowhere.** Not on a page, in the corpus API, the bulk export or the MCP tools. Public display waits on the
   owner's public-character policy (`docs/design/specs/2026-10-28-owned-character-identity.md`) and must leave hidden
   characters out.
-- **Switch.** `EVERLOOT_PULL_SUMMARIES=1`. Off, intake drops the rows with "Pull summaries are not collected yet." and
-  they stay in the player's file, as player rows did before the player pages.
+- **Switch.** `EVERLOOT_PULL_SUMMARIES=1`, one switch for the whole server side of this design. Off, intake parses
+  every upload as it did before (`parseUpload(payload, { runRecords: false })`): `encounter` keeps only its old fields
+  (a malformed `startedAt` is dropped unread, not refused), and `instance_run` and `pull_summary` are refused as
+  unknown kinds, so an upload gets the same receipt and stores the same rows as on `main` before this change
+  (`packages/protocol/test/fixtures/run-records-off.main.json` is that answer, from `main`'s own build). On, every
+  intake receipt carries `runRecords: true`.
+- **Uploaders hold what the site does not read.** The Desktop App and the command-line uploader keep the site's last
+  answer for a batch that carried `instance_run` or `pull_summary` rows in `site-collects.json` beside `sent.json`.
+  They send those rows when the site has not answered yet, when it last said `runRecords: true`, or a day after it
+  last said nothing; otherwise the rows stay in the file, not marked sent, and the run says how many wait. So a site
+  with the switch off is asked at most once a day, and the file is written only once such a row exists. The Desktop
+  App's settings describe boss pulls only once the site has said it reads them.
 
 The data policy (`docs/DATA_POLICY.md`, "Boss pulls and runs" and "Group numbers in boss pulls") says this, and the
 upload page's preview says what the rows hold, how to stop them, that the site keeps them privately for a year and
@@ -194,7 +208,11 @@ pull request adds it there as the item `#boss-pulls`, shown only while `EVERLOOT
 - **Release gate.** `E.RUN_RECORDS` in `addon/core.lua`, `false` on `main`. While it is false the nightly and any
   tagged build behave as before this design: `openworld.lua` registers neither `ENCOUNTER_START` nor
   `CHAT_MSG_SYSTEM`, writes no run and adds no field to `encounter`, and `pulls.lua` returns before it defines
-  anything, so there is no module, settings row or `/everloot pulls` command. A gate was chosen over moving the Lua
+  anything, so there is no module, settings row, `pulls` switch in the saved file, status line or `/everloot pulls`
+  command (it prints the command list, as an unknown command does). `addon/tests/gate_off_snapshot.py` runs one
+  session with a boss pull and records the saved file, every printed line, `/everloot status`, the commands around
+  pulls, the registered events and the settings rows; `pulls_contract.py` requires this tree's to equal
+  `addon/tests/fixtures/gate_off_main.json`, the same session on `main`'s addon. A gate was chosen over moving the Lua
   into a second pull request: the site, protocol and addon stay one reviewed change, the nightly cannot pick the code
   up by accident, and turning it on is one reviewed line in the release pull request (`docs/RELEASING.md`, "Release
   gates").
@@ -210,11 +228,14 @@ pull request adds it there as the item `#boss-pulls`, shown only while `EVERLOOT
 - `supabase/migrations/20261102130000_pull_summaries.sql` and `supabase/tests/pull_summaries.sql`: the pull tables,
   insert, forget, the hide trigger and retention.
 - `web`: `lib/pull-summaries.ts` (switch, checks) and `lib/pull-store.ts` (Supabase, and a memory store with the same
-  rules); intake writes pull rows there and stores timing and runs with the upload; the hide form deletes from the
-  pulls; the snapshot cron prunes them; the upload page preview explains them; `/privacy` has the item above behind the
-  switch. Tests for each, including a hide before and after an upload.
-- `companion`: the uploader sends `pull_summary` only with `pulls: true`, which the Desktop App sets; the Desktop App's
-  settings say so.
+  rules); with the switch on, intake writes pull rows there and stores timing and runs with the upload, and with it off
+  answers as `main` did; the hide form deletes from the pulls; the snapshot cron prunes them, switch or not; the upload
+  page preview explains them; `/privacy` has the item above behind the switch. Tests for each, including a hide
+  before and after an upload, a verified owner's opt-out under another spelling of the realm, and intake with the
+  switch off against `main`'s answers.
+- `companion`: the uploader sends `pull_summary` only with `pulls: true`, which the Desktop App sets, and runs and
+  pull summaries only to a site that reads them (`site-collects.json`, above); the Desktop App's settings describe
+  them once the site does.
 
 No addon version bump, no zip, no release.
 

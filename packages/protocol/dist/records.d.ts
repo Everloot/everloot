@@ -170,6 +170,24 @@ export declare const instanceEntrance: z.ZodObject<{
     x: z.ZodNumber;
     y: z.ZodNumber;
 }, z.core.$strip>;
+/**
+ * A boss encounter's end as intake took it before pull timing. While the site's `EVERLOOT_PULL_SUMMARIES` switch is off,
+ * intake parses `encounter` rows with this (`parseRecords(rows, { runRecords: false })`): the timing fields are dropped
+ * unread, as any unknown field is, so an upload gets the same answer it got before they existed.
+ */
+export declare const encounterEndBeforeRuns: z.ZodObject<{
+    installId: z.ZodString;
+    eventId: z.ZodOptional<z.ZodString>;
+    capturedAt: z.ZodString;
+    kind: z.ZodLiteral<"encounter">;
+    encounterId: z.ZodNumber;
+    name: z.ZodString;
+    instanceMapId: z.ZodNumber;
+    difficulty: z.ZodOptional<z.ZodNumber>;
+    size: z.ZodOptional<z.ZodNumber>;
+    success: z.ZodBoolean;
+    npcIds: z.ZodOptional<z.ZodArray<z.ZodNumber>>;
+}, z.core.$strip>;
 /** A boss encounter's end, as `ENCOUNTER_END` reports it. */
 export declare const encounterEnd: z.ZodObject<{
     installId: z.ZodString;
@@ -901,6 +919,12 @@ export declare const pullSummary: z.ZodObject<{
 }, z.core.$strip>;
 /** The pull summary kind. Named, so never in an upload object or the public corpus; intake writes it to its own tables. */
 export declare const PULL_KINDS: readonly string[];
+/**
+ * The kinds that exist only once the site collects runs and pulls (`EVERLOOT_PULL_SUMMARIES`). Until then intake parses
+ * with `{ runRecords: false }` and these are unknown kinds, as they were before; an uploader holds them until a receipt
+ * says `runRecords: true`.
+ */
+export declare const RUN_RECORD_KINDS: readonly string[];
 /**
  * The guild kill kind. Stored with the upload, never served raw: it is not on the public corpus allowlist, and
  * only the guild rollup (2 installs, hidden guilds out, behind the switch) publishes kills.

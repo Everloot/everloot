@@ -64,6 +64,23 @@ begin
   if (select count(*) from public.pull_members) <> 0 or (select count(*) from public.pull_summaries) <> 0 then raise exception 'an opt-out left pull rows'; end if;
 end $$;
 
+-- A verified owner's opt-out recorded before the upload keeps the realm only lower-cased ('forever-pioneer'), and the
+-- trigger has nothing to delete yet: an upload spelling the realm 'Forever Pioneer' still leaves the character out.
+insert into public.character_suppressions (realm, character) values ('forever-pioneer', 'optedout');
+select public.insert_pull_summaries('[
+  {"installId":"install-1234","eventId":"epoch:9","capturedAt":"2026-11-02T12:10:00Z","summary":{"kind":"pull_summary"},
+   "members":[{"name":"OptedOut","realm":"Forever Pioneer","class":"MAGE"},{"name":"Stays","realm":"Forever Pioneer","class":"MAGE"}]},
+  {"installId":"install-1234","eventId":"epoch:10","capturedAt":"2026-11-02T12:12:00Z","summary":{"kind":"pull_summary"},
+   "members":[{"name":"OptedOut","realm":"Forever Pioneer","class":"MAGE"}]}
+]'::jsonb);
+do $$
+begin
+  if exists (select 1 from public.pull_members where name_key = 'optedout') then raise exception 'an opted-out character came back under another realm spelling'; end if;
+  if exists (select 1 from public.pull_summaries where event_id = 'epoch:10') then raise exception 'a pull of an opted-out character only was written'; end if;
+  if not exists (select 1 from public.pull_members where name_key = 'stays') then raise exception 'the other member was dropped'; end if;
+  delete from public.pull_summaries where event_id = 'epoch:9';
+end $$;
+
 -- forget_pull_member is safe to repeat.
 select public.forget_pull_member('Forever Pioneer', 'Nobody');
 

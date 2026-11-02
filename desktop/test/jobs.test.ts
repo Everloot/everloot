@@ -274,3 +274,48 @@ describe("character link codes in the upload job", () => {
     }
   });
 });
+
+test("runs and boss pulls a site does not read are sent once, then kept unsent across runs until it reads them", async () => {
+  const d = dir();
+  const file = join(d, "Everloot.lua");
+  writeFileSync(file, `EverlootDB = { version = "0.3.16", installId = "abcd-1234-ef56-7890", records = {
+    loot = { { eventId = "epoch:1", capturedAt = "2026-11-02T12:00:00Z", sourceNpcId = 42, sourceEvidence = "loot-api", items = { { itemId = 5, count = 1 } } } },
+    instance_run = { { eventId = "epoch:2", capturedAt = "2026-11-02T12:40:00Z", runId = "0123456789abcdef", instanceMapId = 36, instanceType = "party",
+      enteredAt = "2026-11-02T11:50:00Z", leftAt = "2026-11-02T12:40:00Z", pulls = 1, kills = 1, wipes = 0, endReason = "left" } },
+    pull_summary = { { eventId = "epoch:3", capturedAt = "2026-11-02T12:01:00Z", encounterId = 1144, name = "Rhahk'zor", instanceMapId = 36, success = true,
+      realm = "Forever", members = { { name = "Thrallina", class = "SHAMAN" } } } },
+  } }`);
+  // The intake as main answers while the switch is off (unknown kinds), and with runRecords: true once it is on.
+  let on = false;
+  const sent: string[][] = [];
+  vi.stubGlobal("fetch", vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+    expect(String(url)).toBe("https://everloot.app/api/intake");
+    const records = (JSON.parse(String(init?.body)) as { records: { kind: string }[] }).records;
+    sent.push(records.map((r) => r.kind));
+    const accepted: { index: number; kind: string }[] = [], rejected: { index: number; reason: string }[] = [];
+    records.forEach((r, index) => (on || !["instance_run", "pull_summary"].includes(r.kind) ? accepted.push({ index, kind: r.kind }) : rejected.push({ index, reason: `unknown kind: ${r.kind}` })));
+    const flag = on ? { runRecords: true } : {};
+    return accepted.length ? Response.json({ ok: true, persisted: true, uploadId: `u-${sent.length}`, accepted, rejected, ...flag })
+      : Response.json({ ok: false, accepted, rejected, ...flag }, { status: 422 });
+  }));
+  vi.useFakeTimers({ now: new Date("2026-11-02T13:00:00Z"), toFake: ["Date"] });
+  try {
+    const data = join(d, "data");
+    // A new app each run, as after a restart: what the site said is read back from the data folder.
+    const run = () => companionJobs(data, () => ({ ...defaultSettings(), endpoint: "https://everloot.app" })).deps.upload(file);
+    expect(await run()).toMatch(/^sent 1 new events in 1 batch\(es\); the site turned away 2 rows/);
+    expect(sent).toEqual([["loot", "instance_run", "pull_summary"]]);
+    for (let i = 0; i < 3; i++) {
+      vi.setSystemTime(Date.now() + 3_600_000);
+      expect(await run()).toMatch(/^sent 0 new events in 0 batch\(es\);.*; kept 2 runs and boss pulls here until the site reads them/);
+    }
+    expect(sent).toHaveLength(1);
+    // The site switches collection on; a day after it last said no, the app asks again and the rows go.
+    on = true;
+    vi.setSystemTime(new Date("2026-11-03T13:00:00Z"));
+    expect(await run()).toMatch(/^sent 2 new events in 1 batch\(es\); skipped/);
+    expect(sent[1]).toEqual(["instance_run", "pull_summary"]);
+    expect(await run()).toMatch(/^sent 0 new events in 0 batch\(es\)/);
+    expect(sent).toHaveLength(2);
+  } finally { vi.useRealTimers(); vi.unstubAllGlobals(); }
+});

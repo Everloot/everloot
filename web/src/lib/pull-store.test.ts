@@ -81,3 +81,17 @@ test("the cloud store sends one call per upload and per hide, and a failed call 
   doFetch.mockResolvedValueOnce(new Response("", { status: 503 }));
   await expect(store.forget("Forever Pioneer", "Thrallina")).rejects.toThrow("Pull storage unavailable (503)");
 });
+
+test("pruning where the migration was never applied does nothing and throws nothing; any other failure still throws", async () => {
+  const absent = () => new Response(JSON.stringify({ code: "PGRST202", message: "Could not find the function public.prune_pull_summaries" }), { status: 404 });
+  const doFetch = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => absent());
+  const store = createCloudPullStore("https://db.example", "key", doFetch as unknown as typeof fetch);
+  await expect(store.prune()).resolves.toBeUndefined();
+  expect(String(doFetch.mock.calls[0]![0])).toBe("https://db.example/rest/v1/rpc/prune_pull_summaries");
+  // Only retention is excused: a write or a hide against missing tables is still an error.
+  await expect(store.forget("Forever", "Thrallina")).rejects.toThrow("Pull storage unavailable (404)");
+  doFetch.mockResolvedValueOnce(new Response("", { status: 404 }));
+  await expect(store.prune()).rejects.toThrow("Pull storage unavailable (404)");
+  doFetch.mockResolvedValueOnce(new Response("{}", { status: 500 }));
+  await expect(store.prune()).rejects.toThrow("Pull storage unavailable (500)");
+});

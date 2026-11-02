@@ -4,6 +4,7 @@ import { join, relative } from "node:path";
 import { describe, expect, test, vi } from "vitest";
 import { findEverlootFiles } from "../src/savedvariables";
 import { createSentState } from "../src/sent-state";
+import { createSiteCollects } from "../src/site-collects";
 import { RateLimited, uploadFile } from "../src/uploader";
 import { emptySettledList, encodeIds } from "../../kb/src/settled-list";
 
@@ -111,16 +112,75 @@ describe("uploading", () => {
     expect(api.bodies[0].records.map((r) => r.kind)).toEqual(["loot"]);
   });
 
+  const pull = { kind: "pull_summary", lua: `["eventId"] = "epoch:701", ["capturedAt"] = "2026-11-02T12:00:00Z", ["encounterId"] = 1144, ["name"] = "Rhahk'zor", ["instanceMapId"] = 36, ["realm"] = "Forever", ["success"] = true, ["members"] = {{["name"] = "Thrallina", ["class"] = "SHAMAN"}}` };
+  const run = { kind: "instance_run", lua: `["eventId"] = "epoch:702", ["capturedAt"] = "2026-11-02T12:40:00Z", ["runId"] = "0123456789abcdef", ["instanceMapId"] = 36, ["instanceType"] = "party", ["enteredAt"] = "2026-11-02T11:50:00Z", ["leftAt"] = "2026-11-02T12:40:00Z", ["pulls"] = 1, ["kills"] = 1, ["wipes"] = 0, ["endReason"] = "left"` };
+  /** An intake that reads runs and pull summaries only while `on()`: off, it answers as main does, unknown kinds. */
+  function gatedIntake(on: () => boolean) {
+    const bodies: { records: { eventId: string; kind: string }[] }[] = [];
+    const send = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as { records: { kind: string }[] };
+      bodies.push(body as typeof bodies[number]);
+      const accepted: { index: number; kind: string }[] = [], rejected: { index: number; reason: string }[] = [];
+      body.records.forEach((r, index) => (on() || !["instance_run", "pull_summary"].includes(r.kind)
+        ? accepted.push({ index, kind: r.kind }) : rejected.push({ index, reason: `unknown kind: ${r.kind}` })));
+      if (!accepted.length) return Response.json({ ok: false, accepted, rejected, ...(on() ? { runRecords: true } : {}) }, { status: 422 });
+      return Response.json({ ok: true, persisted: true, uploadId: `u-${bodies.length}`, accepted, rejected, ...(on() ? { runRecords: true } : {}) });
+    });
+    return { send: send as unknown as typeof fetch, bodies };
+  }
+  const kinds = (body: { records: { kind: string }[] }) => body.records.map((r) => r.kind);
+
   test("pull summaries go only when the Desktop App asks: the command-line uploader sends no named kind", async () => {
-    const pull = { kind: "pull_summary", lua: `["eventId"] = "epoch:701", ["capturedAt"] = "2026-11-02T12:00:00Z", ["encounterId"] = 1144, ["name"] = "Rhahk'zor", ["instanceMapId"] = 36, ["realm"] = "Forever", ["success"] = true, ["members"] = {{["name"] = "Thrallina", ["class"] = "SHAMAN"}}` };
     const cli = workspace(luaFile([loot(1), pull]));
     const held = intake();
-    expect(await uploadFile(cli.file, { endpoint: "https://everloot.example", fetch: held.send, state: cli.state, census: true, players: true })).toMatchObject({ sent: 1, invalid: 0 });
+    const collects = createSiteCollects(join(cli.dir, "state", "site-collects.json"));
+    expect(await uploadFile(cli.file, { endpoint: "https://everloot.example", fetch: held.send, state: cli.state, census: true, players: true, collects })).toMatchObject({ sent: 1, invalid: 0, heldNamed: 1, heldAddons: 0 });
     expect(held.bodies[0].records.map((r) => r.kind)).toEqual(["loot"]);
     const app = workspace(luaFile([loot(1), pull]));
-    const sent = intake();
-    expect(await uploadFile(app.file, { endpoint: "https://everloot.example", fetch: sent.send, state: app.state, pulls: true })).toMatchObject({ sent: 2, invalid: 0 });
+    const sent = gatedIntake(() => true);
+    const appCollects = createSiteCollects(join(app.dir, "state", "site-collects.json"));
+    expect(await uploadFile(app.file, { endpoint: "https://everloot.example", fetch: sent.send, state: app.state, pulls: true, collects: appCollects })).toMatchObject({ sent: 2, invalid: 0 });
     expect(sent.bodies[0].records.map((r) => r.kind)).toEqual(["loot", "pull_summary"]);
+  });
+
+  test("without a record of what the site reads, runs and pull summaries stay here and nothing new is written", async () => {
+    const { file, state } = workspace(luaFile([loot(1), run, pull]));
+    const api = gatedIntake(() => true);
+    expect(await uploadFile(file, { endpoint: "https://everloot.example", fetch: api.send, state, pulls: true })).toMatchObject({ sent: 1, heldRuns: 2, heldAddons: 0 });
+    expect(kinds(api.bodies[0])).toEqual(["loot"]);
+    // A file with none of them never creates the record either.
+    const plain = workspace(luaFile([loot(1)]));
+    const collects = createSiteCollects(join(plain.dir, "state", "site-collects.json"));
+    await uploadFile(plain.file, { endpoint: "https://everloot.example", fetch: gatedIntake(() => false).send, state: plain.state, pulls: true, collects });
+    expect(() => readFileSync(join(plain.dir, "state", "site-collects.json"))).toThrow();
+  });
+
+  test("a site that does not read runs and pull summaries gets them once, then they wait here, unsent, until it does", async () => {
+    vi.useFakeTimers({ now: new Date("2026-11-02T13:00:00Z"), toFake: ["Date"] });
+    try {
+      const { dir, file, state } = workspace(luaFile([loot(1), run, pull]));
+      const path = join(dir, "state", "site-collects.json");
+      let on = false;
+      const api = gatedIntake(() => on);
+      const go = () => uploadFile(file, { endpoint: "https://everloot.example", fetch: api.send, state, pulls: true, collects: createSiteCollects(path) });
+      // First run: the site has never answered, so they go with the loot; it does not know the kinds.
+      expect(await go()).toMatchObject({ sent: 1, rejected: 2, heldRuns: 0 });
+      expect(kinds(api.bodies[0])).toEqual(["loot", "instance_run", "pull_summary"]);
+      expect(JSON.parse(readFileSync(path, "utf8"))).toEqual({ "https://everloot.example": { collects: false, at: Date.parse("2026-11-02T13:00:00Z") } });
+      // Later runs that day: nothing is sent, and they are not marked sent.
+      expect(await go()).toMatchObject({ sent: 0, batches: 0, heldRuns: 2, rejected: 0 });
+      vi.setSystemTime(new Date("2026-11-03T12:59:00Z"));
+      expect(await go()).toMatchObject({ batches: 0, heldRuns: 2 });
+      expect(api.bodies).toHaveLength(1);
+      // A day on, the site is asked again; now it reads them, they are sent, and the next run has nothing left.
+      on = true;
+      vi.setSystemTime(new Date("2026-11-03T13:00:00Z"));
+      expect(await go()).toMatchObject({ sent: 2, rejected: 0, heldRuns: 0 });
+      expect(kinds(api.bodies[1])).toEqual(["instance_run", "pull_summary"]);
+      expect(JSON.parse(readFileSync(path, "utf8"))["https://everloot.example"].collects).toBe(true);
+      expect(await go()).toMatchObject({ sent: 0, batches: 0, heldRuns: 0 });
+      expect(api.bodies).toHaveLength(2);
+    } finally { vi.useRealTimers(); }
   });
 
   test("the census never leaves from here: the upload page counts it first", async () => {

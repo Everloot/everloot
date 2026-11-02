@@ -131,8 +131,12 @@ export const instanceEntrance = base.extend({
   y: z.number().min(0).max(100).describe("The player's y there, 0 to 100."),
 });
 
-/** A boss encounter's end, as `ENCOUNTER_END` reports it. */
-export const encounterEnd = base.extend({
+/**
+ * A boss encounter's end as intake took it before pull timing. While the site's `EVERLOOT_PULL_SUMMARIES` switch is off,
+ * intake parses `encounter` rows with this (`parseRecords(rows, { runRecords: false })`): the timing fields are dropped
+ * unread, as any unknown field is, so an upload gets the same answer it got before they existed.
+ */
+export const encounterEndBeforeRuns = base.extend({
   kind: z.literal("encounter"),
   encounterId: z.number().int().positive(),
   name: z.string().min(1).max(120).describe("The encounter's name in the client's language. Public only when 3 installs agree on it."),
@@ -141,6 +145,10 @@ export const encounterEnd = base.extend({
   size: z.number().int().min(1).max(40).optional().describe("The group size the encounter reports."),
   success: z.boolean().describe("True for a kill, false for a wipe."),
   npcIds: z.array(z.number().int().positive()).max(40).optional().describe("The bosses' creature ids the client listed for the encounter, or the creatures that died in it. Absent when there were none."),
+});
+
+/** A boss encounter's end, as `ENCOUNTER_END` reports it. */
+export const encounterEnd = encounterEndBeforeRuns.extend({
   startedAt: z.string().datetime({ offset: true }).optional().describe("When `ENCOUNTER_START` fired for this pull. Absent when the addon did not see the start (older addons, a client restarted mid-fight)."),
   durationSeconds: PULL_SECONDS.optional().describe("Whole seconds from `ENCOUNTER_START` to `ENCOUNTER_END`. Present only with `startedAt`."),
   runId: RUN_ID.optional().describe("The `instance_run` this pull belongs to. Absent when the addon had no run open."),
@@ -737,6 +745,13 @@ export const pullSummary = base.extend({
 
 /** The pull summary kind. Named, so never in an upload object or the public corpus; intake writes it to its own tables. */
 export const PULL_KINDS: readonly string[] = ["pull_summary"];
+
+/**
+ * The kinds that exist only once the site collects runs and pulls (`EVERLOOT_PULL_SUMMARIES`). Until then intake parses
+ * with `{ runRecords: false }` and these are unknown kinds, as they were before; an uploader holds them until a receipt
+ * says `runRecords: true`.
+ */
+export const RUN_RECORD_KINDS: readonly string[] = ["instance_run", "pull_summary"];
 
 
 // --- Guild kills: a boss kill credited to the player's own guild (docs/design/specs/2026-10-24-guild-board-design.md) ---

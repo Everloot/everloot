@@ -13,11 +13,13 @@ Pull timing, instance runs and pull summaries (docs/design/specs/2026-11-02-pull
 
 Every row is checked in the shape the upload sends, against the protocol's JSON Schema.
 """
+import json
 import re
 from pathlib import Path
 
 from lupa.lua51 import LuaRuntime
 
+from gate_off_snapshot import snapshot
 from protocol_schema import check_all
 
 root = Path(__file__).parents[1]
@@ -162,14 +164,24 @@ assert(EverlootDB.run == nil and EverlootDB.pullStart == nil and #rows('instance
 assert(#rows('pull_summary') == 0 and meterReads == 0, 'no pull summary and no meter read')
 assert(not string.find(Everloot:Status(), '  pulls: ', 1, true), 'no pulls module in the status')
 for _, line in ipairs(printed) do assert(not string.find(line, 'boss pulls on', 1, true), 'no notice') end
+assert(EverlootDB.toggles.pulls == nil and EverlootDB.pullsNotice == nil, 'no switch and no notice in the file')
+assert(not string.find(Everloot:Status(), 'instance_run', 1, true) and not string.find(Everloot:Status(), 'pull_summary', 1, true), 'no new row counts in the status')
 SlashCmdList.EVERLOOT('pulls on')
-assert(string.find(printed[#printed], 'not in this build', 1, true), printed[#printed])
+assert(string.find(printed[#printed], 'Everloot commands:', 1, true) and EverlootDB.toggles.pulls == nil, 'the command is unknown, as before')
 SlashCmdList.EVERLOOT('help')
 assert(not string.find(printed[#printed], '/everloot pulls', 1, true), 'the command list does not offer it')
 for _, r in ipairs(Everloot.Options.ROWS) do assert(r.key ~= 'pulls', 'the settings page does not offer it') end
 """)
 counts = check_all(lua)
 assert counts.get("encounter") == 1 and "instance_run" not in counts and "pull_summary" not in counts, counts
+
+# --- Before the release, the same session reads exactly as on main: saved file, chat, status, commands, events ---
+main = json.loads((Path(__file__).parent / "fixtures" / "gate_off_main.json").read_text(encoding="utf-8"))
+mine = snapshot(root)
+for case in main:
+    for part in main[case]:
+        assert mine[case][part] == main[case][part], f"gate off, {case} install: {part} differs from main's (fixtures/gate_off_main.json)"
+assert mine.keys() == main.keys()
 
 # --- Pull timing: start and length on the anonymous encounter row ---
 lua = fresh(files=("core.lua", "modules/openworld.lua"))
