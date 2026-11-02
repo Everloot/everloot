@@ -437,9 +437,9 @@ prerequisites, spend gates, the cost and the cap, with spell ids, perk names and
 icons or tooltip text. Like the talent catalog it may be committed to the git repository as a clearly marked game-data
 file (`web/src/data/game-data/legacy-perks.json`, see [LEGACY_PERKS](LEGACY_PERKS.md)), labelled *found in game
 files, unconfirmed*: it is Blizzard's data, kept apart from our CC BY-SA data and outside our licence. Each rule says
-how it was read, and a rule the files do not settle has no value. No page shows it and no planner uses it: a Legacy
-planner waits until the cost, the cap and the spend gates it would enforce are confirmed in game or by Blizzard. It is
-not in the dataset, the API or the MCP server.
+how it was read, and a rule the files do not settle has no value. Decided 2026-11-02 by Carlos: a read-only page,
+`/tools/legacy`, lists it. No planner uses it: a Legacy planner waits until the cost, the cap and the spend gates it
+would enforce are confirmed in game or by Blizzard. It is not in the dataset, the API or the MCP server.
 
 **The map layer.** From the map tables we publish zone rectangles (`UiMapAssignment`), continents
 and instances (`Map`, `UiMap`), dungeon and raid entrance points (`Map.Corpse`) and, for each entrance
