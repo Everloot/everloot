@@ -1,3 +1,4 @@
 packages/protocol/dist/** linguist-generated eol=lf
 packages/protocol/schema/** linguist-generated eol=lf
 addon/media/*.tga binary
+.githooks/* text eol=lf
