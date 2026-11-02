@@ -147,7 +147,7 @@ without it, neither which tables were read nor how many blocks were skipped is k
 
 ## What the files leave open
 
-As of build 1.60.1.70634, which holds the same Legacy rows as the builds the source audit read:
+As of build 1.60.1.70707, which holds the same Legacy rows as 70634 and the builds the source audit read:
 
 - **Where a gate counts.** Each tree's two conditions name the tree's 7-node group. Read by the column name, points
   spent in the other two trees would not count. The source audit sets out the analogy with the class trees and the
@@ -181,7 +181,10 @@ an incomplete inventory or a change a maintainer must look at, not perks that le
 withdraw an id: an id is withdrawn only when a complete inventory lacks it. If Blizzard asks for the data to be taken
 down, a maintainer deletes the file, as [DATA_POLICY](DATA_POLICY.md) says.
 
-## Build 1.60.1.70634
+## Build 1.60.1.70707
+
+The Legacy rows are the same as in 1.60.1.70634; only the build stamp and the read tables' row counts and hashes
+changed (the rows that moved are class-tree rows).
 
 Trees 1187, 1188 and 1189 (and 1118, with no nodes) spend currency 4225, cap 16. Each tree has 9 nodes, 25 ranks with
 every node maxed, a cost of 1, a 5-point and a 10-point gate and 3 prerequisite edges, all `any`. The 27 nodes are 26
