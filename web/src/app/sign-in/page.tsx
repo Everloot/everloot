@@ -21,6 +21,9 @@ export const metadata: Metadata = {
 };
 
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
+// The panel's picture is decoration: the page loads it only when it renders, after the session check and the
+// add-account redirect, so a visitor who is sent on never waits for the asset manifest.
+const shellArt = async () => launchArt(await loadSiteAssets())?.background ?? null;
 const alertBox = "rounded-card border border-danger bg-panel px-4 py-3";
 
 // `?error=<reason>` comes from the Battle.net callback when a sign-in did not finish. The reason is mapped to a
@@ -44,14 +47,13 @@ function signInError(error: string | string[] | undefined): string | null {
 // plugin would replace the current one, so the page refuses instead.
 export default async function SignInPage({ searchParams }: { searchParams?: Promise<{ returnTo?: string | string[]; add?: string | string[]; ready?: string | string[]; error?: string | string[]; flow?: string | string[] }> }) {
   const params = await searchParams;
-  const art = launchArt(await loadSiteAssets())?.background ?? null;
   let add = params?.add === "1" && authV2Enabled() && profilesOn();
   if (add) {
     const state = await addAccountState(await headers()).catch(() => "unavailable" as const);
     if (state === "needs-cookie" && params?.ready !== "1") redirect("/api/me/accounts/add");
     if (state === "full" || state === "needs-cookie" || state === "unavailable") {
       return (
-        <AuthShell art={art} title="Add another account">
+        <AuthShell art={await shellArt()} title="Add another account">
           <p role="status" className="text-fg-2">
             {state === "full"
               ? `You are signed in to ${MAX_DEVICE_ACCOUNTS} accounts on this browser, the most it holds. Sign out of one to add another.`
@@ -72,7 +74,7 @@ export default async function SignInPage({ searchParams }: { searchParams?: Prom
   const providers = methods.battlenet || social.length > 0;
   return (
     <AuthShell
-      art={art}
+      art={await shellArt()}
       title={add ? "Add another account" : "Sign in"}
       lede={<p className="text-sm text-fg-2">{add ? "Sign in with the account you want to add." : "Pick up where you left off with your saved builds."}</p>}
     >

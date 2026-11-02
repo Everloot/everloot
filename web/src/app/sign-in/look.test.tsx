@@ -74,3 +74,10 @@ test("a sign-in error sits in its own box above the buttons", async () => {
   expect(html).toMatch(/<div class="rounded-card border border-danger[^"]*"><p role="alert" class="text-sm text-fg">Battle.net sign-in was cancelled/);
   expect(html.indexOf('role="alert"')).toBeLessThan(html.indexOf("/api/auth/bnet"));
 });
+
+test("a signed-in visitor is sent on before the decorative art is looked up", async () => {
+  auth.getUser.mockResolvedValue({ id: "u1" });
+  await expect(SignInPage(page({ returnTo: "/me" }))).rejects.toThrow("NEXT_REDIRECT /me");
+  await expect(SignUpPage(page())).rejects.toThrow("NEXT_REDIRECT /account");
+  expect(auth.assets).not.toHaveBeenCalled();
+});
