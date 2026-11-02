@@ -47,7 +47,7 @@ end
 local defaults = {
   version = E.VERSION,
   installId = nil,
-  toggles = { openworld = true, guild = true, gear = true, auctions = true, gold = true, addons = false, talents = true, completion = false, census = true, players = false },
+  toggles = { openworld = true, guild = true, gear = true, auctions = true, gold = true, addons = false, talents = true, completion = false, census = true, players = false, pulls = false },
   records = {},
 }
 
@@ -160,11 +160,11 @@ function E:Status()
     lines[#lines + 1] = string.format("  %s: %s", m.name, m.note)
   end
   for _, kind in ipairs({ "npc_sighting", "loot", "quest", "vendor", "item_seen", "item_fact",
-    "object_sighting", "instance_entrance", "encounter", "guild_snapshot", "raid_lockout", "attendance", "loot_award", "gear_snapshot",
+    "object_sighting", "instance_entrance", "encounter", "instance_run", "guild_snapshot", "raid_lockout", "attendance", "loot_award", "gear_snapshot",
     "collection_catalog", "collection_owned", "auction_scan", "auction_snapshot", "recipe_seen", "recipe_observed", "trainer_seen", "price_seen",
     "gold_snapshot", "money_event", "addon_seen", "map_bounds", "talent_snapshot",
     "achievement_catalog", "reputation_catalog", "title_catalog", "quest_chain_catalog",
-    "achievement_owned", "reputation_owned", "title_owned", "quest_owned", "census_self", "census_seen", "player_seen", "character_link" }) do
+    "achievement_owned", "reputation_owned", "title_owned", "quest_owned", "census_self", "census_seen", "player_seen", "character_link", "pull_summary" }) do
     lines[#lines + 1] = string.format("  rows %s: %d", kind, self:Count(kind))
   end
   return table.concat(lines, "\n")
@@ -280,6 +280,17 @@ SlashCmdList["EVERLOOT"] = function(msg)
     end
   elseif msg == "players" and E.Players then
     print(E.Players.StatusLine())
+  elseif msg == "pulls on" or msg == "pulls off" then
+    EverlootDB.toggles.pulls = (msg == "pulls on")
+    if EverlootDB.toggles.pulls then
+      print("Everloot: pulls on. After each boss pull in a dungeon or raid it records your group: each member's name, class and role, and the damage, healing, damage taken and deaths the game's own damage meter shows, with the boss, kill or wipe and how long it took. Never their gear, guild, position or chat. It is sent only from the everloot.app upload page, after its preview, and the site does not show it. /reload to apply.")
+    else
+      -- Turning it off withdraws what it wrote: every pull summary is deleted from this file.
+      if E.Pulls then E.Pulls.Withdraw() end
+      print("Everloot: pulls off; all pull summaries were deleted from this file.")
+    end
+  elseif msg == "pulls" and E.Pulls then
+    print(E.Pulls.StatusLine())
   elseif msg == "scanprompt on" or msg == "scanprompt off" then
     EverlootDB.scanPrompt = (msg == "scanprompt on")
     print("Everloot: the scan prompt at the auction house is " .. (EverlootDB.scanPrompt and "on" or "off")
@@ -304,6 +315,6 @@ SlashCmdList["EVERLOOT"] = function(msg)
       print("Everloot: installed addon list off; all recorded addon rows were deleted from this file. /reload to apply.")
     end
   else
-    print("Everloot commands: /everloot window, /everloot options, /everloot status, /everloot auctions on|off, /everloot scan, /everloot scanprompt on|off, /everloot vendor on|off, /everloot mail on|off, /everloot price [item], /everloot gph [start|pause|stop|reset|show|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], /everloot link [code|clear], /everloot selftest, /everloot talents, /everloot plan [share code|number], /everloot raid [code], /ask <question>")
+    print("Everloot commands: /everloot window, /everloot options, /everloot status, /everloot auctions on|off, /everloot scan, /everloot scanprompt on|off, /everloot vendor on|off, /everloot mail on|off, /everloot price [item], /everloot gph [start|pause|stop|reset|show|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], /everloot pulls [on|off], /everloot link [code|clear], /everloot selftest, /everloot talents, /everloot plan [share code|number], /everloot raid [code], /ask <question>")
   end
 end

@@ -35,6 +35,9 @@ const CENSUS = new Set<string>(["census_self", "census_seen"]);
 /** Named player rows go only from the upload page too, which says what they are first. */
 const PLAYERS: RecordKind = "player_seen";
 
+/** Pull summaries name everyone in the group: like the addon list, they go only from the upload page, never from here. */
+const PULLS: RecordKind = "pull_summary";
+
 /** An answer past the largest request the intake takes is not a receipt. */
 const MAX_ANSWER_BYTES = UPLOAD_LIMITS.maxBodyBytes;
 const KEEP = "Nothing more was marked sent; keep your file and retry.";
@@ -161,7 +164,7 @@ export async function uploadFile(file: string, options: UploadOptions): Promise<
   const heldCensus = unsent.filter(held).length;
   const heldPlayer = (r: Record<string, unknown>) => !options.players && r.kind === PLAYERS;
   const heldPlayers = unsent.filter(heldPlayer).length;
-  const records = unsent.filter((r) => r.kind !== ADDON_LIST && !heldPlayer(r) && !held(r));
+  const records = unsent.filter((r) => r.kind !== ADDON_LIST && r.kind !== PULLS && !heldPlayer(r) && !held(r));
   const list = typeof options.settled === "function" ? await options.settled(parsed.clientBuild) : options.settled;
   const session = prepareUpload({ addonVersion: parsed.version, clientBuild: parsed.clientBuild, records }, {}, [], undefined, settledSkip(list, parsed.clientBuild));
   // A settled row is handled: it is not weighed again next time, whether or not the rest is sent.

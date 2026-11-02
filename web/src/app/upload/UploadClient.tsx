@@ -170,6 +170,10 @@ export default function UploadClient({ playerPages = false }: { playerPages?: bo
             ? <p className="mt-1 text-fg-2">Each row holds a character&apos;s name, realm, race, class, level and guild, and the day it was seen, never where. Everloot keeps the newest row per character and shows it on a public player page with a link to hide it. Characters whose owners hid them are skipped.</p>
             : <p className="mt-1 text-fg-2">Everloot does not collect player rows yet, so the server drops these. They stay in your file.</p>}
         </div>}
+        {(prepared.value.counts.pull_summary ?? 0) > 0 && <div className="mt-3 text-sm text-fg-2">
+          <p>Boss pulls in this upload: {prepared.value.counts.pull_summary.toLocaleString("en-US")}, recorded because you ran <code>/everloot pulls on</code>.</p>
+          <p className="mt-1 text-fg-2">Each row holds the boss, kill or wipe and how long it took, and for each member of your group their name, class, role and the damage, healing, damage taken and deaths the game&apos;s damage meter showed. Everloot keeps them private: no page shows them, and they are not in the public data.</p>
+        </div>}
         {prepared.value.skipped.length > 0 && <p className="mt-3 text-sm text-fg-2">
           Skipped {prepared.value.skipped.length.toLocaleString("en-US")} already settled: {prepared.value.skipped.length === 1 ? "this row repeats a fact" : "these rows repeat facts"} at least five installs agree on, with no other report for 14 days, so Everloot does not need {prepared.value.skipped.length === 1 ? "it" : "them"} again. {prepared.value.skipped.length === 1 ? "It stays" : "They stay"} in your file.
         </p>}

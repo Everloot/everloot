@@ -19,6 +19,9 @@ export declare const RULES: {
     readonly map_bounds: readonly ["map bounds need a width and a height"];
     readonly talent_snapshot: readonly ["talent points must equal the sum of node ranks", "talent node ids must be unique"];
     readonly item_fact: readonly ["an item fact other than damage_per_second is a whole number"];
+    readonly encounter: readonly ["startedAt and durationSeconds come together"];
+    readonly instance_run: readonly ["kills and wipes add up to pulls", "leftAt cannot be before enteredAt"];
+    readonly pull_summary: readonly ["role and roleSource come together"];
 };
 export declare const INSTALL_ID: z.ZodString;
 /** What the game calls a creature (`UnitCreatureType`), in English. The addon sends only these exact names. */
@@ -180,6 +183,43 @@ export declare const encounterEnd: z.ZodObject<{
     size: z.ZodOptional<z.ZodNumber>;
     success: z.ZodBoolean;
     npcIds: z.ZodOptional<z.ZodArray<z.ZodNumber>>;
+    startedAt: z.ZodOptional<z.ZodString>;
+    durationSeconds: z.ZodOptional<z.ZodNumber>;
+    runId: z.ZodOptional<z.ZodString>;
+}, z.core.$strip>;
+/** Why a run ended: gone 30 minutes, entered another instance, or the instance was reset (the game said so, or a killed boss was pulled again). */
+export declare const RUN_END_REASONS: readonly ["left", "new_instance", "reset"];
+/**
+ * One dungeon or raid run: from zoning in to leaving it, with the first pull and last kill, so a clear time exists.
+ * Anonymous like `encounter`: counts and ids, no names. Written only for a run with at least one boss pull.
+ */
+export declare const instanceRun: z.ZodObject<{
+    installId: z.ZodString;
+    eventId: z.ZodOptional<z.ZodString>;
+    capturedAt: z.ZodString;
+    kind: z.ZodLiteral<"instance_run">;
+    runId: z.ZodString;
+    instanceMapId: z.ZodNumber;
+    name: z.ZodOptional<z.ZodString>;
+    instanceType: z.ZodEnum<{
+        party: "party";
+        raid: "raid";
+    }>;
+    difficulty: z.ZodOptional<z.ZodNumber>;
+    enteredAt: z.ZodString;
+    leftAt: z.ZodString;
+    firstPullAt: z.ZodOptional<z.ZodString>;
+    lastKillAt: z.ZodOptional<z.ZodString>;
+    pulls: z.ZodNumber;
+    kills: z.ZodNumber;
+    wipes: z.ZodNumber;
+    size: z.ZodOptional<z.ZodNumber>;
+    killedEncounterIds: z.ZodOptional<z.ZodArray<z.ZodNumber>>;
+    endReason: z.ZodEnum<{
+        left: "left";
+        new_instance: "new_instance";
+        reset: "reset";
+    }>;
 }, z.core.$strip>;
 /** A game object the game's vignette API showed on the minimap, such as a treasure chest, at its own position. */
 export declare const objectSighting: z.ZodObject<{
@@ -795,6 +835,71 @@ export declare const playerSeen: z.ZodObject<{
 }, z.core.$strip>;
 /** The player-page kind. Never part of the public corpus; intake writes it to the players table, not to the upload. */
 export declare const PLAYER_KINDS: readonly string[];
+/** How the addon came by a member's role: the group role the game shows, or the larger of healing and damage done. */
+export declare const PULL_ROLES: readonly ["tank", "healer", "damage"];
+export declare const ROLE_SOURCES: readonly ["assigned", "inferred"];
+/** One group member in one pull. A total is absent when the meter had no readable line for it, never zero by default. */
+export declare const pullMember: z.ZodObject<{
+    name: z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>;
+    realm: z.ZodOptional<z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>>;
+    class: z.ZodString;
+    self: z.ZodOptional<z.ZodLiteral<true>>;
+    role: z.ZodOptional<z.ZodEnum<{
+        damage: "damage";
+        healer: "healer";
+        tank: "tank";
+    }>>;
+    roleSource: z.ZodOptional<z.ZodEnum<{
+        assigned: "assigned";
+        inferred: "inferred";
+    }>>;
+    damageDone: z.ZodOptional<z.ZodNumber>;
+    healingDone: z.ZodOptional<z.ZodNumber>;
+    damageTaken: z.ZodOptional<z.ZodNumber>;
+    deaths: z.ZodOptional<z.ZodNumber>;
+}, z.core.$strip>;
+/**
+ * One boss pull with each group member's totals from the game's own damage meter. Names other players, so it is
+ * off in the addon until `/everloot pulls on`, sent only from the upload page, and never part of the public corpus.
+ */
+export declare const pullSummary: z.ZodObject<{
+    installId: z.ZodString;
+    eventId: z.ZodOptional<z.ZodString>;
+    capturedAt: z.ZodString;
+    kind: z.ZodLiteral<"pull_summary">;
+    encounterId: z.ZodNumber;
+    name: z.ZodString;
+    instanceMapId: z.ZodNumber;
+    difficulty: z.ZodOptional<z.ZodNumber>;
+    size: z.ZodOptional<z.ZodNumber>;
+    success: z.ZodBoolean;
+    startedAt: z.ZodOptional<z.ZodString>;
+    durationSeconds: z.ZodOptional<z.ZodNumber>;
+    runId: z.ZodOptional<z.ZodString>;
+    realm: z.ZodOptional<z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>>;
+    meterSeconds: z.ZodOptional<z.ZodNumber>;
+    members: z.ZodArray<z.ZodObject<{
+        name: z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>;
+        realm: z.ZodOptional<z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>>;
+        class: z.ZodString;
+        self: z.ZodOptional<z.ZodLiteral<true>>;
+        role: z.ZodOptional<z.ZodEnum<{
+            damage: "damage";
+            healer: "healer";
+            tank: "tank";
+        }>>;
+        roleSource: z.ZodOptional<z.ZodEnum<{
+            assigned: "assigned";
+            inferred: "inferred";
+        }>>;
+        damageDone: z.ZodOptional<z.ZodNumber>;
+        healingDone: z.ZodOptional<z.ZodNumber>;
+        damageTaken: z.ZodOptional<z.ZodNumber>;
+        deaths: z.ZodOptional<z.ZodNumber>;
+    }, z.core.$strip>>;
+}, z.core.$strip>;
+/** The pull summary kind. Named, so never in the public corpus; stored with the upload for later rollups. */
+export declare const PULL_KINDS: readonly string[];
 /**
  * The guild kill kind. Stored with the upload, never served raw: it is not on the public corpus allowlist, and
  * only the guild rollup (2 installs, hidden guilds out, behind the switch) publishes kills.
@@ -1017,6 +1122,37 @@ export declare const recordSchemas: {
         size: z.ZodOptional<z.ZodNumber>;
         success: z.ZodBoolean;
         npcIds: z.ZodOptional<z.ZodArray<z.ZodNumber>>;
+        startedAt: z.ZodOptional<z.ZodString>;
+        durationSeconds: z.ZodOptional<z.ZodNumber>;
+        runId: z.ZodOptional<z.ZodString>;
+    }, z.core.$strip>;
+    readonly instance_run: z.ZodObject<{
+        installId: z.ZodString;
+        eventId: z.ZodOptional<z.ZodString>;
+        capturedAt: z.ZodString;
+        kind: z.ZodLiteral<"instance_run">;
+        runId: z.ZodString;
+        instanceMapId: z.ZodNumber;
+        name: z.ZodOptional<z.ZodString>;
+        instanceType: z.ZodEnum<{
+            party: "party";
+            raid: "raid";
+        }>;
+        difficulty: z.ZodOptional<z.ZodNumber>;
+        enteredAt: z.ZodString;
+        leftAt: z.ZodString;
+        firstPullAt: z.ZodOptional<z.ZodString>;
+        lastKillAt: z.ZodOptional<z.ZodString>;
+        pulls: z.ZodNumber;
+        kills: z.ZodNumber;
+        wipes: z.ZodNumber;
+        size: z.ZodOptional<z.ZodNumber>;
+        killedEncounterIds: z.ZodOptional<z.ZodArray<z.ZodNumber>>;
+        endReason: z.ZodEnum<{
+            left: "left";
+            new_instance: "new_instance";
+            reset: "reset";
+        }>;
     }, z.core.$strip>;
     readonly object_sighting: z.ZodObject<{
         installId: z.ZodString;
@@ -1501,6 +1637,42 @@ export declare const recordSchemas: {
         difficulty: z.ZodOptional<z.ZodNumber>;
         size: z.ZodOptional<z.ZodNumber>;
     }, z.core.$strip>;
+    readonly pull_summary: z.ZodObject<{
+        installId: z.ZodString;
+        eventId: z.ZodOptional<z.ZodString>;
+        capturedAt: z.ZodString;
+        kind: z.ZodLiteral<"pull_summary">;
+        encounterId: z.ZodNumber;
+        name: z.ZodString;
+        instanceMapId: z.ZodNumber;
+        difficulty: z.ZodOptional<z.ZodNumber>;
+        size: z.ZodOptional<z.ZodNumber>;
+        success: z.ZodBoolean;
+        startedAt: z.ZodOptional<z.ZodString>;
+        durationSeconds: z.ZodOptional<z.ZodNumber>;
+        runId: z.ZodOptional<z.ZodString>;
+        realm: z.ZodOptional<z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>>;
+        meterSeconds: z.ZodOptional<z.ZodNumber>;
+        members: z.ZodArray<z.ZodObject<{
+            name: z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>;
+            realm: z.ZodOptional<z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>>;
+            class: z.ZodString;
+            self: z.ZodOptional<z.ZodLiteral<true>>;
+            role: z.ZodOptional<z.ZodEnum<{
+                damage: "damage";
+                healer: "healer";
+                tank: "tank";
+            }>>;
+            roleSource: z.ZodOptional<z.ZodEnum<{
+                assigned: "assigned";
+                inferred: "inferred";
+            }>>;
+            damageDone: z.ZodOptional<z.ZodNumber>;
+            healingDone: z.ZodOptional<z.ZodNumber>;
+            damageTaken: z.ZodOptional<z.ZodNumber>;
+            deaths: z.ZodOptional<z.ZodNumber>;
+        }, z.core.$strip>>;
+    }, z.core.$strip>;
 };
 export type RecordKind = keyof typeof recordSchemas;
 export declare const ALL_RECORD_KINDS: RecordKind[];
@@ -1673,6 +1845,9 @@ export declare const anyRecord: z.ZodDiscriminatedUnion<[z.ZodObject<{
     size: z.ZodOptional<z.ZodNumber>;
     success: z.ZodBoolean;
     npcIds: z.ZodOptional<z.ZodArray<z.ZodNumber>>;
+    startedAt: z.ZodOptional<z.ZodString>;
+    durationSeconds: z.ZodOptional<z.ZodNumber>;
+    runId: z.ZodOptional<z.ZodString>;
 }, z.core.$strip>, z.ZodObject<{
     installId: z.ZodString;
     eventId: z.ZodOptional<z.ZodString>;
@@ -2123,6 +2298,68 @@ export declare const anyRecord: z.ZodDiscriminatedUnion<[z.ZodObject<{
     instanceMapId: z.ZodNumber;
     difficulty: z.ZodOptional<z.ZodNumber>;
     size: z.ZodOptional<z.ZodNumber>;
+}, z.core.$strip>, z.ZodObject<{
+    installId: z.ZodString;
+    eventId: z.ZodOptional<z.ZodString>;
+    capturedAt: z.ZodString;
+    kind: z.ZodLiteral<"instance_run">;
+    runId: z.ZodString;
+    instanceMapId: z.ZodNumber;
+    name: z.ZodOptional<z.ZodString>;
+    instanceType: z.ZodEnum<{
+        party: "party";
+        raid: "raid";
+    }>;
+    difficulty: z.ZodOptional<z.ZodNumber>;
+    enteredAt: z.ZodString;
+    leftAt: z.ZodString;
+    firstPullAt: z.ZodOptional<z.ZodString>;
+    lastKillAt: z.ZodOptional<z.ZodString>;
+    pulls: z.ZodNumber;
+    kills: z.ZodNumber;
+    wipes: z.ZodNumber;
+    size: z.ZodOptional<z.ZodNumber>;
+    killedEncounterIds: z.ZodOptional<z.ZodArray<z.ZodNumber>>;
+    endReason: z.ZodEnum<{
+        left: "left";
+        new_instance: "new_instance";
+        reset: "reset";
+    }>;
+}, z.core.$strip>, z.ZodObject<{
+    installId: z.ZodString;
+    eventId: z.ZodOptional<z.ZodString>;
+    capturedAt: z.ZodString;
+    kind: z.ZodLiteral<"pull_summary">;
+    encounterId: z.ZodNumber;
+    name: z.ZodString;
+    instanceMapId: z.ZodNumber;
+    difficulty: z.ZodOptional<z.ZodNumber>;
+    size: z.ZodOptional<z.ZodNumber>;
+    success: z.ZodBoolean;
+    startedAt: z.ZodOptional<z.ZodString>;
+    durationSeconds: z.ZodOptional<z.ZodNumber>;
+    runId: z.ZodOptional<z.ZodString>;
+    realm: z.ZodOptional<z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>>;
+    meterSeconds: z.ZodOptional<z.ZodNumber>;
+    members: z.ZodArray<z.ZodObject<{
+        name: z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>;
+        realm: z.ZodOptional<z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>>;
+        class: z.ZodString;
+        self: z.ZodOptional<z.ZodLiteral<true>>;
+        role: z.ZodOptional<z.ZodEnum<{
+            damage: "damage";
+            healer: "healer";
+            tank: "tank";
+        }>>;
+        roleSource: z.ZodOptional<z.ZodEnum<{
+            assigned: "assigned";
+            inferred: "inferred";
+        }>>;
+        damageDone: z.ZodOptional<z.ZodNumber>;
+        healingDone: z.ZodOptional<z.ZodNumber>;
+        damageTaken: z.ZodOptional<z.ZodNumber>;
+        deaths: z.ZodOptional<z.ZodNumber>;
+    }, z.core.$strip>>;
 }, z.core.$strip>], "kind">;
 export type IntakeRecord = z.infer<typeof anyRecord>;
 /**

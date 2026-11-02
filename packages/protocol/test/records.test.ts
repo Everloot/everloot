@@ -15,7 +15,9 @@ test("recipe observations preserve optional API identity and learned state with 
 
 describe("intake contract", () => {
   test("all record kinds exist", () => {
-    expect(ALL_RECORD_KINDS).toHaveLength(40);
+    expect(ALL_RECORD_KINDS).toHaveLength(42);
+    expect(ALL_RECORD_KINDS).toContain("instance_run");
+    expect(ALL_RECORD_KINDS).toContain("pull_summary");
     expect(ALL_RECORD_KINDS).toContain("guild_kill");
     expect(ALL_RECORD_KINDS).toContain("item_fact");
     expect(ALL_RECORD_KINDS).toContain("census_self");
@@ -216,6 +218,65 @@ describe("intake contract", () => {
     ]);
     expect(result.records.map((r) => r.kind)).toEqual(["instance_entrance", "instance_entrance", "encounter", "encounter", "object_sighting", "object_sighting"]);
     expect(result.receipt.rejected.map((r) => r.index)).toEqual([6, 7, 8, 9, 10, 11]);
+  });
+
+  test("an encounter may carry its start, length and run; start and length come together", () => {
+    const encounter = { ...base, kind: "encounter", encounterId: 1144, name: "Edwin VanCleef", instanceMapId: 36, success: true };
+    const timed = { ...encounter, startedAt: "2026-09-29T11:58:30Z", durationSeconds: 90, runId: "0123456789abcdef" };
+    const result = parseRecords([
+      timed, { ...encounter, runId: "0123456789abcdef" },
+      { ...timed, durationSeconds: undefined },
+      { ...timed, startedAt: undefined },
+      { ...timed, durationSeconds: 86_401 },
+      { ...timed, durationSeconds: 1.5 },
+      { ...timed, runId: "run-1" },
+    ]);
+    expect(result.records).toHaveLength(2);
+    expect(result.receipt.rejected.map((r) => r.index)).toEqual([2, 3, 4, 5, 6]);
+  });
+
+  test("an instance run counts pulls as kills plus wipes, ends after it starts, and is never served raw", () => {
+    const run = {
+      ...base, kind: "instance_run", runId: "0123456789abcdef", instanceMapId: 36, name: "The Deadmines", instanceType: "party",
+      enteredAt: "2026-09-29T11:00:00Z", leftAt: "2026-09-29T12:00:00Z", firstPullAt: "2026-09-29T11:20:00Z",
+      lastKillAt: "2026-09-29T11:55:00Z", pulls: 6, kills: 5, wipes: 1, size: 5, killedEncounterIds: [1144], endReason: "left",
+    };
+    const result = parseRecords([
+      run, { ...run, name: undefined, firstPullAt: undefined, lastKillAt: undefined, killedEncounterIds: undefined, kills: 0, wipes: 6 },
+      { ...run, kills: 4 },
+      { ...run, pulls: 0, kills: 0, wipes: 0 },
+      { ...run, leftAt: "2026-09-29T10:59:59Z" },
+      { ...run, endReason: "logout" },
+      { ...run, instanceType: "pvp" },
+    ]);
+    expect(result.records).toHaveLength(2);
+    expect(result.receipt.rejected.map((r) => r.index)).toEqual([2, 3, 4, 5, 6]);
+    expect(PUBLIC_RECORD_KINDS).not.toContain("instance_run");
+    expect(sharingCategory(result.records[0])).toBeNull();
+  });
+
+  test("a pull summary names group members with their class, role and meter totals; it is never served raw", () => {
+    const member = { name: "Thrallina", class: "SHAMAN", role: "healer", roleSource: "assigned", damageDone: 1200, healingDone: 9800, damageTaken: 3100, deaths: 0 };
+    const pull = {
+      ...base, kind: "pull_summary", encounterId: 1144, name: "Edwin VanCleef", instanceMapId: 36, difficulty: 1, size: 5, success: false,
+      startedAt: "2026-09-29T11:58:30Z", durationSeconds: 90, runId: "0123456789abcdef", realm: "Forever", meterSeconds: 91,
+      members: [member, { name: "Myself", class: "HUNTER", self: true }, { name: "Grom", realm: "Elsewhere", class: "WARRIOR", role: "damage", roleSource: "inferred", damageDone: 5000, healingDone: 0 }],
+    };
+    const result = parseRecords([
+      pull,
+      { ...pull, startedAt: undefined, durationSeconds: undefined, meterSeconds: undefined, runId: undefined, realm: undefined, members: [{ name: "Myself", class: "HUNTER" }] },
+      { ...pull, members: [] },
+      { ...pull, members: [{ ...member, roleSource: undefined }] },
+      { ...pull, members: [{ ...member, role: "tank", roleSource: "guessed" }] },
+      { ...pull, members: [{ ...member, name: "Bob1" }] },
+      { ...pull, members: [{ ...member, damageDone: -1 }] },
+      { ...pull, members: [{ ...member, self: false }] },
+      { ...pull, members: Array.from({ length: 41 }, () => member) },
+      { ...pull, durationSeconds: undefined },
+    ]);
+    expect(result.records).toHaveLength(2);
+    expect(result.receipt.rejected.map((r) => r.index)).toEqual([2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(PUBLIC_RECORD_KINDS).not.toContain("pull_summary");
   });
 
   test("an item fact carries the item, the line, its number and the build; only damage per second has a decimal", () => {

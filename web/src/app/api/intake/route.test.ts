@@ -539,6 +539,42 @@ describe("guild kill rows in an upload", () => {
   });
 });
 
+describe("pull timing, runs and pull summaries in an upload", () => {
+  const runId = "0123456789abcdef";
+  const encounter = {
+    kind: "encounter", installId: "install-1234", eventId: "epoch:1", capturedAt, encounterId: 1144, name: "Rhahk'zor", instanceMapId: 36,
+    success: true, startedAt: "2026-10-04T23:58:45.000Z", durationSeconds: 75, runId,
+  };
+  const run = {
+    kind: "instance_run", installId: "install-1234", eventId: "epoch:2", capturedAt, runId, instanceMapId: 36, name: "The Deadmines",
+    instanceType: "party", enteredAt: "2026-10-04T23:00:00.000Z", leftAt: capturedAt, firstPullAt: "2026-10-04T23:10:00.000Z",
+    lastKillAt: "2026-10-04T23:59:00.000Z", pulls: 3, kills: 2, wipes: 1, size: 5, killedEncounterIds: [1144, 1145], endReason: "left",
+  };
+  const pull = {
+    kind: "pull_summary", installId: "install-1234", eventId: "epoch:3", capturedAt, encounterId: 1144, name: "Rhahk'zor", instanceMapId: 36,
+    success: true, startedAt: "2026-10-04T23:58:45.000Z", durationSeconds: 75, runId, realm: "Forever", meterSeconds: 76,
+    members: [{ name: "Myself", class: "HUNTER", self: true, role: "damage", roleSource: "inferred", damageDone: 30000 },
+      { name: "Thrallina", class: "SHAMAN", role: "healer", roleSource: "assigned", healingDone: 25000, deaths: 1 }],
+  };
+
+  test("are accepted and stored whole in the upload, with nothing added or lost", async () => {
+    const POST = await freshPost();
+    const body = await (await POST(request({ addonVersion: "0.3.16", records: [encounter, run, pull] }))).json();
+    expect(body).toMatchObject({ ok: true, persisted: true });
+    expect(body.accepted.map((a: { kind: string }) => a.kind)).toEqual(["encounter", "instance_run", "pull_summary"]);
+    expect(store.putUpload.mock.calls[0]![2].records).toEqual([encounter, run, pull]);
+  });
+
+  test("a run whose counts do not add up, or a member with a role but no source, is refused with the rule", async () => {
+    const POST = await freshPost();
+    const body = await (await POST(request({ addonVersion: "0.3.16", records: [
+      { ...run, kills: 3 }, { ...pull, members: [{ name: "Thrallina", class: "SHAMAN", role: "healer" }] }, canonicalLoot,
+    ] }))).json();
+    expect(body.accepted.map((a: { kind: string }) => a.kind)).toEqual(["loot"]);
+    expect(body.rejected.map((r: { index: number }) => r.index)).toEqual([0, 1]);
+  });
+});
+
 describe("player rows in an upload", () => {
   const seenAt = new Date().toISOString();
   const player = (name: string, extra: object = {}) => ({

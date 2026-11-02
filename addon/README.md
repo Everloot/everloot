@@ -99,7 +99,11 @@ share and cap), a game object as an `object_sighting`, once per vignette, zone a
 raid records an `instance_entrance`: the instance from `GetInstanceInfo` and where you stood outdoors when the
 loading screen started (`PLAYER_LEAVING_WORLD`), once per instance and zone; a dungeon finder teleport records
 none. A boss fight's end inside one (`ENCOUNTER_END`) records an `encounter`: kill or wipe, difficulty, group size
-and the bosses' creature ids when the client sends them. None of these has run in the Forever client yet. The quest-log calls (`GetQuestLogTitle`, `C_QuestLog.GetQuestTagInfo`)
+and the bosses' creature ids when the client sends them, and with `ENCOUNTER_START` seen, when the pull started and how
+many seconds it took. Each dungeon or raid run with a boss pull is one `instance_run` row: when you entered and left,
+the first pull, the last kill, pulls, kills and wipes, and the bosses killed. A run survives a reload, a corpse run or a
+trip out; it ends after 30 minutes outside, in another instance, at the game's reset line, or when a boss it already
+killed is pulled again. No names (`docs/design/specs/2026-11-02-pull-and-run-records-design.md`). None of these has run in the Forever client yet. The quest-log calls (`GetQuestLogTitle`, `C_QuestLog.GetQuestTagInfo`)
 have not been tried in the Forever client; a call that is missing or returns something unexpected records
 nothing for that field. The site shows each value only after 3 installs agree.
 
@@ -241,6 +245,28 @@ whether it is on and how many characters it holds; `/everloot players off` stops
 - **Sending**: only from the upload page, which counts the rows first. The Desktop App and the command-line
   uploader never send them. The site
   drops them until the owner has turned the player pages on.
+
+## Boss pulls
+
+Off until `/everloot pulls on` (then `/reload`). After each boss pull in a dungeon or raid it writes one `pull_summary`
+row: the boss, kill or wipe, how long it took, and for each member of your group their name, class, role and the
+damage done, healing done, damage taken and deaths that the game's own damage meter (`C_DamageMeter`) shows.
+`/everloot pulls` says whether it is on and how many pulls it holds; `/everloot pulls off` stops it at once and deletes
+every row.
+
+- **No combat log.** Forever restricts `COMBAT_LOG_EVENT_UNFILTERED`, and the module never registers it. It reads the
+  meter's totals once per pull, after combat ends, when the client stops hiding them. A total the client still hides,
+  or a member with no meter line, is left out of the row, never written as zero. A client without the meter gets rows
+  with the group and assigned roles only, and `/everloot status` says so.
+- **Role**: the group role the game shows (`UnitGroupRolesAssigned`), marked `assigned`; without one, healer when
+  healing done was larger than damage done, else damage, marked `inferred`. A tank is never inferred.
+- **Nothing else** about another player: no gear, talents, guild, position or chat. `addon/tests/pulls_contract.py`
+  lists every call the module may make.
+- **Size**: about 150 bytes a member. At most 200 pulls and 2,000 member entries in the file (about 300 KB); then it
+  pauses like every other kind.
+- **Sending**: only from the upload page, which counts the rows first. The Desktop App and the command-line uploader
+  never send them. The site stores them privately and shows them nowhere until a policy for showing players exists.
+  None of this has run in the Forever client yet.
 
 ## Linking a character
 
@@ -395,6 +421,7 @@ addon/
 │   ├── completion.lua  achievements, reputation, titles, quest chains: catalogs and your progress; off until enabled
 │   ├── census.lua      race, class, level and faction of your characters and players you see; on in a new install
 │   ├── players.lua     name, realm, race, class, level and guild of your characters and players you see; off until enabled
+│   ├── pulls.lua       each boss pull: your group's names, classes, roles and damage meter totals; off until enabled
 │   ├── selftest.lua    /everloot selftest and /everloot talents
 │   ├── plan.lua        share code reader and the display-only plan panel
 │   ├── raid_data.lua   raid buff list generated from web/src/data/game-data/raid-*.json

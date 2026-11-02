@@ -1,8 +1,8 @@
 -- Everloot open-world collector: NPC sightings, loot windows, quests, vendors, items seen, minimap vignettes,
--- dungeon entrances and boss encounters.
--- Anonymous by design: no character or guild names, no chat. Matches the intake contract
+-- dungeon entrances, boss encounters with their length, and dungeon and raid runs.
+-- Anonymous by design: no character or guild names, no player chat. Matches the intake contract
 -- (web/src/lib/intake.ts kinds: npc_sighting, loot, quest, vendor, item_seen, object_sighting, instance_entrance,
--- encounter).
+-- encounter, instance_run). The one chat event it reads is CHAT_MSG_SYSTEM, for the game's own instance reset line.
 -- NPC type, rank and a quest's category, group size, tag and faction are game facts about the NPC or quest.
 -- The faction is the accepting character's side only; no character name is read or stored.
 
@@ -567,6 +567,110 @@ local function enteringWorld()
   }) then EverlootDB.entranceSeen[seenKey] = true end
 end
 
+-- Pull timing and instance runs (docs/design/specs/2026-11-02-pull-and-run-records-design.md). Anonymous like the
+-- encounter row: times, counts and ids, never a name.
+--   * ENCOUNTER_START notes the pull's start in the file (time(), so a /reload during the fight keeps it); the
+--     encounter row then carries startedAt and durationSeconds. An END without its START has neither: a guessed
+--     length is worse than none.
+--   * A run starts when you zone into a dungeon or raid and ends when you are gone from it for 30 minutes, enter
+--     another instance, the game says it was reset (CHAT_MSG_SYSTEM, the game's own INSTANCE_RESET_SUCCESS line,
+--     never a player's chat), or a boss the run already killed is pulled again. A corpse run, a reload or a trip out
+--     to a vendor does not end it. A run with no boss pull writes nothing; one with pulls writes one instance_run row.
+--     A run still open when you stop playing is written at the next loading screen after the 30 minutes.
+local RUN_GAP = 1800
+local MAX_PULL_SECONDS = 86400
+
+local function iso(t) return date("!%Y-%m-%dT%H:%M:%SZ", t) end
+
+local function newRunId()
+  return string.format("%08x%08x", math.random(0, 0x7fffffff), math.random(0, 0x7fffffff))
+end
+
+local function finishRun(reason)
+  local run = EverlootDB.run
+  EverlootDB.run = nil
+  if type(run) ~= "table" or type(run.pulls) ~= "number" or run.pulls < 1 or type(run.enteredAt) ~= "number" then return end
+  local leftAt = math.max(run.leftAt or run.lastSeen or run.enteredAt, run.enteredAt)
+  E:Store("instance_run", {
+    installId = EverlootDB.installId, capturedAt = iso(leftAt),
+    runId = run.id, instanceMapId = run.instanceMapId, name = run.name, instanceType = run.instanceType,
+    difficulty = run.difficulty, enteredAt = iso(run.enteredAt), leftAt = iso(leftAt),
+    firstPullAt = run.firstPull and iso(run.firstPull), lastKillAt = run.lastKill and iso(run.lastKill),
+    pulls = run.pulls, kills = run.kills, wipes = run.wipes, size = run.size,
+    killedEncounterIds = #run.killed > 0 and run.killed or nil, endReason = reason,
+  })
+end
+
+--- PLAYER_ENTERING_WORLD: start, continue, pause or end the run.
+local function runWorld()
+  local now = time()
+  local info = instanceInfo()
+  local mapId = info and (info.instanceType == "party" or info.instanceType == "raid") and whole(info.instanceMapId, 1, MAX_ID)
+  local run = type(EverlootDB.run) == "table" and EverlootDB.run or nil
+  if run then
+    local away = now - (run.leftAt or run.lastSeen or now)
+    if mapId and mapId == run.instanceMapId and run.difficulty == whole(info.difficulty, 0, 255) and away <= RUN_GAP then
+      run.leftAt, run.lastSeen = nil, now
+      return
+    end
+    if not mapId and away <= RUN_GAP then
+      run.leftAt = run.leftAt or now
+      return
+    end
+    finishRun(mapId and "new_instance" or "left")
+  end
+  if not mapId then return end
+  local name = info.name
+  EverlootDB.run = {
+    id = newRunId(), instanceMapId = mapId, instanceType = info.instanceType, difficulty = whole(info.difficulty, 0, 255),
+    name = type(name) == "string" and name ~= "" and #name <= 120 and name or nil,
+    enteredAt = now, lastSeen = now, pulls = 0, kills = 0, wipes = 0, killed = {},
+  }
+end
+
+--- The run a pull in this instance belongs to. A boss the run already killed, pulled again, means the instance was
+--- reset without a line the addon could read: that run ends and a new one starts.
+local function runFor(instanceMapId, encounterId)
+  local run = EverlootDB.run
+  if type(run) ~= "table" or run.instanceMapId ~= instanceMapId or run.leftAt then return nil end
+  for _, id in ipairs(run.killed) do
+    if id == encounterId then
+      finishRun("reset")
+      runWorld()
+      return EverlootDB.run
+    end
+  end
+  return run
+end
+
+--- CHAT_MSG_SYSTEM: the game's "<instance> has been reset." for the run you left ends it.
+local function runReset(text)
+  local run = EverlootDB.run
+  text = E.Readable(text)
+  if type(run) ~= "table" or not run.leftAt or not run.name or type(text) ~= "string" or type(INSTANCE_RESET_SUCCESS) ~= "string" then return end
+  if text == INSTANCE_RESET_SUCCESS:format(run.name) then finishRun("reset") end
+end
+
+--- The run's id while you are inside it; nil outside. The pulls module puts it on its rows.
+function E.CurrentRunId()
+  local run = EverlootDB and EverlootDB.run
+  return type(run) == "table" and not run.leftAt and run.id or nil
+end
+
+-- ENCOUNTER_START: encounterID, encounterName, difficultyID, groupSize. Only the start time is kept.
+local function encounterStart(encounterId)
+  encounterId = whole(encounterId, 1, MAX_ID)
+  if not encounterId then return end
+  local info = instanceInfo()
+  if not info or (info.instanceType ~= "party" and info.instanceType ~= "raid") then return end
+  local instanceMapId = whole(info.instanceMapId, 1, MAX_ID)
+  if not instanceMapId then return end
+  local now = time()
+  EverlootDB.pullStart = { encounterId = encounterId, at = now }
+  local run = runFor(instanceMapId, encounterId)
+  if run then run.firstPull = run.firstPull or now; run.lastSeen = now end
+end
+
 -- ENCOUNTER_END inside a dungeon or raid: encounterID, encounterName, difficultyID, groupSize, success (1 a kill, 0 a wipe) and, on clients
 -- that send it, the boss units engaged, each with a creatureID.
 local function encounterEnd(encounterId, name, difficulty, size, success, units)
@@ -584,12 +688,37 @@ local function encounterEnd(encounterId, name, difficulty, size, success, units)
       if npcId and not seen[npcId] and #npcIds < 40 then seen[npcId] = true; npcIds[#npcIds + 1] = npcId end
     end
   end
+  local now = time()
+  local start = EverlootDB.pullStart
+  EverlootDB.pullStart = nil
+  local startedAt
+  if type(start) == "table" and start.encounterId == encounterId and type(start.at) == "number"
+    and now >= start.at and now - start.at <= MAX_PULL_SECONDS then
+    startedAt = start.at
+  end
+  size = whole(size, 1, 40)
+  local run = runFor(instanceMapId, encounterId)
+  if run then
+    run.pulls = run.pulls + 1
+    run.lastSeen = now
+    run.firstPull = run.firstPull or startedAt or now
+    if size and size > (run.size or 0) then run.size = size end
+    if success then
+      run.kills = run.kills + 1
+      run.lastKill = now
+      if #run.killed < 40 then run.killed[#run.killed + 1] = encounterId end
+    else
+      run.wipes = run.wipes + 1
+    end
+  end
   E:Store("encounter", {
     installId = EverlootDB.installId,
     capturedAt = date("!%Y-%m-%dT%H:%M:%SZ"),
     encounterId = encounterId, name = name, instanceMapId = instanceMapId, success = success,
-    difficulty = whole(difficulty, 0, 255), size = whole(size, 1, 40),
+    difficulty = whole(difficulty, 0, 255), size = size,
     npcIds = #npcIds > 0 and npcIds or nil,
+    startedAt = startedAt and iso(startedAt), durationSeconds = startedAt and now - startedAt,
+    runId = run and run.id,
   })
 end
 
@@ -637,7 +766,7 @@ E:RegisterModule("openworld", function()
   for event in pairs(WINDOW_ROLES) do pcall(function() f:RegisterEvent(event) end) end
   for _, event in ipairs({ "PLAYER_INTERACTION_MANAGER_FRAME_SHOW", "UNIT_SPELLCAST_SENT", "UNIT_SPELLCAST_FAILED",
     "UNIT_SPELLCAST_FAILED_QUIET", "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_INTERRUPTED", "LOOT_CLOSED", "VIGNETTE_MINIMAP_UPDATED", "VIGNETTES_UPDATED", "PLAYER_LEAVING_WORLD",
-    "PLAYER_ENTERING_WORLD", "ENCOUNTER_END" }) do
+    "PLAYER_ENTERING_WORLD", "ENCOUNTER_START", "ENCOUNTER_END", "CHAT_MSG_SYSTEM" }) do
     pcall(function() f:RegisterEvent(event) end)
   end
   f:HookScript("OnEvent", function(_, event, arg1, arg2, arg3, arg4, arg5, arg6)
@@ -655,8 +784,10 @@ E:RegisterModule("openworld", function()
     elseif event == "VIGNETTE_MINIMAP_UPDATED" then if arg2 then pcall(vignetteSighting, arg1) end
     elseif event == "VIGNETTES_UPDATED" then pcall(vignettesUpdated)
     elseif event == "PLAYER_LEAVING_WORLD" then pcall(leavingWorld)
-    elseif event == "PLAYER_ENTERING_WORLD" then pcall(enteringWorld)
+    elseif event == "PLAYER_ENTERING_WORLD" then pcall(enteringWorld); pcall(runWorld)
+    elseif event == "ENCOUNTER_START" then pcall(encounterStart, arg1)
     elseif event == "ENCOUNTER_END" then pcall(encounterEnd, arg1, arg2, arg3, arg4, arg5, arg6)
+    elseif event == "CHAT_MSG_SYSTEM" then pcall(runReset, arg1)
     elseif event == "PLAYER_INTERACTION_MANAGER_FRAME_SHOW" then
       local role = interactionRole(arg1)
       if role ~= nil then pcall(interactionSighting, role or nil) end

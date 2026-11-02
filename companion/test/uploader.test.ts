@@ -111,6 +111,15 @@ describe("uploading", () => {
     expect(api.bodies[0].records.map((r) => r.kind)).toEqual(["loot"]);
   });
 
+  test("pull summaries never leave from here, whatever the player allowed: they name the whole group", async () => {
+    const pull = { kind: "pull_summary", lua: `["eventId"] = "epoch:701", ["capturedAt"] = "2026-11-02T12:00:00Z", ["encounterId"] = 1144, ["name"] = "Rhahk'zor", ["instanceMapId"] = 36, ["success"] = true, ["members"] = {{["name"] = "Thrallina", ["class"] = "SHAMAN"}}` };
+    const { file, state } = workspace(luaFile([loot(1), pull]));
+    const api = intake();
+    const result = await uploadFile(file, { endpoint: "https://everloot.example", fetch: api.send, state, census: true, players: true });
+    expect(result).toMatchObject({ sent: 1, invalid: 0 });
+    expect(api.bodies[0].records.map((r) => r.kind)).toEqual(["loot"]);
+  });
+
   test("the census never leaves from here: the upload page counts it first", async () => {
     const seen = { kind: "census_seen", lua: `["eventId"] = "census_seen:2026-10-18:1", ["capturedAt"] = "2026-10-18T00:00:00Z", ["guid"] = "Player-4242-00000001", ["race"] = "Orc", ["class"] = "WARRIOR", ["level"] = 20, ["faction"] = "Horde", ["via"] = "target"` };
     const own = { kind: "census_self", lua: `["eventId"] = "census_self:2026-10-18:1", ["capturedAt"] = "2026-10-18T00:00:00Z", ["guid"] = "Player-4242-00AABBCC", ["race"] = "Orc", ["class"] = "WARRIOR", ["level"] = 20, ["faction"] = "Horde", ["realm"] = "Forever"` };
