@@ -15,27 +15,14 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
-- Addon: login and `/reload` print one line (version, modules on and off, any that could not start, any paused
-  collection) instead of the full status; `/everloot status` still lists everything. Without the Desktop App's price
-  file, the first item tooltip says once per install in chat where community prices come from. `/ask` names the
-  Everloot Desktop App (with Ask turned on) instead of the companion, and a question still unanswered a load after it was
-  written says once that no answer arrived and what to do.
-- Addon: profession observations prefer the complete recipe list when available and retain the API's recipe
-  identifier and explicit learned state. Repeated observations are keyed by identifier, rank, colour and learned
-  state; older clients can still use their filtered list without changing the player's filters. Explicitly
-  unlearned recipes and conflicting recipe identities cannot establish craftable skill ranges.
-  Turning profession collection off also stops an in-progress chunked read.
-- Addon: when a player-started replication scan cannot run or times out, a bounded browse/search fallback can
-  collect actual listing prices as a clearly labelled partial sample. It obeys query throttling, stops when the
-  house closes or collection is disabled, and never constructs a full-market snapshot from browse summaries.
 - Addon and companion: when `/ask` cannot be answered (the companion offline, no model set up), the reason is shown once and
   the question stays queued, so the retry's answer still reaches the game. Before, the question was dropped and a later answer never
   appeared. After each `/reload` the addon says how many questions are still waiting. Needs the next addon and Desktop App
   releases; each half is harmless without the other.
 
 ### Added
-- Addon, Desktop App and site, behind `EVERLOOT_CHARACTER_LINKS` (off): `/everloot link <code>` writes one link row
-  for the character you are playing, with a code made on the account page. The Desktop App, signed in, sends it only
+- Desktop App and site, behind `EVERLOOT_CHARACTER_LINKS` (off): the addon's `/everloot link <code>` (0.3.15) writes one
+  link row for the character you are playing, with a code made on the account page. The Desktop App, signed in, sends it only
   to the account's own link endpoint; uploads never carry link rows. The account page lists your linked characters,
   linked or frozen, and unlinks them. A link is a claim from the addon file, not proof of ownership.
 - Site and MCP: racial traits from the game files (build-stamped `races.json`, found in game files, unconfirmed).
@@ -159,6 +146,42 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   agree. Fishing (the bobber, or an object installs agree is fished) is never a pin. An upload of an event
   that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
   instead of withdrawing the event as a conflict. The map shows none of this yet.
+
+## [0.3.15] - 2026-11-01
+
+Release channel: Alpha
+
+Live-client verification is pending. This is a pre-release for WoW: Forever 1.60.1, not a verified stable build.
+None of the changes below has been run in the Forever client yet: the one-line login message, the price-file hint,
+the `/ask` no-answer message, `/everloot link`, the fuller recipe read and the auction fallback sample still need
+an in-game check. The 0.3.14 Home window and the collection checks listed there also remain unverified.
+
+### Added
+- `/everloot link <code>` and `/everloot link clear`, for tying the character you are playing to your everloot.app
+  account. Linking is not open yet: everloot.app does not hand out link codes, so there is no code to type for now.
+  The command itself is in place. A code in the right shape (like `EL-7K3Q-9P`) saves your own character's name,
+  realm, race, class, level and faction in your Everloot file and asks you to `/reload`; a code in the wrong shape
+  is refused. Nothing is sent from the game. `/everloot link` on its own explains the command and how many link rows
+  your file holds, and `/everloot link clear` deletes them all. At most 10 are kept.
+
+### Changed
+- Logging in or `/reload` prints one line instead of the full status: the version, how many modules are on and off,
+  any that could not start and any collection paused at capacity. `/everloot status` still shows everything.
+- `/ask` messages name the Everloot Desktop App (with Ask turned on) instead of the companion.
+- Raid buff data now comes from the game files of build 1.60.1.70707.
+
+### Fixed
+- Without the Desktop App's price file, item tooltips showed only your own scans and never said why. The first
+  tooltip now says once per install, in chat, that community prices come from the Everloot Desktop App, and that
+  `/everloot price [item]` shows what Everloot has for an item.
+- A question asked with `/ask` that still has no answer two loads later now says so once, and tells you to open the
+  Everloot Desktop App with Ask turned on (from everloot.app/addon) and `/reload`. The question stays saved until answered.
+- Recipe recording reads the full recipe list when the game offers it, keeps each recipe's id and whether you have
+  learned it, and no longer counts a recipe you have not learned toward your craftable skill ranges. Your
+  profession window filters are left as they were. Turning profession collection off also stops a read in progress.
+- When an auction scan you start cannot run or times out, Everloot can fall back to a browse search that records
+  real listing prices as a partial sample, clearly labelled as such. It respects the auction house's query limit,
+  stops when you close the auction house or turn collection off, and never presents the sample as a full scan.
 
 ## [0.3.14] - 2026-10-30
 
