@@ -154,7 +154,8 @@ test("a published dungeon page shows the game files' level and entrance marked u
   expect(glance).toMatch(/<dt[^>]*>Level<\/dt><dd[^>]*>16 <span data-badge="files"/);
   expect(glance).not.toMatch(/16\s*[–-]/);
   expect(glance).toMatch(/<dt[^>]*>Entrance<\/dt><dd[^>]*>[\s\S]*href="\/database\/zones\/1436-westfall"[^>]*>Westfall<\/a>[\s\S]*href="\/map\?zone=1436&amp;x=38.2&amp;y=77.5"[^>]*>38.2, 77.5<\/a>[\s\S]*data-badge="files"/);
-  expect(glance.match(/data-badge="files"/g)).toHaveLength(2);
+  expect(glance).toContain("Difficulties in the files");
+  expect(glance).toContain("up to 5 players");
   expect(glance).toContain('<a href="/database/instances/36-deadmines"');
   // The facts link the database and the map, never another wiki page, so no draft can surface through them.
   expect(glance).not.toContain('href="/wiki/');
@@ -166,7 +167,7 @@ test("players' reports keep their evidence: the entrance and each boss 3 install
     entrances: ["a", "b", "c"].map((installId, n) => ({ installId, instanceMapId: 36, name: "Deadmines", instanceType: "party", mapId: 1436, x: 38, y: 77, capturedAt: `2026-10-${17 + n}T10:00:00Z` })),
     encounters: [
       ...["a", "b", "c", "a"].map((installId, n) => ({ installId, encounterId: 1, name: "Edwin VanCleef", instanceMapId: 36, success: true, npcIds: [639], capturedAt: `2026-10-${18 + n}T11:00:00Z` })),
-      ...["a", "b"].map((installId) => ({ installId, encounterId: 2, name: "Rhahk'Zor", instanceMapId: 36, success: true, npcIds: [644], capturedAt: "2026-10-20T11:00:00Z" })),
+      ...["a", "b"].map((installId) => ({ installId, encounterId: 2, name: "Not-yet-public name", instanceMapId: 36, success: true, npcIds: [644], capturedAt: "2026-10-20T11:00:00Z" })),
     ],
   });
   const html = await render("test-dungeon");
@@ -174,12 +175,13 @@ test("players' reports keep their evidence: the entrance and each boss 3 install
   const bosses = section(html, "bosses");
   expect(bosses).toContain(">Bosses</h2>");
   expect(bosses).toContain("Edwin VanCleef (4 kills) from 3 installs, last seen 2026-10-21");
-  expect(html).not.toContain("Rhahk");
+  expect(html).not.toContain("Not-yet-public name");
 });
 
-test("relations nobody has reported are left out: no boss section, no quest or loot list, no zero and no later-update placeholder", async () => {
+test("without reports, file-only bosses are unconfirmed and no quest, loot or kill totals are invented", async () => {
   const html = await render("test-dungeon");
-  expect(html).not.toContain('aria-labelledby="bosses"');
+  expect(section(html, "bosses")).toContain('data-badge="files"');
+  expect(section(html, "bosses")).not.toContain("last seen");
   expect(html).not.toContain("Confirmed entrance");
   expect(html).not.toMatch(/Quests that send you here|Loot by boss|From the database/);
   expect(html).not.toMatch(/\b0 (?:bosses|installs|kills)\b/);
@@ -194,7 +196,8 @@ test("with storage down, the game files' facts stay and the page says players' r
   expect(glance).toContain("Storage unreachable. These figures are unrecorded, not zero. Players&#x27; reports cannot be shown until it is back; what is here is from the game files.");
   expect(glance).toMatch(/>Level<\/dt><dd[^>]*>16 /);
   expect(glance).toContain(">Westfall</a>");
-  expect(html).not.toContain('aria-labelledby="bosses"');
+  expect(section(html, "bosses")).toContain('data-badge="files"');
+  expect(section(html, "bosses")).not.toContain("last seen");
   expect(html).not.toContain("data-wiki-placeholder");
 });
 
@@ -214,7 +217,7 @@ test("a raid page shows the same facts, and a level the game files do not give h
   const glance = section(html, "at-a-glance");
   expect(glance).not.toContain(">Level</dt>");
   expect(glance).toMatch(/<dt[^>]*>Entrance<\/dt><dd[^>]*>[\s\S]*>Dustwallow Marsh<\/a>/);
-  expect(glance.match(/data-badge="files"/g)).toHaveLength(1);
+  expect(glance).toContain("Difficulties in the files");
   expect(glance).toContain('<a href="/database/instances/249-onyxia-s-lair"');
   expect(html).not.toContain("data-wiki-placeholder");
 });

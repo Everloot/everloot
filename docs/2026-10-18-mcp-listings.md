@@ -37,13 +37,16 @@ Use the same words everywhere, so the listings match the site and each other.
 
 ### Long description
 
-> Everloot answers questions about World of Warcraft: Forever from two sources it names on every
-> answer: the Warcraft Wiki archive (CC BY-SA 4.0, with the article each fact came from) and what
-> players reported through the Everloot addon. A player-reported fact (a drop rate, a vendor's price, a
+> Everloot answers questions about World of Warcraft: Forever using the Warcraft Wiki archive
+> (CC BY-SA 4.0, with article attribution), game-file records labelled unconfirmed with their build,
+> and observations players reported through the Everloot addon. Archive lore is historical background,
+> not confirmation of Forever gameplay. A player-reported fact (a drop rate, a vendor's price, a
 > quest's rewards, where an NPC stands, which recipe turns yellow) is stated only once three separate
 > installs reported it, and the answer says how many did and when the data was last updated. Nothing
 > is scraped from other sites and no fact is guessed: when something is not recorded yet, the tool says
 > so instead of making a number up.
+> Player-observed coverage is limited before launch. A tool's presence does not mean its requested
+> data has been recorded; missing observations remain unrecorded, not zero.
 >
 > 32 read-only tools: search the lore archive, open one record, look up an item, NPC, object, quest or
 > vendor, find what is near a spot on the map, follow relations (dropped by, sold by, reagent for),

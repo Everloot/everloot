@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { Badge, Card, SectionHeading } from "@/components/ui";
-import { bossLine, instanceTitle, type InstancePlace } from "@/lib/instances";
+import { bossLine, bossRows, instanceTitle, type InstancePlace } from "@/lib/instances";
 import { mapHref } from "@/lib/map-view";
 import { dayLabel } from "@/lib/report-labels";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import type { DungeonFacts } from "@/lib/wiki-dungeon";
 import { zoneHref } from "@/lib/zones";
+import { WORLD_MAP } from "@/lib/world-map";
 
 /** The line under a dungeon or raid page's "Before you go", which keeps the advice apart from the facts. */
 export const ADVICE_NOTE = "Advice in Everloot's own words, not data from the game files or from players.";
@@ -31,7 +32,7 @@ const placeKey = (p: InstancePlace) => `${p.mapId}-${p.x}-${p.y}`;
  */
 export function DungeonGlance({ facts }: { facts: DungeonFacts }) {
   const { row, level, unreachable } = facts;
-  if (level === null && !row.files.length && !row.confirmed.length) return null;
+  if (level === null && !row.files.length && !row.confirmed.length && !row.difficulties.length) return null;
   return (
     <Card as="section" aria-labelledby="at-a-glance" className="mb-8">
       <h2 id="at-a-glance" className="text-sm font-semibold text-fg">At a glance</h2>
@@ -42,6 +43,17 @@ export function DungeonGlance({ facts }: { facts: DungeonFacts }) {
           <>
             <dt className="text-muted">Level</dt>
             <dd className="text-fg">{level} <Badge tone="files" /></dd>
+          </>
+        )}
+        {row.difficulties.length > 0 && (
+          <>
+            <dt className="text-muted">Difficulties in the files</dt>
+            <dd className="space-y-1">
+              {row.difficulties.map((id) => {
+                const difficulty = WORLD_MAP.difficulties?.[id];
+                return <div key={id}>{difficulty?.name ?? `Difficulty ${id}`}{difficulty?.maxPlayers && difficulty.maxPlayers > 0 ? `, up to ${difficulty.maxPlayers} players` : ""} <Badge tone="files" /></div>;
+              })}
+            </dd>
           </>
         )}
         {row.files.length > 0 && (
@@ -69,18 +81,22 @@ export function DungeonGlance({ facts }: { facts: DungeonFacts }) {
 }
 
 /**
- * The bosses 3 installs report in the instance, each with its kills, installs and last seen. With none there is no
- * section; with storage down the row has none either, and the infobox says why.
+ * Confirmed bosses keep their evidence; file-only encounters stay unconfirmed, including when storage is down.
  */
 export function DungeonBosses({ facts }: { facts: DungeonFacts }) {
-  if (!facts.row.bosses.length) return null;
+  const bosses = bossRows(facts.unreachable ? { bosses: [], encounters: facts.row.encounters } : facts.row);
+  if (!bosses.length) return null;
   return (
     <section aria-labelledby="bosses" className="mt-12">
-      <SectionHeading id="bosses" note="A boss is listed once 3 installs report its encounter ending here. Kills count every install's kills together; wipes are not kills.">
+      <SectionHeading id="bosses" note="Encounters from the game files are unconfirmed. Player reports appear once 3 installs report an encounter ending here. Kills count every install's kills together; wipes are not kills.">
         Bosses
       </SectionHeading>
       <ul className="space-y-1 text-sm text-fg-2">
-        {facts.row.bosses.map((b) => <li key={b.encounterId}>{bossLine(b)}</li>)}
+        {bosses.map((b) => (
+          <li key={b.encounterId}>
+            {b.boss ? bossLine({ ...b.boss, name: b.name }) : b.name ?? `Encounter ${b.encounterId}`} {b.filesName && <Badge tone="files" />}
+          </li>
+        ))}
       </ul>
     </section>
   );
