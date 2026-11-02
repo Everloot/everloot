@@ -295,7 +295,7 @@ if (!app.requestSingleInstanceLock()) {
     }
     broadcast();
   });
-  // Restart asks first, waits for a running upload or price refresh to finish, then hands over to the installer.
+  // The window's own dialog has asked already. Restart waits for a running upload or price refresh to finish, then hands over to the installer.
   handle("updateRestart", async () => {
     if (!downloaded || updateProgress.stage !== "ready") return false;
     // A newer release may have appeared while this verified installer waited for a restart.
@@ -313,21 +313,6 @@ if (!app.requestSingleInstanceLock()) {
       broadcast();
       return false;
     }
-    const busy = JOBS.filter((j) => engine.snapshot().jobs[j].state === "running");
-    const answer = await messageBox({
-      type: "question",
-      buttons: ["Restart and update", "Not now"],
-      defaultId: 0,
-      cancelId: 1,
-      title: "Restart to update",
-      message: `Restart Everloot Desktop App to install ${downloaded.version}?`,
-      detail: [
-        "The app closes, installs the update and opens again in a few seconds.",
-        "Your settings, characters, chat and backups stay in the data folder. The game and its save files are not touched.",
-        busy.length ? `It waits for the running ${busy.join(" and ")} job to finish first.` : "Nothing is uploading right now.",
-      ].join("\n\n"),
-    });
-    if (answer.response !== 0) return false;
     for (let i = 0; i < 120 && JOBS.some((j) => engine.snapshot().jobs[j].state === "running"); i++) await new Promise((r) => setTimeout(r, 500));
     // The app quits only once the installer has started; if it cannot start, the app stays open and says so.
     recordAttempt(join(data, "updates"), downloaded.version);

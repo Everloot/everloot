@@ -1,6 +1,6 @@
 import { accountOf as account } from "../main/engine";
 import { diagnostics } from "../shared/diagnostics";
-import { ago, answerSuggestion, clock, companionStatus, copyLabel, esc, gold, kb, msg, JOB_NAMES, savedNote, setupAddonLine, sparkline, statusText, when, type CompanionState } from "./format";
+import { ago, answerSuggestion, clock, companionStatus, copyLabel, esc, gold, kb, msg, JOB_NAMES, restartWait, savedNote, setupAddonLine, sparkline, statusText, when, type CompanionState } from "./format";
 import { NO_SOURCED_ANSWER, type AddonInfo, type AppState, type AskInfo, type BackupInfo, type ChangeItem, type CharacterRow, type CharactersInfo, type ChatInfo, type ChatProgress, type EverlootApi, type PriceLookup, type FileSummary, type GameFolderCandidate, type Job, type JobStatus, type MarketInfo, type MoneyDay } from "../shared/types";
 import { PROVIDER_PRESETS, assistantSource, keptModelPick, manualModelShown, presetFor, removalNotice, type ModelChoice, type ProviderKind } from "../shared/providers";
 import { inkOn } from "../../../web/src/lib/chat/catalogue";
@@ -80,6 +80,9 @@ const updatePop = document.getElementById("updatePop")!;
 let updateOpen = false;
 /** The update notification asked for the popover before the first state arrived. */
 let updateAsked = false;
+const restartDlg = document.getElementById("restartDlg") as HTMLDialogElement;
+/** Restart was confirmed and the app is handing over to the installer. */
+let restarting = false;
 
 const ext = (url: string, text: string) => `<button type="button" class="link" data-open="${esc(url)}">${esc(text)}</button>`;
 
@@ -1027,6 +1030,7 @@ function renderSide(s: AppState): void {
     : `<button type="button" class="account-btn" id="accountBtn">${PERSON}<span class="acct-text"><b>Sign in</b><span>everloot.app</span></span></button>`;
   sideFoot.innerHTML = `${acct}${updateRow(s)}<div class="foot-row"><button type="button" data-page="settings" ${page === "settings" ? 'aria-current="page"' : ""}>${GEAR}Settings</button><button type="button" class="foot-icon" id="reportBug" aria-label="Report a bug" title="Report a bug">${BUG}</button>${updateButton(s)}</div>
     <div class="foot-line"><span>${e.files.length ? `Watching ${e.files.length} file(s)` : "Not watching"}${e.paused ? " · paused" : ""}</span><span>v${esc(s.version)}</span></div>`;
+  paintBars(sideFoot);
   if (refocus) side.querySelector<HTMLElement>(refocus)?.focus({ preventScroll: true });
 }
 
@@ -1045,8 +1049,17 @@ function updateRow(s: AppState): string {
   const v = esc(up.latest ?? "");
   if (!up.installable) return `<button type="button" class="restart-btn" id="updateDownloadPage" data-open="${esc(up.downloadUrl ?? up.url ?? "")}">${ARROW}Download ${v}</button>`;
   if (p.stage === "ready") return `<button type="button" class="restart-btn" id="updateRestart" title="Restart to install ${v}">${ARROW}Restart to update</button>`;
-  if (p.stage === "downloading") return `<button type="button" class="restart-btn busy" id="updateNow" disabled>Downloading ${v}… ${p.percent}%</button>`;
+  if (p.stage === "downloading") return downloadBar(v, p.percent);
   return `<button type="button" class="restart-btn" id="updateNow" title="Download ${v}, check it and install it on restart">${ARROW}${p.stage === "failed" ? "Update failed, try again" : `Update to ${v}`}</button>`;
+}
+
+/** The download fills its row as it goes; the width is set from data-w after render (the CSP allows no inline styles). */
+function downloadBar(v: string, percent: number): string {
+  return `<div class="dl-bar" role="progressbar" aria-label="Downloading ${v}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}"><span class="dl-fill" data-w="${percent}"></span><span class="dl-text">Downloading ${v}</span><span class="dl-pct">${percent}%</span></div>`;
+}
+
+function paintBars(root: ParentNode): void {
+  for (const el of root.querySelectorAll<HTMLElement>("[data-w]")) el.style.width = `${el.dataset.w}%`;
 }
 
 /** The arrow beside Settings opens what the new version changed. */
@@ -1076,7 +1089,8 @@ const NOTES_SHOWN = 8;
 function updatePopover(u: NonNullable<AppState["update"]>, p: AppState["updateProgress"]): string {
   const notes = u.notes.slice(0, NOTES_SHOWN).map((n) => `<li><span class="note" title="${esc(n.text)}">${esc(n.text)}${n.author ? ` <span class="muted">by @${esc(n.author)}${n.pr ? ` in #${n.pr}` : ""}</span>` : ""}</span></li>`).join("");
   const more = u.notes.length > NOTES_SHOWN ? `${u.notes.length - NOTES_SHOWN} more changes on GitHub ↗` : "Release notes on GitHub ↗";
-  return `<div class="pop-head"><h2 id="updTitle">Update available</h2><div class="muted small">${esc(u.latest ?? "")} · you run ${esc(u.current)}${u.publishedAt ? ` · released ${when(u.publishedAt)}` : ""}</div></div>
+  const title = !u.installable ? "Update available" : p.stage === "ready" ? "Update ready to install" : p.stage === "downloading" ? "Downloading the update" : "Update available";
+  return `<div class="pop-head"><h2 id="updTitle">${title}</h2><div class="muted small">${esc(u.latest ?? "")} · you run ${esc(u.current)}${u.publishedAt ? ` · released ${when(u.publishedAt)}` : ""}</div></div>
     <div class="pop-body"><h3>What's changed</h3>${notes ? `<ul>${notes}</ul>` : '<p class="muted small">This release lists no changes.</p>'}${u.url ? ext(u.url, more) : ""}</div>
     ${p.stage === "failed" ? `<p class="error small">The update failed: ${esc(p.error ?? "")}</p>` : ""}
     <div class="pop-foot">${updatePrimary(u, p)}<button type="button" class="btn" id="updateLater">Later</button></div>
@@ -1089,7 +1103,7 @@ function updatePopover(u: NonNullable<AppState["update"]>, p: AppState["updatePr
 function updatePrimary(u: NonNullable<AppState["update"]>, p: AppState["updateProgress"]): string {
   if (!u.installable) return `<button type="button" class="btn btn-primary" data-open="${esc(u.downloadUrl ?? u.url ?? "")}">Download ${esc(u.latest ?? "")}</button>`;
   if (p.stage === "ready") return `<button type="button" class="btn btn-primary" id="updateRestartPop">Restart to update</button>`;
-  if (p.stage === "downloading") return `<button type="button" class="btn btn-primary" disabled>Downloading ${p.percent}%</button>`;
+  if (p.stage === "downloading") return downloadBar(esc(u.latest ?? ""), p.percent);
   return `<button type="button" class="btn btn-primary" id="updateGet">${p.stage === "failed" ? "Try again" : `Download and install ${esc(u.latest ?? "")}`}</button>`;
 }
 
@@ -1100,9 +1114,41 @@ function renderUpdate(s: AppState): void {
   if (updateOpen && up) {
     const focused = document.activeElement?.id;
     updatePop.innerHTML = updatePopover(up, s.updateProgress);
+    paintBars(updatePop);
     // Progress re-renders the panel; keep the reader where they were.
     if (focused) document.getElementById(focused)?.focus();
   }
+}
+
+/** Restart asks in the app's own dialog: what happens, what stays, and which running job it waits for. */
+function restartDialog(s: AppState): string {
+  const off = restarting ? " disabled" : "";
+  return `<div class="confirm-head"><h2 id="rsTitle">Restart to update?</h2><div class="muted small">Everloot Desktop App ${esc(s.update?.latest ?? "")} · you run ${esc(s.version)}</div></div>
+    <div class="confirm-body"><p>The app closes, installs the update and opens again in a few seconds.</p><p class="fg2">Your settings, characters, chat and backups stay in the data folder. The game and its save files are not touched.</p></div>
+    <div class="confirm-foot"><span class="muted small">${esc(restartWait(s.engine))}</span><div class="row"><button type="button" class="btn" id="restartCancel"${off}>Not now</button><button type="button" class="btn btn-primary" id="restartGo"${off}>${restarting ? "Restarting…" : "Restart and update"}</button></div></div>`;
+}
+
+function renderRestart(s: AppState): void {
+  if (!restartDlg.open) return;
+  // A newer release or a failed check takes the download back; the sidebar then says which.
+  if (s.updateProgress.stage !== "ready" || !s.update?.newer) { closeRestart(); return; }
+  const focused = document.activeElement?.id;
+  restartDlg.innerHTML = restartDialog(s);
+  if (focused) document.getElementById(focused)?.focus();
+}
+
+function openRestart(): void {
+  if (!state || restartDlg.open) return;
+  if (updateOpen) toggleUpdate(false);
+  restarting = false;
+  restartDlg.innerHTML = restartDialog(state);
+  restartDlg.showModal();
+  restartDlg.querySelector<HTMLElement>("#restartGo")?.focus();
+}
+
+function closeRestart(): void {
+  restarting = false;
+  if (restartDlg.open) restartDlg.close();
 }
 
 function toggleUpdate(open: boolean): void {
@@ -1119,6 +1165,7 @@ function render(): void {
   if (setup) { main.innerHTML = welcome(); return; }
   renderSide(state);
   renderUpdate(state);
+  renderRestart(state);
   // Unsaved fields on Settings or Ask are not rebuilt; the Assistant panel beside them still moves.
   if ((page === "settings" || page === "ask") && draftDirty) { renderAssistant(); return; }
   const s = state;
@@ -1289,7 +1336,16 @@ async function onClick(ev: MouseEvent): Promise<void> {
   if (el.closest("#updateBtn")) { toggleUpdate(!updateOpen); return; }
   if (el.closest("#updateLater")) { toggleUpdate(false); return; }
   if (el.closest("#updateGet, #updateNow, #updateNowCallout")) { await api.updateDownload(); return; }
-  if (el.closest("#updateRestart, #updateRestartPop, #updateRestartCallout")) { await api.updateRestart(); return; }
+  if (el.closest("#updateRestart, #updateRestartPop, #updateRestartCallout")) { openRestart(); return; }
+  if (el.closest("#restartCancel")) { closeRestart(); return; }
+  if (el.closest("#restartGo") && !restarting) {
+    restarting = true;
+    if (state) renderRestart(state);
+    // On success the app quits; otherwise the dialog closes and the sidebar shows what happened.
+    let started = false;
+    try { started = await api.updateRestart(); } finally { if (!started) closeRestart(); }
+    return;
+  }
   if (el.closest("#accountBtn, [data-account]")) {
     if (page !== "settings") await go("settings");
     const panel = main.querySelector<HTMLElement>("#account");
@@ -1521,6 +1577,9 @@ main.addEventListener("input", (ev) => {
   if (f && f.id !== "chatForm" && f.id !== "providerForm") draftDirty = true;
   if (f?.id === "priceForm") priceEdits++;
 });
+// Escape or a click on the dimmed backdrop closes the restart dialog, unless the restart is already under way.
+restartDlg.addEventListener("cancel", (ev) => { ev.preventDefault(); if (!restarting) closeRestart(); });
+restartDlg.addEventListener("click", (ev) => { if (ev.target === restartDlg && !restarting) closeRestart(); });
 // Escape closes the update popover from anywhere.
 document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && updateOpen) { ev.preventDefault(); toggleUpdate(false); } });
 main.addEventListener("keydown", (ev) => {
