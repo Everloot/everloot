@@ -4,8 +4,8 @@
  */
 import type { AchievementEntry, CompletionFacts, FactionEntry, OwnedCharacter, TitleEntry } from "./completion.js";
 import {
-  characterId, scoreAccount, scoreCharacter,
-  type AccountScore, type CharacterScore, type OwnKill, type ScoreContext, type ScoreInstance, type WitnessKill,
+  characterId, COMPLETION_PARTS, scoreAccount, scoreCharacter,
+  type AccountScore, type CharacterScore, type OwnKill, type PullWitness, type ScoreContext, type ScoreInstance,
 } from "./everloot-score.js";
 
 const range = (n: number, from = 1) => Array.from({ length: n }, (_, i) => from + i);
@@ -15,11 +15,13 @@ const KILLED_AT = "2026-11-20T20:00:00.000Z";
 const RECEIVED_AT = "2026-11-21T10:00:00.000Z";
 const INSTALL = "example-install";
 
-/** A tier-1 raid of 10 bosses and three dungeons of 5, each dungeon's last boss its final one. */
+/** A tier-1 raid of 10 bosses and three dungeons of 5, each on one made-up difficulty. */
 export const EXAMPLE_INSTANCES: ScoreInstance[] = [
-  { instanceMapId: 1, kind: "raid", bosses: range(10, 101), minLevel: 60 },
-  ...[2, 3, 4].map((id): ScoreInstance => ({ instanceMapId: id, kind: "dungeon", bosses: range(5, id * 100 + 1), finalBoss: id * 100 + 5, minLevel: 50 })),
+  { instanceMapId: 1, kind: "raid", bosses: range(10, 101), difficulties: [1], minLevel: 60 },
+  ...[2, 3, 4].map((id): ScoreInstance => ({ instanceMapId: id, kind: "dungeon", bosses: range(5, id * 100 + 1), difficulties: [1], minLevel: 50 })),
 ];
+/** The made-up curated final-boss list: each dungeon's fifth boss. */
+export const EXAMPLE_FINAL_BOSSES = new Set([205, 305, 405]);
 
 /** The made-up lists: 60 achievements of 10 points, 12 factions, 10 titles and 300 quests, each agreed by 3 installs. */
 export const EXAMPLE_LISTS = { achievements: 60, achievementPoints: 10, factions: 12, titles: 10, quests: 300 };
@@ -56,12 +58,14 @@ const completion: CompletionFacts = {
 
 const instanceOf = (encounterId: number) => EXAMPLE_INSTANCES.find((i) => i.bosses.includes(encounterId))!.instanceMapId;
 const kills: OwnKill[] = EXAMPLE_CHARACTERS.flatMap((c) => c.kills.map((encounterId) => ({
-  installId: INSTALL, characterKey: c.key, encounterId, instanceMapId: instanceOf(encounterId), difficulty: 1, success: true, capturedAt: KILLED_AT, receivedAt: RECEIVED_AT,
+  installId: INSTALL, addressHash: "example-address-home", characterKey: c.key, encounterId, instanceMapId: instanceOf(encounterId), difficulty: 1,
+  success: true, capturedAt: KILLED_AT, receivedAt: RECEIVED_AT,
 })));
-// Every kill was also seen by two other players' installs, from two other addresses, in the same minute.
-const witnesses: WitnessKill[] = kills.flatMap((k) => ["example-witness-1", "example-witness-2"].map((installId, i) => ({
-  installId, reporter: `example-address-${i}`, encounterId: k.encounterId, difficulty: 1, success: true, capturedAt: KILLED_AT,
-})));
+// Every kill was also in a pull summary uploaded by another player's install, from another address, the same minute.
+const pullSummaries: PullWitness[] = kills.map((k) => ({
+  installId: "example-witness", addressHash: "example-address-witness", encounterId: k.encounterId, difficulty: 1, success: true,
+  capturedAt: KILLED_AT, receivedAt: RECEIVED_AT, members: [characterId(k.installId, k.characterKey)],
+}));
 
 export const EXAMPLE_CONTEXT: ScoreContext = {
   asOf: new Date("2026-11-22T00:00:00.000Z"),
@@ -69,14 +73,16 @@ export const EXAMPLE_CONTEXT: ScoreContext = {
   progress: {
     instances: EXAMPLE_INSTANCES,
     raidTiers: new Map([[1, 1]]),
+    finalBosses: EXAMPLE_FINAL_BOSSES,
     seasonStart: EXAMPLE_LAUNCH,
     kills,
-    witnesses,
-    guildKills: [],
+    pullSummaries,
+    reports: { encounters: [], guildKills: [] },
     recorders: new Set(EXAMPLE_CHARACTERS.map((c) => characterId(INSTALL, c.key))),
     guilds: new Map(),
   },
   completion,
+  completionCoverage: new Map(EXAMPLE_CHARACTERS.map((c) => [characterId(INSTALL, c.key), new Set(COMPLETION_PARTS)])),
   agreedQuests: new Set(range(EXAMPLE_LISTS.quests)),
   contested: new Set(),
 };

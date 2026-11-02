@@ -1,36 +1,42 @@
 import { describe, expect, test } from "vitest";
 import type { CompletionFacts, OwnedCharacter } from "../src/completion.js";
 import {
-  characterId, LEVEL_SLACK, scoreAccount, scoreCharacter, SCORE_VERSION,
-  type AccountCharacter, type CharacterScore, type ComponentScore, type OwnKill, type ProgressFacts, type ScoreContext, type ScoreInstance, type WitnessKill,
+  characterId, CLOCK_SKEW_MINUTES, COMPLETION_PARTS, independentWitnesses, LEVEL_SLACK, scoreAccount, scoreCharacter, SCORE_VERSION,
+  type AccountCharacter, type CharacterScore, type CompletionPart, type ComponentScore, type OwnKill, type ProgressFacts, type PullWitness,
+  type ScoreContext, type ScoreInstance,
 } from "../src/everloot-score.js";
 import { EXAMPLE_ACCOUNT, EXAMPLE_CHARACTERS, EXAMPLE_SCORES } from "../src/everloot-score-example.js";
 
 // SYNTHETIC data throughout: the ids, installs, addresses and keys are made up.
 const INSTALL = "install-one";
+const ADDRESS = "address-home";
 const KEY = "0a1b2c3d";
 const ME = { installId: INSTALL, characterKey: KEY };
+const MY_ID = characterId(INSTALL, KEY);
 const LAUNCH = "2026-11-04T23:00:00.000Z";
 const AT = "2026-11-10T20:00:00.000Z";
 const RECEIVED = "2026-11-11T08:00:00.000Z";
+const minutes = (iso: string, n: number) => new Date(Date.parse(iso) + n * 60_000).toISOString();
 
-/** A tier-2 raid (bosses 10, 11) and a dungeon (bosses 1, 2, 3; 3 is the final one), levels 60 and 30. */
+/** A tier-2 raid (bosses 10, 11) and a dungeon (bosses 1, 2, 3), levels 60 and 30, each with difficulties 1 and 2. */
 const INSTANCES: ScoreInstance[] = [
-  { instanceMapId: 200, kind: "raid", bosses: [10, 11], minLevel: 60 },
-  { instanceMapId: 100, kind: "dungeon", bosses: [1, 2, 3], finalBoss: 3, minLevel: 30 },
+  { instanceMapId: 200, kind: "raid", bosses: [10, 11], difficulties: [1, 2], minLevel: 60 },
+  { instanceMapId: 100, kind: "dungeon", bosses: [1, 2, 3], difficulties: [1, 2], minLevel: 30 },
 ];
 
 const kill = (encounterId: number, fields: Partial<OwnKill> = {}): OwnKill => ({
-  installId: INSTALL, characterKey: KEY, encounterId, instanceMapId: encounterId >= 10 ? 200 : 100, difficulty: 1, success: true, capturedAt: AT, receivedAt: RECEIVED, ...fields,
+  installId: INSTALL, addressHash: ADDRESS, characterKey: KEY, encounterId, instanceMapId: encounterId >= 10 ? 200 : 100, difficulty: 1,
+  success: true, capturedAt: AT, receivedAt: RECEIVED, ...fields,
 });
-/** Two other installs from two other addresses saw this kill at the same time. */
-const seen = (encounterId: number, fields: Partial<WitnessKill> = {}): WitnessKill[] =>
-  [1, 2].map((n) => ({ installId: `witness-${n}`, reporter: `address-${n}`, encounterId, difficulty: 1, success: true, capturedAt: AT, ...fields }));
+/** Another install, from another address, uploaded a pull summary of this kill that lists the character. */
+const seen = (encounterId: number, fields: Partial<PullWitness> = {}): PullWitness[] => [{
+  installId: "witness-1", addressHash: "address-1", encounterId, difficulty: 1, success: true, capturedAt: AT, receivedAt: RECEIVED, members: [MY_ID], ...fields,
+}];
 
-function progress(kills: OwnKill[], witnesses: WitnessKill[] = kills.flatMap((k) => seen(k.encounterId)), fields: Partial<ProgressFacts> = {}): ProgressFacts {
+function progress(kills: OwnKill[], pullSummaries: PullWitness[] = kills.flatMap((k) => seen(k.encounterId, { difficulty: k.difficulty })), fields: Partial<ProgressFacts> = {}): ProgressFacts {
   return {
-    instances: INSTANCES, raidTiers: new Map([[200, 2]]), seasonStart: LAUNCH, kills, witnesses, guildKills: [],
-    recorders: new Set([characterId(INSTALL, KEY)]), guilds: new Map(), ...fields,
+    instances: INSTANCES, raidTiers: new Map([[200, 2]]), finalBosses: new Set([3]), seasonStart: LAUNCH, kills, pullSummaries,
+    reports: { encounters: [], guildKills: [] }, recorders: new Set([MY_ID]), guilds: new Map(), ...fields,
   };
 }
 
@@ -61,17 +67,18 @@ function lists(own: OwnedCharacter[] = [owned()]): CompletionFacts {
   };
 }
 const noLists = (own: OwnedCharacter[] = []): CompletionFacts => ({ achievements: new Map(), factions: new Map(), titles: new Map(), chains: new Map(), owned: own });
+const covered = (parts: readonly CompletionPart[] = COMPLETION_PARTS) => new Map([[MY_ID, new Set(parts)]]);
 
 function context(fields: Partial<ScoreContext> = {}): ScoreContext {
   return {
-    asOf: new Date("2026-11-20T00:00:00.000Z"), launch: LAUNCH, progress: progress([]), completion: lists(),
+    asOf: new Date("2026-11-20T00:00:00.000Z"), launch: LAUNCH, progress: progress([]), completion: lists(), completionCoverage: covered(),
     agreedQuests: new Set([1, 2, 3]), contested: new Set(), ...fields,
   };
 }
 
 const points = (c: ComponentScore) => (c.status === "scored" ? c.points : null);
 const part = (c: ComponentScore, key: string) => (c.status === "scored" ? c.parts.find((p) => p.key === key) : undefined);
-const progressOf = (kills: OwnKill[], witnesses?: WitnessKill[], fields: Partial<ProgressFacts> = {}, ctx: Partial<ScoreContext> = {}) =>
+const progressOf = (kills: OwnKill[], witnesses?: PullWitness[], fields: Partial<ProgressFacts> = {}, ctx: Partial<ScoreContext> = {}) =>
   scoreCharacter(ME, context({ progress: progress(kills, witnesses, fields), ...ctx }));
 
 describe("a character with no data", () => {
@@ -103,7 +110,7 @@ describe("a character with no data", () => {
 });
 
 describe("Progress", () => {
-  test("a raid boss is worth 10 times its tier, a dungeon boss 1 and a final boss 3", () => {
+  test("a raid boss is worth 10 times its tier, a dungeon boss 1 and a listed final boss 3", () => {
     const s = progressOf([kill(10), kill(1), kill(3)]);
     expect(part(s.progress, "raid")).toEqual({ key: "raid", count: 1, points: 20 });
     expect(part(s.progress, "dungeon")).toEqual({ key: "dungeon", count: 2, points: 4 });
@@ -111,8 +118,13 @@ describe("Progress", () => {
     expect(s.kills.counted).toEqual(["10:1", "1:1", "3:1"].sort());
   });
 
+  test("until the curated final-boss list exists, every dungeon boss is worth 1", () => {
+    expect(part(progressOf([kill(1), kill(3)], undefined, { finalBosses: null }).progress, "dungeon")).toEqual({ key: "dungeon", count: 2, points: 2 });
+  });
+
   test("each boss counts once per difficulty", () => {
-    const s = progressOf([kill(1), kill(1, { capturedAt: "2026-11-10T21:00:00.000Z" }), kill(1, { difficulty: 2 })], [...seen(1), ...seen(1, { capturedAt: "2026-11-10T21:00:00.000Z" }), ...seen(1, { difficulty: 2 })]);
+    const later = "2026-11-10T21:00:00.000Z";
+    const s = progressOf([kill(1), kill(1, { capturedAt: later }), kill(1, { difficulty: 2 })], [...seen(1), ...seen(1, { capturedAt: later }), ...seen(1, { difficulty: 2 })]);
     expect(points(s.progress)).toBe(2);
     expect(s.kills.dropped).toEqual({ repeat: 1 });
   });
@@ -144,6 +156,12 @@ describe("the anti-gaming rules (plan section 3.3)", () => {
     expect(s.kills.dropped).toEqual({ "not on the boss list": 2 });
   });
 
+  test("a difficulty the instance does not have scores nothing", () => {
+    expect(progressOf([kill(1, { difficulty: 9 })]).kills.dropped).toEqual({ "difficulty not valid": 1 });
+    // An instance the files give no difficulty for scores nothing at all.
+    expect(progressOf([kill(1)], undefined, { instances: [INSTANCES[0], { ...INSTANCES[1], difficulties: [] }] }).kills.dropped).toEqual({ "difficulty not valid": 1 });
+  });
+
   test("an instance of unknown kind scores nothing", () => {
     const s = progressOf([kill(1)], undefined, { instances: [{ ...INSTANCES[1], kind: null }] });
     expect(s.kills.dropped).toEqual({ "not on the boss list": 1 });
@@ -153,69 +171,135 @@ describe("the anti-gaming rules (plan section 3.3)", () => {
     expect(progressOf([kill(10)], undefined, { raidTiers: new Map() }).kills.dropped).toEqual({ "raid not on the tier list": 1 });
   });
 
-  describe("corroboration", () => {
-    test("needs two other installs", () => {
-      const one = progressOf([kill(1)], seen(1).slice(0, 1));
-      expect(one.kills.dropped).toEqual({ "not corroborated": 1 });
-      expect(points(one.progress)).toBe(0);
+  describe("confirmation by another uploader's pull summary", () => {
+    test("one pull summary from another install and another address, listing the character, confirms the kill", () => {
+      expect(points(progressOf([kill(1)]).progress)).toBe(1);
+      const none = progressOf([kill(1)], []);
+      expect(none.kills.dropped).toEqual({ "not confirmed": 1 });
+      expect(points(none.progress)).toBe(0);
     });
 
-    test("needs two other addresses, not two installs behind one", () => {
-      expect(progressOf([kill(1)], seen(1).map((w) => ({ ...w, reporter: "one-address" }))).kills.dropped).toEqual({ "not corroborated": 1 });
+    test("a pull summary that does not list the character confirms nothing", () => {
+      expect(progressOf([kill(1)], seen(1, { members: [characterId("witness-1", "ffffffff")] })).kills.dropped).toEqual({ "not confirmed": 1 });
     });
 
-    test("does not take the character's own install as a witness", () => {
-      expect(progressOf([kill(1)], [...seen(1).slice(0, 1), { ...seen(1)[1], installId: INSTALL }]).kills.dropped).toEqual({ "not corroborated": 1 });
+    test("the character's own install, or its own address, is never a witness", () => {
+      // The upload that carried the kill came from ADDRESS: a second install behind it is the same uploader's.
+      expect(progressOf([kill(1)], seen(1, { addressHash: ADDRESS })).kills.dropped).toEqual({ "not confirmed": 1 });
+      expect(progressOf([kill(1)], seen(1, { installId: INSTALL })).kills.dropped).toEqual({ "not confirmed": 1 });
+    });
+
+    test("witnesses are counted as independent (install, address) pairs", () => {
+      const subject = { installId: "S", addressHash: "s" };
+      const pair = (installId: string, addressHash: string) => ({ installId, addressHash });
+      // Three installs and three addresses, but one address behind three installs and one install behind three
+      // addresses: only two pairs share nothing. Counting installs and addresses apart would say three.
+      expect(independentWitnesses([pair("A", "x"), pair("B", "x"), pair("C", "x"), pair("A", "y"), pair("A", "z")], subject)).toBe(2);
+      expect(independentWitnesses([pair("A", "x"), pair("A", "y")], subject)).toBe(1);
+      expect(independentWitnesses([pair("A", "s"), pair("S", "x")], subject)).toBe(0);
+      expect(independentWitnesses([pair("A", "x"), pair("B", "y")], subject)).toBe(2);
     });
 
     test("needs the same boss, difficulty and a kill, within ten minutes", () => {
       for (const witness of [{ encounterId: 2 }, { difficulty: 2 }, { success: false }, { capturedAt: "2026-11-10T20:10:01.000Z" }]) {
-        expect(progressOf([kill(1)], seen(1, witness)).kills.dropped, JSON.stringify(witness)).toEqual({ "not corroborated": 1 });
+        expect(progressOf([kill(1)], seen(1, witness)).kills.dropped, JSON.stringify(witness)).toEqual({ "not confirmed": 1 });
       }
       expect(points(progressOf([kill(1)], seen(1, { capturedAt: "2026-11-10T20:10:00.000Z" })).progress)).toBe(1);
     });
 
+    test("a witness dated past its own arrival, or arriving after the server's clock, confirms nothing", () => {
+      const asOf = new Date("2026-11-10T20:30:00.000Z");
+      const k = kill(1, { receivedAt: "2026-11-10T20:20:00.000Z" });
+      const witness = (capturedAt: string, receivedAt: string) => progressOf([k], seen(1, { capturedAt, receivedAt }), {}, { asOf });
+      // The witness's upload arrived at 20:00; it may claim a time up to the skew after that, and no later.
+      const ahead = minutes(AT, CLOCK_SKEW_MINUTES);
+      expect(points(witness(ahead, AT).progress)).toBe(1);
+      expect(witness(new Date(Date.parse(ahead) + 1000).toISOString(), AT).kills.dropped).toEqual({ "not confirmed": 1 });
+      expect(witness(AT, "2026-11-10T20:30:01.000Z").kills.dropped).toEqual({ "not confirmed": 1 });
+    });
+
     test("ignores witnesses from contested installs", () => {
-      expect(progressOf([kill(1)], undefined, {}, { contested: new Set(["witness-1"]) }).kills.dropped).toEqual({ "not corroborated": 1 });
+      expect(progressOf([kill(1)], undefined, {}, { contested: new Set(["witness-1"]) }).kills.dropped).toEqual({ "not confirmed": 1 });
     });
 
-    test("a kill the character's own guild owns that day is enough", () => {
+    test("the guild's kill or other installs' anonymous rows label a kill reported, and score nothing", () => {
       const guild = { guildName: "Example Guild", realm: "Example" };
-      const guildKills = [{ ...guild, encounterId: 1, killedAt: "2026-11-10T23:30:00.000Z" }];
-      expect(points(progressOf([kill(1)], [], { guildKills, guilds: new Map([[characterId(INSTALL, KEY), guild]]) }).progress)).toBe(1);
-      // Another guild's kill, or the guild's kill on another day, is not.
-      expect(points(progressOf([kill(1)], [], { guildKills, guilds: new Map([[characterId(INSTALL, KEY), { ...guild, guildName: "Other" }]]) }).progress)).toBe(0);
-      expect(points(progressOf([kill(1)], [], { guildKills: [{ ...guildKills[0], killedAt: "2026-11-11T00:30:00.000Z" }], guilds: new Map([[characterId(INSTALL, KEY), guild]]) }).progress)).toBe(0);
+      const guilds = new Map([[MY_ID, guild]]);
+      const guildKill = { ...guild, encounterId: 1, difficulty: 1, killedAt: "2026-11-10T23:30:00.000Z" };
+      const byGuild = progressOf([kill(1)], [], { guilds, reports: { encounters: [], guildKills: [guildKill] } });
+      expect(points(byGuild.progress)).toBe(0);
+      expect(byGuild.kills.dropped).toEqual({ "reported, not confirmed": 1 });
+      const anonymous = [1, 2].map((n) => ({ installId: `other-${n}`, encounterId: 1, difficulty: 1, success: true, capturedAt: AT }));
+      const byRows = progressOf([kill(1)], [], { reports: { encounters: anonymous, guildKills: [] } });
+      expect(points(byRows.progress)).toBe(0);
+      expect(byRows.kills.dropped).toEqual({ "reported, not confirmed": 1 });
+      // The label needs the same difficulty and day, and the character's own guild.
+      for (const g of [{ ...guildKill, difficulty: 2 }, { ...guildKill, difficulty: null }, { ...guildKill, killedAt: "2026-11-11T00:30:00.000Z" }, { ...guildKill, guildName: "Other" }]) {
+        expect(progressOf([kill(1)], [], { guilds, reports: { encounters: [], guildKills: [g] } }).kills.dropped, JSON.stringify(g)).toEqual({ "not confirmed": 1 });
+      }
     });
 
-    test("a later corroborated kill of the same boss still counts", () => {
+    test("one guild kill against many difficulty variants of the same boss scores nothing", () => {
+      const guild = { guildName: "Example Guild", realm: "Example" };
+      const variants = Array.from({ length: 20 }, (_, d) => kill(10, { difficulty: d + 1 }));
+      const s = progressOf(variants, [], { guilds: new Map([[MY_ID, guild]]), reports: { encounters: [], guildKills: [{ ...guild, encounterId: 10, difficulty: 1, killedAt: AT }] } });
+      expect(points(s.progress)).toBe(0);
+      expect(s.kills.dropped).toEqual({ "reported, not confirmed": 1, "difficulty not valid": 18, "not confirmed": 1 });
+    });
+
+    test("a later confirmed kill of the same boss still counts", () => {
       const later = "2026-11-12T20:00:00.000Z";
-      const s = progressOf([kill(1), kill(1, { capturedAt: later, receivedAt: later })], seen(1, { capturedAt: later }));
+      const s = progressOf([kill(1), kill(1, { capturedAt: later, receivedAt: later })], seen(1, { capturedAt: later, receivedAt: later }));
       expect(points(s.progress)).toBe(1);
-      expect(s.kills.dropped).toEqual({ "not corroborated": 1 });
+      expect(s.kills.dropped).toEqual({ "not confirmed": 1 });
     });
   });
 
-  test("a character under the level band, or of unknown level, scores nothing there", () => {
+  test("a character under the level band scores nothing there", () => {
     const low = (level: number) => scoreCharacter({ ...ME, level }, context({ progress: progress([kill(10)]) }));
     expect(low(60 - LEVEL_SLACK - 1).kills.dropped).toEqual({ "under the level band": 1 });
     expect(points(low(60 - LEVEL_SLACK).progress)).toBe(20);
-    // No link level and no completion rows: the level cannot be checked.
-    const unknown = scoreCharacter(ME, context({ progress: progress([kill(10)]), completion: lists([]) }));
-    expect(unknown.kills.dropped).toEqual({ "level unknown": 1 });
     // The completion rows' level stands in when the link gives none.
     expect(points(scoreCharacter(ME, context({ progress: progress([kill(10)]), completion: lists([owned({ level: 20 })]) })).progress)).toBe(0);
   });
 
-  test("dates: nothing before launch or the season, after the server's clock, or far from the upload", () => {
+  test("an unknown character level makes Progress unknown, not zero", () => {
+    // No link level and no completion rows: the level cannot be checked.
+    const unknown = scoreCharacter(ME, context({ progress: progress([kill(10)]), completion: lists([]) }));
+    expect(unknown.kills.dropped).toEqual({ "level unknown": 1 });
+    expect(unknown.progress).toEqual({ key: "progress", status: "unknown", missing: "character level" });
+    expect(unknown.total).toBeNull();
+    // A level that is not a level is unknown too.
+    expect(scoreCharacter({ ...ME, level: 0 }, context({ progress: progress([kill(10)]), completion: lists([owned({ level: 0 })]) })).progress.status).toBe("unknown");
+  });
+
+  test("an instance with no level in the files scores nothing: the band cannot be checked", () => {
+    const noLevel = [{ ...INSTANCES[0], minLevel: undefined }, INSTANCES[1]];
+    const s = progressOf([kill(10)], undefined, { instances: noLevel });
+    expect(s.kills.dropped).toEqual({ "instance level unknown": 1 });
+    expect(points(s.progress)).toBe(0);
+    // Even when the character's own level is unknown.
+    expect(scoreCharacter(ME, context({ progress: progress([kill(10)], undefined, { instances: noLevel }), completion: lists([]) })).kills.dropped)
+      .toEqual({ "instance level unknown": 1 });
+  });
+
+  test("dates: nothing before launch or the season, dated past its arrival, arriving after the server's clock, or over 60 days late", () => {
     const cases: [Partial<OwnKill>, string][] = [
       [{ capturedAt: "2026-11-04T22:59:59.000Z", receivedAt: "2026-11-05T00:00:00.000Z" }, "before the season"],
-      [{ capturedAt: "2026-11-21T00:00:00.000Z", receivedAt: "2026-11-21T00:00:00.000Z" }, "date out of range"],
-      [{ capturedAt: "2026-11-10T20:00:00.000Z", receivedAt: "2026-12-11T00:00:00.000Z" }, "date out of range"],
-      [{ capturedAt: "2026-11-12T20:00:00.000Z", receivedAt: "2026-11-11T08:00:00.000Z" }, "date out of range"],
+      [{ capturedAt: "2026-11-19T00:00:00.000Z", receivedAt: "2026-11-20T00:00:01.000Z" }, "date out of range"],
+      [{ capturedAt: "2026-11-11T08:10:01.000Z", receivedAt: "2026-11-11T08:00:00.000Z" }, "date out of range"],
       [{ capturedAt: "not a date" }, "date out of range"],
     ];
-    for (const [fields, why] of cases) expect(progressOf([kill(1, fields)], seen(1, { capturedAt: fields.capturedAt ?? AT })).kills.dropped, why).toEqual({ [why]: 1 });
+    for (const [fields, why] of cases) {
+      expect(progressOf([kill(1, fields)], seen(1, { capturedAt: fields.capturedAt ?? AT, receivedAt: fields.receivedAt ?? RECEIVED })).kills.dropped, why).toEqual({ [why]: 1 });
+    }
+    // Ten minutes ahead of its arrival is the allowed skew.
+    const ahead = "2026-11-11T08:10:00.000Z";
+    expect(points(progressOf([kill(1, { capturedAt: ahead })], seen(1, { capturedAt: ahead })).progress)).toBe(1);
+    // Intake takes a kill up to 60 days old at its upload; older is out of range.
+    const late = (receivedAt: string) => progressOf([kill(1, { receivedAt })], seen(1), {}, { asOf: new Date("2027-01-20T00:00:00.000Z") });
+    expect(points(late("2027-01-09T20:00:00.000Z").progress)).toBe(1);
+    expect(late("2027-01-09T20:00:01.000Z").kills.dropped).toEqual({ "date out of range": 1 });
     // A new tier's season starts later: kills before it no longer count.
     expect(progressOf([kill(1)], undefined, { seasonStart: "2026-11-15T00:00:00.000Z" }).kills.dropped).toEqual({ "before the season": 1 });
   });
@@ -265,6 +349,17 @@ describe("Completion", () => {
     expect(s.total).toBe(0);
   });
 
+  test("a kind of row the character never uploaded is unknown, not zero", () => {
+    const me = owned({ achievements: new Map([[1, done], [2, done]]) });
+    const partial = scoreCharacter(ME, context({ progress: null, completion: lists([me]), completionCoverage: covered(["achievements"]) }));
+    expect(partial.completion).toEqual({ key: "completion", status: "unknown", missing: "own reputation, title, quest rows" });
+    expect(partial.total).toBeNull();
+    expect(scoreCharacter(ME, context({ progress: null, completion: lists([me]), completionCoverage: new Map() })).completion.status).toBe("unknown");
+    // A kind with no agreed list is not needed: with no quest list, quests need not be uploaded.
+    const noQuests = scoreCharacter(ME, context({ progress: null, completion: lists([me]), agreedQuests: null, completionCoverage: covered(["achievements", "reputations", "titles"]) }));
+    expect(points(noQuests.completion)).toBe(4);
+  });
+
   test("an achievement earned on launch day counts", () => {
     const me = owned({ achievements: new Map([[2, { ...done, earnedOn: "2026-11-04" }]]) });
     expect(part(scoreCharacter(ME, context({ progress: null, completion: lists([me]) })).completion, "achievements")?.points).toBe(3);
@@ -288,7 +383,7 @@ describe("components stay apart", () => {
     expect(s.pvp.status).toBe("not-scored");
   });
 
-  test("Progress does not move when Completion changes, and the total is their sum", () => {
+  test("Progress does not move when Completion changes, and the profile total is their sum", () => {
     const a = scoreCharacter(ME, context({ progress: progress([kill(10)]) }));
     const b = scoreCharacter(ME, context({ progress: progress([kill(10)]), completion: lists([owned({ titles: new Set([1, 2]) })]) }));
     expect(b.progress).toEqual(a.progress);
@@ -306,11 +401,11 @@ describe("a list change between game builds", () => {
     expect(points(progressOf(kills, undefined, { instances: more }).progress)).toBe(21);
   });
 
-  test("a new final boss changes only that boss's worth", () => {
+  test("a final-boss list change moves only that boss's worth", () => {
     const kills = [kill(2), kill(3)];
     expect(points(progressOf(kills).progress)).toBe(4);
-    expect(points(progressOf(kills, undefined, { instances: [INSTANCES[0], { ...INSTANCES[1], finalBoss: 2 }] }).progress)).toBe(4);
-    expect(points(progressOf(kills, undefined, { instances: [INSTANCES[0], { ...INSTANCES[1], finalBoss: undefined }] }).progress)).toBe(2);
+    expect(points(progressOf(kills, undefined, { finalBosses: new Set([2]) }).progress)).toBe(4);
+    expect(points(progressOf(kills, undefined, { finalBosses: new Set() }).progress)).toBe(2);
   });
 
   test("an achievement's points come from the current list", () => {
@@ -325,61 +420,67 @@ describe("a list change between game builds", () => {
 });
 
 describe("one account across its characters", () => {
-  const scoreOf = (key: string, total: number | null, counted: string[] = []): CharacterScore => ({
-    version: SCORE_VERSION, asOf: "2026-11-20T00:00:00.000Z", installId: INSTALL, characterKey: key, total,
-    progress: { key: "progress", status: "scored", points: 0, parts: [] },
-    completion: total === null ? { key: "completion", status: "unknown", missing: "own completion rows" } : { key: "completion", status: "scored", points: total, parts: [] },
+  const scoreOf = (key: string, progressPoints: number | null, completionPoints: number | null, counted: string[] = []): CharacterScore => ({
+    version: SCORE_VERSION, asOf: "2026-11-20T00:00:00.000Z", installId: INSTALL, characterKey: key,
+    total: progressPoints === null || completionPoints === null ? null : progressPoints + completionPoints,
+    progress: progressPoints === null ? { key: "progress", status: "unknown", missing: "own boss kills" } : { key: "progress", status: "scored", points: progressPoints, parts: [] },
+    completion: completionPoints === null ? { key: "completion", status: "unknown", missing: "own completion rows" } : { key: "completion", status: "scored", points: completionPoints, parts: [] },
     speed: { key: "speed", status: "not-scored", reason: "" }, pvp: { key: "pvp", status: "not-scored", reason: "" },
     kills: { counted, dropped: {} },
   });
   const linked = (score: CharacterScore, fields: Partial<AccountCharacter> = {}): AccountCharacter => ({ score, link: "linked", hidden: false, sourceOwned: true, ruleset: "forever", ...fields });
 
   test("no characters, no score", () => {
-    expect(scoreAccount([], "forever")).toMatchObject({ total: null, best: null, counted: 0, record: 0 });
+    expect(scoreAccount([], "forever")).toMatchObject({ progress: null, completion: null, counted: 0, record: 0 });
   });
 
-  test("one character is the account's score", () => {
-    expect(scoreAccount([linked(scoreOf("00000001", 400))], "forever")).toMatchObject({ total: 400, altBonus: 0, counted: 1 });
+  test("one character is the account's Progress and Completion", () => {
+    expect(scoreAccount([linked(scoreOf("00000001", 40, 400))], "forever")).toMatchObject({
+      progress: { points: 40, characterKey: "00000001" }, completion: { points: 400, characterKey: "00000001" }, counted: 1,
+    });
   });
 
-  test("many characters: the best one, with no bonus for alts by default", () => {
-    const a = scoreAccount([linked(scoreOf("00000001", 200, ["1:1"])), linked(scoreOf("00000002", 600, ["1:1", "10:1"])), linked(scoreOf("00000003", 150, ["2:1"]))], "forever");
-    expect(a.best).toEqual({ installId: INSTALL, characterKey: "00000002", total: 600 });
-    expect(a.total).toBe(600);
+  test("Progress and Completion each take their own best character; a big Completion never picks the Progress one", () => {
+    const a = scoreAccount([
+      linked(scoreOf("00000001", 10, 500, ["1:1"])), // the highest combined total
+      linked(scoreOf("00000002", 100, 0, ["1:1", "10:1"])),
+      linked(scoreOf("00000003", 50, 20, ["2:1"])),
+    ], "forever");
+    expect(a.progress).toEqual({ points: 100, installId: INSTALL, characterKey: "00000002" });
+    expect(a.completion).toEqual({ points: 500, installId: INSTALL, characterKey: "00000001" });
     expect(a.counted).toBe(3);
     // The record is every distinct boss any of them killed.
     expect(a.record).toBe(3);
   });
 
-  test("an alt bonus, if the owner chooses one, is a capped share of the others", () => {
-    const alts = Array.from({ length: 30 }, (_, i) => linked(scoreOf(`1000${String(i).padStart(4, "0")}`, 50)));
-    const a = scoreAccount([linked(scoreOf("00000001", 900)), ...alts], "forever", { share: 0.1, cap: 100 });
-    expect(a.altBonus).toBe(100);
-    expect(a.total).toBe(1000);
-    expect(scoreAccount([linked(scoreOf("00000001", 900)), alts[0]], "forever", { share: 0.1, cap: 100 }).altBonus).toBe(5);
+  test("a character unknown in one number still counts in the other", () => {
+    const a = scoreAccount([linked(scoreOf("00000001", null, 300)), linked(scoreOf("00000002", 30, null))], "forever");
+    expect(a.progress?.characterKey).toBe("00000002");
+    expect(a.completion?.characterKey).toBe("00000001");
   });
 
-  test("frozen, hidden, other accounts' sources, other rulesets, unknown totals, old versions and repeats do not count", () => {
+  test("frozen, hidden, other accounts' sources, other rulesets, nothing scored, old versions and repeats do not count", () => {
     const a = scoreAccount([
-      linked(scoreOf("00000001", 300)),
-      linked(scoreOf("00000002", 900), { link: "frozen" }),
-      linked(scoreOf("00000003", 900), { hidden: true }),
-      linked(scoreOf("00000004", 900), { sourceOwned: false }),
-      linked(scoreOf("00000005", 900), { ruleset: "another" }),
-      linked(scoreOf("00000006", null)),
-      linked({ ...scoreOf("00000007", 900), version: SCORE_VERSION + 1 }),
-      linked(scoreOf("00000001", 300)),
+      linked(scoreOf("00000001", 30, 300)),
+      linked(scoreOf("00000002", 90, 900), { link: "frozen" }),
+      linked(scoreOf("00000003", 90, 900), { hidden: true }),
+      linked(scoreOf("00000004", 90, 900), { sourceOwned: false }),
+      linked(scoreOf("00000005", 90, 900), { ruleset: "another" }),
+      linked(scoreOf("00000006", null, null)),
+      linked({ ...scoreOf("00000007", 90, 900), version: SCORE_VERSION + 1 }),
+      linked(scoreOf("00000001", 30, 300)),
     ], "forever");
-    expect(a.total).toBe(300);
+    expect(a.progress?.points).toBe(30);
+    expect(a.completion?.points).toBe(300);
     expect(a.counted).toBe(1);
-    expect(a.excluded.map((e) => e.reason).sort()).toEqual(["frozen", "hidden", "listed twice", "other ruleset", "other version", "source not owned", "unknown total"]);
+    expect(a.excluded.map((e) => e.reason).sort()).toEqual(["frozen", "hidden", "listed twice", "nothing scored", "other ruleset", "other version", "source not owned"]);
   });
 
-  test("equal totals pick the same best character whatever the order", () => {
-    const a = linked(scoreOf("0000000a", 500));
-    const b = linked(scoreOf("0000000b", 500));
-    expect(scoreAccount([a, b], "forever").best?.characterKey).toBe("0000000a");
-    expect(scoreAccount([b, a], "forever").best?.characterKey).toBe("0000000a");
+  test("equal points pick the same best character whatever the order", () => {
+    const a = linked(scoreOf("0000000a", 50, 500));
+    const b = linked(scoreOf("0000000b", 50, 500));
+    expect(scoreAccount([a, b], "forever").progress?.characterKey).toBe("0000000a");
+    expect(scoreAccount([b, a], "forever").completion?.characterKey).toBe("0000000a");
   });
 });
 
@@ -391,6 +492,6 @@ describe("the worked example (plan section 3.2)", () => {
     expect(all).toEqual([["raid", 40], ["dungeon", 18], ["achievements", 41], ["reputations", 20], ["titles", 5], ["quests", 7]]);
     expect([points(a.progress), points(a.completion), a.total]).toEqual([58, 73, 131]);
     expect([b.total, c.total]).toEqual([34, 9]);
-    expect(EXAMPLE_ACCOUNT).toMatchObject({ total: 131, altBonus: 0, counted: 3, record: 18, best: { characterKey: "0000000a" } });
+    expect(EXAMPLE_ACCOUNT).toMatchObject({ progress: { points: 58, characterKey: "0000000a" }, completion: { points: 73, characterKey: "0000000a" }, counted: 3, record: 18 });
   });
 });
