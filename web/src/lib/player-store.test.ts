@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { createCloudPlayerStore, createMemoryPlayerStore, playerStoreFrom } from "./player-store";
+import { createCloudPlayerStore, createMemoryPlayerStore, playerHideKey, playerStoreFrom } from "./player-store";
 import { optOutPath, playerDateProblem, playerIndexingOn, playerPagesOn, playerPath, playerUpsert, realmSlug, searchPrefix, type PlayerRow } from "./player-pages";
 
 const row = (name: string, extra: object = {}) => ({ name, realm: "Forever Pioneer", race: "Orc", class: "SHAMAN", level: 24, seen: "2026-10-20", ...extra });
@@ -110,6 +110,21 @@ describe("the Supabase store", () => {
   test("a failed request throws, so the caller can tell the player to retry", async () => {
     const send = vi.fn(async () => new Response("", { status: 500 }));
     await expect(createCloudPlayerStore("https://db.example", "k", send as unknown as typeof fetch).upsert([row("Aa")])).rejects.toThrow(/unavailable/);
+  });
+
+  test("the hidden characters are read from the opt-out table, a thousand rows a page, keyed however the realm was spelled", async () => {
+    const page = Array.from({ length: 1000 }, (_, i) => ({ realm: "forever pioneer", character: `name${i}` }));
+    const pages = [page, [{ realm: "Forever-Pioneer", character: "Ada" }]];
+    const send = vi.fn(async () => new Response(JSON.stringify(pages.shift() ?? []), { status: 200 }));
+    const hidden = await createCloudPlayerStore("https://db.example/", "service-key", send as unknown as typeof fetch).hiddenPlayers();
+    expect(send).toHaveBeenCalledTimes(2);
+    const [url, init] = send.mock.calls[1] as unknown as [string, RequestInit];
+    expect(url).toBe("https://db.example/rest/v1/character_suppressions?select=realm,character&order=realm,character&limit=1000&offset=1000");
+    expect(new Headers(init.headers).get("authorization")).toBe("Bearer service-key");
+    expect(hidden.size).toBe(1001);
+    expect(hidden.has(playerHideKey("Forever Pioneer", "ada"))).toBe(true);
+    const failed = vi.fn(async () => new Response("", { status: 503 }));
+    await expect(createCloudPlayerStore("https://db.example", "k", failed as unknown as typeof fetch).hiddenPlayers()).rejects.toThrow(/unavailable/);
   });
 
   test("production without Supabase settings has no store instead of a silent one", () => {
