@@ -33,14 +33,14 @@ beforeEach(() => { vi.clearAllMocks(); h.builds = 0; h.tooltips = 0; });
 test("with no newer app the menu has no update item and the tooltip says nothing about one", () => {
   createTray("tray.png", actions).update(base);
   expect(item(/update/i)).toBeUndefined();
-  expect(h.tooltip).toBe("Everloot Desktop App");
+  expect(h.tooltip).toBe("Everloot");
 });
 
 test("an update the app can install opens its update panel, and says Restart once it is downloaded", () => {
   const tray = createTray("tray.png", actions);
   tray.update({ ...base, update: update(true) });
-  expect(h.tooltip).toBe("Everloot Desktop App · update 0.1.12 available");
-  item(/^Update Everloot Desktop App to 0\.1\.12$/)!.click!();
+  expect(h.tooltip).toBe("Everloot · update 0.1.12 available");
+  item(/^Update Everloot to 0\.1\.12$/)!.click!();
   expect(actions.show).toHaveBeenCalledWith("update");
   expect(actions.openExternal).not.toHaveBeenCalled();
   tray.update({ ...base, update: update(true), updateProgress: { stage: "ready", percent: 100, error: null } });
@@ -49,8 +49,8 @@ test("an update the app can install opens its update panel, and says Restart onc
 
 test("where the app cannot install itself, the item opens the release page", () => {
   createTray("tray.png", actions).update({ ...base, update: update(false), engine: { ...base.engine, paused: true } });
-  expect(h.tooltip).toBe("Everloot Desktop App (paused) · update 0.1.12 available");
-  item(/^Update Everloot Desktop App to 0\.1\.12$/)!.click!();
+  expect(h.tooltip).toBe("Everloot (paused) · update 0.1.12 available");
+  item(/^Update Everloot to 0\.1\.12$/)!.click!();
   expect(actions.openExternal).toHaveBeenCalledWith("https://github.com/Everloot/everloot/releases/tag/desktop-v0.1.12");
   expect(actions.show).not.toHaveBeenCalled();
 });
@@ -73,7 +73,7 @@ test("an item from a menu that was kept acts on the newest state", () => {
   tray.update({ ...base, update: update(false) });
   // Same labels, so the menu is kept; the release can now be installed here, and the click must know.
   tray.update({ ...base, update: update(true) });
-  item(/^Update Everloot Desktop App to 0\.1\.12$/)!.click!();
+  item(/^Update Everloot to 0\.1\.12$/)!.click!();
   expect(actions.show).toHaveBeenCalledWith("update");
   expect(actions.openExternal).not.toHaveBeenCalled();
 });

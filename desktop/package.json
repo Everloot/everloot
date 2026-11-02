@@ -69,6 +69,8 @@
     },
     "nsis": {
       "artifactName": "Everloot-DesktopApp-${version}-win-${arch}-setup.${ext}",
+      "shortcutName": "Everloot",
+      "uninstallDisplayName": "Everloot",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "deleteAppDataOnUninstall": false

@@ -28,7 +28,7 @@ export async function connectInBrowser(endpoint: string, open: (url: string) => 
       server = createServer((req, res) => {
         const url = new URL(req.url ?? "/", "http://127.0.0.1");
         if (url.pathname !== "/callback" || url.searchParams.get("state") !== state) {
-          res.writeHead(404, { "content-type": "text/html; charset=utf-8" }).end(page("Not found", "This address only answers the Everloot Desktop App's sign-in."));
+          res.writeHead(404, { "content-type": "text/html; charset=utf-8" }).end(page("Not found", "This address only answers the Everloot app's sign-in."));
           return;
         }
         if (url.searchParams.get("error") === "denied") {
@@ -38,7 +38,7 @@ export async function connectInBrowser(endpoint: string, open: (url: string) => 
         }
         openSealed({ epk: url.searchParams.get("epk"), iv: url.searchParams.get("iv"), ct: url.searchParams.get("ct") }, privateKey, state).then(
           (key) => {
-            res.writeHead(200, { "content-type": "text/html; charset=utf-8" }).end(page("Everloot Desktop App is signed in", "You can close this tab and go back to the app."));
+            res.writeHead(200, { "content-type": "text/html; charset=utf-8" }).end(page("Everloot is signed in", "You can close this tab and go back to the app."));
             finish(() => resolve(key));
           },
           () => {
