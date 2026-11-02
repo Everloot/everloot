@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { Badge, Card, SectionHeading } from "@/components/ui";
-import { bossLine, instanceTitle, type InstancePlace } from "@/lib/instances";
+import { bossLine, bossRows, instanceTitle, type InstancePlace } from "@/lib/instances";
 import { mapHref } from "@/lib/map-view";
 import { dayLabel } from "@/lib/report-labels";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import type { DungeonFacts } from "@/lib/wiki-dungeon";
 import { zoneHref } from "@/lib/zones";
+import { WORLD_MAP } from "@/lib/world-map";
+import type { DungeonRecords } from "@/lib/wiki-dungeon-records";
+import type { LoadingArt } from "@/lib/game-assets";
 
 /** The line under a dungeon or raid page's "Before you go", which keeps the advice apart from the facts. */
 export const ADVICE_NOTE = "Advice in Everloot's own words, not data from the game files or from players.";
@@ -31,7 +34,7 @@ const placeKey = (p: InstancePlace) => `${p.mapId}-${p.x}-${p.y}`;
  */
 export function DungeonGlance({ facts }: { facts: DungeonFacts }) {
   const { row, level, unreachable } = facts;
-  if (level === null && !row.files.length && !row.confirmed.length) return null;
+  if (level === null && !row.files.length && !row.confirmed.length && !row.difficulties.length) return null;
   return (
     <Card as="section" aria-labelledby="at-a-glance" className="mb-8">
       <h2 id="at-a-glance" className="text-sm font-semibold text-fg">At a glance</h2>
@@ -42,6 +45,17 @@ export function DungeonGlance({ facts }: { facts: DungeonFacts }) {
           <>
             <dt className="text-muted">Level</dt>
             <dd className="text-fg">{level} <Badge tone="files" /></dd>
+          </>
+        )}
+        {row.difficulties.length > 0 && (
+          <>
+            <dt className="text-muted">Difficulties in the files</dt>
+            <dd className="space-y-1">
+              {row.difficulties.map((id) => {
+                const difficulty = WORLD_MAP.difficulties?.[id];
+                return <div key={id}>{difficulty?.name ?? `Difficulty ${id}`}{difficulty?.maxPlayers && difficulty.maxPlayers > 0 ? `, up to ${difficulty.maxPlayers} players` : ""} <Badge tone="files" /></div>;
+              })}
+            </dd>
           </>
         )}
         {row.files.length > 0 && (
@@ -69,19 +83,65 @@ export function DungeonGlance({ facts }: { facts: DungeonFacts }) {
 }
 
 /**
- * The bosses 3 installs report in the instance, each with its kills, installs and last seen. With none there is no
- * section; with storage down the row has none either, and the infobox says why.
+ * Confirmed bosses keep their evidence; file-only encounters stay unconfirmed, including when storage is down.
  */
 export function DungeonBosses({ facts }: { facts: DungeonFacts }) {
-  if (!facts.row.bosses.length) return null;
+  const bosses = bossRows(facts.unreachable ? { bosses: [], encounters: facts.row.encounters } : facts.row);
+  if (!bosses.length) return null;
   return (
     <section aria-labelledby="bosses" className="mt-12">
-      <SectionHeading id="bosses" note="A boss is listed once 3 installs report its encounter ending here. Kills count every install's kills together; wipes are not kills.">
+      <SectionHeading id="bosses" note="Encounters from the game files are unconfirmed. Player reports appear once 3 installs report an encounter ending here. Kills count every install's kills together; wipes are not kills.">
         Bosses
       </SectionHeading>
       <ul className="space-y-1 text-sm text-fg-2">
-        {facts.row.bosses.map((b) => <li key={b.encounterId}>{bossLine(b)}</li>)}
+        {bosses.map((b) => (
+          <li key={b.encounterId}>
+            {b.boss ? bossLine({ ...b.boss, name: b.name }) : b.name ?? `Encounter ${b.encounterId}`} {b.filesName && <Badge tone="files" />}
+          </li>
+        ))}
       </ul>
     </section>
+  );
+}
+
+export function DungeonRecordedFacts({ records }: { records: DungeonRecords }) {
+  if (records.unavailable) return <p className="mt-8 text-sm text-warning">Player reports are unavailable. Recorded loot and quests are unknown until storage is back.</p>;
+  return (
+    <div className="mt-12 space-y-10">
+      <p className="text-meta text-muted">Corpus snapshot: {records.dataAsOf ? dayLabel(records.dataAsOf) : "date unrecorded"}. Recorded observations may be from earlier builds.</p>
+      <section aria-labelledby="recorded-loot">
+        <SectionHeading id="recorded-loot" note="Public loot observations from NPCs players confirmed for these bosses. These are recorded loot windows, not a complete loot table, and are not separated by difficulty.">Recorded boss loot</SectionHeading>
+        {records.loot.length ? <ul className="space-y-2 text-sm text-fg-2">{records.loot.map((drop) => (
+          <li key={`${drop.encounterId}-${drop.sourceNpcId}-${drop.itemId}`}>
+            {drop.boss}: <Link href={`/database/items/${drop.itemId}`} className={link}>{drop.itemName ?? `Item ${drop.itemId}`}</Link>
+            {` — ${drop.drops} drops in ${drop.kills} loot windows, from ${drop.reporters} installs`}
+          </li>
+        ))}</ul> : <p className="text-sm text-muted">No public boss loot observations yet. Unrecorded does not mean a boss drops nothing.</p>}
+      </section>
+      <section aria-labelledby="recorded-quests">
+        <SectionHeading id="recorded-quests" note="Player reports agree on this dungeon's quest category and dungeon tag. Each displayed fact keeps its own confirmation rule.">Recorded dungeon quests</SectionHeading>
+        {records.quests.length ? <ul className="space-y-2 text-sm text-fg-2">{records.quests.map((quest) => (
+          <li key={quest.questId}>
+            <Link href={`/database/quests/${quest.questId}`} className={link}>{quest.title ?? `Quest ${quest.questId}`}</Link>
+            {quest.side && ` · ${quest.side}`}
+            {quest.giverNpcId !== null && <> · given by <Link href={`/database/npcs/${quest.giverNpcId}`} className={link}>NPC {quest.giverNpcId}</Link></>}
+            {quest.rewards.length > 0 && <> · rewards: {quest.rewards.map((id, index) => <span key={id}>{index > 0 && ", "}<Link href={`/database/items/${id}`} className={link}>Item {id}</Link></span>)}</>}
+          </li>
+        ))}</ul> : <p className="text-sm text-muted">No public dungeon quest reports yet. This does not mean there are no quests here.</p>}
+      </section>
+      <p className="text-sm text-muted">After your run, <Link href="/upload" className={link}>upload the addon's saved data</Link> to help confirm what is here. Gameplay facts appear once three separate installs agree.</p>
+    </div>
+  );
+}
+
+export function DungeonLoadingArt({ art }: { art: LoadingArt | null }) {
+  if (!art) return null;
+  return (
+    <figure className="my-6">
+      {/* Approved loading-screen art; never an interior map or evidence of an encounter. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={art.small?.url ?? art.url} width={art.small?.width ?? art.width} height={Math.round((art.small?.width ?? art.width) * 9 / 16)} alt="" loading="lazy" className="aspect-video w-full rounded-card object-cover" />
+      <figcaption className="mt-2 text-meta text-muted">Loading-screen artwork from the game files. <Link href="/methodology#credits" className={link}>Blizzard artwork credits</Link>. This is not an interior map.</figcaption>
+    </figure>
   );
 }

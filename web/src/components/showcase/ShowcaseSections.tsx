@@ -4,7 +4,7 @@ import { className, raceName } from "@/app/players/player-view";
 import { Bar } from "@/app/tools/collections/CompletionView";
 import { Card, DataTable, Facts, SectionHeading } from "@/components/ui";
 import {
-  averageItemLevel, EMPTY_LINE, isPublic, PRIVATE_LINE, STALE_LINE, UNSUPPORTED_LINE,
+  averageItemLevel, EMPTY_LINE, isPublic, PLANNED_LINE, PRIVATE_LINE, STALE_LINE, UNSUPPORTED_LINE,
   type CollectionsData, type GearRow, type ProfessionRow, type RaidsData, type ReputationRow, type Section, type Showcase, type ShownSection, type TalentsData,
 } from "@/lib/character-showcase";
 
@@ -30,10 +30,12 @@ function Gear({ rows }: { rows: GearRow[] }) {
 }
 
 function Talents({ data, classSlug }: { data: TalentsData; classSlug: string | null }) {
-  const calculator = classSlug ? `/tools/talents/${classSlug}${data.code ? `#plan=${data.code}` : ""}` : null;
+  // No trees: nothing was synced from the game, only planned builds, so there is no in-game build to open.
+  const inGame = data.trees.length > 0;
+  const calculator = inGame && classSlug ? `/tools/talents/${classSlug}${data.code ? `#plan=${data.code}` : ""}` : null;
   return (
     <Card className="space-y-4">
-      <Facts layout="list" label="Points per tree" items={data.trees.map((t) => ({ label: t.name, value: t.points, numeric: true }))} />
+      {inGame && <Facts layout="list" label="Points per tree" items={data.trees.map((t) => ({ label: t.name, value: t.points, numeric: true }))} />}
       {calculator && (
         <p className="text-sm">
           <Link href={calculator} className={link}>{data.code ? "Open this build in the talent calculator" : "Open the talent calculator"}</Link>
@@ -41,7 +43,8 @@ function Talents({ data, classSlug }: { data: TalentsData; classSlug: string | n
       )}
       {data.planned.length > 0 && (
         <div className="space-y-1 text-sm">
-          <h3 className="text-fg">Planned build</h3>
+          <h3 className="text-fg">{data.planned.length === 1 ? "Planned build" : "Planned builds"}</h3>
+          <p className="text-fg-2">{PLANNED_LINE}</p>
           <ul className="space-y-1">
             {data.planned.map((b) => <li key={b.slug}><Link href={`/b/${b.slug}`} className={link}>{b.name}</Link></li>)}
           </ul>

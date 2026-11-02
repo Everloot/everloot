@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const outfile = join(tmpdir(), `everloot-bench-${process.pid}.cjs`);
+const workerFile = join(tmpdir(), `everloot-bench-worker-${process.pid}.cjs`);
 
 /** Renames `export function name(` to a private one and exports a timed wrapper under the old name. */
 function wrap(source, names, wrapper) {
@@ -28,7 +29,7 @@ const probe = {
     b.onLoad({ filter: /[\\/]web[\\/]src[\\/]lib[\\/]sv-parse\.ts$/ }, (args) => ({
       loader: "ts",
       contents: wrap(readFileSync(args.path, "utf8"), ["parseEverlootLua", "parseEverlootTable"], ["parseEverlootLua", "parseEverlootTable"].map((n) =>
-        `export function ${n}(text: string) { const t = performance.now(); try { return __orig_${n}(text); } finally { (globalThis as any).__benchProbe?.("${n}", performance.now() - t); } }`).join("\n")),
+        `export function ${n}(text: string, ...rest: any[]) { const t = performance.now(); try { return (__orig_${n} as any)(text, ...rest); } finally { (globalThis as any).__benchProbe?.("${n}", performance.now() - t); } }`).join("\n")),
     }));
     b.onLoad({ filter: /[\\/]companion[\\/]src[\\/]sent-state\.ts$/ }, (args) => ({
       loader: "ts",
@@ -37,20 +38,23 @@ export function createSentState(path: string, onRecovery?: (message: string) => 
   const t = performance.now();
   const s = __orig_createSentState(path, onRecovery);
   (globalThis as any).__benchProbe?.("sent.load", performance.now() - t);
-  return { has: s.has, add(install: string, ids: string[]) { const t0 = performance.now(); try { s.add(install, ids); } finally { (globalThis as any).__benchProbe?.("sent.add", performance.now() - t0); } } };
+  return { has: s.has, keepOnly: s.keepOnly, add(install: string, ids: string[]) { const t0 = performance.now(); try { s.add(install, ids); } finally { (globalThis as any).__benchProbe?.("sent.add", performance.now() - t0); } } };
 }`),
     }));
   },
 };
 
-await build({
+const node = {
   bundle: true, platform: "node", format: "cjs", target: "node22", external: ["electron"], logLevel: "warning",
   alias: { zod: join(root, "..", "web", "node_modules", "zod") },
-  entryPoints: [join(root, "bench", "bench.ts")], outfile, plugins: [probe],
-});
+};
+await build({ ...node, entryPoints: [join(root, "bench", "bench.ts")], outfile, plugins: [probe] });
+// The save reader's worker as the app ships it, without the counters: its parses are not the main thread's.
+await build({ ...node, entryPoints: [join(root, "src", "main", "parse-worker.ts")], outfile: workerFile });
 try {
-  const r = spawnSync(process.execPath, [outfile, ...process.argv.slice(2)], { stdio: "inherit" });
+  const r = spawnSync(process.execPath, [outfile, ...process.argv.slice(2)], { stdio: "inherit", env: { ...process.env, EVERLOOT_BENCH_WORKER: workerFile } });
   process.exitCode = r.status ?? 1;
 } finally {
   rmSync(outfile, { force: true });
+  rmSync(workerFile, { force: true });
 }

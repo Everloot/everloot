@@ -121,6 +121,8 @@ const SHOWS_ART = new Set([
   "web/src/app/database/quests/page.tsx",
   // The site-wide credit (footer → /methodology#credits): reads only the manifest's build and label, no art.
   "web/src/app/methodology/page.tsx",
+  // The chat's suggestion cards: the warrior and Tailoring icons, as the home page shows the class and profession icons.
+  "web/src/app/chat/page.tsx",
   // The item names shown from the game files and the Warcraft Wiki: read for the item pages, and by the sitemap
   // only to know whether a category has enough names to list.
   "web/src/lib/shown-item-names.ts", "web/src/app/sitemap.ts", "web/scripts/upload-item-names.mjs",
@@ -131,6 +133,8 @@ const SHOWS_ART = new Set([
   "web/src/lib/site-card.ts", "web/src/lib/item-icons.ts",
   // The same names and quest titles for the entity tokens on a wiki page.
   "web/src/lib/wiki-names.ts",
+  // Dungeon wiki pages show loading-screen art under the approved page-banner extension.
+  "web/src/app/wiki/[slug]/page.tsx", "web/src/app/wiki/dungeon-facts.tsx",
   // The coverage score's expected counts (coverage-expected.json, counts only) sit beside the names in the private bucket.
   "web/src/lib/coverage-compute.ts",
 ]);

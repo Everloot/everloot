@@ -142,19 +142,31 @@ function tooledKey(
   return `${source}|${corpus.dataAsOf ?? ""}|${corpus.records.length}|${scopes}`;
 }
 
+/**
+ * Tools whose facts are built on every read instead of kept per corpus version. The site's publication check drops an
+ * opted-out character from inside a guild roster or attendance record, which leaves the corpus time and record count
+ * as they were: a kept board would go on naming them.
+ */
+const BUILT_EACH_READ: ReadonlySet<ToolName> = new Set(["guild_board"]);
+
+function buildFacts<T>(records: readonly unknown[], tool: ToolName, recheck: readonly RecheckScope[]): T {
+  const wanted = new Set<string>(TOOL_KINDS[tool]);
+  const build = TOOL_FACT_BUILDERS[tool] as (records: unknown[], scopes: readonly RecheckScope[]) => T;
+  return build(records.filter((r) => wanted.has((r as { kind?: string }).kind ?? "")), recheck);
+}
+
 function tooledFacts<T>(
   source: string,
   corpus: { records: readonly unknown[]; dataAsOf?: string | null },
   tool: ToolName,
   recheck: readonly RecheckScope[] = [],
 ): T {
+  if (BUILT_EACH_READ.has(tool)) return buildFacts<T>(corpus.records, tool, recheck);
   const key = tooledKey(source, corpus, recheck);
   if (!tooledMemo || tooledMemo.key !== key) tooledMemo = { key, byTool: new Map() };
   let facts = tooledMemo.byTool.get(tool) as T | undefined;
   if (facts === undefined) {
-    const wanted = new Set<string>(TOOL_KINDS[tool]);
-    const build = TOOL_FACT_BUILDERS[tool] as (records: unknown[], scopes: readonly RecheckScope[]) => T;
-    facts = build(corpus.records.filter((r) => wanted.has((r as { kind?: string }).kind ?? "")), recheck);
+    facts = buildFacts<T>(corpus.records, tool, recheck);
     tooledMemo.byTool.set(tool, facts);
   }
   return facts;

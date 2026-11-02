@@ -58,3 +58,7 @@ holds nothing about anyone else.
 7. **Privacy page.** /privacy needs a matching paragraph when this section is accepted.
 8. **Prerequisites.** `EVERLOOT_CHARACTER_LINKS=1` and a readback of `20261021190000_character_links.sql` on the
    production database (S2's own conditions); the visibility endpoint answers 404 unless both flags are on.
+
+The [decision sheet](../2026-11-02-showcase-decisions.md) puts these with a recommended answer each; the
+[go-live checklist](../2026-11-02-showcase-go-live.md) and the [proposed /privacy text](../2026-11-02-showcase-privacy-text.md)
+are the steps after them.

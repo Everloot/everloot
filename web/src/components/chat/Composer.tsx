@@ -68,7 +68,7 @@ export default function Composer(p: {
           </p>
         ) : (
           <p className="border-b border-line px-4 py-2 text-sm text-fg-2">
-            Everloot search is ready: Send shows its results. {setup} adds an optional AI model, which uses your own provider account.
+            Everloot search is ready. {setup} adds an optional AI model on your own provider account.
           </p>
         ))}
         <textarea ref={p.box} rows={1} value={p.value} aria-label="Your question" aria-keyshortcuts="Enter Shift+Enter"
@@ -136,7 +136,7 @@ export default function Composer(p: {
         </div>
       </div>
       <p className="mt-2 hidden text-center text-xs text-muted sm:block">
-        Enter sends, Shift+Enter adds a line, Esc stops, Ctrl+Shift+O starts a new chat.
+        Enter sends · Shift+Enter adds a line · Esc stops · Ctrl+Shift+O new chat
       </p>
     </form>
   );
