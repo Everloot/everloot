@@ -55,3 +55,15 @@ test("retrying an add-account sign-in keeps its add-account context", async () =
   await act(async () => container.querySelector<HTMLButtonElement>("button")!.click());
   expect(JSON.parse(String(fetcher.mock.calls[0][1].body)).errorCallbackURL).toBe("/sign-in?flow=social&returnTo=%2F&add=1&ready=1");
 });
+
+test("each button carries its provider's logo and keeps it while the pending label shows", async () => {
+  vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => {})));
+  await act(async () => root.render(<SocialSignIn providers={["google", "microsoft", "twitch", "discord"]} />));
+  const buttons = [...container.querySelectorAll("button")];
+  expect(buttons.map((b) => b.querySelector("svg")?.getAttribute("data-provider-logo"))).toEqual(["google", "microsoft", "twitch", "discord"]);
+  expect(buttons.every((b) => b.querySelector("svg")?.getAttribute("aria-hidden") === "true")).toBe(true);
+  await act(async () => buttons[1].click());
+  expect(buttons[1].textContent).toBe("Opening Microsoft…");
+  expect(buttons[1].getAttribute("aria-busy")).toBe("true");
+  expect(buttons[1].querySelector('[data-provider-logo="microsoft"]')).not.toBeNull();
+});

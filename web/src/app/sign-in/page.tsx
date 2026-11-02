@@ -2,12 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import AuthShell, { AUTH_BUTTON, AuthDivider } from "@/components/AuthShell";
 import EmailAuthForm from "@/components/EmailAuthForm";
 import SocialSignIn from "@/components/SocialSignIn";
 import { configuredSocialProviders } from "@/lib/auth/social";
 import { authV2Enabled, signInMethods } from "@/lib/auth/auth";
 import { addAccountState, MAX_DEVICE_ACCOUNTS, profilesOn } from "@/lib/auth/device-accounts";
 import { safeReturnTo } from "@/lib/auth/return-to";
+import { launchArt, loadSiteAssets } from "@/lib/game-assets";
 import { pageMetadata } from "@/lib/seo";
 import { getUser } from "@/lib/supabase/server";
 
@@ -18,7 +20,8 @@ export const metadata: Metadata = {
   robots: { index: false, follow: true },
 };
 
-const battlenetButton = "inline-flex items-center justify-center min-h-11 px-4 rounded-lg border border-line text-sm text-fg hover:text-accent";
+const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
+const alertBox = "rounded-card border border-danger bg-panel px-4 py-3";
 
 // `?error=<reason>` comes from the Battle.net callback when a sign-in did not finish. The reason is mapped to a
 // sentence here and never shown as-is.
@@ -41,20 +44,20 @@ function signInError(error: string | string[] | undefined): string | null {
 // plugin would replace the current one, so the page refuses instead.
 export default async function SignInPage({ searchParams }: { searchParams?: Promise<{ returnTo?: string | string[]; add?: string | string[]; ready?: string | string[]; error?: string | string[]; flow?: string | string[] }> }) {
   const params = await searchParams;
+  const art = launchArt(await loadSiteAssets())?.background ?? null;
   let add = params?.add === "1" && authV2Enabled() && profilesOn();
   if (add) {
     const state = await addAccountState(await headers()).catch(() => "unavailable" as const);
     if (state === "needs-cookie" && params?.ready !== "1") redirect("/api/me/accounts/add");
     if (state === "full" || state === "needs-cookie" || state === "unavailable") {
       return (
-        <article className="max-w-3xl space-y-6">
-          <h1 className="text-3xl font-bold text-fg">Add another account</h1>
+        <AuthShell art={art} title="Add another account">
           <p role="status" className="text-fg-2">
             {state === "full"
               ? `You are signed in to ${MAX_DEVICE_ACCOUNTS} accounts on this browser, the most it holds. Sign out of one to add another.`
               : "Adding an account is unavailable right now. Try again in a minute."}
           </p>
-        </article>
+        </AuthShell>
       );
     }
     add = state === "ready";
@@ -66,26 +69,33 @@ export default async function SignInPage({ searchParams }: { searchParams?: Prom
   const methods = signInMethods();
   const social = configuredSocialProviders();
   const errorMessage = signInError(params?.flow === "social" && params.error ? "social" : params?.error);
+  const providers = methods.battlenet || social.length > 0;
   return (
-    <article className="max-w-3xl space-y-6">
-      <h1 className="text-3xl font-bold text-fg">{add ? "Add another account" : "Sign in"}</h1>
-      {add && <p className="text-sm text-fg-2">Sign in with the account you want to add.</p>}
-      {errorMessage && <p role="alert" className="text-sm text-fg">{errorMessage}</p>}
-      {methods.battlenet && (
-        <p><a href={bnetReturn ? `/api/auth/bnet?returnTo=${encodeURIComponent(bnetReturn)}` : "/api/auth/bnet"} className={battlenetButton}>Sign in with Battle.net</a></p>
+    <AuthShell
+      art={art}
+      title={add ? "Add another account" : "Sign in"}
+      lede={<p className="text-sm text-fg-2">{add ? "Sign in with the account you want to add." : "Pick up where you left off with your saved builds."}</p>}
+    >
+      {errorMessage && <div className={alertBox}><p role="alert" className="text-sm text-fg">{errorMessage}</p></div>}
+      {providers && (
+        <div className="space-y-2">
+          {methods.battlenet && (
+            <a href={bnetReturn ? `/api/auth/bnet?returnTo=${encodeURIComponent(bnetReturn)}` : "/api/auth/bnet"} className={AUTH_BUTTON}>Sign in with Battle.net</a>
+          )}
+          <SocialSignIn providers={social} returnTo={returnTo ?? undefined} addAccount={add} />
+        </div>
       )}
-      <SocialSignIn providers={social} returnTo={returnTo ?? undefined} addAccount={add} />
       {methods.email ? (
         <>
-          {(methods.battlenet || social.length > 0) && <p className="text-sm text-muted">Or with your email:</p>}
+          {providers && <AuthDivider>or with your email</AuthDivider>}
           <EmailAuthForm mode="sign-in" returnTo={returnTo ?? undefined} />
           <p className="text-sm text-fg-2">
-            New here? <Link href={returnTo ? `/sign-up?returnTo=${encodeURIComponent(returnTo)}` : "/sign-up"} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Make an account</Link>
+            New here? <Link href={returnTo ? `/sign-up?returnTo=${encodeURIComponent(returnTo)}` : "/sign-up"} className={link}>Make an account</Link>
             {" · "}
-            <Link href="/reset-password" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Forgot your password?</Link>
+            <Link href="/reset-password" className={link}>Forgot your password?</Link>
           </p>
         </>
-      ) : !methods.battlenet && !social.length && <p className="text-fg-2">Sign-in is not available right now.</p>}
-    </article>
+      ) : !providers && <p className="text-fg-2">Sign-in is not available right now.</p>}
+    </AuthShell>
   );
 }
