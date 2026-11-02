@@ -8,17 +8,25 @@ const RANGE = /^(?:(\d+)-(\d+)|\*)\/(\d+)$/;
  */
 export async function readAllRows(page: (offset: number) => Promise<Response>): Promise<unknown[]> {
   const rows: unknown[] = [];
+  // The total every page must report: a row added or removed between pages shifts the offsets, so a changed total
+  // means the pages may have skipped or repeated a row, and the read is an error rather than a guess.
+  let total: number | null = null;
   for (;;) {
     const response = await page(rows.length);
     const part: unknown = await response.json();
     if (!Array.isArray(part)) throw new Error("Invalid rows");
     const range = RANGE.exec(response.headers.get("content-range")?.trim() ?? "");
     if (!range) throw new Error("Row count missing");
+    const count = Number(range[3]);
+    if (total === null) total = count;
+    else if (count !== total) throw new Error("Row count changed between pages");
     const first = range[1] === undefined ? null : Number(range[1]);
-    const matches = part.length === 0 ? first === null : first === rows.length && Number(range[2]) - first + 1 === part.length;
+    const matches = part.length === 0
+      ? first === null
+      : first === rows.length && Number(range[2]) - first + 1 === part.length && Number(range[2]) < total;
     if (!matches) throw new Error("Rows do not match their range");
     rows.push(...part);
-    if (rows.length >= Number(range[3])) return rows;
+    if (rows.length === total) return rows;
     if (part.length === 0) throw new Error("Rows stopped before their count");
   }
 }
