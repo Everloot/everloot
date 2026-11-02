@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
-  agreedKills, formatGuildPage, formatLadder, guildDirectory, guildKey, guildKillsFromRecords, guildLadder, guildProgression, guildRanks,
+  agreedKills, FIRST_KILL_WINDOW_MS, formatGuildPage, formatLadder, guildDirectory, guildKey, guildKillsFromRecords, guildLadder, guildProgression, guildRanks,
   mergeKills, officerKills, searchGuilds,
   type GuildKillRow, type InstanceDef, type SeenGuild,
 } from "../src/guilds.js";
@@ -46,6 +46,24 @@ describe("agreedKills", () => {
     const rows = [kill("a", "Night Watch", 663, "2026-10-20T20:00:00Z"), kill("b", "Night Watch", 663, "2026-10-20T20:01:00Z")];
     expect(agreedKills(rows, NOW, [MC, DM], new Set([guildKey("Forever Pioneer", "Night Watch")]))).toEqual([]);
     expect(agreedKills([rows[0]!, kill("b", "Night Watch", 663, "2026-10-30T00:00:00Z")], NOW, [MC, DM])).toEqual([]);
+  });
+
+  test("a first-kill time needs two installs reporting one kill within the window; reports a week apart are not one kill", () => {
+    const apart = agreedKills([kill("a", "Night Watch", 663, "2026-10-09T20:00:00Z"), kill("b", "Night Watch", 663, "2026-10-16T20:00:00Z")], NOW, [MC]);
+    // Still a kill for the ladder, at the earliest report, but no first-kill time.
+    expect(apart[0]).toMatchObject({ killedAt: "2026-10-09T20:00:00.000Z", occurredAt: null, installs: 2 });
+    const later = agreedKills([
+      kill("a", "Night Watch", 663, "2026-10-09T20:00:00Z"),
+      kill("a", "Night Watch", 663, "2026-10-16T20:10:00Z"),
+      kill("b", "Night Watch", 663, "2026-10-16T20:00:00Z"),
+    ], NOW, [MC]);
+    expect(later[0]).toMatchObject({ killedAt: "2026-10-09T20:00:00.000Z", occurredAt: "2026-10-16T20:00:00.000Z" });
+    const edge = (gap: number) => agreedKills([
+      kill("a", "Night Watch", 663, "2026-10-20T20:00:00.000Z"), kill("b", "Night Watch", 663, new Date(Date.parse("2026-10-20T20:00:00Z") + gap).toISOString()),
+    ], NOW, [MC])[0]!.occurredAt;
+    expect(edge(FIRST_KILL_WINDOW_MS)).toBe("2026-10-20T20:00:00.000Z");
+    expect(edge(FIRST_KILL_WINDOW_MS + 1)).toBeNull();
+    expect(guildProgression(later, [MC])[0]!.list[0]).toMatchObject({ killedAt: "2026-10-09T20:00:00.000Z", occurredAt: "2026-10-16T20:00:00.000Z" });
   });
 
   test("the same guild name on two realms is two guilds", () => {

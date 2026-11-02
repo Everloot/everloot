@@ -4,7 +4,7 @@ import JsonLd from "@/components/JsonLd";
 import { Card, Container, EmptyState, FilterBar, PageHeader, type FilterControl } from "@/components/ui";
 import { dataAgeLabel } from "@/lib/data-age";
 import {
-  COLLECTING_LINE, isFiltered, itemListJsonLd, loadRankingWeeks, rankedCount, rankingDef, rankingHref,
+  COLLECTING_LINE, censusHrefOf, isFiltered, itemListJsonLd, loadRankingWeeks, rankedCount, rankingDef, rankingHref,
   rankingIndexable, rankingPath, rankingView, type RankingQuery, type RankingView,
 } from "@/lib/rankings";
 import { pageMetadata } from "@/lib/seo";
@@ -102,7 +102,13 @@ export default async function RankingPage({ params, searchParams }: Props) {
                 {week.window.collecting ? (
                   <EmptyState count={week.window.installs} message={COLLECTING_LINE} />
                 ) : (
-                  <RankTable rows={view.rows} caption={`${def.title}, ${weekLabel(week)}`} showChange={view.previous !== null} asOf={week.to} />
+                  <RankTable
+                    rows={view.rows}
+                    caption={`${def.title}, ${weekLabel(week)}`}
+                    showChange={view.previous !== null}
+                    asOf={week.to}
+                    hrefOf={(r) => censusHrefOf(def.slug, r, q)}
+                  />
                 )}
                 {!isFiltered(q) && rankedCount(view.rows) > 0 && (
                   <JsonLd data={itemListJsonLd(`WoW Forever ${def.title}`, path, ranked.map((r) => ({ name: r.sub ? `${r.label} (${r.sub})` : r.label })))} />

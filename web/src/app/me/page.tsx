@@ -6,7 +6,8 @@ import CharacterForm from "@/components/builds/CharacterForm";
 import { className, describeBuilds } from "@/components/builds/describe";
 import { publishedClassChanges } from "@/lib/talents/freshness-records";
 import { CLASS_TEXT } from "@/components/talents/TalentTreeView";
-import { Container, DataTitle, EmptyState } from "@/components/ui";
+import { Container, EmptyState } from "@/components/ui";
+import YourEverlootHeader from "@/components/YourEverloot";
 import { signInPath } from "@/lib/auth/return-to";
 import { savedBuildsOn, type AccountBuilds } from "@/lib/saved-builds";
 import { listOwn } from "@/lib/saved-builds-store";
@@ -32,7 +33,7 @@ export default async function MyBuildsPage() {
   } catch {
     return (
       <Container>
-        <DataTitle title="My builds" />
+        <YourEverlootHeader current="/me" title="My builds" />
         <p role="alert" className="text-fg-2">Your builds are unavailable right now. Try again in a minute.</p>
       </Container>
     );
@@ -44,10 +45,11 @@ export default async function MyBuildsPage() {
 
   return (
     <Container>
-      <DataTitle
+      <YourEverlootHeader
+        current="/me"
         title="My builds"
         meta={`${plural(builds.length, "build", "builds")} · ${plural(characters.length, "character", "characters")}`}
-        aside={<Link href="/tools/talents" className="text-meta text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Open the talent calculator</Link>}
+        actions={<Link href="/tools/talents" className="text-meta text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Open the talent calculator</Link>}
       />
 
       {builds.length === 0 && characters.length === 0 ? (
