@@ -6,7 +6,7 @@ import { Card, Container, PageHeader } from "@/components/ui";
 import { FOOTER_LINE, showcaseOn } from "@/lib/character-showcase";
 import { optOutPath, playerPagesOn } from "@/lib/player-pages";
 import { pageMetadata } from "@/lib/seo";
-import { characterShowcase, lookup, type Params } from "./character-view";
+import { characterShowcase, lookup, plannedBuilds, type Params } from "./character-view";
 
 /** Read on every request and never cached, so a page switched off is gone at once. */
 export const dynamic = "force-dynamic";
@@ -40,7 +40,7 @@ export async function generateMetadata(props: { params: Promise<Params> }): Prom
   };
 }
 
-/** A linked character's public page: the identity from the link row, with its upload date. */
+/** A linked character's public page: the identity from the link row, with its upload date, and any planned builds. */
 export default async function CharacterPage(props: { params: Promise<Params> }) {
   if (!showcaseOn()) notFound();
   const p = await props.params;
@@ -54,7 +54,7 @@ export default async function CharacterPage(props: { params: Promise<Params> }) 
     );
   }
   if (!found) notFound();
-  const showcase = characterShowcase(found, new Date());
+  const showcase = characterShowcase(found, new Date(), await plannedBuilds(found));
   const c = showcase.input;
   return (
     <Container width="reading">
