@@ -1,6 +1,7 @@
 import { guildKey } from "../../../kb/src/guilds";
 import { linkRealmKey } from "./character-links";
 import { DEFAULT_RULESET, realmSlug, type Player, type PlayerUpsert } from "./player-pages";
+import { readAllRows } from "./postgrest-pages";
 
 /**
  * Where the player rows live: Supabase in production (the functions in 20261021130000_players.sql and
@@ -28,6 +29,11 @@ export interface PlayerStore {
   suppressGuild(realm: string, guild: string): Promise<void>;
   /** Every hidden guild, as `guildHideKey` keys, so the ladder can leave them out too. */
   hiddenGuilds(): Promise<Set<string>>;
+  /**
+   * Every hidden character, as `playerHideKey` keys, so names that come from somewhere other than the players
+   * table (the roster, loot and attendance the officers publish) can be left out too.
+   */
+  hiddenPlayers(): Promise<Set<string>>;
 }
 
 const SEARCH_LIMIT = 25;
@@ -40,6 +46,9 @@ export const PLAYER_KEPT_DAYS = 90;
  */
 export const guildHideKey = (realm: string, guild: string): string => guildKey(linkRealmKey(realm), guild);
 
+/** The key a character hide is matched under: the realm as the players table keys it, then the name in lower case. */
+export const playerHideKey = (realm: string, name: string): string => `${linkRealmKey(realm)}\u0000${name.trim().toLowerCase()}`;
+
 interface Stored { name: string; realm: string; ruleset?: string; race: string; class: string; level: number; guild: string | null; last_seen: string }
 interface StoredGuild { realm: string; guild: string; members: number; last_seen: string }
 
@@ -48,7 +57,10 @@ const toPlayer = (row: Stored, ruleset: string): Player => ({
 });
 const toGuild = (row: StoredGuild): GuildHit => ({ realm: row.realm, guild: row.guild, members: Number(row.members), lastSeen: row.last_seen });
 
-export function createCloudPlayerStore(url: string, key: string, doFetch: typeof fetch = fetch): PlayerStore {
+/** How long the whole hide list may take to read, every page together. Past it, the read fails and pages withhold names. */
+export const HIDDEN_READ_MS = 5_000;
+
+export function createCloudPlayerStore(url: string, key: string, doFetch: typeof fetch = fetch, hiddenReadMs = HIDDEN_READ_MS): PlayerStore {
   async function rpc<T>(fn: string, body: unknown): Promise<T> {
     const response = await doFetch(`${url.replace(/\/$/, "")}/rest/v1/rpc/${fn}`, {
       method: "POST", cache: "no-store", signal: AbortSignal.timeout(10_000),
@@ -58,6 +70,18 @@ export function createCloudPlayerStore(url: string, key: string, doFetch: typeof
     if (!response.ok) throw new Error(`Player storage unavailable (${response.status})`);
     const text = await response.text();
     return (text ? JSON.parse(text) : null) as T;
+  }
+  // character_suppressions is read as a table, as the publication check already reads it (the server's key may
+  // select it since 20261007070647_verified_publication.sql), a thousand rows a request, every page under one deadline.
+  async function suppressions(): Promise<{ realm: string; character: string }[]> {
+    const signal = AbortSignal.timeout(hiddenReadMs);
+    return await readAllRows(async (offset) => {
+      const response = await doFetch(`${url.replace(/\/$/, "")}/rest/v1/character_suppressions?select=realm,character&order=realm,character&limit=1000&offset=${offset}`, {
+        cache: "no-store", signal, headers: { apikey: key, authorization: `Bearer ${key}`, prefer: "count=exact" },
+      });
+      if (!response.ok) throw new Error(`Player storage unavailable (${response.status})`);
+      return response;
+    }) as { realm: string; character: string }[];
   }
   return {
     async upsert(rows) {
@@ -86,6 +110,9 @@ export function createCloudPlayerStore(url: string, key: string, doFetch: typeof
       const rows = await rpc<{ realm_key: string; guild_key: string }[]>("hidden_guilds", {});
       return new Set(Array.isArray(rows) ? rows.map((row) => guildHideKey(row.realm_key, row.guild_key)) : []);
     },
+    async hiddenPlayers() {
+      return new Set((await suppressions()).map((row) => playerHideKey(row.realm, row.character)));
+    },
   };
 }
 
@@ -94,6 +121,7 @@ export function createMemoryPlayerStore(now: () => Date = () => new Date()): Pla
   const rows = new Map<string, Player>();
   const hidden = new Set<string>();
   const hiddenGuilds = new Set<string>();
+  const hiddenPlayers = new Set<string>();
   const key = (realm: string, name: string) => `${realm.trim().toLowerCase()}\u0000${name.toLowerCase()}`;
   const visible = (p: Player) => !hidden.has(key(p.realm, p.name));
   return {
@@ -113,7 +141,7 @@ export function createMemoryPlayerStore(now: () => Date = () => new Date()): Pla
       return [...rows.values()].filter((r) => r.name.toLowerCase().startsWith(p) && visible(r))
         .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()) || a.realm.localeCompare(b.realm)).slice(0, SEARCH_LIMIT);
     },
-    async suppress(realm, name) { hidden.add(key(realm, name)); rows.delete(key(realm, name)); },
+    async suppress(realm, name) { hidden.add(key(realm, name)); hiddenPlayers.add(playerHideKey(realm, name)); rows.delete(key(realm, name)); },
     async prune() {
       const cutoff = new Date(now().getTime() - PLAYER_KEPT_DAYS * 86_400_000).toISOString().slice(0, 10);
       for (const [k, p] of rows) if (p.lastSeen < cutoff) rows.delete(k);
@@ -140,6 +168,7 @@ export function createMemoryPlayerStore(now: () => Date = () => new Date()): Pla
     },
     async suppressGuild(realm, guild) { hiddenGuilds.add(guildHideKey(realm, guild)); },
     async hiddenGuilds() { return new Set(hiddenGuilds); },
+    async hiddenPlayers() { return new Set(hiddenPlayers); },
   };
 }
 

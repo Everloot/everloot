@@ -14,13 +14,14 @@ export interface LocalTool {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
-  run(input: Record<string, unknown>): string;
+  run(input: Record<string, unknown>): string | Promise<string>;
 }
 
 export interface LocalData {
-  characters(): CharactersInfo;
+  /** The app waits for the save reader first, so a large save is not parsed on the main thread. */
+  characters(): CharactersInfo | Promise<CharactersInfo>;
   /** Every realm's last full scan, newest first; at is null when a realm was never scanned. */
-  scans(): ScanAge[];
+  scans(): ScanAge[] | Promise<ScanAge[]>;
   /** The realms the player follows for the prices file. */
   followed(): string[];
   status(): AppStatus;
@@ -70,8 +71,8 @@ export function localTools(data: LocalData, now: () => number = Date.now): Local
       name: "my_characters",
       description: "The player's own characters from the save files on this computer: gold now and at its peak, gold earned and spent in the last seven days, item level and gear slots, level and class, achievements, exalted reputations and titles. Use for any question about the player's characters, gold or progress.",
       inputSchema: NO_ARGS,
-      run: () => {
-        const info = data.characters();
+      run: async () => {
+        const info = await data.characters();
         if (!info.characters.length && !info.progress.length) return `No characters in the account files yet. The addon writes them after a login; the app reads Everloot.lua from the game folder.\nSource: ${LOCAL_SOURCE}`;
         const lines = info.characters.map((c) => {
           const net = c.week.earned - c.week.spent;
@@ -92,9 +93,9 @@ export function localTools(data: LocalData, now: () => number = Date.now): Local
       name: "my_realm_scans",
       description: "When the player last ran a full auction house scan on each realm, and which realms the prices file follows. Use for questions about scan freshness, which realms have the player's data, or whether to scan again.",
       inputSchema: NO_ARGS,
-      run: () => {
+      run: async () => {
         const t = now();
-        const scans = data.scans();
+        const scans = await data.scans();
         const followed = data.followed();
         const lines = scans.map((s) => `${s.realm}: last full scan ${s.at ? `${s.at} (${ago(s.at, t)})` : "never"}`);
         if (!lines.length) lines.push("No auction scans in the account files yet. A scan is started in game with the addon's scan button.");

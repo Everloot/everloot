@@ -27,6 +27,8 @@ const node = {
 await Promise.all([
   build({ ...node, entryPoints: [join(root, "src/main/index.ts")], outfile: join(dist, "main.cjs") }),
   build({ ...node, entryPoints: [join(root, "src/preload.ts")], outfile: join(dist, "preload.cjs") }),
+  // The save reader's worker thread; the main process reads this file's text and starts it with eval (see save-reader.ts).
+  build({ ...node, entryPoints: [join(root, "src/main/parse-worker.ts")], outfile: join(dist, "parse-worker.cjs") }),
   build({
     bundle: true,
     platform: "browser",

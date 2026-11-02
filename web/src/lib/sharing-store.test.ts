@@ -28,6 +28,30 @@ test("cloud opt-out preserves request headers alongside server authentication", 
   expect(calls[1].headers.get("prefer")).toBe("resolution=ignore-duplicates");
   expect(calls[1].headers.get("authorization")).toBe("Bearer service");
 });
+test("cloud publication state is read to its exact count, and a list that cannot be shown complete is an error", async () => {
+  const cloud: CloudConfig = { r2AccountId: "acct", r2AccessKeyId: "key", r2SecretAccessKey: "secret",
+    r2Bucket: "bucket", supabaseUrl: "https://sb.example", supabaseServiceKey: "service" };
+  const stateFrom = (suppressions: (offset: number) => Response) => {
+    const calls: Request[] = [];
+    const store = createSharingStore({ cloud, localDir: "unused", now, fetch: (async (url, init) => {
+      const request = new Request(url, init); calls.push(request);
+      if (request.url.includes("publication_grants")) return Response.json([], { headers: { "content-range": "*/0" } });
+      return suppressions(Number(new URL(request.url).searchParams.get("offset")));
+    }) as typeof fetch });
+    return { calls, state: store.loadState() };
+  };
+  const row = (character: string) => ({ realm: "moon guard", character });
+  const paged = stateFrom((offset) => offset === 0
+    ? Response.json([row("a"), row("b")], { status: 206, headers: { "content-range": "0-1/3" } })
+    : Response.json([row("c")], { status: 206, headers: { "content-range": "2-2/3" } }));
+  expect((await paged.state).suppressions.map((s) => s.character)).toEqual(["a", "b", "c"]);
+  expect(paged.calls.every((c) => c.headers.get("prefer") === "count=exact")).toBe(true);
+  expect(paged.calls.some((c) => c.url.endsWith("offset=2"))).toBe(true);
+  await expect(stateFrom(() => Response.json([row("a")])).state).rejects.toThrow(/count missing/);
+  await expect(stateFrom((offset) => offset === 0
+    ? Response.json([row("a")], { status: 206, headers: { "content-range": "0-0/2" } })
+    : new Response("", { status: 503 })).state).rejects.toThrow(/unavailable/);
+});
 test("grants are random, stored only as hashes and scoped by verified evidence", async () => {
   const localDir = mkdtempSync(join(tmpdir(), "sharing-"));
   const store = createSharingStore({ cloud: null, localDir, now });
