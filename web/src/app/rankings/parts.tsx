@@ -193,7 +193,9 @@ export function RankCard({ view }: { view: RankingView }) {
                   <span className="sr-only"> in the census</span>
                 </Link>
               </span>
-              {trend.has(r.key) && <Sparkline series={trend.get(r.key)!} className="hidden md:block" />}
+              {/* Only from xl (1280 px), where each of the two cards still leaves the name about 200 px. Narrower, the
+                  sparkline would squeeze the name to nothing (about 800 px), so the share bar shows alone. */}
+              {trend.has(r.key) && <Sparkline series={trend.get(r.key)!} className="hidden xl:block" />}
               {r.share !== null && (
                 <>
                   <ShareBar share={r.share} classToken={r.classToken} className="hidden w-20 sm:block" />
@@ -450,10 +452,21 @@ function Tile({ label, value, note }: { label: string; value: ReactNode; note: R
   );
 }
 
-/** The hub's headline numbers: characters counted, the change against last week, the most played class, the installs. */
+/** "Mage", "Mage and Rogue", "Hunter, Mage and Rogue". */
+const listOf = (names: string[]) => (names.length < 3 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`);
+
+/** The leading published class tile's note: its share, whether it is a tie, and why it may not be the most played. */
+function leaderNote(m: HubMetrics, collecting: boolean): string {
+  const [top] = m.leadingClasses;
+  if (!top || top.share === null) return collecting ? "Still collecting" : "No class has a number yet";
+  const share = m.leadingClasses.length > 1 ? `Tied at ${percent(top.share)} of characters each` : `${percent(top.share)} of characters`;
+  return m.classHidden ? `${share}. Hidden classes are not ranked and could be larger.` : share;
+}
+
+/** The hub's headline numbers: characters counted, the change against last week, the leading published class, the installs. */
 export function MetricTiles({ m }: { m: HubMetrics }) {
   const collecting = m.week.window.collecting;
-  const top = m.topClass;
+  const leaders = m.leadingClasses;
   return (
     <dl data-metric-tiles aria-label="This week in numbers" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <Tile
@@ -467,9 +480,9 @@ export function MetricTiles({ m }: { m: HubMetrics }) {
         note={m.change ? (m.change.share === null ? "characters" : `${signedPercent(m.change.share)} characters`) : "Starts once two weeks have numbers"}
       />
       <Tile
-        label="Most played class"
-        value={top ? <span className="font-sans">{top.label}</span> : <NotYet why="not yet" />}
-        note={top?.share != null ? `${percent(top.share)} of characters` : collecting ? "Still collecting" : "No class has a number yet"}
+        label={leaders.length > 1 ? "Leading published classes" : "Leading published class"}
+        value={leaders.length > 0 ? <span className="font-sans">{listOf(leaders.map((r) => r.label))}</span> : <NotYet why="not yet" />}
+        note={leaderNote(m, collecting)}
       />
       <Tile label="Reporting installs" value={number(m.installs)} note="Installs that sent census rows that week" />
     </dl>

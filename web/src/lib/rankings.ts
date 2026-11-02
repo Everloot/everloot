@@ -273,26 +273,28 @@ export interface HubMetrics {
   /** Characters against the week before, from the two rounded counts; null without a week before with numbers. */
   change: { by: number; share: number | null } | null;
   installs: number;
-  /** The most played class and the larger side, from the newest rankings. */
-  topClass: RankRow | null;
-  topFaction: RankRow | null;
+  /**
+   * The class or classes ranked first among those with a published count (more than one on a tie). A hidden class
+   * is not ranked, so it could be larger: this is the leading published class, not always the most played.
+   */
+  leadingClasses: RankRow[];
+  /** Whether any class is hidden that week, so a larger class could be among them. */
+  classHidden: boolean;
 }
 
 export function hubMetrics(views: readonly RankingView[]): HubMetrics | null {
   const classes = views.find((v) => v.def.slug === "classes");
-  const factions = views.find((v) => v.def.slug === "factions");
   const week = classes?.week;
   if (!classes || !week) return null;
   const now = week.window.characters;
   const before = classes.previous?.window.characters ?? null;
-  const first = (v: RankingView | undefined) => v?.rows.find((r) => r.rank === 1) ?? null;
   return {
     week,
     characters: now,
     change: now !== null && before !== null ? { by: now - before, share: before ? (now - before) / before : null } : null,
     installs: week.window.installs,
-    topClass: first(classes),
-    topFaction: first(factions),
+    leadingClasses: classes.rows.filter((r) => r.rank === 1),
+    classHidden: classes.rows.some((r) => r.rank === null),
   };
 }
 

@@ -203,7 +203,7 @@ test("hub numbers: this week's characters against last week's, both rounded; mov
   const m = hubMetrics(views)!;
   expect(m.week.start).toBe("2026-11-16");
   expect(m.change!.by).toBe(m.characters! - weeks.find((w) => w.start === "2026-11-09")!.window.characters!);
-  expect(m.topClass!.rank).toBe(1);
+  expect(m.leadingClasses.map((r) => r.key)).toEqual(["HUNTER"]); // 42 + 22 Hunters against 60 Warriors
   expect(weeklyCharacters(weeks).map((p) => p.week.start)).toEqual(weeks.map((w) => w.start));
   const movers = topMovers(views);
   expect(movers.length).toBeGreaterThan(0);
@@ -212,4 +212,18 @@ test("hub numbers: this week's characters against last week's, both rounded; mov
   expect(movers.every((x) => x.href.startsWith("/census"))).toBe(true);
   // Before the first week there is nothing to headline.
   expect(hubMetrics(RANKINGS.map((def) => rankingView(def, [])))).toBeNull();
+});
+test("the leading published class is not the most played when a larger class is hidden; a tie names every leader", () => {
+  // 200 Warlocks reported by one install: under the install threshold, so the Warlock count is hidden though it is the largest.
+  const hiddenLeader = [
+    ...crowd(42, "h1", WEEK1, { class: "HUNTER" }), ...crowd(28, "h2", WEEK1, { class: "WARRIOR" }), ...crowd(16, "h3", WEEK1, { race: "Gnome", class: "PRIEST" }),
+    ...crowd(200, "h4", WEEK1, { race: "Gnome", class: "WARLOCK", installId: "install-a", reporter: "0".padStart(16, "0") }),
+  ];
+  const at = "2026-11-15T12:00:00.000Z";
+  const m = hubMetrics(RANKINGS.map((def) => rankingView(def, rankingWeeks(hiddenLeader, at))))!;
+  expect(m.leadingClasses.map((r) => r.key)).toEqual(["HUNTER"]);
+  expect(m.classHidden).toBe(true);
+  const tie = [...crowd(40, "t1", WEEK1, { class: "HUNTER" }), ...crowd(40, "t2", WEEK1, { class: "WARRIOR" }), ...crowd(20, "t3", WEEK1, { race: "Gnome", class: "PRIEST" })];
+  const t = hubMetrics(RANKINGS.map((def) => rankingView(def, rankingWeeks(tie, at))))!;
+  expect(t.leadingClasses.map((r) => r.key)).toEqual(["HUNTER", "WARRIOR"]);
 });
