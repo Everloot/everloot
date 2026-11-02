@@ -192,7 +192,7 @@ describe("class hubs", () => {
     expect(page).toContain('href="/database/spells?class=mage"');
     expect(page).not.toContain("/tools/talents/warrior");
     // The spell link opens a subset, and the hub names it as exactly that.
-    expect(visible(page)).toContain("Spells in the Mage talent catalog");
+    expect(visible(page)).toContain("Mage spells on the class's skill lines and in its talent catalog");
     // So does the item link: the item list narrows to what the class can use by the game files.
     expect(page).toContain('href="/database/items?class=mage"');
     expect(visible(page)).toContain("Items a Mage can use by its proficiencies in the game files");

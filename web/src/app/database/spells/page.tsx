@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import ClassContextChip from "@/components/classes/ClassContextChip";
 import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column } from "@/components/ui";
 import Badge from "@/components/ui/Badge";
+import { CLIENT_CLASS_SPELLS } from "@/data/game-data/client-class-spells";
 import { classLabel, hasClassContext, parseClassContext, withClassContext, withoutClassContext, type ClassContext, type ClassSlug } from "@/lib/class-context";
 import { loadSpellNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";
@@ -47,16 +48,21 @@ export default async function SpellListPage(props: { searchParams?: Promise<Sear
   const search = (await props.searchParams) ?? {};
   const q = listQuery(search, SORTS);
   if (!q) notFound();
-  // A class from a class hub narrows the list to the spells its talent catalog names, and the page says that is all
-  // it is. The level and role narrow nothing; a catalog that cannot be read narrows nothing either.
+  // A class from a class hub narrows the list to the class's spells by the game files: the spells on its own skill lines
+  // (data/game-data/client-class-spells.json) and the ones its talent catalog names. A spell no class line or catalog
+  // names (an item's, a profession's, a creature's, a mount) is no class's, so a class leaves it out. The level and
+  // role narrow nothing; a catalog that cannot be read leaves the skill lines to narrow by.
   const read = parseClassContext(search);
   const context = read.ok ? read.context : null;
   const [names, talents] = await Promise.all([loadSpellNames(CLIENT_LAYER.build.version), context ? talentCatalogSpells(context.classSlug) : null]);
   const all = names?.names ?? new Map<number, string>();
+  const lines = context ? CLIENT_CLASS_SPELLS.classes[context.classSlug]?.spells ?? [] : [];
+  const mine = context ? new Set([...lines, ...(talents ?? [])]) : null;
   const text = q.q?.toLowerCase();
   const id = text && /^#?\d+$/.test(text) ? Number(text.replace("#", "")) : null;
+  const kept = mine ? [...all.keys()].filter((spellId) => mine.has(spellId)).length : 0;
   const rows = [...all.entries()]
-    .filter(([spellId, name]) => (!talents || talents.has(spellId)) && (!text || (id !== null ? spellId === id : name.toLowerCase().includes(text))))
+    .filter(([spellId, name]) => (!mine || mine.has(spellId)) && (!text || (id !== null ? spellId === id : name.toLowerCase().includes(text))))
     .map(([spellId, name]) => ({ spellId, name }));
   const sort = q.sort ?? DEFAULT_SORT;
   const sorted = sortRows(rows, (x) => (sort.key === "name" ? x.name.toLowerCase() : x.spellId), sort.desc, (x) => x.spellId);
@@ -65,7 +71,7 @@ export default async function SpellListPage(props: { searchParams?: Promise<Sear
   const shown = sorted.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
   const here = (over: Partial<ListQuery<Sort>>) => href({ ...q, page: 1, ...over }, context);
   const className = context ? classLabel(context.classSlug) : "";
-  const subset = talents ? `Spells in the ${className} talent catalog` : null;
+  const subset = mine ? `${className} spells in the game files` : null;
   const clear = withClassContext("/database/spells", context);
 
   const columns: Column<(typeof rows)[number]>[] = [
@@ -77,8 +83,8 @@ export default async function SpellListPage(props: { searchParams?: Promise<Sear
   const chips = q.q ? [{ label: `Name: ${q.q}`, href: here({ q: undefined }) }] : [];
   const empty = !names ? <Unreadable />
     : q.q ? <NoMatches noun="spells" chips={chips} clearHref={clear} />
-    // The catalog was read: it names no spell, or none this list has.
-    : talents ? <p className="py-4 text-cell text-fg-2">{`No spells from the ${className} talent catalog are listed here.`}</p>
+    // The class's lines and catalog name no spell this list has.
+    : mine ? <p className="py-4 text-cell text-fg-2">{`No ${className} spells are listed here.`}</p>
     : <NoObservations>No spell is listed yet.</NoObservations>;
 
   return (
@@ -93,10 +99,15 @@ export default async function SpellListPage(props: { searchParams?: Promise<Sear
           clearHref={clear}
         />
         <ClassContextChip read={read} here={withoutClassContext("/database/spells", search)}>
-          {/* The catalog is from the game files: its subset carries the quiet unconfirmed marker (DATA_POLICY.md, the talent catalog). */}
-          {context && (subset
-            ? <span>{`${subset} only, not every ${className} spell.`} <Badge tone="files" /></span>
-            : `The ${className} talent catalog could not be read, so every spell is listed.`)}
+          {/* The skill lines and the catalog are from the game files: the subset carries the quiet unconfirmed marker (DATA_POLICY.md). */}
+          {context && (
+            <span>
+              <Badge tone="files" />{" "}
+              {`Only ${className} spells: the ones on the class's own skill lines and in its talent catalog, found in game files, unconfirmed. ${kept.toLocaleString("en-US")} ${kept === 1 ? "spell" : "spells"} kept; spells no class names (items, professions, riding) are left out.`}
+              {!talents && ` The ${className} talent catalog could not be read, so only the skill lines count.`}
+              {(context.level !== undefined || context.role) && ` The ${context.level !== undefined && context.role ? "level and role do" : context.role ? "role does" : "level does"} not change the list.`}
+            </span>
+          )}
         </ClassContextChip>
         <div className="mt-2">
           <DataTable
