@@ -87,6 +87,18 @@ test("a quest nobody has titled takes the Warcraft Wiki's title with the quiet m
   expect(titled).not.toContain('data-badge="files"');
 });
 
+test("Raw JSON is linked for a quest players reported, and not for one only the wiki names (the API has no card for it)", async () => {
+  titles.quests = {
+    version: "1.60.1.70450", wiki: { name: "Warcraft Wiki", url: "https://warcraft.wiki.gg" },
+    names: new Map([[6, { name: "Wanted: Hogger", wikiPage: "https://warcraft.wiki.gg/wiki/Wanted:_Hogger" }]]),
+  };
+  expect(await questPage("5")).toContain('href="/api/tooltip/quest/5"');
+  const wikiOnly = await questPage("6");
+  expect(wikiOnly).toContain("Wanted: Hogger");
+  expect(wikiOnly).not.toContain("/api/tooltip/quest/6");
+  expect(await npcPage()).toContain('href="/api/tooltip/npc/77"');
+});
+
 test("no lore section when no lore page has the name, and none when the archive cannot be opened", async () => {
   store.loadCorpus.mockResolvedValue({ uploads: 3, records: records.map((r) => (r.kind === "npc_sighting" ? { ...r, name: "Nobody Named This" } : r)), dataAsOf: "2026-10-09T00:00:00.000Z" });
   expect(await npcPage()).not.toContain('id="lore"');

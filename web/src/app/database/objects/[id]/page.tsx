@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { hasCard } from "@/lib/tooltip";
 import { objectPage, type ObjectDrop, type ObjectFacts, type ObjectPage as ObjectFactsPage } from "../../../../../../kb/src/object-page";
 import { pendingLine } from "../../../../../../kb/src/pending-loot";
 import { pinLink } from "@/lib/world-map";
@@ -99,7 +100,7 @@ export default async function ObjectPage(props: { params: Promise<{ id: string }
         <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
         <OpenData
           text={[`${title} (object ${page.objectId})`, ...summary, `Source: https://everloot.app/database/objects/${page.objectId}`].join("\n")}
-          jsonHref={`/api/tooltip/object/${page.objectId}`}
+          jsonHref={!facts.unreachable && hasCard.object(page) ? `/api/tooltip/object/${page.objectId}` : undefined}
         />
         <Tabs
           label={`${title}: relations`}
