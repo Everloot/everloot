@@ -7,6 +7,9 @@ required, or tightening a limit is a major release.
 ## [Unreleased]
 
 ### Changed
+- Description text only, no shape change: the MCP tools built on player data say they read "Everloot's public
+  player data" instead of "current authorized public corpus", `entity_relations` names the game-file relations of the
+  current build, and `gold_ledger` says what its answer holds. Titles, input and output schemas are unchanged.
 - 1.13.0 (record protocol unchanged, 1.7.0), description text only, no shape change: `corpusPublicResponse.records`
   now says each record's `installId` is a per-install pseudonym (`pub-` and 32 hex), never the addon's install id,
   and absent when the server has no key to make one. The records pass `parseRecords` again, so installs can be counted.
