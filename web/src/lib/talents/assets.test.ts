@@ -104,12 +104,14 @@ const root = join(__dirname, "../../../..");
 const SHOWS_ART = new Set([
   "web/src/lib/talents/assets.ts", "web/src/lib/game-assets.ts", "web/src/lib/game-assets.fixture.ts",
   "web/src/components/RaidBuilder.tsx",
-  "web/src/app/page.tsx", "web/src/app/map/map-screen.tsx", "web/src/components/RaidView.tsx", "web/src/app/tools/auctions/page.tsx", "web/src/app/tools/auctions/art.ts",
+  "web/src/app/page.tsx", "web/src/app/sign-in/page.tsx", "web/src/app/sign-up/page.tsx", "web/src/components/AuthShell.tsx", "web/src/app/map/map-screen.tsx", "web/src/components/RaidView.tsx", "web/src/app/tools/auctions/page.tsx", "web/src/app/tools/auctions/art.ts",
   "web/src/app/tools/professions/page.tsx", "web/src/app/tools/professions/[profession]/page.tsx", "web/src/app/database/drops/page.tsx", "web/src/app/database/items/[id]/page.tsx", "web/src/app/database/items/category-page.tsx",
   "web/src/lib/tooltip.ts", // the embeddable hover card: one item per request
   "web/src/app/database/vendors/[id]/page.tsx", "web/src/app/database/npcs/[id]/page.tsx", "web/src/app/database/quests/[id]/page.tsx", "web/src/app/changes/page.tsx", "web/src/app/changes/[post]/page.tsx", "web/src/app/lore/page.tsx", "web/src/lib/spell-mentions.ts", "web/src/app/wow-forever/page.tsx", "web/src/app/tools/talents/page.tsx",
   "kb/src/cli.ts", "web/scripts/upload-game-assets.mjs", "web/scripts/game-assets-upload.mjs",
   "web/src/app/database/zones/[zone]/page.tsx",
+  // The dungeon and raid list's small loading screens, and the zone list's small map pictures.
+  "web/src/app/database/instances/page.tsx", "web/src/app/database/zones/page.tsx",
   // The spell page: the spell's icon and its text come from the same manifest as the item's.
   "web/src/app/database/spells/[id]/page.tsx",
   // The spell list reads the spell names to list them, under the quest list's rule. No art, no tooltip.
@@ -137,6 +139,9 @@ const SHOWS_ART = new Set([
   "web/src/app/wiki/[slug]/page.tsx", "web/src/app/wiki/dungeon-facts.tsx",
   // The coverage score's expected counts (coverage-expected.json, counts only) sit beside the names in the private bucket.
   "web/src/lib/coverage-compute.ts",
+  // The tools index's card icons, and the class, profession and faction icons Plans and Alts on this device draw
+  // (read on the server by the two pages through workspace-icons.ts, passed to the client as URLs).
+  "web/src/app/tools/page.tsx", "web/src/app/tools/builds/page.tsx", "web/src/app/tools/alts/page.tsx", "web/src/lib/workspace-icons.ts",
 ]);
 
 test("nothing outside the pages that show the art can read the asset URL or the manifest modules", () => {

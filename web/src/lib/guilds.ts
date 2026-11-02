@@ -6,7 +6,8 @@ import {
   type AgreedKill, type GuildFaction, type GuildKillRow, type GuildPage, type GuildProgress, type GuildReader, type GuildSummary, type InstanceDef, type LadderFilter, type LadderRow,
 } from "../../../kb/src/guilds";
 import { instanceFactsFromRecords } from "../../../kb/src/instances";
-import { playerPagesOn, type Player } from "./player-pages";
+import { loadGuildAlts, memberKey, type GuildAlt } from "./guild-alts";
+import { playerPagesOn, playerPath, rulesetOf, type Player } from "./player-pages";
 import { guildHideKey, playerHideKey, playerStore, type GuildHit } from "./player-store";
 import { uploadStore } from "./upload-store";
 
@@ -214,16 +215,36 @@ export async function loadGuildSearch(prefix: string): Promise<{ results: GuildS
   return { results: searchGuilds(directory, prefix), unreachable: false, dataAsOf: data.dataAsOf };
 }
 
-export interface LadderQuery { instance?: number; realm?: string; faction?: GuildFaction; page?: number }
+/** The day raids open on Forever (UTC). Before it, while no raid has an agreed kill, the hub says when raid ranking starts. */
+export const RAIDS_OPEN_DAY = "2026-12-09";
+export const raidsOpen = (now: Date = new Date()): boolean => now.toISOString().slice(0, 10) >= RAIDS_OPEN_DAY;
+
+export interface LadderQuery { instance?: number; ruleset?: string; realm?: string; faction?: GuildFaction; page?: number }
+
+/** One ladder row with the guild's ruleset and its rank in the world, its ruleset and its faction within that ruleset. */
+export interface RankedRow extends LadderRow {
+  ruleset: string;
+  ranks: { world: number; ruleset: number; faction: number | null };
+}
+
+/**
+ * The first guilds in the view to kill a boss: a kill counts only at a time two members' installs report it within
+ * FIRST_KILL_WINDOW_MS of each other, and guilds with the same earliest time share the first. Empty before anyone has.
+ */
+export interface BossFirst { encounterId: number; name: string; killedAt: string | null; guilds: { key: string; guildName: string; realm: string }[] }
 
 export interface LadderView {
   /** The instances with an agreed kill, newest tier first. */
   instances: InstanceDef[];
   instance: InstanceDef | null;
   query: LadderQuery;
+  /** Rulesets with a kill in the instance, for the filter. */
+  rulesets: string[];
   /** Realms with a kill in the instance, for the filter. */
   realms: string[];
-  rows: LadderRow[];
+  rows: RankedRow[];
+  /** Each boss of the instance and the first guild in the filtered view to kill it. */
+  firsts: BossFirst[];
   total: number;
   page: number;
   pages: number;
@@ -232,11 +253,13 @@ export interface LadderView {
 type Search = Record<string, string | string[] | undefined>;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
-/** The URL's ladder filters: an instance id, a realm and a faction, anything else ignored. */
+/** The URL's ladder filters: an instance id, a ruleset, a realm and a faction, anything else ignored. */
 export function parseLadderQuery(search: Search): LadderQuery {
   const q: LadderQuery = {};
   const instance = Number(one(search.instance));
   if (Number.isInteger(instance) && instance > 0) q.instance = instance;
+  const ruleset = one(search.ruleset)?.trim().toLowerCase();
+  if (ruleset && /^[a-z][a-z-]{1,19}$/.test(ruleset)) q.ruleset = ruleset;
   const realm = one(search.realm)?.trim();
   if (realm && realm.length >= 2 && realm.length <= 40) q.realm = realm;
   const faction = one(search.faction)?.toLowerCase();
@@ -249,6 +272,7 @@ export function parseLadderQuery(search: Search): LadderQuery {
 export function ladderHref(q: LadderQuery): string {
   const params = new URLSearchParams();
   if (q.instance) params.set("instance", String(q.instance));
+  if (q.ruleset) params.set("ruleset", q.ruleset);
   if (q.realm) params.set("realm", q.realm);
   if (q.faction) params.set("faction", q.faction);
   if (q.page && q.page > 1) params.set("page", String(q.page));
@@ -266,29 +290,121 @@ async function membersSeen(guilds: readonly { realm: string; guildName: string }
 }
 
 /**
- * One page of the ladder for one instance (the newest with a kill unless the URL picks one), filtered by realm
- * and faction. Members seen are counted for the rows on the page only.
+ * A guild's rank in the world, in its ruleset, and among its faction in that ruleset, for one instance. Each
+ * ladder is built once per ruleset and faction asked for.
+ */
+function standings(progress: readonly GuildProgress[], instanceMapId: number): (row: LadderRow) => RankedRow {
+  const ladders = new Map<string, Map<string, number>>();
+  const rankIn = (id: string, key: string, list: () => LadderRow[]): number => {
+    let ranks = ladders.get(id);
+    if (!ranks) { ranks = new Map(list().map((r) => [r.key, r.rank])); ladders.set(id, ranks); }
+    return ranks.get(key) ?? 0;
+  };
+  return (row) => {
+    const ruleset = rulesetOf(row.realm);
+    const own = () => progress.filter((p) => rulesetOf(p.realm) === ruleset);
+    return {
+      ...row,
+      ruleset,
+      ranks: {
+        world: rankIn("world", row.key, () => guildLadder(progress, instanceMapId)),
+        ruleset: rankIn(`r:${ruleset}`, row.key, () => guildLadder(own(), instanceMapId)),
+        faction: row.faction ? rankIn(`f:${ruleset}:${row.faction}`, row.key, () => guildLadder(own(), instanceMapId, { faction: row.faction! })) : null,
+      },
+    };
+  };
+}
+
+/**
+ * Each boss of the instance with the first guilds among `rows` to kill it, in name order whatever order `rows` come
+ * in. Only a kill two installs back at one time counts (BossProgress.occurredAt), so reports of different kills a week
+ * apart never add up to an early first. The ladder itself still counts a kill once two installs report the boss at all.
+ * Officers' kills carry no time and never count as first.
+ */
+export function bossFirsts(instance: InstanceDef, rows: readonly GuildProgress[]): BossFirst[] {
+  return instance.bosses.map((boss) => {
+    let killedAt: string | null = null;
+    let guilds: BossFirst["guilds"] = [];
+    for (const r of rows) {
+      const at = r.list.find((x) => x.encounterId === boss.encounterId)?.occurredAt;
+      if (!at) continue;
+      const guild = { key: r.key, guildName: r.guildName, realm: r.realm };
+      if (killedAt === null || at < killedAt) { killedAt = at; guilds = [guild]; }
+      else if (at === killedAt) guilds.push(guild);
+    }
+    guilds.sort((a, b) => a.guildName.localeCompare(b.guildName) || a.realm.localeCompare(b.realm) || a.key.localeCompare(b.key));
+    return { encounterId: boss.encounterId, name: boss.name, killedAt, guilds };
+  });
+}
+
+/**
+ * One page of the ladder for one instance (the newest with a kill unless the URL picks one), filtered by ruleset,
+ * realm and faction. Members seen are counted for the rows on the page only.
  */
 export async function loadLadder(data: GuildData, query: LadderQuery): Promise<LadderView> {
   const ranked = new Set(data.progress.filter((p) => p.killed > 0).map((p) => p.instanceMapId));
   const instances = data.instances.filter((i) => ranked.has(i.instanceMapId)).sort((a, b) => b.tier - a.tier);
   const instance = instances.find((i) => i.instanceMapId === query.instance) ?? instances[0] ?? null;
-  if (!instance) return { instances, instance: null, query, realms: [], rows: [], total: 0, page: 1, pages: 0 };
+  if (!instance) return { instances, instance: null, query, rulesets: [], realms: [], rows: [], firsts: [], total: 0, page: 1, pages: 0 };
+  const inInstance = data.progress.filter((p) => p.instanceMapId === instance.instanceMapId && p.killed > 0);
+  const scoped = query.ruleset ? data.progress.filter((p) => rulesetOf(p.realm) === query.ruleset) : data.progress;
   const filter: LadderFilter = { ...(query.realm ? { realm: query.realm } : {}), ...(query.faction ? { faction: query.faction } : {}) };
-  const all = guildLadder(data.progress, instance.instanceMapId, filter);
-  const realms = [...new Set(data.progress.filter((p) => p.instanceMapId === instance.instanceMapId && p.killed > 0).map((p) => p.realm))].sort((a, b) => a.localeCompare(b));
+  const all = guildLadder(scoped, instance.instanceMapId, filter);
+  const sorted = (values: Iterable<string>) => [...new Set(values)].sort((a, b) => a.localeCompare(b));
+  const rulesets = sorted(inInstance.map((p) => rulesetOf(p.realm)));
+  const realms = sorted(inInstance.filter((p) => !query.ruleset || rulesetOf(p.realm) === query.ruleset).map((p) => p.realm));
   const pages = Math.max(1, Math.ceil(all.length / LADDER_PAGE));
   const page = Math.min(query.page ?? 1, pages);
   const slice = all.slice((page - 1) * LADDER_PAGE, page * LADDER_PAGE);
   const seen = await membersSeen(slice);
-  const rows = slice.map((r) => ({ ...r, membersSeen: seen.get(r.key) ?? null }));
-  return { instances, instance, query, realms, rows, total: all.length, page, pages: all.length ? pages : 0 };
+  const rank = standings(data.progress, instance.instanceMapId);
+  const rows = slice.map((r) => rank({ ...r, membersSeen: seen.get(r.key) ?? null }));
+  return { instances, instance, query, rulesets, realms, rows, firsts: bossFirsts(instance, all), total: all.length, page, pages: all.length ? pages : 0 };
+}
+
+/** One member as the guild page lists it: the officers' roster and the addon's sightings, joined by name. */
+export interface GuildMember {
+  name: string;
+  realm: string;
+  /** A store token ("SHAMAN") from a sighting, or the class name the officers' roster gives ("Mage"). */
+  class: string;
+  level: number;
+  /** The guild rank, only from a roster the officers published. */
+  rank: string | null;
+  /** The day the addon last saw the character in this guild; null when only the officers list it. */
+  lastSeen: string | null;
+  /** The character's player page, when the addon saw it there. */
+  path: string | null;
+  /** Other characters on the member's account, only as `character_link` proves them and the switches allow. */
+  alts: GuildAlt[];
+}
+
+/**
+ * The member list: the officers' roster in its own order, each name joined to its sighting when there is one, then
+ * the characters only seen, newest first. `seen` comes from the players table, which already leaves out hidden
+ * characters and hidden guilds.
+ */
+export function guildMemberList(
+  realm: string, seen: readonly Player[], roster: readonly { name: string; rank: string; level: number; className: string }[],
+): Omit<GuildMember, "alts">[] {
+  const name = (n: string) => n.trim().toLowerCase();
+  const sighted = new Map(seen.map((p) => [name(p.name), p]));
+  const fromSighting = (p: Player) => ({ name: p.name, realm: p.realm, class: p.class, level: p.level, lastSeen: p.lastSeen, path: playerPath(p) });
+  const out: Omit<GuildMember, "alts">[] = roster.map((m) => {
+    const p = sighted.get(name(m.name));
+    if (p) sighted.delete(name(m.name));
+    return p
+      ? { ...fromSighting(p), level: Math.max(p.level, m.level), rank: m.rank }
+      : { name: m.name, realm, class: m.className, level: m.level, rank: m.rank, lastSeen: null, path: null };
+  });
+  return [...out, ...[...sighted.values()].map((p) => ({ ...fromSighting(p), rank: null }))];
 }
 
 export interface GuildPageData {
   page: GuildPage;
   /** The officer board, when officers published one. */
   board: GuildBoard | null;
+  members: GuildMember[];
   /** True when the hidden characters could not be read, so the officers' roster, loot and attendance are left out. */
   namesWithheld: boolean;
   dataAsOf: string | null;
@@ -339,9 +455,12 @@ export async function loadGuildPage(realmSlug: string, guildSlug_: string, loade
   const summary = guildDirectory({ kills: data.kills, seen, boards: board ? boardSources(new Map([[key, board]])) : [] }).find((g) => g.key === key)
     ?? { key, guildName: identity.guildName.trim(), realm: identity.realm.trim(), faction: null, membersSeen: null, membersPublished: null, kills: 0, latestKillAt: null, lastSeen: null, sources: [] };
   const activity = data.kills.filter((k) => k.key === key && k.killedAt).sort((a, b) => b.killedAt.localeCompare(a.killedAt));
+  const listed = guildMemberList(identity.realm.trim(), seenRoster, board?.roster ?? []);
+  const alts = await loadGuildAlts(listed);
   return {
     page: { summary, progression: data.progress.filter((p) => p.key === key), activity, seenRoster, ranks: guildRanks(key, data.progress) },
     board,
+    members: listed.map((m) => ({ ...m, alts: alts.get(memberKey(m.realm, m.name)) ?? [] })),
     namesWithheld: data.namesWithheld,
     dataAsOf: data.dataAsOf,
   };

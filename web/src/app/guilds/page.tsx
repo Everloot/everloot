@@ -5,18 +5,21 @@ import { Card, Container, DataTable, EmptyState, FilterBar, Input, PageHeader, R
 import { FAMILIES } from "@/data/families";
 import { dataAgeLabel } from "@/lib/data-age";
 import {
-  guildPath, guildSearchPrefix, guildsOn, ladderHref, loadGuildData, loadGuildSearch, loadLadder, parseLadderQuery, type LadderQuery,
+  factionLabel, guildPath, guildSearchPrefix, guildsOn, ladderHref, loadGuildData, loadGuildSearch, loadLadder, parseLadderQuery, raidsOpen,
+  type BossFirst, type LadderQuery, type RankedRow,
 } from "@/lib/guilds";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
-import type { GuildSummary, LadderRow } from "../../../../kb/src/guilds";
+import type { GuildSummary } from "../../../../kb/src/guilds";
 import { LADDER_PAGE } from "../../../../kb/src/guilds";
-import { day, FactionMark, guildRobots, link, number, Progress } from "./parts";
+import { BossStrip, day, FactionMark, guildRobots, link, number, Progress, rulesetLabel } from "./parts";
 
 export const dynamic = "force-dynamic";
 
 const DESCRIPTION = "WoW: Forever guilds by progression: a ladder per raid from the kills two members' uploads agree on, each guild's bosses, roster sightings and activity.";
 const START_LINE = "The ladder starts with the first kill two members report.";
+/** Before raids open, said in place of a raid ranking. Nothing is estimated in its place. */
+const RAIDS_LINE = "Ranking starts when raids open on December 9.";
 
 type Search = Record<string, string | string[] | undefined>;
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
@@ -30,7 +33,11 @@ export async function generateMetadata(props: { searchParams: Promise<Search> })
   };
 }
 
-const ladderColumns: Column<LadderRow>[] = [
+/** "World 3 · Forever 2 · Horde 1": the guild's standing outside the current filters. */
+const ranksText = (r: RankedRow) =>
+  [`World ${r.ranks.world}`, `${rulesetLabel(r.ruleset)} ${r.ranks.ruleset}`, r.ranks.faction && r.faction ? `${factionLabel(r.faction)} ${r.ranks.faction}` : ""].filter(Boolean).join(" · ");
+
+const ladderColumns: Column<RankedRow>[] = [
   {
     key: "guild", header: "Guild",
     cell: (r) => (
@@ -43,8 +50,27 @@ const ladderColumns: Column<LadderRow>[] = [
   { key: "realm", header: "Realm", cell: (r) => r.realm },
   { key: "faction", header: "Faction", nowrap: true, cell: (r) => <FactionMark faction={r.faction} /> },
   { key: "progress", header: "Progress", numeric: true, cell: (r) => <Progress killed={r.killed} bosses={r.bosses} className="justify-end" /> },
+  { key: "bosses", header: "Bosses", nowrap: true, cell: (r) => <BossStrip list={r.list} /> },
+  { key: "ranks", header: "Ranks", nowrap: true, cell: (r) => <span className="text-cell-2 text-fg-2">{ranksText(r)}</span> },
   { key: "latest", header: "Latest kill", numeric: true, cell: (r) => (r.latestKillAt ? day(r.latestKillAt) : <span className="text-muted">Officers, no date</span>) },
   { key: "seen", header: "Members seen", numeric: true, cell: (r) => (r.membersSeen === null ? <span className="text-muted">Not counted</span> : number(r.membersSeen)) },
+];
+
+const firstNames = (b: BossFirst) => b.guilds.map((g) => g.guildName).join(", ") + (b.guilds.length > 1 ? " (joint)" : "");
+
+const firstColumns: Column<BossFirst>[] = [
+  { key: "boss", header: "Boss", cell: (b) => <span className="font-medium">{b.name}</span> },
+  {
+    key: "guild", header: "First kill",
+    cell: (b) => (b.guilds.length === 0 ? <span className="text-muted">Not yet</span> : (
+      <span className="flex flex-wrap items-baseline gap-x-2">
+        {b.guilds.map((g) => <Link key={g.key} href={guildPath(g.realm, g.guildName)} className={link}>{g.guildName}</Link>)}
+        {b.guilds.length > 1 && <span className="text-cell-2 text-muted">Joint</span>}
+      </span>
+    )),
+  },
+  { key: "realm", header: "Realm", cell: (b) => [...new Set(b.guilds.map((g) => g.realm))].join(", ") },
+  { key: "day", header: "Day", numeric: true, cell: (b) => <span className="font-mono tabular-nums">{day(b.killedAt)}</span> },
 ];
 
 const searchColumns: Column<GuildSummary>[] = [
@@ -62,6 +88,7 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
   const q = (first(params.q) ?? "").trim().slice(0, 40);
   const prefix = q ? guildSearchPrefix(q) : null;
   const query = parseLadderQuery(params);
+  const open = raidsOpen();
   const data = await loadGuildData();
   const [ladder, found] = await Promise.all([
     data.unreachable ? null : loadLadder(data, query),
@@ -73,6 +100,15 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
       type: "menu", key: "instance", label: ladder.instance.name,
       options: ladder.instances.map((i) => ({ label: i.name, href: href({ instance: i.instanceMapId, realm: undefined }), on: i.instanceMapId === ladder.instance!.instanceMapId })),
     },
+    // While every guild is on one ruleset (player rows are all "forever" for now) the menu would only repeat it; it
+    // shows once there are two, or when the address picks one, so the choice can be cleared.
+    ...(ladder.rulesets.length > 1 || query.ruleset ? [{
+      type: "menu" as const, key: "ruleset", label: query.ruleset ? rulesetLabel(query.ruleset) : "Ruleset",
+      options: [
+        { label: "Every ruleset", href: href({ ruleset: undefined }), on: !query.ruleset, reset: true },
+        ...ladder.rulesets.map((r) => ({ label: rulesetLabel(r), href: href({ ruleset: r, realm: undefined }), on: query.ruleset === r })),
+      ],
+    }] : []),
     {
       type: "menu", key: "realm", label: query.realm ?? "Realm",
       options: [
@@ -120,23 +156,39 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
           {data.unreachable || !ladder ? (
             <Card><p className="text-fg-2">{STORAGE_UNREACHABLE}</p></Card>
           ) : !ladder.instance ? (
-            <StartState />
+            <StartState line={open ? START_LINE : RAIDS_LINE} />
           ) : (
-            <section aria-labelledby="ladder" className="space-y-3">
-              <SectionHeading id="ladder" note="Bosses killed, then who reached the latest kill first. Equal rows share a rank. No score.">
-                {ladder.instance.name}
-              </SectionHeading>
-              <FilterBar
-                label="Ladder filters"
-                controls={controls}
-                active={(query.realm ? 1 : 0) + (query.faction ? 1 : 0)}
-                clearHref={href({ realm: undefined, faction: undefined })}
-                aside={ladder.total > 0 && <ResultStrip total={ladder.total} noun="guilds" page={ladder.page} perPage={LADDER_PAGE} href={(page) => ladderHref({ ...query, page })} />}
-              />
-              {ladder.rows.length === 0
-                ? <p className="text-sm text-fg-2">No guild matches these filters yet.</p>
-                : <DataTable dense caption={`${ladder.instance.name} ladder`} columns={ladderColumns} rows={ladder.rows} rowKey={(r) => r.key} meta={(r) => `${r.realm} · ${r.killed}/${r.bosses}`} />}
-            </section>
+            <>
+              {!ladder.instances.some((i) => i.instanceType === "raid") && <p className="text-cell text-fg-2">{open ? START_LINE : RAIDS_LINE}</p>}
+              <section aria-labelledby="ladder" className="space-y-3">
+                <SectionHeading
+                  id="ladder"
+                  note={ladder.instance.instanceType === "raid"
+                    ? "Bosses killed, then who reached the latest kill first. Equal rows share a rank. No score."
+                    : "A dungeon: bosses cleared, then who got there first. Equal rows share a rank. No score."}
+                >
+                  {ladder.instance.name}
+                </SectionHeading>
+                <FilterBar
+                  label="Ladder filters"
+                  controls={controls}
+                  active={(query.ruleset ? 1 : 0) + (query.realm ? 1 : 0) + (query.faction ? 1 : 0)}
+                  clearHref={href({ ruleset: undefined, realm: undefined, faction: undefined })}
+                  aside={ladder.total > 0 && <ResultStrip total={ladder.total} noun="guilds" page={ladder.page} perPage={LADDER_PAGE} href={(page) => ladderHref({ ...query, page })} />}
+                />
+                {ladder.rows.length === 0
+                  ? <p className="text-sm text-fg-2">No guild matches these filters yet.</p>
+                  : <DataTable dense caption={`${ladder.instance.name} ladder`} columns={ladderColumns} rows={ladder.rows} rowKey={(r) => r.key} meta={(r) => `${r.realm} · ${r.killed}/${r.bosses} · ${ranksText(r)}`} />}
+              </section>
+              {ladder.total > 0 && (
+                <section aria-labelledby="firsts" className="space-y-3">
+                  <SectionHeading id="firsts" note="The first guild in this view to kill each boss: two members' uploads have to report the same kill within an hour of each other. Guilds with the same time share it. Officers' kills carry no day.">
+                    First kills
+                  </SectionHeading>
+                  <DataTable dense caption={`First kills in ${ladder.instance.name}`} columns={firstColumns} rows={ladder.firsts} rowKey={(b) => String(b.encounterId)} meta={(b) => (b.guilds.length ? `${firstNames(b)} · ${day(b.killedAt)}` : "Not yet")} />
+                </section>
+              )}
+            </>
           )}
 
           <div className="grid gap-4 md:grid-cols-2 lg:gap-6">
@@ -165,16 +217,16 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
 }
 
 /** Before the first agreed kill: the start line, then what the ladder will hold. */
-function StartState() {
+function StartState({ line }: { line: string }) {
   return (
     <div className="space-y-4">
-      <EmptyState message={START_LINE} />
+      <EmptyState message={line} />
       <Card as="section" aria-labelledby="what-will-be-here">
         <h2 id="what-will-be-here" className="text-h2-sm text-fg sm:text-h2">What will be here</h2>
         <ol className="mt-3 grid gap-3 text-cell text-fg-2 sm:grid-cols-3">
           <li className="flex gap-3"><span className="w-5 shrink-0 font-mono text-muted">1</span><span>A ladder per raid: bosses killed, then who got there first.</span></li>
           <li className="flex gap-3"><span className="w-5 shrink-0 font-mono text-muted">2</span><span>A page per guild with each boss and the day it fell.</span></li>
-          <li className="flex gap-3"><span className="w-5 shrink-0 font-mono text-muted">3</span><span>Filters by realm and faction.</span></li>
+          <li className="flex gap-3"><span className="w-5 shrink-0 font-mono text-muted">3</span><span>Filters by ruleset, realm and faction.</span></li>
         </ol>
       </Card>
     </div>

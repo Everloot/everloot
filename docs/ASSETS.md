@@ -27,6 +27,8 @@ variables (`GAME_DATA_*`), item links stay plain while the other art still shows
 | `/database/drops`, `/database/vendors/<id>`, `/tools/auctions` | Item icon beside each item link, the item's tooltip on hover and keyboard focus |
 | `/database/items/<id>` | The item's tooltip as a card, once players have reported the item; the icon of each spell that creates or uses the item, beside that relation; the item's name, quality colour and icon where the game files and the Warcraft Wiki give the same name |
 | `/database/items/<class>/<subclass>` | Icon and game file name of each listed item players have reported, and name, quality colour and icon for every item the game files or the Warcraft Wiki name; other rows stay "Item N" |
+| `/database/instances` | Each dungeon's and raid's loading screen, small, before its name; a held-back one shows none |
+| `/database/zones` | Each zone's own map picture, small, before its name (the picture its zone page shows) |
 | `/tools/professions` | Profession icons as a picker |
 | `/tools/raid` | Class, talent tree and buff icons, each buff's tooltip on hover and keyboard focus, and Molten Core's loading screen as the banner |
 | `/map` | The game's own continent and zone pictures under the zone outlines, with a switch to hide them; the continent's loading screen as the banner; each dungeon's and raid's loading screen, small, beside its entrance; the game's minimap icons on the legend rows and the pins they switch, where the upload has them |

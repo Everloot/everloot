@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import ArtThumb from "@/components/game/ArtThumb";
 import { Badge, Container, DataTable, DataTitle, type Column } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import { compareInstances, instanceHref, instanceRows, instanceTitle, levelLabel, loadSightings, type InstanceRow } from "@/lib/instances";
+import { loadingArt, loadSiteAssets } from "@/lib/game-assets";
 import { PLACEHOLDER } from "@/lib/item-names";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
@@ -24,10 +26,17 @@ const link = "text-fg underline decoration-edge underline-offset-4 hover:decorat
 export default async function InstancesPage() {
   const seen = await loadSightings();
   const rows = [...instanceRows(seen.unreachable ? {} : seen).values()].sort(compareInstances);
+  // Each instance's own loading screen, small, before its name; a held-back one, or one the upload lacks, has none.
+  const assets = await loadSiteAssets();
+  const thumb = (r: InstanceRow) => { const art = loadingArt(assets, r.instanceMapId); return art ? art.small?.url ?? art.url : null; };
   const dash = <span className="text-muted">–</span>;
   const guides = prepPages();
   const columns: Column<InstanceRow>[] = [
-    { key: "name", header: "Name", cell: (r) => <Link href={instanceHref(r.instanceMapId, r.name)} className={link}>{instanceTitle(r)}</Link> },
+    { key: "name", header: "Name", cell: (r) => {
+      const src = thumb(r);
+      const name = <Link href={instanceHref(r.instanceMapId, r.name)} className={link}>{instanceTitle(r)}</Link>;
+      return src ? <span className="flex min-w-0 items-center gap-2"><ArtThumb src={src} />{name}</span> : name;
+    } },
     { key: "kind", header: "Type", cell: (r) => (r.raid === null ? PLACEHOLDER : r.raid ? "Raid" : "Dungeon") },
     { key: "level", header: "Level", numeric: true, cell: (r) => levelLabel(r.level) ?? dash },
     { key: "zone", header: "Entered from", cell: (r) => {
