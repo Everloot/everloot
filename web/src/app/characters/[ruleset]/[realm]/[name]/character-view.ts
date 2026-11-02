@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { validPlayerName } from "@everloot/protocol";
-import { publicCharacter, type PublicCharacter } from "@/lib/character-links-store";
-import { buildShowcase, characterPath, showcaseOn, type Showcase } from "@/lib/character-showcase";
+import { publicCharacter, publicCharacterBuilds, type PlannedBuild, type PublicCharacter } from "@/lib/character-links-store";
+import { buildShowcase, characterPath, showcaseBuildsOn, showcaseOn, type Showcase } from "@/lib/character-showcase";
 import { renderCharacterCard, type CharacterCardSize } from "@/lib/og-card";
 
 /**
@@ -25,6 +25,20 @@ function parse(p: Params): Params | null {
 
 export interface Found { ruleset: string; character: PublicCharacter }
 
+/**
+ * The planned builds for a found character (slice S4), read only with EVERLOOT_SHOWCASE_BUILDS=1 and only once the
+ * character itself was found, so a 404 asks nothing more. A failed read leaves the section out rather than taking
+ * the page down: the identity is still right without it.
+ */
+export async function plannedBuilds({ ruleset, character: c }: Found): Promise<PlannedBuild[]> {
+  if (!showcaseBuildsOn()) return [];
+  try {
+    return await publicCharacterBuilds(ruleset, c.realm, c.name);
+  } catch {
+    return [];
+  }
+}
+
 /** The character, null for a 404, or "unavailable" when storage could not answer; never a throw. Once per request. */
 export const lookup = cache(async (ruleset: string, realm: string, name: string): Promise<Found | null | "unavailable"> => {
   const parts = parse({ ruleset, realm, name });
@@ -39,9 +53,10 @@ export const lookup = cache(async (ruleset: string, realm: string, name: string)
 
 /**
  * The showcase for a found character. The identity comes from the link row and its date is the link's last upload.
- * Every other section is `empty` until the sync slices land, so the public page and card leave them out.
+ * Talents show the planned builds when there are any, dated by the newest; every other section is `empty` until the
+ * sync slices land, so the public page and card leave them out.
  */
-export function characterShowcase({ ruleset, character: c }: Found, now: Date): Showcase {
+export function characterShowcase({ ruleset, character: c }: Found, now: Date, planned: readonly PlannedBuild[] = []): Showcase {
   return buildShowcase({
     sample: false,
     path: characterPath(ruleset, c.realm, c.name),
@@ -54,7 +69,13 @@ export function characterShowcase({ ruleset, character: c }: Found, now: Date): 
     guild: null,
     lastUpload: new Date(c.lastUploadAt).toISOString().slice(0, 10),
     gear: { state: "empty" },
-    talents: { state: "empty" },
+    talents: planned.length
+      ? {
+        state: "shown",
+        asOf: new Date(Math.max(...planned.map((b) => Date.parse(b.updatedAt)))).toISOString().slice(0, 10),
+        data: { trees: [], code: null, planned: planned.map((b) => ({ name: b.name, slug: b.slug })) },
+      }
+      : { state: "empty" },
     professions: { state: "empty" },
     reputations: { state: "empty" },
     raids: { state: "empty" },
