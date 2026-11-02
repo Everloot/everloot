@@ -107,6 +107,23 @@ No migration is part of the switch.
 | 31 | Carlos | Decide what waits for Live data: the six-weapon check result into `CHECKED_WEAPONS`; the recheck scopes in `kb/curated/recheck.json` that the build watch added for moved zones; directory listings that still carry the old MCP tool count. | A list with owners. | n/a |
 | 32 | Agent | Write the closeout: what ran, what was observed, what was skipped. No numbers that were not measured. | In the repository's closeout convention (`docs/2026-10-2x-lane-...-closeout.md`). | n/a |
 
+## Filling the realm map
+
+Blizzard has not named Forever's realms, so until launch every realm is in one "forever" view: the
+Auction House's ruleset tabs say "No realm is mapped to PvP yet", and character, player and guild
+addresses use `forever`. The map is one file, `web/src/data/realms.ts` (`REALMS`), and nothing else reads
+a realm's ruleset or region.
+
+| # | Owner | Step | Check and expected result | If it fails |
+|---|---|---|---|---|
+| R1 | Carlos | Once the realm list is up in game, write down each realm's name exactly as the list spells it, its ruleset (Normal, PvP, Roleplaying, RP-PvP, later Hardcore) and its region. Only what the list shows; a realm not seen stays out. | A list of realm, ruleset, region from the game. | Leave the map empty; the site keeps the one view. |
+| R2 | Agent | Add one line per realm to `REALMS`: `{ name: "Mal'Ganis", ruleset: "pvp", region: "us" }`. The rulesets are `normal`, `pvp`, `rp`, `rp-pvp`, `hardcore`. Open it as its own pull request, `data(web): map Forever's realms to their rulesets`. | `cd web && npx vitest run src/lib/realms src/app/tools/auctions src/lib/player-store.test.ts && npm run typecheck` pass; `src/lib/realms.test.ts` fails on a realm listed twice under two spellings. | Fix the line the test names. |
+| R3 | Agent | After the deploy, open `/tools/auctions` and each ruleset tab. | Each tab lists only its realms; a mapped ruleset with no scans says "No public prices on PvP realms yet"; "Realms not mapped yet" holds only realms the list did not have. The plain URLs (`/tools/auctions/<realm>`, `/tools/auctions/item/<id>`) answer as before. | Revert the map pull request; the site goes back to one view. |
+
+Mapping a realm moves its new player rows to that ruleset's addresses (`/players/pvp/...`). Rows already
+stored under `forever` keep their old address until the character is seen again or the 90-day prune
+removes them, so map realms on launch day, before player pages are switched on.
+
 ## Smoke list
 
 Run `python scripts/launch_smoke.py` from the repository root (add `--after-switch` once the switch is

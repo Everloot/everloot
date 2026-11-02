@@ -27,13 +27,10 @@ export function playerIndexingOn(env: Record<string, string | undefined> = proce
 }
 
 /**
- * The ruleset a realm belongs to. Forever's realm names are not confirmed (census design §6, step 4), so every
- * realm is "forever" until the launch-day check says how realms map to rulesets and regions.
+ * The ruleset a realm belongs to, from the realm map (../data/realms.ts). Forever's realm names are not confirmed
+ * (census design §6, step 4), so a realm the map does not list is "forever", as every realm was before launch.
  */
-export const DEFAULT_RULESET = "forever";
-export function rulesetOf(_realm: string): string {
-  return DEFAULT_RULESET;
-}
+export { DEFAULT_RULESET, rulesetOf } from "./realms";
 
 /** A player row may be dated at most this far back, and one day ahead, of the server's clock. */
 export const PLAYER_DAYS_BACK = 30;

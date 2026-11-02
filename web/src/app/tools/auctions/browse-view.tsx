@@ -11,14 +11,16 @@ import {
 import type { Crumb } from "@/lib/jsonld";
 import { trailFor } from "@/lib/breadcrumbs";
 import {
-  AH_PATH, HOUSES, agreementSoFar, crossRealmHref, findBoard, houseCounts, itemHref, itemIdParam, money, percent, realmBoards, realmHref, slugWords,
+  AH_PATH, HOUSES, agreementSoFar, crossRealmHref, findBoard, houseCounts, itemHref, itemIdParam, money, onRuleset, percent, realmBoards, realmHref,
+  rulesetSummaries, slugWords,
 } from "@/lib/auction-house";
+import { AFTER_LAUNCH, RULESET_LABEL, isRulesetSlug, mappedRulesets } from "@/lib/realms";
 import { auctionNames, itemArt, type ItemTip } from "./art";
 import {
   AH_PER_PAGE, DEFAULT_SORT, activeFilters, ahHref, ahQuery, browseRows, categoryRow, categoryTree, inCategory,
   type AhQuery, type AhSort, type BrowseRow, type TreeNode,
 } from "./browse";
-import { Contribute, Facts, ItemLink, Sparkline, count } from "./parts";
+import { Contribute, Facts, ItemLink, RulesetSummaryTable, Sparkline, count } from "./parts";
 import TimeAgo from "./TimeAgo";
 
 type Search = Record<string, string | string[] | undefined>;
@@ -30,8 +32,8 @@ const bracket = (r: { min: number; max: number }) => (r.min === r.max ? String(r
 /** The sorts that read the tooltip facts or names of every row, not just the page's. */
 const WIDE_SORTS: AhSort[] = ["name", "ilvl", "req"];
 
-/** Only the plain view is indexed; a filter, a house, a sort or a later page points its canonical at it. */
-export const isPlainView = (q: AhQuery) => activeFilters(q) === 0 && !q.house && !q.sort && q.page === 1;
+/** Only the plain view is indexed; a filter, a house, a ruleset, a sort or a later page points its canonical at it. */
+export const isPlainView = (q: AhQuery) => activeFilters(q) === 0 && !q.house && !q.ruleset && !q.sort && q.page === 1;
 
 /** A house tab's item count: read out everywhere, drawn from 640 px up so the four tabs fit a phone. */
 function HouseCount({ n }: { n: number }) {
@@ -74,7 +76,11 @@ export async function browseView({ slug, search }: { slug: string | null; search
   const state = market.state;
   const realmWide = state ? realmBoards(state, now) : [];
   const boards = state ? realmBoards(state, now, q.house) : [];
-  const mine = slug ? boards.filter((b) => b.realm.slug === slug) : boards;
+  // A realm is on one ruleset, so the ruleset tabs are the all-realms page's only.
+  const ruleset = slug ? null : q.ruleset ?? null;
+  const rulesetName = ruleset ? RULESET_LABEL[ruleset] : null;
+  const mine = slug ? boards.filter((b) => b.realm.slug === slug) : onRuleset(boards, ruleset);
+  const realmsHere = slug ? realmWide : onRuleset(realmWide, ruleset);
   const realmName = slug ? (findBoard(realmWide, slug)?.realm.name ?? mine[0]?.realm.name ?? slugWords(slug)) : null;
   const rows = mine.flatMap((b) => b.rows);
   const allIds = [...new Set(rows.map((r) => r.value.itemId))];
@@ -102,15 +108,27 @@ export async function browseView({ slug, search }: { slug: string | null; search
   const strip = <ResultStrip total={results.length} noun={results.length === 1 ? "item" : "items"} page={q.page} perPage={AH_PER_PAGE} href={pageHref} label="Result pages" />;
   const board = slug ? findBoard(realmWide, slug) : null;
   const updated = slug ? (mine[0]?.updatedAt ?? board?.updatedAt ?? null) : market.dataAsOf ? Date.parse(market.dataAsOf) : null;
-  const title = realmName ?? "Auction House";
+  const title = realmName ?? (rulesetName ? `${rulesetName} Auction House` : "Auction House");
   const trail: Crumb[] = [...trailFor(AH_PATH)!, ...(slug ? [{ name: title, path }] : [])];
   const showRealm = !slug;
 
-  const counts = state ? houseCounts(state, now, slug ?? undefined) : new Map<AuctionHouse | null, number>();
+  const counts = state ? houseCounts(state, now, slug ?? undefined, ruleset) : new Map<AuctionHouse | null, number>();
   const houseTabs = [
     { href: here({ house: null }), label: <>All<span className="sr-only sm:not-sr-only"> houses</span><HouseCount n={counts.get(null) ?? 0} /></>, current: !q.house },
     ...HOUSES.map((h) => ({ href: here({ house: h }), label: <>{h}<HouseCount n={counts.get(h) ?? 0} /></>, current: q.house === h })),
   ];
+
+  // The ruleset tabs and their summary, counted on the realm-wide blend (every house) so they do not change with the house tab.
+  const summaries = state && !slug ? rulesetSummaries(state, now) : [];
+  const rulesetTabs = summaries.flatMap(({ ruleset: r, items }) => (isRulesetSlug(r)
+    ? [{ href: here({ ruleset: r }), label: RULESET_LABEL[r], count: items, current: ruleset === r }]
+    : []));
+  const mapped = mappedRulesets();
+  const laterRulesets = [...AFTER_LAUNCH].filter((r) => !mapped.has(r));
+  // The summary is the unfiltered first page's; a search or filter shows only its results.
+  const summaryRows = activeFilters(q) || q.page > 1 ? [] : ruleset ? summaries.filter((r) => r.ruleset === ruleset) : summaries;
+  const moveIds = [...new Set(summaryRows.flatMap((r) => r.moves.map((m) => m.row.value.itemId)))];
+  const moveNames = moveIds.length ? await auctionNames(moveIds, (await itemArt(moveIds)).tips) : new Map<number, string>();
 
   const inCat = rows.filter((r) => inCategory(r.value.itemId, q));
   const qualityCount = new Map<number, number>();
@@ -123,7 +141,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
       type: "menu", key: "realm", label: "Realm",
       options: [
         { label: "All realms", href: ahHref(AH_PATH, { ...q, page: 1 }), on: !slug, reset: true },
-        ...realmWide.map((b) => ({ label: b.realm.name, href: ahHref(realmHref(b.realm), { ...q, page: 1 }), on: b.realm.slug === slug, count: b.rows.length })),
+        ...realmsHere.map((b) => ({ label: b.realm.name, href: ahHref(realmHref(b.realm), { ...q, ruleset: undefined, page: 1 }), on: b.realm.slug === slug, count: b.rows.length })),
       ],
     },
     {
@@ -146,7 +164,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
   ];
   // The search box keeps every other filter (not the page) as hidden fields.
   const keep = Object.fromEntries(new URLSearchParams(ahHref("", { ...q, q: undefined, page: 1 }).split("?")[1] ?? ""));
-  const clearHref = ahHref(path, { house: q.house });
+  const clearHref = ahHref(path, { house: q.house, ruleset: q.ruleset });
 
   const listings = shown.some((b) => b.row.listings !== null);
   const columns: Column<BrowseRow>[] = [
@@ -190,6 +208,10 @@ export async function browseView({ slug, search }: { slug: string | null; search
   let body;
   if (!state) {
     body = <Card><p className="text-fg-2" role="status">Market values are unavailable right now. They are unrecorded, not zero.</p></Card>;
+  } else if (rows.length === 0 && ruleset && !mapped.has(ruleset)) {
+    body = <EmptyState message={`${AFTER_LAUNCH.has(ruleset) ? `${rulesetName} opens after launch, and n` : "N"}o realm is mapped to ${rulesetName} yet. Blizzard names Forever's realms at launch; until each is mapped to its ruleset, every realm's prices are under All.`} />;
+  } else if (rows.length === 0 && ruleset) {
+    body = <EmptyState message={`No public prices on ${rulesetName} realms${q.house ? ` in the ${q.house} auction house` : ""} yet: a price shows once 3 players scan the same item on one of them.`} />;
   } else if (rows.length === 0) {
     const where = `${q.house ? `the ${q.house} auction house on ` : ""}${realmName ?? (q.house ? "any realm" : "")}`;
     body = slug
@@ -230,11 +252,25 @@ export async function browseView({ slug, search }: { slug: string | null; search
               // With no prices to show, the time says when the rollup was last read, not that anything changed.
               updated !== null ? <>{rows.length ? "Updated" : "Checked"} <TimeAgo at={updated} renderedAt={now.getTime()} /></> : "Update time unrecorded",
               ...(slug && board ? [`${count(board.reporters, "reporter")} this week`] : []),
-              ...(!slug && realmWide.length ? [count(realmWide.length, "realm")] : []),
+              ...(!slug && realmsHere.length ? [count(realmsHere.length, "realm")] : []),
             ]} />
           )}
           aside={strip}
         />
+        {!slug && state && (
+          <>
+            <LinkTabs
+              label="Ruleset"
+              tabs={[{ href: here({ ruleset: undefined }), label: <>All<span className="sr-only"> rulesets</span></>, current: !ruleset }, ...rulesetTabs]}
+              aside={laterRulesets.length ? <span>{laterRulesets.map((r) => RULESET_LABEL[r]).join(", ")}: after launch</span> : undefined}
+            />
+            {summaryRows.length > 0 && (
+              <div className="mt-3 mb-4">
+                <RulesetSummaryTable rows={summaryRows} now={now} names={moveNames} href={(r) => here({ ruleset: r })} />
+              </div>
+            )}
+          </>
+        )}
         <LinkTabs label="Auction house" tabs={houseTabs} />
         <div className="mt-3 grid gap-4 lg:grid-cols-[13rem_minmax(0,1fr)]">
           <aside aria-label="Browse" className="min-w-0 space-y-3">

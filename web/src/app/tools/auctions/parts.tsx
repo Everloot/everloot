@@ -2,7 +2,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import ItemTip from "@/components/game/ItemTip";
 import { Card, Contribute as ContributeCard, DataTable, EmptyState, QUALITY_LABEL, QUALITY_TEXT, qualityOf as qualityToken, type Column, type Quality } from "@/components/ui";
-import { SPARK_BOX, itemHref, itemLabel, money, sparkline, type ItemNames, type MarketRow } from "@/lib/auction-house";
+import { SPARK_BOX, itemHref, itemLabel, money, percent, sparkline, type ItemNames, type MarketRow, type RulesetSummary } from "@/lib/auction-house";
+import { RULESET_LABEL, isRulesetSlug, type RulesetSlug } from "@/lib/realms";
 import { HISTORY_DAYS, formatCopper, type PublicDay } from "../../../../../kb/src/market";
 import type { ItemTip as Tip } from "./art";
 import { categoryRow } from "./browse";
@@ -53,6 +54,42 @@ export function HousePrices({ rows, caption, now }: { rows: MarketRow[]; caption
     { key: "updated", header: "Updated", numeric: true, cell: (r) => (r.updatedAt !== null ? <TimeAgo at={r.updatedAt} renderedAt={now.getTime()} /> : r.value.day) },
   ];
   return <DataTable dense caption={caption} columns={columns} rows={rows} rowKey={(r) => r.house ?? "all"} />;
+}
+
+/**
+ * One line per ruleset: realms, items priced, the last scan and the week's biggest moves, across every house. A
+ * ruleset with nothing says why: no realm is mapped to it yet, or its realms have no public prices yet.
+ */
+export function RulesetSummaryTable({ rows, now, names, href }: { rows: RulesetSummary[]; now: Date; names: ItemNames; href: (r: RulesetSlug) => string }) {
+  const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
+  const columns: Column<RulesetSummary>[] = [
+    {
+      key: "ruleset", header: "Ruleset", nowrap: true,
+      cell: (r) => (isRulesetSlug(r.ruleset) ? <Link href={href(r.ruleset)} className={link}>{RULESET_LABEL[r.ruleset]}</Link> : <span className="text-fg-2">Realms not mapped yet</span>),
+    },
+    { key: "realms", header: "Realms", numeric: true, cell: (r) => r.realms.toLocaleString("en-US") },
+    { key: "items", header: "Items priced", numeric: true, cell: (r) => r.items.toLocaleString("en-US") },
+    {
+      key: "updated", header: "Last scan", nowrap: true,
+      cell: (r) => (!r.mapped ? <span className="text-muted">Not mapped yet</span>
+        : !r.items ? <span className="text-muted">No scans yet</span>
+        : r.updatedAt !== null ? <TimeAgo at={r.updatedAt} renderedAt={now.getTime()} /> : <span className="text-muted">Over a week ago</span>),
+    },
+    {
+      key: "moves", header: "Biggest moves, 7 days",
+      cell: (r) => (r.moves.length ? (
+        <span className="flex flex-wrap gap-x-3">
+          {r.moves.map((m) => (
+            <span key={`${m.row.realm.key}:${m.row.value.itemId}`}>
+              <Link href={itemHref(m.row.realm, m.row.value.itemId)} className={link}>{itemLabel(m.row.value.itemId, names)}</Link>{" "}
+              <span className={m.change > 0 ? "text-accent" : "text-fg"}>{percent(m.change)}</span>
+            </span>
+          ))}
+        </span>
+      ) : <span className="text-muted">—</span>),
+    },
+  ];
+  return <DataTable dense caption="Auction House by ruleset, all houses" columns={columns} rows={rows} rowKey={(r) => r.ruleset} />;
 }
 
 /** Contributing is the one way a realm gets prices: run a scan, upload it. */
