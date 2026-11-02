@@ -116,6 +116,9 @@ export default async function GuildPage(props: Params) {
 
           <section aria-labelledby="roster" className="space-y-3">
             <SectionHeading id="roster" note={members.length > 0 ? `${number(members.length)} listed` : undefined}>Members</SectionHeading>
+            {board && loaded.namesWithheld && (
+              <p className="text-sm text-fg-2">The officers&apos; roster is not shown right now: it could not be checked against the characters who asked to be hidden.</p>
+            )}
             {members.length > 0 && (
               <>
                 <p className="text-sm text-fg-2">
