@@ -129,3 +129,91 @@ describe("no public row", () => {
     expect((await card(squareCard)).status).toBe(503);
   });
 });
+
+describe("planned builds (S4)", () => {
+  /** What public_character_builds returns, plus fields it never sends, which must not reach the page anyway. */
+  const BUILDS = [
+    { name: "Levelling enh", slug: "Shared02", updated_at: "2026-10-31T09:00:00+00:00", notes: "my private note", code: "EL1-shaman-0-1.60.1.70450-MTE6NQ" },
+    { name: "Raid resto", slug: "Shared01", updated_at: "2026-10-29T09:00:00+00:00" },
+  ];
+  const BUILDS_RPC = "rpc/public_character_builds";
+  const answer = (builds: unknown) => auth.authQuery.mockImplementation(async (path: string) => {
+    if (path === "rpc/public_character") return [ROW];
+    if (path === BUILDS_RPC) {
+      if (builds instanceof Error) throw builds;
+      return builds;
+    }
+    throw new Error(`unexpected ${path}`);
+  });
+  const askedForBuilds = () => auth.authQuery.mock.calls.some(([path]) => path === BUILDS_RPC);
+  const on = () => { vi.stubEnv("EVERLOOT_SHOWCASE_BUILDS", "1"); vi.stubEnv("EVERLOOT_SAVED_BUILDS", "1"); };
+
+  test("with the switch off, or saved builds off, nothing asks for builds and the page has no talents section", async () => {
+    answer(BUILDS);
+    for (const [builds, saved] of [["", "1"], ["0", "1"], ["true", "1"], ["1", ""], ["1", "0"]]) {
+      vi.stubEnv("EVERLOOT_SHOWCASE_BUILDS", builds);
+      vi.stubEnv("EVERLOOT_SAVED_BUILDS", saved);
+      const html = await render();
+      expect(html).toContain("Thrallina");
+      expect(html).not.toContain('data-section="talents"');
+      expect(html).not.toContain("/b/");
+    }
+    expect(askedForBuilds()).toBe(false);
+  });
+
+  test("with the showcase off, the builds switch alone shows nothing and reads nothing", async () => {
+    on();
+    vi.stubEnv("EVERLOOT_SHOWCASE", "0");
+    answer(BUILDS);
+    await expect(Page(props())).rejects.toThrow("NEXT_NOT_FOUND");
+    expect(auth.authQuery).not.toHaveBeenCalled();
+  });
+
+  test("on, the page lists the attached label's shared builds as a plan, with links and nothing else about them", async () => {
+    on();
+    answer(BUILDS);
+    const html = await render();
+    expect(JSON.parse(auth.authQuery.mock.calls.find(([path]) => path === BUILDS_RPC)![1].body))
+      .toEqual({ p_ruleset: "forever", p_realm_slug: "Forever Pioneer", p_name: "Thrallina" });
+    expect(html).toContain('data-section="talents"');
+    expect(html).toContain("Planned builds");
+    expect(html).toContain("A plan, not a record of play.");
+    expect(html).toContain('href="/b/Shared02"');
+    expect(html).toContain('href="/b/Shared01"');
+    expect(html.indexOf("Levelling enh")).toBeLessThan(html.indexOf("Raid resto"));
+    // Dated by the newest build; no in-game tree table or calculator link, since nothing was synced from the game.
+    expect(html).toContain("2026-10-31");
+    expect(html).not.toContain("Points per tree");
+    expect(html).not.toContain("/tools/talents/");
+    for (const secret of ["my private note", "EL1-", USER_ID, "Thrall#1234"]) expect(html).not.toContain(secret);
+    expect(html).not.toMatch(/verified|owner|proven|✓/i);
+  });
+
+  test("a hidden, opted-out, frozen or private character is a 404 and its builds are never asked for", async () => {
+    on();
+    // public_character answers no row for each of these (supabase/tests/character_links.sql), and
+    // public_character_builds none either (supabase/tests/build_label_links.sql).
+    auth.authQuery.mockImplementation(async (path: string) => (path === BUILDS_RPC ? BUILDS : []));
+    await expect(Page(props())).rejects.toThrow("NEXT_NOT_FOUND");
+    expect(askedForBuilds()).toBe(false);
+  });
+
+  test("no builds, a malformed row or a failed read leave the talents section out and keep the page", async () => {
+    on();
+    for (const builds of [[], [{ name: "Bad", slug: "../x", updated_at: "2026-10-31" }, { name: "No date", slug: "Shared03" }], new Error("down")]) {
+      answer(builds);
+      const html = await render();
+      expect(html).toContain("Thrallina");
+      expect(html).not.toContain('data-section="talents"');
+      expect(html).not.toContain("/b/");
+    }
+  });
+
+  test("the cards never ask for builds", async () => {
+    on();
+    answer(BUILDS);
+    expect((await card(wideCard)).status).toBe(200);
+    expect((await card(squareCard)).status).toBe(200);
+    expect(askedForBuilds()).toBe(false);
+  });
+});

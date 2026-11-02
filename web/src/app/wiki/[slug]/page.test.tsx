@@ -10,6 +10,8 @@ vi.mock("next/link", () => ({
   ),
 }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NOT_FOUND"); }, usePathname: () => "/" }));
+const caching = vi.hoisted(() => ({ noStore: vi.fn() }));
+vi.mock("next/cache", async (original) => ({ ...(await original<typeof import("next/cache")>()), unstable_noStore: caching.noStore }));
 
 // Three installs agree on an item name and an NPC name; the quest has no title anywhere, so it reads "Quest 166".
 const agree = <T,>(row: (installId: string) => T) => ["a", "b", "c"].map(row);
@@ -17,15 +19,16 @@ const facts = vi.hoisted(() => ({ rates: [] as unknown[], names: [] as unknown[]
 const world = vi.hoisted(() => ({ npcs: [] as unknown[], quests: [] as unknown[], vendors: [] as unknown[], unreachable: false }));
 // Nobody has zoned into a dungeon or reported a boss unless a test says so.
 const instances = vi.hoisted(() => ({ entrances: [] as unknown[], encounters: [] as unknown[], sightings: [] as unknown[], unreachable: false, dataAsOf: null as string | null }));
-vi.mock("@/lib/rollup-compute", () => ({ loadItemFacts: async () => facts, loadWorldFacts: async () => world, loadInstanceFacts: async () => instances }));
+vi.mock("@/lib/rollup-compute", () => ({ loadItemFacts: async () => facts, loadWorldFacts: async () => world, loadInstanceFacts: async () => instances, computeRollups: async () => ({ stats: { unreachable: false, dataAsOf: "2026-10-22T01:30:27.923Z" } }) }));
 facts.names = agree((installId) => ({ installId, itemId: 2589, name: "Linen Cloth" }));
 world.npcs = agree((installId) => ({ installId, npcId: 639, name: "Edwin VanCleef", mapId: 1436, x: 40, y: 70, positionKind: "npc" }));
 
 const FIXTURES = fileURLToPath(new URL("../../../test/wiki", import.meta.url));
-beforeEach(() => { vi.stubEnv("WIKI_DIR", FIXTURES); });
+beforeEach(() => { vi.stubEnv("WIKI_DIR", FIXTURES); caching.noStore.mockClear(); });
 afterEach(() => {
   vi.unstubAllEnvs();
   Object.assign(instances, { entrances: [], encounters: [], unreachable: false, dataAsOf: null });
+  world.unreachable = false;
 });
 
 const params = (slug: string) => ({ params: Promise.resolve({ slug }) });
@@ -35,6 +38,19 @@ const render = async (slug: string) => {
 };
 /** The markup of one `<section>`, by the id of its heading. */
 const section = (html: string, id: string) => new RegExp(`<section[^>]*aria-labelledby="${id}"[^>]*>[\\s\\S]*?</section>`).exec(html)?.[0] ?? "";
+
+test.each(["instances", "world"] as const)("unavailable %s data is not cached as an empty dungeon response, and a healthy read recovers", async (layer) => {
+  const storage = layer === "instances" ? instances : world;
+  storage.unreachable = true;
+  expect(await render("test-dungeon")).toContain("Player reports are unavailable");
+  expect(caching.noStore).toHaveBeenCalled();
+  storage.unreachable = false;
+  caching.noStore.mockClear();
+  const recovered = await render("test-dungeon");
+  expect(recovered).toContain('aria-labelledby="recorded-loot"');
+  expect(recovered).not.toContain("Player reports are unavailable");
+  expect(caching.noStore).not.toHaveBeenCalled();
+});
 
 test("a published page that meets the bar is indexed, with a self canonical and a title under 60 characters", async () => {
   const { generateMetadata } = await import("./page");
@@ -154,7 +170,8 @@ test("a published dungeon page shows the game files' level and entrance marked u
   expect(glance).toMatch(/<dt[^>]*>Level<\/dt><dd[^>]*>16 <span data-badge="files"/);
   expect(glance).not.toMatch(/16\s*[–-]/);
   expect(glance).toMatch(/<dt[^>]*>Entrance<\/dt><dd[^>]*>[\s\S]*href="\/database\/zones\/1436-westfall"[^>]*>Westfall<\/a>[\s\S]*href="\/map\?zone=1436&amp;x=38.2&amp;y=77.5"[^>]*>38.2, 77.5<\/a>[\s\S]*data-badge="files"/);
-  expect(glance.match(/data-badge="files"/g)).toHaveLength(2);
+  expect(glance).toContain("Difficulties in the files");
+  expect(glance).toContain("up to 5 players");
   expect(glance).toContain('<a href="/database/instances/36-deadmines"');
   // The facts link the database and the map, never another wiki page, so no draft can surface through them.
   expect(glance).not.toContain('href="/wiki/');
@@ -166,7 +183,7 @@ test("players' reports keep their evidence: the entrance and each boss 3 install
     entrances: ["a", "b", "c"].map((installId, n) => ({ installId, instanceMapId: 36, name: "Deadmines", instanceType: "party", mapId: 1436, x: 38, y: 77, capturedAt: `2026-10-${17 + n}T10:00:00Z` })),
     encounters: [
       ...["a", "b", "c", "a"].map((installId, n) => ({ installId, encounterId: 1, name: "Edwin VanCleef", instanceMapId: 36, success: true, npcIds: [639], capturedAt: `2026-10-${18 + n}T11:00:00Z` })),
-      ...["a", "b"].map((installId) => ({ installId, encounterId: 2, name: "Rhahk'Zor", instanceMapId: 36, success: true, npcIds: [644], capturedAt: "2026-10-20T11:00:00Z" })),
+      ...["a", "b"].map((installId) => ({ installId, encounterId: 2, name: "Not-yet-public name", instanceMapId: 36, success: true, npcIds: [644], capturedAt: "2026-10-20T11:00:00Z" })),
     ],
   });
   const html = await render("test-dungeon");
@@ -174,12 +191,13 @@ test("players' reports keep their evidence: the entrance and each boss 3 install
   const bosses = section(html, "bosses");
   expect(bosses).toContain(">Bosses</h2>");
   expect(bosses).toContain("Edwin VanCleef (4 kills) from 3 installs, last seen 2026-10-21");
-  expect(html).not.toContain("Rhahk");
+  expect(html).not.toContain("Not-yet-public name");
 });
 
-test("relations nobody has reported are left out: no boss section, no quest or loot list, no zero and no later-update placeholder", async () => {
+test("without reports, file-only bosses are unconfirmed and no quest, loot or kill totals are invented", async () => {
   const html = await render("test-dungeon");
-  expect(html).not.toContain('aria-labelledby="bosses"');
+  expect(section(html, "bosses")).toContain('data-badge="files"');
+  expect(section(html, "bosses")).not.toContain("last seen");
   expect(html).not.toContain("Confirmed entrance");
   expect(html).not.toMatch(/Quests that send you here|Loot by boss|From the database/);
   expect(html).not.toMatch(/\b0 (?:bosses|installs|kills)\b/);
@@ -194,7 +212,8 @@ test("with storage down, the game files' facts stay and the page says players' r
   expect(glance).toContain("Storage unreachable. These figures are unrecorded, not zero. Players&#x27; reports cannot be shown until it is back; what is here is from the game files.");
   expect(glance).toMatch(/>Level<\/dt><dd[^>]*>16 /);
   expect(glance).toContain(">Westfall</a>");
-  expect(html).not.toContain('aria-labelledby="bosses"');
+  expect(section(html, "bosses")).toContain('data-badge="files"');
+  expect(section(html, "bosses")).not.toContain("last seen");
   expect(html).not.toContain("data-wiki-placeholder");
 });
 
@@ -214,7 +233,7 @@ test("a raid page shows the same facts, and a level the game files do not give h
   const glance = section(html, "at-a-glance");
   expect(glance).not.toContain(">Level</dt>");
   expect(glance).toMatch(/<dt[^>]*>Entrance<\/dt><dd[^>]*>[\s\S]*>Dustwallow Marsh<\/a>/);
-  expect(glance.match(/data-badge="files"/g)).toHaveLength(1);
+  expect(glance).toContain("Difficulties in the files");
   expect(glance).toContain('<a href="/database/instances/249-onyxia-s-lair"');
   expect(html).not.toContain("data-wiki-placeholder");
 });

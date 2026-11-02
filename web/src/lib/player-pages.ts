@@ -27,8 +27,9 @@ export function playerIndexingOn(env: Record<string, string | undefined> = proce
 }
 
 /**
- * The ruleset a realm belongs to. Forever's realm names are not confirmed (census design §6, step 4), so every
- * realm is "forever" until the launch-day check says how realms map to rulesets and regions.
+ * The ruleset in a player's, guild member's or character link's address. Every realm is "forever" here, even
+ * once the realm map (./realms.ts) lists it: the stored rows are keyed on the ruleset, so moving a realm to its
+ * ruleset needs a migration of those rows first. The map groups Auction House prices only (`realmRuleset`).
  */
 export const DEFAULT_RULESET = "forever";
 export function rulesetOf(_realm: string): string {

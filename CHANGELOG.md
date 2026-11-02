@@ -333,6 +333,26 @@ Live-client verification is pending. This is a pre-release for WoW: Forever 1.60
   the census box ticked on its setup screen, or turns it on in Settings; a setup finished before this keeps
   it off. Still never names, guilds, gear or places, and the site shows only totals.
 
+## [desktop-v0.1.15] - 2026-11-02
+
+### Added
+- Desktop App: Settings has a "Data on this computer" section. It shows how much space the app's data folder takes
+  and what uses it (backups, update downloads, chat, upload history, settings and keys), says what goes to
+  everloot.app and what stays on your computer, and opens the folder. "Delete my local data" asks first, then empties
+  the folder, which the command-line tool uses too, and starts the app over on its setup screen. Your game folder and
+  `Everloot.lua` are not touched. The Overview tells you once if the folder passes 500 MB.
+
+### Changed
+- Desktop App: Restart to update asks in the app's own dialog instead of a Windows message box, and names the job it
+  waits for. While an update downloads, the sidebar and the update panel show a progress bar with the percentage.
+- Desktop App: your save file is read on a background thread, so logging out on a large save no longer freezes the
+  app. The longest pause on a 14 MB test save went from about 300 ms to about 100 ms. If the background reader cannot
+  start, the app reads the file as before and says so once on the Log page.
+- Desktop App: the Upload page no longer reads each save file four more times after every write (about 1 s on a large
+  save). It shows the same counts and errors as before.
+- Desktop App: upload history keeps only the events still in each account's `Everloot.lua`, and cached lists not
+  refreshed for a week are deleted, so the data folder stops growing the longer you play.
+
 ## [desktop-v0.1.14] - 2026-11-02
 
 ### Changed
