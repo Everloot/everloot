@@ -3,6 +3,7 @@ import AdSlot from "@/components/AdSlot";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { hasCard } from "@/lib/tooltip";
 import { npcPage, npcTraits, type NpcPin, type NpcRank } from "../../../../../../kb/src/world-pages";
 import { pendingForNpc, pendingLine } from "../../../../../../kb/src/pending-loot";
 import { npcLootTable } from "../../../../../../kb/src/loot-tables";
@@ -158,7 +159,7 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
         <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
         <OpenData
           text={[`${title} (npc ${npcId})`, ...summary, `Source: https://everloot.app/database/npcs/${npcId}`].join("\n")}
-          jsonHref={`/api/tooltip/npc/${npcId}`}
+          jsonHref={!facts.unreachable && hasCard.npc(page) ? `/api/tooltip/npc/${npcId}` : undefined}
         />
         <Tabs
           label={`${title}: relations`}

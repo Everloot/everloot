@@ -3,6 +3,7 @@ import AdSlot from "@/components/AdSlot";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { hasCard } from "@/lib/tooltip";
 import { npcPage, questPage } from "../../../../../../kb/src/world-pages";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { pinLink } from "@/lib/world-map";
@@ -130,7 +131,7 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
         <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
         <OpenData
           text={[`${title} (quest ${page.questId})`, ...summary, `Source: https://everloot.app/database/quests/${page.questId}`].join("\n")}
-          jsonHref={`/api/tooltip/quest/${page.questId}`}
+          jsonHref={!facts.unreachable && hasCard.quest(page) ? `/api/tooltip/quest/${page.questId}` : undefined}
         />
         <Tabs
           label={`${title}: relations`}
