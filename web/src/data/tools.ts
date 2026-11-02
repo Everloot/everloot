@@ -156,6 +156,7 @@ export const TOOL_GROUPS: { title: string; links: { label: string; href: string 
     title: "Look up",
     links: [
       { label: "Chat", href: "/chat" },
+      { label: "Legacy perks", href: "/tools/legacy" },
       { label: "Auction House", href: "/tools/auctions" },
       { label: "Census", href: "/census" },
       { label: "Rankings", href: "/rankings" },
@@ -182,6 +183,7 @@ export const TOOL_LINES: Record<string, string> = {
   "/tools/professions": "Skill-up paths and recipe ranges for each profession, from recipes and prices players uploaded.",
   "/tools/farming-routes": "Farming areas by what you farm, filled in from what players upload.",
   "/chat": "Ask a question in plain words. Your own AI model looks it up in Everloot's data and names the sources.",
+  "/tools/legacy": "WoW: Forever's Legacy perk trees as the game files hold them: ids, ranks, prerequisites and spend gates, unconfirmed.",
   "/tools/auctions": "Auction House prices by realm, from player scans. A price shows once 3 reporters agree.",
   "/census": "Races, classes and levels, counted from players who turned the census on.",
   "/rankings": "WoW: Forever week by week, from players who turned the census on.",
