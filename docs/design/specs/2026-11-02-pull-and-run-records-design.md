@@ -155,7 +155,11 @@ On the server:
   the owner adds by hand). Both sides compare `link_realm_key` of the realm, never the realm as stored: a verified
   owner's opt-out keeps it only lower-cased (`forever-pioneer`), and a later upload spelling it `Forever Pioneer` must
   still leave the character out. Every member is stored with a realm (the row's when the member has none), and a row
-  without one is refused, so a hide always finds it.
+  without one is refused, so a hide always finds it. An upload and a hide of the same character at the same moment
+  cannot pass each other (each unable to see the other's uncommitted row, leaving the hidden character stored): both
+  take the character's transaction lock (`pull_member_lock`, one of 64 buckets; an upload takes its buckets in
+  ascending order) before they check or delete, and `web/src/lib/pull-store.pg.test.ts` runs that race on two
+  connections against real Postgres.
 - **Retention.** One year after the site received the pull (`prune_pull_summaries`, run by the snapshot cron on every
   run, whether or not the switch below is on, so turning collection off never keeps what was collected). Before the
   migration PostgREST has no such function (PGRST202) and the cron treats that as nothing to prune. A row dated more
@@ -169,12 +173,15 @@ On the server:
   unknown kinds, so an upload gets the same receipt and stores the same rows as on `main` before this change
   (`packages/protocol/test/fixtures/run-records-off.main.json` is that answer, from `main`'s own build). On, every
   intake receipt carries `runRecords: true`.
-- **Uploaders hold what the site does not read.** The Desktop App and the command-line uploader keep the site's last
-  answer for a batch that carried `instance_run` or `pull_summary` rows in `site-collects.json` beside `sent.json`.
-  They send those rows when the site has not answered yet, when it last said `runRecords: true`, or a day after it
-  last said nothing; otherwise the rows stay in the file, not marked sent, and the run says how many wait. So a site
-  with the switch off is asked at most once a day, and the file is written only once such a row exists. The Desktop
-  App's settings describe boss pulls only once the site has said it reads them.
+- **Uploaders hold what the site does not read.** The upload page reads a file the way the site will (`prepareUpload`
+  with `{ runRecords }` from the switch), so with it off the preview and the batches are `main`'s: a run or a pull is
+  an invalid row there, and an encounter loses its timing fields. The Desktop App and the command-line uploader learn
+  the site's answer from every receipt (`runRecords: true`, or nothing) and keep the last one in `site-collects.json`
+  beside `sent.json`, written only for a file that has `instance_run` or `pull_summary` rows. They send those rows
+  only once that answer is yes; until then the rows stay in the file, not marked sent, the run says how many wait, and
+  the file is prepared as the site with the switch off reads it. So a site with the switch off is never sent them, and
+  a site that turns it on gets them from the run after the next upload. The Desktop App's settings describe boss pulls
+  only once the site has said it reads them.
 
 The data policy (`docs/DATA_POLICY.md`, "Boss pulls and runs" and "Group numbers in boss pulls") says this, and the
 upload page's preview says what the rows hold, how to stop them, that the site keeps them privately for a year and
@@ -226,7 +233,8 @@ pull request adds it there as the item `#boss-pulls`, shown only while `EVERLOOT
   of every row.
 - `packages/protocol`: the three changes above, `PULL_KINDS`, rules, tests; `dist/` and `schema/` regenerated.
 - `supabase/migrations/20261102130000_pull_summaries.sql` and `supabase/tests/pull_summaries.sql`: the pull tables,
-  insert, forget, the hide trigger and retention.
+  insert, forget, the hide trigger, the lock they share and retention; `web/src/lib/pull-store.pg.test.ts`, the
+  upload-against-hide race on real Postgres (`PULL_TEST_DATABASE_URL`).
 - `web`: `lib/pull-summaries.ts` (switch, checks) and `lib/pull-store.ts` (Supabase, and a memory store with the same
   rules); with the switch on, intake writes pull rows there and stores timing and runs with the upload, and with it off
   answers as `main` did; the hide form deletes from the pulls; the snapshot cron prunes them, switch or not; the upload

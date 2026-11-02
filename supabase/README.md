@@ -36,6 +36,9 @@ any other host or database name. The accounts script drops and recreates the `pu
 made before `20261022120000_api_key_expiry.sql` keep working, that an expired key is refused, and that a
 rolled key keeps its settings. `web/scripts/chat-workspace.integration.mjs` does the same for the private Chat
 workspace (`docs/2026-10-25-chat-workspace-activation.md`).
+`web/src/lib/pull-store.pg.test.ts` races an upload of pull summaries against a hide of the same character on two
+connections, after applying every migration to a disposable local Postgres named `pull_summaries_test`, set in
+`PULL_TEST_DATABASE_URL`; without it the test is skipped.
 
 ## Where things live
 

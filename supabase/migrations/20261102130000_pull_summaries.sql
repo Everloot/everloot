@@ -1,5 +1,5 @@
 -- Pull summaries: each group member's damage meter totals for one boss pull, as the uploader's addon recorded them
--- (docs/design/specs/2026-11-02-pull-and-run-records-design.md). Additive: two new tables, three functions and one
+-- (docs/design/specs/2026-11-02-pull-and-run-records-design.md). Additive: two new tables, five functions and one
 -- trigger. Apply before setting EVERLOOT_PULL_SUMMARIES=1; until then the site never calls anything here and drops
 -- every pull_summary row at intake.
 --
@@ -10,6 +10,15 @@
 -- character deletes its member rows, whichever form recorded the hide (the trigger below). A pull left with no
 -- member is deleted with its last one. Every pull is deleted a year after it was received. Nothing reads these
 -- tables for a page yet.
+--
+-- A write and a hide of the same character never pass each other. Without a lock, an upload could check for a hide,
+-- find none and add the member while a hide recorded at the same moment found no member to delete; both commit and
+-- the hidden character stays. So both take the same transaction lock for the character first (pull_member_lock
+-- below) and check or delete only after it, in a later statement, which under READ COMMITTED, Supabase's default,
+-- sees what the other committed. The lock is one of 64 buckets per character, so an upload holds at most 64 locks
+-- whatever it names; an upload takes its buckets in ascending order, so two uploads cannot deadlock. A transaction that
+-- records several hides of characters that are also being uploaded can still deadlock with that upload; Postgres
+-- then cancels one of the two, and the upload is retried or the hide reported as failed, never half done.
 
 create table if not exists public.pull_summaries (
   id bigint generated always as identity primary key,
@@ -37,6 +46,15 @@ create index if not exists pull_members_character on public.pull_members (realm_
 alter table public.pull_members enable row level security;
 revoke all on public.pull_members from public, anon, authenticated, service_role;
 
+-- 0. The lock a write and a hide share for one character: its bucket, keyed the way pull_members keys the character.
+create or replace function public.pull_member_lock(p_realm text, p_name text)
+returns integer
+language sql immutable set search_path = ''
+as $$
+  select abs(hashtext(public.link_realm_key(p_realm) || '/' || lower(btrim(p_name))) % 64);
+$$;
+revoke all on function public.pull_member_lock(text, text) from public, anon, authenticated;
+
 -- 1. Write: the pull rows of one upload, as jsonb [{installId, eventId, capturedAt, summary, members: [{name, realm,
 -- ...}]}], every member's realm filled in by the site. A hidden character is skipped; a pull with no member left is
 -- not written. A pull already stored (same install and event) is left as it is. The caller has validated every
@@ -48,11 +66,21 @@ as $$
 declare
   r jsonb;
   pull bigint;
+  bucket integer;
   written integer := 0;
 begin
   if p_rows is null or jsonb_typeof(p_rows) <> 'array' or jsonb_array_length(p_rows) > 2000 then
     raise exception 'Invalid pull batch';
   end if;
+  -- Every member's lock before any check (see the top of this file), in ascending order.
+  for bucket in
+    select distinct public.pull_member_lock(m->>'realm', m->>'name')
+    from jsonb_array_elements(p_rows) x, jsonb_array_elements(x.value->'members') m
+    where jsonb_typeof(x.value->'members') = 'array'
+    order by 1
+  loop
+    perform pg_advisory_xact_lock(hashtext('public.pull_members'), bucket);
+  end loop;
   for r in select value from jsonb_array_elements(p_rows) loop
     if jsonb_typeof(r->'members') <> 'array' then raise exception 'Invalid pull batch'; end if;
     pull := null;
@@ -92,6 +120,8 @@ declare
   touched bigint[];
 begin
   if p_realm is null or p_name is null then raise exception 'Invalid character'; end if;
+  -- The lock an upload of this character takes; the delete below runs after it, so it sees that upload's members.
+  perform pg_advisory_xact_lock(hashtext('public.pull_members'), public.pull_member_lock(p_realm, p_name));
   with gone as (
     delete from public.pull_members
     where realm_key = public.link_realm_key(p_realm) and name_key = lower(btrim(p_name))
@@ -146,6 +176,7 @@ notify pgrst, 'reload schema';
 --   drop function if exists public.prune_pull_summaries();
 --   drop function if exists public.forget_pull_member(text, text);
 --   drop function if exists public.insert_pull_summaries(jsonb);
+--   drop function if exists public.pull_member_lock(text, text);
 --   drop table if exists public.pull_members;
 --   drop table if exists public.pull_summaries;
 --   notify pgrst, 'reload schema';

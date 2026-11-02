@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { recordSchemas } from "@everloot/protocol";
 import { expect, test, vi } from "vitest";
 import { censusCharacters, censusSummary, prepareUpload, sendBatches } from "./upload-batches";
@@ -192,4 +193,22 @@ test("skip leaves settled rows out of the batches and returns their event ids; n
   expect(session.counts).toEqual({ npc_sighting: 1, loot: 1 });
   expect(session.held.legacy).toBe(1);
   expect(prepareUpload({ addonVersion: "0.2.6", records }, {}, []).skipped).toEqual([]);
+});
+
+// The rows and main's answer for them (packages/protocol/test/fixtures): `run-records-off.main.json` is what main's own
+// build parsed. With the site's pull switch off, the preview and its batches must hold exactly main's rows.
+const fixture = (name: string) => JSON.parse(readFileSync(new URL(`../../../packages/protocol/test/fixtures/${name}`, import.meta.url), "utf8"));
+test("with the pull switch off, the preview reads a file as main does: same rows sent, same rows held", () => {
+  const inputs = fixture("run-records-off.inputs.json") as unknown[];
+  const main = fixture("run-records-off.main.json") as { records: { records: unknown[]; receipt: { rejected: unknown[] } } };
+  for (const session of [prepareUpload({ addonVersion: "0.3.15", records: inputs }, {}, []),
+    prepareUpload({ addonVersion: "0.3.15", records: inputs }, {}, [], undefined, undefined, { runRecords: false })]) {
+    expect(session.batches.flatMap((b) => JSON.parse(b).records)).toEqual(main.records.records);
+    expect(session.counts).toEqual({ encounter: 4, loot: 1 });
+    expect(session.held).toEqual({ legacy: 0, named: 0, invalid: main.records.receipt.rejected.length, links: 0 });
+  }
+  // On, the timing fields are read and checked, and the new kinds counted.
+  const on = prepareUpload({ addonVersion: "0.3.15", records: inputs }, {}, [], undefined, undefined, { runRecords: true });
+  expect(on.counts.encounter).toBe(2);
+  expect(on.counts.instance_run).toBe(1);
 });

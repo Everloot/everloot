@@ -139,8 +139,11 @@ describe("uploading", () => {
     const app = workspace(luaFile([loot(1), pull]));
     const sent = gatedIntake(() => true);
     const appCollects = createSiteCollects(join(app.dir, "state", "site-collects.json"));
-    expect(await uploadFile(app.file, { endpoint: "https://everloot.example", fetch: sent.send, state: app.state, pulls: true, collects: appCollects })).toMatchObject({ sent: 2, invalid: 0 });
-    expect(sent.bodies[0].records.map((r) => r.kind)).toEqual(["loot", "pull_summary"]);
+    const go = () => uploadFile(app.file, { endpoint: "https://everloot.example", fetch: sent.send, state: app.state, pulls: true, collects: appCollects });
+    // The loot's receipt says the site reads them; the next run sends the pull.
+    expect(await go()).toMatchObject({ sent: 1, invalid: 0, heldRuns: 1 });
+    expect(await go()).toMatchObject({ sent: 1, invalid: 0, heldRuns: 0 });
+    expect(sent.bodies.map(kinds)).toEqual([["loot"], ["pull_summary"]]);
   });
 
   test("without a record of what the site reads, runs and pull summaries stay here and nothing new is written", async () => {
@@ -155,32 +158,54 @@ describe("uploading", () => {
     expect(() => readFileSync(join(plain.dir, "state", "site-collects.json"))).toThrow();
   });
 
-  test("a site that does not read runs and pull summaries gets them once, then they wait here, unsent, until it does", async () => {
+  test("runs and pull summaries wait here, unsent, until a receipt for the other rows says the site reads them", async () => {
     vi.useFakeTimers({ now: new Date("2026-11-02T13:00:00Z"), toFake: ["Date"] });
     try {
-      const { dir, file, state } = workspace(luaFile([loot(1), run, pull]));
+      const loots = (n: number) => Array.from({ length: n }, (_, i) => loot(i + 1));
+      const { dir, file, state } = workspace(luaFile([...loots(1), run, pull]));
       const path = join(dir, "state", "site-collects.json");
       let on = false;
       const api = gatedIntake(() => on);
       const go = () => uploadFile(file, { endpoint: "https://everloot.example", fetch: api.send, state, pulls: true, collects: createSiteCollects(path) });
-      // First run: the site has never answered, so they go with the loot; it does not know the kinds.
-      expect(await go()).toMatchObject({ sent: 1, rejected: 2, heldRuns: 0 });
-      expect(kinds(api.bodies[0])).toEqual(["loot", "instance_run", "pull_summary"]);
+      // The site has never answered: the loot goes alone, and its receipt says the site does not read them.
+      expect(await go()).toMatchObject({ sent: 1, rejected: 0, heldRuns: 2 });
       expect(JSON.parse(readFileSync(path, "utf8"))).toEqual({ "https://everloot.example": { collects: false, at: Date.parse("2026-11-02T13:00:00Z") } });
-      // Later runs that day: nothing is sent, and they are not marked sent.
-      expect(await go()).toMatchObject({ sent: 0, batches: 0, heldRuns: 2, rejected: 0 });
-      vi.setSystemTime(new Date("2026-11-03T12:59:00Z"));
-      expect(await go()).toMatchObject({ batches: 0, heldRuns: 2 });
-      expect(api.bodies).toHaveLength(1);
-      // A day on, the site is asked again; now it reads them, they are sent, and the next run has nothing left.
+      // A week of play with a site that keeps saying no: each day's new loot goes, the held rows never do.
+      for (let day = 2; day <= 8; day++) {
+        vi.setSystemTime(new Date(Date.parse("2026-11-02T13:00:00Z") + (day - 1) * 86_400_000));
+        writeFileSync(file, luaFile([...loots(day), run, pull]));
+        expect(await go()).toMatchObject({ sent: 1, rejected: 0, heldRuns: 2 });
+      }
+      expect(await go()).toMatchObject({ sent: 0, batches: 0, heldRuns: 2 });
+      expect(api.bodies.map(kinds)).toEqual(Array.from({ length: 8 }, () => ["loot"]));
+      // The site switches collection on: the next upload's receipt says so, and the run after it sends them.
       on = true;
-      vi.setSystemTime(new Date("2026-11-03T13:00:00Z"));
-      expect(await go()).toMatchObject({ sent: 2, rejected: 0, heldRuns: 0 });
-      expect(kinds(api.bodies[1])).toEqual(["instance_run", "pull_summary"]);
+      writeFileSync(file, luaFile([...loots(9), run, pull]));
+      expect(await go()).toMatchObject({ sent: 1, heldRuns: 2 });
       expect(JSON.parse(readFileSync(path, "utf8"))["https://everloot.example"].collects).toBe(true);
+      expect(await go()).toMatchObject({ sent: 2, rejected: 0, heldRuns: 0 });
+      expect(kinds(api.bodies[9])).toEqual(["instance_run", "pull_summary"]);
       expect(await go()).toMatchObject({ sent: 0, batches: 0, heldRuns: 0 });
-      expect(api.bodies).toHaveLength(2);
+      expect(api.bodies).toHaveLength(10);
     } finally { vi.useRealTimers(); }
+  });
+
+  test("until the site says it reads them, a file is sent as main sent it: the same rows, the same fields", async () => {
+    // The rows and main's parse of them (packages/protocol/test/fixtures), written the way the addon writes a file.
+    const fixture = (name: string) => JSON.parse(readFileSync(new URL(`../../packages/protocol/test/fixtures/${name}`, import.meta.url), "utf8"));
+    const inputs = fixture("run-records-off.inputs.json") as Record<string, unknown>[];
+    const main = fixture("run-records-off.main.json") as { records: { records: unknown[]; receipt: { rejected: unknown[] } } };
+    const lua = (v: unknown): string => Array.isArray(v) ? `{${v.map(lua).join(", ")}}`
+      : v !== null && typeof v === "object" ? `{${Object.entries(v).map(([k, x]) => `["${k}"] = ${lua(x)}`).join(", ")}}`
+      : typeof v === "string" ? JSON.stringify(v) : String(v);
+    const { dir, file, state } = workspace(luaFile(inputs.map(({ kind, ...row }) => ({ kind: String(kind), lua: lua(row).slice(1, -1) })))
+      .replace('["version"] = "0.2.2"', '["version"] = "0.3.15"'));
+    const api = intake();
+    const result = await uploadFile(file, { endpoint: "https://everloot.example", fetch: api.send, state, pulls: true, collects: createSiteCollects(join(dir, "state", "site-collects.json")) });
+    expect(api.bodies.flatMap((b) => b.records)).toEqual(main.records.records);
+    // Main read the run and the pull as unknown kinds; here they wait unsent for a site that reads them.
+    expect(result).toMatchObject({ sent: main.records.records.length, invalid: 1, heldRuns: 2 });
+    expect(result.invalid + result.heldRuns).toBe(main.records.receipt.rejected.length);
   });
 
   test("the census never leaves from here: the upload page counts it first", async () => {

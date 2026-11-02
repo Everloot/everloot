@@ -21,9 +21,10 @@ export interface UploadOptions {
    */
   pulls?: boolean;
   /**
-   * What each site last said about reading runs and pull summaries (`RUN_RECORD_KINDS`). Those rows go only to a site
-   * whose last receipt said `runRecords: true`, or, to learn it, when it has not answered yet or last said no a day or
-   * more ago; otherwise they stay unsent here, not marked sent. Without it they are never sent.
+   * What each site last said about reading pull timing, runs and pull summaries (`RUN_RECORD_KINDS`). Every receipt from a
+   * site with them on says `runRecords: true`, so the answer is learnt from the other rows' batches: the rows go only
+   * once a site's last receipt said so, and until then stay unsent here, not marked sent, and the file is read as that
+   * site reads it, as before them. Without it they are never sent.
    */
   collects?: SiteCollects;
   /**
@@ -49,9 +50,6 @@ const PLAYERS: RecordKind = "player_seen";
 
 /** Pull summaries name everyone in the group: they go from the upload page, or from here only with `pulls`. */
 const PULLS: RecordKind = "pull_summary";
-
-/** A site that said it does not read runs and pull summaries is asked again, by sending them, after a day. */
-const ASK_AGAIN_MS = 86_400_000;
 
 /** An answer past the largest request the intake takes is not a receipt. */
 const MAX_ANSWER_BYTES = UPLOAD_LIMITS.maxBodyBytes;
@@ -186,25 +184,26 @@ export async function uploadFile(file: string, options: UploadOptions): Promise<
   const heldPull = (r: Record<string, unknown>) => !options.pulls && r.kind === PULLS;
   const heldPulls = unsent.filter(heldPull).length;
   const origin = new URL(options.endpoint).origin;
-  const answer = options.collects?.get(origin);
-  const askSite = options.collects !== undefined && (!answer || answer.collects || Date.now() - answer.at >= ASK_AGAIN_MS);
+  const reads = options.collects?.get(origin)?.collects === true;
   const isRun = (r: Record<string, unknown>) => RUN_RECORD_KINDS.includes(String(r.kind));
-  const heldRun = (r: Record<string, unknown>) => !askSite && isRun(r) && !heldPull(r);
+  const heldRun = (r: Record<string, unknown>) => !reads && isRun(r) && !heldPull(r);
   const heldRuns = unsent.filter(heldRun).length;
   const records = unsent.filter((r) => r.kind !== ADDON_LIST && !heldPull(r) && !heldRun(r) && !heldPlayer(r) && !held(r));
   const list = typeof options.settled === "function" ? await options.settled(parsed.clientBuild) : options.settled;
-  const session = prepareUpload({ addonVersion: parsed.version, clientBuild: parsed.clientBuild, records }, {}, [], undefined, settledSkip(list, parsed.clientBuild));
+  const session = prepareUpload({ addonVersion: parsed.version, clientBuild: parsed.clientBuild, records }, {}, [], undefined, settledSkip(list, parsed.clientBuild),
+    { runRecords: reads });
   // A settled row is handled: it is not weighed again next time, whether or not the rest is sent.
   if (session.skipped.length) options.state.add(receiptKey, session.skipped);
   const result = { sent: 0, batches: session.batches.length, skipped: session.skipped.length, heldNamed: session.held.named + heldPulls, heldLegacy: session.held.legacy,
     heldAddons: unsent.length - records.length - heldCensus - heldPlayers - heldPulls - heldRuns, heldCensus, heldPlayers, heldRuns, invalid: session.held.invalid, rejected: 0 };
   if (session.batches.length === 0) return result;
   const send = bounded(options.fetch ?? fetch, new URL(options.endpoint).host, options.timeoutMs ?? 60_000);
-  // A receipt for a batch that carried runs or pull summaries says whether the site reads them; the last one is kept.
+  // Every receipt says whether the site reads runs and pull summaries; the last one is kept, but only for a file that
+  // has them, so an install whose addon never writes them never gets the file.
+  const learning = unsent.some(isRun);
   let said: boolean | undefined;
-  const learn = (batch: number, receipt: BatchReceipt) => {
-    const rows = JSON.parse(session.batches[batch]).records as Record<string, unknown>[];
-    if (rows.some(isRun)) said = (receipt as { runRecords?: unknown }).runRecords === true;
+  const learn = (receipt: BatchReceipt) => {
+    if (learning) said = (receipt as { runRecords?: unknown }).runRecords === true;
   };
   const progress = () => {
     // Only the rows the receipt names as accepted are sent. A rejected row, or an index that names no row, stays
@@ -219,7 +218,7 @@ export async function uploadFile(file: string, options: UploadOptions): Promise<
       .map((a) => (a as { index?: unknown } | null)?.index)
       .filter((i): i is number => Number.isInteger(i) && (i as number) >= 0 && (i as number) < rows.length && !rejected.has(i)));
     options.state.add(receiptKey, [...indices].map((i) => rows[i].eventId));
-    learn(session.next - 1, session.receipts[session.next - 1]);
+    learn(session.receipts[session.next - 1]);
     result.sent += indices.size;
     result.rejected += rows.length - indices.size;
   };
@@ -230,7 +229,7 @@ export async function uploadFile(file: string, options: UploadOptions): Promise<
     for (;;) {
       try { await sendBatches(session, send, progress, intake); break; } catch (err) {
         if (!(err instanceof EveryRowRejected)) throw err;
-        learn(session.next, err.receipt);
+        learn(err.receipt);
         session.receipts.push(err.receipt); session.next++;
         result.rejected += err.receipt.rejected!.length;
       }

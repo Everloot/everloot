@@ -11,12 +11,20 @@ begin
     foreach tbl in array array['public.pull_summaries', 'public.pull_members'] loop
       if has_table_privilege(role_name, tbl, 'SELECT,INSERT,UPDATE,DELETE') then raise exception '% can touch %', role_name, tbl; end if;
     end loop;
-    foreach fn in array array['public.insert_pull_summaries(jsonb)', 'public.forget_pull_member(text, text)', 'public.prune_pull_summaries()'] loop
+    foreach fn in array array['public.insert_pull_summaries(jsonb)', 'public.forget_pull_member(text, text)', 'public.prune_pull_summaries()', 'public.pull_member_lock(text, text)'] loop
       if has_function_privilege(role_name, fn, 'EXECUTE') then raise exception '% can execute %', role_name, fn; end if;
     end loop;
   end loop;
   if not (select relrowsecurity from pg_class where oid = 'public.pull_members'::regclass) then raise exception 'RLS disabled on pull_members'; end if;
   if not has_function_privilege('service_role', 'public.insert_pull_summaries(jsonb)', 'EXECUTE') then raise exception 'server cannot write'; end if;
+end $$;
+
+-- A write and a hide of one character take the same lock, however the realm and name are spelled (the two-connection
+-- race is web/src/lib/pull-store.pg.test.ts).
+do $$
+begin
+  if public.pull_member_lock('Forever-Pioneer', ' Hidden ') <> public.pull_member_lock('forever  pioneer', 'hidden') then raise exception 'spellings lock apart'; end if;
+  if public.pull_member_lock('Forever Pioneer', 'Hidden') not between 0 and 63 then raise exception 'lock outside its buckets'; end if;
 end $$;
 
 -- A character hidden before the upload is never written.

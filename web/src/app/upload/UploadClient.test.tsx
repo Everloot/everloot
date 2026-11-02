@@ -74,7 +74,7 @@ test("an upload with nothing accepted reports rejection and zero saved records",
   expect(container.textContent).not.toContain("batches confirmed");
 });
 
-test("the preview counts boss pulls, says what they hold and how to stop them, and whether the site keeps them", async () => {
+test("the preview counts boss pulls, says what they hold and how to stop them, only where the site keeps them", async () => {
   const pull = { kind: "pull_summary", installId: "upload-ui-pull", eventId: "epoch:1", capturedAt: "2026-11-02T12:00:00Z", encounterId: 1144,
     name: "Rhahk'zor", instanceMapId: 36, success: true, realm: "Forever", members: [{ name: "Thrallina", class: "SHAMAN" }] };
   const text = JSON.stringify({ addonVersion: "0.3.16", records: [pull] });
@@ -85,13 +85,15 @@ test("the preview counts boss pulls, says what they hold and how to stop them, a
     Object.defineProperty(input, "files", { value: [file], configurable: true });
     await act(async () => input.dispatchEvent(new Event("change", { bubbles: true })));
   };
+  // Switch off: the row is read as the site then reads it, an unknown kind, as before boss pulls.
+  await choose();
+  expect(container.textContent).not.toContain("Boss pulls");
+  expect(container.textContent).toContain("and 1 invalid records stay out of this upload");
+  await act(async () => root.render(<UploadClient pullSummaries />));
   await choose();
   expect(container.textContent).toContain("Boss pulls in this upload: 1.");
   expect(container.textContent).toContain("/everloot pulls off");
   expect(container.textContent).toContain("name, realm, class, role and the damage, healing, damage taken and deaths");
-  expect(container.textContent).toContain("Everloot does not collect boss pulls yet, so the server drops these.");
-  await act(async () => root.render(<UploadClient pullSummaries />));
-  await choose();
   expect(container.textContent).toContain("Everloot keeps them privately for a year");
   expect(container.querySelector('a[href="/players/opt-out"]')?.textContent).toBe("hide a character");
 });
