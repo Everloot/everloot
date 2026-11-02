@@ -110,6 +110,8 @@ const SHOWS_ART = new Set([
   "web/src/app/database/vendors/[id]/page.tsx", "web/src/app/database/npcs/[id]/page.tsx", "web/src/app/database/quests/[id]/page.tsx", "web/src/app/changes/page.tsx", "web/src/app/changes/[post]/page.tsx", "web/src/app/lore/page.tsx", "web/src/lib/spell-mentions.ts", "web/src/app/wow-forever/page.tsx", "web/src/app/tools/talents/page.tsx",
   "kb/src/cli.ts", "web/scripts/upload-game-assets.mjs", "web/scripts/game-assets-upload.mjs",
   "web/src/app/database/zones/[zone]/page.tsx",
+  // The dungeon and raid list's small loading screens, and the zone list's small map pictures.
+  "web/src/app/database/instances/page.tsx", "web/src/app/database/zones/page.tsx",
   // The spell page: the spell's icon and its text come from the same manifest as the item's.
   "web/src/app/database/spells/[id]/page.tsx",
   // The spell list reads the spell names to list them, under the quest list's rule. No art, no tooltip.
