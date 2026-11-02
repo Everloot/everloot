@@ -21,13 +21,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   releases; each half is harmless without the other.
 
 ### Added
-- Desktop App: Settings has a "Data on this computer" section. It shows how big the data folder is and what takes the
-  space (backups, update downloads, chat, upload history, settings and keys), says what goes to everloot.app and what
-  stays here, and opens the folder. "Delete my local data" asks in the app's own dialog, then empties the folder the
-  command line shares and starts the app over on its setup screen; the game folder and `Everloot.lua` are not touched.
-  The Overview says once when the folder passes 500 MB. Upload history now keeps only the events still in each
-  account's `Everloot.lua` (all of it while two accounts' files share one install id), and cached settled lists not
-  refreshed for a week are deleted, so neither grows for as long as the game is played.
 - Desktop App and site, behind `EVERLOOT_CHARACTER_LINKS` (off): the addon's `/everloot link <code>` (0.3.15) writes one
   link row for the character you are playing, with a code made on the account page. The Desktop App, signed in, sends it only
   to the account's own link endpoint; uploads never carry link rows. The account page lists your linked characters,
@@ -53,16 +46,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   in and out, this week, categories, receipts and gold history. The published ledgers stay below.
 
 ### Changed
-- Desktop App: Restart to update asks in the app's own dialog instead of a Windows message box, and names the
-  running job it waits for. While the update downloads, its sidebar row and the update panel fill as a progress bar
-  with the percentage.
-- Desktop App: the Upload page reads the save parse the jobs and other pages share, instead of parsing each account
-  file four more times after every write (about 0.8–1.2 s on a large save). It shows the same counts and the same
-  errors the upload would give.
-- Desktop App: the save file is parsed on a background thread, so a logout on a large save no longer freezes the app
-  while it is read: the longest pause per logout on a 14 MB save went from about 300 ms to about 100 ms. The upload,
-  prices and /ask jobs, the pages and the chat read what that thread found. If it cannot start or stops, the app reads
-  the file as before and says so once on the Log page.
 - Site and Desktop App: Ollama suggests one small model, `qwen3:4b` (2.5 GB, calls tools), instead of `qwen3:8b`, and
   says what running a model on your own computer means: private and free, slower, and it uses your memory while it
   answers. The free cloud models stay the first choice.
@@ -349,6 +332,26 @@ Live-client verification is pending. This is a pre-release for WoW: Forever 1.60
   off until `/everloot census on`. The Desktop App sends census rows with its uploads when the player leaves
   the census box ticked on its setup screen, or turns it on in Settings; a setup finished before this keeps
   it off. Still never names, guilds, gear or places, and the site shows only totals.
+
+## [desktop-v0.1.15] - 2026-11-02
+
+### Added
+- Desktop App: Settings has a "Data on this computer" section. It shows how much space the app's data folder takes
+  and what uses it (backups, update downloads, chat, upload history, settings and keys), says what goes to
+  everloot.app and what stays on your computer, and opens the folder. "Delete my local data" asks first, then empties
+  the folder, which the command-line tool uses too, and starts the app over on its setup screen. Your game folder and
+  `Everloot.lua` are not touched. The Overview tells you once if the folder passes 500 MB.
+
+### Changed
+- Desktop App: Restart to update asks in the app's own dialog instead of a Windows message box, and names the job it
+  waits for. While an update downloads, the sidebar and the update panel show a progress bar with the percentage.
+- Desktop App: your save file is read on a background thread, so logging out on a large save no longer freezes the
+  app. The longest pause on a 14 MB test save went from about 300 ms to about 100 ms. If the background reader cannot
+  start, the app reads the file as before and says so once on the Log page.
+- Desktop App: the Upload page no longer reads each save file four more times after every write (about 1 s on a large
+  save). It shows the same counts and errors as before.
+- Desktop App: upload history keeps only the events still in each account's `Everloot.lua`, and cached lists not
+  refreshed for a week are deleted, so the data folder stops growing the longer you play.
 
 ## [desktop-v0.1.14] - 2026-11-02
 
