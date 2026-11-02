@@ -111,3 +111,30 @@ test("further-reading links are search URLs with the question encoded, and nothi
   expect(furtherReading("Thrall & Jaina")[1].url).toBe("https://www.wowhead.com/search?q=Thrall%20%26%20Jaina");
   expect(furtherReading("   ")).toEqual([]);
 });
+
+test.each(["Which bosses are in Deadmines?", "¿Qué jefes hay en Deadmines?"])("a named dungeon keeps its own archive context, not musical or pet-battle search matches: %s", async (question) => {
+  const db = openDb(":memory:");
+  await replaceSourceRows(db, "warcraft-wiki-2023", ["lore_page"], [
+    row("mine", "Deadmines", "The Deadmines are old mines beneath Westfall."),
+    row("musical", "Welcome to the Deadmines", "The bosses in Deadmines sing in a musical."),
+    row("pets", "Deadmines: Pet Edition", "The bosses in Deadmines are pet battle opponents."),
+  ]);
+  const files = { build: "test-build", extractedAt: null, facts: [{ kind: "instance" as const, name: "Deadmines", claim: "The files name a dungeon encounter." }] };
+  const answer = await answerSources(db, { question, limit: 8 }, null, null, files);
+  expect(answer.evidence.filter((piece) => piece.kind === "lore").map((piece) => piece.source.title)).toEqual(["Deadmines"]);
+  expect(answer.evidence[0]?.kind).toBe("files");
+  expect(formatAnswerSources(answer, false)).toContain("Archive lore is historical context");
+  db.close();
+});
+
+test("question and game-name words do not introduce unrelated archive or curated evidence", async () => {
+  const db = openDb(":memory:");
+  await replaceSourceRows(db, "warcraft-wiki-2023", ["lore_page"], [
+    row("edwin", "Edwin VanCleef", "Edwin VanCleef led the Stonemasons."),
+    row("what", "What Aspects Fear", "What Aspects Fear is an unrelated book."),
+  ]);
+  await replaceSourceRows(db, "curated", ["lore_page"], [row("launch", "Forever launch", "Forever launches on a stated date.")]);
+  const answer = await answerSources(db, { question: "What drops from Edwin VanCleef in Forever?", limit: 8 }, null, null);
+  expect(answer.evidence.map((piece) => piece.source.title)).toEqual(["Edwin VanCleef"]);
+  db.close();
+});

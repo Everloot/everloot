@@ -260,6 +260,50 @@ test("a guild page with the officer board only: the officers' roster and their k
   expect(html).not.toContain(">Activity<");
 });
 
+/** Iron Oath's officers publish a two-member roster, a loot line and attendance; Ada is on all three. */
+const namedBoard = () => ["o1", "o2"].flatMap((installId) => [
+  {
+    installId, kind: "guild_snapshot", claimToken: "x".repeat(16), guildName: "Iron Oath", realm: "Forever Pioneer", faction: "alliance",
+    members: [{ name: "Ada", rank: "Officer", level: 60, class: "Mage" }, { name: "Bertrand", rank: "Raider", level: 58, class: "Priest" }],
+  },
+  { installId, kind: "loot_award", claimToken: "x".repeat(16), guildName: "Iron Oath", realm: "Forever Pioneer", itemId: 16800, recipient: "Ada", sourceBoss: "Lucifron" },
+  { installId, kind: "attendance", claimToken: "x".repeat(16), guildName: "Iron Oath", realm: "Forever Pioneer", present: ["Ada", "Bertrand"] },
+]);
+
+test("a character who opted out leaves the officers' roster, loot and attendance at once, though the corpus is unchanged", async () => {
+  on();
+  holder.records = [...world, ...memberKills, ...officers.filter((r) => r.kind !== "guild_snapshot"), ...namedBoard()];
+  const before = await guildPage("forever-pioneer", "iron-oath");
+  expect(before).toContain("Ada");
+  expect(before).toContain("Item 16800</a> to Ada");
+  // The opt-out form spells the realm its own way; the hide still reaches the officers' roster.
+  await holder.store!.suppress("forever-pioneer", "ada");
+  const reads = holder.reads;
+  const after = await guildPage("forever-pioneer", "iron-oath");
+  expect(holder.reads).toBe(reads + 1);
+  expect(after).not.toContain("Ada");
+  expect(after).toContain("Bertrand");
+  expect(after).toContain("Present at the last raid: Bertrand.");
+  const { loadGuildPage } = await import("@/lib/guilds");
+  const loaded = await loadGuildPage("forever-pioneer", "iron-oath");
+  if (!loaded || loaded === "unreachable") throw new Error("no page");
+  expect(loaded.board?.roster.map((m) => m.name)).toEqual(["Bertrand"]);
+  expect(loaded.board?.loot).toEqual([]);
+});
+
+test("when the hidden characters cannot be read, the officers' names are withheld and the rest of the page stays", async () => {
+  on();
+  holder.records = [...world, ...memberKills, ...officers.filter((r) => r.kind !== "guild_snapshot"), ...namedBoard()];
+  vi.spyOn(holder.store!, "hiddenPlayers").mockRejectedValue(new Error("character_suppressions unavailable"));
+  const html = await guildPage("forever-pioneer", "iron-oath");
+  expect(html).toContain("Iron Oath");
+  expect(html).toContain("could not be checked against the characters who asked to be hidden");
+  expect(html).not.toContain("Ada");
+  expect(html).not.toContain("Bertrand");
+  // The ladder names no one, so it still shows the guild.
+  expect(await hub()).toContain(">Iron Oath</a>");
+});
+
 test("a guild page with both, plus the seen roster labelled as sightings", async () => {
   on();
   vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");

@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import LinkedCharacters, { FROZEN_TEXT, PAGE_TEXT, type ListedLink } from "./LinkedCharacters";
+import LinkedCharacters, { FROZEN_TEXT, LABEL_TEXT, PAGE_TEXT, type ListedLink } from "./LinkedCharacters";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -146,4 +146,57 @@ test("without the showcase there is no page switch; with it a linked character's
   // Never a search switch: indexing is not offered yet.
   expect(Array.from(container.querySelectorAll("button, input"), (b) => b.textContent ?? "").join(" ")).not.toMatch(/index|search/i);
   expect(container.textContent!.toLowerCase()).not.toContain("verified");
+});
+
+test("planned builds: no picker and no label read unless the list offers it; then only the character's class, never preselected", async () => {
+  const PATH = "/characters/forever/forever-pioneer/thrallina";
+  const LABELS = [
+    { id: "7d1e2f3a-4b5c-4d6e-8f70-8192a3b4c5d6", name: "Raid plans", classSlug: "shaman" },
+    // Same name as the character: still not picked for the player.
+    { id: "8e2f3a4b-5c6d-4e7f-8a91-92a3b4c5d6e7", name: "Thrallina", classSlug: "shaman" },
+    { id: "9f3a4b5c-6d7e-4f80-9ba2-a3b4c5d6e7f8", name: "Frosty", classSlug: "mage" },
+  ];
+  const urls: string[] = [];
+  const sent: Array<{ url: string; body: unknown }> = [];
+  let lists: object[] = [{ links: [{ ...LINK, page: { public: true, path: PATH } }] }];
+  let read = 0;
+  vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+    urls.push(url);
+    if (init?.method === "POST") {
+      sent.push({ url, body: JSON.parse(String(init.body)) });
+      return Response.json({ id: LINK.id, label: LABELS[0].id });
+    }
+    if (url === "/api/me/builds") return Response.json({ characters: LABELS, builds: [] });
+    return Response.json(lists[Math.min(read++, lists.length - 1)]);
+  });
+
+  // The switch off: the list has no label field, so no picker, and the labels are never read.
+  await show();
+  expect(container.querySelector("select")).toBeNull();
+  expect(container.textContent).not.toContain(LABEL_TEXT);
+  expect(urls).not.toContain("/api/me/builds");
+  await act(async () => root.unmount());
+  root = createRoot(container);
+
+  // On: a picker with None selected and the shaman labels only.
+  lists = [
+    { links: [{ ...LINK, page: { public: true, path: PATH, label: null } }, { ...FROZEN, page: { public: false, path: "/x", label: null } }] },
+    { links: [{ ...LINK, page: { public: true, path: PATH, label: { id: LABELS[0].id, name: "Raid plans" } } }] },
+  ];
+  read = 0;
+  await show();
+  expect(container.textContent).toContain(LABEL_TEXT);
+  // A frozen link gets no picker.
+  expect(container.querySelectorAll("select")).toHaveLength(1);
+  const select = container.querySelector("select")!;
+  expect(select.value).toBe("");
+  expect(Array.from(select.options, (o) => o.textContent)).toEqual(["None", "Raid plans", "Thrallina"]);
+  expect(sent).toEqual([]);
+
+  await act(async () => {
+    select.value = LABELS[0].id;
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  expect(sent).toEqual([{ url: `/api/me/characters/links/${LINK.id}/label`, body: { label: LABELS[0].id } }]);
+  expect(container.querySelector("select")!.value).toBe(LABELS[0].id);
 });

@@ -19,6 +19,7 @@ import { writeClientEncounters } from "./client-encounters.js";
 import { writeClientMounts } from "./client-mounts.js";
 import { writeClientClassGear } from "./client-class-gear.js";
 import { writeClientClassSpells } from "./client-class-spells.js";
+import { writeClientRecipes } from "./client-recipes.js";
 import { writeClientLayer } from "./client-layer.js";
 import { writeRaceTable } from "./client-races.js";
 import { evaluateWritten, formatAnswerEval, openAiCompatible, sampleKeyed } from "./answer-eval.js";
@@ -200,6 +201,9 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
   client-class-spells <snapshot.sqlite> [--out ../web/src/data/game-data/client-class-spells.json]
     (the spells on each class's own skill lines, one build-stamped file the spell list narrows to under a class
     context. Pages only, as above)
+  client-recipes <snapshot.sqlite> [--out ../web/src/data/game-data/client-recipes.json]
+    (every recipe on each profession's skill line with the item it makes, its reagents and the files' skill ranks,
+    one build-stamped file the profession pages list. Pages only, as above)
   item-names <snapshot.sqlite> --wiki <knowledge base or release .sqlite> [--ledger data/item-names/ledger.json] [--out data/assets]
     (adds the snapshot's item names and the Warcraft Wiki dump's item names to the name ledger, which only
     grows, and writes the name the site shows for every item a source names (the game files' first, with the wiki
@@ -704,6 +708,13 @@ async function main(): Promise<number> {
       const path = flags.get("out") || "../web/src/data/game-data/client-class-spells.json";
       const table = writeClientClassSpells(args[0], path);
       console.log(`${table.build.product} ${table.build.version}: ${Object.keys(table.classes).length} classes -> ${path}`);
+      return 0;
+    }
+    case "client-recipes": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-recipes.json";
+      const table = writeClientRecipes(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${table.professions.length} professions, ${table.professions.reduce((n, p) => n + p.recipes.length, 0)} recipes -> ${path}`);
       return 0;
     }
     case "client-diff": {

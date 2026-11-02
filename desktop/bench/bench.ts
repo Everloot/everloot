@@ -3,7 +3,7 @@
  * Run with `npm run bench` (bench/run.mjs bundles this file with call counters around the parser and sent.json state).
  * Everything here is synthetic and lives in a temp folder; nothing is sent anywhere.
  */
-import { mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { cpus, tmpdir, totalmem } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
@@ -16,7 +16,8 @@ import { createEngine } from "../src/main/engine";
 import { confirmedCounts, readScanAges, staleScans, summarizeFiles } from "../src/main/inspect";
 import { companionJobs } from "../src/main/jobs";
 import { characterRealms, ownRealms } from "../src/main/market";
-import { charactersFromFiles, saveFacts } from "../src/main/save-facts";
+import { charactersFromFiles, onFacts, peekFacts, readyFacts, saveFacts } from "../src/main/save-facts";
+import { useSaveReader } from "../src/main/save-reader";
 import { defaultSettings } from "../src/main/settings";
 import type { Settings } from "../src/shared/types";
 import { SCENARIOS, syntheticSave, syntheticSent } from "./synthetic";
@@ -69,11 +70,16 @@ const fakeFetch: typeof fetch = async (input, init) => {
 
 interface CycleResult { parses: number; parseMs: number; maxParse: number; byCaller: Map<string, number>; sentWrites: number; sentWriteMs: number; emits: number; batches: number; loopMax: number }
 
+/** dist/parse-worker.cjs, bundled by run.mjs without the counters: the worker's parses are off the main thread. */
+const workerCode = process.env.EVERLOOT_BENCH_WORKER ? readFileSync(process.env.EVERLOOT_BENCH_WORKER, "utf8") : null;
+
 /**
  * One account's logout as the app handles it: the upload job (prices follow it) and the ask job, with every state push
- * doing what index.ts's broadcast does for the scan ages (memoized per size and write time, as there).
+ * doing what index.ts's broadcast does for the scan ages. `worker` false is the app before the save reader: every
+ * parse on the main thread, the push reading saveFacts. With it, the push peeks at the last facts and asks the reader
+ * for the write, and pushes again when the reader is done, as index.ts does now.
  */
-async function cycles(scenario: (typeof SCENARIOS)[number], steadyRuns: number): Promise<{ first: CycleResult; steady: CycleResult[]; sentBytes: number }> {
+async function cycles(scenario: (typeof SCENARIOS)[number], steadyRuns: number, worker: boolean): Promise<{ first: CycleResult; steady: CycleResult[]; sentBytes: number }> {
   const root = mkdtempSync(join(tmpdir(), "everloot-bench-"));
   try {
     const game = join(root, "game"), data = join(root, "data");
@@ -87,11 +93,16 @@ async function cycles(scenario: (typeof SCENARIOS)[number], steadyRuns: number):
     // The app's own settle times: a write is picked up by the real file watcher, as after a logout.
     const engine = createEngine(jobs.deps, { rescanMs: 1e9, pricesEveryMs: 1e9 });
     let emits = 0;
-    // index.ts: `allScans` behind every broadcast.
-    engine.onChange((s) => {
+    if (worker) useSaveReader({ code: () => workerCode!, log: (text) => { console.log(`bench: ${text}`); } });
+    // index.ts: the scan ages behind every broadcast.
+    const push = () => {
       emits++;
-      staleScans(s.files.flatMap((f) => { try { return saveFacts(f).scans; } catch { return []; } }));
-    });
+      const files = engine.snapshot().files;
+      if (worker) staleScans(files.flatMap((f) => peekFacts(f)?.scans ?? []));
+      else staleScans(files.flatMap((f) => { try { return saveFacts(f).scans; } catch { return []; } }));
+    };
+    engine.onChange((s) => { push(); if (worker) void readyFacts(s.files); });
+    const stopFacts = worker ? onFacts(push) : () => {};
     const settled = (before: (string | null)[]) => new Promise<void>((resolve, reject) => {
       const t0 = Date.now();
       const tick = () => {
@@ -135,6 +146,8 @@ async function cycles(scenario: (typeof SCENARIOS)[number], steadyRuns: number):
       steady.push(await measure(() => {}));
     }
     engine.stop();
+    stopFacts();
+    useSaveReader(null);
     return { first, steady, sentBytes: statSync(join(data, "sent.json")).size };
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -169,23 +182,24 @@ async function main(): Promise<void> {
   say(table(["size", "file", "records", "parseEverlootLua (upload job)", "parseEverlootTable", "readRealms (prices job)", "readAsks (ask job)", "readScanAges (broadcast)", "summarizeCharacters", "ownRealms (Overview / Market page reload, same file)", "characterRealms (realm suggestions, same reload)", "charactersFromFiles (Characters page / my_characters, same file)"], rows));
 
   say("\n### One logout, as the engine runs it (upload, then prices; ask beside it)\n");
-  say("First run = every row is new (an install's first upload), started as at launch. Steady = the next logouts, 20 new rows each, started by the real file watcher after the app's settle times; p50 / p95 across runs. The site is a local stub that answers at once.\n");
+  say("First run = every row is new (an install's first upload), started as at launch. Steady = the next logouts, 20 new rows each, started by the real file watcher after the app's settle times; p50 / p95 across runs. The site is a local stub that answers at once. Parses counted are the main thread's; \"main\" is the app before the save reader, \"worker\" with it.\n");
   const crow: (string | number)[][] = [];
   let callers = "";
-  for (const s of SCENARIOS) {
+  for (const s of SCENARIOS) for (const worker of workerCode ? [false, true] : [false]) {
     const steadyRuns = quick ? 2 : s.name === "extreme" ? 3 : 8;
-    const r = await cycles(s, steadyRuns);
+    const r = await cycles(s, steadyRuns, worker);
     const st = r.steady;
+    const on = worker ? "worker" : "main";
     const pp = (f: (c: CycleResult) => number) => `${ms(pct(st.map(f), 50))} / ${ms(pct(st.map(f), 95))}`;
     const range = (f: (c: CycleResult) => number) => { const xs = st.map(f); const lo = Math.min(...xs), hi = Math.max(...xs); return lo === hi ? String(lo) : `${lo}-${hi}`; };
-    crow.push([s.name, "first", r.first.parses, ms(r.first.parseMs), ms(r.first.maxParse), r.first.batches, r.first.sentWrites, ms(r.first.sentWriteMs), r.first.emits, ms(r.first.loopMax)]);
-    crow.push([s.name, "steady", range((c) => c.parses), pp((c) => c.parseMs), pp((c) => c.maxParse), range((c) => c.batches), range((c) => c.sentWrites), pp((c) => c.sentWriteMs), range((c) => c.emits), pp((c) => c.loopMax)]);
-    if (s.name === "heavy") callers = [...st[0].byCaller].map(([k, n]) => `${k} x${n}`).join(", ");
-    say(`- ${s.name}: sent.json after the first run ${mb(r.sentBytes)}`);
+    crow.push([s.name, on, "first", r.first.parses, ms(r.first.parseMs), ms(r.first.maxParse), r.first.batches, r.first.sentWrites, ms(r.first.sentWriteMs), r.first.emits, ms(r.first.loopMax)]);
+    crow.push([s.name, on, "steady", range((c) => c.parses), pp((c) => c.parseMs), pp((c) => c.maxParse), range((c) => c.batches), range((c) => c.sentWrites), pp((c) => c.sentWriteMs), range((c) => c.emits), pp((c) => c.loopMax)]);
+    if (s.name === "heavy" && !worker) callers = [...st[0].byCaller].map(([k, n]) => `${k} x${n}`).join(", ");
+    say(`- ${s.name} (${on}): sent.json after the first run ${mb(r.sentBytes)}`);
   }
   say("");
-  say(table(["size", "run", "full parses", "parse ms total", "longest parse", "batches", "sent.json writes", "sent.json write ms", "state pushes", "longest event-loop stall"], crow));
-  say(`\nParse calls in one steady heavy cycle, by caller: ${callers}.`);
+  say(table(["size", "parse on", "run", "main-thread parses", "parse ms total", "longest parse", "batches", "sent.json writes", "sent.json write ms", "state pushes", "longest event-loop stall"], crow));
+  say(`\nParse calls in one steady heavy cycle on the main thread, by caller: ${callers}.`);
 
   say("\n### sent.json (one install's receipts; ms, p50 / p95)\n");
   const srow: (string | number)[][] = [];
@@ -219,12 +233,17 @@ async function main(): Promise<void> {
       const hit = time(quick ? 3 : 10, 1, () => summarizeFiles([f], sentPath, "https://everloot.app"));
       urow.push([n.toLocaleString("en-US"), `${ms(hit.p50)} / ${ms(hit.p95)}`]);
     }
-    const missRuns: number[] = [];
+    const missRuns: number[] = [], afterPush: number[] = [];
     for (let i = 0; i < (quick ? 2 : 5); i++) {
       writeFileSync(f, syntheticSave(SCENARIOS[1], i + 1));
       const t = performance.now(); summarizeFiles([f], join(root, "sent-10000.json"), "https://everloot.app"); missRuns.push(performance.now() - t);
+      // In the app the state push after the write has read the file already; the page then takes that parse.
+      writeFileSync(f, syntheticSave(SCENARIOS[1], i + 101));
+      saveFacts(f);
+      const u = performance.now(); summarizeFiles([f], join(root, "sent-10000.json"), "https://everloot.app"); afterPush.push(performance.now() - u);
     }
-    say(`After a write (cache miss: parseEverlootLua + three parseEverlootTable): ${ms(pct(missRuns, 50))} / ${ms(pct(missRuns, 95))} ms.\n`);
+    say(`After a write, read first by the page (one shared parseEverlootTable): ${ms(pct(missRuns, 50))} / ${ms(pct(missRuns, 95))} ms.\n`);
+    say(`After a write the state push already read (the app's order): ${ms(pct(afterPush, 50))} / ${ms(pct(afterPush, 95))} ms.\n`);
     say(table(["sent.json event ids", "a later open or state push (cache hit, sent.json read again)"], urow));
     rmSync(root, { recursive: true, force: true });
   }
