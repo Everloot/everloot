@@ -2,7 +2,7 @@ import type { ItemFacts } from "../../../kb/src/item-page";
 import type { WorldFacts } from "../../../kb/src/world-pages";
 import type { InstanceRow } from "./instances";
 import { itemNames } from "./names";
-import { loadItemFacts, loadWorldFacts } from "./rollup-compute";
+import { computeRollups, loadItemFacts, loadWorldFacts } from "./rollup-compute";
 import { publicQuests } from "./world-lists";
 
 /** Only existing public observations, joined by agreed NPC ids and exact quest categories. */
@@ -17,9 +17,9 @@ export function dungeonRecords(row: InstanceRow, items: ItemFacts & { unreachabl
   return { loot, quests, unavailable };
 }
 
-export type DungeonRecords = ReturnType<typeof dungeonRecords>;
+export type DungeonRecords = ReturnType<typeof dungeonRecords> & { dataAsOf?: string | null };
 
 export async function loadDungeonRecords(row: InstanceRow): Promise<DungeonRecords> {
-  const [items, world] = await Promise.all([loadItemFacts(), loadWorldFacts()]);
-  return dungeonRecords(row, items, world);
+  const [items, world, rollup] = await Promise.all([loadItemFacts(), loadWorldFacts(), computeRollups()]);
+  return { ...dungeonRecords(row, items, world), dataAsOf: rollup.stats.unreachable ? null : rollup.stats.dataAsOf };
 }

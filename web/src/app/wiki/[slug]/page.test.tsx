@@ -10,6 +10,8 @@ vi.mock("next/link", () => ({
   ),
 }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NOT_FOUND"); }, usePathname: () => "/" }));
+const caching = vi.hoisted(() => ({ noStore: vi.fn() }));
+vi.mock("next/cache", async (original) => ({ ...(await original<typeof import("next/cache")>()), unstable_noStore: caching.noStore }));
 
 // Three installs agree on an item name and an NPC name; the quest has no title anywhere, so it reads "Quest 166".
 const agree = <T,>(row: (installId: string) => T) => ["a", "b", "c"].map(row);
@@ -17,15 +19,16 @@ const facts = vi.hoisted(() => ({ rates: [] as unknown[], names: [] as unknown[]
 const world = vi.hoisted(() => ({ npcs: [] as unknown[], quests: [] as unknown[], vendors: [] as unknown[], unreachable: false }));
 // Nobody has zoned into a dungeon or reported a boss unless a test says so.
 const instances = vi.hoisted(() => ({ entrances: [] as unknown[], encounters: [] as unknown[], sightings: [] as unknown[], unreachable: false, dataAsOf: null as string | null }));
-vi.mock("@/lib/rollup-compute", () => ({ loadItemFacts: async () => facts, loadWorldFacts: async () => world, loadInstanceFacts: async () => instances }));
+vi.mock("@/lib/rollup-compute", () => ({ loadItemFacts: async () => facts, loadWorldFacts: async () => world, loadInstanceFacts: async () => instances, computeRollups: async () => ({ stats: { unreachable: false, dataAsOf: "2026-10-22T01:30:27.923Z" } }) }));
 facts.names = agree((installId) => ({ installId, itemId: 2589, name: "Linen Cloth" }));
 world.npcs = agree((installId) => ({ installId, npcId: 639, name: "Edwin VanCleef", mapId: 1436, x: 40, y: 70, positionKind: "npc" }));
 
 const FIXTURES = fileURLToPath(new URL("../../../test/wiki", import.meta.url));
-beforeEach(() => { vi.stubEnv("WIKI_DIR", FIXTURES); });
+beforeEach(() => { vi.stubEnv("WIKI_DIR", FIXTURES); caching.noStore.mockClear(); });
 afterEach(() => {
   vi.unstubAllEnvs();
   Object.assign(instances, { entrances: [], encounters: [], unreachable: false, dataAsOf: null });
+  world.unreachable = false;
 });
 
 const params = (slug: string) => ({ params: Promise.resolve({ slug }) });
@@ -35,6 +38,19 @@ const render = async (slug: string) => {
 };
 /** The markup of one `<section>`, by the id of its heading. */
 const section = (html: string, id: string) => new RegExp(`<section[^>]*aria-labelledby="${id}"[^>]*>[\\s\\S]*?</section>`).exec(html)?.[0] ?? "";
+
+test.each(["instances", "world"] as const)("unavailable %s data is not cached as an empty dungeon response, and a healthy read recovers", async (layer) => {
+  const storage = layer === "instances" ? instances : world;
+  storage.unreachable = true;
+  expect(await render("test-dungeon")).toContain("Player reports are unavailable");
+  expect(caching.noStore).toHaveBeenCalled();
+  storage.unreachable = false;
+  caching.noStore.mockClear();
+  const recovered = await render("test-dungeon");
+  expect(recovered).toContain('aria-labelledby="recorded-loot"');
+  expect(recovered).not.toContain("Player reports are unavailable");
+  expect(caching.noStore).not.toHaveBeenCalled();
+});
 
 test("a published page that meets the bar is indexed, with a self canonical and a title under 60 characters", async () => {
   const { generateMetadata } = await import("./page");
