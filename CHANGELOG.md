@@ -62,12 +62,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site and Desktop App: Ollama suggests one small model, `qwen3:4b` (2.5 GB, calls tools), instead of `qwen3:8b`, and
   says what running a model on your own computer means: private and free, slower, and it uses your memory while it
   answers. The free cloud models stay the first choice.
-- Desktop App: the realms the Overview and the Market page offer to follow come from the one read of each save file
-  per write that the logout already makes, instead of a full read of every save each time either page opens (about
-  165 ms to under 1 ms per open on the heavy synthetic save in the quick benchmark).
-- Desktop App: the Characters page and the chat's look at your characters read the same one parse per write, instead
-  of reading every save in full each time (about 170 to 2 ms on the heavy synthetic save). The last seven days, the
-  30-day chart and the latest receipts are still counted up to the moment you open the page.
 - Knowledge base: `entities.name_norm` stores each name's words as the search re-rank reads them, with an index on
   `(name_norm, kind)`. The exact-name lookup reads it instead of scanning every row through `lower(replace(...))`,
   and now matches non-ASCII capitals and punctuation the SQL expression missed. A punctuated name with stopwords
@@ -315,6 +309,16 @@ Live-client verification is pending. This is a pre-release for WoW: Forever 1.60
   off until `/everloot census on`. The Desktop App sends census rows with its uploads when the player leaves
   the census box ticked on its setup screen, or turns it on in Settings; a setup finished before this keeps
   it off. Still never names, guilds, gear or places, and the site shows only totals.
+
+## [desktop-v0.1.14] - 2026-11-02
+
+### Changed
+- Desktop App: opening the Overview or the Market page no longer reads every save file again to suggest your
+  characters' realms. The suggestions come from the read the app already makes when the file changes (about 165 ms
+  to under 1 ms per open on a large test save).
+- Desktop App: the Characters page and the chat's lookup of your characters work the same way (about 170 to 2 ms on
+  a large test save). The last seven days, the 30-day chart and the latest receipts still count up to the moment you
+  open the page.
 
 ## [desktop-v0.1.13] - 2026-11-01
 
