@@ -78,7 +78,7 @@ const PRIMARY = [
   "app/tools/collections/page.tsx",
   "app/tools/gold-ledger/page.tsx",
   "app/tools/guild-board/page.tsx",
-  "app/tools/professions/page.tsx",
+  "app/tools/professions/[profession]/page.tsx",
   "app/upload/UploadClient.tsx",
   "app/not-found.tsx",
   "app/page.tsx",

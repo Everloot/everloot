@@ -26,6 +26,7 @@ import Home from "@/app/page";
 import DropsPage from "@/app/database/drops/page";
 import AuctionsRealmPage from "@/app/tools/auctions/[realm]/page";
 import ProfessionsPage from "@/app/tools/professions/page";
+import ProfessionPage from "@/app/tools/professions/[profession]/page";
 import RaidPage from "@/app/tools/raid/page";
 import MapPage from "@/app/map/page";
 import ContinentMapPage from "@/app/map/[continent]/page";
@@ -261,12 +262,14 @@ test("changes: a compact title row like the database lists, no loading-screen ba
   expect(html).not.toMatch(/data-game-credit|data-source-line/);
 });
 
-test("professions: a picker of profession icons with their names", async () => {
+test("professions: the hub's cards and the profession page's picker carry the profession icons with their names", async () => {
   vi.stubEnv("NEXT_PUBLIC_GAME_ASSETS_URL", BASE);
   vi.stubGlobal("fetch", bucket());
-  const html = await render(() => ProfessionsPage({ searchParams: Promise.resolve({ profession: "alchemy" }) }));
+  const hub = await render(() => ProfessionsPage({ searchParams: Promise.resolve({}) }));
+  expect(hub).toMatch(/href="\/tools\/professions\/alchemy"[^>]*><img[^>]*icons\/7001\.webp[^>]*\/?>/);
+  const html = await render(() => ProfessionPage({ params: Promise.resolve({ profession: "alchemy" }), searchParams: Promise.resolve({}) }));
   expect(html).toMatch(/<nav aria-label="Professions"/);
-  expect(html).toMatch(/href="\/tools\/professions\?profession=Alchemy&amp;from=1&amp;to=75" aria-current="page"[^>]*><img[^>]*icons\/7001\.webp[^>]*\/?>Alchemy/);
+  expect(html).toMatch(/href="\/tools\/professions\/alchemy" aria-current="page"[^>]*><img[^>]*icons\/7001\.webp[^>]*\/?>Alchemy/);
   expect(html).not.toMatch(/data-game-credit|data-source-line/);
 });
 
