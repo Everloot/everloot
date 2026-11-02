@@ -3,8 +3,8 @@
 Generated from `kb/src/bridge-plan.ts`. Edit that file, then regenerate this page.
 The MCP tool `everloot_plan` returns the same text.
 
-Hakoovak (US / Moon Guard) is Carlos's own character, sent so two reference pages
-could be opened on a real name. It is not a fixture and not the Forever beta character.
+Two reference links open a page on the maintainer's own character, so the page shape
+could be read on a real name. It is not a fixture and not the Forever beta character.
 
 Order: one server. Each product tool is one MCP tool on that server. A ChatGPT
 subscription connects to the public HTTPS mount and uses its own model. Closed
@@ -73,7 +73,7 @@ Rows: 75.
 | Id | Name | Done when |
 |---|---|---|
 | `ops.adsense` | AdSense | Carlos's account. Consent banner already on the site. |
-| `ops.beta_guild` | Beta character in a guild | two raid nights before 2026-10-21. Hakoovak is not this character. |
+| `ops.beta_guild` | Beta character in a guild | two raid nights before 2026-10-21. The reference character is not this character. |
 | `ops.hero_shot` | Hero screenshot | a real beta screenshot replaces the empty hero |
 | `ops.curseforge` | CurseForge pack | staged around 2026-10-24 |
 | `ops.signing` | Windows code signing | publisher is likely R21 Media Group LLC |
@@ -92,7 +92,7 @@ Rows: 75.
 | `ref.gaming_tools` | gaming.tools/wow | page shape: a path that recalculates. Price it from our uploads. |
 | `ref.wow_professions` | wow-professions.com | page shape: a Forever door and a TomTom pin. Do not copy their routes. |
 | `ref.missing_mounts` | missingmounts.com | page shape: missing list, vendor-ready pile separated. Data comes from uploads. |
-| `ref.simple_armory` | simplearmory.com | page shape: character URL, owned versus missing. Hakoovak was only a real name to open the page. |
+| `ref.simple_armory` | simplearmory.com | page shape: character URL, owned versus missing. The character was only a real name to open the page. |
 | `ref.data_for_azeroth` | dataforazeroth.com | page shape: character page. Not a rankings product. |
 | `ref.wowauctions` | wowauctions.net | page shape: realm, then item, then price history. |
 | `ref.ask_mr_robot` | askmrrobot.com | page shape: one gear optimizer. Their lists stay theirs. |
