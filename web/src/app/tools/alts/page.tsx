@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Container, PageHeader } from "@/components/ui";
+import { Container } from "@/components/ui";
+import YourEverlootHeader from "@/components/YourEverloot";
 import { trailFor } from "@/lib/breadcrumbs";
 import { pageMetadata } from "@/lib/seo";
 import AltPlanner from "./AltPlanner";
@@ -18,7 +19,8 @@ export const metadata: Metadata = {
 export default function AltsPage() {
   return (
     <Container>
-      <PageHeader
+      <YourEverlootHeader
+        current="/tools/alts"
         title={TITLE}
         lede="Your characters and the plans each uses, kept in this browser. No account needed, and nothing is uploaded."
         trail={trailFor("/tools/alts")!}

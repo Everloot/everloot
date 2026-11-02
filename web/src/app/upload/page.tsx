@@ -4,7 +4,8 @@ import { pageMetadata } from "@/lib/seo";
 import { latestAddonRelease } from "@/lib/addon-release";
 import { REPO_URL } from "@/lib/source";
 import { playerPagesOn } from "@/lib/player-pages";
-import { Card, Container, PageHeader, SectionHeading } from "@/components/ui";
+import { Card, Container, SectionHeading } from "@/components/ui";
+import YourEverlootHeader from "@/components/YourEverloot";
 import { trailFor } from "@/lib/breadcrumbs";
 import UploadClient from "./UploadClient";
 import TrackedDownload from "@/components/TrackedDownload";
@@ -21,7 +22,8 @@ export default function UploadPage() {
   const addon = latestAddonRelease();
   return (
     <Container width="reading">
-      <PageHeader
+      <YourEverlootHeader
+        current="/upload"
         title="Upload addon data"
         lede="Collected by the Everloot addon or the Polestar Recorder while you play. You preview exactly what goes out before anything is sent."
         trail={trailFor("/upload")!}

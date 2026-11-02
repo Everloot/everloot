@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import DevicePlans, { type PlanTrees } from "@/components/workspace/DevicePlans";
 import TransferPlans from "@/components/workspace/TransferPlans";
-import { Container, PageHeader } from "@/components/ui";
+import { Container } from "@/components/ui";
+import YourEverlootHeader from "@/components/YourEverloot";
 import { trailFor } from "@/lib/breadcrumbs";
 import { savedBuildsOn } from "@/lib/saved-builds";
 import { TALENT_CLASSES, loadCatalog } from "@/lib/talents/catalogs";
@@ -32,7 +33,8 @@ export default async function DevicePlansPage() {
   const transfer = savedBuildsOn();
   return (
     <Container>
-      <PageHeader
+      <YourEverlootHeader
+        current="/tools/builds"
         title={TITLE}
         lede={`Talent plans kept by name in this browser. No account needed, and nothing is uploaded${transfer ? " unless you save plans to your account" : ""}.`}
         trail={trailFor("/tools/builds")!}
