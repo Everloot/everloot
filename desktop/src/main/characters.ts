@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { parseEverlootLua } from "../../../web/src/lib/sv-parse";
 import { SPENDING_CATEGORIES } from "../../../kb/src/gold-ledger";
 import type { CharacterRow, CharactersInfo, ProgressRow } from "../shared/types";
@@ -29,15 +28,23 @@ export function thin<T>(points: T[], max = HISTORY_POINTS): T[] {
 }
 
 export function summarizeCharacters(text: string, now = Date.now()): CharactersInfo {
-  return summarizeRecords(parseEverlootLua(text).records, now);
+  return charactersAt(collectCharacters(parseEverlootLua(text).records), now);
 }
 
-/** The same summary from records already read: saveFacts takes the character realms from it without a second parse. */
-export function summarizeRecords(records: Array<Record<string, unknown>>, now = Date.now()): CharactersInfo {
+type MoneyEvent = { at: string; ms: number; category: string; copper: number; direction: "in" | "out" };
+
+/**
+ * The part of the summary that depends on the file alone, kept per write by saveFacts. Its rows are shared between
+ * calls and not changed after; charactersAt adds what depends on the time of the call.
+ */
+export interface CharacterBase extends CharactersInfo { money: Map<string, MoneyEvent[]> }
+
+/** Everything in the summary but the last seven days, the 30 days and the receipts, from records already read. */
+export function collectCharacters(records: Array<Record<string, unknown>>): CharacterBase {
   const named = new Map<string, CharacterRow>();
   const keyed = new Map<string, ProgressRow>();
   const gearAt = new Map<string, string>();
-  const money = new Map<string, { at: string; ms: number; category: string; copper: number; direction: "in" | "out" }[]>();
+  const money = new Map<string, MoneyEvent[]>();
   const row = (r: Record<string, unknown>): CharacterRow | null => {
     const character = str(r.character), realm = str(r.realm);
     if (!character || !realm) return null;
@@ -83,7 +90,6 @@ export function summarizeRecords(records: Array<Record<string, unknown>>, now = 
         const bucket = out ? c.spent : c.earned;
         bucket[cat] = (bucket[cat] ?? 0) + copper;
         const at = Date.parse(str(r.capturedAt));
-        if (Number.isFinite(at) && now - at <= WEEK_MS) c.week[out ? "spent" : "earned"] += copper;
         if (Number.isFinite(at)) {
           const id = `${c.character}-${c.realm}`;
           const list = money.get(id) ?? [];
@@ -109,12 +115,25 @@ export function summarizeRecords(records: Array<Record<string, unknown>>, now = 
   }
   // Talent snapshots carry class and level but no key or name; count the active one per class as a hint.
   const talents = records.filter((r) => r.kind === "talent_snapshot" && r.active === true).map((r) => ({ class: str(r.class), level: num(r.level), points: num(r.points) }));
+  for (const c of named.values()) c.history = thin(c.history.sort((a, b) => a.at.localeCompare(b.at)));
+  return {
+    characters: [...named.values()].sort((a, b) => (b.gold ?? 0) - (a.gold ?? 0)),
+    progress: [...keyed.values()].sort((a, b) => b.level - a.level),
+    talents,
+    money,
+  };
+}
+
+/** The summary at `now`: each character's last seven days, 30 days and latest receipts, on a copy of its row. */
+export function charactersAt(base: CharacterBase, now = Date.now()): CharactersInfo {
   const at = new Date(now);
   const end = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate());
   const start = end - (MONEY_DAYS - 1) * DAY_MS;
-  for (const c of named.values()) {
-    const id = `${c.character}-${c.realm}`;
-    const events = (money.get(id) ?? []).filter((e) => e.ms >= start && e.ms <= now).sort((a, b) => a.ms - b.ms);
+  const characters = base.characters.map((c) => {
+    const all = base.money.get(`${c.character}-${c.realm}`) ?? [];
+    const week = { earned: 0, spent: 0 };
+    for (const e of all) if (now - e.ms <= WEEK_MS) week[e.direction === "out" ? "spent" : "earned"] += e.copper;
+    const events = all.filter((e) => e.ms >= start && e.ms <= now).sort((a, b) => a.ms - b.ms);
     const days = Array.from({ length: MONEY_DAYS }, (_, i) => ({ date: new Date(start + i * DAY_MS).toISOString().slice(0, 10), earned: 0, spent: 0 }));
     const where = new Map(days.map((d, i) => [d.date, i]));
     for (const e of events) {
@@ -122,24 +141,8 @@ export function summarizeRecords(records: Array<Record<string, unknown>>, now = 
       if (i === undefined) continue;
       if (e.direction === "out") days[i].spent += e.copper; else days[i].earned += e.copper;
     }
-    c.days = days;
-    c.receipts = events.slice(-RECEIPTS).reverse().map((e) => ({ at: e.at, category: e.category, copper: e.copper, direction: e.direction }));
-    c.history = thin(c.history.sort((a, b) => a.at.localeCompare(b.at)));
-  }
-  return {
-    characters: [...named.values()].sort((a, b) => (b.gold ?? 0) - (a.gold ?? 0)),
-    progress: [...keyed.values()].sort((a, b) => b.level - a.level),
-    talents,
-  };
-}
-
-export function charactersFromFiles(files: string[]): CharactersInfo {
-  const all: CharactersInfo = { characters: [], progress: [], talents: [] };
-  for (const file of files) {
-    try {
-      const one = summarizeCharacters(readFileSync(file, "utf8"));
-      all.characters.push(...one.characters); all.progress.push(...one.progress); all.talents.push(...one.talents);
-    } catch { /* an unreadable file shows on the Upload page */ }
-  }
-  return all;
+    const receipts = events.slice(-RECEIPTS).reverse().map((e) => ({ at: e.at, category: e.category, copper: e.copper, direction: e.direction }));
+    return { ...c, week, days, receipts };
+  });
+  return { characters, progress: base.progress, talents: base.talents };
 }

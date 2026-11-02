@@ -11,12 +11,12 @@ import { readAsks } from "../../companion/src/bridge/asks";
 import { readRealms } from "../../companion/src/prices";
 import { createSentState } from "../../companion/src/sent-state";
 import { parseEverlootLua, parseEverlootTable } from "../../web/src/lib/sv-parse";
-import { charactersFromFiles, summarizeCharacters } from "../src/main/characters";
+import { summarizeCharacters } from "../src/main/characters";
 import { createEngine } from "../src/main/engine";
 import { confirmedCounts, readScanAges, staleScans, summarizeFiles } from "../src/main/inspect";
 import { companionJobs } from "../src/main/jobs";
 import { characterRealms, ownRealms } from "../src/main/market";
-import { saveFacts } from "../src/main/save-facts";
+import { charactersFromFiles, saveFacts } from "../src/main/save-facts";
 import { defaultSettings } from "../src/main/settings";
 import type { Settings } from "../src/shared/types";
 import { SCENARIOS, syntheticSave, syntheticSent } from "./synthetic";
@@ -166,7 +166,7 @@ async function main(): Promise<void> {
     ]);
     rmSync(root, { recursive: true, force: true });
   }
-  say(table(["size", "file", "records", "parseEverlootLua (upload job)", "parseEverlootTable", "readRealms (prices job)", "readAsks (ask job)", "readScanAges (broadcast)", "summarizeCharacters", "ownRealms (Overview / Market page reload, same file)", "characterRealms (realm suggestions, same reload)", "charactersFromFiles (Characters page)"], rows));
+  say(table(["size", "file", "records", "parseEverlootLua (upload job)", "parseEverlootTable", "readRealms (prices job)", "readAsks (ask job)", "readScanAges (broadcast)", "summarizeCharacters", "ownRealms (Overview / Market page reload, same file)", "characterRealms (realm suggestions, same reload)", "charactersFromFiles (Characters page / my_characters, same file)"], rows));
 
   say("\n### One logout, as the engine runs it (upload, then prices; ask beside it)\n");
   say("First run = every row is new (an install's first upload), started as at launch. Steady = the next logouts, 20 new rows each, started by the real file watcher after the app's settle times; p50 / p95 across runs. The site is a local stub that answers at once.\n");

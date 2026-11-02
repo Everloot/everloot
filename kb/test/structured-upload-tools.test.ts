@@ -83,6 +83,23 @@ test("a blank profession is refused as an error, not answered as a connected emp
   expect(JSON.stringify(offline.content)).toContain("Name a profession.");
 });
 
+test("an unknown profession is refused as an error that lists the professions, not answered as one long gap", async () => {
+  const c = await client({ corpus });
+  const unknown = { profession_path: { profession: "Necromancy", fromSkill: 1, toSkill: 75 }, recipe_thresholds: { profession: "Necromancy" } };
+  for (const [name, args] of Object.entries(unknown)) {
+    const result = await c.callTool({ name, arguments: args });
+    expect(result.isError, name).toBe(true);
+    expect(result.structuredContent, name).toBeUndefined();
+    const text = JSON.stringify(result.content);
+    expect(text, name).toContain('No profession named \\"Necromancy\\".');
+    expect(text, name).toContain("Alchemy, Blacksmithing, Cooking, Enchanting, Engineering, First Aid, Fishing, Herbalism, Leatherworking, Mining, Skinning, Tailoring.");
+    expect(text, name).not.toMatch(/Gap|DNT/);
+  }
+  // The game's names in any case are professions.
+  const lower = await c.callTool({ name: "profession_path", arguments: { profession: "alchemy", fromSkill: 1, toSkill: 10 } });
+  expect(lower.isError).toBeFalsy();
+});
+
 test("entity_relations answers with the observed and game-file edges the text lists, cut per group", async () => {
   const c = await client({ corpus });
   const observed = observedEdgesFromRecords(records);

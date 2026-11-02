@@ -1,0 +1,38 @@
+#!/bin/sh
+# Lint and typecheck every package this push changes, before it leaves your machine.
+# Turn it on once per clone: git config core.hooksPath .githooks
+# Skip it once with git push --no-verify (for example, to delete a branch).
+root=$(git rev-parse --show-toplevel)
+zero=0000000000000000000000000000000000000000
+list=$(mktemp)
+trap 'rm -f "$list"' EXIT
+
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue
+  base=""
+  if [ "$remote_sha" != "$zero" ] && git cat-file -e "$remote_sha" 2>/dev/null; then
+    base=$remote_sha
+  else
+    base=$(git merge-base "$local_sha" origin/main 2>/dev/null)
+  fi
+  if [ -z "$base" ]; then echo "ALL" >> "$list"; continue; fi
+  git diff --name-only "$base" "$local_sha" >> "$list"
+done
+
+fail=0
+for pkg in packages/protocol web kb companion desktop; do
+  grep -q -e "^ALL$" -e "^$pkg/" "$list" || continue
+  dir="$root/$pkg"
+  if [ ! -d "$dir/node_modules" ]; then
+    echo "pre-push: $pkg changed but has no node_modules. Run npm ci in $pkg first." >&2
+    fail=1
+    continue
+  fi
+  for script in lint typecheck; do
+    if (cd "$dir" && node -e "process.exit(require('./package.json').scripts?.['$script'] ? 0 : 1)"); then
+      echo "pre-push: $pkg $script"
+      (cd "$dir" && npm run --silent "$script") || fail=1
+    fi
+  done
+done
+exit $fail

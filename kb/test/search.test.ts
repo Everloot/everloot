@@ -24,6 +24,19 @@ async function seed() {
   return db;
 }
 
+test("kind object finds the objects pfQuest stores as npc rows, and only those", async () => {
+  // The entities table's kind check has no `object`, so the pfQuest importer stores objects as `npc` rows with
+  // the ext id `object:<id>`. The search and exact-name tools still offer kind "object".
+  const db = openDb(":memory:");
+  await replaceSourceRows(db, "curated", ["npc"], [
+    row("object:1617", "Copper Vein", "A vein of ore.", { kind: "npc", gameVersion: "classic" }),
+    row("3100", "Copper Vein Watcher", "Watches a copper vein.", { kind: "npc", gameVersion: "classic" }),
+  ]);
+  expect((await search(db, "copper vein", 10, { kinds: ["object"] })).map((h) => h.extId)).toEqual(["object:1617"]);
+  expect((await getByName(db, "Copper Vein", "object")).map((h) => h.extId)).toEqual(["object:1617"]);
+  expect(await getByName(db, "Copper Vein Watcher", "object")).toEqual([]);
+});
+
 test("an exact-name match ranks first even when another page repeats the words", async () => {
   const hits = await search(await seed(), "Thunderfury");
   expect(hits.length).toBeGreaterThan(0);

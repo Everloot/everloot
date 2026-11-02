@@ -135,7 +135,7 @@ Later that day the talent build and raid plan link preview cards were added (20 
 
 The same ones CI runs (`.github/workflows/checks.yml`): `python scripts/check_md_links.py`,
 `python scripts/check_internal_paths.py`, `python scripts/check_dco.py origin/main HEAD`,
-`python scripts/check_no_ai_credit.py origin/main HEAD`, and `PR_TITLE="..." python scripts/check_pr_title.py`.
+and `PR_TITLE="..." python scripts/check_pr_title.py`.
 For code: `cd kb && npm test -- --maxWorkers=2 && npm run typecheck`; `cd web && npm test && npm run typecheck
 && npm run lint && npm run build`; the addon tests listed in `docs/2026-10-08-release-checklist.md`.
 
@@ -147,6 +147,14 @@ For code: `cd kb && npm test -- --maxWorkers=2 && npm run typecheck`; `cd web &&
 - Build-watch test generation (#586) removed the manual build-pinned test edits. The 70707 update (#582)
   merged after retaining those generated-build tests.
 - Search Console and Bing report Success for all submitted sitemaps. This proves receipt, not indexing.
+
+## Release state added 2026-11-01
+
+- The Worker serves the knowledge release from D1 `everloot-knowledge-2026-11-01` (`KNOWLEDGE_RELEASE_SHA256`
+  `6bcd2797…`), deployed with #658. Rollback: revert #658 to point back at `everloot-knowledge-2026-10-24`,
+  which is kept in D1, then run the checked deployment.
+- The public smoke list (`scripts/launch_smoke.py`) has 20 checks, adding `/addon`, `/upload` and the talent
+  build and raid plan card checks to the 16 of 2026-10-31.
 
 ## Remaining observations and launch gates
 

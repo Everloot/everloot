@@ -56,6 +56,9 @@ You need Node 22, Python 3.12 and Git. Each part's README says how to run and te
   `node_modules/@everloot/protocol` and run `npm install`: they install a packed copy, and npm keeps the
   old one while the version number is unchanged. Commit the regenerated `dist/` and `schema/`.
 
+To catch lint and type errors before CI does, turn on the pre-push check once per clone:
+`git config core.hooksPath .githooks`. It lints and typechecks only the packages your push changes.
+
 ### Sign your commits (DCO)
 
 Every commit needs a `Signed-off-by:` line. It certifies that you wrote the change, or have the right
@@ -67,9 +70,6 @@ Add it with `-s`:
 If CI says a commit is not signed off, fix the last commit with `git commit --amend -s --no-edit`,
 or several with `git rebase --signoff main`, then force-push your branch. Commits from GitHub's own
 bots, such as Dependabot, are exempt: a bot cannot certify anything.
-
-Commits and pull requests name people only. Leave out co-author lines and "generated with"
-footers that credit an AI tool; CI rejects them.
 
 ### Pull request titles
 

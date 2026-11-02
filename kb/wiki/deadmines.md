@@ -21,11 +21,9 @@ reviewed: null
 
 ## Overview
 
-The Deadmines are worked gold mines under Westfall that emptied out in the First War. Much later the Defias
-Brotherhood, a band of unpaid builders who turned outlaw, made them its stronghold. Far inside, its leader, Edwin
-VanCleef, has goblins helping him build a ship.
-
-The mines lie under a zone of farms that the Brotherhood has overrun.
+Before the First War, the Deadmines were the richest gold mines in human lands; the war emptied them. Much later
+the Defias Brotherhood, a band of unpaid builders turned outlaw, made them its stronghold. Far inside, its leader,
+Edwin VanCleef, is building a ship with the help of goblins.
 
 ## Getting there
 
@@ -34,9 +32,9 @@ Sentinel Hill's flight point is the nearest in the game files, and the entrance 
 
 ## History
 
-VanCleef was the head of the Stonemasons' Guild, the builders who put Stormwind back together after the Horde
-wrecked it. Once the city stood again, the House of Nobles would not pay what the masons wanted. The nobles broke up
-the guild, the masons took to the streets, and VanCleef led them away to hide in Westfall.
+VanCleef led the Stonemasons' Guild, the builders who put Stormwind back together after the Horde wrecked it. Once
+the city stood again, the House of Nobles offered the masons a pittance for their work and then ordered the guild
+broken up. The masons rioted in the streets, and VanCleef led them out of the city to hide in Westfall.
 
 There they ran farmers off their land, seized the mines and became the Defias Brotherhood. Their fight was with
 Stormwind's government, and the farmers of Westfall paid for it.
@@ -46,22 +44,21 @@ Stormwind's government, and the farmers of Westfall paid for it.
 Everloot's record of Blizzard's posts, through 2026-10-23, has nothing about the Deadmines for WoW: Forever. Nothing
 here is confirmed for Forever yet.
 
-The level, the entrance and the encounters come from the game files Everloot reads, build 1.60.1.70707. They are
-found in the game files and not confirmed in the game. The list of encounters is on
-[the database page](/database/instances/36-deadmines); which of them you meet in Forever, and in what order, is not
-known.
+The level, the entrance and the encounters come from the game files Everloot reads, build 1.60.1.70707, and are not
+confirmed in the game. [The database page](/database/instances/36-deadmines) lists the encounters; which of them
+Forever has, and in what order, is not known.
 
 Once players with the Everloot addon zone in and [upload their data](/upload), this page shows the entrance they
-agree on, and each boss they report with its kills and when it was last seen. Loot and quests are not known for
+agree on and each boss they report, with its kills and when it was last seen. Loot and quests are not known for
 Forever yet, so this page lists none.
 
 ## Before you go
 
 ### Editor to confirm
 
-- Proposed: Check the level in this page's facts before you form a group. It is the one level the game files give,
-  not a range, and it is not confirmed in the game.
+- Proposed: Check the level in this page's facts before you form a group. The game files give a level, not a range,
+  and the game has not confirmed it.
 - Proposed: Fly to Sentinel Hill, the nearest flight point in the game files, and travel southwest to Moonbrook.
 - Proposed: The game files list more than one difficulty for the Deadmines.
-  [The database page](/database/instances/36-deadmines) shows them, with the encounters. Which difficulties Forever
+  [The database page](/database/instances/36-deadmines) shows them with the encounters. Which difficulties Forever
   opens is not known, so do not plan a run around one yet.

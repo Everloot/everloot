@@ -33,7 +33,7 @@ import { handleRecipeThresholds, pathFactsFromRecords, recipeFactsFromRecords, r
 import { formatNpcPage, formatQuestPage, formatVendorPage, npcFactsFromRecords, npcPage, questPage, vendorPage, worldFactsFromRecords } from "./world-pages.js";
 import { handleWorldMapNear, mapFactsFromRecords, nearResult, nearZoneSpot } from "./world-map-near.js";
 import { WORLD_MAP_DATA } from "./world-map-file.js";
-import { CLIENT_EDGES, CLIENT_LAYER, CLIENT_TAXONOMY } from "./client-layer-file.js";
+import { CLIENT_EDGES, CLIENT_LAYER, CLIENT_SKILLS, CLIENT_TAXONOMY } from "./client-layer-file.js";
 import { RACE_TABLE } from "./client-races-file.js";
 import { handleClassRaces } from "./class-races-tool.js";
 import { withRacialNotes } from "./racial-notes.js";
@@ -570,10 +570,16 @@ async function entityPageUrl(
   return undefined;
 }
 
-/** A blank profession is refused before any read: an error, not a connected page about no profession. */
+/** The game's professions, from the build's SkillLine names; its "[DNT]" test lines are not one. */
+const PROFESSION_NAMES = [...CLIENT_SKILLS.values()].filter((name) => !name.includes("[DNT]")).sort();
+
+/** A blank or unknown profession is refused before any read: an error, not a connected page about no profession. */
 function professionArg(profession: string): string {
   const trimmed = profession.trim();
   if (!trimmed) throw new Error("Name a profession.");
+  if (!PROFESSION_NAMES.some((name) => name.toLowerCase() === trimmed.toLowerCase())) {
+    throw new Error(`No profession named "${trimmed}". The professions are ${PROFESSION_NAMES.join(", ")}.`);
+  }
   return trimmed;
 }
 
@@ -657,7 +663,7 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
       const answer = await readPageIn("item_page", (facts: ReturnType<typeof itemToolFactsFromRecords>, dataAsOf) => {
         const reported = reportedItemFacts(facts.numbers.get(args.itemId), new Date(dataAsOf ?? NaN));
         const page = { ...itemPage(args.itemId, facts), reported };
-        return { text: `${formatItemPage(page)}\n${formatItemNumbers(reported)}\nItem-number data as of ${dataAsOf ?? "[?]"}.`, page, url: itemPageUrl(page, inGameFiles(page.itemId)) };
+        return { text: `${formatItemPage(page)}\n${formatItemNumbers(reported, CLIENT_TAXONOMY.items.find((r) => r[0] === args.itemId))}\nItem-number data as of ${dataAsOf ?? "[?]"}.`, page, url: itemPageUrl(page, inGameFiles(page.itemId)) };
       });
       if ("connected" in answer.structured && !answer.structured.connected) answer.text += "\nItem numbers: [?]; no corpus read. Agreeing installs [?], last seen [?], build [?], data as of [?].";
       return answer;

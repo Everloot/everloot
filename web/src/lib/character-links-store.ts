@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { hashKey, KEY_PATTERN, presentedKey } from "./api-keys";
 import { signInPath } from "./auth/return-to";
 import { characterLinksOn, completionRef, linkCodeHash, linkKey, LINKS_PER_ACCOUNT, linkRealmKey, newLinkCode, type LinkRow } from "./character-links";
-import { rulesetOf } from "./player-pages";
+import { characterPath, showcaseOn } from "./character-showcase";
+import { DEFAULT_RULESET, rulesetOf } from "./player-pages";
 import { authQuery, getUser, siteUrl } from "./supabase/server";
 
 // Server side of character links: every write goes through the security definer functions in
@@ -59,19 +60,84 @@ export async function redeemLink(userId: string, row: LinkRow, secret: string, c
 export interface OwnLink {
   id: string; name: string; realm: string; race: string; class: string; faction: "Alliance" | "Horde"; level: number;
   status: "linked" | "frozen"; linked_at: string; last_upload_at: string;
+  /** Only with EVERLOOT_SHOWCASE=1: whether the character's public page is on, and its address. */
+  page?: { public: boolean; path: string };
 }
 const OWN_LINK_COLUMNS = "id,name,realm,race,class,faction,level,status,linked_at,last_upload_at";
+/** With the showcase on, the list also reads each link's ruleset and page switch. */
+const SHOWCASE_COLUMNS = "ruleset,character_visibility(page_public)";
+
+type ListedRow = Omit<OwnLink, "page"> & {
+  ruleset?: string;
+  // PostgREST embeds the one-to-one visibility row as an object; older versions send a one-row array.
+  character_visibility?: { page_public?: unknown } | Array<{ page_public?: unknown }> | null;
+};
 
 /** The account's links, oldest first. Only these columns are read, so nothing else can leave by mistake. */
 export async function listLinks(userId: string): Promise<OwnLink[]> {
-  const rows = await authQuery<OwnLink[]>(
-    `character_links?select=${OWN_LINK_COLUMNS}&user_id=eq.${encodeURIComponent(userId)}&order=linked_at.asc,id.asc&limit=${LINKS_PER_ACCOUNT}`,
+  const showcase = showcaseOn();
+  const columns = showcase ? `${OWN_LINK_COLUMNS},${SHOWCASE_COLUMNS}` : OWN_LINK_COLUMNS;
+  const rows = await authQuery<ListedRow[]>(
+    `character_links?select=${columns}&user_id=eq.${encodeURIComponent(userId)}&order=linked_at.asc,id.asc&limit=${LINKS_PER_ACCOUNT}`,
   );
   if (!Array.isArray(rows)) throw new Error("Invalid links response");
-  return rows.map((r) => ({
-    id: r.id, name: r.name, realm: r.realm, race: r.race, class: r.class, faction: r.faction, level: r.level,
-    status: r.status === "linked" ? "linked" : "frozen", linked_at: r.linked_at, last_upload_at: r.last_upload_at,
-  }));
+  return rows.map((r) => {
+    const link: OwnLink = {
+      id: r.id, name: r.name, realm: r.realm, race: r.race, class: r.class, faction: r.faction, level: r.level,
+      status: r.status === "linked" ? "linked" : "frozen", linked_at: r.linked_at, last_upload_at: r.last_upload_at,
+    };
+    if (!showcase) return link;
+    const visibility = Array.isArray(r.character_visibility) ? r.character_visibility[0] : r.character_visibility;
+    return { ...link, page: { public: visibility?.page_public === true, path: characterPath(r.ruleset ?? DEFAULT_RULESET, r.realm, r.name) } };
+  });
+}
+
+/** What `public_character` returns for a live, public, unhidden link. No account, key or hash is among it. */
+export interface PublicCharacter {
+  name: string; realm: string; race: string; class: string; faction: "Alliance" | "Horde"; level: number;
+  linkedAt: string; lastUploadAt: string;
+}
+
+/**
+ * The public read of one character through `public_character`, or null: not linked, frozen, hidden by a hide
+ * request, or its page switched off all look the same. Only the identity columns are kept; the section switches it
+ * also returns are for later slices.
+ */
+export async function publicCharacter(ruleset: string, realmSlug: string, name: string): Promise<PublicCharacter | null> {
+  const rows = await authQuery<Array<Record<string, unknown>>>("rpc/public_character", {
+    method: "POST", body: JSON.stringify({ p_ruleset: ruleset, p_realm_slug: realmSlug, p_name: name }),
+  });
+  if (!Array.isArray(rows)) throw new Error("Invalid character response");
+  const r = rows[0];
+  if (!r) return null;
+  if (typeof r.name !== "string" || typeof r.realm !== "string" || typeof r.race !== "string" || typeof r.class !== "string"
+    || (r.faction !== "Alliance" && r.faction !== "Horde") || typeof r.level !== "number"
+    || typeof r.linked_at !== "string" || typeof r.last_upload_at !== "string") {
+    throw new Error("Invalid character response");
+  }
+  return {
+    name: r.name, realm: r.realm, race: r.race, class: r.class, faction: r.faction, level: r.level,
+    linkedAt: r.linked_at, lastUploadAt: r.last_upload_at,
+  };
+}
+
+/** The page address of one of the account's links, or null when the account has no link with that id. */
+export async function ownLinkPath(userId: string, id: string): Promise<string | null> {
+  const rows = await authQuery<Array<{ ruleset: string; realm: string; name: string }>>(
+    `character_links?select=ruleset,realm,name&id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(userId)}&limit=1`,
+  );
+  if (!Array.isArray(rows)) throw new Error("Invalid links response");
+  return rows[0] ? characterPath(rows[0].ruleset, rows[0].realm, rows[0].name) : null;
+}
+
+/** The switches the owner may set in this slice. The section and ranking switches wait for their own contracts. */
+export type VisibilityFlags = { page_public?: boolean; indexable?: boolean };
+
+/** Sets the given switches through `set_visibility`. False when the link is not the account's. */
+export async function setVisibility(userId: string, id: string, flags: VisibilityFlags): Promise<boolean> {
+  return (await authQuery<boolean>("rpc/set_visibility", {
+    method: "POST", body: JSON.stringify({ p_user_id: userId, p_id: id, p_flags: flags }),
+  })) === true;
 }
 
 /**
