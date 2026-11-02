@@ -135,7 +135,7 @@ Later that day the talent build and raid plan link preview cards were added (20 
 
 The same ones CI runs (`.github/workflows/checks.yml`): `python scripts/check_md_links.py`,
 `python scripts/check_internal_paths.py`, `python scripts/check_dco.py origin/main HEAD`,
-`python scripts/check_no_ai_credit.py origin/main HEAD`, and `PR_TITLE="..." python scripts/check_pr_title.py`.
+and `PR_TITLE="..." python scripts/check_pr_title.py`.
 For code: `cd kb && npm test -- --maxWorkers=2 && npm run typecheck`; `cd web && npm test && npm run typecheck
 && npm run lint && npm run build`; the addon tests listed in `docs/2026-10-08-release-checklist.md`.
 
