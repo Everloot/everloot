@@ -62,6 +62,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site and Desktop App: Ollama suggests one small model, `qwen3:4b` (2.5 GB, calls tools), instead of `qwen3:8b`, and
   says what running a model on your own computer means: private and free, slower, and it uses your memory while it
   answers. The free cloud models stay the first choice.
+- Desktop App: the realms the Overview and the Market page offer to follow come from the one read of each save file
+  per write that the logout already makes, instead of a full read of every save each time either page opens (about
+  165 ms to under 1 ms per open on the heavy synthetic save in the quick benchmark).
 - Knowledge base: `entities.name_norm` stores each name's words as the search re-rank reads them, with an index on
   `(name_norm, kind)`. The exact-name lookup reads it instead of scanning every row through `lower(replace(...))`,
   and now matches non-ASCII capitals and punctuation the SQL expression missed. A punctuated name with stopwords

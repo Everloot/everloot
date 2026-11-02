@@ -29,7 +29,11 @@ export function thin<T>(points: T[], max = HISTORY_POINTS): T[] {
 }
 
 export function summarizeCharacters(text: string, now = Date.now()): CharactersInfo {
-  const { records } = parseEverlootLua(text);
+  return summarizeRecords(parseEverlootLua(text).records, now);
+}
+
+/** The same summary from records already read: saveFacts takes the character realms from it without a second parse. */
+export function summarizeRecords(records: Array<Record<string, unknown>>, now = Date.now()): CharactersInfo {
   const named = new Map<string, CharacterRow>();
   const keyed = new Map<string, ProgressRow>();
   const gearAt = new Map<string, string>();

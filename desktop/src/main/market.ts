@@ -3,7 +3,6 @@ import { join } from "node:path";
 import { fetchRealmPrices, writePricesAddon, type DropRow, type DropSources, type RealmPrices } from "../../../companion/src/prices";
 import { validRealm } from "../../../packages/protocol/src/realm";
 import type { RealmSummary } from "../shared/types";
-import { charactersFromFiles } from "./characters";
 import { saveFacts } from "./save-facts";
 
 /** The companion's cap on realms in one prices file. */
@@ -44,8 +43,11 @@ export function mergeRealms(own: string[], followed: string[]): { realm: string;
  */
 export function characterRealms(svFiles: string[]): string[] {
   const names: string[] = [];
-  for (const { realm } of charactersFromFiles(svFiles).characters) {
-    if (validRealm(realm) && !names.some((n) => realmKey(n) === realmKey(realm))) names.push(realm.trim());
+  for (const file of svFiles) {
+    let realms: string[];
+    // A file that cannot be read or parsed suggests nothing, as on the Characters page.
+    try { realms = saveFacts(file).characterRealms; } catch { continue; }
+    for (const realm of realms) if (validRealm(realm) && !names.some((n) => realmKey(n) === realmKey(realm))) names.push(realm.trim());
   }
   return names;
 }
