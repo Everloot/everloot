@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test, vi } from "vitest";
 import type { DungeonFacts } from "@/lib/wiki-dungeon";
-import { DungeonBosses, DungeonGlance } from "./dungeon-facts";
+import { DungeonBosses, DungeonGlance, DungeonLoadingArt, DungeonRecordedFacts } from "./dungeon-facts";
 
 vi.mock("@/lib/world-map", () => ({ WORLD_MAP: { difficulties: { 1: { name: "Normal", maxPlayers: 5 } } } }));
 
@@ -31,4 +31,24 @@ test("difficulty and group capacity come from the files and stay unconfirmed, ev
   expect(html).toContain("up to 5 players");
   expect(html).toContain('data-badge="files"');
   expect(html).not.toContain("Confirmed difficulty");
+});
+
+test("empty recorded sections explain missing evidence and link to upload without claiming no quests or drops", () => {
+  const html = renderToStaticMarkup(<DungeonRecordedFacts records={{ loot: [], quests: [], unavailable: false }} />);
+  expect(html).toContain("Unrecorded does not mean a boss drops nothing");
+  expect(html).toContain("This does not mean there are no quests here");
+  expect(html).toContain('href="/upload"');
+});
+
+test("a storage failure replaces recorded sections with an unknown-data notice", () => {
+  const html = renderToStaticMarkup(<DungeonRecordedFacts records={{ loot: [], quests: [], unavailable: true }} />);
+  expect(html).toContain("Player reports are unavailable");
+  expect(html).not.toContain("No public");
+});
+
+test("loading art has a credit and no-map caption, while missing art draws nothing", () => {
+  expect(renderToStaticMarkup(<DungeonLoadingArt art={null} />)).toBe("");
+  const html = renderToStaticMarkup(<DungeonLoadingArt art={{ mapId: 36, name: "Test mine", kind: "dungeon", heldBack: false, url: "https://example.test/loading.webp", width: 1600, small: null }} />);
+  expect(html).toContain('href="/methodology#credits"');
+  expect(html).toContain("This is not an interior map");
 });
