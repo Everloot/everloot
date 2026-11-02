@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, expect, test, vi } from "vitest";
-import { addonGithub } from "./addon-github";
+import { addonGithub, addonGithubSummary } from "./addon-github";
 import { plainNotes } from "./plain-notes";
 
 // A new repo per test: failed answers are remembered for a few minutes by repo name.
@@ -148,4 +148,21 @@ test("release notes lose their markdown and get an ellipsis when cut", () => {
   expect(cut.endsWith("…")).toBe(true);
   expect(plainNotes("short")).toBe("short");
   expect(plainNotes("   ")).toBeNull();
+});
+
+test("the summary reads stars and the newest release in two requests", async () => {
+  const fetch = stubFetch((url) => (new URL(url).pathname === `/repos/${REPO}` ? Response.json({ ...info, stargazers_count: 172 }) : answer(url)));
+  expect(await addonGithubSummary(REPO)).toEqual({
+    status: "ok",
+    data: { repo: REPO, url: info.html_url, stars: 172, release: { tag: "v1.2.0", date: "2026-10-14", url: release.html_url } },
+  });
+  expect(fetch).toHaveBeenCalledTimes(2);
+});
+
+test("the summary says when the rate limit was the reason, and remembers the failure", async () => {
+  const limited = stubFetch(() => new Response("", { status: 403, headers: { "x-ratelimit-remaining": "0" } }));
+  expect(await addonGithubSummary(REPO)).toEqual({ status: "unavailable", rateLimited: true });
+  expect(await addonGithubSummary(REPO)).toEqual({ status: "unavailable", rateLimited: true });
+  expect(limited).toHaveBeenCalledTimes(1);
+  expect(await addonGithubSummary("not a repo")).toEqual({ status: "missing" });
 });

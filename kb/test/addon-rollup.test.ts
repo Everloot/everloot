@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { plainTitle, popularAddonsFromRecords, rollupAllAddons, type AddonSeenRow } from "../src/addon-rollup.js";
+import { addonTrends, plainTitle, popularAddonsFromRecords, rollupAllAddons, type AddonSeenRow } from "../src/addon-rollup.js";
 
 /** When the corpus was current: rows dated after it are ignored. */
 const AS_OF = "2026-10-17T12:00:00Z";
@@ -133,4 +133,25 @@ test("a version is listed only when three installs report it, highest version fi
   ].map((row) => ({ kind: "addon_seen", ...row })), AS_OF);
   expect(addons[0].versions).toEqual(["1.10", "1.9", "1.1", "1.0"].map((version) => ({ version, installs: 3 })));
   expect(JSON.stringify(addons)).not.toContain("9.9-private");
+});
+
+test("the trend holds each week's share and the rank a week earlier, with the three-install rule on every week", () => {
+  const rows = [
+    // Bagnon: three installs two weeks back.
+    ...["a", "b", "c"].map((id) => seen(id, "Bagnon", "2026-10-02T00:00:00Z")),
+    // Questie: two installs two weeks back, the third and fourth this week, so it overtakes Bagnon.
+    seen("a", "Questie", "2026-10-02T00:00:00Z"), seen("b", "Questie", "2026-10-02T00:00:00Z"),
+    seen("c", "Questie", "2026-10-15T00:00:00Z"), seen("d", "Questie", "2026-10-15T00:00:00Z"),
+  ];
+  const trends = addonTrends(rows, AS_OF, 3);
+  expect(Object.keys(trends).sort()).toEqual(["Bagnon", "Questie"]);
+  // Weeks end 2026-10-03, 10-10 and 10-17 (12:00 UTC).
+  expect(trends.Bagnon).toEqual({ shares: [1, 1, 0.75], previousRank: 1 });
+  expect(trends.Questie).toEqual({ shares: [null, null, 1], previousRank: null });
+});
+
+test("an addon listed now but not a week ago has no previous rank; no weeks means no trend", () => {
+  expect(addonTrends([], AS_OF)).toEqual({});
+  const rows = ["a", "b", "c"].map((id) => seen(id, "Questie", "2026-10-16T00:00:00Z"));
+  expect(addonTrends(rows, AS_OF, 2).Questie).toEqual({ shares: [null, 1], previousRank: null });
 });

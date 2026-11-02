@@ -155,3 +155,36 @@ export function popularAddonsFromRecords(records: unknown[], asOf: string | Date
   const all = rollupAllAddons(addonRowsFromRecords(records), asOf);
   return { ...all, addons: all.addons.filter((addon) => addon.public) };
 }
+
+const WEEK_MS = 7 * 86_400_000;
+
+export interface AddonTrend {
+  /**
+   * The share as the leaderboard stood at the end of each of the last weeks, oldest first, the last one at `asOf`.
+   * Null for a week the addon was not listed yet (fewer than three installs had reported it).
+   */
+  shares: (number | null)[];
+  /** The addon's rank on the board as it stood a week before `asOf`, or null when it was not listed then. */
+  previousRank: number | null;
+}
+
+/**
+ * The board as it stood at the end of each of the last `weeks` weeks, by addon folder name, for the addons
+ * listed at `asOf`. Each week is the same all-time count cut off at that week's end, so the three-install rule
+ * holds for every point, and a week before the first upload has no listed addons.
+ */
+export function addonTrends(rows: AddonSeenRow[], asOf: string | Date = new Date(), weeks = 8): Record<string, AddonTrend> {
+  const end = new Date(asOf).getTime();
+  const boards = Array.from({ length: weeks }, (_, i) => {
+    const listed = rollupAllAddons(rows, new Date(end - (weeks - 1 - i) * WEEK_MS)).addons.filter((a) => a.public);
+    return new Map(listed.map((a, rank) => [a.name, { share: a.share, rank: rank + 1 }]));
+  });
+  const trends: Record<string, AddonTrend> = {};
+  for (const name of boards[weeks - 1]?.keys() ?? []) {
+    trends[name] = {
+      shares: boards.map((board) => board.get(name)?.share ?? null),
+      previousRank: weeks > 1 ? boards[weeks - 2].get(name)?.rank ?? null : null,
+    };
+  }
+  return trends;
+}

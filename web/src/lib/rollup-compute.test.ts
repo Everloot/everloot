@@ -14,7 +14,10 @@ const fns = vi.hoisted(() => ({
 // No recheck scopes: the cut-off hands the same records back, so the windows are read once.
 vi.mock("../../../kb/src/drop-rollup", () => ({ itemFactsFromRecords: fns.itemFacts, recheckLootRecords: (records: unknown[]) => records }));
 vi.mock("../../../kb/src/world-pages", () => ({ worldFactsFromRecords: fns.worldFacts }));
-vi.mock("../../../kb/src/addon-rollup", () => ({ popularAddonsFromRecords: fns.addons }));
+vi.mock("../../../kb/src/addon-rollup", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../kb/src/addon-rollup")>()),
+  popularAddonsFromRecords: fns.addons,
+}));
 vi.mock("../../../kb/src/edges", () => ({ observedEdges: fns.edges }));
 vi.mock("./rollups", () => ({ lootWindowsFromRecords: fns.windows, rollupDrops: fns.rollup }));
 
@@ -75,7 +78,7 @@ test("answer shapes are unchanged", async () => {
   expect(await loadItemFacts()).toEqual({ rates: [], names: [], npcs: [], unreachable: false });
   // The world facts carry the recheck scopes the readers apply (kb/curated/recheck.json holds none today).
   expect(await loadWorldFacts()).toEqual({ npcs: [], quests: [], vendors: [], recheck: [], unreachable: false });
-  expect(await loadPopularAddons()).toEqual({ addons: [], reportingInstalls: 0, unreachable: false, dataAsOf: "2026-10-10T11:00:00.000Z" });
+  expect(await loadPopularAddons()).toEqual({ addons: [], reportingInstalls: 0, trends: {}, unreachable: false, dataAsOf: "2026-10-10T11:00:00.000Z" });
   expect(await loadObservedEdges()).toEqual({ edges: [], unreachable: false, dataAsOf: "2026-10-10T11:00:00.000Z" });
 });
 
@@ -84,7 +87,7 @@ test("an unreadable store stays unreadable and never serves stale aggregates", a
   expect((await computeRollups()).stats.unreachable).toBe(true);
   expect((await loadItemFacts()).unreachable).toBe(true);
   expect((await loadWorldFacts()).unreachable).toBe(true);
-  expect(await loadPopularAddons()).toEqual({ addons: [], reportingInstalls: 0, unreachable: true, dataAsOf: null });
+  expect(await loadPopularAddons()).toEqual({ addons: [], reportingInstalls: 0, trends: {}, unreachable: true, dataAsOf: null });
   expect(await loadObservedEdges()).toEqual({ edges: [], unreachable: true, dataAsOf: null });
   store.loadCensus.mockResolvedValue({ rows: [], dataAsOf: null, unreachable: true });
   expect(await loadCensus()).toEqual({ view: null, unreachable: true, dataAsOf: null });

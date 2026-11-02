@@ -1,4 +1,4 @@
-import { popularAddonsFromRecords, type AddonRollup } from "../../../kb/src/addon-rollup";
+import { addonRowsFromRecords, addonTrends, popularAddonsFromRecords, type AddonRollup, type AddonTrend } from "../../../kb/src/addon-rollup";
 import { censusFromRows, type CensusView } from "../../../kb/src/census";
 import { itemFactsFromRecords, recheckLootRecords } from "../../../kb/src/drop-rollup";
 import { observedEdges, type Edge } from "../../../kb/src/edges";
@@ -42,6 +42,8 @@ interface AggregateSet {
   /** Items 3 installs saw a recipe make. */
   crafted: Set<number>;
   addons: AddonRollup;
+  /** Each listed addon's share at the end of the last 8 weeks and its rank a week ago, by folder name. */
+  addonTrends: Record<string, AddonTrend>;
   edges: Edge[];
   /** The NPC loot and item-source tables, with each source's windows, installs and dates. */
   loot: LootTables;
@@ -92,6 +94,7 @@ async function loadAggregates(): Promise<AggregateSet | null> {
       crafted: craftedItemsFromRecords(corpus.records),
       // Addon rows dated after the corpus was current are ignored, so one forged clock cannot set "last seen".
       addons: popularAddonsFromRecords(corpus.records, corpus.dataAsOf ?? new Date()),
+      addonTrends: addonTrends(addonRowsFromRecords(corpus.records), corpus.dataAsOf ?? new Date()),
       edges: observedEdges(corpus.records, corpus.dataAsOf ?? new Date(), RECHECK_SCOPES),
       loot: lootTablesFromRecords(lootRecords, corpus.dataAsOf ?? null),
     };
@@ -166,10 +169,10 @@ export async function loadLootTables(): Promise<{ tables: LootTables; unreachabl
 }
 
 /** The addon leaderboard: only addons three installs report, as counts with no install ids. */
-export async function loadPopularAddons(): Promise<AddonRollup & { unreachable: boolean; dataAsOf: string | null }> {
+export async function loadPopularAddons(): Promise<AddonRollup & { trends: Record<string, AddonTrend>; unreachable: boolean; dataAsOf: string | null }> {
   const agg = await loadAggregates();
-  if (!agg) return { addons: [], reportingInstalls: 0, unreachable: true, dataAsOf: null };
-  return { ...agg.addons, unreachable: false, dataAsOf: agg.dataAsOf };
+  if (!agg) return { addons: [], reportingInstalls: 0, trends: {}, unreachable: true, dataAsOf: null };
+  return { ...agg.addons, trends: agg.addonTrends, unreachable: false, dataAsOf: agg.dataAsOf };
 }
 
 let censusMemo: { read: CensusRead; view: CensusView } | null = null;
