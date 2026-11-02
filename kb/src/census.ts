@@ -15,6 +15,9 @@
  *   relation with anything hidden has at least two hidden parts whose true counts add up to at least
  *   10. Where it would not, the smallest shown part is hidden too, until it does. So, from any one sum,
  *   a hidden part could be anything from 0 to at least 10.
+ * - The level crosses (faction, race and class by level band, read by /census filters) are sums too: a faction, race
+ *   or class = its bands; a band = its factions = its races = its classes; a faction at a band = its races at that
+ *   band. Only level-cross cells are parts in those sums, so they never hide a cell of the tables above.
  * - Every count that shows is rounded to the nearest 5, each from its own true number, so a total is
  *   not the sum of its rounded parts either.
  * - A hidden count is null: the page and the MCP tool read it as "not enough reports" (fewer than 10 characters,
@@ -127,6 +130,14 @@ export interface CensusWindow {
   classes: { class: string; count: CensusCount }[];
   raceClass: { faction: Faction; race: string; class: string; count: CensusCount }[];
   levels: { band: LevelBand; count: CensusCount }[];
+  /**
+   * Level bands crossed with faction, race and class, for /census filters. Every one of these cells is a part in
+   * the suppression, never a total, so adding them hides nothing in the tables above. Faction by class is not
+   * published: it would be a sum of race and class cells that are already shown.
+   */
+  factionLevels: { faction: Faction; band: LevelBand; count: CensusCount }[];
+  raceLevels: { faction: Faction; race: string; band: LevelBand; count: CensusCount }[];
+  classLevels: { class: string; band: LevelBand; count: CensusCount }[];
 }
 
 export interface CensusView {
@@ -256,15 +267,23 @@ function windowOf(id: CensusWindow["id"], rows: readonly Dated[], from: number, 
   const classes = cells<string>(CENSUS_CLASSES.map((c) => c.token));
   const grid = cells(CENSUS_RACES.flatMap((r) => r.classes.map((c) => `${r.faction}/${r.token}/${c}`)));
   const levels = cells(LEVEL_BANDS.map((b) => b.id));
+  const bands = LEVEL_BANDS.map((b) => b.id);
+  const factionLevels = cells(FACTIONS.flatMap((f) => bands.map((b) => `${f}/${b}`)));
+  const raceLevels = cells(CENSUS_RACES.flatMap((r) => bands.map((b) => `${r.faction}/${r.token}/${b}`)));
+  const classLevels = cells(CENSUS_CLASSES.flatMap((c) => bands.map((b) => `${c.token}/${b}`)));
   for (const c of characters.values()) {
     const r = c.latest.row;
+    const b = bandOf(r.level);
     total.add(c);
     (c.own ? own : seen).add(c);
     factions.get(r.faction)!.add(c);
     races.get(`${r.faction}/${r.race}`)!.add(c);
     classes.get(r.class)!.add(c);
     grid.get(`${r.faction}/${r.race}/${r.class}`)!.add(c);
-    levels.get(bandOf(r.level))!.add(c);
+    levels.get(b)!.add(c);
+    factionLevels.get(`${r.faction}/${b}`)!.add(c);
+    raceLevels.get(`${r.faction}/${r.race}/${b}`)!.add(c);
+    classLevels.get(`${r.class}/${b}`)!.add(c);
   }
 
   const collecting = !clears(total.characters, total.installs.size, total.reporters.size);
@@ -279,8 +298,21 @@ function windowOf(id: CensusWindow["id"], rows: readonly Dated[], from: number, 
       margin: classes.get(c.token)!,
       parts: CENSUS_RACES.filter((r) => (r.classes as readonly string[]).includes(c.token)).map((r) => grid.get(`${r.faction}/${r.token}/${c.token}`)!),
     })),
+    // The level crosses. Their parts are only level-cross cells, so they never hide a cell of the tables above.
+    ...FACTIONS.map((f) => ({ margin: factions.get(f)!, parts: bands.map((b) => factionLevels.get(`${f}/${b}`)!) })),
+    ...bands.map((b) => ({ margin: levels.get(b)!, parts: FACTIONS.map((f) => factionLevels.get(`${f}/${b}`)!) })),
+    ...FACTIONS.flatMap((f) => bands.map((b) => ({
+      margin: factionLevels.get(`${f}/${b}`)!, parts: CENSUS_RACES.filter((r) => r.faction === f).map((r) => raceLevels.get(`${f}/${r.token}/${b}`)!),
+    }))),
+    ...bands.map((b) => ({ margin: levels.get(b)!, parts: CENSUS_RACES.map((r) => raceLevels.get(`${r.faction}/${r.token}/${b}`)!) })),
+    ...CENSUS_RACES.map((r) => ({ margin: races.get(`${r.faction}/${r.token}`)!, parts: bands.map((b) => raceLevels.get(`${r.faction}/${r.token}/${b}`)!) })),
+    ...CENSUS_CLASSES.map((c) => ({ margin: classes.get(c.token)!, parts: bands.map((b) => classLevels.get(`${c.token}/${b}`)!) })),
+    ...bands.map((b) => ({ margin: levels.get(b)!, parts: CENSUS_CLASSES.map((c) => classLevels.get(`${c.token}/${b}`)!) })),
   ];
-  suppress([own, seen, ...factions.values(), ...races.values(), ...classes.values(), ...grid.values(), ...levels.values()], relations);
+  suppress([
+    own, seen, ...factions.values(), ...races.values(), ...classes.values(), ...grid.values(), ...levels.values(),
+    ...factionLevels.values(), ...raceLevels.values(), ...classLevels.values(),
+  ], relations);
 
   const shown = (c: Cell): CensusCount => (collecting || c.hidden ? null : roundCount(c.characters));
   return {
@@ -298,6 +330,11 @@ function windowOf(id: CensusWindow["id"], rows: readonly Dated[], from: number, 
       faction: r.faction, race: r.token, class: cls, count: shown(grid.get(`${r.faction}/${r.token}/${cls}`)!),
     }))),
     levels: LEVEL_BANDS.map((b) => ({ band: b.id, count: shown(levels.get(b.id)!) })),
+    factionLevels: FACTIONS.flatMap((faction) => bands.map((band) => ({ faction, band, count: shown(factionLevels.get(`${faction}/${band}`)!) }))),
+    raceLevels: CENSUS_RACES.flatMap((r) => bands.map((band) => ({
+      faction: r.faction, race: r.token, band, count: shown(raceLevels.get(`${r.faction}/${r.token}/${band}`)!),
+    }))),
+    classLevels: CENSUS_CLASSES.flatMap((c) => bands.map((band) => ({ class: c.token, band, count: shown(classLevels.get(`${c.token}/${band}`)!) }))),
   };
 }
 

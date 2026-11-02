@@ -227,6 +227,43 @@ test("a lone hidden level band takes the smallest shown band with it", () => {
   expect(band(w, "20-29")).toBe(30);
 });
 
+test("a lone small Troll band is hidden with another Troll band, so the Troll count minus the rest can't give it", () => {
+  const trolls = (n: number, prefix: string, level: number) => crowd(n, prefix, { race: "Troll", class: "PRIEST", faction: "Horde", level });
+  const rows = [...everyone().filter((r) => r.race !== "Troll"), ...trolls(40, "t1", 15), ...trolls(25, "t2", 45), ...trolls(3, "t3", 60)];
+  const w = week(rows);
+  const troll = w.raceLevels.filter((x) => x.faction === "Horde" && x.race === "Troll");
+  expect(w.races.find((r) => r.race === "Troll")!.count).not.toBeNull();
+  expect(troll.find((x) => x.band === "60")!.count).toBeNull();
+  expect(troll.filter((x) => x.count === null).length).toBeGreaterThanOrEqual(2);
+});
+
+test("the level crosses hide only their own cells: levels never change what the faction, race, class or grid tables hide", () => {
+  // Those tables do not read level. If a level cross could hide one of their cells, moving characters between
+  // bands would change them; so the same characters at random levels and all at one level must agree.
+  const pick = (w: CensusWindow) => ({ characters: w.characters, bias: w.bias, factions: w.factions, races: w.races, classes: w.classes, raceClass: w.raceClass });
+  for (let seed = 1; seed <= 60; seed++) {
+    const next = random(seed);
+    const rows: CensusRow[] = [];
+    COMBOS.forEach((c, k) => {
+      const n = next() < 0.3 ? 0 : Math.floor(next() * 30);
+      for (let i = 0; i < n; i++) {
+        rows.push(row({ installId: INSTALLS[i % 3], characterKey: `w${seed}x${k}x${i}`, faction: c.faction, race: c.race, class: c.class, level: 1 + Math.floor(next() * 60) }));
+      }
+    });
+    const flat = rows.map((r) => ({ ...r, level: 30 }));
+    expect(pick(week(rows)), `seed ${seed}`).toEqual(pick(week(flat)));
+  }
+  const w = week(everyone(23));
+  expect(w.factionLevels).toHaveLength(FACTIONS.length * LEVEL_BANDS.length);
+  expect(w.raceLevels).toHaveLength(CENSUS_RACES.length * LEVEL_BANDS.length);
+  expect(w.classLevels).toHaveLength(CENSUS_CLASSES.length * LEVEL_BANDS.length);
+});
+
+test("while collecting, the level crosses are empty too", () => {
+  const w = week(crowd(9, "v1"));
+  expect([...w.factionLevels, ...w.raceLevels, ...w.classLevels].every((c) => c.count === null)).toBe(true);
+});
+
 test("a lone hidden cell in the race and class grid takes cells with it in its row and in its column", () => {
   const w = week([...everyone(20, "Alliance/Gnome/PRIEST"), ...crowd(4, "r1")]);
   expect(cell(w, "Gnome", "PRIEST")).toBeNull();
@@ -251,6 +288,23 @@ function relations(w: CensusWindow): { name: string; margin: CensusCount; parts:
     out.push({ name: `${r.faction} ${r.race} row`, margin: r.count, parts: w.raceClass.filter((c) => c.faction === r.faction && c.race === r.race).map((c) => c.count) });
   }
   for (const c of w.classes) out.push({ name: `${c.class} column`, margin: c.count, parts: w.raceClass.filter((x) => x.class === c.class).map((x) => x.count) });
+  // The level crosses /census filters read.
+  for (const f of w.factions) out.push({ name: `${f.faction} by level`, margin: f.count, parts: w.factionLevels.filter((x) => x.faction === f.faction).map((x) => x.count) });
+  for (const r of w.races) {
+    out.push({ name: `${r.faction} ${r.race} by level`, margin: r.count, parts: w.raceLevels.filter((x) => x.faction === r.faction && x.race === r.race).map((x) => x.count) });
+  }
+  for (const c of w.classes) out.push({ name: `${c.class} by level`, margin: c.count, parts: w.classLevels.filter((x) => x.class === c.class).map((x) => x.count) });
+  for (const l of w.levels) {
+    out.push({ name: `${l.band} by faction`, margin: l.count, parts: w.factionLevels.filter((x) => x.band === l.band).map((x) => x.count) });
+    out.push({ name: `${l.band} by race`, margin: l.count, parts: w.raceLevels.filter((x) => x.band === l.band).map((x) => x.count) });
+    out.push({ name: `${l.band} by class`, margin: l.count, parts: w.classLevels.filter((x) => x.band === l.band).map((x) => x.count) });
+  }
+  for (const f of w.factionLevels) {
+    out.push({
+      name: `${f.faction} ${f.band} by race`, margin: f.count,
+      parts: w.raceLevels.filter((x) => x.faction === f.faction && x.band === f.band).map((x) => x.count),
+    });
+  }
   return out;
 }
 
@@ -289,7 +343,11 @@ test("from any one published sum, a hidden count could be any of at least 11 val
       if (w.collecting) continue;
       for (const rel of relations(w)) {
         const hidden = rel.parts.filter((p) => p === null).length;
-        if (hidden === 0) continue;
+        // A hidden margin whose parts all show would be their sum.
+        if (hidden === 0) {
+          expect(rel.margin, `seed ${seed} ${w.id} ${rel.name}: hidden total, every part shown`).not.toBeNull();
+          continue;
+        }
         expect(hidden, `seed ${seed} ${w.id} ${rel.name}`).toBeGreaterThanOrEqual(2);
         if (rel.margin === null) continue; // a hidden margin bounds nothing from this sum
         const shownLow = rel.parts.filter((p): p is number => p !== null).reduce((s, p) => s + Math.max(p - half, CENSUS_MIN_CHARACTERS), 0);
