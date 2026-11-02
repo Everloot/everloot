@@ -40,4 +40,9 @@ for name in ['nightly.yml', 'release.yml']:
     workflow = (root / '.github/workflows' / name).read_text(encoding='utf-8')
     for contract in ['planner_contract.py', 'raid_plan_contract.py']:
         assert contract in workflow, (name, contract)
+# One list of addon contract tests (addon/tests/run_all.py) for pull requests, releases and nightlies.
+for name in ['checks.yml', 'nightly.yml', 'release.yml']:
+    workflow = (root / '.github/workflows' / name).read_text(encoding='utf-8')
+    assert 'python addon/tests/run_all.py' in workflow, (name, 'run_all.py')
+    assert '_contract.py && python addon/tests/' not in workflow.replace('raid_plan_contract.py && python addon/tests/planner_contract.py', ''), (name, 'a hand-kept list')
 print('Alpha release classification and planner publication contracts: PASS')
