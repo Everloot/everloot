@@ -100,6 +100,45 @@ test("with two weeks: the weekly chart, the change column and the current week m
   for (const slug of ["classes", "races", "factions"]) expect(hubPage).toContain(`href="/rankings/${slug}"`);
 });
 
+test("the hub's headline tiles, weekly totals and top movers, each row linking to the census filtered to it", async () => {
+  store.loadCensus.mockResolvedValue(read([...week(WEEK1, "w"), ...week(WEEK2, "v", 80)], "2026-11-20T12:00:00.000Z"));
+  const page = await hub();
+  const words = text(page);
+  // 149 characters last week round to 150; 201 this week round to 200.
+  expect(page).toContain("data-metric-tiles");
+  expect(words).toContain("Characters counted 200 This week so far (from 2026-11-16)");
+  expect(words).toContain("Against last week +50 +33% characters");
+  expect(words).toContain("Most played class Warrior 40% of characters");
+  expect(words).toContain("Reporting installs 3");
+  expect(page).toContain("data-weekly-totals");
+  expect(words).toMatch(/Week of 2026-11-09 150 This week so far \(from 2026-11-16\) 200/);
+  const movers = page.match(/<ol data-movers[\s\S]*?<\/ol>/)![0];
+  expect(text(movers)).toMatch(/▲2 up 2 Warrior Classes by players/);
+  expect(movers).toContain('href="/census?class=warrior"');
+  // The leaderboards link into the census, and draw each row's share over the weeks.
+  expect(page).toContain('href="/census?race=human"');
+  expect(page).toContain('href="/census?faction=alliance"');
+  expect(page).toContain("data-sparkline");
+  // Every chart has its numbers as a table, closed until asked for, and nothing on the page animates.
+  expect(page.match(/data-chart-table/g)!.length).toBe(2);
+  expect(words).toContain("Show as a table");
+  expect(page).not.toMatch(/animate-/);
+});
+
+test("with one week, the tiles and movers say why they have nothing to compare yet", async () => {
+  store.loadCensus.mockResolvedValue(read(week(WEEK1, "w"), "2026-11-15T12:00:00.000Z"));
+  const words = text(await hub());
+  expect(words).toContain("Against last week — not yet Starts once two weeks have numbers");
+  expect(words).toMatch(/Top movers .*Change against last week and the weekly chart start once two weeks have numbers/);
+  expect(words).not.toContain("data-movers");
+});
+
+test("a ranking's rows link to the census with the ranking's filters", async () => {
+  store.loadCensus.mockResolvedValue(read(week(WEEK1, "w"), "2026-11-15T12:00:00.000Z"));
+  expect(await ranking("races", { class: "hunter" })).toContain('href="/census?race=human&amp;class=hunter"');
+  expect(await ranking("classes")).toContain('href="/census?class=priest"');
+});
+
 test("a week under the thresholds says it is still collecting, with no number", async () => {
   store.loadCensus.mockResolvedValue(read(crowd(4, "s", WEEK1), "2026-11-15T12:00:00.000Z"));
   const page = await ranking("factions");

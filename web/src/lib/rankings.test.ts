@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
 import { censusFromRows, type CensusRow, type CensusWindow, type Faction } from "../../../kb/src/census";
 import {
-  RANKINGS, START_LINE, firstWeek, hubIndexable, parseRankingQuery, rankRows, rankedCount, rankingDef, rankingHref,
-  rankingIndexable, rankingView, rankingWeeks, weekStart,
+  RANKINGS, START_LINE, censusHrefOf, firstWeek, hubIndexable, hubMetrics, parseRankingQuery, rankRows, rankedCount, rankingDef, rankingHref,
+  rankingIndexable, rankingView, rankingWeeks, topMovers, weekStart, weeklyCharacters, type RankRow,
 } from "./rankings";
 
 let n = 0;
@@ -180,4 +180,36 @@ test("indexing: unfiltered with at least 10 ranked rows; a filtered or past-week
 test("every ranking has a description search engines accept", () => {
   for (const r of RANKINGS) expect(r.description.length, r.slug).toBeGreaterThanOrEqual(120);
   for (const r of RANKINGS) expect(r.description.length, r.slug).toBeLessThanOrEqual(160);
+});
+
+test("a row's census link names what it counts: a class, a side, or a race with its side only where it needs one", () => {
+  const row = (key: string, faction?: Faction) => ({ key, label: key, faction, count: 10, share: 0.1, rank: 1, change: null }) as RankRow;
+  expect(censusHrefOf("classes", row("MAGE"))).toBe("/census?class=mage");
+  expect(censusHrefOf("factions", row("Horde", "Horde"))).toBe("/census?faction=horde");
+  expect(censusHrefOf("races", row("Horde/Troll", "Horde"))).toBe("/census?race=troll");
+  expect(censusHrefOf("races", row("Horde/Troll", "Horde"), { class: "PRIEST" })).toBe("/census?race=troll&class=priest");
+  expect(censusHrefOf("races", row("Alliance/Skyborne", "Alliance"))).toBe("/census?faction=alliance&race=skyborne");
+});
+
+test("hub numbers: this week's characters against last week's, both rounded; movers by rank change over every ranking", () => {
+  const second = [
+    ...crowd(42, "m1", WEEK2, { class: "HUNTER" }), ...crowd(60, "m2", WEEK2, { class: "WARRIOR" }),
+    ...crowd(16, "m3", WEEK2, { race: "Gnome", class: "PRIEST" }), ...crowd(22, "m4", WEEK2, { race: "Orc", class: "HUNTER", faction: "Horde" }),
+    ...crowd(30, "m6", WEEK2, { race: "Troll", class: "PRIEST", faction: "Horde" }), ...crowd(6, "m7", WEEK2, { race: "Gnome", class: "MAGE" }),
+    ...crowd(5, "m8", WEEK2, { race: "Gnome", class: "WARLOCK" }),
+  ];
+  const weeks = rankingWeeks([...mixed(WEEK1, "w"), ...second], "2026-11-20T12:00:00.000Z");
+  const views = RANKINGS.map((def) => rankingView(def, weeks));
+  const m = hubMetrics(views)!;
+  expect(m.week.start).toBe("2026-11-16");
+  expect(m.change!.by).toBe(m.characters! - weeks.find((w) => w.start === "2026-11-09")!.window.characters!);
+  expect(m.topClass!.rank).toBe(1);
+  expect(weeklyCharacters(weeks).map((p) => p.week.start)).toEqual(weeks.map((w) => w.start));
+  const movers = topMovers(views);
+  expect(movers.length).toBeGreaterThan(0);
+  const by = movers.map((x) => (x.row.change as { by: number }).by);
+  expect(by).toEqual([...by].sort((a, b) => b - a));
+  expect(movers.every((x) => x.href.startsWith("/census"))).toBe(true);
+  // Before the first week there is nothing to headline.
+  expect(hubMetrics(RANKINGS.map((def) => rankingView(def, [])))).toBeNull();
 });
