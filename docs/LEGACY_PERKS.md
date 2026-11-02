@@ -11,7 +11,8 @@ follows.
 "Legacy" here is the game system's name. The catalog has nothing to do with the [legacy-data policy](LEGACY_DATA_POLICY.md)
 (uploads from before event ids) or with the code that reads old data formats and old sign-in sessions.
 
-No page or planner reads the file yet. A planner may enforce only the rules the catalog marks `stored`. The cost, the
+`/tools/legacy` lists it, read-only: trees, perks, ids, ranks and prerequisites, the gate amounts, and the cost
+and cap as unconfirmed readings, with the build and the label. No planner reads it. A planner may enforce only the rules the catalog marks `stored`. The cost, the
 cap and where a spend gate counts its points are `inferred`: they may be shown, labelled as unconfirmed readings, and
 nothing enforces them until each is confirmed in game or by Blizzard.
 

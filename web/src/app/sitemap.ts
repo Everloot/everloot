@@ -21,6 +21,7 @@ import { RANKINGS, hubIndexable, loadRankingWeeks, rankingIndexable, rankingPath
 import { hasContent, publicZones, zoneContents, zoneHref } from "@/lib/zones";
 import { loadNews, newsSitemapPaths } from "@/lib/news";
 import { wikiSitemapPaths } from "@/lib/wiki";
+import { LEGACY_PERKS } from "@/data/game-data/legacy-perks";
 
 // Rendered per request, as the database and auctions sitemaps are: built ahead of time it reflects only what the
 // build could read (the Cloudflare build has no storage keys, so item names, zones and dungeons were missing).
@@ -35,7 +36,7 @@ const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://everloot.app";
  * /wow-forever. Every other page has none, because a made-up date teaches crawlers to ignore the field.
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const staticRoutes = ["/", "/wow-forever", "/methodology", "/about", "/privacy", "/terms", "/security", "/accessibility", "/contact", "/upload", "/addon", "/lore", "/lore/coverage", "/changes", "/map", "/map/eastern-kingdoms", "/map/kalimdor", ...DATABASE_HUB_PATHS, "/tools", "/tools/collections", "/tools/guild-board", "/tools/auctions", "/tools/gold-ledger", "/addons", "/addons/popular", "/census", "/addons/ecosystem", "/addons/polestar", "/addons/polestar/packs", "/addons/polestar/wanted"];
+  const staticRoutes = ["/", "/wow-forever", "/methodology", "/about", "/privacy", "/terms", "/security", "/accessibility", "/contact", "/upload", "/addon", "/lore", "/lore/coverage", "/changes", "/map", "/map/eastern-kingdoms", "/map/kalimdor", ...DATABASE_HUB_PATHS, "/tools", "/tools/collections", "/tools/guild-board", "/tools/auctions", "/tools/gold-ledger", "/tools/legacy", "/addons", "/addons/popular", "/census", "/addons/ecosystem", "/addons/polestar", "/addons/polestar/packs", "/addons/polestar/wanted"];
 
   const talentRoutes = TALENT_CLASSES.map((slug) => `/tools/talents/${slug}`);
   // Item categories from the client layer: each class and subclass that holds items, first page only, and only
@@ -89,6 +90,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     if (path === "/map" || path.startsWith("/map/")) return MAP_DATA_EXTRACTED_AT;
     if (path.startsWith("/database/items")) return new Date(CLIENT_LAYER.build.extractedAt);
     if (path === "/tools/raid" || path === "/tools/talents" || path.startsWith("/tools/talents/")) return TALENT_DATA_EXTRACTED_AT;
+    if (path === "/tools/legacy") return new Date(LEGACY_PERKS.build.extractedAt);
     if (path === "/wow-forever") return new Date(LAUNCH.checkedOn);
     return undefined;
   };
