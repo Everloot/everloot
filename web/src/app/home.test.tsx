@@ -7,6 +7,7 @@ vi.mock("next/link", () => ({
     <a href={href} className={className}>{children}</a>
   ),
 }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {} }) }));
 
 import Home from "./page";
 import { loadTimeline } from "@/lib/changes";
@@ -68,12 +69,12 @@ test("the panel shows a post that arrived from two regions once", async () => {
     expect(timeline.some((e) => e.id === copy.id)).toBe(false);
   }
 });
-test("the hero asks: a GET form to /chat whose question goes in q, the one primary button there", () => {
+test("the hero asks: a GET form to /chat whose question goes in ask (prefilled there, never sent), the one primary button there", () => {
   const hero = html.slice(html.indexOf('id="hero-title"'), html.indexOf('id="whats-new"'));
   const form = hero.match(/<form [^>]*>/)?.[0] ?? "";
   for (const attr of ['action="/chat"', 'method="get"', 'role="search"', 'aria-label="Ask Everloot"']) expect(form).toContain(attr);
   const input = hero.match(/<input id="home-ask"[^>]*>/)?.[0] ?? "";
-  expect(input).toContain('name="q"');
+  expect(input).toContain('name="ask"');
   expect(input).toContain('required=""');
   expect(hero).toMatch(/<label for="home-ask" class="sr-only">/);
   expect(hero.match(/btn-primary/g)).toHaveLength(1);

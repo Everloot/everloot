@@ -5,6 +5,7 @@ import type { AccountShell, ShellCharacter } from "@/lib/account-shell-types";
 import { signInPath } from "@/lib/auth/return-to";
 import { answer, answerFree, FREE_TOOLS, loadTools, marketReply, searchOnly, signedIn, type ChatProgress, type ToolDef } from "@/lib/chat/agent";
 import { ITEM_FOUND, itemQuery, resolveItem, type ItemRef } from "@/lib/chat/items";
+import { handOver, takeHandoff } from "@/lib/chat/handoff";
 import { chatProvider } from "@/lib/chat/providers";
 import { providerStorage } from "@/lib/chat/provider-session";
 import {
@@ -233,11 +234,22 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `characters` is memoised in a ref
   }, [signed, savedBuilds, profiles, accountId]);
 
-  // From the home's Ask box: /chat?q=<question>&character=<id>. The character becomes the context chip. With a key
+  // From the signed-in home's form: /chat?q=<question>&character=<id>. The character becomes the context chip. With a key
   // ready, or the free model on, the question is sent at once; otherwise it waits in the box. The URL drops both so a reload does not resend.
+  // From the public home's Ask box: the question arrives in this tab's storage (lib/chat/handoff.ts), read once, and waits in
+  // the box for Send. Its no-JavaScript form, /chat?ask=, is moved there and the page reloaded on a clean entry,
+  // because Next's history state keeps the old address's search even after replaceState.
   useEffect(() => {
     if (!ready || signed === null || prefilled.current) return;
     const params = new URLSearchParams(window.location.search);
+    if (params.has("ask")) {
+      prefilled.current = true;
+      if (handOver(params.get("ask") ?? "")) window.location.replace(window.location.pathname);
+      else window.history.replaceState(null, "", window.location.pathname);
+      return;
+    }
+    const handed = takeHandoff();
+    if (handed) { prefilled.current = true; setDraft(handed); box.current?.focus(); return; }
     const q = (params.get("q") ?? "").trim().slice(0, 2000);
     const characterId = params.get("character");
     if (!q && !characterId) return;
