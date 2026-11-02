@@ -65,6 +65,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Desktop App: the realms the Overview and the Market page offer to follow come from the one read of each save file
   per write that the logout already makes, instead of a full read of every save each time either page opens (about
   165 ms to under 1 ms per open on the heavy synthetic save in the quick benchmark).
+- Desktop App: the Characters page and the chat's look at your characters read the same one parse per write, instead
+  of reading every save in full each time (about 170 to 2 ms on the heavy synthetic save). The last seven days, the
+  30-day chart and the latest receipts are still counted up to the moment you open the page.
 - Knowledge base: `entities.name_norm` stores each name's words as the search re-rank reads them, with an index on
   `(name_norm, kind)`. The exact-name lookup reads it instead of scanning every row through `lower(replace(...))`,
   and now matches non-ASCII capitals and punctuation the SQL expression missed. A punctuated name with stopwords
