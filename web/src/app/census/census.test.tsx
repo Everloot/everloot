@@ -173,14 +173,15 @@ test("every row of the census tables links to the census filtered to it, in the 
   expect(page).toContain('aria-label="Census filters"');
 });
 
-test("filtered to a race: its count and share, then by class and by level band, and no day-by-day trend", async () => {
+test("filtered to a race: its count and share, then by class, and no day-by-day trend", async () => {
   store.loadCensus.mockResolvedValue(corpus(RECORDS));
   const page = await filtered({ race: "troll", window: "launch" });
   const words = text(page);
   expect(words).toContain("About 30 characters, 21% of all characters counted.");
   // Every Troll is a Priest, so the Priest cell would be the Troll count minus zeros: the grid hides it, and so does the filter.
   expect(words).toMatch(/Troll: by class .*Priest not enough reports/);
-  expect(words).toContain("Troll: by level band");
+  // Level is not crossed with race, so there is no split by level band.
+  expect(words).not.toContain("by level band");
   expect(page).toContain('href="/census?race=troll&amp;class=priest&amp;window=launch"');
   expect(page).not.toContain('aria-labelledby="trend"');
   // The window tabs keep the filter.
@@ -194,6 +195,25 @@ test("a filter with no published total says so and lists the parts without a sha
   expect(words).toMatch(/Alliance Hunter: by race .*Human 40 /);
   expect(words).not.toMatch(/Alliance Hunter: by race .*Share/);
   expect(words).toContain("Ruleset: every realm counts as Forever until realms are mapped to rulesets.");
+});
+
+test("the race menu lists Skyborne under either faction filter", async () => {
+  store.loadCensus.mockResolvedValue(corpus(RECORDS));
+  expect(await filtered({ faction: "horde" })).toContain('href="/census?faction=horde&amp;race=skyborne"');
+  expect(await filtered({ faction: "alliance" })).toContain('href="/census?faction=alliance&amp;race=skyborne"');
+});
+
+test("a level band with any other filter says it is too fine to publish and shows no number", async () => {
+  store.loadCensus.mockResolvedValue(corpus(RECORDS));
+  const searches: Record<string, string>[] = [{ level: "60", faction: "alliance" }, { level: "60", race: "human" }, { level: "60", class: "warrior" }];
+  for (const search of searches) {
+    const page = await filtered(search);
+    expect(text(page), JSON.stringify(search)).toContain("This is too fine to publish.");
+    expect(page, JSON.stringify(search)).not.toContain('aria-labelledby="by-');
+    expect(text(page), JSON.stringify(search)).not.toMatch(/About \d+ characters,/);
+  }
+  // A level band alone is a published cell.
+  expect(text(await filtered({ level: "20-29" }))).toMatch(/About \d+ characters, \d+% of all characters counted\./);
 });
 
 test("a filtered page shows no number the unfiltered census hides", async () => {

@@ -158,8 +158,10 @@ function filterControls(f: CensusFilter, chosen: "week" | "launch"): FilterContr
       ...options.map((o) => ({ label: o.label, href: href({ [key]: o.value }), on: f[key] === o.value })),
     ],
   });
-  // Skyborne is one race name on both sides, so the race menu lists it once.
-  const races = CENSUS_RACES.filter((r, i) => CENSUS_RACES.findIndex((x) => x.token === r.token) === i && (!f.faction || r.faction === f.faction));
+  // Skyborne is one race name on both sides, so the race menu lists it once. The faction goes first: deduplicating
+  // first would keep only the Horde entry, and an Alliance filter would then drop it.
+  const sided = CENSUS_RACES.filter((r) => !f.faction || r.faction === f.faction);
+  const races = sided.filter((r, i) => sided.findIndex((x) => x.token === r.token) === i);
   return [
     menu("faction", "Faction", "Both", FACTIONS.map((x) => ({ label: x, value: x }))),
     menu("race", "Race", "All races", races.map((r) => ({ label: r.name, value: r.token }))),
@@ -172,7 +174,7 @@ const NOTE: Record<NonNullable<FilteredCensus["note"]>, string> = {
   impossible: "No character can be that combination, so there is nothing to count.",
   "both-sides": "Skyborne play on both sides with different classes, so the census counts each side apart and never adds them up. Pick a side.",
   "no-total": "The census does not publish one total for this combination, only the parts below. Adding them up would not be a count: a hidden part could be anything.",
-  "too-fine": "The census does not cross class and level with a race or a faction: those cells would be too small to show. Remove a filter.",
+  "too-fine": "This is too fine to publish. The census counts level bands on their own only, not by faction, race or class, so that a hidden count can't be worked out from the others. Remove a filter.",
 };
 
 /** The census under filters: the one published count for the whole filter, then each split it leaves open. */

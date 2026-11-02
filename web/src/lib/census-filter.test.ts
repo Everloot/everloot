@@ -55,9 +55,6 @@ function published(w: CensusWindow): Map<string, CensusCount> {
   for (const c of w.classes) m.set(key({ class: c.class }), c.count);
   for (const c of w.raceClass) m.set(key({ faction: c.faction, race: c.race, class: c.class }), c.count);
   for (const c of w.levels) m.set(key({ level: c.band }), c.count);
-  for (const c of w.factionLevels) m.set(key({ faction: c.faction, level: c.band }), c.count);
-  for (const c of w.raceLevels) m.set(key({ faction: c.faction, race: c.race, level: c.band }), c.count);
-  for (const c of w.classLevels) m.set(key({ class: c.class, level: c.band }), c.count);
   return m;
 }
 const keyOf = (f: CensusFilter) => [f.faction ?? "", f.race ?? "", f.class ?? "", f.level ?? ""].join("|");
@@ -99,19 +96,20 @@ describe("the URL", () => {
 describe("what a filter shows", () => {
   const w = weekOf(corpus(7));
 
-  test("a race shows its own count, by class from the grid and by level band", () => {
+  test("a race shows its own count and its classes from the grid, not its level bands", () => {
     const v = filterCensus(w, { race: "Troll" });
     expect(v.label).toBe("Troll");
     expect(v.headline).toEqual({ count: w.races.find((r) => r.race === "Troll")!.count });
-    expect(v.breakdowns.map((b) => b.by)).toEqual(["class", "level"]);
+    expect(v.breakdowns.map((b) => b.by)).toEqual(["class"]);
     expect(v.breakdowns[0].rows.map((r) => r.label)).toEqual(["Hunter", "Mage", "Priest", "Rogue", "Shaman", "Warlock", "Warrior"]);
     expect(v.breakdowns[0].rows[0].href).toBe("/census?race=troll&class=hunter");
   });
 
-  test("a level band splits by faction, race and class, and each row links one filter deeper", () => {
+  test("a level band shows its own count and no split: level is not crossed with faction, race or class", () => {
     const v = filterCensus(w, { level: "60" }, "launch");
-    expect(v.breakdowns.map((b) => b.by)).toEqual(["faction", "race", "class"]);
-    expect(v.breakdowns[1].rows.find((r) => r.label === "Troll (Horde)")!.href).toBe("/census?race=troll&level=60&window=launch");
+    expect(v.headline).toEqual({ count: w.levels.find((l) => l.band === "60")!.count });
+    expect(v.breakdowns).toEqual([]);
+    expect(v.note).toBeNull();
   });
 
   test("Skyborne without a side shows the two sides apart, never one total", () => {
@@ -130,8 +128,12 @@ describe("what a filter shows", () => {
     expect(v.breakdowns[0].rows.map((r) => r.label)).toEqual(["Orc", "Troll", "Undead"]);
   });
 
-  test("race, class and level at once is too fine to publish; an impossible combination says so", () => {
-    expect(filterCensus(w, { race: "Troll", class: "PRIEST", level: "60" })).toMatchObject({ headline: null, breakdowns: [], note: "too-fine" });
+  test("a level band with any other filter is too fine to publish; an impossible combination says so", () => {
+    for (const f of [
+      { race: "Troll", class: "PRIEST", level: "60" }, { faction: "Horde", level: "60" }, { race: "Troll", level: "60" }, { class: "MAGE", level: "1-9" },
+    ] as CensusFilter[]) {
+      expect(filterCensus(w, f), JSON.stringify(f)).toMatchObject({ headline: null, breakdowns: [], note: "too-fine" });
+    }
     expect(filterCensus(w, { race: "Troll", class: "PALADIN" })).toMatchObject({ headline: null, breakdowns: [], note: "impossible" });
     expect(filterCensus(w, { race: "Troll", faction: "Alliance" })).toMatchObject({ headline: null, breakdowns: [], note: "impossible" });
   });
@@ -158,7 +160,7 @@ describe("filters reveal nothing the census hides", () => {
         }
       }
     }
-    expect(checked).toBeGreaterThan(5000);
+    expect(checked).toBeGreaterThan(2000);
   });
 
   test("no filtered split has a lone hidden part, and a hidden filter count is never the sum of shown parts", () => {
@@ -181,17 +183,17 @@ describe("filters reveal nothing the census hides", () => {
     expect(hiddenSplits).toBeGreaterThan(100);
   });
 
-  test("a lone small band of one race: filtering to that race hides it with another band, not alone", () => {
-    const rows = corpus(3).filter((r) => r.race !== "Troll");
-    const troll = (n: number, level: number, at: string) => Array.from({ length: n }, (_, i): CensusRow => ({
-      kind: "census_seen", installId: `install-${"abc"[i % 3]}`, reporter: `r${"abc"[i % 3]}`.padStart(16, "0"), capturedAt: "2026-11-15T10:00:00.000Z",
-      characterKey: `troll-${at}-${i}`, serverId: 4, faction: "Horde", race: "Troll", class: "PRIEST", level, via: "target",
-    }));
-    const w = weekOf([...rows, ...troll(40, 15, "a"), ...troll(25, 45, "b"), ...troll(3, 60, "c")]);
-    const v = filterCensus(w, { race: "Troll" });
-    expect(v.headline!.count).not.toBeNull();
-    const bands = v.breakdowns.find((b) => b.by === "level")!.rows;
-    expect(bands.find((r) => r.label === "At 60")!.count).toBeNull();
-    expect(bands.filter((r) => r.count === null).length).toBeGreaterThanOrEqual(2);
+  test("no filter shows a number for a level band crossed with anything", () => {
+    const w = weekOf(corpus(3));
+    for (const f of everyFilter()) {
+      const v = filterCensus(w, f);
+      if (f.level && activeDims(f).length > 1) expect(v.headline, JSON.stringify(f)).toBeNull();
+      for (const b of v.breakdowns) {
+        for (const r of b.rows) {
+          const g = filterOf(r.href);
+          expect(Boolean(g.level) && activeDims(g).length > 1, `${JSON.stringify(f)} ${r.href}`).toBe(false);
+        }
+      }
+    }
   });
 });

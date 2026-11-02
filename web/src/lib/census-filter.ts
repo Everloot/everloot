@@ -5,10 +5,10 @@ import { DEFAULT_RULESET } from "./player-pages";
 
 /**
  * /census filters: faction, race, class, level band and ruleset in the URL. A filter only ever picks cells the
- * census rollup already publishes (kb/src/census.ts: the tables, the race and class grid and the level crosses),
- * each under the rollup's own suppression, so no filter adds a sum the suppression did not check. A combination
- * with no published cell (race, class and level at once; a faction's class total) says so instead of adding
- * one up.
+ * census rollup already publishes (kb/src/census.ts: the faction, race, class and level tables and the race and
+ * class grid), each under the rollup's own suppression, so no filter adds a sum the suppression did not check. A
+ * combination with no published cell says so instead of adding one up: a faction's class total lists its races,
+ * and a level band with any other filter is too fine, because the census does not cross level with anything.
  */
 
 export type CensusDim = "faction" | "race" | "class" | "level";
@@ -82,9 +82,6 @@ function tables(w: CensusWindow): { dims: CensusDim[]; cells: Picked[] }[] {
     { dims: ["class"], cells: w.classes.map((c) => ({ pick: { class: c.class }, count: c.count })) },
     { dims: ["faction", "race", "class"], cells: w.raceClass.map((c) => ({ pick: { faction: c.faction, race: c.race, class: c.class }, count: c.count })) },
     { dims: ["level"], cells: w.levels.map((c) => ({ pick: { level: c.band }, count: c.count })) },
-    { dims: ["faction", "level"], cells: w.factionLevels.map((c) => ({ pick: { faction: c.faction, level: c.band }, count: c.count })) },
-    { dims: ["faction", "race", "level"], cells: w.raceLevels.map((c) => ({ pick: { faction: c.faction, race: c.race, level: c.band }, count: c.count })) },
-    { dims: ["class", "level"], cells: w.classLevels.map((c) => ({ pick: { class: c.class, level: c.band }, count: c.count })) },
   ];
 }
 

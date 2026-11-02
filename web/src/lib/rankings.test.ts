@@ -31,7 +31,7 @@ const mixed = (at: string, p: string) => [
 /** A hand-made week: only what rankRows reads. */
 const windowOf = (classes: Record<string, number | null>, characters: number | null = 100): CensusWindow => ({
   id: "week", from: "", to: "", collecting: characters === null, characters, installs: 3, bias: { own: null, seen: null },
-  factions: [], races: [], raceClass: [], levels: [], factionLevels: [], raceLevels: [], classLevels: [],
+  factions: [], races: [], raceClass: [], levels: [],
   classes: Object.entries(classes).map(([cls, count]) => ({ class: cls, count })),
 });
 
