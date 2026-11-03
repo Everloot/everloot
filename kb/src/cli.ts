@@ -65,6 +65,7 @@ import { importWikiDump } from "./importers/wiki-dump.js";
 import { lootWindowsFromRecords, rollupDrops } from "./drop-rollup.js";
 import { startHttpBridge } from "./mcp-http.js";
 import { readCorpusRecords, serveStdio } from "./mcp-server.js";
+import { buildCatalogIndex, readCatalogFiles } from "./catalog-index.js";
 import { answerSourcesFactsFromRecords } from "./answer-sources.js";
 import { objectSpawnRowsFromRecords } from "./object-spawns.js";
 import { openPublicSnapshot } from "./public-snapshot.js";
@@ -414,12 +415,16 @@ async function main(): Promise<number> {
     case "serve-mcp": {
       const release = openPublicSnapshot(requireDbPath(flags, "serve-mcp"));
       closeOnExit(release.db);
+      // The game-file catalogs, read once; a missing file is named on stderr (stdout is the protocol) and skipped.
+      const { files, missing } = readCatalogFiles(flags.get("game-data") || "../web/src/data/game-data");
+      if (missing.length) console.error(`game-data: not found, skipped: ${missing.join(", ")}`);
+      const catalog = buildCatalogIndex(files);
       await serveStdio(release.db, () => {
         // The same files blue-check and builds-check write; absent files mean "not connected".
         const posts = join(CHANGES_DIR, "blue-posts.json");
         const builds = join(CHANGES_DIR, "builds.json");
         return existsSync(posts) || existsSync(builds) ? buildTimeline(loadStore(posts).posts, loadRegistry(builds).builds) : null;
-      });
+      }, () => catalog);
       return 0;
     }
     case "serve-mcp-http": {

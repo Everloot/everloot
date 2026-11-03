@@ -46,7 +46,8 @@ import {
   changesUrl, collectionsUrl, ECOSYSTEM_URL, goldLedgerUrl, guildBoardUrl, guildPageUrl, guildsUrl, itemPageUrl, ITEMS_URL, loreUrls, mapSpotUrl, marketItemUrl,
   npcPageUrl, npcUrl, objectPageUrl, professionsUrl, questPageUrl, vendorPageUrl, withMore,
 } from "./page-urls.js";
-import { getByName, getDocument, getEntity, search, searchSomeWords, SOME_WORDS, type SearchHit } from "./search.js";
+import { allTerms, getByName, getDocument, getEntity, search, searchSomeWords, SOME_WORDS, type SearchHit } from "./search.js";
+import { getCatalogByName, getCatalogEntity, isCatalogId, searchCatalog, type CatalogIndex, type CatalogRecord } from "./catalog-index.js";
 
 export const SERVER_NAME = "everloot-knowledge";
 export const SERVER_VERSION = "0.8.1";
@@ -475,25 +476,52 @@ async function withPages(db: ReleaseSource, hits: SearchHit[]): Promise<(SearchH
 
 /** The hits as text, each with its page on the site when it has one. */
 async function formatHits(db: ReleaseSource, hits: SearchHit[]): Promise<string> {
-  return (await withPages(db, hits)).map((h) => withMore(`[${h.kind}/${h.gameVersion}] ${h.name}\n${h.snippet}\nSource: ${h.sourceUrl} (${h.licence}, retrieved ${h.retrievedAt})`, h.url)).join("\n\n");
+  return (await withPages(db, hits)).map((h) => {
+    const line = `[${h.kind}/${h.gameVersion}] ${h.name}\n${h.snippet}\nSource: ${h.sourceUrl} (${h.licence}, retrieved ${h.retrievedAt})`;
+    // A game-file record carries its own credit as the last line, after the page it links.
+    return isCatalogId(h.id) ? withMore(`${line}\n${GAME_DATA_CREDIT}`, h.url, GAME_DATA_CREDIT) : withMore(line, h.url);
+  }).join("\n\n");
 }
 
 export { SOME_WORDS };
 
 /** The hits for every asked word, or, when no page has them all, the pages with some of them. */
-async function searchResult(db: ReleaseSource, args: SearchArgs): Promise<{ hits: SearchHit[]; some: boolean }> {
+async function searchResult(db: ReleaseSource, args: SearchArgs, catalog: CatalogIndex | null = null): Promise<{ hits: SearchHit[]; some: boolean }> {
   const opts = { kinds: args.kind ? [args.kind] : undefined, versions: args.version ? [args.version] : undefined };
-  const hits = await search(db, args.query, args.limit, opts);
-  return hits.length ? { hits, some: false } : { hits: await searchSomeWords(db, args.query, args.limit, opts), some: true };
+  const found = mergeHits(await search(db, args.query, args.limit, opts), catalogSearch(catalog, args), args);
+  return found.length ? { hits: found, some: false } : { hits: await searchSomeWords(db, args.query, args.limit, opts), some: true };
+}
+
+/** Catalog records are game-file data in the "forever" build; a version filter for another build excludes them. */
+function catalogSearch(catalog: CatalogIndex | null, args: SearchArgs): SearchHit[] {
+  if (!catalog || (args.version && args.version !== "forever")) return [];
+  return searchCatalog(catalog, args.query, { kinds: args.kind ? [args.kind] : undefined, limit: args.limit ?? 10 }).map(plainHit);
+}
+
+/** A catalog record as the plain hit every search answer carries (no body, no data). */
+function plainHit({ body: _body, data: _data, ...hit }: CatalogRecord): SearchHit {
+  return hit;
+}
+
+/** Exact-name hits first (release before catalog on ties), then the rest in order, cut to the limit. */
+function mergeHits(release: SearchHit[], catalog: SearchHit[], args: SearchArgs): SearchHit[] {
+  if (catalog.length === 0) return release;
+  const asked = allTerms(args.query);
+  const all = [...release, ...catalog];
+  const exact = (h: SearchHit): boolean => asked !== "" && allTerms(h.name) === asked;
+  return [...all.filter(exact), ...all.filter((h) => !exact(h))].slice(0, args.limit ?? 10);
 }
 
 /** Pure handlers — tested directly; the MCP registration below is a thin wrapper. */
-export async function searchHits(db: ReleaseSource, args: SearchArgs): Promise<SearchHit[]> {
-  return (await searchResult(db, args)).hits;
+export async function searchHits(db: ReleaseSource, args: SearchArgs, catalog: CatalogIndex | null = null): Promise<SearchHit[]> {
+  return (await searchResult(db, args, catalog)).hits;
 }
 
-export async function handleSearch(db: ReleaseSource, args: SearchArgs): Promise<string> {
-  const { hits, some } = await searchResult(db, args);
+export async function handleSearch(db: ReleaseSource, args: SearchArgs, catalog: CatalogIndex | null = null): Promise<string> {
+  return textOfSearch(db, await searchResult(db, args, catalog));
+}
+
+async function textOfSearch(db: ReleaseSource, { hits, some }: { hits: SearchHit[]; some: boolean }): Promise<string> {
   if (hits.length === 0) return "No matches. Try fewer or different words.";
   return some ? `${SOME_WORDS}\n\n${await formatHits(db, hits)}` : formatHits(db, hits);
 }
@@ -513,16 +541,34 @@ function jsonAnswer(structured: object): StructuredAnswer {
   return { text: JSON.stringify(structured), structured };
 }
 
-export async function handleGetEntity(db: ReleaseSource, args: { id: number }): Promise<string> {
-  const hit = await getEntity(db, args.id);
+/** One row by id: a catalog id is read from the index, any other from the release. */
+async function entityOf(db: ReleaseSource, id: number, catalog: CatalogIndex | null): Promise<SearchHit | undefined> {
+  if (isCatalogId(id)) {
+    const record = catalog ? getCatalogEntity(catalog, id) : undefined;
+    return record ? plainHit(record) : undefined;
+  }
+  return getEntity(db, id);
+}
+
+/** The release's exact-name records, then the catalog's. */
+async function namedHits(db: ReleaseSource, name: string, kind: (typeof KNOWLEDGE_KINDS)[number] | undefined, catalog: CatalogIndex | null): Promise<SearchHit[]> {
+  const release = await getByName(db, name, kind);
+  return catalog ? [...release, ...getCatalogByName(catalog, name, kind).map(plainHit)] : release;
+}
+
+export async function handleGetEntity(db: ReleaseSource, args: { id: number }, catalog: CatalogIndex | null = null): Promise<string> {
+  const hit = await entityOf(db, args.id, catalog);
   return hit ? formatHits(db, [hit]) : `No record with id ${args.id}.`;
 }
 
-export async function handleGetByName(db: ReleaseSource, args: { name: string; kind?: (typeof KNOWLEDGE_KINDS)[number] }): Promise<string> {
-  const hits = await getByName(db, args.name, args.kind);
+export async function handleGetByName(db: ReleaseSource, args: { name: string; kind?: (typeof KNOWLEDGE_KINDS)[number] }, catalog: CatalogIndex | null = null): Promise<string> {
+  const hits = await namedHits(db, args.name, args.kind, catalog);
   if (hits.length === 0) return `No record named exactly "${args.name}". Try search_knowledge for close matches.`;
   return formatHits(db, hits);
 }
+
+/** The game-file catalogs the knowledge tools union with the release. Null means the host carries none. */
+export type CatalogLoader = () => CatalogIndex | null | Promise<CatalogIndex | null>;
 
 /** The game-data files' facts for answer_sources (files-evidence.ts). Null means the host carries none. */
 export type GameDataLoader = () => FilesIndex | null | Promise<FilesIndex | null>;
@@ -597,7 +643,7 @@ function professionArg(profession: string): string {
 }
 
 /** The readers a host lends the tools: the site's store in process, or nothing for a standalone server. */
-export interface ToolOptions { corpus?: CorpusLoader; market?: MarketLoader; gameData?: GameDataLoader; completion?: CompletionLoader; changes?: ChangesLoader; ecosystem?: EcosystemLoader; census?: CensusLoader; coverage?: CoverageLoader; settledSummary?: SettledSummaryLoader; guilds?: GuildReader; recheck?: readonly RecheckScope[] }
+export interface ToolOptions { catalog?: CatalogLoader; corpus?: CorpusLoader; market?: MarketLoader; gameData?: GameDataLoader; completion?: CompletionLoader; changes?: ChangesLoader; ecosystem?: EcosystemLoader; census?: CensusLoader; coverage?: CoverageLoader; settledSummary?: SettledSummaryLoader; guilds?: GuildReader; recheck?: readonly RecheckScope[] }
 
 /** The guild ladder's tools: registered only when the host lends a guild reader (EVERLOOT_GUILDS on the site). */
 export const GUILD_TOOLS: readonly McpToolName[] = ["guild_search", "guild_rankings"];
@@ -622,21 +668,43 @@ export type ToolHandlers = { [K in McpToolName]: (args: McpToolArgs<K>) => ToolA
  */
 export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {}): ToolHandlers {
   const recheck = options.recheck ?? [];
+  // A catalog that cannot be read leaves the release's answer, never an error.
+  const catalogOf = async (): Promise<CatalogIndex | null> => {
+    try { return (await options.catalog?.()) ?? null; } catch { return null; }
+  };
   const readPageIn = <T>(tool: ToolName, page: (facts: T, dataAsOf: string | null) => { text: string; page: object; url?: string }) =>
     readPage<T>(tool, options.corpus, page, recheck);
   const readFacts = <T>(tool: ToolName, render: (facts: T) => string) => fromTooledUploads(tool, render, options.corpus, recheck);
   const handlers: ToolHandlers = {
-    search_knowledge: async (args) => ({ text: await handleSearch(db, args), structured: { hits: await withPages(db, await searchHits(db, args)) } }),
-    get_entity: async (args) => {
-      const hit = await getEntity(db, args.id);
-      return { text: await handleGetEntity(db, args), structured: { hit: hit ? (await withPages(db, [hit]))[0]! : null } };
+    search_knowledge: async (args) => {
+      const result = await searchResult(db, args, await catalogOf());
+      return { text: await textOfSearch(db, result), structured: { hits: await withPages(db, result.hits) } };
     },
-    get_by_name: async (args) => ({ text: await handleGetByName(db, args), structured: { hits: await withPages(db, await getByName(db, args.name, args.kind)) } }),
+    get_entity: async (args) => {
+      const catalog = await catalogOf();
+      const hit = await entityOf(db, args.id, catalog);
+      return { text: await handleGetEntity(db, args, catalog), structured: { hit: hit ? (await withPages(db, [hit]))[0]! : null } };
+    },
+    get_by_name: async (args) => {
+      const catalog = await catalogOf();
+      return { text: await handleGetByName(db, args, catalog), structured: { hits: await withPages(db, await namedHits(db, args.name, args.kind, catalog)) } };
+    },
     search: async (args) => jsonAnswer({
-      results: (await searchHits(db, { query: args.query, limit: 10 })).map((h) => ({ id: String(h.id), title: h.name, url: recordUrl(h, SITE) })),
+      results: (await searchHits(db, { query: args.query, limit: 10 }, await catalogOf())).map((h) => ({ id: String(h.id), title: h.name, url: recordUrl(h, SITE) })),
     }),
     fetch: async (args) => {
-      const doc = /^\d{1,15}$/.test(args.id) ? await getDocument(db, Number(args.id)) : undefined;
+      const numeric = /^\d{1,15}$/.test(args.id) ? Number(args.id) : undefined;
+      if (numeric !== undefined && isCatalogId(numeric)) {
+        const catalog = await catalogOf();
+        const record = catalog ? getCatalogEntity(catalog, numeric) : undefined;
+        if (record) {
+          return jsonAnswer({
+            id: String(record.id), title: record.name, text: record.body, url: record.sourceUrl,
+            metadata: { kind: record.kind, gameVersion: record.gameVersion, sourceUrl: record.sourceUrl, sourceId: record.sourceId, licence: record.licence, retrievedAt: record.retrievedAt, credit: GAME_DATA_CREDIT },
+          });
+        }
+      }
+      const doc = numeric !== undefined && !isCatalogId(numeric) ? await getDocument(db, numeric) : undefined;
       if (!doc) throw new Error(`No record with id "${args.id}". Ids come from search results.`);
       return jsonAnswer({
         id: String(doc.id), title: doc.name, text: doc.body, url: recordUrl(doc, SITE),
@@ -896,10 +964,10 @@ export function createKnowledgeServer(db: ReleaseSource, options: ToolOptions = 
 }
 
 /** stdio transport: Claude, ChatGPT dev mode, and the Everloot companion all speak this. Never returns. */
-export async function serveStdio(db: DB, changes?: ChangesLoader): Promise<never> {
+export async function serveStdio(db: DB, changes?: ChangesLoader, catalog?: CatalogLoader): Promise<never> {
   // The site's snapshot changes about every ten minutes; reading it more often gains nothing.
   cachePublicCorpus(10 * 60_000);
-  const server = createKnowledgeServer(db, { changes });
+  const server = createKnowledgeServer(db, { changes, catalog });
   await server.connect(new StdioServerTransport());
   return new Promise<never>(() => {});
 }

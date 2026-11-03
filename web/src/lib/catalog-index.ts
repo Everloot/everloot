@@ -1,0 +1,40 @@
+// The game-file catalogs (achievements, factions, titles, quest lines, mounts, legacy perks, races, instances) as the
+// knowledge tools' search index, built once from the site's own committed files (the same imports the pages read) and
+// lent to the MCP mounts and GET /api/tools. See kb/src/catalog-index.ts.
+import achievementsJson from "@/data/game-data/client-achievements.json";
+import encountersJson from "@/data/game-data/client-encounters.json";
+import factionsJson from "@/data/game-data/client-factions.json";
+import mountsJson from "@/data/game-data/client-mounts.json";
+import titlesJson from "@/data/game-data/client-titles.json";
+import questLinesJson from "@/data/game-data/client-quest-lines.json";
+import legacyPerksJson from "@/data/game-data/legacy-perks.json";
+import mapJson from "@/data/game-data/map.json";
+import racesJson from "@/data/game-data/races.json";
+import { buildCatalogIndex, WorldMapEntrances, type CatalogIndex } from "../../../kb/src/catalog-index";
+import { ClientAchievements } from "../../../kb/src/client-achievements";
+import { ClientEncounters } from "../../../kb/src/client-encounters";
+import { ClientMounts } from "../../../kb/src/client-mounts";
+import { ClientFactions } from "../../../kb/src/client-factions";
+import { ClientQuestLines } from "../../../kb/src/client-quest-lines";
+import { RaceTable } from "../../../kb/src/client-races";
+import { ClientTitles } from "../../../kb/src/client-titles";
+import { LegacyPerkCatalog } from "../../../kb/src/legacy-perks/catalog";
+
+let index: CatalogIndex | null = null;
+
+/** The index, built on first use and kept for the process. */
+export function catalogIndex(): CatalogIndex {
+  index ??= buildCatalogIndex({
+    achievements: ClientAchievements.parse(achievementsJson),
+    mounts: ClientMounts.parse(mountsJson),
+    encounters: ClientEncounters.parse(encountersJson),
+    map: WorldMapEntrances.parse(mapJson),
+    // Parsed once here: the imports' schema fields are plain strings to the compiler.
+    legacyPerks: LegacyPerkCatalog.parse(legacyPerksJson),
+    races: RaceTable.parse(racesJson),
+    factions: ClientFactions.parse(factionsJson),
+    titles: ClientTitles.parse(titlesJson),
+    questLines: ClientQuestLines.parse(questLinesJson),
+  });
+  return index;
+}
