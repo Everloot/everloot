@@ -505,7 +505,7 @@ export const knowledgeHit = z.object({
   sourceId: z.string(),
   licence: z.string().describe("The source's licence, such as CC-BY-SA-4.0."),
   retrievedAt: z.string().describe("When the source was read."),
-  url: z.string().optional().describe("The record's page on everloot.app, absolute: an indexed lore page. Absent for a record the site has no page for."),
+  url: z.string().optional().describe("The record's page on everloot.app, absolute: an indexed lore page or a catalog page. Absent for a record the site has no page for."),
 });
 export type KnowledgeHit = z.infer<typeof knowledgeHit>;
 
