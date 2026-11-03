@@ -14,6 +14,7 @@ the site states a fact only once three installs agree.**
 [![Site: everloot.app](https://img.shields.io/badge/site-everloot.app-2f7a0a)](https://everloot.app)
 [![Discord](https://img.shields.io/badge/chat-Discord-5865F2)](https://discord.gg/9CKsbHTRu3)
 [![Latest addon release](https://img.shields.io/github/v/release/Everloot/everloot?filter=addon-v*&label=addon)](https://github.com/Everloot/everloot/releases)
+[![MCP connector on Glama: tool definition quality and endpoint health](https://glama.ai/mcp/connectors/app.everloot/knowledge/badges/score.svg)](https://glama.ai/mcp/connectors/app.everloot/knowledge)
 
 ![The Everloot home page](docs/media/home.webp)
 
