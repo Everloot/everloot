@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/talent_tree.json",
   "title": "Talent trees for one class",
-  "description": "The WoW: Forever talent trees of one class from the game files (found in game files, unconfirmed, with the build): every node with its talents, ranks, grid position, prerequisites and row gate, plus the levels talent points arrive at. Node ids are the ids a share code names. Narrow to one tree by name. The calculator is at /tools/talents/<class>.",
+  "description": "Returns the WoW: Forever talent trees of one class from the game files (found in game files, unconfirmed, with the build): every node with its talents, ranks, grid position, prerequisites and row gate, plus the levels talent points arrive at. Node ids are the ids a share code names. Use it to read or explain a class's trees; use talent_plan to decode a share code against them, and class_races for which races can be the class. Narrow to one tree by name; without it the answer holds every node of every tree. The answer links the calculator.",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false

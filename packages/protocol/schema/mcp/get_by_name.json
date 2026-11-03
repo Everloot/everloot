@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/get_by_name.json",
   "title": "Get records by exact name",
-  "description": "Exact full-name match (case-insensitive) for disambiguation.",
+  "description": "Returns the records whose full name matches exactly, case-insensitively, optionally narrowed to one record kind. Use it to disambiguate when you know the exact name and want the id without a ranked search; use search_knowledge for partial names, keywords or questions. Several records can share a name across kinds, so check each hit's kind. Empty hits mean no record has that exact name.",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false

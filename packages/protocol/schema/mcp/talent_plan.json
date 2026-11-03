@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/talent_plan.json",
   "title": "Read a talent share code",
-  "description": "Decodes an Everloot talent share code (EL1-<class>-<spec>-<build>-<payload>, or a calculator link carrying one after #plan=) against the class's trees: the talents and ranks it holds, points per tree, the lowest level that can hold it, and every problem in plain words: a code made on another build, nodes the tree does not have, ranks cut back, points the rules would not place. Nothing is dropped silently. Game-file data, found in game files, unconfirmed.",
+  "description": "Decodes an Everloot talent share code (EL1-<class>-<spec>-<build>-<payload>, or a calculator link carrying one after #plan=) against the class's trees: the talents and ranks it holds, points per tree, the lowest level that can hold it, and every problem in plain words: a code made on another build, nodes the tree does not have, ranks cut back, points the rules would not place. Nothing is dropped silently. Use it when given a share code or a calculator link; use talent_tree to read the trees themselves. Game-file data, found in game files, unconfirmed.",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false

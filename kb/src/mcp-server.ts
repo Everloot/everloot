@@ -49,7 +49,7 @@ import {
 import { getByName, getDocument, getEntity, search, searchSomeWords, SOME_WORDS, type SearchHit } from "./search.js";
 
 export const SERVER_NAME = "everloot-knowledge";
-export const SERVER_VERSION = "0.8.0";
+export const SERVER_VERSION = "0.8.1";
 /** The source this server runs, offered to every client (AGPL section 13). */
 export const SOURCE_URL = "https://github.com/Everloot/everloot";
 /** One line a client shows beside the server's name in its list of servers. */

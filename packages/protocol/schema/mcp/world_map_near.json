@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/world_map_near.json",
   "title": "What is near a place on the map",
-  "description": "Entrances, NPCs, vendors and treasures near a spot, nearest first, with straight-line distances in yards. Give a zone (name or map id) with x and y from 0 to 100, or an NPC id to start from where that NPC stands. Entrances come from the game files; one is confirmed once 3 installs zoned in from it. NPCs, vendors and treasures are player-observed and listed only where 3 installs agree on the position. Zones the files hold back as possibly unreleased are not offered. Reads Everloot's public player data when connected.",
+  "description": "Entrances, NPCs, vendors and treasures near a spot, nearest first, with straight-line distances in yards. Give a zone (name or map id) with x and y from 0 to 100, or an NPC id to start from where that NPC stands. Entrances come from the game files; one is confirmed once 3 installs zoned in from it. NPCs, vendors and treasures are player-observed and listed only where 3 installs agree on the position. Zones the files hold back as possibly unreleased are not offered. Use it for what is near a spot; use npc_page, vendor_page or entity_relations for one entity's own facts. Reads Everloot's public player data when connected.",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false

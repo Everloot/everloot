@@ -7,6 +7,10 @@ required, or tightening a limit is a major release.
 ## [Unreleased]
 
 ### Changed
+- Description text only, no shape change: every MCP tool description opens with what it returns, says when to use it and
+  which sibling tool to use instead, and where its id comes from; the `limit` parameters of `guild_search`,
+  `guild_rankings`, `recent_changes` and `ecosystem_projects` state what they cap. Written against the tool definition
+  quality review on Glama (the lowest were `npc_page` and `vendor_page`). Titles, input and output shapes are unchanged.
 - Description text only, no shape change: the MCP tools built on player data say they read "Everloot's public
   player data" instead of "current authorized public corpus", `entity_relations` names the game-file relations of the
   current build, and `gold_ledger` says what its answer holds. Titles, input and output schemas are unchanged.

@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/recipe_thresholds.json",
   "title": "Recipe skill ranges",
-  "description": "Where a Forever profession's recipes turn yellow, green and grey, inferred from the colours players' trade-skill windows showed. A recipe appears only after 3 installs agree, as ranges, never guessed exact numbers. Agreed reagents come with an estimated cost per craft when every reagent has an agreed price. Reads Everloot's current public corpus.",
+  "description": "Returns where one Forever profession's recipes turn yellow, green and grey, as skill ranges inferred from the colours players' trade-skill windows showed, never guessed exact numbers. A recipe appears only after 3 installs agree. Agreed reagents come with an estimated cost per craft when every reagent has an agreed price. Use it for how long a recipe keeps giving skill points; use profession_path for a step-by-step route between two skill levels. Narrow the list with part of a recipe name. Reads Everloot's current public corpus.",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false
