@@ -12,6 +12,7 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, posix, win32 } from "node:path";
 import { pathToFileURL } from "node:url";
+import { parseEverlootLua } from "../../web/src/lib/sv-parse";
 import { createAnswerStore, answerPending } from "./bridge/run";
 import { lazyEngine, mcpAnswerSources, mcpEngine, mcpMarketValue, siteItemSearch, withMarket } from "./bridge/engine";
 import { llmEngine } from "./bridge/llm-engine";
@@ -63,6 +64,22 @@ export function uploadSummary(file: string, r: UploadResult): string {
   const rejected = r.rejected ? ` the site turned away ${r.rejected} ${r.rejected === 1 ? "row, which stays unsent and goes" : "rows, which stay unsent and go"} again next run;` : "";
   const runs = r.heldRuns ? ` ${r.heldRuns} ${r.heldRuns === 1 ? "run or boss pull waits" : "runs and boss pulls wait"} here until the site reads them.` : "";
   return `${file}: sent ${r.sent} new events in ${r.batches} batch(es);${rejected} kept ${r.heldNamed} named, ${r.heldAddons} installed-addon, ${r.heldCensus} census, ${r.heldPlayers} player and ${r.heldLegacy} legacy rows here.${runs}`;
+}
+
+/**
+ * Whether a save other than `file` carries this install id, as with a copied WTF folder. Each upload cuts upload
+ * history to its own file's events, so two files sharing one would cut each other's; the uploader keeps it whole
+ * while this says yes. A file that cannot be read counts as not sharing, as in the Desktop App.
+ */
+export function sharesInstallWith(file: string, files: readonly string[]): (installId: string) => boolean {
+  return (installId) => files.some((other) => {
+    if (other === file) return false;
+    try {
+      return parseEverlootLua(readFileSync(other, "utf8")).installId === installId;
+    } catch {
+      return false;
+    }
+  });
 }
 
 export function debounce(run: () => void, ms: number): () => void {
@@ -133,7 +150,7 @@ async function main(argv: string[]): Promise<void> {
   if (args.command === "prices") return prices();
   const send = async (file: string) => {
     try {
-      console.log(uploadSummary(file, await uploadFile(file, { endpoint: args.endpoint, state, collects })));
+      console.log(uploadSummary(file, await uploadFile(file, { endpoint: args.endpoint, state, collects, sharesInstall: sharesInstallWith(file, files) })));
       if (args.command === "watch") await prices();
     } catch (err) {
       console.error(`${file}: ${err instanceof Error ? err.message : String(err)}`);
