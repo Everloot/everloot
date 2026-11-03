@@ -118,6 +118,22 @@
             "url": {
               "description": "The record's page on everloot.app, absolute: an indexed lore page or a catalog page. Absent for a record the site has no page for.",
               "type": "string"
+            },
+            "confirmed": {
+              "description": "Present when player uploads confirm this game-file entry (3 or more installs agree). asOf is the date the rollup was current.",
+              "type": "object",
+              "properties": {
+                "asOf": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "asOf"
+              ],
+              "additionalProperties": false
             }
           },
           "required": [

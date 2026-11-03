@@ -1052,6 +1052,9 @@ export declare const fetchedDocument: z.ZodObject<{
         licence: z.ZodString;
         retrievedAt: z.ZodString;
         credit: z.ZodString;
+        confirmed: z.ZodOptional<z.ZodObject<{
+            asOf: z.ZodNullable<z.ZodString>;
+        }, z.core.$strip>>;
     }, z.core.$strip>;
 }, z.core.$strip>;
 export type FetchedDocumentOut = z.infer<typeof fetchedDocument>;
@@ -1091,6 +1094,9 @@ export declare const knowledgeHit: z.ZodObject<{
     licence: z.ZodString;
     retrievedAt: z.ZodString;
     url: z.ZodOptional<z.ZodString>;
+    confirmed: z.ZodOptional<z.ZodObject<{
+        asOf: z.ZodNullable<z.ZodString>;
+    }, z.core.$strip>>;
 }, z.core.$strip>;
 export type KnowledgeHit = z.infer<typeof knowledgeHit>;
 /** One entry of the changes timeline as recent_changes returns it. Titles and excerpts are quoted source text. */
@@ -1226,6 +1232,9 @@ export declare const MCP_TOOLS: {
                 licence: z.ZodString;
                 retrievedAt: z.ZodString;
                 url: z.ZodOptional<z.ZodString>;
+                confirmed: z.ZodOptional<z.ZodObject<{
+                    asOf: z.ZodNullable<z.ZodString>;
+                }, z.core.$strip>>;
             }, z.core.$strip>>;
         };
         readonly annotations: {
@@ -1275,6 +1284,9 @@ export declare const MCP_TOOLS: {
                 licence: z.ZodString;
                 retrievedAt: z.ZodString;
                 url: z.ZodOptional<z.ZodString>;
+                confirmed: z.ZodOptional<z.ZodObject<{
+                    asOf: z.ZodNullable<z.ZodString>;
+                }, z.core.$strip>>;
             }, z.core.$strip>>;
         };
         readonly annotations: {
@@ -1343,6 +1355,9 @@ export declare const MCP_TOOLS: {
                 licence: z.ZodString;
                 retrievedAt: z.ZodString;
                 url: z.ZodOptional<z.ZodString>;
+                confirmed: z.ZodOptional<z.ZodObject<{
+                    asOf: z.ZodNullable<z.ZodString>;
+                }, z.core.$strip>>;
             }, z.core.$strip>>;
         };
         readonly annotations: {
@@ -1410,6 +1425,9 @@ export declare const MCP_TOOLS: {
                 licence: z.ZodString;
                 retrievedAt: z.ZodString;
                 credit: z.ZodString;
+                confirmed: z.ZodOptional<z.ZodObject<{
+                    asOf: z.ZodNullable<z.ZodString>;
+                }, z.core.$strip>>;
             }, z.core.$strip>;
         };
         readonly annotations: {
@@ -2951,6 +2969,9 @@ export declare const MCP_TOOL_LIST: ({
             licence: z.ZodString;
             retrievedAt: z.ZodString;
             url: z.ZodOptional<z.ZodString>;
+            confirmed: z.ZodOptional<z.ZodObject<{
+                asOf: z.ZodNullable<z.ZodString>;
+            }, z.core.$strip>>;
         }, z.core.$strip>>;
     };
     annotations: {
@@ -3000,6 +3021,9 @@ export declare const MCP_TOOL_LIST: ({
             licence: z.ZodString;
             retrievedAt: z.ZodString;
             url: z.ZodOptional<z.ZodString>;
+            confirmed: z.ZodOptional<z.ZodObject<{
+                asOf: z.ZodNullable<z.ZodString>;
+            }, z.core.$strip>>;
         }, z.core.$strip>>;
     };
     annotations: {
@@ -3068,6 +3092,9 @@ export declare const MCP_TOOL_LIST: ({
             licence: z.ZodString;
             retrievedAt: z.ZodString;
             url: z.ZodOptional<z.ZodString>;
+            confirmed: z.ZodOptional<z.ZodObject<{
+                asOf: z.ZodNullable<z.ZodString>;
+            }, z.core.$strip>>;
         }, z.core.$strip>>;
     };
     annotations: {
@@ -3135,6 +3162,9 @@ export declare const MCP_TOOL_LIST: ({
             licence: z.ZodString;
             retrievedAt: z.ZodString;
             credit: z.ZodString;
+            confirmed: z.ZodOptional<z.ZodObject<{
+                asOf: z.ZodNullable<z.ZodString>;
+            }, z.core.$strip>>;
         }, z.core.$strip>;
     };
     annotations: {

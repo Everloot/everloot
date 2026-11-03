@@ -456,6 +456,7 @@ export const fetchedDocument = z.object({
         licence: z.string().describe("The source's licence, such as CC-BY-SA-4.0."),
         retrievedAt: z.string().describe("When the source was read."),
         credit: z.string().describe("The credit line to show with the text."),
+        confirmed: z.object({ asOf: z.string().nullable() }).optional().describe("Present when player uploads confirm this game-file entry (3 or more installs agree). asOf is the date the rollup was current."),
     }),
 });
 /** One knowledge record as search_knowledge, get_entity and get_by_name return it. */
@@ -471,6 +472,7 @@ export const knowledgeHit = z.object({
     licence: z.string().describe("The source's licence, such as CC-BY-SA-4.0."),
     retrievedAt: z.string().describe("When the source was read."),
     url: z.string().optional().describe("The record's page on everloot.app, absolute: an indexed lore page or a catalog page. Absent for a record the site has no page for."),
+    confirmed: z.object({ asOf: z.string().nullable() }).optional().describe("Present when player uploads confirm this game-file entry (3 or more installs agree). asOf is the date the rollup was current."),
 });
 /** One entry of the changes timeline as recent_changes returns it. Titles and excerpts are quoted source text. */
 export const changeEntry = z.object({

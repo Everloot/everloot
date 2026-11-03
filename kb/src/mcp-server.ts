@@ -47,6 +47,7 @@ import {
   npcPageUrl, npcUrl, objectPageUrl, professionsUrl, questPageUrl, vendorPageUrl, withMore,
 } from "./page-urls.js";
 import { allTerms, getByName, getDocument, getEntity, search, searchSomeWords, SOME_WORDS, type SearchHit } from "./search.js";
+import { confirmedCatalog, confirmedLine, type ConfirmedIds } from "./catalog-confirmed.js";
 import { getCatalogByName, getCatalogEntity, isCatalogId, searchCatalog, type CatalogIndex, type CatalogRecord } from "./catalog-index.js";
 
 export const SERVER_NAME = "everloot-knowledge";
@@ -474,12 +475,20 @@ async function withPages(db: ReleaseSource, hits: SearchHit[]): Promise<(SearchH
   return hits.map((h) => (urls.has(h.id) ? { ...h, url: urls.get(h.id)! } : h));
 }
 
+/** Hits that player uploads confirm carry `confirmed`. Only catalog records can be: release rows are lore. */
+function annotate<T extends SearchHit>(hits: T[], ids: ConfirmedIds | null): (T & { confirmed?: { asOf: string | null } })[] {
+  if (!ids) return hits;
+  return hits.map((h) => (isCatalogId(h.id) && confirmedLine(h.kind, h.extId, ids) ? { ...h, confirmed: { asOf: ids.asOf } } : h));
+}
+
 /** The hits as text, each with its page on the site when it has one. */
-async function formatHits(db: ReleaseSource, hits: SearchHit[]): Promise<string> {
+async function formatHits(db: ReleaseSource, hits: SearchHit[], ids: ConfirmedIds | null = null): Promise<string> {
   return (await withPages(db, hits)).map((h) => {
     const line = `[${h.kind}/${h.gameVersion}] ${h.name}\n${h.snippet}\nSource: ${h.sourceUrl} (${h.licence}, retrieved ${h.retrievedAt})`;
+    const confirmed = ids && isCatalogId(h.id) ? confirmedLine(h.kind, h.extId, ids) : null;
+    const head = confirmed ? `${line}\n${confirmed}` : line;
     // A game-file record carries its own credit as the last line, after the page it links.
-    return isCatalogId(h.id) ? withMore(`${line}\n${GAME_DATA_CREDIT}`, h.url, GAME_DATA_CREDIT) : withMore(line, h.url);
+    return isCatalogId(h.id) ? withMore(`${head}\n${GAME_DATA_CREDIT}`, h.url, GAME_DATA_CREDIT) : withMore(head, h.url);
   }).join("\n\n");
 }
 
@@ -521,9 +530,9 @@ export async function handleSearch(db: ReleaseSource, args: SearchArgs, catalog:
   return textOfSearch(db, await searchResult(db, args, catalog));
 }
 
-async function textOfSearch(db: ReleaseSource, { hits, some }: { hits: SearchHit[]; some: boolean }): Promise<string> {
+async function textOfSearch(db: ReleaseSource, { hits, some }: { hits: SearchHit[]; some: boolean }, ids: ConfirmedIds | null = null): Promise<string> {
   if (hits.length === 0) return "No matches. Try fewer or different words.";
-  return some ? `${SOME_WORDS}\n\n${await formatHits(db, hits)}` : formatHits(db, hits);
+  return some ? `${SOME_WORDS}\n\n${await formatHits(db, hits, ids)}` : formatHits(db, hits, ids);
 }
 
 /** A tool answer: the text every client gets, plus structured content for tools with an output schema. */
@@ -556,15 +565,15 @@ async function namedHits(db: ReleaseSource, name: string, kind: (typeof KNOWLEDG
   return catalog ? [...release, ...getCatalogByName(catalog, name, kind).map(plainHit)] : release;
 }
 
-export async function handleGetEntity(db: ReleaseSource, args: { id: number }, catalog: CatalogIndex | null = null): Promise<string> {
+export async function handleGetEntity(db: ReleaseSource, args: { id: number }, catalog: CatalogIndex | null = null, ids: ConfirmedIds | null = null): Promise<string> {
   const hit = await entityOf(db, args.id, catalog);
-  return hit ? formatHits(db, [hit]) : `No record with id ${args.id}.`;
+  return hit ? formatHits(db, [hit], ids) : `No record with id ${args.id}.`;
 }
 
-export async function handleGetByName(db: ReleaseSource, args: { name: string; kind?: (typeof KNOWLEDGE_KINDS)[number] }, catalog: CatalogIndex | null = null): Promise<string> {
+export async function handleGetByName(db: ReleaseSource, args: { name: string; kind?: (typeof KNOWLEDGE_KINDS)[number] }, catalog: CatalogIndex | null = null, ids: ConfirmedIds | null = null): Promise<string> {
   const hits = await namedHits(db, args.name, args.kind, catalog);
   if (hits.length === 0) return `No record named exactly "${args.name}". Try search_knowledge for close matches.`;
-  return formatHits(db, hits);
+  return formatHits(db, hits, ids);
 }
 
 /** The game-file catalogs the knowledge tools union with the release. Null means the host carries none. */
@@ -672,22 +681,27 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
   const catalogOf = async (): Promise<CatalogIndex | null> => {
     try { return (await options.catalog?.()) ?? null; } catch { return null; }
   };
+  // The rollup's agreed ids; unreadable leaves the answer unconfirmed, never an error.
+  const confirmedOf = (): Promise<ConfirmedIds | null> => confirmedCatalog(options.completion);
   const readPageIn = <T>(tool: ToolName, page: (facts: T, dataAsOf: string | null) => { text: string; page: object; url?: string }) =>
     readPage<T>(tool, options.corpus, page, recheck);
   const readFacts = <T>(tool: ToolName, render: (facts: T) => string) => fromTooledUploads(tool, render, options.corpus, recheck);
   const handlers: ToolHandlers = {
     search_knowledge: async (args) => {
       const result = await searchResult(db, args, await catalogOf());
-      return { text: await textOfSearch(db, result), structured: { hits: await withPages(db, result.hits) } };
+      const ids = await confirmedOf();
+      return { text: await textOfSearch(db, result, ids), structured: { hits: annotate(await withPages(db, result.hits), ids) } };
     },
     get_entity: async (args) => {
       const catalog = await catalogOf();
+      const ids = await confirmedOf();
       const hit = await entityOf(db, args.id, catalog);
-      return { text: await handleGetEntity(db, args, catalog), structured: { hit: hit ? (await withPages(db, [hit]))[0]! : null } };
+      return { text: await handleGetEntity(db, args, catalog, ids), structured: { hit: hit ? annotate(await withPages(db, [hit]), ids)[0]! : null } };
     },
     get_by_name: async (args) => {
       const catalog = await catalogOf();
-      return { text: await handleGetByName(db, args, catalog), structured: { hits: await withPages(db, await namedHits(db, args.name, args.kind, catalog)) } };
+      const ids = await confirmedOf();
+      return { text: await handleGetByName(db, args, catalog, ids), structured: { hits: annotate(await withPages(db, await namedHits(db, args.name, args.kind, catalog)), ids) } };
     },
     search: async (args) => jsonAnswer({
       results: (await searchHits(db, { query: args.query, limit: 10 }, await catalogOf())).map((h) => ({ id: String(h.id), title: h.name, url: recordUrl(h, SITE) })),
@@ -698,9 +712,11 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
         const catalog = await catalogOf();
         const record = catalog ? getCatalogEntity(catalog, numeric) : undefined;
         if (record) {
+          const ids = await confirmedOf();
+          const line = ids ? confirmedLine(record.kind, record.extId, ids) : null;
           return jsonAnswer({
-            id: String(record.id), title: record.name, text: record.body, url: record.sourceUrl,
-            metadata: { kind: record.kind, gameVersion: record.gameVersion, sourceUrl: record.sourceUrl, sourceId: record.sourceId, licence: record.licence, retrievedAt: record.retrievedAt, credit: GAME_DATA_CREDIT },
+            id: String(record.id), title: record.name, text: line ? `${record.body}\n${line}` : record.body, url: record.sourceUrl,
+            metadata: { kind: record.kind, gameVersion: record.gameVersion, sourceUrl: record.sourceUrl, sourceId: record.sourceId, licence: record.licence, retrievedAt: record.retrievedAt, credit: GAME_DATA_CREDIT, ...(line ? { confirmed: { asOf: ids!.asOf } } : {}) },
           });
         }
       }

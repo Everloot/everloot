@@ -92,6 +92,22 @@
           "credit": {
             "type": "string",
             "description": "The credit line to show with the text."
+          },
+          "confirmed": {
+            "description": "Present when player uploads confirm this game-file entry (3 or more installs agree). asOf is the date the rollup was current.",
+            "type": "object",
+            "properties": {
+              "asOf": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "asOf"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
