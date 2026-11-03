@@ -1,0 +1,66 @@
+{
+ "schema": "everloot.legacy-perks/1",
+ "label": "found in game files, unconfirmed",
+ "credit": "Game data © Blizzard Entertainment, Inc., read from the public client; not under Everloot's licence. Column names from WoWDBDefs (https://github.com/wowdev/WoWDBDefs), CC BY-SA 4.0.",
+ "build": {
+  "product": "wowf",
+  "buildId": 70707,
+  "version": "1.60.1.70707",
+  "buildConfig": "7feb61f3c994bcb168526b8db521514a",
+  "definitions": "a3840427a39e",
+  "extractedAt": "2026-11-01T16:07:29.475Z"
+ },
+ "traitSystemId": 45,
+ "currencies": [
+  {
+   "id": 4225,
+   "cap": {
+    "value": 16,
+    "confidence": "inferred",
+    "from": "TraitCurrency.SourcedMax"
+   }
+  }
+ ],
+ "trees": [
+  {
+   "id": 1187,
+   "currencyId": 4225,
+   "cost": {
+    "value": 1,
+    "confidence": "inferred",
+    "from": "TraitTreeXTraitCost, TraitCost.Amount",
+    "traitCostId": 4843,
+    "currencyId": 4225
+   },
+   "nodes": [
+    {
+     "id": 110284,
+     "x": 4200,
+     "y": 1750,
+     "kind": "single",
+     "flags": 8,
+     "ranks": {
+      "value": 1,
+      "confidence": "stored",
+      "from": "TraitNodeEntry.MaxRanks"
+     },
+     "entries": [
+      {
+       "id": 136844,
+       "definitionId": 141607,
+       "spellId": 1225469,
+       "name": "Sturdy",
+       "maxRanks": 1
+      }
+     ],
+     "prereqs": []
+    }
+   ],
+   "gates": []
+  }
+ ],
+ "emptyTreeIds": [],
+ "withdrawn": [],
+ "tables": [],
+ "warnings": []
+}

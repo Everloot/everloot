@@ -1,0 +1,27 @@
+{
+ "schema": "everloot.world-map/1",
+ "source": {
+  "name": "Everloot client extract",
+  "status": "found in game files, unconfirmed",
+  "product": "wowf",
+  "buildId": 70707,
+  "version": "1.60.1.70707",
+  "extractedAt": "2026-10-30T15:48:39.935Z"
+ },
+ "entrances": [
+  {
+   "mapId": 36,
+   "name": "Deadmines",
+   "raid": false,
+   "continentId": 0,
+   "worldX": -11208,
+   "worldY": 1672,
+   "uiMapId": 1436,
+   "minLevel": 10,
+   "maxLevel": 20,
+   "difficultyIds": [
+    1
+   ]
+  }
+ ]
+}
