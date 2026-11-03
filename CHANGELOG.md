@@ -46,10 +46,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   in and out, this week, categories, receipts and gold history. The published ledgers stay below.
 
 ### Changed
-- Desktop App: the app calls itself Everloot: in its window, tray, notifications and dialogs, and in the Start menu,
-  the desktop shortcut and Apps once it updates. An update now has one small round button beside Settings instead of
-  a second one above it. It opens what changed, fills a ring while the update downloads, and turns into a restart
-  once it is ready. The restart dialog carries the Everloot mark.
 - Site and Desktop App: Ollama suggests one small model, `qwen3:4b` (2.5 GB, calls tools), instead of `qwen3:8b`, and
   says what running a model on your own computer means: private and free, slower, and it uses your memory while it
   answers. The free cloud models stay the first choice.
@@ -336,6 +332,15 @@ Live-client verification is pending. This is a pre-release for WoW: Forever 1.60
   off until `/everloot census on`. The Desktop App sends census rows with its uploads when the player leaves
   the census box ticked on its setup screen, or turns it on in Settings; a setup finished before this keeps
   it off. Still never names, guilds, gear or places, and the site shows only totals.
+
+## [desktop-v0.1.16] - 2026-11-03
+
+### Changed
+- Desktop App: the app is called Everloot in its window, tray, notifications and dialogs. After this update, the Start
+  menu, the desktop shortcut and Apps say Everloot too.
+- Desktop App: an update has one small round button beside Settings instead of a second bar above it. It opens what
+  changed, fills a ring while the update downloads, and turns into a restart button once it is ready. The restart
+  dialog carries the Everloot mark.
 
 ## [desktop-v0.1.15] - 2026-11-02
 
