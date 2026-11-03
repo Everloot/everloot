@@ -347,6 +347,11 @@ test("a base-only achievement page keeps the file-only presentation and the unco
   expect(out).toContain("found in game files, unconfirmed");
   expect(out).not.toContain("as players reported it");
   expect(out).not.toContain("three players reported them");
+  expect(out).toContain("Criteria and text are the game files");
+  expect(out).toContain("appear once three installs agree");
+  expect(out).not.toContain("No player has reported");
+  expect(out).not.toContain("becomes a page in the list");
+  expect(out).not.toContain("report it the same way");
   const description = (await achievementMetadata(page("50-loremaster"))).description;
   expect(description).toContain("Found in game files, unconfirmed");
   expect(description).not.toContain("player reports");

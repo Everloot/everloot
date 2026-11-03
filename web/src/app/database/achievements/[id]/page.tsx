@@ -109,7 +109,7 @@ export default async function AchievementPage(props: Props) {
           <EmptyTab players={false} action={null} message="The criteria show once three players report the same full list." />
         ) : null}
         {!entry && files && (
-          <p className="mt-2 text-meta text-muted">No player has reported this achievement yet. Everything above is build {fileVersion} of the client&apos;s own files (found in game files, unconfirmed); it becomes a page in the list once three installs report it the same way.</p>
+          <p className="mt-2 text-meta text-muted">Found in game files, unconfirmed. Criteria and text are the game files&apos;; the category and the count of installs that earned it appear once three installs agree.</p>
         )}
       </article>
     </Container>
