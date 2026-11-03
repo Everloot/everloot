@@ -1,10 +1,21 @@
 User-agent: *
 Allow: /
 
-# Subclass and filter permutations are noindex and crawled heavily.
-Disallow: /database/items/*/*
+# Named category and subclass pages are indexable; keep filter permutations out.
 Disallow: /database/items?*
 Disallow: /database/items/*?*
+
+# AI search and user-requested fetches follow the public rules above.
+# Training crawlers are blocked, matching the Cloudflare training policy.
+User-agent: GPTBot
+User-agent: ClaudeBot
+User-agent: CCBot
+User-agent: Bytespider
+User-agent: Amazonbot
+User-agent: Meta-ExternalAgent
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+Disallow: /
 
 # No ads run on the lore archive (Warcraft Wiki text); the AdSense crawler has no reason to read it.
 User-agent: Mediapartners-Google

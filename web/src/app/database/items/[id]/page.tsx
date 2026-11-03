@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import JsonLd from "@/components/JsonLd";
+import { entityPageJsonLd } from "@/lib/jsonld";
 import AdSlot from "@/components/AdSlot";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
@@ -267,6 +269,7 @@ export default async function ItemPage(props: Props) {
 
   return (
     <Container width="data">
+      <JsonLd data={entityPageJsonLd({ name: title, path: `/database/items/${itemId}`, identifier: `item:${itemId}` })} />
       <article>
         <EntityHeader
           trail={trail}

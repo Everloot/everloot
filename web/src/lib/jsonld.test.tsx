@@ -3,11 +3,21 @@ import { expect, test } from "vitest";
 import JsonLd from "@/components/JsonLd";
 import type { ChangeEntry } from "./changes";
 import {
-  aboutPageJsonLd, breadcrumbJsonLd, changesJsonLd, datasetJsonLd, loreCollectionJsonLd, organizationJsonLd,
+  aboutPageJsonLd, breadcrumbJsonLd, changesJsonLd, datasetJsonLd, entityPageJsonLd, loreCollectionJsonLd, organizationJsonLd,
   newsArticleJsonLd, serializeJsonLd, softwareApplicationJsonLd, webApplicationJsonLd, websiteJsonLd,
 } from "./jsonld";
 
 const everything = JSON.stringify;
+
+test("entity pages identify the visible game entity without inventing ratings, dates or ownership", () => {
+  const page = entityPageJsonLd({ name: "Linen Cloth", path: "/database/items/2589", identifier: "item:2589" });
+  expect(page).toMatchObject({
+    "@type": "WebPage", name: "Linen Cloth", url: "https://everloot.app/database/items/2589",
+    mainEntity: { "@type": "Thing", name: "Linen Cloth", identifier: "item:2589", url: "https://everloot.app/database/items/2589" },
+    isPartOf: { "@id": "https://everloot.app/#website" },
+  });
+  expect(JSON.stringify(page)).not.toMatch(/Product|Offer|license|aggregateRating|dateModified|datePublished/);
+});
 
 test("news image is optional and site paths become absolute without changing author policy", () => {
   const post = { title: "Title", description: "Summary", path: "/news/example", published: "2026-10-25", modified: "2026-10-26", author: "Visible author" };
@@ -29,7 +39,7 @@ test("JsonLd renders nothing for null", () => {
   expect(renderToStaticMarkup(<JsonLd data={null} />)).toBe("");
 });
 
-test("Organization carries the repository, the email and the site blurb, and WebSite describes its search as lore search", () => {
+test("Organization carries the repository, email and site blurb, and WebSite describes site search", () => {
   const org = organizationJsonLd() as Record<string, unknown> & { description: string };
   expect(org.sameAs).toEqual(["https://github.com/Everloot/everloot", "https://discord.gg/9CKsbHTRu3", "https://x.com/WowEverloot", "https://www.facebook.com/WowEverloot", "https://www.instagram.com/woweverloot/", "https://www.pinterest.com/woweverloot/"]);
   expect(org.email).toBe("hello@everloot.app");
@@ -39,7 +49,7 @@ test("Organization carries the repository, the email and the site blurb, and Web
   expect(org.parentOrganization).toEqual({ "@type": "Organization", name: "R21 Media Group, LLC" });
   expect(org.logo).toEqual({ "@type": "ImageObject", url: "https://everloot.app/icon-512.png", width: 512, height: 512 });
   const site = websiteJsonLd() as { potentialAction: { name: string; target: { urlTemplate: string } } };
-  expect(site.potentialAction.name).toBe("Search the lore archive");
+  expect(site.potentialAction.name).toBe("Search Everloot");
   expect(site.potentialAction.target.urlTemplate).toBe("https://everloot.app/search?q={search_term_string}");
 });
 

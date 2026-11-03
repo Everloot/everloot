@@ -16,6 +16,8 @@ const GROUPS: { title: string; items: Item[] }[] = [
     title: "Browse",
     items: [
       { label: "Database", href: "/database" },
+      { label: "Wiki", href: "/wiki" },
+      { label: "Classes", href: "/classes" },
       { label: "World map", href: "/map" },
       { label: "Changes", href: "/changes" },
       { label: "News", href: "/news" },

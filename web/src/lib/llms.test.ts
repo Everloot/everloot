@@ -8,6 +8,14 @@ import { FULL_VERSION, llmsFullTxt, llmsTxt } from "./llms";
 
 const registered = liveToolNames();
 
+test("both maps lead readers to the original wiki and class guides", async () => {
+  for (const text of [llmsTxt(), await llmsFullTxt()]) {
+    expect(text).toContain("https://everloot.app/wiki)");
+    expect(text).toContain("https://everloot.app/classes)");
+    expect(text).toContain("reviewed");
+  }
+});
+
 test("both files list every MCP tool the protocol declares", async () => {
   expect(registered.length).toBeGreaterThan(0);
   for (const name of registered) {

@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import JsonLd from "@/components/JsonLd";
+import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ClassContextLink } from "@/components/classes/ClassContextChip";
@@ -80,6 +82,7 @@ export default async function ClassHubPage({ params }: Params) {
 
   return (
     <Container>
+      <JsonLd data={entityPageJsonLd({ name, path, identifier: `class:${slug}` })} />
       <PageHeader
         trail={[{ name: "Home", path: "/" }, { name: "Classes", path: "/classes" }, { name, path }]}
         title={<span className={CLASS_TEXT[slug]}>{name}</span>}

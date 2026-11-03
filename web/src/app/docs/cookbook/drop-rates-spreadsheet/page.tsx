@@ -51,7 +51,7 @@ import json
 import os
 from urllib.error import HTTPError
 from urllib.parse import urljoin
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 BASE = "https://everloot.app"
 url = BASE + "/api/rollups/drops?limit=500"
@@ -60,7 +60,8 @@ credit = ""
 
 while url:
     try:
-        with urlopen(url, timeout=30) as res:
+        request = Request(url, headers={"User-Agent": "everloot-cookbook/1.0"})
+        with urlopen(request, timeout=30) as res:
             page = json.load(res)
     except HTTPError as err:
         if err.code == 429:

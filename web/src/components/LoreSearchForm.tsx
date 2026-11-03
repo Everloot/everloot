@@ -2,10 +2,11 @@
 
 import { track } from "@/lib/analytics/track";
 
-/** Plain GET form to /search; works without JavaScript. `/search` itself searches the whole site, the lore pages' own forms the lore archive. */
+/** Plain GET form scoped to the lore archive; works without JavaScript. */
 export default function LoreSearchForm({ query = "", label = "Search the lore archive", placeholder = "Thrall, Zul'Gurub, Ashbringer…" }: { query?: string; label?: string; placeholder?: string }) {
   return (
     <form action="/search" method="get" role="search" onSubmit={() => track("search", { surface: "lore" })} className="flex flex-col sm:flex-row gap-2 max-w-xl">
+      <input type="hidden" name="in" value="lore" />
       <label htmlFor="lore-q" className="sr-only">{label}</label>
       <input
         id="lore-q"
