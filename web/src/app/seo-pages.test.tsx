@@ -29,25 +29,29 @@ function blocks(html: string): Record<string, any>[] {
 const visible = (html: string) => html.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/\s+/g, " ");
 const h1 = (html: string) => visible(html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)![1]).trim();
 
-test("the home page carries Organization and WebSite, and shows the lore search the action points at", async () => {
+test("the home page advertises site search, and its lore form searches only the archive", async () => {
   const { default: Home } = await import("./page");
   const html = renderToStaticMarkup(await Home());
   const [org, site] = blocks(html);
   expect(org["@type"]).toBe("Organization");
   expect(site["@type"]).toBe("WebSite");
-  expect(site.potentialAction.name).toBe("Search the lore archive");
+  expect(site.potentialAction.name).toBe("Search Everloot");
   expect(visible(html)).toContain("Search the lore archive");
   expect(html).toContain('action="/search"');
+  expect(html).toContain('name="in" value="lore"');
 });
 
 test("the footer shows the email and the blurb the Organization repeats", async () => {
   const { default: Footer } = await import("@/components/Footer");
   const { organizationJsonLd, SITE_BLURB } = await import("@/lib/jsonld");
-  const text = visible(renderToStaticMarkup(<Footer />));
+  const html = renderToStaticMarkup(<Footer />);
+  const text = visible(html);
   const org = organizationJsonLd() as { email: string; description: string };
   expect(text).toContain(org.email);
   expect(org.description).toBe(SITE_BLURB);
   for (const sentence of org.description.split(/(?<=\.) /)) expect(text).toContain(sentence);
+  expect(html).toContain('href="/wiki"');
+  expect(html).toContain('href="/classes"');
 });
 
 test("a class page: name matches the H1, description and facts are visible, the hub is its parent, and the breadcrumb is real links", async () => {
@@ -57,6 +61,7 @@ test("a class page: name matches the H1, description and facts are visible, the 
   expect(app["@type"]).toBe("WebApplication");
   expect(app.name).toBe(h1(html));
   expect(app.name).toBe("WoW Forever Hunter Talent Calculator");
+  expect(html).toContain('href="/classes/hunter"');
   expect(visible(html)).toContain(app.description);
   expect(app.isPartOf["@id"]).toBe("https://everloot.app/tools/talents#webapplication");
   expect(visible(html)).toContain("How many talent points does a Hunter get at level 60?");

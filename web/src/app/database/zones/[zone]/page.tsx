@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import JsonLd from "@/components/JsonLd";
+import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import AdSlot from "@/components/AdSlot";
@@ -135,6 +137,7 @@ export default async function ZonePage(props: Props) {
 
   return (
     <Container width="data">
+      <JsonLd data={entityPageJsonLd({ name: zone.name, path: canonical, identifier: `zone:${zone.mapId}` })} />
       <article>
         {/* The database title row: name, continent, and the map link as a quiet control (the header keeps the one filled button). */}
         <DataTitle

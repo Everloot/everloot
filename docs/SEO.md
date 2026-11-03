@@ -89,7 +89,11 @@ the owner can do. Written after the 2026-10-17 audit.
 5. **MCP registry.** Publish the public server (`https://everloot.app/mcp/public`) to the official MCP
    registry as `io.github.Everloot/everloot`, then to Glama, Smithery and mcp.so. The server must have
    `EVERLOOT_MCP_PUBLIC=1` in the `vars` of `web/wrangler.jsonc`, or the endpoint answers 404.
-6. **Bot protection.** Check that Cloudflare's bot settings for the zone (Security → Bots) do not challenge GPTBot,
-   ClaudeBot, PerplexityBot or OAI-SearchBot. The audit saw 200s for all of them.
+6. **Bot protection (policy confirmed 2026-11-02).** Keep AI training blocked in Cloudflare and in
+   `web/public/robots.txt`. Allow AI search and user-requested fetches (OAI-SearchBot, ChatGPT-User,
+   Claude-SearchBot, Claude-User and PerplexityBot), as well as Googlebot and Bingbot. Check actual verified
+   crawler events as well as user-agent probes; a spoofed user agent alone does not prove crawler access.
+   Keep Bot Preference Sync off while the repository owns robots.txt. API and discovery clients should not
+   receive browser challenges; preserve endpoint authentication, quotas and rate limits.
 7. **Decided 2026-10-20:** the Warcraft Wiki copies under /lore are noindex and out of the sitemaps; /about names
    R21 Media Group, LLC.

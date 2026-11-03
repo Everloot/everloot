@@ -270,7 +270,7 @@ export default async function Home() {
         </p>
       </Card>
 
-      {/* Lore search: the WebSite SearchAction points here. */}
+      {/* This form searches only lore; the WebSite SearchAction searches the whole site. */}
       <section aria-labelledby="lore-search">
         <SectionHeading id="lore-search" note="Warcraft Wiki pages as of 2023, for lore and history. It is not collected WoW: Forever data.">
           {LORE_SEARCH_LABEL}

@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import JsonLd from "@/components/JsonLd";
+import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { AgreementMeter, Badge, Card, Container, DataTable, DataTitle, EmptyState, SectionHeading, type Column } from "@/components/ui";
@@ -93,6 +95,7 @@ export default async function InstancePage(props: Props) {
 
   return (
     <Container width="data">
+      <JsonLd data={entityPageJsonLd({ name: title, path: canonical, identifier: `instance:${row.instanceMapId}` })} />
       <article>
         <DataTitle
           title={title}

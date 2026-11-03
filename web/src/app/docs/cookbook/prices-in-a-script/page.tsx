@@ -59,14 +59,15 @@ import os
 import sys
 from urllib.error import HTTPError
 from urllib.parse import quote
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 BASE = "https://everloot.app"
 
 
 def get(path):
     try:
-        with urlopen(BASE + path, timeout=30) as res:
+        request = Request(BASE + path, headers={"User-Agent": "everloot-cookbook/1.0"})
+        with urlopen(request, timeout=30) as res:
             return json.load(res)
     except HTTPError as err:
         if err.code == 429:

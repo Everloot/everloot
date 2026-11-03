@@ -77,7 +77,7 @@ import json
 import sys
 from urllib.error import HTTPError
 from urllib.parse import urlencode
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 sys.stdout.reconfigure(encoding="utf-8")  # the text can hold characters a Windows console does not
 BASE = "https://everloot.app"
@@ -85,7 +85,8 @@ tool, *pairs = sys.argv[1:]
 query = urlencode([tuple(pair.split("=", 1)) for pair in pairs])
 
 try:
-    with urlopen(f"{BASE}/api/tools/{tool}?{query}", timeout=30) as res:
+    request = Request(f"{BASE}/api/tools/{tool}?{query}", headers={"User-Agent": "everloot-cookbook/1.0"})
+    with urlopen(request, timeout=30) as res:
         body = json.load(res)
 except HTTPError as err:
     if err.code == 429:

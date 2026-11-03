@@ -55,7 +55,7 @@ export function organizationJsonLd(): JsonLd {
   };
 }
 
-/** The search box on the home page reads the lore archive, and the action says so. */
+/** The site's search endpoint covers the database, classes and lore archive. */
 export function websiteJsonLd(): JsonLd {
   return {
     "@context": CONTEXT,
@@ -67,7 +67,7 @@ export function websiteJsonLd(): JsonLd {
     publisher,
     potentialAction: {
       "@type": "SearchAction",
-      name: LORE_SEARCH_LABEL,
+      name: "Search Everloot",
       target: { "@type": "EntryPoint", urlTemplate: `${SITE_URL}/search?q={search_term_string}` },
       "query-input": "required name=search_term_string",
     },
@@ -75,6 +75,19 @@ export function websiteJsonLd(): JsonLd {
 }
 
 export interface Crumb { name: string; path: string }
+
+/** The entity the page visibly names; game facts carry no claim of an offer, rating or licence. */
+export function entityPageJsonLd({ name, path, identifier }: { name: string; path: string; identifier: string }): JsonLd {
+  const url = absoluteUrl(path);
+  return {
+    "@context": CONTEXT,
+    "@type": "WebPage",
+    name,
+    url,
+    isPartOf: { "@id": WEBSITE_ID },
+    mainEntity: { "@type": "Thing", name, identifier, url },
+  };
+}
 
 /** The same trail the visible breadcrumb shows. The last crumb is the page itself. */
 export function breadcrumbJsonLd(trail: Crumb[]): JsonLd {
