@@ -3,11 +3,11 @@
  "label": "found in game files, unconfirmed",
  "build": {
   "product": "wowf",
-  "buildId": 70707,
-  "version": "1.60.1.70707",
-  "buildConfig": "7feb61f3c994bcb168526b8db521514a",
-  "definitions": "a3840427a39e",
-  "extractedAt": "2026-10-30T15:48:39.935Z"
+  "buildId": 70755,
+  "version": "1.60.1.70755",
+  "buildConfig": "9d9888f2d89a2dcc9eacc68a2d7cb3dc",
+  "definitions": "92bb4dc62114",
+  "extractedAt": "2026-11-03T23:11:00.660Z"
  },
  "classId": 5,
  "className": "Priest",
@@ -94,7 +94,7 @@
    {"id":105853,"x":6220,"y":4530,"row":4,"col":2,"kind":"single","maxRanks":5,"entries":[{"definitionId":135383,"spellId":14901,"name":"Spiritual Guidance","maxRanks":5}],"prereqs":[],"unlock":{"spentRequired":{"amount":20,"scope":"tree","gateGroupId":11611,"currencyId":3820,"traitTreeId":1114,"companionGroupId":12766}}},
    {"id":105854,"x":5620,"y":4530,"row":4,"col":1,"kind":"single","maxRanks":1,"entries":[{"definitionId":135384,"spellId":20711,"name":"Spirit of Redemption","maxRanks":1}],"prereqs":[],"unlock":{"spentRequired":{"amount":20,"scope":"tree","gateGroupId":11611,"currencyId":3820,"traitTreeId":1114,"companionGroupId":12766}}},
    {"id":105855,"x":5020,"y":4530,"row":4,"col":0,"kind":"single","maxRanks":2,"entries":[{"definitionId":135385,"spellId":1317006,"name":"Litany of Light","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":20,"scope":"tree","gateGroupId":11611,"currencyId":3820,"traitTreeId":1114,"companionGroupId":12766}}},
-   {"id":105856,"x":6820,"y":3930,"row":3,"col":3,"kind":"single","maxRanks":1,"entries":[{"definitionId":135386,"spellId":401937,"name":"Binding Heal","maxRanks":1}],"prereqs":[],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11612,"currencyId":3820,"traitTreeId":1114,"companionGroupId":12767}}},
+   {"id":105856,"x":6820,"y":3930,"row":3,"col":3,"kind":"single","maxRanks":1,"entries":[{"definitionId":135386,"spellId":1328569,"name":"Holy Binding","maxRanks":1}],"prereqs":[],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11612,"currencyId":3820,"traitTreeId":1114,"companionGroupId":12767}}},
    {"id":105857,"x":6220,"y":3930,"row":3,"col":2,"kind":"single","maxRanks":2,"entries":[{"definitionId":135387,"spellId":14909,"name":"Searing Light","maxRanks":2}],"prereqs":[{"nodeId":105863,"rule":"any"}],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11612,"currencyId":3820,"traitTreeId":1114,"companionGroupId":12767}}},
    {"id":105858,"x":5620,"y":3930,"row":3,"col":1,"kind":"single","maxRanks":3,"entries":[{"definitionId":135388,"spellId":14912,"name":"Improved Healing","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11612,"currencyId":3820,"traitTreeId":1114,"companionGroupId":12767}}},
    {"id":105859,"x":5020,"y":3930,"row":3,"col":0,"kind":"single","maxRanks":2,"entries":[{"definitionId":135389,"spellId":27789,"name":"Holy Reach","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11612,"currencyId":3820,"traitTreeId":1114,"companionGroupId":12767}}},

@@ -4,11 +4,11 @@
  "credit": "Game data © Blizzard Entertainment, Inc., read from the public client; not under Everloot's licence. Column names from WoWDBDefs (https://github.com/wowdev/WoWDBDefs), CC BY-SA 4.0.",
  "build": {
   "product": "wowf",
-  "buildId": 70707,
-  "version": "1.60.1.70707",
-  "buildConfig": "7feb61f3c994bcb168526b8db521514a",
-  "definitions": "a3840427a39e",
-  "extractedAt": "2026-10-30T15:48:39.935Z"
+  "buildId": 70755,
+  "version": "1.60.1.70755",
+  "buildConfig": "9d9888f2d89a2dcc9eacc68a2d7cb3dc",
+  "definitions": "92bb4dc62114",
+  "extractedAt": "2026-11-03T23:11:00.660Z"
  },
  "note": "names are the game files'; kills, creatures and dates come from player reports",
  "instances": {
@@ -48,9 +48,9 @@
   "2856": [{"id":3185,"name":"Balnazzar"},{"id":3187,"name":"Beatrix"},{"id":3196,"name":"Beastmaster"},{"id":3186,"name":"Solistrasza"},{"id":3197,"name":"Mason"},{"id":3188,"name":"Reborn Council"},{"id":3190,"name":"Lillian Voss"},{"id":3189,"name":"Caldoran"}],
   "2875": [{"id":3141,"name":"Harbinger of Sin"},{"id":3146,"name":"Creeping Malison"},{"id":3144,"name":"Three Little Wolves"},{"id":3145,"name":"Dark Rider"},{"id":3143,"name":"Kharon"},{"id":3152,"name":"Unk'omon"},{"id":3168,"name":"Hans and Greta"},{"id":3169,"name":"The Ugly Goblin"},{"id":3170,"name":"Kaigy Maryla"},{"id":3171,"name":"Sairuh Maryla"},{"id":3172,"name":"Barian Maryla"}],
   "2921": [{"id":3296,"name":"Spirit of Mograine"}],
-  "2959": [{"id":3298,"name":"Arcane Anomaly"},{"id":3299,"name":"Fel Ancient"},{"id":3300,"name":"Mana Devourer"},{"id":3301,"name":"Mana Elemental"},{"id":3302,"name":"Unstable Sentinel"},{"id":3303,"name":"Shade of the Archmage"},{"id":3310,"name":"Lyn the Ignored"},{"id":3311,"name":"Atrexis the Grave Knight"},{"id":3312,"name":"Mana Wraith"}],
+  "2959": [{"id":3298,"name":"Arcane Anomaly"},{"id":3299,"name":"Fel Ancient"},{"id":3300,"name":"Mana Devourer"},{"id":3301,"name":"Mana Elemental"},{"id":3302,"name":"Unstable Sentinel"},{"id":3310,"name":"Lyn the Ignored"},{"id":3311,"name":"Atrexis the Grave Knight"},{"id":3312,"name":"Mana Wraith"},{"id":3303,"name":"Shade of the Archmage"}],
   "2998": [{"id":3480,"name":"Saltspine"},{"id":3481,"name":"Shadetooth"},{"id":3644,"name":"Highland Horror"},{"id":3482,"name":"Relic Guardian"}],
-  "2999": [{"id":3353,"name":"Witherfang"},{"id":3357,"name":"The Abandoned"},{"id":3355,"name":"The Butcher"},{"id":3354,"name":"Rath'mael"},{"id":3408,"name":"Lordaeron Captain"},{"id":3411,"name":"Viktor the Vile"},{"id":3412,"name":"Bjork"}],
+  "2999": [{"id":3353,"name":"Witherfang"},{"id":3357,"name":"The Abandoned"},{"id":3355,"name":"The Butcher"},{"id":3408,"name":"Lordaeron Captain"},{"id":3411,"name":"Viktor the Vile"},{"id":3412,"name":"Bjork"},{"id":3354,"name":"Rath'mael"}],
   "3002": [{"id":3369,"name":"Deathulus"},{"id":3371,"name":"Crushfist Bloodbreaker"}],
   "3065": [{"id":3493,"name":"Faldrim Anvilmar"},{"id":3495,"name":"Infurnus"},{"id":3494,"name":"Plunder"},{"id":3496,"name":"Durgen Dirgehammer"}]
  }

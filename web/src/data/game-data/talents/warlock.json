@@ -3,11 +3,11 @@
  "label": "found in game files, unconfirmed",
  "build": {
   "product": "wowf",
-  "buildId": 70707,
-  "version": "1.60.1.70707",
-  "buildConfig": "7feb61f3c994bcb168526b8db521514a",
-  "definitions": "a3840427a39e",
-  "extractedAt": "2026-10-30T15:48:39.935Z"
+  "buildId": 70755,
+  "version": "1.60.1.70755",
+  "buildConfig": "9d9888f2d89a2dcc9eacc68a2d7cb3dc",
+  "definitions": "92bb4dc62114",
+  "extractedAt": "2026-11-03T23:11:00.660Z"
  },
  "classId": 9,
  "className": "Warlock",

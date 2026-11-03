@@ -4,11 +4,11 @@
  "credit": "Game data © Blizzard Entertainment, Inc., read from the public client; not under Everloot's licence. Column names from WoWDBDefs (https://github.com/wowdev/WoWDBDefs), CC BY-SA 4.0.",
  "build": {
   "product": "wowf",
-  "buildId": 70707,
-  "version": "1.60.1.70707",
-  "buildConfig": "7feb61f3c994bcb168526b8db521514a",
-  "definitions": "a3840427a39e",
-  "extractedAt": "2026-10-30T15:48:39.935Z"
+  "buildId": 70755,
+  "version": "1.60.1.70755",
+  "buildConfig": "9d9888f2d89a2dcc9eacc68a2d7cb3dc",
+  "definitions": "92bb4dc62114",
+  "extractedAt": "2026-11-03T23:11:00.660Z"
  },
  "note": "criteria and text are the game files'; category names come from player reports",
  "achievements": {
@@ -447,7 +447,6 @@
   "64185": {"title":"Total deaths in 40-player raids","points":0,"description":"Total deaths in 40-player raids","criteria":[],"statistic":true},
   "64208": {"title":"<Hidden> Completed New Player Experience (Account)","points":0,"description":"Once earned, the player is no longer considered \"new\" and is allowed to choose between Exlie's Reach and the racial starting experience when creating a new character.","criteria":[]},
   "64222": {"title":"Times camped","points":0,"description":"Times gathered around the campfire","criteria":[{"text":"Gain Aura"}],"statistic":true},
-  "64283": {"title":"Played in the WoW: Forever Beta","points":0,"description":"Granted for playing in the World of Warcraft: Forever Beta. Thanks for testing!","criteria":[{"text":"Played in the World of Warcraft: Forever Beta"}]},
   "64348": {"title":"Arathi Basin bases assaulted","points":0,"description":"Arathi Basin bases assaulted","criteria":[{"text":"Arathi Basin bases assaulted"}],"statistic":true},
   "64349": {"title":"Arathi Basin bases defended","points":0,"description":"Arathi Basin bases defended","criteria":[{"text":"Arathi Basin bases defended"}],"statistic":true},
   "64350": {"title":"Darkspear Islands bases assaulted","points":0,"description":"Darkspear Islands bases assaulted","criteria":[{"text":"Darkspear Islands bases assaulted"}],"statistic":true},

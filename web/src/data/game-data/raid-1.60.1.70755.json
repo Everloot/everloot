@@ -2,9 +2,12 @@
  "schema": "everloot.web-raid-data/1",
  "label": "Found in game files, unconfirmed",
  "source": "everloot.raid-buffs/2 and everloot.talent-catalog, trimmed to ids, names and scope",
- "build": "1.60.1.70707",
+ "build": "1.60.1.70755",
  "notFound": [
-  "blessing-of-sanctuary"
+  "blessing-of-salvation",
+  "blessing-of-light",
+  "blessing-of-sanctuary",
+  "greater-blessing-of-salvation"
  ],
  "families": [
   {
@@ -100,16 +103,6 @@
   {
    "id": "blessing-of-wisdom",
    "label": "Blessing of Wisdom",
-   "kind": "buff"
-  },
-  {
-   "id": "blessing-of-salvation",
-   "label": "Blessing of Salvation",
-   "kind": "buff"
-  },
-  {
-   "id": "blessing-of-light",
-   "label": "Blessing of Light",
    "kind": "buff"
   },
   {
@@ -680,38 +673,6 @@
    ]
   },
   {
-   "id": "blessing-of-salvation",
-   "label": "Blessing of Salvation",
-   "kind": "buff",
-   "class": "paladin",
-   "family": "blessing-of-salvation",
-   "scope": "unknown",
-   "tree": "baseline",
-   "names": [
-    "Salvation"
-   ],
-   "spellIds": [
-    1038
-   ]
-  },
-  {
-   "id": "blessing-of-light",
-   "label": "Blessing of Light",
-   "kind": "buff",
-   "class": "paladin",
-   "family": "blessing-of-light",
-   "scope": "single",
-   "tree": "baseline",
-   "names": [
-    "Blessing of Light"
-   ],
-   "spellIds": [
-    19977,
-    19978,
-    19979
-   ]
-  },
-  {
    "id": "greater-blessing-of-might",
    "label": "Greater Blessing of Might",
    "kind": "buff",
@@ -756,21 +717,6 @@
    "spellIds": [
     25894,
     25918
-   ]
-  },
-  {
-   "id": "greater-blessing-of-salvation",
-   "label": "Greater Blessing of Salvation",
-   "kind": "buff",
-   "class": "paladin",
-   "family": "blessing-of-salvation",
-   "scope": "unknown",
-   "tree": "baseline",
-   "names": [
-    "Mass Salvation"
-   ],
-   "spellIds": [
-    25895
    ]
   },
   {
