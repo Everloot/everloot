@@ -1693,7 +1693,7 @@ export declare const MCP_TOOLS: {
     };
     readonly vendor_page: {
         readonly title: "Vendor page";
-        readonly description: "Returns the goods one Forever vendor sells, by the vendor's NPC id, with copper prices. An item is listed when 3 installs agree on that item and its copper price; two agreed prices both stay listed. No copied catalog. Use it for what a vendor sells and at what price; use npc_page for where the vendor stands, entity_relations with the sold_by relation for who sells an item, and market_value for auction prices. The id is the same NPC id npc_page takes. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
+        readonly description: "Returns the goods one Forever vendor sells, by the vendor's NPC id, each with the copper price players saw. An item is listed when 3 installs agree on that item and its copper price; two agreed prices both stay listed. No copied catalog. Use it for what a vendor sells and at what price; use npc_page for where the vendor stands, entity_relations with the sold_by relation for who sells an item, and market_value for auction prices. The id is the same NPC id npc_page takes. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
         readonly inputSchema: {
             readonly vendorNpcId: z.ZodNumber;
         };
@@ -3370,7 +3370,7 @@ export declare const MCP_TOOL_LIST: ({
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
 } | {
     title: "Vendor page";
-    description: "Returns the goods one Forever vendor sells, by the vendor's NPC id, with copper prices. An item is listed when 3 installs agree on that item and its copper price; two agreed prices both stay listed. No copied catalog. Use it for what a vendor sells and at what price; use npc_page for where the vendor stands, entity_relations with the sold_by relation for who sells an item, and market_value for auction prices. The id is the same NPC id npc_page takes. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
+    description: "Returns the goods one Forever vendor sells, by the vendor's NPC id, each with the copper price players saw. An item is listed when 3 installs agree on that item and its copper price; two agreed prices both stay listed. No copied catalog. Use it for what a vendor sells and at what price; use npc_page for where the vendor stands, entity_relations with the sold_by relation for who sells an item, and market_value for auction prices. The id is the same NPC id npc_page takes. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
     inputSchema: {
         readonly vendorNpcId: z.ZodNumber;
     };

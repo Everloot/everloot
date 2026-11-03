@@ -607,7 +607,7 @@ export const MCP_TOOLS = {
     },
     vendor_page: {
         title: "Vendor page",
-        description: "Returns the goods one Forever vendor sells, by the vendor's NPC id, with copper prices. An item is listed when 3 installs agree on that item and its copper price; two agreed prices both stay listed. No copied catalog. Use it for what a vendor sells and at what price; use npc_page for where the vendor stands, entity_relations with the sold_by relation for who sells an item, and market_value for auction prices. The id is the same NPC id npc_page takes. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
+        description: "Returns the goods one Forever vendor sells, by the vendor's NPC id, each with the copper price players saw. An item is listed when 3 installs agree on that item and its copper price; two agreed prices both stay listed. No copied catalog. Use it for what a vendor sells and at what price; use npc_page for where the vendor stands, entity_relations with the sold_by relation for who sells an item, and market_value for auction prices. The id is the same NPC id npc_page takes. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
         inputSchema: { vendorNpcId: z.number().int().positive().describe("Vendor NPC id.") },
         outputSchema: { ...uploadsAnswer, page: vendorPage.optional() },
         annotations: { readOnlyHint: true, openWorldHint: false },
