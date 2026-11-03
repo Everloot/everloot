@@ -5,7 +5,7 @@ import { JOBS, NO_SOURCED_ANSWER, type AddonInfo, type AppState, type AskInfo, t
 import { PROVIDER_PRESETS, assistantSource, keptModelPick, manualModelShown, presetFor, removalNotice, type ModelChoice, type ProviderKind } from "../shared/providers";
 import { inkOn } from "../../../web/src/lib/chat/catalogue";
 import { WEBSITE_LINKS, websiteUrl } from "../shared/website";
-import { statePill } from "./parts";
+import { statePill, watchPill } from "./parts";
 
 declare global { interface Window { everloot: EverlootApi } }
 const api = window.everloot;
@@ -73,6 +73,7 @@ let priceLookup: PriceLookup | null = null;
 const data: { upload?: FileSummary[]; backups?: BackupInfo[]; market?: MarketInfo; ask?: AskInfo; addon?: AddonInfo; changes?: ChangeItem[]; changesError?: string; characters?: CharactersInfo; chat?: ChatInfo; usage?: DataUsage } = {};
 
 const main = document.getElementById("app")!;
+const bar = document.getElementById("bar")!;
 const side = document.getElementById("side")!;
 const nav = document.getElementById("nav")!;
 const sideFoot = document.getElementById("side-foot")!;
@@ -198,7 +199,7 @@ function overview(s: AppState): string {
   const job = (ico: string, name: string, dotHtml: string, state: string, sub: string) => `<div class="job"><span class="job-ico">${icon(ico)}</span><div class="grow"><div class="job-name">${name}</div><div class="muted small">${sub}</div></div><div class="job-state">${dotHtml}<span>${state}</span></div></div>`;
   const last = (j: JobStatus) => (j.at ? `last run ${ago(j.at)}` : "not run yet");
   return `<div class="page">
-    <div class="head"><h1>Overview</h1><span class="sub">${e.files.length ? `Watching ${e.files.length} account file(s)` : "Not watching a game folder"}${e.paused ? " · paused" : ""}</span></div>
+    <div class="head"><h1>Overview</h1></div>
     ${s.notice ? `<p class="callout error">${icon("alert")}<span>${esc(s.notice)}</span></p>` : ""}
     ${foreverCallout(s)}
     ${updateCallout(s)}
@@ -1087,6 +1088,12 @@ function renderSide(s: AppState): void {
   if (refocus) side.querySelector<HTMLElement>(refocus)?.focus({ preventScroll: true });
 }
 
+/** The title bar: where the player is, and what the app watches. It is draggable like a native title. */
+function renderBar(s: AppState): void {
+  const label = PAGES.find((p) => p.id === page)?.label ?? "";
+  bar.innerHTML = `<nav class="crumb" aria-label="Where you are"><span>Everloot</span><span class="sep" aria-hidden="true">/</span><strong>${esc(label)}</strong></nav>${watchPill(s.engine)}`;
+}
+
 const PERSON = icon("account");
 const BUG = icon("bug");
 
@@ -1287,8 +1294,10 @@ function render(): void {
   if (!state) return;
   const setup = !state.settings.consentedAt;
   side.hidden = setup;
+  bar.hidden = setup;
   if (setup) { main.innerHTML = welcome(); return; }
   renderSide(state);
+  renderBar(state);
   renderUpdate(state);
   renderRestart(state);
   renderWipe(state);
