@@ -127,8 +127,13 @@ private assets bucket (`spell-names.json`), never in a committed file, so a reci
 honest name; recipes stay reachable through `profession_path`, `recipe_thresholds` and the spell pages
 (found while planning, 2026-11-03).
 
-**Base first, confirmation on top.** Every new kind gets a static base row in the knowledge release from
-the game files, labelled "found in game files, unconfirmed" with its build. Where the upload rollup
+**Base first, confirmation on top.** Every new kind gets a static base record from the game files,
+labelled "found in game files, unconfirmed" with its build. (Ruled while building, 2026-11-03: those
+records are served from the committed catalog files through an in-memory index that the knowledge tools
+union with the release at query time, never as rows inside the release. The release is the open CC BY-SA
+dataset and its publish guard refuses any other licence; game-file data stays under Blizzard's credit,
+exactly as the client layer and race table reach the MCP today. Nothing changes for the assistant: the
+same search, the same ids in `fetch`, the same page URLs.) Where the upload rollup
 (`agreedCatalog()`) has an agreed entry for the same id, the hit and the `fetch` body add "observed, N
 installs agree" with the date; the rollup confirms, it never creates. All rows share the `SearchHit`
 shape (id, kind, name, snippet, page URL, licence, date).
