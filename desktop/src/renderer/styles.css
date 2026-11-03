@@ -434,6 +434,17 @@ details.adv[open] > summary { margin-bottom: 12px; }
 .wk-down i { display: block; width: 100%; min-height: 1px; background: rgb(var(--copper)); border-radius: 0 0 2px 2px; }
 .wk-d { text-align: center; font-size: var(--fs-sm); color: rgb(var(--muted)); }
 .week-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 8px; }
+/* Before any data, the profile's outline: dashed, dim, inert. With data, the selected character's profile sits on the page. */
+.ghost { opacity: 0.45; pointer-events: none; user-select: none; }
+.ghost > * + * { margin-top: 16px; }
+.ghost .panel { border-style: dashed; }
+.ghost .river { height: 96px; border-bottom: 1px solid var(--edge); }
+.ghost .week-bars { margin-top: 6px; }
+.ghost .wk-col { height: 68px; border-bottom: 1px solid var(--edge); }
+.ghost-line { display: inline-block; width: 72px; height: 10px; border-radius: 3px; background: var(--edge); }
+.ghost-line.short { width: 40px; }
+.profile .dw-stats { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.profile > * + * { margin-top: 16px; }
 .roster-row { cursor: pointer; }
 .roster-row:hover td, .roster-row.sel td { background: rgb(var(--fg) / 0.05); }
 .roster-row:focus-visible { outline-offset: -2px; }

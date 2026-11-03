@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { JobState, JobStatus, LogLine } from "../src/shared/types";
-import { emptyCause, emptyState, jobOfLine, statePill, threadLines, watchPill, workingStrip } from "../src/renderer/parts";
+import { emptyCause, emptyState, ghostProfile, jobOfLine, statePill, threadLines, watchPill, workingStrip } from "../src/renderer/parts";
 
 const j = (state: JobState): JobStatus => ({ state, message: "", at: null });
 
@@ -116,6 +116,15 @@ test("a strip with no line yet has the headline only, and a paused engine says P
   expect(html).toContain(">Paused<");
   expect(html).toContain("strip-paused");
   expect(html).not.toContain("strip-last");
+});
+
+test("the ghost profile is hidden from assistive tech and draws the three regions", () => {
+  const html = ghostProfile();
+  expect(html).toContain('aria-hidden="true"');
+  expect(html).toContain("river-card");
+  expect(html).toContain("week-card");
+  expect(html).toContain("Roster");
+  expect((html.match(/wk-col/g) ?? []).length).toBe(7);
 });
 
 test("the rendered block escapes the cause and carries the action as a data attribute", () => {

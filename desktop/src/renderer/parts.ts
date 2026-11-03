@@ -98,6 +98,24 @@ export function workingStrip(job: Job, s: { engine: Pick<EngineState, "jobs" | "
   return `<section class="strip strip-${kind}" aria-live="polite">${statePill(j, s.engine.paused)}<div class="strip-main"><p class="strip-head">${esc(headline)}</p>${last}</div></section>`;
 }
 
+/**
+ * The Characters page before any data: the profile's outline, drawn dashed and dim so the player sees what the
+ * addon will fill in. Decorative only; the empty state above it says why it is empty.
+ */
+export function ghostProfile(): string {
+  const cols = Array.from({ length: 7 }, () => '<div class="wk-col"></div>').join("");
+  const rows = Array.from({ length: 3 }, () => '<tr><td><span class="ghost-line"></span></td><td class="num"><span class="ghost-line short"></span></td><td class="num"><span class="ghost-line short"></span></td><td class="num"><span class="ghost-line short"></span></td><td class="num"><span class="ghost-line short"></span></td></tr>').join("");
+  return `<div class="ghost" aria-hidden="true">
+    <div class="char-hero">
+      <section class="panel river-card"><div class="row between"><h2>30-day money river</h2><span class="muted small">earned and spent, by day</span></div><div class="river"></div></section>
+      <section class="panel week-card"><div class="row between"><h2>This week</h2><span class="muted small">earned above · spent below</span></div><div class="week-bars">${cols}</div></section>
+    </div>
+    <section class="panel"><div class="row between"><h2>Roster</h2><span class="muted small">gold, 7 days, item level, last seen</span></div>
+      <div class="tablewrap"><table class="roster"><thead><tr><th>Character</th><th class="num">Gold</th><th class="num">7 days</th><th class="num">Item level</th><th class="num">Last seen</th></tr></thead><tbody>${rows}</tbody></table></div>
+    </section>
+  </div>`;
+}
+
 /** The title bar's pill: what the app watches, or that it is paused, which matters more. */
 export function watchPill(e: Pick<EngineState, "files" | "paused">): string {
   if (e.paused) return '<span class="pill-s pill-paused">Paused</span>';

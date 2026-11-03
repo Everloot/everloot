@@ -5,7 +5,7 @@ import { JOBS, NO_SOURCED_ANSWER, type AddonInfo, type AppState, type AskInfo, t
 import { PROVIDER_PRESETS, assistantSource, keptModelPick, manualModelShown, presetFor, removalNotice, type ModelChoice, type ProviderKind } from "../shared/providers";
 import { inkOn } from "../../../web/src/lib/chat/catalogue";
 import { WEBSITE_LINKS, websiteUrl } from "../shared/website";
-import { emptyCause, emptyState, jobOfLine, statePill, threadLines, watchPill, workingStrip } from "./parts";
+import { emptyCause, emptyState, ghostProfile, jobOfLine, statePill, threadLines, watchPill, workingStrip } from "./parts";
 
 declare global { interface Window { everloot: EverlootApi } }
 const api = window.everloot;
@@ -575,9 +575,10 @@ function characters(): string {
     </div>
     <p class="fg2">What the addon recorded about your own characters. Gold and gear carry the name; progress rows carry an opaque key the addon derives per character, so they are listed apart. Sharing any of this with the site is a choice you make on the upload page with a verified grant, never here.</p>
     ${named.length ? `${hero}
-    <section class="panel"><div class="row between"><h2>Roster</h2><span class="muted small">click a character, or press Enter, for the details</span></div>
+    <section class="panel profile" aria-label="${esc(selected?.character ?? "")}: gold, gear and money by category">${selected ? drawerOverview(selected, true) : ""}</section>
+    <section class="panel"><div class="row between"><h2>Roster</h2><span class="muted small">click a character, or press Enter, for history and sharing</span></div>
       <div class="tablewrap"><table class="roster"><thead><tr><th>Character</th><th class="num">Gold</th><th class="num">7 days</th><th class="num">Item level</th><th class="num">Last seen</th></tr></thead><tbody>${rows}</tbody></table></div>
-    </section>` : c ? emptyState(emptyCause("characters", state!), icon("characters")) : `<section class="panel"><p class="muted">Loading…</p></section>`}
+    </section>` : c ? `${emptyState(emptyCause("characters", state!), icon("characters"))}${ghostProfile()}` : `<section class="panel"><p class="muted">Loading…</p></section>`}
     <section class="panel" id="keyed" tabindex="-1"><h2>Progress · keyed</h2>
       ${prog ? `<div class="tablewrap"><table><thead><tr><th>Key</th><th>Class</th><th class="num">Achievements</th><th class="num">Reputations</th><th class="num">Titles</th><th class="num">Quests done</th></tr></thead><tbody>${prog}</tbody></table></div>` : `<p class="muted">${c ? "Nothing yet. The completion tracker is off until <code>/everloot completion on</code> in game." : "Loading…"}</p>`}
       ${c?.talents.length ? `<p class="muted small">Active talent builds: ${c.talents.map((x) => `${esc(x.class.toLowerCase())} ${x.level} (${x.points} points)`).join(", ")}. Not linked to a name.</p>` : ""}
@@ -600,7 +601,8 @@ function characters(): string {
   </div>`;
 }
 
-function drawerOverview(c: CharacterRow): string {
+/** The character's profile: gold now and at its peak, the week, every gear slot, money by category. On the page it skips the pointer to the keyed rows, which sit right under it there. */
+function drawerOverview(c: CharacterRow, onPage = false): string {
   const week = netOf(c.week);
   const slots = new Map(c.equipped.map((e) => [e.slot, e.itemLevel]));
   const avg = c.equipped.length ? (c.equipped.reduce((s, e) => s + e.itemLevel, 0) / c.equipped.length).toFixed(1) : null;
@@ -625,9 +627,9 @@ function drawerOverview(c: CharacterRow): string {
     <section class="dw-sec"><div class="row between"><h3>Money by category</h3><span class="muted small">all time in this file</span></div>
       <div class="cat-cols"><div><h4>Earned</h4>${catCol("in")}</div><div><h4>Spent</h4>${catCol("out")}</div></div>
     </section>
-    <section class="dw-sec"><h3>Progress</h3>
+    ${onPage ? "" : `<section class="dw-sec"><h3>Progress</h3>
       <p class="muted small">Achievements, reputations, titles and quests are keyed by an opaque identifier, never a name, so they stay listed apart from this character. <button type="button" class="link" id="gotoKeyed">Show the keyed rows</button></p>
-    </section>`;
+    </section>`}`;
 }
 
 function drawerHistory(c: CharacterRow): string {
