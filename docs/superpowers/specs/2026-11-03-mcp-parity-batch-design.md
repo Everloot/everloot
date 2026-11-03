@@ -3,8 +3,8 @@
 ## Intent
 
 Everloot's public MCP (`https://everloot.app/mcp/public`, 32 read-only tools) was the only WoW: Forever
-connector an assistant could reach without an install. On 2026-11-03 the Glama read
-(`D:/R21-Brain/wiki/projects/everloot/ops/2026-11-03-glama-competitor-analysis.md`) found Azeroth DB
+connector an assistant could reach without an install. On 2026-11-03 a read of the Glama listings
+next to Everloot's (kept in the maintainers' notes) found Azeroth DB
 (wiki.wowdb) running the same model with a connector scored A 3.8 against Everloot's B 3.4, searching
 fifteen record kinds in ten locales with a field-level read, and TalentAnvil scoring A 4.0 on description
 quality alone. Carlos's words: "this is one of our selling points and if someone else has the same stuff
