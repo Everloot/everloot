@@ -234,6 +234,18 @@ p { margin: 0; }
 .dot-running { background: rgb(var(--info)); }
 .dot-idle { background: var(--edge); }
 .dot-off { background: transparent; border: 2px solid var(--edge); }
+/* The state pill: a word for the job's state, in the rail, the title bar and a job page's strip. */
+.pill-s { --tone: var(--fg-2); display: inline-flex; align-items: center; gap: 5px; flex: none; margin-left: auto; padding: 1px 7px; border-radius: 9999px; border: 1px solid rgb(var(--tone) / 0.5); background: rgb(var(--tone) / 0.1); color: rgb(var(--tone)); font-size: 11px; font-weight: 600; letter-spacing: 0.02em; line-height: 1.5; white-space: nowrap; }
+.pill-working { --tone: var(--info); }
+.pill-failed { --tone: var(--danger); }
+.pill-ok { --tone: var(--accent); }
+.pill-paused { --tone: var(--warning); }
+.pill-off { --tone: var(--muted); background: transparent; }
+.pill-waiting { --tone: var(--fg-2); background: transparent; }
+.pill-ring { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid rgb(var(--tone) / 0.3); border-top-color: rgb(var(--tone)); }
+@media (prefers-reduced-motion: no-preference) { .pill-ring { animation: pill-spin 900ms linear infinite; } }
+@keyframes pill-spin { to { transform: rotate(360deg); } }
+@media (forced-colors: active) { .pill-s { border-color: CanvasText; } }
 
 /* Tables scroll inside their own wrapper; the page never scrolls sideways. */
 .tablewrap { overflow-x: auto; max-width: 100%; }

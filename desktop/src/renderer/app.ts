@@ -5,6 +5,7 @@ import { JOBS, NO_SOURCED_ANSWER, type AddonInfo, type AppState, type AskInfo, t
 import { PROVIDER_PRESETS, assistantSource, keptModelPick, manualModelShown, presetFor, removalNotice, type ModelChoice, type ProviderKind } from "../shared/providers";
 import { inkOn } from "../../../web/src/lib/chat/catalogue";
 import { WEBSITE_LINKS, websiteUrl } from "../shared/website";
+import { statePill } from "./parts";
 
 declare global { interface Window { everloot: EverlootApi } }
 const api = window.everloot;
@@ -1066,9 +1067,8 @@ function renderSide(s: AppState): void {
     : null;
   const item = (id: string, label: string, job?: Job) => {
     const j = job ? s.engine.jobs[job] : null;
-    // A coloured dot alone says nothing to a screen reader; failures and running work are said in words.
-    const said = j && (j.state === "error" || j.state === "running") ? `<span class="sr-only"> (${j.state === "error" ? "failed" : "running"})</span>` : "";
-    return `<button type="button" data-page="${id}" ${id === page ? 'aria-current="page"' : ""}>${icon(id)}<span class="grow">${esc(label)}${said}</span>${j ? dot(j) : ""}</button>`;
+    // The pill says the job's state in a word, so a screen reader hears it with the label.
+    return `<button type="button" data-page="${id}" ${id === page ? 'aria-current="page"' : ""}>${icon(id)}<span class="grow">${esc(label)}</span>${j ? statePill(j, s.engine.paused) : ""}</button>`;
   };
   // The site's tools open in the browser; the app does not carry them.
   const web = WEBSITE_LINKS.map((l) => `<button type="button" class="out" data-open="${esc(websiteUrl(s.settings.endpoint, l.path))}"><span class="grow">${esc(l.label)}<span class="sr-only"> (opens in your browser)</span></span>${icon("external", "ico ext")}</button>`).join("");
