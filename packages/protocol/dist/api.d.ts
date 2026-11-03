@@ -364,6 +364,7 @@ export declare const intakeReceipt: z.ZodObject<{
         kind: z.ZodOptional<z.ZodString>;
         reason: z.ZodOptional<z.ZodString>;
     }, z.core.$strip>>;
+    runRecords: z.ZodOptional<z.ZodLiteral<true>>;
 }, z.core.$loose>;
 /** POST /api/intake, 4xx or 503: refused; `accepted` and `rejected` say why when the envelope parsed. */
 export declare const intakeRefused: z.ZodObject<{
@@ -381,6 +382,7 @@ export declare const intakeRefused: z.ZodObject<{
         kind: z.ZodOptional<z.ZodString>;
         reason: z.ZodOptional<z.ZodString>;
     }, z.core.$strip>>>;
+    runRecords: z.ZodOptional<z.ZodLiteral<true>>;
 }, z.core.$strip>;
 /** POST /api/intake request body: the envelope, with the sharing choices and grants the upload page adds. */
 export declare const intakeRequest: z.ZodObject<{
@@ -555,6 +557,9 @@ export declare const intakeRequest: z.ZodObject<{
         size: z.ZodOptional<z.ZodNumber>;
         success: z.ZodBoolean;
         npcIds: z.ZodOptional<z.ZodArray<z.ZodNumber>>;
+        startedAt: z.ZodOptional<z.ZodString>;
+        durationSeconds: z.ZodOptional<z.ZodNumber>;
+        runId: z.ZodOptional<z.ZodString>;
     }, z.core.$strip>, z.ZodObject<{
         installId: z.ZodString;
         eventId: z.ZodOptional<z.ZodString>;
@@ -1005,6 +1010,68 @@ export declare const intakeRequest: z.ZodObject<{
         instanceMapId: z.ZodNumber;
         difficulty: z.ZodOptional<z.ZodNumber>;
         size: z.ZodOptional<z.ZodNumber>;
+    }, z.core.$strip>, z.ZodObject<{
+        installId: z.ZodString;
+        eventId: z.ZodOptional<z.ZodString>;
+        capturedAt: z.ZodString;
+        kind: z.ZodLiteral<"instance_run">;
+        runId: z.ZodString;
+        instanceMapId: z.ZodNumber;
+        name: z.ZodOptional<z.ZodString>;
+        instanceType: z.ZodEnum<{
+            party: "party";
+            raid: "raid";
+        }>;
+        difficulty: z.ZodOptional<z.ZodNumber>;
+        enteredAt: z.ZodString;
+        leftAt: z.ZodString;
+        firstPullAt: z.ZodOptional<z.ZodString>;
+        lastKillAt: z.ZodOptional<z.ZodString>;
+        pulls: z.ZodNumber;
+        kills: z.ZodNumber;
+        wipes: z.ZodNumber;
+        size: z.ZodOptional<z.ZodNumber>;
+        killedEncounterIds: z.ZodOptional<z.ZodArray<z.ZodNumber>>;
+        endReason: z.ZodEnum<{
+            left: "left";
+            new_instance: "new_instance";
+            reset: "reset";
+        }>;
+    }, z.core.$strip>, z.ZodObject<{
+        installId: z.ZodString;
+        eventId: z.ZodOptional<z.ZodString>;
+        capturedAt: z.ZodString;
+        kind: z.ZodLiteral<"pull_summary">;
+        encounterId: z.ZodNumber;
+        name: z.ZodString;
+        instanceMapId: z.ZodNumber;
+        difficulty: z.ZodOptional<z.ZodNumber>;
+        size: z.ZodOptional<z.ZodNumber>;
+        success: z.ZodBoolean;
+        startedAt: z.ZodOptional<z.ZodString>;
+        durationSeconds: z.ZodOptional<z.ZodNumber>;
+        runId: z.ZodOptional<z.ZodString>;
+        realm: z.ZodOptional<z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>>;
+        meterSeconds: z.ZodOptional<z.ZodNumber>;
+        members: z.ZodArray<z.ZodObject<{
+            name: z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>;
+            realm: z.ZodOptional<z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>>;
+            class: z.ZodString;
+            self: z.ZodOptional<z.ZodLiteral<true>>;
+            role: z.ZodOptional<z.ZodEnum<{
+                damage: "damage";
+                healer: "healer";
+                tank: "tank";
+            }>>;
+            roleSource: z.ZodOptional<z.ZodEnum<{
+                assigned: "assigned";
+                inferred: "inferred";
+            }>>;
+            damageDone: z.ZodOptional<z.ZodNumber>;
+            healingDone: z.ZodOptional<z.ZodNumber>;
+            damageTaken: z.ZodOptional<z.ZodNumber>;
+            deaths: z.ZodOptional<z.ZodNumber>;
+        }, z.core.$strip>>;
     }, z.core.$strip>], "kind">>;
     sharing: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodBoolean>>;
     grantTokens: z.ZodOptional<z.ZodArray<z.ZodString>>;
@@ -1780,6 +1847,9 @@ export declare const API_SCHEMAS: {
             size: z.ZodOptional<z.ZodNumber>;
             success: z.ZodBoolean;
             npcIds: z.ZodOptional<z.ZodArray<z.ZodNumber>>;
+            startedAt: z.ZodOptional<z.ZodString>;
+            durationSeconds: z.ZodOptional<z.ZodNumber>;
+            runId: z.ZodOptional<z.ZodString>;
         }, z.core.$strip>, z.ZodObject<{
             installId: z.ZodString;
             eventId: z.ZodOptional<z.ZodString>;
@@ -2230,6 +2300,68 @@ export declare const API_SCHEMAS: {
             instanceMapId: z.ZodNumber;
             difficulty: z.ZodOptional<z.ZodNumber>;
             size: z.ZodOptional<z.ZodNumber>;
+        }, z.core.$strip>, z.ZodObject<{
+            installId: z.ZodString;
+            eventId: z.ZodOptional<z.ZodString>;
+            capturedAt: z.ZodString;
+            kind: z.ZodLiteral<"instance_run">;
+            runId: z.ZodString;
+            instanceMapId: z.ZodNumber;
+            name: z.ZodOptional<z.ZodString>;
+            instanceType: z.ZodEnum<{
+                party: "party";
+                raid: "raid";
+            }>;
+            difficulty: z.ZodOptional<z.ZodNumber>;
+            enteredAt: z.ZodString;
+            leftAt: z.ZodString;
+            firstPullAt: z.ZodOptional<z.ZodString>;
+            lastKillAt: z.ZodOptional<z.ZodString>;
+            pulls: z.ZodNumber;
+            kills: z.ZodNumber;
+            wipes: z.ZodNumber;
+            size: z.ZodOptional<z.ZodNumber>;
+            killedEncounterIds: z.ZodOptional<z.ZodArray<z.ZodNumber>>;
+            endReason: z.ZodEnum<{
+                left: "left";
+                new_instance: "new_instance";
+                reset: "reset";
+            }>;
+        }, z.core.$strip>, z.ZodObject<{
+            installId: z.ZodString;
+            eventId: z.ZodOptional<z.ZodString>;
+            capturedAt: z.ZodString;
+            kind: z.ZodLiteral<"pull_summary">;
+            encounterId: z.ZodNumber;
+            name: z.ZodString;
+            instanceMapId: z.ZodNumber;
+            difficulty: z.ZodOptional<z.ZodNumber>;
+            size: z.ZodOptional<z.ZodNumber>;
+            success: z.ZodBoolean;
+            startedAt: z.ZodOptional<z.ZodString>;
+            durationSeconds: z.ZodOptional<z.ZodNumber>;
+            runId: z.ZodOptional<z.ZodString>;
+            realm: z.ZodOptional<z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>>;
+            meterSeconds: z.ZodOptional<z.ZodNumber>;
+            members: z.ZodArray<z.ZodObject<{
+                name: z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>;
+                realm: z.ZodOptional<z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>>;
+                class: z.ZodString;
+                self: z.ZodOptional<z.ZodLiteral<true>>;
+                role: z.ZodOptional<z.ZodEnum<{
+                    damage: "damage";
+                    healer: "healer";
+                    tank: "tank";
+                }>>;
+                roleSource: z.ZodOptional<z.ZodEnum<{
+                    assigned: "assigned";
+                    inferred: "inferred";
+                }>>;
+                damageDone: z.ZodOptional<z.ZodNumber>;
+                healingDone: z.ZodOptional<z.ZodNumber>;
+                damageTaken: z.ZodOptional<z.ZodNumber>;
+                deaths: z.ZodOptional<z.ZodNumber>;
+            }, z.core.$strip>>;
         }, z.core.$strip>], "kind">>;
         sharing: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodBoolean>>;
         grantTokens: z.ZodOptional<z.ZodArray<z.ZodString>>;
@@ -2248,6 +2380,7 @@ export declare const API_SCHEMAS: {
             kind: z.ZodOptional<z.ZodString>;
             reason: z.ZodOptional<z.ZodString>;
         }, z.core.$strip>>;
+        runRecords: z.ZodOptional<z.ZodLiteral<true>>;
     }, z.core.$loose>;
     readonly intakeRefused: z.ZodObject<{
         ok: z.ZodLiteral<false>;
@@ -2264,6 +2397,7 @@ export declare const API_SCHEMAS: {
             kind: z.ZodOptional<z.ZodString>;
             reason: z.ZodOptional<z.ZodString>;
         }, z.core.$strip>>>;
+        runRecords: z.ZodOptional<z.ZodLiteral<true>>;
     }, z.core.$strip>;
     readonly healthResponse: z.ZodObject<{
         ok: z.ZodBoolean;

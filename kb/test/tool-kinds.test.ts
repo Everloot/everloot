@@ -11,7 +11,7 @@ import { fromUploads, TOOL_KINDS, UPLOADS_UNSET } from "../src/mcp-server.js";
 import { pathFactsFromRecords, recipeFactsFromRecords } from "../src/recipe-thresholds.js";
 import { npcFactsFromRecords, worldFactsFromRecords } from "../src/world-pages.js";
 import { mapFactsFromRecords } from "../src/world-map-near.js";
-import { ALL_RECORD_KINDS, CENSUS_KINDS, COMPLETION_KINDS, LINK_KINDS, PLAYER_KINDS, parseRecords } from "@everloot/protocol";
+import { ALL_RECORD_KINDS, CENSUS_KINDS, COMPLETION_KINDS, LINK_KINDS, PLAYER_KINDS, PULL_KINDS, parseRecords } from "@everloot/protocol";
 import { MCP_CREDIT } from "@everloot/protocol";
 
 const base = { installId: "install-one", capturedAt: "2026-10-09T00:00:00Z" };
@@ -43,6 +43,9 @@ const EVERY_KIND = parseRecords([
   { ...base, installId: "ps-1111111111111111-2222222222222222", eventId: "e:36", kind: "loot", sourceNpcId: 42, items: [{ itemId: 5, count: 1 }] },
   { ...base, eventId: "e:37", kind: "instance_entrance", instanceMapId: 36, name: "Deadmines", instanceType: "party", mapId: 1436, x: 42, y: 71 },
   { ...base, eventId: "e:38", kind: "encounter", encounterId: 1144, name: "Edwin VanCleef", instanceMapId: 36, success: true, npcIds: [639] },
+  // Runs wait for a rollup of their own, and pull summaries live in their own tables: no corpus tool reads either.
+  { ...base, eventId: "e:42", kind: "instance_run", runId: "0123456789abcdef", instanceMapId: 36, instanceType: "party", enteredAt: "2026-10-08T23:00:00Z", leftAt: "2026-10-09T00:00:00Z", pulls: 1, kills: 1, wipes: 0, endReason: "left" },
+  { ...base, eventId: "e:43", kind: "pull_summary", encounterId: 1144, name: "Edwin VanCleef", instanceMapId: 36, success: true, realm: "Forever", members: [{ name: "Thrallina", class: "SHAMAN" }] },
   { ...base, eventId: "e:39", kind: "object_sighting", objectId: 2843, name: "Battered Chest", mapId: 1436, x: 30, y: 50 },
   // Read by item_page as well as the site's item pages; the tool input stays frozen.
   { ...base, eventId: "e:40", kind: "item_fact", itemId: 5, fact: "stamina", value: 3, clientBuild: "1.60.1.70450" },
@@ -104,8 +107,8 @@ test("no corpus tool reads a completion kind: completion_progress reads the roll
   for (const [tool, kinds] of Object.entries(TOOL_KINDS)) for (const kind of COMPLETION_KINDS) expect(kinds, tool).not.toContain(kind);
 });
 
-test("no corpus tool reads a census, player or link kind: the census is published as counts only", () => {
-  for (const [tool, kinds] of Object.entries(TOOL_KINDS)) for (const kind of [...CENSUS_KINDS, ...PLAYER_KINDS, ...LINK_KINDS]) expect(kinds, tool).not.toContain(kind);
+test("no corpus tool reads a census, player, link or pull kind: the census is published as counts only", () => {
+  for (const [tool, kinds] of Object.entries(TOOL_KINDS)) for (const kind of [...CENSUS_KINDS, ...PLAYER_KINDS, ...LINK_KINDS, ...PULL_KINDS]) expect(kinds, tool).not.toContain(kind);
 });
 
 test("a tool asks the public corpus for its kinds only", async () => {

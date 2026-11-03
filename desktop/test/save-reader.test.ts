@@ -155,7 +155,7 @@ test("an upload through the reader sends, skips, holds and marks sent exactly wh
   // those 2. The held rows (the one with no id among them) and the refused one are never marked sent, so they cross each time.
   expect(crossed).toEqual([9, 8, 6]);
   // Every count is in play: 2 sent, 1 settled, 1 refused, and one each held as named, legacy (no id), addon, census, player.
-  const held = { heldNamed: 1, heldLegacy: 1, heldAddons: 1, heldCensus: 1, heldPlayers: 1, invalid: 0, rejected: 1, batches: 1 };
+  const held = { heldNamed: 1, heldLegacy: 1, heldAddons: 1, heldCensus: 1, heldPlayers: 1, heldRuns: 0, invalid: 0, rejected: 1, batches: 1 };
   expect(results.main).toEqual([{ sent: 2, skipped: 1, ...held }, { sent: 1, skipped: 1, ...held }, { sent: 0, skipped: 0, ...held }]);
   expect(lines).toEqual([]);
 });

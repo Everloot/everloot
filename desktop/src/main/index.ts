@@ -32,6 +32,7 @@ import { createTray } from "./tray";
 import { checkForUpdates, fetchReleases, updateFrom } from "./updates";
 import { downloadUpdate, failedAttempt, forgetAttempt, pruneInstallers, recordAttempt, runInstaller } from "./self-update";
 import { fitWindow, readWindowState, writeWindowState } from "./window-state";
+import { siteReadsRuns } from "../../../companion/src/site-collects";
 
 /** The same folder the command line uses (`companion/src/cli.ts` defaultStatePath), so both share sent.json. */
 function dataFolder(): string {
@@ -111,7 +112,7 @@ if (!app.requestSingleInstanceLock()) {
     onChange: () => broadcast(),
     log: (level, text) => engine.log(level, text),
   });
-  const appState = (): AppState => ({ version: app.getVersion(), platform: process.platform, dataFolder: data, notice: loaded.error, settings, foreverFolder: foreverSuggestion(settings.gameFolder, settings.keptGameFolder, realFs), engine: engine.snapshot(), update, updateProgress, staleScans: staleScans(knownScans()), account: accountInfo(data), builds: builds.status() });
+  const appState = (): AppState => ({ version: app.getVersion(), platform: process.platform, dataFolder: data, notice: loaded.error, settings, foreverFolder: foreverSuggestion(settings.gameFolder, settings.keptGameFolder, realFs), engine: engine.snapshot(), update, updateProgress, staleScans: staleScans(knownScans()), account: accountInfo(data), builds: builds.status(), runRecords: siteReadsRuns(join(data, "site-collects.json"), settings.endpoint) });
   const broadcast = () => {
     const s = appState();
     win?.webContents.send("state", s);

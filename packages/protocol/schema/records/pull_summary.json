@@ -1,0 +1,170 @@
+{
+  "$id": "https://everloot.app/schema/records/pull_summary.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "installId": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 64,
+      "description": "Random install id, no account needed."
+    },
+    "eventId": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 96,
+      "pattern": "^[A-Za-z0-9:_-]+$"
+    },
+    "capturedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+      "description": "ISO time the event happened in-game."
+    },
+    "kind": {
+      "type": "string",
+      "const": "pull_summary"
+    },
+    "encounterId": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120,
+      "description": "The encounter's name in the client's language."
+    },
+    "instanceMapId": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991,
+      "description": "The instance's map id, the 8th return of `GetInstanceInfo`: a map, not a UiMap."
+    },
+    "difficulty": {
+      "description": "The difficulty id `GetInstanceInfo` reports. Absent when the source did not record it.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 255
+    },
+    "size": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 40
+    },
+    "success": {
+      "type": "boolean",
+      "description": "True for a kill, false for a wipe."
+    },
+    "startedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+    },
+    "durationSeconds": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 86400
+    },
+    "runId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{16}$"
+    },
+    "realm": {
+      "description": "GetRealmName(): the realm the addon runs on.",
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 60
+    },
+    "meterSeconds": {
+      "description": "The damage meter's own length for the fight it totalled. Far from `durationSeconds` means the totals cover more or less than the pull.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 86400
+    },
+    "members": {
+      "minItems": 1,
+      "maxItems": 40,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 48,
+            "description": "UnitName: letters only, 2 to 12 of them."
+          },
+          "realm": {
+            "description": "Only for a member from another realm than the row's.",
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 60
+          },
+          "class": {
+            "type": "string",
+            "pattern": "^[A-Z]{3,16}$",
+            "description": "Class token, UnitClass's second return, e.g. HUNTER."
+          },
+          "self": {
+            "description": "The uploader's own character.",
+            "type": "boolean",
+            "const": true
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "tank",
+              "healer",
+              "damage"
+            ]
+          },
+          "roleSource": {
+            "description": "`assigned`: UnitGroupRolesAssigned. `inferred`: healer when healing done was larger than damage done, else damage. A tank is never inferred.",
+            "type": "string",
+            "enum": [
+              "assigned",
+              "inferred"
+            ]
+          },
+          "damageDone": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000000000
+          },
+          "healingDone": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000000000
+          },
+          "damageTaken": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000000000
+          },
+          "deaths": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "name",
+          "class"
+        ]
+      }
+    }
+  },
+  "required": [
+    "installId",
+    "capturedAt",
+    "kind",
+    "encounterId",
+    "name",
+    "instanceMapId",
+    "success",
+    "members"
+  ],
+  "description": "Everloot upload record: pull_summary. The server also checks: role and roleSource come together."
+}

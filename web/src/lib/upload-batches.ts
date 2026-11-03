@@ -1,4 +1,4 @@
-import { CLIENT_BUILD, LINK_KINDS, parseRecords, PROTOCOL_VERSION, sharingCategory, UPLOAD_LIMITS, UPLOAD_SOURCES, type SharingCategory } from "@everloot/protocol";
+import { CLIENT_BUILD, LINK_KINDS, parseRecords, PROTOCOL_VERSION, sharingCategory, UPLOAD_LIMITS, UPLOAD_SOURCES, type ParseOptions, type SharingCategory } from "@everloot/protocol";
 import { recorderSession } from "./polestar-recorder";
 
 export type SharingChoices = Partial<Record<SharingCategory, boolean>>;
@@ -37,14 +37,17 @@ export function censusSummary(census: UploadSession["census"]): string | null {
 /**
  * Builds the upload's batches. `skip(record)`, when given, leaves out rows whose fact is already settled
  * (kb/src/settled-list.ts `settledSkip`); their event ids are returned in `skipped`, so a caller can mark them handled.
+ * `parse` reads the rows the way the site will: `{ runRecords: true }` only where the site collects pull timing, runs
+ * and pull summaries (its `EVERLOOT_PULL_SUMMARIES` switch). Left out, the rows are read as intake read them before
+ * those, so the preview and the batches match what a site with the switch off keeps.
  */
 export function prepareUpload(payload: unknown, sharing: SharingChoices, grantTokens: string[], maxBytes: number = UPLOAD_LIMITS.batchBytes,
-  skip?: (record: Readonly<Record<string, unknown>>) => boolean): UploadSession {
+  skip?: (record: Readonly<Record<string, unknown>>) => boolean, parse: ParseOptions = { runRecords: false }): UploadSession {
   const envelope = payload as { addonVersion?: unknown; clientBuild?: unknown; source?: unknown; records?: unknown };
   if (!envelope || typeof envelope.addonVersion !== "string" || envelope.addonVersion.length > UPLOAD_LIMITS.addonVersionMax || !Array.isArray(envelope.records)) throw new Error("Choose an Everloot file with a version and records array.");
   if (envelope.records.length > UPLOAD_LIMITS.recordsPerFile) throw new Error(`This file is too large. Keep the original and split it into files of at most ${UPLOAD_LIMITS.recordsPerFile.toLocaleString("en-US")} records.`);
   if (grantTokens.length > UPLOAD_LIMITS.grantTokensMax || grantTokens.some((token) => !/^[a-f0-9]{64}$/.test(token))) throw new Error("Verification grants must be 64 lowercase hexadecimal characters, one per line (at most four).");
-  const parsed = parseRecords(envelope.records);
+  const parsed = parseRecords(envelope.records, parse);
   const held = { legacy: 0, named: 0, invalid: parsed.receipt.rejected.length, links: 0 };
   const counts: Record<string, number> = {};
   const addons = new Map<string, string>();

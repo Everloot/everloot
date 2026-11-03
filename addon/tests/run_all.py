@@ -16,12 +16,12 @@ TESTS = [
     "gph_contract.py", "talents_contract.py", "plan_contract.py", "raid_contract.py", "completion_contract.py",
     "census_contract.py", "players_contract.py", "link_contract.py", "conveniences_contract.py",
     "protocol_contract.py", "no_ads_contract.py", "minimap_contract.py", "secret_values_contract.py",
-    "ui_window_contract.py", "answers_contract.py",
+    "ui_window_contract.py", "answers_contract.py", "pulls_contract.py",
 ]
 # Run by the workflows' own step; scripts/test_alpha_release.py checks that step names them.
 PLANNER = ["raid_plan_contract.py", "planner_contract.py"]
 # Imported by the tests, not a test itself.
-HELPERS = ["protocol_schema.py", Path(__file__).name]
+HELPERS = ["protocol_schema.py", "gate_off_snapshot.py", Path(__file__).name]
 
 here = Path(__file__).parent
 unlisted = sorted({p.name for p in here.glob("*.py")} - set(TESTS) - set(PLANNER) - set(HELPERS))

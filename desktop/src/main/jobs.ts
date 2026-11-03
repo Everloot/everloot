@@ -7,6 +7,7 @@ import { providersOnDemand } from "../../../companion/src/providers/config";
 import { linkSummary, sendLinks } from "../../../companion/src/link-sender";
 import { findEverlootFiles } from "../../../companion/src/savedvariables";
 import { createSentState } from "../../../companion/src/sent-state";
+import { createSiteCollects } from "../../../companion/src/site-collects";
 import { uploadFile } from "../../../companion/src/uploader";
 import { watchFile } from "../../../companion/src/watch-file";
 import { appSettledList } from "../../../web/src/lib/settled-cache";
@@ -28,6 +29,8 @@ export function companionJobs(dataFolder: string, current: () => Settings): { de
   const notices: string[] = [];
   const recovered = (message: string) => { notices.push(message); };
   const state = createSentState(join(dataFolder, "sent.json"), recovered);
+  // Whether the site reads runs and pull summaries, from its last receipt for them; until it does they wait here.
+  const collects = createSiteCollects(join(dataFolder, "site-collects.json"), recovered);
   const answerStore = createAnswerStore(join(dataFolder, "answers.json"), recovered);
   const addonsDir = () => join(current().gameFolder ?? "", "Interface", "AddOns");
   let lastMarket: RealmSummary[] = [];
@@ -49,7 +52,8 @@ export function companionJobs(dataFolder: string, current: () => Settings): { de
         return others.some((f) => { try { return saveFacts(f).upload.installId === installId; } catch { return false; } });
       };
       // The save reader parses the file off the main thread and hands over only the rows still unsent.
-      const r = await uploadFile(file, { endpoint, state, census: current().census, players: current().players, settled, read: readForUpload, sharesInstall });
+      const r = await uploadFile(file, { endpoint, state, census: current().census, players: current().players, pulls: true, collects, settled, read: readForUpload, sharesInstall });
+      const runs = r.heldRuns ? `; kept ${r.heldRuns} ${r.heldRuns === 1 ? "run or boss pull" : "runs and boss pulls"} here until the site reads them` : "";
       // A list for a build the game has moved on from is never read again.
       pruneSettledLists(dataFolder);
       const rejected = r.rejected ? `; the site turned away ${r.rejected} ${r.rejected === 1 ? "row, which stays unsent and goes" : "rows, which stay unsent and go"} again next run` : "";
@@ -60,7 +64,7 @@ export function companionJobs(dataFolder: string, current: () => Settings): { de
         const said = linkSummary(await sendLinks(file, { endpoint, key: accountKeyForSite(dataFolder, endpoint), state }));
         if (said) links = `; ${said}`;
       } catch (err) { links = `; character links not sent: ${err instanceof Error ? err.message : String(err)}`; }
-      return `sent ${r.sent} new events in ${r.batches} batch(es)${rejected}; skipped ${r.skipped} already settled; kept ${r.heldNamed} named, ${r.heldAddons} installed-addon, ${r.heldCensus} census and ${r.heldLegacy} legacy rows here${links}${backup}`;
+      return `sent ${r.sent} new events in ${r.batches} batch(es)${rejected}; skipped ${r.skipped} already settled; kept ${r.heldNamed} named, ${r.heldAddons} installed-addon, ${r.heldCensus} census and ${r.heldLegacy} legacy rows here${runs}${links}${backup}`;
     },
     async prices(files) {
       const s = current();

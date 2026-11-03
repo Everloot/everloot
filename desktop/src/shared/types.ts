@@ -275,6 +275,8 @@ export interface AppState {
   staleScans: ScanAge[];
   account: Account;
   builds: BuildsStatus;
+  /** The site's last receipt for runs and boss pulls said it reads them; the settings page describes them only then. */
+  runRecords?: boolean;
 }
 
 /** What `window.everloot` offers the page. Implemented in preload.ts over IPC. */
