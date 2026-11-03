@@ -70,7 +70,9 @@
       },
     });
     window.__go = (page) => navigate && navigate(page);
-    addEventListener("load", () => { const p = q.get("page"); if (p) setTimeout(() => window.__go(p), 50); });
+    // The page id comes from an allowlist, never from the query string itself.
+    const PAGES = ["overview", "chat", "characters", "upload", "market", "ask", "addon", "changes", "log", "settings"];
+    addEventListener("load", () => { const p = PAGES.find((id) => id === q.get("page")); if (p) setTimeout(() => window.__go(p), 50); });
   </script>
 </head>
 <body>
