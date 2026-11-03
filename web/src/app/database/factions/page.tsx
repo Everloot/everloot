@@ -6,11 +6,11 @@ import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, t
 import { factionHref, loadCatalog, type Listed } from "@/lib/completion-lists";
 import { LINK } from "../entity";
 import {
-  listHref, listMetadata, listQuery, nextSort, NoMatches, NoObservations, PER_PAGE, sortParam, sortRows, Unreadable,
-  type ListQuery, type Search,
+  confirmedCell, ConfirmationsUnread, listCaption, listHref, listMetadata, listQuery, nextSort, NoMatches, noneListed, NoObservations, PER_PAGE,
+  sortParam, sortRows, Unreadable, type ListQuery, type Search,
 } from "../list-parts";
 
-const META = { title: "WoW Forever Faction List", description: "Reputation factions in WoW: Forever by name, standing header and faction ID. A faction is listed once three players report it the same way.", path: "/database/factions" };
+const META = { title: "WoW Forever Faction List", description: "Reputation factions in WoW: Forever by name, header and ID. From the game files; confirmed once three players report each the same way.", path: "/database/factions" };
 export const dynamic = "force-dynamic";
 
 const SORTS = ["name", "header", "id"] as const;
@@ -41,6 +41,7 @@ export default async function FactionListPage(props: { searchParams?: Promise<Se
   const q = factionQuery((await props.searchParams) ?? {});
   if (!q) notFound();
   const catalog = await loadCatalog();
+  const confirmations = catalog?.confirmations ?? false;
   const all = catalog?.factions ?? [];
   const text = q.q?.toLowerCase();
   const id = text && /^#?\d+$/.test(text) ? Number(text.replace("#", "")) : null;
@@ -58,7 +59,7 @@ export default async function FactionListPage(props: { searchParams?: Promise<Se
   const columns: Column<Listed<FactionEntry>>[] = [
     { key: "name", header: "Name", sortable: true, cell: (x) => <Link href={factionHref(x.factionId, x.name)} className={LINK}>{x.name}</Link> },
     { key: "header", header: "Header", sortable: true, cell: (x) => x.header ?? dash },
-    { key: "confirmed", header: "Confirmed", cell: (x) => (x.confirmed ? "Confirmed" : "Unconfirmed") },
+    { key: "confirmed", header: "Confirmed", cell: (x) => confirmedCell(x, confirmations) },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.factionId },
   ];
 
@@ -79,12 +80,13 @@ export default async function FactionListPage(props: { searchParams?: Promise<Se
   ];
   const empty = !catalog ? <Unreadable />
     : filters(q) > 0 ? <NoMatches noun="factions" chips={chips} clearHref="/database/factions" />
-    : <NoObservations>No faction is listed yet; each appears once three players report it.</NoObservations>;
+    : <NoObservations>{noneListed("faction")}</NoObservations>;
 
   return (
     <Container width="data">
       <article>
         <DataTitle title="Factions" aside={strip} />
+        {catalog && !confirmations && <ConfirmationsUnread />}
         <FilterBar
           label="Faction filters"
           search={{ action: "/database/factions", value: q.q, placeholder: "Name or id", label: "Filter by name or id", keep }}
@@ -95,7 +97,7 @@ export default async function FactionListPage(props: { searchParams?: Promise<Se
         <div className="mt-2">
           <DataTable
             dense
-            caption={`Factions three players reported: ${rows.length}`}
+            caption={listCaption("factions", rows, confirmations)}
             columns={columns}
             rows={shown}
             rowKey={(x) => String(x.factionId)}

@@ -14,8 +14,11 @@ import { uploadStore } from "./upload-store";
 /** An entry and whether player uploads confirm it (the rollup agrees on the same id); the rest come from the game files only. */
 export type Listed<T> = T & { confirmed: boolean };
 
-/** `base` says whether any game file was read, even one with no eligible entry. */
-export interface CompletionCatalog { achievements: Listed<AchievementEntry>[]; factions: Listed<FactionEntry>[]; titles: Listed<TitleEntry>[]; chains: Listed<ChainEntry>[]; dataAsOf: string | null; base: boolean }
+/**
+ * `base` says whether any game file was read, even one with no eligible entry. `confirmations` says whether the
+ * rollup was read: when false, no entry is known to be confirmed or unconfirmed, so a list must say "unrecorded".
+ */
+export interface CompletionCatalog { achievements: Listed<AchievementEntry>[]; factions: Listed<FactionEntry>[]; titles: Listed<TitleEntry>[]; chains: Listed<ChainEntry>[]; dataAsOf: string | null; base: boolean; confirmations: boolean }
 
 /** Whether a game-file wrapper could be read; a file that is there but holds no eligible entry still counts. */
 function readable(file: () => unknown): boolean {
@@ -75,6 +78,7 @@ export async function loadCatalog(): Promise<CompletionCatalog | null> {
     chains: merge(base.chains, agreed?.chains ?? new Map()),
     dataAsOf: read.state ? read.dataAsOf : null,
     base: base.available,
+    confirmations: read.state !== null,
   };
 }
 

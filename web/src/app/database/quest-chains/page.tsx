@@ -6,11 +6,11 @@ import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column } 
 import { chainHref, loadCatalog, type Listed } from "@/lib/completion-lists";
 import { LINK } from "../entity";
 import {
-  listHref, listMetadata, listQuery, nextSort, NoMatches, NoObservations, PER_PAGE, sortParam, sortRows, Unreadable,
-  type ListQuery, type Search,
+  confirmedCell, ConfirmationsUnread, listCaption, listHref, listMetadata, listQuery, nextSort, NoMatches, noneListed, NoObservations, PER_PAGE,
+  sortParam, sortRows, Unreadable, type ListQuery, type Search,
 } from "../list-parts";
 
-const META = { title: "WoW Forever Quest Chain List", description: "Quest chains in WoW: Forever with the number of quests in each and its quest line ID. A chain is listed once three players report it the same way.", path: "/database/quest-chains" };
+const META = { title: "WoW Forever Quest Chain List", description: "Quest chains in WoW: Forever by quest count and quest line ID. From the game files; confirmed once three players report each the same way.", path: "/database/quest-chains" };
 export const dynamic = "force-dynamic";
 
 const SORTS = ["name", "quests", "id"] as const;
@@ -30,6 +30,7 @@ export default async function QuestChainListPage(props: { searchParams?: Promise
   const q = listQuery((await props.searchParams) ?? {}, SORTS);
   if (!q) notFound();
   const catalog = await loadCatalog();
+  const confirmations = catalog?.confirmations ?? false;
   const all = catalog?.chains ?? [];
   const text = q.q?.toLowerCase();
   const id = text && /^#?\d+$/.test(text) ? Number(text.replace("#", "")) : null;
@@ -46,7 +47,7 @@ export default async function QuestChainListPage(props: { searchParams?: Promise
   const columns: Column<Listed<ChainEntry>>[] = [
     { key: "name", header: "Name", sortable: true, cell: (x) => <Link href={chainHref(x.questLineId, x.name)} className={LINK}>{x.name}</Link> },
     { key: "quests", header: "Quests", numeric: true, sortable: true, cell: count },
-    { key: "confirmed", header: "Confirmed", cell: (x) => (x.confirmed ? "Confirmed" : "Unconfirmed") },
+    { key: "confirmed", header: "Confirmed", cell: (x) => confirmedCell(x, confirmations) },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.questLineId },
   ];
   const keep = Object.fromEntries(new URLSearchParams(href({ ...q, q: undefined, page: 1 }).split("?")[1] ?? ""));
@@ -54,12 +55,13 @@ export default async function QuestChainListPage(props: { searchParams?: Promise
   const chips = q.q ? [{ label: `Name: ${q.q}`, href: here({ q: undefined }) }] : [];
   const empty = !catalog ? <Unreadable />
     : q.q ? <NoMatches noun="quest chains" chips={chips} clearHref="/database/quest-chains" />
-    : <NoObservations>No quest chain is listed yet; each appears once three players report it.</NoObservations>;
+    : <NoObservations>{noneListed("quest chain")}</NoObservations>;
 
   return (
     <Container width="data">
       <article>
         <DataTitle title="Quest chains" aside={strip} />
+        {catalog && !confirmations && <ConfirmationsUnread />}
         <FilterBar
           label="Quest chain filters"
           search={{ action: "/database/quest-chains", value: q.q, placeholder: "Name or id", label: "Filter by name or id", keep }}
@@ -70,7 +72,7 @@ export default async function QuestChainListPage(props: { searchParams?: Promise
         <div className="mt-2">
           <DataTable
             dense
-            caption={`Quest chains three players reported: ${rows.length}`}
+            caption={listCaption("quest chains", rows, confirmations)}
             columns={columns}
             rows={shown}
             rowKey={(x) => String(x.questLineId)}

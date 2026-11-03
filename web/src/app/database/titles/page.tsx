@@ -6,11 +6,11 @@ import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column } 
 import { loadCatalog, titleHref, type Listed } from "@/lib/completion-lists";
 import { LINK } from "../entity";
 import {
-  listHref, listMetadata, listQuery, nextSort, NoMatches, NoObservations, PER_PAGE, sortParam, sortRows, Unreadable,
-  type ListQuery, type Search,
+  confirmedCell, ConfirmationsUnread, listCaption, listHref, listMetadata, listQuery, nextSort, NoMatches, noneListed, NoObservations, PER_PAGE,
+  sortParam, sortRows, Unreadable, type ListQuery, type Search,
 } from "../list-parts";
 
-const META = { title: "WoW Forever Title List", description: "Player titles in WoW: Forever by name and title ID, searchable by either. A title is listed once three players report it the same way.", path: "/database/titles" };
+const META = { title: "WoW Forever Title List", description: "Player titles in WoW: Forever by name and ID. From the game files; confirmed once three players report each the same way.", path: "/database/titles" };
 export const dynamic = "force-dynamic";
 
 const SORTS = ["name", "id"] as const;
@@ -31,6 +31,7 @@ export default async function TitleListPage(props: { searchParams?: Promise<Sear
   if (!q) notFound();
   const catalog = await loadCatalog();
   const all = catalog?.titles ?? [];
+  const confirmations = catalog?.confirmations ?? false;
   const text = q.q?.toLowerCase();
   const id = text && /^#?\d+$/.test(text) ? Number(text.replace("#", "")) : null;
   const matched = all.filter((x) => !text || (id !== null ? x.titleId === id : x.name.toLowerCase().includes(text)));
@@ -43,7 +44,7 @@ export default async function TitleListPage(props: { searchParams?: Promise<Sear
 
   const columns: Column<Listed<TitleEntry>>[] = [
     { key: "name", header: "Name", sortable: true, cell: (x) => <Link href={titleHref(x.titleId, x.name)} className={LINK}>{x.name}</Link> },
-    { key: "confirmed", header: "Confirmed", cell: (x) => (x.confirmed ? "Confirmed" : "Unconfirmed") },
+    { key: "confirmed", header: "Confirmed", cell: (x) => confirmedCell(x, confirmations) },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.titleId },
   ];
   const keep = Object.fromEntries(new URLSearchParams(href({ ...q, q: undefined, page: 1 }).split("?")[1] ?? ""));
@@ -51,12 +52,13 @@ export default async function TitleListPage(props: { searchParams?: Promise<Sear
   const chips = q.q ? [{ label: `Name: ${q.q}`, href: here({ q: undefined }) }] : [];
   const empty = !catalog ? <Unreadable />
     : q.q ? <NoMatches noun="titles" chips={chips} clearHref="/database/titles" />
-    : <NoObservations>No title is listed yet; each appears once three players report it.</NoObservations>;
+    : <NoObservations>{noneListed("title")}</NoObservations>;
 
   return (
     <Container width="data">
       <article>
         <DataTitle title="Titles" aside={strip} />
+        {catalog && !confirmations && <ConfirmationsUnread />}
         <FilterBar
           label="Title filters"
           search={{ action: "/database/titles", value: q.q, placeholder: "Name or id", label: "Filter by name or id", keep }}
@@ -67,7 +69,7 @@ export default async function TitleListPage(props: { searchParams?: Promise<Sear
         <div className="mt-2">
           <DataTable
             dense
-            caption={`Titles three players reported: ${rows.length}`}
+            caption={listCaption("titles", rows, confirmations)}
             columns={columns}
             rows={shown}
             rowKey={(x) => String(x.titleId)}

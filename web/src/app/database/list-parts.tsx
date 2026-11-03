@@ -110,3 +110,24 @@ export function NoMatches({ noun, chips, clearHref }: { noun: string; chips: { l
 export function Unreadable() {
   return <p className="py-4 text-cell text-fg-2">{STORAGE_UNREACHABLE}</p>;
 }
+
+/** What a list says it holds: the game files' entries and the players' confirmations kept apart. */
+export function listCaption(noun: string, rows: readonly { confirmed: boolean }[], confirmations: boolean): string {
+  const label = noun.charAt(0).toUpperCase() + noun.slice(1);
+  if (!confirmations) return `${label} in the game files: ${rows.length}`;
+  return `${label} in the game files or reported by players: ${rows.length}, ${rows.filter((r) => r.confirmed).length} confirmed by players`;
+}
+
+/** The Confirmed column. With no rollup read, nothing is known about confirmation: unrecorded, not unconfirmed. */
+export function confirmedCell(entry: { confirmed: boolean }, confirmations: boolean): string {
+  return entry.confirmed ? "Confirmed" : confirmations ? "Unconfirmed" : "Unrecorded";
+}
+
+/** The sentence a list shows when it holds no entry at all: neither the files nor the players have given one. */
+export const noneListed = (noun: string): string =>
+  `No ${noun} is listed yet. None is in the game files, and none has been confirmed by three players.`;
+
+/** Shown when the player rollup could not be read: the entries below come from the game files alone. */
+export function ConfirmationsUnread() {
+  return <p data-confirmations-unread className="py-2 text-cell text-fg-2">Player confirmations could not be read just now, so the Confirmed column is unrecorded.</p>;
+}
