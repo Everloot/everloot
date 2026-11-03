@@ -335,6 +335,24 @@ Live-client verification is pending. This is a pre-release for WoW: Forever 1.60
   the census box ticked on its setup screen, or turns it on in Settings; a setup finished before this keeps
   it off. Still never names, guilds, gear or places, and the site shows only totals.
 
+## [desktop-v0.1.17] - 2026-11-03
+
+### Added
+- Desktop App: Geist and Geist Mono ship with the app, so the type is the same on every computer instead of
+  falling back to the system font where Geist was not installed.
+- Desktop App: a title bar above the page says where you are and whether the app is watching a save file, or
+  paused.
+- Desktop App: Upload, Market and Ask carry a word in the sidebar for what they are doing: Working, OK, Failed,
+  Waiting, Off or Paused.
+- Desktop App: an empty page says why it is empty and what fills it. Characters, Upload, Market, Ask, Log and
+  Changes each name the real cause: no game folder chosen, no `Everloot.lua` under the folder yet, the app paused,
+  the job off, or a fetch that failed, with a Retry.
+
+### Changed
+- Desktop App: the look is that of a developer tool: neutral near-black surfaces, hairline rules, a 13 px type scale
+  with 14 px prose, tighter rows and controls, and a narrower sidebar. The lime accent and the mark stay. Light mode
+  moves to neutral greys too.
+
 ## [desktop-v0.1.16] - 2026-11-03
 
 ### Changed
