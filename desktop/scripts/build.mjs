@@ -1,7 +1,7 @@
 // Bundles the Node side, the preload and the page into dist/. The companion's modules and the
 // site's parser are bundled in, so the packaged app ships dist/ and nothing from node_modules.
 import { build } from "esbuild";
-import { cpSync, mkdirSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -42,6 +42,14 @@ await Promise.all([
 ]);
 cpSync(join(root, "src/renderer/index.html"), join(dist, "renderer", "index.html"));
 cpSync(join(root, "src/renderer/styles.css"), join(dist, "renderer", "styles.css"));
+// The page's fonts come from the geist package under web/ (SIL OFL 1.1), the same files the site serves.
+const geist = join(root, "..", "web", "node_modules", "geist", "dist", "fonts");
+mkdirSync(join(dist, "renderer", "fonts"), { recursive: true });
+for (const [dir, file] of [["geist-sans", "Geist-Variable.woff2"], ["geist-mono", "GeistMono-Variable.woff2"]]) {
+  const from = join(geist, dir, file);
+  if (!existsSync(from)) throw new Error(`${from} is missing: run npm ci in web/ first, the desktop bundle takes its fonts from there`);
+  cpSync(from, join(dist, "renderer", "fonts", file));
+}
 cpSync(join(root, "build", "icon.png"), join(dist, "renderer", "logo.png"));
 // Tray icons travel with the bundle; build/ itself is only for electron-builder.
 for (const icon of ["tray.png", "trayTemplate.png", "trayTemplate@2x.png"]) cpSync(join(root, "build", icon), join(dist, icon));

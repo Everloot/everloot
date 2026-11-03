@@ -25,7 +25,7 @@ The site ships [Leaflet](https://leafletjs.com/) 1.9.4 (BSD-2-Clause, Volodymyr 
 ## Media
 
 The site self-hosts the Geist and Geist Mono fonts by Vercel (SIL Open Font License 1.1) from the
-`geist` npm package, and Google Sans Medium (Latin subset, SIL Open Font License 1.1, copyright 2025 The Google
+`geist` npm package; the desktop app ships the same two variable files from that package in its bundle. The site also uses Google Sans Medium (Latin subset, SIL Open Font License 1.1, copyright 2025 The Google
 Sans Project Authors) for the Sign in with Google button only, from the
 [Google Fonts css2 API](https://fonts.googleapis.com/css2?family=Google+Sans:wght@500), as
 `web/public/brand/google/GoogleSans-Medium-latin.woff2` with its licence in `web/public/brand/google/OFL.txt`. The favicon

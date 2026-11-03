@@ -1,3 +1,8 @@
+/* Geist and Geist Mono travel with the app (build.mjs copies them from the geist package, SIL OFL 1.1), so every
+   system renders the same type; before this, the name was only honoured where the font happened to be installed. */
+@font-face { font-family: "Geist"; src: url("fonts/Geist-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Geist Mono"; src: url("fonts/GeistMono-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+
 /* The site's colours (web/src/design/tokens.ts), dark by default, light with the system setting.
    Command-center layout: a labelled rail, a status-led Overview, ruled rows instead of stacks of cards.
    Type is set in px on purpose: the root is 16 px, so rem sizes would silently drop under the 13 px floor. */
