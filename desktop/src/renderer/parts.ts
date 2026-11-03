@@ -1,5 +1,6 @@
 // Pieces of the page that need no DOM: each returns HTML for app.ts to place, so a test can read the markup.
-import type { EngineState, JobStatus } from "../shared/types";
+import type { EngineState, Job, JobStatus, Settings } from "../shared/types";
+import { esc } from "./format";
 
 /** A pill's look and the word it carries, per job state. `paused` wins for every job that is on. */
 export type PillKind = "working" | "failed" | "ok" | "off" | "waiting" | "paused";
@@ -21,6 +22,48 @@ export function statePill(j: JobStatus, paused: boolean): string {
   const label = kind === "paused" ? "Paused" : PILL[j.state][1];
   const ring = kind === "working" ? '<i class="pill-ring" aria-hidden="true"></i>' : "";
   return `<span class="pill-s pill-${kind}">${ring}${label}</span>`;
+}
+
+// ---------- empty states: the real reason a page has nothing, and the one thing that fills it ----------
+
+export type EmptyPage = "characters" | "upload" | "market" | "ask" | "log" | "changes";
+/** The one control under an empty state: a page to open, a job to run, or a link to open. */
+export interface EmptyAction { label: string; page?: string; run?: Job; open?: string }
+export interface Empty { cause: string; step: string; action?: EmptyAction }
+type EmptyContext = { settings: Pick<Settings, "gameFolder" | "upload" | "ask">; engine: Pick<EngineState, "files" | "paused"> };
+
+const EMPTY_DEFAULT: Record<EmptyPage, Empty> = {
+  characters: { cause: "Save file read, no named character rows yet", step: "The addon records gold and gear while you play" },
+  upload: { cause: "Nothing sent yet", step: "The first upload runs after your next logout", action: { label: "Upload now", run: "upload" } },
+  market: { cause: "No full scan in your save file yet", step: "At the auction house, press Everloot scan" },
+  ask: { cause: "No question waiting", step: "Type /ask in game, then /reload" },
+  log: { cause: "Nothing logged since start", step: "" },
+  changes: { cause: "No changes fetched yet", step: "" },
+};
+
+/**
+ * Why a page is empty, from the engine's own state, most fundamental first: no folder, no save file, paused, the job
+ * off, a fetch error, and only then "no data yet" with what produces it.
+ */
+export function emptyCause(page: EmptyPage, s: EmptyContext, extra: { error?: string; followed?: number } = {}): Empty {
+  // The changes feed comes from the site, not the game: the folder and the jobs say nothing about it.
+  if (page === "changes") return extra.error ? { cause: extra.error, step: "Try again", action: { label: "Retry", page } } : EMPTY_DEFAULT.changes;
+  if (!s.settings.gameFolder) return { cause: "Not watching a game folder", step: "Choose it in Settings", action: { label: "Open Settings", page: "settings" } };
+  if (!s.engine.files.length) return { cause: `No Everloot.lua under ${s.settings.gameFolder} yet`, step: "Log out once in the game so it writes the file" };
+  if (s.engine.paused) return { cause: "Everloot is paused", step: "Resume on the Overview", action: { label: "Overview", page: "overview" } };
+  if (page === "upload" && !s.settings.upload) return { cause: "Upload is off", step: "Turn it on above" };
+  if (page === "ask" && !s.settings.ask.enabled) return { cause: "/ask is off", step: "Turn it on above" };
+  if (page === "market" && extra.followed === 0) return { cause: "No realm followed yet", step: "Follow one below, or scan at the auction house" };
+  if (extra.error) return { cause: extra.error, step: "Try again", action: { label: "Retry", page } };
+  return EMPTY_DEFAULT[page];
+}
+
+/** The block itself: the page's icon, the cause in bold, the step under it, and the action at the end. */
+export function emptyState(e: Empty, icon: string): string {
+  const a = e.action;
+  const attr = a ? (a.page ? `data-page="${esc(a.page)}"` : a.run ? `data-run="${a.run}"` : `data-open="${esc(a.open ?? "")}"`) : "";
+  const button = a ? `<button type="button" class="btn small" ${attr}>${esc(a.label)}</button>` : "";
+  return `<div class="empty">${icon}<div class="empty-text"><p class="empty-cause">${esc(e.cause)}</p>${e.step ? `<p class="empty-step muted">${esc(e.step)}</p>` : ""}</div>${button}</div>`;
 }
 
 /** The title bar's pill: what the app watches, or that it is paused, which matters more. */
