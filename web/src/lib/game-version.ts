@@ -3,10 +3,10 @@ import { LAUNCH } from "@/data/wow-forever";
 
 /**
  * The game versions the site knows, Live / PTR / Beta as on WoWDB. One list: the header label, the
- * tests and the docs (docs/ASSETS.md, "Adding a product or build") all start here. The Beta build is
+ * tests and the docs (docs/ASSETS.md, "Adding a product or build") all start here. The Live build is
  * read from the committed game-data layers, so a build bump is one regenerated file, not an edit here.
- * Live arrives at launch and Blizzard runs no PTR for Forever today; each becomes available by filling
- * in its product and build below.
+ * Blizzard runs no PTR or Beta for Forever today; each becomes available by filling in its product and
+ * build below.
  */
 export type GameVersionId = "live" | "ptr" | "beta";
 
@@ -25,9 +25,10 @@ export interface GameVersion {
 const layer = clientLayer.build;
 
 export const GAME_VERSIONS: readonly GameVersion[] = [
-  { id: "live", label: "Live", product: null, build: null, available: false, note: `Available at launch, ${LAUNCH.date}` },
+  { id: "live", label: "Live", product: layer.product, build: layer.version, available: true, note: null },
   { id: "ptr", label: "PTR", product: null, build: null, available: false, note: "None running" },
-  { id: "beta", label: "Beta", product: layer.product, build: layer.version, available: true, note: null },
+  // The beta was WoW: Forever's own product (wowf) before launch, the same product Live reads now.
+  { id: "beta", label: "Beta", product: null, build: null, available: false, note: `None running since launch, ${LAUNCH.date}` },
 ];
 
 /** The version the site shows its game-file data for: the first available one, in Live, PTR, Beta order. */
