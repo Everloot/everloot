@@ -43,7 +43,7 @@ export default async function TitleListPage(props: { searchParams?: Promise<Sear
 
   const columns: Column<Listed<TitleEntry>>[] = [
     { key: "name", header: "Name", sortable: true, cell: (x) => <Link href={titleHref(x.titleId, x.name)} className={LINK}>{x.name}</Link> },
-    { key: "confirmed", header: "Status", cell: (x) => (x.confirmed ? "Confirmed" : "Unconfirmed") },
+    { key: "confirmed", header: "Confirmed", cell: (x) => (x.confirmed ? "Confirmed" : "Unconfirmed") },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.titleId },
   ];
   const keep = Object.fromEntries(new URLSearchParams(href({ ...q, q: undefined, page: 1 }).split("?")[1] ?? ""));

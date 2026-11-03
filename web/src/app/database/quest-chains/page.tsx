@@ -46,7 +46,7 @@ export default async function QuestChainListPage(props: { searchParams?: Promise
   const columns: Column<Listed<ChainEntry>>[] = [
     { key: "name", header: "Name", sortable: true, cell: (x) => <Link href={chainHref(x.questLineId, x.name)} className={LINK}>{x.name}</Link> },
     { key: "quests", header: "Quests", numeric: true, sortable: true, cell: count },
-    { key: "confirmed", header: "Status", cell: (x) => (x.confirmed ? "Confirmed" : "Unconfirmed") },
+    { key: "confirmed", header: "Confirmed", cell: (x) => (x.confirmed ? "Confirmed" : "Unconfirmed") },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.questLineId },
   ];
   const keep = Object.fromEntries(new URLSearchParams(href({ ...q, q: undefined, page: 1 }).split("?")[1] ?? ""));

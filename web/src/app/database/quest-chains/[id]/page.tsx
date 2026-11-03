@@ -6,6 +6,7 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { chainHref, loadCatalog, parseSegment } from "@/lib/completion-lists";
 import { loadNames } from "@/lib/names";
 import { pageMetadata } from "@/lib/seo";
+import { CLIENT_LABEL } from "../../../../../../kb/src/edges";
 import { EntityHeader, EntityTop, Unreachable } from "../../entity";
 
 export const dynamic = "force-dynamic";
@@ -16,10 +17,10 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   const { id: segment } = await props.params;
   const id = parseSegment(segment);
   const entry = id === null ? undefined : (await loadCatalog())?.chains.find((c) => c.questLineId === id);
-  // Only an entry three players reported is a page; storage down says noindex rather than cache a thin page.
+  // A listed entry is a page, from the game files or three players' reports; nothing listed says noindex rather than cache a thin page.
   if (!entry) return { robots: { index: false, follow: true } };
   return {
-    ...pageMetadata({ title: `${entry.name} (quest chain)`, description: `The ${entry.name} quest chain in WoW: Forever and the quests in it, as three players reported it.`, path: chainHref(entry.questLineId, entry.name) }),
+    ...pageMetadata({ title: `${entry.name} (quest chain)`, description: `The ${entry.name} quest chain in WoW: Forever and the quests in it${entry.confirmed ? ", as three players reported it." : `. ${CLIENT_LABEL}.`}`, path: chainHref(entry.questLineId, entry.name) }),
     robots: { index: true, follow: true },
   };
 }
@@ -48,7 +49,7 @@ export default async function QuestChainPage(props: Props) {
         {entry ? (
           <>
             <EntityTop
-              box={<TooltipFrame name={entry.name} label={`${entry.name}, as players reported it`}><p>{count} quests</p></TooltipFrame>}
+              box={<TooltipFrame name={entry.name} label={entry.confirmed ? `${entry.name}, as players reported it` : `${entry.name}, ${CLIENT_LABEL.toLowerCase()}`}><p>{count} quests</p></TooltipFrame>}
               facts={
                 <Facts
                   layout="list"

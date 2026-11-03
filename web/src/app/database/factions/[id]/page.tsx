@@ -4,6 +4,7 @@ import { Container, Facts, TooltipFrame } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import { factionHref, loadCatalog, parseSegment } from "@/lib/completion-lists";
 import { pageMetadata } from "@/lib/seo";
+import { CLIENT_LABEL } from "../../../../../../kb/src/edges";
 import { EntityHeader, EntityTop, Unreachable } from "../../entity";
 
 export const dynamic = "force-dynamic";
@@ -14,10 +15,10 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   const { id: segment } = await props.params;
   const id = parseSegment(segment);
   const entry = id === null ? undefined : (await loadCatalog())?.factions.find((f) => f.factionId === id);
-  // Only an entry three players reported is a page; storage down says noindex rather than cache a thin page.
+  // A listed entry is a page, from the game files or three players' reports; nothing listed says noindex rather than cache a thin page.
   if (!entry) return { robots: { index: false, follow: true } };
   return {
-    ...pageMetadata({ title: `${entry.name} (faction)`, description: `The ${entry.name} reputation faction in WoW: Forever${entry.header ? `, under ${entry.header}` : ""}, as three players reported it.`, path: factionHref(entry.factionId, entry.name) }),
+    ...pageMetadata({ title: `${entry.name} (faction)`, description: `The ${entry.name} reputation faction in WoW: Forever${entry.header ? `, under ${entry.header}` : ""}${entry.confirmed ? ", as three players reported it." : `. ${CLIENT_LABEL}.`}`, path: factionHref(entry.factionId, entry.name) }),
     robots: { index: true, follow: true },
   };
 }
@@ -43,7 +44,7 @@ export default async function FactionPage(props: Props) {
         {entry ? (
           <EntityTop
             box={
-              <TooltipFrame name={entry.name} label={`${entry.name}, as players reported it`}>
+              <TooltipFrame name={entry.name} label={entry.confirmed ? `${entry.name}, as players reported it` : `${entry.name}, ${CLIENT_LABEL.toLowerCase()}`}>
                 {entry.header && <p>{entry.header}</p>}
                 {entry.major && <p>Major faction</p>}
               </TooltipFrame>

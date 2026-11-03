@@ -7,30 +7,49 @@ import { CLIENT_QUEST_LINES } from "@/data/game-data/client-quest-lines";
 import { CLIENT_TITLES } from "@/data/game-data/client-titles";
 import { uploadStore } from "./upload-store";
 
-// The achievements, factions, titles and quest chains the database lists: the completion rollup's agreed catalog, the same
-// three-reporter rule the collections tool and the MCP tool read (kb/src/completion-rollup.ts). Nothing
-// here is read from the game files and no owned progress is touched.
+// The achievements, factions, titles and quest chains the database lists: the game files' entries (unconfirmed) merged with
+// the completion rollup's agreed catalog (confirmed), the same three-reporter rule the collections tool and the MCP tool
+// read (kb/src/completion-rollup.ts). The rollup's entry wins where both have an id. No owned progress is touched.
 
 /** An entry and whether player uploads confirm it (the rollup agrees on the same id); the rest come from the game files only. */
 export type Listed<T> = T & { confirmed: boolean };
 
-/** `base` says whether any game-file entry was read. */
+/** `base` says whether any game file was read, even one with no eligible entry. */
 export interface CompletionCatalog { achievements: Listed<AchievementEntry>[]; factions: Listed<FactionEntry>[]; titles: Listed<TitleEntry>[]; chains: Listed<ChainEntry>[]; dataAsOf: string | null; base: boolean }
 
-/** The game-file entries by id, each unconfirmed until the rollup says otherwise. */
+/** Whether a game-file wrapper could be read; a file that is there but holds no eligible entry still counts. */
+function readable(file: () => unknown): boolean {
+  try { return file() != null; } catch { return false; }
+}
+
+/** The game-file entries by id, each unconfirmed until the rollup says otherwise, and whether any file was read. */
 function baseEntries() {
   const achievements = new Map<number, Listed<AchievementEntry>>();
-  for (const [id, a] of Object.entries(CLIENT_ACHIEVEMENTS.achievements)) {
-    if (a.statistic) continue;
-    achievements.set(Number(id), { achievementId: Number(id), name: a.title, category: "", points: a.points, criteriaCount: a.criteria.length, confirmed: false });
-  }
   const factions = new Map<number, Listed<FactionEntry>>();
-  for (const f of CLIENT_FACTIONS.factions) if (f.shown) factions.set(f.id, { factionId: f.id, name: f.name, header: undefined, major: false, confirmed: false });
   const titles = new Map<number, Listed<TitleEntry>>();
-  for (const t of CLIENT_TITLES.titles) titles.set(t.id, { titleId: t.id, name: t.name, confirmed: false });
   const chains = new Map<number, Listed<ChainEntry>>();
-  for (const c of CLIENT_QUEST_LINES.questLines) chains.set(c.id, { questLineId: c.id, name: c.name, questIds: c.questIds, truncated: false, confirmed: false });
-  return { achievements, factions, titles, chains };
+  const read = [
+    readable(() => {
+      for (const [id, a] of Object.entries(CLIENT_ACHIEVEMENTS.achievements)) {
+        if (a.statistic) continue;
+        achievements.set(Number(id), { achievementId: Number(id), name: a.title, category: "", points: a.points, criteriaCount: a.criteria.length, confirmed: false });
+      }
+      return CLIENT_ACHIEVEMENTS.achievements;
+    }),
+    readable(() => {
+      for (const f of CLIENT_FACTIONS.factions) if (f.shown) factions.set(f.id, { factionId: f.id, name: f.name, header: undefined, major: false, confirmed: false });
+      return CLIENT_FACTIONS.factions;
+    }),
+    readable(() => {
+      for (const t of CLIENT_TITLES.titles) titles.set(t.id, { titleId: t.id, name: t.name, confirmed: false });
+      return CLIENT_TITLES.titles;
+    }),
+    readable(() => {
+      for (const c of CLIENT_QUEST_LINES.questLines) chains.set(c.id, { questLineId: c.id, name: c.name, questIds: c.questIds, truncated: false, confirmed: false });
+      return CLIENT_QUEST_LINES.questLines;
+    }),
+  ];
+  return { achievements, factions, titles, chains, available: read.some(Boolean) };
 }
 
 /** The rollup's agreed entries replace the base entries of the same id, marked confirmed. */
@@ -46,9 +65,8 @@ function merge<T>(base: Map<number, Listed<T>>, agreed: Map<number, T>): Listed<
  */
 export async function loadCatalog(): Promise<CompletionCatalog | null> {
   const base = baseEntries();
-  const hasBase = base.achievements.size + base.factions.size + base.titles.size + base.chains.size > 0;
   const read = await uploadStore.loadCompletion();
-  if (!read.state && !hasBase) return null;
+  if (!read.state && !base.available) return null;
   const agreed = read.state ? agreedCatalog(read.state) : null;
   return {
     achievements: merge(base.achievements, agreed?.achievements ?? new Map()),
@@ -56,7 +74,7 @@ export async function loadCatalog(): Promise<CompletionCatalog | null> {
     titles: merge(base.titles, agreed?.titles ?? new Map()),
     chains: merge(base.chains, agreed?.chains ?? new Map()),
     dataAsOf: read.state ? read.dataAsOf : null,
-    base: hasBase,
+    base: base.available,
   };
 }
 

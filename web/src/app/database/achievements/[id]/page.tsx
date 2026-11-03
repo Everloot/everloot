@@ -4,6 +4,7 @@ import { Badge, Container, DataTable, Facts, TooltipFrame } from "@/components/u
 import { trailFor } from "@/lib/breadcrumbs";
 import { achievementHref, loadCatalog, parseSegment } from "@/lib/completion-lists";
 import { pageMetadata } from "@/lib/seo";
+import { CLIENT_LABEL } from "../../../../../../kb/src/edges";
 import { CLIENT_ACHIEVEMENTS } from "@/data/game-data/client-achievements";
 import { EmptyTab, EntityHeader, EntityTop, Unreachable } from "../../entity";
 
@@ -22,14 +23,15 @@ function fromFiles(id: number) {
 export async function generateMetadata(props: Props): Promise<Metadata> {
   const { id: segment } = await props.params;
   const id = parseSegment(segment);
-  const entry = id === null ? undefined : (await loadCatalog())?.achievements.find((a) => a.achievementId === id);
+  const listed = id === null ? undefined : (await loadCatalog())?.achievements.find((a) => a.achievementId === id);
+  const entry = listed?.confirmed ? listed : undefined;
   const files = id === null ? null : fromFiles(id);
   // A page exists for an id three players reported, or for one the game files carry.
-  if (!entry && !files) return { robots: { index: false, follow: true } };
-  const name = entry?.name ?? files?.title ?? `Achievement ${id}`;
+  if (!listed && !files) return { robots: { index: false, follow: true } };
+  const name = listed?.name ?? files?.title ?? `Achievement ${id}`;
   const criteria = entry?.criteria ? "reported criteria" : files?.criteria.length ? "the criteria from the game files" : "criteria count";
   return {
-    ...pageMetadata({ title: `${name} (achievement)`, description: `The ${name} achievement in WoW: Forever: category, points and ${criteria}, from player reports and the build's own game files as each has them.`, path: achievementHref(id!, name) }),
+    ...pageMetadata({ title: `${name} (achievement)`, description: `The ${name} achievement in WoW: Forever: category, points and ${criteria}, ${entry ? "from player reports and the build's own game files as each has them." : `from the build's own game files. ${CLIENT_LABEL}.`}`, path: achievementHref(id!, name) }),
     robots: { index: true, follow: true },
   };
 }
@@ -39,10 +41,12 @@ export default async function AchievementPage(props: Props) {
   const id = parseSegment(segment);
   if (id === null) notFound();
   const catalog = await loadCatalog();
-  const entry = catalog?.achievements.find((a) => a.achievementId === id) ?? null;
+  const listed = catalog?.achievements.find((a) => a.achievementId === id) ?? null;
+  // A base entry is the game files' own, so it keeps the file-only presentation; only a confirmed one is a player report.
+  const entry = listed?.confirmed ? listed : null;
   const files = fromFiles(id);
-  if (catalog && !entry && !files) notFound();
-  const title = entry?.name ?? files?.title ?? `Achievement ${id}`;
+  if (catalog && !listed && !files) notFound();
+  const title = listed?.name ?? files?.title ?? `Achievement ${id}`;
   const canonical = achievementHref(id, title);
   if (`/database/achievements/${segment}` !== canonical) permanentRedirect(canonical);
   const trail = [...trailFor("/database/achievements")!, { name: title, path: `/database/achievements/${segment}` }];

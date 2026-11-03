@@ -60,7 +60,7 @@ export default async function AchievementListPage(props: { searchParams?: Promis
     { key: "category", header: "Category", sortable: true, cell: (x) => x.category },
     { key: "points", header: "Points", numeric: true, sortable: true, cell: (x) => x.points },
     { key: "criteria", header: "Criteria", numeric: true, sortable: true, cell: (x) => x.criteriaCount },
-    { key: "confirmed", header: "Status", cell: (x) => (x.confirmed ? "Confirmed" : "Unconfirmed") },
+    { key: "confirmed", header: "Confirmed", cell: (x) => (x.confirmed ? "Confirmed" : "Unconfirmed") },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.achievementId },
   ];
 
