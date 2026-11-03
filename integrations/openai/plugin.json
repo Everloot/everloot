@@ -1,22 +1,32 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "everloot",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Sourced World of Warcraft: Forever lore, game data and player observations.",
   "author": {
     "name": "R21 Media Group, LLC",
     "email": "hello@everloot.app",
     "url": "https://everloot.app"
   },
-  "homepage": "https://everloot.app/connect",
+  "homepage": "https://everloot.app/docs/mcp",
   "repository": "https://github.com/Everloot/everloot",
   "license": "AGPL-3.0-only",
   "keywords": [
     "world-of-warcraft",
     "wow",
+    "wow-forever",
     "forever",
     "lore",
     "talents",
+    "talent-calculator",
+    "drop-rates",
+    "loot",
+    "dungeons",
+    "quests",
+    "vendors",
+    "professions",
+    "auction-house",
+    "guilds",
     "game-data"
   ],
   "extensions": {
@@ -24,22 +34,32 @@
       "interface": {
         "displayName": "Everloot",
         "shortDescription": "WoW: Forever data with sources",
-        "longDescription": "Look up World of Warcraft: Forever lore, items, NPCs, quests, vendors, professions, item relations, talent trees, map locations, auction history, and recent Blizzard posts and builds. Player-observed facts carry their evidence count and date. Game-file facts name their build and are marked unconfirmed. Lore comes from the licensed Warcraft Wiki archive and may differ in Forever. Missing data is reported as unrecorded. The public server is read-only, requires no account or API key, and has rate limits. Answers include source and licence information. Everloot cannot play the game, buy items, or change a game account. Everloot is an independent fan project, not affiliated with or endorsed by Blizzard.",
+        "longDescription": "Everloot is a reference for World of Warcraft: Forever. Ask about an item, a dungeon boss, a quest, a vendor, a profession or a talent build, and the answer comes with its source.\n\nWhat you can ask\n- Drops and loot: where an item drops, how often players saw it drop, and which bosses each dungeon has in the game files.\n- Quests, NPCs and vendors: quest givers, turn-ins and rewards, where an NPC stands, and what a vendor sells and for how much.\n- Professions: a leveling path for a profession, and where recipes turn yellow, green and grey.\n- Talents and classes: every class's talent trees, a talent share code read back as a build, and which races can play a class, with their racial traits.\n- Map: entrances, NPCs, vendors and treasures near a spot, with distances.\n- Economy: auction price history and market value for an item on a realm.\n- Guilds: find a guild, see guild ladders for a raid or dungeon, and read the boards that a guild's own officers chose to publish.\n- Lore: the Warcraft Wiki archive, with attribution, for characters, places and history.\n- News: Blizzard's recent posts and game builds, with links to the originals.\n\nWhere the data comes from\nEvery fact says which of three sources it comes from. Game-file facts name their build and are marked unconfirmed. Player-observed facts come from players who run the Everloot addon: a fact is published only after three separate installs agree, and the answer gives the count and the date. Lore comes from the Warcraft Wiki archive under CC BY-SA 4.0 and may differ from what is in Forever. Nothing is scraped from other sites.\n\nLimits\nWhen something has not been recorded, Everloot says so instead of guessing, and unrecorded is never shown as zero. Player-observed coverage grows as people play, so new content can be thin at first. Everloot is read-only: it cannot play the game, buy items or change a game account. No account or API key is needed, and the public server has rate limits.\n\nEverloot is an independent fan project by R21 Digital, not affiliated with or endorsed by Blizzard Entertainment. Its data is CC BY-SA 4.0 and its code is open source.",
         "developerName": "R21 Digital",
         "category": "Entertainment",
         "capabilities": [
-          "Search Warcraft lore",
-          "Read sourced game data",
-          "Inspect talent plans"
+          "Look up where an item drops and how often players saw it",
+          "List the bosses in each dungeon",
+          "Find quest givers, turn-ins and rewards",
+          "See what a vendor sells and for how much",
+          "Plan a profession's leveling path and recipe skill-ups",
+          "Browse each class's talent trees",
+          "Read a talent share code as a build",
+          "Check which races can play a class, with racial traits",
+          "Find NPCs, entrances and treasures near a map spot",
+          "Check auction price history and market value",
+          "Find guilds and guild ladders for a raid or dungeon",
+          "Search Warcraft lore with attributed sources",
+          "Read Blizzard's latest posts and game builds"
         ],
         "websiteURL": "https://everloot.app",
         "supportURL": "https://everloot.app/contact",
         "privacyPolicyURL": "https://everloot.app/privacy",
         "termsOfServiceURL": "https://everloot.app/terms",
         "defaultPrompt": [
-          "Who is Thrall? Cite the source and distinguish lore from observed Forever data.",
-          "Show the Mage Arcane talent tree, its game build and confirmation status.",
-          "What are the latest WoW: Forever builds and Blizzard posts? Include original links."
+          "Which bosses are in the Deadmines, and what have players recorded them dropping?",
+          "Show the Mage Fire talent tree and tell me which game build it comes from.",
+          "Who is Thrall? Cite the source and separate lore from what is confirmed in Forever."
         ],
         "brandColor": "#2F7A0A",
         "composerIcon": "./assets/icon-64.png",
@@ -100,7 +120,7 @@
       },
       "publication": {
         "countries": [],
-        "release_notes": "Corrected the listing category to Entertainment for this World of Warcraft game reference service."
+        "release_notes": "A fuller description of what Everloot answers and where its data comes from, more capabilities, and new starter prompts."
       }
     }
   }
