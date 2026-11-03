@@ -14,10 +14,10 @@ export const AUTH_BUTTON = "btn w-full gap-3 px-5 text-sm focus-visible:outline 
 const footLink = "underline decoration-edge underline-offset-4 hover:text-fg hover:decoration-fg";
 
 /**
- * The frame of /sign-in and /sign-up: Glint and the site's line over the home hero's art, then one centred card
- * with the page's title and its sign-in methods, then the page's own links and the legal links under it. On a phone
- * the card is the width of the screen. Without the art (no asset upload) the mark sits on the plain canvas and
- * there is no credit.
+ * The frame of /sign-in and /sign-up: a panel with Glint and the site's line over the home hero's art (under a
+ * solid canvas veil, never a gradient or a dimmed picture), then one centred card with the page's title and its
+ * sign-in methods, then the page's own links and the legal links under it. On a phone the card is the width of
+ * the screen. Without the art (no asset upload) the panel is the plain panel colour and there is no credit.
  */
 export default function AuthShell({ art, title, lede, children, footer }: {
   art: LoadingArt | null;
@@ -28,17 +28,23 @@ export default function AuthShell({ art, title, lede, children, footer }: {
   footer?: ReactNode;
 }) {
   return (
-    <div data-auth-shell className="relative isolate mx-auto w-full max-w-md py-4">
-      {art && (
-        <div data-auth-art aria-hidden="true" className="absolute inset-x-0 top-0 -z-10 h-72 overflow-hidden rounded-card opacity-50 [mask-image:linear-gradient(to_bottom,black_20%,transparent)]">
-          <BannerArt art={art} eager position={ART_POSITION} sizes="(min-width: 640px) 448px, 100vw" />
+    <div data-auth-shell className="mx-auto w-full max-w-md space-y-4 py-4">
+      <div data-auth-art className="relative overflow-hidden rounded-card border border-line bg-panel">
+        {art && (
+          <>
+            <BannerArt art={art} eager position={ART_POSITION} sizes="(min-width: 640px) 448px, 100vw" />
+            <div aria-hidden="true" className="absolute inset-0 bg-canvas/70" />
+            <p data-auth-credit className="absolute right-2 top-2 rounded-control bg-canvas/80 px-1.5 py-0.5 text-[10px] leading-none text-muted">
+              {BANNER_CAPTION}
+            </p>
+          </>
+        )}
+        <div className="relative flex flex-col items-center gap-3 px-4 py-6 text-center">
+          <Glint size={72} className="h-16 w-16 sm:h-18 sm:w-18" />
+          <p className="text-sm font-semibold tracking-tight text-fg">
+            Every drop. Every guild. <span className="text-accent">Every reset.</span>
+          </p>
         </div>
-      )}
-      <div className="flex flex-col items-center gap-3 px-4 pb-6 pt-6 text-center">
-        <Glint size={72} className="h-16 w-16 sm:h-18 sm:w-18" />
-        <p className="text-sm font-semibold tracking-tight text-fg">
-          Every drop. Every guild. <span className="text-accent">Every reset.</span>
-        </p>
       </div>
       <div className="rounded-card border border-line bg-panel p-5 sm:p-8">
         <div className="space-y-6">
@@ -49,14 +55,13 @@ export default function AuthShell({ art, title, lede, children, footer }: {
           {children}
         </div>
       </div>
-      <div className="space-y-4 px-4 pt-6 text-center">
+      <div className="space-y-4 px-4 pt-2 text-center">
         {footer}
         <nav aria-label="Legal" className="flex flex-wrap justify-center gap-x-5 gap-y-1 text-sm text-muted">
           <Link href="/terms" className={footLink}>Terms of Service</Link>
           <Link href="/privacy" className={footLink}>Privacy Policy</Link>
           <Link href="/security" className={footLink}>Security</Link>
         </nav>
-        {art && <p data-auth-credit className="text-[10px] leading-none text-muted">{BANNER_CAPTION}</p>}
       </div>
     </div>
   );
