@@ -7,6 +7,20 @@ vi.mock("@/lib/upload-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/upload-store")>()),
   uploadStore: { loadCompletion: store.loadCompletion },
 }));
+// The game-file base the lists start from: empty unless a test sets it, so the cases below keep testing the rollup alone.
+const game = vi.hoisted(() => ({
+  factions: [] as { id: number; name: string; shown: boolean; parentId?: number }[],
+  titles: [] as { id: number; name: string }[],
+  questLines: [] as { id: number; name: string; questIds: number[] }[],
+  achievements: {} as Record<string, { title: string; points: number; criteria: unknown[]; statistic?: true }>,
+}));
+vi.mock("@/data/game-data/client-factions", () => ({ get CLIENT_FACTIONS() { return { factions: game.factions }; } }));
+vi.mock("@/data/game-data/client-titles", () => ({ get CLIENT_TITLES() { return { titles: game.titles }; } }));
+vi.mock("@/data/game-data/client-quest-lines", () => ({ get CLIENT_QUEST_LINES() { return { questLines: game.questLines }; } }));
+vi.mock("@/data/game-data/client-achievements", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/data/game-data/client-achievements")>();
+  return { get CLIENT_ACHIEVEMENTS() { return { ...real.CLIENT_ACHIEVEMENTS, achievements: game.achievements }; } };
+});
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
 vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
@@ -77,6 +91,46 @@ const rows = [
 beforeEach(() => {
   store.loadCompletion.mockReset();
   serve(rows);
+  game.factions = []; game.titles = []; game.questLines = []; game.achievements = {};
+});
+
+/** The table row that links `href`. */
+const rowOf = (out: string, href: string) => out.split("<tr").find((r) => r.includes(`href="${href}"`)) ?? "";
+
+test("factions list shows base entries unconfirmed when the rollup is null", async () => {
+  game.factions = [{ id: 72, name: "Stormwind", shown: true }, { id: 1, name: "Hidden Header", shown: false }];
+  store.loadCompletion.mockResolvedValue({ state: null, dataAsOf: null, unreachable: true });
+  const out = await html(FactionList(search()));
+  expect(linked(out, "factions")).toEqual(["72-stormwind"]);
+  expect(out).toContain("Unconfirmed");
+  expect(out).not.toContain("Hidden Header");
+  expect(out).not.toContain("data-empty-state");
+  expect(out).not.toContain("unreachable");
+});
+
+test("an agreed faction shows as confirmed and keeps the rollup's header", async () => {
+  game.factions = [{ id: 69, name: "Darnassus (base)", shown: true }, { id: 72, name: "Stormwind", shown: true }];
+  const out = await html(FactionList(search()));
+  expect(linked(out, "factions")).toEqual(["69-darnassus", "72-stormwind", "76-orgrimmar", "529-argent-dawn"]);
+  const agreed = rowOf(out, "/database/factions/69-darnassus");
+  expect(agreed).toContain(">Confirmed<");
+  expect(agreed).toContain(">Alliance<");
+  expect(agreed).not.toContain("Unconfirmed");
+  expect(rowOf(out, "/database/factions/72-stormwind")).toContain(">Unconfirmed<");
+});
+
+test("titles, quest chains and achievements list from the base too; statistics stay out", async () => {
+  game.titles = [{ id: 7, name: "%s, Champion" }];
+  game.questLines = [{ id: 1, name: "The Missing Diplomat", questIds: [11, 10] }];
+  game.achievements = { "50": { title: "Loremaster", points: 10, criteria: [{}, {}] }, "51": { title: "Kills", points: 0, criteria: [], statistic: true } };
+  store.loadCompletion.mockResolvedValue({ state: null, dataAsOf: null, unreachable: true });
+  expect(await html(TitleList(search()))).toContain("Unconfirmed");
+  const chains = await html(ChainList(search()));
+  expect(linked(chains, "quest-chains")).toEqual(["1-the-missing-diplomat"]);
+  expect(chains).toContain(">2<");
+  const achievements = await html(AchievementList(search()));
+  expect(linked(achievements, "achievements")).toEqual(["50-loremaster"]);
+  expect(achievements).not.toContain("Kills");
 });
 
 test("the achievement list shows what three reporters agree on and hides the rest", async () => {

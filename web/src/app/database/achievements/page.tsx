@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { AchievementEntry } from "../../../../../kb/src/completion";
 import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, type FilterControl } from "@/components/ui";
-import { achievementHref, loadCatalog } from "@/lib/completion-lists";
+import { achievementHref, loadCatalog, type Listed } from "@/lib/completion-lists";
 import { LINK } from "../entity";
 import {
   listHref, listMetadata, listQuery, nextSort, NoMatches, NoObservations, PER_PAGE, sortParam, sortRows, Unreadable,
@@ -47,7 +47,7 @@ export default async function AchievementListPage(props: { searchParams?: Promis
   const matched = all.filter((x) =>
     (!text || (id !== null ? x.achievementId === id : x.name.toLowerCase().includes(text))) && (!q.category || x.category === q.category));
   const sort = q.sort ?? DEFAULT_SORT;
-  const key = (x: AchievementEntry): string | number | null => sort.key === "name" ? x.name.toLowerCase() : sort.key === "category" ? x.category.toLowerCase()
+  const key = (x: Listed<AchievementEntry>): string | number | null => sort.key === "name" ? x.name.toLowerCase() : sort.key === "category" ? x.category.toLowerCase()
     : sort.key === "points" ? x.points : sort.key === "criteria" ? x.criteriaCount : x.achievementId;
   const rows = sortRows(matched, key, sort.desc, (x) => x.achievementId);
   const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
@@ -55,15 +55,16 @@ export default async function AchievementListPage(props: { searchParams?: Promis
   const shown = rows.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
   const here = (over: Partial<AchievementQuery>) => href({ ...q, page: 1, ...over });
 
-  const columns: Column<AchievementEntry>[] = [
+  const columns: Column<Listed<AchievementEntry>>[] = [
     { key: "name", header: "Name", sortable: true, cell: (x) => <Link href={achievementHref(x.achievementId, x.name)} className={LINK}>{x.name}</Link> },
     { key: "category", header: "Category", sortable: true, cell: (x) => x.category },
     { key: "points", header: "Points", numeric: true, sortable: true, cell: (x) => x.points },
     { key: "criteria", header: "Criteria", numeric: true, sortable: true, cell: (x) => x.criteriaCount },
+    { key: "confirmed", header: "Status", cell: (x) => (x.confirmed ? "Confirmed" : "Unconfirmed") },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.achievementId },
   ];
 
-  const categories = [...new Set(all.map((x) => x.category))].sort((a, b) => a.localeCompare(b));
+  const categories = [...new Set(all.flatMap((x) => (x.category ? [x.category] : [])))].sort((a, b) => a.localeCompare(b));
   const controls: FilterControl[] = [
     {
       type: "menu", key: "category", label: "Category",

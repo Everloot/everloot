@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ChainEntry } from "../../../../../kb/src/completion";
 import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column } from "@/components/ui";
-import { chainHref, loadCatalog } from "@/lib/completion-lists";
+import { chainHref, loadCatalog, type Listed } from "@/lib/completion-lists";
 import { LINK } from "../entity";
 import {
   listHref, listMetadata, listQuery, nextSort, NoMatches, NoObservations, PER_PAGE, sortParam, sortRows, Unreadable,
@@ -43,9 +43,10 @@ export default async function QuestChainListPage(props: { searchParams?: Promise
 
   // A chain cut at 80 quests has more than it lists.
   const count = (x: ChainEntry) => (x.truncated ? `${x.questIds.length}+` : x.questIds.length);
-  const columns: Column<ChainEntry>[] = [
+  const columns: Column<Listed<ChainEntry>>[] = [
     { key: "name", header: "Name", sortable: true, cell: (x) => <Link href={chainHref(x.questLineId, x.name)} className={LINK}>{x.name}</Link> },
     { key: "quests", header: "Quests", numeric: true, sortable: true, cell: count },
+    { key: "confirmed", header: "Status", cell: (x) => (x.confirmed ? "Confirmed" : "Unconfirmed") },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.questLineId },
   ];
   const keep = Object.fromEntries(new URLSearchParams(href({ ...q, q: undefined, page: 1 }).split("?")[1] ?? ""));

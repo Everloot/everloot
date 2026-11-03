@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { TitleEntry } from "../../../../../kb/src/completion";
 import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column } from "@/components/ui";
-import { loadCatalog, titleHref } from "@/lib/completion-lists";
+import { loadCatalog, titleHref, type Listed } from "@/lib/completion-lists";
 import { LINK } from "../entity";
 import {
   listHref, listMetadata, listQuery, nextSort, NoMatches, NoObservations, PER_PAGE, sortParam, sortRows, Unreadable,
@@ -41,8 +41,9 @@ export default async function TitleListPage(props: { searchParams?: Promise<Sear
   const shown = rows.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
   const here = (over: Partial<ListQuery<Sort>>) => href({ ...q, page: 1, ...over });
 
-  const columns: Column<TitleEntry>[] = [
+  const columns: Column<Listed<TitleEntry>>[] = [
     { key: "name", header: "Name", sortable: true, cell: (x) => <Link href={titleHref(x.titleId, x.name)} className={LINK}>{x.name}</Link> },
+    { key: "confirmed", header: "Status", cell: (x) => (x.confirmed ? "Confirmed" : "Unconfirmed") },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.titleId },
   ];
   const keep = Object.fromEntries(new URLSearchParams(href({ ...q, q: undefined, page: 1 }).split("?")[1] ?? ""));

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { FactionEntry } from "../../../../../kb/src/completion";
 import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, type FilterControl } from "@/components/ui";
-import { factionHref, loadCatalog } from "@/lib/completion-lists";
+import { factionHref, loadCatalog, type Listed } from "@/lib/completion-lists";
 import { LINK } from "../entity";
 import {
   listHref, listMetadata, listQuery, nextSort, NoMatches, NoObservations, PER_PAGE, sortParam, sortRows, Unreadable,
@@ -47,7 +47,7 @@ export default async function FactionListPage(props: { searchParams?: Promise<Se
   const matched = all.filter((x) =>
     (!text || (id !== null ? x.factionId === id : x.name.toLowerCase().includes(text))) && (!q.header || x.header === q.header));
   const sort = q.sort ?? DEFAULT_SORT;
-  const key = (x: FactionEntry): string | number | null => sort.key === "name" ? x.name.toLowerCase() : sort.key === "header" ? x.header?.toLowerCase() ?? null : x.factionId;
+  const key = (x: Listed<FactionEntry>): string | number | null => sort.key === "name" ? x.name.toLowerCase() : sort.key === "header" ? x.header?.toLowerCase() ?? null : x.factionId;
   const rows = sortRows(matched, key, sort.desc, (x) => x.factionId);
   const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
   if (q.page > pages) notFound();
@@ -55,9 +55,10 @@ export default async function FactionListPage(props: { searchParams?: Promise<Se
   const here = (over: Partial<FactionQuery>) => href({ ...q, page: 1, ...over });
 
   const dash = <span className="text-muted">—</span>;
-  const columns: Column<FactionEntry>[] = [
+  const columns: Column<Listed<FactionEntry>>[] = [
     { key: "name", header: "Name", sortable: true, cell: (x) => <Link href={factionHref(x.factionId, x.name)} className={LINK}>{x.name}</Link> },
     { key: "header", header: "Header", sortable: true, cell: (x) => x.header ?? dash },
+    { key: "confirmed", header: "Status", cell: (x) => (x.confirmed ? "Confirmed" : "Unconfirmed") },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.factionId },
   ];
 
