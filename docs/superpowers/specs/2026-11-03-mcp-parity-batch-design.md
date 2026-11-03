@@ -121,8 +121,11 @@ record a completionist cares about reachable through the same search an assistan
 ### PR 1: search over every catalog kind (goal 1)
 
 **Kinds added** to `KNOWLEDGE_KINDS`, the `entities.kind` CHECK and the release builder:
-`achievement`, `faction`, `title`, `quest_chain`, `mount`, `recipe`, `legacy_perk`, `race`, `instance`.
-`object` is added to the CHECK at the same time.
+`achievement`, `faction`, `title`, `quest_chain`, `mount`, `legacy_perk`, `race`, `instance`.
+`object` is added to the CHECK at the same time. `recipe` waits: recipe spell names exist only in the
+private assets bucket (`spell-names.json`), never in a committed file, so a recipe row would have no
+honest name; recipes stay reachable through `profession_path`, `recipe_thresholds` and the spell pages
+(found while planning, 2026-11-03).
 
 **Base first, confirmation on top.** Every new kind gets a static base row in the knowledge release from
 the game files, labelled "found in game files, unconfirmed" with its build. Where the upload rollup
@@ -137,7 +140,6 @@ shape (id, kind, name, snippet, page URL, licence, date).
 | title | **new layer** from `CharTitles` (same) | the source that grants it when the files say | `/database/titles/<id>-<slug>` |
 | quest_chain | **new layer** from `QuestLine` (same; `QuestLineXQuest` for the quest list) | quest count | `/database/quest-chains/<id>-<slug>` |
 | mount | `client-mounts.json` | source kind (vendor, drop, quest, profession) when the file says | the mount's item page when it is an item, else `/tools/collections` |
-| recipe | `client-recipes.json` | profession, skill ranges (yellow, green, grey), reagents | the recipe's spell or item page |
 | legacy_perk | `legacy-perks.json` | tier, what it does | `/tools/legacy` |
 | race | `races.json` | faction, classes, racial traits | `/classes/choose` |
 | instance | `client-encounters.json` | level band, bosses, 5/10/20/40 size | `/database/instances/<slug>` |
