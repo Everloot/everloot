@@ -22,7 +22,7 @@ import { candidateRoots, detectGameFolders, foreverSuggestion, realFs, resolvePi
 import { newestScans, staleScans, summarizeFiles } from "./inspect";
 import { onReconnect } from "./online";
 import { companionJobs } from "./jobs";
-import { loginItemOptions } from "./login-item";
+import { loginItemOptions, startupLoginItemOptions } from "./login-item";
 import { characterRealms, itemIdFrom, listRealms, ownRealms, priceRows, readPricesFile, suggestedRealms } from "./market";
 import { charactersFromFiles, onFacts, peekFacts, readyFacts, saveFacts } from "./save-facts";
 import { useSaveReader } from "./save-reader";
@@ -571,7 +571,8 @@ if (!app.requestSingleInstanceLock()) {
     tray = createTray(join(__dirname, process.platform === "darwin" ? "trayTemplate.png" : "tray.png"), {
       show, runNow: (job) => void engine.runNow(job), setPaused: (p) => engine.setPaused(p), openExternal: (url) => { if (allowedExternal(url)) void shell.openExternal(url); }, quit: () => { quitting = true; app.quit(); },
     });
-    applyLoginItem();
+    const startupLoginItem = startupLoginItemOptions(process.platform, settings.launchAtLogin, process.env.PORTABLE_EXECUTABLE_FILE);
+    if (startupLoginItem) app.setLoginItemSettings(startupLoginItem);
     // The installer that brought this version, and older ones, are no longer needed.
     pruneInstallers(join(data, "updates"), app.getVersion());
     // An installer that ran but left this version in place: said once, and the update row offers it again.

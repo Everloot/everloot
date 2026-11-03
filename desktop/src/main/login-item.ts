@@ -9,3 +9,13 @@ export function loginItemOptions(platform: string, openAtLogin: boolean, portabl
   if (platform === "linux") return null;
   return { openAtLogin, args: ["--hidden"], ...(platform === "win32" && portableExe ? { path: portableExe } : {}) };
 }
+
+/**
+ * What start-up hands to app.setLoginItemSettings: the entry only when the player asked for one, null otherwise.
+ * Writing "off" on every start is what macOS refuses for an app that is not signed or runs from a temporary
+ * folder ("Unable to set login item … Operation not permitted" in the log), and nothing needs it: the setting
+ * changes only from Settings, which applies it then, on or off.
+ */
+export function startupLoginItemOptions(platform: string, openAtLogin: boolean, portableExe: string | undefined): ReturnType<typeof loginItemOptions> {
+  return openAtLogin ? loginItemOptions(platform, openAtLogin, portableExe) : null;
+}
