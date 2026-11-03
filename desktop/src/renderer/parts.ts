@@ -45,7 +45,7 @@ const EMPTY_DEFAULT: Record<EmptyPage, Empty> = {
  * Why a page is empty, from the engine's own state, most fundamental first: no folder, no save file, paused, the job
  * off, a fetch error, and only then "no data yet" with what produces it.
  */
-export function emptyCause(page: EmptyPage, s: EmptyContext, extra: { error?: string; followed?: number } = {}): Empty {
+export function emptyCause(page: EmptyPage, s: EmptyContext, extra: { error?: string } = {}): Empty {
   // The changes feed comes from the site, not the game: the folder and the jobs say nothing about it.
   if (page === "changes") return extra.error ? { cause: extra.error, step: "Try again", action: { label: "Retry", page } } : EMPTY_DEFAULT.changes;
   if (!s.settings.gameFolder) return { cause: "Not watching a game folder", step: "Choose it in Settings", action: { label: "Open Settings", page: "settings" } };
@@ -53,7 +53,6 @@ export function emptyCause(page: EmptyPage, s: EmptyContext, extra: { error?: st
   if (s.engine.paused) return { cause: "Everloot is paused", step: "Resume on the Overview", action: { label: "Overview", page: "overview" } };
   if (page === "upload" && !s.settings.upload) return { cause: "Upload is off", step: "Turn it on above" };
   if (page === "ask" && !s.settings.ask.enabled) return { cause: "/ask is off", step: "Turn it on above" };
-  if (page === "market" && extra.followed === 0) return { cause: "No realm followed yet", step: "Follow one below, or scan at the auction house" };
   if (extra.error) return { cause: extra.error, step: "Try again", action: { label: "Retry", page } };
   return EMPTY_DEFAULT[page];
 }

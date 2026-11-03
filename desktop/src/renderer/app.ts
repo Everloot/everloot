@@ -795,7 +795,7 @@ function market(s: AppState): string {
       <p class="muted small">At most 20 realms in one prices file; your scans come first. The full tables and 60-day charts are on the Auction prices tool in the sidebar.</p>
     </section>
     <section class="panel"><h2>Your scans</h2>
-      ${scans ? `<div class="tablewrap"><table><thead><tr><th>Realm</th><th>Last full scan</th><th>Status</th></tr></thead><tbody>${scans}</tbody></table></div>` : emptyState(emptyCause("market", s, { followed: followed.size }), icon("market"))}
+      ${scans ? `<div class="tablewrap"><table><thead><tr><th>Realm</th><th>Last full scan</th><th>Status</th></tr></thead><tbody>${scans}</tbody></table></div>` : emptyState(emptyCause("market", s), icon("market"))}
       <p class="muted small">Every scan you upload is one of the three reporters a day needs before a price is published. A realm is only as fresh as its last scans.</p>
     </section>
     <section class="panel"><div class="row between"><h2>Written into the game</h2><span class="muted small">${j.at ? when(j.at) : ""}</span></div>

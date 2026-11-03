@@ -51,7 +51,8 @@ test("a paused app says so before anything about data", () => {
 test("an off job says it is off before anything about data", () => {
   expect(emptyCause("ask", { ...base, settings: { ...base.settings, ask: { ...base.settings.ask, enabled: false } } }).cause).toBe("/ask is off");
   expect(emptyCause("upload", { ...base, settings: { ...base.settings, upload: false } }).cause).toBe("Upload is off");
-  expect(emptyCause("market", base, { followed: 0 }).cause).toBe("No realm followed yet");
+  // Following a realm is the realms panel's business; the scans panel says what a scan needs, whatever is followed.
+  expect(emptyCause("market", base, { followed: 0 } as never).cause).toBe("No full scan in your save file yet");
 });
 
 test("a fetch error is the cause, with a retry", () => {
@@ -63,7 +64,7 @@ test("a fetch error is the cause, with a retry", () => {
 test("with everything on and a file watched, each page has its own reason", () => {
   expect(emptyCause("characters", base).cause).toBe("Save file read, no named character rows yet");
   expect(emptyCause("upload", base).action?.run).toBe("upload");
-  expect(emptyCause("market", base, { followed: 2 }).cause).toBe("No full scan in your save file yet");
+  expect(emptyCause("market", base).cause).toBe("No full scan in your save file yet");
   expect(emptyCause("ask", base).cause).toBe("No question waiting");
   expect(emptyCause("log", base).cause).toBe("Nothing logged since start");
 });
