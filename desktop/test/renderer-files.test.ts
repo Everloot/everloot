@@ -14,3 +14,9 @@ test("Geist and Geist Mono are declared from the bundled files", () => {
   expect(css).toMatch(/@font-face\s*\{[^}]*font-family:\s*"Geist"[^}]*url\("fonts\/Geist-Variable\.woff2"\)/);
   expect(css).toMatch(/@font-face\s*\{[^}]*font-family:\s*"Geist Mono"[^}]*url\("fonts\/GeistMono-Variable\.woff2"\)/);
 });
+
+test("a top-level note marked small keeps the small size under the prose rule", () => {
+  // `.page > p` (0,1,1) would beat `.small` (0,1,0); the prose rule must leave small notes alone.
+  expect(css).toMatch(/\.page > p:not\(\.small\)/);
+  expect(css).not.toMatch(/\.page > p,/);
+});
