@@ -87,6 +87,17 @@ export function threadLines(log: LogLine[], n: number, icons: Record<Job | "app"
   }).join("");
 }
 
+/**
+ * A job page's first row: the state pill, what the job is doing in a sentence, and the last line it wrote with its
+ * time. It is a live region, so a screen reader hears the job move without leaving the page.
+ */
+export function workingStrip(job: Job, s: { engine: Pick<EngineState, "jobs" | "paused"> }, headline: string, lastLine: LogLine | null): string {
+  const j = s.engine.jobs[job];
+  const kind = pillKind(j, s.engine.paused);
+  const last = lastLine ? `<p class="strip-last"><time>${clock(lastLine.at)}</time>${esc(lastLine.text)}</p>` : "";
+  return `<section class="strip strip-${kind}" aria-live="polite">${statePill(j, s.engine.paused)}<div class="strip-main"><p class="strip-head">${esc(headline)}</p>${last}</div></section>`;
+}
+
 /** The title bar's pill: what the app watches, or that it is paused, which matters more. */
 export function watchPill(e: Pick<EngineState, "files" | "paused">): string {
   if (e.paused) return '<span class="pill-s pill-paused">Paused</span>';

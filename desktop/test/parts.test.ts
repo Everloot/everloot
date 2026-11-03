@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { JobState, JobStatus, LogLine } from "../src/shared/types";
-import { emptyCause, emptyState, jobOfLine, statePill, threadLines, watchPill } from "../src/renderer/parts";
+import { emptyCause, emptyState, jobOfLine, statePill, threadLines, watchPill, workingStrip } from "../src/renderer/parts";
 
 const j = (state: JobState): JobStatus => ({ state, message: "", at: null });
 
@@ -98,6 +98,24 @@ test("the thread shows the last n lines and nothing for an empty log", () => {
   const html = threadLines(log, 2, { upload: "", prices: "", ask: "", app: "" });
   expect(html).toContain("line 3"); expect(html).toContain("line 4"); expect(html).not.toContain("line 2");
   expect(threadLines([], 10, { upload: "", prices: "", ask: "", app: "" })).toBe("");
+});
+
+const strip = (state: JobState, paused: boolean) => ({ engine: { jobs: { upload: j(state) }, paused, files: ["a"], log: [] }, settings: { upload: true } } as never as Parameters<typeof workingStrip>[1]);
+
+test("a strip carries the pill, the headline and the job's last line", () => {
+  const html = workingStrip("upload", strip("running", false), "Uploading TESTACC", { at: "2026-11-03T01:01:00Z", level: "info", text: "upload TESTACC: sending <2> batches" });
+  expect(html).toContain("pill-working");
+  expect(html).toContain("strip-working");
+  expect(html).toContain("Uploading TESTACC");
+  expect(html).toContain("sending &lt;2&gt; batches");
+  expect(html).toContain('aria-live="polite"');
+});
+
+test("a strip with no line yet has the headline only, and a paused engine says Paused", () => {
+  const html = workingStrip("upload", strip("idle", true), "Waiting for the next write", null);
+  expect(html).toContain(">Paused<");
+  expect(html).toContain("strip-paused");
+  expect(html).not.toContain("strip-last");
 });
 
 test("the rendered block escapes the cause and carries the action as a data attribute", () => {

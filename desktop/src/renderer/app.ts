@@ -5,7 +5,7 @@ import { JOBS, NO_SOURCED_ANSWER, type AddonInfo, type AppState, type AskInfo, t
 import { PROVIDER_PRESETS, assistantSource, keptModelPick, manualModelShown, presetFor, removalNotice, type ModelChoice, type ProviderKind } from "../shared/providers";
 import { inkOn } from "../../../web/src/lib/chat/catalogue";
 import { WEBSITE_LINKS, websiteUrl } from "../shared/website";
-import { emptyCause, emptyState, statePill, watchPill } from "./parts";
+import { emptyCause, emptyState, jobOfLine, statePill, watchPill, workingStrip } from "./parts";
 
 declare global { interface Window { everloot: EverlootApi } }
 const api = window.everloot;
@@ -122,6 +122,8 @@ const whyQuestion = (job: Job, s: AppState) => `Why did ${job === "ask" ? "the /
 const whyFailed = (s: AppState): string[] => (["upload", "prices", "ask"] as Job[]).filter((j) => s.engine.jobs[j].state === "error").map((j) => whyQuestion(j, s));
 /** The "ask why" link under a stat whose job failed; nothing otherwise. */
 const askWhy = (job: Job, s: AppState) => (s.engine.jobs[job].state === "error" ? ` · <button type="button" class="link" data-ask="${esc(whyQuestion(job, s))}">ask why</button>` : "");
+/** The newest log line a job wrote, for its page's strip; null before it wrote one. */
+const lastLineOf = (job: Job, s: AppState) => [...s.engine.log].reverse().find((l) => jobOfLine(l.text) === job) ?? null;
 const logLines = (s: AppState, n: number) => s.engine.log.slice(-n).reverse().map((l) => `<div><time>${clock(l.at)}</time><span class="${l.level}">${esc(l.text)}</span></div>`).join("") || '<span class="muted">Nothing yet.</span>';
 
 // ---------- screens ----------
@@ -752,7 +754,7 @@ function upload(s: AppState): string {
   return `<div class="page">
     <div class="head"><h1>Upload</h1><div class="row">${jobSwitch("upload", s)}${runBtn("upload", s)}</div></div>
     <p class="fg2">After every logout or <code>/reload</code> the game rewrites <code>Everloot.lua</code>; once the write settles, the events the site has not confirmed are sent. Named data (guild, gear, gold, collection) and your installed addon list stay here.</p>
-    <section class="panel"><div class="row between"><h2>Last run</h2><span class="muted small">${j.at ? when(j.at) : ""}</span></div><p class="${j.state === "error" ? "error" : "fg2"}">${esc(statusText(j))}</p></section>
+    ${workingStrip("upload", s, statusText(j), lastLineOf("upload", s))}
     <section class="panel"><h2>Account files</h2>
       ${files.length ? `<div class="tablewrap"><table><thead><tr><th>Account</th><th>Written</th><th>Addon</th><th class="num">Records</th><th class="num">Confirmed</th><th>What it holds</th></tr></thead><tbody>${rows}</tbody></table></div>` : emptyState(emptyCause("upload", s), icon("upload"))}
       <p class="muted small">Records are what the addon has on disk; confirmed is how many of them the site has accepted from this install. The site states a fact once three installs agree.</p>
@@ -780,6 +782,7 @@ function market(s: AppState): string {
   const scans = (m?.scans ?? []).map((sc) => `<tr><td>${esc(sc.realm)}</td><td>${sc.at ? ago(sc.at) : "unknown"}</td><td class="${stale(sc.at) ? "warn" : "ok"}">${stale(sc.at) ? "scan again next time you are at the auction house" : "fresh"}</td></tr>`).join("");
   return `<div class="page">
     <div class="head"><h1>Market</h1><div class="row">${jobSwitch("prices", s)}${runBtn("prices", s, "Refresh now")}</div></div>
+    ${workingStrip("prices", s, statusText(j), lastLineOf("prices", s))}
     <section class="panel"><div class="row between"><h2>Look up a price</h2>${ext(websiteUrl(s.settings.endpoint, "/tools/auctions"), "Auction prices on everloot.app ↗")}</div>
       <form id="priceForm" class="row" autocomplete="off"><input type="text" id="priceItem" name="priceItem" class="grow" aria-label="Item id or link" placeholder="Item id, or an item link pasted from game chat" maxlength="500"><button type="submit" class="btn">Look up</button></form>
       ${priceResult(s)}
@@ -838,6 +841,7 @@ function ask(s: AppState): string {
   const configured = Boolean(st.tokenFile) || !usualUrl;
   return `<div class="page">
     <div class="head"><h1>Ask</h1><div class="row">${jobSwitch("ask", s)}${runBtn("ask", s, "Answer now")}</div></div>
+    ${workingStrip("ask", s, statusText(s.engine.jobs.ask), lastLineOf("ask", s))}
     ${flash ? `<p role="status" class="${flash.startsWith("!") ? "error" : "ok"} small">${esc(flash.replace(/^!/, ""))}</p>` : ""}
     <p class="fg2">Ask in game with <code>/ask</code>, then <code>/reload</code> to save your question. Keep this app running while it answers, then <code>/reload</code> again to read the answer. Answers arrive through saved files, not live.</p>
     <p class="fg2 small">Item prices come from recorded scans, not live listings. Price and search results include their source. The time beside an answer is when it was written; price answers also show the observation day.</p>

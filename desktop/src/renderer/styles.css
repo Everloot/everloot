@@ -199,6 +199,19 @@ p { margin: 0; }
 .callout { display: flex; gap: 10px; padding: 12px 14px; border-radius: var(--radius); border: 1px solid var(--edge); border-left-width: 3px; background: rgb(var(--panel)); overflow-wrap: anywhere; }
 .callout .ico { margin-top: 2px; }
 .callout.error { border-color: rgb(var(--danger)); }
+/* A job page opens with a strip: the pill, what the job is doing, and the last line it wrote. The left edge takes the pill's tone. */
+.strip { --tone: var(--fg-2); display: flex; align-items: flex-start; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-left: 3px solid rgb(var(--tone)); border-radius: 8px; background: rgb(var(--panel)); overflow-wrap: anywhere; }
+.strip-working { --tone: var(--info); }
+.strip-failed { --tone: var(--danger); }
+.strip-ok { --tone: var(--accent); }
+.strip-paused { --tone: var(--warning); }
+.strip-off { --tone: var(--muted); }
+.strip .pill-s { margin: 2px 0 0; }
+.strip-main { flex: 1 1 auto; min-width: 0; }
+.strip-head { font-weight: 600; }
+.strip-failed .strip-head { color: rgb(var(--danger)); }
+.strip-last { margin-top: 3px; font-family: "Geist Mono", ui-monospace, Menlo, monospace; font-size: var(--fs-sm); color: rgb(var(--muted)); }
+.strip-last time { margin-right: 8px; font-variant-numeric: tabular-nums; }
 /* An empty page says why and offers the one thing that fills it; never a bare "nothing yet". */
 .empty { display: flex; align-items: flex-start; gap: 12px; padding: 14px; border: 1px dashed var(--edge); border-radius: 8px; overflow-wrap: anywhere; }
 .empty > .ico { width: 18px; height: 18px; color: rgb(var(--muted)); margin-top: 1px; }
