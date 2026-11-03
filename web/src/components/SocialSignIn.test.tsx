@@ -103,3 +103,28 @@ test("the G is Google's bundled logo cropped from its dark button, with no butto
   expect(svg).not.toContain("#131314");
   expect(svg).not.toContain("#E3E3E3");
 });
+test("the tile layout shows each provider's mark alone, named for assistive technology, and keeps Microsoft as its text button", async () => {
+  vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => {})));
+  await act(async () => root.render(<SocialSignIn providers={["google", "github", "discord", "twitch", "microsoft"]} layout="tiles" />));
+  const tiles = [...container.querySelectorAll<HTMLButtonElement>("button[data-provider-tile]")];
+  expect(tiles.map((t) => t.dataset.providerTile)).toEqual(["google", "github", "discord", "twitch"]);
+  expect(tiles.map((t) => t.getAttribute("aria-label"))).toEqual(["Continue with Google", "Continue with GitHub", "Continue with Discord", "Continue with Twitch"]);
+  expect(tiles.map((t) => t.getAttribute("title"))).toEqual(tiles.map((t) => t.getAttribute("aria-label")));
+  expect(tiles.every((t) => t.textContent === "")).toBe(true);
+  expect(tiles.every((t) => t.querySelector("[data-provider-logo]")?.getAttribute("aria-hidden") === "true")).toBe(true);
+  // Google's tile is the icon mode of its dark button; the others are Everloot's control.
+  expect(tiles[0].className).toContain("bg-[#131314]");
+  expect(tiles[0].className).toContain("border-[#8E918F]");
+  expect(tiles[0].querySelector("img")?.getAttribute("width")).toBe("20");
+  expect(tiles[1].className).toContain("border-line");
+  expect(tiles[1].querySelector("svg")?.getAttribute("width")).toBe("24");
+  const buttons = [...container.querySelectorAll("button")];
+  const microsoft = buttons[buttons.length - 1];
+  expect(microsoft.hasAttribute("data-provider-tile")).toBe(false);
+  expect(microsoft.textContent).toBe("Sign in with Microsoft");
+  expect(buttons.indexOf(tiles[3])).toBeLessThan(buttons.indexOf(microsoft));
+  await act(async () => tiles[1].click());
+  expect(tiles[1].getAttribute("aria-busy")).toBe("true");
+  expect(buttons.every((b) => b.disabled)).toBe(true);
+  expect(container.querySelector('[role="status"]')?.textContent).toBe("Opening GitHub…");
+});

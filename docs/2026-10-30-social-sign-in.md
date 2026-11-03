@@ -1,16 +1,23 @@
 # Social sign-in
 
-Google, Microsoft, Twitch and Discord use Better Auth's built-in providers. Battle.net keeps its
+Google, GitHub, Discord, Twitch and Microsoft use Better Auth's built-in providers. Battle.net keeps its
 existing sign-in URL and generic OAuth provider. Sign-in, sign-up and adding an account share the
 same social controls. Account settings show linked providers and offer the configured methods
 that are not linked yet.
+
+On `/sign-in` and `/sign-up` the providers are a row of square tiles under the Battle.net button, each
+showing only its mark and named for assistive technology and the tooltip. Microsoft is the exception: its
+guidelines tie the logo to the words "Sign in with Microsoft", so it keeps a full-width text button under the
+row. Battle.net stays a text button because Blizzard publishes no logo licence. From an account's settings the
+same controls are full-width text buttons ("Link Discord").
 
 ## Configuration
 
 `EVERLOOT_AUTH_V2` must equal `1`. Each social provider needs both `<PROVIDER>_CLIENT_ID` and
 `<PROVIDER>_CLIENT_SECRET`; blank or incomplete pairs do not register the provider or show a button.
 Register `https://everloot.app/api/auth/callback/<provider>` for each provider. Microsoft uses the
-`common` tenant for work, school and personal accounts. Discord requests only `identify email`,
+`common` tenant for work, school and personal accounts. GitHub is registered as an OAuth App, not a GitHub
+App, and its accounts need a verified email. Discord requests only `identify email`,
 without bot or server permissions. Providers that supply no email cannot create an account.
 
 The accounts migration and `BETTER_AUTH_SECRET` are still required. The Worker uses an

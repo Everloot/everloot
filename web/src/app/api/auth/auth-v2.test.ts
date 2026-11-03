@@ -246,7 +246,7 @@ test.each([
   ["POST", "/api/auth/unlink-account"],
   ["GET", "/api/auth/list-accounts"],
   ["POST", "/api/auth/callback/battlenet"],
-  ["GET", "/api/auth/callback/github"],
+  ["GET", "/api/auth/callback/facebook"],
   ["GET", "/api/auth/anything-at-all"],
 ])("the catch-all route answers %s %s with 404 and never reaches Better Auth", async (method, path) => {
   const request = new Request(`https://everloot.app${path}`, { method });
