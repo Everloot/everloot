@@ -36,5 +36,6 @@ export async function confirmedCatalog(loader: CompletionLoader | undefined): Pr
 export function confirmedLine(kind: string, extId: string, ids: ConfirmedIds): string | null {
   if (kind !== "achievement" && kind !== "faction" && kind !== "title" && kind !== "quest_chain") return null;
   if (!ids[kind].has(Number(extId))) return null;
-  return `Confirmed by player uploads (3 or more installs agree) as of ${ids.asOf ?? "an unrecorded date"}.`;
+  const base = "Confirmed by player uploads (3 or more installs agree)";
+  return ids.asOf ? `${base} as of ${ids.asOf}.` : `${base}; date unrecorded.`;
 }
