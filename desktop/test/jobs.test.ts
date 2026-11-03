@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { emptySettledList, encodeIds } from "../../kb/src/settled-list";
 import * as bridge from "../../companion/src/bridge/engine";
+import { createSentState, receiptKeyForSite } from "../../companion/src/sent-state";
 import { FIXTURE_STRUCTURED, FIXTURE_URL } from "../../web/src/lib/chat/market-fixture";
 import { ACCOUNT_KEY_FILE, writeKeyOrigin } from "../src/main/account";
 import { companionJobs } from "../src/main/jobs";
@@ -26,6 +27,38 @@ test.each(["https://other.test", "http://everloot.app", "https://everloot.app"])
     await companionJobs(d, () => ({ ...defaultSettings(), endpoint, gameFolder: d })).deps.ask(file);
     expect(engine.mock.calls[0][0].token).toBe(endpoint === "https://everloot.app" ? key : null);
   } finally { engine.mockRestore(); }
+});
+
+test("an upload keeps the history whole while another account's file has the same install id", async () => {
+  const d = dir();
+  const account = (name: string, installId: string, eventId: string) => {
+    const folder = join(d, "WTF", "Account", name, "SavedVariables");
+    mkdirSync(folder, { recursive: true });
+    const file = join(folder, "Everloot.lua");
+    writeFileSync(file, `EverlootDB = { version = "0.3.14", installId = "${installId}", records = { loot = {
+    { eventId = "${eventId}", capturedAt = "2026-10-27T00:00:00Z", sourceNpcId = 42, sourceEvidence = "loot-api", items = { { itemId = 5, count = 1 } } },
+  } } }`);
+    return file;
+  };
+  const settings = () => ({ ...defaultSettings(), gameFolder: d });
+  const data = join(d, "data");
+  const key = receiptKeyForSite("abcd-1234-ef56-7890", settings().endpoint);
+  const history = () => JSON.parse(readFileSync(join(data, "sent.json"), "utf8"))[key];
+  const a = account("A", "abcd-1234-ef56-7890", "epoch:2");
+  // The other account's file is a copy: the same install id, and a row of its own.
+  account("B", "abcd-1234-ef56-7890", "epoch:1");
+  mkdirSync(data, { recursive: true });
+  createSentState(join(data, "sent.json")).add(key, ["epoch:1", "epoch:2"]);
+  vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("offline"); }));
+  try {
+    // Both rows are sent already, so nothing goes; only the history is in question.
+    await companionJobs(data, settings).deps.upload(a).catch(() => undefined);
+    expect(history()).toEqual(["epoch:1", "epoch:2"]);
+    // Once the other file has its own id, the history is cut to this file's rows.
+    account("B", "ffff-0000-ffff-0000", "epoch:1");
+    await companionJobs(data, settings).deps.upload(a).catch(() => undefined);
+    expect(history()).toEqual(["epoch:2"]);
+  } finally { vi.unstubAllGlobals(); }
 });
 
 describe("a price question in /ask", () => {
@@ -273,4 +306,54 @@ describe("character link codes in the upload job", () => {
       vi.unstubAllGlobals();
     }
   });
+});
+
+test("runs and boss pulls stay unsent across runs, never resent, until a receipt says the site reads them", async () => {
+  const d = dir();
+  const file = join(d, "Everloot.lua");
+  const loot = (n: number) => `{ eventId = "epoch:1${n}", capturedAt = "2026-11-02T12:00:00Z", sourceNpcId = 42, sourceEvidence = "loot-api", items = { { itemId = 5, count = 1 } } }`;
+  const write = (loots: number) => writeFileSync(file, `EverlootDB = { version = "0.3.16", installId = "abcd-1234-ef56-7890", records = {
+    loot = { ${Array.from({ length: loots }, (_, i) => loot(i)).join(", ")} },
+    instance_run = { { eventId = "epoch:2", capturedAt = "2026-11-02T12:40:00Z", runId = "0123456789abcdef", instanceMapId = 36, instanceType = "party",
+      enteredAt = "2026-11-02T11:50:00Z", leftAt = "2026-11-02T12:40:00Z", pulls = 1, kills = 1, wipes = 0, endReason = "left" } },
+    pull_summary = { { eventId = "epoch:3", capturedAt = "2026-11-02T12:01:00Z", encounterId = 1144, name = "Rhahk'zor", instanceMapId = 36, success = true,
+      realm = "Forever", members = { { name = "Thrallina", class = "SHAMAN" } } } },
+  } }`);
+  write(1);
+  // The intake as main answers while the switch is off (unknown kinds), and with runRecords: true once it is on.
+  let on = false;
+  const sent: string[][] = [];
+  vi.stubGlobal("fetch", vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+    expect(String(url)).toBe("https://everloot.app/api/intake");
+    const records = (JSON.parse(String(init?.body)) as { records: { kind: string }[] }).records;
+    sent.push(records.map((r) => r.kind));
+    const accepted: { index: number; kind: string }[] = [], rejected: { index: number; reason: string }[] = [];
+    records.forEach((r, index) => (on || !["instance_run", "pull_summary"].includes(r.kind) ? accepted.push({ index, kind: r.kind }) : rejected.push({ index, reason: `unknown kind: ${r.kind}` })));
+    const flag = on ? { runRecords: true } : {};
+    return accepted.length ? Response.json({ ok: true, persisted: true, uploadId: `u-${sent.length}`, accepted, rejected, ...flag })
+      : Response.json({ ok: false, accepted, rejected, ...flag }, { status: 422 });
+  }));
+  vi.useFakeTimers({ now: new Date("2026-11-02T13:00:00Z"), toFake: ["Date"] });
+  try {
+    const data = join(d, "data");
+    // A new app each run, as after a restart: what the site said is read back from the data folder.
+    const run = () => companionJobs(data, () => ({ ...defaultSettings(), endpoint: "https://everloot.app" })).deps.upload(file);
+    expect(await run()).toMatch(/^sent 1 new events in 1 batch\(es\);.*; kept 2 runs and boss pulls here until the site reads them/);
+    // Days of play with the switch off: new loot goes, the held rows never do.
+    for (let i = 0; i < 3; i++) {
+      vi.setSystemTime(Date.now() + 86_400_000);
+      expect(await run()).toMatch(/^sent 0 new events in 0 batch\(es\);.*; kept 2 runs and boss pulls here until the site reads them/);
+      write(i + 2);
+      expect(await run()).toMatch(/^sent 1 new events in 1 batch\(es\);.*; kept 2 runs and boss pulls here until the site reads them/);
+    }
+    expect(sent).toEqual([["loot"], ["loot"], ["loot"], ["loot"]]);
+    // The site switches collection on: the next upload's receipt says so, and the run after it sends the rows.
+    on = true;
+    write(5);
+    expect(await run()).toMatch(/^sent 1 new events in 1 batch\(es\);.*; kept 2 runs and boss pulls here until the site reads them/);
+    expect(await run()).toMatch(/^sent 2 new events in 1 batch\(es\); skipped/);
+    expect(sent[5]).toEqual(["instance_run", "pull_summary"]);
+    expect(await run()).toMatch(/^sent 0 new events in 0 batch\(es\)/);
+    expect(sent).toHaveLength(6);
+  } finally { vi.useRealTimers(); vi.unstubAllGlobals(); }
 });

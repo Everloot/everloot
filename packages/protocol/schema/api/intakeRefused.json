@@ -64,6 +64,11 @@
         ],
         "additionalProperties": false
       }
+    },
+    "runRecords": {
+      "description": "The site reads `instance_run`, `pull_summary` and the encounter timing fields. Absent while it does not; an uploader then keeps those rows.",
+      "type": "boolean",
+      "const": true
     }
   },
   "required": [

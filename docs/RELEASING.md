@@ -68,6 +68,17 @@ again. If only the CurseForge job fails, inspect the project's Files page before
 an interrupted response can still mean the upload succeeded. Do not recreate an already published
 GitHub release or re-upload an existing CurseForge file. The upload command prints the file ID on success.
 
+## Release gates
+
+Some addon code is merged before a release may carry it. Its switch in `addon/core.lua` stays `false` on `main`, so the
+nightly (built from `main`) and any tag leave it out, and an addon test checks the code does nothing while it is off.
+The release pull request that ships it sets the switch to `true`, after the steps in its row. Its server side waits on
+a site switch that stays unset until then; unset, the site answers as it did before the code was merged.
+
+| Switch | What it holds back | Before setting it to `true` |
+|---|---|---|
+| `E.RUN_RECORDS` | Boss pull timing on `encounter`, `instance_run` and the `pulls` module (`pull_summary`). Off, `addon/tests/pulls_contract.py` requires the saved file, chat, `/everloot status`, commands and events to equal `main`'s (`addon/tests/fixtures/gate_off_main.json`). Site switch: `EVERLOOT_PULL_SUMMARIES`; unset, intake parses as before (timing fields dropped, the two kinds unknown) and the Desktop App and command-line uploader keep those rows unsent until a receipt says `runRecords: true`. Retention runs either way. | The live probes in section 8 of `docs/design/specs/2026-11-02-pull-and-run-records-design.md`; `supabase/migrations/20261102130000_pull_summaries.sql` applied; `EVERLOOT_PULL_SUMMARIES=1` deployed for the Worker before the addon release |
+
 ## Nightly
 
 The nightly workflow runs daily at 06:17 UTC and on demand (Actions, Nightly, Run workflow; tick

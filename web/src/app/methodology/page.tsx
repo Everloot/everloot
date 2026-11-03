@@ -11,6 +11,7 @@ import { REPO_URL } from "@/lib/source";
 import { CREDIT } from "@/lib/talents/assets";
 import { MAP_SOURCE } from "@/lib/world-map";
 import { PageHeader, ReadingLayout, SectionHeading, type TocItem } from "@/components/ui";
+import { ScoreSection } from "./score";
 
 const description =
   "How Everloot turns addon uploads into WoW Forever facts: three installs must agree, addresses are never published, and names only on the player pages.";
@@ -26,6 +27,7 @@ const SECTIONS: TocItem[] = [
   { id: "files", label: "Game files and play are kept apart" },
   { id: "population", label: "Population numbers" },
   { id: "guilds", label: "How guilds are counted" },
+  { id: "score", label: "The Everloot Score" },
   { id: "credits", label: "Credits" },
 ];
 
@@ -175,6 +177,8 @@ export default async function MethodologyPage() {
             </ul>
           </div>
         </section>}
+
+        <ScoreSection />
 
         {/* The full attribution. Pages carry none of their own; the footer's one line links here (docs/DATA_POLICY.md). */}
         <section aria-labelledby="credits">

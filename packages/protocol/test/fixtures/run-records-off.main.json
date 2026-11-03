@@ -1,0 +1,206 @@
+{
+  "records": {
+    "records": [
+      {
+        "installId": "install-1234",
+        "eventId": "e:1",
+        "capturedAt": "2026-11-02T12:01:15Z",
+        "kind": "encounter",
+        "encounterId": 1144,
+        "name": "Rhahk'zor",
+        "instanceMapId": 36,
+        "difficulty": 1,
+        "size": 5,
+        "success": true,
+        "npcIds": [
+          644
+        ]
+      },
+      {
+        "installId": "install-1234",
+        "eventId": "e:2",
+        "capturedAt": "2026-11-02T12:01:15Z",
+        "kind": "encounter",
+        "encounterId": 1144,
+        "name": "Rhahk'zor",
+        "instanceMapId": 36,
+        "success": true
+      },
+      {
+        "installId": "install-1234",
+        "eventId": "e:3",
+        "capturedAt": "2026-11-02T12:01:15Z",
+        "kind": "encounter",
+        "encounterId": 1144,
+        "name": "Rhahk'zor",
+        "instanceMapId": 36,
+        "success": false
+      },
+      {
+        "installId": "install-1234",
+        "eventId": "e:4",
+        "capturedAt": "2026-11-02T12:01:15Z",
+        "kind": "encounter",
+        "encounterId": 1144,
+        "name": "Rhahk'zor",
+        "instanceMapId": 36,
+        "success": true
+      },
+      {
+        "installId": "install-1234",
+        "eventId": "e:8",
+        "capturedAt": "2026-11-02T12:01:15Z",
+        "kind": "loot",
+        "sourceNpcId": 644,
+        "items": [
+          {
+            "itemId": 5,
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "receipt": {
+      "accepted": [
+        {
+          "index": 0,
+          "kind": "encounter"
+        },
+        {
+          "index": 1,
+          "kind": "encounter"
+        },
+        {
+          "index": 2,
+          "kind": "encounter"
+        },
+        {
+          "index": 3,
+          "kind": "encounter"
+        },
+        {
+          "index": 7,
+          "kind": "loot"
+        }
+      ],
+      "rejected": [
+        {
+          "index": 4,
+          "reason": "Too small: expected number to be >0"
+        },
+        {
+          "index": 5,
+          "reason": "unknown kind: instance_run"
+        },
+        {
+          "index": 6,
+          "reason": "unknown kind: pull_summary"
+        }
+      ]
+    }
+  },
+  "upload": {
+    "ok": true,
+    "upload": {
+      "addonVersion": "0.3.15",
+      "records": [
+        {
+          "installId": "install-1234",
+          "eventId": "e:1",
+          "capturedAt": "2026-11-02T12:01:15Z",
+          "kind": "encounter",
+          "encounterId": 1144,
+          "name": "Rhahk'zor",
+          "instanceMapId": 36,
+          "difficulty": 1,
+          "size": 5,
+          "success": true,
+          "npcIds": [
+            644
+          ]
+        },
+        {
+          "installId": "install-1234",
+          "eventId": "e:2",
+          "capturedAt": "2026-11-02T12:01:15Z",
+          "kind": "encounter",
+          "encounterId": 1144,
+          "name": "Rhahk'zor",
+          "instanceMapId": 36,
+          "success": true
+        },
+        {
+          "installId": "install-1234",
+          "eventId": "e:3",
+          "capturedAt": "2026-11-02T12:01:15Z",
+          "kind": "encounter",
+          "encounterId": 1144,
+          "name": "Rhahk'zor",
+          "instanceMapId": 36,
+          "success": false
+        },
+        {
+          "installId": "install-1234",
+          "eventId": "e:4",
+          "capturedAt": "2026-11-02T12:01:15Z",
+          "kind": "encounter",
+          "encounterId": 1144,
+          "name": "Rhahk'zor",
+          "instanceMapId": 36,
+          "success": true
+        },
+        {
+          "installId": "install-1234",
+          "eventId": "e:8",
+          "capturedAt": "2026-11-02T12:01:15Z",
+          "kind": "loot",
+          "sourceNpcId": 644,
+          "items": [
+            {
+              "itemId": 5,
+              "count": 1
+            }
+          ]
+        }
+      ]
+    },
+    "receipt": {
+      "accepted": [
+        {
+          "index": 0,
+          "kind": "encounter"
+        },
+        {
+          "index": 1,
+          "kind": "encounter"
+        },
+        {
+          "index": 2,
+          "kind": "encounter"
+        },
+        {
+          "index": 3,
+          "kind": "encounter"
+        },
+        {
+          "index": 7,
+          "kind": "loot"
+        }
+      ],
+      "rejected": [
+        {
+          "index": 4,
+          "reason": "Too small: expected number to be >0"
+        },
+        {
+          "index": 5,
+          "reason": "unknown kind: instance_run"
+        },
+        {
+          "index": 6,
+          "reason": "unknown kind: pull_summary"
+        }
+      ]
+    }
+  }
+}

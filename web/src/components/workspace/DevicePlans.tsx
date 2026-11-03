@@ -12,7 +12,11 @@ import {
 import { codeFreshness, savedPlanNote, type ClassTalentChanges, type TreeBuild } from "@/lib/talents/freshness";
 import { planHash, replacePlanHash } from "@/lib/talents/import";
 import { decodeBuild } from "@/lib/talents/share";
+import { copyExamplePlans, type ExamplePlan } from "@/lib/workspace-examples";
+import { NO_ICONS, type WorkspaceIcons } from "@/lib/workspace-icons";
+import { ExamplePlans, useExamplesShown } from "./Examples";
 import { useWorkspaceOwner } from "./LocalPlanSave";
+import { ClassIcon, ClassName, classEdge } from "./marks";
 
 // /tools/builds: the plans kept in this browser (lib/player-workspace.ts) for whoever is signed in now, or for
 // the browser signed out. Named, opened, edited, copied, deleted, backed up and restored here, with nothing sent:
@@ -79,7 +83,13 @@ function dropSent() {
   if (hash !== window.location.hash) window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}${hash}`);
 }
 
-export default function DevicePlans({ trees }: { trees?: PlanTrees } = {}) {
+export default function DevicePlans({ trees, examples = [], icons = NO_ICONS }: {
+  trees?: PlanTrees;
+  /** Sample plans shown while this bucket has none (lib/workspace-examples.ts); never saved unless copied. */
+  examples?: ExamplePlan[];
+  /** Class icons, when the page has the asset folder. */
+  icons?: WorkspaceIcons;
+} = {}) {
   const [state, retry] = useWorkspaceOwner();
   const owner = state.status === "ready" ? state.owner : null;
   // The plan the calculator sent, read from the address once, and the owner it was first shown to. It is offered to
@@ -114,13 +124,16 @@ export default function DevicePlans({ trees }: { trees?: PlanTrees } = {}) {
           Who is signed in here changed, so the plan from the calculator was not saved. To keep it, go back to the calculator and press Save on this device again.
         </p>
       )}
-      <Bucket key={bucketKey(state.owner)} owner={state.owner} trees={trees} sent={offered} onSentDone={() => { setSent(null); dropSent(); }} />
+      <Bucket key={bucketKey(state.owner)} owner={state.owner} trees={trees} examples={examples} icons={icons} sent={offered} onSentDone={() => { setSent(null); dropSent(); }} />
     </>
   );
 }
 
-function Bucket({ owner, trees, sent, onSentDone }: { owner: Owner; trees?: PlanTrees; sent: PlanText | null; onSentDone: () => void }) {
+function Bucket({ owner, trees, examples, icons, sent, onSentDone }: {
+  owner: Owner; trees?: PlanTrees; examples: ExamplePlan[]; icons: WorkspaceIcons; sent: PlanText | null; onSentDone: () => void;
+}) {
   const [read, setRead] = useState<ReadResult | null>(null);
+  const [examplesShown, hideExamples] = useExamplesShown("builds");
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<{ text: string; alert: boolean; inUse?: boolean; focus?: boolean } | null>(null);
   // An alert that comes in place of the control pressed (a refused clear, its damaged text since repaired) takes the focus.
@@ -181,18 +194,28 @@ function Bucket({ owner, trees, sent, onSentDone }: { owner: Owner; trees?: Plan
         )}
         {plans.length === 0 ? (
           // EmptyState's meter counts agreeing installs, which a device's own plans have nothing to do with.
-          <Card>
-            <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-6">
-              <p className="min-w-0 flex-1 text-fg-2">No plans on this device yet. Paste a talent link above to keep one here by name.</p>
-              <a href="/tools/talents" className="btn shrink-0">Open the calculator</a>
-            </div>
-          </Card>
+          <div className="space-y-4">
+            <Card>
+              <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-6">
+                <p className="min-w-0 flex-1 text-fg-2">No plans on this device yet. Paste a talent link above to keep one here by name.</p>
+                <a href="/tools/talents" className="btn shrink-0">Open the calculator</a>
+              </div>
+            </Card>
+            {examplesShown && read.workspace.version !== 3 && (
+              <ExamplePlans plans={examples} icons={icons} onHide={hideExamples} onCopy={async () => {
+                const result = await withWorkspaceLock(() => copyExamplePlans(deviceStorage(), owner, examples));
+                after(result.ok ? { ok: true } : result, "Copied the example plans to this device. Edit or delete them like any plan.");
+                return result.ok ? { ok: true } : result;
+              }} />
+            )}
+          </div>
         ) : (
           <ul className="divide-y divide-line border-y border-line">
             {plans.map((plan) => (
               <PlanItem
                 key={plan.id}
                 plan={plan}
+                icons={icons}
                 note={freshnessNote(plan, trees)}
                 onEdit={async (edit) => {
                   const result = await withWorkspaceLock(() => editPlan(deviceStorage(), owner, plan.id, edit));
@@ -216,8 +239,9 @@ function Bucket({ owner, trees, sent, onSentDone }: { owner: Owner; trees?: Plan
   );
 }
 
-function PlanItem({ plan, note, onEdit, onCopy, onDelete, onCopied }: {
+function PlanItem({ plan, icons, note, onEdit, onCopy, onDelete, onCopied }: {
   plan: LocalPlan;
+  icons: WorkspaceIcons;
   /** What changed in its talents since an older game build (savedPlanNote); null when nothing to say. */
   note: string | null;
   /** Null when it saved, else why not. */
@@ -229,10 +253,12 @@ function PlanItem({ plan, note, onEdit, onCopy, onDelete, onCopied }: {
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
   return (
-    <li className="space-y-2 py-4">
+    <li className={`my-2 flex items-start gap-3 py-2 ${classEdge(plan.classSlug)}`}>
+      <ClassIcon slug={plan.classSlug} icons={icons} />
+      <div className="min-w-0 flex-1 space-y-2">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h3 className="min-w-0 font-semibold text-fg [overflow-wrap:anywhere]">{plan.name}</h3>
-        <span className="text-meta text-muted">{className(plan.classSlug)}{madeOn(plan.code) && ` · game build ${madeOn(plan.code)}`} · updated {day(plan.updatedAt)}</span>
+        <span className="text-meta text-muted"><ClassName slug={plan.classSlug} />{madeOn(plan.code) && ` · game build ${madeOn(plan.code)}`} · updated {day(plan.updatedAt)}</span>
       </div>
       {/* The plan stays as it was saved: opening it shows the calculator's report, and nothing here re-stamps it. */}
       {note && <p className="text-sm text-fg-2">{note} <a href={openPath(plan)} className="underline decoration-edge underline-offset-4 hover:text-accent">Open in the current calculator</a></p>}
@@ -250,6 +276,7 @@ function PlanItem({ plan, note, onEdit, onCopy, onDelete, onCopied }: {
         )}
       </div>
       {editing && <EditForm plan={plan} onSave={async (edit) => { const error = await onEdit(edit); if (!error) setEditing(false); return error; }} onCancel={() => setEditing(false)} />}
+      </div>
     </li>
   );
 }

@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/guild_board.json",
   "title": "Guild board its officers published",
-  "description": "One guild's roster, bosses killed, loot awarded, raid attendance and average item level, as that guild's own officers chose to publish them. Only uploads from officers holding a verified grant for the guild count, and a figure is public after 2 of them agree. Names are in-game character names, never accounts or real-world identities. A character's owner can opt out, and an opted-out character is left out of the roster, loot and attendance. A guild whose officers have not published gets an empty board; the tool does not look up other players or guilds. The average names how many roster members were measured; there is no combined score. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.",
+  "description": "One guild's roster, bosses killed, loot awarded, raid attendance and average item level, as that guild's own officers chose to publish them. Only uploads from officers holding a verified grant for the guild count, and a figure is public after 2 of them agree. Names are in-game character names, never accounts or real-world identities. A character's owner can opt out, and an opted-out character is left out of the roster, loot and attendance. A guild whose officers have not published gets an empty board; the tool does not look up other players or guilds. The average names how many roster members were measured; there is no combined score. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false

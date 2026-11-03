@@ -79,3 +79,22 @@ test("with the wiki unreadable, an instance's page still renders, with no prep l
     vi.unstubAllEnvs();
   }
 });
+
+test("the list's Guide column links a published prep page and, for a raid, the raid builder; a draft gets no link", async () => {
+  vi.stubEnv("WIKI_DIR", fileURLToPath(new URL("../../../test/wiki", import.meta.url)));
+  try {
+    const html = renderToStaticMarkup(await InstancesPage());
+    const headers = [...html.matchAll(/<th[^>]*>(.*?)<\/th>/g)].map((m) => text(m[1]!).replace(/\|/g, ""));
+    const col = headers.indexOf("Guide");
+    expect(col).toBeGreaterThan(-1);
+    expect(cells(html, "/database/instances/409-molten-core")[col]).toContain("Raid builder");
+    const row = (href: string) => html.split("<tr").find((r) => r.includes(`href="${href}"`)) ?? "";
+    expect(row("/database/instances/409-molten-core")).toContain('href="/tools/raid"');
+    expect(row("/database/instances/389-ragefire-chasm")).not.toContain('href="/tools/raid"');
+    // The published fixture binds the Deadmines; the draft fixture binds Ragefire Chasm.
+    expect(row("/database/instances/36-deadmines")).toContain('href="/wiki/test-dungeon"');
+    expect(row("/database/instances/389-ragefire-chasm")).not.toContain("/wiki/");
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});

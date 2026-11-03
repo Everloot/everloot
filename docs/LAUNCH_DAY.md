@@ -5,7 +5,7 @@ sentence, kept in `web/src/data/wow-forever.ts` as `LAUNCH` and `LAUNCH_AT`; las
 below are relative to that hour, "L".
 
 This page is the order of work, not the detail. Each step points at the document that holds the detail.
-It was written on 2026-10-23 from what is in the repository and refreshed on 2026-10-31 (addon 0.3.14 Alpha, Desktop App 0.1.10, build 70707 and production receipts). A step marked **[unverified]** has no tested
+It was written on 2026-10-23 from what is in the repository and refreshed on 2026-11-02 (addon 0.3.15 Alpha, Desktop App 0.1.14, build 70707 and production receipts). A step marked **[unverified]** has no tested
 procedure behind it yet; the list of those is at the end.
 
 Two rules for this page and for anything done from it:
@@ -17,6 +17,10 @@ Two rules for this page and for anything done from it:
 - The build watch never merges. Maintainer-authorized changes still use protected pull requests and the checked deployment workflow. The Live switch stays draft until players can play; a scheduled preflight does not authorize an early switch.
 
 Owners: **Carlos** supplies account sign-in and real game observations. **Agent** handles repository work, public checks and already-authorized account operations. Keep separately owned authentication activation out of the launch switch.
+
+The [ChatGPT readiness check](2026-11-02-chatgpt-launch-readiness.md) records directory publication, the remaining
+guild-tool review, the public tool-contract command, traffic baseline and quota decision. Recheck its in-app
+prompt table before launch and at T+1 hour. Endpoint tests alone do not establish ChatGPT answer quality.
 
 ## What changes at launch
 
@@ -107,6 +111,23 @@ No migration is part of the switch.
 | 31 | Carlos | Decide what waits for Live data: the six-weapon check result into `CHECKED_WEAPONS`; the recheck scopes in `kb/curated/recheck.json` that the build watch added for moved zones; directory listings that still carry the old MCP tool count. | A list with owners. | n/a |
 | 32 | Agent | Write the closeout: what ran, what was observed, what was skipped. No numbers that were not measured. | In the repository's closeout convention (`docs/2026-10-2x-lane-...-closeout.md`). | n/a |
 
+## Filling the realm map
+
+Blizzard has not named Forever's realms, so until launch every realm is in one "forever" view: the
+Auction House's ruleset tabs say "No realm is mapped to PvP yet". The map is one file,
+`web/src/data/realms.ts` (`REALMS`), and it groups Auction House prices only.
+
+| # | Owner | Step | Check and expected result | If it fails |
+|---|---|---|---|---|
+| R1 | Carlos | Once the realm list is up in game, write down each realm's name exactly as the list spells it, its ruleset (Normal, PvP, Roleplaying, RP-PvP, later Hardcore) and its region. Only what the list shows; a realm not seen stays out. | A list of realm, ruleset, region from the game. | Leave the map empty; the site keeps the one view. |
+| R2 | Agent | Add one line per realm to `REALMS`: `{ name: "Mal'Ganis", ruleset: "pvp", region: "us" }`. The rulesets are `normal`, `pvp`, `rp`, `rp-pvp`, `hardcore`. Open it as its own pull request, `data(web): map Forever's realms to their rulesets`. | `cd web && npx vitest run src/lib/realms src/app/tools/auctions src/lib/player-store.test.ts src/lib/player-pages.test.ts && npm run typecheck` pass; `src/lib/realms.test.ts` fails on a realm listed twice under two spellings. | Fix the line the test names. |
+| R3 | Agent | After the deploy, open `/tools/auctions` and each ruleset tab. | Each tab lists only its realms; a mapped ruleset with no scans says "No public prices on PvP realms yet"; "Realms not mapped yet" holds only realms the list did not have. The plain URLs (`/tools/auctions/<realm>`, `/tools/auctions/item/<id>`) answer as before. | Revert the map pull request; the site goes back to one view. |
+
+Character, player, guild and character-link addresses stay on `forever` after mapping
+(`rulesetOf` in `web/src/lib/player-pages.ts`). Their stored rows are keyed on the ruleset, so moving them
+to `/players/pvp/...` needs its own pull request: a migration that rewrites the stored rows and keeps the
+old addresses answering. Mapping the realms does not wait for it.
+
 ## Smoke list
 
 Run `python scripts/launch_smoke.py` from the repository root (add `--after-switch` once the switch is
@@ -135,7 +156,7 @@ Later that day the talent build and raid plan link preview cards were added (20 
 
 The same ones CI runs (`.github/workflows/checks.yml`): `python scripts/check_md_links.py`,
 `python scripts/check_internal_paths.py`, `python scripts/check_dco.py origin/main HEAD`,
-`python scripts/check_no_ai_credit.py origin/main HEAD`, and `PR_TITLE="..." python scripts/check_pr_title.py`.
+and `PR_TITLE="..." python scripts/check_pr_title.py`.
 For code: `cd kb && npm test -- --maxWorkers=2 && npm run typecheck`; `cd web && npm test && npm run typecheck
 && npm run lint && npm run build`; the addon tests listed in `docs/2026-10-08-release-checklist.md`.
 
@@ -147,6 +168,14 @@ For code: `cd kb && npm test -- --maxWorkers=2 && npm run typecheck`; `cd web &&
 - Build-watch test generation (#586) removed the manual build-pinned test edits. The 70707 update (#582)
   merged after retaining those generated-build tests.
 - Search Console and Bing report Success for all submitted sitemaps. This proves receipt, not indexing.
+
+## Release state added 2026-11-01
+
+- The Worker serves the knowledge release from D1 `everloot-knowledge-2026-11-01` (`KNOWLEDGE_RELEASE_SHA256`
+  `6bcd2797…`), deployed with #658. Rollback: revert #658 to point back at `everloot-knowledge-2026-10-24`,
+  which is kept in D1, then run the checked deployment.
+- The public smoke list (`scripts/launch_smoke.py`) has 20 checks, adding `/addon`, `/upload` and the talent
+  build and raid plan card checks to the 16 of 2026-10-31.
 
 ## Remaining observations and launch gates
 

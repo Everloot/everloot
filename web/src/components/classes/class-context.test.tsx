@@ -13,6 +13,7 @@ vi.mock("next/navigation", async () => {
   const subscribe = (fn: () => void) => { window.addEventListener("popstate", fn); return () => window.removeEventListener("popstate", fn); };
   return {
     notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
+    redirect: (to: string) => { throw new Error(`NEXT_REDIRECT ${to}`); },
     useSearchParams: () => new URLSearchParams(useSyncExternalStore(subscribe, () => window.location.search, () => window.location.search)),
     usePathname: () => window.location.pathname,
   };
@@ -54,8 +55,10 @@ import RaidLinkPage from "@/app/tools/raid/r/[code]/page";
 import { CURRENT_BUILD } from "@/data/game-data/raid";
 import { emptySlots, encodeRaid } from "@/lib/raid";
 import ProfessionsPage from "@/app/tools/professions/page";
+import ProfessionPage from "@/app/tools/professions/[profession]/page";
 import { CLASS_CONTEXT_SLOT, type ClassContext, type ContextRead } from "@/lib/class-context";
 import { loadCatalog } from "@/lib/talents/catalogs";
+import { CLIENT_CLASS_SPELLS } from "@/data/game-data/client-class-spells";
 
 const full: ClassContext = { classSlug: "mage", level: 25, role: "damage" };
 const read = (context: ClassContext | null): ContextRead => ({ ok: true, context });
@@ -264,38 +267,50 @@ describe("on the raid planner, a page built once", () => {
 
 describe("the spell list", () => {
   const BANDAGE = 3275;
-  /** Names for three spells of the Mage talent catalog and one no talent has. */
+  // Fireball is on a Mage skill line and Heroic Strike on a Warrior one (data/game-data/client-class-spells.json).
+  const FIREBALL = 133, HEROIC_STRIKE = 78;
+  /** Names for three Mage talent catalog spells no Mage skill line lists, Fireball, Heroic Strike and a bandage no class has. */
   async function names(): Promise<number[]> {
-    const ids = [...new Set((await loadCatalog("mage")).nodes.flatMap((n) => n.entries.map((e) => e.spellId)).filter((id): id is number => id !== null))].slice(0, 3);
+    const lines = new Set(CLIENT_CLASS_SPELLS.classes.mage.spells);
+    const ids = [...new Set((await loadCatalog("mage")).nodes.flatMap((n) => n.entries.map((e) => e.spellId)).filter((id): id is number => id !== null && !lines.has(id)))].slice(0, 3);
     expect(ids).toHaveLength(3);
-    expect(ids).not.toContain(BANDAGE);
-    files.spells = { version: "1.60.1.70630", names: new Map([...ids.map((id, i): [number, string] => [id, `Talent spell ${i}`]), [BANDAGE, "Linen Bandage"]]) };
+    expect(lines.has(FIREBALL)).toBe(true);
+    expect(CLIENT_CLASS_SPELLS.classes.warrior.spells).toContain(HEROIC_STRIKE);
+    expect(Object.values(CLIENT_CLASS_SPELLS.classes).some((c) => c.spells.includes(BANDAGE))).toBe(false);
+    files.spells = { version: "1.60.1.70630", names: new Map([...ids.map((id, i): [number, string] => [id, `Talent spell ${i}`]), [FIREBALL, "Fireball"], [HEROIC_STRIKE, "Heroic Strike"], [BANDAGE, "Linen Bandage"]]) };
     return ids;
   }
   const spells = async (search: Record<string, string> = {}) => renderToStaticMarkup(await SpellListPage({ searchParams: Promise.resolve(search) }));
   const rows = (html: string) => html.slice(html.indexOf("<tbody"), html.indexOf("</tbody>"));
+  const chip = (html: string) => new DOMParser().parseFromString(html, "text/html").querySelector("[data-class-context]")!;
 
-  test("a class narrows the list to the spells in its talent catalog, named as exactly that subset", async () => {
+  test("a class keeps its own spells, from its skill lines and its talent catalog, and drops another class's and general spells", async () => {
     const ids = await names();
     const page = await spells({ class: "mage" });
-    for (const id of ids) expect(page).toContain(`href="/database/spells/${id}"`);
+    for (const id of [...ids, FIREBALL]) expect(page).toContain(`href="/database/spells/${id}"`);
+    // Heroic Strike is the Warrior's; a bandage is no class's, so a class leaves it out.
+    expect(page).not.toContain(`href="/database/spells/${HEROIC_STRIKE}"`);
     expect(page).not.toContain(`href="/database/spells/${BANDAGE}"`);
-    expect(visible(page)).toContain("Spells in the Mage talent catalog only, not every Mage spell.");
-    expect(page).toContain(`Spells in the Mage talent catalog: ${ids.length}`);
+    expect(page).toContain(`Mage spells in the game files: ${ids.length + 1}`);
+    const warrior = await spells({ class: "warrior" });
+    expect(warrior).toContain(`href="/database/spells/${HEROIC_STRIKE}"`);
+    expect(warrior).not.toContain(`href="/database/spells/${FIREBALL}"`);
     const all = await spells();
-    expect(all).toContain(`href="/database/spells/${BANDAGE}"`);
+    for (const id of [FIREBALL, HEROIC_STRIKE, BANDAGE]) expect(all).toContain(`href="/database/spells/${id}"`);
     expect(all).not.toContain("data-class-context");
   });
 
-  test("the talent catalog subset carries the quiet unconfirmed marker beside its explanation", async () => {
-    await names();
-    const chip = (html: string) => new DOMParser().parseFromString(html, "text/html").querySelector("[data-class-context]")!;
-    const subset = chip(await spells({ class: "mage" }));
-    expect(subset.textContent).toContain("Spells in the Mage talent catalog only, not every Mage spell.");
-    expect(subset.querySelector('[data-badge="files"]')?.getAttribute("title")).toBe("From the game files, not yet confirmed by players");
-    // Listing every spell because the catalog could not be read is no catalog fact, and carries no marker.
-    files.withdrawn = true;
-    expect(chip(await spells({ class: "mage" })).querySelector('[data-badge="files"]')).toBeNull();
+  test("the chip says the class context is on, carries the unconfirmed marker and counts what it kept", async () => {
+    const ids = await names();
+    const on = chip(await spells({ class: "mage" }));
+    expect(on.textContent).toContain(`Only Mage spells: the ones on the class's own skill lines and in its talent catalog, found in game files, unconfirmed. ${ids.length + 1} spells kept; spells no class names (items, professions, riding) are left out.`);
+    expect(on.querySelector('[data-badge="files"]')?.getAttribute("title")).toBe("From the game files, not yet confirmed by players");
+    expect(on.querySelector('a[href="/database/spells"]')?.textContent).toContain("Remove Mage");
+    // The count is the class's spells, not what a name search leaves.
+    expect(chip(await spells({ class: "mage", q: "fireball" })).textContent).toContain(`${ids.length + 1} spells kept`);
+    files.spells = { version: "1.60.1.70630", names: new Map([[FIREBALL, "Fireball"], [BANDAGE, "Linen Bandage"]]) };
+    files.emptyCatalog = true;
+    expect(chip(await spells({ class: "mage" })).textContent).toContain("1 spell kept;");
   });
 
   test("a remembered class used from a later page opens the first page of its subset, not a page the subset lacks", async () => {
@@ -305,7 +320,7 @@ describe("the spell list", () => {
     localStorage.setItem(CLASS_CONTEXT_SLOT, JSON.stringify(full));
     await mount(<ClassContextChip read={read(null)} here="/database/spells?sort=name&page=3" />);
     const target = new URL(anchor("Use it")!.getAttribute("href")!, "https://everloot.app");
-    expect(await spells(Object.fromEntries(target.searchParams))).toContain(`Spells in the Mage talent catalog: ${catalog.length}`);
+    expect(await spells(Object.fromEntries(target.searchParams))).toContain(`Mage spells in the game files: ${catalog.length}`);
   });
 
   test("the list's own links and name box keep the context; taking it off keeps the name search and the sort", async () => {
@@ -317,36 +332,35 @@ describe("the spell list", () => {
     expect(page).toMatch(/<input[^>]*name="level"[^>]*value="25"/);
   });
 
-  test("a level or a role narrows nothing: the spells are the same for every level and role", async () => {
+  test("a level or a role narrows nothing: the spells are the same for every level and role, and the chip says so", async () => {
     await names();
     const base = rows(await spells({ class: "mage" }));
     for (const search of [{ class: "mage", role: "tank" }, { class: "mage", role: "damage", level: "10" }, { class: "mage", level: "60" }] as Record<string, string>[]) {
       expect(rows(await spells(search)), JSON.stringify(search)).toBe(base);
     }
+    expect(chip(await spells({ class: "mage", role: "damage", level: "10" })).textContent).toContain("The level and role do not change the list.");
+    expect(chip(await spells({ class: "mage" })).textContent).not.toContain("change the list");
   });
 
-  test("a withdrawn talent catalog falls back to every spell and says so", async () => {
-    await names();
+  test("a withdrawn talent catalog leaves the skill lines to narrow by and says so", async () => {
+    const ids = await names();
     files.withdrawn = true;
     const page = await spells({ class: "mage" });
-    expect(page).toContain(`href="/database/spells/${BANDAGE}"`);
-    expect(visible(page)).toContain("The Mage talent catalog could not be read, so every spell is listed.");
-    expect(visible(page)).not.toContain("not every Mage spell");
+    expect(page).toContain(`href="/database/spells/${FIREBALL}"`);
+    for (const id of [...ids, BANDAGE, HEROIC_STRIKE]) expect(page).not.toContain(`href="/database/spells/${id}"`);
+    expect(visible(page)).toContain("The Mage talent catalog could not be read, so only the skill lines count.");
+    expect(chip(page).querySelector('[data-badge="files"]')).not.toBeNull();
   });
 
-  test("a talent catalog that reads but has no listed spell says so and lists no other spell", async () => {
+  test("a class none of whose spells the list names says so and lists no other spell", async () => {
     await names();
     files.emptyCatalog = true;
+    files.spells = { version: "1.60.1.70630", names: new Map([[HEROIC_STRIKE, "Heroic Strike"], [BANDAGE, "Linen Bandage"]]) };
     const empty = await spells({ class: "mage" });
-    expect(empty).not.toContain(`href="/database/spells/${BANDAGE}"`);
-    expect(visible(empty)).toContain("No spells from the Mage talent catalog are listed here.");
+    expect(rows(empty)).not.toContain("/database/spells/");
+    expect(visible(empty)).toContain("No Mage spells are listed here.");
+    expect(visible(empty)).toContain("0 spells kept");
     expect(visible(empty)).not.toContain("could not be read");
-    // A catalog whose spells the list does not name reads the same way.
-    files.emptyCatalog = false;
-    files.spells = { version: "1.60.1.70630", names: new Map([[BANDAGE, "Linen Bandage"]]) };
-    const unnamed = await spells({ class: "mage" });
-    expect(unnamed).not.toContain(`href="/database/spells/${BANDAGE}"`);
-    expect(visible(unnamed)).toContain("No spells from the Mage talent catalog are listed here.");
   });
 
   test("a class the page cannot read narrows nothing, says why, and is not a 404", async () => {
@@ -369,21 +383,25 @@ describe("the spell list", () => {
 });
 
 describe("the profession hubs", () => {
-  const page = async (search: Record<string, string>) => renderToStaticMarkup(await ProfessionsPage({ searchParams: Promise.resolve(search) }));
+  const hub = async (search: Record<string, string>) => renderToStaticMarkup(await ProfessionsPage({ searchParams: Promise.resolve(search) }));
+  const page = async (search: Record<string, string>) =>
+    renderToStaticMarkup(await ProfessionPage({ params: Promise.resolve({ profession: "tailoring" }), searchParams: Promise.resolve(search) }));
 
-  test("a class context is a chip and nothing more: the paths are the same, and the page's links and form keep it", async () => {
-    files.professions = [{ key: "Tailoring", name: "Tailoring", icon: "https://assets.test/tailoring.png" }, { key: "Alchemy", name: "Alchemy", icon: "https://assets.test/alchemy.png" }];
-    const withContext = await page({ profession: "Tailoring", from: "1", to: "75", class: "mage", level: "25" });
-    const plain = await page({ profession: "Tailoring", from: "1", to: "75" });
+  test("a class context is a chip and nothing more: the paths are the same, and the pages' links and form keep it", async () => {
+    const withContext = await page({ from: "1", to: "75", class: "mage", level: "25" });
+    const plain = await page({ from: "1", to: "75" });
     expect(withContext).toContain('href="/classes/mage?level=25"');
-    // The cross keeps the profession and the skill range.
-    expect(withContext).toContain('href="/tools/professions?profession=Tailoring&amp;from=1&amp;to=75"');
+    // The cross keeps the skill range.
+    expect(withContext).toContain('href="/tools/professions/tailoring?from=1&amp;to=75"');
     // The profession picker and the form carry the context on.
-    expect(withContext).toContain('href="/tools/professions?profession=Alchemy&amp;from=1&amp;to=75&amp;class=mage&amp;level=25"');
+    expect(withContext).toContain('href="/tools/professions/alchemy?class=mage&amp;level=25"');
     expect(withContext).toMatch(/<input[^>]*name="class"[^>]*value="mage"/);
     expect(withContext).toMatch(/<input[^>]*name="level"[^>]*value="25"/);
     // Nothing else says anything about the class: no skill-up claim for a Mage.
     expect(visible(withContext, "[data-class-context]")).toBe(visible(plain));
     expect(plain).not.toContain("data-class-context");
+    // The hub's cards keep it, and the old form's address goes to the profession's page with it.
+    expect(await hub({ class: "mage", level: "25" })).toContain('href="/tools/professions/alchemy?class=mage&amp;level=25"');
+    await expect(hub({ profession: "Tailoring", class: "mage", level: "25" })).rejects.toThrow("NEXT_REDIRECT /tools/professions/tailoring?class=mage&level=25");
   });
 });

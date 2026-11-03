@@ -11,6 +11,7 @@ vi.mock("./CookieConsent", () => ({ CookiePreferencesButton: () => <button type=
 
 import Footer from "./Footer";
 import { NON_AFFILIATION, TRADEMARK_LINE } from "@/lib/jsonld";
+import { LAUNCH_AT } from "@/data/wow-forever";
 
 afterEach(() => { vi.unstubAllEnvs(); });
 
@@ -21,6 +22,11 @@ test("links the four verified social profiles on desktop and mobile", () => {
   for (const href of ["https://x.com/WowEverloot", "https://www.facebook.com/WowEverloot", "https://www.instagram.com/woweverloot/", "https://www.pinterest.com/woweverloot/"]) {
     expect(markup.split(`href="${href}"`).length - 1, href).toBe(2);
   }
+});
+test("the group links are at least 24 pixels wide, so the one-letter X link is tappable", () => {
+  const links = html().match(/<a [^>]*>X<\/a>/g) ?? [];
+  expect(links.length).toBeGreaterThan(0);
+  for (const link of links) expect(link).toContain("min-w-6");
 });
 const text = () => html().replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ");
 
@@ -120,9 +126,14 @@ test("Glint perches on the footer's edge as a labelled button, his drawing hidde
   expect(markup).toMatch(/data-footer-glint[\s\S]*aria-live="polite"/);
 });
 
-test("says when the beta ends and when the game launches", () => {
-  const t = text();
-  // The beta's last day has passed, so the sentence is in the past; the launch is still ahead.
-  expect(t).toContain("The beta ran until October 23, 2026");
-  expect(t).toContain("the game launches November 4, 2026");
+test("says when the beta ended and when the game launches, and from the launch instant that it launched", () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  try {
+    vi.setSystemTime(new Date(Date.parse(LAUNCH_AT) - 1));
+    expect(text()).toContain("The beta ran until October 23, 2026, and the game launches November 4, 2026.");
+    vi.setSystemTime(new Date(LAUNCH_AT));
+    expect(text()).toContain("The beta ran until October 23, 2026, and the game launched on November 4, 2026.");
+  } finally {
+    vi.useRealTimers();
+  }
 });

@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/answer_sources.json",
   "title": "Evidence for a question, each piece with its source",
-  "description": "The evidence behind a question about WoW: Forever, for an answer that cites its sources: facts players observed (public after three installs agree, with the install count), curated facts, and the 2023 Warcraft Wiki (marked: may differ in Forever). Every piece carries a claim, its source URL, licence and date. Returns evidence rather than prose. Further-reading links are search URLs on other sites; nothing is fetched from them. Reads Everloot's current authorized public corpus when connected; when it is not, the observed layer is unrecorded, not empty.",
+  "description": "The evidence behind a question about WoW: Forever, for an answer that cites its sources: facts players observed (public after three installs agree, with the install count), curated facts, and the 2023 Warcraft Wiki (marked: may differ in Forever). Every piece carries a claim, its source URL, licence and date. Returns evidence rather than prose. Further-reading links are search URLs on other sites; nothing is fetched from them. Reads Everloot's public player data when connected; when it is not, the observed layer is unrecorded, not empty.",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false

@@ -291,26 +291,49 @@ test("the profession menu leaves out a development profession unless the leftove
 
 const rows = (page: string) => page.slice(page.indexOf("<tbody"), page.indexOf("</tbody>"));
 
-test("a class context is a chip, never an item filter: the rows are the same for every class and role, and nothing is called best", async () => {
+test("a class context narrows the list to what the class can use by the game files, labelled, and nothing is called best", async () => {
   const plain = await html(SubclassPage(sub("armor", "cloth")));
   const mage = await html(SubclassPage(sub("armor", "cloth", { class: "mage", level: "25", role: "damage" })));
-  const warrior = await html(SubclassPage(sub("armor", "cloth", { class: "warrior", role: "tank" })));
+  // Every class has cloth, so the cloth list keeps its rows.
   expect(rows(plain).match(/<tr /g)?.length).toBeGreaterThan(0);
   expect(rows(mage)).toBe(rows(plain));
-  expect(rows(warrior)).toBe(rows(plain));
   expect(mage).toContain('href="/classes/mage?level=25&amp;role=damage"');
-  // Which items a class can use is not proven by any source we read, so the list says it is not narrowed.
-  expect(mage).toContain("The list is the same for every class and role: which items a class can use is not in our data yet.");
-  expect(await html(SubclassPage(sub("armor", "cloth", { class: "mage" })))).toContain("The list is the same for every class: which items a class can use is not in our data yet.");
-  for (const page of [mage, warrior]) expect(page).not.toMatch(/best in slot|\bBiS\b|best for|recommended/i);
+  expect(mage).toContain("Only items a Mage can use by level 25: weapon and armor types from the class&#x27;s proficiencies and each item&#x27;s class restriction, found in game files, unconfirmed.");
+  expect(mage).toContain("The role does not change the list.");
+  // Plate is a page of its own: a Mage has none of it, at any level.
+  const plate = await html(SubclassPage(sub("armor", "plate", { class: "mage" })));
+  expect(plate).toContain("No items in this category a Mage can use.");
+  expect(plate).toContain("Only items a Mage can use: ");
+  for (const page of [mage, plate]) expect(page).not.toMatch(/best in slot|\bBiS\b|best for|recommended/i);
   expect(plain).not.toContain("data-class-context");
+});
+
+test("plate shows for a Warrior from level 40, and the chip's cross takes the narrowing off", async () => {
+  const at39 = await html(SubclassPage(sub("armor", "plate", { class: "warrior", level: "39" })));
+  const at40 = await html(SubclassPage(sub("armor", "plate", { class: "warrior", level: "40" })));
+  expect(at39).toContain("No items in this category a Warrior can use by level 39.");
+  expect(rows(at40).match(/<tr /g)?.length).toBeGreaterThan(0);
+  expect(at39).toContain('href="/database/items/armor/plate"');
+});
+
+test("the all-items list for a Mage counts fewer items, keeps cloth and wands, and says how many the files do not decide", async () => {
+  const page = await html(items({ class: "mage" }));
+  const total = Number(/>([\d,]+)<\/span> items/.exec(page)![1].replace(/,/g, ""));
+  expect(total).toBeGreaterThan(0);
+  expect(total).toBeLessThan(CLIENT_TAXONOMY.items.length);
+  expect(page).toMatch(/[\d,]+ items the files do not decide for a class \(rings, relics, items with no class data\) are kept\./);
+  // The class menu counts what the narrowed list holds.
+  expect(page).toContain(`>${total.toLocaleString("en-US")}</span>`);
+  const wands = await html(SubclassPage(sub("weapons", "wands", { class: "mage" })));
+  expect(rows(wands).match(/<tr /g)?.length).toBeGreaterThan(0);
+  const shields = await html(SubclassPage(sub("armor", "shields", { class: "mage" })));
+  expect(shields).toContain("No items in this category a Mage can use.");
 });
 
 test("a level offers the required-level filter, on the levels items show; the context never sets it by itself", async () => {
   const page = await html(items({ class: "mage", level: "25" }));
   expect(page).toContain('href="/database/items?req=1-25&amp;class=mage&amp;level=25"');
   expect(page).toContain("Filter to required level 25 or lower");
-  expect(page).toContain(`>${CLIENT_TAXONOMY.items.length.toLocaleString("en-US")}</span> items`);
   // A required level already chosen is kept, and none is offered over it.
   const chosen = await html(items({ req: "11-20", class: "mage", level: "25" }));
   expect(chosen).not.toContain("Filter to required level");

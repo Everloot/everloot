@@ -16,7 +16,8 @@ anonymous open-world events, and census rows if you allowed the census on its se
 command-line uploader sends only the anonymous events. Neither sends named data (guild, gear, gold,
 collection) or the installed addon list: those stay on your machine. Player rows are a third case:
 the Desktop App sends them only if you turn on "Send the player pages with the uploads" in its
-settings, and until you do, they stay on your machine like the named data.
+settings, and until you do, they stay on your machine like the named data. Boss pull summaries
+(below) are a fourth: the Desktop App sends them, and the command-line uploader does not.
 
 Recipe observations can include the profession API's recipe identifier and whether that recipe is learned,
 when the client supplies those values. They remain anonymous profession observations, not a linked
@@ -89,6 +90,28 @@ already public on its own page, grouped by the guild the game showed, and the pa
 the game's member list. Anyone can hide a guild with the guild hide form, without an account or proof of office:
 the guild leaves the pages, the ladder, the search and the export at once, and its kill rows are dropped at
 intake from then on. Its characters keep their own pages, which the character hide form governs.
+
+**Boss pulls and runs.** Inside dungeons and raids the addon records how long each boss pull took, kill or wipe
+(`startedAt`, `durationSeconds` and `runId` on the `encounter` row), and each run (`instance_run`): when you
+entered and left, the first pull, the last kill, how many pulls, kills and wipes, and which bosses died. No names.
+Both are on with the World switch. Runs are stored with the upload and not published yet: they wait for a rollup
+with its own agreement rule.
+
+**Group numbers in boss pulls.** After each boss pull the addon also records one `pull_summary` row: the boss, kill
+or wipe and how long it took, and each member of your group by name and realm, with their class, their role and
+the damage done, healing done, damage taken and deaths the game's own damage meter (`C_DamageMeter`) showed. The
+role is the group role the game shows (`assigned`) or, without one, a guess from healing and damage (`inferred`:
+healer or damage, never tank). It never reads their gear, talents, guild, position or chat. Whoever uploads sends
+the whole group's numbers, and the protection is per character: anyone can hide a character with the character
+hide form, without an account. A hidden character is deleted from every stored pull at once and left out of every
+later upload, and a pull left with no member is deleted. The module is on in the addon, which says so once in
+chat; `/everloot pulls off` stops it and deletes the rows from the file. The rows leave the computer from the
+upload page, after a preview that counts them and says what they hold, or from the Desktop App; the command-line
+uploader never sends them. The site stores them in their own tables, never in the upload object or the public
+corpus, keeps each one for a year after it was received, and shows them nowhere: not on a page, in the corpus
+API, the open data export or the MCP tools. Any later display waits on a published policy for showing players and
+leaves hidden characters out. Nothing is collected until both the addon release that carries it and the site's
+switch for it are on.
 
 The addon also reads a few game facts about the NPC you target and the quest you accept, as the game
 shows them to you. For an NPC: its creature type (Beast, Undead, Humanoid) and its rank (normal, elite,
@@ -437,9 +460,9 @@ prerequisites, spend gates, the cost and the cap, with spell ids, perk names and
 icons or tooltip text. Like the talent catalog it may be committed to the git repository as a clearly marked game-data
 file (`web/src/data/game-data/legacy-perks.json`, see [LEGACY_PERKS](LEGACY_PERKS.md)), labelled *found in game
 files, unconfirmed*: it is Blizzard's data, kept apart from our CC BY-SA data and outside our licence. Each rule says
-how it was read, and a rule the files do not settle has no value. No page shows it and no planner uses it: a Legacy
-planner waits until the cost, the cap and the spend gates it would enforce are confirmed in game or by Blizzard. It is
-not in the dataset, the API or the MCP server.
+how it was read, and a rule the files do not settle has no value. Decided 2026-11-02 by Carlos: a read-only page,
+`/tools/legacy`, lists it. No planner uses it: a Legacy planner waits until the cost, the cap and the spend gates it
+would enforce are confirmed in game or by Blizzard. It is not in the dataset, the API or the MCP server.
 
 **The map layer.** From the map tables we publish zone rectangles (`UiMapAssignment`), continents
 and instances (`Map`, `UiMap`), dungeon and raid entrance points (`Map.Corpse`) and, for each entrance

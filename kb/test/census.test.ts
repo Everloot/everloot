@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { expect, test } from "vitest";
 import {
   CENSUS_CLASSES, CENSUS_LAUNCH, CENSUS_MIN_CHARACTERS, CENSUS_MIN_INSTALLS, CENSUS_MIN_REPORTERS, CENSUS_RACES, CENSUS_ROUND_TO, FACTIONS, LEVEL_BANDS,
-  censusFromRows, roundCount, rollupCensus, type CensusCount, type CensusRow, type CensusView, type CensusWindow,
+  censusFromRows, roundCount, rollupCensus, type CensusCount, type CensusRow, type CensusView, type CensusWindow, type Faction,
 } from "../src/census.js";
 
 /** When the corpus was current: a Monday, twelve days after launch. */
@@ -234,6 +234,44 @@ test("a lone hidden cell in the race and class grid takes cells with it in its r
   const priestColumn = w.raceClass.filter((c) => c.class === "PRIEST");
   expect(gnomeRow.filter((c) => c.count === null).length).toBeGreaterThanOrEqual(2);
   expect(priestColumn.filter((c) => c.count === null).length).toBeGreaterThanOrEqual(2);
+});
+
+test("no level cross is published: with them, one hidden level-1 Undead Priest could be bounded below 10 (PR #699 review)", () => {
+  // Twelve groups of ten and one Undead Priest at level 1. Faction, race and class by level band, each
+  // suppressed sum by sum, let the Undead and Warlock totals, the Undead Warlocks and their shown bands
+  // bound the hidden Undead at 1-9 to at most 6. Until suppression checks constraints across tables, the
+  // census publishes level bands on their own only.
+  const groups: [Faction, string, string, number][] = [
+    ["Horde", "Orc", "ROGUE", 40], ["Horde", "Tauren", "DRUID", 10], ["Horde", "Tauren", "WARRIOR", 60], ["Horde", "Troll", "MAGE", 50],
+    ["Horde", "Scourge", "PALADIN", 40], ["Horde", "Scourge", "PRIEST", 50], ["Horde", "Scourge", "ROGUE", 60], ["Horde", "Scourge", "WARLOCK", 10],
+    ["Horde", "Scourge", "WARLOCK", 30], ["Alliance", "Gnome", "WARLOCK", 20], ["Alliance", "NightElf", "DRUID", 30], ["Alliance", "NightElf", "ROGUE", 20],
+  ];
+  const rows = groups.flatMap(([faction, race, cls, level], k) => crowd(10, `p${k.toString(16)}`, { faction, race, class: cls, level }));
+  rows.push(row({ installId: INSTALLS[0], characterKey: "p-hidden-one", faction: "Horde", race: "Scourge", class: "PRIEST", level: 1 }));
+  const view = census(rows);
+  for (const w of [view.windows.week, view.windows.launch]) {
+    expect(Object.keys(w).sort()).toEqual(["bias", "characters", "classes", "collecting", "factions", "from", "id", "installs", "levels", "raceClass", "races", "to"]);
+  }
+  expect(JSON.stringify(view)).not.toMatch(/factionLevels|raceLevels|classLevels/);
+  const w = view.windows.week;
+  const shown = <T extends { count: CensusCount }>(cells: T[], key: (c: T) => string) =>
+    Object.fromEntries(cells.filter((c) => c.count !== null).map((c) => [key(c), c.count]));
+  expect({
+    characters: w.characters, bias: w.bias,
+    factions: shown(w.factions, (c) => c.faction),
+    races: shown(w.races, (c) => `${c.faction}/${c.race}`),
+    classes: shown(w.classes, (c) => c.class),
+    raceClass: shown(w.raceClass, (c) => `${c.faction}/${c.race}/${c.class}`),
+    levels: shown(w.levels, (c) => c.band),
+  }).toEqual({
+    // The tables as main publishes them: the Undead Priest cell and the two lowest bands stay hidden.
+    characters: 120, bias: { own: null, seen: null },
+    factions: { Alliance: 30, Horde: 90 },
+    races: { "Alliance/NightElf": 20, "Horde/Scourge": 50, "Horde/Tauren": 20, "Horde/Troll": 10 },
+    classes: { DRUID: 20, PALADIN: 10, PRIEST: 10, ROGUE: 30, WARLOCK: 30, WARRIOR: 10 },
+    raceClass: { "Alliance/NightElf/ROGUE": 10, "Horde/Scourge/ROGUE": 10, "Horde/Scourge/WARLOCK": 20 },
+    levels: { "20-29": 20, "30-39": 20, "40-49": 20, "50-59": 20, "60": 20 },
+  });
 });
 
 /** Every published sum in a window: its margin (null for the total) and its parts. */

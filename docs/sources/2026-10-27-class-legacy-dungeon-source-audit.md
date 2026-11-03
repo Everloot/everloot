@@ -181,6 +181,11 @@ Missing: which item classes and subclasses a skill line or proficiency spell all
 names to item subclass names would be a guess and is not done. **Partial**: a "usable by this class" filter waits
 for a wave that reads `SpellEquippedItems`.
 
+Update 2026-11-01 (build 1.60.1.70707): `SpellEquippedItems` is read. `kb/src/client-class-gear.ts` joins skill line →
+proficiency spell (a `SpellEffect` of type 60, so Parry and Block, which only ask for a weapon, stay out) → item class
+and subclass, with `MinLevel` and `ItemSparse.AllowableClass`, no name matching. The item list narrows to it under a
+class context, labelled unconfirmed; types no proficiency names, and items with no class data, are kept.
+
 ## Trainer spells
 
 - **In the files.** Each class has 3 or 4 class-only skill lines (category 7). The readable rows of
@@ -194,6 +199,12 @@ for a wave that reads `SpellEquippedItems`.
 - **Verdict.** Partial for "class spells with the level the files give, found in game files, unconfirmed"; blocked
   for a trainer list. A trainer list needs a reviewed capture of class trainer windows (an addon change and a data
   policy decision), not another table.
+
+Update 2026-11-01 (build 1.60.1.70707): `kb/src/client-class-spells.ts` writes each class's spells on its category 7
+skill lines (`SkillLineAbility` with its `ClassMask`, `SkillRaceClassInfo` for the line's classes; 322 to 578 per
+class). Mounts, Companions, Engraving and Runes are category 7 lines every class has: a spell on them counts only when
+its own mask names a class. The spell list narrows to these and the talent catalog's spells under a class context,
+labelled unconfirmed; a spell on no class line is left out. No learn level, no trainer.
 
 ## Boss names and NPC identity
 

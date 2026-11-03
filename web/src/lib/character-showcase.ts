@@ -1,5 +1,7 @@
 import { describePlayer } from "@/app/players/player-view";
 import { CLASSES } from "@/design/tokens";
+import { realmSlug } from "@/lib/player-pages";
+import { savedBuildsOn } from "@/lib/saved-builds";
 
 /**
  * The character showcase (docs/design/2026-11-01-character-showcase-plan.md): one character's page, published by
@@ -11,6 +13,23 @@ import { CLASSES } from "@/design/tokens";
 /** The owner's switch for the showcase pages and their cards. Off, every one of them is a 404. */
 export function showcaseOn(env: Record<string, string | undefined> = process.env): boolean {
   return env.EVERLOOT_SHOWCASE === "1";
+}
+
+/**
+ * Planned builds on the showcase pages (slice S4): an owner attaches one of their build labels to a link, and the
+ * page lists that label's shared builds. Its own switch, because it needs 20261102120000_build_label_links.sql while
+ * the pages do not, and it needs the pages and saved builds on as well. Off, nothing reads or writes a label's link.
+ */
+export function showcaseBuildsOn(env: Record<string, string | undefined> = process.env): boolean {
+  return showcaseOn(env) && savedBuildsOn(env) && env.EVERLOOT_SHOWCASE_BUILDS === "1";
+}
+
+/**
+ * A linked character's public page: /characters/<ruleset>/<realm>/<name>, slugged as the player pages are. A
+ * separate address from /players, because a link never adds data to a sighting page (identity ADR).
+ */
+export function characterPath(ruleset: string, realm: string, name: string): string {
+  return `/characters/${ruleset}/${encodeURIComponent(realmSlug(realm))}/${encodeURIComponent(name.toLowerCase())}`;
 }
 
 /** A section older than this says it may be out of date. */
@@ -84,6 +103,8 @@ export const EMPTY_LINE = "Nothing synced for this yet.";
 export const PRIVATE_LINE = "Hidden from the public page.";
 export const UNSUPPORTED_LINE = "The game does not report this to addons yet.";
 export const STALE_LINE = "May be out of date.";
+/** Under the planned builds: saved in the calculator, so a plan, not what the character runs in game. */
+export const PLANNED_LINE = "Saved in the talent calculator by this character's linked player. A plan, not a record of play.";
 export const FOOTER_LINE = "Self-reported by this character's linked player through the Everloot addon. Not checked against Blizzard.";
 
 export interface ShownSection { key: SectionKey; title: string; section: Section<unknown>; asOf: string | null; stale: boolean }

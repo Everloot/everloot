@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import ApiKeys from "@/components/ApiKeys";
 import ChatKeys from "@/components/chat/ChatKeys";
 import LinkedCharacters from "@/components/LinkedCharacters";
-import { Container, DataTitle } from "@/components/ui";
+import { Container } from "@/components/ui";
+import YourEverlootHeader from "@/components/YourEverloot";
 import { loadOverview, type AccountOverview } from "@/lib/account-overview";
 import { authV2Enabled, withAuth, signInMethods } from "@/lib/auth/auth";
 import { configuredSocialProviders, type SocialProvider } from "@/lib/auth/social";
@@ -66,7 +67,7 @@ export default async function AccountPage({ searchParams }: { searchParams?: Pro
   } catch {
     return (
       <Container width="reading">
-        <DataTitle title="Your account" />
+        <YourEverlootHeader current="/account" title="Your account" />
         <p role="alert" className="text-fg-2">Your account is unavailable right now. Try again in a minute.</p>
       </Container>
     );
@@ -99,7 +100,7 @@ export default async function AccountPage({ searchParams }: { searchParams?: Pro
 
   return (
     <Container width="reading">
-      <DataTitle title="Your account" />
+      <YourEverlootHeader current="/account" title="Your account" lede="Your sign-in methods, keys, connected apps and data." />
       <nav aria-label="Account sections" className="mb-6 flex flex-wrap gap-x-4 gap-y-1 border-b border-line pb-2 text-meta">
         {sections(withProfile, characterLinksOn()).map((s) => <a key={s.id} href={`#${s.id}`} className="text-fg-2 hover:text-accent">{s.label}</a>)}
       </nav>

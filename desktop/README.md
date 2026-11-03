@@ -55,7 +55,7 @@ The window is a sidebar with one page per thing to manage:
 | Addon | Installed version against the latest `addon-v*` release (an Alpha included, the version the download page serves), install or update in one click (the zip is checked against the release's `SHA256SUMS` before anything is written), the slot addons' state, and the saved-builds sync: when it last synced, Sync builds, and why it could not (a key without the permission links to the key page) |
 | Changes | The site's change tracker feed: Blizzard posts, hotfixes and builds |
 | Log | Everything the engine did this session, with Pause |
-| Settings | Pinned at the bottom of the sidebar. What runs (upload, market prices, in-game `/ask`), Assistant setup (the model keys: use, add, remove), the game folder, startup, the site address under Advanced, the data folder and the update check |
+| Settings | Pinned at the bottom of the sidebar. What runs (upload, market prices, in-game `/ask`), Assistant setup (the model keys: use, add, remove), the game folder, startup, the site address under Advanced, the update check, and Data on this computer: the folder's size by part, what is sent and what stays, and Delete my local data |
 | On everloot.app | Links to the site's database, talent calculator, raid builder and auction prices. They open in your browser (tagged `utm_source=desktop-app`), not inside the app; Chat answers what the database and lore archive would |
 
 ### Recorded item prices, without a model
@@ -76,10 +76,13 @@ The tray menu shows each job's last result, a reminder when a realm's last full 
 than a day, the newer app release when there is one, and Upload now, Refresh prices now, Pause and Quit.
 Closing the window keeps the app in the tray. The window opens where you left it, at the same
 size, unless that screen is gone. The release checks (app and addon) run at start, after the first Start, every hour
-and when the window is opened. A newer app shows as **Update to X** in the sidebar and on the Overview, and once per
-version as a notification while the window is not in front. On a Windows install one click downloads it and checks
-it against the release's `SHA256SUMS`, and **Restart to update** installs it; if the old version is still there at the
-next start, the app says the update failed. Elsewhere the button opens the download.
+and when the window is opened. A newer app shows as a round arrow beside Settings and on the Overview, and once per
+version as a notification while the window is not in front. The arrow opens what the new version changed. On a
+Windows install one click there downloads it and checks it against the release's `SHA256SUMS` while a ring fills
+around the arrow; the arrow then turns into a restart, which asks in the app's own dialog and installs it. If the
+old version is still there at the next start, the app says the update failed. Elsewhere the panel opens the download.
+The installer names the app **Everloot** in the Start menu, on the desktop and in Apps. The product name, install
+folder and release file names (`Everloot-DesktopApp-*`) stay as they were, so an update installs over the old version.
 
 The app shares its data folder with the command line (`%APPDATA%\Everloot`,
 `~/Library/Application Support/Everloot`, `~/.config/everloot`): `sent.json` for confirmed events,
@@ -93,8 +96,14 @@ Everything stays on this computer when you uninstall the app: the installer leav
 reinstall picks up where you left off. That includes your everloot.app key (`everloot-key.txt`), any model keys the
 Assistant setup saved, `chat.json` and the `backups/` copies of your save files (gold, gear, guild and the rest the
 addon records). The keys are plain files, protected by your user account like the rest of the folder, because the
-command line reads the same files. To remove it all, quit the app and delete the data folder (Settings shows where it is
-and opens it).
+command line reads the same files. To remove it all, use Delete my local data under Settings > Data on this computer:
+it empties the folder, the command line's files included, and starts the app over on its setup screen. The game folder
+and `Everloot.lua` are not touched. Settings also shows how much space each part takes.
+
+Nothing in the folder grows for as long as the game is played: backups keep ten copies per account, a downloaded
+update is deleted once it is installed, Chat keeps its last 100 messages and `answers.json` its last 20, `sent.json`
+keeps only the events still in each account's `Everloot.lua`, and a cached `settled-<build>.json` not refreshed for a
+week is deleted.
 
 ## Run it from source
 

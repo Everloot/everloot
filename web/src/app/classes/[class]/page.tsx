@@ -36,8 +36,8 @@ type Destination = Exclude<ContextDestination, "hub">;
 /** What each linked page holds, and that it is the whole list where it is not narrowed to the class. */
 const NOTES: Record<Destination, (name: string) => string> = {
   talents: (name) => `${name} talent trees with the game's point rules, two talent sets and a share link.`,
-  spells: (name) => `Spells in the ${name} talent catalog, from the game files.`,
-  items: () => "Every item, with filters for slot, quality, item level and required level.",
+  spells: (name) => `${name} spells on the class's skill lines and in its talent catalog, from the game files.`,
+  items: (name) => `Items a ${name} can use by its proficiencies in the game files, with filters for slot, quality, item level and required level.`,
   raid: () => "Fill a 10, 20 or 40 player raid with classes and talent trees to see which buffs each group gets.",
   professions: () => "Profession paths and recipe skill ranges, estimated from the recipes and prices players uploaded.",
   dungeons: () => "Every dungeon and raid, lowest level first, with where it is entered and the bosses players report.",

@@ -1,10 +1,12 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { Card, DataTable, EmptyState, Explainer, type Column } from "@/components/ui";
 import { guildsOn } from "@/lib/guild-switch";
 import { CENSUS_MIN_CHARACTERS, CENSUS_MIN_INSTALLS, CENSUS_MIN_REPORTERS, CENSUS_ROUND_TO, HIDDEN_LABEL } from "../../../../kb/src/census";
-import type { Faction } from "../../../../kb/src/census";
+import type { CensusCount, Faction } from "../../../../kb/src/census";
 import {
-  COLLECTING_LINE, HUB_ROWS, RAIL_GROUPS, START_LINE, rankingPath, type Change, type ChartSeries, type RankRow, type RankingView, type RankingWeek,
+  COLLECTING_LINE, HUB_ROWS, RAIL_GROUPS, START_LINE, censusHrefOf, rankingPath,
+  type Change, type ChartSeries, type HubMetrics, type Mover, type RankRow, type RankingView, type RankingWeek,
 } from "@/lib/rankings";
 
 export const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
@@ -108,8 +110,11 @@ export function ShareBar({ share, classToken, className = "" }: { share: number;
   );
 }
 
-/** The ranked rows: rank, change against last week, the colour mark, name, faction, count, share and the data's date. */
-export function RankTable({ rows, caption, showChange, asOf }: { rows: RankRow[]; caption: string; showChange: boolean; asOf: string }) {
+/**
+ * The ranked rows: rank, change against last week, the colour mark, name, faction, count, share and the data's
+ * date. With `hrefOf`, each name links to the census filtered to that row.
+ */
+export function RankTable({ rows, caption, showChange, asOf, hrefOf }: { rows: RankRow[]; caption: string; showChange: boolean; asOf: string; hrefOf?: (r: RankRow) => string }) {
   const showSub = rows.some((r) => r.sub);
   const columns: Column<RankRow>[] = [
     {
@@ -118,7 +123,7 @@ export function RankTable({ rows, caption, showChange, asOf }: { rows: RankRow[]
         <span className="flex min-w-0 items-center gap-2">
           <span className="w-6 shrink-0 text-right font-mono tabular-nums text-muted">{r.rank ?? "—"}</span>
           <Swatch {...markOf(r)} />
-          <span className="font-medium">{r.label}</span>
+          {hrefOf ? <Link href={hrefOf(r)} className={`${link} font-medium`}>{r.label}</Link> : <span className="font-medium">{r.label}</span>}
         </span>
       ),
     },
@@ -162,6 +167,8 @@ export function RankCard({ view }: { view: RankingView }) {
   const week = view.week!;
   const rows = view.rows.filter((r) => r.rank !== null).slice(0, HUB_ROWS);
   const showChange = view.previous !== null;
+  // A row's share over the weeks, drawn small beside it once two weeks have numbers.
+  const trend = new Map(view.weeksWithNumbers >= 2 ? view.series.map((s) => [s.key, s]) : []);
   return (
     <Card as="section" padding="none" aria-labelledby={def.slug}>
       <div className="px-4 pt-4 sm:px-6 sm:pt-5">
@@ -180,9 +187,15 @@ export function RankCard({ view }: { view: RankingView }) {
               <span className="w-5 shrink-0 text-right font-mono tabular-nums text-cell-2 text-muted">{r.rank}</span>
               <Swatch {...markOf(r)} />
               <span className="min-w-0 flex-1 truncate font-medium text-fg">
-                {r.label}
-                {r.sub && <span className="ml-1.5 font-normal text-fg-2">{r.sub}</span>}
+                <Link href={censusHrefOf(def.slug, r, view.query)} className="hover:underline hover:decoration-edge hover:underline-offset-4">
+                  {r.label}
+                  {r.sub && <span className="ml-1.5 font-normal text-fg-2">{r.sub}</span>}
+                  <span className="sr-only"> in the census</span>
+                </Link>
               </span>
+              {/* Only from xl (1280 px), where each of the two cards still leaves the name about 200 px. Narrower, the
+                  sparkline would squeeze the name to nothing (about 800 px), so the share bar shows alone. */}
+              {trend.has(r.key) && <Sparkline series={trend.get(r.key)!} className="hidden xl:block" />}
               {r.share !== null && (
                 <>
                   <ShareBar share={r.share} classToken={r.classToken} className="hidden w-20 sm:block" />
@@ -207,10 +220,11 @@ export function StartState() {
       <Card as="section" aria-labelledby="what-will-be-here">
         <h2 id="what-will-be-here" className="text-h2-sm text-fg sm:text-h2">What will be here</h2>
         {/* Plain marks here: a class colour stands for a class, not for a bullet. */}
-        <ol className="mt-3 grid gap-3 text-cell text-fg-2 sm:grid-cols-3">
+        <ol className="mt-3 grid gap-3 text-cell text-fg-2 sm:grid-cols-2 lg:grid-cols-4">
           <li className="flex gap-3"><span className="w-5 shrink-0 font-mono text-muted">1</span><span>Three rankings: classes by players, races, and the faction balance.</span></li>
           <li className="flex gap-3"><span className="w-5 shrink-0 font-mono text-muted">2</span><span>A weekly chart of each entry&apos;s share of the characters counted.</span></li>
-          <li className="flex gap-3"><span className="w-5 shrink-0 font-mono text-muted">3</span><span>Each rank&apos;s change against last week.</span></li>
+          <li className="flex gap-3"><span className="w-5 shrink-0 font-mono text-muted">3</span><span>Each rank&apos;s change against last week, and the biggest movers.</span></li>
+          <li className="flex gap-3"><span className="w-5 shrink-0 font-mono text-muted">4</span><span>Every row links to the census, filtered to it.</span></li>
         </ol>
       </Card>
     </div>
@@ -292,6 +306,7 @@ export function WeeklyChart({ weeks, series, title }: { weeks: RankingWeek[]; se
               </li>
             ))}
           </ul>
+          <SharesTable weeks={weeks} series={series} caption={title} />
         </figcaption>
       </figure>
     </Card>
@@ -366,9 +381,192 @@ export function StackedWeeks({ weeks, series, hidden = false, title }: { weeks: 
           {(hidden || partial.some(Boolean)) && (
             <p className="text-cell-2 text-muted">A count under the thresholds has no segment, so that week&apos;s bar is partial.</p>
           )}
+          <SharesTable weeks={weeks} series={series} caption={title} />
         </figcaption>
       </figure>
     </Card>
+  );
+}
+
+/**
+ * A chart's numbers as a table, closed until asked for: the text alternative to the drawing, for screen readers
+ * and for anyone who wants the figures. Native <details>, so it opens without JavaScript.
+ */
+function ChartTable<T>({ caption, columns, rows, rowKey }: { caption: string; columns: Column<T>[]; rows: T[]; rowKey: (row: T) => string }) {
+  return (
+    <details data-chart-table className="group">
+      <summary className="inline-flex min-h-8 cursor-pointer list-none items-center gap-1.5 text-control text-fg-2 hover:text-fg [&::-webkit-details-marker]:hidden">
+        <span aria-hidden="true" className="font-mono text-muted group-open:hidden">+</span>
+        <span aria-hidden="true" className="hidden font-mono text-muted group-open:inline">−</span>
+        Show as a table
+      </summary>
+      <div className="mt-2 overflow-x-auto">
+        <DataTable dense caption={caption} columns={columns} rows={rows} rowKey={rowKey} />
+      </div>
+    </details>
+  );
+}
+
+const shareCell = (p: number | null) => (p === null ? <span className="text-muted">{HIDDEN_LABEL}</span> : percent(p));
+
+/** Each series' share week by week, a row per series and a column per week. */
+function SharesTable({ weeks, series, caption }: { weeks: RankingWeek[]; series: ChartSeries[]; caption: string }) {
+  const columns: Column<ChartSeries>[] = [
+    { key: "name", header: "Name", nowrap: true, cell: (s) => <span className="font-medium">{nameOf(s)}</span> },
+    ...weeks.map((w, i): Column<ChartSeries> => ({ key: w.start, header: w.current ? "So far" : w.start.slice(5), numeric: true, cell: (s) => shareCell(s.points[i]) })),
+  ];
+  return <ChartTable caption={caption} columns={columns} rows={series} rowKey={(s) => s.key} />;
+}
+
+/** A row's share over the weeks, drawn small. Decorative: the full ranking's chart and table hold the numbers. */
+export function Sparkline({ series: s, className = "" }: { series: ChartSeries; className?: string }) {
+  const w = 64;
+  const h = 18;
+  const shown = s.points.filter((p): p is number => p !== null);
+  if (shown.length < 2) return null;
+  const lo = Math.min(...shown);
+  const hi = Math.max(...shown);
+  const x = (i: number) => 1 + (i / (s.points.length - 1)) * (w - 2);
+  const y = (v: number) => (hi === lo ? h / 2 : 2 + (1 - (v - lo) / (hi - lo)) * (h - 4));
+  const d = s.points.map((p, i) => (p === null ? "" : `${i > 0 && s.points[i - 1] !== null ? "L" : "M"}${x(i).toFixed(1)},${y(p).toFixed(1)}`)).join(" ").trim();
+  return (
+    <svg aria-hidden="true" data-sparkline width={w} height={h} viewBox={`0 0 ${w} ${h}`} className={`shrink-0 ${className}`}>
+      <path d={d} fill="none" strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" className={stroke(s)} />
+    </svg>
+  );
+}
+
+const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${number(Math.abs(n))}`;
+const signedPercent = (share: number) => `${share > 0 ? "+" : share < 0 ? "−" : ""}${Math.abs(Math.round(share * 100))}%`;
+
+/** What a tile shows while it has no number: a dash for the eye, words for a screen reader. */
+const NotYet = ({ why }: { why: string }) => <><span aria-hidden="true" className="text-muted">—</span><span className="sr-only">{why}</span></>;
+
+function Tile({ label, value, note }: { label: string; value: ReactNode; note: ReactNode }) {
+  return (
+    <div className="min-w-0 rounded-card border border-line bg-panel p-4 sm:p-5">
+      <dt className="text-meta text-muted">{label}</dt>
+      <dd className="mt-1 truncate font-mono text-h2-sm tabular-nums text-fg sm:text-h2">{value}</dd>
+      <dd className="mt-1 text-cell-2 text-fg-2">{note}</dd>
+    </div>
+  );
+}
+
+/** "Mage", "Mage and Rogue", "Hunter, Mage and Rogue". */
+const listOf = (names: string[]) => (names.length < 3 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`);
+
+/** The leading published class tile's note: its share, whether it is a tie, and why it may not be the most played. */
+function leaderNote(m: HubMetrics, collecting: boolean): string {
+  const [top] = m.leadingClasses;
+  if (!top || top.share === null) return collecting ? "Still collecting" : "No class has a number yet";
+  const share = m.leadingClasses.length > 1 ? `Tied at ${percent(top.share)} of characters each` : `${percent(top.share)} of characters`;
+  return m.classHidden ? `${share}. Hidden classes are not ranked and could be larger.` : share;
+}
+
+/** The hub's headline numbers: characters counted, the change against last week, the leading published class, the installs. */
+export function MetricTiles({ m }: { m: HubMetrics }) {
+  const collecting = m.week.window.collecting;
+  const leaders = m.leadingClasses;
+  return (
+    <dl data-metric-tiles aria-label="This week in numbers" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <Tile
+        label="Characters counted"
+        value={m.characters === null ? <NotYet why="still collecting" /> : number(m.characters)}
+        note={collecting ? "Still collecting" : weekLabel(m.week)}
+      />
+      <Tile
+        label="Against last week"
+        value={m.change ? signed(m.change.by) : <NotYet why="not yet" />}
+        note={m.change ? (m.change.share === null ? "characters" : `${signedPercent(m.change.share)} characters`) : "Starts once two weeks have numbers"}
+      />
+      <Tile
+        label={leaders.length > 1 ? "Leading published classes" : "Leading published class"}
+        value={leaders.length > 0 ? <span className="font-sans">{listOf(leaders.map((r) => r.label))}</span> : <NotYet why="not yet" />}
+        note={leaderNote(m, collecting)}
+      />
+      <Tile label="Reporting installs" value={number(m.installs)} note="Installs that sent census rows that week" />
+    </dl>
+  );
+}
+
+const TW = 720;
+const TH = 200;
+const TPAD = { left: 48, right: 16, top: 22, bottom: 28 };
+
+/**
+ * Characters counted each week, one bar a week, each labelled with its number. Inline SVG drawn on the server;
+ * a collecting week has no bar and says so. The table under it holds the same numbers.
+ */
+export function WeeklyTotals({ points }: { points: { week: RankingWeek; count: CensusCount }[] }) {
+  const max = Math.max(1, ...points.map((p) => p.count ?? 0));
+  const top = Math.ceil(max / 50) * 50 || 50;
+  const plotW = TW - TPAD.left - TPAD.right;
+  const plotH = TH - TPAD.top - TPAD.bottom;
+  const slot = plotW / points.length;
+  const barW = Math.min(48, slot * 0.6);
+  const x = (i: number) => TPAD.left + slot * i + (slot - barW) / 2;
+  const y = (v: number) => TPAD.top + (1 - v / top) * plotH;
+  const title = "Characters counted each week";
+  return (
+    <figure data-weekly-totals className="min-w-0">
+      <svg viewBox={`0 0 ${TW} ${TH}`} role="img" aria-label={`${title}, ${points.length} weeks`} className="h-auto w-full">
+        <title>{title}</title>
+        {[0, top / 2, top].map((v) => (
+          <g key={v}>
+            <line x1={TPAD.left} x2={TW - TPAD.right} y1={y(v)} y2={y(v)} className="stroke-line" strokeWidth={1} />
+            <text x={TPAD.left - 6} y={y(v) + 4} textAnchor="end" className="fill-muted font-mono text-[11px]">{number(v)}</text>
+          </g>
+        ))}
+        {points.map((p, i) => (
+          <g key={p.week.start}>
+            {p.count === null ? (
+              <text x={x(i) + barW / 2} y={y(0) - 6} textAnchor="middle" className="fill-muted text-[11px]">collecting</text>
+            ) : (
+              <>
+                <rect x={x(i)} y={y(p.count)} width={barW} height={Math.max(0, y(0) - y(p.count))} rx={2} className="fill-fg-2">
+                  <title>{`${weekLabel(p.week)}: ${number(p.count)} characters`}</title>
+                </rect>
+                <text x={x(i) + barW / 2} y={y(p.count) - 6} textAnchor="middle" className="fill-fg-2 font-mono text-[11px]">{number(p.count)}</text>
+              </>
+            )}
+            <text x={x(i) + barW / 2} y={TH - 8} textAnchor="middle" className="fill-muted font-mono text-[11px]">{weekTick(p.week)}</text>
+          </g>
+        ))}
+      </svg>
+      <figcaption className="mt-3">
+        <ChartTable
+          caption={title}
+          columns={[
+            { key: "week", header: "Week", cell: (p) => weekLabel(p.week) },
+            { key: "count", header: "Characters", numeric: true, cell: (p) => (p.count === null ? <span className="text-muted">still collecting</span> : number(p.count)) },
+          ]}
+          rows={points}
+          rowKey={(p) => p.week.start}
+        />
+      </figcaption>
+    </figure>
+  );
+}
+
+/** The rows that moved most against last week, across the rankings, each linking to the census filtered to it. */
+export function Movers({ movers }: { movers: Mover[] }) {
+  if (movers.length === 0) return <EmptyState framed={false} message="No rank moved against last week." />;
+  return (
+    <ol data-movers aria-label="Top movers" className="border-t border-line">
+      {movers.map(({ def, row: r, href }) => (
+        <li key={`${def.slug}/${r.key}`} className="flex min-h-row items-center gap-3 border-b border-line text-cell last:border-b-0">
+          <span className="w-10 shrink-0 text-cell-2"><ChangeMark change={r.change} /></span>
+          <Swatch {...markOf(r)} />
+          <span className="min-w-0 flex-1 truncate">
+            <Link href={href} className="font-medium text-fg hover:underline hover:decoration-edge hover:underline-offset-4">
+              {r.label}{r.sub && <span className="ml-1.5 font-normal text-fg-2">{r.sub}</span>}
+            </Link>
+            <span className="ml-1.5 text-cell-2 text-muted">{def.title}</span>
+          </span>
+          <span className="shrink-0 font-mono tabular-nums text-fg-2">{r.share === null ? "" : percent(r.share)}</span>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -386,6 +584,10 @@ export function HowItCounts() {
         Share is a row&apos;s part of all characters counted that week. <Link href="/methodology#population" className={link}>How we count</Link>.
       </p>
       <p>Only race, class, level and faction are counted. No name or character id is stored or shown. The full counts are on the <Link href="/census" className={link}>census</Link>.</p>
+      <p>
+        Each row links to the census filtered to it. The census counts the last 7 days rather than a Monday-to-Sunday
+        week, so its number can differ from the row&apos;s.
+      </p>
     </Explainer>
   );
 }

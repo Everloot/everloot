@@ -2,7 +2,7 @@
   "name": "everloot-desktop",
   "productName": "Everloot Desktop App",
   "license": "AGPL-3.0-only",
-  "version": "0.1.13",
+  "version": "0.1.16",
   "private": true,
   "description": "Everloot Desktop App: uploads the addon's save file after every logout, keeps market prices in game and answers /ask, from the system tray.",
   "homepage": "https://everloot.app",
@@ -15,7 +15,7 @@
     "build": "node scripts/build.mjs",
     "start": "npm run build && electron .",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "node node_modules/typescript-native/bin/tsc --noEmit",
     "bench": "node bench/run.mjs",
     "icons": "node scripts/icons.mjs",
     "pack": "npm run build && electron-builder --publish never"
@@ -29,6 +29,7 @@
     "esbuild": "0.28.2",
     "fflate": "0.8.3",
     "typescript": "^5.6.3",
+    "typescript-native": "npm:typescript@^7.0.2",
     "vitest": "^5.0.3"
   },
   "overrides": {
@@ -68,6 +69,8 @@
     },
     "nsis": {
       "artifactName": "Everloot-DesktopApp-${version}-win-${arch}-setup.${ext}",
+      "shortcutName": "Everloot",
+      "uninstallDisplayName": "Everloot",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "deleteAppDataOnUninstall": false

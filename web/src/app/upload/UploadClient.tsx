@@ -28,8 +28,12 @@ async function loadSettled(build: unknown): Promise<SettledList | null> {
   } catch { return null; }
 }
 
-/** `playerPages`: the site collects player rows. Off, the server drops them, and the preview says so. */
-export default function UploadClient({ playerPages = false }: { playerPages?: boolean } = {}) {
+/**
+ * `playerPages`: the site collects player rows. Off, the server drops them, and the preview says so. `pullSummaries`:
+ * it collects pull timing, runs and pull summaries. Off, the file is read as the site then reads it, as before them: a
+ * pull summary or run counts as an invalid row, exactly as the intake answers.
+ */
+export default function UploadClient({ playerPages = false, pullSummaries = false }: { playerPages?: boolean; pullSummaries?: boolean } = {}) {
   const [payload, setPayload] = useState<unknown>(null);
   const [settled, setSettled] = useState<SettledList | null>(null);
   const [choices, setChoices] = useState<SharingChoices>({});
@@ -47,9 +51,9 @@ export default function UploadClient({ playerPages = false }: { playerPages?: bo
   const prepared = useMemo(() => {
     if (!payload) return { value: null, error: null };
     const skip = settledSkip(settled, (payload as { clientBuild?: unknown }).clientBuild);
-    try { return { value: prepareUpload(payload, choices, tokens.split(/\s+/).filter(Boolean), undefined, skip), error: null }; }
+    try { return { value: prepareUpload(payload, choices, tokens.split(/\s+/).filter(Boolean), undefined, skip, { runRecords: pullSummaries }), error: null }; }
     catch (e) { return { value: null, error: e instanceof Error ? e.message : "Could not prepare this file." }; }
-  }, [payload, choices, tokens, settled]);
+  }, [payload, choices, tokens, settled, pullSummaries]);
   const busy = sending || loading;
   function resetSession() { saved.current = null; setSession(null); setError(null); }
   async function loadFile(file: File) {
@@ -66,7 +70,7 @@ export default function UploadClient({ playerPages = false }: { playerPages?: bo
         const parsed = parseEverlootLua(text);
         value = { addonVersion: parsed.version, clientBuild: parsed.clientBuild, records: parsed.records };
       } else value = JSON.parse(text);
-      prepareUpload(value, {}, []);
+      prepareUpload(value, {}, [], undefined, undefined, { runRecords: pullSummaries });
       const list = await loadSettled((value as { clientBuild?: unknown } | null)?.clientBuild);
       if (loadId.current === id) { setSettled(list); setPayload(value); }
     } catch (e) { if (loadId.current === id) setError(e instanceof Error ? e.message : "Could not read this file."); }
@@ -169,6 +173,11 @@ export default function UploadClient({ playerPages = false }: { playerPages?: bo
           {playerPages
             ? <p className="mt-1 text-fg-2">Each row holds a character&apos;s name, realm, race, class, level and guild, and the day it was seen, never where. Everloot keeps the newest row per character and shows it on a public player page with a link to hide it. Characters whose owners hid them are skipped.</p>
             : <p className="mt-1 text-fg-2">Everloot does not collect player rows yet, so the server drops these. They stay in your file.</p>}
+        </div>}
+        {(prepared.value.counts.pull_summary ?? 0) > 0 && <div className="mt-3 text-sm text-fg-2">
+          <p>Boss pulls in this upload: {prepared.value.counts.pull_summary.toLocaleString("en-US")}. The addon records them unless you turn them off with <code>/everloot pulls off</code>, which also deletes them from your file.</p>
+          <p className="mt-1 text-fg-2">Each row holds the boss, kill or wipe and how long it took, and for each member of your group their name, realm, class, role and the damage, healing, damage taken and deaths the game&apos;s damage meter showed.</p>
+          <p className="mt-1 text-fg-2">Everloot keeps them privately for a year: no page shows them, and they are not in the public data. Characters whose owners hid them are left out, and anyone can <a className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg" href="/players/opt-out">hide a character</a>, which deletes it from every stored pull.</p>
         </div>}
         {prepared.value.skipped.length > 0 && <p className="mt-3 text-sm text-fg-2">
           Skipped {prepared.value.skipped.length.toLocaleString("en-US")} already settled: {prepared.value.skipped.length === 1 ? "this row repeats a fact" : "these rows repeat facts"} at least five installs agree on, with no other report for 14 days, so Everloot does not need {prepared.value.skipped.length === 1 ? "it" : "them"} again. {prepared.value.skipped.length === 1 ? "It stays" : "They stay"} in your file.

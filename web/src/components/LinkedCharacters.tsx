@@ -7,7 +7,14 @@ import CopyButton from "@/components/ui/CopyButton";
 export interface ListedLink {
   id: string; name: string; realm: string; race: string; class: string; faction: string; level: number;
   status: "linked" | "frozen"; linked_at: string; last_upload_at: string;
+  /**
+   * Listed only while the character pages are on (EVERLOOT_SHOWCASE=1). `label` only while planned builds are on too
+   * (EVERLOOT_SHOWCASE_BUILDS=1): the build label whose shared builds the page lists, or null.
+   */
+  page?: { public: boolean; path: string; label?: { id: string; name: string } | null };
 }
+/** A build label as GET /api/me/builds lists it. */
+interface Label { id: string; name: string; classSlug: string }
 type State = { status: "loading" } | { status: "signed-out" } | { status: "off" } | { status: "error"; message: string } | { status: "ready"; links: ListedLink[] };
 
 const button = "inline-flex items-center justify-center min-h-11 px-3 rounded-lg border border-line text-sm text-fg hover:text-accent disabled:opacity-60";
@@ -19,6 +26,12 @@ const CODE_MINUTES = 15;
 /** The game's tokens as words: SHAMAN is Shaman, NightElf is Night Elf, Scourge is Undead. */
 const words = (token: string) => token === "Scourge" ? "Undead"
   : token.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+
+/** What a public character page shows, said next to its switch. */
+export const PAGE_TEXT = "The public page shows this character's name, level, race, class, faction and realm, and the day it was last sent. Never your BattleTag or account. Search engines are asked not to index it.";
+
+/** What attaching a build label does, said next to its picker. */
+export const LABEL_TEXT = "Planned builds: the page can list the shared builds you filed under one of your build labels on My builds. Only the build's name and link show; unshared builds never do.";
 
 /**
  * What a frozen link says to its owner. It tells them another account linked the character too, and nothing about
@@ -37,6 +50,8 @@ export default function LinkedCharacters() {
   const [busy, setBusy] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
   const [said, setSaid] = useState<string | null>(null);
+  // The account's build labels, read only when the list offers planned builds; null until then or when unreadable.
+  const [labels, setLabels] = useState<Label[] | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -46,6 +61,10 @@ export default function LinkedCharacters() {
       if (response.status === 401) return setState({ status: "signed-out" });
       if (!response.ok || !Array.isArray(result.links)) return setState({ status: "error", message: result.error ?? "Your linked characters are unavailable right now. Try again in a minute." });
       setState({ status: "ready", links: result.links });
+      if ((result.links as ListedLink[]).some((l) => l.page?.label !== undefined)) {
+        const builds = await fetch("/api/me/builds", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        setLabels(Array.isArray(builds?.characters) ? builds.characters : null);
+      }
     } catch {
       setState({ status: "error", message: "Your linked characters are unavailable right now. Try again in a minute." });
     }
@@ -85,6 +104,42 @@ export default function LinkedCharacters() {
     }
   }
 
+  async function setPublic(link: ListedLink, on: boolean) {
+    setBusy(link.id);
+    setSaid(null);
+    try {
+      const response = await fetch(`/api/me/characters/links/${encodeURIComponent(link.id)}/visibility`, {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ page_public: on }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error ?? "That did not work. Try again.");
+      setSaid(on ? `${link.name}'s page is public.` : `${link.name}'s page is private again.`);
+      await load();
+    } catch (e) {
+      setSaid(e instanceof Error ? e.message : "That did not work. Try again.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function setLabel(link: ListedLink, id: string | null) {
+    setBusy(link.id);
+    setSaid(null);
+    try {
+      const response = await fetch(`/api/me/characters/links/${encodeURIComponent(link.id)}/label`, {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ label: id }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error ?? "That did not work. Try again.");
+      setSaid(id ? `${link.name}'s page lists that label's shared builds.` : `${link.name}'s page lists no planned builds.`);
+      await load();
+    } catch (e) {
+      setSaid(e instanceof Error ? e.message : "That did not work. Try again.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   if (state.status === "off") return null;
   if (state.status === "loading") return <p className="text-sm text-fg-2">Loading your linked characters…</p>;
   if (state.status === "signed-out") return <p className="text-sm text-fg-2"><a href="/sign-in" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Sign in</a> to link your characters.</p>;
@@ -96,7 +151,7 @@ export default function LinkedCharacters() {
       <p className="text-sm text-fg-2">
         Link a character by typing a code on it in game. A link says that a character typed a code from this account in its
         Everloot addon file; it is not checked with Blizzard. Linked characters are private: nothing about them is shown
-        to anyone else.
+        to anyone else{state.links.some((l) => l.page) ? " unless you make a character's page public" : ""}.
       </p>
       <div className="space-y-2">
         <button type="button" className={primary} onClick={() => void makeCode()} disabled={busy !== null}>{busy === "code" ? "Making a code…" : "Make a link code"}</button>
@@ -123,6 +178,46 @@ export default function LinkedCharacters() {
               </div>
               <p className="text-fg-2">Linked {day(link.linked_at)}, last sent {day(link.last_upload_at)}.</p>
               {link.status === "frozen" && <p className="text-fg">{FROZEN_TEXT}</p>}
+              {link.status === "linked" && link.page && (
+                <div className="space-y-2">
+                  <p className="text-fg-2">{PAGE_TEXT}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-fg">Public page: {link.page.public ? "on" : "off"}</span>
+                    <button
+                      type="button"
+                      className={button}
+                      aria-label={link.page.public ? `Make ${link.name}'s page private` : `Make ${link.name}'s page public`}
+                      onClick={() => void setPublic(link, !link.page!.public)}
+                      disabled={busy !== null}
+                    >
+                      {busy === link.id ? "Saving…" : link.page.public ? "Make it private" : "Make it public"}
+                    </button>
+                    {link.page.public && (
+                      <>
+                        <a href={link.page.path} className={button}>View the page</a>
+                        <a href={`${link.page.path}/card-square.png`} download={`${link.name.toLowerCase()}-card.png`} className={button}>Download card</a>
+                      </>
+                    )}
+                  </div>
+                  {link.page.label !== undefined && (
+                    <div className="space-y-1">
+                      <p className="text-fg-2">{LABEL_TEXT}</p>
+                      <label className="flex flex-wrap items-center gap-2">
+                        <span className="text-fg">Planned builds from</span>
+                        <select
+                          className="min-h-11 rounded-lg border border-line bg-bg px-2 text-sm text-fg"
+                          value={link.page.label?.id ?? ""}
+                          onChange={(e) => void setLabel(link, e.target.value || null)}
+                          disabled={busy !== null}
+                        >
+                          <option value="">None</option>
+                          {labelChoices(link, labels).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                        </select>
+                      </label>
+                    </div>
+                  )}
+                </div>
+              )}
               {confirm === link.id ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-fg">Unlink {link.name}? Your saved builds stay.</span>
@@ -140,4 +235,14 @@ export default function LinkedCharacters() {
       <p role="status" className="text-sm text-fg-2">{said}</p>
     </div>
   );
+}
+
+/**
+ * The labels a link can take: the account's labels of the character's class, and the attached one even when the
+ * labels could not be read. Never picked for the player: "None" stays until they choose.
+ */
+function labelChoices(link: ListedLink, labels: Label[] | null): { id: string; name: string }[] {
+  const own = (labels ?? []).filter((l) => l.classSlug === link.class.toLowerCase());
+  const attached = link.page?.label;
+  return attached && !own.some((l) => l.id === attached.id) ? [attached, ...own] : own;
 }

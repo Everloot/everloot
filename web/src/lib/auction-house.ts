@@ -4,6 +4,7 @@ import {
   TRIM_FACTOR, TRIM_MIN_DAYS, formatCopper, houseKey, itemListings, itemMarket, parseHouse, validRealm,
   type ItemDays, type MarketState, type MarketValue, type PublicDay, type RealmDays,
 } from "../../../kb/src/market";
+import { AFTER_LAUNCH, DEFAULT_RULESET, RULESET_SLUGS, isRulesetSlug, mappedRulesets, realmRuleset, type RulesetSlug } from "./realms";
 
 /**
  * The Auction House pages' view of the market rollup (kb/src/market.ts): realms, the rows each one
@@ -23,6 +24,8 @@ export interface RealmRef {
   /** The first spelling seen. */
   name: string;
   slug: string;
+  /** The realm map's ruleset (../data/realms.ts), or "forever" while the map does not list the realm. */
+  ruleset: string;
 }
 
 /**
@@ -107,7 +110,7 @@ function realmBoard(state: MarketState, key: string, now: Date, house: AuctionHo
   const stored: RealmDays | undefined = house ? state.houses?.[houseKey(key, house)] : state.realms[key];
   const name = state.realms[key]?.name ?? stored?.name;
   if (!stored || !name || !validRealm(name)) return null;
-  const realm: RealmRef = { key, name, slug: realmSlug(name) };
+  const realm: RealmRef = { key, name, slug: realmSlug(name), ruleset: realmRuleset(name) };
   const reporters = new Set<string>();
   let realmUpdated: number | null = null;
   const rows: MarketRow[] = [];
@@ -152,10 +155,10 @@ export function realmBoards(state: MarketState, now: Date = new Date(), house: A
   return boards;
 }
 
-/** Items with a public value on each house of a realm (or across realms without `slug`), for the house switch. */
-export function houseCounts(state: MarketState, now: Date, slug?: string): Map<AuctionHouse | null, number> {
+/** Items with a public value on each house of a realm (or across realms without `slug`, or a ruleset's realms), for the house switch. */
+export function houseCounts(state: MarketState, now: Date, slug?: string, ruleset: RulesetSlug | null = null): Map<AuctionHouse | null, number> {
   const count = (boards: RealmBoard[]) => {
-    const mine = slug === undefined ? boards : boards.filter((b) => b.realm.slug === slug);
+    const mine = slug === undefined ? onRuleset(boards, ruleset) : boards.filter((b) => b.realm.slug === slug);
     return new Set(mine.flatMap((b) => b.rows.map((r) => r.value.itemId))).size;
   };
   return new Map<AuctionHouse | null, number>([null, ...HOUSES].map((h) => [h, count(realmBoards(state, now, h))]));
@@ -170,6 +173,65 @@ export function itemByHouse(state: MarketState, now: Date, slug: string, itemId:
 
 export function findBoard(boards: RealmBoard[], slug: string): RealmBoard | null {
   return boards.find((b) => b.realm.slug === slug) ?? null;
+}
+
+/* ---------- Rulesets ---------- */
+
+/** The boards of realms the map puts on `ruleset`; null keeps every realm. */
+export function onRuleset(boards: RealmBoard[], ruleset: RulesetSlug | null): RealmBoard[] {
+  return ruleset === null ? boards : boards.filter((b) => b.realm.ruleset === ruleset);
+}
+
+/**
+ * The boards grouped ruleset, then realm (each board is one realm's house or blend): the rulesets in the game's
+ * order, "forever" (realms the map does not list yet) last. Only rulesets with a board are keys.
+ */
+export function boardsByRuleset(boards: RealmBoard[]): Map<string, RealmBoard[]> {
+  const groups = new Map<string, RealmBoard[]>();
+  for (const r of [...RULESET_SLUGS, DEFAULT_RULESET]) {
+    const mine = boards.filter((b) => b.realm.ruleset === r);
+    if (mine.length) groups.set(r, mine);
+  }
+  return groups;
+}
+
+export interface RulesetSummary {
+  /** A ruleset's slug, or "forever" for the realms the map does not list yet. */
+  ruleset: string;
+  /** Whether the realm map puts any realm on this ruleset; always true for "forever". */
+  mapped: boolean;
+  realms: number;
+  /** Distinct items with a public value on its realms. */
+  items: number;
+  /** The newest scan behind an open public day there (epoch ms); null with none. */
+  updatedAt: number | null;
+  /** The biggest week moves there, by size, at most `MOVES_SHOWN`. */
+  moves: Move[];
+}
+
+export const MOVES_SHOWN = 3;
+
+/**
+ * One line per ruleset for the hub: the launch rulesets always, Hardcore once a realm is mapped to it, and
+ * "forever" when a realm with prices is not in the map yet. Counts come from public values only.
+ */
+export function rulesetSummaries(state: MarketState, now: Date, house: AuctionHouse | null = null): RulesetSummary[] {
+  const groups = boardsByRuleset(realmBoards(state, now, house));
+  const mapped = mappedRulesets();
+  const shown: string[] = RULESET_SLUGS.filter((r) => !AFTER_LAUNCH.has(r) || mapped.has(r));
+  if (groups.has(DEFAULT_RULESET)) shown.push(DEFAULT_RULESET);
+  return shown.map((ruleset) => {
+    const boards = groups.get(ruleset) ?? [];
+    const rows = boards.flatMap((b) => b.rows);
+    const updated = boards.map((b) => b.updatedAt).filter((t): t is number => t !== null);
+    const moves = rows.map((r) => priceMove(r, 7, now)).filter((m): m is Move => m !== null)
+      .sort((a, b) => Math.abs(b.change) - Math.abs(a.change) || a.row.value.itemId - b.row.value.itemId)
+      .slice(0, MOVES_SHOWN);
+    return {
+      ruleset, mapped: !isRulesetSlug(ruleset) || mapped.has(ruleset), realms: boards.length,
+      items: new Set(rows.map((r) => r.value.itemId)).size, updatedAt: updated.length ? Math.max(...updated) : null, moves,
+    };
+  });
 }
 
 /**

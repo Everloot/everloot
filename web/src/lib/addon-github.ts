@@ -137,3 +137,68 @@ async function read(repo: string): Promise<AddonGithubResult> {
     },
   };
 }
+
+/** What a leaderboard row needs: stars and the newest release, two requests instead of a profile's six. */
+export interface AddonGithubSummary {
+  repo: string;
+  url: string;
+  stars: number | null;
+  release: { tag: string; date: string; url: string } | null;
+}
+
+export type AddonGithubSummaryResult =
+  | { status: "ok"; data: AddonGithubSummary }
+  /** The repository was read but its newest release could not be: `data.release` is null for that reason, not for none. */
+  | { status: "partial"; data: AddonGithubSummary; rateLimited: boolean }
+  | { status: "missing" }
+  | { status: "unavailable"; rateLimited: boolean };
+
+const summaryFailures = new Map<string, { until: number; result: AddonGithubSummaryResult }>();
+/** Repositories GitHub said have no release, until when: the answer is kept as long as a cached request would be. */
+const noRelease = new Map<string, number>();
+const NO_RELEASE_MS = 3600_000;
+
+/**
+ * Stars and the newest release of one repository, under the same cache, timeout and failure memory as addonGithub.
+ * A failed release read counts as a failure too: the partial answer is remembered, so the next views do not retry it.
+ */
+export async function addonGithubSummary(repo: string): Promise<AddonGithubSummaryResult> {
+  if (!validRepo(repo)) return { status: "missing" };
+  const remembered = summaryFailures.get(repo);
+  if (remembered && remembered.until > Date.now()) return remembered.result;
+  const result = await readSummary(repo);
+  if (result.status !== "ok") summaryFailures.set(repo, { until: Date.now() + FAILURE_MS, result });
+  else summaryFailures.delete(repo);
+  return result;
+}
+
+async function readSummary(repo: string): Promise<AddonGithubSummaryResult> {
+  let info: { html_url?: string; stargazers_count?: number };
+  try {
+    info = (await get(`/repos/${repo}`)) as typeof info;
+  } catch (error) {
+    if (error instanceof GithubError && (error.code === 404 || error.code === 410)) return { status: "missing" };
+    return { status: "unavailable", rateLimited: error instanceof GithubError && error.rateLimited };
+  }
+  const url = info ? githubUrl(info.html_url) : null;
+  if (!url) return { status: "unavailable", rateLimited: false };
+  const data = { repo, url, stars: typeof info.stargazers_count === "number" ? info.stargazers_count : null, release: null };
+  if ((noRelease.get(repo) ?? 0) > Date.now()) return { status: "ok", data };
+  let release: Record<string, unknown>;
+  try {
+    release = (await get(`/repos/${repo}/releases/latest`)) as Record<string, unknown>;
+  } catch (error) {
+    if (error instanceof GithubError && error.code === 404) {
+      noRelease.set(repo, Date.now() + NO_RELEASE_MS);
+      return { status: "ok", data };
+    }
+    return { status: "partial", data, rateLimited: error instanceof GithubError && error.rateLimited };
+  }
+  noRelease.delete(repo);
+  const tag = text(release?.tag_name, 100);
+  const date = day(release?.published_at);
+  return {
+    status: "ok",
+    data: { ...data, release: release && tag && date ? { tag, date, url: githubUrl(release.html_url) ?? `${url}/releases` } : null },
+  };
+}

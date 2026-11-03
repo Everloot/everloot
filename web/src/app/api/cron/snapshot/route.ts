@@ -5,6 +5,7 @@ import { pruneKeys } from "@/lib/api-keys";
 import { guardOn } from "@/lib/data-guard";
 import { playerPagesOn } from "@/lib/player-pages";
 import { playerStore } from "@/lib/player-store";
+import { pullStore } from "@/lib/pull-store";
 import { writeCoverage } from "@/lib/coverage-store";
 import { currentSettledWeek, writeSettled } from "@/lib/settled-store";
 
@@ -44,6 +45,9 @@ export async function GET(req: Request) {
     if (playerPagesOn()) {
       try { await playerStore().prune(); } catch (err) { console.error("player retention failed", err); }
     }
+    // Pull summaries are kept a year after they were received, switch on or off: turning collection off must not keep
+    // what was collected. Before the migration there is nothing to prune, and the store says so without an error.
+    try { await pullStore().prune(); } catch (err) { console.error("pull retention failed", err); }
     // The market has its own watermark, so a failure here leaves the corpus snapshot current
     // and the next run retries the same uploads.
     let market: { added: number; scans: number } | null = null;

@@ -16,6 +16,11 @@
 import { confirmedEntrances, instanceBosses, type InstanceFacts } from "./instances.js";
 
 export const GUILD_KILL_AGREEMENT = 2;
+/**
+ * How close two installs' reports of a boss must be to count as the same kill, for a first-kill claim. Members in
+ * one raid report a kill within minutes of each other; a week apart is two kills, and neither is backed by two installs.
+ */
+export const FIRST_KILL_WINDOW_MS = 60 * 60_000;
 /** Rows a ladder page shows. */
 export const LADDER_PAGE = 20;
 
@@ -71,6 +76,11 @@ export interface AgreedKill {
   difficulty: number | null;
   /** The earliest report among the agreeing installs, ISO. */
   killedAt: string;
+  /**
+   * The earliest report another install backs within FIRST_KILL_WINDOW_MS, ISO: the time of one kill two installs
+   * saw, which a first-kill claim rests on. Null when no two installs' reports are that close, and for an officers' kill.
+   */
+  occurredAt: string | null;
   installs: number;
   source: KillSource;
 }
@@ -80,6 +90,8 @@ export interface BossProgress {
   name: string;
   killed: boolean;
   killedAt: string | null;
+  /** As AgreedKill.occurredAt. */
+  occurredAt: string | null;
   source: KillSource | null;
 }
 
@@ -205,10 +217,21 @@ export function agreedKills(rows: readonly GuildKillRow[], now: Date, instances:
       key: guildKey(first.realm, first.guildName), guildName: first.guildName.trim(), realm: first.realm.trim(), faction,
       encounterId: first.encounterId, name,
       instanceMapId: first.instanceMapId, difficulty, killedAt: new Date(parseTime(first.capturedAt)!).toISOString(),
-      installs: installs.size, source: "members",
+      occurredAt: backedAt(list), installs: installs.size, source: "members",
     });
   }
   return out.sort((a, b) => a.killedAt.localeCompare(b.killedAt) || a.key.localeCompare(b.key) || a.encounterId - b.encounterId);
+}
+
+/** The earliest report that a report from another install backs within FIRST_KILL_WINDOW_MS, ISO; null when none does. */
+function backedAt(rows: readonly GuildKillRow[]): string | null {
+  const times = rows.map((r) => ({ install: r.installId.trim(), at: parseTime(r.capturedAt)! })).sort((a, b) => a.at - b.at);
+  for (let i = 0; i < times.length; i++) {
+    for (let j = i + 1; j < times.length && times[j]!.at - times[i]!.at <= FIRST_KILL_WINDOW_MS; j++) {
+      if (times[j]!.install !== times[i]!.install) return new Date(times[i]!.at).toISOString();
+    }
+  }
+  return null;
 }
 
 /** The most frequent value; ties go to the one seen first. */
@@ -245,7 +268,7 @@ export function officerKills(
         out.push({
           key: guildKey(board.realm, board.guildName), guildName: board.guildName.trim(), realm: board.realm.trim(), faction: null,
           encounterId: boss.encounterId, name: boss.name, instanceMapId: def.instanceMapId, difficulty: null,
-          killedAt: "", installs: 0, source: "officers",
+          killedAt: "", occurredAt: null, installs: 0, source: "officers",
         });
       }
     }
@@ -279,7 +302,7 @@ export function guildProgression(kills: readonly AgreedKill[], instances: readon
     const byBoss = new Map(list.map((k) => [k.encounterId, k]));
     const bosses: BossProgress[] = def.bosses.map((b) => {
       const k = byBoss.get(b.encounterId);
-      return { encounterId: b.encounterId, name: b.name, killed: Boolean(k), killedAt: k?.killedAt || null, source: k?.source ?? null };
+      return { encounterId: b.encounterId, name: b.name, killed: Boolean(k), killedAt: k?.killedAt || null, occurredAt: k?.occurredAt ?? null, source: k?.source ?? null };
     });
     const timed = list.map((k) => k.killedAt).filter(Boolean).sort();
     const faction = list.find((k) => k.faction)?.faction ?? null;

@@ -1,4 +1,4 @@
-import { popularAddonsFromRecords, type AddonRollup } from "../../../kb/src/addon-rollup";
+import { addonRowsFromRecords, addonTrends, popularAddonsFromRecords, type AddonRollup, type AddonTrend } from "../../../kb/src/addon-rollup";
 import { censusFromRows, type CensusView } from "../../../kb/src/census";
 import { itemFactsFromRecords, recheckLootRecords } from "../../../kb/src/drop-rollup";
 import { observedEdges, type Edge } from "../../../kb/src/edges";
@@ -11,7 +11,7 @@ import { objectSightingRowsFromRecords, type ObjectSpawnRow } from "../../../kb/
 import { worldFactsFromRecords, type WorldFacts } from "../../../kb/src/world-pages";
 import { RECHECK_SCOPES } from "./recheck-scopes";
 import { lootWindowsFromRecords, rollupDrops, type RollupResult } from "./rollups";
-import { uploadStore, type CensusRead } from "./upload-store";
+import { uploadStore, type CensusRead, type Corpus } from "./upload-store";
 
 export interface CorpusStats {
   uploads: number;
@@ -42,6 +42,11 @@ interface AggregateSet {
   /** Items 3 installs saw a recipe make. */
   crafted: Set<number>;
   addons: AddonRollup;
+  /**
+   * Each listed addon's weekly history, by folder name. Only /addons/popular shows it, so it is worked out
+   * on that page's first read of this corpus, not for every caller of these aggregates.
+   */
+  addonTrends: () => Record<string, AddonTrend>;
   edges: Edge[];
   /** The NPC loot and item-source tables, with each source's windows, installs and dates. */
   loot: LootTables;
@@ -65,8 +70,15 @@ function corpusKey(corpus: { uploads: number; records: readonly unknown[]; dataA
   return `${corpus.uploads}|${corpus.dataAsOf ?? ""}|${corpus.records.length}`;
 }
 
-async function loadAggregates(): Promise<AggregateSet | null> {
-  const corpus = await uploadStore.loadCorpus();
+/** The value worked out on the first call and kept for the next. */
+function once<T>(make: () => T): () => T {
+  let value: { v: T } | null = null;
+  return () => (value ??= { v: make() }).v;
+}
+
+/** `read` is a corpus the caller already loaded, so a page that needs the records too reads the store once. */
+async function loadAggregates(read?: Corpus): Promise<AggregateSet | null> {
+  const corpus = read ?? await uploadStore.loadCorpus();
   if (corpus.unreachable) return null;
   const key = corpusKey(corpus);
   if (memoized === null || memoized.key !== key) {
@@ -75,6 +87,8 @@ async function loadAggregates(): Promise<AggregateSet | null> {
     const lootRecords = recheckLootRecords(corpus.records, RECHECK_SCOPES);
     const counted = lootRecords === corpus.records ? windows : lootWindowsFromRecords(lootRecords);
     const items = itemFactsFromRecords(corpus.records, RECHECK_SCOPES);
+    const { records } = corpus;
+    const asOf = corpus.dataAsOf ?? new Date();
     memoized = {
       key,
       uploads: corpus.uploads,
@@ -92,6 +106,7 @@ async function loadAggregates(): Promise<AggregateSet | null> {
       crafted: craftedItemsFromRecords(corpus.records),
       // Addon rows dated after the corpus was current are ignored, so one forged clock cannot set "last seen".
       addons: popularAddonsFromRecords(corpus.records, corpus.dataAsOf ?? new Date()),
+      addonTrends: once(() => addonTrends(addonRowsFromRecords(records), asOf)),
       edges: observedEdges(corpus.records, corpus.dataAsOf ?? new Date(), RECHECK_SCOPES),
       loot: lootTablesFromRecords(lootRecords, corpus.dataAsOf ?? null),
     };
@@ -100,8 +115,8 @@ async function loadAggregates(): Promise<AggregateSet | null> {
 }
 
 /** Every stored upload, loot windows pulled out, rolled up. */
-export async function computeRollups(): Promise<RollupResult & { stats: CorpusStats }> {
-  const agg = await loadAggregates();
+export async function computeRollups(read?: Corpus): Promise<RollupResult & { stats: CorpusStats }> {
+  const agg = await loadAggregates(read);
   if (!agg) return { rates: [], measuredZeros: [], rejected: [], stats: UNREAD };
   return {
     rates: agg.drops.rates,
@@ -125,8 +140,8 @@ export async function loadItemFacts(): Promise<ItemFacts & { unreachable: boolea
 }
 
 /** NPC, quest, and vendor rows from the same uploads. */
-export async function loadWorldFacts(): Promise<WorldFacts & { unreachable: boolean }> {
-  const agg = await loadAggregates();
+export async function loadWorldFacts(read?: Corpus): Promise<WorldFacts & { unreachable: boolean }> {
+  const agg = await loadAggregates(read);
   if (!agg) return { npcs: [], quests: [], vendors: [], unreachable: true };
   return { ...agg.world, unreachable: false };
 }
@@ -170,6 +185,13 @@ export async function loadPopularAddons(): Promise<AddonRollup & { unreachable: 
   const agg = await loadAggregates();
   if (!agg) return { addons: [], reportingInstalls: 0, unreachable: true, dataAsOf: null };
   return { ...agg.addons, unreachable: false, dataAsOf: agg.dataAsOf };
+}
+
+/** The leaderboard and each listed addon's weekly history, for /addons/popular only. */
+export async function loadAddonLeaderboard(): Promise<AddonRollup & { trends: Record<string, AddonTrend>; unreachable: boolean; dataAsOf: string | null }> {
+  const agg = await loadAggregates();
+  if (!agg) return { addons: [], reportingInstalls: 0, trends: {}, unreachable: true, dataAsOf: null };
+  return { ...agg.addons, trends: agg.addonTrends(), unreachable: false, dataAsOf: agg.dataAsOf };
 }
 
 let censusMemo: { read: CensusRead; view: CensusView } | null = null;

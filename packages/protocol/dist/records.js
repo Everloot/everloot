@@ -27,6 +27,9 @@ export const RULES = {
     map_bounds: ["map bounds need a width and a height"],
     talent_snapshot: ["talent points must equal the sum of node ranks", "talent node ids must be unique"],
     item_fact: ["an item fact other than damage_per_second is a whole number"],
+    encounter: ["startedAt and durationSeconds come together"],
+    instance_run: ["kills and wipes add up to pulls", "leftAt cannot be before enteredAt"],
+    pull_summary: ["role and roleSource come together"],
 };
 export const INSTALL_ID = z.string().min(8).max(64).describe("Random install id, no account needed.");
 const base = z.object({
@@ -96,6 +99,10 @@ export const questEvent = base.extend({
     suggestedGroup: z.number().int().min(2).max(40).optional().describe("The suggested group size the quest log shows; absent for a solo quest."),
     tag: z.enum(QUEST_TAGS).optional().describe("The quest tag the game reports, when it reports one."),
 });
+/** Whole seconds a pull lasted. A day is far past any boss. */
+const PULL_SECONDS = z.number().int().min(0).max(86_400);
+/** A run's random id: 16 lowercase hex. */
+const RUN_ID = z.string().regex(/^[0-9a-f]{16}$/);
 /** The instance kinds `GetInstanceInfo` reports for a dungeon (`party`) and a raid. */
 export const INSTANCE_TYPES = ["party", "raid"];
 const INSTANCE_MAP_ID = z.number().int().positive().describe("The instance's map id, the 8th return of `GetInstanceInfo`: a map, not a UiMap.");
@@ -111,8 +118,12 @@ export const instanceEntrance = base.extend({
     x: z.number().min(0).max(100).describe("The player's x there, 0 to 100."),
     y: z.number().min(0).max(100).describe("The player's y there, 0 to 100."),
 });
-/** A boss encounter's end, as `ENCOUNTER_END` reports it. */
-export const encounterEnd = base.extend({
+/**
+ * A boss encounter's end as intake took it before pull timing. While the site's `EVERLOOT_PULL_SUMMARIES` switch is off,
+ * intake parses `encounter` rows with this (`parseRecords(rows, { runRecords: false })`): the timing fields are dropped
+ * unread, as any unknown field is, so an upload gets the same answer it got before they existed.
+ */
+export const encounterEndBeforeRuns = base.extend({
     kind: z.literal("encounter"),
     encounterId: z.number().int().positive(),
     name: z.string().min(1).max(120).describe("The encounter's name in the client's language. Public only when 3 installs agree on it."),
@@ -121,6 +132,42 @@ export const encounterEnd = base.extend({
     size: z.number().int().min(1).max(40).optional().describe("The group size the encounter reports."),
     success: z.boolean().describe("True for a kill, false for a wipe."),
     npcIds: z.array(z.number().int().positive()).max(40).optional().describe("The bosses' creature ids the client listed for the encounter, or the creatures that died in it. Absent when there were none."),
+});
+/** A boss encounter's end, as `ENCOUNTER_END` reports it. */
+export const encounterEnd = encounterEndBeforeRuns.extend({
+    startedAt: z.string().datetime({ offset: true }).optional().describe("When `ENCOUNTER_START` fired for this pull. Absent when the addon did not see the start (older addons, a client restarted mid-fight)."),
+    durationSeconds: PULL_SECONDS.optional().describe("Whole seconds from `ENCOUNTER_START` to `ENCOUNTER_END`. Present only with `startedAt`."),
+    runId: RUN_ID.optional().describe("The `instance_run` this pull belongs to. Absent when the addon had no run open."),
+}).refine((r) => (r.startedAt === undefined) === (r.durationSeconds === undefined), {
+    message: RULES.encounter[0],
+});
+/** Why a run ended: gone 30 minutes, entered another instance, or the instance was reset (the game said so, or a killed boss was pulled again). */
+export const RUN_END_REASONS = ["left", "new_instance", "reset"];
+/**
+ * One dungeon or raid run: from zoning in to leaving it, with the first pull and last kill, so a clear time exists.
+ * Anonymous like `encounter`: counts and ids, no names. Written only for a run with at least one boss pull.
+ */
+export const instanceRun = base.extend({
+    kind: z.literal("instance_run"),
+    runId: RUN_ID.describe("Random id for this run, shared with its `encounter` and `pull_summary` rows."),
+    instanceMapId: INSTANCE_MAP_ID,
+    name: z.string().min(1).max(120).optional().describe("The instance's name as the game showed it, in the client's language."),
+    instanceType: z.enum(INSTANCE_TYPES),
+    difficulty: DIFFICULTY,
+    enteredAt: z.string().datetime({ offset: true }).describe("When the player zoned in (or logged in inside it)."),
+    leftAt: z.string().datetime({ offset: true }).describe("When the player was last seen inside, or zoned out for good."),
+    firstPullAt: z.string().datetime({ offset: true }).optional().describe("The first boss pull's start."),
+    lastKillAt: z.string().datetime({ offset: true }).optional().describe("The last boss kill. Absent when nothing died."),
+    pulls: z.number().int().min(1).max(1000).describe("Boss pulls, kills and wipes together."),
+    kills: z.number().int().min(0).max(1000),
+    wipes: z.number().int().min(0).max(1000),
+    size: z.number().int().min(1).max(40).optional().describe("The largest group size an encounter reported."),
+    killedEncounterIds: z.array(z.number().int().positive()).max(40).optional().describe("The encounters killed, in order."),
+    endReason: z.enum(RUN_END_REASONS),
+}).refine((r) => r.kills + r.wipes === r.pulls, {
+    message: RULES.instance_run[0],
+}).refine((r) => Date.parse(r.leftAt) >= Date.parse(r.enteredAt), {
+    message: RULES.instance_run[1],
 });
 /** A game object the game's vignette API showed on the minimap, such as a treasure chest, at its own position. */
 export const objectSighting = base.extend({
@@ -570,6 +617,54 @@ export const playerSeen = base.extend({
 });
 /** The player-page kind. Never part of the public corpus; intake writes it to the players table, not to the upload. */
 export const PLAYER_KINDS = ["player_seen"];
+// --- Pull summaries: each group member's totals for one boss pull (docs/design/specs/2026-11-02-pull-and-run-records-design.md) ---
+/** How the addon came by a member's role: the group role the game shows, or the larger of healing and damage done. */
+export const PULL_ROLES = ["tank", "healer", "damage"];
+export const ROLE_SOURCES = ["assigned", "inferred"];
+const METER_TOTAL = z.number().int().min(0).max(1_000_000_000_000);
+/** One group member in one pull. A total is absent when the meter had no readable line for it, never zero by default. */
+export const pullMember = z.object({
+    name: z.string().min(2).max(48).refine(validPlayerName, { message: "not a character name" }).describe("UnitName: letters only, 2 to 12 of them."),
+    realm: CENSUS_REALM.optional().describe("Only for a member from another realm than the row's."),
+    class: CENSUS_CLASS,
+    self: z.literal(true).optional().describe("The uploader's own character."),
+    role: z.enum(PULL_ROLES).optional(),
+    roleSource: z.enum(ROLE_SOURCES).optional().describe("`assigned`: UnitGroupRolesAssigned. `inferred`: healer when healing done was larger than damage done, else damage. A tank is never inferred."),
+    damageDone: METER_TOTAL.optional(),
+    healingDone: METER_TOTAL.optional(),
+    damageTaken: METER_TOTAL.optional(),
+    deaths: z.number().int().min(0).max(1000).optional(),
+}).refine((m) => (m.role === undefined) === (m.roleSource === undefined), { message: RULES.pull_summary[0] });
+/**
+ * One boss pull with each group member's totals from the game's own damage meter. Names other players, as Warcraft
+ * Logs does for whoever uploads: on in the addon until `/everloot pulls off`, sent from the upload page or the Desktop
+ * App, kept out of the upload object and the public corpus, and stored where a hidden character can be deleted.
+ */
+export const pullSummary = base.extend({
+    kind: z.literal("pull_summary"),
+    encounterId: z.number().int().positive(),
+    name: z.string().min(1).max(120).describe("The encounter's name in the client's language."),
+    instanceMapId: INSTANCE_MAP_ID,
+    difficulty: DIFFICULTY,
+    size: z.number().int().min(1).max(40).optional(),
+    success: z.boolean().describe("True for a kill, false for a wipe."),
+    startedAt: z.string().datetime({ offset: true }).optional(),
+    durationSeconds: PULL_SECONDS.optional(),
+    runId: RUN_ID.optional(),
+    realm: CENSUS_REALM.optional().describe("GetRealmName(): the realm the addon runs on."),
+    meterSeconds: PULL_SECONDS.optional().describe("The damage meter's own length for the fight it totalled. Far from `durationSeconds` means the totals cover more or less than the pull."),
+    members: z.array(pullMember).min(1).max(40),
+}).refine((r) => (r.startedAt === undefined) === (r.durationSeconds === undefined), {
+    message: RULES.encounter[0],
+});
+/** The pull summary kind. Named, so never in an upload object or the public corpus; intake writes it to its own tables. */
+export const PULL_KINDS = ["pull_summary"];
+/**
+ * The kinds that exist only once the site collects runs and pulls (`EVERLOOT_PULL_SUMMARIES`). Until then intake parses
+ * with `{ runRecords: false }` and these are unknown kinds, as they were before; an uploader holds them until a receipt
+ * says `runRecords: true`.
+ */
+export const RUN_RECORD_KINDS = ["instance_run", "pull_summary"];
 // --- Guild kills: a boss kill credited to the player's own guild (docs/design/specs/2026-10-24-guild-board-design.md) ---
 // Written by the players module on ENCOUNTER_END with success, when the game shows the player a guild. The row
 // names the guild and the boss, never a character. A kill is the guild's once 2 installs report it.
@@ -625,6 +720,7 @@ export const recordSchemas = {
     item_seen: itemSeen,
     instance_entrance: instanceEntrance,
     encounter: encounterEnd,
+    instance_run: instanceRun,
     object_sighting: objectSighting,
     item_fact: itemFact,
     guild_snapshot: guildSnapshot,
@@ -658,6 +754,7 @@ export const recordSchemas = {
     player_seen: playerSeen,
     character_link: characterLink,
     guild_kill: guildKill,
+    pull_summary: pullSummary,
 };
 export const ALL_RECORD_KINDS = Object.keys(recordSchemas);
 /**
@@ -683,6 +780,8 @@ const PUBLIC_KIND_LIST = [
     // So is guild_kill (GUILD_KILL_KINDS): one install's row is not yet a fact, and a hidden guild's rows must not
     // leave. Kills reach the public only through the guild pages, the guild tools and the guild export files, which
     // count the 2-install bar, leave hidden guilds out and answer only while EVERLOOT_GUILDS is on.
+    // So are instance_run and pull_summary (PULL_KINDS): runs wait for a rollup with its own agreement rule, and pull
+    // summaries name other players, so nothing shows them until the owner's public-character policy says how.
 ];
 export const PUBLIC_RECORD_KINDS = PUBLIC_KIND_LIST;
 export const anyRecord = z.discriminatedUnion("kind", [
@@ -691,6 +790,7 @@ export const anyRecord = z.discriminatedUnion("kind", [
     collectionCatalog, collectionOwned, achievementCatalog, reputationCatalog, titleCatalog, questChainCatalog,
     achievementOwned, reputationOwned, titleOwned, questOwned, auctionScan, auctionSnapshot, recipeSeen, priceSeen, recipeObserved, trainerSeen,
     goldSnapshot, moneyEvent, addonSeen, mapBounds, talentSnapshot, censusSelf, censusSeen, playerSeen, characterLink, guildKill,
+    instanceRun, pullSummary,
 ]);
 /** Where an upload's rows came from when the Everloot addon did not write them. */
 export const UPLOAD_SOURCES = ["polestar_recorder"];
