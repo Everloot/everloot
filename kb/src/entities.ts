@@ -2,10 +2,15 @@ import type { DB } from "./db.js";
 import { allTerms } from "./search.js";
 import { SOURCES, type SourceId } from "./sources.js";
 
-export type Kind = "item" | "npc" | "object" | "quest" | "zone" | "spell" | "lore_page" | "creator" | "realm";
+export type Kind =
+  | "item" | "npc" | "object" | "quest" | "zone" | "spell" | "lore_page" | "creator" | "realm"
+  | "achievement" | "faction" | "title" | "quest_chain" | "mount" | "legacy_perk" | "race" | "instance";
 export type GameVersion = "forever" | "classic" | "retail" | "lore";
 
-export const ALL_KINDS: Kind[] = ["item", "npc", "object", "quest", "zone", "spell", "lore_page", "creator", "realm"];
+export const ALL_KINDS: Kind[] = [
+  "item", "npc", "object", "quest", "zone", "spell", "lore_page", "creator", "realm",
+  "achievement", "faction", "title", "quest_chain", "mount", "legacy_perk", "race", "instance",
+];
 export const ALL_GAME_VERSIONS: GameVersion[] = ["forever", "classic", "retail", "lore"];
 
 export interface EntityInput {

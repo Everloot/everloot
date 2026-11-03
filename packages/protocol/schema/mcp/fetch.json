@@ -54,7 +54,15 @@
               "spell",
               "lore_page",
               "creator",
-              "realm"
+              "realm",
+              "achievement",
+              "faction",
+              "title",
+              "quest_chain",
+              "mount",
+              "legacy_perk",
+              "race",
+              "instance"
             ]
           },
           "gameVersion": {

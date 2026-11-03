@@ -7,7 +7,7 @@ import { z } from "zod";
  * minor release, tool by tool.
  */
 /** Record kinds in the knowledge release (lore and reference data). */
-export declare const KNOWLEDGE_KINDS: readonly ["item", "npc", "object", "quest", "zone", "spell", "lore_page", "creator", "realm"];
+export declare const KNOWLEDGE_KINDS: readonly ["item", "npc", "object", "quest", "zone", "spell", "lore_page", "creator", "realm", "achievement", "faction", "title", "quest_chain", "mount", "legacy_perk", "race", "instance"];
 /** Game versions a knowledge record can belong to. */
 export declare const GAME_VERSIONS: readonly ["forever", "classic", "retail", "lore"];
 /** Entities relation edges connect. A zone is a UiMap id. */
@@ -1023,14 +1023,22 @@ export declare const fetchedDocument: z.ZodObject<{
     url: z.ZodString;
     metadata: z.ZodObject<{
         kind: z.ZodEnum<{
+            achievement: "achievement";
             creator: "creator";
+            faction: "faction";
+            instance: "instance";
             item: "item";
+            legacy_perk: "legacy_perk";
             lore_page: "lore_page";
+            mount: "mount";
             npc: "npc";
             object: "object";
             quest: "quest";
+            quest_chain: "quest_chain";
+            race: "race";
             realm: "realm";
             spell: "spell";
+            title: "title";
             zone: "zone";
         }>;
         gameVersion: z.ZodEnum<{
@@ -1052,14 +1060,22 @@ export declare const knowledgeHit: z.ZodObject<{
     id: z.ZodNumber;
     extId: z.ZodString;
     kind: z.ZodEnum<{
+        achievement: "achievement";
         creator: "creator";
+        faction: "faction";
+        instance: "instance";
         item: "item";
+        legacy_perk: "legacy_perk";
         lore_page: "lore_page";
+        mount: "mount";
         npc: "npc";
         object: "object";
         quest: "quest";
+        quest_chain: "quest_chain";
+        race: "race";
         realm: "realm";
         spell: "spell";
+        title: "title";
         zone: "zone";
     }>;
     name: z.ZodString;
@@ -1148,14 +1164,22 @@ export declare const MCP_TOOLS: {
         readonly inputSchema: {
             query: z.ZodString;
             kind: z.ZodOptional<z.ZodEnum<{
+                achievement: "achievement";
                 creator: "creator";
+                faction: "faction";
+                instance: "instance";
                 item: "item";
+                legacy_perk: "legacy_perk";
                 lore_page: "lore_page";
+                mount: "mount";
                 npc: "npc";
                 object: "object";
                 quest: "quest";
+                quest_chain: "quest_chain";
+                race: "race";
                 realm: "realm";
                 spell: "spell";
+                title: "title";
                 zone: "zone";
             }>>;
             version: z.ZodOptional<z.ZodEnum<{
@@ -1171,14 +1195,22 @@ export declare const MCP_TOOLS: {
                 id: z.ZodNumber;
                 extId: z.ZodString;
                 kind: z.ZodEnum<{
+                    achievement: "achievement";
                     creator: "creator";
+                    faction: "faction";
+                    instance: "instance";
                     item: "item";
+                    legacy_perk: "legacy_perk";
                     lore_page: "lore_page";
+                    mount: "mount";
                     npc: "npc";
                     object: "object";
                     quest: "quest";
+                    quest_chain: "quest_chain";
+                    race: "race";
                     realm: "realm";
                     spell: "spell";
+                    title: "title";
                     zone: "zone";
                 }>;
                 name: z.ZodString;
@@ -1212,14 +1244,22 @@ export declare const MCP_TOOLS: {
                 id: z.ZodNumber;
                 extId: z.ZodString;
                 kind: z.ZodEnum<{
+                    achievement: "achievement";
                     creator: "creator";
+                    faction: "faction";
+                    instance: "instance";
                     item: "item";
+                    legacy_perk: "legacy_perk";
                     lore_page: "lore_page";
+                    mount: "mount";
                     npc: "npc";
                     object: "object";
                     quest: "quest";
+                    quest_chain: "quest_chain";
+                    race: "race";
                     realm: "realm";
                     spell: "spell";
+                    title: "title";
                     zone: "zone";
                 }>;
                 name: z.ZodString;
@@ -1248,14 +1288,22 @@ export declare const MCP_TOOLS: {
         readonly inputSchema: {
             readonly name: z.ZodString;
             readonly kind: z.ZodOptional<z.ZodEnum<{
+                achievement: "achievement";
                 creator: "creator";
+                faction: "faction";
+                instance: "instance";
                 item: "item";
+                legacy_perk: "legacy_perk";
                 lore_page: "lore_page";
+                mount: "mount";
                 npc: "npc";
                 object: "object";
                 quest: "quest";
+                quest_chain: "quest_chain";
+                race: "race";
                 realm: "realm";
                 spell: "spell";
+                title: "title";
                 zone: "zone";
             }>>;
         };
@@ -1264,14 +1312,22 @@ export declare const MCP_TOOLS: {
                 id: z.ZodNumber;
                 extId: z.ZodString;
                 kind: z.ZodEnum<{
+                    achievement: "achievement";
                     creator: "creator";
+                    faction: "faction";
+                    instance: "instance";
                     item: "item";
+                    legacy_perk: "legacy_perk";
                     lore_page: "lore_page";
+                    mount: "mount";
                     npc: "npc";
                     object: "object";
                     quest: "quest";
+                    quest_chain: "quest_chain";
+                    race: "race";
                     realm: "realm";
                     spell: "spell";
+                    title: "title";
                     zone: "zone";
                 }>;
                 name: z.ZodString;
@@ -1325,14 +1381,22 @@ export declare const MCP_TOOLS: {
             url: z.ZodString;
             metadata: z.ZodObject<{
                 kind: z.ZodEnum<{
+                    achievement: "achievement";
                     creator: "creator";
+                    faction: "faction";
+                    instance: "instance";
                     item: "item";
+                    legacy_perk: "legacy_perk";
                     lore_page: "lore_page";
+                    mount: "mount";
                     npc: "npc";
                     object: "object";
                     quest: "quest";
+                    quest_chain: "quest_chain";
+                    race: "race";
                     realm: "realm";
                     spell: "spell";
+                    title: "title";
                     zone: "zone";
                 }>;
                 gameVersion: z.ZodEnum<{
@@ -2825,14 +2889,22 @@ export declare const MCP_TOOL_LIST: ({
     inputSchema: {
         query: z.ZodString;
         kind: z.ZodOptional<z.ZodEnum<{
+            achievement: "achievement";
             creator: "creator";
+            faction: "faction";
+            instance: "instance";
             item: "item";
+            legacy_perk: "legacy_perk";
             lore_page: "lore_page";
+            mount: "mount";
             npc: "npc";
             object: "object";
             quest: "quest";
+            quest_chain: "quest_chain";
+            race: "race";
             realm: "realm";
             spell: "spell";
+            title: "title";
             zone: "zone";
         }>>;
         version: z.ZodOptional<z.ZodEnum<{
@@ -2848,14 +2920,22 @@ export declare const MCP_TOOL_LIST: ({
             id: z.ZodNumber;
             extId: z.ZodString;
             kind: z.ZodEnum<{
+                achievement: "achievement";
                 creator: "creator";
+                faction: "faction";
+                instance: "instance";
                 item: "item";
+                legacy_perk: "legacy_perk";
                 lore_page: "lore_page";
+                mount: "mount";
                 npc: "npc";
                 object: "object";
                 quest: "quest";
+                quest_chain: "quest_chain";
+                race: "race";
                 realm: "realm";
                 spell: "spell";
+                title: "title";
                 zone: "zone";
             }>;
             name: z.ZodString;
@@ -2889,14 +2969,22 @@ export declare const MCP_TOOL_LIST: ({
             id: z.ZodNumber;
             extId: z.ZodString;
             kind: z.ZodEnum<{
+                achievement: "achievement";
                 creator: "creator";
+                faction: "faction";
+                instance: "instance";
                 item: "item";
+                legacy_perk: "legacy_perk";
                 lore_page: "lore_page";
+                mount: "mount";
                 npc: "npc";
                 object: "object";
                 quest: "quest";
+                quest_chain: "quest_chain";
+                race: "race";
                 realm: "realm";
                 spell: "spell";
+                title: "title";
                 zone: "zone";
             }>;
             name: z.ZodString;
@@ -2925,14 +3013,22 @@ export declare const MCP_TOOL_LIST: ({
     inputSchema: {
         readonly name: z.ZodString;
         readonly kind: z.ZodOptional<z.ZodEnum<{
+            achievement: "achievement";
             creator: "creator";
+            faction: "faction";
+            instance: "instance";
             item: "item";
+            legacy_perk: "legacy_perk";
             lore_page: "lore_page";
+            mount: "mount";
             npc: "npc";
             object: "object";
             quest: "quest";
+            quest_chain: "quest_chain";
+            race: "race";
             realm: "realm";
             spell: "spell";
+            title: "title";
             zone: "zone";
         }>>;
     };
@@ -2941,14 +3037,22 @@ export declare const MCP_TOOL_LIST: ({
             id: z.ZodNumber;
             extId: z.ZodString;
             kind: z.ZodEnum<{
+                achievement: "achievement";
                 creator: "creator";
+                faction: "faction";
+                instance: "instance";
                 item: "item";
+                legacy_perk: "legacy_perk";
                 lore_page: "lore_page";
+                mount: "mount";
                 npc: "npc";
                 object: "object";
                 quest: "quest";
+                quest_chain: "quest_chain";
+                race: "race";
                 realm: "realm";
                 spell: "spell";
+                title: "title";
                 zone: "zone";
             }>;
             name: z.ZodString;
@@ -3002,14 +3106,22 @@ export declare const MCP_TOOL_LIST: ({
         url: z.ZodString;
         metadata: z.ZodObject<{
             kind: z.ZodEnum<{
+                achievement: "achievement";
                 creator: "creator";
+                faction: "faction";
+                instance: "instance";
                 item: "item";
+                legacy_perk: "legacy_perk";
                 lore_page: "lore_page";
+                mount: "mount";
                 npc: "npc";
                 object: "object";
                 quest: "quest";
+                quest_chain: "quest_chain";
+                race: "race";
                 realm: "realm";
                 spell: "spell";
+                title: "title";
                 zone: "zone";
             }>;
             gameVersion: z.ZodEnum<{

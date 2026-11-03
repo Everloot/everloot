@@ -8,7 +8,10 @@ import { ITEM_FACTS } from "./records.js";
  * minor release, tool by tool.
  */
 /** Record kinds in the knowledge release (lore and reference data). */
-export const KNOWLEDGE_KINDS = ["item", "npc", "object", "quest", "zone", "spell", "lore_page", "creator", "realm"];
+export const KNOWLEDGE_KINDS = [
+    "item", "npc", "object", "quest", "zone", "spell", "lore_page", "creator", "realm",
+    "achievement", "faction", "title", "quest_chain", "mount", "legacy_perk", "race", "instance",
+];
 /** Game versions a knowledge record can belong to. */
 export const GAME_VERSIONS = ["forever", "classic", "retail", "lore"];
 /** Entities relation edges connect. A zone is a UiMap id. */
