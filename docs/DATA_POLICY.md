@@ -222,7 +222,7 @@ Game files show what exists; play shows what is real. Everloot keeps the two apa
 is which.
 
 **What the game files contain.** *Status: the table data is not published yet, except the talent catalog, the map layer, the
-raid buff table, the client layer, the race table, the Legacy perk catalog and the build changes described below.* A maintainer can read tables of a game's current build from the files Blizzard's
+raid buff table, the client layer, the race table, the Legacy perk catalog, the faction, title and quest line tables and the build changes described below.* A maintainer can read tables of a game's current build from the files Blizzard's
 launcher downloads from its public CDN, the same files every player receives, and compare two
 builds field by field. The [source ledger](sources/LEDGER.md) lists the tables we read. Those
 snapshots and comparisons stay on the maintainer's machine. Encrypted blocks are skipped, never

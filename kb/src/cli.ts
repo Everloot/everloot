@@ -20,6 +20,9 @@ import { writeClientMounts } from "./client-mounts.js";
 import { writeClientClassGear } from "./client-class-gear.js";
 import { writeClientClassSpells } from "./client-class-spells.js";
 import { writeClientRecipes } from "./client-recipes.js";
+import { writeClientFactions } from "./client-factions.js";
+import { writeClientTitles } from "./client-titles.js";
+import { writeClientQuestLines } from "./client-quest-lines.js";
 import { writeClientLayer } from "./client-layer.js";
 import { writeRaceTable } from "./client-races.js";
 import { evaluateWritten, formatAnswerEval, openAiCompatible, sampleKeyed } from "./answer-eval.js";
@@ -204,6 +207,12 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
   client-recipes <snapshot.sqlite> [--out ../web/src/data/game-data/client-recipes.json]
     (every recipe on each profession's skill line with the item it makes, its reagents and the files' skill ranks,
     one build-stamped file the profession pages list. Pages only, as above)
+  client-factions <snapshot.sqlite> [--out ../web/src/data/game-data/client-factions.json]
+    (every faction with its parent and whether it shows in the reputation pane. Pages and search, as above)
+  client-titles <snapshot.sqlite> [--out ../web/src/data/game-data/client-titles.json]
+    (every character title, the %s placeholder kept. Pages and search, as above)
+  client-quest-lines <snapshot.sqlite> [--out ../web/src/data/game-data/client-quest-lines.json]
+    (every quest line with its quest ids in order. Pages and search, as above)
   item-names <snapshot.sqlite> --wiki <knowledge base or release .sqlite> [--ledger data/item-names/ledger.json] [--out data/assets]
     (adds the snapshot's item names and the Warcraft Wiki dump's item names to the name ledger, which only
     grows, and writes the name the site shows for every item a source names (the game files' first, with the wiki
@@ -715,6 +724,27 @@ async function main(): Promise<number> {
       const path = flags.get("out") || "../web/src/data/game-data/client-recipes.json";
       const table = writeClientRecipes(args[0], path);
       console.log(`${table.build.product} ${table.build.version}: ${table.professions.length} professions, ${table.professions.reduce((n, p) => n + p.recipes.length, 0)} recipes -> ${path}`);
+      return 0;
+    }
+    case "client-factions": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-factions.json";
+      const table = writeClientFactions(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${table.factions.length} factions -> ${path}`);
+      return 0;
+    }
+    case "client-titles": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-titles.json";
+      const table = writeClientTitles(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${table.titles.length} titles -> ${path}`);
+      return 0;
+    }
+    case "client-quest-lines": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-quest-lines.json";
+      const table = writeClientQuestLines(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${table.questLines.length} quest lines -> ${path}`);
       return 0;
     }
     case "client-diff": {
