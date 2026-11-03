@@ -15,6 +15,9 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
+- Site: search finds Everloot's own published guides (the dungeon and raid pages) by title, with or without the leading
+  "The", in a Guides group above the lore archive. Before, "Deadmines" found a cleaver and archive pages but not the guide.
+- Site: `/ask` sends the visitor to the chat at `/chat` instead of a 404; the addon's command and the header both say Ask.
 - Addon and companion: when `/ask` cannot be answered (the companion offline, no model set up), the reason is shown once and
   the question stays queued, so the retry's answer still reaches the game. Before, the question was dropped and a later answer never
   appeared. After each `/reload` the addon says how many questions are still waiting. Needs the next addon and Desktop App

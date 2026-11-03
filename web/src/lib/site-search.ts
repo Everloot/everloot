@@ -11,6 +11,7 @@ import { CLASSES } from "@/design/tokens";
 import { loreSlug, MAX_QUERY, searchLore, searchLoreSomeWords, UNAVAILABLE } from "./lore";
 import { loadNames, type Names } from "./names";
 import { loadObjectFacts } from "./objects";
+import { loadWiki, publishedPages, wikiHref } from "./wiki";
 import { WORLD_MAP } from "./world-map";
 import { zoneHref } from "./zones";
 
@@ -20,18 +21,18 @@ import { zoneHref } from "./zones";
  * the item is in the build.
  */
 export interface SearchResult { label: string; href: string; note?: string; exact: boolean; id?: number; quality?: number | null; meta?: string }
-export type SearchType = "class" | "item" | "npc" | "quest" | "object" | "achievement" | "faction" | "title" | "chain" | "zone" | "lore" | "tool" | "doc";
+export type SearchType = "class" | "item" | "npc" | "quest" | "object" | "achievement" | "faction" | "title" | "chain" | "zone" | "guide" | "lore" | "tool" | "doc";
 /** `total` counts every match; `results` holds the first `limit` of them. */
 export interface SearchGroup { type: SearchType; heading: string; results: SearchResult[]; total: number }
 export const GROUP_LIMIT = 8;
 export const LORE_LIMIT = 5;
 
 export const HEADINGS: Record<SearchType, string> = {
-  class: "Classes", item: "Items", npc: "NPCs", quest: "Quests", object: "Objects", achievement: "Achievements", faction: "Factions", title: "Titles", chain: "Quest chains", zone: "Zones", lore: "Lore archive", tool: "Tools", doc: "Docs",
+  class: "Classes", item: "Items", npc: "NPCs", quest: "Quests", object: "Objects", achievement: "Achievements", faction: "Factions", title: "Titles", chain: "Quest chains", zone: "Zones", guide: "Guides", lore: "Lore archive", tool: "Tools", doc: "Docs",
 };
 /** The lore group's heading when its pages hold only some of the asked words. */
 export const LORE_SOME_WORDS = "Lore archive, some of your words";
-const ORDER: SearchType[] = ["class", "item", "npc", "quest", "object", "achievement", "faction", "title", "chain", "zone", "lore", "tool", "doc"];
+const ORDER: SearchType[] = ["class", "item", "npc", "quest", "object", "achievement", "faction", "title", "chain", "zone", "guide", "lore", "tool", "doc"];
 /** The types a search can be scoped to (`/search?q=…&in=item`); `in=lore` is the lore archive's own list. */
 export const SCOPES = ["item", "npc", "quest", "object"] as const satisfies readonly SearchType[];
 export type Scope = (typeof SCOPES)[number];
@@ -143,6 +144,16 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, names
       .map((slug) => ({ label: classLabel(slug), href: `/classes/${slug}`, note: "Guides, talents and who can play it", exact: q.replace(/s$/, "") === slug }));
     found.set("class", { results: classes, total: classes.length });
 
+    // Everloot's own guides (dungeons, raids, races), published pages only: by title, with or without a leading
+    // "The", then by summary. They are the Forever record, so they sit with the database groups, above the archive.
+    const guides = publishedPages(loadWiki()).flatMap((p) => {
+      const t = p.title.toLowerCase();
+      const best = Math.min(rank(t, q) ?? 9, rank(t.replace(/^the /, ""), q) ?? 9);
+      const r = best < 9 ? best : p.summary.toLowerCase().includes(q) ? 3 : null;
+      return r === null ? [] : [{ label: p.title, href: wikiHref(p.slug), note: p.summary, exact: r === 0, r }];
+    }).sort((a, b) => a.r - b.r).map(({ r: _r, ...hit }) => hit);
+    found.set("guide", { results: guides, total: guides.length });
+
     const lore = await searchLore(text, 1);
     if (lore !== UNAVAILABLE) {
       const loreHit = (h: SearchHit) => ({ label: h.name, href: `/lore/${loreSlug(h)}`, note: h.snippet, exact: h.name.toLowerCase() === q });
@@ -183,7 +194,7 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, names
 
 /** The things a player meets in the game: their groups lead the page. */
 const GAME: ReadonlySet<SearchType> = new Set(["item", "npc", "quest", "object", "zone"]);
-const DATABASE: ReadonlySet<SearchType> = new Set([...GAME, "class", "achievement", "faction", "title", "chain"]);
+const DATABASE: ReadonlySet<SearchType> = new Set([...GAME, "class", "achievement", "faction", "title", "chain", "guide"]);
 
 /**
  * Where a group sits, lowest first; the order above within a tier. An exact name or id on a game entry leads,

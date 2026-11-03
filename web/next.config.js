@@ -141,6 +141,8 @@ const nextConfig = {
       { source: "/tools/gold-per-hour", destination: "/addon#gold-per-hour", statusCode: 301 },
       // The developer page became the docs; docs/page.tsx sends its old #anchors on to the matching page.
       { source: "/connect", destination: "/docs", permanent: true },
+      // The addon's command is /ask and the header says Ask, so the typed URL lands on the chat.
+      { source: "/ask", destination: "/chat", permanent: true },
       // The notice for a version without a snapshot lives at its prefix, not at its internal route.
       { source: `/game-version/:id(${Object.keys(versions.prefixes).join("|")})`, destination: "/:id", permanent: true },
     ];
