@@ -3,7 +3,8 @@
  * `OrderIndex` order (ties by row id). A line with no quest rows keeps an empty list. A line with no name, or whose
  * name marks it as a development leftover, is left out.
  *
- * Blizzard's data, labelled "found in game files, unconfirmed", pages only. The build watch regenerates it.
+ * Blizzard's data, labelled "found in game files, unconfirmed". The site's pages and the knowledge search (catalog-index.ts)
+ * read it. The build watch regenerates it.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";

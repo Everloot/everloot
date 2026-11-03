@@ -3,7 +3,8 @@
  * whether it shows in the reputation pane (`Faction.ReputationIndex` is a slot number; a faction with no slot there
  * holds -1, which the unsigned column in the 1.60.1 files reads back as 255). A faction with no name, or whose name marks it as a development leftover, is left out.
  *
- * Blizzard's data, labelled "found in game files, unconfirmed", pages only. The build watch regenerates it.
+ * Blizzard's data, labelled "found in game files, unconfirmed". The site's pages and the knowledge search (catalog-index.ts,
+ * shown factions only) read it. The build watch regenerates it.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";

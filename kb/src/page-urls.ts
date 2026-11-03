@@ -146,8 +146,9 @@ const PUBLISHABLE = Object.values(SOURCES).filter((s) => s.publishable).map((s) 
 const LORE_BATCH = 90;
 
 /**
- * The lore page of each record that has a full one on the site, by record id: a lore page from a
- * publishable source with enough text, not a redirect stub. Other records get none.
+ * The page of each record that has one on the site, by record id: a lore page from a publishable source with
+ * enough text, not a redirect stub, and a game-file catalog record (catalog-index.ts) with its database page.
+ * Other records get none.
  */
 export async function loreUrls(source: ReleaseSource, rows: readonly { id: number; extId: string; name: string; kind: string }[]): Promise<Map<number, string>> {
   const out = new Map<number, string>();

@@ -15,7 +15,7 @@ to the registry for it.
 3. Call `search` for `Deadmines`. Expect the instance hit.
 4. For each hit, confirm the licence line carries Blizzard's credit.
 5. Open the url on each hit. These must load:
-   - `/database/factions/1-stormwind`
+   - `/database/factions/72-stormwind`
    - `/database/instances/36-deadmines`
 
 If a hit is missing, check the deploy first, then the committed JSON for that kind. Do not cut a release to
