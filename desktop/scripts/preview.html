@@ -1,0 +1,100 @@
+<!doctype html>
+<!-- The page in a plain browser, with window.everloot stubbed, for design checks without running Electron:
+     run `npm run build`, then open this file. `?live=1` shows a watched file with data; `?page=upload` opens a page.
+     window.__go(page) switches pages from the console. Nothing here ships: build.mjs copies only src/renderer. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Everloot preview</title>
+  <link rel="stylesheet" href="../dist/renderer/styles.css">
+  <script>
+    const q = new URLSearchParams(location.search);
+    const live = q.get("live") === "1";
+    const t = (minutesAgo) => new Date(Date.now() - minutesAgo * 60000).toISOString();
+    const folder = "W:\\World of Warcraft\\_classic_era_";
+    const days = Array.from({ length: 30 }, (_, i) => {
+      const d = new Date(Date.now() - (29 - i) * 86400000);
+      return { date: d.toISOString().slice(0, 10), earned: i % 3 === 0 ? 0 : 20000 + ((i * 7919) % 90000), spent: i % 4 === 0 ? 0 : 5000 + ((i * 104729) % 40000) };
+    });
+    const history = Array.from({ length: 14 }, (_, i) => ({ at: t((13 - i) * 1440), copper: 800000 + i * 60000 + ((i * 31) % 7) * 10000 }));
+    const character = {
+      character: "Hakoovak", realm: "Moon Guard", gold: 1634500, peakGold: 1700000, gearSlots: 14, itemLevel: 41,
+      equipped: ["head", "neck", "shoulder", "back", "chest", "wrist", "hands", "waist", "legs", "feet", "finger1", "finger2", "trinket1", "mainhand"].map((slot, i) => ({ slot, itemLevel: 36 + (i % 5) })),
+      spent: { repair: 120000, vendor: 340000, auction_house: 210000, mail: 4000 }, earned: { quest_reward: 900000, vendor: 420000, loot: 310000, auction_house: 160000 },
+      history, week: { earned: 112000, spent: 48000 }, days,
+      receipts: [{ at: t(30), category: "quest_reward", copper: 12500, direction: "in" }, { at: t(95), category: "repair", copper: 4200, direction: "out" }, { at: t(400), category: "auction_house", copper: 90000, direction: "in" }],
+    };
+    const engine = live
+      ? { files: [folder + "\\WTF\\Account\\TESTACC\\SavedVariables\\Everloot.lua"], paused: false,
+          jobs: { upload: { state: "ok", message: "sent 12 new events in 1 batch; kept 3 named, 1 installed-addon and 0 legacy rows here", at: t(4) }, prices: { state: "running", message: "fetching prices for 2 realm(s)", at: t(61) }, ask: { state: "off", message: "", at: null } },
+          log: [
+            { at: t(120), level: "info", text: "Watching 1 account file(s) in " + folder },
+            { at: t(61), level: "info", text: "prices: 1,204 items on 2 realm(s) written; /reload in game to see them" },
+            { at: t(30), level: "info", text: "upload TESTACC: file settled after logout" },
+            { at: t(4), level: "info", text: "upload TESTACC: sent 12 new events in 1 batch; kept 3 named, 1 installed-addon and 0 legacy rows here" },
+            { at: t(1), level: "info", text: "prices: fetching prices for 2 realm(s)" },
+          ] }
+      : { files: [], paused: false, jobs: { upload: { state: "idle", message: "", at: null }, prices: { state: "idle", message: "", at: null }, ask: { state: "off", message: "", at: null } },
+          log: [{ at: t(3), level: "info", text: "No Everloot.lua under " + folder + ". Log out once so the game writes it." }] };
+    const state = {
+      version: "0.1.17", platform: "win32", dataFolder: "C:\\Users\\you\\AppData\\Roaming\\Everloot", notice: null,
+      settings: { gameFolder: folder, keptGameFolder: null, endpoint: "https://everloot.app", upload: true, prices: true, census: true, players: false,
+        ask: { enabled: false, mcpUrl: "https://everloot.app/mcp", tokenFile: null }, market: { realms: live ? ["Moon Guard", "Nightslayer"] : [], dismissed: [] },
+        consentedAt: "2026-11-01T00:00:00Z", launchAtLogin: false, startInTray: true, dataNoticeDismissed: false },
+      foreverFolder: null, engine, update: null, updateProgress: { stage: "idle", percent: 0, error: null }, staleScans: [],
+      account: { signedIn: true, hint: "5f65" }, builds: { state: "off", message: "", syncedAt: null, builds: null },
+    };
+    const fixtures = {
+      state, uploadInfo: live ? [{ file: engine.files[0], ok: true, error: null, writtenAt: t(30), bytes: 418000, addonVersion: "0.3.15", clientBuild: "1.60.1.70707", records: 2410, confirmed: 1880, kinds: [{ kind: "loot", count: 1200 }, { kind: "vendor", count: 640 }, { kind: "quest", count: 300 }, { kind: "spawn", count: 270 }] }] : [],
+      backups: live ? [{ file: "TESTACC-2026-11-02T23-00-00Z.lua", account: "TESTACC", at: t(4), bytes: 418000 }] : [],
+      marketInfo: { own: live ? ["Moon Guard"] : [], followed: live ? ["Moon Guard", "Nightslayer"] : [], suggested: [], known: live ? ["Moon Guard", "Nightslayer", "Dreamscythe"] : [], dataAsOf: live ? t(90) : null,
+        last: live ? [{ realm: "Moon Guard", items: 812, dataAsOf: t(90), why: "" }, { realm: "Nightslayer", items: 392, dataAsOf: t(90), why: "" }] : [], scans: live ? [{ realm: "Moon Guard", at: t(300) }] : [], error: null, inGame: null },
+      askInfo: { pending: [], answers: [], providers: [], providerError: null },
+      addonInfo: { addonsDir: folder + "\\Interface\\AddOns", installed: "0.3.15", latest: { version: "0.3.15", url: "https://everloot.app/addon" }, newer: false, slots: { prices: live, answers: false, builds: false }, error: null },
+      changes: [
+        { title: "Build: WoW: Forever build 1.60.1.70707", link: "https://everloot.app/changes", date: t(2000), summary: "" },
+        { title: "Blue post: Forever launches November 4 at 3 PM PT", link: "https://everloot.app/changes", date: t(3000), summary: "Raids open December 9." },
+        { title: "Blue post: Beta realm maintenance", link: "https://everloot.app/changes", date: t(5000), summary: "" },
+      ],
+      charactersInfo: { characters: live ? [character] : [], progress: [], talents: [] },
+      chatInfo: { messages: [], mode: "plain search", mcpUrl: "https://everloot.app/mcp", withToken: false, withAccountKey: true, provider: null, providers: [], busy: false, error: null },
+      chatModels: [], dataUsage: { total: 2048000, parts: { backups: 1024000, updates: 0, chat: 1000, uploads: 20000, settings: 1000, other: 0 }, notice: false },
+      detectGameFolders: [], saveSettings: state,
+    };
+    let navigate = null;
+    window.everloot = new Proxy({}, {
+      get: (_, name) => {
+        if (name === "onState" || name === "onChatProgress") return () => () => {};
+        if (name === "onNavigate") return (cb) => { navigate = cb; return () => {}; };
+        return () => Promise.resolve(fixtures[name]);
+      },
+    });
+    window.__go = (page) => navigate && navigate(page);
+    // The page id comes from an allowlist, never from the query string itself.
+    const PAGES = ["overview", "chat", "characters", "upload", "market", "ask", "addon", "changes", "log", "settings"];
+    addEventListener("load", () => { const p = PAGES.find((id) => id === q.get("page")); if (p) setTimeout(() => window.__go(p), 50); });
+  </script>
+</head>
+<body>
+  <div id="shell" class="shell">
+    <aside id="side" class="side" hidden>
+      <div class="brand">
+        <svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" class="mark-bg"/><path d="M32 12 52 32 32 52 12 32Z" fill="none" stroke="currentColor" stroke-width="5" stroke-linejoin="round"/></svg>
+        <span>Everloot</span>
+      </div>
+      <nav id="nav" class="nav" aria-label="Pages"></nav>
+      <div id="side-foot" class="side-foot"></div>
+    </aside>
+    <div class="col">
+      <header id="bar" class="bar" hidden></header>
+      <main id="app" class="main"></main>
+    </div>
+  </div>
+  <div id="toast" class="toast" role="alert" hidden></div>
+  <div id="announce" class="sr-only" role="status"></div>
+  <div id="updatePop" class="update-pop" role="dialog" aria-labelledby="updTitle" hidden></div>
+  <dialog id="restartDlg" class="confirm" aria-labelledby="rsTitle"></dialog>
+  <dialog id="wipeDlg" class="confirm" aria-labelledby="wpTitle"></dialog>
+  <script src="../dist/renderer/app.js"></script>
+</body>
+</html>

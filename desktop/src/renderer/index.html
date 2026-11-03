@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; img-src 'self' data:; script-src 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; script-src 'self'">
   <title>Everloot</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -16,7 +16,10 @@
       <nav id="nav" class="nav" aria-label="Pages"></nav>
       <div id="side-foot" class="side-foot"></div>
     </aside>
-    <main id="app" class="main"></main>
+    <div class="col">
+      <header id="bar" class="bar" hidden></header>
+      <main id="app" class="main"></main>
+    </div>
   </div>
   <div id="toast" class="toast" role="alert" hidden></div>
   <div id="announce" class="sr-only" role="status"></div>
