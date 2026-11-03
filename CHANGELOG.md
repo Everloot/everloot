@@ -19,6 +19,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   the question stays queued, so the retry's answer still reaches the game. Before, the question was dropped and a later answer never
   appeared. After each `/reload` the addon says how many questions are still waiting. Needs the next addon and Desktop App
   releases; each half is harmless without the other.
+- Companion: when two account folders carry the same install id (a copied WTF folder), upload history is kept whole, as the
+  Desktop App already does. Before, each account's upload trimmed the other's, and the next run sent those events again.
 
 ### Added
 - Desktop App and site, behind `EVERLOOT_CHARACTER_LINKS` (off): the addon's `/everloot link <code>` (0.3.15) writes one

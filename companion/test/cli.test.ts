@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
-import { debounce, defaultStatePath, parseArgs, uploadNotice, uploadSummary } from "../src/cli";
+import { debounce, defaultStatePath, parseArgs, sharesInstallWith, uploadNotice, uploadSummary } from "../src/cli";
 import { loopbackSite } from "./loopback-mcp";
 
 test("arguments name a command, a file or a game folder, and an endpoint", () => {
@@ -56,6 +56,24 @@ test("an upload's line says how many rows the site turned away, and only when it
   expect(uploadSummary("Everloot.lua", r)).toBe("Everloot.lua: sent 500 new events in 2 batch(es); the site turned away 2000 rows, which stay unsent and go again next run; kept 1 named, 0 installed-addon, 0 census, 0 player and 0 legacy rows here.");
   expect(uploadSummary("Everloot.lua", { ...r, rejected: 0 })).toBe("Everloot.lua: sent 500 new events in 2 batch(es); kept 1 named, 0 installed-addon, 0 census, 0 player and 0 legacy rows here.");
   expect(uploadSummary("Everloot.lua", { ...r, rejected: 0, heldRuns: 3 })).toBe("Everloot.lua: sent 500 new events in 2 batch(es); kept 1 named, 0 installed-addon, 0 census, 0 player and 0 legacy rows here. 3 runs and boss pulls wait here until the site reads them.");
+});
+
+test("two account files with one install id keep upload history whole; a file that cannot be read does not count", () => {
+  const dir = mkdtempSync(join(tmpdir(), "everloot-shares-"));
+  try {
+    const save = (name: string, installId: string) => {
+      const file = join(dir, name);
+      writeFileSync(file, `EverlootDB = {\n["version"] = "0.2.2",\n["installId"] = "${installId}",\n["records"] = {},\n}\n`);
+      return file;
+    };
+    const a = save("a.lua", "abcd-1234-ef56-7890"), b = save("b.lua", "abcd-1234-ef56-7890"), c = save("c.lua", "ffff-0000-ffff-0000");
+    const broken = join(dir, "broken.lua");
+    writeFileSync(broken, "EverlootDB = {");
+    expect(sharesInstallWith(a, [a, b, c, broken])("abcd-1234-ef56-7890")).toBe(true);
+    expect(sharesInstallWith(c, [a, b, c, broken])("ffff-0000-ffff-0000")).toBe(false);
+    expect(sharesInstallWith(a, [a, c, broken, join(dir, "missing.lua")])("abcd-1234-ef56-7890")).toBe(false);
+    expect(sharesInstallWith(a, [a])("abcd-1234-ef56-7890")).toBe(false);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test("prices needs the game folder, because it writes the slot addon there", () => {
