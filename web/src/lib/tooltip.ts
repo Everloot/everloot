@@ -37,6 +37,18 @@ export function tooltipId(value: string): number | null {
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /**
+ * Whether the card is answered for an entity: players have reported it. A page shown only from the game files or
+ * the Warcraft Wiki gets a 404 from the card, so it links no "Raw JSON".
+ */
+export const hasCard = {
+  item: (page: ReturnType<typeof itemPage>) => Boolean(page.name || page.drops.length || page.pins.length),
+  object: (page: ReturnType<typeof objectPage>) => Boolean(page.drops.length || page.zero),
+  npc: (page: ReturnType<typeof npcPage>) => Boolean(page.name || page.pins.length),
+  quest: (page: ReturnType<typeof questPage>) =>
+    Boolean(page.title || page.level !== null || page.giverNpcId !== null || page.turnInNpcId !== null || page.rewards.length),
+};
+
+/**
  * What an item card says, without the game files, about the stat amounts, who may use it, its set and its Equip and
  * Use effects. With the files, those lines come from them (item-names.ts). Each value here is a fact only once 3
  * installs agree on it, as everywhere else; null is no such fact. No upload record carries these yet, so today
@@ -86,7 +98,7 @@ export async function loadTooltip(type: TooltipType, id: number): Promise<Toolti
     if (facts.unreachable) return unreachable;
     const page = itemPage(id, facts);
     // The same test as the item page: the game file tooltip only for an item players have reported.
-    if (!(page.name || page.drops.length || page.pins.length)) return notFound;
+    if (!hasCard.item(page)) return notFound;
     // The game's icon and tooltip text are Blizzard's; docs/DATA_POLICY.md ("Third extension") lets one item's
     // into a card, under the same rules as its page.
     const assets = await loadSiteAssets();
@@ -107,7 +119,7 @@ export async function loadTooltip(type: TooltipType, id: number): Promise<Toolti
     const facts = await loadObjectFacts();
     if (facts.unreachable) return unreachable;
     const page = objectPage(id, facts);
-    if (!(page.drops.length || page.zero)) return notFound;
+    if (!hasCard.object(page)) return notFound;
     return card({
       title: page.name ?? `Object ${id}`,
       lines: page.zero
@@ -120,7 +132,7 @@ export async function loadTooltip(type: TooltipType, id: number): Promise<Toolti
   if (facts.unreachable) return unreachable;
   if (type === "npc") {
     const page = npcPage(id, facts);
-    if (!(page.name || page.pins.length)) return notFound;
+    if (!hasCard.npc(page)) return notFound;
     return card({
       title: page.name ?? `NPC ${id}`,
       lines: [
@@ -131,7 +143,7 @@ export async function loadTooltip(type: TooltipType, id: number): Promise<Toolti
   }
 
   const page = questPage(id, facts);
-  if (!(page.title || page.level !== null || page.giverNpcId !== null || page.turnInNpcId !== null || page.rewards.length)) return notFound;
+  if (!hasCard.quest(page)) return notFound;
   const npc = (npcId: number) => npcPage(npcId, facts).name ?? `NPC ${npcId}`;
   return card({
     title: page.title ?? `Quest ${id}`,

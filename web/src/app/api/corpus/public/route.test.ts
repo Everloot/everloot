@@ -5,7 +5,7 @@ vi.mock("@/lib/upload-store", () => ({ uploadStore: { loadCorpus: store.loadCorp
 vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { api: store.api } }));
 
 import { GET } from "./route";
-import { ALL_RECORD_KINDS, CENSUS_KINDS, COMPLETION_KINDS, GUILD_KILL_KINDS, LINK_KINDS, PLAYER_KINDS, PUBLIC_RECORD_KINDS } from "@everloot/protocol";
+import { ALL_RECORD_KINDS, CENSUS_KINDS, COMPLETION_KINDS, GUILD_KILL_KINDS, LINK_KINDS, PLAYER_KINDS, PUBLIC_RECORD_KINDS, PULL_KINDS } from "@everloot/protocol";
 import { ANON_PAGE, KEY_PAGE } from "@/lib/data-guard";
 import { newKey } from "@/lib/api-keys";
 import { corpusPublicResponse, parseRecords } from "@everloot/protocol";
@@ -134,8 +134,9 @@ test("every record kind is either on the allowlist or named private here", () =>
   // The completion kinds are served only through the completion rollup: 3-install agreement and live grants.
   // The census kinds are published only as counts, like addon lists. Player rows go to the player pages, never this feed.
   // Link rows are redeemed at the account's link endpoint and never stored. Guild kills reach the public only
-  // through the guild rollup (2 installs, hidden guilds out, behind EVERLOOT_GUILDS).
-  const privateKinds = ["addon_seen", "talent_snapshot", "auction_snapshot", ...COMPLETION_KINDS, ...CENSUS_KINDS, ...PLAYER_KINDS, ...LINK_KINDS, ...GUILD_KILL_KINDS];
+  // through the guild rollup (2 installs, hidden guilds out, behind EVERLOOT_GUILDS). Runs wait for a rollup of their
+  // own, and pull summaries name the whole group, so neither is served until the owner says how.
+  const privateKinds = ["addon_seen", "talent_snapshot", "auction_snapshot", "instance_run", ...COMPLETION_KINDS, ...CENSUS_KINDS, ...PLAYER_KINDS, ...LINK_KINDS, ...GUILD_KILL_KINDS, ...PULL_KINDS];
   expect([...PUBLIC_RECORD_KINDS, ...privateKinds].sort()).toEqual([...ALL_RECORD_KINDS].sort());
 });
 

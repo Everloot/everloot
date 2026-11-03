@@ -17,6 +17,7 @@ import { lazyEngine, mcpAnswerSources, mcpEngine, mcpMarketValue, siteItemSearch
 import { llmEngine } from "./bridge/llm-engine";
 import { providersOnDemand } from "./providers/config";
 import { findEverlootFiles } from "./savedvariables";
+import { createSiteCollects } from "./site-collects";
 import { createSentState } from "./sent-state";
 import { refreshPrices } from "./prices";
 import { uploadFile, type UploadResult } from "./uploader";
@@ -60,7 +61,8 @@ export function defaultStatePath(os: { platform: string; env: Record<string, str
 /** What one file's upload sent, what the site turned away, and what stayed on this machine. */
 export function uploadSummary(file: string, r: UploadResult): string {
   const rejected = r.rejected ? ` the site turned away ${r.rejected} ${r.rejected === 1 ? "row, which stays unsent and goes" : "rows, which stay unsent and go"} again next run;` : "";
-  return `${file}: sent ${r.sent} new events in ${r.batches} batch(es);${rejected} kept ${r.heldNamed} named, ${r.heldAddons} installed-addon, ${r.heldCensus} census, ${r.heldPlayers} player and ${r.heldLegacy} legacy rows here.`;
+  const runs = r.heldRuns ? ` ${r.heldRuns} ${r.heldRuns === 1 ? "run or boss pull waits" : "runs and boss pulls wait"} here until the site reads them.` : "";
+  return `${file}: sent ${r.sent} new events in ${r.batches} batch(es);${rejected} kept ${r.heldNamed} named, ${r.heldAddons} installed-addon, ${r.heldCensus} census, ${r.heldPlayers} player and ${r.heldLegacy} legacy rows here.${runs}`;
 }
 
 export function debounce(run: () => void, ms: number): () => void {
@@ -81,6 +83,7 @@ async function main(argv: string[]): Promise<void> {
   const args = parseArgs(argv);
   const statePath = args.state ?? defaultStatePath({ platform: process.platform, env: process.env, home: homedir() });
   const state = createSentState(statePath);
+  const collects = createSiteCollects(join(dirname(statePath), "site-collects.json"));
   const files = args.file ? [args.file] : findEverlootFiles(args.game!);
   if (files.length === 0) throw new Error(`No Everloot.lua under ${join(args.game ?? "", "WTF", "Account")}. Log out once so the game writes it.`);
   if (args.command === "bridge") {
@@ -130,7 +133,7 @@ async function main(argv: string[]): Promise<void> {
   if (args.command === "prices") return prices();
   const send = async (file: string) => {
     try {
-      console.log(uploadSummary(file, await uploadFile(file, { endpoint: args.endpoint, state })));
+      console.log(uploadSummary(file, await uploadFile(file, { endpoint: args.endpoint, state, collects })));
       if (args.command === "watch") await prices();
     } catch (err) {
       console.error(`${file}: ${err instanceof Error ? err.message : String(err)}`);

@@ -4,6 +4,7 @@ import { pageMetadata } from "@/lib/seo";
 import { REVOKED_KEPT_DAYS, USAGE_KEPT_DAYS } from "@/lib/api-keys";
 import { OPERATOR } from "@/lib/jsonld";
 import { trailFor } from "@/lib/breadcrumbs";
+import { pullSummariesOn } from "@/lib/pull-summaries";
 import { Container, PageHeader, Prose, SectionHeading, ReadingLayout, type TocItem } from "@/components/ui";
 
 export const metadata: Metadata = {
@@ -34,7 +35,9 @@ function Section({ id, children }: { id: string; children: React.ReactNode }) {
 }
 
 export default function PrivacyPage() {
-  const updated = "27 October 2026";
+  // The boss pulls item shows only once the site collects them (EVERLOOT_PULL_SUMMARIES), and dates the page with it.
+  const pulls = pullSummariesOn();
+  const updated = pulls ? "2 November 2026" : "27 October 2026";
   return (
     <article>
       <Container width="reading">
@@ -241,6 +244,19 @@ export default function PrivacyPage() {
                 <Link href="/guilds/hide">guild hide form</Link>; its kills are then not kept. Its characters
                 keep their own pages, which the character hide form covers.
               </li>
+              {pulls && <li id="boss-pulls">
+                <strong>Boss pulls (on for uploaders, private):</strong> after each boss pull in a dungeon or raid,
+                the addon records each member of your group by name and realm, with their class, their role (the
+                group role the game shows, or a guess from their healing and damage, marked as a guess) and the
+                damage, healing, damage taken and deaths the game&apos;s own damage meter showed, with the boss, kill
+                or wipe and how long it took. It never reads their gear, guild, position or chat. It is on in the
+                addon, which says so once in chat; <code>/everloot pulls off</code> stops it and deletes those rows
+                from your file. You send them from the upload page, after a preview, or from the Everloot Desktop
+                App. We keep them privately for a year after we receive them and show them nowhere; they are not in
+                the public records. The players they name have not been asked. Anyone can have a character hidden,
+                without an account, on the <Link href="/players/opt-out">hide form</Link>: it is deleted from every
+                stored pull and left out of later uploads.
+              </li>}
               <li>
                 <strong>Cookies:</strong> an essential login cookie if you sign in (plus a
                 short-lived one, 10 minutes, that holds the sign-in state while you are at

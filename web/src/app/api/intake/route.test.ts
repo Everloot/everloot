@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { mergeCensusRows } from "../../../../../kb/src/census-rows";
 
@@ -6,8 +7,9 @@ import { mergeCensusRows } from "../../../../../kb/src/census-rows";
  * accepted records, and it must never report a receipt the store did not write.
  */
 
-const store = vi.hoisted(() => ({ putUpload: vi.fn(), lookup: vi.fn(), requestQuota: vi.fn(), installQuota: vi.fn(), reporter: vi.fn(), installCensus: vi.fn() }));
-vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { request: store.requestQuota, install: store.installQuota, reporter: store.reporter } }));
+const store = vi.hoisted(() => ({ putUpload: vi.fn(), lookup: vi.fn(), requestQuota: vi.fn(), installQuota: vi.fn(), reporter: vi.fn(), installCensus: vi.fn(), formQuota: vi.fn() }));
+vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { request: store.requestQuota, install: store.installQuota, reporter: store.reporter, form: store.formQuota } }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
 
 vi.mock("@/lib/upload-store", () => ({
   sharingStore: { lookup: store.lookup },
@@ -20,10 +22,17 @@ vi.mock("@/lib/upload-store", () => ({
   },
 }));
 
-const players = vi.hoisted(() => ({ upsert: vi.fn(), hiddenGuilds: vi.fn() }));
+const players = vi.hoisted(() => ({ upsert: vi.fn(), hiddenGuilds: vi.fn(), suppress: vi.fn() }));
 vi.mock("@/lib/player-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/player-store")>()),
-  playerStore: () => ({ upsert: players.upsert, hiddenGuilds: players.hiddenGuilds }),
+  playerStore: () => ({ upsert: players.upsert, hiddenGuilds: players.hiddenGuilds, suppress: players.suppress }),
+}));
+
+// The pull tables, as the memory store that follows their rules. Each test that needs it sets a fresh one.
+const pulls = vi.hoisted(() => ({ store: null as unknown as import("@/lib/pull-store").PullStore }));
+vi.mock("@/lib/pull-store", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/pull-store")>()),
+  pullStore: () => pulls.store,
 }));
 
 const capturedAt = "2026-10-05T00:00:00.000Z";
@@ -536,6 +545,160 @@ describe("guild kill rows in an upload", () => {
     const body = await (await POST(request({ addonVersion: "0.4.0", records: [kill("Ember"), canonicalLoot] }))).json();
     expect(body.accepted.map((a: { kind: string }) => a.kind)).toEqual(["loot"]);
     expect(body.rejected[0].reason).toMatch(/could not be checked/);
+  });
+});
+
+describe("pull timing, runs and pull summaries in an upload", () => {
+  const runId = "0123456789abcdef";
+  const at = new Date(Date.now() - 3_600_000);
+  const iso = (offsetSeconds: number) => new Date(at.getTime() + offsetSeconds * 1000).toISOString();
+  const encounter = {
+    kind: "encounter", installId: "install-1234", eventId: "epoch:1", capturedAt: iso(0), encounterId: 1144, name: "Rhahk'zor", instanceMapId: 36,
+    success: true, startedAt: iso(-75), durationSeconds: 75, runId,
+  };
+  const run = {
+    kind: "instance_run", installId: "install-1234", eventId: "epoch:2", capturedAt: iso(60), runId, instanceMapId: 36, name: "The Deadmines",
+    instanceType: "party", enteredAt: iso(-3000), leftAt: iso(60), firstPullAt: iso(-2400),
+    lastKillAt: iso(0), pulls: 3, kills: 2, wipes: 1, size: 5, killedEncounterIds: [1144, 1145], endReason: "left",
+  };
+  const pull = {
+    kind: "pull_summary", installId: "install-1234", eventId: "epoch:3", capturedAt: iso(0), encounterId: 1144, name: "Rhahk'zor", instanceMapId: 36,
+    success: true, startedAt: iso(-75), durationSeconds: 75, runId, realm: "Forever", meterSeconds: 76,
+    members: [{ name: "Myself", class: "HUNTER", self: true, role: "damage", roleSource: "inferred", damageDone: 30000 },
+      { name: "Thrallina", class: "SHAMAN", role: "healer", roleSource: "assigned", healingDone: 25000, deaths: 1 }],
+  };
+  const stored = () => (pulls.store as ReturnType<typeof import("@/lib/pull-store").createMemoryPullStore>).pulls();
+  const memberNames = () => stored().map((p) => p.members.map((m) => m.name));
+
+  beforeEach(async () => {
+    const { createMemoryPullStore } = await vi.importActual<typeof import("@/lib/pull-store")>("@/lib/pull-store");
+    pulls.store = createMemoryPullStore();
+    store.formQuota.mockReset().mockResolvedValue({ allowed: true, retryAfter: 0 });
+    players.suppress.mockReset().mockResolvedValue(undefined);
+  });
+  afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
+
+  test("with the switch off, an upload gets main's answer: encounter rows as before, the new kinds unknown", async () => {
+    const POST = await freshPost();
+    const body = await (await POST(request({ addonVersion: "0.3.16", records: [encounter, run, pull] }))).json();
+    expect(body).toMatchObject({ ok: true, persisted: true });
+    expect(body).not.toHaveProperty("runRecords");
+    expect(body.accepted).toEqual([{ index: 0, kind: "encounter" }]);
+    const { startedAt: _s, durationSeconds: _d, runId: _r, ...before } = encounter;
+    expect(store.putUpload.mock.calls[0]![2].records).toEqual([before]);
+    expect(body.rejected).toEqual([{ index: 1, reason: "unknown kind: instance_run" }, { index: 2, reason: "unknown kind: pull_summary" }]);
+    expect(stored()).toEqual([]);
+  });
+
+  test("with the switch off, the same rows get the receipt and stored records main's parser gave them", async () => {
+    // The protocol's fixture: rows and what main's own build answered for them (packages/protocol/test/fixtures).
+    const fixtures = new URL("../../../../../packages/protocol/test/fixtures/", import.meta.url);
+    const inputs = JSON.parse(readFileSync(new URL("run-records-off.inputs.json", fixtures), "utf8"));
+    const main = JSON.parse(readFileSync(new URL("run-records-off.main.json", fixtures), "utf8"));
+    const POST = await freshPost();
+    const body = await (await POST(request({ addonVersion: "0.3.15", records: inputs }))).json();
+    expect(body).toMatchObject({ ok: true, persisted: true });
+    expect({ accepted: body.accepted, rejected: body.rejected }).toEqual(main.upload.receipt);
+    expect(Object.keys(body).sort()).toEqual(["accepted", "ok", "persisted", "rejected", "uploadId"]);
+    expect(store.putUpload.mock.calls[0]![2].records).toEqual(main.upload.upload.records);
+    // On, the expanded contract: a malformed start is refused, the timing survives, the new kinds are read.
+    vi.stubEnv("EVERLOOT_PULL_SUMMARIES", "1");
+    const on = await (await (await freshPost())(request({ addonVersion: "0.3.15", records: inputs }))).json();
+    expect(on.runRecords).toBe(true);
+    expect(on.rejected.map((r: { index: number }) => r.index)).toEqual([2, 3, 4]);
+    expect(store.putUpload.mock.calls[1]![2].records[1]).toMatchObject({ startedAt: "2026-11-02T12:00:00Z", durationSeconds: 75 });
+  });
+
+  test("with the switch on, pull summaries go to the pull tables, never into the upload object", async () => {
+    vi.stubEnv("EVERLOOT_PULL_SUMMARIES", "1");
+    const POST = await freshPost();
+    const body = await (await POST(request({ addonVersion: "0.3.16", records: [encounter, run, pull] }))).json();
+    expect(body).toMatchObject({ ok: true, persisted: true });
+    expect(body.rejected).toEqual([]);
+    expect(store.putUpload.mock.calls[0]![2].records).toEqual([encounter, run]);
+    const { members, ...summary } = pull;
+    expect(stored()).toEqual([expect.objectContaining({
+      installId: "install-1234", eventId: "epoch:3", summary, members: members.map((m) => ({ ...m, realm: "Forever" })),
+    })]);
+  });
+
+  test("an upload of pull summaries only is stored with no upload object, and a failed write is not a receipt", async () => {
+    vi.stubEnv("EVERLOOT_PULL_SUMMARIES", "1");
+    let POST = await freshPost();
+    const body = await (await POST(request({ addonVersion: "0.3.16", records: [pull] }))).json();
+    expect(body).toMatchObject({ ok: true, persisted: true });
+    expect(store.putUpload).not.toHaveBeenCalled();
+    expect(memberNames()).toEqual([["Myself", "Thrallina"]]);
+    pulls.store = { insert: vi.fn().mockRejectedValue(new Error("down")), forget: vi.fn(), prune: vi.fn() };
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    POST = await freshPost();
+    const failed = await POST(request({ addonVersion: "0.3.16", records: [{ ...pull, eventId: "epoch:4" }] }));
+    expect(failed.status).toBe(503);
+    expect(await failed.json()).toMatchObject({ ok: false, persisted: false });
+  });
+
+  test("a pull summary with no realm for a member, or dated past the year kept, is refused", async () => {
+    vi.stubEnv("EVERLOOT_PULL_SUMMARIES", "1");
+    const POST = await freshPost();
+    const { realm: _realm, ...noRealm } = pull;
+    const body = await (await POST(request({ addonVersion: "0.3.16", records: [
+      noRealm, { ...pull, eventId: "epoch:5", capturedAt: "2025-01-01T00:00:00.000Z", startedAt: undefined, durationSeconds: undefined }, canonicalLoot,
+    ] }))).json();
+    expect(body.rejected.map((r: { index: number }) => r.index)).toEqual([0, 1]);
+    expect(body.rejected[0].reason).toContain("realm");
+    expect(body.rejected[1].reason).toContain("365 days");
+    expect(stored()).toEqual([]);
+  });
+
+  test("a character hidden before the upload is left out of it; a pull of hidden characters only is not stored", async () => {
+    vi.stubEnv("EVERLOOT_PULL_SUMMARIES", "1");
+    const { POST: optOut } = await import("../players/opt-out/route");
+    const form = new Request("https://everloot.app/api/players/opt-out", {
+      method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ name: "thrallina", realm: "forever" }),
+    });
+    expect((await optOut(form)).status).toBe(303);
+    const POST = await freshPost();
+    const alone = { ...pull, eventId: "epoch:6", members: [pull.members[1]] };
+    const body = await (await POST(request({ addonVersion: "0.3.16", records: [pull, alone] }))).json();
+    expect(body).toMatchObject({ ok: true, persisted: true });
+    expect(memberNames()).toEqual([["Myself"]]);
+  });
+
+  test("a verified owner's opt-out, which keeps the realm only lower-cased, still leaves the character out of later pulls", async () => {
+    vi.stubEnv("EVERLOOT_PULL_SUMMARIES", "1");
+    // lib/sharing-store.ts records 'forever-pioneer' / 'thrallina'; the upload spells the realm 'Forever Pioneer'.
+    await pulls.store.forget("forever-pioneer", "thrallina");
+    const POST = await freshPost();
+    const pioneer = { ...pull, realm: "Forever Pioneer" };
+    const body = await (await POST(request({ addonVersion: "0.3.16", records: [pioneer, { ...pioneer, eventId: "epoch:9", members: [pull.members[1]] }] }))).json();
+    expect(body).toMatchObject({ ok: true, persisted: true });
+    expect(memberNames()).toEqual([["Myself"]]);
+  });
+
+  test("hiding a character after the upload deletes it from the stored pulls, and later uploads leave it out", async () => {
+    vi.stubEnv("EVERLOOT_PULL_SUMMARIES", "1");
+    const POST = await freshPost();
+    await POST(request({ addonVersion: "0.3.16", records: [pull, { ...pull, eventId: "epoch:7", members: [pull.members[1]] }] }));
+    expect(memberNames()).toEqual([["Myself", "Thrallina"], ["Thrallina"]]);
+    const { POST: optOut } = await import("../players/opt-out/route");
+    const form = new Request("https://everloot.app/api/players/opt-out", {
+      method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ name: "Thrallina", realm: "Forever" }),
+    });
+    expect(new URL((await optOut(form)).headers.get("location")!).search).toBe("?done=1");
+    expect(players.suppress).toHaveBeenCalledWith("Forever", "Thrallina");
+    expect(memberNames()).toEqual([["Myself"]]);
+    await (await freshPost())(request({ addonVersion: "0.3.16", records: [{ ...pull, eventId: "epoch:8" }] }));
+    expect(memberNames()).toEqual([["Myself"], ["Myself"]]);
+  });
+
+  test("a run whose counts do not add up, or a member with a role but no source, is refused with the rule", async () => {
+    vi.stubEnv("EVERLOOT_PULL_SUMMARIES", "1");
+    const POST = await freshPost();
+    const body = await (await POST(request({ addonVersion: "0.3.16", records: [
+      { ...run, kills: 3 }, { ...pull, members: [{ name: "Thrallina", class: "SHAMAN", role: "healer" }] }, canonicalLoot,
+    ] }))).json();
+    expect(body.accepted.map((a: { kind: string }) => a.kind)).toEqual(["loot"]);
+    expect(body.rejected.map((r: { index: number; reason: string }) => r.reason)).toEqual(["kills and wipes add up to pulls", "role and roleSource come together"]);
   });
 });
 

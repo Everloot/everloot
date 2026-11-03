@@ -5,6 +5,7 @@ import { afterEach, expect, test } from "vitest";
 import { z } from "zod";
 import { handleClassRaces } from "../src/class-races-tool.js";
 import { RACE_TABLE } from "../src/client-races-file.js";
+import { RACIAL_NOTES, withRacialNotes } from "../src/racial-notes.js";
 import { openDb, type DB } from "../src/db.js";
 import { createKnowledgeServer } from "../src/mcp-server.js";
 
@@ -64,4 +65,20 @@ test("class_races answers over MCP with structured content of the declared shape
   const res = await client.callTool({ name: "class_races", arguments: { class: "warlock", faction: "horde" } });
   expect(res.isError).not.toBe(true);
   expect(out.parse(res.structuredContent).factions[0].races.map((r) => r.name)).toEqual(["Orc", "Undead", "Troll"]);
+  // The server answers with Blizzard's October 26 racial pass: Orc's Savage is gone and Command is back.
+  const orc = out.parse(res.structuredContent).factions[0].races[0];
+  expect(orc.traits.map((t) => t.name)).toEqual(["Blood Fury", "Shatter Curse", "Command", "Hardiness"]);
+  const text = (res.content as { type: string; text: string }[])[0].text;
+  expect(text).toContain(RACIAL_NOTES.sourceUrl);
+});
+
+test("with the notes applied, removed racials give way to Blizzard's replacements and the notes are named once", () => {
+  const { text, structured } = handleClassRaces({ class: "warrior", faction: "alliance" }, withRacialNotes(RACE_TABLE));
+  const page = out.parse(structured);
+  const dwarf = page.factions[0].races.find((r) => r.name === "Dwarf");
+  expect(dwarf?.traits.map((t) => t.name)).toEqual(["Stoneform", "Find Treasure", "Artisan's Precision", "Big Game Hunter"]);
+  expect(text).not.toContain("Earth Fury");
+  expect(text.split(RACIAL_NOTES.sourceUrl)).toHaveLength(2);
+  // The raw files' answer names no notes.
+  expect(handleClassRaces({ class: "warrior" }, RACE_TABLE).text).not.toContain(RACIAL_NOTES.sourceUrl);
 });

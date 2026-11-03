@@ -14,6 +14,11 @@ sources:
   - title: "Wowhead (Forever news 383554)"
     url: https://www.wowhead.com/forever/news/383554
 status: published
+hero:
+  src: /news/heroes/wow-forever-beta-closed-priority-fixes-podcast/wow-forever-beta-closed-priority-fixes-podcast-clean.webp
+  alt: "Everloot card: Beta, Oct 26, 2026. Beta closed. Priority fixes, then launch Nov 4. No more beta access. Your next login is character creation on Oct 27. What comes next: 5 weeks: Beta, now officially closed; A few days: Focused work on priority issues; Oct 27: Character creation opens; Nov 4: Launch. Footer: per Blizzard, fan recap, not affiliated, everloot.app."
+  thumb: /news/heroes/wow-forever-beta-closed-priority-fixes-podcast/wow-forever-beta-closed-priority-fixes-podcast-card.webp
+  share: /news/heroes/wow-forever-beta-closed-priority-fixes-podcast/wow-forever-beta-closed-priority-fixes-podcast-share.png
 ---
 
 **TL;DR:** The WoW: Forever beta is officially closed after five weeks. Blizzard says it will spend a few days on priority issues and the game service, open character creation on Tuesday, October 27, and keep the WoW: Forever Podcast going next week. Launch is still November 4.

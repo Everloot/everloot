@@ -79,7 +79,7 @@ function problemsOf(over: Record<string, unknown> = {}, body = DUNGEON_BODY): st
 const withSection = (section: string, text: string) => DUNGEON_BODY.replace(`## ${section}\n\n`, `## ${section}\n\n${text}\n\n`);
 
 /** The first dungeon pages prepared for review. Each is published on its own, by the person who reviewed it. */
-const DUNGEON_PILOTS = ["ragefire-chasm", "deadmines", "wailing-caverns"];
+const DUNGEON_PILOTS = ["ragefire-chasm", "deadmines", "wailing-caverns", "shadowfang-keep", "blackfathom-deeps"];
 
 test("a good published page and its linked page pass", () => {
   const result = checkWiki([file(), westfall()], ctx);

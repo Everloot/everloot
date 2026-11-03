@@ -55,12 +55,13 @@ const NAMES: Record<string, string> = {
   "/tools/builds": "Plans on this device",
   "/tools/alts": "Alts on this device",
   "/tools/raid": "Raid builder",
+  "/tools/legacy": "Legacy perks",
   "/tools/collections": "Collection gap",
   "/tools/guild-board": "Guild board",
   "/tools/auctions": "Auction House",
   "/tools/gold-ledger": "Gold ledger",
   "/tools/professions": "Profession hubs",
-  "/tools/farming-routes": "Farming routes",
+  "/tools/farming-routes": "Farming",
   "/docs": "Docs",
 };
 

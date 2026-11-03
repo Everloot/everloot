@@ -3,6 +3,7 @@ import AdSlot from "@/components/AdSlot";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { hasCard } from "@/lib/tooltip";
 import { itemPage } from "../../../../../../kb/src/item-page";
 import { loadShownNames } from "@/lib/shown-item-names";
 import { loadEdges } from "@/lib/edges";
@@ -272,7 +273,7 @@ export default async function ItemPage(props: Props) {
           title={title}
           quality={shownQuality}
           icon={<EntityIcon src={tip?.icon} unconfirmed={!confirmed} />}
-          meta={[category?.class?.label, subclassLabel, name ? <span className="tabular-nums">ID {itemId}</span> : null]}
+          meta={[category?.class?.label, subclassLabel, name ? <span key="id" className="tabular-nums">ID {itemId}</span> : null]}
         />
         {isDevelopmentItemName(name?.name) && (
           <p className="mt-2 text-meta text-fg-2">The game files mark this as a development item: a test, placeholder or retired entry. The item lists leave it out unless asked.</p>
@@ -308,7 +309,7 @@ export default async function ItemPage(props: Props) {
             ...summary,
             `Source: https://everloot.app/database/items/${itemId}`,
           ].join("\n")}
-          jsonHref={`/api/tooltip/item/${itemId}`}
+          jsonHref={!facts.unreachable && hasCard.item(page) ? `/api/tooltip/item/${itemId}` : undefined}
         />
         <MarketBox itemId={itemId} rows={auctions} />
         <Tabs label={`${title}: relations`} tabs={tabs} />

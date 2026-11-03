@@ -99,3 +99,12 @@ test("census rows never enter the corpus, as sent or as stored", () => {
   expect(state.events.map((e) => e.record.kind)).toEqual(["loot"]);
   expect(state.legacyRecords).toBe(0);
 });
+test("pull summaries never enter the corpus: they name the group and live where a hidden character can be deleted", () => {
+  const pull = {
+    kind: "pull_summary", installId: "install-one", eventId: "epoch:9", capturedAt: "2026-11-02T12:00:00Z", encounterId: 1144,
+    name: "Rhahk'zor", instanceMapId: 36, success: true, realm: "Forever", members: [{ name: "Thrallina", class: "SHAMAN" }],
+  };
+  expect(parseRecords([pull]).records).toHaveLength(1);
+  const state = mergeCorpus(undefined, [pull, loot()]);
+  expect(state.events.map((e) => e.record.kind)).toEqual(["loot"]);
+});

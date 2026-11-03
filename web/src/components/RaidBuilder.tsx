@@ -536,7 +536,7 @@ export default function RaidBuilder({ art = null, initialCode, classContext = fa
                           data-drop-slot={index}
                           ref={(el) => { slotRefs.current[index] = el; }}
                           aria-pressed={selected === index}
-                          aria-label={`Group ${g + 1}, slot ${k + 1}: ${slot ? `${titleCase(slot.class)}, ${treeName}` : "empty"}`}
+                          aria-label={`Group ${g + 1}, slot ${k + 1}: ${slot ? `${titleCase(slot.class)}, ${treeName}` : "empty, add"}`}
                           onClick={() => pickSlot(index)}
                           onPointerDown={slot ? startDrag({ kind: "slot", index }) : undefined}
                           onDragStart={(e) => e.preventDefault()}

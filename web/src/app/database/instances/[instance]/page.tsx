@@ -11,6 +11,8 @@ import { PLACEHOLDER } from "@/lib/item-names";
 import { mapHref } from "@/lib/map-view";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
+import { wikiHref } from "@/lib/wiki";
+import { prepPage } from "@/lib/wiki-dungeon";
 import { zoneHref } from "@/lib/zones";
 
 export const dynamic = "force-dynamic";
@@ -63,6 +65,7 @@ export default async function InstancePage(props: Props) {
   if (`/database/instances/${segment}` !== canonical) permanentRedirect(canonical);
   const title = instanceTitle(row);
   const empty = (message: string) => <EmptyState message={message} framed={false} />;
+  const prep = prepPage(row.instanceMapId);
 
   const confirmedColumns: Column<InstanceRow["confirmed"][number]>[] = [
     { key: "at", header: "Outdoor map and position", cell: placeCell },
@@ -101,6 +104,10 @@ export default async function InstancePage(props: Props) {
             { name: title, path: canonical },
           ]}
         />
+
+        {prep && (
+          <p className="mb-3 text-sm"><Link href={wikiHref(prep.slug)} className={link}>Prepare for this {prep.type === "raid" ? "raid" : "dungeon"}</Link></p>
+        )}
 
         {unreachable && <p className="mb-3 text-meta text-warning">{STORAGE_UNREACHABLE} Players&apos; reports cannot be shown until it is back; the entrance below is from the game files.</p>}
 

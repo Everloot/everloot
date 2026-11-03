@@ -56,7 +56,7 @@ test("every route that reads the wiki pages carries them in its bundle", () => {
   const keyFor = (route: string) => Object.keys(includes).find((key) => picomatch(key, { dot: true, contains: true })(route));
   // The wiki pages are read from kb/wiki at request time, so a route that lists or shows them needs the
   // folder in its own bundle. Without it the route answers 500 in production while the tests pass.
-  for (const route of ["/wiki/route", "/wiki/[slug]/route", "/sitemap.xml/route", "/guides/route", "/guides/[slug]/route"]) {
+  for (const route of ["/wiki/route", "/wiki/[slug]/route", "/sitemap.xml/route", "/guides/route", "/guides/[slug]/route", "/database/instances/[instance]/route"]) {
     const key = keyFor(route);
     expect(key, route).toBeDefined();
     expect(includes[key!], route).toContain("../kb/wiki/*.md");
@@ -73,12 +73,19 @@ test("every route that reads the guides carries them in its bundle", () => {
 });
 
 test("the build cache checks the protocol package's files, and trusts every other package's version", () => {
-  const config = nextConfig.webpack!({ resolve: {}, snapshot: { immutablePaths: [] } } as never, { isServer: true } as never) as { snapshot: { managedPaths: RegExp[]; immutablePaths: unknown[] } };
+  const config = nextConfig.webpack!({ resolve: {}, module: { rules: [] }, snapshot: { immutablePaths: [] } } as never, { isServer: true } as never) as { snapshot: { managedPaths: RegExp[]; immutablePaths: unknown[] } };
   const managed = (file: string) => config.snapshot.managedPaths.some((re) => re.test(file));
   expect(managed("/vercel/path0/web/node_modules/zod/index.js")).toBe(true);
   expect(managed("/vercel/path0/web/node_modules/@everloot/protocol/dist/index.js")).toBe(false);
   expect(managed("C:\\work\\web\\node_modules\\@everloot\\protocol\\dist\\index.js")).toBe(false);
   expect(config.snapshot.immutablePaths).toEqual([]);
+});
+
+test("a file imported with ?inline is its bytes inside the bundle, for the link previews the Worker draws", () => {
+  const config = nextConfig.webpack!({ resolve: {}, module: { rules: [] }, snapshot: {} } as never, { isServer: true } as never) as { module: { rules: unknown[] } };
+  const rule = config.module.rules.find((r) => (r as { resourceQuery?: RegExp }).resourceQuery?.test("?inline")) as { type: string; parser: { dataUrlCondition: () => boolean } };
+  expect(rule.type).toBe("asset");
+  expect(rule.parser.dataUrlCondition()).toBe(true);
 });
 
 /** The headers a request for `path` gets: Next applies every matching entry in order, and a later entry's key wins. */

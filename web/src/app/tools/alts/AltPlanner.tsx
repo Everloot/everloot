@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Card, Field, SectionHeading } from "@/components/ui";
+import { ExampleAlts, useExamplesShown } from "@/components/workspace/Examples";
 import { useWorkspaceOwner } from "@/components/workspace/LocalPlanSave";
+import { Chip, ClassIconWithLevel, ClassName, FactionTag, ProfessionChips, classEdge } from "@/components/workspace/marks";
 import {
-  DETAIL_WORDS, FIELD_WORDS, altFailure, copyNumbers, deleteAlt, detailsLine, listOf, restoreLines, saveAlt, type AltField, type AltInput,
+  DETAIL_WORDS, FIELD_WORDS, altFailure, copyNumbers, deleteAlt, listOf, restoreLines, saveAlt, type AltField, type AltInput,
 } from "@/lib/alt-workspace";
 import {
   ALT_PROFESSIONS, BACKUP_TOO_LARGE, WORKSPACE_LIMITS, applyImport, bucketKey, deviceStorage, exportBackup, hiddenFrom, newFormatOverflow, previewImport,
@@ -12,6 +14,8 @@ import {
 } from "@/lib/player-workspace";
 import { TALENT_CLASSES } from "@/lib/talents/catalogs";
 import { planHash } from "@/lib/talents/import";
+import { EXAMPLE_ALTS, copyExampleAlts, type ExamplePlan } from "@/lib/workspace-examples";
+import { NO_ICONS, type WorkspaceIcons } from "@/lib/workspace-icons";
 import ReadSaveFile from "./ReadSaveFile";
 
 // /tools/alts: the player's characters in this browser's PlayerWorkspace (lib/player-workspace.ts), the same buckets
@@ -50,7 +54,12 @@ function sourceLine({ provenance: { source, fileRecordAt, fileDetails } }: Local
   return `${how} ${what} its Everloot.lua records up to ${day(fileRecordAt)}.`;
 }
 
-export default function AltPlanner() {
+export default function AltPlanner({ examplePlans = [], icons = NO_ICONS }: {
+  /** The sample plans the example alts use (lib/workspace-examples.ts); never saved unless copied. */
+  examplePlans?: ExamplePlan[];
+  /** Class, profession and faction icons, when the page has the asset folder. */
+  icons?: WorkspaceIcons;
+} = {}) {
   const [state, retry] = useWorkspaceOwner();
   if (state.status === "checking") return <p role="status" className="text-sm text-muted">Checking who is signed in…</p>;
   if (state.status === "unavailable") {
@@ -62,11 +71,12 @@ export default function AltPlanner() {
     );
   }
   // One bucket at a time. Another owner remounts everything below, so nothing begun for one bucket ends in another.
-  return <Bucket key={bucketKey(state.owner)} owner={state.owner} />;
+  return <Bucket key={bucketKey(state.owner)} owner={state.owner} examplePlans={examplePlans} icons={icons} />;
 }
 
-function Bucket({ owner }: { owner: Owner }) {
+function Bucket({ owner, examplePlans, icons }: { owner: Owner; examplePlans: ExamplePlan[]; icons: WorkspaceIcons }) {
   const [read, setRead] = useState<ReadResult | null>(null);
+  const [examplesShown, hideExamples] = useExamplesShown("alts");
   const [message, setMessage] = useState<{ text: string; alert: boolean } | null>(null);
   const reload = useCallback(() => setRead(readWorkspace(deviceStorage(), owner)), [owner]);
   useEffect(() => {
@@ -135,13 +145,23 @@ function Bucket({ owner }: { owner: Owner }) {
         <p role="status" className="mb-3 text-sm text-fg-2 empty:hidden">{message && !message.alert ? message.text : ""}</p>
         {message?.alert && <p role="alert" className="mb-3 text-sm text-danger">{message.text}</p>}
         {alts.length === 0 ? (
-          <Card><p className="text-fg-2">No alts on this device yet. Add one above, or read your Everloot.lua.</p></Card>
+          <div className="space-y-4">
+            <Card><p className="text-fg-2">No alts on this device yet. Add one above, or read your Everloot.lua.</p></Card>
+            {examplesShown && read.workspace.version !== 3 && (
+              <ExampleAlts alts={EXAMPLE_ALTS} plans={examplePlans} icons={icons} onHide={hideExamples} onCopy={async () => {
+                const result = await withWorkspaceLock(() => copyExampleAlts(storage, owner, EXAMPLE_ALTS, examplePlans));
+                after(result, "Copied the example alts and their plans to this device. Edit or delete them like any alt.");
+                return result;
+              }} />
+            )}
+          </div>
         ) : (
           <ul className="divide-y divide-line border-y border-line">
             {alts.map((alt) => (
               <AltItem
                 key={alt.id}
                 alt={alt}
+                icons={icons}
                 copy={copies.get(alt.id) ?? null}
                 plans={plans}
                 onSave={async (input) => {
@@ -305,8 +325,9 @@ function AltForm({ label, alt, plans, submit, onSave, onCancel }: {
   );
 }
 
-function AltItem({ alt, copy, plans, onSave, onBackup, onDelete }: {
+function AltItem({ alt, icons, copy, plans, onSave, onBackup, onDelete }: {
   alt: LocalAlt;
+  icons: WorkspaceIcons;
   /** Its number among alts that read alike (copyNumbers), null when it reads like no other. */
   copy: number | null;
   plans: LocalPlan[];
@@ -318,16 +339,24 @@ function AltItem({ alt, copy, plans, onSave, onBackup, onDelete }: {
   const [confirming, setConfirming] = useState(false);
   const used = alt.planIds.flatMap((id) => plans.filter((p) => p.id === id));
   return (
-    <li className="space-y-2 py-4">
+    <li className={`my-2 flex items-start gap-3 py-2 ${classEdge(alt.classSlug)}`}>
+      <ClassIconWithLevel slug={alt.classSlug} level={alt.level} icons={icons} />
+      <div className="min-w-0 flex-1 space-y-2">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h3 className="min-w-0 font-semibold text-fg [overflow-wrap:anywhere]">{alt.name}</h3>
-        <span className="text-meta text-muted [overflow-wrap:anywhere]">{[copy === null ? "" : `Copy ${copy}`, alt.realm ?? "Realm not set", detailsLine(alt)].filter(Boolean).join(" · ")}</span>
+        {/* The same words as detailsLine, with the class and faction in their colours. */}
+        <span className="text-meta text-muted [overflow-wrap:anywhere]">
+          {[copy === null ? "" : `Copy ${copy}`, alt.realm ?? "Realm not set"].filter(Boolean).join(" · ")}
+          {alt.classSlug && <> · <ClassName slug={alt.classSlug} /></>}
+          {alt.level !== null && ` · Level ${alt.level}`}
+          {alt.faction && <> · <FactionTag faction={alt.faction} icons={icons} /></>}
+        </span>
       </div>
-      {alt.professions.length > 0 && <p className="text-sm text-fg-2">Professions: {alt.professions.join(", ")}</p>}
+      <ProfessionChips professions={alt.professions} icons={icons} />
       {alt.notes && <p className="whitespace-pre-line text-sm text-fg-2 [overflow-wrap:anywhere]">{alt.notes}</p>}
       {used.length > 0 && (
-        <p className="text-sm text-fg-2 [overflow-wrap:anywhere]">
-          Plans: {used.map((plan, i) => <span key={plan.id}>{i > 0 && ", "}<a href={openPath(plan)} className={link}>{plan.name}</a></span>)}
+        <p className="flex flex-wrap gap-1.5">
+          <span className="sr-only">Plans: </span>{used.map((plan) => <Chip key={plan.id} href={openPath(plan)}>{plan.name}</Chip>)}
         </p>
       )}
       <p className="text-meta text-muted">{sourceLine(alt)}</p>
@@ -349,6 +378,7 @@ function AltItem({ alt, copy, plans, onSave, onBackup, onDelete }: {
         <AltForm label={`Edit ${alt.name}`} alt={alt} plans={plans} submit="Save" onCancel={() => setEditing(false)}
           onSave={async (input) => { const error = await onSave(input); if (!error) setEditing(false); return error; }} />
       )}
+      </div>
     </li>
   );
 }

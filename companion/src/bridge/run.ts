@@ -40,10 +40,11 @@ export function earlierFor(ask: Ask, answered: readonly Answer[]): Earlier | und
 
 /** Answer every new /ask in one SavedVariables file and rewrite the slot addon. Failures are shown, and retried next time. */
 export async function answerPending(options: {
-  svFile: string; addonsDir: string; engine: AnswerEngine; store: AnswerStore; now?: () => Date;
+  /** The file's asks when the caller has read them already; otherwise `svFile` is read. */
+  svFile: string; asks?: Ask[]; addonsDir: string; engine: AnswerEngine; store: AnswerStore; now?: () => Date;
 }): Promise<{ answered: number; failed: number }> {
   const now = options.now ?? (() => new Date());
-  const asks = readAsks(readFileSync(options.svFile, "utf8"));
+  const asks = options.asks ?? readAsks(readFileSync(options.svFile, "utf8"));
   const pending = asks.filter((a) => !options.store.has(a.id));
   if (pending.length === 0) {
     // An answered question is still queued in game: not read yet, or its checksum failed. Rewriting the

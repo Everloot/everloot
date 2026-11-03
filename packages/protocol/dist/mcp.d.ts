@@ -1355,7 +1355,7 @@ export declare const MCP_TOOLS: {
     };
     readonly answer_sources: {
         readonly title: "Evidence for a question, each piece with its source";
-        readonly description: "The evidence behind a question about WoW: Forever, for an answer that cites its sources: facts players observed (public after three installs agree, with the install count), curated facts, and the 2023 Warcraft Wiki (marked: may differ in Forever). Every piece carries a claim, its source URL, licence and date. Returns evidence rather than prose. Further-reading links are search URLs on other sites; nothing is fetched from them. Reads Everloot's current authorized public corpus when connected; when it is not, the observed layer is unrecorded, not empty.";
+        readonly description: "The evidence behind a question about WoW: Forever, for an answer that cites its sources: facts players observed (public after three installs agree, with the install count), curated facts, and the 2023 Warcraft Wiki (marked: may differ in Forever). Every piece carries a claim, its source URL, licence and date. Returns evidence rather than prose. Further-reading links are search URLs on other sites; nothing is fetched from them. Reads Everloot's public player data when connected; when it is not, the observed layer is unrecorded, not empty.";
         readonly inputSchema: {
             readonly question: z.ZodString;
             readonly limit: z.ZodDefault<z.ZodNumber>;
@@ -1391,7 +1391,7 @@ export declare const MCP_TOOLS: {
     };
     readonly profession_path: {
         readonly title: "Profession leveling path";
-        readonly description: "Leveling path for one Forever profession from Everloot uploads. A step exists only after 3 installs agree: on a reported recipe, or on the recipe colours that make it orange (a guaranteed skill-up), starting at the trainer's required rank. Gold exists only after 3 price uploads agree. No copied guide. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.";
+        readonly description: "Leveling path for one Forever profession from Everloot uploads. A step exists only after 3 installs agree: on a reported recipe, or on the recipe colours that make it orange (a guaranteed skill-up), starting at the trainer's required rank. Gold exists only after 3 price uploads agree. No copied guide. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
         readonly inputSchema: {
             readonly profession: z.ZodString;
             readonly fromSkill: z.ZodDefault<z.ZodNumber>;
@@ -1483,7 +1483,7 @@ export declare const MCP_TOOLS: {
     };
     readonly item_page: {
         readonly title: "Item page for a drop";
-        readonly description: "One Forever item: agreed name, observed loot-window drop frequency, agreed map pins, and player-reported armor, block, damage per second, stats and resistances. Each item number needs one value with 3 agreeing installs in the newest build with 3 reporting installs, and no competing value with 3; contested values are withheld. Each number states its agreeing installs, build and last seen, with the corpus date and method. Missing numbers are [?] with a reason. No baseline rows or player names. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.";
+        readonly description: "One Forever item: agreed name, observed loot-window drop frequency, agreed map pins, and player-reported armor, block, damage per second, stats and resistances. Each item number needs one value with 3 agreeing installs in the newest build with 3 reporting installs, and no competing value with 3; contested values are withheld. Each number states its agreeing installs, build and last seen, with the corpus date and method. Missing numbers are [?] with a reason. No baseline rows or player names. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
         readonly inputSchema: {
             readonly itemId: z.ZodNumber;
         };
@@ -1593,7 +1593,7 @@ export declare const MCP_TOOLS: {
     };
     readonly npc_page: {
         readonly title: "NPC page";
-        readonly description: "One Forever NPC: agreed name and map pins, and loot windows reported but not yet in the rates. A name or pin needs 3 installs agreeing. The pin does not require a drop. No copied spawn list. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.";
+        readonly description: "One Forever NPC: agreed name and map pins, and loot windows reported but not yet in the rates. A name or pin needs 3 installs agreeing. The pin does not require a drop. No copied spawn list. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
         readonly inputSchema: {
             readonly npcId: z.ZodNumber;
         };
@@ -1624,7 +1624,7 @@ export declare const MCP_TOOLS: {
     };
     readonly object_page: {
         readonly title: "Game object page";
-        readonly description: "One game object (a chest, herb, ore vein or fishing pool) by the id in its GUID: the items players looted from it, each with observed loot windows, windows with the item and distinct install reports. A frequency is public after 3 install reports; a public object with nothing in its windows reads as a measured zero. The name is shown when 3 installs agree on it. Reads Everloot's current authorized public corpus when connected.";
+        readonly description: "One game object (a chest, herb, ore vein or fishing pool) by the id in its GUID: the items players looted from it, each with observed loot windows, windows with the item and distinct install reports. A frequency is public after 3 install reports; a public object with nothing in its windows reads as a measured zero. The name is shown when 3 installs agree on it. Reads Everloot's public player data when connected.";
         readonly inputSchema: {
             readonly objectId: z.ZodNumber;
         };
@@ -1668,7 +1668,7 @@ export declare const MCP_TOOLS: {
     };
     readonly quest_page: {
         readonly title: "Quest page";
-        readonly description: "One Forever quest: agreed title, level, giver, turn-in, and rewards. Each fact needs 3 installs agreeing. No copied quest text. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.";
+        readonly description: "One Forever quest: agreed title, level, giver, turn-in, and rewards. Each fact needs 3 installs agreeing. No copied quest text. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
         readonly inputSchema: {
             readonly questId: z.ZodNumber;
         };
@@ -1693,7 +1693,7 @@ export declare const MCP_TOOLS: {
     };
     readonly vendor_page: {
         readonly title: "Vendor page";
-        readonly description: "Goods one Forever vendor sells. An item is listed when 3 installs agree on that item and its copper price. Two agreed prices both stay listed. No copied catalog. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.";
+        readonly description: "Goods one Forever vendor sells. An item is listed when 3 installs agree on that item and its copper price. Two agreed prices both stay listed. No copied catalog. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
         readonly inputSchema: {
             readonly vendorNpcId: z.ZodNumber;
         };
@@ -1720,7 +1720,7 @@ export declare const MCP_TOOLS: {
     };
     readonly world_map_near: {
         readonly title: "What is near a place on the map";
-        readonly description: `Entrances, NPCs, vendors and treasures near a spot, nearest first, with straight-line distances in yards. Give a zone (name or map id) with x and y from 0 to 100, or an NPC id to start from where that NPC stands. Entrances come from the game files; one is confirmed once 3 installs zoned in from it. NPCs, vendors and treasures are player-observed and listed only where 3 installs agree on the position. Zones the files hold back as possibly unreleased are not offered. Reads Everloot's current authorized public corpus when connected.`;
+        readonly description: `Entrances, NPCs, vendors and treasures near a spot, nearest first, with straight-line distances in yards. Give a zone (name or map id) with x and y from 0 to 100, or an NPC id to start from where that NPC stands. Entrances come from the game files; one is confirmed once 3 installs zoned in from it. NPCs, vendors and treasures are player-observed and listed only where 3 installs agree on the position. Zones the files hold back as possibly unreleased are not offered. Reads Everloot's public player data when connected.`;
         readonly inputSchema: {
             readonly zone: z.ZodOptional<z.ZodString>;
             readonly x: z.ZodOptional<z.ZodNumber>;
@@ -1786,7 +1786,7 @@ export declare const MCP_TOOLS: {
     };
     readonly entity_relations: {
         readonly title: "How an item, NPC, spell or quest connects to others";
-        readonly description: `Every typed relation of one entity, both directions: dropped by, sold by, reward from, located in (player-observed, listed where 3 installs agree, with the install count and last seen), and created by, reagent for, part of set, same icon (found in game files, unconfirmed, with the build they came from). Ids are the game's own. Reads Everloot's current authorized public corpus and the committed client layer.`;
+        readonly description: `Every typed relation of one entity, both directions: dropped by, sold by, reward from, located in (player-observed, listed where 3 installs agree, with the install count and last seen), and created by, reagent for, part of set, same icon (found in game files, unconfirmed, with the build they came from). Ids are the game's own. Reads Everloot's public player data and the game-file relations of the current build.`;
         readonly inputSchema: {
             readonly kind: z.ZodEnum<{
                 icon: "icon";
@@ -2174,7 +2174,7 @@ export declare const MCP_TOOLS: {
     };
     readonly collection_gap: {
         readonly title: "Owned versus missing in a collection";
-        readonly description: "Missing items in one collection for one install. A list row is public after 3 installs agree on the collection, the source, and the item. Owned is what that install uploaded. Not a Blizzard profile read and not a copied catalog. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.";
+        readonly description: "Missing items in one collection for one install. A list row is public after 3 installs agree on the collection, the source, and the item. Owned is what that install uploaded. Not a Blizzard profile read and not a copied catalog. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
         readonly inputSchema: {
             readonly collection: z.ZodString;
             readonly ownerInstallId: z.ZodString;
@@ -2203,7 +2203,7 @@ export declare const MCP_TOOLS: {
     };
     readonly completion_progress: {
         readonly title: "Achievement, reputation, title and quest progress";
-        readonly description: "What one install's characters have finished, and what is closest to done: achievements with the largest share of criteria or progress met, reputations nearest the next standing, titles known, and quests finished in a chain. A list entry is public after 3 players (installs uploading from different addresses) report it identically. Progress is shown only when that install uploaded it with the collection sharing choice and a verified grant; without it the answer says so. Not a Blizzard profile read and not a copied catalog. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.";
+        readonly description: "What one install's characters have finished, and what is closest to done: achievements with the largest share of criteria or progress met, reputations nearest the next standing, titles known, and quests finished in a chain. A list entry is public after 3 players (installs uploading from different addresses) report it identically. Progress is shown only when that install uploaded it with the collection sharing choice and a verified grant; without it the answer says so. Not a Blizzard profile read and not a copied catalog. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
         readonly inputSchema: {
             readonly ownerInstallId: z.ZodString;
             readonly characterKey: z.ZodOptional<z.ZodString>;
@@ -2290,7 +2290,7 @@ export declare const MCP_TOOLS: {
     };
     readonly guild_board: {
         readonly title: "Guild board its officers published";
-        readonly description: "One guild's roster, bosses killed, loot awarded, raid attendance and average item level, as that guild's own officers chose to publish them. Only uploads from officers holding a verified grant for the guild count, and a figure is public after 2 of them agree. Names are in-game character names, never accounts or real-world identities. A character's owner can opt out, and an opted-out character is left out of the roster, loot and attendance. A guild whose officers have not published gets an empty board; the tool does not look up other players or guilds. The average names how many roster members were measured; there is no combined score. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.";
+        readonly description: "One guild's roster, bosses killed, loot awarded, raid attendance and average item level, as that guild's own officers chose to publish them. Only uploads from officers holding a verified grant for the guild count, and a figure is public after 2 of them agree. Names are in-game character names, never accounts or real-world identities. A character's owner can opt out, and an opted-out character is left out of the roster, loot and attendance. A guild whose officers have not published gets an empty board; the tool does not look up other players or guilds. The average names how many roster members were measured; there is no combined score. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
         readonly inputSchema: {
             readonly guildName: z.ZodString;
             readonly realm: z.ZodString;
@@ -2376,7 +2376,7 @@ export declare const MCP_TOOLS: {
     };
     readonly guild_search: {
         readonly title: "Find a guild by the start of its name";
-        readonly description: "Guilds whose name starts with what you typed, each with its realm, faction, how many characters the addon saw in it, and the count and date of its agreed boss kills. A guild is listed once its members' uploads agree on a kill (2 installs reporting the same guild and boss), once its officers published a board, or once a character was seen in it. Guild names only, never a member's name, and a guild that asked to be hidden is left out. Members seen are counted only when the player pages are connected; otherwise the count is unrecorded, not zero. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.";
+        readonly description: "Guilds whose name starts with what you typed, each with its realm, faction, how many characters the addon saw in it, and the count and date of its agreed boss kills. A guild is listed once its members' uploads agree on a kill (2 installs reporting the same guild and boss), once its officers published a board, or once a character was seen in it. Guild names only, never a member's name, and a guild that asked to be hidden is left out. Members seen are counted only when the player pages are connected; otherwise the count is unrecorded, not zero. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
         readonly inputSchema: {
             readonly query: z.ZodString;
             readonly limit: z.ZodDefault<z.ZodNumber>;
@@ -2407,7 +2407,7 @@ export declare const MCP_TOOLS: {
     };
     readonly guild_rankings: {
         readonly title: "Guild ladder for one raid or dungeon";
-        readonly description: "Every guild with an agreed kill in one instance, ordered by bosses killed, then by who reached its latest kill first, then by name; equal rows share a rank. A kill is a guild's once 2 of its members' installs report the same boss there, timed at the earliest report, or once its officers published it through the guild board, which carries no time. The boss list and its order are the encounters 3 installs reported in that instance; a kill of a boss not on it counts for nothing. There is no score, no rating and no total across instances. Without an instance, the newest raid with a kill is ranked; realm and faction narrow the ladder. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.";
+        readonly description: "Every guild with an agreed kill in one instance, ordered by bosses killed, then by who reached its latest kill first, then by name; equal rows share a rank. A kill is a guild's once 2 of its members' installs report the same boss there, timed at the earliest report, or once its officers published it through the guild board, which carries no time. The boss list and its order are the encounters 3 installs reported in that instance; a kill of a boss not on it counts for nothing. There is no score, no rating and no total across instances. Without an instance, the newest raid with a kill is ranked; realm and faction narrow the ladder. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
         readonly inputSchema: {
             readonly instanceMapId: z.ZodOptional<z.ZodNumber>;
             readonly realm: z.ZodOptional<z.ZodString>;
@@ -2449,7 +2449,7 @@ export declare const MCP_TOOLS: {
     };
     readonly auction_history: {
         readonly title: "Auction history for one item";
-        readonly description: "Price history from auction scans players uploaded on purpose. A day is public after 3 installs scanned that item on that realm. Copper is the median. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.";
+        readonly description: "Price history from auction scans players uploaded on purpose. A day is public after 3 installs scanned that item on that realm. Copper is the median. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
         readonly inputSchema: {
             readonly realm: z.ZodString;
             readonly itemId: z.ZodNumber;
@@ -2517,7 +2517,7 @@ export declare const MCP_TOOLS: {
     };
     readonly gold_ledger: {
         readonly title: "Gold ledger for one character";
-        readonly description: "Peak gold and the money events that character's own upload recorded. Loot, quests, vendors, and auction sales stay on the money line. Gameplay stays on its own line. A missing line is unrecorded. The difference is not called bought and is not a ban. Installs are not merged. No scan of a player who did not upload. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.";
+        readonly description: "Peak and current gold and the money events that character's own upload recorded: income (loot, quests, vendor and auction sales) and spending (flight paths, postage, barber, respecs, auction purchases), each install's ledger kept apart. A category with nothing recorded reads as unrecorded, not zero, and gold from other gameplay is unrecorded. The gap between recorded income and peak gold is shown as unrecorded, never called bought gold or a ban. No scan of a player who did not upload. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
         readonly inputSchema: {
             readonly character: z.ZodString;
             readonly realm: z.ZodString;
@@ -3032,7 +3032,7 @@ export declare const MCP_TOOL_LIST: ({
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
 } | {
     title: "Evidence for a question, each piece with its source";
-    description: "The evidence behind a question about WoW: Forever, for an answer that cites its sources: facts players observed (public after three installs agree, with the install count), curated facts, and the 2023 Warcraft Wiki (marked: may differ in Forever). Every piece carries a claim, its source URL, licence and date. Returns evidence rather than prose. Further-reading links are search URLs on other sites; nothing is fetched from them. Reads Everloot's current authorized public corpus when connected; when it is not, the observed layer is unrecorded, not empty.";
+    description: "The evidence behind a question about WoW: Forever, for an answer that cites its sources: facts players observed (public after three installs agree, with the install count), curated facts, and the 2023 Warcraft Wiki (marked: may differ in Forever). Every piece carries a claim, its source URL, licence and date. Returns evidence rather than prose. Further-reading links are search URLs on other sites; nothing is fetched from them. Reads Everloot's public player data when connected; when it is not, the observed layer is unrecorded, not empty.";
     inputSchema: {
         readonly question: z.ZodString;
         readonly limit: z.ZodDefault<z.ZodNumber>;
@@ -3068,7 +3068,7 @@ export declare const MCP_TOOL_LIST: ({
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
 } | {
     title: "Profession leveling path";
-    description: "Leveling path for one Forever profession from Everloot uploads. A step exists only after 3 installs agree: on a reported recipe, or on the recipe colours that make it orange (a guaranteed skill-up), starting at the trainer's required rank. Gold exists only after 3 price uploads agree. No copied guide. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.";
+    description: "Leveling path for one Forever profession from Everloot uploads. A step exists only after 3 installs agree: on a reported recipe, or on the recipe colours that make it orange (a guaranteed skill-up), starting at the trainer's required rank. Gold exists only after 3 price uploads agree. No copied guide. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
     inputSchema: {
         readonly profession: z.ZodString;
         readonly fromSkill: z.ZodDefault<z.ZodNumber>;
@@ -3160,7 +3160,7 @@ export declare const MCP_TOOL_LIST: ({
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
 } | {
     title: "Item page for a drop";
-    description: "One Forever item: agreed name, observed loot-window drop frequency, agreed map pins, and player-reported armor, block, damage per second, stats and resistances. Each item number needs one value with 3 agreeing installs in the newest build with 3 reporting installs, and no competing value with 3; contested values are withheld. Each number states its agreeing installs, build and last seen, with the corpus date and method. Missing numbers are [?] with a reason. No baseline rows or player names. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.";
+    description: "One Forever item: agreed name, observed loot-window drop frequency, agreed map pins, and player-reported armor, block, damage per second, stats and resistances. Each item number needs one value with 3 agreeing installs in the newest build with 3 reporting installs, and no competing value with 3; contested values are withheld. Each number states its agreeing installs, build and last seen, with the corpus date and method. Missing numbers are [?] with a reason. No baseline rows or player names. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
     inputSchema: {
         readonly itemId: z.ZodNumber;
     };
@@ -3270,7 +3270,7 @@ export declare const MCP_TOOL_LIST: ({
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
 } | {
     title: "NPC page";
-    description: "One Forever NPC: agreed name and map pins, and loot windows reported but not yet in the rates. A name or pin needs 3 installs agreeing. The pin does not require a drop. No copied spawn list. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.";
+    description: "One Forever NPC: agreed name and map pins, and loot windows reported but not yet in the rates. A name or pin needs 3 installs agreeing. The pin does not require a drop. No copied spawn list. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
     inputSchema: {
         readonly npcId: z.ZodNumber;
     };
@@ -3301,7 +3301,7 @@ export declare const MCP_TOOL_LIST: ({
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
 } | {
     title: "Game object page";
-    description: "One game object (a chest, herb, ore vein or fishing pool) by the id in its GUID: the items players looted from it, each with observed loot windows, windows with the item and distinct install reports. A frequency is public after 3 install reports; a public object with nothing in its windows reads as a measured zero. The name is shown when 3 installs agree on it. Reads Everloot's current authorized public corpus when connected.";
+    description: "One game object (a chest, herb, ore vein or fishing pool) by the id in its GUID: the items players looted from it, each with observed loot windows, windows with the item and distinct install reports. A frequency is public after 3 install reports; a public object with nothing in its windows reads as a measured zero. The name is shown when 3 installs agree on it. Reads Everloot's public player data when connected.";
     inputSchema: {
         readonly objectId: z.ZodNumber;
     };
@@ -3345,7 +3345,7 @@ export declare const MCP_TOOL_LIST: ({
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
 } | {
     title: "Quest page";
-    description: "One Forever quest: agreed title, level, giver, turn-in, and rewards. Each fact needs 3 installs agreeing. No copied quest text. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.";
+    description: "One Forever quest: agreed title, level, giver, turn-in, and rewards. Each fact needs 3 installs agreeing. No copied quest text. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
     inputSchema: {
         readonly questId: z.ZodNumber;
     };
@@ -3370,7 +3370,7 @@ export declare const MCP_TOOL_LIST: ({
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
 } | {
     title: "Vendor page";
-    description: "Goods one Forever vendor sells. An item is listed when 3 installs agree on that item and its copper price. Two agreed prices both stay listed. No copied catalog. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.";
+    description: "Goods one Forever vendor sells. An item is listed when 3 installs agree on that item and its copper price. Two agreed prices both stay listed. No copied catalog. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
     inputSchema: {
         readonly vendorNpcId: z.ZodNumber;
     };
@@ -3397,7 +3397,7 @@ export declare const MCP_TOOL_LIST: ({
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
 } | {
     title: "What is near a place on the map";
-    description: `Entrances, NPCs, vendors and treasures near a spot, nearest first, with straight-line distances in yards. Give a zone (name or map id) with x and y from 0 to 100, or an NPC id to start from where that NPC stands. Entrances come from the game files; one is confirmed once 3 installs zoned in from it. NPCs, vendors and treasures are player-observed and listed only where 3 installs agree on the position. Zones the files hold back as possibly unreleased are not offered. Reads Everloot's current authorized public corpus when connected.`;
+    description: `Entrances, NPCs, vendors and treasures near a spot, nearest first, with straight-line distances in yards. Give a zone (name or map id) with x and y from 0 to 100, or an NPC id to start from where that NPC stands. Entrances come from the game files; one is confirmed once 3 installs zoned in from it. NPCs, vendors and treasures are player-observed and listed only where 3 installs agree on the position. Zones the files hold back as possibly unreleased are not offered. Reads Everloot's public player data when connected.`;
     inputSchema: {
         readonly zone: z.ZodOptional<z.ZodString>;
         readonly x: z.ZodOptional<z.ZodNumber>;
@@ -3463,7 +3463,7 @@ export declare const MCP_TOOL_LIST: ({
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
 } | {
     title: "How an item, NPC, spell or quest connects to others";
-    description: `Every typed relation of one entity, both directions: dropped by, sold by, reward from, located in (player-observed, listed where 3 installs agree, with the install count and last seen), and created by, reagent for, part of set, same icon (found in game files, unconfirmed, with the build they came from). Ids are the game's own. Reads Everloot's current authorized public corpus and the committed client layer.`;
+    description: `Every typed relation of one entity, both directions: dropped by, sold by, reward from, located in (player-observed, listed where 3 installs agree, with the install count and last seen), and created by, reagent for, part of set, same icon (found in game files, unconfirmed, with the build they came from). Ids are the game's own. Reads Everloot's public player data and the game-file relations of the current build.`;
     inputSchema: {
         readonly kind: z.ZodEnum<{
             icon: "icon";
@@ -3851,7 +3851,7 @@ export declare const MCP_TOOL_LIST: ({
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
 } | {
     title: "Owned versus missing in a collection";
-    description: "Missing items in one collection for one install. A list row is public after 3 installs agree on the collection, the source, and the item. Owned is what that install uploaded. Not a Blizzard profile read and not a copied catalog. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.";
+    description: "Missing items in one collection for one install. A list row is public after 3 installs agree on the collection, the source, and the item. Owned is what that install uploaded. Not a Blizzard profile read and not a copied catalog. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
     inputSchema: {
         readonly collection: z.ZodString;
         readonly ownerInstallId: z.ZodString;
@@ -3880,7 +3880,7 @@ export declare const MCP_TOOL_LIST: ({
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
 } | {
     title: "Achievement, reputation, title and quest progress";
-    description: "What one install's characters have finished, and what is closest to done: achievements with the largest share of criteria or progress met, reputations nearest the next standing, titles known, and quests finished in a chain. A list entry is public after 3 players (installs uploading from different addresses) report it identically. Progress is shown only when that install uploaded it with the collection sharing choice and a verified grant; without it the answer says so. Not a Blizzard profile read and not a copied catalog. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.";
+    description: "What one install's characters have finished, and what is closest to done: achievements with the largest share of criteria or progress met, reputations nearest the next standing, titles known, and quests finished in a chain. A list entry is public after 3 players (installs uploading from different addresses) report it identically. Progress is shown only when that install uploaded it with the collection sharing choice and a verified grant; without it the answer says so. Not a Blizzard profile read and not a copied catalog. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
     inputSchema: {
         readonly ownerInstallId: z.ZodString;
         readonly characterKey: z.ZodOptional<z.ZodString>;
@@ -3967,7 +3967,7 @@ export declare const MCP_TOOL_LIST: ({
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
 } | {
     title: "Guild board its officers published";
-    description: "One guild's roster, bosses killed, loot awarded, raid attendance and average item level, as that guild's own officers chose to publish them. Only uploads from officers holding a verified grant for the guild count, and a figure is public after 2 of them agree. Names are in-game character names, never accounts or real-world identities. A character's owner can opt out, and an opted-out character is left out of the roster, loot and attendance. A guild whose officers have not published gets an empty board; the tool does not look up other players or guilds. The average names how many roster members were measured; there is no combined score. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.";
+    description: "One guild's roster, bosses killed, loot awarded, raid attendance and average item level, as that guild's own officers chose to publish them. Only uploads from officers holding a verified grant for the guild count, and a figure is public after 2 of them agree. Names are in-game character names, never accounts or real-world identities. A character's owner can opt out, and an opted-out character is left out of the roster, loot and attendance. A guild whose officers have not published gets an empty board; the tool does not look up other players or guilds. The average names how many roster members were measured; there is no combined score. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
     inputSchema: {
         readonly guildName: z.ZodString;
         readonly realm: z.ZodString;
@@ -4053,7 +4053,7 @@ export declare const MCP_TOOL_LIST: ({
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
 } | {
     title: "Find a guild by the start of its name";
-    description: "Guilds whose name starts with what you typed, each with its realm, faction, how many characters the addon saw in it, and the count and date of its agreed boss kills. A guild is listed once its members' uploads agree on a kill (2 installs reporting the same guild and boss), once its officers published a board, or once a character was seen in it. Guild names only, never a member's name, and a guild that asked to be hidden is left out. Members seen are counted only when the player pages are connected; otherwise the count is unrecorded, not zero. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.";
+    description: "Guilds whose name starts with what you typed, each with its realm, faction, how many characters the addon saw in it, and the count and date of its agreed boss kills. A guild is listed once its members' uploads agree on a kill (2 installs reporting the same guild and boss), once its officers published a board, or once a character was seen in it. Guild names only, never a member's name, and a guild that asked to be hidden is left out. Members seen are counted only when the player pages are connected; otherwise the count is unrecorded, not zero. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
     inputSchema: {
         readonly query: z.ZodString;
         readonly limit: z.ZodDefault<z.ZodNumber>;
@@ -4084,7 +4084,7 @@ export declare const MCP_TOOL_LIST: ({
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
 } | {
     title: "Guild ladder for one raid or dungeon";
-    description: "Every guild with an agreed kill in one instance, ordered by bosses killed, then by who reached its latest kill first, then by name; equal rows share a rank. A kill is a guild's once 2 of its members' installs report the same boss there, timed at the earliest report, or once its officers published it through the guild board, which carries no time. The boss list and its order are the encounters 3 installs reported in that instance; a kill of a boss not on it counts for nothing. There is no score, no rating and no total across instances. Without an instance, the newest raid with a kill is ranked; realm and faction narrow the ladder. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.";
+    description: "Every guild with an agreed kill in one instance, ordered by bosses killed, then by who reached its latest kill first, then by name; equal rows share a rank. A kill is a guild's once 2 of its members' installs report the same boss there, timed at the earliest report, or once its officers published it through the guild board, which carries no time. The boss list and its order are the encounters 3 installs reported in that instance; a kill of a boss not on it counts for nothing. There is no score, no rating and no total across instances. Without an instance, the newest raid with a kill is ranked; realm and faction narrow the ladder. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
     inputSchema: {
         readonly instanceMapId: z.ZodOptional<z.ZodNumber>;
         readonly realm: z.ZodOptional<z.ZodString>;
@@ -4126,7 +4126,7 @@ export declare const MCP_TOOL_LIST: ({
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
 } | {
     title: "Auction history for one item";
-    description: "Price history from auction scans players uploaded on purpose. A day is public after 3 installs scanned that item on that realm. Copper is the median. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.";
+    description: "Price history from auction scans players uploaded on purpose. A day is public after 3 installs scanned that item on that realm. Copper is the median. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
     inputSchema: {
         readonly realm: z.ZodString;
         readonly itemId: z.ZodNumber;
@@ -4194,7 +4194,7 @@ export declare const MCP_TOOL_LIST: ({
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
 } | {
     title: "Gold ledger for one character";
-    description: "Peak gold and the money events that character's own upload recorded. Loot, quests, vendors, and auction sales stay on the money line. Gameplay stays on its own line. A missing line is unrecorded. The difference is not called bought and is not a ban. Installs are not merged. No scan of a player who did not upload. Reads Everloot's current authorized public corpus when connected. Missing or unavailable data is reported explicitly.";
+    description: "Peak and current gold and the money events that character's own upload recorded: income (loot, quests, vendor and auction sales) and spending (flight paths, postage, barber, respecs, auction purchases), each install's ledger kept apart. A category with nothing recorded reads as unrecorded, not zero, and gold from other gameplay is unrecorded. The gap between recorded income and peak gold is shown as unrecorded, never called bought gold or a ban. No scan of a player who did not upload. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
     inputSchema: {
         readonly character: z.ZodString;
         readonly realm: z.ZodString;

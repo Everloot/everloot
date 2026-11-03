@@ -13,5 +13,5 @@
       "zod": ["../web/node_modules/zod"]
     }
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  "include": ["src/**/*.ts", "test/**/*.ts", "bench/**/*.ts"]
 }

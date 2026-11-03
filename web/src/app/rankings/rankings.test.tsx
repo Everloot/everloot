@@ -100,6 +100,78 @@ test("with two weeks: the weekly chart, the change column and the current week m
   for (const slug of ["classes", "races", "factions"]) expect(hubPage).toContain(`href="/rankings/${slug}"`);
 });
 
+test("the hub's headline tiles, weekly totals and top movers, each row linking to the census filtered to it", async () => {
+  store.loadCensus.mockResolvedValue(read([...week(WEEK1, "w"), ...week(WEEK2, "v", 80)], "2026-11-20T12:00:00.000Z"));
+  const page = await hub();
+  const words = text(page);
+  // 149 characters last week round to 150; 201 this week round to 200.
+  expect(page).toContain("data-metric-tiles");
+  expect(words).toContain("Characters counted 200 This week so far (from 2026-11-16)");
+  expect(words).toContain("Against last week +50 +33% characters");
+  // Mage and Warlock are hidden this week, so the tile names the leader among published classes and says why.
+  expect(words).toContain("Leading published class Warrior 40% of characters. Hidden classes are not ranked and could be larger.");
+  expect(words).not.toContain("Most played class");
+  expect(words).toContain("Reporting installs 3");
+  expect(page).toContain("data-weekly-totals");
+  expect(words).toMatch(/Week of 2026-11-09 150 This week so far \(from 2026-11-16\) 200/);
+  const movers = page.match(/<ol data-movers[\s\S]*?<\/ol>/)![0];
+  expect(text(movers)).toMatch(/▲2 up 2 Warrior Classes by players/);
+  expect(movers).toContain('href="/census?class=warrior"');
+  // The leaderboards link into the census, and draw each row's share over the weeks.
+  expect(page).toContain('href="/census?race=human"');
+  expect(page).toContain('href="/census?faction=alliance"');
+  expect(page).toContain("data-sparkline");
+  // With two populated weeks, a sparkline only shows from xl: at tablet widths (two cards of about 360 px) it would
+  // squeeze the names to nothing, so there the share bar shows alone. Every sparkline carries that rule.
+  const sparklines = page.match(/<svg[^>]*data-sparkline[^>]*>/g)!;
+  expect(sparklines.length).toBeGreaterThanOrEqual(5);
+  for (const s of sparklines) {
+    expect(s).toMatch(/class="[^"]*\bhidden xl:block\b/);
+    expect(s).not.toMatch(/\b(sm|md|lg):block\b/);
+  }
+  // Every chart has its numbers as a table, closed until asked for, and nothing on the page animates.
+  expect(page.match(/data-chart-table/g)!.length).toBe(2);
+  expect(words).toContain("Show as a table");
+  expect(page).not.toMatch(/animate-/);
+});
+
+test("a hidden class larger than every shown one never reads as the most played; a tie names both leaders", async () => {
+  // 200 Warlocks from one install: under the install threshold, so hidden, though no shown class comes close.
+  const hiddenMajority = [
+    ...crowd(42, "h1", WEEK1, { class: "HUNTER" }), ...crowd(28, "h2", WEEK1, { class: "WARRIOR" }), ...crowd(16, "h3", WEEK1, { race: "Gnome", class: "PRIEST" }),
+    ...crowd(200, "h4", WEEK1, { race: "Gnome", class: "WARLOCK", installId: "install-a", reporter: "0".padStart(16, "0") }),
+  ];
+  store.loadCensus.mockResolvedValue(read(hiddenMajority, "2026-11-15T12:00:00.000Z"));
+  const words = text(await hub());
+  expect(words).toMatch(/Leading published class Hunter \d+% of characters\. Hidden classes are not ranked and could be larger\./);
+  expect(words).not.toContain("Most played");
+  const tie = [...crowd(40, "t1", WEEK1, { class: "HUNTER" }), ...crowd(40, "t2", WEEK1, { class: "WARRIOR" }), ...crowd(20, "t3", WEEK1, { race: "Gnome", class: "PRIEST" })];
+  store.loadCensus.mockResolvedValue(read(tie, "2026-11-15T12:00:00.000Z"));
+  expect(text(await hub())).toContain("Leading published classes Hunter and Warrior Tied at 40% of characters each.");
+});
+
+test("with one week, the tiles and movers say why they have nothing to compare yet", async () => {
+  store.loadCensus.mockResolvedValue(read(week(WEEK1, "w"), "2026-11-15T12:00:00.000Z"));
+  const words = text(await hub());
+  expect(words).toContain("Against last week — not yet Starts once two weeks have numbers");
+  expect(words).toMatch(/Top movers .*Change against last week and the weekly chart start once two weeks have numbers/);
+  expect(words).not.toContain("data-movers");
+});
+
+test("a ranking's rows link to the census with the ranking's filters", async () => {
+  store.loadCensus.mockResolvedValue(read(week(WEEK1, "w"), "2026-11-15T12:00:00.000Z"));
+  expect(await ranking("races", { class: "hunter" })).toContain('href="/census?race=human&amp;class=hunter"');
+  expect(await ranking("classes")).toContain('href="/census?class=priest"');
+  // The census publishes no level band crossed with anything, so no rankings link asks for one.
+  store.loadCensus.mockResolvedValue(read([...week(WEEK1, "w"), ...week(WEEK2, "v", 80)], "2026-11-20T12:00:00.000Z"));
+  const pages = [await hub(), ...(await Promise.all(["classes", "races", "factions"].map((slug) => ranking(slug)))), await ranking("races", { class: "hunter" })];
+  for (const page of pages) {
+    const links = page.match(/href="\/census\?[^"]*"/g) ?? [];
+    expect(links.length).toBeGreaterThan(0);
+    for (const l of links) expect(l).not.toContain("level=");
+  }
+});
+
 test("a week under the thresholds says it is still collecting, with no number", async () => {
   store.loadCensus.mockResolvedValue(read(crowd(4, "s", WEEK1), "2026-11-15T12:00:00.000Z"));
   const page = await ranking("factions");

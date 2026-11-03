@@ -8,7 +8,7 @@ import { Container, PageHeader, SectionHeading } from "@/components/ui";
 import { classLabel, contextLinks, type ContextDestination, type ContextLink } from "@/lib/class-context";
 import { classGuides, classRaces, hubIndexable } from "@/lib/class-hub";
 import { guideHref } from "@/lib/guides";
-import { RACE_TABLE, traitsFor } from "@/lib/race-traits";
+import { RACE_TABLE, RACIAL_NOTES, traitsFor } from "@/lib/race-traits";
 import { pageMetadata } from "@/lib/seo";
 import { TALENT_CLASSES, isTalentClass } from "@/lib/talents/catalogs";
 import type { GuideActivity, GuideRole } from "../../../../../kb/src/guides/guide";
@@ -36,8 +36,8 @@ type Destination = Exclude<ContextDestination, "hub">;
 /** What each linked page holds, and that it is the whole list where it is not narrowed to the class. */
 const NOTES: Record<Destination, (name: string) => string> = {
   talents: (name) => `${name} talent trees with the game's point rules, two talent sets and a share link.`,
-  spells: (name) => `Spells in the ${name} talent catalog, from the game files.`,
-  items: () => "Every item, with filters for slot, quality, item level and required level.",
+  spells: (name) => `${name} spells on the class's skill lines and in its talent catalog, from the game files.`,
+  items: (name) => `Items a ${name} can use by its proficiencies in the game files, with filters for slot, quality, item level and required level.`,
   raid: () => "Fill a 10, 20 or 40 player raid with classes and talent trees to see which buffs each group gets.",
   professions: () => "Profession paths and recipe skill ranges, estimated from the recipes and prices players uploaded.",
   dungeons: () => "Every dungeon and raid, lowest level first, with where it is entered and the bosses players report.",
@@ -149,7 +149,9 @@ export default async function ClassHubPage({ params }: Params) {
           </div>
           <p className="mt-3 text-sm text-muted">
             {races.some((f) => f.races.some((r) => r.isNew)) && <><span className="font-semibold text-accent">New</span> marks the combinations Blizzard names as new in WoW: Forever. </>}
-            {`Racial traits found in game files, unconfirmed, build ${RACE_TABLE.build.version}. `}
+            {`Racial traits found in game files, unconfirmed, build ${RACE_TABLE.build.version}, with Blizzard's final racial changes from `}
+            <a href={RACIAL_NOTES.sourceUrl} rel="noopener" className={LINK}>{`${RACIAL_NOTES.sourceName}, ${RACIAL_NOTES.sourceTitle}`}</a>
+            {". "}
             <Link href="/wow-forever#races" className={LINK}>Every race and class</Link>
           </p>
         </section>

@@ -42,16 +42,23 @@ class Parser {
    */
   parseWhole(): LuaTable {
     const table = this.parse();
+    const extra = this.extraText();
+    if (extra) throw new LuaParseError(extra);
+    return table;
+  }
+
+  /** Right after parse: why the file is more than that one assignment, or null when it is not. */
+  extraText(): string | null {
     const end = this.i;
     // Only whitespace and comments before the assignment, ending where it begins (not one inside a comment).
     this.i = 0;
     this.ws();
-    if (this.i !== this.start) throw new LuaParseError(`extra text before ${this.root}`);
+    if (this.i !== this.start) return `extra text before ${this.root}`;
     this.i = end;
     this.ws();
     if (this.s[this.i] === ";") { this.i++; this.ws(); }
-    if (this.i < this.s.length) throw new LuaParseError(`extra text after ${this.root} at offset ${this.i}`);
-    return table;
+    if (this.i < this.s.length) return `extra text after ${this.root} at offset ${this.i}`;
+    return null;
   }
 
   private ws(): void {
@@ -172,9 +179,14 @@ export interface EverlootFile {
   records: Array<Record<string, unknown>>;
 }
 
-/** The whole EverlootDB table as plain values, for readers that need more than the records (the /ask bridge). */
-export function parseEverlootTable(text: string): Record<string, unknown> {
-  const plain = toPlain(new Parser(text).parse());
+/**
+ * The whole EverlootDB table as plain values, for readers that need more than the records (the /ask bridge). With
+ * `check`, `check.extra` says why parseEverlootLua would refuse the file for text around the assignment, or is null.
+ */
+export function parseEverlootTable(text: string, check?: { extra: string | null }): Record<string, unknown> {
+  const parser = new Parser(text);
+  const plain = toPlain(parser.parse());
+  if (check) check.extra = parser.extraText();
   return Array.isArray(plain) ? {} : (plain as Record<string, unknown>);
 }
 

@@ -3,6 +3,7 @@ import AdSlot from "@/components/AdSlot";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { hasCard } from "@/lib/tooltip";
 import { npcPage, npcTraits, type NpcPin, type NpcRank } from "../../../../../../kb/src/world-pages";
 import { pendingForNpc, pendingLine } from "../../../../../../kb/src/pending-loot";
 import { npcLootTable } from "../../../../../../kb/src/loot-tables";
@@ -133,7 +134,7 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
   return (
     <Container width="data">
       <article>
-        <EntityHeader trail={trail} title={title} meta={["NPC", zone?.name, named ? <span className="tabular-nums">ID {npcId}</span> : null]} />
+        <EntityHeader trail={trail} title={title} meta={["NPC", zone?.name, named ? <span key="id" className="tabular-nums">ID {npcId}</span> : null]} />
         <EntityTop
           box={(firstPin && zone && <MapThumb pin={firstPin} zone={zone.name} art={art?.smallUrl ?? art?.url ?? null} />) || (
             <TooltipFrame name={title} label={`${title}, as players saw it`}>
@@ -158,7 +159,7 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
         <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
         <OpenData
           text={[`${title} (npc ${npcId})`, ...summary, `Source: https://everloot.app/database/npcs/${npcId}`].join("\n")}
-          jsonHref={`/api/tooltip/npc/${npcId}`}
+          jsonHref={!facts.unreachable && hasCard.npc(page) ? `/api/tooltip/npc/${npcId}` : undefined}
         />
         <Tabs
           label={`${title}: relations`}

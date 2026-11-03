@@ -3,8 +3,9 @@ import { dirname, join, relative } from "node:path";
 import { describe, expect, test } from "vitest";
 import ts from "typescript";
 import { fixture } from "./fixture";
-import { compareGameBuilds, freshnessLines, planFreshness, type HistoryGap, type PlanFreshness } from "./freshness";
+import { codeFreshness, compareGameBuilds, freshnessLines, planFreshness, savedPlanNote, type HistoryGap, type PlanFreshness } from "./freshness";
 import { PUBLISHED_CHANGES, classTalentChanges } from "./freshness-records";
+import { encodeBuild } from "./share";
 import type { Ranks, TalentCatalog } from "./types";
 
 // Change records in the shape the build watch writes (kb/src/build-watch/changes.ts). Made-up builds and
@@ -316,6 +317,47 @@ describe("planFreshness", () => {
     expect(f.touched.map((t) => [t.nodeId, t.points])).toEqual([[11, 5]]);
     expect(JSON.stringify(changes)).toBe(before);
     expect(planFreshness(tree, changes, "1.0.0.1", null as never)).toMatchObject({ touched: [], changed: false });
+  });
+});
+
+describe("savedPlanNote", () => {
+  const changes = () => classTalentChanges(changedRecords(), 8);
+  const code = (build: string, ranks: Ranks = plan) => encodeBuild({ classSlug: "mage", specId: 0, build, ranks });
+
+  test("a plan made on the tree's build, or a newer or unreadable one, gets no note", () => {
+    expect(savedPlanNote([codeFreshness(tree, changes(), code("1.0.0.5"))])).toBeNull();
+    expect(savedPlanNote([codeFreshness(tree, changes(), code("1.0.0.9"))])).toBeNull();
+    expect(savedPlanNote([codeFreshness(tree, changes(), "not a code"), null])).toBeNull();
+    expect(savedPlanNote([])).toBeNull();
+  });
+
+  test("an older plan whose talents changed says how many, without naming them", () => {
+    const note = savedPlanNote([codeFreshness(tree, changes(), code("1.0.0.1"))]);
+    expect(note).toBe("Made on an older game build: the game files changed 6 of its talents since.");
+    // The second set's changed talents count once with the first's.
+    const both = savedPlanNote([codeFreshness(tree, changes(), code("1.0.0.1")), codeFreshness(tree, changes(), code("1.0.0.3", { 11: { rank: 5 }, 41: { rank: 1 } }))]);
+    expect(both).toBe(note);
+  });
+
+  test("an older plan none of whose talents changed gets no note", () => {
+    expect(savedPlanNote([codeFreshness(tree, changes(), code("1.0.0.1", { 41: { rank: 1 }, 52: { rank: 1 } }))])).toBeNull();
+  });
+
+  test("when the records cannot say, the note says only that it is older and the change is unknown", () => {
+    const missing = classTalentChanges([changedRecords()[0]], 8);
+    expect(savedPlanNote([codeFreshness(tree, missing, code("1.0.0.1", { 41: { rank: 1 } }))])).toBe("Made on an older game build; whether its talents changed since is not known.");
+  });
+
+  test("a spoiler build's change is counted, never named, and a point-level change is said", () => {
+    const records = [
+      record("1.0.0.5", "1.0.0.1", {
+        ranks: [at(11, { name: "Hidden Name", before: 5, after: 3 })],
+        pointLevels: [{ classId: 8, className: "Mage", before: [10, 11, 12], after: [10, 12, 14], spoiler: false }],
+      }, { live: false, spoiler: true }),
+    ];
+    const note = savedPlanNote([codeFreshness(tree, classTalentChanges(records, 8), code("1.0.0.1"))]);
+    expect(note).toBe("Made on an older game build: the game files changed 1 of its talents and the levels talent points arrive at since.");
+    expect(note).not.toContain("Hidden Name");
   });
 });
 

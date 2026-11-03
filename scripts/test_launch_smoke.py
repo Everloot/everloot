@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from launch_smoke import (  # noqa: E402
-    checks, judge_deadmines, judge_downloads, judge_health, judge_named_item, judge_notice, judge_redirect, judge_tools, mcp_payload,
+    checks, judge_deadmines, judge_downloads, judge_health, judge_named_item, judge_notice, judge_png, judge_redirect, judge_tools, mcp_payload,
 )
 
 # A version page with nothing running needs the notice and noindex; before the switch /beta is any 200 page.
@@ -31,6 +31,16 @@ assert judge_health(200, {}, "<html>") == "is not JSON"
 # An item page must be named: "Item 25" means the build's names are not uploaded.
 assert judge_named_item(25)(200, {}, "<title>Worn Shortsword – WoW Forever item · Everloot</title>") is None
 assert "no item name" in judge_named_item(25)(200, {}, "<title>Item 25 · Everloot</title>")
+
+# A link preview card is a PNG; the 500 it answered on the Worker, or a page in its place, is a miss.
+assert judge_png(200, {"content-type": "image/png"}, "") is None
+assert judge_png(500, {}, "") == "answered 500"
+assert judge_png(200, {"content-type": "text/html; charset=utf-8"}, "<html>") == "is text/html; charset=utf-8, not image/png"
+assert judge_png(200, {}, "") == "is untyped, not image/png"
+assert {label: judge for label, _p, _b, judge in checks(False)}["raid plan card"] is judge_png
+assert [p for _l, p, _b, judge in checks(False) if judge is judge_png] == [
+    "/tools/talents/mage/card?a=EL1-mage-0-1.60.1.70707-MTA1ODE1OjE&b=-", "/tools/raid/card?c=ELR1-10-1.60.1.70707-MTM1Mg",
+]
 
 # A download page links the zip (and on /addon an installer); the GitHub fallback is a miss.
 zip_link = '<a href="/downloads/Everloot-0.3.14.zip">'
@@ -60,5 +70,11 @@ good = "- [game files, found in game files and unconfirmed] Deadmines: a dungeon
 assert judge_deadmines(200, {}, sources(good)) is None
 assert "more than once" in judge_deadmines(200, {}, sources(good.replace("Rhahk'Zor, Sneed", "Sneed, Sneed")))
 assert "not the game files" in judge_deadmines(200, {}, sources("- [lore] Welcome to the Deadmines: a song\n- [game files] Deadmines: ..."))
+
+# Since #707 a dungeon answer can open with a caveat line about archive lore; the first piece is still the fact.
+caveat = "Archive lore is historical context, not confirmation of Forever gameplay.\n"
+assert judge_deadmines(200, {}, sources(caveat + good)) is None
+assert "not the game files" in judge_deadmines(200, {}, sources(caveat + "- [lore] Welcome to the Deadmines: a song\n- [game files] Deadmines: ..."))
+assert "not the game files" in judge_deadmines(200, {}, sources(caveat))
 
 print("launch_smoke: all tests passed")

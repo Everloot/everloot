@@ -46,6 +46,28 @@ to the database and render the name the site may show:
 | `{item:N}`, `{npc:N}`, `{quest:N}`, `{zone:N}`, `{faction:N}` | the entity's name, linked to its database page |
 | `[[slug]]` | a link to a published wiki page |
 
+### Figures
+
+A paragraph that is only an image shows as a figure, the image across the column with its caption under it:
+
+```markdown
+![The zone map with the camps marked](/news/figures/<slug>/camps.webp "Where the camps are")
+```
+
+- **Alt text is required:** the words in `[ ]` describe the image for someone who cannot see it.
+- **The caption is optional:** the words in quotes after the path. Alt text and caption are plain text, no
+  tokens or links.
+- **The file is ours:** a `.webp` committed at `web/public/news/figures/<slug>/`, in the post's own folder
+  (lowercase letters, digits, `-` and `_` in the file name). No other address works, an https URL included.
+- **Every figure is 1600×900.** The page draws each one at that size so nothing moves while it loads, and the check
+  reads each file's header to hold it to that.
+- **An image is its own paragraph.** An image inside a sentence, a list or a quote is not supported.
+
+The check fails a post with an image that breaks a rule. If one reaches the site anyway, the page leaves that block
+out. The feed carries the summary only, so a figure never shows there. The post's plain text (its reading time)
+reads a figure as its caption, or its alt text when it has none. A figure's words do not count toward the 80 words
+of prose.
+
 ## Rules
 
 - **Our own words.** A post is written by a person and names that person in `author`. No AI tool credits.

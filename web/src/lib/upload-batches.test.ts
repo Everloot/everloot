@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { recordSchemas } from "@everloot/protocol";
 import { expect, test, vi } from "vitest";
 import { censusCharacters, censusSummary, prepareUpload, sendBatches } from "./upload-batches";
@@ -108,8 +109,21 @@ test("splits a full file by records and bytes, withholds legacy and unselected n
   const gold = { kind: "gold_snapshot", installId: "install-batches", eventId: "epoch:gold", capturedAt: row(1).capturedAt, character: "Thrall", realm: "Moon Guard", currentCopper: 1, peakCopper: 1 };
   const session = prepareUpload({ addonVersion: "0.2.0", records: [...Array.from({ length: 4500 }, (_, i) => row(i)), legacy, gold, { kind: "bogus" }] }, {}, []);
   expect(session.batches.map((b) => JSON.parse(b).records.length)).toEqual([2000, 2000, 500]);
-  expect(session.held).toEqual({ legacy: 1, named: 1, invalid: 1 });
+  expect(session.held).toEqual({ legacy: 1, named: 1, invalid: 1, links: 0 });
   expect(session.batches.every((b) => new TextEncoder().encode(b).length <= 600_000)).toBe(true);
+});
+test("character link rows never go in an upload, whatever is shared: their GUID and code stay out of every batch", () => {
+  const link = {
+    kind: "character_link", installId: "install-batches", eventId: "character_link:1", capturedAt: row(1).capturedAt, code: "EL-7K3Q-9P",
+    name: "Thrallina", realm: "Forever Pioneer", race: "Orc", class: "SHAMAN", level: 24, faction: "Horde", guid: "Player-4395-0A1B2C3D", completionKey: "0a1b2c3d",
+  };
+  for (const sharing of [{}, { gear: true, gold: true, guild: true, collection: true }]) {
+    const session = prepareUpload({ addonVersion: "0.2.0", records: [link, row(1), { ...link, eventId: undefined }] }, sharing, ["a".repeat(64)]);
+    expect(session.held.links).toBe(2);
+    expect(session.batches).toHaveLength(1);
+    for (const secret of ["character_link", "Player-4395", "EL-7K3Q-9P", "0a1b2c3d"]) expect(session.batches.join("")).not.toContain(secret);
+  }
+  expect(prepareUpload({ addonVersion: "0.2.0", records: [link] }, {}, []).batches).toEqual([]);
 });
 test("resumes at the first unconfirmed batch and rejects an unpersisted receipt", async () => {
   const session = prepareUpload({ addonVersion: "0.2.0", records: Array.from({ length: 2001 }, (_, i) => row(i)) }, {}, []);
@@ -179,4 +193,22 @@ test("skip leaves settled rows out of the batches and returns their event ids; n
   expect(session.counts).toEqual({ npc_sighting: 1, loot: 1 });
   expect(session.held.legacy).toBe(1);
   expect(prepareUpload({ addonVersion: "0.2.6", records }, {}, []).skipped).toEqual([]);
+});
+
+// The rows and main's answer for them (packages/protocol/test/fixtures): `run-records-off.main.json` is what main's own
+// build parsed. With the site's pull switch off, the preview and its batches must hold exactly main's rows.
+const fixture = (name: string) => JSON.parse(readFileSync(new URL(`../../../packages/protocol/test/fixtures/${name}`, import.meta.url), "utf8"));
+test("with the pull switch off, the preview reads a file as main does: same rows sent, same rows held", () => {
+  const inputs = fixture("run-records-off.inputs.json") as unknown[];
+  const main = fixture("run-records-off.main.json") as { records: { records: unknown[]; receipt: { rejected: unknown[] } } };
+  for (const session of [prepareUpload({ addonVersion: "0.3.15", records: inputs }, {}, []),
+    prepareUpload({ addonVersion: "0.3.15", records: inputs }, {}, [], undefined, undefined, { runRecords: false })]) {
+    expect(session.batches.flatMap((b) => JSON.parse(b).records)).toEqual(main.records.records);
+    expect(session.counts).toEqual({ encounter: 4, loot: 1 });
+    expect(session.held).toEqual({ legacy: 0, named: 0, invalid: main.records.receipt.rejected.length, links: 0 });
+  }
+  // On, the timing fields are read and checked, and the new kinds counted.
+  const on = prepareUpload({ addonVersion: "0.3.15", records: inputs }, {}, [], undefined, undefined, { runRecords: true });
+  expect(on.counts.encounter).toBe(2);
+  expect(on.counts.instance_run).toBe(1);
 });

@@ -144,6 +144,16 @@ test("wikitextToText strips markup and collects categories", () => {
   expect(categories).toEqual(["Orcs"]);
 });
 
+test("a {{Testing}} banner in the lead adds the wiki's Testing-only content category", () => {
+  // The live wiki's "Omar's Test Quest": the banner is a template, so the converter alone records no category.
+  const quest = "{{Testing}}\n{{Questbox\n | name = Omar's Test Quest\n}}\n\n==Objectives==\nGet [[Omar the Test Dragon|Omar]] some cloth\n* [[Linen Cloth]]";
+  expect(wikitextToText(quest).categories).toEqual(["Testing-only content"]);
+  expect(wikitextToText("{{testing|type=forever}}\nA beta reward.\n[[Category:Testing-only content]]").categories).toEqual(["Testing-only content"]);
+  // Below a heading the banner marks one section of a real page, and other templates that start alike are not it.
+  expect(wikitextToText("'''Thrall''' leads the [[Horde]].\n\n==Beta==\n{{Testing}}\nAn early test version.").categories).toEqual([]);
+  expect(wikitextToText("{{Testing realm}}\n'''Thrall''' leads the [[Horde]].").categories).toEqual([]);
+});
+
 test("wikiUrl builds a readable wiki URL", () => {
   expect(wikiUrl("Thrall (lore)")).toBe("https://warcraft.wiki.gg/wiki/Thrall_(lore)");
   expect(wikiUrl("Ahn'Qiraj: The Fallen Kingdom")).toBe("https://warcraft.wiki.gg/wiki/Ahn'Qiraj:_The_Fallen_Kingdom");
