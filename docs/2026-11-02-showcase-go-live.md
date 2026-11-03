@@ -72,10 +72,11 @@ select check_name, ok from (values
 
 Tested on a disposable Postgres 17: all `t` with every migration applied, all `f` on an empty database, and `f` on
 the two access rows after a stray grant to `anon` or `authenticated`. The row "the server can read the link and
-visibility tables directly" was added after review and has not been run yet: it must turn `f` after
+visibility tables directly" was added after review. It must turn `f` after
 `revoke select on public.character_links from service_role;` (and the same for `character_visibility`), since the
-owner list and the visibility controls read those tables directly, not only through the functions. Run that
-revoke-and-readback once on a disposable database before go-live, then grant it back.
+owner list and the visibility controls read those tables directly, not only through the functions. Run on
+2026-11-02 against a disposable `supabase/postgres:17.6.1.106` with all 23 migrations in `supabase/migrations/`
+applied: every row `t`; after that revoke, this row alone turned `f`; after granting it back, every row `t` again.
 
 ## The go-live PR
 
