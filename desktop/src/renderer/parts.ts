@@ -1,6 +1,6 @@
 // Pieces of the page that need no DOM: each returns HTML for app.ts to place, so a test can read the markup.
-import type { EngineState, Job, JobStatus, Settings } from "../shared/types";
-import { esc } from "./format";
+import type { EngineState, Job, JobStatus, LogLine, Settings } from "../shared/types";
+import { clock, esc } from "./format";
 
 /** A pill's look and the word it carries, per job state. `paused` wins for every job that is on. */
 export type PillKind = "working" | "failed" | "ok" | "off" | "waiting" | "paused";
@@ -64,6 +64,27 @@ export function emptyState(e: Empty, icon: string): string {
   const attr = a ? (a.page ? `data-page="${esc(a.page)}"` : a.run ? `data-run="${a.run}"` : `data-open="${esc(a.open ?? "")}"`) : "";
   const button = a ? `<button type="button" class="btn small" ${attr}>${esc(a.label)}</button>` : "";
   return `<div class="empty">${icon}<div class="empty-text"><p class="empty-cause">${esc(e.cause)}</p>${e.step ? `<p class="empty-step muted">${esc(e.step)}</p>` : ""}</div>${button}</div>`;
+}
+
+// ---------- the thread: the engine's log as the steps the app took ----------
+
+/** Which job wrote a log line. The engine prefixes a job's lines with its name, then an account or a colon. */
+export function jobOfLine(text: string): Job | "app" {
+  const m = /^(upload|prices|ask)(?=[ :])/.exec(text);
+  return m ? (m[1] as Job) : "app";
+}
+
+/**
+ * The last `n` lines, oldest first so the thread reads down to now, each with its time, its job's icon and its
+ * text; errors in the danger colour and the newest marked. An empty log gives "" so the caller can say why.
+ */
+export function threadLines(log: LogLine[], n: number, icons: Record<Job | "app", string>): string {
+  const lines = log.slice(-n);
+  return lines.map((l, i) => {
+    const job = jobOfLine(l.text);
+    const last = i === lines.length - 1 ? " step-last" : "";
+    return `<div class="step step-${l.level}${last}" data-job="${job}"><time>${clock(l.at)}</time>${icons[job]}<span class="step-text">${esc(l.text)}</span></div>`;
+  }).join("");
 }
 
 /** The title bar's pill: what the app watches, or that it is paused, which matters more. */

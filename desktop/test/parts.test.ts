@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
-import type { JobState, JobStatus } from "../src/shared/types";
-import { emptyCause, emptyState, statePill, watchPill } from "../src/renderer/parts";
+import type { JobState, JobStatus, LogLine } from "../src/shared/types";
+import { emptyCause, emptyState, jobOfLine, statePill, threadLines, watchPill } from "../src/renderer/parts";
 
 const j = (state: JobState): JobStatus => ({ state, message: "", at: null });
 
@@ -66,6 +66,38 @@ test("with everything on and a file watched, each page has its own reason", () =
   expect(emptyCause("market", base, { followed: 2 }).cause).toBe("No full scan in your save file yet");
   expect(emptyCause("ask", base).cause).toBe("No question waiting");
   expect(emptyCause("log", base).cause).toBe("Nothing logged since start");
+});
+
+test("a line's job comes from its prefix, and the rest belongs to the app", () => {
+  expect(jobOfLine("upload TESTACC: sent 0 new events")).toBe("upload");
+  expect(jobOfLine("upload: paused, skipped")).toBe("upload");
+  expect(jobOfLine("prices: 0 items on 0 realm(s) written")).toBe("prices");
+  expect(jobOfLine("prices: the site asked to wait; trying again in 3 min")).toBe("prices");
+  expect(jobOfLine("ask TESTACC: answered 1 question")).toBe("ask");
+  expect(jobOfLine("Watching 1 account file(s) in W:\\_classic_era_")).toBe("app");
+  expect(jobOfLine("builds: 2 saved build(s) written")).toBe("app");
+  expect(jobOfLine("uploads are not a job")).toBe("app");
+});
+
+test("the thread keeps app lines, reads oldest first and marks the newest", () => {
+  const log: LogLine[] = [
+    { at: "2026-11-03T01:00:00Z", level: "info", text: "Watching 1 account file(s)" },
+    { at: "2026-11-03T01:01:00Z", level: "error", text: "upload X: failed" },
+  ];
+  const html = threadLines(log, 10, { upload: "U", prices: "P", ask: "A", app: "E" });
+  expect(html.indexOf("Watching")).toBeLessThan(html.indexOf("failed"));
+  expect(html).toContain('data-job="app"');
+  expect(html).toContain('data-job="upload"');
+  expect(html).toContain("step-error");
+  expect(html.match(/step-last/g)?.length).toBe(1);
+  expect(html.lastIndexOf("step-last")).toBeGreaterThan(html.indexOf("Watching"));
+});
+
+test("the thread shows the last n lines and nothing for an empty log", () => {
+  const log: LogLine[] = Array.from({ length: 5 }, (_, i) => ({ at: "2026-11-03T01:0" + i + ":00Z", level: "info", text: "prices: line " + i }));
+  const html = threadLines(log, 2, { upload: "", prices: "", ask: "", app: "" });
+  expect(html).toContain("line 3"); expect(html).toContain("line 4"); expect(html).not.toContain("line 2");
+  expect(threadLines([], 10, { upload: "", prices: "", ask: "", app: "" })).toBe("");
 });
 
 test("the rendered block escapes the cause and carries the action as a data attribute", () => {
