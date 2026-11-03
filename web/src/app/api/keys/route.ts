@@ -74,12 +74,15 @@ export async function POST(req: Request) {
     }
     let body: unknown = {};
     try { body = await req.json(); } catch {}
-    const fields = (body ?? {}) as { label?: unknown; builds?: unknown; purpose?: unknown; scopes?: unknown; expiresInDays?: unknown; expiresOn?: unknown };
+    const fields = (body ?? {}) as { label?: unknown; builds?: unknown; links?: unknown; purpose?: unknown; scopes?: unknown; expiresInDays?: unknown; expiresOn?: unknown };
     if (!Array.isArray(fields.scopes)) {
       const legacyLabel = cleanLabel(fields.label);
       // Only the Desktop App's key skips purpose and expiry; any other caller must send them once the migration is in.
       if (legacyLabel !== DESKTOP_KEY_LABEL && (await readKeys(user.id)).records) return fail(400, LEGACY_REFUSED);
-      const made = await createKey(user.id, legacyLabel, fields.builds === true && savedBuildsOn() ? OWN_SCOPES : undefined);
+      // The Desktop App's key may also send link codes while character links are on, when its connect page asks.
+      const links = fields.links === true && legacyLabel === DESKTOP_KEY_LABEL && characterLinksOn();
+      const reads: readonly string[] | undefined = fields.builds === true && savedBuildsOn() ? OWN_SCOPES : undefined;
+      const made = await createKey(user.id, legacyLabel, links ? [...(reads ?? ["read:public"]), "link:own"] : reads);
       return refusal(made) ?? NextResponse.json({ ok: true, ...made }, { status: 201, headers });
     }
     const label = cleanLabel(fields.label);

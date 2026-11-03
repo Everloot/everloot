@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import ArtThumb from "@/components/game/ArtThumb";
 import { Container, DataTable, DataTitle, filledColumns, type SparseColumn } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
+import { loadSiteAssets } from "@/lib/game-assets";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
@@ -22,6 +24,9 @@ export default async function ZonesPage() {
   const facts = await loadWorldFacts();
   const contents = zoneContents(facts.unreachable ? { npcs: [], quests: [], vendors: [] } : facts);
   const zones = publicZones();
+  // Each zone's own map picture, small, before its name: the same picture the zone page shows, never a held-back one.
+  const assets = await loadSiteAssets();
+  const pictures = new Map((assets?.maps ?? []).filter((m) => m.kind === "zone" && !m.heldBack).map((m) => [m.uiMapId, m.smallUrl ?? m.url]));
   const noneConfirmed = !zones.some((z) => hasConfirmed(contents.get(z.mapId)));
   const continents = WORLD_MAP.continents.map((c) => ({
     ...c,
@@ -36,7 +41,11 @@ export default async function ZonesPage() {
     blank: (row: Row) => row.contents === null || facts.unreachable || pick(row.contents) === 0,
   });
   const columns: SparseColumn<Row>[] = filledColumns([
-    { key: "zone", header: "Zone", cell: (z) => <Link href={zoneHref(z.mapId, z.name)} className="text-fg hover:underline underline-offset-4">{z.name}</Link> },
+    { key: "zone", header: "Zone", cell: (z) => {
+      const src = pictures.get(z.mapId);
+      const name = <Link href={zoneHref(z.mapId, z.name)} className="text-fg hover:underline underline-offset-4">{z.name}</Link>;
+      return src ? <span className="flex min-w-0 items-center gap-2"><ArtThumb src={src} width={42} height={28} />{name}</span> : name;
+    } },
     { key: "npcs", header: "NPCs", numeric: true, ...count((c) => c.npcs.filter((n) => !n.vendor).length) },
     { key: "vendors", header: "Vendors", numeric: true, ...count((c) => c.npcs.filter((n) => n.vendor).length) },
     { key: "quests", header: "Quests", numeric: true, ...count((c) => c.quests.length) },

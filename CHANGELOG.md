@@ -15,25 +15,16 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
-- Addon: login and `/reload` print one line (version, modules on and off, any that could not start, any paused
-  collection) instead of the full status; `/everloot status` still lists everything. Without the Desktop App's price
-  file, the first item tooltip says once per install in chat where community prices come from. `/ask` names the
-  Everloot Desktop App (with Ask turned on) instead of the companion, and a question still unanswered a load after it was
-  written says once that no answer arrived and what to do.
-- Addon: profession observations prefer the complete recipe list when available and retain the API's recipe
-  identifier and explicit learned state. Repeated observations are keyed by identifier, rank, colour and learned
-  state; older clients can still use their filtered list without changing the player's filters. Explicitly
-  unlearned recipes and conflicting recipe identities cannot establish craftable skill ranges.
-  Turning profession collection off also stops an in-progress chunked read.
-- Addon: when a player-started replication scan cannot run or times out, a bounded browse/search fallback can
-  collect actual listing prices as a clearly labelled partial sample. It obeys query throttling, stops when the
-  house closes or collection is disabled, and never constructs a full-market snapshot from browse summaries.
 - Addon and companion: when `/ask` cannot be answered (the companion offline, no model set up), the reason is shown once and
   the question stays queued, so the retry's answer still reaches the game. Before, the question was dropped and a later answer never
   appeared. After each `/reload` the addon says how many questions are still waiting. Needs the next addon and Desktop App
   releases; each half is harmless without the other.
 
 ### Added
+- Desktop App and site, behind `EVERLOOT_CHARACTER_LINKS` (off): the addon's `/everloot link <code>` (0.3.15) writes one
+  link row for the character you are playing, with a code made on the account page. The Desktop App, signed in, sends it only
+  to the account's own link endpoint; uploads never carry link rows. The account page lists your linked characters,
+  linked or frozen, and unlinks them. A link is a claim from the addon file, not proof of ownership.
 - Site and MCP: racial traits from the game files (build-stamped `races.json`, found in game files, unconfirmed).
   Each class page lists, under "Who can be a {Class}", every race's traits with active or passive and the short
   text; `/wow-forever` adds a trait table per faction. New MCP tool `class_races` (protocol 1.20.0): the races that
@@ -152,6 +143,42 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   agree. Fishing (the bobber, or an object installs agree is fished) is never a pin. An upload of an event
   that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
   instead of withdrawing the event as a conflict. The map shows none of this yet.
+
+## [0.3.15] - 2026-11-01
+
+Release channel: Alpha
+
+Live-client verification is pending. This is a pre-release for WoW: Forever 1.60.1, not a verified stable build.
+None of the changes below has been run in the Forever client yet: the one-line login message, the price-file hint,
+the `/ask` no-answer message, `/everloot link`, the fuller recipe read and the auction fallback sample still need
+an in-game check. The 0.3.14 Home window and the collection checks listed there also remain unverified.
+
+### Added
+- `/everloot link <code>` and `/everloot link clear`, for tying the character you are playing to your everloot.app
+  account. Linking is not open yet: everloot.app does not hand out link codes, so there is no code to type for now.
+  The command itself is in place. A code in the right shape (like `EL-7K3Q-9P`) saves your own character's name,
+  realm, race, class, level and faction in your Everloot file and asks you to `/reload`; a code in the wrong shape
+  is refused. Nothing is sent from the game. `/everloot link` on its own explains the command and how many link rows
+  your file holds, and `/everloot link clear` deletes them all. At most 10 are kept.
+
+### Changed
+- Logging in or `/reload` prints one line instead of the full status: the version, how many modules are on and off,
+  any that could not start and any collection paused at capacity. `/everloot status` still shows everything.
+- `/ask` messages name the Everloot Desktop App (with Ask turned on) instead of the companion.
+- Raid buff data now comes from the game files of build 1.60.1.70707.
+
+### Fixed
+- Without the Desktop App's price file, item tooltips showed only your own scans and never said why. The first
+  tooltip now says once per install, in chat, that community prices come from the Everloot Desktop App, and that
+  `/everloot price [item]` shows what Everloot has for an item.
+- A question asked with `/ask` that still has no answer two loads later now says so once, and tells you to open the
+  Everloot Desktop App with Ask turned on (from everloot.app/addon) and `/reload`. The question stays saved until answered.
+- Recipe recording reads the full recipe list when the game offers it, keeps each recipe's id and whether you have
+  learned it, and no longer counts a recipe you have not learned toward your craftable skill ranges. Your
+  profession window filters are left as they were. Turning profession collection off also stops a read in progress.
+- When an auction scan you start cannot run or times out, Everloot can fall back to a browse search that records
+  real listing prices as a partial sample, clearly labelled as such. It respects the auction house's query limit,
+  stops when you close the auction house or turn collection off, and never presents the sample as a full scan.
 
 ## [0.3.14] - 2026-10-30
 
@@ -305,6 +332,75 @@ Live-client verification is pending. This is a pre-release for WoW: Forever 1.60
   off until `/everloot census on`. The Desktop App sends census rows with its uploads when the player leaves
   the census box ticked on its setup screen, or turns it on in Settings; a setup finished before this keeps
   it off. Still never names, guilds, gear or places, and the site shows only totals.
+
+## [desktop-v0.1.16] - 2026-11-03
+
+### Changed
+- Desktop App: the app is called Everloot in its window, tray, notifications and dialogs. After this update, the Start
+  menu, the desktop shortcut and Apps say Everloot too.
+- Desktop App: an update has one small round button beside Settings instead of a second bar above it. It opens what
+  changed, fills a ring while the update downloads, and turns into a restart button once it is ready. The restart
+  dialog carries the Everloot mark.
+
+## [desktop-v0.1.15] - 2026-11-02
+
+### Added
+- Desktop App: Settings has a "Data on this computer" section. It shows how much space the app's data folder takes
+  and what uses it (backups, update downloads, chat, upload history, settings and keys), says what goes to
+  everloot.app and what stays on your computer, and opens the folder. "Delete my local data" asks first, then empties
+  the folder, which the command-line tool uses too, and starts the app over on its setup screen. Your game folder and
+  `Everloot.lua` are not touched. The Overview tells you once if the folder passes 500 MB.
+
+### Changed
+- Desktop App: Restart to update asks in the app's own dialog instead of a Windows message box, and names the job it
+  waits for. While an update downloads, the sidebar and the update panel show a progress bar with the percentage.
+- Desktop App: your save file is read on a background thread, so logging out on a large save no longer freezes the
+  app. The longest pause on a 14 MB test save went from about 300 ms to about 100 ms. If the background reader cannot
+  start, the app reads the file as before and says so once on the Log page.
+- Desktop App: the Upload page no longer reads each save file four more times after every write (about 1 s on a large
+  save). It shows the same counts and errors as before.
+- Desktop App: upload history keeps only the events still in each account's `Everloot.lua`, and cached lists not
+  refreshed for a week are deleted, so the data folder stops growing the longer you play.
+
+## [desktop-v0.1.14] - 2026-11-02
+
+### Changed
+- Desktop App: opening the Overview or the Market page no longer reads every save file again to suggest your
+  characters' realms. The suggestions come from the read the app already makes when the file changes (about 165 ms
+  to under 1 ms per open on a large test save).
+- Desktop App: the Characters page and the chat's lookup of your characters work the same way (about 170 to 2 ms on
+  a large test save). The last seven days, the 30-day chart and the latest receipts still count up to the moment you
+  open the page.
+
+## [desktop-v0.1.13] - 2026-11-01
+
+### Fixed
+- Desktop App and companion: after an upload, the character-link step skips a save file that has no link rows instead
+  of parsing it a second time, so a logout is back to two full parses of the save (the heavy synthetic save's longest
+  pause drops from about 620 to 380 ms in the quick benchmark).
+- Desktop App: the tray menu is replaced only when one of its lines changes, not on every status update (each percent
+  of an update download was one), so a menu the player has open is not swapped out under them.
+
+## [desktop-v0.1.12] - 2026-11-01
+
+### Added
+- Desktop App: a new app release shows within the hour instead of the next day. The sidebar shows **Update to X**:
+  one click downloads it and checks it against the release's checksum, and the next click restarts into it. The
+  Overview offers the same, the tray item opens the update panel, and a notification says so once per version while
+  the window is not in front. Where the app cannot install itself (macOS, Linux, the portable exe), the button opens
+  the download. If the installer runs but the old version is still there at the next start, the app says so once
+  instead of offering the same update again unexplained.
+
+### Changed
+- Desktop App: the Market page offers to follow your characters' realms (read from the save file on this computer)
+  in one click, and the Overview does too while the game has no prices. Nothing is requested for those realms until
+  you press Follow; then they are followed realms like any other, and No thanks keeps the offer away. The Overview says
+  what `/ask` does and links to the Ask page.
+- Desktop App: Settings and the README say that uninstalling keeps the data folder, with the account and model keys,
+  chat and save backups in it, that the keys are plain files protected by the user account, and how to remove it all.
+- Desktop App: a logout reads each save file once for its realms, scan ages and pending `/ask` questions, instead of
+  once for each, which roughly halves the longest pause after a logout with a large save (722 to 391 ms on a 14 MB
+  synthetic save, measured with the new `npm run bench`).
 
 ## [desktop-v0.1.11] - 2026-11-01
 

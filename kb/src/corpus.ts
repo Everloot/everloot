@@ -1,4 +1,4 @@
-import { CENSUS_KINDS, COMPLETION_KINDS, parseRecords, type IntakeRecord } from "@everloot/protocol";
+import { CENSUS_KINDS, COMPLETION_KINDS, PULL_KINDS, parseRecords, type IntakeRecord } from "@everloot/protocol";
 import { foldRecorderInstalls } from "./recorder-installs.js";
 
 export interface CorpusEvent { record: IntakeRecord; grants: string[] }
@@ -49,6 +49,9 @@ export function mergeCorpus(previous: CorpusState | undefined, raw: readonly unk
     // Census rows are only ever published as counts (spec 2026-10-18-census-design.md §5.2), like addon lists.
     // Stored ones carry a character key in place of the GUID and fail the wire schema anyway; this is explicit.
     if (CENSUS_KINDS.includes(parsed.kind)) continue;
+    // Pull summaries name the group and live in their own tables, where a hidden character can be deleted
+    // (web/src/lib/pull-store.ts). Intake never puts them in an upload; one that got there is not folded in.
+    if (PULL_KINDS.includes(parsed.kind)) continue;
     const row = { ...parsed };
     // Old SavedVariables may contain a placeholder or secret. Neither is a public fact.
     if ("claimToken" in row) delete row.claimToken;

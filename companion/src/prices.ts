@@ -27,7 +27,11 @@ const AUCTION_KINDS = ["auction_snapshot", "auction_scan", "price_seen"];
 
 /** Realm names from the player's own auction scans: `lastScans`, then auction records. Guild, gold and other realms are never sent. */
 export function readRealms(savedVariables: string): string[] {
-  const db = parseEverlootTable(savedVariables);
+  return realmsIn(parseEverlootTable(savedVariables));
+}
+
+/** As readRealms, from a table already parsed. */
+export function realmsIn(db: Record<string, unknown>): string[] {
   const names: string[] = [];
   const add = (value: unknown) => {
     if (typeof value !== "string") return;

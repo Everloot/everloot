@@ -1,4 +1,4 @@
-import { recordSchemas, uploadPayload } from "./records.js";
+import { encounterEndBeforeRuns, recordSchemas, RUN_RECORD_KINDS, uploadPayload } from "./records.js";
 import { ACCEPTED_MAJORS, protocolMajor } from "./version.js";
 /** The record's own `kind`; a prototype or inherited key never names a schema. */
 function ownKindOf(raw) {
@@ -6,18 +6,27 @@ function ownKindOf(raw) {
         return undefined;
     return raw.kind;
 }
+function schemaFor(kind, options) {
+    if (options.runRecords === false) {
+        if (kind === "encounter")
+            return encounterEndBeforeRuns;
+        if (RUN_RECORD_KINDS.includes(kind))
+            return undefined;
+    }
+    return recordSchemas[kind];
+}
 /**
  * Parse every record against its own kind schema, keeping the parsed value and the original
  * index. Only own `kind` keys name a schema: inherited or prototype keys are unknown kinds.
  */
-export function parseRecords(records) {
+export function parseRecords(records, options = {}) {
     const parsed = [];
     const accepted = [];
     const rejected = [];
     records.forEach((raw, index) => {
         const kind = ownKindOf(raw);
         const schema = typeof kind === "string" && Object.hasOwn(recordSchemas, kind)
-            ? recordSchemas[kind]
+            ? schemaFor(kind, options)
             : undefined;
         if (!schema) {
             rejected.push({ index, reason: `unknown kind: ${String(kind)}` });
@@ -40,7 +49,7 @@ const envelopeRefused = (reason) => ({ ok: false, receipt: { accepted: [], rejec
  * rows were all rejected still returns an upload with zero records — callers decide what that means.
  * An envelope from a protocol major the server no longer accepts is refused whole.
  */
-export function parseUpload(payload) {
+export function parseUpload(payload, options = {}) {
     const parsed = uploadPayload.safeParse(payload);
     if (!parsed.success)
         return envelopeRefused("payload needs addonVersion + records[1..2000]");
@@ -48,7 +57,7 @@ export function parseUpload(payload) {
     if (protocol !== undefined && !ACCEPTED_MAJORS.includes(protocolMajor(protocol) ?? -1)) {
         return envelopeRefused(`protocol ${protocol} is not supported; update the addon or uploader`);
     }
-    const { records, receipt } = parseRecords(parsed.data.records);
+    const { records, receipt } = parseRecords(parsed.data.records, options);
     return { ok: true, upload: { addonVersion, ...(clientBuild ? { clientBuild } : {}), ...(source ? { source } : {}), records }, receipt };
 }
 /**

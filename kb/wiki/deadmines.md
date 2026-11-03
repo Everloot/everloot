@@ -9,48 +9,57 @@ categories: [dungeons, eastern-kingdoms, westfall]
 origin: original
 adaptedFrom: []
 sources:
-  - { title: "Explore the New Dungeons of World of Warcraft: Forever (Blizzard news)", url: "https://worldofwarcraft.blizzard.com/en-us/news/24301455", checkedOn: 2026-10-20 }
-  - { title: "Explore the New Dungeons of World of Warcraft: Forever (forum post)", url: "https://us.forums.blizzard.com/en/wow/t/explore-the-new-dungeons-of-world-of-warcraft-forever/2387658", checkedOn: 2026-10-20 }
-  - { title: "Everloot map: dungeon entrances and flight points (game files, build 1.60.1.70634)", url: "https://everloot.app/map", checkedOn: 2026-10-27 }
+  - { title: "Explore the New Dungeons of World of Warcraft: Forever (Blizzard news)", url: "https://worldofwarcraft.blizzard.com/en-us/news/24301455", checkedOn: 2026-11-01 }
+  - { title: "Explore the New Dungeons of World of Warcraft: Forever (forum post)", url: "https://us.forums.blizzard.com/en/wow/t/explore-the-new-dungeons-of-world-of-warcraft-forever/2387658", checkedOn: 2026-11-01 }
+  - { title: "Everloot map: dungeon entrances and flight points (game files, build 1.60.1.70707)", url: "https://everloot.app/map", checkedOn: 2026-11-01 }
+  - { title: "Everloot database: instance page, level, entrance and encounters (game files, build 1.60.1.70707)", url: "https://everloot.app/database/instances/36-deadmines", checkedOn: 2026-11-01 }
   - { title: "Deadmines (lore page, Warcraft Wiki)", url: "https://everloot.app/lore/416567-deadmines", checkedOn: 2026-10-27 }
   - { title: "Edwin VanCleef (lore page, Warcraft Wiki)", url: "https://everloot.app/lore/24821-edwin-vancleef", checkedOn: 2026-10-27 }
-status: draft
-reviewed: null
+status: published
+reviewed: { by: Carlos, on: 2026-11-02 }
 ---
 
 ## Overview
 
-The Deadmines are worked gold mines under Westfall that emptied out in the First War. Much later the Defias
-Brotherhood, a band of unpaid builders who turned outlaw, made them its stronghold. Far inside, its leader, Edwin
-VanCleef, has goblins helping him build a ship.
-
-The mines lie under a zone of farms that the Brotherhood has overrun.
+Before the First War, the Deadmines were the richest gold mines in human lands; the war emptied them. Much later
+the Defias Brotherhood, a band of unpaid builders turned outlaw, made them its stronghold. Far inside, its leader,
+Edwin VanCleef, is building a ship with the help of goblins.
 
 ## Getting there
 
-The entrance is in Moonbrook, in the southwest of {zone:1436}. Sentinel Hill's flight point is the nearest in the
-game files, and the entrance lies to its southwest.
+The entrance is in Moonbrook, in the southwest of {zone:1436}. [Find it on the map](/map?zone=1436&x=38.2&y=77.5).
+Sentinel Hill's flight point is the nearest in the game files, and the entrance lies to its southwest.
 
 ## History
 
-VanCleef was the head of the Stonemasons' Guild, the builders who put Stormwind back together after the Horde wrecked
-it. Once the city stood again, the House of Nobles would not pay what the masons wanted. The nobles broke up the
-guild, the masons took to the streets, and VanCleef led them away to hide in Westfall.
+VanCleef led the Stonemasons' Guild, the builders who put Stormwind back together after the Horde wrecked it. Once
+the city stood again, the House of Nobles offered the masons a pittance for their work and then ordered the guild
+broken up. The masons rioted in the streets, and VanCleef led them out of the city to hide in Westfall.
 
 There they ran farmers off their land, seized the mines and became the Defias Brotherhood. Their fight was with
 Stormwind's government, and the farmers of Westfall paid for it.
 
 ## In WoW: Forever
 
-Everloot's record of Blizzard's posts, through 2026-10-23, has nothing about the Deadmines for WoW: Forever. The
-entrance and the level in this page's facts come from the current build's game files and are not confirmed in the
-game. Its bosses are listed here once players report them.
+The history above is background lore, not a report of a run in Forever. Use the file-derived facts on this page as
+preparation; they do not establish which encounters or difficulties are available in the live game.
+
+The level, the entrance and the encounters come from the game files Everloot reads, build 1.60.1.70707, and are not
+confirmed in the game. [The database page](/database/instances/36-deadmines) lists the encounters; which of them
+Forever has, and in what order, is not known.
+
+Player reports confirm the entrance and encounters once separate installs agree. The recorded loot and quest
+sections below fill from public observations, with each fact keeping its own confirmation rule. An empty section
+means the data is unrecorded; it does not establish that the dungeon has no loot or quests. After a run,
+[upload the addon's saved data](/upload) to help fill the gaps.
 
 ## Before you go
 
-### Editor to confirm
+Check the level and entrance in the facts before forming a group. Treat game-file entries as unconfirmed until
+players report them from Forever.
 
-- Proposed: check the level in this page's facts and go with a group around it. It is the level the game files
-  give, not yet confirmed in the game.
-- Proposed: fly to Sentinel Hill, the nearest flight point, and travel southwest to Moonbrook.
-- Proposed: expect Defias fighters throughout, and rest between pulls when the group can.
+Use the entrance's map link to plan a route that your faction can reach. Check which flight points your character
+has unlocked rather than assuming the closest one is available to you.
+
+Read the encounter list with your group before setting out. It describes what the files contain, not a tested
+route or a promise that a particular difficulty is open. Boss tactics, loot and quests still need player evidence.

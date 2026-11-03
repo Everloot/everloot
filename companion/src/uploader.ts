@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
-import { UPLOAD_LIMITS, type RecordKind } from "@everloot/protocol";
-import { parseEverlootLua } from "../../web/src/lib/sv-parse";
+import { RUN_RECORD_KINDS, UPLOAD_LIMITS, type RecordKind } from "@everloot/protocol";
+import { parseEverlootLua, type EverlootFile } from "../../web/src/lib/sv-parse";
 import { prepareUpload, sendBatches, type BatchReceipt } from "../../web/src/lib/upload-batches";
 import { settledSkip, type SettledList } from "../../kb/src/settled-list";
 import { receiptKeyForSite, type SentState } from "./sent-state";
+import type { SiteCollects } from "./site-collects";
 
 export interface UploadOptions {
   /** Site origin, e.g. https://everloot.app. */
@@ -15,12 +16,36 @@ export interface UploadOptions {
   /** The player allowed the player pages in the Desktop App; without it they wait for the upload page. */
   players?: boolean;
   /**
+   * Send pull summaries. The Desktop App sets it: the addon's own switch (`/everloot pulls off`) is the player's choice,
+   * as on the upload page. The command-line uploader does not, so it sends no named kind at all.
+   */
+  pulls?: boolean;
+  /**
+   * What each site last said about reading pull timing, runs and pull summaries (`RUN_RECORD_KINDS`). Every receipt from a
+   * site with them on says `runRecords: true`, so the answer is learnt from the other rows' batches: the rows go only
+   * once a site's last receipt said so, and until then stay unsent here, not marked sent, and the file is read as that
+   * site reads it, as before them. Without it they are never sent.
+   */
+  collects?: SiteCollects;
+  /**
    * The settled list for the file's build (`/api/coverage/settled`), or a function that loads it for a build. Rows
    * whose fact is settled are left out and marked handled; without a list, or for another build, nothing is skipped.
    */
   settled?: SettledList | null | ((build: string | undefined) => Promise<SettledList | null>);
   /** How long one batch may take, its answer included, before it counts as failed. One minute by default. */
   timeoutMs?: number;
+  /**
+   * Reads the file, as `parseEverlootLua(readFileSync(file, "utf8"))` does by default, with the same errors. It may
+   * leave out the records `sent` names as sent already (the Desktop App parses off its main thread and takes only the
+   * rest across). Every record it returns is still checked against the sent state here. `eventIds` lists every
+   * record's event id in the file (null for a record without one), the ones left out too: upload history keeps those.
+   */
+  read?: (file: string, sent: (installId: string, eventId: string) => boolean) => Promise<EverlootFile & { eventIds: ReadonlyArray<string | null> }>;
+  /**
+   * Whether another save file carries this file's install id. Upload history is cut to the events still in the file
+   * after each read, so two files with one install id would cut each other's; while this says yes, it is kept whole.
+   */
+  sharesInstall?: (installId: string) => boolean | Promise<boolean>;
 }
 
 /** Installed addon lists go only from the upload page, after its preview; the companion never sends them. */
@@ -34,6 +59,9 @@ const CENSUS = new Set<string>(["census_self", "census_seen"]);
 
 /** Named player rows go only from the upload page too, which says what they are first. */
 const PLAYERS: RecordKind = "player_seen";
+
+/** Pull summaries name everyone in the group: they go from the upload page, or from here only with `pulls`. */
+const PULLS: RecordKind = "pull_summary";
 
 /** An answer past the largest request the intake takes is not a receipt. */
 const MAX_ANSWER_BYTES = UPLOAD_LIMITS.maxBodyBytes;
@@ -144,8 +172,11 @@ function bounded(send: typeof fetch, site: string, timeoutMs: number): typeof fe
   };
 }
 
-/** `rejected` counts the rows the site did not accept this run: they stay unsent and go again next run. */
-export interface UploadResult { sent: number; batches: number; skipped: number; heldNamed: number; heldLegacy: number; heldAddons: number; heldCensus: number; heldPlayers: number; invalid: number; rejected: number }
+/**
+ * `rejected` counts the rows the site did not accept this run: they stay unsent and go again next run. `heldRuns`
+ * counts the runs and pull summaries kept here because the site does not read them yet.
+ */
+export interface UploadResult { sent: number; batches: number; skipped: number; heldNamed: number; heldLegacy: number; heldAddons: number; heldCensus: number; heldPlayers: number; heldRuns: number; invalid: number; rejected: number }
 
 /**
  * Send one SavedVariables file's unsent events, the same way the upload page does: named categories
@@ -154,22 +185,49 @@ export interface UploadResult { sent: number; batches: number; skipped: number; 
  * The census stays here too unless `census` is set.
  */
 export async function uploadFile(file: string, options: UploadOptions): Promise<UploadResult> {
-  const parsed = parseEverlootLua(readFileSync(file, "utf8"));
+  const keys = new Map<string, string>();
+  const sent = (installId: string, eventId: string) => {
+    let key = keys.get(installId);
+    if (key === undefined) { key = receiptKeyForSite(installId, options.endpoint); keys.set(installId, key); }
+    return options.state.has(key, eventId);
+  };
+  const read = options.read ? await options.read(file, sent) : null;
+  const parsed = read ?? parseEverlootLua(readFileSync(file, "utf8"));
   const receiptKey = receiptKeyForSite(parsed.installId, options.endpoint);
+  if (!(await options.sharesInstall?.(parsed.installId))) {
+    const ids = read ? read.eventIds : parsed.records.map((r) => r.eventId);
+    options.state.keepOnly(receiptKey, new Set(ids.filter((id): id is string => typeof id === "string")));
+  }
   const unsent = parsed.records.filter((r) => typeof r.eventId !== "string" || !options.state.has(receiptKey, r.eventId));
   const held = (r: Record<string, unknown>) => !options.census && CENSUS.has(String(r.kind));
   const heldCensus = unsent.filter(held).length;
   const heldPlayer = (r: Record<string, unknown>) => !options.players && r.kind === PLAYERS;
   const heldPlayers = unsent.filter(heldPlayer).length;
-  const records = unsent.filter((r) => r.kind !== ADDON_LIST && !heldPlayer(r) && !held(r));
+  // Pull summaries name the group: never without `pulls`. Runs and pull summaries go only to a site that reads them.
+  const heldPull = (r: Record<string, unknown>) => !options.pulls && r.kind === PULLS;
+  const heldPulls = unsent.filter(heldPull).length;
+  const origin = new URL(options.endpoint).origin;
+  const reads = options.collects?.get(origin)?.collects === true;
+  const isRun = (r: Record<string, unknown>) => RUN_RECORD_KINDS.includes(String(r.kind));
+  const heldRun = (r: Record<string, unknown>) => !reads && isRun(r) && !heldPull(r);
+  const heldRuns = unsent.filter(heldRun).length;
+  const records = unsent.filter((r) => r.kind !== ADDON_LIST && !heldPull(r) && !heldRun(r) && !heldPlayer(r) && !held(r));
   const list = typeof options.settled === "function" ? await options.settled(parsed.clientBuild) : options.settled;
-  const session = prepareUpload({ addonVersion: parsed.version, clientBuild: parsed.clientBuild, records }, {}, [], undefined, settledSkip(list, parsed.clientBuild));
+  const session = prepareUpload({ addonVersion: parsed.version, clientBuild: parsed.clientBuild, records }, {}, [], undefined, settledSkip(list, parsed.clientBuild),
+    { runRecords: reads });
   // A settled row is handled: it is not weighed again next time, whether or not the rest is sent.
   if (session.skipped.length) options.state.add(receiptKey, session.skipped);
-  const result = { sent: 0, batches: session.batches.length, skipped: session.skipped.length, heldNamed: session.held.named, heldLegacy: session.held.legacy,
-    heldAddons: unsent.length - records.length - heldCensus - heldPlayers, heldCensus, heldPlayers, invalid: session.held.invalid, rejected: 0 };
+  const result = { sent: 0, batches: session.batches.length, skipped: session.skipped.length, heldNamed: session.held.named + heldPulls, heldLegacy: session.held.legacy,
+    heldAddons: unsent.length - records.length - heldCensus - heldPlayers - heldPulls - heldRuns, heldCensus, heldPlayers, heldRuns, invalid: session.held.invalid, rejected: 0 };
   if (session.batches.length === 0) return result;
   const send = bounded(options.fetch ?? fetch, new URL(options.endpoint).host, options.timeoutMs ?? 60_000);
+  // Every receipt says whether the site reads runs and pull summaries; the last one is kept, but only for a file that
+  // has them, so an install whose addon never writes them never gets the file.
+  const learning = unsent.some(isRun);
+  let said: boolean | undefined;
+  const learn = (receipt: BatchReceipt) => {
+    if (learning) said = (receipt as { runRecords?: unknown }).runRecords === true;
+  };
   const progress = () => {
     // Only the rows the receipt names as accepted are sent. A rejected row, or an index that names no row, stays
     // unsent and goes again next run: a stored batch can still turn rows away for now (a store that was down).
@@ -183,18 +241,24 @@ export async function uploadFile(file: string, options: UploadOptions): Promise<
       .map((a) => (a as { index?: unknown } | null)?.index)
       .filter((i): i is number => Number.isInteger(i) && (i as number) >= 0 && (i as number) < rows.length && !rejected.has(i)));
     options.state.add(receiptKey, [...indices].map((i) => rows[i].eventId));
+    learn(session.receipts[session.next - 1]);
     result.sent += indices.size;
     result.rejected += rows.length - indices.size;
   };
   const intake = new URL("/api/intake", options.endpoint).href;
   // A batch the site turned away whole is passed over with its own receipt, so each receipt stays with its batch; one
   // pass at most per batch. Any other failure stops the run.
-  for (;;) {
-    try { await sendBatches(session, send, progress, intake); break; } catch (err) {
-      if (!(err instanceof EveryRowRejected)) throw err;
-      session.receipts.push(err.receipt); session.next++;
-      result.rejected += err.receipt.rejected!.length;
+  try {
+    for (;;) {
+      try { await sendBatches(session, send, progress, intake); break; } catch (err) {
+        if (!(err instanceof EveryRowRejected)) throw err;
+        learn(err.receipt);
+        session.receipts.push(err.receipt); session.next++;
+        result.rejected += err.receipt.rejected!.length;
+      }
     }
+  } finally {
+    if (said !== undefined) options.collects?.set(origin, { collects: said, at: Date.now() });
   }
   return result;
 }

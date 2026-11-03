@@ -83,9 +83,9 @@ export const tools: Tool[] = [
     slug: "professions",
     title: "Forever Profession Hubs",
     shortTitle: "Professions",
-    tagline: "Leveling routes from player data.",
+    tagline: "Every recipe, plus player leveling paths.",
     description:
-      "One hub per Forever profession: skill-up paths and materials lists drawn from in-game collection. Hubs open their numbers as reports arrive.",
+      "One page per Forever profession: every recipe in the game files with its reagents and skill ranks, and the skill-up paths and recipe ranges players upload.",
     status: "collecting",
     keywords: [
       "wow forever professions",
@@ -95,11 +95,11 @@ export const tools: Tool[] = [
   },
   {
     slug: "farming-routes",
-    title: "Forever Farming Routes",
-    shortTitle: "Routes",
-    tagline: "Planned routes from uploaded sightings.",
+    title: "Forever Farming",
+    shortTitle: "Farming",
+    tagline: "Gold and reputation areas from uploads.",
     description:
-      "Zone routes and respawn timing are planned. Upload sightings now and they become the first spawn maps.",
+      "Gold and reputation farming areas from what players upload. Gathering is on the profession pages, and dungeons have their own list.",
     status: "coming-soon",
     keywords: [
       "wow forever farming",
@@ -149,13 +149,14 @@ export const TOOL_GROUPS: { title: string; links: { label: string; href: string 
       { label: "Alts on this device", href: "/tools/alts" },
       { label: "Raid builder", href: "/tools/raid" },
       { label: "Professions", href: "/tools/professions" },
-      { label: "Farming routes", href: "/tools/farming-routes" },
+      { label: "Farming", href: "/tools/farming-routes" },
     ],
   },
   {
     title: "Look up",
     links: [
       { label: "Chat", href: "/chat" },
+      { label: "Legacy perks", href: "/tools/legacy" },
       { label: "Auction House", href: "/tools/auctions" },
       { label: "Census", href: "/census" },
       { label: "Rankings", href: "/rankings" },
@@ -179,9 +180,10 @@ export const TOOL_LINES: Record<string, string> = {
   "/tools/builds": "Talent plans kept by name in this browser, with a backup to restore them. No account needed, and nothing is uploaded.",
   "/tools/alts": "Your characters kept in this browser, with their realm, class, level, professions, notes and plans. Add them by hand or from your Everloot.lua. No account needed, and nothing is uploaded.",
   "/tools/raid": "Fill a 10, 20 or 40 player raid and see which buffs and debuffs it covers.",
-  "/tools/professions": "Skill-up paths and recipe ranges for each profession, from recipes and prices players uploaded.",
-  "/tools/farming-routes": "Farming areas by what you farm, filled in from what players upload.",
+  "/tools/professions": "Every profession's recipes from the game files, with skill-up paths and recipe ranges from what players uploaded.",
+  "/tools/farming-routes": "Gold and reputation farming areas, filled in from what players upload.",
   "/chat": "Ask a question in plain words. Your own AI model looks it up in Everloot's data and names the sources.",
+  "/tools/legacy": "WoW: Forever's Legacy perk trees as the game files hold them: ids, ranks, prerequisites and spend gates, unconfirmed.",
   "/tools/auctions": "Auction House prices by realm, from player scans. A price shows once 3 reporters agree.",
   "/census": "Races, classes and levels, counted from players who turned the census on.",
   "/rankings": "WoW: Forever week by week, from players who turned the census on.",

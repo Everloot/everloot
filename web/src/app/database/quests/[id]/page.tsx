@@ -3,6 +3,7 @@ import AdSlot from "@/components/AdSlot";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { hasCard } from "@/lib/tooltip";
 import { npcPage, questPage } from "../../../../../../kb/src/world-pages";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { pinLink } from "@/lib/world-map";
@@ -102,9 +103,9 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
           trail={trail}
           title={title}
           meta={[
-            "Quest", !facts.unreachable && page.level !== null ? `Level ${page.level}` : null, named ? <span className="tabular-nums">ID {page.questId}</span> : null,
+            "Quest", !facts.unreachable && page.level !== null ? `Level ${page.level}` : null, named ? <span key="id" className="tabular-nums">ID {page.questId}</span> : null,
             // A title from the wiki carries the quiet unconfirmed marker; its source is a tooltip, never a printed label.
-            wikiTitle ? <Badge tone="files">{`${GAME_NAME_TITLE.wiki.toLowerCase()}, unconfirmed`}</Badge> : null,
+            wikiTitle ? <Badge key="wiki" tone="files">{`${GAME_NAME_TITLE.wiki.toLowerCase()}, unconfirmed`}</Badge> : null,
           ]}
         />
         <EntityTop
@@ -130,7 +131,7 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
         <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
         <OpenData
           text={[`${title} (quest ${page.questId})`, ...summary, `Source: https://everloot.app/database/quests/${page.questId}`].join("\n")}
-          jsonHref={`/api/tooltip/quest/${page.questId}`}
+          jsonHref={!facts.unreachable && hasCard.quest(page) ? `/api/tooltip/quest/${page.questId}` : undefined}
         />
         <Tabs
           label={`${title}: relations`}

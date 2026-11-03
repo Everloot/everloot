@@ -1,10 +1,9 @@
 import { BrowserWindow, Notification, app, clipboard, dialog, ipcMain, net, powerMonitor, screen, session, shell } from "electron";
-import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { readAsks } from "../../../companion/src/bridge/asks";
 import { loadProviders } from "../../../companion/src/providers/config";
-import type { AddonInfo, AppState, AskInfo, Job, MarketInfo, PriceLookup, Settings } from "../shared/types";
+import type { AddonInfo, AppState, AskInfo, DataUsage, Job, MarketInfo, PriceLookup, Settings } from "../shared/types";
 import { JOBS } from "../shared/types";
 import { reportDiagnostics } from "../shared/diagnostics";
 import { presetFor, type ProviderKind } from "../shared/providers";
@@ -13,24 +12,27 @@ import { gameRunning, listBackups, restoreBackup } from "./backups";
 import { createBuildsSync } from "./builds";
 import { compareVersions, installAddon, installedAddonVersion, newestAddonRelease, slotAddons } from "./addon";
 import { fetchChanges } from "./changes";
-import { charactersFromFiles } from "./characters";
 import { createChat } from "./chat";
+import { DATA_NOTICE_BYTES, dataUsage, deleteLocalData } from "./data-folder";
 import { localTools } from "./local-tools";
 import { createEngine } from "./engine";
 import { connectInBrowser } from "./connect";
 import { allowedExternal } from "./external";
 import { candidateRoots, detectGameFolders, foreverSuggestion, realFs, resolvePickedFolder } from "./game-folder";
-import { newestScans, readScanAges, staleScans, summarizeFiles } from "./inspect";
+import { newestScans, staleScans, summarizeFiles } from "./inspect";
 import { onReconnect } from "./online";
 import { companionJobs } from "./jobs";
 import { loginItemOptions } from "./login-item";
-import { itemIdFrom, listRealms, ownRealms, priceRows, readPricesFile } from "./market";
+import { characterRealms, itemIdFrom, listRealms, ownRealms, priceRows, readPricesFile, suggestedRealms } from "./market";
+import { charactersFromFiles, onFacts, peekFacts, readyFacts, saveFacts } from "./save-facts";
+import { useSaveReader } from "./save-reader";
 import { loadSettings, mergeSettings, saveSettings } from "./settings";
 import { allowedPermission, fromAppPage } from "./sender";
 import { createTray } from "./tray";
 import { checkForUpdates, fetchReleases, updateFrom } from "./updates";
-import { downloadUpdate, pruneInstallers, runInstaller } from "./self-update";
+import { downloadUpdate, failedAttempt, forgetAttempt, pruneInstallers, recordAttempt, runInstaller } from "./self-update";
 import { fitWindow, readWindowState, writeWindowState } from "./window-state";
+import { siteReadsRuns } from "../../../companion/src/site-collects";
 
 /** The same folder the command line uses (`companion/src/cli.ts` defaultStatePath), so both share sent.json. */
 function dataFolder(): string {
@@ -66,30 +68,28 @@ if (!app.requestSingleInstanceLock()) {
   const jobs = companionJobs(data, () => settings);
   loaded.error = [loaded.error, ...jobs.notices].filter(Boolean).join("\n") || null;
   const engine = createEngine(jobs.deps);
+  // The account files are parsed on a worker thread; its bundle is read with fs, which reads inside app.asar.
+  useSaveReader({ code: () => readFileSync(join(__dirname, "parse-worker.cjs"), "utf8"), log: (text) => engine.log("error", text) });
   let win: BrowserWindow | null = null;
   let tray: ReturnType<typeof createTray> | null = null;
   let quitting = false;
+  /** The data folder was emptied: nothing is written to it again before the app starts over. */
+  let wiped = false;
 
   const addonsDir = () => (settings.gameFolder ? join(settings.gameFolder, "Interface", "AddOns") : null);
   let update: AppState["update"] = null;
   let updateProgress: AppState["updateProgress"] = { stage: "idle", percent: 0, error: null };
   /** The verified installer, once downloaded, and the version it installs. */
   let downloaded: { path: string; version: string } | null = null;
-  // Scan ages come from parsing each account file; remembered per file size and write time so a broadcast stays cheap.
-  const scanMemo = new Map<string, { key: string; scans: ReturnType<typeof readScanAges> }>();
+  // Scan ages come from parsing each account file once per write (saveFacts). The pages call readyFacts first, so the
+  // parse is the save reader's, off the main thread.
   const allScans = () => engine.snapshot().files.flatMap((f) => {
-    try {
-      const st = statSync(f), key = `${st.mtimeMs}:${st.size}`;
-      const hit = scanMemo.get(f);
-      if (hit && hit.key === key) return hit.scans;
-      const scans = readScanAges(readFileSync(f, "utf8"));
-      scanMemo.set(f, { key, scans });
-      return scans;
-    } catch { return []; }
+    try { return saveFacts(f).scans; } catch { return []; }
   });
+  const knownScans = () => engine.snapshot().files.flatMap((f) => peekFacts(f)?.scans ?? []);
   const chat = createChat(data, () => settings, localTools({
-    characters: () => charactersFromFiles(engine.snapshot().files),
-    scans: () => newestScans(allScans()),
+    characters: async () => { const files = engine.snapshot().files; await readyFacts(files); return charactersFromFiles(files); },
+    scans: async () => { await readyFacts(engine.snapshot().files); return newestScans(allScans()); },
     followed: () => settings.market.realms,
     status: () => {
       const e = engine.snapshot();
@@ -112,16 +112,19 @@ if (!app.requestSingleInstanceLock()) {
     onChange: () => broadcast(),
     log: (level, text) => engine.log(level, text),
   });
-  const appState = (): AppState => ({ version: app.getVersion(), platform: process.platform, dataFolder: data, notice: loaded.error, settings, foreverFolder: foreverSuggestion(settings.gameFolder, settings.keptGameFolder, realFs), engine: engine.snapshot(), update, updateProgress, staleScans: staleScans(allScans()), account: accountInfo(data), builds: builds.status() });
+  const appState = (): AppState => ({ version: app.getVersion(), platform: process.platform, dataFolder: data, notice: loaded.error, settings, foreverFolder: foreverSuggestion(settings.gameFolder, settings.keptGameFolder, realFs), engine: engine.snapshot(), update, updateProgress, staleScans: staleScans(knownScans()), account: accountInfo(data), builds: builds.status(), runRecords: siteReadsRuns(join(data, "site-collects.json"), settings.endpoint) });
   const broadcast = () => {
     const s = appState();
     win?.webContents.send("state", s);
     tray?.update(s);
   };
   engine.onChange(broadcast);
+  // The state push never parses: it shows the last facts read, and pushes again when the save reader has a new write's.
+  engine.onChange((s) => { void readyFacts(s.files); });
+  onFacts(() => broadcast());
 
-  // Two system notifications only: answers landed in the game (so the player knows to /reload),
-  // and a newer addon exists (once per run). Nothing else interrupts.
+  // Three system notifications only: answers landed in the game (so the player knows to /reload),
+  // a newer addon exists, and a newer app exists (each once per version). Nothing else interrupts.
   const notify = (title: string, body: string, page: string) => {
     if (!Notification.isSupported()) return;
     const n = new Notification({ title, body, silent: true });
@@ -136,13 +139,22 @@ if (!app.requestSingleInstanceLock()) {
     const m = /^answered (\d+)/.exec(ask.message);
     if (m && Number(m[1]) > 0) notify("Everloot answered in game", `${m[1]} answer(s) written. Type /reload to read them.`, "ask");
   });
-  // The desktop release check at start is a line on the Overview and in the tray, never a notification.
+  // A newer app shows in the sidebar, on the Overview and in the tray, and once per version as a
+  // notification unless the window is in front; clicking it opens the update panel.
+  let desktopNoticed: string | null = null;
   const desktopUpdateLine = async () => {
     try {
       const check = updateFrom(await releases(), app.getVersion(), process.platform, Boolean(process.env.PORTABLE_EXECUTABLE_FILE));
       update = check.latest ? check : null;
-      if (update?.newer) broadcast();
-    } catch { update = null; }
+      if (!update?.newer) return;
+      broadcast();
+      if (update.latest !== desktopNoticed && !win?.isFocused()) {
+        desktopNoticed = update.latest;
+        notify("Everloot update", update.installable
+          ? `${update.latest} is out (you run ${update.current}). Click to update; your settings stay.`
+          : `${update.latest} is out (you run ${update.current}). Click to download it.`, "update");
+      }
+    } catch { /* offline: keep what the last check found */ }
   };
   let addonNoticed: string | null = null;
   const addonUpdateNotice = async () => {
@@ -157,8 +169,18 @@ if (!app.requestSingleInstanceLock()) {
       }
     } catch { /* offline; the Addon page will say so */ }
   };
-  /** Both release checks; at start, after the first Start, and once a day. */
-  const checkReleases = () => { if (settings.consentedAt) { void addonUpdateNotice(); void desktopUpdateLine(); } };
+  /**
+   * Both release checks; at start, after the first Start, every hour and when the window is opened
+   * (the release list is cached for ten minutes). The installer that just updated the app is still
+   * running at the first start and cannot be deleted then, so the prune runs here again, though not
+   * while a download is writing its `.part` file.
+   */
+  const checkReleases = () => {
+    if (!settings.consentedAt) return;
+    void addonUpdateNotice();
+    void desktopUpdateLine();
+    if (updateProgress.stage !== "downloading") pruneInstallers(join(data, "updates"), app.getVersion());
+  };
 
   const releases = cached(10 * 60 * 1000, () => fetchReleases(fetch, `everloot-desktop/${app.getVersion()}`));
   const knownRealms = cached(10 * 60 * 1000, () => listRealms(settings.endpoint), () => settings.endpoint);
@@ -170,6 +192,7 @@ if (!app.requestSingleInstanceLock()) {
   };
 
   const show = (page?: string) => {
+    checkReleases();
     if (!win) createWindow();
     else { if (win.isMinimized()) win.restore(); win.show(); win.focus(); }
     if (page && win) {
@@ -185,7 +208,7 @@ if (!app.requestSingleInstanceLock()) {
     const bounds = fitWindow(readWindowState(windowPath), screen.getAllDisplays().map((d) => d.workArea));
     win = new BrowserWindow({
       ...bounds, minWidth: 760, minHeight: 540,
-      title: "Everloot Desktop App",
+      title: "Everloot",
       backgroundColor: "#0E0F0D",
       show: false,
       autoHideMenuBar: true,
@@ -195,7 +218,7 @@ if (!app.requestSingleInstanceLock()) {
     win.once("ready-to-show", () => { win?.show(); });
     // The size and place come back next time; written a moment after the last drag, and on close.
     let saveTimer: ReturnType<typeof setTimeout> | null = null;
-    const remember = () => { if (win && !win.isDestroyed() && !win.isMinimized() && !win.isMaximized() && !win.isFullScreen()) { try { writeWindowState(windowPath, win.getBounds()); } catch { /* read-only data folder; nothing to remember */ } } };
+    const remember = () => { if (!wiped && win && !win.isDestroyed() && !win.isMinimized() && !win.isMaximized() && !win.isFullScreen()) { try { writeWindowState(windowPath, win.getBounds()); } catch { /* read-only data folder; nothing to remember */ } } };
     const rememberSoon = () => { if (saveTimer) clearTimeout(saveTimer); saveTimer = setTimeout(remember, 500); };
     win.on("resize", rememberSoon);
     win.on("move", rememberSoon);
@@ -225,6 +248,7 @@ if (!app.requestSingleInstanceLock()) {
   /** The settings the engine reads at start; a change to any of them restarts it, anything else does not. */
   const engineInputs = (s: Settings) => JSON.stringify([s.gameFolder, s.endpoint, s.upload, s.prices, s.ask, s.consentedAt]);
   handle("saveSettings", (_e, patch: unknown) => {
+    if (wiped) throw new Error("The data folder was emptied; the app starts over in a moment.");
     const before = settings;
     const next = mergeSettings(settings, patch);
     // Written first: a save that fails (data folder read-only or full) changes nothing and the page hears why.
@@ -244,6 +268,46 @@ if (!app.requestSingleInstanceLock()) {
   handle("runNow", (_e, job: unknown) => { if (JOBS.includes(job as Job)) return engine.runNow(job as Job); });
   handle("setPaused", (_e, paused: unknown) => engine.setPaused(paused === true));
   handle("openDataFolder", () => shell.openPath(data).then(() => undefined));
+  handle("dataUsage", (): DataUsage => {
+    const usage = dataUsage(data);
+    return { ...usage, notice: !settings.dataNoticeDismissed && usage.total > DATA_NOTICE_BYTES };
+  });
+  // The portable exe runs from a temporary copy that is removed when it quits, so it starts again from the exe the player opened.
+  const relaunch = () => {
+    const portable = process.env.PORTABLE_EXECUTABLE_FILE;
+    app.relaunch(portable ? { execPath: portable, args: [] } : undefined);
+    app.exit(0);
+  };
+  /**
+   * Delete my local data, once the window's dialog has asked. Refused while something is writing to the
+   * folder; otherwise the jobs, watchers and builds timer stop, the folder is emptied and the app starts
+   * over on its welcome screen. Starting over clears what the running app holds in memory (upload
+   * receipts, chat, the key) in one step, so none of it can be written back. Returns the entries that
+   * could not be deleted; the app then stays open so the player can close what holds them and try again.
+   */
+  handle("deleteLocalData", () => {
+    const e = engine.snapshot();
+    const running = JOBS.filter((j) => e.jobs[j].state === "running").map((j) => ({ upload: "upload", prices: "price refresh", ask: "/ask answer" })[j]);
+    if (running.length) throw new Error(`Wait for the ${running.join(" and the ")} to finish, then try again.`);
+    if (chat.info().busy) throw new Error("Wait for Chat to finish its answer, or stop it, then try again.");
+    if (updateProgress.stage === "downloading") throw new Error("Wait for the update download to finish, then try again.");
+    if (builds.status().state === "running") throw new Error("Wait for the saved builds to finish syncing, then try again.");
+    connecting?.abort();
+    builds.stop();
+    engine.stop();
+    wiped = true;
+    let left: string[];
+    try { left = deleteLocalData(data, settings.gameFolder); } catch (err) {
+      // Refused before anything was deleted: the app carries on as it was.
+      wiped = false;
+      engine.start(settings);
+      builds.start();
+      throw err;
+    }
+    if (left.length === 0) relaunch();
+    return left;
+  });
+  handle("relaunch", () => { if (wiped) relaunch(); });
   handle("openAddonsFolder", () => { const dir = addonsDir(); return dir && existsSync(dir) ? shell.openPath(dir).then(() => undefined) : undefined; });
   handle("openConfig", () => {
     const config = join(data, "config.json");
@@ -284,7 +348,7 @@ if (!app.requestSingleInstanceLock()) {
     }
     broadcast();
   });
-  // Restart asks first, waits for a running upload or price refresh to finish, then hands over to the installer.
+  // The window's own dialog has asked already. Restart waits for a running upload or price refresh to finish, then hands over to the installer.
   handle("updateRestart", async () => {
     if (!downloaded || updateProgress.stage !== "ready") return false;
     // A newer release may have appeared while this verified installer waited for a restart.
@@ -302,26 +366,13 @@ if (!app.requestSingleInstanceLock()) {
       broadcast();
       return false;
     }
-    const busy = JOBS.filter((j) => engine.snapshot().jobs[j].state === "running");
-    const answer = await messageBox({
-      type: "question",
-      buttons: ["Restart and update", "Not now"],
-      defaultId: 0,
-      cancelId: 1,
-      title: "Restart to update",
-      message: `Restart Everloot Desktop App to install ${downloaded.version}?`,
-      detail: [
-        "The app closes, installs the update and opens again in a few seconds.",
-        "Your settings, characters, chat and backups stay in the data folder. The game and its save files are not touched.",
-        busy.length ? `It waits for the running ${busy.join(" and ")} job to finish first.` : "Nothing is uploading right now.",
-      ].join("\n\n"),
-    });
-    if (answer.response !== 0) return false;
     for (let i = 0; i < 120 && JOBS.some((j) => engine.snapshot().jobs[j].state === "running"); i++) await new Promise((r) => setTimeout(r, 500));
     // The app quits only once the installer has started; if it cannot start, the app stays open and says so.
+    recordAttempt(join(data, "updates"), downloaded.version);
     try {
       await runInstaller(downloaded.path);
     } catch (err) {
+      forgetAttempt(join(data, "updates"));
       downloaded = null;
       updateProgress = { stage: "failed", percent: 0, error: `the installer did not start (${err instanceof Error ? err.message : String(err)})` };
       broadcast();
@@ -340,7 +391,7 @@ if (!app.requestSingleInstanceLock()) {
       defaultId: 0,
       cancelId: 2,
       title: "Report a bug",
-      message: "Report a bug in Everloot Desktop App",
+      message: "Report a bug in Everloot",
       detail: "Opens a bug report on GitHub with the app version and these diagnostics filled in: your settings (where the token file is, never the token), the files watched, each job's last state and the last log lines, with your user folder hidden. You read and edit it before sending; it needs a GitHub account. Or copy the diagnostics and post them in the Discord #bug-reports channel.",
     });
     if (answer.response === 1) { clipboard.writeText(text); return "copied"; }
@@ -388,7 +439,11 @@ if (!app.requestSingleInstanceLock()) {
     return check;
   });
 
-  handle("uploadInfo", () => summarizeFiles(engine.snapshot().files, join(data, "sent.json"), settings.endpoint));
+  handle("uploadInfo", async () => {
+    const files = engine.snapshot().files;
+    await readyFacts(files);
+    return summarizeFiles(files, join(data, "sent.json"), settings.endpoint);
+  });
   handle("backups", () => listBackups(data));
   handle("openBackupsFolder", () => { const dir = join(data, "backups"); return existsSync(dir) ? shell.openPath(dir).then(() => undefined) : undefined; });
   handle("restoreBackup", async (_e, file: unknown) => {
@@ -410,10 +465,13 @@ if (!app.requestSingleInstanceLock()) {
   });
   handle("marketInfo", async (): Promise<MarketInfo> => {
     const files = engine.snapshot().files;
+    await readyFacts(files);
     const scans = newestScans(allScans());
     const dir = addonsDir();
     const inGame = dir ? readPricesFile(dir)?.realms ?? null : null;
-    const base = { own: ownRealms(files), followed: settings.market.realms, last: jobs.lastMarket(), scans, inGame };
+    const own = ownRealms(files);
+    const suggested = suggestedRealms(characterRealms(files), own, settings.market.realms, settings.market.dismissed);
+    const base = { own, followed: settings.market.realms, suggested, last: jobs.lastMarket(), scans, inGame };
     try {
       const k = await knownRealms();
       return { ...base, known: k.realms, dataAsOf: k.dataAsOf, error: null };
@@ -430,9 +488,11 @@ if (!app.requestSingleInstanceLock()) {
     const rows = priceRows(file, itemId).map(({ realm, dataAsOf, market, min, historical, quantity, day, reporters }) => ({ realm, dataAsOf, market, min, historical, quantity, day, reporters }));
     return { itemId, rows, note: rows.length ? null : "This item is not in the game's price file. Each realm's file keeps the 2,000 items with the most units listed, so a public price may still be on the website; a day is public once three reporters scanned it." };
   });
-  handle("askInfo", (): AskInfo => {
-    const pending = engine.snapshot().files.map((file) => {
-      try { return { file, asks: readAsks(readFileSync(file, "utf8")) }; } catch { return { file, asks: [] }; }
+  handle("askInfo", async (): Promise<AskInfo> => {
+    const files = engine.snapshot().files;
+    await readyFacts(files);
+    const pending = files.map((file) => {
+      try { return { file, asks: saveFacts(file).asks }; } catch { return { file, asks: [] }; }
     });
     let providers: string[] = [], providerError: string | null = null;
     try { providers = loadProviders(join(data, "config.json")).map((p) => p.name); }
@@ -468,7 +528,11 @@ if (!app.requestSingleInstanceLock()) {
     return installAddon({ version: latest.version, endpoint: settings.endpoint, addonsDir: dir });
   });
   handle("changes", () => changes());
-  handle("charactersInfo", () => charactersFromFiles(engine.snapshot().files));
+  handle("charactersInfo", async () => {
+    const files = engine.snapshot().files;
+    await readyFacts(files);
+    return charactersFromFiles(files);
+  });
 
   handle("chatInfo", () => chat.info());
   handle("chatSend", (e, text: unknown) => (typeof text === "string" ? chat.send(text, (p) => { if (!e.sender.isDestroyed()) e.sender.send("chatProgress", p); }) : chat.info()));
@@ -510,6 +574,12 @@ if (!app.requestSingleInstanceLock()) {
     applyLoginItem();
     // The installer that brought this version, and older ones, are no longer needed.
     pruneInstallers(join(data, "updates"), app.getVersion());
+    // An installer that ran but left this version in place: said once, and the update row offers it again.
+    const missed = failedAttempt(join(data, "updates"), app.getVersion());
+    if (missed) {
+      updateProgress = { stage: "failed", percent: 0, error: `the installer for ${missed} ran, but ${app.getVersion()} is still installed. Try again, or download it from the release page` };
+      engine.log("error", `The update to ${missed} did not install; ${app.getVersion()} is still installed.`);
+    }
     engine.start(settings);
     // A laptop that slept through the last retry would otherwise wait for the next logout.
     powerMonitor.on("resume", () => engine.recover());
@@ -520,8 +590,8 @@ if (!app.requestSingleInstanceLock()) {
     if (!settings.consentedAt || !(hidden && settings.startInTray)) createWindow();
     broadcast();
     checkReleases();
-    // The app sits in the tray for weeks; look again once a day.
-    setInterval(checkReleases, 24 * 60 * 60 * 1000);
+    // The app sits in the tray for weeks; look again every hour, so a release shows up the same day.
+    setInterval(checkReleases, 60 * 60 * 1000);
     // Saved builds once at start, then every 15 minutes; each turn does nothing without a key.
     void builds.tick();
     builds.start();

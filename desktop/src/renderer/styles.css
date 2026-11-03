@@ -112,14 +112,33 @@ p { margin: 0; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* The update button beside Settings, and its popover: what changed in the new version, and the download. */
-.side-foot .update-btn { flex: none; display: grid; place-items: center; width: 36px; padding: 0; border-radius: var(--radius); border: 1px solid rgb(var(--accent)); background: rgb(var(--accent) / 0.14); color: rgb(var(--accent)); }
+.side-foot .update-btn { position: relative; flex: none; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border-radius: 50%; border: 1px solid rgb(var(--accent)); background: rgb(var(--accent) / 0.14); color: rgb(var(--accent)); }
 .side-foot .update-btn svg { width: 18px; height: 18px; }
 .side-foot .update-btn:hover, .side-foot .update-btn[aria-expanded="true"] { background: rgb(var(--accent) / 0.26); color: rgb(var(--accent)); }
-.side-foot .update-btn.busy { border-style: dashed; }
-.side-foot .update-btn .pct { font-size: var(--fs-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
-.side-foot .restart-btn { justify-content: center; background: rgb(var(--accent)); color: rgb(var(--accent-ink)); font-weight: 600; border-radius: 9999px; }
-.side-foot .restart-btn:hover { background: rgb(var(--accent)); color: rgb(var(--accent-ink)); filter: brightness(1.08); }
-.side-foot .restart-btn svg { width: 16px; height: 16px; }
+/* Downloading: a ring fills around a smaller arrow, from the top, clockwise. */
+.side-foot .update-btn.downloading { border-color: transparent; background: rgb(var(--accent) / 0.08); }
+.side-foot .update-btn.downloading .arrow { width: 14px; height: 14px; }
+.side-foot .update-btn .ring { position: absolute; top: -1px; left: -1px; width: calc(100% + 2px); height: calc(100% + 2px); transform: rotate(-90deg); fill: none; stroke-width: 2.5; }
+.ring-track { stroke: rgb(var(--accent) / 0.22); }
+.ring-fill { stroke: rgb(var(--accent)); stroke-linecap: round; transition: stroke-dasharray 240ms linear; }
+.side-foot .update-btn.failed { border-color: rgb(var(--danger)); background: rgb(var(--danger) / 0.12); color: rgb(var(--danger)); }
+/* Ready: a solid restart, the one control in the footer that asks for a click. */
+.side-foot .update-btn.ready, .side-foot .update-btn.ready:hover { background: rgb(var(--accent)); color: rgb(var(--accent-ink)); }
+.side-foot .update-btn.ready:hover { filter: brightness(1.08); }
+@media (prefers-reduced-motion: no-preference) {
+  .side-foot .update-btn.ready { animation: update-ready 1.8s ease-out 3; }
+}
+@keyframes update-ready { from { box-shadow: 0 0 0 0 rgb(var(--accent) / 0.55); } to { box-shadow: 0 0 0 10px rgb(var(--accent) / 0); } }
+/* While the update downloads, its row fills from the left, with the percentage at the end. */
+.dl-bar { position: relative; overflow: hidden; flex: 1 1 auto; display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 14px; border-radius: 9999px; border: 1px solid rgb(var(--accent) / 0.55); background: rgb(var(--accent) / 0.08); color: rgb(var(--fg)); font-weight: 600; font-variant-numeric: tabular-nums; cursor: progress; }
+.dl-fill { position: absolute; inset: 0 auto 0 0; width: 0; overflow: hidden; background: rgb(var(--accent) / 0.3); transition: width 240ms linear; }
+.dl-text, .dl-pct { position: relative; }
+.dl-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dl-pct { color: rgb(var(--accent)); }
+@media (prefers-reduced-motion: no-preference) {
+  .dl-fill::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgb(var(--fg) / 0.16), transparent); animation: dl-sheen 1.6s linear infinite; }
+}
+@keyframes dl-sheen { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
 .update-pop { position: fixed; left: calc(var(--rail) + 12px); bottom: 12px; z-index: 40; width: min(400px, calc(100vw - var(--rail) - 24px)); max-height: calc(100vh - 24px); display: flex; flex-direction: column; gap: 10px; padding: 16px 18px; border-radius: 12px; border: 1px solid rgb(var(--edge)); background: rgb(var(--panel)); box-shadow: 0 16px 48px rgb(0 0 0 / 0.45); overscroll-behavior: contain; }
 .update-pop[hidden] { display: none; }
 .update-pop h3 { font-size: var(--fs-body); font-weight: 600; margin: 0 0 6px; }
@@ -129,6 +148,28 @@ p { margin: 0; }
 /* A long change reads as three lines; the release page has it in full. */
 .update-pop li .note { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .update-pop .pop-foot { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Restart asks in the app's own dialog, over a dimmed window. */
+.confirm { width: min(480px, calc(100vw - 32px)); padding: 0; border-radius: 12px; border: 1px solid rgb(var(--edge)); background: rgb(var(--panel)); color: rgb(var(--fg)); box-shadow: 0 24px 64px rgb(0 0 0 / 0.5); overflow: hidden; }
+.confirm::backdrop { background: rgb(0 0 0 / 0.55); }
+.confirm-head { padding: 20px 22px 0; }
+.confirm-head h2 { font-size: 20px; letter-spacing: -0.01em; margin-bottom: 2px; }
+.confirm-body { padding: 14px 22px 20px; line-height: 1.5; }
+.confirm-body p { margin: 0; }
+.confirm-body p + p { margin-top: 8px; }
+.confirm-foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; padding: 14px 22px; border-top: 1px solid rgb(var(--line)); background: rgb(var(--canvas)); }
+.confirm-foot .row { margin-left: auto; }
+/* The restart dialog carries the Everloot mark and a line of the accent along its top. */
+#restartDlg { border-top: 3px solid rgb(var(--accent)); }
+.brand-head { display: flex; align-items: center; gap: 14px; }
+.brand-head .mark { width: 40px; height: 40px; }
+.btn-icon svg { width: 16px; height: 16px; flex: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .confirm[open] { animation: confirm-in 160ms ease-out; }
+  .confirm[open]::backdrop { animation: confirm-fade 160ms ease-out; }
+}
+@keyframes confirm-in { from { opacity: 0; transform: translateY(6px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes confirm-fade { from { opacity: 0; } to { opacity: 1; } }
 
 /* ---------- main, headings, surfaces ---------- */
 .main { overflow: auto; min-height: 0; min-width: 0; }
@@ -167,6 +208,12 @@ p { margin: 0; }
 .btn-primary { background: rgb(var(--accent)); border-color: rgb(var(--accent)); color: rgb(var(--accent-ink)); font-weight: 600; }
 .btn-primary:hover { filter: brightness(1.08); }
 .btn-primary:disabled:hover { border-color: rgb(var(--accent)); filter: none; }
+/* Delete my local data: red outline on the page, filled red in its dialog. */
+.btn-danger { color: rgb(var(--danger)); border-color: rgb(var(--danger) / 0.6); }
+.btn-danger:hover { border-color: rgb(var(--danger)); }
+.btn-danger-fill { background: rgb(var(--danger)); border-color: rgb(var(--danger)); color: #fff; font-weight: 600; }
+.btn-danger-fill:hover { filter: brightness(1.08); }
+.btn-danger-fill:disabled:hover { border-color: rgb(var(--danger)); filter: none; }
 .btn-lg { min-height: 44px; padding: 0 20px; font-size: var(--fs-lg); }
 .link { background: none; border: 0; color: rgb(var(--accent)); font: inherit; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; text-align: left; }
 .link:hover { text-decoration-thickness: 2px; }
@@ -388,6 +435,7 @@ details.adv[open] > summary { margin-bottom: 12px; }
 .set-lead { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
 .set-body { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .set-body > * + * { margin-top: 0; }
+.set-body h3 { font-size: var(--fs-body); font-weight: 600; margin: 4px 0 -6px; }
 .page.settings > .head + * { border-top: 0; }
 #settings .switch { display: flex; width: fit-content; }
 .set-save { padding-top: 20px; border-top: 1px solid rgb(var(--line)); }

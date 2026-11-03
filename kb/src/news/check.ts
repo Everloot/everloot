@@ -3,7 +3,7 @@
  * caller passes the files and the published wiki slugs, so tests can use small fixtures.
  */
 import { inlineText, type Block, type Inline, type ParsedPage } from "../wiki/page.js";
-import { parsePost, PostFrontMatter } from "./post.js";
+import { FIGURE_SIZE, parsePost, postFigure, PostFrontMatter } from "./post.js";
 
 export interface NewsCheckContext {
   /** Slugs of the wiki pages a `[[slug]]` may link to; a published post links only to published pages. */
@@ -12,6 +12,8 @@ export interface NewsCheckContext {
   privatePaths: RegExp;
   /** Today, so a published post is never dated after it. */
   today: string;
+  /** The width and height of a figure's committed file (`/news/figures/…` under web/public), or null when there is none. */
+  figureSize?: (src: string) => { width: number; height: number } | null;
 }
 
 export interface NewsFile { path: string; source: string }
@@ -28,7 +30,8 @@ const AI_CREDIT = new RegExp(
   "i",
 );
 
-const prose = (b: Block): Inline[][] => (b.type === "paragraph" ? [b.inline] : b.type === "list" ? b.items : []);
+// A figure is not prose, nor is a block with an image the page cannot draw.
+const prose = (b: Block): Inline[][] => (postFigure(b) ? [] : b.type === "paragraph" ? [b.inline] : b.type === "list" ? b.items : []);
 const inlines = (b: Block): Inline[][] => (b.type === "quote" ? [b.inline] : prose(b));
 
 /** Words of the post's own prose: paragraphs and lists, not headings or quotes. A token counts as one word. */
@@ -89,6 +92,16 @@ function checkPost({ fm, post }: CheckedPost, ctx: NewsCheckContext, report: (me
 
   for (const block of post.blocks) {
     if (block.type === "heading" && block.level === 1) report("no # heading in the body; the title comes from the front matter", block.line);
+    const figure = postFigure(block, fm.slug);
+    if (figure && "problem" in figure) report(figure.problem, block.line);
+    else if (figure && ctx.figureSize) {
+      const { src } = figure.figure;
+      const size = ctx.figureSize(src);
+      if (!size) report(`the figure ${src} is not a WebP file committed at web/public${src}`, block.line);
+      else if (size.width !== FIGURE_SIZE.width || size.height !== FIGURE_SIZE.height) {
+        report(`the figure ${src} is ${size.width}x${size.height}; a figure is ${FIGURE_SIZE.width}x${FIGURE_SIZE.height}`, block.line);
+      }
+    }
     for (const run of inlines(block)) {
       for (const t of run) {
         if (t.kind !== "link") continue;

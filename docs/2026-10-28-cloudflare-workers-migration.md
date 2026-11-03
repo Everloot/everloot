@@ -42,7 +42,8 @@ at build time (a generated module, or a static asset fetched through the `ASSETS
 
 - `web/src/lib/`: `news.ts` (`kb/news`), `guides.ts` and `guide-submissions.ts` (`kb/guides`), `wiki.ts`,
   `addon-release.ts`, `everloot-releases.ts`, `bulk-export.ts`, `settled-cache.ts`, `sharing-store.ts`,
-  `upload-store.ts` (local directory mode only; production uses R2), `og-card.tsx`.
+  `upload-store.ts` (local directory mode only; production uses R2). `og-card.tsx` read the Geist fonts here until
+  11/01; the link preview cards drawn per request answered 500, and the fonts are now inlined in the bundle.
 - `web/src/app/`: `classes/choose/page.tsx`, `docs/cookbook/drop-rates-spreadsheet/page.tsx`,
   `opengraph-image.tsx`, `schema/[...path]/route.ts`.
 - `kb/src/` modules the site imports that read files: `blue-posts`, `guides/class-chooser`, `wiki/data`,

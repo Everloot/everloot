@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import JsonLd from "@/components/JsonLd";
-import { Card, Container, PageHeader, SectionHeading } from "@/components/ui";
+import { Card, Container, EmptyState, PageHeader, SectionHeading } from "@/components/ui";
 import { dataAgeLabel } from "@/lib/data-age";
-import { RANKINGS, hubIndexable, itemListJsonLd, loadRankingWeeks, rankingPath, rankingView } from "@/lib/rankings";
+import {
+  COLLECTING_LINE, RANKINGS, hubIndexable, hubMetrics, itemListJsonLd, loadRankingWeeks, rankingPath, rankingView, topMovers, weeklyCharacters,
+} from "@/lib/rankings";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
-import { HowItCounts, ONE_WEEK_LINE, RankCard, RankingRail, StackedWeeks, StartState } from "./parts";
+import { HowItCounts, MetricTiles, Movers, ONE_WEEK_LINE, RankCard, RankingRail, StackedWeeks, StartState, WeeklyTotals } from "./parts";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +29,7 @@ export default async function RankingsHub() {
   // The hero stacks the class shares: the first ranking, every class with a number in the newest week.
   const classes = views[0];
   const withNumbers = classes.weeksWithNumbers;
+  const metrics = hubMetrics(views);
   return (
     <Container width="data">
       <article>
@@ -43,7 +46,18 @@ export default async function RankingsHub() {
             <StartState />
           ) : (
             <>
+              {metrics && <MetricTiles m={metrics} />}
               {withNumbers === 1 && <p className="text-cell text-muted">{ONE_WEEK_LINE}</p>}
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-6">
+                <Card as="section" aria-labelledby="weekly-totals">
+                  <SectionHeading id="weekly-totals" note="Each character counts once a week, from Monday to Sunday, UTC.">Characters counted each week</SectionHeading>
+                  {withNumbers >= 1 ? <WeeklyTotals points={weeklyCharacters(weeks)} /> : <EmptyState framed={false} count={classes.week?.window.installs} message={COLLECTING_LINE} />}
+                </Card>
+                <Card as="section" aria-labelledby="movers">
+                  <SectionHeading id="movers" note="The rows whose rank changed most against last week, in every ranking.">Top movers</SectionHeading>
+                  {withNumbers >= 2 && classes.previous ? <Movers movers={topMovers(views)} /> : <EmptyState framed={false} message={ONE_WEEK_LINE} />}
+                </Card>
+              </div>
               {withNumbers >= 1 && classes.week && (
                 <section aria-labelledby="by-class">
                   <SectionHeading id="by-class" note="Each class's part of the characters counted that week, from the oldest week shown to this one so far.">

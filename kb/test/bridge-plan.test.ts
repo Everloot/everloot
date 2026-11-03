@@ -18,7 +18,7 @@ test("the markdown file is the plan, not a second list", () => {
   // A Windows checkout with core.autocrlf writes CRLF; the content is what must match.
   const disk = readFileSync(new URL("../../docs/TRACKER.md", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   expect(disk.trim()).toBe(renderTracker().trim());
-  expect(handlePlan()).toContain("Hakoovak");
+  expect(handlePlan()).not.toContain("Hakoovak");
   expect(handlePlan()).toContain("not the Forever beta character");
 });
 

@@ -37,5 +37,25 @@ export function Progress({ killed, bosses, className = "" }: { killed: number; b
   );
 }
 
+/** A ruleset as a word: "forever" reads "Forever". */
+export const rulesetLabel = (ruleset: string) => ruleset.charAt(0).toUpperCase() + ruleset.slice(1).replace(/-/g, " ");
+
+/** One mark per boss in encounter order, filled when the guild killed it; the words are for screen readers and the tooltip. */
+export function BossStrip({ list }: { list: readonly { encounterId: number; name: string; killed: boolean; killedAt: string | null }[] }) {
+  return (
+    <ol className="inline-flex gap-0.5" aria-label="Bosses">
+      {list.map((b) => {
+        const said = `${b.name}: ${b.killed ? `killed${b.killedAt ? ` ${day(b.killedAt)}` : ""}` : "not yet"}`;
+        return (
+          <li key={b.encounterId} title={said}>
+            <span className="sr-only">{said}</span>
+            <span aria-hidden="true" className={`block h-3 w-2 rounded-sm ${b.killed ? "bg-accent" : "bg-line"}`} />
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 /** Who reported a kill, in words. */
 export const sourceLabel = (source: "members" | "officers" | null) => (source === "members" ? "Members" : source === "officers" ? "Officers" : "");

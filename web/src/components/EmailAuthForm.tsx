@@ -4,8 +4,8 @@ import { useState, type FormEvent } from "react";
 
 type Mode = "sign-in" | "sign-up" | "request-reset" | "reset";
 
-const input = "min-h-11 w-full rounded-lg border border-line bg-canvas px-3 text-sm text-fg";
-const button = "inline-flex items-center justify-center min-h-11 px-4 rounded-lg border border-line text-sm text-fg hover:text-accent disabled:opacity-60";
+const input = "min-h-11 w-full rounded-control border border-edge bg-canvas px-3 text-sm text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+const button = "btn btn-primary w-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait";
 
 // Where each form posts, and the body Better Auth expects.
 function request(mode: Mode, form: FormData, token?: string, returnTo = "/account"): [string, object] {
@@ -18,6 +18,13 @@ function request(mode: Mode, form: FormData, token?: string, returnTo = "/accoun
     case "reset": return ["/api/auth/reset-password", { newPassword: password, token }];
   }
 }
+
+const label: Record<Mode, [idle: string, busy: string]> = {
+  "sign-in": ["Sign in", "Signing in…"],
+  "sign-up": ["Make my account", "Making your account…"],
+  "request-reset": ["Send reset link", "Sending…"],
+  reset: ["Save new password", "Saving…"],
+};
 
 const done: Record<Mode, string> = {
   "sign-in": "",
@@ -58,7 +65,7 @@ export default function EmailAuthForm({ mode, token, returnTo = "/account" }: { 
 
   if (message) return <p role="status" className="text-fg-2">{message}</p>;
   return (
-    <form onSubmit={submit} className="space-y-3 max-w-sm">
+    <form onSubmit={submit} className="w-full max-w-sm space-y-3">
       {mode === "sign-up" && (
         <label className="block text-sm text-fg-2">Name shown on Everloot
           <input name="name" required maxLength={40} autoComplete="nickname" className={`${input} mt-1`} />
@@ -77,7 +84,7 @@ export default function EmailAuthForm({ mode, token, returnTo = "/account" }: { 
         </label>
       )}
       <button type="submit" className={button} disabled={busy} aria-busy={busy}>
-        {{ "sign-in": "Sign in", "sign-up": "Make my account", "request-reset": "Send reset link", reset: "Save new password" }[mode]}
+        {label[mode][busy ? 1 : 0]}
       </button>
       {error && <p role="alert" className="text-sm text-fg">{error}</p>}
     </form>

@@ -140,6 +140,53 @@ describe("Everloot (free) on /chat", () => {
     expect(text()).toContain("Own key answer.");
   });
 
+  test("the home's question waits in the box with the free model on, signed in or out, and leaves nothing behind", async () => {
+    for (const signedIn of [false, true]) {
+      api();
+      if (signedIn) {
+        const base = vi.mocked(fetch).getMockImplementation()!;
+        vi.mocked(fetch).mockImplementation(async (input, init) =>
+          String(input) === "/api/auth/me" ? Response.json({ user: { id: "u1", name: "Pat" } }) : base(input, init));
+      }
+      sessionStorage.setItem(PROVIDERS, JSON.stringify([{ kind: "openrouter", model: "deepseek/deepseek-v4.1-flash", key: KEY }]));
+      sessionStorage.setItem("everloot.chat.ask.v1", "Where does Linen Cloth drop?");
+      await render(<ChatClient freeChat={["Groq"]} />);
+      expect(textarea().value).toBe("Where does Linen Cloth drop?");
+      expect(document.activeElement).toBe(textarea());
+      expect(calls.some((c) => c.url === FREE || c.url === "https://openrouter.ai/api/v1/chat/completions" || c.url.startsWith("/api/tools/"))).toBe(false);
+      expect(sessionStorage.getItem("everloot.chat.ask.v1")).toBeNull();
+      expect(window.location.href).not.toContain("Linen");
+      expect(JSON.stringify(window.history.state ?? null)).not.toContain("Linen");
+      await act(async () => root.unmount());
+      root = createRoot(container);
+    }
+  });
+
+  test("the home form's no-JavaScript ?ask= is moved to the tab's storage, never sent", async () => {
+    api();
+    window.history.replaceState(null, "", `/chat?ask=${encodeURIComponent("Where does Linen Cloth drop?")}`);
+    // jsdom cannot reload; the page asks for a clean /chat, and the stored question is what the reload reads.
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    await render(<ChatClient freeChat={["Groq"]} />);
+    error.mockRestore();
+    expect(sessionStorage.getItem("everloot.chat.ask.v1")).toBe("Where does Linen Cloth drop?");
+    expect(calls.some((c) => c.url === FREE || c.url.startsWith("/api/tools/"))).toBe(false);
+    expect(textarea().value).toBe("");
+  });
+
+  test("with no storage in the tab, ?ask= waits in the box and leaves no trace in the address or history", async () => {
+    api();
+    window.history.replaceState(null, "", `/chat?ask=${encodeURIComponent("Where does Linen Cloth drop?")}`);
+    const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("blocked"); });
+    await render(<ChatClient freeChat={["Groq"]} />);
+    setItem.mockRestore();
+    expect(textarea().value).toBe("Where does Linen Cloth drop?");
+    expect(document.activeElement).toBe(textarea());
+    expect(window.location.search).toBe("");
+    expect(JSON.stringify(window.history.state ?? null)).not.toContain("Linen");
+    expect(calls.some((c) => c.url === FREE || c.url.startsWith("/api/tools/"))).toBe(false);
+  });
+
   test("while the free model is off, the page is as before: search, no mode menu, no proxy", async () => {
     api();
     await render(<ChatClient />);

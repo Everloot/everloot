@@ -1,0 +1,220 @@
+{
+ "new": {
+  "options": [
+   "window",
+   "auctions",
+   "scanPrompt",
+   "autoVendor",
+   "mailCollect",
+   "census",
+   "openworld",
+   "gold",
+   "gear",
+   "talents",
+   "guild",
+   "completion",
+   "addons",
+   "players"
+  ],
+  "printed": [
+   "Everloot 0.3.15: 2 modules on, 0 off. /everloot status for details.",
+   "Everloot: census on. It records the race, class, level and faction of your characters and of players you target, mouse over or group with. Never their names, guilds, gear or where they are. It stays in this file unless the Everloot Desktop App, if you allowed the census there, or the everloot.app upload page sends it. /everloot census off stops it and deletes the rows.",
+   "Everloot 0.3.15 (0000-0000-0000-0000)\n  openworld: ready (target/mouseover/loot/merchant/NPC windows; quests off, this client has no GetQuestLogTitle)\n  options: ready (window; /everloot options opens it)\n  rows npc_sighting: 0\n  rows loot: 0\n  rows quest: 0\n  rows vendor: 0\n  rows item_seen: 0\n  rows item_fact: 0\n  rows object_sighting: 0\n  rows instance_entrance: 1\n  rows encounter: 1\n  rows guild_snapshot: 0\n  rows raid_lockout: 0\n  rows attendance: 0\n  rows loot_award: 0\n  rows gear_snapshot: 0\n  rows collection_catalog: 0\n  rows collection_owned: 0\n  rows auction_scan: 0\n  rows auction_snapshot: 0\n  rows recipe_seen: 0\n  rows recipe_observed: 0\n  rows trainer_seen: 0\n  rows price_seen: 0\n  rows gold_snapshot: 0\n  rows money_event: 0\n  rows addon_seen: 0\n  rows map_bounds: 0\n  rows talent_snapshot: 0\n  rows achievement_catalog: 0\n  rows reputation_catalog: 0\n  rows title_catalog: 0\n  rows quest_chain_catalog: 0\n  rows achievement_owned: 0\n  rows reputation_owned: 0\n  rows title_owned: 0\n  rows quest_owned: 0\n  rows census_self: 0\n  rows census_seen: 0\n  rows player_seen: 0\n  rows character_link: 0",
+   "Everloot commands: /everloot window, /everloot options, /everloot status, /everloot auctions on|off, /everloot scan, /everloot scanprompt on|off, /everloot vendor on|off, /everloot mail on|off, /everloot price [item], /everloot gph [start|pause|stop|reset|show|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], /everloot link [code|clear], /everloot selftest, /everloot talents, /everloot plan [share code|number], /everloot raid [code], /ask <question>",
+   "Everloot commands: /everloot window, /everloot options, /everloot status, /everloot auctions on|off, /everloot scan, /everloot scanprompt on|off, /everloot vendor on|off, /everloot mail on|off, /everloot price [item], /everloot gph [start|pause|stop|reset|show|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], /everloot link [code|clear], /everloot selftest, /everloot talents, /everloot plan [share code|number], /everloot raid [code], /ask <question>",
+   "Everloot commands: /everloot window, /everloot options, /everloot status, /everloot auctions on|off, /everloot scan, /everloot scanprompt on|off, /everloot vendor on|off, /everloot mail on|off, /everloot price [item], /everloot gph [start|pause|stop|reset|show|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], /everloot link [code|clear], /everloot selftest, /everloot talents, /everloot plan [share code|number], /everloot raid [code], /ask <question>",
+   "Everloot commands: /everloot window, /everloot options, /everloot status, /everloot auctions on|off, /everloot scan, /everloot scanprompt on|off, /everloot vendor on|off, /everloot mail on|off, /everloot price [item], /everloot gph [start|pause|stop|reset|show|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], /everloot link [code|clear], /everloot selftest, /everloot talents, /everloot plan [share code|number], /everloot raid [code], /ask <question>"
+  ],
+  "registered": {
+   "ADDON_LOADED": 1,
+   "AUCTION_HOUSE_SHOW": 1,
+   "BANKFRAME_OPENED": 1,
+   "CONFIRM_BINDER": 1,
+   "ENCOUNTER_END": 1,
+   "GOSSIP_SHOW": 1,
+   "LOOT_CLOSED": 1,
+   "LOOT_OPENED": 1,
+   "MERCHANT_SHOW": 2,
+   "PET_STABLE_SHOW": 1,
+   "PLAYER_ENTERING_WORLD": 1,
+   "PLAYER_INTERACTION_MANAGER_FRAME_SHOW": 1,
+   "PLAYER_LEAVING_WORLD": 1,
+   "PLAYER_TARGET_CHANGED": 1,
+   "QUEST_ACCEPTED": 1,
+   "QUEST_DETAIL": 1,
+   "QUEST_GREETING": 1,
+   "TAXIMAP_OPENED": 1,
+   "TRAINER_SHOW": 1,
+   "UNIT_SPELLCAST_FAILED": 1,
+   "UNIT_SPELLCAST_FAILED_QUIET": 1,
+   "UNIT_SPELLCAST_INTERRUPTED": 1,
+   "UNIT_SPELLCAST_SENT": 1,
+   "UNIT_SPELLCAST_SUCCEEDED": 1,
+   "UPDATE_MOUSEOVER_UNIT": 1,
+   "VIGNETTES_UPDATED": 1,
+   "VIGNETTE_MINIMAP_UPDATED": 1
+  },
+  "saved": {
+   "censusNotice": true,
+   "entranceSeen": {
+    "36:1436": true
+   },
+   "eventEpoch": "0000-0000-0000-0000-1793620800",
+   "installId": "0000-0000-0000-0000",
+   "nextEvent": 2,
+   "records": {
+    "encounter": [
+     {
+      "capturedAt": "2026-11-02T12:01:15Z",
+      "difficulty": 1,
+      "encounterId": 1144,
+      "eventId": "0000-0000-0000-0000-1793620800:2",
+      "installId": "0000-0000-0000-0000",
+      "instanceMapId": 36,
+      "kindLoggedAt": "2026-11-02T12:01:15Z",
+      "name": "Rhahk'zor",
+      "size": 5,
+      "success": true
+     }
+    ],
+    "instance_entrance": [
+     {
+      "capturedAt": "2026-11-02T12:00:00Z",
+      "difficulty": 1,
+      "eventId": "0000-0000-0000-0000-1793620800:1",
+      "installId": "0000-0000-0000-0000",
+      "instanceMapId": 36,
+      "instanceType": "party",
+      "kindLoggedAt": "2026-11-02T12:00:00Z",
+      "mapId": 1436,
+      "name": "The Deadmines",
+      "x": 40,
+      "y": 70
+     }
+    ]
+   },
+   "toggles": {
+    "addons": false,
+    "auctions": true,
+    "census": true,
+    "completion": false,
+    "gear": true,
+    "gold": true,
+    "guild": true,
+    "openworld": true,
+    "players": false,
+    "talents": true
+   },
+   "version": "0.3.15"
+  },
+  "status": "Everloot 0.3.15 (0000-0000-0000-0000)\n  openworld: ready (target/mouseover/loot/merchant/NPC windows; quests off, this client has no GetQuestLogTitle)\n  options: ready (window; /everloot options opens it)\n  rows npc_sighting: 0\n  rows loot: 0\n  rows quest: 0\n  rows vendor: 0\n  rows item_seen: 0\n  rows item_fact: 0\n  rows object_sighting: 0\n  rows instance_entrance: 1\n  rows encounter: 1\n  rows guild_snapshot: 0\n  rows raid_lockout: 0\n  rows attendance: 0\n  rows loot_award: 0\n  rows gear_snapshot: 0\n  rows collection_catalog: 0\n  rows collection_owned: 0\n  rows auction_scan: 0\n  rows auction_snapshot: 0\n  rows recipe_seen: 0\n  rows recipe_observed: 0\n  rows trainer_seen: 0\n  rows price_seen: 0\n  rows gold_snapshot: 0\n  rows money_event: 0\n  rows addon_seen: 0\n  rows map_bounds: 0\n  rows talent_snapshot: 0\n  rows achievement_catalog: 0\n  rows reputation_catalog: 0\n  rows title_catalog: 0\n  rows quest_chain_catalog: 0\n  rows achievement_owned: 0\n  rows reputation_owned: 0\n  rows title_owned: 0\n  rows quest_owned: 0\n  rows census_self: 0\n  rows census_seen: 0\n  rows player_seen: 0\n  rows character_link: 0"
+ },
+ "upgrade": {
+  "options": [
+   "window",
+   "auctions",
+   "scanPrompt",
+   "autoVendor",
+   "mailCollect",
+   "census",
+   "openworld",
+   "gold",
+   "gear",
+   "talents",
+   "guild",
+   "completion",
+   "addons",
+   "players"
+  ],
+  "printed": [
+   "Everloot 0.3.15: 2 modules on, 0 off. /everloot status for details.",
+   "Everloot 0.3.15 (abcd-1234)\n  openworld: ready (target/mouseover/loot/merchant/NPC windows; quests off, this client has no GetQuestLogTitle)\n  options: ready (window; /everloot options opens it)\n  rows npc_sighting: 0\n  rows loot: 0\n  rows quest: 0\n  rows vendor: 0\n  rows item_seen: 0\n  rows item_fact: 0\n  rows object_sighting: 0\n  rows instance_entrance: 1\n  rows encounter: 1\n  rows guild_snapshot: 0\n  rows raid_lockout: 0\n  rows attendance: 0\n  rows loot_award: 0\n  rows gear_snapshot: 0\n  rows collection_catalog: 0\n  rows collection_owned: 0\n  rows auction_scan: 0\n  rows auction_snapshot: 0\n  rows recipe_seen: 0\n  rows recipe_observed: 0\n  rows trainer_seen: 0\n  rows price_seen: 0\n  rows gold_snapshot: 0\n  rows money_event: 0\n  rows addon_seen: 0\n  rows map_bounds: 0\n  rows talent_snapshot: 0\n  rows achievement_catalog: 0\n  rows reputation_catalog: 0\n  rows title_catalog: 0\n  rows quest_chain_catalog: 0\n  rows achievement_owned: 0\n  rows reputation_owned: 0\n  rows title_owned: 0\n  rows quest_owned: 0\n  rows census_self: 0\n  rows census_seen: 0\n  rows player_seen: 0\n  rows character_link: 0",
+   "Everloot commands: /everloot window, /everloot options, /everloot status, /everloot auctions on|off, /everloot scan, /everloot scanprompt on|off, /everloot vendor on|off, /everloot mail on|off, /everloot price [item], /everloot gph [start|pause|stop|reset|show|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], /everloot link [code|clear], /everloot selftest, /everloot talents, /everloot plan [share code|number], /everloot raid [code], /ask <question>",
+   "Everloot commands: /everloot window, /everloot options, /everloot status, /everloot auctions on|off, /everloot scan, /everloot scanprompt on|off, /everloot vendor on|off, /everloot mail on|off, /everloot price [item], /everloot gph [start|pause|stop|reset|show|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], /everloot link [code|clear], /everloot selftest, /everloot talents, /everloot plan [share code|number], /everloot raid [code], /ask <question>",
+   "Everloot commands: /everloot window, /everloot options, /everloot status, /everloot auctions on|off, /everloot scan, /everloot scanprompt on|off, /everloot vendor on|off, /everloot mail on|off, /everloot price [item], /everloot gph [start|pause|stop|reset|show|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], /everloot link [code|clear], /everloot selftest, /everloot talents, /everloot plan [share code|number], /everloot raid [code], /ask <question>",
+   "Everloot commands: /everloot window, /everloot options, /everloot status, /everloot auctions on|off, /everloot scan, /everloot scanprompt on|off, /everloot vendor on|off, /everloot mail on|off, /everloot price [item], /everloot gph [start|pause|stop|reset|show|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], /everloot link [code|clear], /everloot selftest, /everloot talents, /everloot plan [share code|number], /everloot raid [code], /ask <question>"
+  ],
+  "registered": {
+   "ADDON_LOADED": 1,
+   "AUCTION_HOUSE_SHOW": 1,
+   "BANKFRAME_OPENED": 1,
+   "CONFIRM_BINDER": 1,
+   "ENCOUNTER_END": 1,
+   "GOSSIP_SHOW": 1,
+   "LOOT_CLOSED": 1,
+   "LOOT_OPENED": 1,
+   "MERCHANT_SHOW": 2,
+   "PET_STABLE_SHOW": 1,
+   "PLAYER_ENTERING_WORLD": 1,
+   "PLAYER_INTERACTION_MANAGER_FRAME_SHOW": 1,
+   "PLAYER_LEAVING_WORLD": 1,
+   "PLAYER_TARGET_CHANGED": 1,
+   "QUEST_ACCEPTED": 1,
+   "QUEST_DETAIL": 1,
+   "QUEST_GREETING": 1,
+   "TAXIMAP_OPENED": 1,
+   "TRAINER_SHOW": 1,
+   "UNIT_SPELLCAST_FAILED": 1,
+   "UNIT_SPELLCAST_FAILED_QUIET": 1,
+   "UNIT_SPELLCAST_INTERRUPTED": 1,
+   "UNIT_SPELLCAST_SENT": 1,
+   "UNIT_SPELLCAST_SUCCEEDED": 1,
+   "UPDATE_MOUSEOVER_UNIT": 1,
+   "VIGNETTES_UPDATED": 1,
+   "VIGNETTE_MINIMAP_UPDATED": 1
+  },
+  "saved": {
+   "entranceSeen": {
+    "36:1436": true
+   },
+   "eventEpoch": "0000-0000-0000-0000-1793620800",
+   "installId": "abcd-1234",
+   "nextEvent": 2,
+   "records": {
+    "encounter": [
+     {
+      "capturedAt": "2026-11-02T12:01:15Z",
+      "difficulty": 1,
+      "encounterId": 1144,
+      "eventId": "0000-0000-0000-0000-1793620800:2",
+      "installId": "abcd-1234",
+      "instanceMapId": 36,
+      "kindLoggedAt": "2026-11-02T12:01:15Z",
+      "name": "Rhahk'zor",
+      "size": 5,
+      "success": true
+     }
+    ],
+    "instance_entrance": [
+     {
+      "capturedAt": "2026-11-02T12:00:00Z",
+      "difficulty": 1,
+      "eventId": "0000-0000-0000-0000-1793620800:1",
+      "installId": "abcd-1234",
+      "instanceMapId": 36,
+      "instanceType": "party",
+      "kindLoggedAt": "2026-11-02T12:00:00Z",
+      "mapId": 1436,
+      "name": "The Deadmines",
+      "x": 40,
+      "y": 70
+     }
+    ]
+   },
+   "toggles": {
+    "addons": false,
+    "auctions": true,
+    "census": false,
+    "completion": false,
+    "gear": true,
+    "gold": true,
+    "guild": true,
+    "openworld": true,
+    "players": false,
+    "talents": true
+   },
+   "version": "0.3.15"
+  },
+  "status": "Everloot 0.3.15 (abcd-1234)\n  openworld: ready (target/mouseover/loot/merchant/NPC windows; quests off, this client has no GetQuestLogTitle)\n  options: ready (window; /everloot options opens it)\n  rows npc_sighting: 0\n  rows loot: 0\n  rows quest: 0\n  rows vendor: 0\n  rows item_seen: 0\n  rows item_fact: 0\n  rows object_sighting: 0\n  rows instance_entrance: 1\n  rows encounter: 1\n  rows guild_snapshot: 0\n  rows raid_lockout: 0\n  rows attendance: 0\n  rows loot_award: 0\n  rows gear_snapshot: 0\n  rows collection_catalog: 0\n  rows collection_owned: 0\n  rows auction_scan: 0\n  rows auction_snapshot: 0\n  rows recipe_seen: 0\n  rows recipe_observed: 0\n  rows trainer_seen: 0\n  rows price_seen: 0\n  rows gold_snapshot: 0\n  rows money_event: 0\n  rows addon_seen: 0\n  rows map_bounds: 0\n  rows talent_snapshot: 0\n  rows achievement_catalog: 0\n  rows reputation_catalog: 0\n  rows title_catalog: 0\n  rows quest_chain_catalog: 0\n  rows achievement_owned: 0\n  rows reputation_owned: 0\n  rows title_owned: 0\n  rows quest_owned: 0\n  rows census_self: 0\n  rows census_seen: 0\n  rows player_seen: 0\n  rows character_link: 0"
+ }
+}

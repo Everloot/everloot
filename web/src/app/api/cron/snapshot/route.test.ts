@@ -8,6 +8,8 @@ const keys = vi.hoisted(() => ({ pruneKeys: vi.fn() }));
 vi.mock("@/lib/api-keys", () => ({ pruneKeys: keys.pruneKeys }));
 const players = vi.hoisted(() => ({ prune: vi.fn() }));
 vi.mock("@/lib/player-store", () => ({ playerStore: () => ({ prune: players.prune }) }));
+const pulls = vi.hoisted(() => ({ store: null as unknown as import("@/lib/pull-store").PullStore }));
+vi.mock("@/lib/pull-store", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/pull-store")>()), pullStore: () => pulls.store }));
 const coverage = vi.hoisted(() => ({ writeCoverage: vi.fn() }));
 vi.mock("@/lib/coverage-store", () => ({ writeCoverage: coverage.writeCoverage }));
 const settled = vi.hoisted(() => ({ writeSettled: vi.fn(), week: vi.fn(() => "2026-W43") }));
@@ -23,6 +25,7 @@ beforeEach(() => {
   store.prune.mockReset().mockResolvedValue(undefined);
   keys.pruneKeys.mockReset().mockResolvedValue(undefined);
   players.prune.mockReset().mockResolvedValue(undefined);
+  pulls.store = { insert: vi.fn(), forget: vi.fn(), prune: vi.fn().mockResolvedValue(undefined) };
   coverage.writeCoverage.mockReset().mockResolvedValue({ written: false });
   settled.writeSettled.mockReset().mockResolvedValue({ written: false });
 });
@@ -140,6 +143,26 @@ test("player rows are pruned only with the player pages on, and a failure does n
   players.prune.mockRejectedValue(new Error("players down"));
   expect((await GET(req())).status).toBe(200);
   expect(players.prune).toHaveBeenCalledOnce();
+  vi.unstubAllEnvs();
+});
+
+test("pull summaries are pruned with their collection switch off, and a database without their tables is no error", async () => {
+  vi.stubEnv("EVERLOOT_PULL_SUMMARIES", "");
+  expect((await GET(req())).status).toBe(200);
+  expect(pulls.store.prune).toHaveBeenCalledOnce();
+  // Before the migration: PostgREST has no prune_pull_summaries and answers PGRST202.
+  const { createCloudPullStore } = await vi.importActual<typeof import("@/lib/pull-store")>("@/lib/pull-store");
+  const doFetch = vi.fn(async () => new Response(JSON.stringify({ code: "PGRST202" }), { status: 404 }));
+  pulls.store = createCloudPullStore("https://db.example", "key", doFetch as unknown as typeof fetch);
+  const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+  expect((await GET(req())).status).toBe(200);
+  expect(doFetch).toHaveBeenCalledOnce();
+  expect(logged).not.toHaveBeenCalled();
+  // A store that fails for another reason is logged and the run still succeeds.
+  pulls.store = { insert: vi.fn(), forget: vi.fn(), prune: vi.fn().mockRejectedValue(new Error("pulls down")) };
+  expect((await GET(req())).status).toBe(200);
+  expect(logged).toHaveBeenCalledWith("pull retention failed", expect.any(Error));
+  logged.mockRestore();
   vi.unstubAllEnvs();
 });
 

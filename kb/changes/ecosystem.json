@@ -1,20 +1,20 @@
 {
   "schema": 1,
-  "refreshedAt": "2026-10-31T12:47:02.550Z",
+  "refreshedAt": "2026-11-02T21:47:34.987Z",
   "projects": {
     "everloot": {
       "status": "ok",
-      "fetchedAt": "2026-10-31T12:47:02.550Z",
+      "fetchedAt": "2026-11-02T21:47:34.987Z",
       "stars": 0,
       "archived": false,
       "license": "AGPL-3.0",
-      "lastCommit": "2026-10-31T06:52:52Z",
+      "lastCommit": "2026-11-02T21:42:25Z",
       "release": {
-        "tag": "desktop-v0.1.9",
-        "date": "2026-10-31T06:56:31Z",
-        "url": "https://github.com/Everloot/everloot/releases/tag/desktop-v0.1.9"
+        "tag": "desktop-v0.1.14",
+        "date": "2026-11-02T07:12:14Z",
+        "url": "https://github.com/Everloot/everloot/releases/tag/desktop-v0.1.14"
       },
-      "commits4w": 1726,
+      "commits4w": 1793,
       "contributors": 2,
       "openIssues": 5,
       "closedIssues": 6,
@@ -26,20 +26,20 @@
     },
     "polestar": {
       "status": "ok",
-      "fetchedAt": "2026-10-31T12:47:09.997Z",
-      "stars": 172,
+      "fetchedAt": "2026-11-02T21:47:42.264Z",
+      "stars": 183,
       "archived": false,
       "license": null,
-      "lastCommit": "2026-10-31T08:12:21Z",
+      "lastCommit": "2026-11-02T17:50:13Z",
       "release": {
         "tag": "v0.2.6",
         "date": "2026-10-19T17:20:38Z",
         "url": "https://github.com/fitzforge/polestar/releases/tag/v0.2.6"
       },
-      "commits4w": 2036,
+      "commits4w": 2080,
       "contributors": 32,
-      "openIssues": 42,
-      "closedIssues": 237,
+      "openIssues": 29,
+      "closedIssues": 254,
       "medianFirstResponseHours": null,
       "responseSample": 1,
       "interfaces": [
@@ -48,7 +48,7 @@
     },
     "olympus": {
       "status": "ok",
-      "fetchedAt": "2026-10-31T12:47:17.169Z",
+      "fetchedAt": "2026-11-02T21:47:49.519Z",
       "stars": 21,
       "archived": false,
       "license": "MIT",
@@ -58,7 +58,7 @@
         "date": "2026-10-26T23:42:08Z",
         "url": "https://github.com/dnl-gentile/olympus-addon/releases/tag/v1.3.3"
       },
-      "commits4w": 648,
+      "commits4w": 647,
       "contributors": 4,
       "openIssues": 6,
       "closedIssues": 13,
@@ -72,13 +72,13 @@
     },
     "forever-ref": {
       "status": "ok",
-      "fetchedAt": "2026-10-31T12:47:26.618Z",
+      "fetchedAt": "2026-11-02T21:47:59.358Z",
       "stars": 0,
       "archived": false,
       "license": null,
       "lastCommit": "2026-10-27T12:13:21Z",
       "release": null,
-      "commits4w": 12,
+      "commits4w": 11,
       "contributors": 2,
       "openIssues": 0,
       "closedIssues": 1,
@@ -146,7 +146,15 @@
         "stars": 0
       },
       {
-        "at": "2026-10-31T12:47:02.550Z",
+        "at": "2026-10-31T21:44:02.895Z",
+        "stars": 0
+      },
+      {
+        "at": "2026-11-01T22:11:19.794Z",
+        "stars": 0
+      },
+      {
+        "at": "2026-11-02T21:47:34.987Z",
         "stars": 0
       }
     ],
@@ -208,8 +216,16 @@
         "stars": 172
       },
       {
-        "at": "2026-10-31T12:47:02.550Z",
-        "stars": 172
+        "at": "2026-10-31T21:44:02.895Z",
+        "stars": 174
+      },
+      {
+        "at": "2026-11-01T22:11:19.794Z",
+        "stars": 178
+      },
+      {
+        "at": "2026-11-02T21:47:34.987Z",
+        "stars": 183
       }
     ],
     "olympus": [
@@ -270,7 +286,15 @@
         "stars": 21
       },
       {
-        "at": "2026-10-31T12:47:02.550Z",
+        "at": "2026-10-31T21:44:02.895Z",
+        "stars": 21
+      },
+      {
+        "at": "2026-11-01T22:11:19.794Z",
+        "stars": 21
+      },
+      {
+        "at": "2026-11-02T21:47:34.987Z",
         "stars": 21
       }
     ],
@@ -332,7 +356,15 @@
         "stars": 0
       },
       {
-        "at": "2026-10-31T12:47:02.550Z",
+        "at": "2026-10-31T21:44:02.895Z",
+        "stars": 0
+      },
+      {
+        "at": "2026-11-01T22:11:19.794Z",
+        "stars": 0
+      },
+      {
+        "at": "2026-11-02T21:47:34.987Z",
         "stars": 0
       }
     ]

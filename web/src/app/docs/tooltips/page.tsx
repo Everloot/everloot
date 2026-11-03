@@ -42,7 +42,7 @@ export default function Page() {
       </P>
       <Callout kind="note">
         <p>
-          WoW: Forever launches on 4 November 2026. Until players have reported these pages, the card request answers{" "}
+          Reports start with WoW: Forever&apos;s launch on 4 November 2026. Until players have reported these pages, the card request answers{" "}
           <C>404</C> and the three links above show no card. They start to work as players upload and 3 installs agree.
         </p>
       </Callout>

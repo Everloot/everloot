@@ -4,16 +4,21 @@ import { answerPending, createAnswerStore } from "../../../companion/src/bridge/
 import { lazyEngine, mcpAnswerSources, mcpEngine, mcpMarketValue, siteItemSearch, withMarket } from "../../../companion/src/bridge/engine";
 import { llmEngine } from "../../../companion/src/bridge/llm-engine";
 import { providersOnDemand } from "../../../companion/src/providers/config";
+import { linkSummary, sendLinks } from "../../../companion/src/link-sender";
 import { findEverlootFiles } from "../../../companion/src/savedvariables";
 import { createSentState } from "../../../companion/src/sent-state";
+import { createSiteCollects } from "../../../companion/src/site-collects";
 import { uploadFile } from "../../../companion/src/uploader";
 import { watchFile } from "../../../companion/src/watch-file";
 import { appSettledList } from "../../../web/src/lib/settled-cache";
 import type { RealmSummary, Settings } from "../shared/types";
 import { accountKeyForSite } from "./account";
 import { backupSavedVariables } from "./backups";
+import { pruneSettledLists } from "./data-folder";
 import type { EngineDeps } from "./engine";
 import { refreshMarket } from "./market";
+import { readyFacts, saveFacts } from "./save-facts";
+import { readForUpload } from "./save-reader";
 
 /**
  * The engine's jobs, built on the companion's own functions so the app sends and writes exactly
@@ -24,6 +29,8 @@ export function companionJobs(dataFolder: string, current: () => Settings): { de
   const notices: string[] = [];
   const recovered = (message: string) => { notices.push(message); };
   const state = createSentState(join(dataFolder, "sent.json"), recovered);
+  // Whether the site reads runs and pull summaries, from its last receipt for them; until it does they wait here.
+  const collects = createSiteCollects(join(dataFolder, "site-collects.json"), recovered);
   const answerStore = createAnswerStore(join(dataFolder, "answers.json"), recovered);
   const addonsDir = () => join(current().gameFolder ?? "", "Interface", "AddOns");
   let lastMarket: RealmSummary[] = [];
@@ -36,12 +43,32 @@ export function companionJobs(dataFolder: string, current: () => Settings): { de
       try { backupSavedVariables(file, dataFolder); backup = "; backup kept"; } catch (err) { backup = `; backup failed: ${err instanceof Error ? err.message : String(err)}`; }
       // The settled list is kept beside sent.json and refreshed once a day.
       const settled = (build: string | undefined) => appSettledList({ folder: dataFolder, endpoint, build });
-      const r = await uploadFile(file, { endpoint, state, census: current().census, players: current().players, settled });
+      // Two accounts' files can carry one install id (a copied WTF folder). Their upload history is kept whole while
+      // another file has the same id, so neither cuts the other's. After readyFacts this reads the reader's parse; a
+      // file that cannot be read or parsed has no id to share.
+      const sharesInstall = async (installId: string) => {
+        const others = findEverlootFiles(current().gameFolder ?? "").filter((f) => f !== file);
+        await readyFacts(others);
+        return others.some((f) => { try { return saveFacts(f).upload.installId === installId; } catch { return false; } });
+      };
+      // The save reader parses the file off the main thread and hands over only the rows still unsent.
+      const r = await uploadFile(file, { endpoint, state, census: current().census, players: current().players, pulls: true, collects, settled, read: readForUpload, sharesInstall });
+      const runs = r.heldRuns ? `; kept ${r.heldRuns} ${r.heldRuns === 1 ? "run or boss pull" : "runs and boss pulls"} here until the site reads them` : "";
+      // A list for a build the game has moved on from is never read again.
+      pruneSettledLists(dataFolder);
       const rejected = r.rejected ? `; the site turned away ${r.rejected} ${r.rejected === 1 ? "row, which stays unsent and goes" : "rows, which stay unsent and go"} again next run` : "";
-      return `sent ${r.sent} new events in ${r.batches} batch(es)${rejected}; skipped ${r.skipped} already settled; kept ${r.heldNamed} named, ${r.heldAddons} installed-addon, ${r.heldCensus} census and ${r.heldLegacy} legacy rows here${backup}`;
+      // Codes typed with /everloot link go to the account's own link endpoint with the account key, never with the
+      // upload. A link that fails never fails the upload; its rows go again next run.
+      let links = "";
+      try {
+        const said = linkSummary(await sendLinks(file, { endpoint, key: accountKeyForSite(dataFolder, endpoint), state }));
+        if (said) links = `; ${said}`;
+      } catch (err) { links = `; character links not sent: ${err instanceof Error ? err.message : String(err)}`; }
+      return `sent ${r.sent} new events in ${r.batches} batch(es)${rejected}; skipped ${r.skipped} already settled; kept ${r.heldNamed} named, ${r.heldAddons} installed-addon, ${r.heldCensus} census and ${r.heldLegacy} legacy rows here${runs}${links}${backup}`;
     },
     async prices(files) {
       const s = current();
+      await readyFacts(files);
       const r = await refreshMarket({ svFiles: files, followed: s.market.realms, addonsDir: addonsDir(), endpoint: s.endpoint });
       lastMarket = r.realms;
       return `${r.items} items on ${r.realms.length} realm(s) and ${r.drops} drop sources written; /reload in game to see them`;
@@ -65,13 +92,16 @@ export function companionJobs(dataFolder: string, current: () => Settings): { de
         lazyEngine(() => providers().length ? llmEngine({ sources: (q) => mcpAnswerSources(mcp, q, 3), providers: providers() }) : mcpEngine(mcp)),
         { lookup: (realm, id, signal) => mcpMarketValue(mcp, realm, id, signal), resolveItem: siteItemSearch(s.endpoint), realmChoices: s.market.realms },
       );
-      const r = await answerPending({ svFile: file, addonsDir: addonsDir(), engine, store: answerStore });
+      await readyFacts([file]);
+      const r = await answerPending({ svFile: file, asks: saveFacts(file).asks, addonsDir: addonsDir(), engine, store: answerStore });
       let how: string;
       try { how = providers().length ? providers().map((p) => p.name).join(" > ") : "plain search"; }
       catch (err) { how = `config.json: ${err instanceof Error ? err.message : String(err)}`; }
       return r.answered || r.failed ? `answered ${r.answered}, failed ${r.failed} (${how}); /reload in game to read them` : `nothing pending (${how})`;
     },
-    watch: (file, onChange) => watchFile(file, onChange),
+    // The jobs wait a few seconds for the write to settle; the save reader starts on it at once, so its facts are
+    // usually ready before they run.
+    watch: (file, onChange) => watchFile(file, () => { void readyFacts([file]); onChange(); }),
   };
   return { deps, lastMarket: () => lastMarket, answerStore, notices };
 }

@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, expect, test, vi } from "vitest";
-import { addonGithub } from "./addon-github";
+import { addonGithub, addonGithubSummary } from "./addon-github";
 import { plainNotes } from "./plain-notes";
 
 // A new repo per test: failed answers are remembered for a few minutes by repo name.
@@ -148,4 +148,52 @@ test("release notes lose their markdown and get an ellipsis when cut", () => {
   expect(cut.endsWith("…")).toBe(true);
   expect(plainNotes("short")).toBe("short");
   expect(plainNotes("   ")).toBeNull();
+});
+
+test("the summary reads stars and the newest release in two requests", async () => {
+  const fetch = stubFetch((url) => (new URL(url).pathname === `/repos/${REPO}` ? Response.json({ ...info, stargazers_count: 172 }) : answer(url)));
+  expect(await addonGithubSummary(REPO)).toEqual({
+    status: "ok",
+    data: { repo: REPO, url: info.html_url, stars: 172, release: { tag: "v1.2.0", date: "2026-10-14", url: release.html_url } },
+  });
+  expect(fetch).toHaveBeenCalledTimes(2);
+});
+
+test("the summary says when the rate limit was the reason, and remembers the failure", async () => {
+  const limited = stubFetch(() => new Response("", { status: 403, headers: { "x-ratelimit-remaining": "0" } }));
+  expect(await addonGithubSummary(REPO)).toEqual({ status: "unavailable", rateLimited: true });
+  expect(await addonGithubSummary(REPO)).toEqual({ status: "unavailable", rateLimited: true });
+  expect(limited).toHaveBeenCalledTimes(1);
+  expect(await addonGithubSummary("not a repo")).toEqual({ status: "missing" });
+});
+
+const repoOnly = (url: string) => (new URL(url).pathname === `/repos/${REPO}` ? Response.json({ ...info, stargazers_count: 172 }) : null);
+
+test("a rate-limited release read keeps the stars, says the limit was the reason, and is not retried for a while", async () => {
+  const fetch = stubFetch((url) => repoOnly(url) ?? new Response("", { status: 429 }));
+  const partial = { status: "partial", data: { repo: REPO, url: info.html_url, stars: 172, release: null }, rateLimited: true };
+  expect(await addonGithubSummary(REPO)).toEqual(partial);
+  expect(await addonGithubSummary(REPO)).toEqual(partial);
+  expect(fetch).toHaveBeenCalledTimes(2);
+});
+
+test("a repository with no release is not asked again on the next view", async () => {
+  const fetch = stubFetch((url) => repoOnly(url) ?? new Response("", { status: 404 }));
+  const none = { status: "ok", data: { repo: REPO, url: info.html_url, stars: 172, release: null } };
+  expect(await addonGithubSummary(REPO)).toEqual(none);
+  expect(await addonGithubSummary(REPO)).toEqual(none);
+  const releases = fetch.mock.calls.filter(([url]) => String(url).endsWith("/releases/latest"));
+  expect(releases).toHaveLength(1);
+});
+
+test("a release read that times out is a partial answer, remembered like a failure", async () => {
+  const fetch = stubFetch((url) => {
+    const ok = repoOnly(url);
+    if (ok) return ok;
+    throw new DOMException("The operation timed out.", "TimeoutError");
+  });
+  const partial = { status: "partial", data: { repo: REPO, url: info.html_url, stars: 172, release: null }, rateLimited: false };
+  expect(await addonGithubSummary(REPO)).toEqual(partial);
+  expect(await addonGithubSummary(REPO)).toEqual(partial);
+  expect(fetch).toHaveBeenCalledTimes(2);
 });

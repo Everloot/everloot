@@ -6,17 +6,21 @@ import { Badge, Card, GET_THE_ADDON } from "@/components/ui";
 import type { AccountOverview } from "@/lib/account-overview";
 import { guardOn } from "@/lib/data-guard";
 import { DESKTOP_KEY_LABEL } from "@/lib/desktop-connect";
+import ProviderLogo, { hasProviderLogo } from "@/components/ProviderLogo";
 import SocialSignIn from "@/components/SocialSignIn";
 import { PROVIDER_NAMES, type SocialProvider } from "@/lib/auth/social";
 
 const subheading = "text-meta font-semibold text-fg-2";
 const action = "btn min-h-11 px-3 text-sm";
 
-/** In place of a logo: Everloot's diamond for its own apps, a few letters for the rest (no third-party logo is shipped). */
-function Mark({ letters }: { letters?: string }) {
+/**
+ * The entry's mark: a sign-in provider's logo where ProviderLogo has one, Everloot's diamond for its own apps, a few
+ * letters for the rest (Battle.net and API keys).
+ */
+function Mark({ letters, provider }: { letters?: string; provider?: string }) {
   return (
     <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-control border border-line bg-canvas text-xs font-bold tracking-tight text-fg-2">
-      {letters ?? (
+      {provider && hasProviderLogo(provider) ? <ProviderLogo provider={provider} size={20} /> : letters ?? (
         <svg viewBox="8 8 48 48" width="18" height="18" className="text-accent">
           <path d="M32 12 52 32 32 52 12 32Z" fill="none" stroke="currentColor" strokeWidth="5" strokeLinejoin="round" />
         </svg>
@@ -29,11 +33,11 @@ function Mark({ letters }: { letters?: string }) {
  * One integration: its mark, its name (with a badge only where the badge is a fact), its line and the one thing to do.
  * The action sits at the foot of the card, so the actions of a row line up however long each line is.
  */
-function Entry({ letters, name, badge, action, children }: { letters?: string; name: string; badge?: ReactNode; action?: ReactNode; children: ReactNode }) {
+function Entry({ letters, provider, name, badge, action, children }: { letters?: string; provider?: string; name: string; badge?: ReactNode; action?: ReactNode; children: ReactNode }) {
   return (
     <Card as="li" padding="none">
       <div className="flex h-full items-start gap-3 p-4">
-        <Mark letters={letters} />
+        <Mark letters={letters} provider={provider} />
         <div className="flex min-w-0 flex-1 flex-col gap-3 self-stretch">
           <div>
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold text-fg [overflow-wrap:anywhere]">{name}{badge}</p>
@@ -83,7 +87,7 @@ export default function Integrations({ methods, name, overview, availableLogins 
               </Entry>
             )}
             {logins.filter((method) => method !== "battlenet").map((method) => (
-              <Entry key={method} letters={PROVIDER_NAMES[method].slice(0, 2)} name={PROVIDER_NAMES[method]} badge={<Badge tone="neutral">Sign-in</Badge>}>
+              <Entry key={method} letters={PROVIDER_NAMES[method].slice(0, 2)} provider={method} name={PROVIDER_NAMES[method]} badge={<Badge tone="neutral">Sign-in</Badge>}>
                 <p className="text-meta text-muted">Linked to your account</p>
               </Entry>
             ))}

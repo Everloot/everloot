@@ -9,51 +9,59 @@ categories: [dungeons, kalimdor, orgrimmar]
 origin: original
 adaptedFrom: []
 sources:
-  - { title: "Explore the New Dungeons of World of Warcraft: Forever (Blizzard news)", url: "https://worldofwarcraft.blizzard.com/en-us/news/24301455", checkedOn: 2026-10-20 }
-  - { title: "Explore the New Dungeons of World of Warcraft: Forever (forum post)", url: "https://us.forums.blizzard.com/en/wow/t/explore-the-new-dungeons-of-world-of-warcraft-forever/2387658", checkedOn: 2026-10-20 }
-  - { title: "Everloot map: dungeon entrances and flight points (game files, build 1.60.1.70634)", url: "https://everloot.app/map", checkedOn: 2026-10-27 }
+  - { title: "Explore the New Dungeons of World of Warcraft: Forever (Blizzard news)", url: "https://worldofwarcraft.blizzard.com/en-us/news/24301455", checkedOn: 2026-11-01 }
+  - { title: "Explore the New Dungeons of World of Warcraft: Forever (forum post)", url: "https://us.forums.blizzard.com/en/wow/t/explore-the-new-dungeons-of-world-of-warcraft-forever/2387658", checkedOn: 2026-11-01 }
+  - { title: "Everloot map: dungeon entrances and flight points (game files, build 1.60.1.70707)", url: "https://everloot.app/map", checkedOn: 2026-11-01 }
+  - { title: "Everloot database: instance page, level, entrance and encounters (game files, build 1.60.1.70707)", url: "https://everloot.app/database/instances/389-ragefire-chasm", checkedOn: 2026-11-01 }
   - { title: "Ragefire Chasm (lore page, Warcraft Wiki)", url: "https://everloot.app/lore/518947-ragefire-chasm", checkedOn: 2026-10-27 }
   - { title: "Searing Blade (lore page, Warcraft Wiki)", url: "https://everloot.app/lore/269935-searing-blade", checkedOn: 2026-10-27 }
   - { title: "Burning Blade clan (lore page, Warcraft Wiki)", url: "https://everloot.app/lore/539948-burning-blade-clan", checkedOn: 2026-10-27 }
   - { title: "Orgrimmar (lore page, Warcraft Wiki)", url: "https://everloot.app/lore/279316-orgrimmar", checkedOn: 2026-10-27 }
-status: draft
-reviewed: null
+status: published
+reviewed: { by: Carlos, on: 2026-11-02 }
 ---
 
 ## Overview
 
 Ragefire Chasm is a set of volcanic caves under Orgrimmar, the capital of the Horde. Troggs have climbed into them
-from far underground. The Searing Blade, a Shadow Council cult related to the Burning Blade clan, hides there as well
-and plots against the Horde.
+from deep below the lava tunnels. The Searing Blade, a Shadow Council cult and a sister group of the Burning Blade
+clan, hides there as well and plots against the Horde.
 
-Its entrance is inside Orgrimmar, so an Alliance group has to get through a Horde city to reach it. Of all the
-dungeon entrances in the game files, this one has the lowest level; this page's facts show it.
+The entrance is inside Orgrimmar, so an Alliance group has to get through a Horde city to reach it. It has the
+lowest level of any dungeon entrance in the game files.
 
 ## Getting there
 
-The entrance is inside {zone:1454}, in the district called the Cleft of Shadow. Orgrimmar's own flight point is the
-nearest in the game files.
+The entrance is inside {zone:1454}, in the district the lore archive calls the Cleft of Shadow.
+[Find it on the map](/map?zone=1454&x=53&y=48.9). Orgrimmar's own flight point is the nearest in the game files.
 
 ## History
 
-The Burning Blade was an orc clan before it was a cult. A faction of it never gave up the demons of the Burning Legion
-and came to worship them. The Searing Blade grew up in Durotar as an enemy of the new Horde and moved into the chasm,
-where it could work unseen beneath the capital.
+The Burning Blade was an orc clan before it was a cult. Part of it stayed loyal to the demons of the Burning
+Legion and came to worship them. The Searing Blade formed in Durotar to overthrow Thrall's new Horde and moved into
+the chasm, where it could work in secret beneath the capital.
 
-When the Horde tried to talk peace with the troggs, they would have none of it.
+Magatha the Seer of the tauren tried to make peace with the troggs, and they met her with nothing but hostility.
 
 ## In WoW: Forever
 
-Everloot's record of Blizzard's posts, through 2026-10-23, has nothing about Ragefire Chasm for WoW: Forever. The
-entrance and the level in this page's facts come from the current build's game files and are not confirmed in the
-game. Its bosses are listed here once players report them.
+The history above is background lore, not a report of a run in Forever. Use the file-derived facts on this page as
+preparation; they do not establish which encounters or difficulties are available in the live game.
+
+The level, the entrance and the encounters come from the game files Everloot reads, build 1.60.1.70707, and are not
+confirmed in the game. [The database page](/database/instances/389-ragefire-chasm) lists the encounters; which of them
+Forever has, and in what order, is not known.
+
+Player reports confirm the entrance and encounters once separate installs agree. The recorded loot and quest
+sections below fill from public observations, with each fact keeping its own confirmation rule. An empty section
+means the data is unrecorded; it does not establish that the dungeon has no loot or quests. After a run,
+[upload the addon's saved data](/upload) to help fill the gaps.
 
 ## Before you go
 
-### Editor to confirm
-
-- Proposed: check the level in this page's facts and go with a group around it. It is the level the game files
-  give, not yet confirmed in the game.
-- Proposed: an Alliance group should plan its way through Orgrimmar before it forms, since the entrance is inside the
-  city.
-- Proposed: bring someone who can hold the enemies' attention and someone who can heal.
+- Check the level in this page's facts before you form a group. The game files give a level, not a range,
+  and the game has not confirmed it.
+- If you play Alliance, the entrance is inside the Horde's capital. Plan how you will get through
+  Orgrimmar before you invite anyone.
+- Go through the encounters on [the database page](/database/instances/389-ragefire-chasm) with your group
+  before you go in. Treat the list as what may be there, not a promise.

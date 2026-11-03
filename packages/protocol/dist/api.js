@@ -189,6 +189,8 @@ export const tooltipResponse = z.object({
 });
 /** One accepted or rejected row in an intake receipt, by its index in the request. */
 const receiptEntry = z.object({ index: z.number().int(), kind: z.string().optional(), reason: z.string().optional() });
+/** Present only while the site collects pull timing, runs and pull summaries (`RUN_RECORD_KINDS`); absent, it does not. */
+const RUN_RECORDS_SAID = z.literal(true).optional().describe("The site reads `instance_run`, `pull_summary` and the encounter timing fields. Absent while it does not; an uploader then keeps those rows.");
 /** POST /api/intake, 200: stored. */
 export const intakeReceipt = z.object({
     ok: z.literal(true),
@@ -196,6 +198,7 @@ export const intakeReceipt = z.object({
     uploadId: z.string().uuid(),
     accepted: z.array(receiptEntry),
     rejected: z.array(receiptEntry),
+    runRecords: RUN_RECORDS_SAID,
 }).passthrough();
 /** POST /api/intake, 4xx or 503: refused; `accepted` and `rejected` say why when the envelope parsed. */
 export const intakeRefused = z.object({
@@ -205,6 +208,7 @@ export const intakeRefused = z.object({
     uploadId: z.string().uuid().optional(),
     accepted: z.array(receiptEntry).optional(),
     rejected: z.array(receiptEntry).optional(),
+    runRecords: RUN_RECORDS_SAID,
 });
 /** POST /api/intake request body: the envelope, with the sharing choices and grants the upload page adds. */
 export const intakeRequest = z.object({

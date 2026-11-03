@@ -25,7 +25,7 @@ import { PRIMARY } from "@/components/Header";
 import { toolGroups } from "@/data/tools";
 import { classesIndexable, classRaces, hubIndexable } from "@/lib/class-hub";
 import { CLASS_CONTEXT_SLOT, contextLinks } from "@/lib/class-context";
-import { RACE_TABLE } from "@/lib/race-traits";
+import { RACE_TABLE, RACIAL_NOTES } from "@/lib/race-traits";
 import { TALENT_CLASSES, loadCatalog } from "@/lib/talents/catalogs";
 import { fixture } from "@/lib/talents/fixture";
 import { encodeBuild, encodeOrder } from "@/lib/talents/share";
@@ -192,7 +192,10 @@ describe("class hubs", () => {
     expect(page).toContain('href="/database/spells?class=mage"');
     expect(page).not.toContain("/tools/talents/warrior");
     // The spell link opens a subset, and the hub names it as exactly that.
-    expect(visible(page)).toContain("Spells in the Mage talent catalog");
+    expect(visible(page)).toContain("Mage spells on the class's skill lines and in its talent catalog");
+    // So does the item link: the item list narrows to what the class can use by the game files.
+    expect(page).toContain('href="/database/items?class=mage"');
+    expect(visible(page)).toContain("Items a Mage can use by its proficiencies in the game files");
   });
 
   test("the hub's links carry the level and role of its address, added in the browser since the page is built once", async () => {
@@ -235,6 +238,20 @@ describe("class hubs", () => {
     // The label is said once for the section, with the build, not on every row.
     expect(races.match(/found in game files, unconfirmed/gi)).toHaveLength(1);
     expect(races).toContain(RACE_TABLE.build.version);
+  });
+
+  test("a hub's racial traits carry Blizzard's October 26 changes, with the notes linked", async () => {
+    const html = section(await hub("warlock"), "races");
+    const races = visible(html);
+    // Orc: "Savage removed" and "Command re-added, increasing Warlock and Hunter pet damage by 5%."
+    expect(races).not.toContain("Savage");
+    expect(races).toContain("Command");
+    expect(races).toContain("Increases Warlock and Hunter pet damage by 5%");
+    // Human: "Ruthless now increases critical chance by 1% (was 2%)." Troll: "Berserking duration increased to 15 seconds."
+    expect(races).toContain("Increases spell and ability critical chance by 1%");
+    expect(races).not.toContain("critical chance by 2%");
+    expect(races).toContain("Increases casting and attack speed by 10% for 15 sec");
+    expect(html).toContain(`href="${RACIAL_NOTES.sourceUrl}"`);
   });
 
   test("no header or Tools menu link points at the class pages yet", () => {

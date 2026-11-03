@@ -50,12 +50,12 @@ The window is a sidebar with one page per thing to manage:
 | Chat | Ask anything about the game, or about your own characters. With a provider the model works Everloot's own MCP tools itself and names the sources; three local tools read your characters' gold, gear and progress, each realm's last scan, and the app's own status (what is on, what failed and why, the addon and app versions) from this computer, sourced as "this computer". Local tool results used for an answer are sent to the selected model provider. When the tools have nothing it answers from its own knowledge and says so. The answer shows as the model writes it, with the tool it is running, and each answer has a Copy button. An empty thread offers a few questions to start with; a failed job on the Overview or Log page has an "ask why" link that puts the failure to the chat, the Characters page has an "Ask the assistant" chip, and the tray menu an "Ask Everloot" item. Providers are your own account, and the model menu under the question box switches between the models of every provider you saved (for Chat and the in-game `/ask`), with an Assistant setup entry to add a provider or manage saved ones, the same inline setup as on the Ask and Settings pages (each preset links to its provider's own key page, and the model id box shows for "Another model id" or when the provider has no model list): an Anthropic key, an OpenRouter key (cheap or free models), an OpenCode Zen key (its zero-retention free models), an Ollama on this computer, or any OpenAI-compatible server. The key goes into a file in the data folder and `config.json` names it, so the in-game `/ask` uses the same pick. Saving selects that provider for Chat and puts it first for `/ask`; it does not test the key or send a test completion. Chat uses the first provider only, while `/ask` goes down the configured list. Everloot search itself is free and needs no key; a provider you add is your own account, so its pricing and limits apply. With no provider you get the sourced search hits as they are. Claude.ai and ChatGPT subscriptions cannot be used: both companies allow API keys in other apps, not their consumer sign-ins. The transcript stays in your data folder |
 | Characters | Your own characters from the save file: gold with a line of every snapshot the addon kept and the last seven days as earned, spent and net, peak, item level, and the completion tracker's progress per character key. Stored locally; asking the assistant may send these details to the selected model provider |
 | Upload | Each account file: when it was written, addon and client build, records per kind, how many the site confirmed. Run now |
-| Market | Realm picks: your scanned realms are always carried; tick more from the realms the site has public values for (TSM-style realm picks, on Everloot's own scan data). When you last scanned each realm, with a reminder past a day. What the last refresh wrote |
+| Market | Realm picks: your scanned realms are always carried; tick more from the realms the site has public values for (TSM-style realm picks, on Everloot's own scan data). Your characters' realms, read from the save file on this computer, are offered as one Follow click (the Overview offers it too while the game has no prices); nothing is asked of the site for them before you press it, a followed one is removed like any other, and No thanks keeps the offer away. When you last scanned each realm, with a reminder past a day. What the last refresh wrote |
 | Ask | Assistant setup and which provider answers, the private MCP server and token file under an Advanced section (open from the start when one is saved), questions pending in game, recent answers with the time each was answered (not the source's own date) |
 | Addon | Installed version against the latest `addon-v*` release (an Alpha included, the version the download page serves), install or update in one click (the zip is checked against the release's `SHA256SUMS` before anything is written), the slot addons' state, and the saved-builds sync: when it last synced, Sync builds, and why it could not (a key without the permission links to the key page) |
 | Changes | The site's change tracker feed: Blizzard posts, hotfixes and builds |
 | Log | Everything the engine did this session, with Pause |
-| Settings | Pinned at the bottom of the sidebar. What runs (upload, market prices, in-game `/ask`), Assistant setup (the model keys: use, add, remove), the game folder, startup, the site address under Advanced, the data folder and the update check |
+| Settings | Pinned at the bottom of the sidebar. What runs (upload, market prices, in-game `/ask`), Assistant setup (the model keys: use, add, remove), the game folder, startup, the site address under Advanced, the update check, and Data on this computer: the folder's size by part, what is sent and what stays, and Delete my local data |
 | On everloot.app | Links to the site's database, talent calculator, raid builder and auction prices. They open in your browser (tagged `utm_source=desktop-app`), not inside the app; Chat answers what the database and lore archive would |
 
 ### Recorded item prices, without a model
@@ -75,8 +75,14 @@ website and desktop provider credentials remain separate.
 The tray menu shows each job's last result, a reminder when a realm's last full scan is older
 than a day, the newer app release when there is one, and Upload now, Refresh prices now, Pause and Quit.
 Closing the window keeps the app in the tray. The window opens where you left it, at the same
-size, unless that screen is gone. The release checks (app and addon) run at start, after the first Start, and once a day
-after that.
+size, unless that screen is gone. The release checks (app and addon) run at start, after the first Start, every hour
+and when the window is opened. A newer app shows as a round arrow beside Settings and on the Overview, and once per
+version as a notification while the window is not in front. The arrow opens what the new version changed. On a
+Windows install one click there downloads it and checks it against the release's `SHA256SUMS` while a ring fills
+around the arrow; the arrow then turns into a restart, which asks in the app's own dialog and installs it. If the
+old version is still there at the next start, the app says the update failed. Elsewhere the panel opens the download.
+The installer names the app **Everloot** in the Start menu, on the desktop and in Apps. The product name, install
+folder and release file names (`Everloot-DesktopApp-*`) stay as they were, so an update installs over the old version.
 
 The app shares its data folder with the command line (`%APPDATA%\Everloot`,
 `~/Library/Application Support/Everloot`, `~/.config/everloot`): `sent.json` for confirmed events,
@@ -85,6 +91,19 @@ account's `Everloot.lua` before upload attempts, including while offline (the Up
 and says so instead while World of Warcraft is running; the file it replaces is backed up first), and the optional `config.json` for `/ask` model providers (same
 format and same rules as the [companion README](../companion/README.md#providers-design-sections-6465):
 keys come from a file named by `apiKeyFile`, never from the config itself).
+
+Everything stays on this computer when you uninstall the app: the installer leaves the data folder in place, so a
+reinstall picks up where you left off. That includes your everloot.app key (`everloot-key.txt`), any model keys the
+Assistant setup saved, `chat.json` and the `backups/` copies of your save files (gold, gear, guild and the rest the
+addon records). The keys are plain files, protected by your user account like the rest of the folder, because the
+command line reads the same files. To remove it all, use Delete my local data under Settings > Data on this computer:
+it empties the folder, the command line's files included, and starts the app over on its setup screen. The game folder
+and `Everloot.lua` are not touched. Settings also shows how much space each part takes.
+
+Nothing in the folder grows for as long as the game is played: backups keep ten copies per account, a downloaded
+update is deleted once it is installed, Chat keeps its last 100 messages and `answers.json` its last 20, `sent.json`
+keeps only the events still in each account's `Everloot.lua`, and a cached `settled-<build>.json` not refreshed for a
+week is deleted.
 
 ## Run it from source
 

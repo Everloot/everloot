@@ -4,11 +4,11 @@
   "credit": "Game data © Blizzard Entertainment, Inc., read from the public client; not under Everloot's licence. Column names from WoWDBDefs (https://github.com/wowdev/WoWDBDefs), CC BY-SA 4.0.",
   "build": {
     "product": "wowf",
-    "buildId": 70634,
-    "version": "1.60.1.70634",
-    "buildConfig": "7d8ae4cd9c1f639a3ea04fd47e21c746",
-    "definitions": "50ce5d272897",
-    "extractedAt": "2026-10-27T21:56:28.341Z"
+    "buildId": 70707,
+    "version": "1.60.1.70707",
+    "buildConfig": "7feb61f3c994bcb168526b8db521514a",
+    "definitions": "6083ea62ec17",
+    "extractedAt": "2026-11-01T16:07:29.475Z"
   },
   "traitSystemId": 45,
   "currencies": [
@@ -885,8 +885,8 @@
   "tables": [
     {
       "table": "SpellName",
-      "rows": 31948,
-      "hash": "755d96b020cb",
+      "rows": 32007,
+      "hash": "6146e9429939",
       "encryptedBlocks": 14
     },
     {
@@ -910,7 +910,7 @@
     {
       "table": "TraitDefinition",
       "rows": 659,
-      "hash": "3cd3b8bd49e5",
+      "hash": "328f665a596c",
       "encryptedBlocks": 0
     },
     {
@@ -921,14 +921,14 @@
     },
     {
       "table": "TraitNode",
-      "rows": 557,
-      "hash": "ef2669c38e78",
+      "rows": 556,
+      "hash": "72881d567725",
       "encryptedBlocks": 0
     },
     {
       "table": "TraitNodeEntry",
       "rows": 659,
-      "hash": "420826e3f973",
+      "hash": "a5094af5a011",
       "encryptedBlocks": 0
     },
     {
@@ -957,8 +957,8 @@
     },
     {
       "table": "TraitNodeGroupXTraitNode",
-      "rows": 2152,
-      "hash": "bfe5ff002423",
+      "rows": 2145,
+      "hash": "97023810c5c6",
       "encryptedBlocks": 0
     },
     {
@@ -975,8 +975,8 @@
     },
     {
       "table": "TraitNodeXTraitNodeEntry",
-      "rows": 560,
-      "hash": "0a040d1eb7eb",
+      "rows": 559,
+      "hash": "3a530cbab66c",
       "encryptedBlocks": 0
     },
     {

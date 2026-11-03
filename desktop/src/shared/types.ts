@@ -17,12 +17,18 @@ export interface Settings {
   /** Player pages go with the uploads: the name, realm, race, class, level and guild of the players seen. Off by default. */
   players: boolean;
   ask: { enabled: boolean; mcpUrl: string; tokenFile: string | null };
-  /** Realms to keep prices for beyond the ones in the player's own scans (TSM-style realm picks). */
-  market: { realms: string[] };
+  /**
+   * `realms`: realms to keep prices for beyond the ones in the player's own scans (TSM-style realm picks).
+   * `dismissed`: realms of the player's characters the Market page already suggested and the player answered
+   * (Follow or Not now), so they are not suggested again. Character realms are never fetched on their own.
+   */
+  market: { realms: string[]; dismissed: string[] };
   /** ISO time the player pressed Start on the welcome screen; null until then. Nothing runs before. */
   consentedAt: string | null;
   launchAtLogin: boolean;
   startInTray: boolean;
+  /** The player closed the Overview's note that the data folder has grown past DATA_NOTICE_BYTES; it is not shown again. */
+  dataNoticeDismissed: boolean;
 }
 
 export type JobState = "off" | "idle" | "running" | "ok" | "error";
@@ -63,6 +69,11 @@ export interface UpdateProgress { stage: "idle" | "downloading" | "ready" | "fai
 /** One dated copy of an account's Everloot.lua in the data folder, kept after each upload. */
 export interface BackupInfo { file: string; account: string; at: string; bytes: number }
 
+/** The parts of the data folder, as Settings breaks them down. */
+export type DataPart = "backups" | "updates" | "chat" | "uploads" | "settings" | "other";
+/** The data folder's size in bytes, in total and per part; `notice` is set once it passes the Overview's threshold. */
+export interface DataUsage { total: number; parts: Record<DataPart, number>; notice: boolean }
+
 /** What one account's Everloot.lua holds, for the Upload page. Nothing here leaves the machine. */
 export interface FileSummary {
   file: string;
@@ -90,6 +101,11 @@ export interface MarketInfo {
   /** Realms named in the player's own scans. */
   own: string[];
   followed: string[];
+  /**
+   * Realms of the player's own characters (from the addon's rows) to offer as a one-click follow: not scanned,
+   * not followed, not dismissed. Read on this computer; nothing is fetched for them until the player follows.
+   */
+  suggested: string[];
   /** Realms the site has public values for, when it answered. */
   known: string[];
   dataAsOf: string | null;
@@ -259,6 +275,8 @@ export interface AppState {
   staleScans: ScanAge[];
   account: Account;
   builds: BuildsStatus;
+  /** The site's last receipt for runs and boss pulls said it reads them; the settings page describes them only then. */
+  runRecords?: boolean;
 }
 
 /** What `window.everloot` offers the page. Implemented in preload.ts over IPC. */
@@ -271,6 +289,16 @@ export interface EverlootApi {
   runNow(job: Job): Promise<void>;
   setPaused(paused: boolean): Promise<void>;
   openDataFolder(): Promise<void>;
+  /** The data folder's size, in total and per part. */
+  dataUsage(): Promise<DataUsage>;
+  /**
+   * Empties the data folder once the window's dialog has asked, then starts the app over on its welcome screen.
+   * Refused while a job, a chat answer, an update download or a builds sync is running. Resolves with the entries
+   * that could not be deleted; the app then stays open until `relaunch`.
+   */
+  deleteLocalData(): Promise<string[]>;
+  /** Starts the app over after `deleteLocalData` left something behind; does nothing otherwise. */
+  relaunch(): Promise<void>;
   /** Opens the game's Interface/AddOns folder in the file manager. */
   openAddonsFolder(): Promise<void>;
   openConfig(): Promise<void>;
@@ -278,7 +306,7 @@ export interface EverlootApi {
   checkForUpdates(): Promise<UpdateCheck>;
   /** Downloads the update to install on restart (Windows installs); progress arrives with the state. */
   updateDownload(): Promise<void>;
-  /** Asks to restart, then installs the downloaded update; false when the player chose Not now. */
+  /** Installs the downloaded update once the window's dialog has asked; false when it cannot (a newer release, a failed check or installer). */
   updateRestart(): Promise<boolean>;
   /** Offers a GitHub bug report with these diagnostics, or copies them. */
   reportBug(diagnostics: string): Promise<"opened" | "copied" | null>;

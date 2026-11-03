@@ -32,9 +32,30 @@ test("competing winners and split votes show no value, thin and missing lines st
   const text = typeof answer === "string" ? answer : answer.text;
   expect(text).toContain("Armor: [?]; contested");
   expect(text).toContain("Block: [?]; contested");
-  expect(text).toContain("Stamina: [?]; no number confirmed");
-  expect(text).toContain("Mana: [?]; no number confirmed");
+  // Item 5 is not in the game files, so no line is known to apply: the rest is one unknown, not one [?] per stat.
+  expect(text).not.toContain("Stamina: [?]");
+  expect(text).not.toContain("Mana: [?]");
+  expect(text).toContain("Other numbers: [?]; none confirmed by 3 agreeing installs.");
   expect(JSON.stringify(answer)).not.toMatch(/987|654|321|432|543|private-/);
+});
+
+test("only the lines the item's class shows are listed as unknown, as on the web item page", async () => {
+  const item = async (itemId: number, records: unknown[] = []) => {
+    const answer = await createToolHandlers({} as DB, { corpus: async () => ({ records, dataAsOf: date }) }).item_page({ itemId });
+    return typeof answer === "string" ? answer : answer.text;
+  };
+  // 19019 is a weapon in the game files: damage per second, no armour, block, health or mana.
+  const weapon = await item(19019);
+  expect(weapon).toContain("damage per second: [?]");
+  expect(weapon).not.toMatch(/^(Armor|Block|Health|Mana): \[\?\]/m);
+  expect(weapon).toContain("Other numbers: [?]");
+  // 3242 is plate armour: armour, no damage per second or block.
+  const armour = await item(3242);
+  expect(armour).toContain("Armor: [?]");
+  expect(armour).not.toMatch(/^(damage per second|Block|Health|Mana): \[\?\]/m);
+  // A number players agree on is shown whatever the class.
+  const reported = await item(19019, rows("armor", 25).map((r) => ({ ...r, itemId: 19019 })));
+  expect(reported).toContain("25 Armor: reported by 3 installs");
 });
 
 test("latest vote, newest qualifying build, and unknown last seen use the page's reader", async () => {

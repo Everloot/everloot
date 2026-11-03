@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { EngineState, JobState, Settings } from "../src/shared/types";
-import { ago, companionStatus, copyLabel, esc, gold, kb, msg, savedNote, setupAddonLine, sparkline, statusText } from "../src/renderer/format";
+import { ago, companionStatus, copyLabel, esc, gold, kb, msg, restartWait, savedNote, setupAddonLine, sparkline, statusText } from "../src/renderer/format";
 
 test("gold reads as gold, silver and copper, with the dash for unknown", () => {
   expect(gold(null)).toBe("–");
@@ -58,7 +58,7 @@ test("the sparkline needs two points, escapes its dates and spans the box", () =
 
 const settings = (over: Partial<Settings> = {}): Settings => ({
   gameFolder: "C:/Games/WoW/_classic_era_", keptGameFolder: null, endpoint: "https://everloot.app", upload: true, prices: true, census: true, players: false,
-  ask: { enabled: false, mcpUrl: "", tokenFile: null }, market: { realms: [] }, consentedAt: "2026-10-01T00:00:00Z", launchAtLogin: false, startInTray: false, ...over,
+  ask: { enabled: false, mcpUrl: "", tokenFile: null }, market: { realms: [], dismissed: [] }, consentedAt: "2026-10-01T00:00:00Z", launchAtLogin: false, startInTray: false, dataNoticeDismissed: false, ...over,
 });
 const engine = (jobs: Partial<Record<"upload" | "prices" | "ask", JobState>> = {}, over: Partial<EngineState> = {}): Pick<EngineState, "files" | "jobs" | "log" | "paused"> => {
   const job = (state: JobState) => ({ state, message: state === "error" ? "boom" : "", at: null });
@@ -143,4 +143,10 @@ test("setup mentions the addon only once the picked folder is known to lack it",
   expect(setupAddonLine("0.4.2")).toBeNull();
   // Not checked yet, or the check failed: say nothing rather than guess.
   expect(setupAddonLine(undefined)).toBeNull();
+});
+
+test("the restart dialog names the running jobs it waits for, and says when nothing runs", () => {
+  expect(restartWait(engine())).toBe("Nothing is running right now.");
+  expect(restartWait(engine({ upload: "running", prices: "error" }))).toBe("It waits for the Upload job to finish first.");
+  expect(restartWait(engine({ ask: "running", upload: "running" }))).toBe("It waits for the Upload and In-game /ask jobs to finish first.");
 });
