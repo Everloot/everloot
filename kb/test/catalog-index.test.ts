@@ -51,6 +51,32 @@ describe("catalog index", () => {
     expect(searchCatalog(index, "the", { limit: 1 })).toHaveLength(1);
   });
 
+  test("search orders exact, then every-term, then any-term matches", () => {
+    const build = { version: "1.0.0", extractedAt: "2026-11-03" };
+    const entrance = (mapId: number, name: string) => ({ mapId, name, raid: false });
+    const ranked = buildCatalogIndex({
+      map: {
+        source: build,
+        entrances: [entrance(1, "Mines of Gold"), entrance(2, "Key of Deadmines Mines"), entrance(3, "Deadmines Key"), entrance(4, "Deadmines")],
+      },
+    });
+    expect(searchCatalog(ranked, "deadmines key").map((r) => r.name)).toEqual(["Deadmines Key", "Key of Deadmines Mines", "Deadmines"]);
+    expect(searchCatalog(ranked, "deadmines")[0].name).toBe("Deadmines");
+  });
+
+  test("an empty name or a development name is not indexed, and a name-only record still starts with the name and a newline", () => {
+    const build = { version: "1.0.0", extractedAt: "2026-11-03" };
+    const built = buildCatalogIndex({
+      titles: { build, titles: [{ id: 1, name: "" }, { id: 2, name: "<TEST> Title" }, { id: 3, name: "%s, Champion" }] },
+      map: { source: build, entrances: [{ mapId: 9, name: "   ", raid: false }, { mapId: 10, name: "Deprecated Keep", raid: true }] },
+    } as unknown as Parameters<typeof buildCatalogIndex>[0]);
+    expect(catalogCounts(built)).toEqual({ title: 1 });
+    expect(built.byId.size).toBe(1);
+    expect(searchCatalog(built, "test")).toEqual([]);
+    const [title] = getCatalogByName(built, "%s, Champion");
+    expect(title.body).toBe("%s, Champion\n");
+  });
+
   test("ids are deterministic, reserved and reversible", () => {
     expect(isCatalogId(catalogId("instance", "36"))).toBe(true);
     expect(isCatalogId(123)).toBe(false);

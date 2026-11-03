@@ -1,4 +1,4 @@
-/**
+﻿/**
  * The game-file catalogs (achievements, factions, titles, quest lines, mounts, legacy perks, races, instances) as
  * an in-memory index. These rows are Blizzard data under their own credit, so they never enter the CC BY-SA
  * knowledge release; the knowledge tools union this index with the release at query time instead.
@@ -19,6 +19,7 @@ import { ClientQuestLines } from "./client-quest-lines.js";
 import { RaceTable } from "./client-races.js";
 import { ClientTitles } from "./client-titles.js";
 import { LegacyPerkCatalog } from "./legacy-perks/catalog.js";
+import { isDevelopmentItemName } from "./dev-item-names.js";
 import { allTerms, type SearchHit } from "./search.js";
 
 export const CATALOG_KINDS = ["achievement", "faction", "title", "quest_chain", "mount", "legacy_perk", "race", "instance"] as const;
@@ -38,7 +39,7 @@ export function isCatalogId(id: number): boolean {
   return Number.isInteger(id) && id >= CATALOG_ID_BASE && id < CATALOG_ID_BASE + CATALOG_KINDS.length * KIND_SPAN;
 }
 
-const LICENCE = "Game data © Blizzard Entertainment, Inc.; not under Everloot's licence";
+const LICENCE = "Game data Â© Blizzard Entertainment, Inc.; not under Everloot's licence";
 
 /** Only what the index reads of map.json: the dungeon and raid entrances and the build they came from. */
 export const WorldMapEntrances = z.object({
@@ -102,9 +103,13 @@ interface Stamp { version: string; extractedAt: string }
 const show = (v: unknown): string =>
   Array.isArray(v) ? v.map((x) => (typeof x === "object" ? JSON.stringify(x) : String(x))).join(", ") : String(v);
 
-/** One record: the name, then one `field: value` line per field; `data` carries the build and the same fields. */
-function record(kind: CatalogKind, extId: string, name: string, stamp: Stamp, fields: Record<string, unknown>): CatalogRecord {
-  const body = [name, ...Object.entries(fields).filter(([, v]) => v !== undefined).map(([k, v]) => `${k}: ${show(v)}`)].join("\n");
+/**
+ * One record: the name and a newline, then one `field: value` line per field; `data` carries the build and the same
+ * fields. An empty name or a development leftover gives no record, for every kind.
+ */
+function record(kind: CatalogKind, extId: string, name: string, stamp: Stamp, fields: Record<string, unknown>): CatalogRecord | undefined {
+  if (name.trim() === "" || isDevelopmentItemName(name)) return undefined;
+  const body = `${name}\n${Object.entries(fields).filter(([, v]) => v !== undefined).map(([k, v]) => `${k}: ${show(v)}`).join("\n")}`;
   return {
     id: catalogId(kind, extId),
     extId,
@@ -123,17 +128,17 @@ function record(kind: CatalogKind, extId: string, name: string, stamp: Stamp, fi
 
 const stampOf = (f: { build: Stamp }): Stamp => f.build;
 
-function recordsOfAchievements(f: ClientAchievements): CatalogRecord[] {
+function recordsOfAchievements(f: ClientAchievements): (CatalogRecord | undefined)[] {
   return Object.entries(f.achievements).filter(([, a]) => !a.statistic).map(([id, a]) =>
     record("achievement", id, a.title, stampOf(f), { points: a.points, criteriaCount: a.criteria.length, description: a.description }));
 }
 
-function recordsOfMounts(f: ClientMounts): CatalogRecord[] {
+function recordsOfMounts(f: ClientMounts): (CatalogRecord | undefined)[] {
   return Object.entries(f.mounts).map(([id, m]) => record("mount", id, m.name, stampOf(f), { spellId: m.spellId, ridingSkill: m.ridingSkill }));
 }
 
-function recordsOfLegacyPerks(f: LegacyPerkCatalog): CatalogRecord[] {
-  const out: CatalogRecord[] = [];
+function recordsOfLegacyPerks(f: LegacyPerkCatalog): (CatalogRecord | undefined)[] {
+  const out: (CatalogRecord | undefined)[] = [];
   for (const tree of f.trees) {
     for (const node of tree.nodes) {
       for (const e of node.entries) {
@@ -147,13 +152,13 @@ function recordsOfLegacyPerks(f: LegacyPerkCatalog): CatalogRecord[] {
   return out;
 }
 
-function recordsOfRaces(f: RaceTable): CatalogRecord[] {
+function recordsOfRaces(f: RaceTable): (CatalogRecord | undefined)[] {
   return f.races.map((r) => record("race", String(r.id), r.name, stampOf(f), {
     faction: r.faction, classes: r.classes.map((c) => c.name), traits: r.traits.map((t) => t.name),
   }));
 }
 
-function recordsOfInstances(map: WorldMapEntrances, encounters: ClientEncounters | undefined): CatalogRecord[] {
+function recordsOfInstances(map: WorldMapEntrances, encounters: ClientEncounters | undefined): (CatalogRecord | undefined)[] {
   return map.entrances.flatMap((e) => {
     if (!e.name) return [];
     const list = (encounters?.instances[String(e.mapId)] ?? []).map((x) => ({ id: x.id, name: x.name }));
@@ -161,21 +166,21 @@ function recordsOfInstances(map: WorldMapEntrances, encounters: ClientEncounters
   });
 }
 
-function recordsOfFactions(f: ClientFactions): CatalogRecord[] {
+function recordsOfFactions(f: ClientFactions): (CatalogRecord | undefined)[] {
   return f.factions.map((x) => record("faction", String(x.id), x.name, stampOf(f), { parentId: x.parentId, shown: x.shown }));
 }
 
-function recordsOfTitles(f: ClientTitles): CatalogRecord[] {
+function recordsOfTitles(f: ClientTitles): (CatalogRecord | undefined)[] {
   return f.titles.map((t) => record("title", String(t.id), t.name, stampOf(f), {}));
 }
 
-function recordsOfQuestLines(f: ClientQuestLines): CatalogRecord[] {
+function recordsOfQuestLines(f: ClientQuestLines): (CatalogRecord | undefined)[] {
   return f.questLines.map((q) => record("quest_chain", String(q.id), q.name, stampOf(f), { questIds: q.questIds, questCount: q.questIds.length }));
 }
 
 /** Pure: builds the index from parsed files. A file that is undefined gives no records. */
 export function buildCatalogIndex(files: CatalogFiles): CatalogIndex {
-  const all: CatalogRecord[] = [
+  const all = [
     ...(files.achievements ? recordsOfAchievements(files.achievements) : []),
     ...(files.factions ? recordsOfFactions(files.factions) : []),
     ...(files.titles ? recordsOfTitles(files.titles) : []),
@@ -184,7 +189,7 @@ export function buildCatalogIndex(files: CatalogFiles): CatalogIndex {
     ...(files.legacyPerks ? recordsOfLegacyPerks(files.legacyPerks) : []),
     ...(files.races ? recordsOfRaces(files.races) : []),
     ...(files.map ? recordsOfInstances(files.map, files.encounters) : []),
-  ];
+  ].filter((r): r is CatalogRecord => r !== undefined);
   const index: CatalogIndex = { byKind: new Map(), byId: new Map(), byName: new Map() };
   for (const r of all) {
     index.byId.set(r.id, r);
