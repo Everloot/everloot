@@ -21,8 +21,9 @@ test("the old gold-per-hour page answers 301 with the addon page's section about
   const redirects = await nextConfig.redirects!();
   expect(redirects).toContainEqual({ source: "/tools/gold-per-hour", destination: "/addon#gold-per-hour", statusCode: 301 });
   expect(redirects).toContainEqual({ source: "/connect", destination: "/docs", permanent: true });
+  expect(redirects).toContainEqual({ source: "/ask", destination: "/chat", permanent: true });
   expect(redirects).toContainEqual({ source: "/lore/forever-launch-date", destination: "/wow-forever", permanent: true });
-  expect(redirects).toHaveLength(6);
+  expect(redirects).toHaveLength(7);
 });
 
 test("www.everloot.app answers 301 with the same path on the apex, and only that host does", async () => {

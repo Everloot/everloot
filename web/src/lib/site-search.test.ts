@@ -175,3 +175,15 @@ test("suggestions: an exact id first, then exact, prefix and contains names acro
   expect(byId[0]).toEqual({ type: "item", id: 2589, label: "Item 2589", href: "/database/items/2589", quality: 1 });
   expect(await suggest("  ")).toEqual([]);
 });
+
+test("Everloot's own published guides are found by title, with or without the leading The, and sit above the lore archive", async () => {
+  const groups = await search("deadmines");
+  const guides = groups.find((g) => g.type === "guide")!;
+  expect(guides.heading).toBe("Guides");
+  expect(guides.results[0]).toMatchObject({ label: "The Deadmines", href: "/wiki/deadmines", exact: true });
+  expect(guides.results[0].note).toContain("Defias");
+  const types = groups.map((g) => g.type);
+  if (types.includes("lore")) expect(types.indexOf("guide")).toBeLessThan(types.indexOf("lore"));
+  // A draft page is not on the site, so it is not in the search either.
+  expect((await search("alcaz")).find((g) => g.type === "guide")).toBeUndefined();
+});
