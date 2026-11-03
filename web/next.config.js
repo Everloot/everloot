@@ -176,6 +176,9 @@ const nextConfig = {
       // Changes and search read no cookies, but new blue posts and newly agreed names should show within minutes.
       { source: "/changes", headers: briefCdnHeaders },
       { source: "/search", headers: briefCdnHeaders },
+      // The profession hub and pages read no cookies; a page renders every recipe with the corpus's gathering areas on each request
+      // (2 to 5 s). Five minutes, so a page drawn while storage was unreachable does not stay long.
+      { source: "/tools/professions/:path*", headers: briefCdnHeaders },
       // The sitemap reads no cookies and rebuilds from kb on every request (about 4s cold), so the CDN keeps it an hour.
       // The database and auctions sitemaps set these on their own successful responses, so their 503s stay uncached.
       { source: "/sitemap.xml", headers: databaseItemsCdnHeaders },

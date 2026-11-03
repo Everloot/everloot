@@ -93,11 +93,11 @@ test("the public pages rendered on every request are kept at the CDN; the change
   // Found live 10/27: /database, /map and /changes answered private, no-store, so every visit ran the server.
   const hour = "max-age=3600, stale-while-revalidate=86400";
   const brief = "max-age=300, stale-while-revalidate=3600";
-  for (const [path, value] of [["/database", hour], ["/map", hour], ["/map/kalimdor", hour], ["/changes", brief], ["/search", brief]] as const) {
+  for (const [path, value] of [["/database", hour], ["/map", hour], ["/map/kalimdor", hour], ["/changes", brief], ["/search", brief], ["/tools/professions", brief], ["/tools/professions/alchemy", brief], ["/tools/professions/blacksmithing", brief]] as const) {
     const got = await headersFor(path);
     expect(got["CDN-Cache-Control"], path).toBe(value);
   }
-  for (const path of ["/chat", "/account", "/settings", "/sign-in", "/api/tools/search_knowledge", "/changes/feed.xml"]) {
+  for (const path of ["/chat", "/account", "/settings", "/sign-in", "/api/tools/search_knowledge", "/changes/feed.xml", "/tools/profession-planner"]) {
     expect(await headersFor(path), path).not.toHaveProperty("CDN-Cache-Control");
   }
 });
