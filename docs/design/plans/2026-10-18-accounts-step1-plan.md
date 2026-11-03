@@ -292,7 +292,7 @@ test("with the flag off the catch-all route is 404", async () => { /* authV2Enab
 1. **Apply** `20261003000000_auth_schema.sql` (no-op on production, everything exists) and `20261020120000_accounts.sql`. The data-guard migration is still unapplied on production; this one doesn't depend on it. The accounts migration creates the `everloot_auth` role without a login, grants it `select, insert, update, delete` on `users` and the four `auth_*` tables, and gives it an RLS policy on each.
 2. **Database role login** (SQL editor, agent in Carlos's browser): `alter role everloot_auth login password '<generated>'`. The password goes straight into Vercel, never into chat or git.
 3. **Battle.net developer portal**: add `https://everloot.app/api/auth/callback/battlenet` (keep the old callback until cutover is done).
-4. **Vercel production env**: `BETTER_AUTH_SECRET` (`openssl rand -hex 32`), `BETTER_AUTH_URL=https://everloot.app`, `AUTH_DATABASE_URL` (pooler URI as `everloot_auth.uinmowrmyckklpbwzqhn`). Leave `EVERLOOT_AUTH_V2` unset; deploy; check nothing changed.
+4. **Vercel production env**: `BETTER_AUTH_SECRET` (`openssl rand -hex 32`), `BETTER_AUTH_URL=https://everloot.app`, `AUTH_DATABASE_URL` (pooler URI as `everloot_auth.<project-ref>`). Leave `EVERLOOT_AUTH_V2` unset; deploy; check nothing changed.
 5. **Cutover**: set `EVERLOOT_AUTH_V2=1`, redeploy, sign in with Battle.net on everloot.app, make and revoke an API key, sign out. Rollback = unset the flag and redeploy (Review Focus 3).
 6. **A week later**, a follow-up PR removes the v1 path and drops `public.sessions` (spec §2).
 

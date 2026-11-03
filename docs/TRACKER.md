@@ -38,7 +38,7 @@ Rows: 75.
 | `mcp.chatgpt_directory` | ChatGPT apps directory | public client | approved on 2026-11-02 (version 1.0.1, with the tool descriptions it was submitted with); it uses https://everloot.app/mcp/public with no sign-in |
 | `ops.dns` | everloot.app DNS | on everloot.app | The apex and www records in Cloudflare are proxied, and the Worker routes everloot.app/* and www.everloot.app/* serve them; www answers a 301 to the apex. |
 | `ops.worker_deploy` | Worker deploys | on everloot.app | A push to main that touches web/, kb/ or packages/protocol, once the Release checks pass on it, builds the site with OpenNext and deploys the everloot-web Worker (.github/workflows/deploy-worker.yml), then fetches every sitemap page and fails on any that does not answer 200. |
-| `ops.supabase` | Supabase + R2 storage | on everloot.app | Intake writes the raw upload to R2 bucket everloot-uploads and one index row to Supabase everloot (ref uinmowrmyckklpbwzqhn); the waitlist is a Supabase table. Pages read the indexed objects. Proven end to end on everloot.app 2026-10-04. |
+| `ops.supabase` | Supabase + R2 storage | on everloot.app | Intake writes the raw upload to R2 bucket everloot-uploads and one index row to Supabase everloot; the waitlist is a Supabase table. Pages read the indexed objects. Proven end to end on everloot.app 2026-10-04. |
 
 ## Next
 

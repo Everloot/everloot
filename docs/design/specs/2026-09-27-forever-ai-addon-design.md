@@ -281,7 +281,7 @@ harness library, later, never reachable from game text); model training; a Retai
 
 ## 11. Open questions
 
-- **wiki.gg permission:** asked 2026-09-27 (email from cjimenez@r21digital.com to
+- **wiki.gg permission:** asked 2026-09-27 (email from the maintainer to
   `support@indie.io`, wiki.gg's operator — no public wiki.gg address exists; its own channel is a
   Jira service-desk portal). Asked for a low-rate registered API bot or a current XML dump. Until
   answered, lore comes from the 2023 dump and Forever lore is a gap.
