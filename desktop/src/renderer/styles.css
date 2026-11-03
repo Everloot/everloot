@@ -75,7 +75,7 @@ p { margin: 0; }
 .num { font-variant-numeric: tabular-nums; }
 .eyebrow, .k { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: rgb(var(--muted)); }
 /* Prose paragraphs read at 14 px; controls, tables and meta lines at the 13 and 12 px of the scale. */
-.page > p:not(.small), .lead, .msg, .hero-detail, .welcome .lead, .confirm-body { font-size: 14px; }
+.page > p:not(.small), .lead, .msg, .welcome .lead, .confirm-body { font-size: 14px; }
 .ico { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 /* Keyboard focus: one ring everywhere, drawn outside so it never covers a fill. */
@@ -199,6 +199,19 @@ p { margin: 0; }
 .callout { display: flex; gap: 10px; padding: 12px 14px; border-radius: var(--radius); border: 1px solid var(--edge); border-left-width: 3px; background: rgb(var(--panel)); overflow-wrap: anywhere; }
 .callout .ico { margin-top: 2px; }
 .callout.error { border-color: rgb(var(--danger)); }
+/* A job page opens with a strip: the pill, what the job is doing, and the last line it wrote. The left edge takes the pill's tone. */
+.strip { --tone: var(--fg-2); display: flex; align-items: flex-start; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-left: 3px solid rgb(var(--tone)); border-radius: 8px; background: rgb(var(--panel)); overflow-wrap: anywhere; }
+.strip-working { --tone: var(--info); }
+.strip-failed { --tone: var(--danger); }
+.strip-ok { --tone: var(--accent); }
+.strip-paused { --tone: var(--warning); }
+.strip-off { --tone: var(--muted); }
+.strip .pill-s { margin: 2px 0 0; }
+.strip-main { flex: 1 1 auto; min-width: 0; }
+.strip-head { font-weight: 600; }
+.strip-failed .strip-head { color: rgb(var(--danger)); }
+.strip-last { margin-top: 3px; font-family: "Geist Mono", ui-monospace, Menlo, monospace; font-size: var(--fs-sm); color: rgb(var(--muted)); }
+.strip-last time { margin-right: 8px; font-variant-numeric: tabular-nums; }
 /* An empty page says why and offers the one thing that fills it; never a bare "nothing yet". */
 .empty { display: flex; align-items: flex-start; gap: 12px; padding: 14px; border: 1px dashed var(--edge); border-radius: 8px; overflow-wrap: anywhere; }
 .empty > .ico { width: 18px; height: 18px; color: rgb(var(--muted)); margin-top: 1px; }
@@ -315,29 +328,29 @@ ul.plain { margin: 0; padding-left: 20px; }
 ul.plain li { margin: 4px 0; }
 
 /* ---------- Overview ---------- */
-.hero { --tone: var(--accent); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; align-items: center; padding: 18px 22px; border-radius: 8px; border: 1px solid rgb(var(--tone) / 0.45); background: rgb(var(--tone) / 0.08); overflow: hidden; }
-.hero[data-state="error"] { --tone: var(--danger); }
-.hero[data-state="running"] { --tone: var(--info); }
-.hero[data-state="paused"] { --tone: var(--warning); }
-.hero[data-state="off"], .hero[data-state="setup"] { --tone: var(--edge); }
-.hero-body { min-width: 0; }
-.hero-body > * + * { margin-top: 10px; }
-.pill { display: inline-flex; align-items: center; gap: 8px; padding: 2px 10px; border-radius: 9999px; border: 1px solid rgb(var(--tone) / 0.6); font-size: var(--fs-sm); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
-.pill .dot { width: 8px; height: 8px; background: rgb(var(--tone)); border: 0; box-shadow: none; }
-.hero-title { font-size: 22px; line-height: 1.2; font-weight: 600; letter-spacing: -0.02em; text-wrap: balance; }
-.hero-detail { color: rgb(var(--fg-2)); max-width: 60ch; text-wrap: pretty; }
+/* The status line: the whole app's state in a pill, a sentence, and the actions that fit it. */
+.status-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; background: rgb(var(--panel)); }
+.status-line .pill-s { margin: 0; }
+.status-text { flex: 1 1 240px; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; overflow-wrap: anywhere; }
+.status-text b { font-weight: 600; }
+.status-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.status-failed { flex-basis: 100%; }
 .hero-failed { color: rgb(var(--danger)); overflow-wrap: anywhere; }
-.hero-actions { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 6px; }
-.hero-mark { width: 104px; height: 104px; color: rgb(var(--tone)); flex: none; }
-.hero-mark svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
-.overview-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 32px; align-items: start; }
-.overview-grid > div > * + * { margin-top: 12px; }
+/* The job strip's cells: an eyebrow with the job's icon, the state in a word, one line under it. */
+.stat .k { display: flex; align-items: center; gap: 6px; }
+.ico-k { width: 13px; height: 13px; }
+.stat .v { display: flex; align-items: center; gap: 6px; }
+/* The thread: the engine's steps, oldest at the top, the newest in full colour with the mark's accent. */
+.overview-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+.overview-grid > div > * + * { margin-top: 10px; }
 .sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-.jobs { border-top: 1px solid var(--line); }
-.job { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
-.job-ico { display: grid; place-items: center; width: 30px; height: 30px; border-radius: var(--radius); background: rgb(var(--raised)); color: rgb(var(--fg-2)); flex: none; }
-.job-name { font-weight: 600; }
-.job-state { display: flex; align-items: center; gap: 8px; text-align: right; font-weight: 500; flex: none; max-width: 45%; overflow-wrap: anywhere; }
+.thread-steps { border-top: 1px solid var(--line); }
+.step { display: grid; grid-template-columns: auto 16px minmax(0, 1fr); gap: 10px; align-items: start; padding: 8px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; color: rgb(var(--fg-2)); }
+.step time { min-width: 56px; font-size: var(--fs-sm); color: rgb(var(--muted)); font-variant-numeric: tabular-nums; white-space: nowrap; padding-top: 2px; }
+.step .ico { color: rgb(var(--muted)); margin-top: 2px; }
+.step-error, .step-error .ico { color: rgb(var(--danger)); }
+.step-last { color: rgb(var(--fg)); font-weight: 500; }
+.step-last .ico { color: rgb(var(--accent)); }
 
 /* ---------- Welcome ---------- */
 .welcome { max-width: 720px; margin: 0 auto; padding: 28px var(--pad) 40px; }
@@ -421,6 +434,17 @@ details.adv[open] > summary { margin-bottom: 12px; }
 .wk-down i { display: block; width: 100%; min-height: 1px; background: rgb(var(--copper)); border-radius: 0 0 2px 2px; }
 .wk-d { text-align: center; font-size: var(--fs-sm); color: rgb(var(--muted)); }
 .week-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 8px; }
+/* Before any data, the profile's outline: dashed, dim, inert. With data, the selected character's profile sits on the page. */
+.ghost { opacity: 0.45; pointer-events: none; user-select: none; }
+.ghost > * + * { margin-top: 16px; }
+.ghost .panel { border-style: dashed; }
+.ghost .river { height: 96px; border-bottom: 1px solid var(--edge); }
+.ghost .week-bars { margin-top: 6px; }
+.ghost .wk-col { height: 68px; border-bottom: 1px solid var(--edge); }
+.ghost-line { display: inline-block; width: 72px; height: 10px; border-radius: 3px; background: var(--edge); }
+.ghost-line.short { width: 40px; }
+.profile .dw-stats { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.profile > * + * { margin-top: 16px; }
 .roster-row { cursor: pointer; }
 .roster-row:hover td, .roster-row.sel td { background: rgb(var(--fg) / 0.05); }
 .roster-row:focus-visible { outline-offset: -2px; }
@@ -490,15 +514,10 @@ details.set-sec[open] > summary { margin-bottom: 12px; }
 /* ---------- Narrow windows: stack, keep every control reachable ---------- */
 @media (max-width: 820px) {
   .overview-grid, .char-hero { grid-template-columns: minmax(0, 1fr); gap: 24px; }
-  .hero { grid-template-columns: minmax(0, 1fr); padding: 20px; }
-  .hero-mark { display: none; }
-  .hero-title { font-size: 28px; }
 }
 @media (max-width: 700px) {
   .set-sec { grid-template-columns: minmax(0, 1fr); padding: 20px 0; }
   .set-lead { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; }
-  .job { flex-wrap: wrap; }
-  .job-state { max-width: none; }
 }
 @media (max-height: 620px) {
   .chat #chatForm { padding: 8px 12px; margin-bottom: 8px; }

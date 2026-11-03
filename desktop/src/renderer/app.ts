@@ -5,7 +5,7 @@ import { JOBS, NO_SOURCED_ANSWER, type AddonInfo, type AppState, type AskInfo, t
 import { PROVIDER_PRESETS, assistantSource, keptModelPick, manualModelShown, presetFor, removalNotice, type ModelChoice, type ProviderKind } from "../shared/providers";
 import { inkOn } from "../../../web/src/lib/chat/catalogue";
 import { WEBSITE_LINKS, websiteUrl } from "../shared/website";
-import { emptyCause, emptyState, statePill, watchPill } from "./parts";
+import { emptyCause, emptyState, ghostProfile, jobOfLine, statePill, threadLines, watchPill, workingStrip } from "./parts";
 
 declare global { interface Window { everloot: EverlootApi } }
 const api = window.everloot;
@@ -110,6 +110,8 @@ const ICONS: Record<string, string> = {
   bug: '<rect x="7" y="8" width="10" height="12" rx="5"/><path d="M9 8V7a3 3 0 0 1 6 0v1M12 12v8M3 13h4M17 13h4M4 7l3 2M20 7l-3 2M4 19l3-2M20 19l-3-2"/>',
   external: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
   alert: '<path d="M12 9v4m0 3.5v.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/>',
+  /** The app itself, for thread lines no job wrote: the mark's diamond. */
+  app: '<path d="M12 3 21 12 12 21 3 12Z"/>',
 };
 const icon = (name: string, cls = "ico") => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] ?? ""}</svg>`;
 
@@ -122,6 +124,8 @@ const whyQuestion = (job: Job, s: AppState) => `Why did ${job === "ask" ? "the /
 const whyFailed = (s: AppState): string[] => (["upload", "prices", "ask"] as Job[]).filter((j) => s.engine.jobs[j].state === "error").map((j) => whyQuestion(j, s));
 /** The "ask why" link under a stat whose job failed; nothing otherwise. */
 const askWhy = (job: Job, s: AppState) => (s.engine.jobs[job].state === "error" ? ` · <button type="button" class="link" data-ask="${esc(whyQuestion(job, s))}">ask why</button>` : "");
+/** The newest log line a job wrote, for its page's strip; null before it wrote one. */
+const lastLineOf = (job: Job, s: AppState) => [...s.engine.log].reverse().find((l) => jobOfLine(l.text) === job) ?? null;
 const logLines = (s: AppState, n: number) => s.engine.log.slice(-n).reverse().map((l) => `<div><time>${clock(l.at)}</time><span class="${l.level}">${esc(l.text)}</span></div>`).join("") || '<span class="muted">Nothing yet.</span>';
 
 // ---------- screens ----------
@@ -173,12 +177,8 @@ function welcome(): string {
 }
 
 const STATE_LABEL: Record<CompanionState, string> = { setup: "Setup", paused: "Paused", error: "Error", running: "Running", off: "Off", idle: "Waiting" };
-/** The hero's diamond, with a glyph for the state; decorative, the headline beside it says the same in words. */
-const HERO_GLYPH: Record<CompanionState, string> = {
-  idle: "", running: '<path d="M16 22a8 8 0 0 1 13-5m3 7a8 8 0 0 1-13 5M30 13v4h-4M18 31v-4h4"/>', paused: '<path d="M18 17v14M30 17v14"/>',
-  error: '<path d="M24 16v9m0 5v.01"/>', off: '<path d="M18 24h12"/>', setup: '<path d="M24 17v14M17 24h14"/>',
-};
-const heroMark = (state: CompanionState) => `<div class="hero-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M24 3 45 24 24 45 3 24Z"/><path d="M24 11 37 24 24 37 11 24Z" opacity="0.45"/>${HERO_GLYPH[state]}</svg></div>`;
+/** The whole app's state as a pill kind, for the Overview's status line. */
+const STATE_PILL: Record<CompanionState, string> = { setup: "off", paused: "paused", error: "failed", running: "working", off: "off", idle: "waiting" };
 
 function overview(s: AppState): string {
   const e = s.engine;
@@ -196,40 +196,38 @@ function overview(s: AppState): string {
     : status.state === "error" ? `<button type="button" class="btn btn-primary" data-page="log">Open the log</button>` : "";
   const runs = status.state === "setup" || status.state === "off" ? "" : `${runBtn("upload", s, "Upload now", !lead)}${runBtn("prices", s, "Refresh prices")}`;
   const failed = status.state === "error" ? status.jobs.map((j) => `<p class="hero-failed small"><b>${esc(JOB_NAMES[j])}:</b> ${esc(statusText(e.jobs[j]))}</p>`).join("") : "";
-  const job = (ico: string, name: string, dotHtml: string, state: string, sub: string) => `<div class="job"><span class="job-ico">${icon(ico)}</span><div class="grow"><div class="job-name">${name}</div><div class="muted small">${sub}</div></div><div class="job-state">${dotHtml}<span>${state}</span></div></div>`;
+  // One cell per job in the status strip: a label, the state in a word, and one line of detail under it.
+  const cell = (ico: string, name: string, dotHtml: string, state: string, sub: string) => `<div class="stat"><div class="k">${icon(ico, "ico ico-k")}${name}</div><div class="v">${dotHtml}<span>${state}</span></div><div class="s">${sub}</div></div>`;
   const last = (j: JobStatus) => (j.at ? `last run ${ago(j.at)}` : "not run yet");
+  const kind = STATE_PILL[status.state];
+  const ring = kind === "working" ? '<i class="pill-ring" aria-hidden="true"></i>' : "";
+  const thread = threadLines(e.log, 12, { upload: icon("upload"), prices: icon("market"), ask: icon("ask"), app: icon("app") });
   return `<div class="page">
     <div class="head"><h1>Overview</h1></div>
     ${s.notice ? `<p class="callout error">${icon("alert")}<span>${esc(s.notice)}</span></p>` : ""}
     ${foreverCallout(s)}
     ${updateCallout(s)}
     ${dataNotice()}
-    ${!e.files.length && s.settings.gameFolder ? `<p class="callout fg2">${icon("log")}<span>No <code>Everloot.lua</code> under <span class="mono">${esc(s.settings.gameFolder)}</span> yet. Log out once in the game so it writes the file.</span></p>` : ""}
-    <section class="hero" data-state="${status.state}" aria-labelledby="heroTitle">
-      <div class="hero-body">
-        <span class="pill"><span class="dot" aria-hidden="true"></span>${STATE_LABEL[status.state]}</span>
-        <h2 class="hero-title" id="heroTitle">${esc(status.headline)}</h2>
-        <p class="hero-detail">${esc(status.detail)}</p>
-        ${failed}
-        <div class="hero-actions">${lead}${runs}</div>
-      </div>
-      ${heroMark(status.state)}
+    <section class="status-line" data-state="${status.state}" aria-labelledby="heroTitle">
+      <span class="pill-s pill-${kind}">${ring}${STATE_LABEL[status.state]}</span>
+      <div class="status-text"><b id="heroTitle">${esc(status.headline)}</b><span class="muted">${esc(status.detail)}</span></div>
+      <div class="status-actions">${lead}${runs}</div>
+      ${failed ? `<div class="status-failed">${failed}</div>` : ""}
     </section>
+    <div class="stats">
+      ${cell("upload", "Upload", dot(up), up.state === "ok" ? "OK" : up.state === "error" ? "Failed" : up.state === "off" ? "Off" : up.state === "running" ? "Running" : "Waiting", `${last(up)}${askWhy("upload", s)}`)}
+      ${cell("market", "Market prices", dot(pr), data.market ? `${data.market.last.length} realm(s)` : pr.state === "off" ? "Off" : pr.state === "running" ? "Running" : "Waiting", `${data.market?.scans[0] ? `your last scan ${ago(data.market.scans[0].at)}` : last(pr)}${suggestionLine(data.market)}${askWhy("prices", s)}`)}
+      ${cell("ask", "/ask", dot(ask), ask.state === "off" ? "Off" : ask.state === "error" ? "Failed" : ask.state === "running" ? "Running" : "On", `${ask.at ? last(ask) : s.settings.ask.enabled ? "waiting" : 'answers <code>/ask</code> in game · <button type="button" class="link" data-page="ask">turn on in Ask</button>'}${askWhy("ask", s)}`)}
+      ${cell("addon", "Addon", "", addonLine, `${addon?.slots.prices ? "prices file in game" : "no prices file yet"}${addon && (!addon.installed || addon.newer) ? ` · <button type="button" class="link" data-page="addon">${addon.installed ? "update" : "install"}</button>` : ""}`)}
+    </div>
     <div class="overview-grid">
       <div>
-        <div class="sec-head"><h2>Jobs</h2></div>
-        <div class="jobs">
-          ${job("upload", "Upload", dot(up), up.state === "ok" ? "OK" : up.state === "error" ? "Failed" : up.state === "off" ? "Off" : up.state === "running" ? "Running" : "Waiting", `${last(up)}${askWhy("upload", s)}`)}
-          ${job("market", "Market prices", dot(pr), data.market ? `${data.market.last.length} realm(s)` : pr.state === "off" ? "Off" : pr.state === "running" ? "Running" : "Waiting", `${data.market?.scans[0] ? `your last scan ${ago(data.market.scans[0].at)}` : last(pr)}${suggestionLine(data.market)}${askWhy("prices", s)}`)}
-          ${job("ask", "/ask", dot(ask), ask.state === "off" ? "Off" : ask.state === "error" ? "Failed" : ask.state === "running" ? "Running" : "On", `${ask.at ? last(ask) : s.settings.ask.enabled ? "waiting" : 'answers questions you type in game with <code>/ask</code> · <button type="button" class="link" data-page="ask">turn on in Ask</button>'}${askWhy("ask", s)}`)}
-          ${job("addon", "Addon", "", addonLine, `${addon?.slots.prices ? "prices file in game" : "no prices file yet"}${addon && (!addon.installed || addon.newer) ? ` · <button type="button" class="link" data-page="addon">${addon.installed ? "update" : "install"}</button>` : ""}`)}
-        </div>
+        <div class="sec-head"><h2>What Everloot did</h2><button type="button" class="link" data-page="log">open the log</button></div>
+        ${thread ? `<div class="thread-steps">${thread}</div>` : emptyState(emptyCause("log", s), icon("log"))}
       </div>
       <div>
-        <div class="sec-head"><h2>Recent activity</h2><button type="button" class="link" data-page="log">open the log</button></div>
-        <div class="log feed">${logLines(s, 6)}</div>
         <div class="sec-head"><h2>Latest changes</h2><button type="button" class="link" data-page="changes">all</button></div>
-        <div class="list">${changes.length ? changes.map((c) => `<div class="item"><div class="t">${c.link ? ext(c.link, c.title) : esc(c.title)}</div><div class="muted small">${when(c.date)}</div></div>`).join("") : `<span class="muted">${data.changesError ? esc(data.changesError) : "Loading…"}</span>`}</div>
+        <div class="list">${changes.length ? changes.map((c) => `<div class="item"><div class="t">${c.link ? ext(c.link, c.title) : esc(c.title)}</div><div class="muted small">${when(c.date)}</div></div>`).join("") : data.changesError ? emptyState(emptyCause("changes", s, { error: data.changesError }), icon("changes")) : `<span class="muted">Loading…</span>`}</div>
       </div>
     </div>
   </div>`;
@@ -577,9 +575,10 @@ function characters(): string {
     </div>
     <p class="fg2">What the addon recorded about your own characters. Gold and gear carry the name; progress rows carry an opaque key the addon derives per character, so they are listed apart. Sharing any of this with the site is a choice you make on the upload page with a verified grant, never here.</p>
     ${named.length ? `${hero}
-    <section class="panel"><div class="row between"><h2>Roster</h2><span class="muted small">click a character, or press Enter, for the details</span></div>
+    <section class="panel profile" aria-label="${esc(selected?.character ?? "")}: gold, gear and money by category">${selected ? drawerOverview(selected, true) : ""}</section>
+    <section class="panel"><div class="row between"><h2>Roster</h2><span class="muted small">click a character, or press Enter, for history and sharing</span></div>
       <div class="tablewrap"><table class="roster"><thead><tr><th>Character</th><th class="num">Gold</th><th class="num">7 days</th><th class="num">Item level</th><th class="num">Last seen</th></tr></thead><tbody>${rows}</tbody></table></div>
-    </section>` : c ? emptyState(emptyCause("characters", state!), icon("characters")) : `<section class="panel"><p class="muted">Loading…</p></section>`}
+    </section>` : c ? `${emptyState(emptyCause("characters", state!), icon("characters"))}${ghostProfile()}` : `<section class="panel"><p class="muted">Loading…</p></section>`}
     <section class="panel" id="keyed" tabindex="-1"><h2>Progress · keyed</h2>
       ${prog ? `<div class="tablewrap"><table><thead><tr><th>Key</th><th>Class</th><th class="num">Achievements</th><th class="num">Reputations</th><th class="num">Titles</th><th class="num">Quests done</th></tr></thead><tbody>${prog}</tbody></table></div>` : `<p class="muted">${c ? "Nothing yet. The completion tracker is off until <code>/everloot completion on</code> in game." : "Loading…"}</p>`}
       ${c?.talents.length ? `<p class="muted small">Active talent builds: ${c.talents.map((x) => `${esc(x.class.toLowerCase())} ${x.level} (${x.points} points)`).join(", ")}. Not linked to a name.</p>` : ""}
@@ -602,7 +601,8 @@ function characters(): string {
   </div>`;
 }
 
-function drawerOverview(c: CharacterRow): string {
+/** The character's profile: gold now and at its peak, the week, every gear slot, money by category. On the page it skips the pointer to the keyed rows, which sit right under it there. */
+function drawerOverview(c: CharacterRow, onPage = false): string {
   const week = netOf(c.week);
   const slots = new Map(c.equipped.map((e) => [e.slot, e.itemLevel]));
   const avg = c.equipped.length ? (c.equipped.reduce((s, e) => s + e.itemLevel, 0) / c.equipped.length).toFixed(1) : null;
@@ -627,9 +627,9 @@ function drawerOverview(c: CharacterRow): string {
     <section class="dw-sec"><div class="row between"><h3>Money by category</h3><span class="muted small">all time in this file</span></div>
       <div class="cat-cols"><div><h4>Earned</h4>${catCol("in")}</div><div><h4>Spent</h4>${catCol("out")}</div></div>
     </section>
-    <section class="dw-sec"><h3>Progress</h3>
+    ${onPage ? "" : `<section class="dw-sec"><h3>Progress</h3>
       <p class="muted small">Achievements, reputations, titles and quests are keyed by an opaque identifier, never a name, so they stay listed apart from this character. <button type="button" class="link" id="gotoKeyed">Show the keyed rows</button></p>
-    </section>`;
+    </section>`}`;
 }
 
 function drawerHistory(c: CharacterRow): string {
@@ -752,7 +752,7 @@ function upload(s: AppState): string {
   return `<div class="page">
     <div class="head"><h1>Upload</h1><div class="row">${jobSwitch("upload", s)}${runBtn("upload", s)}</div></div>
     <p class="fg2">After every logout or <code>/reload</code> the game rewrites <code>Everloot.lua</code>; once the write settles, the events the site has not confirmed are sent. Named data (guild, gear, gold, collection) and your installed addon list stay here.</p>
-    <section class="panel"><div class="row between"><h2>Last run</h2><span class="muted small">${j.at ? when(j.at) : ""}</span></div><p class="${j.state === "error" ? "error" : "fg2"}">${esc(statusText(j))}</p></section>
+    ${workingStrip("upload", s, statusText(j), lastLineOf("upload", s))}
     <section class="panel"><h2>Account files</h2>
       ${files.length ? `<div class="tablewrap"><table><thead><tr><th>Account</th><th>Written</th><th>Addon</th><th class="num">Records</th><th class="num">Confirmed</th><th>What it holds</th></tr></thead><tbody>${rows}</tbody></table></div>` : emptyState(emptyCause("upload", s), icon("upload"))}
       <p class="muted small">Records are what the addon has on disk; confirmed is how many of them the site has accepted from this install. The site states a fact once three installs agree.</p>
@@ -780,6 +780,7 @@ function market(s: AppState): string {
   const scans = (m?.scans ?? []).map((sc) => `<tr><td>${esc(sc.realm)}</td><td>${sc.at ? ago(sc.at) : "unknown"}</td><td class="${stale(sc.at) ? "warn" : "ok"}">${stale(sc.at) ? "scan again next time you are at the auction house" : "fresh"}</td></tr>`).join("");
   return `<div class="page">
     <div class="head"><h1>Market</h1><div class="row">${jobSwitch("prices", s)}${runBtn("prices", s, "Refresh now")}</div></div>
+    ${workingStrip("prices", s, statusText(j), lastLineOf("prices", s))}
     <section class="panel"><div class="row between"><h2>Look up a price</h2>${ext(websiteUrl(s.settings.endpoint, "/tools/auctions"), "Auction prices on everloot.app ↗")}</div>
       <form id="priceForm" class="row" autocomplete="off"><input type="text" id="priceItem" name="priceItem" class="grow" aria-label="Item id or link" placeholder="Item id, or an item link pasted from game chat" maxlength="500"><button type="submit" class="btn">Look up</button></form>
       ${priceResult(s)}
@@ -794,7 +795,7 @@ function market(s: AppState): string {
       <p class="muted small">At most 20 realms in one prices file; your scans come first. The full tables and 60-day charts are on the Auction prices tool in the sidebar.</p>
     </section>
     <section class="panel"><h2>Your scans</h2>
-      ${scans ? `<div class="tablewrap"><table><thead><tr><th>Realm</th><th>Last full scan</th><th>Status</th></tr></thead><tbody>${scans}</tbody></table></div>` : emptyState(emptyCause("market", s, { followed: followed.size }), icon("market"))}
+      ${scans ? `<div class="tablewrap"><table><thead><tr><th>Realm</th><th>Last full scan</th><th>Status</th></tr></thead><tbody>${scans}</tbody></table></div>` : emptyState(emptyCause("market", s), icon("market"))}
       <p class="muted small">Every scan you upload is one of the three reporters a day needs before a price is published. A realm is only as fresh as its last scans.</p>
     </section>
     <section class="panel"><div class="row between"><h2>Written into the game</h2><span class="muted small">${j.at ? when(j.at) : ""}</span></div>
@@ -838,6 +839,7 @@ function ask(s: AppState): string {
   const configured = Boolean(st.tokenFile) || !usualUrl;
   return `<div class="page">
     <div class="head"><h1>Ask</h1><div class="row">${jobSwitch("ask", s)}${runBtn("ask", s, "Answer now")}</div></div>
+    ${workingStrip("ask", s, statusText(s.engine.jobs.ask), lastLineOf("ask", s))}
     ${flash ? `<p role="status" class="${flash.startsWith("!") ? "error" : "ok"} small">${esc(flash.replace(/^!/, ""))}</p>` : ""}
     <p class="fg2">Ask in game with <code>/ask</code>, then <code>/reload</code> to save your question. Keep this app running while it answers, then <code>/reload</code> again to read the answer. Answers arrive through saved files, not live.</p>
     <p class="fg2 small">Item prices come from recorded scans, not live listings. Price and search results include their source. The time beside an answer is when it was written; price answers also show the observation day.</p>
@@ -1083,7 +1085,7 @@ function renderSide(s: AppState): void {
     ? `<button type="button" class="account-btn" id="accountBtn" title="Signed in to everloot.app">${PERSON}<span class="acct-text"><b>Signed in</b><span>key …${esc(s.account.hint ?? "")}</span></span></button>`
     : `<button type="button" class="account-btn" id="accountBtn">${PERSON}<span class="acct-text"><b>Sign in</b><span>everloot.app</span></span></button>`;
   sideFoot.innerHTML = `${acct}<div class="foot-row"><button type="button" data-page="settings" ${page === "settings" ? 'aria-current="page"' : ""}>${GEAR}Settings</button><button type="button" class="foot-icon" id="reportBug" aria-label="Report a bug" title="Report a bug">${BUG}</button>${updateButton(s)}</div>
-    <div class="foot-line"><span>${e.files.length ? `Watching ${e.files.length} file(s)` : "Not watching"}${e.paused ? " · paused" : ""}</span><span>v${esc(s.version)}</span></div>`;
+    <div class="foot-line"><span>Everloot</span><span>v${esc(s.version)}</span></div>`;
   paintBars(sideFoot);
   if (refocus) side.querySelector<HTMLElement>(refocus)?.focus({ preventScroll: true });
 }

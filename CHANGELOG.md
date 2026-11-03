@@ -347,6 +347,13 @@ Live-client verification is pending. This is a pre-release for WoW: Forever 1.60
 - Desktop App: an empty page says why it is empty and what fills it. Characters, Upload, Market, Ask, Log and
   Changes each name the real cause: no game folder chosen, no `Everloot.lua` under the folder yet, the app paused,
   the job off, or a fetch that failed, with a Retry.
+- Desktop App: Upload, Market and Ask open with a strip that says what the job is doing now and the last line it
+  wrote, with the time.
+- Desktop App: the Overview reads as a thread of what the app did, oldest at the top and the newest step
+  highlighted, under a one-line status and a four-cell strip for Upload, Market prices, /ask and the addon.
+- Desktop App: Characters with no data draws the profile's outline (money river, week, roster) under the reason it
+  is empty. With data, the selected character's gold, gear slots and money by category sit on the page; the drawer
+  keeps history and sharing.
 
 ### Changed
 - Desktop App: the look is that of a developer tool: neutral near-black surfaces, hairline rules, a 13 px type scale

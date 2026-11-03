@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
-import type { JobState, JobStatus } from "../src/shared/types";
-import { emptyCause, emptyState, statePill, watchPill } from "../src/renderer/parts";
+import type { JobState, JobStatus, LogLine } from "../src/shared/types";
+import { emptyCause, emptyState, ghostProfile, jobOfLine, statePill, threadLines, watchPill, workingStrip } from "../src/renderer/parts";
 
 const j = (state: JobState): JobStatus => ({ state, message: "", at: null });
 
@@ -51,7 +51,8 @@ test("a paused app says so before anything about data", () => {
 test("an off job says it is off before anything about data", () => {
   expect(emptyCause("ask", { ...base, settings: { ...base.settings, ask: { ...base.settings.ask, enabled: false } } }).cause).toBe("/ask is off");
   expect(emptyCause("upload", { ...base, settings: { ...base.settings, upload: false } }).cause).toBe("Upload is off");
-  expect(emptyCause("market", base, { followed: 0 }).cause).toBe("No realm followed yet");
+  // Following a realm is the realms panel's business; the scans panel says what a scan needs, whatever is followed.
+  expect(emptyCause("market", base, { followed: 0 } as never).cause).toBe("No full scan in your save file yet");
 });
 
 test("a fetch error is the cause, with a retry", () => {
@@ -63,9 +64,68 @@ test("a fetch error is the cause, with a retry", () => {
 test("with everything on and a file watched, each page has its own reason", () => {
   expect(emptyCause("characters", base).cause).toBe("Save file read, no named character rows yet");
   expect(emptyCause("upload", base).action?.run).toBe("upload");
-  expect(emptyCause("market", base, { followed: 2 }).cause).toBe("No full scan in your save file yet");
+  expect(emptyCause("market", base).cause).toBe("No full scan in your save file yet");
   expect(emptyCause("ask", base).cause).toBe("No question waiting");
   expect(emptyCause("log", base).cause).toBe("Nothing logged since start");
+});
+
+test("a line's job comes from its prefix, and the rest belongs to the app", () => {
+  expect(jobOfLine("upload TESTACC: sent 0 new events")).toBe("upload");
+  expect(jobOfLine("upload: paused, skipped")).toBe("upload");
+  expect(jobOfLine("prices: 0 items on 0 realm(s) written")).toBe("prices");
+  expect(jobOfLine("prices: the site asked to wait; trying again in 3 min")).toBe("prices");
+  expect(jobOfLine("ask TESTACC: answered 1 question")).toBe("ask");
+  expect(jobOfLine("Watching 1 account file(s) in W:\\_classic_era_")).toBe("app");
+  expect(jobOfLine("builds: 2 saved build(s) written")).toBe("app");
+  expect(jobOfLine("uploads are not a job")).toBe("app");
+});
+
+test("the thread keeps app lines, reads oldest first and marks the newest", () => {
+  const log: LogLine[] = [
+    { at: "2026-11-03T01:00:00Z", level: "info", text: "Watching 1 account file(s)" },
+    { at: "2026-11-03T01:01:00Z", level: "error", text: "upload X: failed" },
+  ];
+  const html = threadLines(log, 10, { upload: "U", prices: "P", ask: "A", app: "E" });
+  expect(html.indexOf("Watching")).toBeLessThan(html.indexOf("failed"));
+  expect(html).toContain('data-job="app"');
+  expect(html).toContain('data-job="upload"');
+  expect(html).toContain("step-error");
+  expect(html.match(/step-last/g)?.length).toBe(1);
+  expect(html.lastIndexOf("step-last")).toBeGreaterThan(html.indexOf("Watching"));
+});
+
+test("the thread shows the last n lines and nothing for an empty log", () => {
+  const log: LogLine[] = Array.from({ length: 5 }, (_, i) => ({ at: "2026-11-03T01:0" + i + ":00Z", level: "info", text: "prices: line " + i }));
+  const html = threadLines(log, 2, { upload: "", prices: "", ask: "", app: "" });
+  expect(html).toContain("line 3"); expect(html).toContain("line 4"); expect(html).not.toContain("line 2");
+  expect(threadLines([], 10, { upload: "", prices: "", ask: "", app: "" })).toBe("");
+});
+
+const strip = (state: JobState, paused: boolean) => ({ engine: { jobs: { upload: j(state) }, paused, files: ["a"], log: [] }, settings: { upload: true } } as never as Parameters<typeof workingStrip>[1]);
+
+test("a strip carries the pill, the headline and the job's last line", () => {
+  const html = workingStrip("upload", strip("running", false), "Uploading TESTACC", { at: "2026-11-03T01:01:00Z", level: "info", text: "upload TESTACC: sending <2> batches" });
+  expect(html).toContain("pill-working");
+  expect(html).toContain("strip-working");
+  expect(html).toContain("Uploading TESTACC");
+  expect(html).toContain("sending &lt;2&gt; batches");
+  expect(html).toContain('aria-live="polite"');
+});
+
+test("a strip with no line yet has the headline only, and a paused engine says Paused", () => {
+  const html = workingStrip("upload", strip("idle", true), "Waiting for the next write", null);
+  expect(html).toContain(">Paused<");
+  expect(html).toContain("strip-paused");
+  expect(html).not.toContain("strip-last");
+});
+
+test("the ghost profile is hidden from assistive tech and draws the three regions", () => {
+  const html = ghostProfile();
+  expect(html).toContain('aria-hidden="true"');
+  expect(html).toContain("river-card");
+  expect(html).toContain("week-card");
+  expect(html).toContain("Roster");
+  expect((html.match(/wk-col/g) ?? []).length).toBe(7);
 });
 
 test("the rendered block escapes the cause and carries the action as a data attribute", () => {
