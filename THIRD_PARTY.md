@@ -65,10 +65,11 @@ BY-SA licences. They name the provider on its own sign-in button and never sugge
 | Microsoft logo | [`ms-symbollockup_mssymbol_19.svg`](https://learn.microsoft.com/en-us/entra/identity-platform/media/howto-add-branding-in-apps/ms-symbollockup_mssymbol_19.svg) | [Sign in with Microsoft branding guidelines](https://learn.microsoft.com/en-us/entra/identity-platform/howto-add-branding-in-apps): the logo unaltered, "Sign in with Microsoft", the dark-theme button | `web/src/components/ProviderLogo.tsx` |
 | Twitch Glitch | [Twitch brand package](https://brand.twitch.com/uploads/Twitch-Brand.zip), file `Twitch Logos/02. Glitch/01. Twitch Purple/glitch_flat_purple.svg` | Logo Usage Guidelines (Speedrun Edition) v3.0, in the same package: core palette, no stretching, effects or low-contrast colours; [Twitch trademark guidelines](https://legal.twitch.com/en/legal/trademark/) | `web/src/components/ProviderLogo.tsx` |
 | Discord symbol | [Discord brand assets](https://discord.com/branding), the Blurple symbol ([`Discord-Symbol-Blurple.svg`](https://cdn.discordapp.com/assets/content/a736b95923ddbc155e828651c92471292e40727655d770a06cec89c48ba0b41f.zip)) | The same page: the logo not edited, recoloured, distorted or reconfigured, digital use only, no implied sponsorship | `web/src/components/ProviderLogo.tsx` |
+| GitHub Invertocat | [Primer Octicons](https://github.com/primer/octicons), `mark-github` (MIT), the same drawing as GitHub's own mark | [GitHub logo guidelines](https://brand.github.com/foundations/logo): white or black only, unaltered, on a plain high-contrast background, no effects, never as Everloot's own mark; it only names the GitHub sign-in | `web/src/components/ProviderLogo.tsx` |
 
 Google and the Google logo are trademarks of Google LLC. Microsoft and the Microsoft logo are trademarks of the
 Microsoft group of companies. Twitch and the Glitch logo are trademarks of Twitch Interactive, Inc. Discord and the
-Discord logo are trademarks of Discord Inc. Battle.net's button has no logo: Blizzard publishes no licence for one.
+Discord logo are trademarks of Discord Inc. GitHub and the Invertocat logo are trademarks of GitHub, Inc. Battle.net's button has no logo: Blizzard publishes no licence for one.
 
 ## Dependencies
 

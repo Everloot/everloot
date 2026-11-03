@@ -10,6 +10,7 @@ const env = {
   MICROSOFT_CLIENT_ID: "microsoft-id", MICROSOFT_CLIENT_SECRET: "microsoft-secret",
   TWITCH_CLIENT_ID: "twitch-id", TWITCH_CLIENT_SECRET: "twitch-secret",
   DISCORD_CLIENT_ID: "discord-id", DISCORD_CLIENT_SECRET: "discord-secret",
+  GITHUB_CLIENT_ID: "github-id", GITHUB_CLIENT_SECRET: "github-secret",
 } as NodeJS.ProcessEnv;
 type Row = Record<string, unknown>;
 afterEach(() => vi.unstubAllGlobals());
@@ -38,9 +39,9 @@ async function callback(auth: ReturnType<typeof createAuth>, start: Response, co
 }
 
 test("social buttons require v2 and both nonblank credentials", () => {
-  expect(configuredSocialProviders(env)).toEqual(["google", "microsoft", "twitch", "discord"]);
+  expect(configuredSocialProviders(env)).toEqual(["google", "github", "discord", "twitch", "microsoft"]);
   expect(configuredSocialProviders({ ...env, EVERLOOT_AUTH_V2: "0" })).toEqual([]);
-  expect(configuredSocialProviders({ ...env, DISCORD_CLIENT_SECRET: "  ", GOOGLE_CLIENT_ID: "" })).toEqual(["microsoft", "twitch"]);
+  expect(configuredSocialProviders({ ...env, DISCORD_CLIENT_SECRET: "  ", GOOGLE_CLIENT_ID: "" })).toEqual(["github", "twitch", "microsoft"]);
 });
 
 test("unconfigured social providers and anonymous linking cannot create accounts", async () => {
@@ -62,7 +63,7 @@ test("an unsolicited Discord callback creates no account or session", async () =
 
 test.each([
   ["google", "accounts.google.com"], ["microsoft", "login.microsoftonline.com"],
-  ["twitch", "id.twitch.tv"], ["discord", "discord.com"],
+  ["twitch", "id.twitch.tv"], ["discord", "discord.com"], ["github", "github.com"],
 ])("%s starts OAuth with its registered callback and state", async (provider, host) => {
   const { auth } = setup();
   const response = await post(auth, "/sign-in/social", { provider, callbackURL: "/me" });

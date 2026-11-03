@@ -30,6 +30,11 @@ test("the legacy page keeps its one Battle.net link, now a full-width button in 
   const html = renderToStaticMarkup(await SignInPage(page()));
   expect(html).toContain("data-auth-shell");
   expect(html).toContain(">Sign in</h1>");
+  // The card's footer: the way to a new account even when email is closed, and the legal links.
+  expect(html).toContain('href="/sign-up"');
+  expect(html).toContain('aria-label="Legal"');
+  expect(html).toContain('href="/terms"');
+  expect(html).toContain('href="/privacy"');
   expect(html.match(/href="\/api\/auth\/bnet"/g)).toHaveLength(1);
   expect(html).toMatch(/<a href="\/api\/auth\/bnet" class="btn w-full[^"]*focus-visible:outline-accent">Sign in with Battle.net<\/a>/);
   // No other method shows without v2: no provider buttons, no email form, no divider.
@@ -51,9 +56,9 @@ test("with the art uploaded, the panel shows the home hero's picture and credits
   }
 });
 
-test("v2 shows every configured provider with its logo, Battle.net as text, then email under a divider", async () => {
+test("v2 shows the configured providers as tiles after Battle.net, Microsoft as its text button, then email under a divider", async () => {
   vi.stubEnv("EVERLOOT_AUTH_V2", "1");
-  for (const p of ["GOOGLE", "MICROSOFT", "TWITCH", "DISCORD"]) {
+  for (const p of ["GOOGLE", "GITHUB", "MICROSOFT", "TWITCH", "DISCORD"]) {
     vi.stubEnv(`${p}_CLIENT_ID`, "id");
     vi.stubEnv(`${p}_CLIENT_SECRET`, "secret");
   }
@@ -61,8 +66,13 @@ test("v2 shows every configured provider with its logo, Battle.net as text, then
   vi.stubEnv("EMAIL_FROM", "Everloot <hello@everloot.app>");
   for (const render of [() => SignInPage(page()), () => SignUpPage(page())]) {
     const html = renderToStaticMarkup(await render());
-    for (const p of ["google", "microsoft", "twitch", "discord"]) expect(html).toContain(`data-provider-logo="${p}"`);
+    for (const p of ["google", "github", "discord", "twitch"]) expect(html).toContain(`data-provider-tile="${p}"`);
+    expect(html).toContain('data-provider-logo="microsoft"');
+    expect(html).not.toContain('data-provider-tile="microsoft"');
     expect(html).not.toContain('data-provider-logo="battlenet"');
+    // The row of tiles, then Microsoft's text button, then email.
+    expect(html.indexOf('data-provider-tile="twitch"')).toBeLessThan(html.indexOf("Sign in with Microsoft"));
+    expect(html.indexOf("Sign in with Microsoft")).toBeLessThan(html.indexOf("or with your email"));
     expect(html.indexOf("Sign in with Battle.net")).toBeLessThan(html.indexOf("Continue with Google"));
     expect(html.indexOf("Continue with Discord")).toBeLessThan(html.indexOf("or with your email"));
     expect(html.indexOf("or with your email")).toBeLessThan(html.indexOf("<form"));

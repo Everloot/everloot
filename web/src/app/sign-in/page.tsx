@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 };
 
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
-// The panel's picture is decoration: the page loads it only when it renders, after the session check and the
+// The page's picture is decoration: the page loads it only when it renders, after the session check and the
 // add-account redirect, so a visitor who is sent on never waits for the asset manifest.
 const shellArt = async () => launchArt(await loadSiteAssets())?.background ?? null;
 const alertBox = "rounded-card border border-danger bg-panel px-4 py-3";
@@ -72,11 +72,18 @@ export default async function SignInPage({ searchParams }: { searchParams?: Prom
   const social = configuredSocialProviders();
   const errorMessage = signInError(params?.flow === "social" && params.error ? "social" : params?.error);
   const providers = methods.battlenet || social.length > 0;
+  const signUp = returnTo ? `/sign-up?returnTo=${encodeURIComponent(returnTo)}` : "/sign-up";
   return (
     <AuthShell
       art={await shellArt()}
       title={add ? "Add another account" : "Sign in"}
       lede={<p className="text-sm text-fg-2">{add ? "Sign in with the account you want to add." : "Pick up where you left off with your saved builds."}</p>}
+      footer={!add && (
+        <p className="text-sm text-fg-2">
+          Don&apos;t have an account? <Link href={signUp} className={link}>Make an account</Link>
+          {methods.email && <>{" · "}<Link href="/reset-password" className={link}>Forgot your password?</Link></>}
+        </p>
+      )}
     >
       {errorMessage && <div className={alertBox}><p role="alert" className="text-sm text-fg">{errorMessage}</p></div>}
       {providers && (
@@ -84,18 +91,13 @@ export default async function SignInPage({ searchParams }: { searchParams?: Prom
           {methods.battlenet && (
             <a href={bnetReturn ? `/api/auth/bnet?returnTo=${encodeURIComponent(bnetReturn)}` : "/api/auth/bnet"} className={AUTH_BUTTON}>Sign in with Battle.net</a>
           )}
-          <SocialSignIn providers={social} returnTo={returnTo ?? undefined} addAccount={add} />
+          <SocialSignIn providers={social} returnTo={returnTo ?? undefined} addAccount={add} layout="tiles" />
         </div>
       )}
       {methods.email ? (
         <>
           {providers && <AuthDivider>or with your email</AuthDivider>}
           <EmailAuthForm mode="sign-in" returnTo={returnTo ?? undefined} />
-          <p className="text-sm text-fg-2">
-            New here? <Link href={returnTo ? `/sign-up?returnTo=${encodeURIComponent(returnTo)}` : "/sign-up"} className={link}>Make an account</Link>
-            {" · "}
-            <Link href="/reset-password" className={link}>Forgot your password?</Link>
-          </p>
         </>
       ) : !providers && <p className="text-fg-2">Sign-in is not available right now.</p>}
     </AuthShell>
