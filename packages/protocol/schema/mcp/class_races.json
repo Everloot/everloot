@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/class_races.json",
   "title": "Races that can be a class, with their racial traits",
-  "description": "Which races can be one class in WoW: Forever, on which faction, and each race's racial traits (name, active or passive) from the game files (found in game files, unconfirmed, with the build). Narrow to one faction. What each trait does is on the class page, linked from the answer.",
+  "description": "Which races can be one class in WoW: Forever, on which faction, and each race's racial traits (name, active or passive) from the game files (found in game files, unconfirmed, with the build). Narrow to one faction. Use it for whether a race can be a class, or which races a class is open to; use talent_tree for the class's talents, and population for how many play it. What each trait does is on the class page, linked from the answer.",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false

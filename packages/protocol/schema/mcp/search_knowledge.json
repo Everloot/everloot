@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/search_knowledge.json",
   "title": "Search the Everloot knowledge base",
-  "description": "Search WoW lore and Forever reference data. Exact-name matches rank first. Every hit carries its source and licence.",
+  "description": "Searches WoW lore and Forever reference data by names, keywords or a question; exact-name matches rank first, and every hit carries its id, source and licence. Use it to find a record when you have a name or a topic, then pass the hit's id to get_entity for the full text. Use get_by_name when you already know the exact full name, and answer_sources when you need cited evidence for a question rather than records. search is the same search in the ChatGPT connector shape.",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false

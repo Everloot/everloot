@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/auction_history.json",
   "title": "Auction history for one item",
-  "description": "Price history from auction scans players uploaded on purpose. A day is public after 3 installs scanned that item on that realm. Copper is the median. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
+  "description": "Returns the day-by-day price history of one item on one WoW: Forever realm, from auction scans players uploaded on purpose. A day is public after 3 installs scanned that item on that realm; copper is the median. Use it for how a price moved over time; use market_value for today's market value, minimum buyout and units listed, item_page for the item itself, and vendor_page for vendor prices. Realm is the realm's name; the item id is the game's. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false

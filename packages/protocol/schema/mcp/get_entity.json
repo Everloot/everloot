@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/get_entity.json",
   "title": "Get one knowledge record by id",
-  "description": "Fetch the full record behind a search hit id, for page rendering.",
+  "description": "Returns one knowledge record in full, by the numeric id a search_knowledge or get_by_name hit gave: title, the full text in the source's words, the URL to cite, source, licence and date. Use it after a search to read the whole record; use fetch for the ChatGPT connector shape, which takes the string id a search result gave. An id no record has returns a null hit, not an error.",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false

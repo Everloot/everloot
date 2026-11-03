@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/search.json",
   "title": "Search (ChatGPT connector contract)",
-  "description": "The same search as search_knowledge, in the shape ChatGPT connectors and deep research call by name: up to 10 results, each with an id for fetch, a title and a URL to cite. The text block is the same JSON as a string.",
+  "description": "Searches the knowledge base in the shape ChatGPT connectors and deep research call by name: up to 10 results, each with an id for fetch, a title and a URL to cite. It is the same search as search_knowledge. Use it only when the client expects the search and fetch pair; other clients should call search_knowledge. The text block is the same JSON as a string.",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false

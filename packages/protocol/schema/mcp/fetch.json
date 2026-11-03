@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/fetch.json",
   "title": "Fetch one document (ChatGPT connector contract)",
-  "description": "One knowledge record by the id a search result gave, whole: title, the full text in the source's words, the URL to cite, and metadata with the source, licence and date. The text block is the same JSON as a string.",
+  "description": "Returns one knowledge record in full, by the string id a search result gave: title, the full text in the source's words, the URL to cite, and metadata with the source, licence and date. It is the ChatGPT connector counterpart of get_entity. Use it after search; elsewhere, use get_entity with a search_knowledge id. The text block is the same JSON as a string.",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false

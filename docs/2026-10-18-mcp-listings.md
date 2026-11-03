@@ -88,7 +88,7 @@ ingest from, so it comes first. Docs: [quickstart](https://modelcontextprotocol.
 may reset.
 
 - **`server.json`** at the repository root describes the remote server: name `app.everloot/knowledge`,
-  one `streamable-http` remote, version `0.8.0` (the MCP server's `SERVER_VERSION`; bump both together).
+  one `streamable-http` remote, version `0.8.1` (the MCP server's `SERVER_VERSION`; bump both together).
   `mcp-publisher validate` passes.
 - **Namespace proof** is the HTTP method: `web/public/.well-known/mcp-registry-auth` holds the public
   key record (`v=MCPv1; k=ed25519; p=…`). The matching private key is on the maintainer machine only,
@@ -212,7 +212,7 @@ They mostly ingest from the official registry, so publish there first and check 
 | Directory | How | Status |
 |---|---|---|
 | [Smithery](https://smithery.ai/new) | Web form or `smithery mcp publish`; remote servers need the public HTTPS endpoint | Check after the registry publish; submit by hand if it did not appear |
-| [Glama](https://glama.ai/mcp) | "Add server" form for remote servers (listed as Connectors); claiming needs `/.well-known/glama.json` with an account-bound token, added in a pull request when the account exists | Owner creates the account; then the token file |
+| [Glama](https://glama.ai/mcp) | Ingested from the registry as a connector; claimed 2026-11-03 by a DNS TXT record (`_glama-claim.everloot.app`, account-bound token, must stay) | Claimed. Publisher profile, support contact and thumbnail filled; profile completion 100% |
 | [PulseMCP](https://www.pulsemcp.com) | Ingests the registry | Check after the publish |
 | [mcpservers.org](https://mcpservers.org/submit) | Free form | Owner |
 | [mcp.so](https://mcp.so) | Site form; reports of a paid tier, unverified | Optional |

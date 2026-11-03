@@ -8,7 +8,7 @@
     "url": "https://github.com/Everloot/everloot",
     "source": "github"
   },
-  "version": "0.8.0",
+  "version": "0.8.1",
   "remotes": [
     {
       "type": "streamable-http",
