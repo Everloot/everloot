@@ -12,7 +12,6 @@ import { pathFactsFromRecords, recipeFactsFromRecords } from "../src/recipe-thre
 import { npcFactsFromRecords, worldFactsFromRecords } from "../src/world-pages.js";
 import { mapFactsFromRecords } from "../src/world-map-near.js";
 import { ALL_RECORD_KINDS, CENSUS_KINDS, COMPLETION_KINDS, LINK_KINDS, PLAYER_KINDS, PULL_KINDS, parseRecords } from "@everloot/protocol";
-import { MCP_CREDIT } from "@everloot/protocol";
 
 const base = { installId: "install-one", capturedAt: "2026-10-09T00:00:00Z" };
 const guild = { guildName: "Olympus", realm: "Forever" };
@@ -129,7 +128,7 @@ test("an in-process corpus loader (the site's own /mcp route) wins over the URL 
     const loader = vi.fn(async () => ({ records: EVERY_KIND.records, dataAsOf: "2026-10-10T06:30:00.000Z" }));
     const answer = await fromUploads((records) => `kinds:${[...new Set((records as { kind: string }[]).map((r) => r.kind))].join(",")}`,
       TOOL_KINDS.gold_ledger, loader);
-    expect(answer).toBe(`kinds:gold_snapshot,money_event\nData as of 2026-10-10 06:30 UTC.\n${MCP_CREDIT}`);
+    expect(answer).toBe("kinds:gold_snapshot,money_event\nData as of 2026-10-10 06:30 UTC.");
     expect(send).not.toHaveBeenCalled();
     const down = await fromUploads(() => "renderer must not run", TOOL_KINDS.auction_history, async () => null);
     expect(down).toMatch(/unavailable/i);

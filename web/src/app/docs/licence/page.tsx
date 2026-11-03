@@ -47,7 +47,8 @@ export default function Page() {
       <P>
         Every answer carries it, so it is hard to lose by accident. The JSON APIs have an <C>attribution</C> field with the
         licence, the credit line and the page the data comes from, and send the same in the <C>X-Everloot-Licence</C>,{" "}
-        <C>X-Everloot-Credit</C> and <C>Link</C> headers. MCP answers built on player data end with the licence and credit.
+        <C>X-Everloot-Credit</C> and <C>Link</C> headers, MCP responses included. An MCP answer links the everloot.app page
+        it comes from, and that link is its credit.
       </P>
 
       <H2 id="code">Code: AGPL-3.0</H2>

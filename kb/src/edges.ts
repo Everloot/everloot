@@ -7,7 +7,7 @@
  * Every edge says where it came from, how many installs agree (observed) or which build (client), and
  * when it was first and last seen. Pages, the MCP tool, the API and the bulk file all read this shape.
  */
-import { GAME_DATA_CREDIT, MCP_CREDIT, RELS, type EntityKind, type Rel } from "@everloot/protocol";
+import { GAME_DATA_CREDIT, RELS, type EntityKind, type Rel } from "@everloot/protocol";
 import { INDEPENDENT_INSTALLS, lootWindowsFromRecords, recheckLootRecords, rollupDrops } from "./drop-rollup.js";
 import type { RecheckScope } from "./coverage.js";
 import { recheckRows, tallyVotes } from "./fact-states.js";
@@ -371,7 +371,6 @@ export function handleEntityRelations(
     for (const rel of RELS) section(REVERSE_LABELS[rel], incoming.filter((e) => e.rel === rel), (e) => entityLabel(e.fromKind, e.fromId));
   }
   if (lines.length === 1) lines.push(`No relations recorded for ${title}. Player-observed relations need 3 installs; game-file relations come from the current build.`);
-  if (used.has("observed")) lines.push(MCP_CREDIT);
   if (used.has("client")) lines.push(GAME_DATA_CREDIT);
   return lines.join("\n");
 }

@@ -1,6 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { GAME_DATA_CREDIT, MCP_CREDIT, MCP_TOOLS, type McpToolName } from "@everloot/protocol";
+import { GAME_DATA_CREDIT, MCP_TOOLS, type McpToolName } from "@everloot/protocol";
 import { afterEach, expect, test } from "vitest";
 import { z } from "zod";
 import { openDb, type DB } from "../src/db.js";
@@ -89,7 +89,7 @@ async function call(c: Client, name: McpToolName, args: Record<string, unknown>)
 }
 
 const THRALL = "https://everloot.app/lore/291323-thrall";
-const FOOTER = `Data as of 2026-10-18 10:00 UTC.\n${MCP_CREDIT}`;
+const FOOTER = "Data as of 2026-10-18 10:00 UTC.";
 
 test("each tool built on uploads links its page last before the data age and credit, and only when the page has something", async () => {
   const c = await client();
@@ -165,7 +165,7 @@ test("answer_sources gives a lore piece its page beside its wiki source", async 
   const text = await call(c, "answer_sources", { question: "Who is Thrall?" });
   expect(text).toContain(`  Source: https://warcraft.wiki.gg/wiki/Thrall (CC-BY-SA-4.0, as of 2023-11-13)\n  More: ${THRALL}`);
   expect(text.match(/More: /g)).toHaveLength(1);
-  expect(text.endsWith(MCP_CREDIT)).toBe(true);
+  expect(text).not.toContain("Licence:");
 });
 
 test("the game-file tools link before Blizzard's credit", async () => {

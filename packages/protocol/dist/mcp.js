@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { MCP_CREDIT } from "./attribution.js";
 import { ITEM_FACTS } from "./records.js";
 /**
  * The Everloot MCP server's tools: names, titles, descriptions, input schemas and annotations, in the
@@ -905,19 +904,24 @@ export const MCP_TOOL_NAMES = Object.keys(MCP_TOOLS);
 /** The list form, for clients that iterate. */
 export const MCP_TOOL_LIST = MCP_TOOL_NAMES.map((name) => ({ name, ...MCP_TOOLS[name] }));
 /**
- * What every tool returns: one text content block. Answers built on player data end with the
- * credit line, after a line stating how old the data is. Tools that read nothing from players carry
- * their sources inside the text instead. Tools with an outputSchema also return structuredContent
- * of that shape (STRUCTURED_TOOLS lists them; coverage is text only).
- * When one everloot.app page shows the answer, its structured `url` holds it and the text carries a
- * `More: <url>` line, last before the data age and credit lines.
+ * The last line of an answer built on player data: how old the data is, "Data as of 2026-10-22 06:30 UTC.",
+ * or `unrecorded` when the snapshot carries no time.
  */
-export const TOOL_OUTPUT = { type: "text", endsWith: MCP_CREDIT };
+export const DATA_AGE = { prefix: "Data as of ", unrecorded: "Data age unrecorded." };
+/**
+ * What every tool returns: one text content block. Answers built on player data end with how old the
+ * data is (DATA_AGE). Tools that read nothing from players carry their sources inside the text instead.
+ * Tools with an outputSchema also return structuredContent of that shape (STRUCTURED_TOOLS lists them;
+ * coverage is text only). When one everloot.app page shows the answer, its structured `url` holds it and
+ * the text carries a `More: <url>` line, last before the data age: that link is how the answer is
+ * credited. The licence and credit line travel in the response headers, not in each answer.
+ */
+export const TOOL_OUTPUT = { type: "text", lastLine: DATA_AGE };
 /** The tools that answer with structuredContent beside the text. */
 export const STRUCTURED_TOOLS = MCP_TOOL_NAMES.filter((name) => "outputSchema" in MCP_TOOLS[name]);
 /** The two tools of OpenAI's connector contract: their text block is the structured answer as a JSON string, not prose. */
 export const CHATGPT_TOOLS = ["search", "fetch"];
-/** The tools whose answers are built on player uploads and therefore end with TOOL_OUTPUT.endsWith. */
+/** The tools whose answers are built on player uploads and therefore end with TOOL_OUTPUT.lastLine. */
 export const PLAYER_DATA_TOOLS = [
     "answer_sources", "profession_path", "recipe_thresholds", "item_page", "npc_page", "object_page", "quest_page", "vendor_page",
     "world_map_near", "entity_relations", "collection_gap", "completion_progress", "guild_board", "guild_search", "guild_rankings", "auction_history",

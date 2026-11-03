@@ -20,7 +20,7 @@ import {
   SOME_WORDS,
 } from "../src/mcp-server.js";
 import type { GuildReader } from "../src/guilds.js";
-import { CREDIT_LINE, MCP_CREDIT } from "@everloot/protocol";
+import { CREDIT_LINE, LICENCE } from "@everloot/protocol";
 
 const UNAVAILABLE_TEXT = "Public corpus unavailable. These figures are unrecorded, not zero.";
 
@@ -114,7 +114,7 @@ test("MCP reads the current sanitized public corpus without caching named grants
   try {
     const [answer] = (await fromUploads((records) => JSON.stringify(records))).split("\n");
     expect(JSON.parse(answer!)).toEqual([gold]);
-    expect(await fromUploads((records) => `records:${records.length}`)).toBe(`records:0\nData age unrecorded.\n${MCP_CREDIT}`);
+    expect(await fromUploads((records) => `records:${records.length}`)).toBe("records:0\nData age unrecorded.");
     expect(await fromUploads(() => { throw new Error("renderer must not run"); })).toMatch(/unavailable/i);
     expect(send).toHaveBeenCalledTimes(3);
     expect(send.mock.calls[0][1].cache).toBe("no-store");
@@ -127,8 +127,8 @@ test("answers from the public corpus say how old its data is", async () => {
     .mockResolvedValueOnce(Response.json({ ok: true, records: [], dataAsOf: "2026-10-09T10:05:42.000Z" }))
     .mockResolvedValueOnce(Response.json({ ok: true, records: [], dataAsOf: "not a time" })));
   try {
-    expect(await fromUploads(() => "Price unrecorded.")).toBe(`Price unrecorded.\nData as of 2026-10-09 10:05 UTC.\n${MCP_CREDIT}`);
-    expect(await fromUploads(() => "Price unrecorded.")).toBe(`Price unrecorded.\nData age unrecorded.\n${MCP_CREDIT}`);
+    expect(await fromUploads(() => "Price unrecorded.")).toBe("Price unrecorded.\nData as of 2026-10-09 10:05 UTC.");
+    expect(await fromUploads(() => "Price unrecorded.")).toBe("Price unrecorded.\nData age unrecorded.");
   } finally { vi.unstubAllEnvs(); vi.unstubAllGlobals(); }
 });
 
@@ -148,13 +148,13 @@ test("public corpus reads enforce the actual byte ceiling even with a false cont
   } finally { vi.unstubAllEnvs(); vi.unstubAllGlobals(); }
 });
 
-test("the server tells every client how to credit player data", () => {
-  expect(SERVER_INSTRUCTIONS).toContain(CREDIT_LINE);
-  expect(SERVER_INSTRUCTIONS).toContain("CC BY-SA 4.0");
+test("the server tells every client to link each answer's page, and what stays Blizzard's", () => {
+  expect(SERVER_INSTRUCTIONS).toContain("More: line");
+  expect(SERVER_INSTRUCTIONS).toContain(LICENCE);
   expect(SERVER_INSTRUCTIONS).toContain("stay Blizzard's");
-  // The line that ends each answer states facts only: nothing in it reads as an instruction to a model.
-  expect(MCP_CREDIT).toBe("Licence: CC BY-SA 4.0. Credit: Everloot contributors, https://everloot.app");
-  expect(MCP_CREDIT).not.toMatch(/(keep|you|must|always|ignore|show)/i);
+  // The link is the credit: no answer ends with a licence line, and the client is not asked to print one.
+  expect(SERVER_INSTRUCTIONS).toContain("https://everloot.app");
+  expect(SERVER_INSTRUCTIONS).not.toContain(CREDIT_LINE);
 });
 
 test("a paged public corpus is read to the end, with EVERLOOT_API_KEY sent as a bearer key", async () => {
@@ -167,7 +167,7 @@ test("a paged public corpus is read to the end, with EVERLOOT_API_KEY sent as a 
     .mockResolvedValueOnce(Response.json({ ok: true, records: [gold(2)], dataAsOf: "2026-10-09T10:05:00.000Z", next: null }));
   vi.stubGlobal("fetch", send);
   try {
-    expect(await fromUploads((records) => `records:${records.length}`)).toBe(`records:2\nData as of 2026-10-09 10:05 UTC.\n${MCP_CREDIT}`);
+    expect(await fromUploads((records) => `records:${records.length}`)).toBe("records:2\nData as of 2026-10-09 10:05 UTC.");
     expect(send.mock.calls.map((call) => call[0])).toEqual(["https://everloot.example/api/corpus/public", "https://everloot.example/api/corpus/public?offset=1"]);
     expect(send.mock.calls[0][1].headers).toEqual({ authorization: `Bearer evl_${"a".repeat(64)}` });
   } finally { vi.unstubAllEnvs(); vi.unstubAllGlobals(); }
@@ -208,7 +208,7 @@ test("pages from two snapshots are never mixed: the read starts again once, then
   vi.stubGlobal("fetch", send);
   try {
     expect(await fromUploads((records) => records.map((r) => (r as { eventId: string }).eventId).join(","))).toBe(
-      `snap:3,snap:4\nData as of 2026-10-09 10:10 UTC.\n${MCP_CREDIT}`);
+      "snap:3,snap:4\nData as of 2026-10-09 10:10 UTC.");
     expect(send).toHaveBeenCalledTimes(4);
     send.mockReset()
       .mockResolvedValueOnce(pageOf(1, a, SECOND)).mockResolvedValueOnce(pageOf(2, b, null))

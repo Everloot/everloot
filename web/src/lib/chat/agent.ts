@@ -169,7 +169,7 @@ export const RANKING_NOTE =
 
 /**
  * answer_sources' text as a visitor reads it: a notice on its first line, then the labelled pieces with their indented
- * Source and More lines. The notes after them are for AI clients (how to credit, links to read, the data's age).
+ * Source and More lines. The notes after them are for AI clients (the observed layer's state, links to read, the data's age).
  */
 export function evidenceLines(text: string): string {
   return text.split("\n").filter((l, i) => /^(?:- |\s+\S)/.test(l) || (i === 0 && l.trim() !== "")).join("\n").trim();

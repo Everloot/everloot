@@ -37,7 +37,8 @@ package and read the JSON Schema files in `schema/`, which the site serves at `h
 - **API clients read** `API_ROUTES` and the response schemas (`schema/api/*.json`) to know what each
   endpoint answers; the site's route tests parse real responses with the same schemas.
 - **MCP clients read** `MCP_TOOLS` (`schema/mcp/<tool>.json`): every tool's input shape, with the
-  output stated as one text block ending in the credit line for answers built on player data.
+  output stated as one text block ending in the data's age for answers built on player data, after
+  the `More:` line that links the answer's page.
 
 ```ts
 import { parseUpload, PROTOCOL_VERSION, UPLOAD_LIMITS } from "@everloot/protocol";

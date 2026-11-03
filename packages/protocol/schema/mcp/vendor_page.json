@@ -115,6 +115,9 @@
   },
   "x-everloot-output": {
     "type": "text",
-    "endsWith": "Licence: CC BY-SA 4.0. Credit: Everloot contributors, https://everloot.app"
+    "lastLine": {
+      "prefix": "Data as of ",
+      "unrecorded": "Data age unrecorded."
+    }
   }
 }

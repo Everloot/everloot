@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { z } from "zod";
-import { MCP_CREDIT, MCP_TOOLS, PLAYER_DATA_TOOLS } from "@everloot/protocol";
+import { MCP_TOOLS, PLAYER_DATA_TOOLS } from "@everloot/protocol";
 import { CENSUS_LAUNCH, CENSUS_RACES, rollupCensus, type CensusRow } from "../src/census.js";
 import { openDb } from "../src/db.js";
 import { createKnowledgeServer } from "../src/mcp-server.js";
@@ -149,8 +149,7 @@ test("over MCP: the protocol's tool, answering text with the data age and credit
   const answer = await client.callTool({ name: "population", arguments: { race: "Gnome", class: "Priest" } });
   const text = (answer.content as { text: string }[])[0].text;
   expect(text).toContain(WEEK);
-  expect(text).toContain("Data as of 2026-11-16 12:00 UTC.");
-  expect(text.endsWith(MCP_CREDIT)).toBe(true);
+  expect(text.endsWith("Data as of 2026-11-16 12:00 UTC.")).toBe(true);
   const structured = z.object(MCP_TOOLS.population.outputSchema).parse(answer.structuredContent);
   expect(structured).toMatchObject({ connected: true, dataAsOf: AS_OF, url: "https://everloot.app/census", page: { characters: 1165, cells: [{ count: 20 }] } });
   expect(text).toContain("More: https://everloot.app/census\nData as of");

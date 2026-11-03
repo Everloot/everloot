@@ -84,8 +84,10 @@ export default function McpOverview() {
 
       <H3 id="sources-and-credit">Sources and credit</H3>
       <P>
-        Lore hits carry their source URL and licence. Keep them with the text. Answers built on player data end with the
-        licence and the credit line, as Everloot&apos;s data is CC BY-SA 4.0. See{" "}
+        Lore hits carry their source URL and licence. Keep them with the text. An answer with a page on everloot.app ends
+        with a <C>More:</C> line holding it, before the data age: show that link, it is how the answer is credited.
+        Everloot&apos;s data is CC BY-SA 4.0, and the licence and credit line travel in every response&apos;s{" "}
+        <C>X-Everloot-Licence</C> and <C>X-Everloot-Credit</C> headers rather than in the answer text. See{" "}
         <Link href="/docs/licence" className={docLink}>Licence and credit</Link>.
       </P>
 

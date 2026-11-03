@@ -1,4 +1,4 @@
-import { MCP_CREDIT, type McpToolArgs } from "@everloot/protocol";
+import { type McpToolArgs } from "@everloot/protocol";
 import { COVERAGE_TYPES, coverageShares, type CoverageCell, type CoverageReport } from "./coverage.js";
 
 /** The host lends the same score its public coverage page reads. No raw records or baseline are read here. */
@@ -19,7 +19,7 @@ function cellText(cell: CoverageCell): string {
 
 export async function answerCoverage(args: McpToolArgs<"coverage">, loader?: CoverageLoader, settledLoader?: SettledSummaryLoader): Promise<string> {
   const scope = `Scope: ${args.zone === undefined ? "all released zones" : `zone ${args.zone}`}; ${args.type === undefined ? "all types" : `type ${args.type}`}. Unplaced facts and held-back zones are excluded.`;
-  const unavailable = (reason: string) => `${scope}\nCoverage ${reason}; counts, denominators, data date and installs are ${unknown}, not measured zero.\nMore: ${page}\n${MCP_CREDIT}`;
+  const unavailable = (reason: string) => `${scope}\nCoverage ${reason}; counts, denominators, data date and installs are ${unknown}, not measured zero.\nMore: ${page}`;
   if (!loader) return unavailable("not connected");
   let report: CoverageReport | null;
   try { report = await loader(); } catch { return unavailable("unavailable"); }
@@ -58,5 +58,5 @@ export async function answerCoverage(args: McpToolArgs<"coverage">, loader?: Cov
       lines.push(`  ${need.type}.${need.field}: ${need.label}; ${need.voters}/3 agreeing installs; ${need.need} more needed; ${need.href ? `https://everloot.app${need.href}` : unknown}`);
     }
   }
-  return `${lines.join("\n")}\nMore: ${page}\n${MCP_CREDIT}`;
+  return `${lines.join("\n")}\nMore: ${page}`;
 }

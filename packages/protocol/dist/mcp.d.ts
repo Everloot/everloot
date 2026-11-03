@@ -4491,22 +4491,33 @@ export declare const MCP_TOOL_LIST: ({
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
 })[];
 /**
- * What every tool returns: one text content block. Answers built on player data end with the
- * credit line, after a line stating how old the data is. Tools that read nothing from players carry
- * their sources inside the text instead. Tools with an outputSchema also return structuredContent
- * of that shape (STRUCTURED_TOOLS lists them; coverage is text only).
- * When one everloot.app page shows the answer, its structured `url` holds it and the text carries a
- * `More: <url>` line, last before the data age and credit lines.
+ * The last line of an answer built on player data: how old the data is, "Data as of 2026-10-22 06:30 UTC.",
+ * or `unrecorded` when the snapshot carries no time.
+ */
+export declare const DATA_AGE: {
+    readonly prefix: "Data as of ";
+    readonly unrecorded: "Data age unrecorded.";
+};
+/**
+ * What every tool returns: one text content block. Answers built on player data end with how old the
+ * data is (DATA_AGE). Tools that read nothing from players carry their sources inside the text instead.
+ * Tools with an outputSchema also return structuredContent of that shape (STRUCTURED_TOOLS lists them;
+ * coverage is text only). When one everloot.app page shows the answer, its structured `url` holds it and
+ * the text carries a `More: <url>` line, last before the data age: that link is how the answer is
+ * credited. The licence and credit line travel in the response headers, not in each answer.
  */
 export declare const TOOL_OUTPUT: {
     readonly type: "text";
-    readonly endsWith: "Licence: CC BY-SA 4.0. Credit: Everloot contributors, https://everloot.app";
+    readonly lastLine: {
+        readonly prefix: "Data as of ";
+        readonly unrecorded: "Data age unrecorded.";
+    };
 };
 /** The tools that answer with structuredContent beside the text. */
 export declare const STRUCTURED_TOOLS: readonly McpToolName[];
 /** The two tools of OpenAI's connector contract: their text block is the structured answer as a JSON string, not prose. */
 export declare const CHATGPT_TOOLS: readonly McpToolName[];
-/** The tools whose answers are built on player uploads and therefore end with TOOL_OUTPUT.endsWith. */
+/** The tools whose answers are built on player uploads and therefore end with TOOL_OUTPUT.lastLine. */
 export declare const PLAYER_DATA_TOOLS: readonly McpToolName[];
 /**
  * The server's resources: documents a client reads whole with resources/read, as opposed to tools it

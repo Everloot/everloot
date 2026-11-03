@@ -57,6 +57,12 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: `/sign-in` and `/sign-up` are one centred card under Glint and the home art: the Battle.net button, a row of provider
   tiles (Google, GitHub, Discord, Twitch; Microsoft keeps its text button, as its guidelines ask), then email, then the links.
   GitHub joins the social providers behind `EVERLOOT_AUTH_V2` (`GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`).
+- MCP: answers no longer end with the licence line ("Licence: CC BY-SA 4.0. Credit: Everloot contributors, …"). An
+  answer built on player data ends with the data's age, after the `More:` line that links its everloot.app page, and the
+  server's instructions ask the client to show that link: the link is the credit. `answer_sources` names each page once
+  (the bosses of one instance share its page) and drops its closing credit sentence. The licence and credit line still
+  travel in every response's `X-Everloot-Licence` and `X-Everloot-Credit` headers and in the methodology resource.
+  Protocol: `TOOL_OUTPUT.lastLine` (`DATA_AGE`) replaces `endsWith`; `MCP_CREDIT` stays exported.
 - Site and Desktop App: Ollama suggests one small model, `qwen3:4b` (2.5 GB, calls tools), instead of `qwen3:8b`, and
   says what running a model on your own computer means: private and free, slower, and it uses your memory while it
   answers. The free cloud models stay the first choice.
