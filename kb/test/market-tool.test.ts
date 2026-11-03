@@ -1,7 +1,6 @@
 import { expect, test, vi } from "vitest";
 import { emptyMarket, foldMarket } from "../src/market.js";
 import { answerMarketValue, MARKET_UNSET } from "../src/mcp-server.js";
-import { MCP_CREDIT } from "@everloot/protocol";
 
 const now = new Date();
 const scans = ["a-install", "b-install", "c-install"].map((installId, i) => ({
@@ -14,7 +13,7 @@ test("market_value answers from the site's rollup with its data age", async () =
   const text = await answerMarketValue({ realm: "Forever", itemId: 2589 }, loader);
   expect(text).toContain("Market value: 1s 10c");
   expect(text).toContain("3 reporters");
-  expect(text.endsWith(`Data as of 2026-10-20 06:30 UTC.\n${MCP_CREDIT}`)).toBe(true);
+  expect(text.endsWith("Data as of 2026-10-20 06:30 UTC.")).toBe(true);
 });
 
 test("an unreadable rollup is unavailable, and no loader says it is not connected", async () => {

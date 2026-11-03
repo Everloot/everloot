@@ -1,4 +1,4 @@
-import { CREDIT_LINE, LICENCE, SITE } from "@everloot/protocol";
+import { LICENCE, SITE } from "@everloot/protocol";
 import { itemFactsFromRecords } from "./drop-rollup.js";
 import { itemPage, ITEM_AGREEMENT, type ItemFacts } from "./item-page.js";
 import { loreUrls, moreLine } from "./page-urls.js";
@@ -216,15 +216,19 @@ export function formatAnswerSources(result: AnswerSources, corpus: boolean | "un
   if (result.someWords) lines.push(SOME_WORDS);
   if (result.evidence.length === 0) lines.push("No evidence found for that question. Nothing here is invented: try other words or an exact name.");
   if (result.evidence.some((e) => e.kind === "lore")) lines.push("Archive lore is historical context, not confirmation of Forever gameplay. Do not infer recorded gameplay facts from it. Game-file facts remain unconfirmed; missing observations remain unrecorded.");
+  const pages = new Set<string>();
   for (const e of result.evidence) {
     const support = e.support !== undefined ? `, ${e.support} installs` : "";
     lines.push(`- [${KIND_LABEL[e.kind]}${support}] ${e.claim}\n  Source: ${e.source.url} (${e.licence}${e.asOf ? `, as of ${e.asOf.slice(0, 10)}` : ""})`);
-    // A lore piece's source is the wiki; its page on the site is listed beside it. An observed piece's source already is its page.
-    if (e.url && e.url !== e.source.url) lines.push(`  ${moreLine(e.url)}`);
+    // A lore piece's source is the wiki; its page on the site is listed beside it, once per page (the bosses of one
+    // instance share its page). An observed piece's source already is its page.
+    if (e.url && e.url !== e.source.url && !pages.has(e.url)) {
+      pages.add(e.url);
+      lines.push(`  ${moreLine(e.url)}`);
+    }
   }
   if (corpus === "unreachable") lines.push("Player observations could not be read just now, so the observed layer is unknown for this answer, not empty.");
   else if (!corpus) lines.push("Player observations are not connected here, so the observed layer is unrecorded, not empty.");
   if (result.furtherReading.length) lines.push(`Further reading (links only, nothing fetched): ${result.furtherReading.map((l) => `${l.site} ${l.url}`).join(" | ")}`);
-  lines.push(`Credit observed facts as "${CREDIT_LINE}"; keep each lore source with its text.`);
   return lines.join("\n");
 }

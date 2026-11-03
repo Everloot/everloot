@@ -101,7 +101,11 @@ test("every answer carries the licence and credit line in its headers", async ()
   expect(res.status).toBe(200);
   expect(res.headers.get("x-everloot-licence")).toBe("CC BY-SA 4.0");
   expect(res.headers.get("x-everloot-credit")).toBe("Data from Everloot (https://everloot.app), CC BY-SA 4.0.");
-  expect((await res.json()).result.instructions).toContain("Data from Everloot (https://everloot.app), CC BY-SA 4.0.");
+  // The instructions ask for the page link, not the licence line: the link is the credit.
+  const instructions = (await res.json()).result.instructions as string;
+  expect(instructions).toContain("More: line");
+  expect(instructions).toContain("CC BY-SA 4.0");
+  expect(instructions).not.toContain("Data from Everloot (https://everloot.app), CC BY-SA 4.0.");
 });
 
 describe("my_builds, the account tool", () => {

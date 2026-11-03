@@ -11,5 +11,9 @@ export declare const CREDIT_LINE = "Data from Everloot (https://everloot.app), C
 export declare const TERMS_URL = "https://everloot.app/terms#licences";
 /** What game-file facts carry instead of our licence (docs/DATA_POLICY.md, "The client layer"). */
 export declare const GAME_DATA_CREDIT: string;
-/** The line an MCP answer built on player data ends with: a plain statement of fact, no instruction. */
+/**
+ * The licence and credit of the player data the MCP tools answer from, as the methodology resource states
+ * it: a plain statement of fact, no instruction. Answers do not end with it; they end with the data's age
+ * and link their page (TOOL_OUTPUT in mcp.ts), and the credit travels in the response headers.
+ */
 export declare const MCP_CREDIT = "Licence: CC BY-SA 4.0. Credit: Everloot contributors, https://everloot.app";

@@ -1,6 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { MCP_CREDIT, MCP_TOOLS } from "@everloot/protocol";
+import { MCP_TOOLS } from "@everloot/protocol";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { z } from "zod";
 import { openDb, type DB } from "../src/db.js";
@@ -59,10 +59,10 @@ test("each page tool answers with its page under the uploads envelope, and the t
   const itemText = JSON.stringify(item.content);
   expect(itemText).toContain("Peacebloom");
   expect(itemText).toContain("Data as of 2026-10-18 10:00 UTC.");
-  expect(itemText).toContain(MCP_CREDIT);
-  // The page link is the body's last line, before the data age and the credit the answer must end with.
+  expect(itemText).not.toContain("Licence:");
+  // The page link is the body's last line, before the data age the answer must end with.
   const itemLines = (item.content as { text: string }[])[0]!.text.split("\n");
-  expect(itemLines.slice(-3)).toEqual(["More: https://everloot.app/database/items/1234", "Data as of 2026-10-18 10:00 UTC.", MCP_CREDIT]);
+  expect(itemLines.slice(-2)).toEqual(["More: https://everloot.app/database/items/1234", "Data as of 2026-10-18 10:00 UTC."]);
 
   const npc = out("npc_page").parse((await c.callTool({ name: "npc_page", arguments: { npcId: 456 } })).structuredContent);
   expect(npc).toEqual({ connected: true, dataAsOf: AS_OF, url: "https://everloot.app/database/npcs/456", page: npcPage(456, world) });

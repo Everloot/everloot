@@ -2,7 +2,6 @@ import { beforeEach, expect, test, vi } from "vitest";
 import { auctionSightingsFromRecords } from "../src/auction-history.js";
 import { goldFactsFromRecords } from "../src/gold-ledger.js";
 import { fromTooledUploads } from "../src/mcp-server.js";
-import { MCP_CREDIT } from "@everloot/protocol";
 
 const base = { installId: "install-one", capturedAt: "2026-10-09T00:00:00Z" };
 const snap = { ...base, eventId: "e:16", kind: "gold_snapshot", character: "Thrall", realm: "Forever", currentCopper: 100, peakCopper: 100 };
@@ -24,8 +23,8 @@ test("one tool's facts are built once per corpus version", async () => {
   const loader = vi.fn(async () => ({ records: [snap, evt], dataAsOf: T1 }));
   const seen: GoldFacts[] = [];
   const render = (facts: GoldFacts) => { seen.push(facts); return `snapshots:${facts.snapshots.length}`; };
-  expect(await fromTooledUploads("gold_ledger", render, loader)).toBe(`snapshots:1\nData as of 2026-10-10 06:30 UTC.\n${MCP_CREDIT}`);
-  expect(await fromTooledUploads("gold_ledger", render, loader)).toBe(`snapshots:1\nData as of 2026-10-10 06:30 UTC.\n${MCP_CREDIT}`);
+  expect(await fromTooledUploads("gold_ledger", render, loader)).toBe("snapshots:1\nData as of 2026-10-10 06:30 UTC.");
+  expect(await fromTooledUploads("gold_ledger", render, loader)).toBe("snapshots:1\nData as of 2026-10-10 06:30 UTC.");
   expect(seen[0]).toBe(seen[1]);
   // New snapshot time: the facts rebuild once for the new version.
   loader.mockResolvedValue({ records: [snap, evt], dataAsOf: T2 });

@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { z } from "zod";
-import { MCP_TOOLS, MCP_CREDIT } from "@everloot/protocol";
+import { MCP_TOOLS } from "@everloot/protocol";
 import { computeCoverage } from "../src/coverage.js";
 import { createToolHandlers } from "../src/mcp-server.js";
 import type { DB } from "../src/db.js";
@@ -42,7 +42,7 @@ test("coverage gives dated counts, field grain, method, installs, and safe repor
   expect(text).toContain("NPC 123");
   expect(text).toContain("2/3 agreeing installs; 1 more needed");
   expect(text).toContain("https://everloot.app/database/coverage");
-  expect(text).toContain(MCP_CREDIT);
+  expect(text).toMatch(/\nMore: https:\/\/everloot\.app\/database\/coverage$/);
   expect(text).not.toMatch(/UNCONFIRMED NAME|PRIVATE PLAYER|private-install/);
 });
 

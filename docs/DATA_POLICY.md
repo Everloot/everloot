@@ -697,8 +697,10 @@ things are asked in return: credit it, and use a free key when you copy all of i
   (https://everloot.app), CC BY-SA 4.0." What you build from it stays under the same licence. Every
   answer carries it so it is hard to lose by accident: the JSON APIs return it in an `attribution`
   field (licence, credit line, the page the data comes from) and in the `X-Everloot-Licence`,
-  `X-Everloot-Credit` and `Link` headers, and MCP answers built on player data end with the licence
-  and credit. Republishing the data without credit breaks the licence.
+  `X-Everloot-Credit` and `Link` headers, which every MCP response carries too. An MCP answer links
+  the everloot.app page it comes from instead of ending with the licence line: the link is its
+  credit, and an assistant that shows it has credited the data. Republishing the data without
+  credit breaks the licence.
 - **Asking questions is free and needs no key.** The MCP server and the market prices keep a
   per-address limit that a person or an AI assistant answering questions does not reach.
 - **Copying in bulk takes a free key.** Once the limits are switched on, the corpus API and the drop

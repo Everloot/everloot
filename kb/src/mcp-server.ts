@@ -2,7 +2,7 @@ import { completable } from "@modelcontextprotocol/sdk/server/completable.js";
 import { answerCoverage, type CoverageLoader, type SettledSummaryLoader } from "./coverage-tool.js";
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { CREDIT_LINE, GAME_DATA_CREDIT, LICENCE, MCP_CREDIT, SITE, type EntityKind } from "@everloot/protocol";
+import { CREDIT_LINE, DATA_AGE, GAME_DATA_CREDIT, LICENCE, SITE, type EntityKind } from "@everloot/protocol";
 import { answerSources, answerSourcesFactsFromRecords, formatAnswerSources, type AnswerSourcesFacts } from "./answer-sources.js";
 import type { RecheckScope } from "./coverage.js";
 import type { FilesIndex } from "./files-evidence.js";
@@ -60,11 +60,12 @@ export const SERVER_ICONS = [
   { src: `${SITE}/icon-512.png`, mimeType: "image/png", sizes: ["512x512"] },
 ];
 
-/** Sent to every client on connect: how to credit what the tools return. */
+/** Sent to every client on connect: where each answer's page is, and what stays whose. */
 export const SERVER_INSTRUCTIONS =
-  `Everloot answers questions about WoW: Forever. Facts built on player uploads are Everloot's data under ${LICENCE}: ` +
-  `when you show them, credit "${CREDIT_LINE}" or link ${SITE}. Lore hits carry their own source and licence; keep them with the text. ` +
-  "Game-file facts and Blizzard's posts stay Blizzard's.";
+  "Everloot answers questions about WoW: Forever. Each answer names its sources, and one with a page on " +
+  `${SITE} ends with a More: line holding it: give the reader that link. The link credits the facts built on player uploads, ` +
+  `which are Everloot's data under ${LICENCE}; there is no need to print the licence. ` +
+  "Lore hits carry their own source and licence; keep them with the text. Game-file facts and Blizzard's posts stay Blizzard's.";
 
 export const UPLOADS_UNSET =
   "Uploads are not connected. Neither EVERLOOT_PUBLIC_CORPUS_URL nor EVERLOOT_UPLOADS is set, so this is not a measured zero.";
@@ -452,16 +453,16 @@ export async function readCorpusRecords(kinds: readonly string[]): Promise<{ rec
   return { records: loadUploadRecords(dir).filter((r) => wanted.has((r as { kind?: string }).kind ?? "")), dataAsOf: null };
 }
 
-/** What ends every answer built on player data: how old the data is, and the credit line it carries. */
+/** What ends every answer built on player data: how old the data is. The credit travels in the response headers. */
 function answerFooter(dataAsOf: unknown): string {
-  return `${dataAgeLine(dataAsOf)}\n${MCP_CREDIT}`;
+  return dataAgeLine(dataAsOf);
 }
 
 /** The web's snapshot time; a stalled snapshot must not read as current. */
 function dataAgeLine(dataAsOf: unknown): string {
-  if (typeof dataAsOf !== "string" || !Number.isFinite(Date.parse(dataAsOf))) return "Data age unrecorded.";
+  if (typeof dataAsOf !== "string" || !Number.isFinite(Date.parse(dataAsOf))) return DATA_AGE.unrecorded;
   const iso = new Date(dataAsOf).toISOString();
-  return `Data as of ${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC.`;
+  return `${DATA_AGE.prefix}${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC.`;
 }
 
 type SearchArgs = McpToolArgs<"search_knowledge">;
@@ -649,7 +650,7 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
       // The fallback is said in the text; the structured answer keeps its published shape.
       const { someWords: _someWords, ...structured } = result;
       const observations = read !== null ? true : observationsConfigured(options.corpus) ? "unreachable" : false;
-      return { text: `${formatAnswerSources(result, observations)}\n${read ? answerFooter(read.dataAsOf) : MCP_CREDIT}`, structured };
+      return { text: `${formatAnswerSources(result, observations)}${read ? `\n${answerFooter(read.dataAsOf)}` : ""}`, structured };
     },
     profession_path: (args) => {
       // The same defaults the text handler applies: from 1, to the start when no end is given.

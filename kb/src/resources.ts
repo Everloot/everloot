@@ -56,7 +56,7 @@ export function methodologyText(sourceUrl: string): string {
     "",
     "## Age of the data and credit",
     "",
-    `Answers built on player data end with how old the data is and the credit line. ${MCP_CREDIT}`,
+    `Answers built on player data end with how old the data is, and an answer with a page on the site links it. ${MCP_CREDIT}`,
     "",
   ].join("\n");
 }

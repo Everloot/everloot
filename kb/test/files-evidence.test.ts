@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { answerSources } from "../src/answer-sources.js";
+import { answerSources, formatAnswerSources } from "../src/answer-sources.js";
 import { openDb } from "../src/db.js";
 import { replaceSourceRows, type EntityInput } from "../src/entities.js";
 import { buildFilesIndex, filesEvidence, readFilesIndex } from "../src/files-evidence.js";
@@ -112,4 +112,16 @@ test("answerSources: the files' facts come after curated and before lore, and a 
   expect(only.evidence[0]!.url).toBe("https://everloot.app/database/achievements/49-storm-the-chasm");
   // Without an index nothing changes.
   expect((await answerSources(db, { question: "how do I get Storm the Chasm", limit: 8 }, null, null)).evidence).toEqual([]);
+});
+
+test("the text names a page once: an instance and its bosses share one More line, and no licence line ends it", async () => {
+  const db = openDb(":memory:");
+  const page = "https://everloot.app/database/instances/34-synthetic-stockade";
+  const result = await answerSources(db, { question: "where is the Synthetic Stockade entrance and who is Synthetic Warden", limit: 8 }, null, null, buildFilesIndex(files));
+  expect(result.evidence.filter((e) => e.url === page).length).toBeGreaterThan(1);
+  const text = formatAnswerSources(result, false);
+  expect(text.match(/More: /g)).toHaveLength(1);
+  expect(text).toContain(`  More: ${page}`);
+  expect(text).not.toContain("Credit observed facts");
+  expect(text).not.toContain("Licence:");
 });

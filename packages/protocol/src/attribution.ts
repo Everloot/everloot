@@ -14,5 +14,9 @@ export const TERMS_URL = `${SITE}/terms#licences`;
 export const GAME_DATA_CREDIT = "Game data © Blizzard Entertainment, Inc., read from the public client; not under Everloot's licence. "
   + "Column names from WoWDBDefs (https://github.com/wowdev/WoWDBDefs), CC BY-SA 4.0.";
 
-/** The line an MCP answer built on player data ends with: a plain statement of fact, no instruction. */
+/**
+ * The licence and credit of the player data the MCP tools answer from, as the methodology resource states
+ * it: a plain statement of fact, no instruction. Answers do not end with it; they end with the data's age
+ * and link their page (TOOL_OUTPUT in mcp.ts), and the credit travels in the response headers.
+ */
 export const MCP_CREDIT = `Licence: ${LICENCE}. Credit: Everloot contributors, ${SITE}`;
