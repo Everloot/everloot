@@ -5,7 +5,7 @@ import { JOBS, NO_SOURCED_ANSWER, type AddonInfo, type AppState, type AskInfo, t
 import { PROVIDER_PRESETS, assistantSource, keptModelPick, manualModelShown, presetFor, removalNotice, type ModelChoice, type ProviderKind } from "../shared/providers";
 import { inkOn } from "../../../web/src/lib/chat/catalogue";
 import { WEBSITE_LINKS, websiteUrl } from "../shared/website";
-import { emptyCause, emptyState, jobOfLine, statePill, watchPill, workingStrip } from "./parts";
+import { emptyCause, emptyState, jobOfLine, statePill, threadLines, watchPill, workingStrip } from "./parts";
 
 declare global { interface Window { everloot: EverlootApi } }
 const api = window.everloot;
@@ -110,6 +110,8 @@ const ICONS: Record<string, string> = {
   bug: '<rect x="7" y="8" width="10" height="12" rx="5"/><path d="M9 8V7a3 3 0 0 1 6 0v1M12 12v8M3 13h4M17 13h4M4 7l3 2M20 7l-3 2M4 19l3-2M20 19l-3-2"/>',
   external: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
   alert: '<path d="M12 9v4m0 3.5v.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/>',
+  /** The app itself, for thread lines no job wrote: the mark's diamond. */
+  app: '<path d="M12 3 21 12 12 21 3 12Z"/>',
 };
 const icon = (name: string, cls = "ico") => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] ?? ""}</svg>`;
 
@@ -175,12 +177,8 @@ function welcome(): string {
 }
 
 const STATE_LABEL: Record<CompanionState, string> = { setup: "Setup", paused: "Paused", error: "Error", running: "Running", off: "Off", idle: "Waiting" };
-/** The hero's diamond, with a glyph for the state; decorative, the headline beside it says the same in words. */
-const HERO_GLYPH: Record<CompanionState, string> = {
-  idle: "", running: '<path d="M16 22a8 8 0 0 1 13-5m3 7a8 8 0 0 1-13 5M30 13v4h-4M18 31v-4h4"/>', paused: '<path d="M18 17v14M30 17v14"/>',
-  error: '<path d="M24 16v9m0 5v.01"/>', off: '<path d="M18 24h12"/>', setup: '<path d="M24 17v14M17 24h14"/>',
-};
-const heroMark = (state: CompanionState) => `<div class="hero-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M24 3 45 24 24 45 3 24Z"/><path d="M24 11 37 24 24 37 11 24Z" opacity="0.45"/>${HERO_GLYPH[state]}</svg></div>`;
+/** The whole app's state as a pill kind, for the Overview's status line. */
+const STATE_PILL: Record<CompanionState, string> = { setup: "off", paused: "paused", error: "failed", running: "working", off: "off", idle: "waiting" };
 
 function overview(s: AppState): string {
   const e = s.engine;
@@ -198,40 +196,38 @@ function overview(s: AppState): string {
     : status.state === "error" ? `<button type="button" class="btn btn-primary" data-page="log">Open the log</button>` : "";
   const runs = status.state === "setup" || status.state === "off" ? "" : `${runBtn("upload", s, "Upload now", !lead)}${runBtn("prices", s, "Refresh prices")}`;
   const failed = status.state === "error" ? status.jobs.map((j) => `<p class="hero-failed small"><b>${esc(JOB_NAMES[j])}:</b> ${esc(statusText(e.jobs[j]))}</p>`).join("") : "";
-  const job = (ico: string, name: string, dotHtml: string, state: string, sub: string) => `<div class="job"><span class="job-ico">${icon(ico)}</span><div class="grow"><div class="job-name">${name}</div><div class="muted small">${sub}</div></div><div class="job-state">${dotHtml}<span>${state}</span></div></div>`;
+  // One cell per job in the status strip: a label, the state in a word, and one line of detail under it.
+  const cell = (ico: string, name: string, dotHtml: string, state: string, sub: string) => `<div class="stat"><div class="k">${icon(ico, "ico ico-k")}${name}</div><div class="v">${dotHtml}<span>${state}</span></div><div class="s">${sub}</div></div>`;
   const last = (j: JobStatus) => (j.at ? `last run ${ago(j.at)}` : "not run yet");
+  const kind = STATE_PILL[status.state];
+  const ring = kind === "working" ? '<i class="pill-ring" aria-hidden="true"></i>' : "";
+  const thread = threadLines(e.log, 12, { upload: icon("upload"), prices: icon("market"), ask: icon("ask"), app: icon("app") });
   return `<div class="page">
     <div class="head"><h1>Overview</h1></div>
     ${s.notice ? `<p class="callout error">${icon("alert")}<span>${esc(s.notice)}</span></p>` : ""}
     ${foreverCallout(s)}
     ${updateCallout(s)}
     ${dataNotice()}
-    ${!e.files.length && s.settings.gameFolder ? `<p class="callout fg2">${icon("log")}<span>No <code>Everloot.lua</code> under <span class="mono">${esc(s.settings.gameFolder)}</span> yet. Log out once in the game so it writes the file.</span></p>` : ""}
-    <section class="hero" data-state="${status.state}" aria-labelledby="heroTitle">
-      <div class="hero-body">
-        <span class="pill"><span class="dot" aria-hidden="true"></span>${STATE_LABEL[status.state]}</span>
-        <h2 class="hero-title" id="heroTitle">${esc(status.headline)}</h2>
-        <p class="hero-detail">${esc(status.detail)}</p>
-        ${failed}
-        <div class="hero-actions">${lead}${runs}</div>
-      </div>
-      ${heroMark(status.state)}
+    <section class="status-line" data-state="${status.state}" aria-labelledby="heroTitle">
+      <span class="pill-s pill-${kind}">${ring}${STATE_LABEL[status.state]}</span>
+      <div class="status-text"><b id="heroTitle">${esc(status.headline)}</b><span class="muted">${esc(status.detail)}</span></div>
+      <div class="status-actions">${lead}${runs}</div>
+      ${failed ? `<div class="status-failed">${failed}</div>` : ""}
     </section>
+    <div class="stats">
+      ${cell("upload", "Upload", dot(up), up.state === "ok" ? "OK" : up.state === "error" ? "Failed" : up.state === "off" ? "Off" : up.state === "running" ? "Running" : "Waiting", `${last(up)}${askWhy("upload", s)}`)}
+      ${cell("market", "Market prices", dot(pr), data.market ? `${data.market.last.length} realm(s)` : pr.state === "off" ? "Off" : pr.state === "running" ? "Running" : "Waiting", `${data.market?.scans[0] ? `your last scan ${ago(data.market.scans[0].at)}` : last(pr)}${suggestionLine(data.market)}${askWhy("prices", s)}`)}
+      ${cell("ask", "/ask", dot(ask), ask.state === "off" ? "Off" : ask.state === "error" ? "Failed" : ask.state === "running" ? "Running" : "On", `${ask.at ? last(ask) : s.settings.ask.enabled ? "waiting" : 'answers <code>/ask</code> in game · <button type="button" class="link" data-page="ask">turn on in Ask</button>'}${askWhy("ask", s)}`)}
+      ${cell("addon", "Addon", "", addonLine, `${addon?.slots.prices ? "prices file in game" : "no prices file yet"}${addon && (!addon.installed || addon.newer) ? ` · <button type="button" class="link" data-page="addon">${addon.installed ? "update" : "install"}</button>` : ""}`)}
+    </div>
     <div class="overview-grid">
       <div>
-        <div class="sec-head"><h2>Jobs</h2></div>
-        <div class="jobs">
-          ${job("upload", "Upload", dot(up), up.state === "ok" ? "OK" : up.state === "error" ? "Failed" : up.state === "off" ? "Off" : up.state === "running" ? "Running" : "Waiting", `${last(up)}${askWhy("upload", s)}`)}
-          ${job("market", "Market prices", dot(pr), data.market ? `${data.market.last.length} realm(s)` : pr.state === "off" ? "Off" : pr.state === "running" ? "Running" : "Waiting", `${data.market?.scans[0] ? `your last scan ${ago(data.market.scans[0].at)}` : last(pr)}${suggestionLine(data.market)}${askWhy("prices", s)}`)}
-          ${job("ask", "/ask", dot(ask), ask.state === "off" ? "Off" : ask.state === "error" ? "Failed" : ask.state === "running" ? "Running" : "On", `${ask.at ? last(ask) : s.settings.ask.enabled ? "waiting" : 'answers questions you type in game with <code>/ask</code> · <button type="button" class="link" data-page="ask">turn on in Ask</button>'}${askWhy("ask", s)}`)}
-          ${job("addon", "Addon", "", addonLine, `${addon?.slots.prices ? "prices file in game" : "no prices file yet"}${addon && (!addon.installed || addon.newer) ? ` · <button type="button" class="link" data-page="addon">${addon.installed ? "update" : "install"}</button>` : ""}`)}
-        </div>
+        <div class="sec-head"><h2>What Everloot did</h2><button type="button" class="link" data-page="log">open the log</button></div>
+        ${thread ? `<div class="thread-steps">${thread}</div>` : emptyState(emptyCause("log", s), icon("log"))}
       </div>
       <div>
-        <div class="sec-head"><h2>Recent activity</h2><button type="button" class="link" data-page="log">open the log</button></div>
-        <div class="log feed">${logLines(s, 6)}</div>
         <div class="sec-head"><h2>Latest changes</h2><button type="button" class="link" data-page="changes">all</button></div>
-        <div class="list">${changes.length ? changes.map((c) => `<div class="item"><div class="t">${c.link ? ext(c.link, c.title) : esc(c.title)}</div><div class="muted small">${when(c.date)}</div></div>`).join("") : `<span class="muted">${data.changesError ? esc(data.changesError) : "Loading…"}</span>`}</div>
+        <div class="list">${changes.length ? changes.map((c) => `<div class="item"><div class="t">${c.link ? ext(c.link, c.title) : esc(c.title)}</div><div class="muted small">${when(c.date)}</div></div>`).join("") : data.changesError ? emptyState(emptyCause("changes", s, { error: data.changesError }), icon("changes")) : `<span class="muted">Loading…</span>`}</div>
       </div>
     </div>
   </div>`;
@@ -1087,7 +1083,7 @@ function renderSide(s: AppState): void {
     ? `<button type="button" class="account-btn" id="accountBtn" title="Signed in to everloot.app">${PERSON}<span class="acct-text"><b>Signed in</b><span>key …${esc(s.account.hint ?? "")}</span></span></button>`
     : `<button type="button" class="account-btn" id="accountBtn">${PERSON}<span class="acct-text"><b>Sign in</b><span>everloot.app</span></span></button>`;
   sideFoot.innerHTML = `${acct}<div class="foot-row"><button type="button" data-page="settings" ${page === "settings" ? 'aria-current="page"' : ""}>${GEAR}Settings</button><button type="button" class="foot-icon" id="reportBug" aria-label="Report a bug" title="Report a bug">${BUG}</button>${updateButton(s)}</div>
-    <div class="foot-line"><span>${e.files.length ? `Watching ${e.files.length} file(s)` : "Not watching"}${e.paused ? " · paused" : ""}</span><span>v${esc(s.version)}</span></div>`;
+    <div class="foot-line"><span>Everloot</span><span>v${esc(s.version)}</span></div>`;
   paintBars(sideFoot);
   if (refocus) side.querySelector<HTMLElement>(refocus)?.focus({ preventScroll: true });
 }
