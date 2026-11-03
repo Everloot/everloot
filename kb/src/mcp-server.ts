@@ -47,7 +47,7 @@ import {
   npcPageUrl, npcUrl, objectPageUrl, professionsUrl, questPageUrl, vendorPageUrl, withMore,
 } from "./page-urls.js";
 import { allTerms, getByName, getDocument, getEntity, search, searchSomeWords, SOME_WORDS, type SearchHit } from "./search.js";
-import { confirmedCatalog, confirmedLine, type ConfirmedIds } from "./catalog-confirmed.js";
+import { confirmedCatalog, confirmedLine, isConfirmable, type ConfirmedIds } from "./catalog-confirmed.js";
 import { getCatalogByName, getCatalogEntity, isCatalogId, searchCatalog, type CatalogIndex, type CatalogRecord } from "./catalog-index.js";
 
 export const SERVER_NAME = "everloot-knowledge";
@@ -497,14 +497,20 @@ export { SOME_WORDS };
 /** The hits for every asked word, or, when no page has them all, the pages with some of them. */
 async function searchResult(db: ReleaseSource, args: SearchArgs, catalog: CatalogIndex | null = null): Promise<{ hits: SearchHit[]; some: boolean }> {
   const opts = { kinds: args.kind ? [args.kind] : undefined, versions: args.version ? [args.version] : undefined };
-  const found = mergeHits(await search(db, args.query, args.limit, opts), catalogSearch(catalog, args), args);
-  return found.length ? { hits: found, some: false } : { hits: await searchSomeWords(db, args.query, args.limit, opts), some: true };
+  // Catalog names that match the asked words exactly or on every word join the normal answer; names that match only
+  // some words wait for the release's own "some words" fallback, so they never hide it.
+  const found = mergeHits(await search(db, args.query, args.limit, opts), catalogSearch(catalog, args, false), args);
+  if (found.length) return { hits: found, some: false };
+  const some = await searchSomeWords(db, args.query, args.limit, opts);
+  const seen = new Set(some.map((h) => h.id));
+  const more = catalogSearch(catalog, args, true).filter((h) => !seen.has(h.id));
+  return { hits: [...some, ...more].slice(0, args.limit ?? 10), some: true };
 }
 
 /** Catalog records are game-file data in the "forever" build; a version filter for another build excludes them. */
-function catalogSearch(catalog: CatalogIndex | null, args: SearchArgs): SearchHit[] {
+function catalogSearch(catalog: CatalogIndex | null, args: SearchArgs, anyWord: boolean): SearchHit[] {
   if (!catalog || (args.version && args.version !== "forever")) return [];
-  return searchCatalog(catalog, args.query, { kinds: args.kind ? [args.kind] : undefined, limit: args.limit ?? 10 }).map(plainHit);
+  return searchCatalog(catalog, args.query, { kinds: args.kind ? [args.kind] : undefined, limit: args.limit ?? 10, anyWord }).map(plainHit);
 }
 
 /** A catalog record as the plain hit every search answer carries (no body, no data). */
@@ -677,31 +683,41 @@ export type ToolHandlers = { [K in McpToolName]: (args: McpToolArgs<K>) => ToolA
  */
 export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {}): ToolHandlers {
   const recheck = options.recheck ?? [];
-  // A catalog that cannot be read leaves the release's answer, never an error.
+  // A catalog that cannot be read leaves the release's answer, never an error. The failure is kept, so the loader is
+  // not run again for every request, and said once.
+  let catalogFailed = false;
   const catalogOf = async (): Promise<CatalogIndex | null> => {
-    try { return (await options.catalog?.()) ?? null; } catch { return null; }
+    if (catalogFailed) return null;
+    try { return (await options.catalog?.()) ?? null; } catch (error) {
+      catalogFailed = true;
+      console.warn(`The game-file catalog could not be read; answers carry the release only: ${error instanceof Error ? error.message : String(error)}`);
+      return null;
+    }
   };
-  // The rollup's agreed ids; unreadable leaves the answer unconfirmed, never an error.
-  const confirmedOf = (): Promise<ConfirmedIds | null> => confirmedCatalog(options.completion);
+  // The rollup's agreed ids, read only when a hit is a catalog record the rollup can confirm; unreadable leaves the
+  // answer unconfirmed, never an error.
+  const confirmedOf = (hits: readonly { id: number; kind: string }[]): Promise<ConfirmedIds | null> =>
+    hits.some(isConfirmable) ? confirmedCatalog(options.completion) : Promise.resolve(null);
   const readPageIn = <T>(tool: ToolName, page: (facts: T, dataAsOf: string | null) => { text: string; page: object; url?: string }) =>
     readPage<T>(tool, options.corpus, page, recheck);
   const readFacts = <T>(tool: ToolName, render: (facts: T) => string) => fromTooledUploads(tool, render, options.corpus, recheck);
   const handlers: ToolHandlers = {
     search_knowledge: async (args) => {
       const result = await searchResult(db, args, await catalogOf());
-      const ids = await confirmedOf();
+      const ids = await confirmedOf(result.hits);
       return { text: await textOfSearch(db, result, ids), structured: { hits: annotate(await withPages(db, result.hits), ids) } };
     },
     get_entity: async (args) => {
       const catalog = await catalogOf();
-      const ids = await confirmedOf();
       const hit = await entityOf(db, args.id, catalog);
+      const ids = await confirmedOf(hit ? [hit] : []);
       return { text: await handleGetEntity(db, args, catalog, ids), structured: { hit: hit ? annotate(await withPages(db, [hit]), ids)[0]! : null } };
     },
     get_by_name: async (args) => {
       const catalog = await catalogOf();
-      const ids = await confirmedOf();
-      return { text: await handleGetByName(db, args, catalog, ids), structured: { hits: annotate(await withPages(db, await namedHits(db, args.name, args.kind, catalog)), ids) } };
+      const hits = await namedHits(db, args.name, args.kind, catalog);
+      const ids = await confirmedOf(hits);
+      return { text: await handleGetByName(db, args, catalog, ids), structured: { hits: annotate(await withPages(db, hits), ids) } };
     },
     search: async (args) => jsonAnswer({
       results: (await searchHits(db, { query: args.query, limit: 10 }, await catalogOf())).map((h) => ({ id: String(h.id), title: h.name, url: recordUrl(h, SITE) })),
@@ -712,7 +728,7 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
         const catalog = await catalogOf();
         const record = catalog ? getCatalogEntity(catalog, numeric) : undefined;
         if (record) {
-          const ids = await confirmedOf();
+          const ids = await confirmedOf([record]);
           const line = ids ? confirmedLine(record.kind, record.extId, ids) : null;
           return jsonAnswer({
             id: String(record.id), title: record.name, text: line ? `${record.body}\n${line}` : record.body, url: record.sourceUrl,

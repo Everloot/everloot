@@ -21,20 +21,36 @@ import { ClientTitles } from "../../../kb/src/client-titles";
 import { LegacyPerkCatalog } from "../../../kb/src/legacy-perks/catalog";
 
 let index: CatalogIndex | null = null;
+let failed = false;
 
-/** The index, built on first use and kept for the process. */
-export function catalogIndex(): CatalogIndex {
-  index ??= buildCatalogIndex({
-    achievements: ClientAchievements.parse(achievementsJson),
-    mounts: ClientMounts.parse(mountsJson),
-    encounters: ClientEncounters.parse(encountersJson),
-    map: WorldMapEntrances.parse(mapJson),
-    // Parsed once here: the imports' schema fields are plain strings to the compiler.
-    legacyPerks: LegacyPerkCatalog.parse(legacyPerksJson),
-    races: RaceTable.parse(racesJson),
-    factions: ClientFactions.parse(factionsJson),
-    titles: ClientTitles.parse(titlesJson),
-    questLines: ClientQuestLines.parse(questLinesJson),
-  });
+/**
+ * The index, built on first use and kept for the process. A file that does not parse leaves no index: the failure is
+ * kept, so the files are not parsed again for every request, and said once; the tools then answer from the release alone.
+ */
+export function catalogIndex(): CatalogIndex | null {
+  if (index || failed) return index;
+  try {
+    index = buildCatalogIndex({
+      achievements: ClientAchievements.parse(achievementsJson),
+      mounts: ClientMounts.parse(mountsJson),
+      encounters: ClientEncounters.parse(encountersJson),
+      map: WorldMapEntrances.parse(mapJson),
+      // Parsed once here: the imports' schema fields are plain strings to the compiler.
+      legacyPerks: LegacyPerkCatalog.parse(legacyPerksJson),
+      races: RaceTable.parse(racesJson),
+      factions: ClientFactions.parse(factionsJson),
+      titles: ClientTitles.parse(titlesJson),
+      questLines: ClientQuestLines.parse(questLinesJson),
+    });
+  } catch (error) {
+    failed = true;
+    console.warn(`The game-file catalog could not be built; the tools answer from the release alone: ${error instanceof Error ? error.message : String(error)}`);
+  }
   return index;
+}
+
+/** For tests: forget the kept index and any kept failure. */
+export function resetCatalogIndex(): void {
+  index = null;
+  failed = false;
 }

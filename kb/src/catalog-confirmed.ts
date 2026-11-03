@@ -1,3 +1,4 @@
+import { isCatalogId } from "./catalog-index.js";
 import type { CompletionLoader } from "./mcp-server.js";
 
 /** The catalog kinds the completion rollup can agree on, with the ids it agrees on. */
@@ -30,6 +31,11 @@ export async function confirmedCatalog(loader: CompletionLoader | undefined): Pr
   } catch {
     return null;
   }
+}
+
+/** Whether the rollup can confirm this hit: a catalog record of one of the four completionist kinds. */
+export function isConfirmable(hit: { id: number; kind: string }): boolean {
+  return isCatalogId(hit.id) && (hit.kind === "achievement" || hit.kind === "faction" || hit.kind === "title" || hit.kind === "quest_chain");
 }
 
 /** The confirmation sentence for a catalog entry the rollup agrees on, else null. */
