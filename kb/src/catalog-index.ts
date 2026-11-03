@@ -1,4 +1,4 @@
-﻿/**
+/**
  * The game-file catalogs (achievements, factions, titles, quest lines, mounts, legacy perks, races, instances) as
  * an in-memory index. These rows are Blizzard data under their own credit, so they never enter the CC BY-SA
  * knowledge release; the knowledge tools union this index with the release at query time instead.
@@ -20,7 +20,10 @@ import { RaceTable } from "./client-races.js";
 import { ClientTitles } from "./client-titles.js";
 import { LegacyPerkCatalog } from "./legacy-perks/catalog.js";
 import { isDevelopmentItemName } from "./dev-item-names.js";
-import { allTerms, type SearchHit } from "./search.js";
+import { CLIENT_LABEL } from "./edges.js";
+import { expandAliases } from "./name-aliases.js";
+import { allTerms, contentTerms, PICK_WORDS, type SearchHit } from "./search.js";
+import { fromSpanish } from "./spanish.js";
 
 export const CATALOG_KINDS = ["achievement", "faction", "title", "quest_chain", "mount", "legacy_perk", "race", "instance"] as const;
 export type CatalogKind = (typeof CATALOG_KINDS)[number];
@@ -32,14 +35,17 @@ const KIND_SPAN = 10_000_000;
 export function catalogId(kind: string, extId: string): number {
   const kindIndex = (CATALOG_KINDS as readonly string[]).indexOf(kind);
   if (kindIndex < 0) throw new Error(`not a catalog kind: ${kind}`);
-  return CATALOG_ID_BASE + kindIndex * KIND_SPAN + Number(extId);
+  const n = Number(extId);
+  // An id outside its kind's span would land in the next kind's range; "" and "1e3" are numbers but not ids.
+  if (!/^\d+$/.test(extId) || n >= KIND_SPAN) throw new Error(`not a catalog id for ${kind}: ${extId}`);
+  return CATALOG_ID_BASE + kindIndex * KIND_SPAN + n;
 }
 
 export function isCatalogId(id: number): boolean {
   return Number.isInteger(id) && id >= CATALOG_ID_BASE && id < CATALOG_ID_BASE + CATALOG_KINDS.length * KIND_SPAN;
 }
 
-const LICENCE = "Game data Â© Blizzard Entertainment, Inc.; not under Everloot's licence";
+export const CATALOG_LICENCE = "Game data © Blizzard Entertainment, Inc.; not under Everloot's licence";
 
 /** Only what the index reads of map.json: the dungeon and raid entrances and the build they came from. */
 export const WorldMapEntrances = z.object({
@@ -103,13 +109,25 @@ interface Stamp { version: string; extractedAt: string }
 const show = (v: unknown): string =>
   Array.isArray(v) ? v.map((x) => (typeof x === "object" ? JSON.stringify(x) : String(x))).join(", ") : String(v);
 
+const isNamed = (x: unknown): x is { id: number; name: string } => typeof x === "object" && x !== null && "id" in x && "name" in x;
+
+/** A list of named things reads as one `name (id)` line each; any other field is `field: value`. */
+function fieldLine(key: string, value: unknown): string {
+  if (Array.isArray(value) && value.length > 0 && value.every(isNamed)) return `${key}:\n${value.map((x) => `${x.name} (${x.id})`).join("\n")}`;
+  return `${key}: ${show(value)}`;
+}
+
+/** The line every catalog answer carries: where the fact comes from and which build it was read in. */
+export const catalogLabel = (build: string): string => `${CLIENT_LABEL} (build ${build}).`;
+
 /**
- * One record: the name and a newline, then one `field: value` line per field; `data` carries the build and the same
- * fields. An empty name or a development leftover gives no record, for every kind.
+ * One record: the name, the game-file label with its build, then one `field: value` line per field; `data` carries
+ * the build and the same fields. An empty name or a development leftover gives no record, for every kind.
  */
 function record(kind: CatalogKind, extId: string, name: string, stamp: Stamp, fields: Record<string, unknown>): CatalogRecord | undefined {
   if (name.trim() === "" || isDevelopmentItemName(name)) return undefined;
-  const body = `${name}\n${Object.entries(fields).filter(([, v]) => v !== undefined).map(([k, v]) => `${k}: ${show(v)}`).join("\n")}`;
+  const lines = Object.entries(fields).filter(([, v]) => v !== undefined).map(([k, v]) => fieldLine(k, v));
+  const body = [name, catalogLabel(stamp.version), ...lines].join("\n");
   return {
     id: catalogId(kind, extId),
     extId,
@@ -119,7 +137,7 @@ function record(kind: CatalogKind, extId: string, name: string, stamp: Stamp, fi
     gameVersion: "forever",
     sourceId: "game-files",
     sourceUrl: `${SITE}${catalogPath(kind, extId, name)}`,
-    licence: LICENCE,
+    licence: CATALOG_LICENCE,
     retrievedAt: stamp.extractedAt,
     body,
     data: { build: stamp.version, ...Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined)) },
@@ -130,7 +148,7 @@ const stampOf = (f: { build: Stamp }): Stamp => f.build;
 
 function recordsOfAchievements(f: ClientAchievements): (CatalogRecord | undefined)[] {
   return Object.entries(f.achievements).filter(([, a]) => !a.statistic).map(([id, a]) =>
-    record("achievement", id, a.title, stampOf(f), { points: a.points, criteriaCount: a.criteria.length, description: a.description }));
+    record("achievement", id, a.title, stampOf(f), { points: a.points, criteriaCount: a.criteria.length }));
 }
 
 function recordsOfMounts(f: ClientMounts): (CatalogRecord | undefined)[] {
@@ -167,7 +185,8 @@ function recordsOfInstances(map: WorldMapEntrances, encounters: ClientEncounters
 }
 
 function recordsOfFactions(f: ClientFactions): (CatalogRecord | undefined)[] {
-  return f.factions.map((x) => record("faction", String(x.id), x.name, stampOf(f), { parentId: x.parentId, shown: x.shown }));
+  // The site lists and links only the factions the game shows; the others are internal names with no page.
+  return f.factions.filter((x) => x.shown).map((x) => record("faction", String(x.id), x.name, stampOf(f), { parentId: x.parentId, shown: x.shown }));
 }
 
 function recordsOfTitles(f: ClientTitles): (CatalogRecord | undefined)[] {
@@ -204,24 +223,35 @@ export function buildCatalogIndex(files: CatalogFiles): CatalogIndex {
   return index;
 }
 
-/** Exact normalised name first, then names holding every query term, then names holding any term. */
-export function searchCatalog(index: CatalogIndex, query: string, opts: { kinds?: string[]; limit?: number } = {}): CatalogRecord[] {
-  const q = allTerms(query);
-  if (!q) return [];
-  const terms = q.split(" ");
+/**
+ * Exact normalised name first, then names holding every query term, then (unless `anyWord` is false) names holding
+ * any term, those with more of the asked words first. The query is read the way `search` reads it: short forms
+ * expanded, Spanish glossed, stopwords dropped. Pick words ("best") never match on their own.
+ */
+export function searchCatalog(index: CatalogIndex, query: string, opts: { kinds?: string[]; limit?: number; anyWord?: boolean } = {}): CatalogRecord[] {
+  const { text } = expandAliases(fromSpanish(query.trim()));
+  const terms = [...new Set(contentTerms(text))];
+  if (terms.length === 0) return [];
+  const asked = new Set([allTerms(text), terms.join(" ")]);
+  const pickless = terms.filter((t) => !PICK_WORDS.has(t));
   const limit = opts.limit ?? 10;
   const kinds = opts.kinds ? new Set(opts.kinds) : undefined;
   const exact: CatalogRecord[] = [];
   const every: CatalogRecord[] = [];
-  const some: CatalogRecord[] = [];
+  const some: { record: CatalogRecord; count: number }[] = [];
   for (const [key, records] of index.byName) {
     const words = new Set(key.split(" "));
-    const hits = terms.filter((t) => words.has(t)).length;
-    if (hits === 0) continue;
-    const tier = key === q ? exact : hits === terms.length ? every : some;
-    for (const r of records) if (!kinds || kinds.has(r.kind)) tier.push(r);
+    const wanted = records.filter((r) => !kinds || kinds.has(r.kind));
+    if (asked.has(key)) exact.push(...wanted);
+    else if (terms.every((t) => words.has(t))) every.push(...wanted);
+    else if (opts.anyWord !== false) {
+      const count = pickless.filter((t) => words.has(t)).length;
+      if (count > 0) some.push(...wanted.map((record) => ({ record, count })));
+    }
   }
-  return [...exact, ...every, ...some].slice(0, limit);
+  // The sort is stable, so names with the same count keep the index's order.
+  const ranked = some.sort((a, b) => b.count - a.count).map((s) => s.record);
+  return [...exact, ...every, ...ranked].slice(0, limit);
 }
 
 export function getCatalogEntity(index: CatalogIndex, id: number): CatalogRecord | undefined {
