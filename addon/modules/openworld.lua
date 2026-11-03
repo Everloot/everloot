@@ -585,8 +585,10 @@ local MAX_PULL_SECONDS = 86400
 
 local function iso(t) return date("!%Y-%m-%dT%H:%M:%SZ", t) end
 
+-- Four 16-bit pieces: Lua 5.1 takes math.random's bounds as ints, so a range up to 0x7fffffff overflows and comes back negative.
 local function newRunId()
-  return string.format("%08x%08x", math.random(0, 0x7fffffff), math.random(0, 0x7fffffff))
+  local r = math.random
+  return string.format("%04x%04x%04x%04x", r(0, 0xffff), r(0, 0xffff), r(0, 0xffff), r(0, 0xffff))
 end
 
 local function finishRun(reason)
