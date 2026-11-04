@@ -243,10 +243,11 @@ describe("class hubs", () => {
   test("a hub's racial traits carry Blizzard's October 26 changes, with the notes linked", async () => {
     const html = section(await hub("warlock"), "races");
     const races = visible(html);
-    // Orc: "Savage removed" and "Command re-added, increasing Warlock and Hunter pet damage by 5%."
+    // Orc: "Savage removed" and "Command re-added, increasing Warlock and Hunter pet damage by 5%." Build 70755 has it
+    // in the files, so the page shows the files' words for it.
     expect(races).not.toContain("Savage");
     expect(races).toContain("Command");
-    expect(races).toContain("Increases Warlock and Hunter pet damage by 5%");
+    expect(races).toContain("Increases damage done by Hunter and Warlock pets by 5%");
     // Human: "Ruthless now increases critical chance by 1% (was 2%)." Troll: "Berserking duration increased to 15 seconds."
     expect(races).toContain("Increases spell and ability critical chance by 1%");
     expect(races).not.toContain("critical chance by 2%");

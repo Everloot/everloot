@@ -47,10 +47,12 @@ test("the traits shown follow Blizzard's October 26 racial pass where the game f
   const byName = (faction: string, race: string) => Object.fromEntries(traitsFor(faction, race).map((t) => [t.name, t]));
   const dwarf = byName("Alliance", "Dwarf");
   expect(dwarf["Earth Fury"]).toBeUndefined();
-  expect(dwarf["Artisan's Precision"]).toMatchObject({ kind: "passive", description: "Increases hit chance with spells and attacks by 1%", fromNotes: true });
+  // Build 70755 carries Artisan's Precision itself, so the notes have nothing to change and the files' text shows.
+  expect(dwarf["Artisan's Precision"]).toMatchObject({ kind: "passive", description: "Spell and attack hit chance increased by 1%" });
+  expect(dwarf["Artisan's Precision"].fromNotes).toBeUndefined();
   const orc = byName("Horde", "Orc");
   expect(orc.Savage).toBeUndefined();
-  expect(orc.Command).toMatchObject({ kind: "passive", description: "Increases Warlock and Hunter pet damage by 5%" });
+  expect(orc.Command).toMatchObject({ kind: "passive", description: "Increases damage done by Hunter and Warlock pets by 5%" });
   const human = byName("Alliance", "Human");
   expect(human.Ruthless.description).toBe("Increases spell and ability critical chance by 1%");
   expect(human["The Human Spirit"].description).toBe("10% increased Spirit");
@@ -67,5 +69,5 @@ test("the traits shown follow Blizzard's October 26 racial pass where the game f
   expect(byName("Horde", "Skyborne").Skysight.description).toContain("Charged for 1 hour, raising it to 30%");
   // Traits the notes leave alone keep the files' text and no mark; the files themselves are untouched.
   expect(byName("Alliance", "Night Elf").Quickness.fromNotes).toBeUndefined();
-  expect(RACE_TABLE.races.find((r) => r.name === "Dwarf")?.traits.map((t) => t.name)).toContain("Earth Fury");
+  expect(RACE_TABLE.races.find((r) => r.name === "Human")?.traits.find((t) => t.name === "Ruthless")?.description).toBe("Increases spell and attack critical chance by 1%");
 });
