@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { sitemapUrls, summarize } from "./cf-warm.mjs";
+import { rateLimited, sitemapUrls, summarize } from "./cf-warm.mjs";
 
 test("the sitemap's pages, in order, once each, with escaped ampersands read back", () => {
   const xml = `<?xml version="1.0"?><urlset>
@@ -17,4 +17,13 @@ test("a run passes only when every page answered 200, and names the ones that di
   const failed = summarize([good, { url: "https://everloot.app/map", status: 503, ms: 900 }, { url: "https://everloot.app/x", status: 0, error: "TimeoutError", ms: 30_000 }]);
   expect(failed.ok).toBe(false);
   expect(failed.lines).toEqual(["3 pages, 1 answered 200, p95 30000 ms", "  503 https://everloot.app/map", "  TimeoutError https://everloot.app/x"]);
+});
+
+test("the pages a pass left at 429 are asked again after the longest Retry-After, or a minute when none is given", () => {
+  const ok = { url: "https://everloot.app/", status: 200, ms: 40 };
+  const a = { url: "https://everloot.app/database/titles/1-a", status: 429, ms: 5, retryAfter: "30" };
+  const b = { url: "https://everloot.app/database/titles/2-b", status: 429, ms: 5, retryAfter: null };
+  expect(rateLimited([ok, a, b])).toEqual({ urls: [a.url, b.url], waitMs: 30_000 });
+  expect(rateLimited([ok, b])).toEqual({ urls: [b.url], waitMs: 60_000 });
+  expect(rateLimited([ok, { url: "https://everloot.app/x", status: 503, ms: 9 }])).toEqual({ urls: [], waitMs: 60_000 });
 });
