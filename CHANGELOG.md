@@ -42,6 +42,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: without a key, `/api/tools/{tool}` (what the site's chat calls for each answer) counts against the MCP server's
   200 requests an hour per address instead of the bulk endpoints' 30, so a signed-out chat no longer runs out after a
   dozen questions. A key is counted as before.
+- Site: `/addon` links the CurseForge project beside the zip download ("Get it on CurseForge"), counted as an
+  `addon_download` to CurseForge like the other download links. The same tested zip is uploaded there on each release.
 
 ### Added
 - Desktop App and site, behind `EVERLOOT_CHARACTER_LINKS` (off): the addon's `/everloot link <code>` (0.3.15) writes one

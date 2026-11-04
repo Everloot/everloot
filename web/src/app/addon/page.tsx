@@ -19,6 +19,8 @@ export const revalidate = 3600;
 
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 const EXT = "noopener noreferrer";
+/** The addon's CurseForge project (1762765): each tagged release uploads the same tested zip there (docs/RELEASING.md). */
+const CURSEFORGE_URL = "https://www.curseforge.com/wow/addons/everloot";
 
 /** The Desktop App files the page offers, in this order, matched by the end of the artifact name. */
 const DESKTOP_KINDS = [
@@ -87,9 +89,14 @@ export default async function AddonPage() {
             </SectionHeading>
             {addon ? (
               <>
-                <TrackedDownload className="btn btn-primary" href={zipHref} addon="everloot" to="site" download>
-                  Download addon {addon.version}{served ? ` (.zip, ${fileSize(served.size)})` : ""}
-                </TrackedDownload>
+                <div className="flex flex-wrap items-center gap-2">
+                  <TrackedDownload className="btn btn-primary" href={zipHref} addon="everloot" to="site" download>
+                    Download addon {addon.version}{served ? ` (.zip, ${fileSize(served.size)})` : ""}
+                  </TrackedDownload>
+                  <TrackedDownload className="btn" href={CURSEFORGE_URL} addon="everloot" to="curseforge">
+                    Get it on CurseForge
+                  </TrackedDownload>
+                </div>
                 <p className="text-sm text-fg-2">{ADDON_LIVE_VERIFIED ? "" : "Live-client verification is pending. "}This Alpha includes website talent and raid plan imports; use <code className="font-mono">/everloot</code> to open the planners.</p>
                 <div>
                   <SectionHeading as="h3">Install</SectionHeading>

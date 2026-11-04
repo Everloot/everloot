@@ -70,6 +70,9 @@ test("the addon and every desktop build are offered with version, date, size and
   const html = await render(() => Promise.resolve(Response.json(releases)));
   const text = visible(html);
   expect(html).toContain(`href="${addon.downloadPath}"`);
+  // The same tested zip is on CurseForge, for players who install with its app.
+  expect(html).toContain('href="https://www.curseforge.com/wow/addons/everloot"');
+  expect(text).toContain("Get it on CurseForge");
   expect(text).toContain(`Version ${addon.version}, Alpha, released 2026-10-18`);
   expect(text).toContain("Version 0.1.0, released 2026-10-19");
   for (const [label, size] of [["Windows installer", "108 MB"], ["Windows portable", "108 MB"], ["macOS disk image", "125 MB"], ["Linux AppImage", "122 MB"]]) {
