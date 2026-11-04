@@ -24,8 +24,8 @@ Use the same words everywhere, so the listings match the site and each other.
 | Field | Text |
 |---|---|
 | Name | `Everloot` (registry name `app.everloot/knowledge`) |
-| One line (≤100, registry) | WoW: Forever lore and player-observed drops, vendors, quests, professions and talents, with sources. |
-| One line (≤200, Claude) | Look up WoW: Forever lore and what players actually saw in play: drop rates, vendors, quests, professions, map pins and talents. Every answer carries its source and licence. |
+| One line (≤100, registry) | World of Warcraft: Forever lore and player-observed drops, vendors, quests, professions and talents. |
+| One line (≤200, Claude) | Look up World of Warcraft: Forever lore and what players actually saw in play: drop rates, vendors, quests, professions, map pins and talents. Every answer carries its source and licence. |
 | Short description (≤30, ChatGPT) | WoW: Forever data with sources |
 | Description (≤2,000) | see [Long description](#long-description) |
 | Categories | ChatGPT: Entertainment (game reference service). Other directories: Gaming or the closest game reference category. |
@@ -212,7 +212,7 @@ They mostly ingest from the official registry, so publish there first and check 
 | Directory | How | Status |
 |---|---|---|
 | [Smithery](https://smithery.ai/new) | Web form or `smithery mcp publish`; remote servers need the public HTTPS endpoint | Check after the registry publish; submit by hand if it did not appear |
-| [Glama](https://glama.ai/mcp) | Ingested from the registry as a connector; claimed 2026-11-03 by a DNS TXT record (`_glama-claim.everloot.app`, account-bound token, must stay) | Claimed. Publisher profile, support contact and thumbnail filled; profile completion 100% |
+| [Glama](https://glama.ai/mcp) | Ingested from the registry as a connector; claimed 2026-11-03 by a DNS TXT record (`_glama-claim.everloot.app`, account-bound token, must stay) | Claimed by DNS on 2026-11-03; ownership verified; publisher details (profile, support contact, thumbnail) filled |
 | [PulseMCP](https://www.pulsemcp.com) | Ingests the registry | Check after the publish |
 | [mcpservers.org](https://mcpservers.org/submit) | Free form | Owner |
 | [mcp.so](https://mcp.so) | Site form; reports of a paid tier, unverified | Optional |
