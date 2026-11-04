@@ -427,11 +427,13 @@ export const planRow = z.object({
     done: z.string().describe("What done means, or why this row is not a build."),
     proof: z.enum(["none", "code", "deployed", "client", "public", "real-data"]).optional().describe("The furthest the row is proven."),
 });
+/** The kind filter of search_knowledge and get_by_name. */
+const KIND_FILTER = "Narrow to one record kind. achievement, faction, title, quest_chain, mount, legacy_perk, race and instance come from the game files (found in game files, unconfirmed); item, npc, object, quest, zone, spell, lore_page, creator and realm from the knowledge release. Without it, every kind.";
 const searchArgs = {
     query: z.string().max(1000).describe("What to look up: names, questions, keywords. Question words are ignored."),
-    kind: z.enum(KNOWLEDGE_KINDS).optional().describe("Narrow to one record kind."),
+    kind: z.enum(KNOWLEDGE_KINDS).optional().describe(KIND_FILTER),
     version: z.enum(GAME_VERSIONS).optional().describe("Narrow to one game version."),
-    limit: z.number().int().min(1).max(25).default(8),
+    limit: z.number().int().min(1).max(25).default(8).describe("Most hits, 1 to 25, default 8."),
 };
 /**
  * search and fetch answer in the shape OpenAI's connector contract asks for (ChatGPT connectors, deep
@@ -544,7 +546,7 @@ export const MCP_TOOLS = {
         description: "Returns the records whose full name matches exactly, case-insensitively, optionally narrowed to one record kind. Use it to disambiguate when you know the exact name and want the id without a ranked search; use search_knowledge for partial names, keywords or questions. Several records can share a name across kinds, so check each hit's kind. Empty hits mean no record has that exact name.",
         inputSchema: {
             name: z.string().max(200).describe("Full record name."),
-            kind: z.enum(KNOWLEDGE_KINDS).optional().describe("Narrow to one record kind."),
+            kind: z.enum(KNOWLEDGE_KINDS).optional().describe(KIND_FILTER),
         },
         outputSchema: { hits: z.array(knowledgeHit) },
         annotations: { readOnlyHint: true, openWorldHint: false },
@@ -635,7 +637,7 @@ export const MCP_TOOLS = {
     },
     world_map_near: {
         title: "What is near a place on the map",
-        description: `Entrances, NPCs, vendors and treasures near a spot, nearest first, with straight-line distances in yards. Give a zone (name or map id) with x and y from 0 to 100, or an NPC id to start from where that NPC stands. Entrances come from the game files; one is confirmed once 3 installs zoned in from it. NPCs, vendors and treasures are player-observed and listed only where 3 installs agree on the position. Zones the files hold back as possibly unreleased are not offered. Use it for what is near a spot; use npc_page, vendor_page or entity_relations for one entity's own facts. Reads Everloot's public player data when connected.`,
+        description: `Lists the entrances, NPCs, vendors and treasures near a spot, nearest first, with straight-line distances in yards. Give a zone (name or map id) with x and y from 0 to 100, or an NPC id to start from where that NPC stands. Entrances come from the game files; one is confirmed once 3 installs zoned in from it. NPCs, vendors and treasures are player-observed and listed only where 3 installs agree on the position. Zones the files hold back as possibly unreleased are not offered. Use it for what is near a spot; use npc_page, vendor_page or entity_relations for one entity's own facts. Reads Everloot's public player data when connected.`,
         inputSchema: {
             zone: z.string().max(80).optional().describe("Zone name or map id, such as Elwynn Forest or 1429. Needs x and y."),
             x: z.number().min(0).max(100).optional().describe("Across the zone map, 0 (west) to 100 (east)."),
@@ -649,7 +651,7 @@ export const MCP_TOOLS = {
     },
     entity_relations: {
         title: "How an item, NPC, spell or quest connects to others",
-        description: `Every typed relation of one entity, both directions: dropped by, sold by, reward from, located in (player-observed, listed where 3 installs agree, with the install count and last seen), and created by, reagent for, part of set, same icon (found in game files, unconfirmed, with the build they came from). Ids are the game's own, as a search_knowledge hit or a page tool gives them. Use it for where something comes from or what something drops, sells or rewards; use the page tools (item_page, npc_page, quest_page) for one entity's own facts, and world_map_near for what is near a place. Reads Everloot's public player data and the game-file relations of the current build.`,
+        description: `Lists every typed relation of one entity, both directions: dropped by, sold by, reward from, located in (player-observed, listed where 3 installs agree, with the install count and last seen), and created by, reagent for, part of set, same icon (found in game files, unconfirmed, with the build they came from). Ids are the game's own, as a search_knowledge hit or a page tool gives them. Use it for where something comes from or what something drops, sells or rewards; use the page tools (item_page, npc_page, quest_page) for one entity's own facts, and world_map_near for what is near a place. Reads Everloot's public player data and the game-file relations of the current build.`,
         inputSchema: {
             kind: z.enum(ENTITY_KINDS).describe("What the id names. A zone is a UiMap id, as on /map."),
             id: z.number().int().positive().describe("The game's id for it, such as item 19019."),
@@ -662,7 +664,7 @@ export const MCP_TOOLS = {
     },
     item_categories: {
         title: "Item categories: class, subclass, slot and quality",
-        description: `Item categories from the game files (found in game files, unconfirmed, with the build): class and subclass with the client's English names and slugs, slot and quality. With no arguments, the whole tree with item counts. With item, that item's category path. With class (a slug such as weapon or armor), and optionally subclass, slot and quality slugs, the items in it. Ids only: item names come from player uploads (item_page).`,
+        description: `Lists item categories from the game files (found in game files, unconfirmed, with the build): class and subclass with the client's English names and slugs, slot and quality. With no arguments, the whole tree with item counts. With item, that item's category path. With class (a slug such as weapon or armor), and optionally subclass, slot and quality slugs, the items in it. Ids only: item names come from player uploads (item_page).`,
         inputSchema: {
             item: z.number().int().positive().optional().describe("An item id: answers its class, subclass, slot and quality."),
             class: z.string().max(40).optional().describe("Class slug, such as weapon, armor, consumable or trade-goods."),
@@ -754,7 +756,7 @@ export const MCP_TOOLS = {
     },
     class_races: {
         title: "Races that can be a class, with their racial traits",
-        description: "Which races can be one class in WoW: Forever, on which faction, and each race's racial traits (name, active or passive) from the game files (found in game files, unconfirmed, with the build). Narrow to one faction. Use it for whether a race can be a class, or which races a class is open to; use talent_tree for the class's talents, and population for how many play it. What each trait does is on the class page, linked from the answer.",
+        description: "Lists which races can be one class in WoW: Forever, on which faction, and each race's racial traits (name, active or passive) from the game files (found in game files, unconfirmed, with the build). Narrow to one faction. Use it for whether a race can be a class, or which races a class is open to; use talent_tree for the class's talents, and population for how many play it. What each trait does is on the class page, linked from the answer.",
         inputSchema: {
             class: z.string().min(1).max(40).describe("Class name or slug, such as Warlock or warlock."),
             faction: z.enum(GUILD_FACTIONS).optional().describe("alliance or horde. Without it, both."),
@@ -795,7 +797,7 @@ export const MCP_TOOLS = {
     },
     completion_progress: {
         title: "Achievement, reputation, title and quest progress",
-        description: "What one install's characters have finished, and what is closest to done: achievements with the largest share of criteria or progress met, reputations nearest the next standing, titles known, and quests finished in a chain. A list entry is public after 3 players (installs uploading from different addresses) report it identically. Progress is shown only when that install uploaded it with the collection sharing choice and a verified grant; without it the answer says so. Not a Blizzard profile read and not a copied catalog. Use it for what a player is closest to finishing; use collection_gap for missing collection items, and guild_board for a guild's kills. ownerInstallId is the id of the install that uploaded; characterKey picks one character's 8-digit key from that upload when the install has several, otherwise every character is read. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
+        description: "Shows what one install's characters have finished, and what is closest to done: achievements with the largest share of criteria or progress met, reputations nearest the next standing, titles known, and quests finished in a chain. A list entry is public after 3 players (installs uploading from different addresses) report it identically. Progress is shown only when that install uploaded it with the collection sharing choice and a verified grant; without it the answer says so. Not a Blizzard profile read and not a copied catalog. Use it for what a player is closest to finishing; use collection_gap for missing collection items, and guild_board for a guild's kills. ownerInstallId is the id of the install that uploaded; characterKey picks one character's 8-digit key from that upload when the install has several, otherwise every character is read. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
         inputSchema: {
             ownerInstallId: z.string().describe("Install id whose completion upload to read."),
             characterKey: z.string().max(8).optional().describe("One character's 8-digit key from the upload, when the install has several."),
@@ -805,7 +807,7 @@ export const MCP_TOOLS = {
     },
     guild_board: {
         title: "Guild board its officers published",
-        description: "One guild's roster, bosses killed, loot awarded, raid attendance and average item level, as that guild's own officers chose to publish them. Only uploads from officers holding a verified grant for the guild count, and a figure is public after 2 of them agree. Names are in-game character names, never accounts or real-world identities. A character's owner can opt out, and an opted-out character is left out of the roster, loot and attendance. A guild whose officers have not published gets an empty board; the tool does not look up other players or guilds. The average names how many roster members were measured; there is no combined score. Use it for one named guild's own published board; use guild_search to find a guild's exact name and realm, and guild_rankings to compare guilds in one instance. Guild name and realm are the in-game names. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
+        description: "Returns one guild's roster, bosses killed, loot awarded, raid attendance and average item level, as that guild's own officers chose to publish them. Only uploads from officers holding a verified grant for the guild count, and a figure is public after 2 of them agree. Names are in-game character names, never accounts or real-world identities. A character's owner can opt out, and an opted-out character is left out of the roster, loot and attendance. A guild whose officers have not published gets an empty board; the tool does not look up other players or guilds. The average names how many roster members were measured; there is no combined score. Use it for one named guild's own published board; use guild_search to find a guild's exact name and realm, and guild_rankings to compare guilds in one instance. Guild name and realm are the in-game names. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
         inputSchema: {
             guildName: z.string().describe("Guild name."),
             realm: z.string().describe("Realm name."),
@@ -815,7 +817,7 @@ export const MCP_TOOLS = {
     },
     guild_search: {
         title: "Find a guild by the start of its name",
-        description: "Guilds whose name starts with what you typed, each with its realm, faction, how many characters the addon saw in it, and the count and date of its agreed boss kills. A guild is listed once its members' uploads agree on a kill (2 installs reporting the same guild and boss), once its officers published a board, or once a character was seen in it. Guild names only, never a member's name, and a guild that asked to be hidden is left out. Members seen are counted only when the player pages are connected; otherwise the count is unrecorded, not zero. Use it to find a guild's exact name and realm before guild_board, or to list the guilds whose name starts with a few letters; use guild_rankings for a ladder. limit caps the guilds listed. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
+        description: "Finds the guilds whose name starts with what you typed, each with its realm, faction, how many characters the addon saw in it, and the count and date of its agreed boss kills. A guild is listed once its members' uploads agree on a kill (2 installs reporting the same guild and boss), once its officers published a board, or once a character was seen in it. Guild names only, never a member's name, and a guild that asked to be hidden is left out. Members seen are counted only when the player pages are connected; otherwise the count is unrecorded, not zero. Use it to find a guild's exact name and realm before guild_board, or to list the guilds whose name starts with a few letters; use guild_rankings for a ladder. limit caps the guilds listed. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
         inputSchema: {
             query: z.string().min(2).max(24).describe("The start of the guild's name, 2 to 24 characters."),
             limit: z.number().int().min(1).max(25).default(10).describe("Most guilds listed, 1 to 25."),
@@ -825,7 +827,7 @@ export const MCP_TOOLS = {
     },
     guild_rankings: {
         title: "Guild ladder for one raid or dungeon",
-        description: "Every guild with an agreed kill in one instance, ordered by bosses killed, then by who reached its latest kill first, then by name; equal rows share a rank. A kill is a guild's once 2 of its members' installs report the same boss there, timed at the earliest report, or once its officers published it through the guild board, which carries no time. The boss list and its order are the encounters 3 installs reported in that instance; a kill of a boss not on it counts for nothing. There is no score, no rating and no total across instances. Without an instance, the newest raid with a kill is ranked; realm and faction narrow the ladder. Use it to compare guilds' progress in one raid or dungeon; use guild_board for one guild's own board, and guild_search to find a guild. The instance map id is the one instance_entrance records carry; limit caps the rows. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
+        description: "Ranks every guild with an agreed kill in one instance, ordered by bosses killed, then by who reached its latest kill first, then by name; equal rows share a rank. A kill is a guild's once 2 of its members' installs report the same boss there, timed at the earliest report, or once its officers published it through the guild board, which carries no time. The boss list and its order are the encounters 3 installs reported in that instance; a kill of a boss not on it counts for nothing. There is no score, no rating and no total across instances. Without an instance, the newest raid with a kill is ranked; realm and faction narrow the ladder. Use it to compare guilds' progress in one raid or dungeon; use guild_board for one guild's own board, and guild_search to find a guild. The instance map id is the one instance_entrance records carry; limit caps the rows. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
         inputSchema: {
             instanceMapId: z.number().int().positive().optional().describe("The instance's map id, as instance_entrance carries it. Omit for the newest raid with a kill."),
             realm: z.string().max(60).optional().describe("Only guilds on this realm."),
@@ -847,7 +849,7 @@ export const MCP_TOOLS = {
     },
     market_value: {
         title: "Forever market value for one item",
-        description: "Market value, minimum buyout, historical value and units listed for one item on one WoW: Forever realm, from full auction scans players started and uploaded. A day is public after 3 reporters (distinct upload addresses) scanned the item; values are medians, thin days and outlier days are left out of the market value. Market value weights the last 14 public days, historical is the median of 60. Use it for what an item is worth now; use auction_history for the price over time, and vendor_page for vendor prices. Realm is the realm's name; the item id is the game's. Missing or unavailable data is reported explicitly.",
+        description: "Returns the market value, minimum buyout, historical value and units listed for one item on one WoW: Forever realm, from full auction scans players started and uploaded. A day is public after 3 reporters (distinct upload addresses) scanned the item; values are medians, thin days and outlier days are left out of the market value. Market value weights the last 14 public days, historical is the median of 60. Use it for what an item is worth now; use auction_history for the price over time, and vendor_page for vendor prices. Realm is the realm's name; the item id is the game's. Missing or unavailable data is reported explicitly.",
         inputSchema: {
             realm: z.string().describe("Realm name."),
             itemId: z.number().int().positive().describe("Item id."),
@@ -857,7 +859,7 @@ export const MCP_TOOLS = {
     },
     gold_ledger: {
         title: "Gold ledger for one character",
-        description: "Peak and current gold and the money events that character's own upload recorded: income (loot, quests, vendor and auction sales) and spending (flight paths, postage, barber, respecs, auction purchases), each install's ledger kept apart. A category with nothing recorded reads as unrecorded, not zero, and gold from other gameplay is unrecorded. The gap between recorded income and peak gold is shown as unrecorded, never called bought gold or a ban. No scan of a player who did not upload. Use it for one uploaded character's own gold history; it cannot look up a character that never uploaded. Character and realm are the in-game names; use guild_board for a guild's loot, and market_value for prices. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
+        description: "Returns the peak and current gold and the money events that character's own upload recorded: income (loot, quests, vendor and auction sales) and spending (flight paths, postage, barber, respecs, auction purchases), each install's ledger kept apart. A category with nothing recorded reads as unrecorded, not zero, and gold from other gameplay is unrecorded. The gap between recorded income and peak gold is shown as unrecorded, never called bought gold or a ban. No scan of a player who did not upload. Use it for one uploaded character's own gold history; it cannot look up a character that never uploaded. Character and realm are the in-game names; use guild_board for a guild's loot, and market_value for prices. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
         inputSchema: {
             character: z.string().describe("Character name."),
             realm: z.string().describe("Realm name."),
@@ -867,7 +869,7 @@ export const MCP_TOOLS = {
     },
     coverage: {
         title: "Database coverage by zone, type and field",
-        description: "How much of WoW: Forever's database is settled or confirmed, and which reported fields need more agreeing installs. The same counts and reported lists as https://everloot.app/database/coverage, as text, per zone, per type and per field, plus scoped totals and the current build's whole-fact settled-list size, separately dated and measured. Coverage = settled / expected, with confirmed / expected beside it; the denominator is max(expected, observed). Confirmed includes settled. Reported fields needing one or two more installs are counted without their values. A player-reported fact needs three agreeing installs to be public. Only public report identifiers and game-file facts are listed, never unconfirmed values, baseline rows, names or ids, or player names. Every answer states its scope, measurement method, data date and install counts; unknown values are [?]. Zone and type are optional; omitted filters cover all released zones and all types. Use it for how complete the database is for a zone or type; use the page tools for the facts themselves.",
+        description: "Counts how much of WoW: Forever's database is settled or confirmed, and which reported fields need more agreeing installs. The same counts and reported lists as https://everloot.app/database/coverage, as text, per zone, per type and per field, plus scoped totals and the current build's whole-fact settled-list size, separately dated and measured. Coverage = settled / expected, with confirmed / expected beside it; the denominator is max(expected, observed). Confirmed includes settled. Reported fields needing one or two more installs are counted without their values. A player-reported fact needs three agreeing installs to be public. Only public report identifiers and game-file facts are listed, never unconfirmed values, baseline rows, names or ids, or player names. Every answer states its scope, measurement method, data date and install counts; unknown values are [?]. Zone and type are optional; omitted filters cover all released zones and all types. Use it for how complete the database is for a zone or type; use the page tools for the facts themselves.",
         inputSchema: {
             zone: z.number().int().positive().optional().describe("Released UiMap zone id, such as 1429 for Elwynn Forest. Omit for all released zones."),
             type: z.enum(["quests", "npcs", "pins", "vendors", "drops", "rares", "entrances", "bosses", "treasures"]).optional().describe("Coverage type. Omit for all types."),
@@ -876,7 +878,7 @@ export const MCP_TOOLS = {
     },
     population: {
         title: "Who plays what: population by race, class, faction and level",
-        description: "How many characters play each race, class, race and class, faction and level band on WoW: Forever, from the census of players who turned it on in the Everloot addon. Each character counts once. A count shows only when it covers at least 10 characters reported by at least 3 installs from at least 3 addresses, rounded to the nearest 5, and a count that could be worked out from the others is hidden too. Every answer states its window: active in the last 7 days (default) or since launch. With no arguments, the overview: most played class first. No names, ever. Missing or unavailable data is reported explicitly.",
+        description: "Counts how many characters play each race, class, race and class, faction and level band on WoW: Forever, from the census of players who turned it on in the Everloot addon. Each character counts once. A count shows only when it covers at least 10 characters reported by at least 3 installs from at least 3 addresses, rounded to the nearest 5, and a count that could be worked out from the others is hidden too. Every answer states its window: active in the last 7 days (default) or since launch. With no arguments, the overview: most played class first. No names, ever. Missing or unavailable data is reported explicitly.",
         inputSchema: {
             race: z.string().max(40).optional().describe("A race, such as Gnome, Night Elf or Undead."),
             class: z.string().max(40).optional().describe("A class, such as Priest."),
@@ -903,7 +905,7 @@ export const MCP_TOOLS = {
     },
     ecosystem_projects: {
         title: "WoW: Forever addons and open-source projects",
-        description: "Forever addons and tools from the community registry, with a board ranking: most installed, rising, most active, freshest release or best maintained. Each project shows its GitHub repository, stars, latest release, last commit, whether its .toc declares a Forever interface number, and installs from Everloot uploads (counted from 3 installs; a missing count means not counted, not zero). Projects are ranked, never people. GitHub facts carry the time they were refreshed. Use it for which Forever addons exist and how maintained they are; use everloot_plan for Everloot's own features, and recent_changes for Blizzard's posts. limit caps the projects listed.",
+        description: "Lists the Forever addons and tools in the community registry, with a board ranking: most installed, rising, most active, freshest release or best maintained. Each project shows its GitHub repository, stars, latest release, last commit, whether its .toc declares a Forever interface number, and installs from Everloot uploads (counted from 3 installs; a missing count means not counted, not zero). Projects are ranked, never people. GitHub facts carry the time they were refreshed. Use it for which Forever addons exist and how maintained they are; use everloot_plan for Everloot's own features, and recent_changes for Blizzard's posts. limit caps the projects listed.",
         inputSchema: {
             board: z.enum(ECOSYSTEM_BOARD_FILTERS).default("all").describe("installed, rising, active, release, maintained, or all (A to Z)."),
             forever_ready_only: z.boolean().optional().describe("Only projects whose .toc lists a Forever interface number."),
