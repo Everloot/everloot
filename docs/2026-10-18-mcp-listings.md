@@ -25,7 +25,7 @@ Use the same words everywhere, so the listings match the site and each other.
 |---|---|
 | Name | `Everloot` (registry name `app.everloot/knowledge`) |
 | One line (≤100, registry) | World of Warcraft: Forever lore and player-observed drops, vendors, quests, professions and talents. |
-| One line (≤200, Claude) | Look up World of Warcraft: Forever lore and what players actually saw in play: drop rates, vendors, quests, professions, map pins and talents. Every answer carries its source and licence. |
+| One line (≤200, Claude) | Look up World of Warcraft: Forever lore and what players actually saw in play: drop rates, vendors, quests, professions, map pins and talents. Every answer names its sources. |
 | Short description (≤30, ChatGPT) | WoW: Forever data with sources |
 | Description (≤2,000) | see [Long description](#long-description) |
 | Categories | ChatGPT: Entertainment (game reference service). Other directories: Gaming or the closest game reference category. |
