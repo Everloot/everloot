@@ -185,6 +185,16 @@ test("signed out, Save offers sign-in and remembers the build for the way back",
   expect(window.location.hash).toMatch(/^#plan=EL1-mage-/);
 });
 
+test("signed out, the calculator does not ask for the account's builds, so the console shows no 401", async () => {
+  api("out");
+  const asked: string[] = [];
+  const site = globalThis.fetch;
+  vi.stubGlobal("fetch", (url: string, init?: RequestInit) => { asked.push(`${init?.method ?? "GET"} ${url}`); return site(url, init); });
+  await render();
+  expect(asked).toEqual(["GET /api/auth/me"]);
+  expect(button(/^Save$/)).toBeDefined();
+});
+
 test("back from sign-in, the build is restored and the save panel opens", async () => {
   api("in", []);
   localStorage.setItem("everloot:pending-save", JSON.stringify({ path: "/tools/talents/mage", hash: `#plan=${CODE}`, at: Date.now() }));
