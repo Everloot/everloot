@@ -22,6 +22,9 @@ required, or tightening a limit is a major release.
   without a key, 5,000 with one), and the corpus and client-layer routes and the market rule read in plain words.
 
 ### Added
+- 1.25.0 (record protocol 1.13.0): `census_seen.via` takes `nameplate`, a player the game drew a nameplate for
+  (`NAME_PLATE_UNIT_ADDED`), beside `target`, `mouseover` and `group`; any other value is still refused. The stored
+  census row accepts it too. Nothing else changes; the addon sends it from 0.3.16.
 - 1.24.0 (record protocol unchanged, 1.12.0): `KNOWLEDGE_KINDS` gains eight catalog kinds read from the game files
   (`achievement`, `faction`, `title`, `quest_chain`, `mount`, `legacy_perk`, `race`, `instance`) and a curated `build`
   kind for the team's starter talent builds; `knowledgeHit` and `fetchedDocument.metadata` gain an optional `confirmed`

@@ -35,9 +35,10 @@ function Section({ id, children }: { id: string; children: React.ReactNode }) {
 }
 
 export default function PrivacyPage() {
-  // The boss pulls item shows only once the site collects them (EVERLOOT_PULL_SUMMARIES), and dates the page with it.
+  // The boss pulls item shows only once the site collects them (EVERLOOT_PULL_SUMMARIES). The census paragraph
+  // gained nameplates on 4 November 2026, which dates the page either way.
   const pulls = pullSummariesOn();
-  const updated = pulls ? "2 November 2026" : "27 October 2026";
+  const updated = "4 November 2026";
   return (
     <article>
       <Container width="reading">
@@ -208,7 +209,9 @@ export default function PrivacyPage() {
                 Desktop App (a box on its setup screen and a switch in its settings) or
                 send your file from the upload page. It records race, class,
                 level and faction for your own characters, with the realm name, and for
-                players you target, mouse over or group with. It never reads another
+                players near you: ones you target, mouse over or group with, and ones the
+                game shows a nameplate for (your own nameplate settings decide which
+                players get one). It never reads another
                 player&apos;s name, guild, gear or position. Before anything is stored,
                 the game&apos;s id for each character is replaced with a keyed one-way
                 hash, and only the number of the server the character is on is kept

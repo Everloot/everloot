@@ -2894,9 +2894,10 @@
                 "enum": [
                   "target",
                   "mouseover",
-                  "group"
+                  "group",
+                  "nameplate"
                 ],
-                "description": "How the addon saw the player."
+                "description": "How the addon saw the player. nameplate: a player the game drew a nameplate for (NAME_PLATE_UNIT_ADDED)."
               },
               "realm": {
                 "description": "Absent: the server id in the GUID says where a player you see is from.",

@@ -730,7 +730,7 @@ export declare const censusSelf: z.ZodObject<{
     realm: z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>;
     via: z.ZodOptional<z.ZodNever>;
 }, z.core.$strip>;
-/** A player you targeted, moused over or grouped with. */
+/** A player you targeted, moused over, grouped with or saw a nameplate for. */
 export declare const censusSeen: z.ZodObject<{
     installId: z.ZodString;
     eventId: z.ZodOptional<z.ZodString>;
@@ -747,6 +747,7 @@ export declare const censusSeen: z.ZodObject<{
     via: z.ZodEnum<{
         group: "group";
         mouseover: "mouseover";
+        nameplate: "nameplate";
         target: "target";
     }>;
     realm: z.ZodOptional<z.ZodNever>;
@@ -790,6 +791,7 @@ export declare const censusSeenStored: z.ZodObject<{
     via: z.ZodEnum<{
         group: "group";
         mouseover: "mouseover";
+        nameplate: "nameplate";
         target: "target";
     }>;
 }, z.core.$strip>;
@@ -829,6 +831,7 @@ export declare const storedCensusSchemas: {
         via: z.ZodEnum<{
             group: "group";
             mouseover: "mouseover";
+            nameplate: "nameplate";
             target: "target";
         }>;
     }, z.core.$strip>;
@@ -1611,6 +1614,7 @@ export declare const recordSchemas: {
         via: z.ZodEnum<{
             group: "group";
             mouseover: "mouseover";
+            nameplate: "nameplate";
             target: "target";
         }>;
         realm: z.ZodOptional<z.ZodNever>;
@@ -2276,6 +2280,7 @@ export declare const anyRecord: z.ZodDiscriminatedUnion<[z.ZodObject<{
     via: z.ZodEnum<{
         group: "group";
         mouseover: "mouseover";
+        nameplate: "nameplate";
         target: "target";
     }>;
     realm: z.ZodOptional<z.ZodNever>;

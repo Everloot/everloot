@@ -63,7 +63,9 @@ Considered and left out of version 1:
 - **Guild roster** (`GetGuildRosterInfo`, `C_GuildInfo`). It would list a whole guild in one read, which is
   the officers' data under today's rules, and it is up to 2,000 rows at a time.
 - **Nameplates** (`NAME_PLATE_UNIT_ADDED`). Fires for every player in view, so it would read far more people
-  than the player is looking at.
+  than the player is looking at. This still holds for names: on 2026-11-04 the anonymous census
+  (`census.lua`) started counting nameplate players (race, class, level, faction), and this module did not.
+  `addon/tests/players_contract.py` fails if `players.lua` names a nameplate event, call or unit.
 - **Inspect, who list, chat, friends.** More data per player, none of it needed for a name page.
 - **Players from another realm.** `UnitName` returns their realm as a second value. A row holds one realm
   string, so they are skipped until launch day shows how Forever names realms.

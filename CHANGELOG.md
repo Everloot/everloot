@@ -70,6 +70,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the header search box suggests dungeons and raids as you type, from the same rows as full search, with or without
   the leading "The": "deadm" offers the Deadmines, labelled "Dungeon, level 16". A box scoped to items, NPCs, quests or
   objects keeps to that type.
+- Addon and site: the census also counts players the game shows a nameplate for (`via: "nameplate"`, protocol 1.25.0),
+  at most 10 new ones a second; still race, class, level and faction only, and the players module still never reads
+  nameplates. Needs the next addon release (0.3.16); no migration.
 
 ### Changed
 - Site: `/sign-in` and `/sign-up` are one centred card under Glint and the home art: the Battle.net button, a row of provider

@@ -547,7 +547,8 @@ const censusBase = base.extend({
     faction: z.enum(["Alliance", "Horde"]),
 });
 const CENSUS_REALM = z.string().min(2).max(60).refine(validRealm, { message: "not a realm name" }).describe("GetRealmName() for your own character.");
-const CENSUS_VIA = z.enum(["target", "mouseover", "group"]).describe("How the addon saw the player.");
+const CENSUS_VIA = z.enum(["target", "mouseover", "group", "nameplate"])
+    .describe("How the addon saw the player. nameplate: a player the game drew a nameplate for (NAME_PLATE_UNIT_ADDED).");
 const NO_REALM = z.never({ error: "realm is sent only for your own characters" }).optional()
     .describe("Absent: the server id in the GUID says where a player you see is from.");
 const NO_VIA = z.never({ error: "via is sent only for players you see" }).optional().describe("Absent on your own characters.");
@@ -557,7 +558,7 @@ export const censusSelf = censusBase.extend({
     realm: CENSUS_REALM,
     via: NO_VIA,
 });
-/** A player you targeted, moused over or grouped with. */
+/** A player you targeted, moused over, grouped with or saw a nameplate for. */
 export const censusSeen = censusBase.extend({
     kind: z.literal("census_seen"),
     via: CENSUS_VIA,
