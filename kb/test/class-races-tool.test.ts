@@ -20,7 +20,7 @@ test("class_races names the races that can be the class on each faction, with th
   expect(page.factions[0].races.map((r) => r.name)).toEqual(["Orc", "Undead", "Troll"]);
   expect(page.factions[0].races[0].traits[0]).toEqual({ name: "Blood Fury", kind: "active", order: 0 });
   expect(text).toContain(`found in game files, unconfirmed; build ${build}`);
-  expect(text).toContain("Orc: Blood Fury (active), Shatter Curse (active), Savage (passive), Hardiness (passive)");
+  expect(text).toContain("Orc: Blood Fury (active), Shatter Curse (active), Command (passive), Hardiness (passive)");
   expect(text.endsWith(`\nMore: https://everloot.app/classes/warlock\n${GAME_DATA_CREDIT}`)).toBe(true);
   // A trait's description is game text: pages only, never in the answer.
   for (const race of RACE_TABLE.races) for (const t of race.traits) {
