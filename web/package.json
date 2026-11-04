@@ -56,7 +56,7 @@
   },
   "overrides": {
     "postcss": "$postcss",
-    "glob": "10.5.0",
+    "glob": "14.0.2",
     "source-map-js": "1.2.2",
     "postcss-selector-parser": "7.1.6"
   },
