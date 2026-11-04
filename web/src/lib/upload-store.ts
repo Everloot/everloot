@@ -109,14 +109,22 @@ interface MarketSnapshot {
   version: 3;
   generatedAt: string;
   state: MarketState;
-  /** Uploads in the read window already folded in, so each is read once. Older ids are forgotten. */
-  seenUploadIds: string[];
+  /** received_at of the newest upload folded in, and the ids sharing it, so ties are not read twice. */
+  lastReceivedAt: string | null;
+  lastIds: string[];
+  /**
+   * Before the watermark, every upload id in the read window was kept here, which grew with every upload of any
+   * kind. Only read, never written: the run after such a rollup lists the window once more and skips these.
+   */
+  seenUploadIds?: string[];
 }
 
 /** An upload received before this can only hold days the 60-day history has pruned (one day of clock drift allowed). */
 const MARKET_READ_DAYS = HISTORY_DAYS + 2;
 /** Upload objects read and folded at a time, so a rebuild never holds every payload at once. */
 const MARKET_FOLD_BATCH = 64;
+/** Uploads one market cron run folds at most; a backlog is folded over several runs, each saving its place. */
+const MARKET_UPLOADS_PER_RUN = 1500;
 /** Uploads one completion cron run folds; a first run or a rebuild takes several runs and saves after each. */
 const COMPLETION_UPLOADS_PER_RUN = 1500;
 
@@ -191,6 +199,8 @@ export function createUploadStore(opts: {
   marketMaxBytes?: number;
   /** Largest completion.json the rollup may read; a write trims to stay under it. Tests lower it. */
   completionMaxBytes?: number;
+  /** Uploads one market run folds at most; the next run continues from where it stopped. */
+  marketBatch?: number;
   /** Uploads one completion run folds at most; the next run continues from where it stopped. */
   completionBatch?: number;
   /** Time and catalog/owned rows one completion run may spend before it saves and stops (checked between batches). */
@@ -207,6 +217,7 @@ export function createUploadStore(opts: {
   let completionCached: { at: number; read: CompletionRead } | null = null;
   let censusCached: { at: number; read: CensusRead } | null = null;
   const marketMaxBytes = opts.marketMaxBytes ?? MARKET_MAX_BYTES;
+  const marketBatch = opts.marketBatch ?? MARKET_UPLOADS_PER_RUN;
   const completionMaxBytes = opts.completionMaxBytes ?? COMPLETION_MAX_BYTES;
   const completionBatch = opts.completionBatch ?? COMPLETION_UPLOADS_PER_RUN;
   const completionBudgetMs = opts.completionBudgetMs ?? 150_000;
@@ -409,17 +420,22 @@ export function createUploadStore(opts: {
     let parsed: Partial<MarketSnapshot>;
     try { parsed = JSON.parse(text) as Partial<MarketSnapshot>; } catch { return { snapshot: null, etag }; }
     const state = parsed.state;
-    if (parsed.version !== 3 || state?.version !== 3 || !state.realms || typeof state.realms !== "object" || !Array.isArray(parsed.seenUploadIds)) {
+    const watermarked = (typeof parsed.lastReceivedAt === "string" || parsed.lastReceivedAt === null) && Array.isArray(parsed.lastIds);
+    if (parsed.version !== 3 || state?.version !== 3 || !state.realms || typeof state.realms !== "object" || (!watermarked && !Array.isArray(parsed.seenUploadIds))) {
       return { snapshot: null, etag };
     }
-    return { snapshot: parsed as MarketSnapshot, etag };
+    return { snapshot: { lastReceivedAt: null, lastIds: [], ...parsed } as MarketSnapshot, etag };
   }
 
   /**
-   * Fold full scans from uploads not yet seen into the market rollup (cron). `rebuild` starts
-   * from empty. A missed object writes nothing, so the next run reads it again.
+   * Fold full scans from uploads not yet seen into the market rollup (cron). The rollup keeps a watermark
+   * (`lastReceivedAt` and the ids sharing it), so a run lists only the uploads received since the last one, folds
+   * at most `marketBatch` of them in arrival order and saves its place; `remaining` says how many wait for the
+   * next run. A rollup from before the watermark carries `seenUploadIds` instead: the run after it lists the whole
+   * read window once more and skips those. `rebuild` starts from empty and folds the whole window in one run.
+   * A missed object writes nothing, so the next run reads it again.
    */
-  async function writeMarket(opts: { rebuild?: boolean; idle?: boolean } = {}): Promise<{ added: number; scans: number; dropped?: number; trimmedDays?: number; skipped?: boolean }> {
+  async function writeMarket(opts: { rebuild?: boolean; idle?: boolean } = {}): Promise<{ added: number; scans: number; remaining?: number; dropped?: number; trimmedDays?: number; skipped?: boolean }> {
     if (!cloud) throw new Error("the market rollup needs the cloud store");
     const current = await readMarketSnapshot();
     if (current && (!current.etag || current.etag.startsWith("W/"))) throw new Error("market rollup has no strong ETag: cannot safely update it");
@@ -429,9 +445,13 @@ export function createUploadStore(opts: {
         new Date(prev.generatedAt).toISOString().slice(0, 10) === now().toISOString().slice(0, 10)) {
       return { added: 0, scans: 0, skipped: true };
     }
-    const seen = new Set(prev?.seenUploadIds ?? []);
-    const rows = await listIndex(new Date(now().getTime() - MARKET_READ_DAYS * 86_400_000).toISOString());
-    const fresh = rows.filter((r) => !seen.has(r.id));
+    const windowStart = new Date(now().getTime() - MARKET_READ_DAYS * 86_400_000).toISOString();
+    // From the watermark when there is one inside the window; an upload older than the window holds only pruned days.
+    const since = prev?.lastReceivedAt && Date.parse(prev.lastReceivedAt) > Date.parse(windowStart) ? prev.lastReceivedAt : windowStart;
+    const legacy = new Set(prev?.seenUploadIds ?? []);
+    const rows = await listIndex(since);
+    const unseen = rows.filter((r) => !legacy.has(r.id) && !(prev?.lastReceivedAt && r.received_at === prev.lastReceivedAt && prev.lastIds.includes(r.id)));
+    const fresh = opts.rebuild ? unseen : unseen.slice(0, marketBatch);
     let state = prev?.state ?? emptyMarket();
     let scans = 0;
     const stats: FoldStats = { dropped: 0 };
@@ -442,13 +462,15 @@ export function createUploadStore(opts: {
       scans += batch.length;
       state = foldMarket(state, batch, now(), {}, stats);
     }
+    const last = fresh.length > 0 ? fresh[fresh.length - 1].received_at : null;
+    const sameTime = (ids: string[]) => (last !== null && prev?.lastReceivedAt === last ? [...new Set([...prev.lastIds, ...ids])] : ids);
     const snapshot: MarketSnapshot = {
       version: 3,
       generatedAt: now().toISOString(),
       // With no new scans the fold still closes and prunes days as time passes.
       state: fresh.length ? state : foldMarket(state, [], now()),
-      // Every listed upload is now folded in; ids outside the window drop out with it.
-      seenUploadIds: rows.map((r) => r.id).sort(),
+      lastReceivedAt: last ?? prev?.lastReceivedAt ?? null,
+      lastIds: last !== null ? sameTime(fresh.filter((r) => r.received_at === last).map((r) => r.id)) : prev?.lastIds ?? [],
     };
     let body = JSON.stringify(snapshot);
     let trimmedDays = 0;
@@ -469,7 +491,7 @@ export function createUploadStore(opts: {
     });
     if (!put.ok) throw new Error(`market write failed (${put.status})`);
     marketCached = null;
-    return { added: fresh.length, scans, dropped: stats.dropped, trimmedDays };
+    return { added: fresh.length, scans, remaining: unseen.length - fresh.length, dropped: stats.dropped, trimmedDays };
   }
 
   async function loadMarket(): Promise<Market> {

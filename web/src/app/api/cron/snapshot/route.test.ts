@@ -84,6 +84,12 @@ test("idle does not strand rollups left behind by failure or a bounded completio
   expect(store.writeCronRun).toHaveBeenCalledWith(true, "2026-10-01", "2026-W43");
 });
 
+test("a market backlog marks the run pending, so an idle next run still folds it", async () => {
+  store.writeMarket.mockResolvedValue({ added: 1500, scans: 1500, remaining: 40, dropped: 0, trimmedDays: 0 });
+  expect(await (await GET(req())).json()).toMatchObject({ ok: true, market: { remaining: 40 } });
+  expect(store.writeCronRun).toHaveBeenCalledWith(true, undefined, null);
+});
+
 test("an explicit rebuild bypasses idle and a failed run never advances the heartbeat", async () => {
   store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: false });
   store.writeMarket.mockRejectedValue(new Error("down"));

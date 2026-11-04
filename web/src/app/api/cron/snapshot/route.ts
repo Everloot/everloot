@@ -59,7 +59,7 @@ export async function GET(req: Request) {
     // and the next run retries the same uploads.
     // `dropped` scans hit a fold cap and `trimmedDays` of closed history went to fit the size limit: both say
     // the rollup is full, which is otherwise invisible.
-    let market: { added: number; scans: number; dropped?: number; trimmedDays?: number } | null = null;
+    let market: { added: number; scans: number; remaining?: number; dropped?: number; trimmedDays?: number } | null = null;
     try {
       market = await uploadStore.writeMarket(idle && !work.retryRollups ? { idle: true } : { rebuild });
     } catch (err) {
@@ -99,8 +99,9 @@ export async function GET(req: Request) {
     } catch (err) {
       console.error("settled list failed", err);
     }
+    // A rollup with uploads left over is pending: the next run folds them even when no new upload arrived.
     await uploadStore.writeCronRun(
-      completion.remaining > 0 || completion.rebuilding,
+      completion.remaining > 0 || completion.rebuilding || (market.remaining ?? 0) > 0,
       result.dataAsOf,
       settled?.written ? week : work.settledWeek ?? null,
     );

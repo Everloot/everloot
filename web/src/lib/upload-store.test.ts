@@ -499,17 +499,35 @@ describe("market rollup", () => {
       [MARKET, "PUT", () => new Response(null, { status: 200 })],
     ]);
     const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now });
-    expect(await store.writeMarket()).toEqual({ added: 3, scans: 3, dropped: 0, trimmedDays: 0 });
+    expect(await store.writeMarket()).toEqual({ added: 3, scans: 3, remaining: 0, dropped: 0, trimmedDays: 0 });
     const put = calls.find((c) => c.method === "PUT")!;
     expect(put.headers.get("if-none-match")).toBe("*");
     const body = JSON.parse(put.body);
-    expect(body).toMatchObject({ version: 3, generatedAt: "2026-10-04T12:00:00.000Z", seenUploadIds: ["a", "b", "c"] });
+    expect(body).toMatchObject({ version: 3, generatedAt: "2026-10-04T12:00:00.000Z", lastReceivedAt: "2026-10-04T02:00:00+00:00", lastIds: ["c"] });
+    expect(body.seenUploadIds).toBeUndefined();
     expect(Object.keys(body.state.realms.forever.items)).toEqual(["2589"]);
     // Uploads older than the 60-day history can only hold pruned days, so they are never read.
     expect(calls.find((c) => c.url.startsWith(INDEX))!.url).toContain("received_at=gte.2026-08-03T12%3A00%3A00.000Z");
   });
 
-  test("a later rollup reads only unseen uploads and replaces the object it read", async () => {
+  test("a later rollup lists only uploads since its watermark, skips the ids sharing it, and replaces the object it read", async () => {
+    const { fn, calls } = fakeFetch([
+      [MARKET, "GET", () => Response.json({ version: 3, generatedAt: "x", state: { version: 3, realms: {} }, lastReceivedAt: "2026-10-04T00:00:00+00:00", lastIds: ["a"] })],
+      [INDEX, "GET", () => Response.json(index(["a", "b"]))],
+      [`${R2}uploads/b.json`, "GET", () => Response.json({ records: [scan("install-2", 200)] })],
+      [MARKET, "PUT", () => new Response(null, { status: 200 })],
+    ]);
+    const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now });
+    expect(await store.writeMarket()).toEqual({ added: 1, scans: 1, remaining: 0, dropped: 0, trimmedDays: 0 });
+    // The listing starts at the watermark, not 62 days back: the index is never read whole again.
+    expect(calls.find((c) => c.url.startsWith(INDEX))!.url).toContain("received_at=gte.2026-10-04T00%3A00%3A00%2B00%3A00");
+    expect(calls.some((c) => c.url.endsWith("uploads/a.json"))).toBe(false);
+    const put = calls.find((c) => c.method === "PUT")!;
+    expect(put.headers.get("if-match")).toBe('"fixture"');
+    expect(JSON.parse(put.body)).toMatchObject({ lastReceivedAt: "2026-10-04T01:00:00+00:00", lastIds: ["b"] });
+  });
+
+  test("a rollup from before the watermark is read once more over the whole window, its seen ids skipped, and written with a watermark", async () => {
     const { fn, calls } = fakeFetch([
       [MARKET, "GET", () => Response.json({ version: 3, generatedAt: "x", state: { version: 3, realms: {} }, seenUploadIds: ["a", "gone"] })],
       [INDEX, "GET", () => Response.json(index(["a", "b"]))],
@@ -517,12 +535,42 @@ describe("market rollup", () => {
       [MARKET, "PUT", () => new Response(null, { status: 200 })],
     ]);
     const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now });
-    expect(await store.writeMarket()).toEqual({ added: 1, scans: 1, dropped: 0, trimmedDays: 0 });
+    expect(await store.writeMarket()).toEqual({ added: 1, scans: 1, remaining: 0, dropped: 0, trimmedDays: 0 });
+    expect(calls.find((c) => c.url.startsWith(INDEX))!.url).toContain("received_at=gte.2026-08-03T12%3A00%3A00.000Z");
     expect(calls.some((c) => c.url.endsWith("uploads/a.json"))).toBe(false);
-    const put = calls.find((c) => c.method === "PUT")!;
-    expect(put.headers.get("if-match")).toBe('"fixture"');
-    // Ids that left the window are forgotten, so the list stays bounded.
-    expect(JSON.parse(put.body).seenUploadIds).toEqual(["a", "b"]);
+    const body = JSON.parse(calls.find((c) => c.method === "PUT")!.body);
+    expect(body).toMatchObject({ lastReceivedAt: "2026-10-04T01:00:00+00:00", lastIds: ["b"] });
+    expect(body.seenUploadIds).toBeUndefined();
+  });
+
+  test("a backlog is folded a batch per run, the watermark moving to the last upload folded, and the rest reported", async () => {
+    const first = fakeFetch([
+      [MARKET, "GET", () => new Response("missing", { status: 404 })],
+      [INDEX, "GET", () => Response.json(index(["a", "b", "c"]))],
+      [`${R2}uploads/a.json`, "GET", () => Response.json({ records: [scan("install-1", 100)] })],
+      [`${R2}uploads/b.json`, "GET", () => Response.json({ records: [scan("install-2", 200)] })],
+      [MARKET, "PUT", () => new Response(null, { status: 200 })],
+    ]);
+    expect(await createUploadStore({ cloud, localDir: "unused", fetch: first.fn, now, marketBatch: 2 }).writeMarket())
+      .toEqual({ added: 2, scans: 2, remaining: 1, dropped: 0, trimmedDays: 0 });
+    expect(first.calls.some((c) => c.url.endsWith("uploads/c.json"))).toBe(false);
+    const written = JSON.parse(first.calls.find((c) => c.method === "PUT")!.body);
+    expect(written).toMatchObject({ lastReceivedAt: "2026-10-04T01:00:00+00:00", lastIds: ["b"] });
+    // The next run continues after b; an upload sharing b's time is a tie it still reads.
+    const tie = { id: "b2", object_key: "uploads/b2.json", received_at: "2026-10-04T01:00:00+00:00" };
+    const second = fakeFetch([
+      [MARKET, "GET", () => new Response(JSON.stringify(written), { headers: { etag: '"fixture"' } })],
+      [INDEX, "GET", () => Response.json([index(["a", "b", "c"])[1], tie, index(["a", "b", "c"])[2]])],
+      [`${R2}uploads/b2.json`, "GET", () => Response.json({ records: [scan("install-4", 250)] })],
+      [`${R2}uploads/c.json`, "GET", () => Response.json({ records: [scan("install-3", 300)] })],
+      [MARKET, "PUT", () => new Response(null, { status: 200 })],
+    ]);
+    expect(await createUploadStore({ cloud, localDir: "unused", fetch: second.fn, now, marketBatch: 2 }).writeMarket())
+      .toEqual({ added: 2, scans: 2, remaining: 0, dropped: 0, trimmedDays: 0 });
+    expect(second.calls.some((c) => c.url.endsWith("uploads/b.json"))).toBe(false);
+    const body = JSON.parse(second.calls.find((c) => c.method === "PUT")!.body);
+    expect(body).toMatchObject({ lastReceivedAt: "2026-10-04T02:00:00+00:00", lastIds: ["c"] });
+    expect(Object.keys(body.state.realms.forever.items["2589"].open["2026-10-04"])).toEqual(["install-1", "install-2", "install-4", "install-3"]);
   });
 
   test("an unreadable upload writes nothing, so it is read again next time", async () => {
@@ -604,8 +652,13 @@ describe("market rollup", () => {
       [`${R2}uploads/a.json`, "GET", () => Response.json({ records: [scan("install-1", 100)] })],
       [MARKET, "PUT", () => new Response(null, { status: 200 })],
     ]);
-    const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now, marketMaxBytes: stored.length + 40 });
-    expect(await store.writeMarket()).toEqual({ added: 1, scans: 1, dropped: 0, trimmedDays: 1 });
+    // One byte short of what the whole rollup needs: the oldest day goes, and the rest fits.
+    const whole = JSON.stringify({
+      version: 3, generatedAt: "2026-10-04T12:00:00.000Z", state: foldMarket(prev, [scan("install-1", 100)], now()),
+      lastReceivedAt: "2026-10-04T00:00:00+00:00", lastIds: ["a"],
+    });
+    const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now, marketMaxBytes: whole.length - 1 });
+    expect(await store.writeMarket()).toEqual({ added: 1, scans: 1, remaining: 0, dropped: 0, trimmedDays: 1 });
     const body = JSON.parse(calls.find((c) => c.method === "PUT")!.body);
     expect(Object.keys(body.state.realms.forever.items["2589"].closed)).toEqual(["2026-09-11"]);
     expect(Object.keys(body.state.realms.forever.items["2589"].open["2026-10-04"])).toEqual(["install-1"]);
@@ -637,7 +690,7 @@ describe("market rollup", () => {
     await expect(createUploadStore({ cloud, localDir: "unused", fetch: stuck.fn, now }).writeMarket()).rejects.toThrow(/rebuild/);
     expect(stuck.calls.some((c) => c.method === "PUT")).toBe(false);
     const rebuilt = fakeFetch(routes());
-    expect(await createUploadStore({ cloud, localDir: "unused", fetch: rebuilt.fn, now }).writeMarket({ rebuild: true })).toEqual({ added: 1, scans: 1, dropped: 0, trimmedDays: 0 });
+    expect(await createUploadStore({ cloud, localDir: "unused", fetch: rebuilt.fn, now }).writeMarket({ rebuild: true })).toEqual({ added: 1, scans: 1, remaining: 0, dropped: 0, trimmedDays: 0 });
     expect(rebuilt.calls.find((c) => c.method === "PUT")!.headers.get("if-match")).toBe('"fixture"');
   });
 });
