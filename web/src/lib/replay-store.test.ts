@@ -52,7 +52,9 @@ test("incremental snapshot, conflict replay and full rebuild have identical even
   f.add("c", [row("epoch:1", 9)]); await store.writeSnapshot();
   f.add("d"); await store.writeSnapshot();
   const before = JSON.parse(f.objects.get("snapshots/corpus.json")!);
-  expect(before.records).toEqual([row("epoch:2")]);
+  expect(before.records).toEqual([]);
+  expect(before.corpusState.events.map((e: { record: unknown }) => e.record)).toEqual([row("epoch:2")]);
+  expect((await store.loadCorpus()).records).toEqual([row("epoch:2")]);
   await store.writeSnapshot({ rebuild: true });
   expect(JSON.parse(f.objects.get("snapshots/corpus.json")!).corpusState).toEqual(before.corpusState);
 });
