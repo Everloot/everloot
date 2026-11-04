@@ -22,7 +22,7 @@ test("the hub lists every profession from the game files with its recipe count, 
   expect(html).toContain('href="/tools/professions/alchemy"');
   expect(html).toContain('href="/tools/professions/first-aid"');
   expect(html).toContain("recipes in the files");
-  expect(html).toContain("found in game files, unconfirmed, build 1.60.1.70755");
+  expect(html).toContain("found in game files, unconfirmed, build 1.60.1.70790");
 });
 
 test("the old form's links go to the profession's page with the same range and class context", async () => {
