@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/item_page.json",
   "title": "Item page for a drop",
-  "description": "Returns one Forever item's page by item id: agreed name, observed loot-window drop frequency, agreed map pins, and player-reported armor, block, damage per second, stats and resistances. Each item number needs one value with 3 agreeing installs in the newest build with 3 reporting installs, and no competing value with 3; contested values are withheld. Each number states its agreeing installs, build and last seen, with the corpus date and method. Missing numbers are [?] with a reason. No baseline rows or player names. Use it when you have an item id, from a drop row, a search_knowledge hit or entity_relations; use market_value for its price, entity_relations for what drops or sells it, and item_categories for its class and slot. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
+  "description": "Returns one Forever item's page by item id: the agreed name, drop frequency from observed loot windows, agreed map pins, and player-reported armor, block, damage per second, stats and resistances. A number is public when one value has 3 agreeing installs in the newest build that 3 installs reported, and no competing value has 3; contested numbers are withheld. Each number states its agreeing installs, build and last seen, with the corpus date and method. Missing numbers are [?] with a reason. No baseline rows or player names. Use it when you have an item id; use market_value for its price, entity_relations for what drops or sells it, and item_categories for its class and slot. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false
@@ -14,7 +14,7 @@
         "type": "integer",
         "exclusiveMinimum": 0,
         "maximum": 9007199254740991,
-        "description": "Item id from a drop row."
+        "description": "The game's item id, from a drop row, entity_relations or the extId of a search_knowledge hit of kind item."
       }
     },
     "required": [

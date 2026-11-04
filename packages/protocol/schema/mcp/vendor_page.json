@@ -14,7 +14,7 @@
         "type": "integer",
         "exclusiveMinimum": 0,
         "maximum": 9007199254740991,
-        "description": "Vendor NPC id."
+        "description": "The vendor's NPC id, the id npc_page takes, from world_map_near or entity_relations."
       }
     },
     "required": [

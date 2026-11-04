@@ -35,14 +35,14 @@
       },
       "radius": {
         "default": 500,
-        "description": "Search radius in yards.",
+        "description": "Search radius in yards, up to 5000, default 500.",
         "type": "number",
         "exclusiveMinimum": 0,
         "maximum": 5000
       },
       "limit": {
         "default": 5,
-        "description": "Most results per list.",
+        "description": "Most results per list, 1 to 20, default 5.",
         "type": "integer",
         "minimum": 1,
         "maximum": 20

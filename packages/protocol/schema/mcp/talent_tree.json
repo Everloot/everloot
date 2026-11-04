@@ -23,7 +23,7 @@
           "warlock",
           "druid"
         ],
-        "description": "Class slug."
+        "description": "Class slug, such as mage."
       },
       "tree": {
         "description": "One tree by name, such as Arcane. Without it, every tree.",

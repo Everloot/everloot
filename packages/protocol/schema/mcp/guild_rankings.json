@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/guild_rankings.json",
   "title": "Guild ladder for one raid or dungeon",
-  "description": "Ranks every guild with an agreed kill in one instance, ordered by bosses killed, then by who reached its latest kill first, then by name; equal rows share a rank. A kill is a guild's once 2 of its members' installs report the same boss there, timed at the earliest report, or once its officers published it through the guild board, which carries no time. The boss list and its order are the encounters 3 installs reported in that instance; a kill of a boss not on it counts for nothing. There is no score, no rating and no total across instances. Without an instance, the newest raid with a kill is ranked; realm and faction narrow the ladder. Use it to compare guilds' progress in one raid or dungeon; use guild_board for one guild's own board, and guild_search to find a guild. The instance map id is the one instance_entrance records carry; limit caps the rows. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
+  "description": "Ranks every guild with an agreed kill in one instance: by bosses killed, then by who reached its latest kill first, then by name; equal rows share a rank. A kill is a guild's once 2 of its members' installs report the same boss there, timed at the earliest report, or once its officers published it on the guild board, which carries no time. The boss list is the encounters 3 installs reported in that instance, in that order; a boss not on it counts for nothing. There is no score, no rating and no total across instances. Use it to compare guilds' progress in one raid or dungeon; use guild_board for one guild's own board, and guild_search to find a guild. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false
@@ -11,18 +11,18 @@
     "type": "object",
     "properties": {
       "instanceMapId": {
-        "description": "The instance's map id, as instance_entrance carries it. Omit for the newest raid with a kill.",
+        "description": "The instance's map id: the extId of a search_knowledge hit of kind instance. Omit for the newest raid with a kill.",
         "type": "integer",
         "exclusiveMinimum": 0,
         "maximum": 9007199254740991
       },
       "realm": {
-        "description": "Only guilds on this realm.",
+        "description": "Only guilds on this realm. Without it, every realm.",
         "type": "string",
         "maxLength": 60
       },
       "faction": {
-        "description": "Only alliance or horde guilds.",
+        "description": "Only alliance or horde guilds. Without it, both.",
         "type": "string",
         "enum": [
           "alliance",
@@ -31,7 +31,7 @@
       },
       "limit": {
         "default": 20,
-        "description": "Most guilds listed, 1 to 100.",
+        "description": "Most guilds listed, 1 to 100, default 20.",
         "type": "integer",
         "minimum": 1,
         "maximum": 100

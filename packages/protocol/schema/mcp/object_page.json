@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/object_page.json",
   "title": "Game object page",
-  "description": "Returns one game object's page (a chest, herb, ore vein or fishing pool) by the entry id in its GUID: the items players looted from it, each with observed loot windows, windows with the item and distinct install reports. A frequency is public after 3 install reports; a public object with nothing in its windows reads as a measured zero. The name is shown when 3 installs agree on it. Use it for gathering nodes and containers; use npc_page for creatures, and item_page for every source of one item. Reads Everloot's public player data when connected.",
+  "description": "Returns one game object's page (a chest, herb, ore vein or fishing pool) by its entry id: the items players looted from it, each with observed loot windows, windows with the item and distinct install reports, and where players saw it on the minimap. A frequency is public after 3 install reports; a public object with nothing in its windows reads as a measured zero. The name shows once 3 installs agree on it. Use it for gathering nodes and containers; use npc_page for creatures, and item_page for every source of one item. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false
@@ -14,7 +14,7 @@
         "type": "integer",
         "exclusiveMinimum": 0,
         "maximum": 9007199254740991,
-        "description": "The object's entry id, as in /database/objects/1731."
+        "description": "The object's entry id, from a world_map_near treasure, as in /database/objects/1731."
       }
     },
     "required": [

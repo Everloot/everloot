@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/collection_gap.json",
   "title": "Owned versus missing in a collection",
-  "description": "Returns what one install still misses in one collection, against what that install uploaded as owned. A list row is public after 3 installs agree on the collection, the source and the item; owned is what that install uploaded. Not a Blizzard profile read and not a copied catalog. Use it for which items of a collection a player is missing; use completion_progress for achievements, reputations and titles. ownerInstallId is the id of the install that uploaded; without that upload the answer says so. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
+  "description": "Returns what one install still misses in one collection, against what that install uploaded as owned, grouped by source. A list row is public after 3 installs agree on the collection, the source and the item; owned is what that install uploaded. Not a Blizzard profile read and not a copied catalog. Use it for which items of a collection a player is missing; use completion_progress for achievements, reputations and titles. When that install never uploaded the collection, the answer says owned is unknown, not empty. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false
@@ -12,11 +12,11 @@
     "properties": {
       "collection": {
         "type": "string",
-        "description": "Collection name, such as Mounts."
+        "description": "Collection name, any case, such as Mounts."
       },
       "ownerInstallId": {
         "type": "string",
-        "description": "Install id whose owned upload to compare."
+        "description": "The player's own install id, whose owned upload to compare. Everloot never publishes install ids, so only the player can give it."
       }
     },
     "required": [

@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/answer_sources.json",
   "title": "Evidence for a question, each piece with its source",
-  "description": "Returns the evidence behind a question about WoW: Forever, so an answer can cite its sources: facts players observed (public after three installs agree, with the install count), curated facts, and the 2023 Warcraft Wiki (marked: may differ in Forever). Every piece carries a claim, its source URL, licence and date; the answer is evidence, not prose. Use it for questions that need citations, such as why, where or how many; use search_knowledge to find a record by name, and the page tools (item_page, npc_page, quest_page) for one entity's agreed facts. Spell names as the game does; limit caps the lore and curated pieces. Further-reading links are search URLs on other sites; nothing is fetched from them. Reads Everloot's public player data when connected; when it is not, the observed layer is unrecorded, not empty.",
+  "description": "Returns the evidence behind a question about WoW: Forever, so an answer can cite it: player observations, curated facts, game files and the 2023 Warcraft Wiki. An observed fact is public after three installs agree and carries the install count; a game-file fact is found in game files, unconfirmed, with the build; lore is marked: may differ in Forever. Every piece carries a claim, its source URL, licence and date; the answer is evidence, not prose. Use it for questions that need citations, such as why, where or how many; use search_knowledge to find a record by name, and the page tools (item_page, npc_page, quest_page) for one entity's agreed facts. Further-reading links are search URLs on other sites; nothing is fetched from them. When Everloot's public player data is not connected, the observed layer is unrecorded, not empty.",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false
@@ -14,11 +14,11 @@
         "type": "string",
         "minLength": 1,
         "maxLength": 500,
-        "description": "The question, with names spelled as in the game."
+        "description": "The question, 1 to 500 characters, with names spelled as in the game."
       },
       "limit": {
         "default": 8,
-        "description": "Most lore and curated pieces.",
+        "description": "Most lore and curated pieces, 1 to 25, default 8.",
         "type": "integer",
         "minimum": 1,
         "maximum": 25

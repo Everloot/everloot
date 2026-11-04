@@ -12,7 +12,7 @@
     "properties": {
       "board": {
         "default": "all",
-        "description": "installed, rising, active, release, maintained, or all (A to Z).",
+        "description": "installed, rising, active, release, maintained, or all (default, A to Z).",
         "type": "string",
         "enum": [
           "all",
@@ -24,12 +24,12 @@
         ]
       },
       "forever_ready_only": {
-        "description": "Only projects whose .toc lists a Forever interface number.",
+        "description": "Only projects whose .toc lists a Forever interface number. Default false.",
         "type": "boolean"
       },
       "limit": {
         "default": 10,
-        "description": "Most projects listed, 1 to 25.",
+        "description": "Most projects listed, 1 to 25, default 10.",
         "type": "integer",
         "minimum": 1,
         "maximum": 25
