@@ -1,0 +1,5411 @@
+{
+  "schema": "everloot.game-changes/2",
+  "label": "found in game files, unconfirmed",
+  "id": "wowf-70790",
+  "product": "wowf",
+  "live": false,
+  "spoiler": true,
+  "detectedAt": "2026-11-04T18:40:43.615Z",
+  "build": {
+    "version": "1.60.1.70790",
+    "buildId": 70790,
+    "buildConfig": "9006ba6948388dd0d4a0578e64b8a92e"
+  },
+  "previous": {
+    "version": "1.60.1.70707",
+    "buildId": 70707,
+    "buildConfig": "7feb61f3c994bcb168526b8db521514a"
+  },
+  "initial": false,
+  "encryptedBlocks": {
+    "total": 374,
+    "tables": [
+      {
+        "table": "Achievement",
+        "blocks": 1
+      },
+      {
+        "table": "AnimKit",
+        "blocks": 1
+      },
+      {
+        "table": "AnimKitSegment",
+        "blocks": 1
+      },
+      {
+        "table": "AreaTable",
+        "blocks": 3
+      },
+      {
+        "table": "BattlePetSpecies",
+        "blocks": 5
+      },
+      {
+        "table": "CharacterLoadout",
+        "blocks": 1
+      },
+      {
+        "table": "Creature",
+        "blocks": 6
+      },
+      {
+        "table": "CreatureDifficulty",
+        "blocks": 6
+      },
+      {
+        "table": "CreatureDisplayInfo",
+        "blocks": 10
+      },
+      {
+        "table": "CreatureDisplayInfoExtra",
+        "blocks": 1
+      },
+      {
+        "table": "CreatureDisplayInfoGeosetData",
+        "blocks": 1
+      },
+      {
+        "table": "CreatureDisplayInfoOption",
+        "blocks": 1
+      },
+      {
+        "table": "CreatureMovementInfo",
+        "blocks": 1
+      },
+      {
+        "table": "CreatureSoundData",
+        "blocks": 8
+      },
+      {
+        "table": "CreatureXDisplayInfo",
+        "blocks": 6
+      },
+      {
+        "table": "Criteria",
+        "blocks": 1
+      },
+      {
+        "table": "DungeonEncounter",
+        "blocks": 3
+      },
+      {
+        "table": "Emotes",
+        "blocks": 1
+      },
+      {
+        "table": "GameObjectDisplayInfo",
+        "blocks": 2
+      },
+      {
+        "table": "GossipNPCOption",
+        "blocks": 1
+      },
+      {
+        "table": "Item",
+        "blocks": 16
+      },
+      {
+        "table": "ItemAppearance",
+        "blocks": 7
+      },
+      {
+        "table": "ItemDisplayInfo",
+        "blocks": 7
+      },
+      {
+        "table": "ItemDisplayInfoMaterialRes",
+        "blocks": 3
+      },
+      {
+        "table": "ItemEffect",
+        "blocks": 12
+      },
+      {
+        "table": "ItemModifiedAppearance",
+        "blocks": 7
+      },
+      {
+        "table": "ItemNameDescription",
+        "blocks": 1
+      },
+      {
+        "table": "ItemSearchName",
+        "blocks": 7
+      },
+      {
+        "table": "ItemSparse",
+        "blocks": 31
+      },
+      {
+        "table": "ItemXItemEffect",
+        "blocks": 12
+      },
+      {
+        "table": "LFGDungeons",
+        "blocks": 1
+      },
+      {
+        "table": "LoadingScreens",
+        "blocks": 2
+      },
+      {
+        "table": "Lock",
+        "blocks": 1
+      },
+      {
+        "table": "Map",
+        "blocks": 3
+      },
+      {
+        "table": "MapDifficulty",
+        "blocks": 1
+      },
+      {
+        "table": "Mount",
+        "blocks": 3
+      },
+      {
+        "table": "MountXDisplay",
+        "blocks": 3
+      },
+      {
+        "table": "ObjectEffect",
+        "blocks": 2
+      },
+      {
+        "table": "ObjectEffectPackageElem",
+        "blocks": 2
+      },
+      {
+        "table": "QuestV2",
+        "blocks": 5
+      },
+      {
+        "table": "SkillLineAbility",
+        "blocks": 8
+      },
+      {
+        "table": "SoundEnvelope",
+        "blocks": 4
+      },
+      {
+        "table": "SoundKit",
+        "blocks": 8
+      },
+      {
+        "table": "SoundKitAdvanced",
+        "blocks": 8
+      },
+      {
+        "table": "SoundKitChild",
+        "blocks": 2
+      },
+      {
+        "table": "SoundKitEntry",
+        "blocks": 8
+      },
+      {
+        "table": "Spell",
+        "blocks": 29
+      },
+      {
+        "table": "SpellAuraOptions",
+        "blocks": 6
+      },
+      {
+        "table": "SpellCategories",
+        "blocks": 12
+      },
+      {
+        "table": "SpellClassOptions",
+        "blocks": 2
+      },
+      {
+        "table": "SpellCooldowns",
+        "blocks": 9
+      },
+      {
+        "table": "SpellEffect",
+        "blocks": 14
+      },
+      {
+        "table": "SpellEquippedItems",
+        "blocks": 3
+      },
+      {
+        "table": "SpellFocusObject",
+        "blocks": 1
+      },
+      {
+        "table": "SpellInterrupts",
+        "blocks": 12
+      },
+      {
+        "table": "SpellItemEnchantment",
+        "blocks": 1
+      },
+      {
+        "table": "SpellLabel",
+        "blocks": 4
+      },
+      {
+        "table": "SpellLevels",
+        "blocks": 6
+      },
+      {
+        "table": "SpellMisc",
+        "blocks": 14
+      },
+      {
+        "table": "SpellName",
+        "blocks": 14
+      },
+      {
+        "table": "SpellPower",
+        "blocks": 2
+      },
+      {
+        "table": "SpellProceduralEffect",
+        "blocks": 1
+      },
+      {
+        "table": "SpellReagents",
+        "blocks": 4
+      },
+      {
+        "table": "SpellShapeshift",
+        "blocks": 1
+      },
+      {
+        "table": "SpellTargetRestrictions",
+        "blocks": 5
+      },
+      {
+        "table": "SpellTotems",
+        "blocks": 1
+      },
+      {
+        "table": "SummonProperties",
+        "blocks": 2
+      },
+      {
+        "table": "TotemCategory",
+        "blocks": 1
+      },
+      {
+        "table": "Toy",
+        "blocks": 1
+      },
+      {
+        "table": "TransmogSet",
+        "blocks": 2
+      },
+      {
+        "table": "TransmogSetItem",
+        "blocks": 2
+      },
+      {
+        "table": "ZoneLight",
+        "blocks": 1
+      }
+    ]
+  },
+  "source": {
+    "definitions": "a936b2d4f4db",
+    "library": "@rhyster/wow-casc-dbc@2.16.19",
+    "extractedAt": "2026-11-04T18:40:31.705Z"
+  },
+  "catalog": {
+    "classes": 9,
+    "nodes": 468
+  },
+  "talents": {
+    "classesAdded": [],
+    "classesRemoved": [],
+    "added": [
+      {
+        "classId": 1,
+        "className": "Warrior",
+        "tree": "Fury",
+        "nodeId": 113636,
+        "name": "Reckless Swings",
+        "spoiler": true,
+        "kind": "single",
+        "maxRanks": 1
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Retribution",
+        "nodeId": 113629,
+        "name": "Turn Evil",
+        "spoiler": true,
+        "kind": "single",
+        "maxRanks": 2
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 113630,
+        "name": "Divine Strength",
+        "spoiler": true,
+        "kind": "single",
+        "maxRanks": 5
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 113631,
+        "name": "Boundless Light",
+        "spoiler": true,
+        "kind": "single",
+        "maxRanks": 2
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Assassination",
+        "nodeId": 113633,
+        "name": "Relentless Strikes",
+        "spoiler": true,
+        "kind": "single",
+        "maxRanks": 5
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Combat",
+        "nodeId": 113635,
+        "name": "Dual Wield Specialization",
+        "spoiler": true,
+        "kind": "single",
+        "maxRanks": 2
+      }
+    ],
+    "removed": [
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 105629,
+        "name": "One-Handed Weapon Specialization",
+        "spoiler": true,
+        "maxRanks": 3
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Retribution",
+        "nodeId": 110880,
+        "name": "Instrument of Law",
+        "spoiler": true,
+        "maxRanks": 2
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 110868,
+        "name": "Improved Distract",
+        "spoiler": true,
+        "maxRanks": 2
+      }
+    ],
+    "moved": [
+      {
+        "classId": 1,
+        "className": "Warrior",
+        "tree": "Fury",
+        "nodeId": 105928,
+        "name": "Flurry",
+        "spoiler": true,
+        "from": {
+          "tree": "Fury",
+          "x": 5620,
+          "y": 5130,
+          "row": 5,
+          "col": 1
+        },
+        "to": {
+          "tree": "Fury",
+          "x": 6220,
+          "y": 5130,
+          "row": 5,
+          "col": 2
+        }
+      },
+      {
+        "classId": 1,
+        "className": "Warrior",
+        "tree": "Fury",
+        "nodeId": 105931,
+        "name": "Enrage",
+        "spoiler": true,
+        "from": {
+          "tree": "Fury",
+          "x": 6220,
+          "y": 3930,
+          "row": 3,
+          "col": 2
+        },
+        "to": {
+          "tree": "Fury",
+          "x": 6820,
+          "y": 3330,
+          "row": 2,
+          "col": 3
+        }
+      },
+      {
+        "classId": 1,
+        "className": "Warrior",
+        "tree": "Fury",
+        "nodeId": 105977,
+        "name": "Improved Whirlwind",
+        "spoiler": true,
+        "from": {
+          "tree": "Fury",
+          "x": 5620,
+          "y": 3930,
+          "row": 3,
+          "col": 1
+        },
+        "to": {
+          "tree": "Fury",
+          "x": 5020,
+          "y": 5130,
+          "row": 5,
+          "col": 0
+        }
+      },
+      {
+        "classId": 1,
+        "className": "Warrior",
+        "tree": "Fury",
+        "nodeId": 113569,
+        "name": "Gore Drinker",
+        "spoiler": true,
+        "from": {
+          "tree": "Fury",
+          "x": 6220,
+          "y": 5130,
+          "row": 5,
+          "col": 2
+        },
+        "to": {
+          "tree": "Fury",
+          "x": 6220,
+          "y": 4530,
+          "row": 4,
+          "col": 2
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 105324,
+        "name": "Divine Precision",
+        "spoiler": true,
+        "from": {
+          "tree": "Holy",
+          "x": 1020,
+          "y": 4530,
+          "row": 4,
+          "col": 0
+        },
+        "to": {
+          "tree": "Holy",
+          "x": 1020,
+          "y": 3930,
+          "row": 3,
+          "col": 0
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 105325,
+        "name": "Divine Favor",
+        "spoiler": true,
+        "from": {
+          "tree": "Holy",
+          "x": 2220,
+          "y": 3930,
+          "row": 3,
+          "col": 2
+        },
+        "to": {
+          "tree": "Holy",
+          "x": 1020,
+          "y": 3330,
+          "row": 2,
+          "col": 0
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 105327,
+        "name": "Purifying Power",
+        "spoiler": true,
+        "from": {
+          "tree": "Holy",
+          "x": 2220,
+          "y": 3330,
+          "row": 2,
+          "col": 2
+        },
+        "to": {
+          "tree": "Holy",
+          "x": 2820,
+          "y": 2730,
+          "row": 1,
+          "col": 3
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 105329,
+        "name": "Illumination",
+        "spoiler": true,
+        "from": {
+          "tree": "Holy",
+          "x": 1620,
+          "y": 3930,
+          "row": 3,
+          "col": 1
+        },
+        "to": {
+          "tree": "Holy",
+          "x": 1620,
+          "y": 3330,
+          "row": 2,
+          "col": 1
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 105330,
+        "name": "Oath of Light",
+        "spoiler": true,
+        "from": {
+          "tree": "Holy",
+          "x": 1020,
+          "y": 3330,
+          "row": 2,
+          "col": 0
+        },
+        "to": {
+          "tree": "Holy",
+          "x": 2220,
+          "y": 3930,
+          "row": 3,
+          "col": 2
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Retribution",
+        "nodeId": 105331,
+        "name": "Unyielding Faith",
+        "spoiler": true,
+        "from": {
+          "tree": "Holy",
+          "x": 2820,
+          "y": 2730,
+          "row": 1,
+          "col": 3
+        },
+        "to": {
+          "tree": "Retribution",
+          "x": 9680,
+          "y": 3330,
+          "row": 2,
+          "col": 1
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 105332,
+        "name": "Divine Intellect",
+        "spoiler": true,
+        "from": {
+          "tree": "Holy",
+          "x": 2220,
+          "y": 2130,
+          "row": 0,
+          "col": 2
+        },
+        "to": {
+          "tree": "Protection",
+          "x": 5620,
+          "y": 2130,
+          "row": 0,
+          "col": 1
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 105335,
+        "name": "Spiritual Focus",
+        "spoiler": true,
+        "from": {
+          "tree": "Holy",
+          "x": 1620,
+          "y": 2730,
+          "row": 1,
+          "col": 1
+        },
+        "to": {
+          "tree": "Holy",
+          "x": 1620,
+          "y": 2130,
+          "row": 0,
+          "col": 1
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 105625,
+        "name": "Templar's Bulwark",
+        "spoiler": true,
+        "from": {
+          "tree": "Protection",
+          "x": 5620,
+          "y": 4530,
+          "row": 4,
+          "col": 1
+        },
+        "to": {
+          "tree": "Protection",
+          "x": 5020,
+          "y": 3330,
+          "row": 2,
+          "col": 0
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 105628,
+        "name": "Holy Shield",
+        "spoiler": true,
+        "from": {
+          "tree": "Protection",
+          "x": 5620,
+          "y": 5730,
+          "row": 6,
+          "col": 1
+        },
+        "to": {
+          "tree": "Protection",
+          "x": 5620,
+          "y": 4530,
+          "row": 4,
+          "col": 1
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 105630,
+        "name": "Toughness",
+        "spoiler": true,
+        "from": {
+          "tree": "Protection",
+          "x": 5620,
+          "y": 2130,
+          "row": 0,
+          "col": 1
+        },
+        "to": {
+          "tree": "Protection",
+          "x": 6820,
+          "y": 3330,
+          "row": 2,
+          "col": 3
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 105632,
+        "name": "Sacred Duty",
+        "spoiler": true,
+        "from": {
+          "tree": "Protection",
+          "x": 6820,
+          "y": 3330,
+          "row": 2,
+          "col": 3
+        },
+        "to": {
+          "tree": "Protection",
+          "x": 6820,
+          "y": 2730,
+          "row": 1,
+          "col": 3
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 105633,
+        "name": "Improved Hammer of Justice",
+        "spoiler": true,
+        "from": {
+          "tree": "Protection",
+          "x": 6220,
+          "y": 3930,
+          "row": 3,
+          "col": 2
+        },
+        "to": {
+          "tree": "Protection",
+          "x": 5620,
+          "y": 3330,
+          "row": 2,
+          "col": 1
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 105634,
+        "name": "Improved Righteous Fury",
+        "spoiler": true,
+        "from": {
+          "tree": "Protection",
+          "x": 5620,
+          "y": 3330,
+          "row": 2,
+          "col": 1
+        },
+        "to": {
+          "tree": "Protection",
+          "x": 5620,
+          "y": 3930,
+          "row": 3,
+          "col": 1
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 105636,
+        "name": "Anticipation",
+        "spoiler": true,
+        "from": {
+          "tree": "Protection",
+          "x": 6820,
+          "y": 2730,
+          "row": 1,
+          "col": 3
+        },
+        "to": {
+          "tree": "Protection",
+          "x": 6220,
+          "y": 3930,
+          "row": 3,
+          "col": 2
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 105639,
+        "name": "Stoicism",
+        "spoiler": true,
+        "from": {
+          "tree": "Holy",
+          "x": 1620,
+          "y": 2130,
+          "row": 0,
+          "col": 1
+        },
+        "to": {
+          "tree": "Protection",
+          "x": 5020,
+          "y": 4530,
+          "row": 4,
+          "col": 0
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Retribution",
+        "nodeId": 105693,
+        "name": "Vengeance",
+        "spoiler": true,
+        "from": {
+          "tree": "Retribution",
+          "x": 9680,
+          "y": 4530,
+          "row": 4,
+          "col": 1
+        },
+        "to": {
+          "tree": "Retribution",
+          "x": 10280,
+          "y": 4530,
+          "row": 4,
+          "col": 2
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Retribution",
+        "nodeId": 105694,
+        "name": "Repentance",
+        "spoiler": true,
+        "from": {
+          "tree": "Retribution",
+          "x": 10280,
+          "y": 4530,
+          "row": 4,
+          "col": 2
+        },
+        "to": {
+          "tree": "Retribution",
+          "x": 9680,
+          "y": 4530,
+          "row": 4,
+          "col": 1
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Retribution",
+        "nodeId": 105697,
+        "name": "Two-Handed Weapon Specialization",
+        "spoiler": true,
+        "from": {
+          "tree": "Retribution",
+          "x": 9080,
+          "y": 4530,
+          "row": 4,
+          "col": 0
+        },
+        "to": {
+          "tree": "Retribution",
+          "x": 10880,
+          "y": 3930,
+          "row": 3,
+          "col": 3
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Retribution",
+        "nodeId": 105700,
+        "name": "Sacred Arbiter",
+        "spoiler": true,
+        "from": {
+          "tree": "Retribution",
+          "x": 10280,
+          "y": 3930,
+          "row": 3,
+          "col": 2
+        },
+        "to": {
+          "tree": "Retribution",
+          "x": 9680,
+          "y": 3930,
+          "row": 3,
+          "col": 1
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Retribution",
+        "nodeId": 105701,
+        "name": "Sanctified Judgement",
+        "spoiler": true,
+        "from": {
+          "tree": "Retribution",
+          "x": 9680,
+          "y": 3330,
+          "row": 2,
+          "col": 1
+        },
+        "to": {
+          "tree": "Retribution",
+          "x": 10280,
+          "y": 2730,
+          "row": 1,
+          "col": 2
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Retribution",
+        "nodeId": 105703,
+        "name": "Conviction",
+        "spoiler": true,
+        "from": {
+          "tree": "Retribution",
+          "x": 10280,
+          "y": 2730,
+          "row": 1,
+          "col": 2
+        },
+        "to": {
+          "tree": "Retribution",
+          "x": 9680,
+          "y": 2730,
+          "row": 1,
+          "col": 1
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 105704,
+        "name": "Holy Conduit",
+        "spoiler": true,
+        "from": {
+          "tree": "Retribution",
+          "x": 9680,
+          "y": 2730,
+          "row": 1,
+          "col": 1
+        },
+        "to": {
+          "tree": "Holy",
+          "x": 2220,
+          "y": 3330,
+          "row": 2,
+          "col": 2
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 110871,
+        "name": "Reverence",
+        "spoiler": true,
+        "from": {
+          "tree": "Holy",
+          "x": 1620,
+          "y": 3330,
+          "row": 2,
+          "col": 1
+        },
+        "to": {
+          "tree": "Holy",
+          "x": 1620,
+          "y": 2730,
+          "row": 1,
+          "col": 1
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 110872,
+        "name": "Consecrated Ground",
+        "spoiler": true,
+        "from": {
+          "tree": "Holy",
+          "x": 2220,
+          "y": 4530,
+          "row": 4,
+          "col": 2
+        },
+        "to": {
+          "tree": "Holy",
+          "x": 1020,
+          "y": 4530,
+          "row": 4,
+          "col": 0
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 110873,
+        "name": "Infusion of Light",
+        "spoiler": true,
+        "from": {
+          "tree": "Holy",
+          "x": 1020,
+          "y": 3930,
+          "row": 3,
+          "col": 0
+        },
+        "to": {
+          "tree": "Holy",
+          "x": 1620,
+          "y": 3930,
+          "row": 3,
+          "col": 1
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 110875,
+        "name": "Shieldsworn",
+        "spoiler": true,
+        "from": {
+          "tree": "Protection",
+          "x": 5030,
+          "y": 3330,
+          "row": 2,
+          "col": 0
+        },
+        "to": {
+          "tree": "Protection",
+          "x": 5620,
+          "y": 5730,
+          "row": 6,
+          "col": 1
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 110878,
+        "name": "Swift Judgement",
+        "spoiler": true,
+        "from": {
+          "tree": "Protection",
+          "x": 5030,
+          "y": 3930,
+          "row": 3,
+          "col": 0
+        },
+        "to": {
+          "tree": "Protection",
+          "x": 5020,
+          "y": 3930,
+          "row": 3,
+          "col": 0
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Retribution",
+        "nodeId": 110882,
+        "name": "Champion of the Light",
+        "spoiler": true,
+        "from": {
+          "tree": "Retribution",
+          "x": 9680,
+          "y": 5130,
+          "row": 5,
+          "col": 1
+        },
+        "to": {
+          "tree": "Retribution",
+          "x": 10280,
+          "y": 5130,
+          "row": 5,
+          "col": 2
+        }
+      },
+      {
+        "classId": 3,
+        "className": "Hunter",
+        "tree": "Beast Mastery",
+        "nodeId": 104972,
+        "name": "Improved Revive Pet",
+        "spoiler": true,
+        "from": {
+          "tree": "Beast Mastery",
+          "x": 2820,
+          "y": 2730,
+          "row": 1,
+          "col": 3
+        },
+        "to": {
+          "tree": "Beast Mastery",
+          "x": 2220,
+          "y": 2730,
+          "row": 1,
+          "col": 2
+        }
+      },
+      {
+        "classId": 3,
+        "className": "Hunter",
+        "tree": "Beast Mastery",
+        "nodeId": 104973,
+        "name": "Pathfinding",
+        "spoiler": true,
+        "from": {
+          "tree": "Beast Mastery",
+          "x": 2220,
+          "y": 2730,
+          "row": 1,
+          "col": 2
+        },
+        "to": {
+          "tree": "Beast Mastery",
+          "x": 1020,
+          "y": 3330,
+          "row": 2,
+          "col": 0
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Assassination",
+        "nodeId": 105709,
+        "name": "Mutilate",
+        "spoiler": true,
+        "from": {
+          "tree": "Assassination",
+          "x": 1620,
+          "y": 4530,
+          "row": 4,
+          "col": 1
+        },
+        "to": {
+          "tree": "Assassination",
+          "x": 1620,
+          "y": 5730,
+          "row": 6,
+          "col": 1
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Assassination",
+        "nodeId": 105712,
+        "name": "Venom",
+        "spoiler": true,
+        "from": {
+          "tree": "Assassination",
+          "x": 1620,
+          "y": 5730,
+          "row": 6,
+          "col": 1
+        },
+        "to": {
+          "tree": "Assassination",
+          "x": 1620,
+          "y": 4530,
+          "row": 4,
+          "col": 1
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Assassination",
+        "nodeId": 105717,
+        "name": "Improved Expose Armor",
+        "spoiler": true,
+        "from": {
+          "tree": "Assassination",
+          "x": 1620,
+          "y": 3330,
+          "row": 2,
+          "col": 1
+        },
+        "to": {
+          "tree": "Assassination",
+          "x": 1620,
+          "y": 2730,
+          "row": 1,
+          "col": 1
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Assassination",
+        "nodeId": 105718,
+        "name": "Blood Splatter",
+        "spoiler": true,
+        "from": {
+          "tree": "Assassination",
+          "x": 1020,
+          "y": 4530,
+          "row": 4,
+          "col": 0
+        },
+        "to": {
+          "tree": "Assassination",
+          "x": 1620,
+          "y": 3330,
+          "row": 2,
+          "col": 1
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Assassination",
+        "nodeId": 105720,
+        "name": "Vigor",
+        "spoiler": true,
+        "from": {
+          "tree": "Assassination",
+          "x": 1620,
+          "y": 2730,
+          "row": 1,
+          "col": 1
+        },
+        "to": {
+          "tree": "Assassination",
+          "x": 1020,
+          "y": 3330,
+          "row": 2,
+          "col": 0
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Combat",
+        "nodeId": 105726,
+        "name": "Weapon Expertise",
+        "spoiler": true,
+        "from": {
+          "tree": "Combat",
+          "x": 5620,
+          "y": 5130,
+          "row": 5,
+          "col": 1
+        },
+        "to": {
+          "tree": "Combat",
+          "x": 6220,
+          "y": 3930,
+          "row": 3,
+          "col": 2
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Combat",
+        "nodeId": 105730,
+        "name": "Aggression",
+        "spoiler": true,
+        "from": {
+          "tree": "Combat",
+          "x": 6220,
+          "y": 5130,
+          "row": 5,
+          "col": 2
+        },
+        "to": {
+          "tree": "Combat",
+          "x": 6820,
+          "y": 3930,
+          "row": 3,
+          "col": 3
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Combat",
+        "nodeId": 105732,
+        "name": "Improved Sprint",
+        "spoiler": true,
+        "from": {
+          "tree": "Combat",
+          "x": 6820,
+          "y": 3330,
+          "row": 2,
+          "col": 3
+        },
+        "to": {
+          "tree": "Combat",
+          "x": 6820,
+          "y": 2730,
+          "row": 1,
+          "col": 3
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Combat",
+        "nodeId": 105740,
+        "name": "Flash of Steel",
+        "spoiler": true,
+        "from": {
+          "tree": "Combat",
+          "x": 6220,
+          "y": 3930,
+          "row": 3,
+          "col": 2
+        },
+        "to": {
+          "tree": "Combat",
+          "x": 6220,
+          "y": 5130,
+          "row": 5,
+          "col": 2
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 105743,
+        "name": "Premeditation",
+        "spoiler": true,
+        "from": {
+          "tree": "Subtlety",
+          "x": 9680,
+          "y": 3930,
+          "row": 3,
+          "col": 1
+        },
+        "to": {
+          "tree": "Subtlety",
+          "x": 9680,
+          "y": 3330,
+          "row": 2,
+          "col": 1
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 105745,
+        "name": "Dirty Deeds",
+        "spoiler": true,
+        "from": {
+          "tree": "Subtlety",
+          "x": 9080,
+          "y": 4530,
+          "row": 4,
+          "col": 0
+        },
+        "to": {
+          "tree": "Subtlety",
+          "x": 9080,
+          "y": 2730,
+          "row": 1,
+          "col": 0
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 105747,
+        "name": "Heightened Senses",
+        "spoiler": true,
+        "from": {
+          "tree": "Subtlety",
+          "x": 9080,
+          "y": 3930,
+          "row": 3,
+          "col": 0
+        },
+        "to": {
+          "tree": "Subtlety",
+          "x": 9080,
+          "y": 4530,
+          "row": 4,
+          "col": 0
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 105749,
+        "name": "Improved Ambush",
+        "spoiler": true,
+        "from": {
+          "tree": "Subtlety",
+          "x": 10880,
+          "y": 2730,
+          "row": 1,
+          "col": 3
+        },
+        "to": {
+          "tree": "Subtlety",
+          "x": 10280,
+          "y": 2730,
+          "row": 1,
+          "col": 2
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 105751,
+        "name": "Setup",
+        "spoiler": true,
+        "from": {
+          "tree": "Subtlety",
+          "x": 9080,
+          "y": 2730,
+          "row": 1,
+          "col": 0
+        },
+        "to": {
+          "tree": "Subtlety",
+          "x": 9080,
+          "y": 2130,
+          "row": 0,
+          "col": 0
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 105752,
+        "name": "Serrated Blades",
+        "spoiler": true,
+        "from": {
+          "tree": "Subtlety",
+          "x": 10280,
+          "y": 3930,
+          "row": 3,
+          "col": 2
+        },
+        "to": {
+          "tree": "Subtlety",
+          "x": 10280,
+          "y": 3330,
+          "row": 2,
+          "col": 2
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 105753,
+        "name": "Elusiveness",
+        "spoiler": true,
+        "from": {
+          "tree": "Subtlety",
+          "x": 9680,
+          "y": 2730,
+          "row": 1,
+          "col": 1
+        },
+        "to": {
+          "tree": "Subtlety",
+          "x": 9080,
+          "y": 3930,
+          "row": 3,
+          "col": 0
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 105754,
+        "name": "Ghostly Strike",
+        "spoiler": true,
+        "from": {
+          "tree": "Subtlety",
+          "x": 9680,
+          "y": 3330,
+          "row": 2,
+          "col": 1
+        },
+        "to": {
+          "tree": "Subtlety",
+          "x": 9680,
+          "y": 3930,
+          "row": 3,
+          "col": 1
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 105756,
+        "name": "Camouflage",
+        "spoiler": true,
+        "from": {
+          "tree": "Subtlety",
+          "x": 9080,
+          "y": 2130,
+          "row": 0,
+          "col": 0
+        },
+        "to": {
+          "tree": "Subtlety",
+          "x": 9680,
+          "y": 2730,
+          "row": 1,
+          "col": 1
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 105757,
+        "name": "Dirty Tricks",
+        "spoiler": true,
+        "from": {
+          "tree": "Subtlety",
+          "x": 10280,
+          "y": 2730,
+          "row": 1,
+          "col": 2
+        },
+        "to": {
+          "tree": "Subtlety",
+          "x": 10880,
+          "y": 2730,
+          "row": 1,
+          "col": 3
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Combat",
+        "nodeId": 105759,
+        "name": "Composure",
+        "spoiler": true,
+        "from": {
+          "tree": "Assassination",
+          "x": 1020,
+          "y": 3330,
+          "row": 2,
+          "col": 0
+        },
+        "to": {
+          "tree": "Combat",
+          "x": 6820,
+          "y": 3330,
+          "row": 2,
+          "col": 3
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 110867,
+        "name": "Quick Getaway",
+        "spoiler": true,
+        "from": {
+          "tree": "Subtlety",
+          "x": 9080,
+          "y": 5130,
+          "row": 5,
+          "col": 0
+        },
+        "to": {
+          "tree": "Subtlety",
+          "x": 10880,
+          "y": 3930,
+          "row": 3,
+          "col": 3
+        }
+      },
+      {
+        "classId": 7,
+        "className": "Shaman",
+        "tree": "Enhancement",
+        "nodeId": 104751,
+        "name": "Improved Lightning Shield",
+        "spoiler": true,
+        "from": {
+          "tree": "Enhancement",
+          "x": 6820,
+          "y": 2730,
+          "row": 1,
+          "col": 3
+        },
+        "to": {
+          "tree": "Enhancement",
+          "x": 6220,
+          "y": 2730,
+          "row": 1,
+          "col": 2
+        }
+      },
+      {
+        "classId": 7,
+        "className": "Shaman",
+        "tree": "Enhancement",
+        "nodeId": 104752,
+        "name": "Improved Ghost Wolf",
+        "spoiler": true,
+        "from": {
+          "tree": "Enhancement",
+          "x": 6220,
+          "y": 2730,
+          "row": 1,
+          "col": 2
+        },
+        "to": {
+          "tree": "Enhancement",
+          "x": 6820,
+          "y": 3930,
+          "row": 3,
+          "col": 3
+        }
+      },
+      {
+        "classId": 11,
+        "className": "Druid",
+        "tree": "Feral Combat",
+        "nodeId": 104951,
+        "name": "Predatory Discipline",
+        "spoiler": true,
+        "from": {
+          "tree": "Feral Combat",
+          "x": 5020,
+          "y": 3930,
+          "row": 3,
+          "col": 0
+        },
+        "to": {
+          "tree": "Feral Combat",
+          "x": 6220,
+          "y": 3930,
+          "row": 3,
+          "col": 2
+        }
+      },
+      {
+        "classId": 11,
+        "className": "Druid",
+        "tree": "Feral Combat",
+        "nodeId": 104952,
+        "name": "Predatory Strikes",
+        "spoiler": true,
+        "from": {
+          "tree": "Feral Combat",
+          "x": 6220,
+          "y": 3930,
+          "row": 3,
+          "col": 2
+        },
+        "to": {
+          "tree": "Feral Combat",
+          "x": 5020,
+          "y": 3930,
+          "row": 3,
+          "col": 0
+        }
+      },
+      {
+        "classId": 11,
+        "className": "Druid",
+        "tree": "Feral Combat",
+        "nodeId": 104953,
+        "name": "Rend and Tear",
+        "spoiler": true,
+        "from": {
+          "tree": "Feral Combat",
+          "x": 6220,
+          "y": 5130,
+          "row": 5,
+          "col": 2
+        },
+        "to": {
+          "tree": "Feral Combat",
+          "x": 5020,
+          "y": 5130,
+          "row": 5,
+          "col": 0
+        }
+      },
+      {
+        "classId": 11,
+        "className": "Druid",
+        "tree": "Feral Combat",
+        "nodeId": 104954,
+        "name": "Natural Reaction",
+        "spoiler": true,
+        "from": {
+          "tree": "Feral Combat",
+          "x": 5020,
+          "y": 5130,
+          "row": 5,
+          "col": 0
+        },
+        "to": {
+          "tree": "Feral Combat",
+          "x": 6820,
+          "y": 5130,
+          "row": 5,
+          "col": 3
+        }
+      },
+      {
+        "classId": 11,
+        "className": "Druid",
+        "tree": "Feral Combat",
+        "nodeId": 113563,
+        "name": "Shifting Power",
+        "spoiler": true,
+        "from": {
+          "tree": "Feral Combat",
+          "x": 5020,
+          "y": 4530,
+          "row": 4,
+          "col": 0
+        },
+        "to": {
+          "tree": "Feral Combat",
+          "x": 6220,
+          "y": 5730,
+          "row": 6,
+          "col": 2
+        }
+      }
+    ],
+    "ranks": [
+      {
+        "classId": 1,
+        "className": "Warrior",
+        "tree": "Fury",
+        "nodeId": 105928,
+        "name": "Flurry",
+        "spoiler": true,
+        "before": 5,
+        "after": 3
+      },
+      {
+        "classId": 1,
+        "className": "Warrior",
+        "tree": "Arms",
+        "nodeId": 105954,
+        "name": "Improved Tactical Mastery",
+        "spoiler": true,
+        "before": 5,
+        "after": 3
+      },
+      {
+        "classId": 1,
+        "className": "Warrior",
+        "tree": "Fury",
+        "nodeId": 105977,
+        "name": "Improved Whirlwind",
+        "spoiler": true,
+        "before": 1,
+        "after": 2
+      },
+      {
+        "classId": 1,
+        "className": "Warrior",
+        "tree": "Arms",
+        "nodeId": 110524,
+        "name": "Bloodthrill",
+        "spoiler": true,
+        "before": 5,
+        "after": 2
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 105324,
+        "name": "Divine Precision",
+        "spoiler": true,
+        "before": 3,
+        "after": 2
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 105334,
+        "name": "Improved Seals",
+        "spoiler": true,
+        "before": 3,
+        "after": 5
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 105335,
+        "name": "Spiritual Focus",
+        "spoiler": true,
+        "before": 2,
+        "after": 5
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 105639,
+        "name": "Stoicism",
+        "spoiler": true,
+        "before": 5,
+        "after": 2
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Retribution",
+        "nodeId": 105703,
+        "name": "Conviction",
+        "spoiler": true,
+        "before": 5,
+        "after": 3
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 110871,
+        "name": "Reverence",
+        "spoiler": true,
+        "before": 3,
+        "after": 2
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 110874,
+        "name": "Shield Specialization",
+        "spoiler": true,
+        "before": 3,
+        "after": 2
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 110879,
+        "name": "Iron Creed",
+        "spoiler": true,
+        "before": 5,
+        "after": 3
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Retribution",
+        "nodeId": 110882,
+        "name": "Champion of the Light",
+        "spoiler": true,
+        "before": 3,
+        "after": 5
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Assassination",
+        "nodeId": 105710,
+        "name": "Seal Fate",
+        "spoiler": true,
+        "before": 5,
+        "after": 3
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Assassination",
+        "nodeId": 105716,
+        "name": "Lethality",
+        "spoiler": true,
+        "before": 5,
+        "after": 2
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Assassination",
+        "nodeId": 105718,
+        "name": "Blood Splatter",
+        "spoiler": true,
+        "before": 2,
+        "after": 1
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 105756,
+        "name": "Camouflage",
+        "spoiler": true,
+        "before": 5,
+        "after": 3
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Combat",
+        "nodeId": 105759,
+        "name": "Composure",
+        "spoiler": true,
+        "before": 1,
+        "after": 2
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 105760,
+        "name": "Opportunity",
+        "spoiler": true,
+        "before": 2,
+        "after": 5
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 110867,
+        "name": "Quick Getaway",
+        "spoiler": true,
+        "before": 5,
+        "after": 2
+      },
+      {
+        "classId": 8,
+        "className": "Mage",
+        "tree": "Arcane",
+        "nodeId": 105802,
+        "name": "Arcane Resilience",
+        "spoiler": true,
+        "before": 2,
+        "after": 3
+      },
+      {
+        "classId": 11,
+        "className": "Druid",
+        "tree": "Feral Combat",
+        "nodeId": 113563,
+        "name": "Shifting Power",
+        "spoiler": true,
+        "before": 2,
+        "after": 1
+      }
+    ],
+    "gates": [
+      {
+        "classId": 1,
+        "className": "Warrior",
+        "tree": "Fury",
+        "nodeId": 105931,
+        "name": "Enrage",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 15,
+            "scope": "tree",
+            "gateGroupId": 11661,
+            "currencyId": 3820,
+            "traitTreeId": 1117,
+            "companionGroupId": 12828
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 10,
+            "scope": "tree",
+            "gateGroupId": 11662,
+            "currencyId": 3820,
+            "traitTreeId": 1117,
+            "companionGroupId": 12829
+          }
+        }
+      },
+      {
+        "classId": 1,
+        "className": "Warrior",
+        "tree": "Fury",
+        "nodeId": 105977,
+        "name": "Improved Whirlwind",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 15,
+            "scope": "tree",
+            "gateGroupId": 11661,
+            "currencyId": 3820,
+            "traitTreeId": 1117,
+            "companionGroupId": 12828
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 25,
+            "scope": "tree",
+            "gateGroupId": 11659,
+            "currencyId": 3820,
+            "traitTreeId": 1117,
+            "companionGroupId": 12826
+          }
+        }
+      },
+      {
+        "classId": 1,
+        "className": "Warrior",
+        "tree": "Fury",
+        "nodeId": 113569,
+        "name": "Gore Drinker",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 25,
+            "scope": "tree",
+            "gateGroupId": 11659,
+            "currencyId": 3820,
+            "traitTreeId": 1117,
+            "companionGroupId": 12826
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 20,
+            "scope": "tree",
+            "gateGroupId": 11660,
+            "currencyId": 3820,
+            "traitTreeId": 1117,
+            "companionGroupId": 12827
+          }
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 105324,
+        "name": "Divine Precision",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 20,
+            "scope": "tree",
+            "gateGroupId": 11482,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12746
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 15,
+            "scope": "tree",
+            "gateGroupId": 11483,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12747
+          }
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 105325,
+        "name": "Divine Favor",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 15,
+            "scope": "tree",
+            "gateGroupId": 11483,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12747
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 10,
+            "scope": "tree",
+            "gateGroupId": 11484,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12748
+          }
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 105327,
+        "name": "Purifying Power",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 10,
+            "scope": "tree",
+            "gateGroupId": 11484,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12748
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 5,
+            "scope": "tree",
+            "gateGroupId": 11485,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12749
+          }
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 105329,
+        "name": "Illumination",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 15,
+            "scope": "tree",
+            "gateGroupId": 11483,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12747
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 10,
+            "scope": "tree",
+            "gateGroupId": 11484,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12748
+          }
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 105330,
+        "name": "Oath of Light",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 10,
+            "scope": "tree",
+            "gateGroupId": 11484,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12748
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 15,
+            "scope": "tree",
+            "gateGroupId": 11483,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12747
+          }
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Retribution",
+        "nodeId": 105331,
+        "name": "Unyielding Faith",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 5,
+            "scope": "tree",
+            "gateGroupId": 11485,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12749
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 10,
+            "scope": "tree",
+            "gateGroupId": 11557,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12758
+          }
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 105335,
+        "name": "Spiritual Focus",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 5,
+            "scope": "tree",
+            "gateGroupId": 11485,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12749
+          }
+        },
+        "after": {}
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 105625,
+        "name": "Templar's Bulwark",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 20,
+            "scope": "tree",
+            "gateGroupId": 11537,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12751
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 10,
+            "scope": "tree",
+            "gateGroupId": 11539,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12753
+          }
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 105628,
+        "name": "Holy Shield",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 30,
+            "scope": "unconfirmed",
+            "gateGroupId": 12482,
+            "currencyId": 3820,
+            "traitTreeId": 1100
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 20,
+            "scope": "tree",
+            "gateGroupId": 11537,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12751
+          }
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 105630,
+        "name": "Toughness",
+        "spoiler": true,
+        "before": {},
+        "after": {
+          "spentRequired": {
+            "amount": 10,
+            "scope": "tree",
+            "gateGroupId": 11539,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12753
+          }
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 105632,
+        "name": "Sacred Duty",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 10,
+            "scope": "tree",
+            "gateGroupId": 11539,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12753
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 5,
+            "scope": "tree",
+            "gateGroupId": 11540,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12754
+          }
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 105633,
+        "name": "Improved Hammer of Justice",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 15,
+            "scope": "tree",
+            "gateGroupId": 11538,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12752
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 10,
+            "scope": "tree",
+            "gateGroupId": 11539,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12753
+          }
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 105634,
+        "name": "Improved Righteous Fury",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 10,
+            "scope": "tree",
+            "gateGroupId": 11539,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12753
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 15,
+            "scope": "tree",
+            "gateGroupId": 11538,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12752
+          }
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 105636,
+        "name": "Anticipation",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 5,
+            "scope": "tree",
+            "gateGroupId": 11540,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12754
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 15,
+            "scope": "tree",
+            "gateGroupId": 11538,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12752
+          }
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 105639,
+        "name": "Stoicism",
+        "spoiler": true,
+        "before": {},
+        "after": {
+          "spentRequired": {
+            "amount": 20,
+            "scope": "tree",
+            "gateGroupId": 11537,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12751
+          }
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Retribution",
+        "nodeId": 105697,
+        "name": "Two-Handed Weapon Specialization",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 20,
+            "scope": "tree",
+            "gateGroupId": 11555,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12756
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 15,
+            "scope": "tree",
+            "gateGroupId": 11556,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12757
+          }
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Retribution",
+        "nodeId": 105701,
+        "name": "Sanctified Judgement",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 10,
+            "scope": "tree",
+            "gateGroupId": 11557,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12758
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 5,
+            "scope": "tree",
+            "gateGroupId": 11558,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12759
+          }
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 105704,
+        "name": "Holy Conduit",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 5,
+            "scope": "tree",
+            "gateGroupId": 11558,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12759
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 10,
+            "scope": "tree",
+            "gateGroupId": 11484,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12748
+          }
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 110871,
+        "name": "Reverence",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 10,
+            "scope": "tree",
+            "gateGroupId": 11484,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12748
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 5,
+            "scope": "tree",
+            "gateGroupId": 11485,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12749
+          }
+        }
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 110875,
+        "name": "Shieldsworn",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 10,
+            "scope": "tree",
+            "gateGroupId": 11539,
+            "currencyId": 3820,
+            "traitTreeId": 1100,
+            "companionGroupId": 12753
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 30,
+            "scope": "unconfirmed",
+            "gateGroupId": 12482,
+            "currencyId": 3820,
+            "traitTreeId": 1100
+          }
+        }
+      },
+      {
+        "classId": 3,
+        "className": "Hunter",
+        "tree": "Beast Mastery",
+        "nodeId": 104973,
+        "name": "Pathfinding",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 5,
+            "scope": "tree",
+            "gateGroupId": 11390,
+            "currencyId": 3820,
+            "traitTreeId": 1091,
+            "companionGroupId": 12719
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 10,
+            "scope": "tree",
+            "gateGroupId": 11389,
+            "currencyId": 3820,
+            "traitTreeId": 1091,
+            "companionGroupId": 12718
+          }
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Assassination",
+        "nodeId": 105709,
+        "name": "Mutilate",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 20,
+            "scope": "tree",
+            "gateGroupId": 11576,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12776
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 30,
+            "scope": "unconfirmed",
+            "gateGroupId": 11574,
+            "currencyId": 3820,
+            "traitTreeId": 1111
+          }
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Assassination",
+        "nodeId": 105712,
+        "name": "Venom",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 30,
+            "scope": "unconfirmed",
+            "gateGroupId": 11574,
+            "currencyId": 3820,
+            "traitTreeId": 1111
+          },
+          "ranksInNodes": [
+            {
+              "nodeId": 105709,
+              "ranks": 1
+            }
+          ]
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 20,
+            "scope": "tree",
+            "gateGroupId": 11576,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12776
+          }
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Assassination",
+        "nodeId": 105717,
+        "name": "Improved Expose Armor",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 10,
+            "scope": "tree",
+            "gateGroupId": 11578,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12778
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 5,
+            "scope": "tree",
+            "gateGroupId": 11579,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12779
+          }
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Assassination",
+        "nodeId": 105718,
+        "name": "Blood Splatter",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 20,
+            "scope": "tree",
+            "gateGroupId": 11576,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12776
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 10,
+            "scope": "tree",
+            "gateGroupId": 11578,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12778
+          }
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Assassination",
+        "nodeId": 105720,
+        "name": "Vigor",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 5,
+            "scope": "tree",
+            "gateGroupId": 11579,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12779
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 10,
+            "scope": "tree",
+            "gateGroupId": 11578,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12778
+          }
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Combat",
+        "nodeId": 105726,
+        "name": "Weapon Expertise",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 25,
+            "scope": "tree",
+            "gateGroupId": 11567,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12780
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 15,
+            "scope": "tree",
+            "gateGroupId": 11569,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12782
+          }
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Combat",
+        "nodeId": 105730,
+        "name": "Aggression",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 25,
+            "scope": "tree",
+            "gateGroupId": 11567,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12780
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 15,
+            "scope": "tree",
+            "gateGroupId": 11569,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12782
+          }
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Combat",
+        "nodeId": 105732,
+        "name": "Improved Sprint",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 10,
+            "scope": "tree",
+            "gateGroupId": 11570,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12783
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 5,
+            "scope": "tree",
+            "gateGroupId": 11571,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12784
+          }
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Combat",
+        "nodeId": 105740,
+        "name": "Flash of Steel",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 15,
+            "scope": "tree",
+            "gateGroupId": 11569,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12782
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 25,
+            "scope": "tree",
+            "gateGroupId": 11567,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12780
+          }
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 105743,
+        "name": "Premeditation",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 15,
+            "scope": "tree",
+            "gateGroupId": 11563,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12787
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 10,
+            "scope": "tree",
+            "gateGroupId": 11564,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12788
+          }
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 105745,
+        "name": "Dirty Deeds",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 20,
+            "scope": "tree",
+            "gateGroupId": 11562,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12786
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 5,
+            "scope": "tree",
+            "gateGroupId": 11565,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12789
+          }
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 105747,
+        "name": "Heightened Senses",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 15,
+            "scope": "tree",
+            "gateGroupId": 11563,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12787
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 20,
+            "scope": "tree",
+            "gateGroupId": 11562,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12786
+          }
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 105751,
+        "name": "Setup",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 5,
+            "scope": "tree",
+            "gateGroupId": 11565,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12789
+          }
+        },
+        "after": {}
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 105752,
+        "name": "Serrated Blades",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 15,
+            "scope": "tree",
+            "gateGroupId": 11563,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12787
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 10,
+            "scope": "tree",
+            "gateGroupId": 11564,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12788
+          }
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 105753,
+        "name": "Elusiveness",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 5,
+            "scope": "tree",
+            "gateGroupId": 11565,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12789
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 15,
+            "scope": "tree",
+            "gateGroupId": 11563,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12787
+          }
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 105754,
+        "name": "Ghostly Strike",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 10,
+            "scope": "tree",
+            "gateGroupId": 11564,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12788
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 15,
+            "scope": "tree",
+            "gateGroupId": 11563,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12787
+          }
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 105756,
+        "name": "Camouflage",
+        "spoiler": true,
+        "before": {},
+        "after": {
+          "spentRequired": {
+            "amount": 5,
+            "scope": "tree",
+            "gateGroupId": 11565,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12789
+          }
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Combat",
+        "nodeId": 105759,
+        "name": "Composure",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 10,
+            "scope": "tree",
+            "gateGroupId": 11578,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12778
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 10,
+            "scope": "tree",
+            "gateGroupId": 11570,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12783
+          }
+        }
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 110867,
+        "name": "Quick Getaway",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 25,
+            "scope": "tree",
+            "gateGroupId": 11561,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12785
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 15,
+            "scope": "tree",
+            "gateGroupId": 11563,
+            "currencyId": 3820,
+            "traitTreeId": 1111,
+            "companionGroupId": 12787
+          }
+        }
+      },
+      {
+        "classId": 7,
+        "className": "Shaman",
+        "tree": "Enhancement",
+        "nodeId": 104752,
+        "name": "Improved Ghost Wolf",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 5,
+            "scope": "tree",
+            "gateGroupId": 11355,
+            "currencyId": 3820,
+            "traitTreeId": 1082,
+            "companionGroupId": 12799
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 15,
+            "scope": "tree",
+            "gateGroupId": 11353,
+            "currencyId": 3820,
+            "traitTreeId": 1082,
+            "companionGroupId": 12797
+          }
+        }
+      },
+      {
+        "classId": 11,
+        "className": "Druid",
+        "tree": "Feral Combat",
+        "nodeId": 113563,
+        "name": "Shifting Power",
+        "spoiler": true,
+        "before": {
+          "spentRequired": {
+            "amount": 20,
+            "scope": "tree",
+            "gateGroupId": 11343,
+            "currencyId": 3820,
+            "traitTreeId": 1089,
+            "companionGroupId": 12706
+          }
+        },
+        "after": {
+          "spentRequired": {
+            "amount": 30,
+            "scope": "unconfirmed",
+            "gateGroupId": 11341,
+            "currencyId": 3820,
+            "traitTreeId": 1089
+          }
+        }
+      }
+    ],
+    "prereqs": [
+      {
+        "classId": 1,
+        "className": "Warrior",
+        "tree": "Fury",
+        "nodeId": 105928,
+        "name": "Flurry",
+        "spoiler": true,
+        "before": [
+          {
+            "nodeId": 105927,
+            "rule": "any"
+          }
+        ],
+        "after": []
+      },
+      {
+        "classId": 1,
+        "className": "Warrior",
+        "tree": "Fury",
+        "nodeId": 105930,
+        "name": "Bloodthirst",
+        "spoiler": true,
+        "before": [],
+        "after": [
+          {
+            "nodeId": 105927,
+            "rule": "any"
+          }
+        ]
+      },
+      {
+        "classId": 1,
+        "className": "Warrior",
+        "tree": "Fury",
+        "nodeId": 113569,
+        "name": "Gore Drinker",
+        "spoiler": true,
+        "before": [
+          {
+            "nodeId": 105931,
+            "rule": "any"
+          }
+        ],
+        "after": [
+          {
+            "nodeId": 105934,
+            "rule": "any"
+          }
+        ]
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 105324,
+        "name": "Divine Precision",
+        "spoiler": true,
+        "before": [
+          {
+            "nodeId": 105323,
+            "rule": "any"
+          }
+        ],
+        "after": []
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 105628,
+        "name": "Holy Shield",
+        "spoiler": true,
+        "before": [
+          {
+            "nodeId": 105625,
+            "rule": "any"
+          }
+        ],
+        "after": []
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Retribution",
+        "nodeId": 105692,
+        "name": "Unsealed Wrath",
+        "spoiler": true,
+        "before": [],
+        "after": [
+          {
+            "nodeId": 105694,
+            "rule": "any"
+          }
+        ]
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Retribution",
+        "nodeId": 105693,
+        "name": "Vengeance",
+        "spoiler": true,
+        "before": [
+          {
+            "nodeId": 105701,
+            "rule": "any"
+          }
+        ],
+        "after": [
+          {
+            "nodeId": 105696,
+            "rule": "any"
+          }
+        ]
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 110875,
+        "name": "Shieldsworn",
+        "spoiler": true,
+        "before": [],
+        "after": [
+          {
+            "nodeId": 105628,
+            "rule": "any"
+          }
+        ]
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 110878,
+        "name": "Swift Judgement",
+        "spoiler": true,
+        "before": [
+          {
+            "nodeId": 110875,
+            "rule": "any"
+          }
+        ],
+        "after": [
+          {
+            "nodeId": 105625,
+            "rule": "any"
+          }
+        ]
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Assassination",
+        "nodeId": 105709,
+        "name": "Mutilate",
+        "spoiler": true,
+        "before": [],
+        "after": [
+          {
+            "nodeId": 105712,
+            "rule": "any"
+          }
+        ]
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Assassination",
+        "nodeId": 105712,
+        "name": "Venom",
+        "spoiler": true,
+        "before": [
+          {
+            "nodeId": 105709,
+            "rule": "any"
+          }
+        ],
+        "after": []
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Combat",
+        "nodeId": 105724,
+        "name": "Adrenaline Rush",
+        "spoiler": true,
+        "before": [],
+        "after": [
+          {
+            "nodeId": 105728,
+            "rule": "any"
+          }
+        ]
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Combat",
+        "nodeId": 105726,
+        "name": "Weapon Expertise",
+        "spoiler": true,
+        "before": [
+          {
+            "nodeId": 105728,
+            "rule": "any"
+          }
+        ],
+        "after": [
+          {
+            "nodeId": 105737,
+            "rule": "any"
+          }
+        ]
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Combat",
+        "nodeId": 105740,
+        "name": "Flash of Steel",
+        "spoiler": true,
+        "before": [
+          {
+            "nodeId": 105737,
+            "rule": "any"
+          }
+        ],
+        "after": []
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 110867,
+        "name": "Quick Getaway",
+        "spoiler": true,
+        "before": [
+          {
+            "nodeId": 105745,
+            "rule": "any"
+          }
+        ],
+        "after": [
+          {
+            "nodeId": 105757,
+            "rule": "any"
+          }
+        ]
+      },
+      {
+        "classId": 11,
+        "className": "Druid",
+        "tree": "Feral Combat",
+        "nodeId": 104951,
+        "name": "Predatory Discipline",
+        "spoiler": true,
+        "before": [
+          {
+            "nodeId": 104945,
+            "rule": "any"
+          }
+        ],
+        "after": []
+      }
+    ],
+    "replaced": [
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 105330,
+        "name": "Oath of Light",
+        "spoiler": true,
+        "before": [
+          1310897
+        ],
+        "after": [
+          1328548
+        ]
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 105639,
+        "name": "Stoicism",
+        "spoiler": true,
+        "before": [
+          20262
+        ],
+        "after": [
+          1328546
+        ]
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 110875,
+        "name": "Shieldsworn",
+        "spoiler": true,
+        "before": [
+          1314103
+        ],
+        "after": [
+          1328544
+        ]
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Assassination",
+        "nodeId": 105709,
+        "name": "Mutilate",
+        "spoiler": true,
+        "before": [
+          1310707
+        ],
+        "after": [
+          399956
+        ]
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Assassination",
+        "nodeId": 105712,
+        "name": "Venom",
+        "spoiler": true,
+        "before": [
+          1310703
+        ],
+        "after": [
+          1329328
+        ]
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Assassination",
+        "nodeId": 105718,
+        "name": "Blood Splatter",
+        "spoiler": true,
+        "before": [
+          14983
+        ],
+        "after": [
+          1329256
+        ]
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Assassination",
+        "nodeId": 105720,
+        "name": "Vigor",
+        "spoiler": true,
+        "before": [
+          14158
+        ],
+        "after": [
+          14983
+        ]
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Combat",
+        "nodeId": 105740,
+        "name": "Flash of Steel",
+        "spoiler": true,
+        "before": [
+          13715
+        ],
+        "after": [
+          1329284
+        ]
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 105750,
+        "name": "Boot Knife",
+        "spoiler": true,
+        "before": [
+          462708
+        ],
+        "after": [
+          1329286
+        ]
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Combat",
+        "nodeId": 105759,
+        "name": "Composure",
+        "spoiler": true,
+        "before": [
+          14179
+        ],
+        "after": [
+          1329265
+        ]
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 110866,
+        "name": "Death Mark",
+        "spoiler": true,
+        "before": [
+          1310721
+        ],
+        "after": [
+          1316709
+        ]
+      },
+      {
+        "classId": 5,
+        "className": "Priest",
+        "tree": "Holy",
+        "nodeId": 105856,
+        "name": "Holy Binding",
+        "spoiler": true,
+        "before": [
+          401937
+        ],
+        "after": [
+          1328569
+        ]
+      },
+      {
+        "classId": 7,
+        "className": "Shaman",
+        "tree": "Elemental Combat",
+        "nodeId": 104760,
+        "name": "Call of Thunder",
+        "spoiler": true,
+        "before": [
+          408490
+        ],
+        "after": [
+          16120
+        ]
+      },
+      {
+        "classId": 11,
+        "className": "Druid",
+        "tree": "Restoration",
+        "nodeId": 104917,
+        "name": "Subtlety",
+        "spoiler": true,
+        "before": [
+          17106
+        ],
+        "after": [
+          17118
+        ]
+      },
+      {
+        "classId": 11,
+        "className": "Druid",
+        "tree": "Restoration",
+        "nodeId": 104918,
+        "name": "Bloom",
+        "spoiler": true,
+        "before": [
+          414673
+        ],
+        "after": [
+          1328621
+        ]
+      },
+      {
+        "classId": 11,
+        "className": "Druid",
+        "tree": "Restoration",
+        "nodeId": 104920,
+        "name": "Reflection",
+        "spoiler": true,
+        "before": [
+          17118
+        ],
+        "after": [
+          17106
+        ]
+      },
+      {
+        "classId": 11,
+        "className": "Druid",
+        "tree": "Feral Combat",
+        "nodeId": 104939,
+        "name": "Furor",
+        "spoiler": true,
+        "before": [
+          17003
+        ],
+        "after": [
+          17056
+        ]
+      },
+      {
+        "classId": 11,
+        "className": "Druid",
+        "tree": "Feral Combat",
+        "nodeId": 104949,
+        "name": "Lacerate",
+        "spoiler": true,
+        "before": [
+          407995
+        ],
+        "after": [
+          1328617
+        ]
+      },
+      {
+        "classId": 11,
+        "className": "Druid",
+        "tree": "Feral Combat",
+        "nodeId": 104951,
+        "name": "Predatory Discipline",
+        "spoiler": true,
+        "before": [
+          1322605
+        ],
+        "after": [
+          1328613
+        ]
+      },
+      {
+        "classId": 11,
+        "className": "Druid",
+        "tree": "Feral Combat",
+        "nodeId": 104956,
+        "name": "Primal Bite",
+        "spoiler": true,
+        "before": [
+          417141
+        ],
+        "after": [
+          407995
+        ]
+      },
+      {
+        "classId": 11,
+        "className": "Druid",
+        "tree": "Restoration",
+        "nodeId": 104958,
+        "name": "Heart of the Wild",
+        "spoiler": true,
+        "before": [
+          17056
+        ],
+        "after": [
+          17003
+        ]
+      },
+      {
+        "classId": 11,
+        "className": "Druid",
+        "tree": "Feral Combat",
+        "nodeId": 113563,
+        "name": "Shifting Power",
+        "spoiler": true,
+        "before": [
+          1322670
+        ],
+        "after": [
+          1322605
+        ]
+      }
+    ],
+    "spellValues": [
+      {
+        "classId": 1,
+        "className": "Warrior",
+        "tree": "Fury",
+        "nodeId": 105938,
+        "name": "Booming Voice",
+        "spoiler": true,
+        "spellId": 12321,
+        "spellName": "Booming Voice",
+        "changes": [
+          {
+            "field": "text",
+            "before": "64f4692719e7",
+            "after": "15756a046703"
+          }
+        ]
+      },
+      {
+        "classId": 1,
+        "className": "Warrior",
+        "tree": "Arms",
+        "nodeId": 105949,
+        "name": "Spearing Strike",
+        "spoiler": true,
+        "spellId": 1310222,
+        "spellName": "Spearing Strike",
+        "changes": [
+          {
+            "field": "effect 2 basePoints",
+            "before": 40,
+            "after": 75
+          },
+          {
+            "field": "effect 3 basePoints",
+            "before": 2,
+            "after": 1
+          }
+        ]
+      },
+      {
+        "classId": 1,
+        "className": "Warrior",
+        "tree": "Fury",
+        "nodeId": 105977,
+        "name": "Improved Whirlwind",
+        "spoiler": true,
+        "spellId": 1310315,
+        "spellName": "Improved Whirlwind",
+        "changes": [
+          {
+            "field": "text",
+            "before": "da4f6e2f3767",
+            "after": "a2c3cb615fdc"
+          },
+          {
+            "field": "effect 1 basePoints",
+            "before": 100,
+            "after": -2000
+          },
+          {
+            "field": "effect 2 basePoints",
+            "before": -30,
+            "after": 30
+          }
+        ]
+      },
+      {
+        "classId": 1,
+        "className": "Warrior",
+        "tree": "Arms",
+        "nodeId": 110858,
+        "name": "Improved Slam",
+        "spoiler": true,
+        "spellId": 12862,
+        "spellName": "Improved Slam",
+        "changes": [
+          {
+            "field": "text",
+            "before": "5a0de1f9f256",
+            "after": "80258bcf7b4c"
+          },
+          {
+            "field": "effect 3 basePoints",
+            "before": -3000,
+            "after": -5000
+          }
+        ]
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 105320,
+        "name": "Light's Vigil",
+        "spoiler": true,
+        "spellId": 1310911,
+        "spellName": "Light's Vigil",
+        "changes": [
+          {
+            "field": "text",
+            "before": "45e5a7d6312a",
+            "after": "4e9de7ab264c"
+          }
+        ]
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 105321,
+        "name": "Holy Power",
+        "spoiler": true,
+        "spellId": 5923,
+        "spellName": "Holy Power",
+        "changes": [
+          {
+            "field": "text",
+            "before": "3221ea90a672",
+            "after": "2a26156b809e"
+          },
+          {
+            "field": "effect 1 basePoints",
+            "before": 5,
+            "after": 0
+          },
+          {
+            "field": "effect 2 basePoints",
+            "before": 15,
+            "after": null
+          },
+          {
+            "field": "effect 2 dieSides",
+            "before": 0,
+            "after": null
+          },
+          {
+            "field": "effect 2 periodMs",
+            "before": 0,
+            "after": null
+          },
+          {
+            "field": "effect 2 chainTargets",
+            "before": 0,
+            "after": null
+          },
+          {
+            "field": "effect 2 miscValue",
+            "before": 0,
+            "after": null
+          }
+        ]
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Holy",
+        "nodeId": 105324,
+        "name": "Divine Precision",
+        "spoiler": true,
+        "spellId": 1310904,
+        "spellName": "Divine Precision",
+        "changes": [
+          {
+            "field": "text",
+            "before": "6f686f5c4edc",
+            "after": "e34c0a9c4e77"
+          },
+          {
+            "field": "effect 1 basePoints",
+            "before": 18,
+            "after": 8
+          },
+          {
+            "field": "effect 2 basePoints",
+            "before": null,
+            "after": -20
+          },
+          {
+            "field": "effect 2 dieSides",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 2 periodMs",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 2 chainTargets",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 2 miscValue",
+            "before": null,
+            "after": 0
+          }
+        ]
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 105628,
+        "name": "Holy Shield",
+        "spoiler": true,
+        "spellId": 20925,
+        "spellName": "Holy Shield",
+        "changes": [
+          {
+            "field": "effect 2 basePoints",
+            "before": 110,
+            "after": 75
+          }
+        ]
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 105632,
+        "name": "Sacred Duty",
+        "spoiler": true,
+        "spellId": 1224697,
+        "spellName": "Sacred Duty",
+        "changes": [
+          {
+            "field": "text",
+            "before": "94d9f8f1a1bf",
+            "after": "cb056a2b3376"
+          },
+          {
+            "field": "effect 1 basePoints",
+            "before": 4,
+            "after": -10000
+          }
+        ]
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Retribution",
+        "nodeId": 105692,
+        "name": "Unsealed Wrath",
+        "spoiler": true,
+        "spellId": 1310735,
+        "spellName": "Unsealed Wrath",
+        "changes": [
+          {
+            "field": "text",
+            "before": "f22ffcdf9879",
+            "after": "661e4daa9455"
+          },
+          {
+            "field": "effect 1 basePoints",
+            "before": -20,
+            "after": 0
+          }
+        ]
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Retribution",
+        "nodeId": 105697,
+        "name": "Two-Handed Weapon Specialization",
+        "spoiler": true,
+        "spellId": 20111,
+        "spellName": "Two-Handed Weapon Specialization",
+        "changes": [
+          {
+            "field": "text",
+            "before": "4a236f63748d",
+            "after": "d5a60fb818c6"
+          },
+          {
+            "field": "effect 2 basePoints",
+            "before": null,
+            "after": -20
+          },
+          {
+            "field": "effect 2 dieSides",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 2 periodMs",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 2 chainTargets",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 2 miscValue",
+            "before": null,
+            "after": 0
+          }
+        ]
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Retribution",
+        "nodeId": 105702,
+        "name": "Vindication",
+        "spoiler": true,
+        "spellId": 9452,
+        "spellName": "Vindication",
+        "changes": [
+          {
+            "field": "text",
+            "before": "947ce9e20491",
+            "after": "56e1eb6bbbef"
+          }
+        ]
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Retribution",
+        "nodeId": 105703,
+        "name": "Conviction",
+        "spoiler": true,
+        "spellId": 20117,
+        "spellName": "Conviction",
+        "changes": [
+          {
+            "field": "text",
+            "before": "afc809af673f",
+            "after": "d6b389fbf1dd"
+          }
+        ]
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Protection",
+        "nodeId": 110878,
+        "name": "Swift Judgement",
+        "spoiler": true,
+        "spellId": 1310994,
+        "spellName": "Swift Judgement",
+        "changes": [
+          {
+            "field": "durationMs",
+            "before": -1,
+            "after": null
+          },
+          {
+            "field": "text",
+            "before": "9b020c525d2a",
+            "after": "a208a17e0662"
+          },
+          {
+            "field": "effect 1 basePoints",
+            "before": -100,
+            "after": 0
+          }
+        ]
+      },
+      {
+        "classId": 2,
+        "className": "Paladin",
+        "tree": "Retribution",
+        "nodeId": 110882,
+        "name": "Champion of the Light",
+        "spoiler": true,
+        "spellId": 1311084,
+        "spellName": "Champion of the Light",
+        "changes": [
+          {
+            "field": "text",
+            "before": "a97a1ade9ba0",
+            "after": "6898ce1aaffe"
+          },
+          {
+            "field": "effect 2 basePoints",
+            "before": null,
+            "after": -1000
+          },
+          {
+            "field": "effect 2 dieSides",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 2 periodMs",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 2 chainTargets",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 2 miscValue",
+            "before": null,
+            "after": 0
+          }
+        ]
+      },
+      {
+        "classId": 3,
+        "className": "Hunter",
+        "tree": "Marksmanship",
+        "nodeId": 104997,
+        "name": "Sniper Shot",
+        "spoiler": true,
+        "spellId": 1310687,
+        "spellName": "Sniper Shot",
+        "changes": [
+          {
+            "field": "effect 1 basePoints",
+            "before": 160,
+            "after": 320
+          }
+        ]
+      },
+      {
+        "classId": 3,
+        "className": "Hunter",
+        "tree": "Marksmanship",
+        "nodeId": 105004,
+        "name": "Trueshot Aura",
+        "spoiler": true,
+        "spellId": 1299346,
+        "spellName": "Trueshot Aura",
+        "changes": [
+          {
+            "field": "effect 1 basePoints",
+            "before": 15,
+            "after": 20
+          }
+        ]
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Combat",
+        "nodeId": 105708,
+        "name": "Coup de Grace",
+        "spoiler": true,
+        "spellId": 14162,
+        "spellName": "Coup de Grace",
+        "changes": [
+          {
+            "field": "text",
+            "before": "08c60cb49b81",
+            "after": "7b86455bf7d8"
+          },
+          {
+            "field": "effect 2 basePoints",
+            "before": null,
+            "after": 20
+          },
+          {
+            "field": "effect 2 dieSides",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 2 periodMs",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 2 chainTargets",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 2 miscValue",
+            "before": null,
+            "after": 0
+          }
+        ]
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Combat",
+        "nodeId": 105730,
+        "name": "Aggression",
+        "spoiler": true,
+        "spellId": 18427,
+        "spellName": "Aggression",
+        "changes": [
+          {
+            "field": "text",
+            "before": "d96f2474be3b",
+            "after": "114de25b7377"
+          }
+        ]
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Combat",
+        "nodeId": 105741,
+        "name": "Efficient Strikes",
+        "spoiler": true,
+        "spellId": 13732,
+        "spellName": "Efficient Strikes",
+        "changes": [
+          {
+            "field": "text",
+            "before": "4af6b0a77e2e",
+            "after": "2cc9e774985d"
+          }
+        ]
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 105748,
+        "name": "Hemorrhage",
+        "spoiler": true,
+        "spellId": 16511,
+        "spellName": "Hemorrhage",
+        "changes": [
+          {
+            "field": "text",
+            "before": "4f2cf9789238",
+            "after": "09eec1fb6ce9"
+          }
+        ]
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 105751,
+        "name": "Setup",
+        "spoiler": true,
+        "spellId": 13983,
+        "spellName": "Setup",
+        "changes": [
+          {
+            "field": "text",
+            "before": "e410437922f8",
+            "after": "a70b57894c55"
+          }
+        ]
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 105754,
+        "name": "Ghostly Strike",
+        "spoiler": true,
+        "spellId": 14278,
+        "spellName": "Ghostly Strike",
+        "changes": [
+          {
+            "field": "text",
+            "before": "5fb081e431e1",
+            "after": "ece69249bde3"
+          },
+          {
+            "field": "effect 5 basePoints",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 5 dieSides",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 5 periodMs",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 5 chainTargets",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 5 miscValue",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 6 basePoints",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 6 dieSides",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 6 periodMs",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 6 chainTargets",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 6 miscValue",
+            "before": null,
+            "after": 0
+          }
+        ]
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Combat",
+        "nodeId": 108100,
+        "name": "Flawless Execution",
+        "spoiler": true,
+        "spellId": 1310711,
+        "spellName": "Flawless Execution",
+        "changes": [
+          {
+            "field": "effect 1 basePoints",
+            "before": -10,
+            "after": -15
+          }
+        ]
+      },
+      {
+        "classId": 4,
+        "className": "Rogue",
+        "tree": "Subtlety",
+        "nodeId": 110867,
+        "name": "Quick Getaway",
+        "spoiler": true,
+        "spellId": 1310728,
+        "spellName": "Quick Getaway",
+        "changes": [
+          {
+            "field": "text",
+            "before": "2a5ff47f76c4",
+            "after": "49f156753150"
+          },
+          {
+            "field": "effect 1 basePoints",
+            "before": 10,
+            "after": 1
+          }
+        ]
+      },
+      {
+        "classId": 5,
+        "className": "Priest",
+        "tree": "Discipline",
+        "nodeId": 105835,
+        "name": "Renewed Hope",
+        "spoiler": true,
+        "spellId": 425280,
+        "spellName": "Renewed Hope",
+        "changes": [
+          {
+            "field": "text",
+            "before": "774e7ec57e4b",
+            "after": "6d32ebfd0030"
+          }
+        ]
+      },
+      {
+        "classId": 7,
+        "className": "Shaman",
+        "tree": "Restoration",
+        "nodeId": 104724,
+        "name": "Riptide",
+        "spoiler": true,
+        "spellId": 408521,
+        "spellName": "Riptide",
+        "changes": [
+          {
+            "field": "text",
+            "before": "d3976030b656",
+            "after": "4fe3f38f5854"
+          },
+          {
+            "field": "effect 1 basePoints",
+            "before": 480,
+            "after": 0
+          }
+        ]
+      },
+      {
+        "classId": 7,
+        "className": "Shaman",
+        "tree": "Enhancement",
+        "nodeId": 104743,
+        "name": "Stormstrike",
+        "spoiler": true,
+        "spellId": 17364,
+        "spellName": "Stormstrike",
+        "changes": [
+          {
+            "field": "text",
+            "before": "139494e30123",
+            "after": "177bcff2ea14"
+          },
+          {
+            "field": "effect 3 basePoints",
+            "before": null,
+            "after": 150
+          },
+          {
+            "field": "effect 3 dieSides",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 3 periodMs",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 3 chainTargets",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 3 miscValue",
+            "before": null,
+            "after": 0
+          }
+        ]
+      },
+      {
+        "classId": 7,
+        "className": "Shaman",
+        "tree": "Elemental Combat",
+        "nodeId": 104758,
+        "name": "Lightning Mastery",
+        "spoiler": true,
+        "spellId": 16166,
+        "spellName": "Lightning Mastery",
+        "changes": [
+          {
+            "field": "text",
+            "before": "5e0c5245c4ba",
+            "after": "0f110187815b"
+          }
+        ]
+      },
+      {
+        "classId": 7,
+        "className": "Shaman",
+        "tree": "Elemental Combat",
+        "nodeId": 104761,
+        "name": "Elemental Reach",
+        "spoiler": true,
+        "spellId": 28999,
+        "spellName": "Elemental Reach",
+        "changes": [
+          {
+            "field": "text",
+            "before": "d83f49ac76a0",
+            "after": "c8b7f4cb72a2"
+          }
+        ]
+      },
+      {
+        "classId": 7,
+        "className": "Shaman",
+        "tree": "Elemental Combat",
+        "nodeId": 104763,
+        "name": "Eye of the Storm",
+        "spoiler": true,
+        "spellId": 29062,
+        "spellName": "Eye of the Storm",
+        "changes": [
+          {
+            "field": "text",
+            "before": "839bc583242a",
+            "after": "885718b596d4"
+          }
+        ]
+      },
+      {
+        "classId": 7,
+        "className": "Shaman",
+        "tree": "Elemental Combat",
+        "nodeId": 104770,
+        "name": "Call of Flame",
+        "spoiler": true,
+        "spellId": 16038,
+        "spellName": "Call of Flame",
+        "changes": [
+          {
+            "field": "text",
+            "before": "d8d05d005ca6",
+            "after": "944872f15d44"
+          }
+        ]
+      },
+      {
+        "classId": 7,
+        "className": "Shaman",
+        "tree": "Elemental Combat",
+        "nodeId": 104771,
+        "name": "Elemental Alacrity",
+        "spoiler": true,
+        "spellId": 16578,
+        "spellName": "Elemental Alacrity",
+        "changes": [
+          {
+            "field": "text",
+            "before": "b855894f3f3e",
+            "after": "284df323a26b"
+          }
+        ]
+      },
+      {
+        "classId": 7,
+        "className": "Shaman",
+        "tree": "Elemental Combat",
+        "nodeId": 104773,
+        "name": "Convection",
+        "spoiler": true,
+        "spellId": 16039,
+        "spellName": "Convection",
+        "changes": [
+          {
+            "field": "text",
+            "before": "a5f73786e7aa",
+            "after": "16d399a18614"
+          }
+        ]
+      },
+      {
+        "classId": 8,
+        "className": "Mage",
+        "tree": "Frost",
+        "nodeId": 105762,
+        "name": "Ice Barrier",
+        "spoiler": true,
+        "spellId": 11426,
+        "spellName": "Ice Barrier",
+        "changes": [
+          {
+            "field": "effect 2 basePoints",
+            "before": 3,
+            "after": 5
+          },
+          {
+            "field": "effect 3 basePoints",
+            "before": 3,
+            "after": 5
+          }
+        ]
+      },
+      {
+        "classId": 8,
+        "className": "Mage",
+        "tree": "Frost",
+        "nodeId": 105763,
+        "name": "Winter's Chill",
+        "spoiler": true,
+        "spellId": 11180,
+        "spellName": "Winter's Chill",
+        "changes": [
+          {
+            "field": "text",
+            "before": "7c5f4ea241b4",
+            "after": "7d3c03f40d80"
+          }
+        ]
+      },
+      {
+        "classId": 8,
+        "className": "Mage",
+        "tree": "Frost",
+        "nodeId": 105767,
+        "name": "Ice Lance",
+        "spoiler": true,
+        "spellId": 1312002,
+        "spellName": "Ice Lance",
+        "changes": [
+          {
+            "field": "effect 2 basePoints",
+            "before": 200,
+            "after": 300
+          }
+        ]
+      },
+      {
+        "classId": 8,
+        "className": "Mage",
+        "tree": "Frost",
+        "nodeId": 105770,
+        "name": "Arctic Reach",
+        "spoiler": true,
+        "spellId": 16757,
+        "spellName": "Arctic Reach",
+        "changes": [
+          {
+            "field": "text",
+            "before": "15862cd30921",
+            "after": "3e1d297d7b81"
+          }
+        ]
+      },
+      {
+        "classId": 8,
+        "className": "Mage",
+        "tree": "Frost",
+        "nodeId": 105779,
+        "name": "Improved Frostbolt",
+        "spoiler": true,
+        "spellId": 11070,
+        "spellName": "Improved Frostbolt",
+        "changes": [
+          {
+            "field": "text",
+            "before": "26522104d8cd",
+            "after": "4b6535a09f50"
+          }
+        ]
+      },
+      {
+        "classId": 8,
+        "className": "Mage",
+        "tree": "Arcane",
+        "nodeId": 105809,
+        "name": "Missile Barrage",
+        "spoiler": true,
+        "spellId": 400588,
+        "spellName": "Missile Barrage",
+        "changes": [
+          {
+            "field": "text",
+            "before": "c08d66eb2320",
+            "after": "01b1e6aedd48"
+          }
+        ]
+      },
+      {
+        "classId": 9,
+        "className": "Warlock",
+        "tree": "Affliction",
+        "nodeId": 105920,
+        "name": "Improved Drains",
+        "spoiler": true,
+        "spellId": 403511,
+        "spellName": "Improved Drains",
+        "changes": [
+          {
+            "field": "text",
+            "before": "976ad4dbe69d",
+            "after": "1d84bcc56cef"
+          },
+          {
+            "field": "effect 2 basePoints",
+            "before": null,
+            "after": 20
+          },
+          {
+            "field": "effect 2 dieSides",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 2 periodMs",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 2 chainTargets",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 2 miscValue",
+            "before": null,
+            "after": 0
+          }
+        ]
+      },
+      {
+        "classId": 11,
+        "className": "Druid",
+        "tree": "Restoration",
+        "nodeId": 104912,
+        "name": "Swiftmend",
+        "spoiler": true,
+        "spellId": 18562,
+        "spellName": "Swiftmend",
+        "changes": [
+          {
+            "field": "text",
+            "before": "701827b461ee",
+            "after": "b3832769dc7f"
+          }
+        ]
+      },
+      {
+        "classId": 11,
+        "className": "Druid",
+        "tree": "Restoration",
+        "nodeId": 104922,
+        "name": "Naturalist",
+        "spoiler": true,
+        "spellId": 17069,
+        "spellName": "Naturalist",
+        "changes": [
+          {
+            "field": "text",
+            "before": "c17f9e2d141d",
+            "after": "1196ef2de4b8"
+          }
+        ]
+      },
+      {
+        "classId": 11,
+        "className": "Druid",
+        "tree": "Balance",
+        "nodeId": 104937,
+        "name": "Moonkin Form",
+        "spoiler": true,
+        "spellId": 24858,
+        "spellName": "Moonkin Form",
+        "changes": [
+          {
+            "field": "text",
+            "before": "b2e156cb0d2e",
+            "after": "c85a7f5641b8"
+          }
+        ]
+      },
+      {
+        "classId": 11,
+        "className": "Druid",
+        "tree": "Feral Combat",
+        "nodeId": 104955,
+        "name": "Leader of the Pack",
+        "spoiler": true,
+        "spellId": 17007,
+        "spellName": "Leader of the Pack",
+        "changes": [
+          {
+            "field": "text",
+            "before": "3d8f0c844f79",
+            "after": "5ccead15709f"
+          }
+        ]
+      },
+      {
+        "classId": 11,
+        "className": "Druid",
+        "tree": "Feral Combat",
+        "nodeId": 104956,
+        "name": "Primal Bite",
+        "spoiler": true,
+        "spellId": 407995,
+        "spellName": "Primal Bite",
+        "changes": [
+          {
+            "field": "effect 1 basePoints",
+            "before": 26,
+            "after": 42
+          }
+        ]
+      }
+    ],
+    "pointLevels": []
+  },
+  "raidBuffs": {
+    "comparedTo": "1.60.1.70707",
+    "scopeChanges": [
+      {
+        "id": "blessing-of-light",
+        "label": "Blessing of Light",
+        "before": "single",
+        "after": null,
+        "beforeRanks": "",
+        "afterRanks": "",
+        "spoiler": true
+      },
+      {
+        "id": "blessing-of-salvation",
+        "label": "Blessing of Salvation",
+        "before": "unknown",
+        "after": null,
+        "beforeRanks": "",
+        "afterRanks": "",
+        "spoiler": true
+      },
+      {
+        "id": "greater-blessing-of-salvation",
+        "label": "Greater Blessing of Salvation",
+        "before": "unknown",
+        "after": null,
+        "beforeRanks": "",
+        "afterRanks": "",
+        "spoiler": true
+      }
+    ],
+    "spellChanges": []
+  },
+  "mapChanges": [],
+  "readSet": {
+    "tables": {
+      "before": 377,
+      "after": 377
+    },
+    "rows": {
+      "before": 1207427,
+      "after": 1208399
+    },
+    "addedTables": [],
+    "removedTables": [],
+    "changedTables": [
+      {
+        "table": "Achievement",
+        "rowsBefore": 441,
+        "rowsAfter": 440,
+        "changed": true
+      },
+      {
+        "table": "AnimKit",
+        "rowsBefore": 806,
+        "rowsAfter": 808,
+        "changed": true
+      },
+      {
+        "table": "AnimKitSegment",
+        "rowsBefore": 1079,
+        "rowsAfter": 1081,
+        "changed": true
+      },
+      {
+        "table": "ChrCustomizationOption",
+        "rowsBefore": 1173,
+        "rowsAfter": 1173,
+        "changed": true
+      },
+      {
+        "table": "ChrRaceRacialAbility",
+        "rowsBefore": 40,
+        "rowsAfter": 40,
+        "changed": true
+      },
+      {
+        "table": "ChrRaces",
+        "rowsBefore": 58,
+        "rowsAfter": 58,
+        "changed": true
+      },
+      {
+        "table": "ComponentModelFileData",
+        "rowsBefore": 50267,
+        "rowsAfter": 50269,
+        "changed": true
+      },
+      {
+        "table": "ComponentTextureFileData",
+        "rowsBefore": 14371,
+        "rowsAfter": 14423,
+        "changed": true
+      },
+      {
+        "table": "CreatureDisplayInfo",
+        "rowsBefore": 14207,
+        "rowsAfter": 14207,
+        "changed": true
+      },
+      {
+        "table": "CreatureDisplayInfoTrn",
+        "rowsBefore": 0,
+        "rowsAfter": 1,
+        "changed": true
+      },
+      {
+        "table": "CreatureModelData",
+        "rowsBefore": 1194,
+        "rowsAfter": 1195,
+        "changed": true
+      },
+      {
+        "table": "CriteriaTree",
+        "rowsBefore": 6759,
+        "rowsAfter": 6759,
+        "changed": true
+      },
+      {
+        "table": "CurrencyTypes",
+        "rowsBefore": 9,
+        "rowsAfter": 9,
+        "changed": true
+      },
+      {
+        "table": "DungeonEncounter",
+        "rowsBefore": 342,
+        "rowsAfter": 342,
+        "changed": true
+      },
+      {
+        "table": "GameObjectDisplayInfo",
+        "rowsBefore": 3248,
+        "rowsAfter": 3248,
+        "changed": true
+      },
+      {
+        "table": "Holidays",
+        "rowsBefore": 22,
+        "rowsAfter": 23,
+        "changed": true
+      },
+      {
+        "table": "Item",
+        "rowsBefore": 31956,
+        "rowsAfter": 31960,
+        "changed": true
+      },
+      {
+        "table": "ItemAppearance",
+        "rowsBefore": 9043,
+        "rowsAfter": 9109,
+        "changed": true
+      },
+      {
+        "table": "ItemDisplayInfo",
+        "rowsBefore": 42527,
+        "rowsAfter": 42645,
+        "changed": true
+      },
+      {
+        "table": "ItemDisplayInfoMaterialRes",
+        "rowsBefore": 55647,
+        "rowsAfter": 55794,
+        "changed": true
+      },
+      {
+        "table": "ItemEffect",
+        "rowsBefore": 12646,
+        "rowsAfter": 12651,
+        "changed": true
+      },
+      {
+        "table": "ItemModifiedAppearance",
+        "rowsBefore": 16884,
+        "rowsAfter": 16884,
+        "changed": true
+      },
+      {
+        "table": "ItemModifiedAppearanceExtra",
+        "rowsBefore": 42,
+        "rowsAfter": 41,
+        "changed": true
+      },
+      {
+        "table": "ItemSearchName",
+        "rowsBefore": 6626,
+        "rowsAfter": 6626,
+        "changed": true
+      },
+      {
+        "table": "ItemSparse",
+        "rowsBefore": 19241,
+        "rowsAfter": 19281,
+        "changed": true
+      },
+      {
+        "table": "ItemXItemEffect",
+        "rowsBefore": 12638,
+        "rowsAfter": 12643,
+        "changed": true
+      },
+      {
+        "table": "Map",
+        "rowsBefore": 73,
+        "rowsAfter": 73,
+        "changed": true
+      },
+      {
+        "table": "ModelFileData",
+        "rowsBefore": 121131,
+        "rowsAfter": 121133,
+        "changed": true
+      },
+      {
+        "table": "ModifierTree",
+        "rowsBefore": 2848,
+        "rowsAfter": 2854,
+        "changed": true
+      },
+      {
+        "table": "Mount",
+        "rowsBefore": 141,
+        "rowsAfter": 141,
+        "changed": true
+      },
+      {
+        "table": "MountCapability",
+        "rowsBefore": 26,
+        "rowsAfter": 27,
+        "changed": true
+      },
+      {
+        "table": "MountType",
+        "rowsBefore": 29,
+        "rowsAfter": 30,
+        "changed": true
+      },
+      {
+        "table": "MountTypeXCapability",
+        "rowsBefore": 30,
+        "rowsAfter": 31,
+        "changed": true
+      },
+      {
+        "table": "SkillLine",
+        "rowsBefore": 154,
+        "rowsAfter": 154,
+        "changed": true
+      },
+      {
+        "table": "SkillLineAbility",
+        "rowsBefore": 7843,
+        "rowsAfter": 7845,
+        "changed": true
+      },
+      {
+        "table": "SoundEnvelope",
+        "rowsBefore": 251,
+        "rowsAfter": 252,
+        "changed": true
+      },
+      {
+        "table": "SoundKit",
+        "rowsBefore": 23360,
+        "rowsAfter": 23379,
+        "changed": true
+      },
+      {
+        "table": "SoundKitAdvanced",
+        "rowsBefore": 16442,
+        "rowsAfter": 16459,
+        "changed": true
+      },
+      {
+        "table": "SoundKitChild",
+        "rowsBefore": 2942,
+        "rowsAfter": 2949,
+        "changed": true
+      },
+      {
+        "table": "SoundKitEntry",
+        "rowsBefore": 91051,
+        "rowsAfter": 91124,
+        "changed": true
+      },
+      {
+        "table": "Spell",
+        "rowsBefore": 32007,
+        "rowsAfter": 32063,
+        "changed": true
+      },
+      {
+        "table": "SpellAuraOptions",
+        "rowsBefore": 12799,
+        "rowsAfter": 12802,
+        "changed": true
+      },
+      {
+        "table": "SpellCategories",
+        "rowsBefore": 10678,
+        "rowsAfter": 10682,
+        "changed": true
+      },
+      {
+        "table": "SpellClassOptions",
+        "rowsBefore": 6086,
+        "rowsAfter": 6112,
+        "changed": true
+      },
+      {
+        "table": "SpellCooldowns",
+        "rowsBefore": 4506,
+        "rowsAfter": 4508,
+        "changed": true
+      },
+      {
+        "table": "SpellDuration",
+        "rowsBefore": 134,
+        "rowsAfter": 134,
+        "changed": true
+      },
+      {
+        "table": "SpellEffect",
+        "rowsBefore": 42830,
+        "rowsAfter": 42940,
+        "changed": true
+      },
+      {
+        "table": "SpellEquippedItems",
+        "rowsBefore": 1886,
+        "rowsAfter": 1889,
+        "changed": true
+      },
+      {
+        "table": "SpellInterrupts",
+        "rowsBefore": 9903,
+        "rowsAfter": 9913,
+        "changed": true
+      },
+      {
+        "table": "SpellItemEnchantment",
+        "rowsBefore": 2217,
+        "rowsAfter": 2218,
+        "changed": true
+      },
+      {
+        "table": "SpellLabel",
+        "rowsBefore": 4656,
+        "rowsAfter": 4681,
+        "changed": true
+      },
+      {
+        "table": "SpellLevels",
+        "rowsBefore": 12958,
+        "rowsAfter": 12978,
+        "changed": true
+      },
+      {
+        "table": "SpellMisc",
+        "rowsBefore": 31987,
+        "rowsAfter": 32043,
+        "changed": true
+      },
+      {
+        "table": "SpellName",
+        "rowsBefore": 32007,
+        "rowsAfter": 32063,
+        "changed": true
+      },
+      {
+        "table": "SpellPower",
+        "rowsBefore": 3467,
+        "rowsAfter": 3475,
+        "changed": true
+      },
+      {
+        "table": "SpellProceduralEffect",
+        "rowsBefore": 993,
+        "rowsAfter": 996,
+        "changed": true
+      },
+      {
+        "table": "SpellReagents",
+        "rowsBefore": 3300,
+        "rowsAfter": 3299,
+        "changed": true
+      },
+      {
+        "table": "SpellShapeshift",
+        "rowsBefore": 3462,
+        "rowsAfter": 3470,
+        "changed": true
+      },
+      {
+        "table": "SpellTargetRestrictions",
+        "rowsBefore": 4500,
+        "rowsAfter": 4505,
+        "changed": true
+      },
+      {
+        "table": "SpellTotems",
+        "rowsBefore": 1121,
+        "rowsAfter": 1122,
+        "changed": true
+      },
+      {
+        "table": "TaxiPath",
+        "rowsBefore": 330,
+        "rowsAfter": 328,
+        "changed": true
+      },
+      {
+        "table": "TaxiPathNode",
+        "rowsBefore": 11012,
+        "rowsAfter": 10965,
+        "changed": true
+      },
+      {
+        "table": "Toy",
+        "rowsBefore": 20,
+        "rowsAfter": 21,
+        "changed": true
+      },
+      {
+        "table": "TraitCond",
+        "rowsBefore": 172,
+        "rowsAfter": 171,
+        "changed": true
+      },
+      {
+        "table": "TraitCurrencySource",
+        "rowsBefore": 187,
+        "rowsAfter": 187,
+        "changed": true
+      },
+      {
+        "table": "TraitDefinition",
+        "rowsBefore": 659,
+        "rowsAfter": 665,
+        "changed": true
+      },
+      {
+        "table": "TraitDefinitionEffectPoints",
+        "rowsBefore": 646,
+        "rowsAfter": 663,
+        "changed": true
+      },
+      {
+        "table": "TraitEdge",
+        "rowsBefore": 99,
+        "rowsAfter": 99,
+        "changed": true
+      },
+      {
+        "table": "TraitNode",
+        "rowsBefore": 556,
+        "rowsAfter": 559,
+        "changed": true
+      },
+      {
+        "table": "TraitNodeEntry",
+        "rowsBefore": 659,
+        "rowsAfter": 666,
+        "changed": true
+      },
+      {
+        "table": "TraitNodeGroupXTraitNode",
+        "rowsBefore": 2145,
+        "rowsAfter": 2159,
+        "changed": true
+      },
+      {
+        "table": "TraitNodeXTraitCond",
+        "rowsBefore": 1,
+        "rowsAfter": 0,
+        "changed": true
+      },
+      {
+        "table": "TraitNodeXTraitNodeEntry",
+        "rowsBefore": 559,
+        "rowsAfter": 562,
+        "changed": true
+      },
+      {
+        "table": "UiTextureAtlas",
+        "rowsBefore": 2826,
+        "rowsAfter": 2826,
+        "changed": true
+      },
+      {
+        "table": "UiTextureAtlasElement",
+        "rowsBefore": 20816,
+        "rowsAfter": 20817,
+        "changed": true
+      },
+      {
+        "table": "UiTextureAtlasMember",
+        "rowsBefore": 20684,
+        "rowsAfter": 20685,
+        "changed": true
+      },
+      {
+        "table": "WMOAreaTable",
+        "rowsBefore": 52737,
+        "rowsAfter": 52737,
+        "changed": true
+      }
+    ],
+    "layoutChanged": true
+  },
+  "warnings": [
+    "table definitions differ (WoWDBDefs a3840427a39e vs a936b2d4f4db): a change may come from the layouts, not the game"
+  ]
+}

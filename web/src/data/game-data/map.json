@@ -6,11 +6,11 @@
     "licence": "Blizzard game data, not under our licence",
     "licenceUrl": "https://github.com/Everloot/everloot/blob/main/docs/DATA_POLICY.md",
     "product": "wowf",
-    "buildId": 70707,
-    "version": "1.60.1.70707",
-    "buildConfig": "7feb61f3c994bcb168526b8db521514a",
-    "definitions": "a3840427a39e",
-    "extractedAt": "2026-10-30T15:48:39.935Z",
+    "buildId": 70790,
+    "version": "1.60.1.70790",
+    "buildConfig": "9006ba6948388dd0d4a0578e64b8a92e",
+    "definitions": "a936b2d4f4db",
+    "extractedAt": "2026-11-04T18:40:31.705Z",
     "tables": [
       {
         "table": "Map",
@@ -34,12 +34,12 @@
       },
       {
         "table": "TaxiPath",
-        "rows": 330,
+        "rows": 328,
         "encryptedBlocks": 0
       },
       {
         "table": "TaxiPathNode",
-        "rows": 11012,
+        "rows": 10965,
         "encryptedBlocks": 0
       },
       {
@@ -1697,14 +1697,6 @@
       "worldX": 4393.5,
       "worldY": -2836.4,
       "uiMapId": 2482
-    },
-    {
-      "id": 3275,
-      "name": "Powderfuse Port, Riverglades",
-      "continentId": 0,
-      "worldX": -8180,
-      "worldY": -5616.3,
-      "uiMapId": 2548
     },
     {
       "id": 3276,
@@ -16364,57 +16356,6 @@
         [
           -916,
           -3493
-        ]
-      ]
-    },
-    {
-      "from": 3275,
-      "to": 3276,
-      "continentId": 0,
-      "points": [
-        [
-          -8180,
-          -5616
-        ],
-        [
-          -8156,
-          -5653
-        ],
-        [
-          -8190,
-          -5712
-        ],
-        [
-          -8255,
-          -5732
-        ],
-        [
-          -8363,
-          -5668
-        ],
-        [
-          -8640,
-          -5659
-        ],
-        [
-          -8697,
-          -5627
-        ],
-        [
-          -8868,
-          -5471
-        ],
-        [
-          -8940,
-          -5298
-        ],
-        [
-          -8933,
-          -5016
-        ],
-        [
-          -9103,
-          -4831
         ]
       ]
     },

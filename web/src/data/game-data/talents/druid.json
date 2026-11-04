@@ -3,11 +3,11 @@
  "label": "found in game files, unconfirmed",
  "build": {
   "product": "wowf",
-  "buildId": 70707,
-  "version": "1.60.1.70707",
-  "buildConfig": "7feb61f3c994bcb168526b8db521514a",
-  "definitions": "a3840427a39e",
-  "extractedAt": "2026-10-30T15:48:39.935Z"
+  "buildId": 70790,
+  "version": "1.60.1.70790",
+  "buildConfig": "9006ba6948388dd0d4a0578e64b8a92e",
+  "definitions": "a936b2d4f4db",
+  "extractedAt": "2026-11-04T18:40:31.705Z"
  },
  "classId": 11,
  "className": "Druid",
@@ -88,7 +88,7 @@
   ]},
   {"id":11347,"name":"Feral Combat","order":1,"nodes":[
    {"id":104938,"x":5620,"y":2130,"row":0,"col":1,"kind":"single","maxRanks":5,"entries":[{"definitionId":134399,"spellId":16934,"name":"Ferocity","maxRanks":5}],"prereqs":[],"unlock":{}},
-   {"id":104939,"x":6220,"y":2130,"row":0,"col":2,"kind":"single","maxRanks":5,"entries":[{"definitionId":134400,"spellId":17003,"name":"Heart of the Wild","maxRanks":5}],"prereqs":[],"unlock":{}},
+   {"id":104939,"x":6220,"y":2130,"row":0,"col":2,"kind":"single","maxRanks":5,"entries":[{"definitionId":134400,"spellId":17056,"name":"Furor","maxRanks":5}],"prereqs":[],"unlock":{}},
    {"id":104940,"x":5620,"y":2730,"row":1,"col":1,"kind":"single","maxRanks":3,"entries":[{"definitionId":134401,"spellId":16947,"name":"Feral Instinct","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11346,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12709}}},
    {"id":104941,"x":6220,"y":2730,"row":1,"col":2,"kind":"single","maxRanks":2,"entries":[{"definitionId":134402,"spellId":16940,"name":"Brutal Impact","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11346,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12709}}},
    {"id":104942,"x":6820,"y":2730,"row":1,"col":3,"kind":"single","maxRanks":3,"entries":[{"definitionId":134403,"spellId":16929,"name":"Thick Hide","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11346,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12709}}},
@@ -98,15 +98,15 @@
    {"id":104946,"x":6820,"y":3330,"row":2,"col":3,"kind":"single","maxRanks":2,"entries":[{"definitionId":134407,"spellId":16942,"name":"Sharpened Claws","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":10,"scope":"tree","gateGroupId":11345,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12708}}},
    {"id":104947,"x":6820,"y":3930,"row":3,"col":3,"kind":"single","maxRanks":2,"entries":[{"definitionId":134408,"spellId":16958,"name":"Blood Frenzy","maxRanks":2}],"prereqs":[{"nodeId":104946,"rule":"any"}],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11344,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12707}}},
    {"id":104948,"x":5620,"y":3330,"row":2,"col":1,"kind":"single","maxRanks":2,"entries":[{"definitionId":134409,"spellId":16998,"name":"Savage Fury","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":10,"scope":"tree","gateGroupId":11345,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12708}}},
-   {"id":104949,"x":5620,"y":3930,"row":3,"col":1,"kind":"single","maxRanks":1,"entries":[{"definitionId":134410,"spellId":407995,"name":"Primal Bite","maxRanks":1}],"prereqs":[{"nodeId":104948,"rule":"any"}],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11344,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12707}}},
+   {"id":104949,"x":5620,"y":3930,"row":3,"col":1,"kind":"single","maxRanks":1,"entries":[{"definitionId":134410,"spellId":1328617,"name":"Lacerate","maxRanks":1}],"prereqs":[{"nodeId":104948,"rule":"any"}],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11344,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12707}}},
    {"id":104950,"x":6820,"y":4530,"row":4,"col":3,"kind":"single","maxRanks":2,"entries":[{"definitionId":134411,"spellId":1223242,"name":"Natural Instinct","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":20,"scope":"tree","gateGroupId":11343,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12706}}},
-   {"id":104951,"x":5020,"y":3930,"row":3,"col":0,"kind":"single","maxRanks":1,"entries":[{"definitionId":134412,"spellId":1322605,"name":"Shifting Power","maxRanks":1}],"prereqs":[{"nodeId":104945,"rule":"any"}],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11344,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12707}}},
-   {"id":104952,"x":6220,"y":3930,"row":3,"col":2,"kind":"single","maxRanks":3,"entries":[{"definitionId":134413,"spellId":16972,"name":"Predatory Strikes","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11344,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12707}}},
-   {"id":104953,"x":6220,"y":5130,"row":5,"col":2,"kind":"single","maxRanks":5,"entries":[{"definitionId":134414,"spellId":1223246,"name":"Rend and Tear","maxRanks":5}],"prereqs":[{"nodeId":104952,"rule":"any"}],"unlock":{"spentRequired":{"amount":25,"scope":"tree","gateGroupId":11342,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12705}}},
-   {"id":104954,"x":5020,"y":5130,"row":5,"col":0,"kind":"single","maxRanks":5,"entries":[{"definitionId":134415,"spellId":417051,"name":"Natural Reaction","maxRanks":5}],"prereqs":[],"unlock":{"spentRequired":{"amount":25,"scope":"tree","gateGroupId":11342,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12705}}},
+   {"id":104951,"x":6220,"y":3930,"row":3,"col":2,"kind":"single","maxRanks":1,"entries":[{"definitionId":134412,"spellId":1328613,"name":"Predatory Discipline","maxRanks":1}],"prereqs":[],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11344,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12707}}},
+   {"id":104952,"x":5020,"y":3930,"row":3,"col":0,"kind":"single","maxRanks":3,"entries":[{"definitionId":134413,"spellId":16972,"name":"Predatory Strikes","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11344,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12707}}},
+   {"id":104953,"x":5020,"y":5130,"row":5,"col":0,"kind":"single","maxRanks":5,"entries":[{"definitionId":134414,"spellId":1223246,"name":"Rend and Tear","maxRanks":5}],"prereqs":[{"nodeId":104952,"rule":"any"}],"unlock":{"spentRequired":{"amount":25,"scope":"tree","gateGroupId":11342,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12705}}},
+   {"id":104954,"x":6820,"y":5130,"row":5,"col":3,"kind":"single","maxRanks":5,"entries":[{"definitionId":134415,"spellId":417051,"name":"Natural Reaction","maxRanks":5}],"prereqs":[],"unlock":{"spentRequired":{"amount":25,"scope":"tree","gateGroupId":11342,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12705}}},
    {"id":104955,"x":5620,"y":4530,"row":4,"col":1,"kind":"single","maxRanks":1,"entries":[{"definitionId":134416,"spellId":17007,"name":"Leader of the Pack","maxRanks":1}],"prereqs":[],"unlock":{"spentRequired":{"amount":20,"scope":"tree","gateGroupId":11343,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12706}}},
-   {"id":104956,"x":5620,"y":5730,"row":6,"col":1,"kind":"single","maxRanks":1,"entries":[{"definitionId":134417,"spellId":417141,"name":"Berserk","maxRanks":1}],"prereqs":[{"nodeId":104955,"rule":"any"}],"unlock":{"spentRequired":{"amount":30,"scope":"unconfirmed","gateGroupId":11341,"currencyId":3820,"traitTreeId":1089}}},
-   {"id":113563,"x":5020,"y":4530,"row":4,"col":0,"kind":"single","maxRanks":2,"entries":[{"definitionId":145859,"spellId":1322670,"name":"Improved Shifting Power","maxRanks":2}],"prereqs":[{"nodeId":104951,"rule":"any"}],"unlock":{"spentRequired":{"amount":20,"scope":"tree","gateGroupId":11343,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12706}}}
+   {"id":104956,"x":5620,"y":5730,"row":6,"col":1,"kind":"single","maxRanks":1,"entries":[{"definitionId":134417,"spellId":407995,"name":"Primal Bite","maxRanks":1}],"prereqs":[{"nodeId":104955,"rule":"any"}],"unlock":{"spentRequired":{"amount":30,"scope":"unconfirmed","gateGroupId":11341,"currencyId":3820,"traitTreeId":1089}}},
+   {"id":113563,"x":6220,"y":5730,"row":6,"col":2,"kind":"single","maxRanks":1,"entries":[{"definitionId":145859,"spellId":1322605,"name":"Shifting Power","maxRanks":1}],"prereqs":[{"nodeId":104951,"rule":"any"}],"unlock":{"spentRequired":{"amount":30,"scope":"unconfirmed","gateGroupId":11341,"currencyId":3820,"traitTreeId":1089}}}
   ]},
   {"id":11340,"name":"Restoration","order":2,"nodes":[
    {"id":104909,"x":10880,"y":4530,"row":4,"col":3,"kind":"single","maxRanks":2,"entries":[{"definitionId":134370,"spellId":17123,"name":"Improved Tranquility","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":20,"scope":"tree","gateGroupId":11336,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12711}}},
@@ -117,14 +117,14 @@
    {"id":104914,"x":10280,"y":3930,"row":3,"col":2,"kind":"single","maxRanks":3,"entries":[{"definitionId":134375,"spellId":17111,"name":"Improved Rejuvenation","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11337,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12712}}},
    {"id":104915,"x":9680,"y":3930,"row":3,"col":1,"kind":"single","maxRanks":5,"entries":[{"definitionId":134376,"spellId":24968,"name":"Tranquil Spirit","maxRanks":5}],"prereqs":[],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11337,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12712}}},
    {"id":104916,"x":10280,"y":3330,"row":2,"col":2,"kind":"single","maxRanks":5,"entries":[{"definitionId":134377,"spellId":17104,"name":"Gift of Nature","maxRanks":5}],"prereqs":[],"unlock":{"spentRequired":{"amount":10,"scope":"tree","gateGroupId":11338,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12713}}},
-   {"id":104917,"x":9680,"y":3330,"row":2,"col":1,"kind":"single","maxRanks":3,"entries":[{"definitionId":134378,"spellId":17106,"name":"Reflection","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":10,"scope":"tree","gateGroupId":11338,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12713}}},
-   {"id":104918,"x":10880,"y":3330,"row":2,"col":3,"kind":"single","maxRanks":1,"entries":[{"definitionId":134379,"spellId":414673,"name":"Gift of the Earthmother","maxRanks":1}],"prereqs":[],"unlock":{"spentRequired":{"amount":10,"scope":"tree","gateGroupId":11338,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12713}}},
+   {"id":104917,"x":9680,"y":3330,"row":2,"col":1,"kind":"single","maxRanks":3,"entries":[{"definitionId":134378,"spellId":17118,"name":"Subtlety","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":10,"scope":"tree","gateGroupId":11338,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12713}}},
+   {"id":104918,"x":10880,"y":3330,"row":2,"col":3,"kind":"single","maxRanks":1,"entries":[{"definitionId":134379,"spellId":1328621,"name":"Bloom","maxRanks":1}],"prereqs":[],"unlock":{"spentRequired":{"amount":10,"scope":"tree","gateGroupId":11338,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12713}}},
    {"id":104919,"x":10280,"y":2730,"row":1,"col":2,"kind":"single","maxRanks":3,"entries":[{"definitionId":134380,"spellId":16833,"name":"Natural Shapeshifter","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11339,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12714}}},
-   {"id":104920,"x":9680,"y":2730,"row":1,"col":1,"kind":"single","maxRanks":3,"entries":[{"definitionId":134381,"spellId":17118,"name":"Subtlety","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11339,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12714}}},
+   {"id":104920,"x":9680,"y":2730,"row":1,"col":1,"kind":"single","maxRanks":3,"entries":[{"definitionId":134381,"spellId":17106,"name":"Reflection","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11339,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12714}}},
    {"id":104921,"x":9080,"y":4530,"row":4,"col":0,"kind":"single","maxRanks":1,"entries":[{"definitionId":134382,"spellId":17116,"name":"Nature's Swiftness","maxRanks":1}],"prereqs":[{"nodeId":104922,"rule":"any"}],"unlock":{"spentRequired":{"amount":20,"scope":"tree","gateGroupId":11336,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12711}}},
    {"id":104922,"x":9080,"y":2730,"row":1,"col":0,"kind":"single","maxRanks":5,"entries":[{"definitionId":134383,"spellId":17069,"name":"Naturalist","maxRanks":5}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11339,"currencyId":3820,"traitTreeId":1089,"companionGroupId":12714}}},
    {"id":104957,"x":9680,"y":2130,"row":0,"col":1,"kind":"single","maxRanks":5,"entries":[{"definitionId":134418,"spellId":17063,"name":"Nature's Focus","maxRanks":5}],"prereqs":[],"unlock":{}},
-   {"id":104958,"x":10280,"y":2130,"row":0,"col":2,"kind":"single","maxRanks":5,"entries":[{"definitionId":134419,"spellId":17056,"name":"Furor","maxRanks":5}],"prereqs":[],"unlock":{}}
+   {"id":104958,"x":10280,"y":2130,"row":0,"col":2,"kind":"single","maxRanks":5,"entries":[{"definitionId":134419,"spellId":17003,"name":"Heart of the Wild","maxRanks":5}],"prereqs":[],"unlock":{}}
   ]}
  ]
 }
