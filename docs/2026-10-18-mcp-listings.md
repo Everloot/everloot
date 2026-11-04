@@ -235,7 +235,7 @@ listing should not promise what the corpus does not hold.
 Execution on 2026-10-18, using the maintainer's existing accounts:
 
 - Official MCP Registry: published `app.everloot/knowledge` version `0.8.0`; the registry API reports active.
-- Official MCP Registry, 0.9.0: `server.json` carries version `0.9.0` with the registry one-liner above; publish it once that version is deployed, then check the registry API reports it active.
+- Official MCP Registry, 0.9.0: published 2026-11-04 after the Worker served that version; the registry API lists 0.8.0, 0.8.1 and 0.9.0, with 0.9.0 latest and active.
 - Claude, ChatGPT and Grok: custom connections created and real tool calls completed successfully.
 - Claude directory: listing draft prepared; all-tool verification and final submission still pending.
 - ChatGPT directory: business publisher verified, Everloot project and plugin draft created, portable package accepted. Domain verification and final submission still pending.
