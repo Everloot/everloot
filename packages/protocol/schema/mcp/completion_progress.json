@@ -12,7 +12,7 @@
     "properties": {
       "ownerInstallId": {
         "type": "string",
-        "description": "The player's own install id, whose completion upload to read. Everloot never publishes install ids, so only the player can give it."
+        "description": "The player's own install id, whose completion upload to read."
       },
       "characterKey": {
         "description": "One character's 8-digit key from the upload, when the install has several. Without it, every character.",

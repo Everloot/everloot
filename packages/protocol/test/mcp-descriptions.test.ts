@@ -7,7 +7,7 @@ test("every input field of every tool is described", () => {
   }
 });
 
-test("every description opens with a verb in the third person", () => {
+test("every description opens with one of the approved verbs", () => {
   const VERBS = /^(Returns|Searches|Finds|Lists|Reads|Decodes|Compares|Fetches|Looks up|Gives|Shows|Ranks|Counts|Answers)\b/;
   for (const [name, tool] of Object.entries(MCP_TOOLS)) expect(tool.description, name).toMatch(VERBS);
 });

@@ -117,6 +117,7 @@ export function formatCollectionGap(gap: CollectionGap): string {
   ];
   if (gap.groups.length === 0) {
     lines.push("List unrecorded. An item joins when 3 installs agree on it and its source.");
+    if (!gap.ownedRecorded) lines.push("Owned: unrecorded. This install has not uploaded this collection.");
   }
   for (const group of gap.groups) {
     lines.push(`${group.source}`);

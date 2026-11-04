@@ -61,8 +61,10 @@ Use the same words everywhere, so the listings match the site and each other.
 > market values, a gold ledger, find a guild, a guild's board and guild ladders for raids and dungeons,
 > collection, achievement, reputation, title and quest progress, database coverage and population,
 > Blizzard's latest posts and builds, the addon ecosystem and Everloot's own build tracker.
-> Game-file facts are labelled "found in game files, unconfirmed" with their build. Data is CC BY-SA 4.0
-> with a credit line in every answer; the code is open source. No account, no key, no sign-in wall.
+> Game-file facts are labelled "found in game files, unconfirmed" with their build, carry Blizzard's
+> credit and are not under Everloot's licence. Player-reported data is CC BY-SA 4.0; an answer built on
+> it ends with a link to its page on everloot.app, when it has one, and the data's age. The code is open source. No
+> account, no key, no sign-in wall.
 
 ### Test cases (for reviewers)
 
@@ -233,7 +235,7 @@ listing should not promise what the corpus does not hold.
 Execution on 2026-10-18, using the maintainer's existing accounts:
 
 - Official MCP Registry: published `app.everloot/knowledge` version `0.8.0`; the registry API reports active.
-- Official MCP Registry, 0.9.0: `server.json` carries version `0.9.0` with the "World of Warcraft: Forever" one-liner; publish it once that version is deployed, then check the registry API reports it active.
+- Official MCP Registry, 0.9.0: `server.json` carries version `0.9.0` with the registry one-liner above; publish it once that version is deployed, then check the registry API reports it active.
 - Claude, ChatGPT and Grok: custom connections created and real tool calls completed successfully.
 - Claude directory: listing draft prepared; all-tool verification and final submission still pending.
 - ChatGPT directory: business publisher verified, Everloot project and plugin draft created, portable package accepted. Domain verification and final submission still pending.

@@ -16,7 +16,7 @@
       },
       "ownerInstallId": {
         "type": "string",
-        "description": "The player's own install id, whose owned upload to compare. Everloot never publishes install ids, so only the player can give it."
+        "description": "The player's own install id, whose owned upload to compare."
       }
     },
     "required": [
