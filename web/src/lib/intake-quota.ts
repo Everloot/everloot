@@ -37,7 +37,7 @@ export function createIntakeQuota(opts: {
   const secret = env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   const production = env.NODE_ENV === "production";
 
-  async function consume(scope: "request" | "install" | "mcp" | "api" | "form", value: string): Promise<QuotaResult> {
+  async function consume(scope: "request" | "install" | "mcp" | "api" | "form" | "market", value: string): Promise<QuotaResult> {
     if (url && secret) {
       const key = createHmac("sha256", secret).update(`${scope}:${value}`).digest("hex");
       const response = await doFetch(`${url.replace(/\/$/, "")}/rest/v1/rpc/consume_intake_quota`, {
@@ -60,6 +60,7 @@ export function createIntakeQuota(opts: {
       : scope === "mcp" ? [["mcp_global", 5000], [`mcp:${value}`, 200]]
       : scope === "api" ? [["api_global", 3000], [`api:${value}`, 30]]
       : scope === "form" ? [["form_global", 2000], [`form:${value}`, 30]]
+      : scope === "market" ? [["market_global", 5000], [`market:${value}`, 200]]
       : [[`install:${value}`, 20]];
     const retryAfter = Math.max(0, ...limits.map(([key, limit]) => {
       const bucket = local.get(key);
@@ -96,10 +97,13 @@ export function createIntakeQuota(opts: {
       return consume("request", `mcp:${clientIp(req)}`);
     },
     /**
-     * Market prices: its own per-IP bucket, on the same scope rules as the public MCP, so a price
-     * poller cannot use up an upload allowance. The CDN answers repeats; this counts the misses.
+     * Market prices: its own per-IP bucket, so a price poller cannot use up an upload allowance. With
+     * EVERLOOT_MARKET_QUOTA_SCOPE=market (set only after 20261104120000_market_quota_scope.sql is applied) it
+     * also gets its own hourly global bucket, so the desktop app's polls cannot starve the public MCP; before
+     * that, the MCP's scope rules as before. The CDN answers repeats; this counts the misses.
      */
     async market(req: Request) {
+      if (env.EVERLOOT_MARKET_QUOTA_SCOPE === "market") return consume("market", clientIp(req));
       if (env.EVERLOOT_MCP_QUOTA_SCOPE === "mcp") return consume("mcp", `market:${clientIp(req)}`);
       return consume("request", `market:${clientIp(req)}`);
     },

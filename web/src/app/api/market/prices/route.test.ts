@@ -99,7 +99,17 @@ test("every answer carries the licence and credit line, and stays cacheable for 
     expect((await res.json()).attribution).toMatchObject({ licence: "CC BY-SA 4.0", source: "https://everloot.app/tools/auctions" });
     expect(res.headers.get("x-everloot-licence")).toBe("CC BY-SA 4.0");
     expect(res.headers.get("cache-control")).toContain("s-maxage=300");
+    // The Worker's edge cache keeps only responses that say so in this header (lib/cf-edge-cache.ts).
+    expect(res.headers.get("cdn-cache-control")).toBe("max-age=300");
   }
+});
+
+test("a refused or unavailable answer is never kept by the edge cache", async () => {
+  store.market.mockResolvedValue({ allowed: false, retryAfter: 120 });
+  expect((await GET(req("?realm=Forever"))).headers.get("cdn-cache-control")).toBeNull();
+  store.market.mockResolvedValue({ allowed: true, retryAfter: 0 });
+  store.loadMarket.mockResolvedValue({ state: null, dataAsOf: null, unreachable: true });
+  expect((await GET(req("?realm=Forever"))).headers.get("cdn-cache-control")).toBeNull();
 });
 
 test("the bodies are the protocol's market responses", async () => {
