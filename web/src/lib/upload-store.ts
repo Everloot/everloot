@@ -693,8 +693,11 @@ export function createUploadStore(opts: {
     } catch {
       throw new Error("snapshot is not JSON");
     }
+    // A snapshot with replay state carries its records there (writeSnapshot stores them once, as events), so the
+    // records array is read, and required, only for a snapshot from before the replay state existed.
+    const replayable = typeof parsed.corpusState === "object" && parsed.corpusState !== null;
     // A snapshot without a records array is unreadable, never an empty corpus.
-    if (!Array.isArray(parsed.records)) throw new Error("snapshot has no records array");
+    if (!replayable && !Array.isArray(parsed.records)) throw new Error("snapshot has no records array");
     return {
       corpusState: parsed.corpusState,
       conflictTombstones: parsed.conflictTombstones,
@@ -702,7 +705,7 @@ export function createUploadStore(opts: {
       etag: res.headers.get("etag") ?? undefined,
       generatedAt: parsed.generatedAt ?? "",
       uploads: typeof parsed.uploads === "number" ? parsed.uploads : 0,
-      records: parseRecords(parsed.records).records,
+      records: replayable ? [] : parseRecords(parsed.records ?? []).records,
       lastReceivedAt: parsed.lastReceivedAt ?? null,
       lastIds: Array.isArray(parsed.lastIds) ? parsed.lastIds : [],
     };
@@ -798,13 +801,14 @@ export function createUploadStore(opts: {
       ? { ...mergeCorpus(undefined, []), conflicts: stateOf(current).conflicts } : undefined;
     const read = await readObjects(fresh.map((r) => r.object_key), start);
     if (read.missed) throw new Error("upload object unreadable");
-    const records = publicRecords(read.state);
     const lastReceivedAt = rows.length > 0 ? rows[rows.length - 1].received_at : prev?.lastReceivedAt ?? null;
     const lastIds = rows.length > 0 ? rows.filter((r) => r.received_at === lastReceivedAt).map((r) => r.id) : prev?.lastIds ?? [];
     const snapshot: Snapshot = {
       generatedAt: now().toISOString(),
       uploads: (prev?.uploads ?? 0) + fresh.length,
-      records,
+      // The records are the replay state's events, stored once. The empty array keeps the file readable by the
+      // previous reader, which required it.
+      records: [],
       corpusState: read.state,
       // A legacy watermark query covers only a suffix of the index. Stay in that
       // mode until a full rebuild supplies the complete upload inventory.

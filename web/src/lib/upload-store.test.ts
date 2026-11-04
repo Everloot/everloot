@@ -276,11 +276,11 @@ describe("corpus snapshot", () => {
     expect(JSON.parse(put.body)).toMatchObject({
       generatedAt: "2026-10-04T12:00:00.000Z",
       uploads: 2,
-      records: [lootRow(), questRow()],
+      records: [],
       lastReceivedAt: "2026-10-04T08:00:00+00:00",
       lastIds: ["b"],
     });
-    expect(JSON.parse(put.body).corpusState.events).toHaveLength(2);
+    expect(JSON.parse(put.body).corpusState.events.map((e: { record: unknown }) => e.record)).toEqual([lootRow(), questRow()]);
     expect(put.headers.get("if-none-match")).toBe("*");
   });
 
@@ -302,7 +302,9 @@ describe("corpus snapshot", () => {
     expect(calls.some((c) => c.url.endsWith("uploads/b.json"))).toBe(false);
     expect(calls.find((c) => c.method === "GET" && c.url.startsWith(INDEX))!.url).toContain("received_at=gte.2026-10-04T08%3A00%3A00%2B00%3A00");
     const put = JSON.parse(calls.find((c) => c.method === "PUT")!.body);
-    expect(put.records).toEqual([lootRow(), questRow(), vendorRow()]);
+    // Stored once, as replay events; the records array stays empty so the previous reader still opens the file.
+    expect(put.records).toEqual([]);
+    expect(put.corpusState.events.map((e: { record: unknown }) => e.record)).toEqual([lootRow(), questRow(), vendorRow()]);
     expect(put.lastIds).toEqual(["c"]);
   });
 
@@ -414,7 +416,8 @@ describe("corpus normalization", () => {
 
     expect(await store.writeSnapshot()).toMatchObject({ uploads: 2, added: 1 });
     const put = JSON.parse(calls.find((c) => c.method === "PUT")!.body);
-    expect(put.records).toEqual([lootRow(), vendorRow()]);
+    expect(put.records).toEqual([]);
+    expect(put.corpusState.events.map((e: { record: unknown }) => e.record)).toEqual([lootRow(), vendorRow()]);
   });
 
   test("a corpus larger than the 2000-row request cap keeps every valid record", async () => {

@@ -5,6 +5,9 @@
   "name": "everloot-web",
   // scripts/cf-entry.mjs, copied here by scripts/cf-bundle-files.mjs: OpenNext's worker plus the scheduled jobs.
   "main": ".open-next/cf-entry.mjs",
+  // The cron routes run as self-requests (scripts/cf-entry.mjs), so the per-request CPU limit applies to them.
+  // The snapshot route declares five minutes (its maxDuration); the default is 30 seconds.
+  "limits": { "cpu_ms": 300000 },
   "routes": [
     { "pattern": "everloot.app/*", "zone_name": "everloot.app" },
     { "pattern": "www.everloot.app/*", "zone_name": "everloot.app" }
