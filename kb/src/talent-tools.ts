@@ -3,7 +3,10 @@ import { DECODE_MESSAGES, extractCode, importCode } from "../../web/src/lib/tale
 import { decodeBuild } from "../../web/src/lib/talents/share";
 import { nodeMap, pointsByTree } from "../../web/src/lib/talents/rules";
 import type { TalentCatalog, TalentNode } from "../../web/src/lib/talents/types";
+import type { BuildData } from "./importers/curated.js";
 import { moreLine, talentBuildUrl, talentsUrl } from "./page-urls.js";
+import type { ReleaseSource } from "./release-db.js";
+import { listByKind } from "./search.js";
 import { siteCatalog } from "./talents/site-catalogs.js";
 
 /**
@@ -39,7 +42,29 @@ function nodeLine(n: TalentNode, nodes: Map<number, TalentNode>): string {
   return parts.join(", ");
 }
 
-export function handleTalentTree(args: McpToolArgs<"talent_tree">): Answer {
+const STARTER_LABEL = "Everloot team starter build, not observed";
+
+/** The team's published starter builds for the class, narrowed to the asked tree, as text lines and structure. */
+async function starterBuilds(source: ReleaseSource, catalog: TalentCatalog, tree: string | undefined) {
+  const cls = catalog.classSlug;
+  const all = (await listByKind(source, "build", { dataKey: "class", equals: cls })).map((row) => {
+    const d = row.data as BuildData;
+    return { name: row.name, purpose: d.purpose, tree: d.tree, shareCode: d.shareCode, points: d.points, build: d.build, url: talentBuildUrl(cls, d.shareCode), label: STARTER_LABEL };
+  });
+  const wanted = tree?.toLowerCase();
+  const builds = wanted ? all.filter((b) => b.tree.toLowerCase() === wanted) : all;
+  const lines = ["", "Starter builds (Everloot team, not observed):"];
+  for (const b of builds) lines.push(`- ${b.name} (${b.purpose}, ${b.tree}, ${b.points} points, build ${b.build}): ${b.shareCode} ${b.url}`);
+  if (all.length === 0) lines.push(`No starter build published yet for ${catalog.className}.`);
+  else if (builds.length === 0) {
+    // Only a tree filter empties a non-empty list: say which trees do have one.
+    const named = catalog.trees.find((t) => t.name.toLowerCase() === wanted)?.name ?? tree;
+    lines.push(`No starter build published yet for ${catalog.className} ${named}. Builds exist for: ${[...new Set(all.map((b) => b.tree))].sort().join(", ")}.`);
+  }
+  return { lines, builds };
+}
+
+export async function handleTalentTree(args: Omit<McpToolArgs<"talent_tree">, "builds"> & { builds?: boolean }, source?: ReleaseSource): Promise<Answer> {
   const catalog = siteCatalog(args.class);
   const wanted = args.tree?.trim().toLowerCase();
   const trees = wanted ? catalog.trees.filter((t) => t.name.toLowerCase() === wanted) : catalog.trees;
@@ -55,6 +80,8 @@ export function handleTalentTree(args: McpToolArgs<"talent_tree">): Answer {
     const rows = [...new Set(own.map((n) => n.row))].sort((a, b) => a - b);
     for (const row of rows) lines.push(`  row ${row}: ${own.filter((n) => n.row === row).map((n) => nodeLine(n, nodes)).join("; ")}`);
   }
+  const starter = args.builds && source ? await starterBuilds(source, catalog, args.tree?.trim()) : null;
+  if (starter) lines.push(...starter.lines);
   // The calculator shows the node ids a share code names.
   const url = talentsUrl(args.class);
   lines.push(moreLine(url), GAME_DATA_CREDIT);
@@ -65,6 +92,7 @@ export function handleTalentTree(args: McpToolArgs<"talent_tree">): Answer {
       points: { firstPointLevel: catalog.rules.firstPointLevel, maxLevel: catalog.rules.maxLevel, total: catalog.rules.pointLevels?.length ?? 0, pointLevels: catalog.rules.pointLevels ?? [] },
       trees: trees.map((t) => ({ id: t.id, name: t.name, nodes: picked.filter((n) => n.treeId === t.id).length })),
       nodes: picked.map(nodeOut),
+      ...(starter ? { starterBuilds: starter.builds } : {}),
       credit: GAME_DATA_CREDIT,
       url,
     },

@@ -2088,6 +2088,7 @@ export declare const MCP_TOOLS: {
                 warrior: "warrior";
             }>;
             readonly tree: z.ZodOptional<z.ZodString>;
+            readonly builds: z.ZodDefault<z.ZodBoolean>;
         };
         readonly outputSchema: {
             readonly label: z.ZodString;
@@ -2148,6 +2149,21 @@ export declare const MCP_TOOLS: {
                     }, z.core.$strip>>>;
                 }, z.core.$strip>>;
             }, z.core.$strip>>;
+            readonly starterBuilds: z.ZodOptional<z.ZodArray<z.ZodObject<{
+                name: z.ZodString;
+                purpose: z.ZodEnum<{
+                    dungeon: "dungeon";
+                    leveling: "leveling";
+                    pvp: "pvp";
+                    raid: "raid";
+                }>;
+                tree: z.ZodString;
+                shareCode: z.ZodString;
+                points: z.ZodNumber;
+                build: z.ZodString;
+                url: z.ZodString;
+                label: z.ZodLiteral<"Everloot team starter build, not observed">;
+            }, z.core.$strip>>>;
             readonly credit: z.ZodString;
             readonly url: z.ZodOptional<z.ZodString>;
         };
@@ -3831,6 +3847,7 @@ export declare const MCP_TOOL_LIST: ({
             warrior: "warrior";
         }>;
         readonly tree: z.ZodOptional<z.ZodString>;
+        readonly builds: z.ZodDefault<z.ZodBoolean>;
     };
     outputSchema: {
         readonly label: z.ZodString;
@@ -3891,6 +3908,21 @@ export declare const MCP_TOOL_LIST: ({
                 }, z.core.$strip>>>;
             }, z.core.$strip>>;
         }, z.core.$strip>>;
+        readonly starterBuilds: z.ZodOptional<z.ZodArray<z.ZodObject<{
+            name: z.ZodString;
+            purpose: z.ZodEnum<{
+                dungeon: "dungeon";
+                leveling: "leveling";
+                pvp: "pvp";
+                raid: "raid";
+            }>;
+            tree: z.ZodString;
+            shareCode: z.ZodString;
+            points: z.ZodNumber;
+            build: z.ZodString;
+            url: z.ZodString;
+            label: z.ZodLiteral<"Everloot team starter build, not observed">;
+        }, z.core.$strip>>>;
         readonly credit: z.ZodString;
         readonly url: z.ZodOptional<z.ZodString>;
     };

@@ -821,7 +821,7 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
         structured: { ...structured, ...(url ? { url } : {}) },
       };
     },
-    talent_tree: (args) => handleTalentTree(args),
+    talent_tree: (args) => handleTalentTree(args, db),
     talent_plan: (args) => handleTalentPlan(args),
     class_races: (args) => handleClassRaces(args, withRacialNotes(RACE_TABLE)),
     collection_gap: (args) => readPageIn("collection_gap", (facts: ReturnType<typeof collectionFactsFromRecords>) => {
