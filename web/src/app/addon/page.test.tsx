@@ -172,6 +172,10 @@ test("the page says why to run the addon: what it records, what the site gives b
   // The census is described the way the data policy does: never a name, and on in a new install.
   expect(text).toContain("never a name");
   expect(text).toContain("on in a new install");
+  // It counts players near you, nameplates included; the players module, which reads names, never reads them.
+  expect(text).toContain("of players near you, including the ones the game shows a nameplate for");
+  expect(text).toContain("players the game shows a nameplate for, so your own nameplate settings decide which of those it sees");
+  expect(text).toMatch(/name, realm, race, class, level and guild of your own characters and of players you target, mouse over or group with,/);
   expect(text).toContain("Your install id, and the address an upload came from, are never published");
   expect(text).toContain("never plays your character");
 });

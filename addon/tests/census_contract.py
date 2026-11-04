@@ -2,7 +2,8 @@
 
 The census module: off by default, one row per player per UTC day with the latest level, 2,000 rows per
 kind with the oldest days dropped first, and nothing read about another player beyond race, class,
-level and faction. The rows are checked in the exact shape the upload sends.
+level and faction. Players come from target, mouseover, the group and nameplates; new nameplate players
+are read at most 10 a second. The rows are checked in the exact shape the upload sends.
 """
 import json
 import re
@@ -32,11 +33,14 @@ FORBIDDEN = [
     # position
     "C_Map", "UnitPosition", "GetPlayerMapPosition", "GetBestMapForUnit", "GetZoneText", "GetRealZoneText",
     "GetSubZoneText", "GetMinimapZoneText", "CheckInteractDistance", "UnitDistanceSquared", "UnitInRange",
+    # every nameplate at once: the census reads only the plate NAME_PLATE_UNIT_ADDED hands it
+    "C_NamePlate", "GetNamePlates", "GetNamePlateForUnit",
 ]
 for name in FORBIDDEN:
     assert not re.search(r"\b" + re.escape(name) + r"\b", source), f"census.lua names {name}"
 
 # Every game call in the code (comments stripped) is on the module's own list, and the list holds only these.
+# Nameplates (2026-11-04) added no call: NAME_PLATE_UNIT_ADDED passes a unit token, read with the calls below.
 code = "\n".join(line.split("--")[0] for line in source.splitlines())
 called = set(re.findall(r"(?<![\w.:])([A-Z][A-Za-z0-9_]*)\s*\(", code))
 ALLOWED = {"UnitIsPlayer", "UnitGUID", "UnitLevel", "UnitRace", "UnitClass", "UnitFactionGroup", "GetRealmName", "IsInRaid"}
@@ -132,12 +136,12 @@ lua = fresh("{ installId = 'abcd-1234', toggles = { census = false }, records = 
 lua.execute("""
 assert(EverlootDB.toggles.census == false, 'the census is off when the player turned it off')
 for _, line in ipairs(printed) do assert(not string.find(line, 'Never their names', 1, true), 'off prints no notice') end
-for _, name in ipairs({ 'PLAYER_TARGET_CHANGED', 'UPDATE_MOUSEOVER_UNIT', 'GROUP_ROSTER_UPDATE', 'PLAYER_LOGIN', 'PLAYER_LEVEL_UP' }) do
+for _, name in ipairs({ 'PLAYER_TARGET_CHANGED', 'UPDATE_MOUSEOVER_UNIT', 'GROUP_ROSTER_UPDATE', 'PLAYER_LOGIN', 'PLAYER_LEVEL_UP', 'NAME_PLATE_UNIT_ADDED' }) do
  assert(registered[name] == nil, 'off registers nothing: ' .. name)
 end
 assert(Everloot.frame.hooks == nil, 'off adds no event handler')
-units.target = player(1); units.mouseover = player(2); units.party1 = player(3)
-event('PLAYER_LOGIN'); event('PLAYER_TARGET_CHANGED'); event('UPDATE_MOUSEOVER_UNIT'); event('GROUP_ROSTER_UPDATE')
+units.target = player(1); units.mouseover = player(2); units.party1 = player(3); units.nameplate1 = player(4)
+event('PLAYER_LOGIN'); event('PLAYER_TARGET_CHANGED'); event('UPDATE_MOUSEOVER_UNIT'); event('GROUP_ROSTER_UPDATE'); event('NAME_PLATE_UNIT_ADDED', 'nameplate1')
 assert(#rows('census_self') == 0 and #rows('census_seen') == 0, 'nothing is recorded while the census is off')
 assert(string.find(Everloot:Status(), 'census: off by toggle', 1, true), 'status shows the census is off')
 SlashCmdList.EVERLOOT('census')
@@ -156,7 +160,7 @@ assert(EverlootDB.toggles.census == true, '/everloot census on turns it on')
 local said = printed[#printed]
 assert(string.find(said, 'race, class, level and faction', 1, true) and string.find(said, 'upload page', 1, true) and string.find(said, 'Never their names', 1, true), said)
 reload()
-assert(registered.PLAYER_TARGET_CHANGED and registered.UPDATE_MOUSEOVER_UNIT and registered.GROUP_ROSTER_UPDATE and registered.PLAYER_LEVEL_UP)
+assert(registered.PLAYER_TARGET_CHANGED and registered.UPDATE_MOUSEOVER_UNIT and registered.GROUP_ROSTER_UPDATE and registered.PLAYER_LEVEL_UP and registered.NAME_PLATE_UNIT_ADDED)
 assert(string.find(Everloot:Status(), 'census: ready', 1, true), Everloot:Status())
 
 local own = rows('census_self')
@@ -308,7 +312,7 @@ def wire(kind, extra):
 
 
 SELF_WIRE = wire("census_self", {"realm": {"type": "string", "minLength": 2, "maxLength": 40}})
-SEEN_WIRE = wire("census_seen", {"via": {"enum": ["target", "mouseover", "group"]}})
+SEEN_WIRE = wire("census_seen", {"via": {"enum": ["target", "mouseover", "group", "nameplate"]}})
 
 
 def uploaded(kind):
@@ -391,6 +395,85 @@ assert(#seen == 2000 and seen[2000].guid == player(1).guid and seen[1].guid == p
 assert(EverlootDB.paused == nil or EverlootDB.paused.census_seen == nil, 'the census rotates instead of pausing')
 """)
 
+# --- Nameplates: a player the game draws a nameplate for is a row like a mouseover, via "nameplate" ---
+lua = fresh("{ installId = 'abcd-1234', toggles = { census = true }, records = {} }")
+lua.execute("""
+event('PLAYER_LOGIN')
+units.nameplate3 = player(60, { race = 'Tauren', class = 'DRUID', level = 41 })
+event('NAME_PLATE_UNIT_ADDED', 'nameplate3')
+local seen = rows('census_seen')
+assert(#seen == 1 and seen[1].via == 'nameplate' and seen[1].guid == player(60).guid and seen[1].race == 'Tauren'
+  and seen[1].class == 'DRUID' and seen[1].level == 41 and seen[1].faction == 'Horde', 'a nameplate player is a row')
+assert(seen[1].eventId == 'census_seen:2026-10-18:1' and seen[1].capturedAt == '2026-10-18T00:00:00Z')
+
+-- Hostile and cross-faction players count as they do on mouseover; creatures, pets and you do not.
+units.nameplate4 = player(61, { faction = 'Alliance', race = 'Human', class = 'PALADIN' })
+event('NAME_PLATE_UNIT_ADDED', 'nameplate4')
+assert(#seen == 2 and seen[2].faction == 'Alliance' and seen[2].via == 'nameplate', 'the other faction is counted')
+for _, u in ipairs({
+ { guid = 'Creature-0-4242-0-1-299-00000ABCDE', player = false, race = 'Orc', class = 'WARRIOR', level = 5, faction = 'Horde' },
+ player(62, { guid = 'Pet-0-4242-0-1-1-0102030405' }), me, player(63, { level = -1 }), player(64, { faction = 'Neutral' }),
+}) do
+ units.nameplate5 = u
+ NOW_T = NOW_T + 1
+ event('NAME_PLATE_UNIT_ADDED', 'nameplate5')
+end
+assert(#seen == 2, 'creatures, pets, yourself, hidden levels and no faction are skipped')
+
+-- Only a nameplate unit token is read: the event never stands in for target, mouseover or a party member.
+units.target = player(65); units.party1 = player(66)
+for _, unit in ipairs({ 'target', 'party1', 'player', 'nameplate', 'nameplateX', 'xnameplate1' }) do event('NAME_PLATE_UNIT_ADDED', unit) end
+event('NAME_PLATE_UNIT_ADDED', nil); event('NAME_PLATE_UNIT_ADDED', 7)
+assert(#seen == 2, 'a unit that is not nameplateN is ignored')
+
+-- A player already recorded today keeps the first way seen; a nameplate only moves the level.
+units.mouseover = player(67, { level = 20 })
+event('UPDATE_MOUSEOVER_UNIT')
+units.nameplate6 = player(67, { level = 20 })
+event('NAME_PLATE_UNIT_ADDED', 'nameplate6')
+assert(#seen == 3 and seen[3].via == 'mouseover', 'a nameplate does not replace the first via')
+units.nameplate6 = player(67, { level = 21 })
+event('NAME_PLATE_UNIT_ADDED', 'nameplate6')
+assert(#seen == 3 and seen[3].level == 21 and seen[3].via == 'mouseover', 'a nameplate takes a new level')
+
+-- A crowd: at most 10 new players a second are read from nameplates; the rest wait for their plate to show again.
+NOW_T = NOW_T + 10
+local before = #seen
+plates = {}
+for i = 1, 25 do plates[i] = 'nameplate' .. i; units[plates[i]] = player(100 + i) end
+for i = 1, 25 do event('NAME_PLATE_UNIT_ADDED', plates[i]) end
+assert(#seen == before + 10, 'ten new nameplate players in one second; got ' .. (#seen - before))
+-- Players already recorded do not use the second's allowance, and a new level still lands.
+units.nameplate1 = player(101, { level = 22 })
+event('NAME_PLATE_UNIT_ADDED', 'nameplate1')
+assert(seen[before + 1].level == 22, 'a new level is taken past the allowance')
+-- Target, mouseover and the group are not throttled.
+units.mouseover = player(200)
+event('UPDATE_MOUSEOVER_UNIT')
+assert(#seen == before + 11 and seen[#seen].via == 'mouseover', 'mouseover is read past the nameplate allowance')
+NOW_T = NOW_T + 1
+for i = 1, 25 do event('NAME_PLATE_UNIT_ADDED', plates[i]) end
+assert(#seen == before + 21, 'the next second reads ten more; got ' .. (#seen - before))
+NOW_T = NOW_T + 1
+for i = 1, 25 do event('NAME_PLATE_UNIT_ADDED', plates[i]) end
+assert(#seen == before + 26, 'and the last five the second after, once each; got ' .. (#seen - before))
+assert(forbidden == 0, 'no name, guild, gear or position call was made')
+
+-- The busy path: plates of players already recorded today allocate nothing.
+local hooks = Everloot.frame.hooks
+collectgarbage('collect'); collectgarbage('stop')
+local mem = collectgarbage('count')
+for n = 1, 20000 do NOW_T = NOW_T + 1; hooks[1](nil, 'NAME_PLATE_UNIT_ADDED', plates[n % 25 + 1]) end
+local grew = collectgarbage('count') - mem
+collectgarbage('restart')
+assert(grew < 1, 'nameplates of recorded players allocated ' .. grew .. ' KB over 20000 events')
+""")
+plate_records = [{"kind": "census_seen", **row} for row in to_plain(lua.globals().EverlootDB.records.census_seen)]
+assert sum(r["via"] == "nameplate" for r in plate_records) == 27, [r["via"] for r in plate_records]
+for record in plate_records:
+    SEEN_WIRE.validate(record)
+check_rows("census_seen", [{k: v for k, v in r.items() if k not in ("kind", "installId")} for r in plate_records], "abcd-1234")
+
 # --- A client without one of the calls disables the module instead of raising ---
 lua = fresh("{ installId = 'abcd-1234', toggles = { census = true }, records = {} }", "UnitRace = nil")
 lua.execute("""
@@ -414,4 +497,5 @@ assert(string.find(table.concat(EverlootDB.selftest.results, '\\n'), 'INFO playe
 """)
 
 print("Lua 5.1 census: off by default, no name/guild/gear/position calls, self and seen rows in the upload shape, "
-      "one row per player per UTC day with the latest level, no allocation on a repeat mouseover, 2000 cap drops the oldest days, off deletes")
+      "one row per player per UTC day with the latest level, no allocation on a repeat mouseover or nameplate, nameplate players "
+      "at most 10 new a second, 2000 cap drops the oldest days, off deletes")

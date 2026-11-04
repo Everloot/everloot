@@ -76,6 +76,13 @@ describe("census records", () => {
     expect(reasons([{ ...seen, via: "inspect" }])).toHaveLength(1);
   });
 
+  test("via is target, mouseover, group or nameplate, and nothing else", () => {
+    for (const via of ["target", "mouseover", "group", "nameplate"]) expect(reasons([{ ...seen, via }]), via).toEqual([]);
+    for (const via of ["inspect", "who", "Nameplate", "nameplate1", "", 1]) expect(reasons([{ ...seen, via }]), String(via)).toHaveLength(1);
+    const { properties } = recordSchema("census_seen") as { properties: Record<string, { enum?: string[] }> };
+    expect(properties.via.enum).toEqual(["target", "mouseover", "group", "nameplate"]);
+  });
+
   test("a realm is a realm name, as in the other realm fields", () => {
     for (const realm of ["visit scam.example/<b>", "a", "x".repeat(41), "  ", "Forever\nGuild"]) expect(reasons([{ ...self, realm }]), realm).toHaveLength(1);
     expect(reasons([{ ...self, realm: "Mal'Ganis" }, { ...self, realm: "Azjol-Nerub" }])).toEqual([]);
@@ -102,6 +109,11 @@ describe("stored census rows", () => {
     expect(censusSeenStored.parse({ ...stored, reporter: "0123456789abcdef" })).toMatchObject({ reporter: "0123456789abcdef" });
     for (const reporter of ["203.0.113.9", "0123456789ABCDEF", "abc"]) expect(censusSeenStored.safeParse({ ...stored, reporter }).success, reporter).toBe(false);
     expect(censusSeenStored.safeParse(stored).success).toBe(true);
+  });
+
+  test("a stored row keeps a nameplate via and refuses an unknown one", () => {
+    expect(censusSeenStored.parse({ ...stored, via: "nameplate" })).toMatchObject({ via: "nameplate" });
+    expect(censusSeenStored.safeParse({ ...stored, via: "inspect" }).success).toBe(false);
   });
 
   test("a stored row needs the server's event id and a full-length key", () => {

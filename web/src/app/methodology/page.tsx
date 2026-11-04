@@ -117,7 +117,8 @@ export default async function MethodologyPage() {
           <div className="space-y-4">
             <p className="text-fg-2">
               The <Link href="/census" className={link}>census</Link> counts characters from players who run the census in the addon:
-              their own characters, and the players they target, mouse over or group with. For other players the addon reads only race,
+              their own characters, and the players near them: ones they target, mouse over or group with, and ones the game shows a
+              nameplate for (each player's nameplate settings decide which). For other players the addon reads only race,
               class, level and faction. Never a name. The census is on in a new install and says so once in chat. An install from
               before the census keeps it off. <code className="font-mono text-fg">/everloot census off</code> turns it off and deletes
               its rows.

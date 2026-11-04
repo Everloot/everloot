@@ -251,7 +251,7 @@ export default async function CensusPage({ searchParams }: { searchParams?: Prom
         <PageHeader
           trail={trailFor("/census")!}
           title="Who plays what on WoW: Forever"
-          lede="Counted from Everloot uploads by players who turned the census on: their own characters and the players they target, mouse over or group with."
+          lede="Counted from Everloot uploads by players who turned the census on: their own characters and the players near them, the ones they target, mouse over or group with or see a nameplate for."
           meta={<>
             <span className="font-mono text-xs">
               {!ready ? "Storage unreachable"

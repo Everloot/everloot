@@ -384,6 +384,23 @@ describe("census rows in an upload", () => {
     expect(store.putUpload.mock.calls[0]![2].records).toEqual([canonicalLoot]);
   });
 
+  test("a player seen on a nameplate is stored with via nameplate; an unknown via is still refused", async () => {
+    vi.stubEnv("EVERLOOT_CHARACTER_KEY", KEY);
+    const POST = await freshPost();
+    const plate = { ...seen, via: "nameplate" };
+    const unknown = [{ ...seen, guid: "Player-4395-0F00BA45", via: "inspect" }, { ...seen, guid: "Player-4395-0F00BA46", via: "nameplate1" }];
+    const response = await POST(request({ addonVersion: "0.4.0", records: [plate, ...unknown] }));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.accepted).toEqual([{ index: 0, kind: "census_seen" }]);
+    expect(body.rejected.map((r: { index: number }) => r.index)).toEqual([1, 2]);
+    const stored = store.putUpload.mock.calls[0]![2];
+    expect(stored.records).toHaveLength(1);
+    expect(stored.records[0]).toMatchObject({ kind: "census_seen", via: "nameplate", serverId: 4395, race: "Skyborne", class: "HUNTER" });
+    expect(stored.records[0]).not.toHaveProperty("name");
+    expectNoGuid(stored);
+  });
+
   test("every census row carries the keyed address hash the server computed, and never an address", async () => {
     vi.stubEnv("EVERLOOT_CHARACTER_KEY", KEY);
     const POST = await freshPost();
