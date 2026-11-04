@@ -26,4 +26,7 @@ test("the pages a pass left at 429 are asked again after the longest Retry-After
   expect(rateLimited([ok, a, b])).toEqual({ urls: [a.url, b.url], waitMs: 30_000 });
   expect(rateLimited([ok, b])).toEqual({ urls: [b.url], waitMs: 60_000 });
   expect(rateLimited([ok, { url: "https://everloot.app/x", status: 503, ms: 9 }])).toEqual({ urls: [], waitMs: 60_000 });
+  // A network error (status 0, e.g. a TypeError from fetch) is asked again too; a 503 stays a failure.
+  const lost = { url: "https://everloot.app/database/achievements/1", status: 0, error: "TypeError", ms: 9 };
+  expect(rateLimited([ok, lost, a])).toEqual({ urls: [lost.url, a.url], waitMs: 30_000 });
 });

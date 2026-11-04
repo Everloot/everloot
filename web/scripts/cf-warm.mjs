@@ -2,9 +2,10 @@
  * After a deploy: waits until the site serves the commit just deployed, then asks for every page in its sitemap,
  * a few at a time. Each deploy changes the edge cache key (src/lib/cf-edge-cache.ts), so this puts the new version's
  * pages in the cache of the data centre the runner reaches, and it is a smoke check of the deploy: any page that
- * does not answer 200 fails the run. A 429 is the edge asking the runner to slow down, not a broken page: those
- * pages are asked for again, fewer at a time, after the wait the answer names (a minute when it names none), up to
- * three times before they count as failures. Other data centres still fill on their first visit.
+ * does not answer 200 fails the run. A 429 is the edge asking the runner to slow down, not a broken page, and a
+ * network error on one request is the runner's connection, not the page: those pages are asked for again, fewer at a
+ * time, after the wait the answer names (a minute when it names none), up to five times before they count as
+ * failures. Other data centres still fill on their first visit.
  * Run: node scripts/cf-warm.mjs <origin> <commit sha>
  */
 import { pathToFileURL } from "node:url";
@@ -14,9 +15,12 @@ export function sitemapUrls(xml) {
   return [...new Set([...xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/g)].map((m) => m[1].replaceAll("&amp;", "&")))];
 }
 
-/** The pages a pass left rate-limited, and how long to wait before asking again: the longest Retry-After, else a minute. */
+/**
+ * The pages a pass left rate-limited or unanswered (a network error, status 0), and how long to wait before asking
+ * again: the longest Retry-After, else a minute.
+ */
 export function rateLimited(results) {
-  const limited = results.filter((r) => r.status === 429);
+  const limited = results.filter((r) => r.status === 429 || r.status === 0);
   const waits = limited.map((r) => Number(r.retryAfter)).filter((n) => Number.isFinite(n) && n > 0);
   return { urls: limited.map((r) => r.url), waitMs: waits.length ? Math.max(...waits) * 1000 : 60_000 };
 }
@@ -70,10 +74,10 @@ async function main([origin, sha]) {
   if (sitemap.status !== 200) throw new Error(`the sitemap answered ${sitemap.status || sitemap.error}`);
   const urls = sitemapUrls(sitemap.body);
   let results = await fetchAll(urls, 4);
-  for (let round = 0; round < 3; round++) {
+  for (let round = 0; round < 5; round++) {
     const { urls: again, waitMs } = rateLimited(results);
     if (again.length === 0) break;
-    console.log(`${again.length} pages answered 429; asking again in ${Math.round(waitMs / 1000)} s`);
+    console.log(`${again.length} pages answered 429 or not at all; asking again in ${Math.round(waitMs / 1000)} s`);
     await new Promise((r) => setTimeout(r, waitMs));
     const retried = new Map((await fetchAll(again, 2)).map((r) => [r.url, r]));
     results = results.map((r) => retried.get(r.url) ?? r);
