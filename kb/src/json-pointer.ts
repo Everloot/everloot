@@ -16,6 +16,8 @@ export function readPointer(root: unknown, pointer: string): PointerRead {
   if (!pointer.startsWith("/")) return { ok: false, keys: keysOf(root) };
   let at: unknown = root;
   for (const raw of pointer.slice(1).split("/")) {
+    // Only ~0 and ~1 are escapes (RFC 6901); any other ~ makes the pointer a miss, not a guess.
+    if (/~(?![01])/.test(raw)) return { ok: false, keys: keysOf(at) };
     const token = raw.replace(/~1/g, "/").replace(/~0/g, "~");
     if (Array.isArray(at)) {
       // Only a canonical index reads: no "-", no leading zeros, no "length".
@@ -48,14 +50,15 @@ export function pageArray(value: unknown, offset: number, limit: number): { valu
  */
 export function cutArrays(data: Record<string, unknown>): { data: Record<string, unknown>; cut: boolean } {
   let cut = false;
-  const out: Record<string, unknown> = {};
+  const entries: [string, unknown][] = [];
   for (const [key, value] of Object.entries(data)) {
     if (Array.isArray(value) && value.length > MAX_ROWS) {
       cut = true;
-      out[key] = value.slice(0, MAX_ROWS);
-      out[`${key}NextOffset`] = MAX_ROWS;
-    } else out[key] = value;
+      entries.push([key, value.slice(0, MAX_ROWS)], [`${key}NextOffset`, MAX_ROWS]);
+    } else entries.push([key, value]);
   }
+  // fromEntries defines own properties, so a key spelled __proto__ in the data survives the copy.
+  const out = Object.fromEntries(entries);
   return { data: cut ? out : data, cut };
 }
 

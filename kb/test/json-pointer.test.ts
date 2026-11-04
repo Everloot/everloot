@@ -15,7 +15,18 @@ test.each([
   ["/constructor", { a: 1 }, { ok: false, keys: ["a"] }],
   ["a", { a: 1 }, { ok: false, keys: ["a"] }],
   ["/x/y", { x: { a: 1, b: 2 } }, { ok: false, keys: ["a", "b"] }],
+  // ~2 and a trailing ~ are not escapes, so the pointer misses even when a key happens to spell the raw token.
+  ["/a~2b", { "a~2b": 1 }, { ok: false, keys: ["a~2b"] }],
+  ["/a~", { "a~": 1 }, { ok: false, keys: ["a~"] }],
 ])("readPointer(%s)", (p, root, want) => expect(readPointer(root, p)).toEqual(want));
+
+test("cutArrays keeps an own key spelled __proto__ instead of turning it into the prototype", () => {
+  const data = JSON.parse('{"__proto__":{"safe":1},"ids":[1,2]}') as Record<string, unknown>;
+  const { data: out } = cutArrays(data);
+  expect(Object.hasOwn(out, "__proto__")).toBe(true);
+  expect(Object.keys(out)).toEqual(["__proto__", "ids"]);
+  expect(Object.getPrototypeOf(out)).toBe(Object.prototype);
+});
 
 test("a null value is a value, not a miss", () => {
   expect(readPointer({ a: null }, "/a")).toEqual({ ok: true, value: null });
