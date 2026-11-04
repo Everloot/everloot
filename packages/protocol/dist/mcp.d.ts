@@ -7,7 +7,7 @@ import { z } from "zod";
  * minor release, tool by tool.
  */
 /** Record kinds in the knowledge release (lore and reference data). */
-export declare const KNOWLEDGE_KINDS: readonly ["item", "npc", "object", "quest", "zone", "spell", "lore_page", "creator", "realm", "achievement", "faction", "title", "quest_chain", "mount", "legacy_perk", "race", "instance"];
+export declare const KNOWLEDGE_KINDS: readonly ["item", "npc", "object", "quest", "zone", "spell", "lore_page", "creator", "realm", "achievement", "faction", "title", "quest_chain", "mount", "legacy_perk", "race", "instance", "build"];
 /** Game versions a knowledge record can belong to. */
 export declare const GAME_VERSIONS: readonly ["forever", "classic", "retail", "lore"];
 /** Entities relation edges connect. A zone is a UiMap id. */
@@ -1024,6 +1024,7 @@ export declare const fetchedDocument: z.ZodObject<{
     metadata: z.ZodObject<{
         kind: z.ZodEnum<{
             achievement: "achievement";
+            build: "build";
             creator: "creator";
             faction: "faction";
             instance: "instance";
@@ -1064,6 +1065,7 @@ export declare const knowledgeHit: z.ZodObject<{
     extId: z.ZodString;
     kind: z.ZodEnum<{
         achievement: "achievement";
+        build: "build";
         creator: "creator";
         faction: "faction";
         instance: "instance";
@@ -1171,6 +1173,7 @@ export declare const MCP_TOOLS: {
             query: z.ZodString;
             kind: z.ZodOptional<z.ZodEnum<{
                 achievement: "achievement";
+                build: "build";
                 creator: "creator";
                 faction: "faction";
                 instance: "instance";
@@ -1202,6 +1205,7 @@ export declare const MCP_TOOLS: {
                 extId: z.ZodString;
                 kind: z.ZodEnum<{
                     achievement: "achievement";
+                    build: "build";
                     creator: "creator";
                     faction: "faction";
                     instance: "instance";
@@ -1254,6 +1258,7 @@ export declare const MCP_TOOLS: {
                 extId: z.ZodString;
                 kind: z.ZodEnum<{
                     achievement: "achievement";
+                    build: "build";
                     creator: "creator";
                     faction: "faction";
                     instance: "instance";
@@ -1301,6 +1306,7 @@ export declare const MCP_TOOLS: {
             readonly name: z.ZodString;
             readonly kind: z.ZodOptional<z.ZodEnum<{
                 achievement: "achievement";
+                build: "build";
                 creator: "creator";
                 faction: "faction";
                 instance: "instance";
@@ -1325,6 +1331,7 @@ export declare const MCP_TOOLS: {
                 extId: z.ZodString;
                 kind: z.ZodEnum<{
                     achievement: "achievement";
+                    build: "build";
                     creator: "creator";
                     faction: "faction";
                     instance: "instance";
@@ -1397,6 +1404,7 @@ export declare const MCP_TOOLS: {
             metadata: z.ZodObject<{
                 kind: z.ZodEnum<{
                     achievement: "achievement";
+                    build: "build";
                     creator: "creator";
                     faction: "faction";
                     instance: "instance";
@@ -2080,6 +2088,7 @@ export declare const MCP_TOOLS: {
                 warrior: "warrior";
             }>;
             readonly tree: z.ZodOptional<z.ZodString>;
+            readonly builds: z.ZodDefault<z.ZodBoolean>;
         };
         readonly outputSchema: {
             readonly label: z.ZodString;
@@ -2140,6 +2149,21 @@ export declare const MCP_TOOLS: {
                     }, z.core.$strip>>>;
                 }, z.core.$strip>>;
             }, z.core.$strip>>;
+            readonly starterBuilds: z.ZodOptional<z.ZodArray<z.ZodObject<{
+                name: z.ZodString;
+                purpose: z.ZodEnum<{
+                    dungeon: "dungeon";
+                    leveling: "leveling";
+                    pvp: "pvp";
+                    raid: "raid";
+                }>;
+                tree: z.ZodString;
+                shareCode: z.ZodString;
+                points: z.ZodNumber;
+                build: z.ZodString;
+                url: z.ZodString;
+                label: z.ZodLiteral<"Everloot team starter build, not observed">;
+            }, z.core.$strip>>>;
             readonly credit: z.ZodString;
             readonly url: z.ZodOptional<z.ZodString>;
         };
@@ -2908,6 +2932,7 @@ export declare const MCP_TOOL_LIST: ({
         query: z.ZodString;
         kind: z.ZodOptional<z.ZodEnum<{
             achievement: "achievement";
+            build: "build";
             creator: "creator";
             faction: "faction";
             instance: "instance";
@@ -2939,6 +2964,7 @@ export declare const MCP_TOOL_LIST: ({
             extId: z.ZodString;
             kind: z.ZodEnum<{
                 achievement: "achievement";
+                build: "build";
                 creator: "creator";
                 faction: "faction";
                 instance: "instance";
@@ -2991,6 +3017,7 @@ export declare const MCP_TOOL_LIST: ({
             extId: z.ZodString;
             kind: z.ZodEnum<{
                 achievement: "achievement";
+                build: "build";
                 creator: "creator";
                 faction: "faction";
                 instance: "instance";
@@ -3038,6 +3065,7 @@ export declare const MCP_TOOL_LIST: ({
         readonly name: z.ZodString;
         readonly kind: z.ZodOptional<z.ZodEnum<{
             achievement: "achievement";
+            build: "build";
             creator: "creator";
             faction: "faction";
             instance: "instance";
@@ -3062,6 +3090,7 @@ export declare const MCP_TOOL_LIST: ({
             extId: z.ZodString;
             kind: z.ZodEnum<{
                 achievement: "achievement";
+                build: "build";
                 creator: "creator";
                 faction: "faction";
                 instance: "instance";
@@ -3134,6 +3163,7 @@ export declare const MCP_TOOL_LIST: ({
         metadata: z.ZodObject<{
             kind: z.ZodEnum<{
                 achievement: "achievement";
+                build: "build";
                 creator: "creator";
                 faction: "faction";
                 instance: "instance";
@@ -3817,6 +3847,7 @@ export declare const MCP_TOOL_LIST: ({
             warrior: "warrior";
         }>;
         readonly tree: z.ZodOptional<z.ZodString>;
+        readonly builds: z.ZodDefault<z.ZodBoolean>;
     };
     outputSchema: {
         readonly label: z.ZodString;
@@ -3877,6 +3908,21 @@ export declare const MCP_TOOL_LIST: ({
                 }, z.core.$strip>>>;
             }, z.core.$strip>>;
         }, z.core.$strip>>;
+        readonly starterBuilds: z.ZodOptional<z.ZodArray<z.ZodObject<{
+            name: z.ZodString;
+            purpose: z.ZodEnum<{
+                dungeon: "dungeon";
+                leveling: "leveling";
+                pvp: "pvp";
+                raid: "raid";
+            }>;
+            tree: z.ZodString;
+            shareCode: z.ZodString;
+            points: z.ZodNumber;
+            build: z.ZodString;
+            url: z.ZodString;
+            label: z.ZodLiteral<"Everloot team starter build, not observed">;
+        }, z.core.$strip>>>;
         readonly credit: z.ZodString;
         readonly url: z.ZodOptional<z.ZodString>;
     };

@@ -35,7 +35,8 @@
           "mount",
           "legacy_perk",
           "race",
-          "instance"
+          "instance",
+          "build"
         ]
       },
       "version": {
@@ -97,7 +98,8 @@
                 "mount",
                 "legacy_perk",
                 "race",
-                "instance"
+                "instance",
+                "build"
               ]
             },
             "name": {

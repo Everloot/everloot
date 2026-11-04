@@ -29,6 +29,11 @@
         "description": "One tree by name, such as Arcane. Without it, every tree.",
         "type": "string",
         "maxLength": 40
+      },
+      "builds": {
+        "default": false,
+        "description": "Also list the Everloot team's starter builds for the class, with share codes. They are the team's, not observed.",
+        "type": "boolean"
       }
     },
     "required": [
@@ -287,6 +292,63 @@
             "maxRanks",
             "talents",
             "prereqs"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "starterBuilds": {
+        "description": "With builds: the team's published starter builds for the class (and tree), by name. Empty when none is published.",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "purpose": {
+              "type": "string",
+              "enum": [
+                "leveling",
+                "dungeon",
+                "raid",
+                "pvp"
+              ]
+            },
+            "tree": {
+              "type": "string",
+              "description": "The tree the build leans on."
+            },
+            "shareCode": {
+              "type": "string",
+              "description": "Reads with talent_plan."
+            },
+            "points": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "build": {
+              "type": "string",
+              "description": "The game build the code was made on."
+            },
+            "url": {
+              "type": "string",
+              "description": "The shared build page."
+            },
+            "label": {
+              "type": "string",
+              "const": "Everloot team starter build, not observed"
+            }
+          },
+          "required": [
+            "name",
+            "purpose",
+            "tree",
+            "shareCode",
+            "points",
+            "build",
+            "url",
+            "label"
           ],
           "additionalProperties": false
         }

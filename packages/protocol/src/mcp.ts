@@ -12,7 +12,7 @@ import { ITEM_FACTS } from "./records.js";
 /** Record kinds in the knowledge release (lore and reference data). */
 export const KNOWLEDGE_KINDS = [
   "item", "npc", "object", "quest", "zone", "spell", "lore_page", "creator", "realm",
-  "achievement", "faction", "title", "quest_chain", "mount", "legacy_perk", "race", "instance",
+  "achievement", "faction", "title", "quest_chain", "mount", "legacy_perk", "race", "instance", "build",
 ] as const;
 /** Game versions a knowledge record can belong to. */
 export const GAME_VERSIONS = ["forever", "classic", "retail", "lore"] as const;
@@ -741,6 +741,7 @@ export const MCP_TOOLS = {
     inputSchema: {
       class: z.enum(TALENT_CLASSES).describe("Class slug."),
       tree: z.string().max(40).optional().describe("One tree by name, such as Arcane. Without it, every tree."),
+      builds: z.boolean().default(false).describe("Also list the Everloot team's starter builds for the class, with share codes. They are the team's, not observed."),
     },
     outputSchema: {
       label: z.string(),
@@ -756,6 +757,16 @@ export const MCP_TOOLS = {
       }),
       trees: z.array(z.object({ id: z.number().int(), name: z.string(), nodes: z.number().int() })),
       nodes: z.array(talentNode),
+      starterBuilds: z.array(z.object({
+        name: z.string(),
+        purpose: z.enum(["leveling", "dungeon", "raid", "pvp"]),
+        tree: z.string().describe("The tree the build leans on."),
+        shareCode: z.string().describe("Reads with talent_plan."),
+        points: z.number().int(),
+        build: z.string().describe("The game build the code was made on."),
+        url: z.string().describe("The shared build page."),
+        label: z.literal("Everloot team starter build, not observed"),
+      })).optional().describe("With builds: the team's published starter builds for the class (and tree), by name. Empty when none is published."),
       credit: z.string(),
       url: z.string().optional().describe(PAGE_URL),
     },

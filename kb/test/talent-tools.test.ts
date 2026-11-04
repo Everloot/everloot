@@ -1,3 +1,6 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { GAME_DATA_CREDIT, MCP_TOOLS, TALENT_CLASSES } from "@everloot/protocol";
@@ -5,7 +8,10 @@ import { afterEach, expect, test } from "vitest";
 import { z } from "zod";
 import { encodeBuild, encodeOrder } from "../../web/src/lib/talents/share";
 import { openDb, type DB } from "../src/db.js";
+import { importCurated } from "../src/importers/curated.js";
 import { createKnowledgeServer } from "../src/mcp-server.js";
+import { talentBuildUrl } from "../src/page-urls.js";
+import type { ReleaseSource } from "../src/release-db.js";
 import { handleTalentPlan, handleTalentTree } from "../src/talent-tools.js";
 import { siteCatalog, siteCatalogs } from "../src/talents/site-catalogs.js";
 
@@ -30,8 +36,8 @@ test("every class catalog the site ships parses, in the protocol's order", () =>
   }
 });
 
-test("talent_tree lists every node of the class with the build, the point levels and the credit", () => {
-  const { text, structured } = handleTalentTree({ class: "mage" });
+test("talent_tree lists every node of the class with the build, the point levels and the credit", async () => {
+  const { text, structured } = await handleTalentTree({ class: "mage" });
   const out = treeOut.parse(structured);
   expect(out.nodes.length).toBe(mage.nodes.length);
   expect(out.build).toBe(mage.build);
@@ -51,13 +57,13 @@ test("talent_tree lists every node of the class with the build, the point levels
   if (after) expect(text).toContain("after ");
 });
 
-test("talent_tree narrows to one tree by name, case-insensitively, and names the trees when there is no such tree", () => {
+test("talent_tree narrows to one tree by name, case-insensitively, and names the trees when there is no such tree", async () => {
   const tree = mage.trees[1];
-  const { structured } = handleTalentTree({ class: "mage", tree: tree.name.toUpperCase() });
+  const { structured } = await handleTalentTree({ class: "mage", tree: tree.name.toUpperCase() });
   const out = treeOut.parse(structured);
   expect(out.trees.map((t) => t.id)).toEqual([tree.id]);
   expect(out.nodes.every((n) => n.treeId === tree.id)).toBe(true);
-  const none = handleTalentTree({ class: "mage", tree: "Nothing" });
+  const none = await handleTalentTree({ class: "mage", tree: "Nothing" });
   expect(none.text).toContain(`No tree named Nothing for Mage. Trees: ${mage.trees.map((t) => t.name).join(", ")}.`);
   expect(treeOut.parse(none.structured).nodes).toEqual([]);
 });
@@ -150,6 +156,98 @@ test("talent_plan keeps the answer it gave before spend orders: the same fields,
 
 const databases: DB[] = [];
 afterEach(() => { for (const db of databases.splice(0)) db.close(); });
+
+const STARTER_LABEL = "Everloot team starter build, not observed";
+const warriorCatalog = siteCatalog("warrior");
+
+/** A published warrior build: the first node of `treeName` at full rank. */
+function warriorBuild(id: string, name: string, treeName: string, purpose: string) {
+  const tree = warriorCatalog.trees.find((t) => t.name === treeName)!;
+  const node = warriorCatalog.nodes.filter((n) => n.treeId === tree.id && !n.unlock && n.prereqs.length === 0 && !n.anyOf)[0];
+  const code = encodeBuild({ classSlug: "warrior", specId: warriorCatalog.specId, build: warriorCatalog.build, ranks: { [node.id]: { rank: node.maxRanks } } });
+  const yaml = [
+    "- kind: build", `  id: ${id}`, `  name: "${name}"`, "  game_version: forever", "  body: A test build.",
+    `  source_url: ${talentBuildUrl("warrior", code)}`, '  retrieved_at: "2026-11-03"', "  data:",
+    "    class: warrior", `    tree: ${treeName}`, `    purpose: ${purpose}`, `    share_code: ${code}`,
+    `    points: ${node.maxRanks}`, `    build: "${warriorCatalog.build}"`, "    status: published",
+  ].join("\n");
+  return { code, points: node.maxRanks, yaml };
+}
+
+const arms = warriorBuild("warrior-leveling-arms", "Warrior leveling: Arms", "Arms", "leveling");
+const protection = warriorBuild("warrior-dungeon-protection", "Warrior dungeon: Protection", "Protection", "dungeon");
+
+/** A release holding the two published warrior builds above. */
+async function withStarterBuilds(): Promise<DB> {
+  const db = openDb(":memory:");
+  databases.push(db);
+  const dir = mkdtempSync(join(tmpdir(), "kb-talent-builds-"));
+  writeFileSync(join(dir, "builds.yaml"), `${arms.yaml}\n${protection.yaml}\n`);
+  expect(await importCurated(db, dir)).toBe(2);
+  return db;
+}
+
+test("talent_tree with builds lists the class's starter builds with the label, the share code and the build page", async () => {
+  const source = await withStarterBuilds();
+  const { text, structured } = await handleTalentTree({ class: "warrior", builds: true }, source);
+  const out = treeOut.parse(structured);
+  expect(out.starterBuilds).toEqual([
+    { name: "Warrior dungeon: Protection", purpose: "dungeon", tree: "Protection", shareCode: protection.code, points: protection.points, build: warriorCatalog.build, url: talentBuildUrl("warrior", protection.code), label: STARTER_LABEL },
+    { name: "Warrior leveling: Arms", purpose: "leveling", tree: "Arms", shareCode: arms.code, points: arms.points, build: warriorCatalog.build, url: talentBuildUrl("warrior", arms.code), label: STARTER_LABEL },
+  ]);
+  expect(out.starterBuilds![0].url).toContain("/tools/talents/warrior");
+  expect(text).toContain("\nStarter builds (Everloot team, not observed):\n");
+  expect(text).toContain(`\n- Warrior leveling: Arms (leveling, Arms, ${arms.points} points, build ${warriorCatalog.build}): ${arms.code} ${talentBuildUrl("warrior", arms.code)}\n`);
+  // The tree listing is unchanged, and the calculator link and the credit still close the answer.
+  expect(text.startsWith((await handleTalentTree({ class: "warrior" })).text.split("\nMore: ")[0])).toBe(true);
+  expect(text.endsWith(`\nMore: https://everloot.app/tools/talents/warrior\n${GAME_DATA_CREDIT}`)).toBe(true);
+});
+
+test("talent_tree with builds and a tree narrows the builds, and says which trees have one when none match", async () => {
+  const source = await withStarterBuilds();
+  const narrowed = treeOut.parse((await handleTalentTree({ class: "warrior", tree: "arms", builds: true }, source)).structured);
+  expect(narrowed.starterBuilds!.map((b) => b.name)).toEqual(["Warrior leveling: Arms"]);
+  const fury = await handleTalentTree({ class: "warrior", tree: "Fury", builds: true }, source);
+  const out = treeOut.parse(fury.structured);
+  expect(out.trees.map((t) => t.name)).toEqual(["Fury"]);
+  expect(out.starterBuilds).toEqual([]);
+  expect(fury.text).toContain("No starter build published yet for Warrior Fury. Builds exist for: Arms, Protection.");
+});
+
+test("talent_tree with builds for a class with none says so and invents nothing", async () => {
+  const source = await withStarterBuilds();
+  const { text, structured } = await handleTalentTree({ class: "mage", builds: true }, source);
+  expect(treeOut.parse(structured).starterBuilds).toEqual([]);
+  expect(text).toContain("\nNo starter build published yet for Mage.\n");
+  expect(text).not.toContain("Builds exist for");
+});
+
+test("talent_tree without builds, or with builds false, answers exactly as before", async () => {
+  const source = await withStarterBuilds();
+  const before = await handleTalentTree({ class: "warrior" });
+  expect(await handleTalentTree({ class: "warrior" }, source)).toEqual(before);
+  expect(await handleTalentTree({ class: "warrior", builds: false }, source)).toEqual(before);
+  expect(before.structured).not.toHaveProperty("starterBuilds");
+  // The release is never read unless builds is asked for, so the text and the key order cannot depend on it.
+  const tripwire = { get: async () => { throw new Error("release read"); }, all: async () => { throw new Error("release read"); } } as unknown as ReleaseSource;
+  for (const args of [{ class: "warrior" as const }, { class: "warrior" as const, builds: false }, { class: "warrior" as const, tree: "Arms" }]) {
+    expect(JSON.stringify(await handleTalentTree(args, tripwire))).toBe(JSON.stringify(await handleTalentTree(args)));
+  }
+});
+
+test("talent_tree takes builds over MCP and returns the declared shape", async () => {
+  const source = await withStarterBuilds();
+  const server = createKnowledgeServer(source);
+  const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+  await server.connect(serverSide);
+  const client = new Client({ name: "test", version: "0" });
+  await client.connect(clientSide);
+  const withBuilds = await client.callTool({ name: "talent_tree", arguments: { class: "warrior", builds: true } });
+  expect(withBuilds.isError).not.toBe(true);
+  expect(treeOut.parse(withBuilds.structuredContent).starterBuilds).toHaveLength(2);
+  const without = await client.callTool({ name: "talent_tree", arguments: { class: "warrior" } });
+  expect(without.structuredContent).toEqual((await handleTalentTree({ class: "warrior" })).structured);
+});
 
 test("both tools answer over MCP with structured content of the declared shape", async () => {
   const db = openDb(":memory:");

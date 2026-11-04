@@ -322,6 +322,21 @@ export async function getDocument(source: ReleaseSource, id: number): Promise<(S
   return r ? { ...toHit(r), body: r.body } : undefined;
 }
 
+/** Every row of one kind with its `data`, by name, optionally where one data field equals a value. Both are bound. */
+export async function listByKind(
+  source: ReleaseSource,
+  kind: Kind,
+  where?: { dataKey: string; equals: string },
+): Promise<(SearchHit & { data: Record<string, unknown> })[]> {
+  const cond = where ? " AND json_extract(data, '$.' || ?) = ?" : "";
+  const params = where ? [kind, where.dataKey, where.equals] : [kind];
+  const rows = await releaseDb(source).all<EntityRow & { data: string }>(
+    `SELECT ${ROW_BY_ID}, data FROM entities WHERE kind = ?${cond} ORDER BY name, id`,
+    ...params,
+  );
+  return rows.map((r) => ({ ...toHit(r), data: JSON.parse(r.data) as Record<string, unknown> }));
+}
+
 /** Exact full-name match (case-insensitive), optionally narrowed to one kind. */
 export async function getByName(source: ReleaseSource, name: string, kind?: Kind): Promise<SearchHit[]> {
   const db = releaseDb(source);
