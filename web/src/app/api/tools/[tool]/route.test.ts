@@ -4,8 +4,8 @@ import { z } from "zod";
 import { openDb } from "../../../../../../kb/src/db";
 import { replaceSourceRows } from "../../../../../../kb/src/entities";
 
-const store = vi.hoisted(() => ({ api: vi.fn(), loadCorpus: vi.fn(), loadMarket: vi.fn(), release: { db: null as unknown } }));
-vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { api: store.api } }));
+const store = vi.hoisted(() => ({ api: vi.fn(), mcp: vi.fn(), loadCorpus: vi.fn(), loadMarket: vi.fn(), release: { db: null as unknown } }));
+vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { api: store.api, mcp: store.mcp } }));
 vi.mock("@/lib/upload-store", () => ({ uploadStore: { loadCorpus: store.loadCorpus, loadMarket: store.loadMarket } }));
 vi.mock("@/lib/release", () => ({ getRelease: () => (store.release.db ? store.release : null) }));
 const auth = vi.hoisted(() => ({ getUser: vi.fn(), authQuery: vi.fn() }));
@@ -27,6 +27,7 @@ const get = (tool: string, query = "") => GET(new Request(`https://everloot.app/
 
 beforeEach(async () => {
   store.api.mockReset().mockResolvedValue({ allowed: true, retryAfter: 0 });
+  store.mcp.mockReset().mockResolvedValue({ allowed: true, retryAfter: 0 });
   store.loadCorpus.mockResolvedValue({ uploads: 3, records, dataAsOf: AS_OF, unreachable: false });
   store.loadMarket.mockResolvedValue({ state: null, dataAsOf: null });
   const db = openDb(":memory:");
@@ -111,12 +112,33 @@ test("my_builds is unknown with the switch off, and with it on answers for the s
   expect(mine.status).toBe(200);
   expect((await mine.json()).text).toContain("No saved builds yet.");
   expect(store.api).not.toHaveBeenCalled();
+  expect(store.mcp).not.toHaveBeenCalled();
 });
 
-test("with the data guard on, the quota decides before the tool runs", async () => {
+test("with the data guard on, the MCP's quota decides before the tool runs, not the bulk endpoints' one", async () => {
   vi.stubEnv("EVERLOOT_DATA_GUARD", "1");
-  store.api.mockResolvedValue({ allowed: false, retryAfter: 30 });
+  expect((await get("everloot_plan")).status).toBe(200);
+  expect(store.mcp).toHaveBeenCalledTimes(1);
+  expect(store.api).not.toHaveBeenCalled();
+  store.mcp.mockResolvedValue({ allowed: false, retryAfter: 30 });
   const res = await get("everloot_plan");
   expect(res.status).toBe(429);
   expect(res.headers.get("retry-after")).toBe("30");
+});
+
+test("with the data guard on, a key is counted on the drops surface and spends no anonymous quota", async () => {
+  vi.stubEnv("EVERLOOT_DATA_GUARD", "1");
+  vi.stubEnv("SUPABASE_URL", "https://db.example");
+  vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service");
+  const send = vi.fn().mockImplementation(async () => Response.json([{ allowed: true, retry_after: 0, key_ref: "00000000-0000-4000-8000-000000000001" }]));
+  vi.stubGlobal("fetch", send);
+  try {
+    const key = `evl_${"a".repeat(64)}`;
+    const res = await GET(new Request("https://everloot.app/api/tools/everloot_plan", { headers: { authorization: `Bearer ${key}` } }), { params: Promise.resolve({ tool: "everloot_plan" }) });
+    expect(res.status).toBe(200);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(send.mock.calls[0][1].body)).toMatchObject({ p_surface: "drops" });
+    expect(store.mcp).not.toHaveBeenCalled();
+    expect(store.api).not.toHaveBeenCalled();
+  } finally { vi.unstubAllGlobals(); }
 });

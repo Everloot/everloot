@@ -119,7 +119,7 @@ Cache-Control: no-store
 Content-Type: application/json
 Retry-After: 2758
 
-{"ok":false,"error":"Without a key this endpoint answers 30 requests per hour per address. Try again in 2758 seconds, or get a free key at https://everloot.app/docs/api/keys and send it as \\"Authorization: Bearer <key>\\".","getAKey":"https://everloot.app/docs/api/keys"}`;
+{"ok":false,"error":"Too many requests from this address. Try again in 2758 seconds, or get a free key at https://everloot.app/docs/api/keys and send it as \\"Authorization: Bearer <key>\\".","getAKey":"https://everloot.app/docs/api/keys"}`;
 
 export default function Page() {
   return (
@@ -133,7 +133,7 @@ export default function Page() {
       <List>
         <li>curl, Node 18 or newer, or Python 3 with only its standard library. The curl examples also use <C>jq</C> to pick fields; leave it off to see the whole answer.</li>
         <li>No account. Every MCP tool answers <C>GET /api/tools/&#123;tool&#125;</C>, with the tool&apos;s arguments as query parameters.</li>
-        <li>Without a key, this endpoint allows 30 requests an hour for each IP address, shared with the corpus, drop list, items and edges endpoints. The MCP server has its own allowance of 200. <Link href="/docs/api/keys" className={docLink}>Limits and keys</Link> covers the free key.</li>
+        <li>Without a key, this endpoint allows 200 requests an hour for each IP address, shared with the MCP server. <Link href="/docs/api/keys" className={docLink}>Limits and keys</Link> covers the free key.</li>
       </List>
 
       <H2 id="steps">Steps</H2>

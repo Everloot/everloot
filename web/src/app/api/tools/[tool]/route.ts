@@ -38,8 +38,9 @@ export async function GET(req: Request, context: { params: Promise<{ tool: strin
   const names = registeredToolNames(loaders);
   if (!(names as string[]).includes(tool)) return refuse(404, `No tool named ${tool}. Tools: ${names.join(", ")}.`);
   const name = tool as McpToolName;
-  // The same key surface and per-IP quota as the other per-row JSON endpoints (/api/edges, /api/items).
-  const admitted = await admit(req, "drops");
+  // A key is counted on the same surface as the other per-row JSON endpoints (/api/edges, /api/items). Without
+  // one, these are the MCP's questions over plain HTTP (the site's chat asks them too), so they spend its quota.
+  const admitted = await admit(req, "drops", { anonymousAs: "mcp" });
   if (admitted instanceof Response) return admitted;
   const parsed = z.object(MCP_TOOLS[name].inputSchema).safeParse(argumentsFromQuery(name, new URL(req.url).searchParams));
   if (!parsed.success) {

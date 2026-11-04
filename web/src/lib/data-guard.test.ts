@@ -77,6 +77,26 @@ test("a key raises the limits: its own allowance, the larger page, and the anony
   expect(init.body).not.toContain(token);
 });
 
+test("anonymousAs: a keyless caller spends the MCP's quota and page, a key is still counted on its own surface", async () => {
+  const quota = quotaMock();
+  expect(await admit(req(), "drops", { env: ON, quota, anonymousAs: "mcp" })).toEqual({ tier: "anonymous", pageMax: null });
+  expect(quota.mcp).toHaveBeenCalledTimes(1);
+  expect(quota.api).not.toHaveBeenCalled();
+  quota.mcp.mockResolvedValueOnce({ allowed: false, retryAfter: 60 });
+  const limited = await admit(req(), "drops", { env: ON, quota, anonymousAs: "mcp" }) as Response;
+  expect(limited.status).toBe(429);
+  expect(limited.headers.get("retry-after")).toBe("60");
+  const { token } = newKey();
+  const send = keyRow({ allowed: true, retry_after: 0, key_ref: KEY_ID });
+  expect(await admit(req(undefined, token), "drops", { env: ON, quota, fetch: send, anonymousAs: "mcp" })).toEqual({ tier: "key", pageMax: KEY_PAGE, keyId: KEY_ID });
+  expect(JSON.parse(send.mock.calls[0][1].body)).toEqual({ p_token_hash: hashKey(token), p_surface: "drops" });
+  expect(quota.mcp).toHaveBeenCalledTimes(2);
+  expect(quota.api).not.toHaveBeenCalled();
+  // Guard off: the surface answers as it did, with no quota.
+  expect(await admit(req(), "drops", { env: OFF, quota, anonymousAs: "mcp" })).toEqual({ tier: "open", pageMax: null });
+  expect(quota.mcp).toHaveBeenCalledTimes(2);
+});
+
 test("a revoked or unknown key is a 401; a malformed one never reaches the database", async () => {
   const revoked = await admit(req(undefined, newKey().token), "corpus", { env: ON, quota: quotaMock(), fetch: keyRow({ allowed: false, retry_after: 0, key_ref: null }) }) as Response;
   expect(revoked.status).toBe(401);

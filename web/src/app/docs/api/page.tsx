@@ -91,9 +91,9 @@ export default function ApiOverview() {
       <H2 id="keys-and-limits">Keys and limits</H2>
       <P>
         {guard
-          ? <>You do not need a key to read. Without one, the corpus feed, the drop list, <C>/api/items</C>, <C>/api/edges</C> and <C>/api/tools</C> share one allowance of {ANON_PER_HOUR} requests per hour for each IP address, {ANON_PAGE} records a page. A free key raises that to {KEY_PER_HOUR.toLocaleString("en-US")} requests per hour and {KEY_PAGE.toLocaleString("en-US")} records a page.</>
+          ? <>You do not need a key to read. Without one, the corpus feed, the drop list, <C>/api/items</C> and <C>/api/edges</C> share one allowance of {ANON_PER_HOUR} requests per hour for each IP address, {ANON_PAGE} records a page. A free key raises that to {KEY_PER_HOUR.toLocaleString("en-US")} requests per hour and {KEY_PAGE.toLocaleString("en-US")} records a page.</>
           : <>You do not need a key to read. Keys are not switched on yet, and nothing needs one.</>}{" "}
-        The MCP server and the market prices have their own per-IP limits. Every endpoint and its limit is on{" "}
+        The MCP server and <C>/api/tools</C> share their own per-IP limit, and the market prices have theirs. Every endpoint and its limit is on{" "}
         <Link href="/docs/api/keys" className={docLink}>Limits and keys</Link>.
       </P>
 
