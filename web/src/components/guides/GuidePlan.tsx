@@ -98,8 +98,8 @@ export default function GuidePlan({ classSlug, catalog, sets }: { classSlug: str
       </div>
       {copies.some(Boolean) && (
         <p className="text-sm text-fg-2">
-          Copy for addon copies one set as a link. In the game: <code>/everloot</code> → Talents → paste → Import. Addon 0.3.12 loads the
-          talents from the link but not the spend order, so spend each point yourself.
+          Copy for addon copies one set as a link. In the game: <code>/everloot</code> → Talents → paste → Import. Addon 0.3.13 and later
+          load the talents and the spend order from the link (0.3.12, the talents only); you still spend each point yourself.
         </p>
       )}
     </section>

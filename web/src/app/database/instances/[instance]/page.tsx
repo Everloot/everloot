@@ -5,7 +5,7 @@ import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { AgreementMeter, Badge, Card, Container, DataTable, DataTitle, EmptyState, SectionHeading, type Column } from "@/components/ui";
 import {
-  bossRows, difficultyLabel, instanceDescription, instanceHref, instanceRows, instanceTitle, levelLabel, loadSightings, parseInstanceSegment,
+  bossRows, difficultyLabel, difficultyList, instanceDescription, instanceHref, instanceRows, instanceTitle, levelLabel, loadSightings, parseInstanceSegment,
   type BossRow, type InstancePlace, type InstanceRow,
 } from "@/lib/instances";
 import { dayLabel } from "@/lib/report-labels";
@@ -127,7 +127,7 @@ export default async function InstancePage(props: Props) {
                 <dd className="text-fg">
                   {row.difficulty !== null ? difficultyLabel(row.difficulty) : PLACEHOLDER}
                   {row.difficulties.length > 0 && (
-                    <span className="ml-2 inline-flex items-baseline gap-1.5 text-meta text-muted"><Badge tone="files" />in the files, {row.difficulties.map(difficultyLabel).join(", ")}</span>
+                    <span className="ml-2 inline-flex items-baseline gap-1.5 text-meta text-muted"><Badge tone="files" />in the files, {difficultyList(row.difficulties)}</span>
                   )}
                 </dd>
                 <dt className="text-muted">Bosses reported</dt>

@@ -316,7 +316,7 @@ test("Copy for addon copies set one as a full link holding only its own code and
   expect(writeText).toHaveBeenCalledWith(`https://everloot.app/tools/talents/mage#plan=${code(r({ 11: 2, 12: 1 }))}&order=O1p-AAB`);
   const share = container.querySelector('[aria-label="Share"]')!.textContent!;
   expect(share).toContain("Talents tab → paste → Import");
-  expect(share).toContain("0.3.12");
+  expect(share).toContain("Addon 0.3.13 and later load the talents and the spend order");
   expect(share).not.toContain("/everloot plan");
 });
 

@@ -9,7 +9,7 @@ import HomeAsk from "@/components/HomeAsk";
 import { AgreementMeter, Banner, Card, CodeBlock, SectionHeading, type Agreement } from "@/components/ui";
 import { TOOL_GROUPS, tools, toolHref } from "@/data/tools";
 import { CLASSES } from "@/design/tokens";
-import { latestAddonRelease } from "@/lib/addon-release";
+import { ADDON_LIVE_VERIFIED, latestAddonRelease } from "@/lib/addon-release";
 import { loadTimeline } from "@/lib/changes";
 import { TYPE_LABEL, postPath } from "../../../kb/src/changes";
 import { longDate } from "@/data/wow-forever";
@@ -127,8 +127,8 @@ export default async function Home() {
           </ul>
           {addon && (
             <p className="text-sm text-fg-2 md:max-w-[26ch]">
-              The addon is <span className="tabular-nums text-fg">{addon.version} Alpha</span>. Live-client verification
-              is pending. It reads the client and sends what you allow.
+              The addon is <span className="tabular-nums text-fg">{addon.version} Alpha</span>.{ADDON_LIVE_VERIFIED ? "" : " Live-client verification is pending."} It reads the
+              client and sends what you allow.
             </p>
           )}
         </Card>

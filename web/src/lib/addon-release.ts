@@ -7,6 +7,12 @@ export interface AddonRelease {
   downloadPath: string;
 }
 
+/**
+ * Whether the addon has been checked in the live Forever client. Only a person who ran it there can say so, so this
+ * is flipped by hand, never by date; the home page and the addon page both read it.
+ */
+export const ADDON_LIVE_VERIFIED = false;
+
 const NAME = /^Everloot-(\d+)\.(\d+)\.(\d+)\.zip$/;
 
 /**

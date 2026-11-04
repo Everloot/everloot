@@ -97,7 +97,12 @@ test("on a phone the tree is one closed Category control and the house tabs drop
   // Short tab labels; the counts and "houses" are read out on a phone but drawn only from sm up.
   const tabs = /data-link-tabs[\s\S]*?<\/nav>/.exec(html)![0];
   expect(tabs.match(/data-house-count="[^"]*" class="sr-only[^"]*sm:not-sr-only/g)).toHaveLength(4);
-  expect(tabs).toContain('<span class="sr-only sm:not-sr-only"> houses</span>');
+  expect(tabs).toContain('<span class="sr-only sm:not-sr-only sm:ml-1"> houses</span>');
+  // A link's text is a flex row, so a leading space in a span drawn from sm up collapses ("Allhouses (0)").
+  // Every span that turns visible carries its own gap.
+  const shown = tabs.match(/<span[^>]*class="[^"]*sm:not-sr-only[^"]*"/g)!;
+  expect(shown.length).toBeGreaterThan(0);
+  for (const span of shown) expect(span).toMatch(/\bsm:ml-1\b/);
 });
 
 test("the old page's links and an item id land on the item pages; a word filters by name", async () => {

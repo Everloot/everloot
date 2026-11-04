@@ -370,6 +370,9 @@ test("the legend's marks are the map's: the game's icon where the upload has one
   // Raids have no piece in this upload: the glyph stays, and so does the pin's.
   expect(row("Raid entrances").querySelector("img")).toBeNull();
   expect(row("Raid entrances").querySelector("svg")).not.toBeNull();
+  // The zones' mark is a drawn map, never a bare square that reads as a second checkbox beside the real one.
+  expect(row("Zones").querySelector("svg rect")).toBeNull();
+  expect(row("Zones").querySelector("svg path")).not.toBeNull();
   expect(leaflet.props.icons).toEqual(poi);
   await act(async () => root.unmount());
   await mount();

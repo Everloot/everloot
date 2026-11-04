@@ -82,6 +82,9 @@ export const difficultyLabelIn =
     data.difficulties?.[id]?.name ?? DIFFICULTY_NAMES[id] ?? `Difficulty ${id}`;
 /** The site's name for a difficulty id, from the build's own files when map.json carries them. */
 export const difficultyLabel = (id: number): string => difficultyLabelIn(WORLD_MAP)(id);
+/** "Normal, Infinite" for ids [1, 201, 213]: the files carry several ids under one name, and each name prints once. */
+export const difficultyList = (ids: readonly number[], label: (id: number) => string = difficultyLabel): string =>
+  [...new Set(ids.map(label))].join(", ");
 export const instanceTitle = (row: Pick<InstanceRow, "instanceMapId" | "name">): string => row.name ?? `Instance ${row.instanceMapId}`;
 
 /** "17–24" for a range, "60" for one level, null when the game files give none. */
