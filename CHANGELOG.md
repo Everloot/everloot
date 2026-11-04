@@ -15,6 +15,9 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
+- Site: search finds dungeons and raids by name, with or without the leading "The", and an exact name puts the instance page
+  first: "deadmines" now opens with `/database/instances/36-deadmines`. The group of wiki pages is headed Wiki, not Guides,
+  so it no longer reads as the reviewed class guides at `/guides`.
 - Site: the Auction House tab reads "All houses", not "Allhouses"; an instance's difficulties from the game files name each
   difficulty once (the Deadmines: "Normal, Infinite", not "Normal, Normal, Infinite"); the map's Zones row shows a small map
   mark instead of an empty square that looked like a second checkbox. The talent copy says addon 0.3.13 and later load the
