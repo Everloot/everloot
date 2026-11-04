@@ -135,4 +135,5 @@ test("the entities table accepts every ALL_KINDS value", () => {
   for (const kind of ALL_KINDS) expect(() => insertRow(db, kind)).not.toThrow();
   const { n } = db.prepare("SELECT count(*) AS n FROM entities").get() as { n: number };
   expect(n).toBe(ALL_KINDS.length);
+  expect(ALL_KINDS.at(-1)).toBe("build");
 });
