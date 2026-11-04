@@ -120,14 +120,19 @@ function fieldLine(key: string, value: unknown): string {
 /** The line every catalog answer carries: where the fact comes from and which build it was read in. */
 export const catalogLabel = (build: string): string => `${CLIENT_LABEL} (build ${build}).`;
 
+/** A record's body: the name, the game-file label with its build, then one `field: value` line per field. */
+export function bodyOf(name: string, build: string, fields: Record<string, unknown>): string {
+  const lines = Object.entries(fields).filter(([, v]) => v !== undefined).map(([k, v]) => fieldLine(k, v));
+  return [name, catalogLabel(build), ...lines].join("\n");
+}
+
 /**
  * One record: the name, the game-file label with its build, then one `field: value` line per field; `data` carries
  * the build and the same fields. An empty name or a development leftover gives no record, for every kind.
  */
 function record(kind: CatalogKind, extId: string, name: string, stamp: Stamp, fields: Record<string, unknown>): CatalogRecord | undefined {
   if (name.trim() === "" || isDevelopmentItemName(name)) return undefined;
-  const lines = Object.entries(fields).filter(([, v]) => v !== undefined).map(([k, v]) => fieldLine(k, v));
-  const body = [name, catalogLabel(stamp.version), ...lines].join("\n");
+  const body = bodyOf(name, stamp.version, fields);
   return {
     id: catalogId(kind, extId),
     extId,

@@ -22,6 +22,9 @@ required, or tightening a limit is a major release.
   without a key, 5,000 with one), and the corpus and client-layer routes and the market rule read in plain words.
 
 ### Added
+- `get_entity` and `fetch` take three optional parameters, `field` (a JSON pointer into the record's data), `offset`
+  and `limit` (at most 48 rows), and answer with optional `field` (`pointer`, `value`, `nextOffset`) and, when the
+  pointer leads nowhere, `keys`. A whole record cut at 48 rows says so. `search` and the page tools are unchanged.
 - 1.23.0 (record protocol 1.12.0), for pull timing, runs and per-player pull totals
   (`docs/design/specs/2026-11-02-pull-and-run-records-design.md`): `encounter` gains optional `startedAt`,
   `durationSeconds` (they come together) and `runId`. Two record kinds, neither in the public corpus:

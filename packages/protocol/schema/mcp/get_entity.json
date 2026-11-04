@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/get_entity.json",
   "title": "Get one knowledge record by id",
-  "description": "Returns one knowledge record in full, by the numeric id a search_knowledge or get_by_name hit gave: title, the full text in the source's words, the URL to cite, source, licence and date. Use it after a search to read the whole record; use fetch for the ChatGPT connector shape, which takes the string id a search result gave. An id no record has returns a null hit, not an error.",
+  "description": "Returns one knowledge record in full, by the numeric id a search_knowledge or get_by_name hit gave: title, the full text in the source's words, the URL to cite, source, licence and date. Use it after a search to read the whole record; use fetch for the ChatGPT connector shape, which takes the string id a search result gave. An id no record has returns a null hit, not an error. Give field, a JSON pointer such as /questIds, to read one value of the record's data instead of the whole record; an array comes in pages of up to 48 rows, and nextOffset says where the next page starts. A pointer that leads nowhere answers with the keys it could have used, not an error.",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false
@@ -15,6 +15,23 @@
         "minimum": -9007199254740991,
         "maximum": 9007199254740991,
         "description": "Record id from a search_knowledge hit."
+      },
+      "field": {
+        "description": "A JSON pointer into the record's data, such as /criteria or /reagents/0. Without it, the whole record.",
+        "type": "string",
+        "maxLength": 200
+      },
+      "offset": {
+        "description": "Row to start at when the field is an array; default 0. Use nextOffset from the last answer.",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "limit": {
+        "description": "Rows per answer, default and at most 48.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 48
       }
     },
     "required": [
@@ -133,6 +150,36 @@
             "type": "null"
           }
         ]
+      },
+      "field": {
+        "description": "Present when field was given and found.",
+        "type": "object",
+        "properties": {
+          "pointer": {
+            "type": "string"
+          },
+          "value": {
+            "description": "The value at the pointer. An array is one page of up to 48 rows."
+          },
+          "nextOffset": {
+            "description": "Present when more rows remain: pass it as offset.",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "pointer",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "keys": {
+        "description": "Present when field was given and not found: the keys of the deepest object the pointer reached. Empty when the record has no structured data.",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
       }
     },
     "required": [
