@@ -19,6 +19,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   difficulty once (the Deadmines: "Normal, Infinite", not "Normal, Normal, Infinite"); the map's Zones row shows a small map
   mark instead of an empty square that looked like a second checkbox. The talent copy says addon 0.3.13 and later load the
   spend order from a link, and the "live-client verification is pending" note comes from one flag.
+- Site: an instance page whose bosses no install has confirmed lists them by name with the unconfirmed marker, not four
+  columns of [?]; on a phone the bosses table fits the screen. The entrance the game files give is labelled as such. On
+  `/wow-forever` the race and class tables use the page's full width, so they no longer scroll on a laptop screen.
 - Site: search finds Everloot's own published guides (the dungeon and raid pages) by title, with or without the leading
   "The", in a Guides group above the lore archive. Before, "Deadmines" found a cleaver and archive pages but not the guide.
 - Site: `/ask` sends the visitor to the chat at `/chat` instead of a 404; the addon's command and the header both say Ask.

@@ -136,7 +136,7 @@ export default async function WowForeverPage() {
   const names = windowAt(now, DATES.namesOpen, DATES.namesClose);
   const step = "font-semibold text-fg";
   return (
-    <Container width="reading">
+    <Container width="wide">
       <JsonLd data={videoGamePageJsonLd({ name: title, description, path: "/wow-forever", source: { title: LAUNCH.sourceTitle, url: LAUNCH.sourceUrl } })} />
       <PageHeader
         title="What is WoW: Forever?"
@@ -145,12 +145,12 @@ export default async function WowForeverPage() {
       />
 
       <div className="space-y-12">
-        <p className="text-fg-2">
+        <p className="max-w-reading text-fg-2">
           Everloot is a fan project, so anything official about WoW: Forever is Blizzard&apos;s to say. This page points at what
           they have said.
         </p>
 
-        <section aria-labelledby="launch">
+        <section aria-labelledby="launch" className="max-w-reading">
           <SectionHeading id="launch">When does WoW: Forever launch?</SectionHeading>
           <div className="space-y-4">
             <p className="text-fg-2">
@@ -165,7 +165,7 @@ export default async function WowForeverPage() {
           </div>
         </section>
 
-        <section aria-labelledby="checklist">
+        <section aria-labelledby="checklist" className="max-w-reading">
           <SectionHeading id="checklist" note="Each dated step is from a Blizzard post Everloot holds.">
             {launched ? "Launch week checklist" : "Before launch"}
           </SectionHeading>
@@ -206,7 +206,7 @@ export default async function WowForeverPage() {
           </Card>
         </section>
 
-        <section aria-labelledby="rulesets">
+        <section aria-labelledby="rulesets" className="max-w-reading">
           <SectionHeading
             id="rulesets"
             note="There is no realm list. A ruleset works like one large player pool: you group, run dungeons and raid with players on your own ruleset."
@@ -225,7 +225,7 @@ export default async function WowForeverPage() {
           </div>
         </section>
 
-        <section aria-labelledby="faq">
+        <section aria-labelledby="faq" className="max-w-reading">
           <SectionHeading id="faq">Questions players ask</SectionHeading>
           <div className="space-y-6">
             {FAQ.map((f) => (
@@ -247,7 +247,7 @@ export default async function WowForeverPage() {
           </SectionHeading>
           <div className="space-y-8">
             {Object.entries(RACES.factions).map(([faction, rows]) => <RaceTable key={faction} faction={faction} rows={rows} icons={icons} />)}
-            <p className="text-sm text-muted">
+            <p className="max-w-reading text-sm text-muted">
               <span className="font-semibold text-accent">New</span> marks the combinations Blizzard names as new in WoW: Forever.
               Source: <a href={RACES.sourceUrl} rel="noopener" className={link}>{RACES.sourceName}, {RACES.sourceTitle}</a>, published{" "}
               <time dateTime={RACES.published}>{longDate(RACES.published)}</time>. Checked on{" "}
@@ -260,7 +260,7 @@ export default async function WowForeverPage() {
           </div>
         </section>
 
-        <section aria-labelledby="latest">
+        <section aria-labelledby="latest" className="max-w-reading">
           <SectionHeading id="latest">What is the latest WoW: Forever build?</SectionHeading>
           <div className="space-y-4">
             <p className="text-fg-2">{latestBuildLine(await loadTimeline())}</p>
@@ -271,7 +271,7 @@ export default async function WowForeverPage() {
           </div>
         </section>
 
-        <section aria-labelledby="tools">
+        <section aria-labelledby="tools" className="max-w-reading">
           <SectionHeading id="tools">What can you do with it on Everloot?</SectionHeading>
           <ul className="list-disc space-y-1 pl-6 text-fg-2">
             <li><Link href="/tools/talents" className={link}>Talent calculator</Link> for all nine classes, from the game files.</li>
