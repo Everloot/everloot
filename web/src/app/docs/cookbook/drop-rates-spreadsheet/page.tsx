@@ -123,7 +123,7 @@ export default function Page() {
       <List>
         <li>Node 18 or newer, or Python 3 with only its standard library. Nothing to install.</li>
         <li>A spreadsheet that opens CSV files: Excel, Google Sheets, LibreOffice or Numbers.</li>
-        <li>No account. Without a key, this endpoint allows 30 requests an hour for each IP address, shared with the corpus, items, edges and tools endpoints, and up to 500 rows a page. <Link href="/docs/api/keys" className={docLink}>Limits and keys</Link> explains the free key that raises both.</li>
+        <li>No account. Without a key, this endpoint allows 30 requests an hour for each IP address, shared with the corpus, items and edges endpoints, and up to 500 rows a page. <Link href="/docs/api/keys" className={docLink}>Limits and keys</Link> explains the free key that raises both.</li>
       </List>
 
       <Callout kind="note">

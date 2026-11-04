@@ -11,7 +11,7 @@ import { intakeQuota } from "./intake-quota";
  *   per hour and return at most ANON_PAGE records a page, with a `next` link;
  * - a free key (Authorization: Bearer evl_…) allows KEY_PER_HOUR requests per hour per account, across
  *   all its keys and every endpoint, and KEY_PAGE records a page; every keyed request is counted per key;
- * - the per-question endpoints (public MCP, market prices) keep their existing per-IP limits.
+ * - the per-question endpoints (public MCP and /api/tools, market prices) keep their existing per-IP limits.
  */
 export const ANON_PER_HOUR = 30;
 export const ANON_PAGE = 500;
@@ -55,15 +55,18 @@ const KEY_HOWTO = `get a free key at ${KEY_URL} and send it as "Authorization: B
 
 /**
  * Admit one request to a machine-readable endpoint, or answer it with 401, 429 or 503. A quota outage
- * fails closed, as the existing endpoints do.
+ * fails closed, as the existing endpoints do. `anonymousAs` counts a keyless caller as another surface
+ * while the guard is on (/api/tools answers the MCP's questions, so it spends the MCP's quota); a key is
+ * still counted under `surface`.
  */
 export async function admit(
   req: Request, surface: Surface,
-  deps: { env?: Record<string, string | undefined>; fetch?: typeof fetch; quota?: Pick<typeof intakeQuota, "api" | "mcp" | "market"> } = {},
+  deps: { env?: Record<string, string | undefined>; fetch?: typeof fetch; quota?: Pick<typeof intakeQuota, "api" | "mcp" | "market">; anonymousAs?: "mcp" } = {},
 ): Promise<Admitted | Response> {
   const env = deps.env ?? process.env;
   const quota = deps.quota ?? intakeQuota;
   const on = guardOn(env);
+  const anonymous = on && deps.anonymousAs ? deps.anonymousAs : surface;
   try {
     const token = on ? presentedKey(req) : null;
     if (token) {
@@ -77,8 +80,8 @@ export async function admit(
       }
       return { tier: "key", pageMax: KEY_PAGE, keyId: result.keyId };
     }
-    if (surface === "mcp" || surface === "market") {
-      const result = surface === "mcp" ? await quota.mcp(req) : await quota.market(req);
+    if (anonymous === "mcp" || anonymous === "market") {
+      const result = anonymous === "mcp" ? await quota.mcp(req) : await quota.market(req);
       if (!result.allowed) {
         return limited(result.retryAfter, `Too many requests from this address. Try again in ${result.retryAfter} seconds${on ? `, or ${KEY_HOWTO}` : ""}.`, on);
       }

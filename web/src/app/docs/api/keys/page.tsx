@@ -33,18 +33,18 @@ export default function KeysPage() {
           <H2 id="limits">Limits</H2>
           <P>
             Without a key, limits are counted per IP address; an IPv6 address counts by its /64 block. Each row below is a
-            separate allowance. The endpoints in the first row share one allowance between them, so a script that calls
-            the tools and then pages the corpus uses up the same {ANON_PER_HOUR} requests.
+            separate allowance. The endpoints in the first row share one allowance between them, so a script that reads
+            the drop list and then pages the corpus uses up the same {ANON_PER_HOUR} requests.
           </P>
           <Table
             head={["Endpoints", "Without a key", "With a key"]}
             rows={[
               [
-                <><C>/api/corpus/public</C>, <C>/api/rollups/drops</C>, <C>/api/items</C>, <C>/api/edges</C> and <C>/api/tools/&#123;tool&#125;</C></>,
-                `${ANON_PER_HOUR} requests per hour for each IP address, ${ANON_PAGE} records a page, shared by all five.`,
+                <><C>/api/corpus/public</C>, <C>/api/rollups/drops</C>, <C>/api/items</C> and <C>/api/edges</C></>,
+                `${ANON_PER_HOUR} requests per hour for each IP address, ${ANON_PAGE} records a page, shared by all four.`,
                 "The key's allowance.",
               ],
-              [<C key="m">/mcp/public</C>, `${REQUESTS_PER_HOUR} requests per hour for each IP address.`, "The key's allowance."],
+              [<><C>/mcp/public</C> and <C>/api/tools/&#123;tool&#125;</C></>, `${REQUESTS_PER_HOUR} requests per hour for each IP address, shared by both.`, "The key's allowance."],
               [<C key="p">/api/market/prices</C>, `${REQUESTS_PER_HOUR} requests per hour for each IP address, apart from the MCP server's. Repeats the cache answers are not counted.`, "The key's allowance."],
               [<><C>/api/tooltip</C>, <C>/api/items/categories</C>, <C>/api/edges/client-layer</C>, <C>/api/health</C> and <C>/api/openapi.json</C></>, "No limit of their own. Most are cached.", "No key needed."],
             ]}
@@ -57,7 +57,7 @@ export default function KeysPage() {
             </li>
             <li>
               <strong>Everyone without a key also shares an hourly cap</strong>: 3,000 requests for the first row, and 10,000
-              for the MCP server, the market prices and uploads together. When one is used up, every keyless caller gets the
+              for the MCP server and <C>/api/tools</C>, the market prices and uploads together. When one is used up, every keyless caller gets the
               same <C>429</C> until the hour resets.
             </li>
             <li>

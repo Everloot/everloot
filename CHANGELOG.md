@@ -33,6 +33,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   releases; each half is harmless without the other.
 - Companion: when two account folders carry the same install id (a copied WTF folder), upload history is kept whole, as the
   Desktop App already does. Before, each account's upload trimmed the other's, and the next run sent those events again.
+- Site: without a key, `/api/tools/{tool}` (what the site's chat calls for each answer) counts against the MCP server's
+  200 requests an hour per address instead of the bulk endpoints' 30, so a signed-out chat no longer runs out after a
+  dozen questions. A key is counted as before.
 
 ### Added
 - Desktop App and site, behind `EVERLOOT_CHARACTER_LINKS` (off): the addon's `/everloot link <code>` (0.3.15) writes one
