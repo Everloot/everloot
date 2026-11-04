@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { TALENT_CLASSES } from "@everloot/protocol";
 import { parse } from "yaml";
 import { z } from "zod";
+import { pointsByTree } from "../../../web/src/lib/talents/rules";
 import { decodeBuild, resolveBuild } from "../../../web/src/lib/talents/share";
 import type { DB } from "../db.js";
 import { ALL_GAME_VERSIONS, ALL_KINDS, replaceSourceRows, type EntityInput, type GameVersion, type Kind } from "../entities.js";
@@ -38,7 +39,8 @@ function buildData(where: string, raw: unknown): BuildData {
   const data = parsed.data;
   const decoded = decodeBuild(data.shareCode);
   if (!decoded.ok) throw new Error(`${where} share code does not decode (${decoded.error})`);
-  const resolved = resolveBuild(siteCatalog(data.class), decoded.build);
+  const catalog = siteCatalog(data.class);
+  const resolved = resolveBuild(catalog, decoded.build);
   if (!resolved.ok) throw new Error(`${where} share code is for ${decoded.build.classSlug} not ${data.class}`);
   const { unknown, clamped, rejected, ranks } = resolved.build;
   if (unknown.length + clamped.length + rejected.length > 0) {
@@ -47,6 +49,15 @@ function buildData(where: string, raw: unknown): BuildData {
   if (decoded.build.build !== data.build) throw new Error(`${where} share code was made on ${decoded.build.build} not ${data.build}`);
   const spent = Object.values(ranks).reduce((sum, r) => sum + r.rank, 0);
   if (spent !== data.points) throw new Error(`${where} share code spends ${spent} points not ${data.points}`);
+  // The declared tree is the one the points lean on, so a tree filter never hides a build by a mislabel.
+  const tree = catalog.trees.find((t) => t.name.toLowerCase() === data.tree.toLowerCase());
+  if (!tree) throw new Error(`${where} tree ${data.tree} is not a ${data.class} tree`);
+  const byTree = pointsByTree(catalog, ranks);
+  const most = Math.max(...byTree.values());
+  if ((byTree.get(tree.id) ?? 0) !== most) {
+    const leans = catalog.trees.filter((t) => byTree.get(t.id) === most).map((t) => t.name).join(" or ");
+    throw new Error(`${where} tree is ${data.tree} but the points lean on ${leans}`);
+  }
   return data;
 }
 

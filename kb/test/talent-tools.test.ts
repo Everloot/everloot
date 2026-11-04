@@ -11,6 +11,7 @@ import { openDb, type DB } from "../src/db.js";
 import { importCurated } from "../src/importers/curated.js";
 import { createKnowledgeServer } from "../src/mcp-server.js";
 import { talentBuildUrl } from "../src/page-urls.js";
+import type { ReleaseSource } from "../src/release-db.js";
 import { handleTalentPlan, handleTalentTree } from "../src/talent-tools.js";
 import { siteCatalog, siteCatalogs } from "../src/talents/site-catalogs.js";
 
@@ -227,6 +228,11 @@ test("talent_tree without builds, or with builds false, answers exactly as befor
   expect(await handleTalentTree({ class: "warrior" }, source)).toEqual(before);
   expect(await handleTalentTree({ class: "warrior", builds: false }, source)).toEqual(before);
   expect(before.structured).not.toHaveProperty("starterBuilds");
+  // The release is never read unless builds is asked for, so the text and the key order cannot depend on it.
+  const tripwire = { get: async () => { throw new Error("release read"); }, all: async () => { throw new Error("release read"); } } as unknown as ReleaseSource;
+  for (const args of [{ class: "warrior" as const }, { class: "warrior" as const, builds: false }, { class: "warrior" as const, tree: "Arms" }]) {
+    expect(JSON.stringify(await handleTalentTree(args, tripwire))).toBe(JSON.stringify(await handleTalentTree(args)));
+  }
 });
 
 test("talent_tree takes builds over MCP and returns the declared shape", async () => {

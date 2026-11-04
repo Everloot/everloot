@@ -57,6 +57,14 @@ test("a share code of another class fails the import with the file, entry and bo
   await expect(importCurated(db, dirWith({ "builds.yaml": yaml }))).rejects.toThrow("builds.yaml: entry 1 share code is for mage not warrior");
 });
 
+test("a declared tree the points do not lean on fails the import, as does a tree the class lacks", async () => {
+  const db = openDb(":memory:");
+  const fury = entry("warrior-mislabelled", { status: "published", tree: "Fury" });
+  await expect(importCurated(db, dirWith({ "builds.yaml": fury }))).rejects.toThrow(`builds.yaml: entry 1 tree is Fury but the points lean on ${warrior.data.tree}`);
+  const none = entry("warrior-no-tree", { status: "published", tree: "Arcane" });
+  await expect(importCurated(db, dirWith({ "builds.yaml": none }))).rejects.toThrow("builds.yaml: entry 1 tree Arcane is not a warrior tree");
+});
+
 test("a published entry without purpose fails the import naming the field", async () => {
   const db = openDb(":memory:");
   const yaml = entry("warrior-no-purpose", { status: "published", purpose: null });
