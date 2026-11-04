@@ -42,6 +42,23 @@ If no safe failure occurs, leave it pending; the automated retry contracts remai
 For upload acceptance, compare the resulting snapshot time after its next refresh. Empty/unchanged files
 may legitimately have no new rows; keep the original file and the actual receipt.
 
+## Market and ledger assumptions
+
+The scan, price and ledger code was written against the beta client and against what addon authors
+reported about Forever's auction house (retail-style `C_AuctionHouse`, one full scan per 15 minutes).
+None of it is confirmed by Blizzard. Each row records what the launch client actually does; a row that
+fails names a code assumption to change, not a player error. Record the same versions as above.
+
+| Check | Action | Expected observation | Actual result |
+|---|---|---|---|
+| Save file read back | Play a session with one scan and one ledger event, log out, log in, `/everloot status` | The scan and the ledger rows from before the restart are still listed (a beta build wrote the save file but did not read it back) | Pending |
+| Scan completes | At the auction house, Everloot tab, "Scan this house" | Finishes within 30 seconds with an item count; `/everloot status` names the realm and the house | Pending |
+| Scan cooldown | Scan again at once, then again after 15 minutes | The second scan is refused and says when the next one is allowed; the third runs. Record the throttle the client itself enforces (`E.SCAN_COOLDOWN` assumes 900 seconds; a shorter real limit means the addon waits too long, a longer one means a scan returns nothing) | Pending |
+| Commodities and gear | Scan a house that lists a trade good (Linen Cloth) and a piece of gear | Both appear with a unit price; record whether the trade good came back as one commodity row per unit price (retail style) or as stack listings | Pending |
+| Sale captured | Sell one item on the auction house, collect the mail with the invoice | `/everloot status` shows the sale with its bid, cut and deposit; record whether the chat notice named the item and whether the invoice carried the commerce flag | Pending |
+| Community price in game | After the Desktop App fetches prices, hover an item with a public value and one without | The first shows market, minimum, reporters and age; the second says there is no public value, never zero | Pending |
+| Three installs agree (Agent) | After three different installs have uploaded a scan of one realm, read `/api/market/prices?realm=<realm>` and the cron's response | Items appear with `reporters` 3 within one cron run; the cron's `market` result shows `dropped` 0 and `trimmedDays` 0 | Pending |
+
 ## Six weapon readings
 
 Hover the plain item in the current client and record its item level, quality, speed and exact damage
