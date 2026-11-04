@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/ecosystem_projects.json",
   "title": "WoW: Forever addons and open-source projects",
-  "description": "Forever addons and tools from the community registry, with a board ranking: most installed, rising, most active, freshest release or best maintained. Each project shows its GitHub repository, stars, latest release, last commit, whether its .toc declares a Forever interface number, and installs from Everloot uploads (counted from 3 installs; a missing count means not counted, not zero). Projects are ranked, never people. GitHub facts carry the time they were refreshed. Use it for which Forever addons exist and how maintained they are; use everloot_plan for Everloot's own features, and recent_changes for Blizzard's posts. limit caps the projects listed.",
+  "description": "Lists the Forever addons and tools in the community registry, with a board ranking: most installed, rising, most active, freshest release or best maintained. Each project shows its GitHub repository, stars, latest release, last commit, whether its .toc declares a Forever interface number, and installs from Everloot uploads (counted from 3 installs; a missing count means not counted, not zero). Projects are ranked, never people. GitHub facts carry the time they were refreshed. Use it for which Forever addons exist and how maintained they are; use everloot_plan for Everloot's own features, and recent_changes for Blizzard's posts. limit caps the projects listed.",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false
@@ -12,7 +12,7 @@
     "properties": {
       "board": {
         "default": "all",
-        "description": "installed, rising, active, release, maintained, or all (A to Z).",
+        "description": "installed, rising, active, release, maintained, or all (default, A to Z).",
         "type": "string",
         "enum": [
           "all",
@@ -24,12 +24,12 @@
         ]
       },
       "forever_ready_only": {
-        "description": "Only projects whose .toc lists a Forever interface number.",
+        "description": "Only projects whose .toc lists a Forever interface number. Default false.",
         "type": "boolean"
       },
       "limit": {
         "default": 10,
-        "description": "Most projects listed, 1 to 25.",
+        "description": "Most projects listed, 1 to 25, default 10.",
         "type": "integer",
         "minimum": 1,
         "maximum": 25

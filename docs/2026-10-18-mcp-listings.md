@@ -24,8 +24,8 @@ Use the same words everywhere, so the listings match the site and each other.
 | Field | Text |
 |---|---|
 | Name | `Everloot` (registry name `app.everloot/knowledge`) |
-| One line (≤100, registry) | WoW: Forever lore and player-observed drops, vendors, quests, professions and talents, with sources. |
-| One line (≤200, Claude) | Look up WoW: Forever lore and what players actually saw in play: drop rates, vendors, quests, professions, map pins and talents. Every answer carries its source and licence. |
+| One line (≤100, registry) | World of Warcraft: Forever lore and player-observed drops, vendors, quests, professions and talents. |
+| One line (≤200, Claude) | Look up World of Warcraft: Forever lore and what players actually saw in play: drop rates, vendors, quests, professions, map pins and talents. Every answer names its sources. |
 | Short description (≤30, ChatGPT) | WoW: Forever data with sources |
 | Description (≤2,000) | see [Long description](#long-description) |
 | Categories | ChatGPT: Entertainment (game reference service). Other directories: Gaming or the closest game reference category. |
@@ -61,8 +61,10 @@ Use the same words everywhere, so the listings match the site and each other.
 > market values, a gold ledger, find a guild, a guild's board and guild ladders for raids and dungeons,
 > collection, achievement, reputation, title and quest progress, database coverage and population,
 > Blizzard's latest posts and builds, the addon ecosystem and Everloot's own build tracker.
-> Game-file facts are labelled "found in game files, unconfirmed" with their build. Data is CC BY-SA 4.0
-> with a credit line in every answer; the code is open source. No account, no key, no sign-in wall.
+> Game-file facts are labelled "found in game files, unconfirmed" with their build, carry Blizzard's
+> credit and are not under Everloot's licence. Player-reported data is CC BY-SA 4.0; an answer built on
+> it ends with a link to its page on everloot.app, when it has one, and the data's age. The code is open source. No
+> account, no key, no sign-in wall.
 
 ### Test cases (for reviewers)
 
@@ -88,7 +90,7 @@ ingest from, so it comes first. Docs: [quickstart](https://modelcontextprotocol.
 may reset.
 
 - **`server.json`** at the repository root describes the remote server: name `app.everloot/knowledge`,
-  one `streamable-http` remote, version `0.8.1` (the MCP server's `SERVER_VERSION`; bump both together).
+  one `streamable-http` remote, version `0.9.0` (the MCP server's `SERVER_VERSION`; bump both together).
   `mcp-publisher validate` passes.
 - **Namespace proof** is the HTTP method: `web/public/.well-known/mcp-registry-auth` holds the public
   key record (`v=MCPv1; k=ed25519; p=…`). The matching private key is on the maintainer machine only,
@@ -212,7 +214,7 @@ They mostly ingest from the official registry, so publish there first and check 
 | Directory | How | Status |
 |---|---|---|
 | [Smithery](https://smithery.ai/new) | Web form or `smithery mcp publish`; remote servers need the public HTTPS endpoint | Check after the registry publish; submit by hand if it did not appear |
-| [Glama](https://glama.ai/mcp) | Ingested from the registry as a connector; claimed 2026-11-03 by a DNS TXT record (`_glama-claim.everloot.app`, account-bound token, must stay) | Claimed. Publisher profile, support contact and thumbnail filled; profile completion 100% |
+| [Glama](https://glama.ai/mcp) | Ingested from the registry as a connector; claimed 2026-11-03 by a DNS TXT record (`_glama-claim.everloot.app`, account-bound token, must stay) | Claimed by DNS on 2026-11-03; ownership verified; publisher details (profile, support contact, thumbnail) filled |
 | [PulseMCP](https://www.pulsemcp.com) | Ingests the registry | Check after the publish |
 | [mcpservers.org](https://mcpservers.org/submit) | Free form | Owner |
 | [mcp.so](https://mcp.so) | Site form; reports of a paid tier, unverified | Optional |
@@ -233,6 +235,7 @@ listing should not promise what the corpus does not hold.
 Execution on 2026-10-18, using the maintainer's existing accounts:
 
 - Official MCP Registry: published `app.everloot/knowledge` version `0.8.0`; the registry API reports active.
+- Official MCP Registry, 0.9.0: `server.json` carries version `0.9.0` with the registry one-liner above; publish it once that version is deployed, then check the registry API reports it active.
 - Claude, ChatGPT and Grok: custom connections created and real tool calls completed successfully.
 - Claude directory: listing draft prepared; all-tool verification and final submission still pending.
 - ChatGPT directory: business publisher verified, Everloot project and plugin draft created, portable package accepted. Domain verification and final submission still pending.

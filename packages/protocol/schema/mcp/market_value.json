@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/market_value.json",
   "title": "Forever market value for one item",
-  "description": "Market value, minimum buyout, historical value and units listed for one item on one WoW: Forever realm, from full auction scans players started and uploaded. A day is public after 3 reporters (distinct upload addresses) scanned the item; values are medians, thin days and outlier days are left out of the market value. Market value weights the last 14 public days, historical is the median of 60. Use it for what an item is worth now; use auction_history for the price over time, and vendor_page for vendor prices. Realm is the realm's name; the item id is the game's. Missing or unavailable data is reported explicitly.",
+  "description": "Returns the market value, minimum buyout, historical value and units listed for one item on one WoW: Forever realm, from full auction scans players started and uploaded. A day is public after 3 reporters (distinct upload addresses) scanned the item, and its value is the median of theirs. Market value is a weighted mean of the public days up to 14 calendar days old, newer days weighing more, leaving out thin days (5 units listed or fewer) and outlier days. Historical is the median of the public days in the last 60 calendar days, of the days that are not thin when there are any. Use it for what an item is worth now; use auction_history for the price over time, and vendor_page for vendor prices. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false
@@ -12,13 +12,13 @@
     "properties": {
       "realm": {
         "type": "string",
-        "description": "Realm name."
+        "description": "The realm's name, as the game shows it."
       },
       "itemId": {
         "type": "integer",
         "exclusiveMinimum": 0,
         "maximum": 9007199254740991,
-        "description": "Item id."
+        "description": "The game's item id, as item_page takes it."
       }
     },
     "required": [

@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/item_categories.json",
   "title": "Item categories: class, subclass, slot and quality",
-  "description": "Item categories from the game files (found in game files, unconfirmed, with the build): class and subclass with the client's English names and slugs, slot and quality. With no arguments, the whole tree with item counts. With item, that item's category path. With class (a slug such as weapon or armor), and optionally subclass, slot and quality slugs, the items in it. Ids only: item names come from player uploads (item_page).",
+  "description": "Lists item categories from the game files (found in game files, unconfirmed, with the build): class and subclass with the client's English names and slugs, slot and quality. With no arguments, the whole tree with item counts. With item, that item's category path. With class (a slug such as weapon or armor), and optionally subclass, slot and quality slugs, the item ids in it. Use it to place an item in its category or to list a category; use item_page for an item's name and stats, and entity_relations for where it comes from. Ids only: item names come from player uploads, through item_page.",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false
@@ -47,7 +47,7 @@
       },
       "limit": {
         "default": 25,
-        "description": "Most items listed.",
+        "description": "Most items listed, 1 to 100, default 25.",
         "type": "integer",
         "minimum": 1,
         "maximum": 100

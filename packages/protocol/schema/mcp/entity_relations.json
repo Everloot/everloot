@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/entity_relations.json",
   "title": "How an item, NPC, spell or quest connects to others",
-  "description": "Every typed relation of one entity, both directions: dropped by, sold by, reward from, located in (player-observed, listed where 3 installs agree, with the install count and last seen), and created by, reagent for, part of set, same icon (found in game files, unconfirmed, with the build they came from). Ids are the game's own, as a search_knowledge hit or a page tool gives them. Use it for where something comes from or what something drops, sells or rewards; use the page tools (item_page, npc_page, quest_page) for one entity's own facts, and world_map_near for what is near a place. Reads Everloot's public player data and the game-file relations of the current build.",
+  "description": "Lists every typed relation of one entity, in both directions, grouped by relation. Player-observed relations (dropped by, sold by, reward from, located in) are listed where 3 installs agree, with the install count and last seen. Game-file relations (created by, reagent for, part of set, same icon) are found in game files, unconfirmed, with the build they came from. Ids are the game's own, as a page tool, a drop row or world_map_near gives them. Use it for where something comes from or what something drops, sells or rewards; use the page tools (item_page, npc_page, quest_page) for one entity's own facts, and world_map_near for what is near a place. Reads Everloot's public player data and the game-file relations of the current build.",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false
@@ -32,7 +32,7 @@
         "description": "The game's id for it, such as item 19019."
       },
       "rel": {
-        "description": "Only this relation.",
+        "description": "Only this relation. Without it, every relation.",
         "type": "string",
         "enum": [
           "dropped_by",
@@ -58,7 +58,7 @@
       },
       "limit": {
         "default": 25,
-        "description": "Most lines per relation.",
+        "description": "Most lines per relation, 1 to 100, default 25.",
         "type": "integer",
         "minimum": 1,
         "maximum": 100

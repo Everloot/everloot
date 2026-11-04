@@ -52,6 +52,18 @@ test("an install that never uploaded the collection has an unrecorded owned set,
   expect(text).toContain("Listed: 1");
 });
 
+test("with no public list, an install that never uploaded the collection still reads owned as unrecorded", () => {
+  const never = handleCollectionGap({ collection: "Mounts", ownerInstallId: "stranger" }, { catalog: [catalog("a", 1)], owned: [] });
+  expect(never).toContain("List unrecorded");
+  expect(never).toContain("Owned: unrecorded");
+  const uploaded = handleCollectionGap(
+    { collection: "Mounts", ownerInstallId: "owner" },
+    { catalog: [catalog("a", 1)], owned: [{ installId: "owner", collection: "Mounts", itemId: 1 }] },
+  );
+  expect(uploaded).toContain("List unrecorded");
+  expect(uploaded).not.toContain("Owned: unrecorded");
+});
+
 test("agreedCollectionItems: an item 3 installs list under the collection, whatever the source; 2 installs do not", () => {
   const facts = {
     catalog: [

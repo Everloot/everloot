@@ -2,13 +2,13 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "app.everloot/knowledge",
   "title": "Everloot: WoW Forever data",
-  "description": "WoW: Forever lore and player-observed drops, vendors, quests, professions and talents, with sources.",
+  "description": "World of Warcraft: Forever lore and player-observed drops, vendors, quests, professions and talents.",
   "websiteUrl": "https://everloot.app/connect",
   "repository": {
     "url": "https://github.com/Everloot/everloot",
     "source": "github"
   },
-  "version": "0.8.1",
+  "version": "0.9.0",
   "remotes": [
     {
       "type": "streamable-http",

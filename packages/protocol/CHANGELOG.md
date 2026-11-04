@@ -22,9 +22,15 @@ required, or tightening a limit is a major release.
   without a key, 5,000 with one), and the corpus and client-layer routes and the market rule read in plain words.
 
 ### Added
-- `get_entity` and `fetch` take three optional parameters, `field` (a JSON pointer into the record's data), `offset`
-  and `limit` (at most 48 rows), and answer with optional `field` (`pointer`, `value`, `nextOffset`) and, when the
-  pointer leads nowhere, `keys`. A whole record cut at 48 rows says so. `search` and the page tools are unchanged.
+- 1.24.0 (record protocol unchanged, 1.12.0): `KNOWLEDGE_KINDS` gains eight catalog kinds read from the game files
+  (`achievement`, `faction`, `title`, `quest_chain`, `mount`, `legacy_perk`, `race`, `instance`) and a curated `build`
+  kind for the team's starter talent builds; `knowledgeHit` and `fetchedDocument.metadata` gain an optional `confirmed`
+  (`asOf`), present when player uploads confirm a game-file entry. `get_entity` and `fetch` take three optional
+  parameters, `field` (a JSON pointer into the record's data), `offset` and `limit` (at most 48 rows), and answer with
+  optional `field` (`pointer`, `value`, `nextOffset`) and, when the pointer leads nowhere, `keys`; a whole record cut at
+  48 rows says so. `talent_tree` takes `builds` and answers with optional `starterBuilds`. Every MCP tool input
+  parameter now carries a description, the `kind` filters of `search_knowledge` and `get_by_name` name the catalog
+  kinds, and every tool description opens with a verb. `search` and the page tools are unchanged.
 - 1.23.0 (record protocol 1.12.0), for pull timing, runs and per-player pull totals
   (`docs/design/specs/2026-11-02-pull-and-run-records-design.md`): `encounter` gains optional `startedAt`,
   `durationSeconds` (they come together) and `runId`. Two record kinds, neither in the public corpus:

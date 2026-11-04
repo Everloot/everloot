@@ -52,11 +52,11 @@ import { bodyOf, catalogLabel, getCatalogByName, getCatalogEntity, isCatalogId, 
 import { cutArrays, MAX_ROWS, readField, type FieldRead } from "./json-pointer.js";
 
 export const SERVER_NAME = "everloot-knowledge";
-export const SERVER_VERSION = "0.8.1";
+export const SERVER_VERSION = "0.9.0";
 /** The source this server runs, offered to every client (AGPL section 13). */
 export const SOURCE_URL = "https://github.com/Everloot/everloot";
 /** One line a client shows beside the server's name in its list of servers. */
-export const SERVER_DESCRIPTION = "WoW: Forever knowledge from player reports and game files, with sources, under CC BY-SA 4.0.";
+export const SERVER_DESCRIPTION = "World of Warcraft: Forever knowledge from player reports and game files, with sources, under CC BY-SA 4.0.";
 /** The site's icon, for clients that draw one beside the server. */
 export const SERVER_ICONS = [
   { src: `${SITE}/icon-64.png`, mimeType: "image/png", sizes: ["64x64"] },

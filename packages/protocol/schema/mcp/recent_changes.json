@@ -12,7 +12,7 @@
     "properties": {
       "filter": {
         "default": "all",
-        "description": "posts (blue posts), hotfixes, builds, or all.",
+        "description": "posts (blue posts), hotfixes, builds, or all (default).",
         "type": "string",
         "enum": [
           "all",
@@ -22,7 +22,7 @@
         ]
       },
       "game": {
-        "description": "Narrow to one game.",
+        "description": "forever or classic. Without it, both.",
         "type": "string",
         "enum": [
           "forever",
@@ -31,7 +31,7 @@
       },
       "limit": {
         "default": 10,
-        "description": "Most entries, 1 to 25, newest first.",
+        "description": "Most entries, 1 to 25, default 10, newest first.",
         "type": "integer",
         "minimum": 1,
         "maximum": 25

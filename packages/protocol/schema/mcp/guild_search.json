@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/guild_search.json",
   "title": "Find a guild by the start of its name",
-  "description": "Guilds whose name starts with what you typed, each with its realm, faction, how many characters the addon saw in it, and the count and date of its agreed boss kills. A guild is listed once its members' uploads agree on a kill (2 installs reporting the same guild and boss), once its officers published a board, or once a character was seen in it. Guild names only, never a member's name, and a guild that asked to be hidden is left out. Members seen are counted only when the player pages are connected; otherwise the count is unrecorded, not zero. Use it to find a guild's exact name and realm before guild_board, or to list the guilds whose name starts with a few letters; use guild_rankings for a ladder. limit caps the guilds listed. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
+  "description": "Finds the guilds whose name starts with what you typed, each with its realm, faction, how many characters the addon saw in it, and the count and date of its agreed boss kills. A guild is listed once 2 of its members' installs report the same boss, once its officers published a board, or once a character was seen in it. Guild names only, never a member's name, and a guild that asked to be hidden is left out. Characters seen are counted only when the player pages are connected; otherwise the count is unrecorded, not zero. Use it to find a guild's exact name and realm before guild_board; use guild_rankings for a ladder. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false
@@ -18,7 +18,7 @@
       },
       "limit": {
         "default": 10,
-        "description": "Most guilds listed, 1 to 25.",
+        "description": "Most guilds listed, 1 to 25, default 10.",
         "type": "integer",
         "minimum": 1,
         "maximum": 25

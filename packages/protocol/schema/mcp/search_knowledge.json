@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/search_knowledge.json",
   "title": "Search the Everloot knowledge base",
-  "description": "Searches WoW lore and Forever reference data by names, keywords or a question; exact-name matches rank first, and every hit carries its id, source and licence. Use it to find a record when you have a name or a topic, then pass the hit's id to get_entity for the full text. Use get_by_name when you already know the exact full name, and answer_sources when you need cited evidence for a question rather than records. search is the same search in the ChatGPT connector shape.",
+  "description": "Searches WoW lore, Forever reference data and the game-file catalogs (achievements, factions, titles, quest chains, mounts, legacy perks, races, instances) by names, keywords or a question. Exact-name matches rank first. Every hit carries its id, kind, source, licence and date, and a game-file hit says when player uploads confirm it. Use it to find a record from a name or a topic, then pass the hit's id to get_entity for its summary, or to fetch as a string for the whole text. Use get_by_name when you already know the exact full name, and answer_sources when you need cited evidence for a question rather than records. search is the same search in the ChatGPT connector shape.",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false
@@ -16,7 +16,7 @@
         "description": "What to look up: names, questions, keywords. Question words are ignored."
       },
       "kind": {
-        "description": "Narrow to one record kind.",
+        "description": "Narrow to one record kind. achievement, faction, title, quest_chain, mount, legacy_perk, race and instance come from the game files (found in game files, unconfirmed); item, npc, object, quest, zone, spell, lore_page, creator and realm from the knowledge release; build is an Everloot team starter talent build, not observed. Without it, every kind.",
         "type": "string",
         "enum": [
           "item",
@@ -40,7 +40,7 @@
         ]
       },
       "version": {
-        "description": "Narrow to one game version.",
+        "description": "Narrow to one game version: forever, classic, retail or lore. Without it, every version.",
         "type": "string",
         "enum": [
           "forever",
@@ -51,6 +51,7 @@
       },
       "limit": {
         "default": 8,
+        "description": "Most hits, 1 to 25, default 8.",
         "type": "integer",
         "minimum": 1,
         "maximum": 25

@@ -14,7 +14,7 @@
         "type": "integer",
         "exclusiveMinimum": 0,
         "maximum": 9007199254740991,
-        "description": "Quest id."
+        "description": "The game's quest id, from entity_relations or the extId of a search_knowledge hit of kind quest."
       }
     },
     "required": [

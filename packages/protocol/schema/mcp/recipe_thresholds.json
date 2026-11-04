@@ -15,7 +15,7 @@
         "description": "Profession name, such as Alchemy."
       },
       "recipe": {
-        "description": "Optional part of a recipe name to narrow the list.",
+        "description": "Part of a recipe name to narrow the list. Without it, every recipe of the profession.",
         "type": "string"
       }
     },
