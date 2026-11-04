@@ -46,7 +46,7 @@
         "us"
       ],
       "firstSeen": "2026-10-22T19:27:13.893Z",
-      "lastSeen": "2026-11-03T23:12:55.796Z",
+      "lastSeen": "2026-11-04T18:49:44.993Z",
       "status": "queued"
     },
     {
@@ -63,7 +63,7 @@
         "us"
       ],
       "firstSeen": "2026-10-27T00:45:35.450Z",
-      "lastSeen": "2026-11-03T23:12:55.796Z",
+      "lastSeen": "2026-11-04T18:49:44.993Z",
       "status": "queued"
     },
     {
@@ -179,6 +179,23 @@
       ],
       "firstSeen": "2026-11-03T23:12:55.796Z",
       "lastSeen": "2026-11-03T23:12:55.796Z",
+      "status": "queued"
+    },
+    {
+      "key": "wowf:9006ba6948388dd0d4a0578e64b8a92e",
+      "product": "wowf",
+      "buildConfig": "9006ba6948388dd0d4a0578e64b8a92e",
+      "buildId": 70790,
+      "version": "1.60.1.70790",
+      "regions": [
+        "cn",
+        "eu",
+        "kr",
+        "tw",
+        "us"
+      ],
+      "firstSeen": "2026-11-04T18:49:44.993Z",
+      "lastSeen": "2026-11-04T18:49:44.993Z",
       "status": "queued"
     }
   ]
