@@ -88,7 +88,7 @@ ingest from, so it comes first. Docs: [quickstart](https://modelcontextprotocol.
 may reset.
 
 - **`server.json`** at the repository root describes the remote server: name `app.everloot/knowledge`,
-  one `streamable-http` remote, version `0.8.1` (the MCP server's `SERVER_VERSION`; bump both together).
+  one `streamable-http` remote, version `0.9.0` (the MCP server's `SERVER_VERSION`; bump both together).
   `mcp-publisher validate` passes.
 - **Namespace proof** is the HTTP method: `web/public/.well-known/mcp-registry-auth` holds the public
   key record (`v=MCPv1; k=ed25519; p=…`). The matching private key is on the maintainer machine only,
@@ -233,6 +233,7 @@ listing should not promise what the corpus does not hold.
 Execution on 2026-10-18, using the maintainer's existing accounts:
 
 - Official MCP Registry: published `app.everloot/knowledge` version `0.8.0`; the registry API reports active.
+- Official MCP Registry, 0.9.0: `server.json` carries version `0.9.0` with the "World of Warcraft: Forever" one-liner; publish it once that version is deployed, then check the registry API reports it active.
 - Claude, ChatGPT and Grok: custom connections created and real tool calls completed successfully.
 - Claude directory: listing draft prepared; all-tool verification and final submission still pending.
 - ChatGPT directory: business publisher verified, Everloot project and plugin draft created, portable package accepted. Domain verification and final submission still pending.

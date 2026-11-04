@@ -52,7 +52,7 @@ import { bodyOf, catalogLabel, getCatalogByName, getCatalogEntity, isCatalogId, 
 import { cutArrays, MAX_ROWS, readField, type FieldRead } from "./json-pointer.js";
 
 export const SERVER_NAME = "everloot-knowledge";
-export const SERVER_VERSION = "0.8.1";
+export const SERVER_VERSION = "0.9.0";
 /** The source this server runs, offered to every client (AGPL section 13). */
 export const SOURCE_URL = "https://github.com/Everloot/everloot";
 /** One line a client shows beside the server's name in its list of servers. */
