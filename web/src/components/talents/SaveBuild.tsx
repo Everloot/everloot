@@ -145,6 +145,8 @@ export default function SaveBuild({ classSlug, codes, defaultName, onMessage }: 
     setPanel(null);
     setBusy(false);
     if (ownerKey === "checking") return;
+    // The account check already says no one is signed in: the list would only answer 401, which the console shows.
+    if (ownerKey === "signed-out") { setAccount({ status: "signed-out" }); return; }
     (async () => {
       try {
         // The list names the account it is for, as every save does: the site refuses it if the session is another one.

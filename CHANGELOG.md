@@ -18,6 +18,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: search finds Everloot's own published guides (the dungeon and raid pages) by title, with or without the leading
   "The", in a Guides group above the lore archive. Before, "Deadmines" found a cleaver and archive pages but not the guide.
 - Site: `/ask` sends the visitor to the chat at `/chat` instead of a 404; the addon's command and the header both say Ask.
+- Site: the talent calculator no longer asks for the account's saved builds when no one is signed in, so a signed-out
+  visit leaves no 401 in the browser console. Save still offers sign-in as before.
 - Desktop App: on macOS the app no longer logs "Unable to set login item" on every start. Start-up registers a login item
   only when "Start when I sign in" is on; Settings still applies the switch either way.
 - Desktop App: the game-folder hint on the first-run screen shows a macOS or Linux path on those systems, not a Windows one.
