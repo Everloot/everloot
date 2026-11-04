@@ -18,9 +18,11 @@
  * site up to a week late still counts, and a day below 3 reporters is not published. A day older
  * than that is closed and ignores later scans.
  *
- * Size: realms, items per realm, installs per item-day and the total entries are capped (MARKET_LIMITS),
- * so the rollup cannot grow with what a stranger uploads; MARKET_MAX_BYTES is the last guard.
- * Days past the open window collapse to their public medians (or are dropped if they never were).
+ * Size: realms, items per realm, installs per item-day and the open install scans are capped (MARKET_LIMITS),
+ * so the rollup cannot grow with what a stranger uploads; a scan a cap drops is counted (FoldStats) so the
+ * cron can say so. Days past the open window collapse to their public medians (or are dropped if they never
+ * were). MARKET_MAX_BYTES is the last guard: past it, trimMarket drops the oldest closed days until the
+ * rollup fits, so history shortens before prices stop.
  *
  * Auction houses: the game files list Alliance, Horde and neutral (Blackwater) houses with different
  * cuts, so they are separate markets. Every scan still feeds the realm-wide view (`realms`, what every
@@ -46,7 +48,11 @@ export const MARKET_LIMITS = {
   realms: 40,
   itemsPerRealm: 20_000,
   installsPerItemDay: 25,
-  /** Open install scans plus closed days, across every realm. About 100 bytes each. */
+  /**
+   * Open install scans across every realm, about 92 bytes each. Closed days do not count: they are bounded by
+   * items × HISTORY_DAYS (about 36 bytes each) and, past MARKET_MAX_BYTES, trimmed oldest first. Counting them
+   * here let a realm's history crowd out its new scans within days.
+   */
   entries: 60_000,
   /** Distinct realms read from one upload (the protocol's limit). */
   realmsPerUpload: UPLOAD_LIMITS.realmsPerUpload as number,
@@ -202,11 +208,11 @@ function publicOf(installs: Record<string, InstallScan>): ClosedDay | null {
 /** Every bucket of the state: the realm-wide views, then the per-house views. */
 const buckets = (state: MarketState): Record<string, RealmDays>[] => [state.realms, state.houses ?? {}];
 
+/** Open install scans in the state: what MARKET_LIMITS.entries bounds. */
 function entryCount(state: MarketState): number {
   let n = 0;
   for (const realm of buckets(state).flatMap((map) => Object.values(map))) {
     for (const days of Object.values(realm.items)) {
-      n += Object.keys(days.closed).length;
       for (const installs of Object.values(days.open)) n += Object.keys(installs).length;
     }
   }
@@ -216,19 +222,26 @@ function entryCount(state: MarketState): number {
 /** Bytes of the serialised rollup, for the MARKET_MAX_BYTES guard. */
 export const marketBytes = (state: MarketState) => Buffer.byteLength(JSON.stringify(state));
 
+/** What a fold left out, so a full rollup is reported rather than silent. */
+export interface FoldStats {
+  /** Item scans a cap dropped (a new realm, item, install or entry past its limit). Late scans for closed days are not counted. */
+  dropped: number;
+}
+
 /**
  * Fold auction_snapshot records into the state, then close days that left the open window and prune
  * days that left the 60-day window. A scan for a day that is already closed is ignored. A record that
  * would exceed a cap (new realm, new item, an install past the day's limit, or an entry past the total)
- * is dropped; scans from installs already counted still update. Every scan is folded into the realm-wide
- * view before any is folded into a house's view, so the caps favour the realm-wide view.
+ * is dropped and counted in `stats`; scans from installs already counted still update. Every scan is folded
+ * into the realm-wide view before any is folded into a house's view, so the caps favour the realm-wide view.
  */
-export function foldMarket(previous: MarketState, records: readonly unknown[], now: Date, limits: Partial<typeof MARKET_LIMITS> = {}): MarketState {
+export function foldMarket(previous: MarketState, records: readonly unknown[], now: Date, limits: Partial<typeof MARKET_LIMITS> = {}, stats?: FoldStats): MarketState {
   const cap = { ...MARKET_LIMITS, ...limits };
   const state: MarketState = structuredClone(previous);
   let entries = entryCount(state);
   const itemCounts = new Map<RealmDays, number>();
   const countOf = (realm: RealmDays) => itemCounts.get(realm) ?? Object.keys(realm.items).length;
+  const drop = (n = 1) => { if (stats) stats.dropped += n; };
   /** One install's scan of one item into one bucket. False when the bucket is new and the map is full. */
   const place = (map: Record<string, RealmDays>, key: string, maxKeys: number, name: string, day: string, itemId: number, installId: string, scan: InstallScan): boolean => {
     const existing = map[key]?.items[String(itemId)];
@@ -238,13 +251,13 @@ export function foldMarket(previous: MarketState, records: readonly unknown[], n
       map[key] = { name, items: {} };
     }
     const realm = map[key]!;
-    if (!existing && countOf(realm) >= cap.itemsPerRealm) return true;
+    if (!existing && countOf(realm) >= cap.itemsPerRealm) { drop(); return true; }
     if (!existing) itemCounts.set(realm, countOf(realm) + 1);
     const days = (realm.items[String(itemId)] ??= { open: {}, closed: {} });
     const installs = (days.open[day] ??= {});
     const prev = installs[installId];
     if (prev && prev[4] >= scan[4]) return true;
-    if (!prev && (Object.keys(installs).length >= cap.installsPerItemDay || entries >= cap.entries)) return true;
+    if (!prev && (Object.keys(installs).length >= cap.installsPerItemDay || entries >= cap.entries)) { drop(); return true; }
     if (!prev) entries++;
     installs[installId] = scan;
     return true;
@@ -266,12 +279,12 @@ export function foldMarket(previous: MarketState, records: readonly unknown[], n
       const map = byHouse ? (state.houses ??= {}) : state.realms;
       const key = byHouse ? houseKey(row.realm, house!) : realmKey(row.realm);
       const maxKeys = byHouse ? cap.realms * AUCTION_HOUSES.length : cap.realms;
-      for (const item of row.items) {
-        const scan = scanItem.safeParse(item);
+      for (let i = 0; i < row.items.length; i++) {
+        const scan = scanItem.safeParse(row.items[i]);
         if (!scan.success) continue;
         const [itemId, auctions, quantity, minUnit, marketUnit] = scan.data;
         const values: InstallScan = [minUnit, marketUnit, quantity, auctions, at, row.reporter ?? ""];
-        if (!place(map, key, maxKeys, row.realm.trim(), day, itemId, row.installId, values)) break;
+        if (!place(map, key, maxKeys, row.realm.trim(), day, itemId, row.installId, values)) { drop(row.items.length - i); break; }
       }
     }
   }
@@ -293,6 +306,40 @@ export function foldMarket(previous: MarketState, records: readonly unknown[], n
   }
   if (state.houses && !Object.keys(state.houses).length) delete state.houses;
   return state;
+}
+
+/**
+ * Drop the oldest closed days, one day at a time across every realm and house, until the serialised state
+ * fits in `maxBytes`. Open days are never dropped: they are the scans still waiting for their third reporter.
+ * The input is left as it was. `trimmedDays` says how many days went, so the cron can report it.
+ */
+export function trimMarket(state: MarketState, maxBytes: number): { state: MarketState; trimmedDays: number } {
+  let bytes = marketBytes(state);
+  if (bytes <= maxBytes) return { state, trimmedDays: 0 };
+  const out: MarketState = structuredClone(state);
+  let trimmedDays = 0;
+  while (bytes > maxBytes) {
+    let oldest: string | null = null;
+    for (const realm of buckets(out).flatMap((map) => Object.values(map))) {
+      for (const days of Object.values(realm.items)) {
+        for (const day of Object.keys(days.closed)) if (oldest === null || day < oldest) oldest = day;
+      }
+    }
+    if (oldest === null) break;
+    for (const map of buckets(out)) {
+      for (const [key, realm] of Object.entries(map)) {
+        for (const [itemId, days] of Object.entries(realm.items)) {
+          delete days.closed[oldest];
+          if (!Object.keys(days.open).length && !Object.keys(days.closed).length) delete realm.items[itemId];
+        }
+        if (!Object.keys(realm.items).length) delete map[key];
+      }
+    }
+    if (out.houses && !Object.keys(out.houses).length) delete out.houses;
+    trimmedDays++;
+    bytes = marketBytes(out);
+  }
+  return { state: out, trimmedDays };
 }
 
 function publicDays(days: ItemDays, now: Date): PublicDay[] {

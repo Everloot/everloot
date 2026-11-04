@@ -231,7 +231,9 @@ They share one branch and one pull request, one commit per stage, because each s
 - Market-data licence decision before the flip.
 - Rollup size at scale: open days hold one scan per install for 7 days; closed days about 10k items ×
   60 days × 4 numbers per realm. The fold caps 40 realms, 20,000 items per realm, 25 installs per
-  item-day and 60,000 entries in all; `market.json` is refused above 10 MB (`MARKET_MAX_BYTES`).
+  item-day and 60,000 open install scans in all (closed days do not count, since 2026-11-04), and
+  counts what it drops. Above 10 MB (`MARKET_MAX_BYTES`) the oldest closed days are trimmed, a day at
+  a time, until `market.json` fits; it is refused only if it still does not.
 - Hardening (review of PR 15), all in `kb/src/market.ts` unless noted:
   - **Reporters.** A day is public at 3 reporters, not 3 installs. A reporter is a keyed (HMAC) 64-bit
     hash of the upload address that the intake route adds to the private upload object; the address is

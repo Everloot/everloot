@@ -496,7 +496,7 @@ describe("market rollup", () => {
       [MARKET, "PUT", () => new Response(null, { status: 200 })],
     ]);
     const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now });
-    expect(await store.writeMarket()).toEqual({ added: 3, scans: 3 });
+    expect(await store.writeMarket()).toEqual({ added: 3, scans: 3, dropped: 0, trimmedDays: 0 });
     const put = calls.find((c) => c.method === "PUT")!;
     expect(put.headers.get("if-none-match")).toBe("*");
     const body = JSON.parse(put.body);
@@ -514,7 +514,7 @@ describe("market rollup", () => {
       [MARKET, "PUT", () => new Response(null, { status: 200 })],
     ]);
     const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now });
-    expect(await store.writeMarket()).toEqual({ added: 1, scans: 1 });
+    expect(await store.writeMarket()).toEqual({ added: 1, scans: 1, dropped: 0, trimmedDays: 0 });
     expect(calls.some((c) => c.url.endsWith("uploads/a.json"))).toBe(false);
     const put = calls.find((c) => c.method === "PUT")!;
     expect(put.headers.get("if-match")).toBe('"fixture"');
@@ -588,6 +588,26 @@ describe("market rollup", () => {
     expect(Object.keys(JSON.parse(calls.find((c) => c.method === "PUT")!.body).state.realms)).toEqual(["aaa", "bbb", "ccc"]);
   });
 
+  test("a rollup past its size limit sheds its oldest closed days and is written, and says so", async () => {
+    const { foldMarket, emptyMarket } = await import("../../../kb/src/market");
+    const day = (d: string, id: string, price: number) => ({ ...scan(id, price), eventId: `scan:${id}:${d}`, scanId: `scan-${id}-${d}`, capturedAt: `${d}T10:00:00Z` });
+    const old = ["install-1", "install-2", "install-3"].flatMap((id) => [day("2026-09-10", id, 100), day("2026-09-11", id, 100)]);
+    const prev = foldMarket(emptyMarket(), old, now());
+    expect(Object.keys(prev.realms.forever!.items["2589"]!.closed)).toEqual(["2026-09-10", "2026-09-11"]);
+    const stored = JSON.stringify({ version: 3, generatedAt: "2026-10-04T11:50:00.000Z", state: prev, seenUploadIds: [] });
+    const { fn, calls } = fakeFetch([
+      [MARKET, "GET", () => new Response(stored, { headers: { etag: '"fixture"' } })],
+      [INDEX, "GET", () => Response.json(index(["a"]))],
+      [`${R2}uploads/a.json`, "GET", () => Response.json({ records: [scan("install-1", 100)] })],
+      [MARKET, "PUT", () => new Response(null, { status: 200 })],
+    ]);
+    const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now, marketMaxBytes: stored.length + 40 });
+    expect(await store.writeMarket()).toEqual({ added: 1, scans: 1, dropped: 0, trimmedDays: 1 });
+    const body = JSON.parse(calls.find((c) => c.method === "PUT")!.body);
+    expect(Object.keys(body.state.realms.forever.items["2589"].closed)).toEqual(["2026-09-11"]);
+    expect(Object.keys(body.state.realms.forever.items["2589"].open["2026-10-04"])).toEqual(["install-1"]);
+  });
+
   test("a rollup past its size limit is not written, and one past it on read is unavailable", async () => {
     const big = fakeFetch([
       [MARKET, "GET", () => new Response("missing", { status: 404 })],
@@ -614,7 +634,7 @@ describe("market rollup", () => {
     await expect(createUploadStore({ cloud, localDir: "unused", fetch: stuck.fn, now }).writeMarket()).rejects.toThrow(/rebuild/);
     expect(stuck.calls.some((c) => c.method === "PUT")).toBe(false);
     const rebuilt = fakeFetch(routes());
-    expect(await createUploadStore({ cloud, localDir: "unused", fetch: rebuilt.fn, now }).writeMarket({ rebuild: true })).toEqual({ added: 1, scans: 1 });
+    expect(await createUploadStore({ cloud, localDir: "unused", fetch: rebuilt.fn, now }).writeMarket({ rebuild: true })).toEqual({ added: 1, scans: 1, dropped: 0, trimmedDays: 0 });
     expect(rebuilt.calls.find((c) => c.method === "PUT")!.headers.get("if-match")).toBe('"fixture"');
   });
 });
