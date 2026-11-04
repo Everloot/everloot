@@ -728,11 +728,11 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
           <div className="flex flex-wrap items-center gap-3 md:col-span-2">
             <CopyButton className="btn text-sm" text={addonLink} label="Copy for addon" disabled={!codes[active]}
               onResult={(ok) => setMessage(ok
-                ? `Copied ${setName} as a link. In the game: /everloot, the Talents tab, paste, then Import. Addon 0.3.12 loads its talents, not its spend order.`
+                ? `Copied ${setName} as a link. In the game: /everloot, the Talents tab, paste, then Import. Addon 0.3.13 and later load its talents and spend order; 0.3.12, the talents only.`
                 : "Copy failed. Select and copy the share link instead.")} />
             <p className="text-sm text-fg-2">
-              Copies {setName} only, as a link. In the addon: <code>/everloot</code> → Talents tab → paste → Import. Addon 0.3.12 loads the
-              talents from it but not the spend order, so spend each point yourself.
+              Copies {setName} only, as a link. In the addon: <code>/everloot</code> → Talents tab → paste → Import. Addon 0.3.13 and later
+              load the talents and the spend order from it (0.3.12, the talents only); you still spend each point yourself.
             </p>
           </div>
           {/* The plan goes to Plans on this device in the address fragment, which never reaches the server; it is named

@@ -5,7 +5,7 @@ import type { EncounterRow, InstanceEntranceRow } from "../../../kb/src/instance
 // The loaders read storage; these tests hand the readers their facts directly.
 vi.mock("./rollup-compute", () => ({ loadInstanceFacts: vi.fn(), loadItemFacts: vi.fn() }));
 
-import { bossLine, bossRows, compareInstances, difficultyLabel, difficultyLabelIn, entranceLinks, instanceHref, instanceRows as rowsWith, levelLabel, parseInstanceSegment } from "./instances";
+import { bossLine, bossRows, compareInstances, difficultyLabel, difficultyLabelIn, difficultyList, entranceLinks, instanceHref, instanceRows as rowsWith, levelLabel, parseInstanceSegment } from "./instances";
 
 // The synthetic world has no encounter list of its own; the one test that merges the files' bosses hands one in.
 const instanceRows = (seen?: Parameters<typeof rowsWith>[0], data?: Parameters<typeof rowsWith>[1]) => rowsWith(seen, data, {});
@@ -144,6 +144,12 @@ describe("instance rows", () => {
     expect(label(12)).toBe("Synthetic Twist");
     expect(label(194)).toBe("25 Player (Heroic)");
     expect(label(9999)).toBe("Difficulty 9999");
+  });
+
+  test("the files' list of difficulties names each one once, in file order", () => {
+    expect(difficultyList([1, 12, 1], difficultyLabelIn(data))).toBe("Synthetic Normal, Synthetic Twist");
+    // The Deadmines' ids in the build: 1 and 201 are both "Normal".
+    expect(difficultyList([1, 201, 213])).toBe("Normal, Infinite");
   });
 
   test("the files' difficulty ids for an instance's map reach its row", () => {

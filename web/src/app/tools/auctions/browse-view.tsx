@@ -124,7 +124,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
 
   const counts = state ? houseCounts(state, now, slug ?? undefined, ruleset) : new Map<AuctionHouse | null, number>();
   const houseTabs = [
-    { href: here({ house: null }), label: <>All<span className="sr-only sm:not-sr-only"> houses</span><HouseCount n={counts.get(null) ?? 0} /></>, current: !q.house },
+    { href: here({ house: null }), label: <>All<span className="sr-only sm:not-sr-only sm:ml-1"> houses</span><HouseCount n={counts.get(null) ?? 0} /></>, current: !q.house },
     ...HOUSES.map((h) => ({ href: here({ house: h }), label: <>{h}<HouseCount n={counts.get(h) ?? 0} /></>, current: q.house === h })),
   ];
 

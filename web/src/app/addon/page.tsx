@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { pageMetadata } from "@/lib/seo";
-import { latestAddonRelease } from "@/lib/addon-release";
+import { ADDON_LIVE_VERIFIED, latestAddonRelease } from "@/lib/addon-release";
 import { addonReleaseFor, fetchReleases, fileSize, newestDesktopRelease, RELEASES_PAGE, servedFile } from "@/lib/everloot-releases";
 import { guildsOn } from "@/lib/guild-switch";
 import { REPO_URL } from "@/lib/source";
@@ -90,7 +90,7 @@ export default async function AddonPage() {
                 <TrackedDownload className="btn btn-primary" href={zipHref} addon="everloot" to="site" download>
                   Download addon {addon.version}{served ? ` (.zip, ${fileSize(served.size)})` : ""}
                 </TrackedDownload>
-                <p className="text-sm text-fg-2">Live-client verification is pending. This Alpha includes website talent and raid plan imports; use <code className="font-mono">/everloot</code> to open the planners.</p>
+                <p className="text-sm text-fg-2">{ADDON_LIVE_VERIFIED ? "" : "Live-client verification is pending. "}This Alpha includes website talent and raid plan imports; use <code className="font-mono">/everloot</code> to open the planners.</p>
                 <div>
                   <SectionHeading as="h3">Install</SectionHeading>
                   <ol className="list-decimal space-y-1 pl-5 text-sm text-fg-2">

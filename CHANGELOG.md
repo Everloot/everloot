@@ -15,6 +15,10 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
+- Site: the Auction House tab reads "All houses", not "Allhouses"; an instance's difficulties from the game files name each
+  difficulty once (the Deadmines: "Normal, Infinite", not "Normal, Normal, Infinite"); the map's Zones row shows a small map
+  mark instead of an empty square that looked like a second checkbox. The talent copy says addon 0.3.13 and later load the
+  spend order from a link, and the "live-client verification is pending" note comes from one flag.
 - Site: search finds Everloot's own published guides (the dungeon and raid pages) by title, with or without the leading
   "The", in a Guides group above the lore archive. Before, "Deadmines" found a cleaver and archive pages but not the guide.
 - Site: `/ask` sends the visitor to the chat at `/chat` instead of a 404; the addon's command and the header both say Ask.

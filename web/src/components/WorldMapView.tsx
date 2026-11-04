@@ -54,7 +54,8 @@ function Swatch({ category, icon }: { category: CategoryId; icon?: string }) {
   }
   return (
     <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" className="shrink-0">
-      {category === "zone" && <rect x="1.5" y="1.5" width="11" height="11" strokeWidth="1.2" className="fill-fg/10 stroke-edge" />}
+      {/* A folded map, not a square: an empty square beside the checkbox read as a second checkbox. */}
+      {category === "zone" && <path d="M1.5 3.5L5 2L9 3.5L12.5 2V10.5L9 12L5 10.5L1.5 12ZM5 2V10.5M9 3.5V12" fill="none" strokeWidth="1.2" strokeLinejoin="round" className="stroke-fg-2" />}
       {category === "dungeon" && <circle cx="7" cy="7" r="5" className="fill-accent" />}
       {category === "raid" && <rect x="2" y="2" width="10" height="10" className="fill-warning" />}
       {category === "flight" && <path d="M7 1.5L12.5 12L1.5 12Z" className="fill-fg" />}

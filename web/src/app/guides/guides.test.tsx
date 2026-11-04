@@ -254,12 +254,12 @@ describe("a guide's page", () => {
     expect(visible(two.outerHTML)).toContain("7 talent points. The second set opens at level 40.");
   });
 
-  test("Copy for addon copies one set as a full calculator link under that set's own pair, and says how to import it and what addon 0.3.12 cannot do", async () => {
+  test("Copy for addon copies one set as a full calculator link under that set's own pair, and says how to import it and which addon versions load the spend order", async () => {
     stubGuides(SOME);
     const html = await page("frost-leveling");
     expect(copyLabels(html)).toEqual(["Copy set 1 for addon", "Copy set 2 for addon"]);
     expect(visible(html)).toContain("In the game: /everloot → Talents → paste → Import.");
-    expect(visible(html)).toContain("Addon 0.3.12 loads the talents from the link but not the spend order, so spend each point yourself.");
+    expect(visible(html)).toContain("Addon 0.3.13 and later load the talents and the spend order from the link (0.3.12, the talents only); you still spend each point yourself.");
     // Never a long link typed into a chat command.
     expect(html).not.toContain("/everloot plan");
 
