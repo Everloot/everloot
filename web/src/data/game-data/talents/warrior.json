@@ -3,11 +3,11 @@
  "label": "found in game files, unconfirmed",
  "build": {
   "product": "wowf",
-  "buildId": 70707,
-  "version": "1.60.1.70707",
-  "buildConfig": "7feb61f3c994bcb168526b8db521514a",
-  "definitions": "a3840427a39e",
-  "extractedAt": "2026-10-30T15:48:39.935Z"
+  "buildId": 70790,
+  "version": "1.60.1.70790",
+  "buildConfig": "9006ba6948388dd0d4a0578e64b8a92e",
+  "definitions": "a936b2d4f4db",
+  "extractedAt": "2026-11-04T18:40:31.705Z"
  },
  "classId": 1,
  "className": "Warrior",
@@ -79,20 +79,20 @@
    {"id":105950,"x":2220,"y":3330,"row":2,"col":2,"kind":"single","maxRanks":3,"entries":[{"definitionId":135481,"spellId":12834,"name":"Deep Wounds","maxRanks":3}],"prereqs":[{"nodeId":105956,"rule":"any"}],"unlock":{"spentRequired":{"amount":10,"scope":"tree","gateGroupId":11648,"currencyId":3820,"traitTreeId":1117,"companionGroupId":12824}}},
    {"id":105951,"x":1620,"y":3330,"row":2,"col":1,"kind":"single","maxRanks":1,"entries":[{"definitionId":135482,"spellId":12296,"name":"Anger Management","maxRanks":1}],"prereqs":[{"nodeId":105954,"rule":"any"}],"unlock":{"spentRequired":{"amount":10,"scope":"tree","gateGroupId":11648,"currencyId":3820,"traitTreeId":1117,"companionGroupId":12824}}},
    {"id":105952,"x":2820,"y":2730,"row":1,"col":3,"kind":"single","maxRanks":2,"entries":[{"definitionId":135483,"spellId":12290,"name":"Improved Overpower","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11649,"currencyId":3820,"traitTreeId":1117,"companionGroupId":12825}}},
-   {"id":105954,"x":1620,"y":2730,"row":1,"col":1,"kind":"single","maxRanks":5,"entries":[{"definitionId":135485,"spellId":12295,"name":"Improved Tactical Mastery","maxRanks":5}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11649,"currencyId":3820,"traitTreeId":1117,"companionGroupId":12825}}},
+   {"id":105954,"x":1620,"y":2730,"row":1,"col":1,"kind":"single","maxRanks":3,"entries":[{"definitionId":135485,"spellId":12295,"name":"Improved Tactical Mastery","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11649,"currencyId":3820,"traitTreeId":1117,"companionGroupId":12825}}},
    {"id":105955,"x":1020,"y":2730,"row":1,"col":0,"kind":"single","maxRanks":2,"entries":[{"definitionId":135486,"spellId":12285,"name":"Improved Charge","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11649,"currencyId":3820,"traitTreeId":1117,"companionGroupId":12825}}},
    {"id":105956,"x":2220,"y":2130,"row":0,"col":2,"kind":"single","maxRanks":3,"entries":[{"definitionId":135487,"spellId":12286,"name":"Improved Rend","maxRanks":3}],"prereqs":[],"unlock":{}},
    {"id":105957,"x":1620,"y":2130,"row":0,"col":1,"kind":"single","maxRanks":5,"entries":[{"definitionId":135488,"spellId":16462,"name":"Deflection","maxRanks":5}],"prereqs":[],"unlock":{}},
    {"id":105958,"x":1020,"y":2130,"row":0,"col":0,"kind":"single","maxRanks":3,"entries":[{"definitionId":135489,"spellId":12282,"name":"Improved Heroic Strike","maxRanks":3}],"prereqs":[],"unlock":{}},
-   {"id":110524,"x":1020,"y":4530,"row":4,"col":0,"kind":"single","maxRanks":5,"entries":[{"definitionId":141974,"spellId":1289682,"name":"Bloodthrill","maxRanks":5}],"prereqs":[],"unlock":{"spentRequired":{"amount":20,"scope":"tree","gateGroupId":11646,"currencyId":3820,"traitTreeId":1117,"companionGroupId":12821}}},
+   {"id":110524,"x":1020,"y":4530,"row":4,"col":0,"kind":"single","maxRanks":2,"entries":[{"definitionId":141974,"spellId":1289682,"name":"Bloodthrill","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":20,"scope":"tree","gateGroupId":11646,"currencyId":3820,"traitTreeId":1117,"companionGroupId":12821}}},
    {"id":110858,"x":1020,"y":5130,"row":5,"col":0,"kind":"single","maxRanks":2,"entries":[{"definitionId":142604,"spellId":12862,"name":"Improved Slam","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":25,"scope":"tree","gateGroupId":11645,"currencyId":3820,"traitTreeId":1117,"companionGroupId":12820}}}
   ]},
   {"id":11657,"name":"Fury","order":1,"nodes":[
    {"id":105926,"x":6820,"y":4530,"row":4,"col":3,"kind":"single","maxRanks":2,"entries":[{"definitionId":135457,"spellId":20504,"name":"Improved Intercept","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":20,"scope":"tree","gateGroupId":11660,"currencyId":3820,"traitTreeId":1117,"companionGroupId":12827}}},
    {"id":105927,"x":5620,"y":4530,"row":4,"col":1,"kind":"single","maxRanks":1,"entries":[{"definitionId":135458,"spellId":12328,"name":"Death Wish","maxRanks":1}],"prereqs":[],"unlock":{"spentRequired":{"amount":20,"scope":"tree","gateGroupId":11660,"currencyId":3820,"traitTreeId":1117,"companionGroupId":12827}}},
-   {"id":105928,"x":5620,"y":5130,"row":5,"col":1,"kind":"single","maxRanks":5,"entries":[{"definitionId":135459,"spellId":12319,"name":"Flurry","maxRanks":5}],"prereqs":[{"nodeId":105927,"rule":"any"}],"unlock":{"spentRequired":{"amount":25,"scope":"tree","gateGroupId":11659,"currencyId":3820,"traitTreeId":1117,"companionGroupId":12826}}},
-   {"id":105930,"x":5620,"y":5730,"row":6,"col":1,"kind":"single","maxRanks":1,"entries":[{"definitionId":135461,"spellId":23881,"name":"Bloodthirst","maxRanks":1}],"prereqs":[],"unlock":{"spentRequired":{"amount":30,"scope":"unconfirmed","gateGroupId":11658,"currencyId":3820,"traitTreeId":1117}}},
-   {"id":105931,"x":6220,"y":3930,"row":3,"col":2,"kind":"single","maxRanks":5,"entries":[{"definitionId":135462,"spellId":12317,"name":"Enrage","maxRanks":5}],"prereqs":[],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11661,"currencyId":3820,"traitTreeId":1117,"companionGroupId":12828}}},
+   {"id":105928,"x":6220,"y":5130,"row":5,"col":2,"kind":"single","maxRanks":3,"entries":[{"definitionId":135459,"spellId":12319,"name":"Flurry","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":25,"scope":"tree","gateGroupId":11659,"currencyId":3820,"traitTreeId":1117,"companionGroupId":12826}}},
+   {"id":105930,"x":5620,"y":5730,"row":6,"col":1,"kind":"single","maxRanks":1,"entries":[{"definitionId":135461,"spellId":23881,"name":"Bloodthirst","maxRanks":1}],"prereqs":[{"nodeId":105927,"rule":"any"}],"unlock":{"spentRequired":{"amount":30,"scope":"unconfirmed","gateGroupId":11658,"currencyId":3820,"traitTreeId":1117}}},
+   {"id":105931,"x":6820,"y":3330,"row":2,"col":3,"kind":"single","maxRanks":5,"entries":[{"definitionId":135462,"spellId":12317,"name":"Enrage","maxRanks":5}],"prereqs":[],"unlock":{"spentRequired":{"amount":10,"scope":"tree","gateGroupId":11662,"currencyId":3820,"traitTreeId":1117,"companionGroupId":12829}}},
    {"id":105932,"x":6820,"y":3930,"row":3,"col":3,"kind":"single","maxRanks":2,"entries":[{"definitionId":135463,"spellId":20502,"name":"Improved Execute","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11661,"currencyId":3820,"traitTreeId":1117,"companionGroupId":12828}}},
    {"id":105933,"x":5020,"y":3930,"row":3,"col":0,"kind":"single","maxRanks":5,"entries":[{"definitionId":135464,"spellId":23584,"name":"Dual Wield Specialization","maxRanks":5}],"prereqs":[],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11661,"currencyId":3820,"traitTreeId":1117,"companionGroupId":12828}}},
    {"id":105934,"x":6220,"y":3330,"row":2,"col":2,"kind":"single","maxRanks":3,"entries":[{"definitionId":135465,"spellId":16487,"name":"Blood Craze","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":10,"scope":"tree","gateGroupId":11662,"currencyId":3820,"traitTreeId":1117,"companionGroupId":12829}}},
@@ -101,10 +101,11 @@
    {"id":105938,"x":5620,"y":2130,"row":0,"col":1,"kind":"single","maxRanks":5,"entries":[{"definitionId":135469,"spellId":12321,"name":"Booming Voice","maxRanks":5}],"prereqs":[],"unlock":{}},
    {"id":105939,"x":6220,"y":2130,"row":0,"col":2,"kind":"single","maxRanks":5,"entries":[{"definitionId":135470,"spellId":12320,"name":"Cruelty","maxRanks":5}],"prereqs":[],"unlock":{}},
    {"id":105953,"x":5020,"y":3330,"row":2,"col":0,"kind":"single","maxRanks":3,"entries":[{"definitionId":135484,"spellId":1323963,"name":"Furious Precision","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":10,"scope":"tree","gateGroupId":11662,"currencyId":3820,"traitTreeId":1117,"companionGroupId":12829}}},
-   {"id":105977,"x":5620,"y":3930,"row":3,"col":1,"kind":"single","maxRanks":1,"entries":[{"definitionId":135508,"spellId":1310315,"name":"Raging Blows","maxRanks":1}],"prereqs":[],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11661,"currencyId":3820,"traitTreeId":1117,"companionGroupId":12828}}},
+   {"id":105977,"x":5020,"y":5130,"row":5,"col":0,"kind":"single","maxRanks":2,"entries":[{"definitionId":135508,"spellId":1310315,"name":"Improved Whirlwind","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":25,"scope":"tree","gateGroupId":11659,"currencyId":3820,"traitTreeId":1117,"companionGroupId":12826}}},
    {"id":105978,"x":5020,"y":4530,"row":4,"col":0,"kind":"single","maxRanks":2,"entries":[{"definitionId":135509,"spellId":20500,"name":"Improved Berserker Rage","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":20,"scope":"tree","gateGroupId":11660,"currencyId":3820,"traitTreeId":1117,"companionGroupId":12827}}},
    {"id":110857,"x":5620,"y":2730,"row":1,"col":1,"kind":"single","maxRanks":5,"entries":[{"definitionId":142603,"spellId":1323964,"name":"Lingering Rage","maxRanks":5}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11663,"currencyId":3820,"traitTreeId":1117,"companionGroupId":12830}}},
-   {"id":113569,"x":6220,"y":5130,"row":5,"col":2,"kind":"single","maxRanks":2,"entries":[{"definitionId":145863,"spellId":1323967,"name":"Gore Drinker","maxRanks":2}],"prereqs":[{"nodeId":105931,"rule":"any"}],"unlock":{"spentRequired":{"amount":25,"scope":"tree","gateGroupId":11659,"currencyId":3820,"traitTreeId":1117,"companionGroupId":12826}}}
+   {"id":113569,"x":6220,"y":4530,"row":4,"col":2,"kind":"single","maxRanks":2,"entries":[{"definitionId":145863,"spellId":1323967,"name":"Gore Drinker","maxRanks":2}],"prereqs":[{"nodeId":105934,"rule":"any"}],"unlock":{"spentRequired":{"amount":20,"scope":"tree","gateGroupId":11660,"currencyId":3820,"traitTreeId":1117,"companionGroupId":12827}}},
+   {"id":113636,"x":5620,"y":3930,"row":3,"col":1,"kind":"single","maxRanks":1,"entries":[{"definitionId":145966,"spellId":1329555,"name":"Reckless Swings","maxRanks":1}],"prereqs":[],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11661,"currencyId":3820,"traitTreeId":1117,"companionGroupId":12828}}}
   ]},
   {"id":11670,"name":"Protection","order":2,"nodes":[
    {"id":105959,"x":9680,"y":5730,"row":6,"col":1,"kind":"single","maxRanks":1,"entries":[{"definitionId":135490,"spellId":23922,"name":"Shield Slam","maxRanks":1}],"prereqs":[{"nodeId":105965,"rule":"any"}],"unlock":{"spentRequired":{"amount":30,"scope":"unconfirmed","gateGroupId":11664,"currencyId":3820,"traitTreeId":1117}}},

@@ -3,11 +3,11 @@
  "label": "found in game files, unconfirmed",
  "build": {
   "product": "wowf",
-  "buildId": 70707,
-  "version": "1.60.1.70707",
-  "buildConfig": "7feb61f3c994bcb168526b8db521514a",
-  "definitions": "a3840427a39e",
-  "extractedAt": "2026-10-30T15:48:39.935Z"
+  "buildId": 70790,
+  "version": "1.60.1.70790",
+  "buildConfig": "9006ba6948388dd0d4a0578e64b8a92e",
+  "definitions": "a936b2d4f4db",
+  "extractedAt": "2026-11-04T18:40:31.705Z"
  },
  "classId": 7,
  "className": "Shaman",
@@ -69,9 +69,9 @@
  "pointCurrencyId": 3820,
  "trees": [
   {"id":11326,"name":"Elemental Combat","order":0,"nodes":[
-   {"id":104758,"x":1620,"y":5730,"row":6,"col":1,"kind":"single","maxRanks":1,"entries":[{"definitionId":134219,"spellId":16166,"name":"Elemental Mastery","maxRanks":1}],"prereqs":[{"nodeId":104760,"rule":"any"}],"unlock":{"spentRequired":{"amount":30,"scope":"unconfirmed","gateGroupId":11356,"currencyId":3820,"traitTreeId":1082}}},
+   {"id":104758,"x":1620,"y":5730,"row":6,"col":1,"kind":"single","maxRanks":1,"entries":[{"definitionId":134219,"spellId":16166,"name":"Lightning Mastery","maxRanks":1}],"prereqs":[{"nodeId":104760,"rule":"any"}],"unlock":{"spentRequired":{"amount":30,"scope":"unconfirmed","gateGroupId":11356,"currencyId":3820,"traitTreeId":1082}}},
    {"id":104759,"x":2220,"y":4530,"row":4,"col":2,"kind":"single","maxRanks":3,"entries":[{"definitionId":134220,"spellId":408438,"name":"Lightning Overload","maxRanks":3}],"prereqs":[{"nodeId":104771,"rule":"any"}],"unlock":{"spentRequired":{"amount":20,"scope":"tree","gateGroupId":11358,"currencyId":3820,"traitTreeId":1082,"companionGroupId":12791}}},
-   {"id":104760,"x":1620,"y":4530,"row":4,"col":1,"kind":"single","maxRanks":1,"entries":[{"definitionId":134221,"spellId":408490,"name":"Lava Burst","maxRanks":1}],"prereqs":[],"unlock":{"spentRequired":{"amount":20,"scope":"tree","gateGroupId":11358,"currencyId":3820,"traitTreeId":1082,"companionGroupId":12791}}},
+   {"id":104760,"x":1620,"y":4530,"row":4,"col":1,"kind":"single","maxRanks":1,"entries":[{"definitionId":134221,"spellId":16120,"name":"Call of Thunder","maxRanks":1}],"prereqs":[],"unlock":{"spentRequired":{"amount":20,"scope":"tree","gateGroupId":11358,"currencyId":3820,"traitTreeId":1082,"companionGroupId":12791}}},
    {"id":104761,"x":1020,"y":4530,"row":4,"col":0,"kind":"single","maxRanks":2,"entries":[{"definitionId":134222,"spellId":28999,"name":"Elemental Reach","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":20,"scope":"tree","gateGroupId":11358,"currencyId":3820,"traitTreeId":1082,"companionGroupId":12791}}},
    {"id":104762,"x":2820,"y":3930,"row":3,"col":3,"kind":"single","maxRanks":1,"entries":[{"definitionId":134223,"spellId":1222988,"name":"Earthbound","maxRanks":1}],"prereqs":[],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11359,"currencyId":3820,"traitTreeId":1082,"companionGroupId":12792}}},
    {"id":104763,"x":1620,"y":3930,"row":3,"col":1,"kind":"single","maxRanks":3,"entries":[{"definitionId":134224,"spellId":29062,"name":"Eye of the Storm","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11359,"currencyId":3820,"traitTreeId":1082,"companionGroupId":12792}}},
@@ -98,8 +98,8 @@
    {"id":104748,"x":6820,"y":3330,"row":2,"col":3,"kind":"single","maxRanks":3,"entries":[{"definitionId":134209,"spellId":16254,"name":"Anticipation","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":10,"scope":"tree","gateGroupId":11354,"currencyId":3820,"traitTreeId":1082,"companionGroupId":12798}}},
    {"id":104749,"x":6220,"y":3330,"row":2,"col":2,"kind":"single","maxRanks":1,"entries":[{"definitionId":134210,"spellId":1223030,"name":"Shamanistic Focus","maxRanks":1}],"prereqs":[],"unlock":{"spentRequired":{"amount":10,"scope":"tree","gateGroupId":11354,"currencyId":3820,"traitTreeId":1082,"companionGroupId":12798}}},
    {"id":104750,"x":5020,"y":3330,"row":2,"col":0,"kind":"single","maxRanks":3,"entries":[{"definitionId":134211,"spellId":16266,"name":"Elemental Weapons","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":10,"scope":"tree","gateGroupId":11354,"currencyId":3820,"traitTreeId":1082,"companionGroupId":12798}}},
-   {"id":104751,"x":6820,"y":2730,"row":1,"col":3,"kind":"single","maxRanks":3,"entries":[{"definitionId":134212,"spellId":16261,"name":"Improved Lightning Shield","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11355,"currencyId":3820,"traitTreeId":1082,"companionGroupId":12799}}},
-   {"id":104752,"x":6220,"y":2730,"row":1,"col":2,"kind":"single","maxRanks":2,"entries":[{"definitionId":134213,"spellId":16262,"name":"Improved Ghost Wolf","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11355,"currencyId":3820,"traitTreeId":1082,"companionGroupId":12799}}},
+   {"id":104751,"x":6220,"y":2730,"row":1,"col":2,"kind":"single","maxRanks":3,"entries":[{"definitionId":134212,"spellId":16261,"name":"Improved Lightning Shield","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11355,"currencyId":3820,"traitTreeId":1082,"companionGroupId":12799}}},
+   {"id":104752,"x":6820,"y":3930,"row":3,"col":3,"kind":"single","maxRanks":2,"entries":[{"definitionId":134213,"spellId":16262,"name":"Improved Ghost Wolf","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11353,"currencyId":3820,"traitTreeId":1082,"companionGroupId":12797}}},
    {"id":104753,"x":5620,"y":2130,"row":0,"col":1,"kind":"single","maxRanks":5,"entries":[{"definitionId":134214,"spellId":16255,"name":"Thundering Strikes","maxRanks":5}],"prereqs":[],"unlock":{}},
    {"id":104754,"x":5020,"y":2730,"row":1,"col":0,"kind":"single","maxRanks":2,"entries":[{"definitionId":134215,"spellId":16258,"name":"Guardian Totems","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11355,"currencyId":3820,"traitTreeId":1082,"companionGroupId":12799}}},
    {"id":104755,"x":5620,"y":2730,"row":1,"col":1,"kind":"single","maxRanks":3,"entries":[{"definitionId":134216,"spellId":415140,"name":"Mental Dexterity","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":5,"scope":"tree","gateGroupId":11355,"currencyId":3820,"traitTreeId":1082,"companionGroupId":12799}}},

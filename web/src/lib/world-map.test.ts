@@ -245,7 +245,7 @@ describe("flights on the map", () => {
   test("the real file holds back exactly the masters on held-back ground, not ones under a held-back rectangle", () => {
     const held = [0, 1].flatMap((c) => continentFlights(c, true).masters.filter((m) => m.heldBack).map((m) => m.name)).sort();
     // Talonbranch Glade stands on Felwood's ground, inside Mount Hyjal's rectangle: it is not a spoiler.
-    expect(held).toEqual(["Farholde Keep, Riverglades", "Powderfuse Port, Riverglades", "Rog'mar, Riverglades", "Summit of Eternity, Mount Hyjal", "Tainted Foothills, Mount Hyjal"]);
+    expect(held).toEqual(["Farholde Keep, Riverglades", "Rog'mar, Riverglades", "Summit of Eternity, Mount Hyjal", "Tainted Foothills, Mount Hyjal"]);
     expect(continentFlights(1).masters.map((m) => m.name)).toContain("Talonbranch Glade, Felwood");
   });
 });

@@ -3,11 +3,11 @@
  "label": "found in game files, unconfirmed",
  "build": {
   "product": "wowf",
-  "buildId": 70707,
-  "version": "1.60.1.70707",
-  "buildConfig": "7feb61f3c994bcb168526b8db521514a",
-  "definitions": "a3840427a39e",
-  "extractedAt": "2026-10-30T15:48:39.935Z"
+  "buildId": 70790,
+  "version": "1.60.1.70790",
+  "buildConfig": "9006ba6948388dd0d4a0578e64b8a92e",
+  "definitions": "a936b2d4f4db",
+  "extractedAt": "2026-11-04T18:40:31.705Z"
  },
  "classId": 8,
  "className": "Mage",
@@ -73,7 +73,7 @@
    {"id":105799,"x":2220,"y":5130,"row":5,"col":2,"kind":"single","maxRanks":3,"entries":[{"definitionId":135329,"spellId":15058,"name":"Arcane Instability","maxRanks":3}],"prereqs":[],"unlock":{"spentRequired":{"amount":25,"scope":"tree","gateGroupId":11584,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12730}}},
    {"id":105800,"x":2220,"y":4530,"row":4,"col":2,"kind":"single","maxRanks":5,"entries":[{"definitionId":135330,"spellId":11232,"name":"Arcane Mind","maxRanks":5}],"prereqs":[],"unlock":{"spentRequired":{"amount":20,"scope":"tree","gateGroupId":11585,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12731}}},
    {"id":105801,"x":1620,"y":4530,"row":4,"col":1,"kind":"single","maxRanks":1,"entries":[{"definitionId":135331,"spellId":12043,"name":"Presence of Mind","maxRanks":1}],"prereqs":[],"unlock":{"spentRequired":{"amount":20,"scope":"tree","gateGroupId":11585,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12731}}},
-   {"id":105802,"x":2220,"y":2130,"row":0,"col":2,"kind":"single","maxRanks":2,"entries":[{"definitionId":135332,"spellId":28574,"name":"Arcane Resilience","maxRanks":2}],"prereqs":[],"unlock":{}},
+   {"id":105802,"x":2220,"y":2130,"row":0,"col":2,"kind":"single","maxRanks":3,"entries":[{"definitionId":135332,"spellId":28574,"name":"Arcane Resilience","maxRanks":3}],"prereqs":[],"unlock":{}},
    {"id":105803,"x":2220,"y":3930,"row":3,"col":2,"kind":"single","maxRanks":3,"entries":[{"definitionId":135333,"spellId":18462,"name":"Arcane Meditation","maxRanks":3}],"prereqs":[{"nodeId":105810,"rule":"any"}],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11586,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12732}}},
    {"id":105804,"x":1620,"y":3930,"row":3,"col":1,"kind":"single","maxRanks":2,"entries":[{"definitionId":135334,"spellId":11255,"name":"Improved Counterspell","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11586,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12732}}},
    {"id":105805,"x":1020,"y":3930,"row":3,"col":0,"kind":"single","maxRanks":2,"entries":[{"definitionId":135335,"spellId":11252,"name":"Arcane Shielding","maxRanks":2}],"prereqs":[],"unlock":{"spentRequired":{"amount":15,"scope":"tree","gateGroupId":11586,"currencyId":3820,"traitTreeId":1112,"companionGroupId":12732}}},
