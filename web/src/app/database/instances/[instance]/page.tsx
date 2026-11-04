@@ -3,7 +3,7 @@ import JsonLd from "@/components/JsonLd";
 import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { AgreementMeter, Badge, Card, Container, DataTable, DataTitle, EmptyState, SectionHeading, type Column } from "@/components/ui";
+import { AgreementMeter, Badge, Card, Container, DataTable, DataTitle, EmptyState, filledColumns, SectionHeading, type Column, type SparseColumn } from "@/components/ui";
 import {
   bossRows, difficultyLabel, difficultyList, instanceDescription, instanceHref, instanceRows, instanceTitle, levelLabel, loadSightings, parseInstanceSegment,
   type BossRow, type InstancePlace, type InstanceRow,
@@ -77,17 +77,25 @@ export default async function InstancePage(props: Props) {
   // Player-first: the bosses 3 installs report, then the encounters the files list that no report has confirmed.
   // When storage is down the files' list stands alone, every row marked unconfirmed.
   const bosses = bossRows(unreachable ? { bosses: [], encounters: row.encounters } : row);
-  const bossColumns: Column<BossRow>[] = [
+  // A column no row has a report for is left out (filledColumns), as on the database lists: a files-only list
+  // reads as names with their unconfirmed marker, not rows of [?].
+  const bossColumns: SparseColumn<BossRow>[] = [
     { key: "name", header: "Boss", cell: (b) => (b.filesName
       ? <span className="inline-flex items-baseline gap-1.5"><Badge tone="files" />{b.name}</span>
       : b.name ?? `Encounter ${b.encounterId}`) },
-    { key: "kills", header: "Kills", numeric: true, cell: (b) => (b.boss ? b.boss.kills.toLocaleString("en-US") : PLACEHOLDER) },
-    { key: "installs", header: "Installs", cell: (b) => (b.boss ? <AgreementMeter count={b.boss.reporters} /> : PLACEHOLDER) },
-    { key: "seen", header: "Last seen", numeric: true, cell: (b) => (b.boss ? dayLabel(b.boss.lastSeen) : PLACEHOLDER) },
-    { key: "npcs", header: "Creatures", cell: (b) => (b.boss?.npcIds.length
+    { key: "kills", header: "Kills", numeric: true, blank: (b) => !b.boss, cell: (b) => (b.boss ? b.boss.kills.toLocaleString("en-US") : PLACEHOLDER) },
+    { key: "installs", header: "Installs", blank: (b) => !b.boss, cell: (b) => (b.boss ? <AgreementMeter count={b.boss.reporters} /> : PLACEHOLDER) },
+    { key: "seen", header: "Last seen", numeric: true, blank: (b) => !b.boss, cell: (b) => (b.boss ? dayLabel(b.boss.lastSeen) : PLACEHOLDER) },
+    { key: "npcs", header: "Creatures", blank: (b) => !b.boss?.npcIds.length, cell: (b) => (b.boss?.npcIds.length
       ? b.boss.npcIds.map((id, i) => <span key={id}>{i > 0 && ", "}<Link href={`/database/npcs/${id}`} className={link}>NPC {id}</Link></span>)
       : PLACEHOLDER) },
   ];
+  const shownBossColumns = filledColumns(bossColumns, bosses);
+  const anyBossReported = bosses.some((b) => b.boss);
+  // On a phone the dense table keeps the boss name and folds the report into one line under it.
+  const bossMeta = (b: BossRow) => (b.boss
+    ? `${b.boss.kills.toLocaleString("en-US")} kills · ${b.boss.reporters} ${b.boss.reporters === 1 ? "install" : "installs"} · ${dayLabel(b.boss.lastSeen)}`
+    : "Not confirmed yet");
 
   const unconfirmed = row.reported > 0
     ? `No entrance is confirmed yet. ${row.reported} ${row.reported === 1 ? "install has" : "installs have"} zoned in, and 3 must agree on the place.`
@@ -148,7 +156,10 @@ export default async function InstancePage(props: Props) {
             {row.files.length > 0 && (
               <ul className="mb-3 space-y-1 text-sm">
                 {row.files.map((p) => (
-                  <li key={`${p.mapId}-${p.x}-${p.y}`} className="flex flex-wrap items-center gap-2">{placeCell(p)}<Badge tone="files" /></li>
+                  <li key={`${p.mapId}-${p.x}-${p.y}`} className="flex flex-wrap items-center gap-2">
+                    {placeCell(p)}
+                    <span className="inline-flex items-baseline gap-1.5 text-meta text-muted"><Badge tone="files" />in the game files, not confirmed by players</span>
+                  </li>
                 ))}
               </ul>
             )}
@@ -165,7 +176,11 @@ export default async function InstancePage(props: Props) {
               Bosses
             </SectionHeading>
             <DataTable
-              dense caption={`Bosses players reported in ${title}, and the ones the game files list`} columns={bossColumns} rows={bosses} rowKey={(b) => String(b.encounterId)}
+              dense caption={`Bosses players reported in ${title}, and the ones the game files list`} columns={shownBossColumns} rows={bosses} rowKey={(b) => String(b.encounterId)}
+              meta={anyBossReported ? bossMeta : undefined}
+              footer={bosses.length > 0 && !anyBossReported ? (unreachable
+                ? "Players' reports cannot be shown right now; this list is the game files' own."
+                : "No boss here has 3 installs reporting it yet. Kills, installs and last seen show once one does.") : undefined}
               empty={empty("No boss has 3 installs reporting it here yet, and the game files list none.")}
             />
           </section>

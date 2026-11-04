@@ -49,6 +49,12 @@ test("with storage down, an instance's page lists the bosses the game files give
   const rows = bosses.split("<tr").slice(2); // the header row and the caption split
   expect(rows.length).toBeGreaterThan(5);
   for (const r of rows) expect(r).toContain('data-badge="files"');
+  // No row has a report, so the report columns are left out rather than filled with [?].
+  const headers = [...bosses.matchAll(/<th[^>]*>(.*?)<\/th>/g)].map((m) => text(m[1]!).replace(/\|/g, ""));
+  expect(headers).toEqual(["Boss"]);
+  for (const r of rows) expect(r).not.toContain("[?]");
+  // The entrance the files give is labelled as such, beside the line saying none is confirmed.
+  expect(text(html.split('id="entrance"')[1] ?? "")).toContain("in the game files, not confirmed by players");
   expect(text(html)).toMatch(/\|Bosses reported\|\[\?\]\|unconfirmed\|in the files, 11\|/);
   const list = renderToStaticMarkup(await InstancesPage());
   const col = [...list.matchAll(/<th[^>]*>(.*?)<\/th>/g)].map((m) => text(m[1]!).replace(/\|/g, "")).indexOf("Bosses");
