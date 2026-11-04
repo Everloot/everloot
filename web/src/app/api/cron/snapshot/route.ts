@@ -50,7 +50,9 @@ export async function GET(req: Request) {
     try { await pullStore().prune(); } catch (err) { console.error("pull retention failed", err); }
     // The market has its own watermark, so a failure here leaves the corpus snapshot current
     // and the next run retries the same uploads.
-    let market: { added: number; scans: number } | null = null;
+    // `dropped` scans hit a fold cap and `trimmedDays` of closed history went to fit the size limit: both say
+    // the rollup is full, which is otherwise invisible.
+    let market: { added: number; scans: number; dropped?: number; trimmedDays?: number } | null = null;
     try {
       market = await uploadStore.writeMarket(idle && !work.retryRollups ? { idle: true } : { rebuild });
     } catch (err) {

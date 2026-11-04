@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import {
   MARKET_LIMITS, MARKET_MAX_BYTES, MAX_PRICE_ROWS, OPEN_DAYS, THIN_UNITS, emptyMarket, foldMarket, handleMarketValue, itemListings, itemMarket,
-  marketBytes, marketHouses, marketPrices, marketRealms, parseHouse, realmMarket, uploadScans, validRealm,
+  marketBytes, marketHouses, marketPrices, marketRealms, parseHouse, realmMarket, trimMarket, uploadScans, validRealm,
 } from "../src/market.js";
 
 const NOW = new Date("2026-10-20T12:00:00Z");
@@ -207,6 +207,53 @@ test("the total entry cap bounds the rollup however many realms and items it hol
   expect(entries).toBe(120);
   expect(marketBytes(state)).toBeLessThan(120 * 200);
   expect(MARKET_LIMITS.entries * 200).toBeLessThan(MARKET_MAX_BYTES * 2);
+});
+
+test("the entry cap counts open scans only: a realm's closed history cannot crowd out its new scans", () => {
+  const history = foldMarket(emptyMarket(), [...three("2026-10-10", [100, 300, 500]), ...three("2026-10-11", [100, 300, 500])], NOW);
+  expect(Object.keys(history.realms.forever!.items["2589"]!.closed)).toEqual(["2026-10-10", "2026-10-11"]);
+  const stats = { dropped: 0 };
+  const state = foldMarket(history, three("2026-10-20", [100, 300, 500]), NOW, { entries: 3 }, stats);
+  expect(stats.dropped).toBe(0);
+  expect(itemMarket(state, "Forever", 2589, NOW).points.map((p) => p.day)).toEqual(["2026-10-10", "2026-10-11", "2026-10-20"]);
+});
+
+test("scans a cap drops are counted, so a full rollup is reported rather than silent", () => {
+  const stats = { dropped: 0 };
+  foldMarket(emptyMarket(), three("2026-10-20", [100, 300, 500]), NOW, { entries: 2 }, stats);
+  expect(stats.dropped).toBe(1);
+  const items = [1, 2, 3, 4].map((id) => [id, 1, 10, 5, 5]);
+  const byItems = { dropped: 0 };
+  foldMarket(emptyMarket(), [snapshot("install-a", "2026-10-20", items)], NOW, { itemsPerRealm: 2 }, byItems);
+  expect(byItems.dropped).toBe(2);
+  const byRealms = { dropped: 0 };
+  foldMarket(emptyMarket(), [snapshot("install-a", "2026-10-20", items), { ...snapshot("install-a", "2026-10-20", items), realm: "Other" }], NOW, { realms: 1 }, byRealms);
+  expect(byRealms.dropped).toBe(4);
+  // A late scan for a closed day is ignored by design, not dropped by a cap.
+  const closed = foldMarket(emptyMarket(), three("2026-10-10", [100, 300, 500]), NOW);
+  const late = { dropped: 0 };
+  foldMarket(closed, [snapshot("install-d", "2026-10-10", [[2589, 1, 1, 9999, 9999]])], NOW, {}, late);
+  expect(late.dropped).toBe(0);
+});
+
+test("past the size limit the oldest closed days go first, a day at a time, and open days never go", () => {
+  const rows = [
+    ...three("2026-10-10", [100, 300, 500]), ...three("2026-10-11", [100, 300, 500]), ...three("2026-10-12", [100, 300, 500]),
+    ...three("2026-10-20", [100, 300, 500]),
+  ];
+  const state = foldMarket(emptyMarket(), rows, NOW);
+  const closedDays = (s: typeof state) => Object.keys(s.realms.forever!.items["2589"]!.closed);
+  expect(closedDays(state)).toEqual(["2026-10-10", "2026-10-11", "2026-10-12"]);
+  expect(trimMarket(state, marketBytes(state))).toEqual({ state, trimmedDays: 0 });
+  const one = trimMarket(state, marketBytes(state) - 1);
+  expect(one.trimmedDays).toBe(1);
+  expect(closedDays(one.state)).toEqual(["2026-10-11", "2026-10-12"]);
+  expect(closedDays(state)).toHaveLength(3);
+  const all = trimMarket(state, 0);
+  expect(all.trimmedDays).toBe(3);
+  expect(closedDays(all.state)).toEqual([]);
+  expect(Object.keys(all.state.realms.forever!.items["2589"]!.open["2026-10-20"]!)).toHaveLength(3);
+  expect(marketBytes(all.state)).toBeGreaterThan(0);
 });
 
 test("only well-formed auction parts are read: strings, floats, huge arrays and extra fields are dropped", () => {

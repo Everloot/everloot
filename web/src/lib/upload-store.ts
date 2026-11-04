@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { AwsClient } from "aws4fetch";
 import { CENSUS_KINDS, parseRecords, type IntakeRecord, type StoredCensusRecord, type StoredUpload } from "@everloot/protocol";
 import { mergeCorpus, mergeCorpusBatches, publicRecords, type CorpusState } from "../../../kb/src/corpus";
-import { HISTORY_DAYS, MARKET_MAX_BYTES, emptyMarket, foldMarket, uploadScans, type MarketState } from "../../../kb/src/market";
+import { HISTORY_DAYS, MARKET_MAX_BYTES, emptyMarket, foldMarket, marketBytes, trimMarket, uploadScans, type FoldStats, type MarketState } from "../../../kb/src/market";
 import { mergeCensusRows } from "../../../kb/src/census-rows";
 import { createSharingStore } from "./sharing-store";
 import {
@@ -419,7 +419,7 @@ export function createUploadStore(opts: {
    * Fold full scans from uploads not yet seen into the market rollup (cron). `rebuild` starts
    * from empty. A missed object writes nothing, so the next run reads it again.
    */
-  async function writeMarket(opts: { rebuild?: boolean; idle?: boolean } = {}): Promise<{ added: number; scans: number; skipped?: boolean }> {
+  async function writeMarket(opts: { rebuild?: boolean; idle?: boolean } = {}): Promise<{ added: number; scans: number; dropped?: number; trimmedDays?: number; skipped?: boolean }> {
     if (!cloud) throw new Error("the market rollup needs the cloud store");
     const current = await readMarketSnapshot();
     if (current && (!current.etag || current.etag.startsWith("W/"))) throw new Error("market rollup has no strong ETag: cannot safely update it");
@@ -434,12 +434,13 @@ export function createUploadStore(opts: {
     const fresh = rows.filter((r) => !seen.has(r.id));
     let state = prev?.state ?? emptyMarket();
     let scans = 0;
+    const stats: FoldStats = { dropped: 0 };
     for (let i = 0; i < fresh.length; i += MARKET_FOLD_BATCH) {
       const { payloads, missed } = await readPayloads(fresh.slice(i, i + MARKET_FOLD_BATCH).map((r) => r.object_key));
       if (missed) throw new Error("upload object unreadable");
       const batch = marketScans(payloads);
       scans += batch.length;
-      state = foldMarket(state, batch, now());
+      state = foldMarket(state, batch, now(), {}, stats);
     }
     const snapshot: MarketSnapshot = {
       version: 3,
@@ -449,9 +450,18 @@ export function createUploadStore(opts: {
       // Every listed upload is now folded in; ids outside the window drop out with it.
       seenUploadIds: rows.map((r) => r.id).sort(),
     };
-    const body = JSON.stringify(snapshot);
-    // The fold's own caps keep this far below the limit; this refuses to store anything past it.
-    if (Buffer.byteLength(body) > marketMaxBytes) throw new Error("market rollup would exceed its size limit; not written");
+    let body = JSON.stringify(snapshot);
+    let trimmedDays = 0;
+    // The fold's caps bound the open scans; the closed history is bounded here, oldest days first, so prices
+    // keep coming at the cost of history. Only a state that cannot be trimmed enough is refused.
+    if (Buffer.byteLength(body) > marketMaxBytes) {
+      const overhead = Buffer.byteLength(body) - marketBytes(snapshot.state);
+      const trimmed = trimMarket(snapshot.state, marketMaxBytes - overhead);
+      snapshot.state = trimmed.state;
+      trimmedDays = trimmed.trimmedDays;
+      body = JSON.stringify(snapshot);
+      if (Buffer.byteLength(body) > marketMaxBytes) throw new Error("market rollup would exceed its size limit; not written");
+    }
     const put = await r2Fetch(MARKET_KEY, {
       method: "PUT",
       body,
@@ -459,7 +469,7 @@ export function createUploadStore(opts: {
     });
     if (!put.ok) throw new Error(`market write failed (${put.status})`);
     marketCached = null;
-    return { added: fresh.length, scans };
+    return { added: fresh.length, scans, dropped: stats.dropped, trimmedDays };
   }
 
   async function loadMarket(): Promise<Market> {
