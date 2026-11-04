@@ -5,8 +5,10 @@ import { uploadStore } from "@/lib/upload-store";
 export const dynamic = "force-dynamic";
 
 const FIELDS = ["itemId", "market", "min", "historical", "quantity", "day", "reporters"] as const;
-// The rollup changes once per cron run (ten minutes); let the CDN answer repeat requests.
-const CACHE = { "Cache-Control": "public, max-age=0, s-maxage=300" };
+// The rollup changes once per cron run (ten minutes); let the CDN answer repeat requests. On the Worker only
+// `CDN-Cache-Control` is honoured (lib/cf-edge-cache.ts keeps a response for its max-age); `s-maxage` is for
+// the rollback host. A request that hits the edge cache never reaches the quota.
+const CACHE = { "Cache-Control": "public, max-age=0, s-maxage=300", "CDN-Cache-Control": "max-age=300" };
 const NO_STORE = { "Cache-Control": "no-store" };
 
 /**

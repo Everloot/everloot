@@ -146,6 +146,29 @@ test("market price requests have their own per-IP bucket, apart from uploads and
   await expect(quota.market(request("spoofed"))).rejects.toThrow();
 });
 
+test("market prices keep the MCP scope until the market scope migration is applied and flagged, then use their own", async () => {
+  const fetch = vi.fn().mockImplementation(async () => new Response(JSON.stringify([{ allowed: true, retry_after: 0 }])));
+  await createIntakeQuota({ env: { ...env, EVERLOOT_MCP_QUOTA_SCOPE: "mcp" }, fetch }).market(request());
+  const flagged = createIntakeQuota({ env: { ...env, EVERLOOT_MCP_QUOTA_SCOPE: "mcp", EVERLOOT_MARKET_QUOTA_SCOPE: "market" }, fetch });
+  await flagged.mcp(request());
+  await flagged.market(request());
+  const [before, mcp, market] = fetch.mock.calls.map(([, init]) => JSON.parse(init.body));
+  expect(before.p_scope).toBe("mcp");
+  expect(market).toEqual({ p_scope: "market", p_key: expect.stringMatching(/^[a-f0-9]{64}$/) });
+  expect(market.p_key).not.toBe(mcp.p_key);
+  expect(fetch.mock.calls[2][1].body).not.toContain("203.0.113.5");
+  await expect(flagged.market(request("spoofed"))).rejects.toThrow();
+});
+
+test("in development the market scope allows 200 an hour per IP and leaves the MCP and upload allowances untouched", async () => {
+  const quota = createIntakeQuota({ env: { NODE_ENV: "test", EVERLOOT_MCP_QUOTA_SCOPE: "mcp", EVERLOOT_MARKET_QUOTA_SCOPE: "market" }, now: () => 0 });
+  const local = new Request("http://localhost/api/market/prices");
+  for (let i = 0; i < 200; i++) expect((await quota.market(local)).allowed).toBe(true);
+  expect((await quota.market(local)).allowed).toBe(false);
+  expect((await quota.mcp(local)).allowed).toBe(true);
+  expect((await quota.request(local)).allowed).toBe(true);
+});
+
 test("a market request past 200 an hour from one IP is refused in development", async () => {
   const quota = createIntakeQuota({ env: { NODE_ENV: "test" }, now: () => 0 });
   const local = new Request("http://localhost/api/market/prices");
