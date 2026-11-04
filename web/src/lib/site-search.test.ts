@@ -176,14 +176,26 @@ test("suggestions: an exact id first, then exact, prefix and contains names acro
   expect(await suggest("  ")).toEqual([]);
 });
 
-test("Everloot's own published guides are found by title, with or without the leading The, and sit above the lore archive", async () => {
+test("Everloot's own published wiki pages are found by title, with or without the leading The, and sit above the lore archive", async () => {
   const groups = await search("deadmines");
   const guides = groups.find((g) => g.type === "guide")!;
-  expect(guides.heading).toBe("Guides");
+  // Labelled for where they live: /guides is the reviewed class guides, a different page.
+  expect(guides.heading).toBe("Wiki");
   expect(guides.results[0]).toMatchObject({ label: "The Deadmines", href: "/wiki/deadmines", exact: true });
   expect(guides.results[0].note).toContain("Defias");
   const types = groups.map((g) => g.type);
   if (types.includes("lore")) expect(types.indexOf("guide")).toBeLessThan(types.indexOf("lore"));
   // A draft page is not on the site, so it is not in the search either.
   expect((await search("alcaz")).find((g) => g.type === "guide")).toBeUndefined();
+});
+
+test("a dungeon's name finds its instance page first, with or without the leading The", async () => {
+  for (const q of ["deadmines", "The Deadmines"]) {
+    const groups = await search(q);
+    expect(groups[0]).toMatchObject({ type: "instance", heading: "Dungeons and raids" });
+    expect(groups[0].results[0]).toMatchObject({ label: "Deadmines", href: "/database/instances/36-deadmines", note: "Dungeon, level 16", exact: true });
+  }
+  // A partial name still finds it, after the exact hits.
+  const part = (await search("deadm")).find((g) => g.type === "instance")!;
+  expect(part.results.map((r) => r.href)).toEqual(["/database/instances/36-deadmines"]);
 });

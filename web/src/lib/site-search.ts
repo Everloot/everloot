@@ -8,6 +8,7 @@ import { CLIENT_TAXONOMY } from "./items";
 import type { SearchHit } from "../../../kb/src/search";
 import { classLabel } from "./class-context";
 import { CLASSES } from "@/design/tokens";
+import { instanceHref, instanceRows, instanceTitle, levelLabel } from "./instances";
 import { loreSlug, MAX_QUERY, searchLore, searchLoreSomeWords, UNAVAILABLE } from "./lore";
 import { loadNames, type Names } from "./names";
 import { loadObjectFacts } from "./objects";
@@ -21,18 +22,18 @@ import { zoneHref } from "./zones";
  * the item is in the build.
  */
 export interface SearchResult { label: string; href: string; note?: string; exact: boolean; id?: number; quality?: number | null; meta?: string }
-export type SearchType = "class" | "item" | "npc" | "quest" | "object" | "achievement" | "faction" | "title" | "chain" | "zone" | "guide" | "lore" | "tool" | "doc";
+export type SearchType = "class" | "item" | "npc" | "quest" | "object" | "achievement" | "faction" | "title" | "chain" | "zone" | "instance" | "guide" | "lore" | "tool" | "doc";
 /** `total` counts every match; `results` holds the first `limit` of them. */
 export interface SearchGroup { type: SearchType; heading: string; results: SearchResult[]; total: number }
 export const GROUP_LIMIT = 8;
 export const LORE_LIMIT = 5;
 
 export const HEADINGS: Record<SearchType, string> = {
-  class: "Classes", item: "Items", npc: "NPCs", quest: "Quests", object: "Objects", achievement: "Achievements", faction: "Factions", title: "Titles", chain: "Quest chains", zone: "Zones", guide: "Guides", lore: "Lore archive", tool: "Tools", doc: "Docs",
+  class: "Classes", item: "Items", npc: "NPCs", quest: "Quests", object: "Objects", achievement: "Achievements", faction: "Factions", title: "Titles", chain: "Quest chains", zone: "Zones", instance: "Dungeons and raids", guide: "Wiki", lore: "Lore archive", tool: "Tools", doc: "Docs",
 };
 /** The lore group's heading when its pages hold only some of the asked words. */
 export const LORE_SOME_WORDS = "Lore archive, some of your words";
-const ORDER: SearchType[] = ["class", "item", "npc", "quest", "object", "achievement", "faction", "title", "chain", "zone", "guide", "lore", "tool", "doc"];
+const ORDER: SearchType[] = ["class", "item", "npc", "quest", "object", "achievement", "faction", "title", "chain", "zone", "instance", "guide", "lore", "tool", "doc"];
 /** The types a search can be scoped to (`/search?q=…&in=item`); `in=lore` is the lore archive's own list. */
 export const SCOPES = ["item", "npc", "quest", "object"] as const satisfies readonly SearchType[];
 export type Scope = (typeof SCOPES)[number];
@@ -138,13 +139,25 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, names
       .map(({ entry, exact }) => ({ label: entry.name, href: zoneHref(entry.id, entry.name), note: "zone", exact }));
     found.set("zone", { results: zones, total: zones.length });
 
+    // Dungeons and raids, the rows /database/instances lists from the game files (an entrance in a held-back zone
+    // is left out, as there), by name with or without a leading "The".
+    const instances = [...instanceRows().values()].flatMap((row) => {
+      const t = instanceTitle(row).toLowerCase();
+      const r = Math.min(rank(t, q) ?? 9, rank(t.replace(/^the /, ""), q) ?? 9, rank(`the ${t}`, q) ?? 9);
+      if (r === 9) return [];
+      const level = levelLabel(row.level);
+      const note = [row.raid === null ? "Instance" : row.raid ? "Raid" : "Dungeon", level && `level ${level}`].filter(Boolean).join(", ");
+      return [{ label: instanceTitle(row), href: instanceHref(row.instanceMapId, row.name), note, exact: r === 0, r }];
+    }).sort((a, b) => a.r - b.r || a.label.localeCompare(b.label)).map(({ r: _r, ...hit }) => hit);
+    found.set("instance", { results: instances, total: instances.length });
+
     // A class named anywhere in the words ("best race for a warlock") leads to its page: guides, talents, who can play it.
     const words = new Set(q.split(/[^a-z]+/).flatMap((w) => [w, w.replace(/s$/, "")]));
     const classes = CLASSES.filter((slug) => words.has(slug))
       .map((slug) => ({ label: classLabel(slug), href: `/classes/${slug}`, note: "Guides, talents and who can play it", exact: q.replace(/s$/, "") === slug }));
     found.set("class", { results: classes, total: classes.length });
 
-    // Everloot's own guides (dungeons, raids, races), published pages only: by title, with or without a leading
+    // Everloot's own wiki pages (dungeons, raids, races), published pages only: by title, with or without a leading
     // "The", then by summary. They are the Forever record, so they sit with the database groups, above the archive.
     const guides = publishedPages(loadWiki()).flatMap((p) => {
       const t = p.title.toLowerCase();
@@ -193,7 +206,7 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, names
 }
 
 /** The things a player meets in the game: their groups lead the page. */
-const GAME: ReadonlySet<SearchType> = new Set(["item", "npc", "quest", "object", "zone"]);
+const GAME: ReadonlySet<SearchType> = new Set(["item", "npc", "quest", "object", "zone", "instance"]);
 const DATABASE: ReadonlySet<SearchType> = new Set([...GAME, "class", "achievement", "faction", "title", "chain", "guide"]);
 
 /**
