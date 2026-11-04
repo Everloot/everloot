@@ -182,7 +182,17 @@ test("stopwords match no catalog name, so a question full of them still gets the
   const bare = createToolHandlers(db);
   const query = { query: "best gold farm in the barrens", limit: 10 };
   const text = textOf(await withCatalog.search_knowledge(query));
-  expect(text.startsWith(SOME_WORDS_LINE)).toBe(true);
+  expect(text).toBe([
+    SOME_WORDS_LINE,
+    "",
+    "[lore_page/lore] Gold farming",
+    "Ways to earn gold.",
+    "Source: https://example.test/21 (CC-BY-SA-4.0, retrieved 2023-11-13)",
+    "",
+    "[lore_page/lore] The Barrens",
+    "A dry plain. Farming here is slow.",
+    "Source: https://example.test/20 (CC-BY-SA-4.0, retrieved 2023-11-13)",
+  ].join("\n"));
   expect(text).not.toContain("The Missing Diplomat");
   expect(text).not.toContain(GAME_DATA_CREDIT);
   expect(text).toBe(textOf(await bare.search_knowledge(query)));
