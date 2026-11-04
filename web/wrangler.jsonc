@@ -61,11 +61,14 @@
     // Feature switches, as in production. Pages built ahead of time read them during the build too, so
     // scripts/cf-deploy.mjs passes every var except the *_DIR paths to the build.
     "EVERLOOT_DATA_GUARD": "1",
-    // The public MCP and market prices count against their own hourly global bucket (5,000), not the uploads'
-    // 10,000 (src/lib/intake-quota.ts). Its "mcp" scope is in 20261019120000_data_guard.sql, which production runs.
+    // The public MCP counts against its own hourly global bucket (5,000), not the uploads' 10,000
+    // (src/lib/intake-quota.ts). Its "mcp" scope is in 20261019120000_data_guard.sql, which production runs.
     "EVERLOOT_MCP_QUOTA_SCOPE": "mcp",
     // Forms use their own allowance after 20261030120000_form_quota_scope.sql is applied.
     "EVERLOOT_FORM_QUOTA_SCOPE": "form",
+    // Market prices get their own hourly global bucket (5,000), so price polls cannot use up the MCP's. Merge only
+    // after 20261104120000_market_quota_scope.sql is applied: before it, the database rejects the "market" scope.
+    "EVERLOOT_MARKET_QUOTA_SCOPE": "market",
     "EVERLOOT_MCP_PUBLIC": "1",
     "EVERLOOT_PLAYER_PAGES": "1",
     "EVERLOOT_SAVED_BUILDS": "1",
