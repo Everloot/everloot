@@ -8,7 +8,7 @@ import { CLIENT_TAXONOMY } from "./items";
 import type { SearchHit } from "../../../kb/src/search";
 import { classLabel } from "./class-context";
 import { CLASSES } from "@/design/tokens";
-import { instanceHref, instanceRows, instanceTitle, levelLabel } from "./instances";
+import { instanceHref, instanceRows, instanceTitle, levelLabel, type InstanceRow } from "./instances";
 import { loreSlug, MAX_QUERY, searchLore, searchLoreSomeWords, UNAVAILABLE } from "./lore";
 import { loadNames, type Names } from "./names";
 import { loadObjectFacts } from "./objects";
@@ -84,6 +84,23 @@ function agreed(kind: "item" | "npc" | "quest", names: Map<number, string>, q: s
   return { results: out, total: out.length };
 }
 
+let instanceList: InstanceRow[] | null = null;
+/**
+ * Dungeons and raids, the rows /database/instances lists from the game files (an entrance in a held-back zone is
+ * left out, as there), by name with or without a leading "The": best first, then by name. Read once per process.
+ */
+function instanceHits(q: string): (SearchResult & { id: number; r: number })[] {
+  instanceList ??= [...instanceRows().values()];
+  return instanceList.flatMap((row) => {
+    const t = instanceTitle(row).toLowerCase();
+    const r = Math.min(rank(t, q) ?? 9, rank(t.replace(/^the /, ""), q) ?? 9, rank(`the ${t}`, q) ?? 9);
+    if (r === 9) return [];
+    const level = levelLabel(row.level);
+    const note = [row.raid === null ? "Instance" : row.raid ? "Raid" : "Dungeon", level && `level ${level}`].filter(Boolean).join(", ");
+    return [{ label: instanceTitle(row), href: instanceHref(row.instanceMapId, row.name), note, exact: r === 0, id: row.instanceMapId, r }];
+  }).sort((a, b) => a.r - b.r || a.label.localeCompare(b.label));
+}
+
 /** An object is found by its id when it has public loot observations; its name is the agreed one, if any. */
 async function objectById(id: number | null, names: Map<number, string>): Promise<SearchResult[]> {
   if (id === null) return [];
@@ -139,16 +156,7 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, names
       .map(({ entry, exact }) => ({ label: entry.name, href: zoneHref(entry.id, entry.name), note: "zone", exact }));
     found.set("zone", { results: zones, total: zones.length });
 
-    // Dungeons and raids, the rows /database/instances lists from the game files (an entrance in a held-back zone
-    // is left out, as there), by name with or without a leading "The".
-    const instances = [...instanceRows().values()].flatMap((row) => {
-      const t = instanceTitle(row).toLowerCase();
-      const r = Math.min(rank(t, q) ?? 9, rank(t.replace(/^the /, ""), q) ?? 9, rank(`the ${t}`, q) ?? 9);
-      if (r === 9) return [];
-      const level = levelLabel(row.level);
-      const note = [row.raid === null ? "Instance" : row.raid ? "Raid" : "Dungeon", level && `level ${level}`].filter(Boolean).join(", ");
-      return [{ label: instanceTitle(row), href: instanceHref(row.instanceMapId, row.name), note, exact: r === 0, r }];
-    }).sort((a, b) => a.r - b.r || a.label.localeCompare(b.label)).map(({ r: _r, ...hit }) => hit);
+    const instances = instanceHits(q).map(({ r: _r, ...hit }) => hit);
     found.set("instance", { results: instances, total: instances.length });
 
     // A class named anywhere in the words ("best race for a warlock") leads to its page: guides, talents, who can play it.
@@ -228,14 +236,18 @@ function strip(result: SearchResult & { r?: number }): SearchResult {
   return out;
 }
 
-/** One instant suggestion under a search box: an item, NPC, quest or object page. */
-export interface Suggestion { type: Scope; id: number; label: string; href: string; quality?: number | null }
+/**
+ * One instant suggestion under a search box: an item, NPC, quest or object page, or (unscoped only) a dungeon or
+ * raid page, whose `note` says which and its level ("Dungeon, level 16").
+ */
+export interface Suggestion { type: Scope | "instance"; id: number; label: string; href: string; quality?: number | null; note?: string }
 export const SUGGEST_LIMIT = 8;
 
 /**
  * Up to 8 pages for a search box as the visitor types: an exact id first, then exact names, then names that
- * start with the text, then names that contain it, across items, NPCs, quests and objects (or one of them).
- * Names only where players agree on them, as on /search; no lore or tools, so it stays cheap per keystroke.
+ * start with the text, then names that contain it, across items, NPCs, quests, objects and, unscoped, dungeons and
+ * raids (or one of the first four). Names only where players agree on them, as on /search; instances from the
+ * same rows as /search; no lore or tools, so it stays cheap per keystroke.
  */
 export async function suggest(raw: string, scope?: Scope, names?: Names): Promise<Suggestion[]> {
   const q = raw.trim().slice(0, MAX_QUERY).toLowerCase();
@@ -251,6 +263,11 @@ export async function suggest(raw: string, scope?: Scope, names?: Names): Promis
     }
     for (const x of agreed(type, all[`${type}s`], q, id).results.slice(0, SUGGEST_LIMIT)) {
       ranked.push({ s: { type, id: x.id!, label: x.label, href: x.href, ...(type === "item" ? { quality: x.quality ?? null } : {}) }, r: x.r, t });
+    }
+  }
+  if (!scope) {
+    for (const x of instanceHits(q).slice(0, SUGGEST_LIMIT)) {
+      ranked.push({ s: { type: "instance", id: x.id, label: x.label, href: x.href, note: x.note }, r: x.r, t: order.length });
     }
   }
   return ranked.sort((a, b) => a.r - b.r || a.t - b.t).slice(0, SUGGEST_LIMIT).map((x) => x.s);

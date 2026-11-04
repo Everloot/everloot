@@ -6,9 +6,11 @@ import GameIcon from "@/components/game/GameIcon";
 import { QUALITY_TEXT, qualityOf } from "./quality";
 
 /** One row the suggestion route answers (GET /search/suggest). */
-export interface Suggestion { type: "item" | "npc" | "quest" | "object"; id: number; label: string; href: string; quality?: number | null; icon?: string }
+export interface Suggestion { type: "item" | "npc" | "quest" | "object" | "instance"; id: number; label: string; href: string; quality?: number | null; icon?: string; note?: string }
 
-const TYPE_LABEL: Record<Suggestion["type"], string> = { item: "Item", npc: "NPC", quest: "Quest", object: "Object" };
+const TYPE_LABEL: Record<Suggestion["type"], string> = { item: "Item", npc: "NPC", quest: "Quest", object: "Object", instance: "Instance" };
+/** The row's right-hand note: a dungeon or raid says which and its level; the rest their type and id. */
+const typeNote = (row: Suggestion) => row.note ?? `${TYPE_LABEL[row.type]}${row.label.endsWith(String(row.id)) ? "" : ` ${row.id}`}`;
 export const SEARCH_SCOPES = [
   { value: "", label: "All" }, { value: "item", label: "Items" }, { value: "npc", label: "NPCs" }, { value: "quest", label: "Quests" }, { value: "object", label: "Objects" },
 ] as const;
@@ -38,9 +40,9 @@ function useSuggestions(text: string, scope: string): Suggestion[] {
 }
 
 /**
- * A search field with instant suggestions (items, NPCs, quests, objects), as a combobox: arrow keys move
- * through the list, Enter opens the one picked, or searches when none is, Escape closes. Inside a GET form,
- * so without JavaScript it is a plain search.
+ * A search field with instant suggestions (items, NPCs, quests, objects, dungeons and raids), as a combobox:
+ * arrow keys move through the list, Enter opens the one picked, or searches when none is, Escape closes. Inside
+ * a GET form, so without JavaScript it is a plain search.
  */
 export function SuggestField({ id, name = "q", label, placeholder, defaultValue = "", scope = "", className, listClassName = "", inputRef, describedBy, after }: {
   id: string; name?: string; label: string; placeholder?: string; defaultValue?: string; scope?: string; className: string; listClassName?: string;
@@ -104,7 +106,7 @@ export function SuggestField({ id, name = "q", label, placeholder, defaultValue 
             >
               {row.icon && <GameIcon src={row.icon} size={18} />}
               <span className={`min-w-0 flex-1 truncate ${row.type === "item" && typeof row.quality === "number" && row.quality <= 5 ? QUALITY_TEXT[qualityOf(row.quality)] : "text-fg"}`}>{row.label}</span>
-              <span className="shrink-0 text-cell-2 text-muted">{TYPE_LABEL[row.type]}{row.label.endsWith(String(row.id)) ? "" : ` ${row.id}`}</span>
+              <span className="shrink-0 text-cell-2 text-muted">{typeNote(row)}</span>
             </Link>
           </li>
         ))}

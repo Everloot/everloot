@@ -105,3 +105,14 @@ test("the new suggestions start with nothing picked, and the arrow keys pick fro
   await press("ArrowDown");
   expect(rows()).toEqual(["true", "false"]);
 });
+
+test("a dungeon row says which it is and its level, and is picked like any other row", async () => {
+  await type("deadm");
+  await answer("deadm", [{ type: "instance", id: 36, label: "Deadmines", href: "/database/instances/36-deadmines", note: "Dungeon, level 16" }, suggestion(4, "Deadmines Map")]);
+  const options = [...container.querySelectorAll("[role=option]")];
+  expect(options.map((o) => o.textContent)).toEqual(["DeadminesDungeon, level 16", "Deadmines MapItem 4"]);
+  await press("ArrowDown");
+  const clicks = watchClicks();
+  await press("Enter");
+  expect(clicks).toEqual(["/database/instances/36-deadmines"]);
+});

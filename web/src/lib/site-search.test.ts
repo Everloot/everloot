@@ -199,3 +199,18 @@ test("a dungeon's name finds its instance page first, with or without the leadin
   const part = (await search("deadm")).find((g) => g.type === "instance")!;
   expect(part.results.map((r) => r.href)).toEqual(["/database/instances/36-deadmines"]);
 });
+
+test("suggestions: a dungeon's name, part of it or with the leading The, suggests its instance page near the top", async () => {
+  vi.stubEnv("KB_SNAPSHOT_PATH", release);
+  const { suggest } = await import("./site-search");
+  mocks.names.items = new Map([[5, "Deadmines Map"], [6, "Old Deadmines Key"]]);
+  for (const q of ["deadm", "the deadmines", "Deadmines"]) {
+    const rows = await suggest(q);
+    expect(rows.find((r) => r.type === "instance"), q).toEqual({ type: "instance", id: 36, label: "Deadmines", href: "/database/instances/36-deadmines", note: "Dungeon, level 16" });
+  }
+  // Ranked with the other names: a prefix item sits beside it, a contains-only item after; an exact name leads.
+  expect((await suggest("deadm")).map((r) => r.label)).toEqual(["Deadmines Map", "Deadmines", "Old Deadmines Key"]);
+  expect((await suggest("deadmines"))[0]).toMatchObject({ type: "instance" });
+  // A scoped box keeps to its database type.
+  expect((await suggest("deadm", "item")).some((r) => r.type === "instance")).toBe(false);
+});

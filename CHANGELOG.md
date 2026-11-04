@@ -67,6 +67,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   from the agreed lists, with done, missing and started views and a "remember this character" helper on the browser.
 - Site: `/tools/gold-ledger` reads `Everloot.lua` in the browser, nothing sent: characters, the last 30 days of money
   in and out, this week, categories, receipts and gold history. The published ledgers stay below.
+- Site: the header search box suggests dungeons and raids as you type, from the same rows as full search, with or without
+  the leading "The": "deadm" offers the Deadmines, labelled "Dungeon, level 16". A box scoped to items, NPCs, quests or
+  objects keeps to that type.
 
 ### Changed
 - Site: `/sign-in` and `/sign-up` are one centred card under Glint and the home art: the Battle.net button, a row of provider
