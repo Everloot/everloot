@@ -1,13 +1,53 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { TALENT_CLASSES } from "@everloot/protocol";
 import { parse } from "yaml";
+import { z } from "zod";
+import { decodeBuild, resolveBuild } from "../../../web/src/lib/talents/share";
 import type { DB } from "../db.js";
 import { ALL_GAME_VERSIONS, ALL_KINDS, replaceSourceRows, type EntityInput, type GameVersion, type Kind } from "../entities.js";
+import { siteCatalog } from "../talents/site-catalogs.js";
 
 const REQUIRED = ["kind", "id", "name", "game_version", "body", "source_url", "retrieved_at"] as const;
 
+export const BUILD_PURPOSES = ["leveling", "dungeon", "raid", "pvp"] as const;
+
+/** A starter build's `data`, as stored. The YAML writes `share_code`; the row carries `shareCode`. */
+export const BuildData = z.object({
+  class: z.enum(TALENT_CLASSES),
+  tree: z.string().min(1),
+  purpose: z.enum(BUILD_PURPOSES),
+  shareCode: z.string().min(1),
+  points: z.number().int().positive(),
+  build: z.string().min(1),
+  status: z.enum(["draft", "published"]),
+});
+export type BuildData = z.infer<typeof BuildData>;
+
 function isMissing(value: unknown): boolean {
   return value === undefined || String(value).trim() === "";
+}
+
+/** Validates a build entry's data block and its share code against the class's site catalog, or throws. */
+function buildData(where: string, raw: unknown): BuildData {
+  const { share_code: shareCode, ...rest } = (raw ?? {}) as Record<string, unknown>;
+  const parsed = BuildData.safeParse({ ...rest, shareCode });
+  if (!parsed.success) {
+    throw new Error(`${where} has bad build data: ${parsed.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}`);
+  }
+  const data = parsed.data;
+  const decoded = decodeBuild(data.shareCode);
+  if (!decoded.ok) throw new Error(`${where} share code does not decode (${decoded.error})`);
+  const resolved = resolveBuild(siteCatalog(data.class), decoded.build);
+  if (!resolved.ok) throw new Error(`${where} share code is for ${decoded.build.classSlug} not ${data.class}`);
+  const { unknown, clamped, rejected, ranks } = resolved.build;
+  if (unknown.length + clamped.length + rejected.length > 0) {
+    throw new Error(`${where} share code does not place whole on the ${data.class} tree`);
+  }
+  if (decoded.build.build !== data.build) throw new Error(`${where} share code was made on ${decoded.build.build} not ${data.build}`);
+  const spent = Object.values(ranks).reduce((sum, r) => sum + r.rank, 0);
+  if (spent !== data.points) throw new Error(`${where} share code spends ${spent} points not ${data.points}`);
+  return data;
 }
 
 /**
@@ -47,11 +87,22 @@ export async function importCurated(db: DB, dir: string): Promise<number> {
         throw new Error(`${file}: entry ${i + 1} duplicates ${kind} id "${extId}" (first defined in ${firstFile})`);
       }
       seen.set(key, file);
+      let data: Record<string, unknown> | undefined;
+      if (kind === "build") {
+        const build = buildData(`${file}: entry ${i + 1}`, e.data);
+        // A draft stays in the file until the team publishes it.
+        if (build.status === "draft") return;
+        data = build;
+      } else if (e.data !== undefined) {
+        if (typeof e.data !== "object" || e.data === null || Array.isArray(e.data)) throw new Error(`${file}: entry ${i + 1} data must be a mapping`);
+        data = e.data as Record<string, unknown>;
+      }
       rows.push({
         kind: kind as Kind,
         extId,
         name: String(e.name).trim(),
         body: String(e.body).trim(),
+        ...(data ? { data } : {}),
         gameVersion: gameVersion as GameVersion,
         sourceUrl: String(e.source_url),
         retrievedAt: String(e.retrieved_at),
