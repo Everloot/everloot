@@ -12,15 +12,15 @@
     Improved Heroic Strike, Improved Charge and Improved Overpower fill the rows that gate the tree, and
     Deflection makes up the twenty points Sweeping Strikes asks for. Two-Handed Weapon Specialization
     assumes you level with a two-handed weapon.
-  source_url: https://everloot.app/tools/talents/warrior/b/EL1-warrior-1491-1.60.1.70755-MTA1OTQ1OjEsMTA1OTQ3OjIsMTA1OTQ4OjMsMTA1OTUwOjMsMTA1OTUyOjIsMTA1OTU1OjIsMTA1OTU2OjMsMTA1OTU3OjIsMTA1OTU4OjM
+  source_url: https://everloot.app/tools/talents/warrior/b/EL1-warrior-1491-1.60.1.70790-MTA1OTQ1OjEsMTA1OTQ3OjIsMTA1OTQ4OjMsMTA1OTUwOjMsMTA1OTUyOjIsMTA1OTU1OjIsMTA1OTU2OjMsMTA1OTU3OjIsMTA1OTU4OjM
   retrieved_at: "2026-11-03"
   data:
     class: warrior
     tree: Arms
     purpose: leveling
-    share_code: EL1-warrior-1491-1.60.1.70755-MTA1OTQ1OjEsMTA1OTQ3OjIsMTA1OTQ4OjMsMTA1OTUwOjMsMTA1OTUyOjIsMTA1OTU1OjIsMTA1OTU2OjMsMTA1OTU3OjIsMTA1OTU4OjM
+    share_code: EL1-warrior-1491-1.60.1.70790-MTA1OTQ1OjEsMTA1OTQ3OjIsMTA1OTQ4OjMsMTA1OTUwOjMsMTA1OTUyOjIsMTA1OTU1OjIsMTA1OTU2OjMsMTA1OTU3OjIsMTA1OTU4OjM
     points: 21
-    build: "1.60.1.70755"
+    build: "1.60.1.70790"
     status: draft
 - kind: build
   id: paladin-leveling-retribution
@@ -32,15 +32,15 @@
     Judgement and Sanctified Judgement fill the second row so the third row opens. Seal of Command goes
     in because Vengeance needs it, and with Pursuit of Justice and Sacred Arbiter that makes the twenty
     points the fifth row asks for.
-  source_url: https://everloot.app/tools/talents/paladin/b/EL1-paladin-1486-1.60.1.70755-MTA1NjkzOjEsMTA1Njk2OjEsMTA1Njk5OjIsMTA1NzAwOjEsMTA1NzAxOjMsMTA1NzAzOjMsMTA1NzA1OjIsMTA1NzA2OjUsMTA1NzA3OjM
+  source_url: https://everloot.app/tools/talents/paladin/b/EL1-paladin-1486-1.60.1.70790-MTA1NjkzOjEsMTA1Njk2OjEsMTA1Njk5OjIsMTA1NzAwOjEsMTA1NzAxOjMsMTA1NzAzOjMsMTA1NzA1OjIsMTA1NzA2OjUsMTA1NzA3OjM
   retrieved_at: "2026-11-03"
   data:
     class: paladin
     tree: Retribution
     purpose: leveling
-    share_code: EL1-paladin-1486-1.60.1.70755-MTA1NjkzOjEsMTA1Njk2OjEsMTA1Njk5OjIsMTA1NzAwOjEsMTA1NzAxOjMsMTA1NzAzOjMsMTA1NzA1OjIsMTA1NzA2OjUsMTA1NzA3OjM
+    share_code: EL1-paladin-1486-1.60.1.70790-MTA1NjkzOjEsMTA1Njk2OjEsMTA1Njk5OjIsMTA1NzAwOjEsMTA1NzAxOjMsMTA1NzAzOjMsMTA1NzA1OjIsMTA1NzA2OjUsMTA1NzA3OjM
     points: 21
-    build: "1.60.1.70755"
+    build: "1.60.1.70790"
     status: draft
 - kind: build
   id: hunter-leveling-beast-mastery
@@ -52,35 +52,35 @@
     open. Focused Fire and Improved Aspect of the Monkey fill the second row so the third opens, then
     Pathfinding, and Bestial Swiftness is taken because Intimidation needs it or Bestial Wrath, and
     Intimidation is where the twenty-first point lands.
-  source_url: https://everloot.app/tools/talents/hunter/b/EL1-hunter-1485-1.60.1.70755-MTA0OTY0OjEsMTA0OTY3OjQsMTA0OTY5OjMsMTA0OTcwOjEsMTA0OTczOjIsMTA0OTc0OjMsMTA0OTc1OjIsMTA0OTc2OjU
+  source_url: https://everloot.app/tools/talents/hunter/b/EL1-hunter-1485-1.60.1.70790-MTA0OTY0OjEsMTA0OTY3OjQsMTA0OTY5OjMsMTA0OTcwOjEsMTA0OTczOjIsMTA0OTc0OjMsMTA0OTc1OjIsMTA0OTc2OjU
   retrieved_at: "2026-11-03"
   data:
     class: hunter
     tree: Beast Mastery
     purpose: leveling
-    share_code: EL1-hunter-1485-1.60.1.70755-MTA0OTY0OjEsMTA0OTY3OjQsMTA0OTY5OjMsMTA0OTcwOjEsMTA0OTczOjIsMTA0OTc0OjMsMTA0OTc1OjIsMTA0OTc2OjU
+    share_code: EL1-hunter-1485-1.60.1.70790-MTA0OTY0OjEsMTA0OTY3OjQsMTA0OTY5OjMsMTA0OTcwOjEsMTA0OTczOjIsMTA0OTc0OjMsMTA0OTc1OjIsMTA0OTc2OjU
     points: 21
-    build: "1.60.1.70755"
+    build: "1.60.1.70790"
     status: draft
 - kind: build
   id: rogue-leveling-combat
   name: "Rogue leveling: Combat"
   game_version: forever
   body: >-
-    This is a draft starter build for leveling a Rogue, the first 21 points, all in Combat. Improved
-    Sinister Strike and Improved Eviscerate open the tree with Sinister Strike and Eviscerate. Precision
-    goes to full rank because Dual Wield Specialization needs it, and Deflection goes to full rank
-    because Riposte needs it. Endurance and a point of Lightning Reflexes make up the twenty points
-    Blade Flurry asks for.
-  source_url: https://everloot.app/tools/talents/rogue/b/EL1-rogue-1488-1.60.1.70755-MTA1NzA4OjMsMTA1NzI4OjEsMTA1NzM1OjEsMTA1NzM2OjIsMTA1NzM3OjMsMTA1NzM4OjMsMTA1NzQwOjUsMTA1NzQxOjIsMTEzMzk4OjE
+    This is a draft starter build for leveling a Rogue, the first 21 points, all in Combat. Efficient
+    Strikes and Coup de Grace open the tree with Sinister Strike and Eviscerate. Precision goes to full
+    rank because Weapon Expertise needs it, and Deflection goes to full rank because Riposte needs it.
+    Endurance and Lightning Reflexes at full rank make up the twenty points Blade Flurry asks for,
+    with the last of them in Weapon Expertise.
+  source_url: https://everloot.app/tools/talents/rogue/b/EL1-rogue-1488-1.60.1.70790-MTA1NzA4OjMsMTA1NzI2OjEsMTA1NzI4OjEsMTA1NzM1OjEsMTA1NzM2OjIsMTA1NzM3OjMsMTA1NzM4OjMsMTA1NzQxOjIsMTEzMzk4OjU
   retrieved_at: "2026-11-03"
   data:
     class: rogue
     tree: Combat
     purpose: leveling
-    share_code: EL1-rogue-1488-1.60.1.70755-MTA1NzA4OjMsMTA1NzI4OjEsMTA1NzM1OjEsMTA1NzM2OjIsMTA1NzM3OjMsMTA1NzM4OjMsMTA1NzQwOjUsMTA1NzQxOjIsMTEzMzk4OjE
+    share_code: EL1-rogue-1488-1.60.1.70790-MTA1NzA4OjMsMTA1NzI2OjEsMTA1NzI4OjEsMTA1NzM1OjEsMTA1NzM2OjIsMTA1NzM3OjMsMTA1NzM4OjMsMTA1NzQxOjIsMTEzMzk4OjU
     points: 21
-    build: "1.60.1.70755"
+    build: "1.60.1.70790"
     status: draft
 - kind: build
   id: priest-leveling-shadow-magic
@@ -92,15 +92,15 @@
     open fights with. Mind Flay is taken as soon as its row opens, and Shadow Focus fills the points the
     fourth row asks for. Shadow Weaving and Vampiric Embrace take that row, and the twenty-first point
     goes to Devouring Contagion.
-  source_url: https://everloot.app/tools/talents/priest/b/EL1-priest-1487-1.60.1.70755-MTA1ODE5OjEsMTA1ODIwOjEsMTA1ODIxOjMsMTA1ODI2OjEsMTA1ODMwOjIsMTA1ODMxOjUsMTA1ODMzOjUsMTEwODUxOjM
+  source_url: https://everloot.app/tools/talents/priest/b/EL1-priest-1487-1.60.1.70790-MTA1ODE5OjEsMTA1ODIwOjEsMTA1ODIxOjMsMTA1ODI2OjEsMTA1ODMwOjIsMTA1ODMxOjUsMTA1ODMzOjUsMTEwODUxOjM
   retrieved_at: "2026-11-03"
   data:
     class: priest
     tree: Shadow Magic
     purpose: leveling
-    share_code: EL1-priest-1487-1.60.1.70755-MTA1ODE5OjEsMTA1ODIwOjEsMTA1ODIxOjMsMTA1ODI2OjEsMTA1ODMwOjIsMTA1ODMxOjUsMTA1ODMzOjUsMTEwODUxOjM
+    share_code: EL1-priest-1487-1.60.1.70790-MTA1ODE5OjEsMTA1ODIwOjEsMTA1ODIxOjMsMTA1ODI2OjEsMTA1ODMwOjIsMTA1ODMxOjUsMTA1ODMzOjUsMTEwODUxOjM
     points: 21
-    build: "1.60.1.70755"
+    build: "1.60.1.70790"
     status: draft
 - kind: build
   id: shaman-leveling-enhancement
@@ -109,17 +109,17 @@
   body: >-
     This is a draft starter build for leveling a Shaman, the first 21 points, all in Enhancement.
     Thundering Strikes takes the first five points. Mental Dexterity goes to full rank because Flurry
-    needs it, and Improved Ghost Wolf finishes the second row for travel between quests. Elemental
-    Weapons and Anticipation open the fourth row, where Flurry and Stormstrike take the last six points.
-  source_url: https://everloot.app/tools/talents/shaman/b/EL1-shaman-1489-1.60.1.70755-MTA0NzQzOjEsMTA0NzQ3OjUsMTA0NzQ4OjIsMTA0NzUwOjMsMTA0NzUyOjIsMTA0NzUzOjUsMTA0NzU1OjM
+    needs it, and Ancestral Knowledge finishes the second row. Elemental Weapons and Anticipation open
+    the fourth row, where Flurry and Stormstrike take the last six points.
+  source_url: https://everloot.app/tools/talents/shaman/b/EL1-shaman-1489-1.60.1.70790-MTA0NzQzOjEsMTA0NzQ3OjUsMTA0NzQ4OjIsMTA0NzUwOjMsMTA0NzUzOjUsMTA0NzU1OjMsMTA0NzU2OjI
   retrieved_at: "2026-11-03"
   data:
     class: shaman
     tree: Enhancement
     purpose: leveling
-    share_code: EL1-shaman-1489-1.60.1.70755-MTA0NzQzOjEsMTA0NzQ3OjUsMTA0NzQ4OjIsMTA0NzUwOjMsMTA0NzUyOjIsMTA0NzUzOjUsMTA0NzU1OjM
+    share_code: EL1-shaman-1489-1.60.1.70790-MTA0NzQzOjEsMTA0NzQ3OjUsMTA0NzQ4OjIsMTA0NzUwOjMsMTA0NzUzOjUsMTA0NzU1OjMsMTA0NzU2OjI
     points: 21
-    build: "1.60.1.70755"
+    build: "1.60.1.70790"
     status: draft
 - kind: build
   id: mage-leveling-frost
@@ -130,15 +130,15 @@
     Frostbolt as the main spell. Improved Frostbolt and Ice Shards take the first ten points. Frost
     Channeling, Ice Lance and a point of Precision open the fourth row, where Shatter, Ice Block and
     Arctic Reach go. The twenty-first point is Cold Snap.
-  source_url: https://everloot.app/tools/talents/mage/b/EL1-mage-1482-1.60.1.70755-MTA1NzY2OjEsMTA1NzY3OjEsMTA1NzY4OjMsMTA1NzY5OjEsMTA1NzcwOjEsMTA1NzcyOjMsMTA1Nzc3OjUsMTA1Nzc4OjEsMTA1Nzc5OjU
+  source_url: https://everloot.app/tools/talents/mage/b/EL1-mage-1482-1.60.1.70790-MTA1NzY2OjEsMTA1NzY3OjEsMTA1NzY4OjMsMTA1NzY5OjEsMTA1NzcwOjEsMTA1NzcyOjMsMTA1Nzc3OjUsMTA1Nzc4OjEsMTA1Nzc5OjU
   retrieved_at: "2026-11-03"
   data:
     class: mage
     tree: Frost
     purpose: leveling
-    share_code: EL1-mage-1482-1.60.1.70755-MTA1NzY2OjEsMTA1NzY3OjEsMTA1NzY4OjMsMTA1NzY5OjEsMTA1NzcwOjEsMTA1NzcyOjMsMTA1Nzc3OjUsMTA1Nzc4OjEsMTA1Nzc5OjU
+    share_code: EL1-mage-1482-1.60.1.70790-MTA1NzY2OjEsMTA1NzY3OjEsMTA1NzY4OjMsMTA1NzY5OjEsMTA1NzcwOjEsMTA1NzcyOjMsMTA1Nzc3OjUsMTA1Nzc4OjEsMTA1Nzc5OjU
     points: 21
-    build: "1.60.1.70755"
+    build: "1.60.1.70790"
     status: draft
 - kind: build
   id: warlock-leveling-affliction
@@ -149,15 +149,15 @@
     Improved Corruption takes the first five points, then Improved Drains and Soul Harvest. The third
     row goes to Improved Bane of Agony, Amplify Curse and Fel Concentration, and the fourth to Nightfall
     and Malevolence. The twenty-first point is Siphon Life.
-  source_url: https://everloot.app/tools/talents/warlock/b/EL1-warlock-1490-1.60.1.70755-MTA1OTEyOjEsMTA1OTE0OjIsMTA1OTE2OjEsMTA1OTE4OjIsMTA1OTE5OjIsMTA1OTIwOjMsMTA1OTIyOjIsMTA1OTI0OjUsMTEwODc2OjM
+  source_url: https://everloot.app/tools/talents/warlock/b/EL1-warlock-1490-1.60.1.70790-MTA1OTEyOjEsMTA1OTE0OjIsMTA1OTE2OjEsMTA1OTE4OjIsMTA1OTE5OjIsMTA1OTIwOjMsMTA1OTIyOjIsMTA1OTI0OjUsMTEwODc2OjM
   retrieved_at: "2026-11-03"
   data:
     class: warlock
     tree: Affliction
     purpose: leveling
-    share_code: EL1-warlock-1490-1.60.1.70755-MTA1OTEyOjEsMTA1OTE0OjIsMTA1OTE2OjEsMTA1OTE4OjIsMTA1OTE5OjIsMTA1OTIwOjMsMTA1OTIyOjIsMTA1OTI0OjUsMTEwODc2OjM
+    share_code: EL1-warlock-1490-1.60.1.70790-MTA1OTEyOjEsMTA1OTE0OjIsMTA1OTE2OjEsMTA1OTE4OjIsMTA1OTE5OjIsMTA1OTIwOjMsMTA1OTIyOjIsMTA1OTI0OjUsMTEwODc2OjM
     points: 21
-    build: "1.60.1.70755"
+    build: "1.60.1.70790"
     status: draft
 - kind: build
   id: druid-leveling-feral-combat
@@ -169,13 +169,13 @@
     Hide. Sharpened Claws, Feral Charge and Shredding Attacks fill the third row, and Sharpened Claws is
     also what Blood Frenzy needs. Predatory Strikes and Blood Frenzy take the fourth row, and the
     twenty-first point is Leader of the Pack.
-  source_url: https://everloot.app/tools/talents/druid/b/EL1-druid-1484-1.60.1.70755-MTA0OTM4OjUsMTA0OTQwOjMsMTA0OTQyOjIsMTA0OTQ0OjEsMTA0OTQ1OjIsMTA0OTQ2OjIsMTA0OTQ3OjIsMTA0OTUyOjMsMTA0OTU1OjE
+  source_url: https://everloot.app/tools/talents/druid/b/EL1-druid-1484-1.60.1.70790-MTA0OTM4OjUsMTA0OTQwOjMsMTA0OTQyOjIsMTA0OTQ0OjEsMTA0OTQ1OjIsMTA0OTQ2OjIsMTA0OTQ3OjIsMTA0OTUyOjMsMTA0OTU1OjE
   retrieved_at: "2026-11-03"
   data:
     class: druid
     tree: Feral Combat
     purpose: leveling
-    share_code: EL1-druid-1484-1.60.1.70755-MTA0OTM4OjUsMTA0OTQwOjMsMTA0OTQyOjIsMTA0OTQ0OjEsMTA0OTQ1OjIsMTA0OTQ2OjIsMTA0OTQ3OjIsMTA0OTUyOjMsMTA0OTU1OjE
+    share_code: EL1-druid-1484-1.60.1.70790-MTA0OTM4OjUsMTA0OTQwOjMsMTA0OTQyOjIsMTA0OTQ0OjEsMTA0OTQ1OjIsMTA0OTQ2OjIsMTA0OTQ3OjIsMTA0OTUyOjMsMTA0OTU1OjE
     points: 21
-    build: "1.60.1.70755"
+    build: "1.60.1.70790"
     status: draft
