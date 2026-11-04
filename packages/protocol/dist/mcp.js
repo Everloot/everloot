@@ -443,6 +443,22 @@ export const searchResult = z.object({
     title: z.string().describe("The record's name."),
     url: z.string().describe("Where the record is read: its page on everloot.app for a lore page, else the source's own page. ChatGPT cites it."),
 });
+/** The parameters get_entity and fetch share to read one field of a record and page a long array. */
+export const FIELD_READ_ROWS = 48;
+export const fieldReadInput = {
+    field: z.string().max(200).optional().describe("A JSON pointer into the record's data, such as /criteria or /reagents/0. Without it, the whole record."),
+    offset: z.number().int().min(0).optional().describe("Row to start at when the field is an array; default 0. Use nextOffset from the last answer."),
+    limit: z.number().int().min(1).max(FIELD_READ_ROWS).optional().describe(`Rows per answer, default and at most ${FIELD_READ_ROWS}.`),
+};
+/** What a field read answers with: the pointed value (an array is one page of it) and where the next page starts. */
+export const fieldReadOutput = {
+    field: z.object({
+        pointer: z.string(),
+        value: z.unknown().describe("The value at the pointer. An array is one page of up to 48 rows."),
+        nextOffset: z.number().int().optional().describe("Present when more rows remain: pass it as offset."),
+    }).optional().describe("Present when field was given and found."),
+    keys: z.array(z.string()).optional().describe("Present when field was given and not found: the keys of the deepest object the pointer reached. Empty when the record has no structured data."),
+};
 export const fetchedDocument = z.object({
     id: z.string().describe("The record id as a string."),
     title: z.string().describe("The record's name."),
@@ -458,6 +474,7 @@ export const fetchedDocument = z.object({
         credit: z.string().describe("The credit line to show with the text."),
         confirmed: z.object({ asOf: z.string().nullable() }).optional().describe("Present when player uploads confirm this game-file entry (3 or more installs agree). asOf is the date the rollup was current."),
     }),
+    ...fieldReadOutput,
 });
 /** One knowledge record as search_knowledge, get_entity and get_by_name return it. */
 export const knowledgeHit = z.object({
@@ -517,9 +534,9 @@ export const MCP_TOOLS = {
     },
     get_entity: {
         title: "Get one knowledge record by id",
-        description: "Returns one knowledge record in full, by the numeric id a search_knowledge or get_by_name hit gave: title, the full text in the source's words, the URL to cite, source, licence and date. Use it after a search to read the whole record; use fetch for the ChatGPT connector shape, which takes the string id a search result gave. An id no record has returns a null hit, not an error.",
-        inputSchema: { id: z.number().int().describe("Record id from a search_knowledge hit.") },
-        outputSchema: { hit: knowledgeHit.nullable() },
+        description: "Returns one knowledge record in full, by the numeric id a search_knowledge or get_by_name hit gave: title, the full text in the source's words, the URL to cite, source, licence and date. Use it after a search to read the whole record; use fetch for the ChatGPT connector shape, which takes the string id a search result gave. An id no record has returns a null hit, not an error. Give field, a JSON pointer such as /questIds, to read one value of the record's data instead of the whole record; an array comes in pages of up to 48 rows, and nextOffset says where the next page starts. A pointer that leads nowhere answers with the keys it could have used, not an error.",
+        inputSchema: { id: z.number().int().describe("Record id from a search_knowledge hit."), ...fieldReadInput },
+        outputSchema: { hit: knowledgeHit.nullable(), ...fieldReadOutput },
         annotations: { readOnlyHint: true, openWorldHint: false },
     },
     get_by_name: {
@@ -541,8 +558,8 @@ export const MCP_TOOLS = {
     },
     fetch: {
         title: "Fetch one document (ChatGPT connector contract)",
-        description: "Returns one knowledge record in full, by the string id a search result gave: title, the full text in the source's words, the URL to cite, and metadata with the source, licence and date. It is the ChatGPT connector counterpart of get_entity. Use it after search; elsewhere, use get_entity with a search_knowledge id. The text block is the same JSON as a string.",
-        inputSchema: { id: z.string().max(20).describe("An id from a search result.") },
+        description: "Returns one knowledge record in full, by the string id a search result gave: title, the full text in the source's words, the URL to cite, and metadata with the source, licence and date. It is the ChatGPT connector counterpart of get_entity. Use it after search; elsewhere, use get_entity with a search_knowledge id. Give field, a JSON pointer such as /questIds, to read one value of the record's data: text then holds that value as JSON, and an array comes in pages of up to 48 rows with nextOffset for the next page. A long array in a whole record is cut at 48 rows. The text block is the same JSON as a string.",
+        inputSchema: { id: z.string().max(20).describe("An id from a search result."), ...fieldReadInput },
         outputSchema: fetchedDocument.shape,
         annotations: { readOnlyHint: true, openWorldHint: false },
     },

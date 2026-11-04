@@ -48,7 +48,8 @@ import {
 } from "./page-urls.js";
 import { allTerms, getByName, getDocument, getEntity, search, searchSomeWords, SOME_WORDS, type SearchHit } from "./search.js";
 import { confirmedCatalog, confirmedLine, isConfirmable, type ConfirmedIds } from "./catalog-confirmed.js";
-import { getCatalogByName, getCatalogEntity, isCatalogId, searchCatalog, type CatalogIndex, type CatalogRecord } from "./catalog-index.js";
+import { bodyOf, catalogLabel, getCatalogByName, getCatalogEntity, isCatalogId, searchCatalog, type CatalogIndex, type CatalogRecord } from "./catalog-index.js";
+import { cutArrays, MAX_ROWS, readField, type FieldRead } from "./json-pointer.js";
 
 export const SERVER_NAME = "everloot-knowledge";
 export const SERVER_VERSION = "0.8.1";
@@ -481,15 +482,18 @@ function annotate<T extends SearchHit>(hits: T[], ids: ConfirmedIds | null): (T 
   return hits.map((h) => (isCatalogId(h.id) && confirmedLine(h.kind, h.extId, ids) ? { ...h, confirmed: { asOf: ids.asOf } } : h));
 }
 
+/** One hit as text: its heading, `middle` (the snippet, or the field read), its source, and its page when it has one. */
+function hitText(h: SearchHit & { url?: string }, middle: string, ids: ConfirmedIds | null): string {
+  const line = `[${h.kind}/${h.gameVersion}] ${h.name}\n${middle}\nSource: ${h.sourceUrl} (${h.licence}, retrieved ${h.retrievedAt})`;
+  const confirmed = ids && isCatalogId(h.id) ? confirmedLine(h.kind, h.extId, ids) : null;
+  const head = confirmed ? `${line}\n${confirmed}` : line;
+  // A game-file record carries its own credit as the last line, after the page it links.
+  return isCatalogId(h.id) ? withMore(`${head}\n${GAME_DATA_CREDIT}`, h.url, GAME_DATA_CREDIT) : withMore(head, h.url);
+}
+
 /** The hits as text, each with its page on the site when it has one. */
 async function formatHits(db: ReleaseSource, hits: SearchHit[], ids: ConfirmedIds | null = null): Promise<string> {
-  return (await withPages(db, hits)).map((h) => {
-    const line = `[${h.kind}/${h.gameVersion}] ${h.name}\n${h.snippet}\nSource: ${h.sourceUrl} (${h.licence}, retrieved ${h.retrievedAt})`;
-    const confirmed = ids && isCatalogId(h.id) ? confirmedLine(h.kind, h.extId, ids) : null;
-    const head = confirmed ? `${line}\n${confirmed}` : line;
-    // A game-file record carries its own credit as the last line, after the page it links.
-    return isCatalogId(h.id) ? withMore(`${head}\n${GAME_DATA_CREDIT}`, h.url, GAME_DATA_CREDIT) : withMore(head, h.url);
-  }).join("\n\n");
+  return (await withPages(db, hits)).map((h) => hitText(h, h.snippet, ids)).join("\n\n");
 }
 
 export { SOME_WORDS };
@@ -569,6 +573,52 @@ async function entityOf(db: ReleaseSource, id: number, catalog: CatalogIndex | n
 async function namedHits(db: ReleaseSource, name: string, kind: (typeof KNOWLEDGE_KINDS)[number] | undefined, catalog: CatalogIndex | null): Promise<SearchHit[]> {
   const release = await getByName(db, name, kind);
   return catalog ? [...release, ...getCatalogByName(catalog, name, kind).map(plainHit)] : release;
+}
+
+/** A record's structured data: a catalog record's own, a release row's `data` column. */
+async function dataOf(db: ReleaseSource, id: number, catalog: CatalogIndex | null): Promise<Record<string, unknown>> {
+  if (isCatalogId(id)) return (catalog ? getCatalogEntity(catalog, id)?.data : undefined) ?? {};
+  return (await getDocument(db, id))?.data ?? {};
+}
+
+type FieldArgs = { field?: string; offset?: number; limit?: number };
+
+/** The field read a request asks for, with the paging defaults: from the first row, a full page. */
+const readFieldOf = (data: Record<string, unknown>, field: string, args: FieldArgs): FieldRead =>
+  readField(data, field, args.offset ?? 0, args.limit ?? MAX_ROWS);
+
+/** What a missed pointer answers: it never errors, it says what the record does have. */
+const missText = (pointer: string, keys: string[]): string =>
+  `No such field ${pointer}. ${keys.length ? `Keys here: ${keys.join(", ")}.` : "There is nothing to read at that point."}`;
+
+/** The `field` part of an answer's structure: the value, an array as one page, and where the next page starts. */
+const fieldOut = (read: Extract<FieldRead, { ok: true }>): { pointer: string; value: unknown; nextOffset?: number } =>
+  ({ pointer: read.pointer, value: read.value, ...(read.nextOffset !== undefined ? { nextOffset: read.nextOffset } : {}) });
+
+/** A field read in words: which rows came, whether more remain, then the value as JSON. */
+function rowsText(read: Extract<FieldRead, { ok: true }>): string {
+  const json = JSON.stringify(read.value);
+  if (read.total === undefined) return `${read.pointer}:\n${json}`;
+  const rows = (read.value as unknown[]).length;
+  const range = rows ? `rows ${read.from + 1}-${read.from + rows} of ${read.total}` : `no rows at offset ${read.from}, the array has ${read.total}`;
+  return `${read.pointer}: ${range}.${read.nextOffset !== undefined ? ` More rows remain: nextOffset ${read.nextOffset}.` : ""}\n${json}`;
+}
+
+const ARRAYS_CUT = `Arrays are cut at ${MAX_ROWS} rows; read more with field and offset.`;
+
+/** A whole catalog record's body, with any array longer than a page cut to its first page. */
+function catalogBody(record: CatalogRecord): { text: string; cut: boolean } {
+  const { data, cut } = cutArrays(record.data);
+  if (!cut) return { text: record.body, cut };
+  const { build, ...fields } = data;
+  return { text: bodyOf(record.name, String(build), fields), cut };
+}
+
+/** fetch's `text` and its field parts: the slice (or the miss) when field is given, else the whole record. */
+function fetchedText(args: FieldArgs, data: Record<string, unknown>, whole: () => string): { text: string; field?: ReturnType<typeof fieldOut>; keys?: string[] } {
+  if (args.field === undefined) return { text: whole() };
+  const read = readFieldOf(data, args.field, args);
+  return read.ok ? { text: JSON.stringify(read.value), field: fieldOut(read) } : { text: missText(args.field, read.keys), keys: read.keys };
 }
 
 export async function handleGetEntity(db: ReleaseSource, args: { id: number }, catalog: CatalogIndex | null = null, ids: ConfirmedIds | null = null): Promise<string> {
@@ -711,7 +761,14 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
       const catalog = await catalogOf();
       const hit = await entityOf(db, args.id, catalog);
       const ids = await confirmedOf(hit ? [hit] : []);
-      return { text: await handleGetEntity(db, args, catalog, ids), structured: { hit: hit ? annotate(await withPages(db, [hit]), ids)[0]! : null } };
+      if (args.field === undefined || !hit) return { text: await handleGetEntity(db, args, catalog, ids), structured: { hit: hit ? annotate(await withPages(db, [hit]), ids)[0]! : null } };
+      const data = await dataOf(db, args.id, catalog);
+      const read = readFieldOf(data, args.field, args);
+      const shown = annotate(await withPages(db, [hit]), ids)[0]!;
+      if (!read.ok) return { text: missText(args.field, read.keys), structured: { hit: shown, keys: read.keys } };
+      // Game-file data keeps its label and build with the slice, as in every other answer about it.
+      const label = isCatalogId(hit.id) && typeof data.build === "string" ? `${catalogLabel(data.build)}\n` : "";
+      return { text: hitText(shown, `${label}${rowsText(read)}`, ids), structured: { hit: shown, field: fieldOut(read) } };
     },
     get_by_name: async (args) => {
       const catalog = await catalogOf();
@@ -730,17 +787,25 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
         if (record) {
           const ids = await confirmedOf([record]);
           const line = ids ? confirmedLine(record.kind, record.extId, ids) : null;
+          const { text, ...read } = fetchedText(args, record.data, () => {
+            const whole = catalogBody(record);
+            const body = line ? `${whole.text}\n${line}` : whole.text;
+            return whole.cut ? `${body}\n${ARRAYS_CUT}` : body;
+          });
           return jsonAnswer({
-            id: String(record.id), title: record.name, text: line ? `${record.body}\n${line}` : record.body, url: record.sourceUrl,
+            id: String(record.id), title: record.name, text, url: record.sourceUrl,
             metadata: { kind: record.kind, gameVersion: record.gameVersion, sourceUrl: record.sourceUrl, sourceId: record.sourceId, licence: record.licence, retrievedAt: record.retrievedAt, credit: GAME_DATA_CREDIT, ...(line ? { confirmed: { asOf: ids!.asOf } } : {}) },
+            ...read,
           });
         }
       }
       const doc = numeric !== undefined && !isCatalogId(numeric) ? await getDocument(db, numeric) : undefined;
       if (!doc) throw new Error(`No record with id "${args.id}". Ids come from search results.`);
+      const { text, ...read } = fetchedText(args, doc.data, () => doc.body);
       return jsonAnswer({
-        id: String(doc.id), title: doc.name, text: doc.body, url: recordUrl(doc, SITE),
+        id: String(doc.id), title: doc.name, text, url: recordUrl(doc, SITE),
         metadata: { kind: doc.kind, gameVersion: doc.gameVersion, sourceUrl: doc.sourceUrl, sourceId: doc.sourceId, licence: doc.licence, retrievedAt: doc.retrievedAt, credit: CREDIT_LINE },
+        ...read,
       });
     },
     answer_sources: async (args) => {

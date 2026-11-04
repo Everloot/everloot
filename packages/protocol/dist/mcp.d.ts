@@ -1016,7 +1016,29 @@ export declare const searchResult: z.ZodObject<{
     url: z.ZodString;
 }, z.core.$strip>;
 export type SearchResultOut = z.infer<typeof searchResult>;
+/** The parameters get_entity and fetch share to read one field of a record and page a long array. */
+export declare const FIELD_READ_ROWS = 48;
+export declare const fieldReadInput: {
+    field: z.ZodOptional<z.ZodString>;
+    offset: z.ZodOptional<z.ZodNumber>;
+    limit: z.ZodOptional<z.ZodNumber>;
+};
+/** What a field read answers with: the pointed value (an array is one page of it) and where the next page starts. */
+export declare const fieldReadOutput: {
+    field: z.ZodOptional<z.ZodObject<{
+        pointer: z.ZodString;
+        value: z.ZodUnknown;
+        nextOffset: z.ZodOptional<z.ZodNumber>;
+    }, z.core.$strip>>;
+    keys: z.ZodOptional<z.ZodArray<z.ZodString>>;
+};
 export declare const fetchedDocument: z.ZodObject<{
+    field: z.ZodOptional<z.ZodObject<{
+        pointer: z.ZodString;
+        value: z.ZodUnknown;
+        nextOffset: z.ZodOptional<z.ZodNumber>;
+    }, z.core.$strip>>;
+    keys: z.ZodOptional<z.ZodArray<z.ZodString>>;
     id: z.ZodString;
     title: z.ZodString;
     text: z.ZodString;
@@ -1248,11 +1270,20 @@ export declare const MCP_TOOLS: {
     };
     readonly get_entity: {
         readonly title: "Get one knowledge record by id";
-        readonly description: "Returns one knowledge record in full, by the numeric id a search_knowledge or get_by_name hit gave: title, the full text in the source's words, the URL to cite, source, licence and date. Use it after a search to read the whole record; use fetch for the ChatGPT connector shape, which takes the string id a search result gave. An id no record has returns a null hit, not an error.";
+        readonly description: "Returns one knowledge record in full, by the numeric id a search_knowledge or get_by_name hit gave: title, the full text in the source's words, the URL to cite, source, licence and date. Use it after a search to read the whole record; use fetch for the ChatGPT connector shape, which takes the string id a search result gave. An id no record has returns a null hit, not an error. Give field, a JSON pointer such as /questIds, to read one value of the record's data instead of the whole record; an array comes in pages of up to 48 rows, and nextOffset says where the next page starts. A pointer that leads nowhere answers with the keys it could have used, not an error.";
         readonly inputSchema: {
+            readonly field: z.ZodOptional<z.ZodString>;
+            readonly offset: z.ZodOptional<z.ZodNumber>;
+            readonly limit: z.ZodOptional<z.ZodNumber>;
             readonly id: z.ZodNumber;
         };
         readonly outputSchema: {
+            readonly field: z.ZodOptional<z.ZodObject<{
+                pointer: z.ZodString;
+                value: z.ZodUnknown;
+                nextOffset: z.ZodOptional<z.ZodNumber>;
+            }, z.core.$strip>>;
+            readonly keys: z.ZodOptional<z.ZodArray<z.ZodString>>;
             readonly hit: z.ZodNullable<z.ZodObject<{
                 id: z.ZodNumber;
                 extId: z.ZodString;
@@ -1392,11 +1423,20 @@ export declare const MCP_TOOLS: {
     };
     readonly fetch: {
         readonly title: "Fetch one document (ChatGPT connector contract)";
-        readonly description: "Returns one knowledge record in full, by the string id a search result gave: title, the full text in the source's words, the URL to cite, and metadata with the source, licence and date. It is the ChatGPT connector counterpart of get_entity. Use it after search; elsewhere, use get_entity with a search_knowledge id. The text block is the same JSON as a string.";
+        readonly description: "Returns one knowledge record in full, by the string id a search result gave: title, the full text in the source's words, the URL to cite, and metadata with the source, licence and date. It is the ChatGPT connector counterpart of get_entity. Use it after search; elsewhere, use get_entity with a search_knowledge id. Give field, a JSON pointer such as /questIds, to read one value of the record's data: text then holds that value as JSON, and an array comes in pages of up to 48 rows with nextOffset for the next page. A long array in a whole record is cut at 48 rows. The text block is the same JSON as a string.";
         readonly inputSchema: {
+            readonly field: z.ZodOptional<z.ZodString>;
+            readonly offset: z.ZodOptional<z.ZodNumber>;
+            readonly limit: z.ZodOptional<z.ZodNumber>;
             readonly id: z.ZodString;
         };
         readonly outputSchema: {
+            field: z.ZodOptional<z.ZodObject<{
+                pointer: z.ZodString;
+                value: z.ZodUnknown;
+                nextOffset: z.ZodOptional<z.ZodNumber>;
+            }, z.core.$strip>>;
+            keys: z.ZodOptional<z.ZodArray<z.ZodString>>;
             id: z.ZodString;
             title: z.ZodString;
             text: z.ZodString;
@@ -3007,11 +3047,20 @@ export declare const MCP_TOOL_LIST: ({
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
 } | {
     title: "Get one knowledge record by id";
-    description: "Returns one knowledge record in full, by the numeric id a search_knowledge or get_by_name hit gave: title, the full text in the source's words, the URL to cite, source, licence and date. Use it after a search to read the whole record; use fetch for the ChatGPT connector shape, which takes the string id a search result gave. An id no record has returns a null hit, not an error.";
+    description: "Returns one knowledge record in full, by the numeric id a search_knowledge or get_by_name hit gave: title, the full text in the source's words, the URL to cite, source, licence and date. Use it after a search to read the whole record; use fetch for the ChatGPT connector shape, which takes the string id a search result gave. An id no record has returns a null hit, not an error. Give field, a JSON pointer such as /questIds, to read one value of the record's data instead of the whole record; an array comes in pages of up to 48 rows, and nextOffset says where the next page starts. A pointer that leads nowhere answers with the keys it could have used, not an error.";
     inputSchema: {
+        readonly field: z.ZodOptional<z.ZodString>;
+        readonly offset: z.ZodOptional<z.ZodNumber>;
+        readonly limit: z.ZodOptional<z.ZodNumber>;
         readonly id: z.ZodNumber;
     };
     outputSchema: {
+        readonly field: z.ZodOptional<z.ZodObject<{
+            pointer: z.ZodString;
+            value: z.ZodUnknown;
+            nextOffset: z.ZodOptional<z.ZodNumber>;
+        }, z.core.$strip>>;
+        readonly keys: z.ZodOptional<z.ZodArray<z.ZodString>>;
         readonly hit: z.ZodNullable<z.ZodObject<{
             id: z.ZodNumber;
             extId: z.ZodString;
@@ -3151,11 +3200,20 @@ export declare const MCP_TOOL_LIST: ({
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
 } | {
     title: "Fetch one document (ChatGPT connector contract)";
-    description: "Returns one knowledge record in full, by the string id a search result gave: title, the full text in the source's words, the URL to cite, and metadata with the source, licence and date. It is the ChatGPT connector counterpart of get_entity. Use it after search; elsewhere, use get_entity with a search_knowledge id. The text block is the same JSON as a string.";
+    description: "Returns one knowledge record in full, by the string id a search result gave: title, the full text in the source's words, the URL to cite, and metadata with the source, licence and date. It is the ChatGPT connector counterpart of get_entity. Use it after search; elsewhere, use get_entity with a search_knowledge id. Give field, a JSON pointer such as /questIds, to read one value of the record's data: text then holds that value as JSON, and an array comes in pages of up to 48 rows with nextOffset for the next page. A long array in a whole record is cut at 48 rows. The text block is the same JSON as a string.";
     inputSchema: {
+        readonly field: z.ZodOptional<z.ZodString>;
+        readonly offset: z.ZodOptional<z.ZodNumber>;
+        readonly limit: z.ZodOptional<z.ZodNumber>;
         readonly id: z.ZodString;
     };
     outputSchema: {
+        field: z.ZodOptional<z.ZodObject<{
+            pointer: z.ZodString;
+            value: z.ZodUnknown;
+            nextOffset: z.ZodOptional<z.ZodNumber>;
+        }, z.core.$strip>>;
+        keys: z.ZodOptional<z.ZodArray<z.ZodString>>;
         id: z.ZodString;
         title: z.ZodString;
         text: z.ZodString;

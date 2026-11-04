@@ -41,3 +41,39 @@ export function pageArray(value: unknown, offset: number, limit: number): { valu
   const page = value.slice(from, to);
   return to < value.length ? { value: page, nextOffset: to } : { value: page };
 }
+
+/**
+ * Every top-level array longer than MAX_ROWS cut to its first MAX_ROWS rows, with a sibling `<name>NextOffset` saying
+ * where the rest starts. `cut` says whether anything was cut.
+ */
+export function cutArrays(data: Record<string, unknown>): { data: Record<string, unknown>; cut: boolean } {
+  let cut = false;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (Array.isArray(value) && value.length > MAX_ROWS) {
+      cut = true;
+      out[key] = value.slice(0, MAX_ROWS);
+      out[`${key}NextOffset`] = MAX_ROWS;
+    } else out[key] = value;
+  }
+  return { data: cut ? out : data, cut };
+}
+
+export type FieldRead =
+  | { ok: true; pointer: string; value: unknown; nextOffset?: number; from: number; total?: number }
+  | { ok: false; keys: string[] };
+
+/**
+ * One field of a record's data: the value at `pointer`, an array as one page of it, an object with its own long arrays
+ * cut. `from` is the row the page starts at and `total` the array's length, when the value is an array.
+ */
+export function readField(data: Record<string, unknown>, pointer: string, offset: number, limit: number): FieldRead {
+  const read = readPointer(data, pointer);
+  if (!read.ok) return read;
+  if (Array.isArray(read.value)) {
+    const paged = pageArray(read.value, offset, limit);
+    return { ok: true, pointer, ...paged, from: Math.max(0, Math.floor(offset)), total: read.value.length };
+  }
+  const value = isObject(read.value) ? cutArrays(read.value).data : read.value;
+  return { ok: true, pointer, value, from: 0 };
+}

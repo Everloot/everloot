@@ -37,7 +37,10 @@ test("search and fetch are listed as read-only tools with the connector contract
     expect(tool.outputSchema).toBeDefined();
   }
   expect(Object.keys(tools.find((t) => t.name === "search")!.inputSchema.properties ?? {})).toEqual(["query"]);
-  expect(Object.keys(tools.find((t) => t.name === "fetch")!.inputSchema.properties ?? {})).toEqual(["id"]);
+  // fetch still takes the id the contract names; the field read parameters are all optional.
+  const fetch = tools.find((t) => t.name === "fetch")!.inputSchema;
+  expect(Object.keys(fetch.properties ?? {})).toEqual(["id", "field", "offset", "limit"]);
+  expect(fetch.required).toEqual(["id"]);
 });
 
 test("search gives results with an id for fetch, a title and a URL, as structured content and as the same JSON text", async () => {

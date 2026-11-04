@@ -316,10 +316,20 @@ export async function getEntity(source: ReleaseSource, id: number): Promise<Sear
   return r ? toHit(r) : undefined;
 }
 
-/** One row by id with its whole body, for the fetch tool. Unknown id gives undefined. */
-export async function getDocument(source: ReleaseSource, id: number): Promise<(SearchHit & { body: string }) | undefined> {
-  const r = await releaseDb(source).get<EntityRow>(`SELECT ${ROW_BY_ID} FROM entities WHERE id = ?`, id);
-  return r ? { ...toHit(r), body: r.body } : undefined;
+/** The `data` column as an object; anything that does not parse to one is an empty record. */
+function parseData(text: string): Record<string, unknown> {
+  try {
+    const data: unknown = JSON.parse(text);
+    return typeof data === "object" && data !== null && !Array.isArray(data) ? (data as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** One row by id with its whole body and structured data, for the fetch tool. Unknown id gives undefined. */
+export async function getDocument(source: ReleaseSource, id: number): Promise<(SearchHit & { body: string; data: Record<string, unknown> }) | undefined> {
+  const r = await releaseDb(source).get<EntityRow & { data: string }>(`SELECT ${ROW_BY_ID}, data FROM entities WHERE id = ?`, id);
+  return r ? { ...toHit(r), body: r.body, data: parseData(r.data) } : undefined;
 }
 
 /** Every row of one kind with its `data`, by name, optionally where one data field equals a value. Both are bound. */
