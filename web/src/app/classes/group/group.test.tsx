@@ -169,8 +169,10 @@ describe("the group page", () => {
   });
 
   test("an effect whose reach the files do not settle is named as not known, not counted as brought", async () => {
+    // Build 70755 dropped Blessing of Salvation, the one effect left with no reach in the files, so no class
+    // lands in "Not known" today; class-group.test.ts holds the rule on its own table.
     await open("#size=5&classes=paladin");
-    expect(items("unknown")).toEqual(["A Paladin brings Blessing of Salvation, but how far it reaches is not known in this build's files."]);
+    expect(items("unknown")).toEqual([]);
     expect(items("brings").join(" ")).not.toContain("Blessing of Salvation");
   });
 

@@ -136,12 +136,15 @@ describe("coverage", () => {
     expect(treeNames(table, "hunter")[1]).toBe("Marksmanship");
   });
 
-  test("Greater Blessings and Salvation stay unknown, and Sanctuary is absent", () => {
+  test("Greater Blessings stay unknown, and Salvation and Sanctuary are absent", () => {
     const paladin = coverage(raid(10, { 0: slot("paladin") }), table);
-    expect(paladin.buffs.find((b) => b.family.id === "blessing-of-salvation")!.raid).toBe("unknown");
+    // Build 70755 no longer has Salvation in the files.
+    expect(paladin.buffs.find((b) => b.family.id === "blessing-of-salvation")).toBeUndefined();
     expect(table.entries.filter((e) => e.id.startsWith("greater-")).every((e) => e.scope === "unknown")).toBe(true);
-    expect(table.entries.some((e) => e.id === "blessing-of-sanctuary")).toBe(false);
-    expect(table.notFound).toContain("blessing-of-sanctuary");
+    for (const id of ["blessing-of-salvation", "blessing-of-sanctuary"]) {
+      expect(table.entries.some((e) => e.id === id)).toBe(false);
+      expect(table.notFound).toContain(id);
+    }
   });
 });
 
