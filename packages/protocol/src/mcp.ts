@@ -460,7 +460,7 @@ export type PlanRowOut = z.infer<typeof planRow>;
 
 /** The kind filter of search_knowledge and get_by_name. */
 const KIND_FILTER =
-  "Narrow to one record kind. achievement, faction, title, quest_chain, mount, legacy_perk, race and instance come from the game files (found in game files, unconfirmed); item, npc, object, quest, zone, spell, lore_page, creator and realm from the knowledge release. Without it, every kind.";
+  "Narrow to one record kind. achievement, faction, title, quest_chain, mount, legacy_perk, race and instance come from the game files (found in game files, unconfirmed); item, npc, object, quest, zone, spell, lore_page, creator and realm from the knowledge release; build is an Everloot team starter talent build, not observed. Without it, every kind.";
 
 const searchArgs = {
   query: z.string().max(1000).describe("What to look up: names, questions, keywords. Question words are ignored."),
@@ -758,7 +758,7 @@ export const MCP_TOOLS = {
   talent_tree: {
     title: "Talent trees for one class",
     description:
-      "Returns the WoW: Forever talent trees of one class from the game files (found in game files, unconfirmed, with the build): every node with its talents, ranks, grid position, prerequisites and row gate, plus the levels talent points arrive at. Node ids are the ids a share code names. Use it to read or explain a class's trees; use talent_plan to decode a share code against them, and class_races for which races can be the class. Narrow to one tree by name; without it the answer holds every node of every tree. The answer links the calculator.",
+      "Returns the WoW: Forever talent trees of one class from the game files (found in game files, unconfirmed, with the build): every node with its talents, ranks, grid position, prerequisites and row gate, plus the levels talent points arrive at. Node ids are the ids a share code names. Use it to read or explain a class's trees; use talent_plan to decode a share code against them, and class_races for which races can be the class. Narrow to one tree by name; without it the answer holds every node of every tree. With builds, the answer also lists the Everloot team's published starter builds for the class, each labelled as the team's and not observed, with its share code and page. The answer links the calculator.",
     inputSchema: {
       class: z.enum(TALENT_CLASSES).describe("Class slug, such as mage."),
       tree: z.string().max(40).optional().describe("One tree by name, such as Arcane. Without it, every tree."),
