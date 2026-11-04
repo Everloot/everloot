@@ -1,20 +1,20 @@
 {
   "schema": 1,
-  "refreshedAt": "2026-11-04T06:41:00.046Z",
+  "refreshedAt": "2026-11-04T19:54:06.083Z",
   "projects": {
     "everloot": {
       "status": "ok",
-      "fetchedAt": "2026-11-04T06:41:00.046Z",
+      "fetchedAt": "2026-11-04T19:54:06.083Z",
       "stars": 0,
       "archived": false,
       "license": "AGPL-3.0",
-      "lastCommit": "2026-11-04T06:33:21Z",
+      "lastCommit": "2026-11-04T19:52:00Z",
       "release": {
         "tag": "desktop-v0.1.17",
         "date": "2026-11-03T16:41:26Z",
         "url": "https://github.com/Everloot/everloot/releases/tag/desktop-v0.1.17"
       },
-      "commits4w": 1828,
+      "commits4w": 1839,
       "contributors": 2,
       "openIssues": 6,
       "closedIssues": 6,
@@ -26,29 +26,29 @@
     },
     "polestar": {
       "status": "ok",
-      "fetchedAt": "2026-11-04T06:41:07.480Z",
-      "stars": 188,
+      "fetchedAt": "2026-11-04T19:54:13.948Z",
+      "stars": 189,
       "archived": false,
       "license": null,
-      "lastCommit": "2026-11-03T18:32:13Z",
+      "lastCommit": "2026-11-04T16:54:21Z",
       "release": {
-        "tag": "v0.3.0",
-        "date": "2026-11-03T09:54:09Z",
-        "url": "https://github.com/fitzforge/polestar/releases/tag/v0.3.0"
+        "tag": "v0.3.1",
+        "date": "2026-11-04T16:31:44Z",
+        "url": "https://github.com/fitzforge/polestar/releases/tag/v0.3.1"
       },
-      "commits4w": 2094,
+      "commits4w": 2126,
       "contributors": 32,
       "openIssues": 28,
-      "closedIssues": 257,
-      "medianFirstResponseHours": null,
-      "responseSample": 2,
+      "closedIssues": 258,
+      "medianFirstResponseHours": 10.7,
+      "responseSample": 3,
       "interfaces": [
         16001
       ]
     },
     "olympus": {
       "status": "ok",
-      "fetchedAt": "2026-11-04T06:41:15.103Z",
+      "fetchedAt": "2026-11-04T19:54:22.419Z",
       "stars": 21,
       "archived": false,
       "license": "MIT",
@@ -58,7 +58,7 @@
         "date": "2026-10-26T23:42:08Z",
         "url": "https://github.com/dnl-gentile/olympus-addon/releases/tag/v1.3.3"
       },
-      "commits4w": 604,
+      "commits4w": 561,
       "contributors": 4,
       "openIssues": 6,
       "closedIssues": 13,
@@ -72,13 +72,13 @@
     },
     "forever-ref": {
       "status": "ok",
-      "fetchedAt": "2026-11-04T06:41:25.156Z",
+      "fetchedAt": "2026-11-04T19:54:33.595Z",
       "stars": 0,
       "archived": false,
       "license": null,
       "lastCommit": "2026-10-27T12:13:21Z",
       "release": null,
-      "commits4w": 10,
+      "commits4w": 9,
       "contributors": 2,
       "openIssues": 0,
       "closedIssues": 1,
@@ -162,7 +162,7 @@
         "stars": 0
       },
       {
-        "at": "2026-11-04T06:41:00.046Z",
+        "at": "2026-11-04T19:54:06.083Z",
         "stars": 0
       }
     ],
@@ -240,8 +240,8 @@
         "stars": 186
       },
       {
-        "at": "2026-11-04T06:41:00.046Z",
-        "stars": 188
+        "at": "2026-11-04T19:54:06.083Z",
+        "stars": 189
       }
     ],
     "olympus": [
@@ -318,7 +318,7 @@
         "stars": 21
       },
       {
-        "at": "2026-11-04T06:41:00.046Z",
+        "at": "2026-11-04T19:54:06.083Z",
         "stars": 21
       }
     ],
@@ -396,7 +396,7 @@
         "stars": 0
       },
       {
-        "at": "2026-11-04T06:41:00.046Z",
+        "at": "2026-11-04T19:54:06.083Z",
         "stars": 0
       }
     ]
