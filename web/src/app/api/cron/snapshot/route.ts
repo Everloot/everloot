@@ -11,9 +11,10 @@ import { currentSettledWeek, writeSettled } from "@/lib/settled-store";
 
 /**
  * GET /api/cron/snapshot — the Worker's Cron Trigger (src/lib/cf-crons.ts, every 10 minutes) extends the corpus snapshot with new uploads,
- * then folds new full auction scans into the market rollup. The market step runs only after the
- * corpus step succeeded; if it fails the corpus snapshot is already current, the response is a 500
- * and the next run retries the same uploads.
+ * then folds new full auction scans into the market rollup. The rollups keep their own watermarks, so
+ * they run whether or not the corpus step succeeded: a corpus snapshot that has grown past what one run can
+ * parse must not freeze prices. A failed step makes the response a 500, leaves the heartbeat alone, and the
+ * next run retries the same uploads.
  * The trigger sends `Authorization: Bearer $CRON_SECRET`; without the secret configured it refuses to run.
  * `?rebuild=1` rebuilds both from empty, which is how a deleted upload leaves them. The market
  * rebuild reads only uploads from the last 62 days (older ones cannot hold a day it keeps), and
@@ -35,7 +36,13 @@ export async function GET(req: Request) {
   try {
     const work = rebuild ? { idle: false, retryRollups: false, dataAsOf: null, settledWeek: null } : await uploadStore.snapshotWork();
     const idle = work.idle && !rebuild;
-    const result = idle ? { added: 0, skipped: true, dataAsOf: work.dataAsOf } : await uploadStore.writeSnapshot({ rebuild });
+    // A corpus failure is reported at the end, after the rollups that do not depend on it have run.
+    let result: { added: number; skipped?: boolean; dataAsOf: string | null } | null = null;
+    try {
+      result = idle ? { added: 0, skipped: true, dataAsOf: work.dataAsOf } : await uploadStore.writeSnapshot({ rebuild });
+    } catch (err) {
+      console.error("snapshot failed", err);
+    }
     await intakeQuota.prune();
     // Key retention (lib/api-keys.ts) runs only once the data guard's tables exist; a failure is retried next run.
     if (guardOn()) {
@@ -58,7 +65,6 @@ export async function GET(req: Request) {
     } catch (err) {
       console.error("market rollup failed", err);
     }
-    if (!market) return NextResponse.json({ ok: false, error: "market rollup failed", rebuild, ...result }, { status: 500 });
     // The completion rollup has its own watermark too, and runs after the market so it cannot starve it.
     let completion: { added: number; remaining: number; trimmed: number; rebuilding: boolean } | null = null;
     try {
@@ -68,6 +74,8 @@ export async function GET(req: Request) {
     } catch (err) {
       console.error("completion rollup failed", err);
     }
+    if (!result) return NextResponse.json({ ok: false, error: "snapshot failed", rebuild, market, completion }, { status: 500 });
+    if (!market) return NextResponse.json({ ok: false, error: "market rollup failed", rebuild, ...result, completion }, { status: 500 });
     if (!completion) return NextResponse.json({ ok: false, error: "completion rollup failed", rebuild, ...result, market }, { status: 500 });
     // The coverage score changes only with the snapshot, so an idle run never recomputes it. It is dated by the
     // snapshot's time, the heartbeat's `dataAsOf`. The pages compute it themselves, so a failure here is logged and

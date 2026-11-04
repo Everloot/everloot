@@ -236,7 +236,10 @@ describe("intake through the store into published facts", () => {
     ]);
 
     expect(await writer.writeSnapshot()).toMatchObject({ uploads: 1, added: 1 });
-    expect(JSON.parse(snapshotBody).records).toEqual([goodLoot]);
+    // The snapshot carries its records as replay events, once; the records array stays empty for the older reader.
+    const snapshot = JSON.parse(snapshotBody);
+    expect(snapshot.records).toEqual([]);
+    expect(snapshot.corpusState.events.map((e: { record: unknown }) => e.record)).toEqual([goodLoot]);
 
     const reader = createUploadStore({ cloud, localDir: "unused", fetch: fn, now, cacheMs: 0 });
     const corpus = await reader.loadCorpus();

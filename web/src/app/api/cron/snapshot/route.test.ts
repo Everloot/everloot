@@ -124,6 +124,23 @@ test("a market failure is reported but does not block the corpus snapshot or cle
   expect(await res.json()).toMatchObject({ ok: false, error: "market rollup failed" });
 });
 
+test("a corpus failure still folds the market and completion, is reported, and never advances the heartbeat", async () => {
+  // The corpus snapshot grows with every record; the rollups have their own watermarks and must not wait on it.
+  const order: string[] = [];
+  store.writeSnapshot.mockImplementation(async () => { order.push("snapshot"); throw new Error("snapshot too big"); });
+  store.prune.mockImplementation(async () => { order.push("prune"); });
+  store.writeMarket.mockImplementation(async () => { order.push("market"); return { added: 3, scans: 7 }; });
+  store.writeCompletion.mockImplementation(async () => { order.push("completion"); return { added: 1, remaining: 0, trimmed: 0, rebuilding: false }; });
+  const res = await GET(req());
+  expect(order).toEqual(["snapshot", "prune", "market", "completion"]);
+  expect(res.status).toBe(500);
+  expect(await res.json()).toMatchObject({ ok: false, error: "snapshot failed", market: { added: 3, scans: 7 }, completion: { added: 1 } });
+  expect(store.writeMarket).toHaveBeenCalledWith({ rebuild: false });
+  expect(coverage.writeCoverage).not.toHaveBeenCalled();
+  expect(settled.writeSettled).not.toHaveBeenCalled();
+  expect(store.writeCronRun).not.toHaveBeenCalled();
+});
+
 test("key retention runs only once the data guard is on, and its failure does not fail the snapshot", async () => {
   vi.stubEnv("EVERLOOT_DATA_GUARD", "");
   expect((await GET(req())).status).toBe(200);
