@@ -1,8 +1,8 @@
 # Market rollup per realm: one object per realm, an index, and a cross-realm summary
 
 Date: 2026-11-04. Status: draft for Carlos's review. Follows
-[the Forever market design](2026-10-16-forever-market-design.md) and the load estimate of 2026-11-03
-(Brain, `wiki/projects/everloot/2026-11-03-tsm-parity-and-load-plan.md`).
+[the Forever market design](2026-10-16-forever-market-design.md) and the maintainer's load estimate
+of 2026-11-03 (an internal note; its conclusions are restated in section 1).
 
 ## 1. Why
 
