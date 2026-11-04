@@ -4,7 +4,7 @@ Date: 2026-11-03. Report only; no code, no new tables, no keys, nothing decrypte
 
 ## Verdict
 
-**Build wowf 1.60.1.70755 lists all ten of Azeroth DB's locales (enUS deDE esES esMX frFR koKR ptBR ruRU zhCN zhTW) as separate content keys for twelve of the thirteen tables asked about, but the local snapshot of this build holds enUS only (one string per column, not one per locale). The other nine locale files were listed in the build's root and not downloaded, so their contents are unverified. QuestV2 has no string column in any locale, so quest titles are not in this table.**
+**Build wowf 1.60.1.70755 lists all ten of Azeroth DB's locales (enUS deDE esES esMX frFR koKR ptBR ruRU zhCN zhTW) as separate content keys for twelve of the thirteen tables asked about. The local snapshot of this build holds enUS only, but the other locales do download and read from the CDN: deDE and esMX strings for CharTitles (41 rows each) and deDE strings for QuestInfo (7 rows) were read in full, with no encrypted blocks and the same row ids as enUS. esES, frFR, koKR, ptBR, ruRU, zhCN and zhTW were not downloaded, and no table beyond QuestInfo and CharTitles was read in any other locale. QuestV2 has no string column in any locale, so quest titles are not in this table.**
 
 ## What was read, and how
 
@@ -13,6 +13,8 @@ Every number below names its source:
 - **Snapshot**: the local snapshot of build 70755 (wowf, build config `9d9888f2d89a2dcc9eacc68a2d7cb3dc`, extracted 2026-11-03T22:07:47Z, library `@rhyster/wow-casc-dbc@2.16.19`, definitions pinned at WoWDBDefs commit `92bb4dc62114`). Copied and opened read-only. `client-extract` was not run again. Queries were ad-hoc SQLite reads of `client_rows` (rows are JSON, one per id) and of the snapshot manifest. Called "snapshot" below.
 - **Definitions**: `definitions/<Table>.dbd` fetched from `raw.githubusercontent.com/wowdev/WoWDBDefs` at commit `92bb4dc62114`; the block listing build `1.60.1.70755` was parsed for `locstring` columns. Called "definition" below.
 - **Root listing**: an ad-hoc read-only script using the pinned library: `CASCClient.getProductVersion("us","wowf")`, `init()`, then `getContentKeysByFileDataID(<id>)` for each table's file data id (ids from `CLIENT_TABLES`). It reads the build's root listing only, no table content. The CDN reported version `1.60.1.70755`, build config `9d9888f2d89a2dcc9eacc68a2d7cb3dc`, matching the snapshot. Called "root listing" below. `client-scan` was not run: its candidate list covers tables outside `CLIENT_TABLES`, and every table asked about is already in it.
+
+- **Other-locale read** (follow-up, same day, section "Other locales, verified"): an ad-hoc read-only script using the same pinned library and the same WoWDBDefs commit. It opened the CDN's current wowf version (the CDN again reported `1.60.1.70755`, build config `9d9888f2d89a2dcc9eacc68a2d7cb3dc`, build id 70755), took from the root listing the content key whose locale flags carry deDE or esMX instead of enUS, downloaded that one file, parsed it as the extractor does and compared it with the snapshot's enUS rows. Three files in total: QuestInfo (deDE), CharTitles (deDE), CharTitles (esMX). Called "other-locale read" below.
 
 All thirteen tables are in the snapshot, so none is "not in the snapshot" or unscanned.
 
@@ -63,9 +65,9 @@ Azeroth DB's ten locales against this listing:
 | Azeroth DB locale | Key in the root listing | Content read |
 |---|---|---|
 | enUS | yes (one key shared with enGB) | yes, in the snapshot |
-| deDE | yes | no |
+| deDE | yes | QuestInfo and CharTitles (other-locale read) |
 | esES | yes | no |
-| esMX | yes | no |
+| esMX | yes | CharTitles (other-locale read) |
 | frFR | yes | no |
 | koKR | yes | no |
 | ptBR | yes (one key shared with ptPT) | no |
@@ -73,7 +75,37 @@ Azeroth DB's ten locales against this listing:
 | zhCN | yes | no |
 | zhTW | yes | no |
 
-"Reachable" here means listed in the build's root. Whether the CDN serves each non-enUS file, whether its blocks are readable (the same blocks that are encrypted in enUS may be encrypted in the others), and how many rows each yields were not tested.
+"Listed" means present in the build's root; the next section reports what was downloaded. For the seven locales marked "no" (esES, frFR, koKR, ptBR, ruRU, zhCN, zhTW), whether the CDN serves the file and whether its blocks are readable was not tested.
+
+## Other locales, verified
+
+Source: the other-locale read, build 70755 (wowf, build config `9d9888f2d89a2dcc9eacc68a2d7cb3dc`), definitions at WoWDBDefs commit `92bb4dc62114`. Counts come from that one run; enUS values come from the local snapshot of build 70755 (same ids).
+
+| Table, locale | File downloaded | Rows readable | Rows | Encrypted blocks | Same ids as enUS | Non-empty strings read | Differ from enUS |
+|---|---|---|---|---|---|---|---|
+| QuestInfo, deDE | yes (505 B) | yes | 7 | 0 | yes | 7 (`InfoName_lang`) | 4 of 7 |
+| CharTitles, deDE | yes (2,197 B) | yes | 41 | 0 | yes | 82 (`Name_lang`, `Name1_lang`) | 80 of 82 |
+| CharTitles, esMX | yes (2,031 B) | yes | 41 | 0 | yes | 82 (`Name_lang`, `Name1_lang`) | 80 of 82 |
+
+No download or read failed. For all three files the root listing had a content key for the locale and it was not flagged encrypted.
+
+Sample strings (id; locale string; enUS string in the snapshot):
+
+| Table, column | Id | Locale | String | enUS |
+|---|---|---|---|---|
+| QuestInfo `InfoName_lang` | 21 | deDE | Leben | Life |
+| QuestInfo `InfoName_lang` | 1 | deDE | Elite | Elite |
+| QuestInfo `InfoName_lang` | 41 | deDE | PvP | PvP |
+| CharTitles `Name_lang` | 144 | deDE | Blutsegeladmiral %s | Bloodsail Admiral %s |
+| CharTitles `Name1_lang` | 144 | deDE | Blutsegeladmiralin %s | Bloodsail Admiral %s |
+| CharTitles `Name_lang` | 1017 | deDE | %s der Magram | %s of the Magram |
+| CharTitles `Name_lang` | 144 | esMX | Almirante Velasangre %s | Bloodsail Admiral %s |
+| CharTitles `Name_lang` | 1017 | esMX | %s de los Magram | %s of the Magram |
+| CharTitles `Name_lang` | 1018 | esMX | %s de los Gelkis | %s of the Gelkis |
+
+What this shows: the other-locale files are separate WDC files of the same shape; the strings are real translations (in deDE, `Name1_lang` for id 144 reads "Blutsegeladmiralin" where `Name_lang` reads "Blutsegeladmiral"; enUS has one string in both), and the `%s` placeholder survives. Two of the three QuestInfo samples ("Elite", "PvP") are the same word in German as in English, which is why they match. The extractor picks the enUS key (else the first key), so these files are not in the snapshot.
+
+What this does not show: that the other seven locales download, that the large tables (ItemSparse, SpellName) have the same encrypted-block pattern in other locales as in enUS, or per-locale file sizes for any table beyond these three.
 
 ## Byte estimate for a name-only extraction (enUS, measured)
 
@@ -98,7 +130,7 @@ One `{id: name}` map per table, from the snapshot (build 70755), using the name 
 
 For comparison, the full rows of the same thirteen tables in the snapshot's `client_rows` total 30,488,690 bytes (`sum(length(raw))`).
 
-Other locales were not downloaded, so no per-locale size is measured. As an assumption only: if each of the ten locales were the size of enUS, ten maps would be about 15.9 MB JSON and 4.4 MB gzipped (sum of per-table). CJK and Cyrillic strings use more UTF-8 bytes per character and fewer characters per name, so the real figure differs.
+Only three non-enUS files were downloaded (see "Other locales, verified"), so no per-locale size for these maps is measured. As an assumption only: if each of the ten locales were the size of enUS, ten maps would be about 15.9 MB JSON and 4.4 MB gzipped (sum of per-table). CJK and Cyrillic strings use more UTF-8 bytes per character and fewer characters per name, so the real figure differs.
 
 ## Cost: what `KNOWLEDGE_KINDS` rows would need
 
@@ -112,8 +144,8 @@ Facts only.
 
 ## Not determined
 
-- Contents, readability and row counts of the nine non-enUS files. They are listed in the root and were not downloaded; a one-table read (QuestInfo, 7 rows) in one locale would answer it.
+- Contents, readability and row counts of the other non-enUS files. Read so far: QuestInfo (deDE) and CharTitles (deDE, esMX); see "Other locales, verified". esES, frFR, koKR, ptBR, ruRU, zhCN and zhTW, and every other table in every other locale, were listed in the root and not downloaded.
 - Why the definition's `locstring` columns marked "Layout only" are absent from the extracted rows. Possible causes (the extractor dropping them, the file lacking them in this build, or my parse of the definition block) were not separated.
 - Whether the 12,678 item ids missing from `ItemSparse` sit in its 31 encrypted blocks.
-- Download size per locale file, and the CDN's behaviour for locales other than the one the launcher installs.
+- Download size per locale file beyond the three measured above, and the CDN's behaviour for the seven locales not tried.
 - Other products' localized builds: not scanned. Everything above is the `wowf` product's own root listing.
