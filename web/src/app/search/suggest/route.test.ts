@@ -29,6 +29,13 @@ test("the type-ahead finds items and quests by the names their pages show", asyn
   expect((await get("?q=19019"))[0]).toMatchObject({ label: "Thunderfury, Blessed Blade of the Windseeker" });
 });
 
+test("the type-ahead suggests a dungeon's page by its name, with or without the leading The, and not in a scoped box", async () => {
+  for (const q of ["deadm", "the%20deadmines"]) {
+    expect((await get(`?q=${q}`))[0], q).toMatchObject({ type: "instance", label: "Deadmines", href: "/database/instances/36-deadmines", note: "Dungeon, level 16" });
+  }
+  expect(await get("?q=deadm&in=npc")).toEqual([]);
+});
+
 test("an item row carries its game icon where its page shows one; NPCs and quests have none", async () => {
   expect((await get("?q=thunderfury"))[0]).toMatchObject({ icon: "https://assets.everloot.app/b/icons/1.webp" });
   expect((await get("?q=destiny"))[0]).not.toHaveProperty("icon");
