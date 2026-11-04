@@ -85,4 +85,5 @@ test("record URLs follow the site's lore slugs", () => {
   expect(recordUrl({ kind: "lore_page", extId: "forever-launch-date", name: "x", sourceUrl: "https://s" }, "https://everloot.app")).toBe("https://everloot.app/wow-forever");
   expect(recordUrl({ kind: "lore_page", extId: "291323", name: "Frostwhisper", sourceUrl: "https://s" }, "https://everloot.app")).toBe("https://everloot.app/lore/291323-frostwhisper");
   expect(recordUrl({ kind: "npc", extId: "1", name: "x", sourceUrl: "https://s" }, "https://everloot.app")).toBe("https://s");
+  expect(recordUrl({ kind: "faction", extId: "1", name: "Stormwind", sourceUrl: "x" }, "https://everloot.app")).toBe("https://everloot.app/database/factions/1-stormwind");
 });

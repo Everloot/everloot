@@ -1,5 +1,6 @@
 import { SITE, type ChangeFilter, type TalentClass } from "@everloot/protocol";
 import { previewPath } from "../../web/src/lib/talents/summary";
+import { catalogPath } from "./catalog-paths.js";
 import { guildSlug } from "./guilds.js";
 import { INDEXABLE_MIN_BODY, lorePath } from "./lore-slug.js";
 import { releaseDb, type ReleaseSource } from "./release-db.js";
@@ -145,12 +146,18 @@ const PUBLISHABLE = Object.values(SOURCES).filter((s) => s.publishable).map((s) 
 const LORE_BATCH = 90;
 
 /**
- * The lore page of each record that has a full one on the site, by record id: a lore page from a
- * publishable source with enough text, not a redirect stub. Other records get none.
+ * The page of each record that has one on the site, by record id: a lore page from a publishable source with
+ * enough text, not a redirect stub, and a game-file catalog record (catalog-index.ts) with its database page.
+ * Other records get none.
  */
 export async function loreUrls(source: ReleaseSource, rows: readonly { id: number; extId: string; name: string; kind: string }[]): Promise<Map<number, string>> {
+  const out = new Map<number, string>();
+  for (const r of rows) {
+    const path = catalogPath(r.kind, r.extId, r.name);
+    if (path !== null) out.set(r.id, abs(path));
+  }
   const lore = rows.filter((r) => r.kind === "lore_page");
-  if (lore.length === 0) return new Map();
+  if (lore.length === 0) return out;
   // D1 binds at most 100 parameters per statement, so the ids go in batches that leave room for the rest.
   const ids = new Set<number>();
   for (let at = 0; at < lore.length; at += LORE_BATCH) {
@@ -161,5 +168,6 @@ export async function loreUrls(source: ReleaseSource, rows: readonly { id: numbe
       ...batch.map((r) => r.id), ...PUBLISHABLE, INDEXABLE_MIN_BODY,
     )) ids.add(r.id);
   }
-  return new Map(lore.filter((r) => ids.has(r.id)).map((r) => [r.id, abs(lorePath(r))]));
+  for (const r of lore) if (ids.has(r.id)) out.set(r.id, abs(lorePath(r)));
+  return out;
 }

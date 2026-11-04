@@ -1,0 +1,20 @@
+{
+ "schema": "everloot.client-factions/1",
+ "label": "Found in game files, unconfirmed",
+ "credit": "Game data © Blizzard Entertainment, Inc., read from the public client; not under Everloot's licence. Column names from WoWDBDefs (https://github.com/wowdev/WoWDBDefs), CC BY-SA 4.0.",
+ "build": {
+  "product": "wowf",
+  "buildId": 70755,
+  "version": "1.60.1.70755",
+  "buildConfig": "7feb61f3c994bcb168526b8db521514a",
+  "definitions": "a3840427a39e",
+  "extractedAt": "2026-11-03T22:07:47.040Z"
+ },
+ "factions": [
+  {
+   "id": 1,
+   "name": "Stormwind",
+   "shown": true
+  }
+ ]
+}

@@ -222,12 +222,12 @@ Game files show what exists; play shows what is real. Everloot keeps the two apa
 is which.
 
 **What the game files contain.** *Status: the table data is not published yet, except the talent catalog, the map layer, the
-raid buff table, the client layer, the race table, the Legacy perk catalog and the build changes described below.* A maintainer can read tables of a game's current build from the files Blizzard's
+raid buff table, the client layer, the race table, the Legacy perk catalog, the faction, title and quest line tables and the build changes described below.* A maintainer can read tables of a game's current build from the files Blizzard's
 launcher downloads from its public CDN, the same files every player receives, and compare two
 builds field by field. The [source ledger](sources/LEDGER.md) lists the tables we read. Those
 snapshots and comparisons stay on the maintainer's machine. Encrypted blocks are skipped, never
 decrypted: no decryption keys are loaded. Nothing else read from the game files is in the dataset, the
-API or the MCP server; the client layer and the race table below are the game-file layers they carry, and answers carry the game-file facts described under *Game-file facts in answers*. On the site, only the talent catalog, the map layer, the raid buff table, the client layer, the race table, the build changes,
+API or the MCP server; the client layer, the race table and the catalog index below are the game-file layers they carry, and answers carry the game-file facts described under *Game-file facts in answers*. On the site, only the talent catalog, the map layer, the raid buff table, the client layer, the race table, the build changes,
 the icons, tooltip text and frame art covered further down, and the item names, quest titles and item set and spell names covered further down may appear.
 
 Publishing the table data comes later, as a separate step. Once it ships, every entry from game
@@ -462,7 +462,8 @@ file (`web/src/data/game-data/legacy-perks.json`, see [LEGACY_PERKS](LEGACY_PERK
 files, unconfirmed*: it is Blizzard's data, kept apart from our CC BY-SA data and outside our licence. Each rule says
 how it was read, and a rule the files do not settle has no value. Decided 2026-11-02 by Carlos: a read-only page,
 `/tools/legacy`, lists it. No planner uses it: a Legacy planner waits until the cost, the cap and the spend gates it
-would enforce are confirmed in game or by Blizzard. It is not in the dataset, the API or the MCP server.
+would enforce are confirmed in game or by Blizzard. It is not in the dataset or the API. Decided 2026-11-03 by Carlos: its
+perk names and ids reach the MCP knowledge search through the catalog index (see *Game-file facts in answers*).
 
 **The map layer.** From the map tables we publish zone rectangles (`UiMapAssignment`), continents
 and instances (`Map`, `UiMap`), dungeon and raid entrance points (`Map.Corpse`) and, for each entrance
@@ -545,6 +546,14 @@ master, mount, achievement or talent the 2023 wiki and player data do not cover.
   the map rule above says.
 - The facts come from the files the build watch regenerates (`web/src/data/game-data`), so every change to
   them goes through a reviewed pull request.
+
+*Amendment, decided 2026-11-03 by Carlos: the catalog kinds (achievements, factions, titles, quest lines, mounts,
+legacy perks, races, instances) reach the MCP knowledge search through the catalog index, as names, ids and the
+listed fields, each labelled found in game files, unconfirmed with its build; achievement descriptions and criteria
+text stay on pages.* The index is built from the same committed files, outside the CC BY-SA knowledge release, and
+`search_knowledge`, `search`, `get_by_name`, `get_entity` and `fetch` read it beside the release. Every such
+answer carries the label and the build, the game-data credit, and a link to a page that exists on the site: only
+the factions the game shows are indexed, and statistics are not achievements.
 
 **Build changes, beta builds included.** Decided 2026-10-18, the same way Wowhead and other
 datamining sites work: when Blizzard ships a new build, a reviewed pull request records what

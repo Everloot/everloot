@@ -3,14 +3,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { AchievementEntry } from "../../../../../kb/src/completion";
 import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, type FilterControl } from "@/components/ui";
-import { achievementHref, loadCatalog } from "@/lib/completion-lists";
+import { achievementHref, loadCatalog, type Listed } from "@/lib/completion-lists";
 import { LINK } from "../entity";
 import {
-  listHref, listMetadata, listQuery, nextSort, NoMatches, NoObservations, PER_PAGE, sortParam, sortRows, Unreadable,
-  type ListQuery, type Search,
+  confirmedCell, ConfirmationsUnread, listCaption, listHref, listMetadata, listQuery, nextSort, NoMatches, noneListed, NoObservations, PER_PAGE,
+  sortParam, sortRows, Unreadable, type ListQuery, type Search,
 } from "../list-parts";
 
-const META = { title: "WoW Forever Achievement List", description: "Achievements in WoW: Forever, by category, points and criteria. An achievement is listed once three players report it the same way.", path: "/database/achievements" };
+const META = { title: "WoW Forever Achievement List", description: "Achievements in WoW: Forever by category, points and criteria. From the game files; confirmed once three players report each the same way.", path: "/database/achievements" };
 export const dynamic = "force-dynamic";
 
 const SORTS = ["name", "category", "points", "criteria", "id"] as const;
@@ -41,13 +41,14 @@ export default async function AchievementListPage(props: { searchParams?: Promis
   const q = achievementQuery((await props.searchParams) ?? {});
   if (!q) notFound();
   const catalog = await loadCatalog();
+  const confirmations = catalog?.confirmations ?? false;
   const all = catalog?.achievements ?? [];
   const text = q.q?.toLowerCase();
   const id = text && /^#?\d+$/.test(text) ? Number(text.replace("#", "")) : null;
   const matched = all.filter((x) =>
     (!text || (id !== null ? x.achievementId === id : x.name.toLowerCase().includes(text))) && (!q.category || x.category === q.category));
   const sort = q.sort ?? DEFAULT_SORT;
-  const key = (x: AchievementEntry): string | number | null => sort.key === "name" ? x.name.toLowerCase() : sort.key === "category" ? x.category.toLowerCase()
+  const key = (x: Listed<AchievementEntry>): string | number | null => sort.key === "name" ? x.name.toLowerCase() : sort.key === "category" ? x.category.toLowerCase()
     : sort.key === "points" ? x.points : sort.key === "criteria" ? x.criteriaCount : x.achievementId;
   const rows = sortRows(matched, key, sort.desc, (x) => x.achievementId);
   const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
@@ -55,15 +56,16 @@ export default async function AchievementListPage(props: { searchParams?: Promis
   const shown = rows.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
   const here = (over: Partial<AchievementQuery>) => href({ ...q, page: 1, ...over });
 
-  const columns: Column<AchievementEntry>[] = [
+  const columns: Column<Listed<AchievementEntry>>[] = [
     { key: "name", header: "Name", sortable: true, cell: (x) => <Link href={achievementHref(x.achievementId, x.name)} className={LINK}>{x.name}</Link> },
     { key: "category", header: "Category", sortable: true, cell: (x) => x.category },
     { key: "points", header: "Points", numeric: true, sortable: true, cell: (x) => x.points },
     { key: "criteria", header: "Criteria", numeric: true, sortable: true, cell: (x) => x.criteriaCount },
+    { key: "confirmed", header: "Confirmed", cell: (x) => confirmedCell(x, confirmations) },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.achievementId },
   ];
 
-  const categories = [...new Set(all.map((x) => x.category))].sort((a, b) => a.localeCompare(b));
+  const categories = [...new Set(all.flatMap((x) => (x.category ? [x.category] : [])))].sort((a, b) => a.localeCompare(b));
   const controls: FilterControl[] = [
     {
       type: "menu", key: "category", label: "Category",
@@ -80,12 +82,13 @@ export default async function AchievementListPage(props: { searchParams?: Promis
   ];
   const empty = !catalog ? <Unreadable />
     : filters(q) > 0 ? <NoMatches noun="achievements" chips={chips} clearHref="/database/achievements" />
-    : <NoObservations>No achievement is listed yet; each appears once three players report it.</NoObservations>;
+    : <NoObservations>{noneListed("achievement")}</NoObservations>;
 
   return (
     <Container width="data">
       <article>
         <DataTitle title="Achievements" aside={strip} />
+        {catalog && !confirmations && <ConfirmationsUnread />}
         <FilterBar
           label="Achievement filters"
           search={{ action: "/database/achievements", value: q.q, placeholder: "Name or id", label: "Filter by name or id", keep }}
@@ -96,7 +99,7 @@ export default async function AchievementListPage(props: { searchParams?: Promis
         <div className="mt-2">
           <DataTable
             dense
-            caption={`Achievements three players reported: ${rows.length}`}
+            caption={listCaption("achievements", rows, confirmations)}
             columns={columns}
             rows={shown}
             rowKey={(x) => String(x.achievementId)}

@@ -48,7 +48,7 @@ const STOPWORDS = new Set([
  * Words that ask for a pick, not a topic. They stay in a full search ("Best in Show" is a name), but when
  * no page has every word, they are what failed it, so the fallback leaves them out.
  */
-const PICK_WORDS = new Set(["best", "better", "worse", "worst", "good", "top"]);
+export const PICK_WORDS = new Set(["best", "better", "worse", "worst", "good", "top"]);
 
 /**
  * A name as its words: lowercased, split on anything that is not a letter or number, joined by
@@ -59,7 +59,7 @@ export function allTerms(name: string): string {
   return (name.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).join(" ");
 }
 
-function contentTerms(input: string): string[] {
+export function contentTerms(input: string): string[] {
   const terms = input.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
   const kept = terms.filter((t) => t.length > 1 && !STOPWORDS.has(t));
   return kept.length > 0 ? kept : terms;

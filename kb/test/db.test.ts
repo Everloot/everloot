@@ -4,7 +4,8 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { expect, test } from "vitest";
-import { openDb, openExistingReadOnlyDb } from "../src/db.js";
+import { openDb, openExistingReadOnlyDb, type DB } from "../src/db.js";
+import { ALL_KINDS } from "../src/entities.js";
 import { SOURCES } from "../src/sources.js";
 
 /** SHA-256 of the file bytes, so a read-only open can be proven not to have touched them. */
@@ -119,4 +120,19 @@ test("a failed readiness check leaves no open handle behind", () => {
   const writer = openDb(empty);
   expect(writer.prepare("SELECT count(*) AS n FROM sources").get()).toEqual({ n: Object.keys(SOURCES).length });
   writer.close();
+});
+
+/** A minimal row of the given kind, written straight to entities. */
+function insertRow(db: DB, kind: string): void {
+  db.prepare(
+    "INSERT INTO entities (kind, ext_id, name, body, game_version, source_id, source_url, licence, retrieved_at)" +
+      " VALUES (@kind, @ext_id, @name, '', 'forever', 'curated', @source_url, 'CC-BY-SA-4.0', '2026-11-03')",
+  ).run({ kind, ext_id: kind, name: `${kind} sample`, source_url: `https://example.test/${kind}` });
+}
+
+test("the entities table accepts every ALL_KINDS value", () => {
+  const db = openDb(":memory:");
+  for (const kind of ALL_KINDS) expect(() => insertRow(db, kind)).not.toThrow();
+  const { n } = db.prepare("SELECT count(*) AS n FROM entities").get() as { n: number };
+  expect(n).toBe(ALL_KINDS.length);
 });

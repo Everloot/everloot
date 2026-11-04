@@ -1,0 +1,36 @@
+{
+ "schema": "everloot.client-achievements/1",
+ "label": "Found in game files, unconfirmed",
+ "credit": "Game data © Blizzard Entertainment, Inc., read from the public client; not under Everloot's licence. Column names from WoWDBDefs (https://github.com/wowdev/WoWDBDefs), CC BY-SA 4.0.",
+ "build": {
+  "product": "wowf",
+  "buildId": 70707,
+  "version": "1.60.1.70707",
+  "buildConfig": "7feb61f3c994bcb168526b8db521514a",
+  "definitions": "a3840427a39e",
+  "extractedAt": "2026-10-30T15:48:39.935Z"
+ },
+ "note": "criteria and text are the game files'; category names come from player reports",
+ "achievements": {
+  "1234": {
+   "title": "Loremaster",
+   "points": 10,
+   "description": "Learn the lore of the world.",
+   "criteria": [
+    {
+     "text": "Read the first book"
+    },
+    {
+     "text": "Read the second book",
+     "amount": 2
+    }
+   ]
+  },
+  "1300": {
+   "title": "Creatures slain",
+   "points": 0,
+   "criteria": [],
+   "statistic": true
+  }
+ }
+}

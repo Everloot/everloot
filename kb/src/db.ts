@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS sources (
 );
 CREATE TABLE IF NOT EXISTS entities (
   id INTEGER PRIMARY KEY,
-  kind TEXT NOT NULL CHECK (kind IN ('item','npc','quest','zone','spell','lore_page','creator','realm')),
+  kind TEXT NOT NULL CHECK (kind IN ('item','npc','object','quest','zone','spell','lore_page','creator','realm','achievement','faction','title','quest_chain','mount','legacy_perk','race','instance')),
   ext_id TEXT NOT NULL,
   name TEXT NOT NULL,
   body TEXT NOT NULL DEFAULT '',

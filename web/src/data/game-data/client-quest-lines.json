@@ -1,0 +1,18 @@
+{
+ "schema": "everloot.client-quest-lines/1",
+ "label": "Found in game files, unconfirmed",
+ "credit": "Game data © Blizzard Entertainment, Inc., read from the public client; not under Everloot's licence. Column names from WoWDBDefs (https://github.com/wowdev/WoWDBDefs), CC BY-SA 4.0.",
+ "build": {
+  "product": "wowf",
+  "buildId": 70755,
+  "version": "1.60.1.70755",
+  "buildConfig": "9d9888f2d89a2dcc9eacc68a2d7cb3dc",
+  "definitions": "92bb4dc62114",
+  "extractedAt": "2026-11-03T22:07:47.040Z"
+ },
+ "questLines": [
+  {"id":5963,"name":"To Have Loved and Lost","questIds":[91564]},
+  {"id":6026,"name":"Toxic Soil","questIds":[92742,92744,92745,92747,92748,92749,92750,92751,92752,92753,92819]},
+  {"id":6293,"name":"PvP Season Journey","questIds":[96912,96913,96914,96915,96916,96917,96918,96919,96920,96921]}
+ ]
+}

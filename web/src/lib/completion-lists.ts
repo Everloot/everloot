@@ -1,20 +1,85 @@
 import { agreedCatalog } from "../../../kb/src/completion-rollup";
 import type { AchievementEntry, ChainEntry, FactionEntry, TitleEntry } from "../../../kb/src/completion";
 import { slugify } from "../../../kb/src/lore-slug";
+import { CLIENT_ACHIEVEMENTS } from "@/data/game-data/client-achievements";
+import { CLIENT_FACTIONS } from "@/data/game-data/client-factions";
+import { CLIENT_QUEST_LINES } from "@/data/game-data/client-quest-lines";
+import { CLIENT_TITLES } from "@/data/game-data/client-titles";
 import { uploadStore } from "./upload-store";
 
-// The achievements, factions, titles and quest chains the database lists: the completion rollup's agreed catalog, the same
-// three-reporter rule the collections tool and the MCP tool read (kb/src/completion-rollup.ts). Nothing
-// here is read from the game files and no owned progress is touched.
+// The achievements, factions, titles and quest chains the database lists: the game files' entries (unconfirmed) merged with
+// the completion rollup's agreed catalog (confirmed), the same three-reporter rule the collections tool and the MCP tool
+// read (kb/src/completion-rollup.ts). The rollup's entry wins where both have an id. No owned progress is touched.
 
-export interface CompletionCatalog { achievements: AchievementEntry[]; factions: FactionEntry[]; titles: TitleEntry[]; chains: ChainEntry[]; dataAsOf: string | null }
+/** An entry and whether player uploads confirm it (the rollup agrees on the same id); the rest come from the game files only. */
+export type Listed<T> = T & { confirmed: boolean };
 
-/** The agreed lists, or null when the rollup could not be read (unrecorded, not empty). */
+/**
+ * `base` says whether any game file was read, even one with no eligible entry. `confirmations` says whether the
+ * rollup was read: when false, no entry is known to be confirmed or unconfirmed, so a list must say "unrecorded".
+ */
+export interface CompletionCatalog { achievements: Listed<AchievementEntry>[]; factions: Listed<FactionEntry>[]; titles: Listed<TitleEntry>[]; chains: Listed<ChainEntry>[]; dataAsOf: string | null; base: boolean; confirmations: boolean }
+
+/** Whether a game-file wrapper could be read; a file that is there but holds no eligible entry still counts. */
+function readable(file: () => unknown): boolean {
+  try { return file() != null; } catch { return false; }
+}
+
+/** The game-file entries by id, each unconfirmed until the rollup says otherwise, and whether any file was read. */
+function baseEntries() {
+  const achievements = new Map<number, Listed<AchievementEntry>>();
+  const factions = new Map<number, Listed<FactionEntry>>();
+  const titles = new Map<number, Listed<TitleEntry>>();
+  const chains = new Map<number, Listed<ChainEntry>>();
+  const read = [
+    readable(() => {
+      for (const [id, a] of Object.entries(CLIENT_ACHIEVEMENTS.achievements)) {
+        if (a.statistic) continue;
+        achievements.set(Number(id), { achievementId: Number(id), name: a.title, category: "", points: a.points, criteriaCount: a.criteria.length, confirmed: false });
+      }
+      return CLIENT_ACHIEVEMENTS.achievements;
+    }),
+    readable(() => {
+      for (const f of CLIENT_FACTIONS.factions) if (f.shown) factions.set(f.id, { factionId: f.id, name: f.name, header: undefined, major: false, confirmed: false });
+      return CLIENT_FACTIONS.factions;
+    }),
+    readable(() => {
+      for (const t of CLIENT_TITLES.titles) titles.set(t.id, { titleId: t.id, name: t.name, confirmed: false });
+      return CLIENT_TITLES.titles;
+    }),
+    readable(() => {
+      for (const c of CLIENT_QUEST_LINES.questLines) chains.set(c.id, { questLineId: c.id, name: c.name, questIds: c.questIds, truncated: false, confirmed: false });
+      return CLIENT_QUEST_LINES.questLines;
+    }),
+  ];
+  return { achievements, factions, titles, chains, available: read.some(Boolean) };
+}
+
+/** The rollup's agreed entries replace the base entries of the same id, marked confirmed. */
+function merge<T>(base: Map<number, Listed<T>>, agreed: Map<number, T>): Listed<T>[] {
+  const out = new Map(base);
+  for (const [id, entry] of agreed) out.set(id, { ...entry, confirmed: true });
+  return [...out.values()];
+}
+
+/**
+ * The lists the database shows: the game files' entries, unconfirmed, with the agreed rollup entries confirmed on top.
+ * Null only when there is no game-file base and the rollup could not be read (unrecorded, not empty).
+ */
 export async function loadCatalog(): Promise<CompletionCatalog | null> {
+  const base = baseEntries();
   const read = await uploadStore.loadCompletion();
-  if (!read.state) return null;
-  const agreed = agreedCatalog(read.state);
-  return { achievements: [...agreed.achievements.values()], factions: [...agreed.factions.values()], titles: [...agreed.titles.values()], chains: [...agreed.chains.values()], dataAsOf: read.dataAsOf };
+  if (!read.state && !base.available) return null;
+  const agreed = read.state ? agreedCatalog(read.state) : null;
+  return {
+    achievements: merge(base.achievements, agreed?.achievements ?? new Map()),
+    factions: merge(base.factions, agreed?.factions ?? new Map()),
+    titles: merge(base.titles, agreed?.titles ?? new Map()),
+    chains: merge(base.chains, agreed?.chains ?? new Map()),
+    dataAsOf: read.state ? read.dataAsOf : null,
+    base: base.available,
+    confirmations: read.state !== null,
+  };
 }
 
 /** `4-ten-quests`: the id, then the name's words. A name with no letters or digits leaves the bare id. */

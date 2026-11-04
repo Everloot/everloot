@@ -7,6 +7,22 @@ vi.mock("@/lib/upload-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/upload-store")>()),
   uploadStore: { loadCompletion: store.loadCompletion },
 }));
+// The game-file base the lists start from: unreadable (null, the wrapper throws) unless a test sets it, so the cases below
+// keep testing the rollup alone. An empty list is a file that was read and holds nothing.
+const game = vi.hoisted(() => ({
+  factions: null as { id: number; name: string; shown: boolean; parentId?: number }[] | null,
+  titles: null as { id: number; name: string }[] | null,
+  questLines: null as { id: number; name: string; questIds: number[] }[] | null,
+  achievements: null as Record<string, { title: string; points: number; criteria: unknown[]; statistic?: true; description?: string }> | null,
+}));
+const file = <T,>(v: T | null): T => { if (v === null) throw new Error("game file unreadable"); return v; };
+vi.mock("@/data/game-data/client-factions", () => ({ get CLIENT_FACTIONS() { return { factions: file(game.factions) }; } }));
+vi.mock("@/data/game-data/client-titles", () => ({ get CLIENT_TITLES() { return { titles: file(game.titles) }; } }));
+vi.mock("@/data/game-data/client-quest-lines", () => ({ get CLIENT_QUEST_LINES() { return { questLines: file(game.questLines) }; } }));
+vi.mock("@/data/game-data/client-achievements", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/data/game-data/client-achievements")>();
+  return { get CLIENT_ACHIEVEMENTS() { return { ...real.CLIENT_ACHIEVEMENTS, achievements: file(game.achievements) }; } };
+});
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
 vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
@@ -22,13 +38,14 @@ vi.mock("@/lib/objects", () => ({ loadObjectFacts: async () => ({ rates: [], mea
 
 import AchievementList, { generateMetadata as achievementListMetadata } from "./achievements/page";
 import AchievementPage, { generateMetadata as achievementMetadata } from "./achievements/[id]/page";
-import FactionList from "./factions/page";
-import FactionPage from "./factions/[id]/page";
-import TitleList from "./titles/page";
-import TitlePage from "./titles/[id]/page";
-import ChainList from "./quest-chains/page";
-import ChainPage from "./quest-chains/[id]/page";
+import FactionList, { generateMetadata as factionListMetadata } from "./factions/page";
+import FactionPage, { generateMetadata as factionMetadata } from "./factions/[id]/page";
+import TitleList, { generateMetadata as titleListMetadata } from "./titles/page";
+import TitlePage, { generateMetadata as titleMetadata } from "./titles/[id]/page";
+import ChainList, { generateMetadata as chainListMetadata } from "./quest-chains/page";
+import ChainPage, { generateMetadata as chainMetadata } from "./quest-chains/[id]/page";
 import sitemap from "../sitemap";
+import { loadCatalog } from "@/lib/completion-lists";
 import { siteSearch } from "@/lib/site-search";
 import { emptyCompletion, foldCompletion } from "../../../../kb/src/completion-rollup";
 
@@ -77,6 +94,88 @@ const rows = [
 beforeEach(() => {
   store.loadCompletion.mockReset();
   serve(rows);
+  game.factions = null; game.titles = null; game.questLines = null; game.achievements = null;
+});
+
+/** The table row that links `href`. */
+const rowOf = (out: string, href: string) => out.split("<tr").find((r) => r.includes(`href="${href}"`)) ?? "";
+
+test("factions list shows base entries unconfirmed when the rollup is null", async () => {
+  game.factions = [{ id: 72, name: "Stormwind", shown: true }, { id: 1, name: "Hidden Header", shown: false }];
+  store.loadCompletion.mockResolvedValue({ state: null, dataAsOf: null, unreachable: true });
+  const out = await html(FactionList(search()));
+  expect(linked(out, "factions")).toEqual(["72-stormwind"]);
+  // The rollup was not read: nothing is known about confirmation, so it is never called unconfirmed.
+  expect(out).toContain(">Unrecorded<");
+  expect(out).not.toContain("Unconfirmed");
+  expect(out).toContain("data-confirmations-unread");
+  expect(out).toContain("Player confirmations could not be read");
+  expect(out).toContain("Factions in the game files: 1");
+  expect(out).not.toContain("Hidden Header");
+  expect(out).not.toContain("data-empty-state");
+  expect(out).not.toContain("unreachable");
+});
+
+test("an agreed faction shows as confirmed and keeps the rollup's header", async () => {
+  game.factions = [{ id: 69, name: "Darnassus (base)", shown: true }, { id: 72, name: "Stormwind", shown: true }];
+  const out = await html(FactionList(search()));
+  expect(linked(out, "factions")).toEqual(["69-darnassus", "72-stormwind", "76-orgrimmar", "529-argent-dawn"]);
+  const agreed = rowOf(out, "/database/factions/69-darnassus");
+  expect(out).toContain(">Confirmed</span></th>");
+  expect(agreed).toContain(">Confirmed<");
+  expect(agreed).toContain(">Alliance<");
+  expect(agreed).not.toContain("Unconfirmed");
+  expect(rowOf(out, "/database/factions/72-stormwind")).toContain(">Unconfirmed<");
+  // With the rollup read, files and players are counted apart and no notice shows.
+  expect(out).toContain("Factions in the game files or reported by players: 4, 3 confirmed by players");
+  expect(out).not.toContain("data-confirmations-unread");
+  expect(out).not.toContain("three players reported:");
+});
+
+test("titles, quest chains and achievements list from the base too; statistics stay out", async () => {
+  game.titles = [{ id: 7, name: "%s, Champion" }];
+  game.questLines = [{ id: 1, name: "The Missing Diplomat", questIds: [11, 10] }];
+  game.achievements = { "50": { title: "Loremaster", points: 10, criteria: [{}, {}] }, "51": { title: "Kills", points: 0, criteria: [], statistic: true } };
+  store.loadCompletion.mockResolvedValue({ state: null, dataAsOf: null, unreachable: true });
+  const titles = await html(TitleList(search()));
+  expect(titles).toContain(">Unrecorded<");
+  expect(titles).toContain("Titles in the game files: 1");
+  const chains = await html(ChainList(search()));
+  expect(linked(chains, "quest-chains")).toEqual(["1-the-missing-diplomat"]);
+  expect(chains).toContain(">2<");
+  expect(chains).toContain("Quest chains in the game files: 1");
+  const achievements = await html(AchievementList(search()));
+  expect(linked(achievements, "achievements")).toEqual(["50-loremaster"]);
+  expect(achievements).not.toContain("Kills");
+  expect(achievements).toContain("Achievements in the game files: 1");
+  // No list says Unconfirmed while the rollup is unread, and each one says why the column is unrecorded.
+  for (const out of [titles, chains, achievements]) {
+    expect(out).not.toContain("Unconfirmed");
+    expect(out).toContain("Player confirmations could not be read");
+  }
+});
+
+test("the list captions and descriptions keep the game files and the players apart", async () => {
+  game.titles = [{ id: 7, name: "%s, Champion" }];
+  game.questLines = [{ id: 1, name: "The Missing Diplomat", questIds: [11, 10] }];
+  game.achievements = { "50": { title: "Loremaster", points: 10, criteria: [{}, {}] } };
+  game.factions = [{ id: 72, name: "Stormwind", shown: true }];
+  for (const [el, caption] of [
+    [AchievementList(search()), "Achievements in the game files or reported by players: 4, 3 confirmed by players"],
+    [TitleList(search()), "Titles in the game files or reported by players: 3, 2 confirmed by players"],
+    [ChainList(search()), "Quest chains in the game files or reported by players: 3, 2 confirmed by players"],
+    [FactionList(search()), "Factions in the game files or reported by players: 4, 3 confirmed by players"],
+  ] as const) {
+    const out = await html(el);
+    expect(out).toContain(caption);
+    expect(out).not.toMatch(/three players reported:/);
+  }
+  const description = (await achievementListMetadata({ searchParams: Promise.resolve({}) })).description!;
+  expect(description).toContain("From the game files; confirmed once three players report each the same way.");
+  expect(description).not.toContain("is listed once three players");
+  for (const meta of [factionListMetadata, titleListMetadata, chainListMetadata]) {
+    expect((await meta({ searchParams: Promise.resolve({}) })).description).toContain("From the game files; confirmed once three players");
+  }
 });
 
 test("the achievement list shows what three reporters agree on and hides the rest", async () => {
@@ -119,7 +218,7 @@ test("before three players report anything, each list says so and shows no rows"
   for (const el of [AchievementList(search()), FactionList(search())]) {
     const out = await html(el);
     expect(out).toContain("data-empty-state");
-    expect(out).toContain("once three players report it");
+    expect(out).toContain("None is in the game files, and none has been confirmed by three players.");
     expect(out).not.toContain("Ten Quests");
   }
 });
@@ -131,6 +230,7 @@ test("an unreadable rollup says unrecorded, never empty", async () => {
 });
 
 test("an achievement page has its facts and is indexed; an unlisted one is a 404", async () => {
+  game.achievements = {}; // the page reads the files too: readable, and without these ids
   const out = await html(AchievementPage(page("4-ten-quests")));
   expect(out).toContain("Ten Quests");
   expect(out).toContain("Quests");
@@ -144,6 +244,7 @@ test("an achievement page has its facts and is indexed; an unlisted one is a 404
 });
 
 test("a bare id or a wrong slug redirects to the canonical address", async () => {
+  game.achievements = {}; // the page reads the files too: readable, and without these ids
   await expect(AchievementPage(page("4"))).rejects.toThrow("REDIRECT /database/achievements/4-ten-quests");
   await expect(FactionPage(page("69-wrong"))).rejects.toThrow("REDIRECT /database/factions/69-darnassus");
 });
@@ -206,7 +307,7 @@ test("empty and unreadable states for titles and quest chains", async () => {
   serve(from(2, { kind: "title_catalog", titleId: 4, name: "Private" }));
   for (const el of [TitleList(search()), ChainList(search())]) {
     const out = await html(el);
-    expect(out).toContain("once three players report it");
+    expect(out).toContain("None is in the game files, and none has been confirmed by three players.");
     expect(out).not.toContain("Private");
   }
   store.loadCompletion.mockResolvedValue({ state: null, dataAsOf: null, unreachable: true });
@@ -224,6 +325,7 @@ test("sitemap and search include agreed titles and quest chains only", async () 
 });
 
 test("an achievement page lists its criteria once three players sent the same full list", async () => {
+  game.achievements = {}; // the page reads the files too: readable, and without these ids
   serve([...rows, ...from(3, { ...ach(5, "Two Steps", "General", 5, 2), criteria: [{ text: "Visit Goldshire", required: 1 }, { text: "Kill 12 Kobolds", required: 12 }] })]);
   expect(await html(AchievementList(search()))).not.toContain("Visit Goldshire");
   const out = await html(AchievementPage(page("5-two-steps")));
@@ -235,4 +337,65 @@ test("an achievement page lists its criteria once three players sent the same fu
   const partial = await html(AchievementPage(page("4-ten-quests")));
   expect(partial).not.toContain("Secret criterion text");
   expect(partial).toContain("The criteria show once three players report the same full list.");
+});
+
+test("base is true when a game file was read and holds no eligible entry; null only when nothing is readable", async () => {
+  store.loadCompletion.mockResolvedValue({ state: null, dataAsOf: null, unreachable: true });
+  expect(await loadCatalog()).toBeNull();
+  game.factions = [{ id: 1, name: "Hidden Header", shown: false }];
+  expect(await loadCatalog()).toMatchObject({ base: true, factions: [], dataAsOf: null, confirmations: false });
+  serve(rows);
+  expect(await loadCatalog()).toMatchObject({ confirmations: true });
+  expect(await html(FactionList(search()))).not.toContain("unreachable");
+});
+
+test("a base-only faction page says it is in the game files, unconfirmed, and never claims player reports", async () => {
+  game.factions = [{ id: 72, name: "Stormwind", shown: true }];
+  const out = await html(FactionPage(page("72-stormwind")));
+  expect(out).toContain("found in game files, unconfirmed");
+  expect(out).not.toContain("as players reported it");
+  const description = (await factionMetadata(page("72-stormwind"))).description;
+  expect(description).toContain("Found in game files, unconfirmed");
+  expect(description).not.toContain("three players");
+  expect((await factionMetadata(page("69-darnassus"))).description).toContain("as three players reported it");
+});
+
+test("a base-only title page says it is in the game files, unconfirmed", async () => {
+  game.titles = [{ id: 8, name: "%s, Champion" }];
+  const out = await html(TitlePage(page("8-s-champion")));
+  expect(out).toContain("found in game files, unconfirmed");
+  expect(out).not.toContain("as players reported it");
+  const description = (await titleMetadata(page("8-s-champion"))).description;
+  expect(description).toContain("Found in game files, unconfirmed");
+  expect(description).not.toContain("three players");
+  expect((await titleMetadata(page("5-corporal"))).description).toContain("as three players reported it");
+});
+
+test("a base-only quest chain page says it is in the game files, unconfirmed", async () => {
+  game.questLines = [{ id: 1, name: "The Missing Diplomat", questIds: [11, 10] }];
+  const out = await html(ChainPage(page("1-the-missing-diplomat")));
+  expect(out).toContain("found in game files, unconfirmed");
+  expect(out).not.toContain("as players reported it");
+  const description = (await chainMetadata(page("1-the-missing-diplomat"))).description;
+  expect(description).toContain("Found in game files, unconfirmed");
+  expect(description).not.toContain("three players");
+  expect((await chainMetadata(page("900-the-defias"))).description).toContain("as three players reported it");
+});
+
+test("a base-only achievement page keeps the file-only presentation and the unconfirmed notice", async () => {
+  game.achievements = { "50": { title: "Loremaster", points: 10, description: "Complete every zone.", criteria: [{ text: "Elwynn", amount: 1 }] } };
+  const out = await html(AchievementPage(page("50-loremaster")));
+  expect(out).toContain("Complete every zone.");
+  expect(out).toContain("from the game files");
+  expect(out).toContain("found in game files, unconfirmed");
+  expect(out).not.toContain("as players reported it");
+  expect(out).not.toContain("three players reported them");
+  expect(out).toContain("Criteria and text are the game files");
+  expect(out).toContain("appear once three installs agree");
+  expect(out).not.toContain("No player has reported");
+  expect(out).not.toContain("becomes a page in the list");
+  expect(out).not.toContain("report it the same way");
+  const description = (await achievementMetadata(page("50-loremaster"))).description;
+  expect(description).toContain("Found in game files, unconfirmed");
+  expect(description).not.toContain("player reports");
 });

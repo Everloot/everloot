@@ -1,4 +1,4 @@
-﻿import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -20,6 +20,9 @@ import { writeClientMounts } from "./client-mounts.js";
 import { writeClientClassGear } from "./client-class-gear.js";
 import { writeClientClassSpells } from "./client-class-spells.js";
 import { writeClientRecipes } from "./client-recipes.js";
+import { writeClientFactions } from "./client-factions.js";
+import { writeClientTitles } from "./client-titles.js";
+import { writeClientQuestLines } from "./client-quest-lines.js";
 import { writeClientLayer } from "./client-layer.js";
 import { writeRaceTable } from "./client-races.js";
 import { evaluateWritten, formatAnswerEval, openAiCompatible, sampleKeyed } from "./answer-eval.js";
@@ -62,6 +65,7 @@ import { importWikiDump } from "./importers/wiki-dump.js";
 import { lootWindowsFromRecords, rollupDrops } from "./drop-rollup.js";
 import { startHttpBridge } from "./mcp-http.js";
 import { readCorpusRecords, serveStdio } from "./mcp-server.js";
+import { buildCatalogIndex, readCatalogFiles } from "./catalog-index.js";
 import { answerSourcesFactsFromRecords } from "./answer-sources.js";
 import { objectSpawnRowsFromRecords } from "./object-spawns.js";
 import { openPublicSnapshot } from "./public-snapshot.js";
@@ -204,6 +208,12 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
   client-recipes <snapshot.sqlite> [--out ../web/src/data/game-data/client-recipes.json]
     (every recipe on each profession's skill line with the item it makes, its reagents and the files' skill ranks,
     one build-stamped file the profession pages list. Pages only, as above)
+  client-factions <snapshot.sqlite> [--out ../web/src/data/game-data/client-factions.json]
+    (every faction with its parent and whether it shows in the reputation pane. Pages and search, as above)
+  client-titles <snapshot.sqlite> [--out ../web/src/data/game-data/client-titles.json]
+    (every character title, the %s placeholder kept. Pages and search, as above)
+  client-quest-lines <snapshot.sqlite> [--out ../web/src/data/game-data/client-quest-lines.json]
+    (every quest line with its quest ids in order. Pages and search, as above)
   item-names <snapshot.sqlite> --wiki <knowledge base or release .sqlite> [--ledger data/item-names/ledger.json] [--out data/assets]
     (adds the snapshot's item names and the Warcraft Wiki dump's item names to the name ledger, which only
     grows, and writes the name the site shows for every item a source names (the game files' first, with the wiki
@@ -405,12 +415,16 @@ async function main(): Promise<number> {
     case "serve-mcp": {
       const release = openPublicSnapshot(requireDbPath(flags, "serve-mcp"));
       closeOnExit(release.db);
+      // The game-file catalogs, read once; a missing file is named on stderr (stdout is the protocol) and skipped.
+      const { files, missing } = readCatalogFiles(flags.get("game-data") || "../web/src/data/game-data");
+      if (missing.length) console.error(`game-data: not found, skipped: ${missing.join(", ")}`);
+      const catalog = buildCatalogIndex(files);
       await serveStdio(release.db, () => {
         // The same files blue-check and builds-check write; absent files mean "not connected".
         const posts = join(CHANGES_DIR, "blue-posts.json");
         const builds = join(CHANGES_DIR, "builds.json");
         return existsSync(posts) || existsSync(builds) ? buildTimeline(loadStore(posts).posts, loadRegistry(builds).builds) : null;
-      });
+      }, () => catalog);
       return 0;
     }
     case "serve-mcp-http": {
@@ -715,6 +729,27 @@ async function main(): Promise<number> {
       const path = flags.get("out") || "../web/src/data/game-data/client-recipes.json";
       const table = writeClientRecipes(args[0], path);
       console.log(`${table.build.product} ${table.build.version}: ${table.professions.length} professions, ${table.professions.reduce((n, p) => n + p.recipes.length, 0)} recipes -> ${path}`);
+      return 0;
+    }
+    case "client-factions": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-factions.json";
+      const table = writeClientFactions(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${table.factions.length} factions -> ${path}`);
+      return 0;
+    }
+    case "client-titles": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-titles.json";
+      const table = writeClientTitles(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${table.titles.length} titles -> ${path}`);
+      return 0;
+    }
+    case "client-quest-lines": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-quest-lines.json";
+      const table = writeClientQuestLines(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${table.questLines.length} quest lines -> ${path}`);
       return 0;
     }
     case "client-diff": {

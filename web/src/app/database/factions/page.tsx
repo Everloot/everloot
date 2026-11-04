@@ -3,14 +3,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { FactionEntry } from "../../../../../kb/src/completion";
 import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, type FilterControl } from "@/components/ui";
-import { factionHref, loadCatalog } from "@/lib/completion-lists";
+import { factionHref, loadCatalog, type Listed } from "@/lib/completion-lists";
 import { LINK } from "../entity";
 import {
-  listHref, listMetadata, listQuery, nextSort, NoMatches, NoObservations, PER_PAGE, sortParam, sortRows, Unreadable,
-  type ListQuery, type Search,
+  confirmedCell, ConfirmationsUnread, listCaption, listHref, listMetadata, listQuery, nextSort, NoMatches, noneListed, NoObservations, PER_PAGE,
+  sortParam, sortRows, Unreadable, type ListQuery, type Search,
 } from "../list-parts";
 
-const META = { title: "WoW Forever Faction List", description: "Reputation factions in WoW: Forever by name, standing header and faction ID. A faction is listed once three players report it the same way.", path: "/database/factions" };
+const META = { title: "WoW Forever Faction List", description: "Reputation factions in WoW: Forever by name, header and ID. From the game files; confirmed once three players report each the same way.", path: "/database/factions" };
 export const dynamic = "force-dynamic";
 
 const SORTS = ["name", "header", "id"] as const;
@@ -41,13 +41,14 @@ export default async function FactionListPage(props: { searchParams?: Promise<Se
   const q = factionQuery((await props.searchParams) ?? {});
   if (!q) notFound();
   const catalog = await loadCatalog();
+  const confirmations = catalog?.confirmations ?? false;
   const all = catalog?.factions ?? [];
   const text = q.q?.toLowerCase();
   const id = text && /^#?\d+$/.test(text) ? Number(text.replace("#", "")) : null;
   const matched = all.filter((x) =>
     (!text || (id !== null ? x.factionId === id : x.name.toLowerCase().includes(text))) && (!q.header || x.header === q.header));
   const sort = q.sort ?? DEFAULT_SORT;
-  const key = (x: FactionEntry): string | number | null => sort.key === "name" ? x.name.toLowerCase() : sort.key === "header" ? x.header?.toLowerCase() ?? null : x.factionId;
+  const key = (x: Listed<FactionEntry>): string | number | null => sort.key === "name" ? x.name.toLowerCase() : sort.key === "header" ? x.header?.toLowerCase() ?? null : x.factionId;
   const rows = sortRows(matched, key, sort.desc, (x) => x.factionId);
   const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
   if (q.page > pages) notFound();
@@ -55,9 +56,10 @@ export default async function FactionListPage(props: { searchParams?: Promise<Se
   const here = (over: Partial<FactionQuery>) => href({ ...q, page: 1, ...over });
 
   const dash = <span className="text-muted">—</span>;
-  const columns: Column<FactionEntry>[] = [
+  const columns: Column<Listed<FactionEntry>>[] = [
     { key: "name", header: "Name", sortable: true, cell: (x) => <Link href={factionHref(x.factionId, x.name)} className={LINK}>{x.name}</Link> },
     { key: "header", header: "Header", sortable: true, cell: (x) => x.header ?? dash },
+    { key: "confirmed", header: "Confirmed", cell: (x) => confirmedCell(x, confirmations) },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.factionId },
   ];
 
@@ -78,12 +80,13 @@ export default async function FactionListPage(props: { searchParams?: Promise<Se
   ];
   const empty = !catalog ? <Unreadable />
     : filters(q) > 0 ? <NoMatches noun="factions" chips={chips} clearHref="/database/factions" />
-    : <NoObservations>No faction is listed yet; each appears once three players report it.</NoObservations>;
+    : <NoObservations>{noneListed("faction")}</NoObservations>;
 
   return (
     <Container width="data">
       <article>
         <DataTitle title="Factions" aside={strip} />
+        {catalog && !confirmations && <ConfirmationsUnread />}
         <FilterBar
           label="Faction filters"
           search={{ action: "/database/factions", value: q.q, placeholder: "Name or id", label: "Filter by name or id", keep }}
@@ -94,7 +97,7 @@ export default async function FactionListPage(props: { searchParams?: Promise<Se
         <div className="mt-2">
           <DataTable
             dense
-            caption={`Factions three players reported: ${rows.length}`}
+            caption={listCaption("factions", rows, confirmations)}
             columns={columns}
             rows={shown}
             rowKey={(x) => String(x.factionId)}

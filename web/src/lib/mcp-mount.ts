@@ -1,5 +1,6 @@
 import { createMcpHttpHandler } from "../../../kb/src/mcp-http-server";
 import type { ToolOptions } from "../../../kb/src/mcp-server";
+import { catalogIndex } from "./catalog-index";
 import { loadTimeline } from "./changes";
 import { loadCoverage } from "./coverage-compute";
 import { loadCompletion } from "./completion-store";
@@ -47,6 +48,8 @@ export function toolLoaders(): ToolOptions {
     ecosystem: () => loadEcosystem(),
     // The committed game-data files' facts, for answer_sources: ids and facts only, labelled unconfirmed.
     gameData: () => filesIndex(),
+    // The game-file catalogs the knowledge tools search beside the release: achievements, factions, titles and more.
+    catalog: () => catalogIndex(),
     // Same deployment as the store: read the public records in process, no HTTP self-fetch or byte ceiling.
     corpus: async () => {
       const loaded = await uploadStore.loadCorpus();
