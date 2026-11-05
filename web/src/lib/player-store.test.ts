@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { createCloudPlayerStore, createMemoryPlayerStore, playerHideKey, playerStoreFrom } from "./player-store";
+import { createCloudPlayerStore, createMemoryPlayerStore, missingFunction, playerHideKey, playerStoreFrom } from "./player-store";
 import { optOutPath, playerDateProblem, playerIndexingOn, playerPagesOn, playerPath, playerUpsert, realmSlug, searchPrefix, type PlayerRow } from "./player-pages";
 
 const row = (name: string, extra: object = {}) => ({ name, realm: "Forever Pioneer", race: "Orc", class: "SHAMAN", level: 24, seen: "2026-10-20", ...extra });
@@ -69,6 +69,23 @@ describe("the development store follows the same rules as the table", () => {
     expect(await store.search("th")).toEqual([]);
   });
 
+  test("realms count their visible guilds once, and a realm's guilds come most members first, hidden guilds left out", async () => {
+    const store = createMemoryPlayerStore();
+    await store.upsert([
+      row("Aa", { guild: "Night Watch" }), row("Bb", { guild: "night watch", seen: "2026-10-23" }), row("Cc", { guild: "Ember" }),
+      row("Dd", { guild: "Quiet" }), row("Ee"), row("Ff", { realm: "Forever Nomad", guild: "Night Watch" }),
+    ]);
+    await store.suppress("Forever Pioneer", "Dd");
+    expect(await store.guildRealms()).toEqual([{ realm: "Forever Nomad", guilds: 1 }, { realm: "Forever Pioneer", guilds: 2 }]);
+    const guilds = await store.realmGuilds("forever-pioneer");
+    expect(guilds.map((g) => [g.guild, g.members])).toEqual([["Night Watch", 2], ["Ember", 1]]);
+    expect(guilds[0]!.lastSeen).toBe("2026-10-23");
+    await store.suppressGuild("Forever Pioneer", "Night Watch");
+    expect((await store.realmGuilds("Forever Pioneer")).map((g) => g.guild)).toEqual(["Ember"]);
+    expect(await store.guildRealms()).toEqual([{ realm: "Forever Nomad", guilds: 1 }, { realm: "Forever Pioneer", guilds: 1 }]);
+    expect(await store.realmGuilds("Nowhere")).toEqual([]);
+  });
+
   test("rows not seen for 90 days are pruned", async () => {
     const now = new Date("2026-10-20T00:00:00Z");
     const store = createMemoryPlayerStore(() => now);
@@ -105,6 +122,32 @@ describe("the Supabase store", () => {
     const { store } = call([{ name: "Thrallina", realm: "Forever Pioneer", race: "Orc", class: "SHAMAN", level: 24, guild: null, last_seen: "2026-10-20" }]);
     expect(await store.get("forever", "forever-pioneer", "thrallina")).toEqual({ name: "Thrallina", realm: "Forever Pioneer", ruleset: "forever", race: "Orc", class: "SHAMAN", level: 24, guild: null, lastSeen: "2026-10-20" });
     expect(await call([]).store.get("forever", "x", "yy")).toBeNull();
+  });
+
+  test("the realm reads call their functions with the realm key and a hard limit, and map the counts", async () => {
+    const { send, store } = call([{ realm: "Forever Pioneer", guilds: "3" }]);
+    expect(await store.guildRealms()).toEqual([{ realm: "Forever Pioneer", guilds: 3 }]);
+    const [url, init] = send.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("https://db.example/rest/v1/rpc/guild_realms");
+    expect(JSON.parse(init.body as string)).toEqual({ p_ruleset: "forever" });
+    const guilds = call([{ realm: "Forever Pioneer", guild: "Night Watch", members: "2", last_seen: "2026-10-23" }]);
+    expect(await guilds.store.realmGuilds("Forever-Pioneer")).toEqual([{ realm: "Forever Pioneer", guild: "Night Watch", members: 2, lastSeen: "2026-10-23" }]);
+    const [guildUrl, guildInit] = guilds.send.mock.calls[0] as unknown as [string, RequestInit];
+    expect(guildUrl).toBe("https://db.example/rest/v1/rpc/realm_guilds");
+    expect(JSON.parse(guildInit.body as string)).toEqual({ p_ruleset: "forever", p_realm_key: "forever pioneer", p_limit: 1000 });
+  });
+
+  test("a function the migration has not made yet is told apart from an outage", async () => {
+    const answer = (status: number, body: unknown) => {
+      const send = vi.fn(async () => new Response(JSON.stringify(body), { status }));
+      return createCloudPlayerStore("https://db.example", "k", send as unknown as typeof fetch).guildRealms().catch((err: unknown) => err);
+    };
+    expect(missingFunction(await answer(404, { code: "PGRST202", message: "Could not find the function public.guild_realms(p_ruleset) in the schema cache" }))).toBe(true);
+    expect(missingFunction(await answer(404, { code: "42883", message: "function public.guild_realms(p_ruleset => text) does not exist" }))).toBe(true);
+    expect(missingFunction(await answer(500, { code: "PGRST202" }))).toBe(false);
+    expect(missingFunction(await answer(503, { message: "down" }))).toBe(false);
+    expect(missingFunction(await answer(404, { code: "PGRST205" }))).toBe(false);
+    expect(missingFunction(new Error("Player storage unavailable (404)"))).toBe(false);
   });
 
   test("a failed request throws, so the caller can tell the player to retry", async () => {

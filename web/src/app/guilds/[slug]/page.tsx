@@ -4,6 +4,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FAMILIES, figureLabel, getFamily, type FamilyFact } from "@/data/families";
 import { Container, DataTable, Explainer, Facts, PageHeader, SectionHeading } from "@/components/ui";
+import { guildsOn } from "@/lib/guilds";
+import { RealmGuilds, realmMetadata } from "./realm";
 
 const KIND_LABEL: Record<FamilyFact["kind"], string> = {
   "guild-site": "Their page",
@@ -17,10 +19,18 @@ export function generateStaticParams() {
   return FAMILIES.map((family) => ({ slug: family.slug }));
 }
 
-export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+type Search = Record<string, string | string[] | undefined>;
+/** The route's props; `searchParams` is read only for a realm, so the family pages stay prerendered. */
+type Props = { params: Promise<{ slug: string }>; searchParams?: Promise<Search> };
+
+export async function generateMetadata(props: Props): Promise<Metadata> {
   const params = await props.params;
   const family = getFamily(params.slug);
-  if (!family) return { title: "Guild family" };
+  if (!family) {
+    // Not a family: a realm's guild list, behind the guild switch like the other guild pages.
+    if (!guildsOn()) return { title: "Guild family" };
+    return realmMetadata(decodeURIComponent(params.slug), (await props.searchParams) ?? {});
+  }
   return pageMetadata({ title: `${family.name} – WoW Forever Guild`, description: familyDescription(family.summary, family.facts), path: `/guilds/${family.slug}` });
 }
 
@@ -33,10 +43,13 @@ function familyDescription(summary: string, facts: readonly FamilyFact[]): strin
   return `${summary} ${n("guild-site", "guild hall", "guild halls")}, ${n("claim", "claim", "claims")} and ${n("sighting", "sighted name", "sighted names")}.`;
 }
 
-export default async function GuildFamilyPage(props: { params: Promise<{ slug: string }> }) {
+export default async function GuildFamilyPage(props: Props) {
   const params = await props.params;
   const family = getFamily(params.slug);
-  if (!family) notFound();
+  if (!family) {
+    if (!guildsOn()) notFound();
+    return RealmGuilds({ slug: decodeURIComponent(params.slug), search: (await props.searchParams) ?? {} });
+  }
 
   const halls = family.facts.filter((fact) => fact.kind === "guild-site");
   const claims = family.facts.filter((fact) => fact.kind === "claim");

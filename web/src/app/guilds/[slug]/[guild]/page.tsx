@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, Container, DataTable, PageHeader, SectionHeading, type Column } from "@/components/ui";
 import { dataAgeLabel } from "@/lib/data-age";
-import { factionLabel, guildPath, guildsOn, hideGuildPath, loadGuildPage, type GuildMember } from "@/lib/guilds";
+import { factionLabel, guildPath, guildsOn, hideGuildPath, loadGuildPage, realmPath, type GuildMember } from "@/lib/guilds";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import type { AgreedKill, GuildProgress } from "../../../../../../kb/src/guilds";
@@ -87,7 +87,10 @@ export default async function GuildPage(props: Params) {
     <Container width="data">
       <article>
         <PageHeader
-          trail={[{ name: "Home", path: "/" }, { name: "Guilds", path: "/guilds" }, { name: summary.guildName, path: guildPath(summary.realm, summary.guildName) }]}
+          trail={[
+            { name: "Home", path: "/" }, { name: "Guilds", path: "/guilds" }, { name: summary.realm, path: realmPath(summary.realm) },
+            { name: summary.guildName, path: guildPath(summary.realm, summary.guildName) },
+          ]}
           title={summary.guildName}
           lede={`${faction ? `${faction} guild` : "Guild"} on ${summary.realm}`}
           meta={

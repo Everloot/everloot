@@ -491,3 +491,133 @@ test("the officers' board page withholds a hidden guild's board while the switch
   expect(unread).toContain("Storage unreachable");
   expect(unread).not.toContain("Ada");
 });
+
+const realmPage = async (slug: string, search: Record<string, string> = {}) => {
+  const { default: Slug } = await import("./[slug]/page");
+  return renderToStaticMarkup(await Slug({ params: Promise.resolve({ slug }), searchParams: Promise.resolve(search) }));
+};
+
+test("a realm page lists every guild seen on the realm, most members seen first, each linked to its page", async () => {
+  on();
+  vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+  const html = await realmPage("forever-pioneer");
+  expect(html).toContain("Guilds on Forever Pioneer");
+  for (const [name, slug] of [["Night Watch", "night-watch"], ["Ember", "ember"], ["Iron Oath", "iron-oath"]]) {
+    expect(html).toContain(`href="/guilds/forever-pioneer/${slug}"`);
+    expect(html).toContain(`>${name}</a>`);
+  }
+  // Night Watch (2 seen) before the guilds known only from kills or an officer board, which are in name order.
+  expect(html.indexOf(">Night Watch</a>")).toBeLessThan(html.indexOf(">Ember</a>"));
+  expect(html.indexOf(">Ember</a>")).toBeLessThan(html.indexOf(">Iron Oath</a>"));
+  expect(html).toContain("Horde");
+  expect(html).toContain("2026-10-23");
+});
+
+test("a realm page pages its guilds 50 at a time", async () => {
+  on();
+  vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+  holder.records = [];
+  await holder.store!.upsert(Array.from({ length: 60 }, (_, i) => ({
+    name: `Member${String(i).padStart(2, "0")}`, realm: "Forever Nomad", race: "Orc", class: "WARRIOR", level: 10, guild: `Guild ${String(i).padStart(2, "0")}`, seen: "2026-10-20",
+  })));
+  const first = await realmPage("forever-nomad");
+  expect(first).toContain(">Guild 00</a>");
+  expect(first).not.toContain(">Guild 55</a>");
+  expect(first).toContain('href="/guilds/forever-nomad?page=2"');
+  const second = await realmPage("forever-nomad", { page: "2" });
+  expect(second).toContain(">Guild 55</a>");
+  expect(second).not.toContain(">Guild 00</a>");
+});
+
+test("a hidden guild leaves its realm's page and the realm count", async () => {
+  on();
+  vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+  await holder.store!.suppressGuild("Forever Pioneer", "Night Watch");
+  const html = await realmPage("forever-pioneer");
+  expect(html).not.toContain("Night Watch");
+  expect(html).toContain(">Ember</a>");
+  // The players table knew Night Watch only, so the realm leaves the list once it is hidden.
+  expect(await hub()).not.toContain('id="realms"');
+});
+
+test("an unknown realm, or one whose only guild is hidden, is a 404; so is any realm with the switch off", async () => {
+  vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+  await expect(realmPage("forever-pioneer")).rejects.toThrow("NEXT_NOT_FOUND");
+  on();
+  await expect(realmPage("nowhere")).rejects.toThrow("NEXT_NOT_FOUND");
+  holder.records = [];
+  await holder.store!.suppressGuild("Forever Pioneer", "Night Watch");
+  await expect(realmPage("forever-pioneer")).rejects.toThrow("NEXT_NOT_FOUND");
+});
+
+test("a family slug still serves the family, with or without the guild switch, and reads no guild data", async () => {
+  vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+  const realms = vi.spyOn(holder.store!, "guildRealms");
+  expect(await realmPage("olympus")).toContain("Olympus");
+  on();
+  const html = await realmPage("olympus");
+  expect(html).toContain("Olympus");
+  expect(html).not.toContain("Guilds on");
+  expect(realms).not.toHaveBeenCalled();
+  expect(holder.reads).toBe(0);
+});
+
+test("before the realm migration is applied, the realm page says storage is unreachable and the hub hides the realms", async () => {
+  on();
+  vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+  const { PlayerStoreError } = await import("@/lib/player-store");
+  const missing = () => Promise.reject(new PlayerStoreError(404, "PGRST202"));
+  vi.spyOn(holder.store!, "guildRealms").mockImplementation(missing);
+  vi.spyOn(holder.store!, "realmGuilds").mockImplementation(missing);
+  const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+  expect(await realmPage("forever-pioneer")).toContain("Storage unreachable");
+  const html = await hub();
+  expect(html).not.toContain('id="realms"');
+  expect(html).toContain("Molten Core");
+  expect(logged).not.toHaveBeenCalled();
+  const { generateMetadata } = await import("./[slug]/page");
+  expect((await generateMetadata({ params: Promise.resolve({ slug: "forever-pioneer" }), searchParams: Promise.resolve({}) })).robots).toEqual({ index: false, follow: false });
+  logged.mockRestore();
+});
+
+test("the hub lists each realm with its guild count, linked to the realm page, below the search box", async () => {
+  on();
+  vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+  await holder.store!.upsert([{ name: "Elsewhere", realm: "Forever Nomad", race: "Orc", class: "HUNTER", level: 30, guild: "Far Watch", seen: "2026-10-20" }]);
+  const html = await hub();
+  expect(html).toContain('id="realms"');
+  expect(html).toMatch(/href="\/guilds\/forever-nomad"[^>]*>Forever Nomad<\/a> <span[^>]*>1<\/span>/);
+  expect(html).toMatch(/href="\/guilds\/forever-pioneer"[^>]*>Forever Pioneer<\/a> <span[^>]*>1<\/span>/);
+  expect(html.indexOf('id="guild-q"')).toBeLessThan(html.indexOf('id="realms"'));
+  // Without the player pages there is no realm list to read.
+  vi.stubEnv("EVERLOOT_PLAYER_PAGES", "");
+  expect(await hub()).not.toContain('id="realms"');
+});
+
+/** The page's BreadcrumbList as [name, path] pairs. */
+const crumbs = (html: string) => {
+  const list = [...html.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/g)]
+    .map((m) => JSON.parse(m[1]!) as { "@type": string; itemListElement?: { name: string; item: string }[] })
+    .find((d) => d["@type"] === "BreadcrumbList");
+  return list?.itemListElement?.map((c) => [c.name, new URL(c.item).pathname]) ?? [];
+};
+
+test("a guild page's trail runs Home, Guilds, its realm, the guild; a realm page's ends at the realm", async () => {
+  on();
+  vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+  expect(crumbs(await guildPage("forever-pioneer", "ember"))).toEqual([
+    ["Home", "/"], ["Guilds", "/guilds"], ["Forever Pioneer", "/guilds/forever-pioneer"], ["Ember", "/guilds/forever-pioneer/ember"],
+  ]);
+  expect(crumbs(await realmPage("forever-pioneer"))).toEqual([["Home", "/"], ["Guilds", "/guilds"], ["Forever Pioneer", "/guilds/forever-pioneer"]]);
+});
+
+test("a realm page is kept out of search engines until guild indexing is on, and a paged view always is", async () => {
+  on();
+  vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+  const { generateMetadata } = await import("./[slug]/page");
+  const meta = (search: Record<string, string> = {}) => generateMetadata({ params: Promise.resolve({ slug: "forever-pioneer" }), searchParams: Promise.resolve(search) });
+  expect((await meta()).robots).toEqual({ index: false, follow: false });
+  vi.stubEnv("EVERLOOT_GUILDS_INDEX", "1");
+  expect((await meta()).robots).toEqual({ index: true, follow: true });
+  expect((await meta({ page: "2" })).robots).toEqual({ index: false, follow: false });
+});

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { validGuildName, validRealm } from "@everloot/protocol";
 import { intakeQuota } from "@/lib/intake-quota";
-import { GUILD_SEARCH_TAG, GUILDS_PATH, guildPath, guildsOn, HIDE_GUILD_PATH } from "@/lib/guilds";
+import { GUILD_SEARCH_TAG, GUILDS_PATH, guildPath, guildsOn, HIDE_GUILD_PATH, realmPath } from "@/lib/guilds";
 import { playerStore } from "@/lib/player-store";
 
 /**
@@ -36,5 +36,6 @@ export async function POST(req: Request) {
   revalidateTag(GUILD_SEARCH_TAG);
   revalidatePath(GUILDS_PATH);
   revalidatePath(guildPath(realm, guild));
+  revalidatePath(realmPath(realm));
   return back(req, "done=1");
 }

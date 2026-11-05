@@ -5,7 +5,7 @@ import { Card, Container, DataTable, EmptyState, FilterBar, Input, PageHeader, R
 import { FAMILIES } from "@/data/families";
 import { dataAgeLabel } from "@/lib/data-age";
 import {
-  factionLabel, guildPath, guildSearchPrefix, guildsOn, ladderHref, loadGuildData, loadGuildSearch, loadLadder, parseLadderQuery, raidsOpen,
+  factionLabel, guildPath, guildSearchPrefix, guildsOn, ladderHref, loadGuildData, loadGuildRealms, loadGuildSearch, loadLadder, parseLadderQuery, raidsOpen, realmPath,
   type BossFirst, type LadderQuery, type RankedRow,
 } from "@/lib/guilds";
 import { pageMetadata } from "@/lib/seo";
@@ -90,9 +90,11 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
   const query = parseLadderQuery(params);
   const open = raidsOpen();
   const data = await loadGuildData();
-  const [ladder, found] = await Promise.all([
+  const [ladder, found, realms] = await Promise.all([
     data.unreachable ? null : loadLadder(data, query),
     prefix ? loadGuildSearch(prefix) : null,
+    // Without a readable hide list no guild is counted, as no guild is listed.
+    data.unreachable ? null : loadGuildRealms(),
   ]);
   const href = (change: Partial<LadderQuery>) => ladderHref({ ...query, page: undefined, ...change });
   const controls: FilterControl[] = ladder?.instance ? [
@@ -150,6 +152,18 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
               {found.results.length === 0
                 ? <p className="text-sm text-fg-2">{found.unreachable ? STORAGE_UNREACHABLE : "A guild is listed once two members report a kill, its officers publish a board, or the addon sees a character in it."}</p>
                 : <DataTable dense caption={`Guilds whose name starts with ${prefix}`} columns={searchColumns} rows={found.results} rowKey={(g) => g.key} meta={(g) => `${g.realm} · ${number(g.kills)} agreed kills`} />}
+            </section>
+          )}
+          {realms && realms.length > 0 && (
+            <section aria-labelledby="realms">
+              <h2 id="realms" className="text-cell font-medium text-fg">Realms</h2>
+              <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-cell">
+                {realms.map((r) => (
+                  <li key={r.realm}>
+                    <Link href={realmPath(r.realm)} className={link}>{r.realm}</Link> <span className="tabular-nums text-muted">{number(r.guilds)}</span>
+                  </li>
+                ))}
+              </ul>
             </section>
           )}
 

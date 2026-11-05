@@ -8,7 +8,7 @@ import {
 import { instanceFactsFromRecords } from "../../../kb/src/instances";
 import { loadGuildAlts, memberKey, type GuildAlt } from "./guild-alts";
 import { playerPagesOn, playerPath, rulesetOf, type Player } from "./player-pages";
-import { guildHideKey, playerHideKey, playerStore, type GuildHit } from "./player-store";
+import { guildHideKey, missingFunction, playerHideKey, playerStore, REALM_GUILD_LIMIT, type GuildHit, type GuildRealm } from "./player-store";
 import { uploadStore } from "./upload-store";
 
 /**
@@ -30,6 +30,11 @@ export const HIDE_GUILD_PATH = "/guilds/hide";
 
 export function guildPath(realm: string, guild: string): string {
   return `${GUILDS_PATH}/${encodeURIComponent(guildSlug(realm))}/${encodeURIComponent(guildSlug(guild))}`;
+}
+
+/** A realm's guild list: the same realm slug `guildPath` writes. */
+export function realmPath(realm: string): string {
+  return `${GUILDS_PATH}/${encodeURIComponent(guildSlug(realm))}`;
 }
 
 export function hideGuildPath(realm: string, guild: string): string {
@@ -213,6 +218,70 @@ export async function loadGuildSearch(prefix: string): Promise<{ results: GuildS
   }
   const directory = guildDirectory({ kills: data.kills, seen: seenFromHits(hits), boards: boardSources(data.boards) });
   return { results: searchGuilds(directory, prefix), unreachable: false, dataAsOf: data.dataAsOf };
+}
+
+/**
+ * A players-table read that may come before its migration: null when the store cannot answer. PostgREST saying the
+ * function is not there yet is expected until the owner applies it, so only other failures are logged.
+ */
+async function storeRead<T>(what: string, read: () => Promise<T>): Promise<T | null> {
+  try {
+    return await read();
+  } catch (err) {
+    if (!missingFunction(err)) console.error(`${what} failed`, err);
+    return null;
+  }
+}
+
+/**
+ * Every realm guilds were seen on, with how many, for the realm list on /guilds: read uncached like the search, so a
+ * hide leaves the count on the next request. Null without the player pages or while the store cannot answer.
+ */
+export async function loadGuildRealms(): Promise<GuildRealm[] | null> {
+  if (!playerPagesOn()) return null;
+  return storeRead("guild realms", () => playerStore().guildRealms());
+}
+
+/** Guilds per realm page. */
+export const REALM_PAGE = 50;
+
+export interface RealmPageData {
+  realm: string;
+  /** Every guild seen on the realm, most members seen first, then name. */
+  guilds: GuildSummary[];
+  /** True when the players table returned its most rows, so some guilds with the fewest members seen are not listed. */
+  capped: boolean;
+  dataAsOf: string | null;
+}
+
+/**
+ * A realm's guild list, by the realm slug in its address: every guild a kill, an officer board or a character seen in
+ * it puts on that realm, hidden guilds left out. Null when nothing is known on the realm (the page is then a 404),
+ * "unreachable" when the corpus, the hide list or the players table could not be read, including before the
+ * realm_guilds migration is applied.
+ */
+export async function loadRealmPage(slug: string, loaded?: GuildData): Promise<RealmPageData | null | "unreachable"> {
+  const wanted = slug.toLowerCase();
+  const data = loaded ?? (await loadGuildData());
+  if (data.unreachable) return "unreachable";
+  const onRealm = <T extends { realm: string }>(rows: Iterable<T>) => [...rows].filter((r) => guildSlug(r.realm) === wanted);
+  let hits: GuildHit[] = [];
+  let realm: string | null = null;
+  if (playerPagesOn()) {
+    const realms = await storeRead("guild realms", () => playerStore().guildRealms());
+    if (realms === null) return "unreachable";
+    realm = realms.find((r) => guildSlug(r.realm) === wanted)?.realm ?? null;
+    if (realm !== null) {
+      const found = await storeRead("realm guilds", () => playerStore().realmGuilds(realm!));
+      if (found === null) return "unreachable";
+      hits = found;
+    }
+  }
+  const boards = new Map(onRealm(data.boards.values()).map((b) => [guildKey(b.realm, b.guildName), b] as const));
+  const guilds = guildDirectory({ kills: onRealm(data.kills), seen: seenFromHits(hits), boards: boardSources(boards) })
+    .sort((a, b) => (b.membersSeen ?? 0) - (a.membersSeen ?? 0) || a.guildName.localeCompare(b.guildName));
+  if (guilds.length === 0) return null;
+  return { realm: realm ?? guilds[0]!.realm, guilds, capped: hits.length >= REALM_GUILD_LIMIT, dataAsOf: data.dataAsOf };
 }
 
 /** The day raids open on Forever (UTC). Before it, while no raid has an agreed kill, the hub says when raid ranking starts. */
