@@ -50,10 +50,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   `addon_download` to CurseForge like the other download links. The same tested zip is uploaded there on each release.
 
 ### Added
-- Addon: the Everloot minimap button gathers other addons' minimap buttons. Hover the crest to see them in a small
-  panel; its clicks work as before, and Blizzard's own buttons stay where they are. It is on by default and covers
-  buttons made with LibDBIcon, which most addons use. `/everloot buttons off`, or the switch in the settings, puts
-  them back after a `/reload`.
 - Desktop App and site, behind `EVERLOOT_CHARACTER_LINKS` (off): the addon's `/everloot link <code>` (0.3.15) writes one
   link row for the character you are playing, with a code made on the account page. The Desktop App, signed in, sends it only
   to the account's own link endpoint; uploads never carry link rows. The account page lists your linked characters,
@@ -82,14 +78,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   objects keeps to that type.
 
 ### Changed
-- Addon: item tooltip prices are two-column rows, the label on the left and the amount on the right in the game's
-  gold, silver and copper icons (Market value, Min buyout, Historical, your scan's min buyout and value, and the
-  vendor sell price when the client knows it), with dates, units, reporters and warnings on muted lines beneath. The
-  Everloot header names the realm with its ruleset (PvP, PvE, RP, RP-PvP, Hardcore) split off in its own colour, and
-  says once that amounts are per unit. Drop rates sit in the value column too, their loot windows and installs beneath;
-  the note for what is missing drops its own "Everloot:". The Auction House tab's lookup shows the same rows in a
-  scrolling result, and Home, Options and the Auction House tab share one native style. `/everloot price` prints the
-  same amounts as plain text.
 - Site: the Auction House files a realm under the PvE, PvP, RP, RP-PvP or Hardcore tab when its name ends in that
   ruleset, as Forever's realm list names them ("CAMWOW US1 Realm 4 PvP"); the realm map still overrides, and a realm
   whose name names no ruleset stays under "Realms not mapped yet". Realm names show split the same way: the name, then
@@ -201,6 +189,30 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   agree. Fishing (the bobber, or an object installs agree is fished) is never a pin. An upload of an event
   that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
   instead of withdrawing the event as a conflict. The map shows none of this yet.
+
+## [0.3.18] - 2026-11-05
+
+Release channel: Alpha
+
+Item tooltips read like the game's own: each price on its own row with gold, silver and copper icons, your realm and
+its ruleset in the header, and drop rates beside their sources. The minimap button gathers other addons' buttons.
+None of this has been seen in the Forever client yet.
+
+### Changed
+- Item tooltip prices are two-column rows, the label on the left and the amount on the right in the game's
+  gold, silver and copper icons (Market value, Min buyout, Historical, your scan's min buyout and value, and the
+  vendor sell price when the client knows it), with dates, units, reporters and warnings on muted lines beneath. The
+  Everloot header names the realm with its ruleset (PvP, PvE, RP, RP-PvP, Hardcore) split off in its own colour, and
+  says once that amounts are per unit. Drop rates sit in the value column too, their loot windows and installs beneath;
+  the note for what is missing drops its own "Everloot:". The Auction House tab's lookup shows the same rows in a
+  scrolling result, and Home, Options and the Auction House tab share one native style. `/everloot price` prints the
+  same amounts as plain text.
+
+### Added
+- The Everloot minimap button gathers other addons' minimap buttons. Hover the crest to see them in a small
+  panel; its clicks work as before, and Blizzard's own buttons stay where they are. It is on by default and covers
+  buttons made with LibDBIcon, which most addons use. `/everloot buttons off`, or the switch in the settings, puts
+  them back after a `/reload`.
 
 ## [0.3.17] - 2026-11-05
 
