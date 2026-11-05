@@ -3,21 +3,46 @@
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import GameIcon from "@/components/game/GameIcon";
+import type { PeopleSearch } from "@/lib/people-search";
 import { QUALITY_TEXT, qualityOf } from "./quality";
 
-/** One row the suggestion route answers (GET /search/suggest). */
-export interface Suggestion { type: "item" | "npc" | "quest" | "object" | "instance"; id: number; label: string; href: string; quality?: number | null; icon?: string; note?: string }
+/**
+ * One row under the field: a database page from GET /search/suggest, or (unscoped only) a character or guild from
+ * GET /search/people. Characters and guilds have no id; their `note` says who and where.
+ */
+export interface Suggestion { type: "item" | "npc" | "quest" | "object" | "instance" | "character" | "guild"; id?: number; label: string; href: string; quality?: number | null; icon?: string; note?: string }
 
-const TYPE_LABEL: Record<Suggestion["type"], string> = { item: "Item", npc: "NPC", quest: "Quest", object: "Object", instance: "Instance" };
-/** The row's right-hand note: a dungeon or raid says which and its level; the rest their type and id. */
-const typeNote = (row: Suggestion) => row.note ?? `${TYPE_LABEL[row.type]}${row.label.endsWith(String(row.id)) ? "" : ` ${row.id}`}`;
+const TYPE_LABEL: Record<Suggestion["type"], string> = { item: "Item", npc: "NPC", quest: "Quest", object: "Object", instance: "Instance", character: "Character", guild: "Guild" };
+/** The row's right-hand note: a dungeon or raid says which and its level, a character or guild who and where; the rest their type and id. */
+const typeNote = (row: Suggestion) => row.note ?? `${TYPE_LABEL[row.type]}${row.id === undefined || row.label.endsWith(String(row.id)) ? "" : ` ${row.id}`}`;
 export const SEARCH_SCOPES = [
   { value: "", label: "All" }, { value: "item", label: "Items" }, { value: "npc", label: "NPCs" }, { value: "quest", label: "Quests" }, { value: "object", label: "Objects" },
 ] as const;
 
+/** Database pages answered for a text, kept for the page's life. Characters and guilds are never kept, so a hide shows at once. */
 const cache = new Map<string, Suggestion[]>();
 
-/** The suggestions for what is typed, 120 ms after the last key; the answer to an older text is dropped. */
+const LIMIT = 8;
+/** At most this many character and guild rows; database pages come first and fill the rest of the 8. */
+export const PEOPLE_ROWS = 3;
+
+/** The rows /search/people adds: characters, then guilds, an exact name first. */
+export function peopleRows(body: Partial<PeopleSearch> | null): Suggestion[] {
+  const rows = [...(body?.characters?.results ?? []), ...(body?.guilds?.results ?? [])];
+  return rows.sort((a, b) => Number(b.exact) - Number(a.exact)).slice(0, PEOPLE_ROWS)
+    .map((r) => ({ type: r.type, label: r.label, href: r.href, note: r.type === "guild" ? `Guild · ${r.meta}` : r.meta }));
+}
+
+/** Database pages first, cut so up to 3 character and guild rows fit under them in the 8. */
+export function withPeople(database: Suggestion[], people: Suggestion[]): Suggestion[] {
+  const kept = people.slice(0, PEOPLE_ROWS);
+  return [...database.slice(0, LIMIT - kept.length), ...kept];
+}
+
+/**
+ * The suggestions for what is typed, 120 ms after the last key; the answer to an older text is dropped. An unscoped
+ * box also asks /search/people, uncached, and shows both answers together.
+ */
 function useSuggestions(text: string, scope: string): Suggestion[] {
   const [rows, setRows] = useState<Suggestion[]>([]);
   useEffect(() => {
@@ -25,14 +50,19 @@ function useSuggestions(text: string, scope: string): Suggestion[] {
     const key = `${scope}|${q.toLowerCase()}`;
     if (!q) { setRows([]); return; }
     const hit = cache.get(key);
-    if (hit) { setRows(hit); return; }
+    if (hit) setRows(hit);
+    if (hit && scope) return;
     const ctrl = new AbortController();
     const timer = setTimeout(() => {
       // The site's own route, matched on the names the pages show (/api/suggest keeps the agreed names only).
-      fetch(`/search/suggest?q=${encodeURIComponent(q)}${scope ? `&in=${scope}` : ""}`, { signal: ctrl.signal })
+      const database = hit ? Promise.resolve(hit) : fetch(`/search/suggest?q=${encodeURIComponent(q)}${scope ? `&in=${scope}` : ""}`, { signal: ctrl.signal })
         .then((r) => (r.ok ? r.json() : { results: [] }))
-        .then((body: { results?: Suggestion[] }) => { const list = body.results ?? []; cache.set(key, list); setRows(list); })
-        .catch(() => {});
+        .then((body: { results?: Suggestion[] }) => { const list = body.results ?? []; cache.set(key, list); return list; });
+      // A failed or switched-off lookup adds no rows; the database pages still show.
+      const people: Promise<Suggestion[]> = scope ? Promise.resolve([]) : fetch(`/search/people?q=${encodeURIComponent(q)}`, { signal: ctrl.signal, cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then(peopleRows, () => []);
+      Promise.all([database, people]).then(([d, p]) => { if (!ctrl.signal.aborted) setRows(withPeople(d, p)); }).catch(() => {});
     }, 120);
     return () => { clearTimeout(timer); ctrl.abort(); };
   }, [text, scope]);
@@ -40,7 +70,7 @@ function useSuggestions(text: string, scope: string): Suggestion[] {
 }
 
 /**
- * A search field with instant suggestions (items, NPCs, quests, objects, dungeons and raids), as a combobox:
+ * A search field with instant suggestions (items, NPCs, quests, objects, dungeons and raids, characters and guilds), as a combobox:
  * arrow keys move through the list, Enter opens the one picked, or searches when none is, Escape closes. Inside
  * a GET form, so without JavaScript it is a plain search.
  */
@@ -94,7 +124,7 @@ export function SuggestField({ id, name = "q", label, placeholder, defaultValue 
       <ul ref={list} id={listId} role="listbox" aria-label={`Suggestions for ${label.toLowerCase()}`} hidden={!shown}
         className={`absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-control border border-edge bg-panel py-1 ${listClassName}`}>
         {rows.map((row, i) => (
-          <li key={`${row.type}-${row.id}`} id={`${listId}-${i}`} role="option" aria-selected={i === active}>
+          <li key={`${row.type}-${row.href}`} id={`${listId}-${i}`} role="option" aria-selected={i === active}>
             <Link
               href={row.href}
               tabIndex={-1}

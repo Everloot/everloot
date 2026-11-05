@@ -25,6 +25,8 @@ vi.mock("@/lib/shown-item-names", () => ({ loadShownNames: async () => ({
 vi.mock("@/lib/shown-search-names", () => ({ loadShownSearchNames: () => namesRead.pending ?? Promise.resolve({ items: new Map(), npcs: new Map(), quests: new Map() }) }));
 const icons = vi.hoisted(() => ({ asked: [] as number[][], map: new Map<number, string>() }));
 vi.mock("@/lib/item-icons", () => ({ shownItemIcons: async (ids: number[]) => { icons.asked.push(ids); return icons.map; } }));
+// The Characters and Guilds groups load in the browser; here a marker shows where they would sit, and the fallback.
+vi.mock("./PeopleResults", () => ({ default: ({ q, empty }: { q: string; empty?: ReactNode }) => <div data-people={q}>{empty}</div> }));
 
 async function render(query: Record<string, string>, path = release) {
   vi.stubEnv("KB_SNAPSHOT_PATH", path);
@@ -127,6 +129,42 @@ test("the overview keeps its All-N link into the scoped search, not the database
   expect(html).not.toContain("Showing");
   expect(html).not.toContain('href="/database/items?q=');
   siteSearch.groups = [];
+});
+
+test("characters and guilds join the overview only with their switch on, never in the page's own HTML", async () => {
+  siteSearch.groups = [
+    { type: "npc", heading: "NPCs", total: 1, results: [{ label: "Thrall", href: "/database/npcs/1", exact: true }] },
+    { type: "lore", heading: "Lore archive", total: 1, results: [{ label: "Thrall", href: "/lore/1-thrall", exact: true }] },
+    { type: "tool", heading: "Tools", total: 1, results: [{ label: "Thrall tool", href: "/tools/x", exact: false }] },
+  ];
+  expect(await render({ q: "thrall" })).not.toContain("data-people");
+  vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+  const players = await render({ q: "thrall" });
+  expect(players).toContain('data-people="thrall"');
+  // After the database groups, before the lore archive and tools.
+  expect(players.indexOf('id="results-npc"')).toBeLessThan(players.indexOf("data-people"));
+  expect(players.indexOf("data-people")).toBeLessThan(players.indexOf('id="results-lore"'));
+  vi.unstubAllEnvs();
+  vi.stubEnv("EVERLOOT_GUILDS", "1");
+  expect(await render({ q: "thrall" })).toContain('data-people="thrall"');
+  // A scoped search lists one database type only.
+  expect(await render({ q: "thrall", in: "npc" })).not.toContain("data-people");
+  siteSearch.groups = [];
+});
+
+test("text that cannot start a character or guild name asks for neither", async () => {
+  vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+  // Digits are never in a character name.
+  expect(await render({ q: "6948" })).not.toContain("data-people");
+  vi.stubEnv("EVERLOOT_GUILDS", "1");
+  expect(await render({ q: "t" })).not.toContain("data-people");
+});
+
+test("with no database match the character lookup still runs, and the empty line is its fallback", async () => {
+  siteSearch.groups = [];
+  vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+  const html = await render({ q: "zuljinna" });
+  expect(html).toMatch(/<div data-people="zuljinna"><p[^>]*>Nothing matches that\./);
 });
 
 test("the search is a plain GET form, so it works without JavaScript", async () => {

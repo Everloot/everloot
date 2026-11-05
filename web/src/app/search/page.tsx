@@ -10,6 +10,9 @@ import { isScope, siteSearch, type Scope, type SearchGroup, type SearchResult } 
 import { loadShownSearchNames } from "@/lib/shown-search-names";
 import { loadShownNames } from "@/lib/shown-item-names";
 import { shownItemIcons } from "@/lib/item-icons";
+import { guildSearchPrefix, guildsOn } from "@/lib/guilds";
+import { playerPagesOn, searchPrefix } from "@/lib/player-pages";
+import PeopleResults from "./PeopleResults";
 
 /** A `type=` value is one of the stored types; anything else means All. */
 function typeOf(raw: string | undefined): LoreType | undefined {
@@ -68,6 +71,19 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
       current: scope === g.type,
     })),
   ];
+  // The overview also lists characters and guilds when their pages are on and the text could start a name. The
+  // browser asks for them (see PeopleResults), so this page's cached HTML never holds a name a hide removed.
+  const people = Boolean(q && !scope && ((playerPagesOn() && searchPrefix(q)) || (guildsOn() && guildSearchPrefix(q))));
+  const archive = (g: SearchGroup) => g.type === "lore" || g.type === "tool" || g.type === "doc";
+  let split = groups?.length ?? 0;
+  while (split > 0 && archive(groups![split - 1])) split--;
+  const nothing = (
+    <p className="py-4 text-cell text-fg-2">
+      Nothing matches that. An id always opens its page, or browse the{" "}
+      <Link href="/database/items" className={link}>items</Link>, <Link href="/database/quests" className={link}>quests</Link> and{" "}
+      <Link href="/database/npcs" className={link}>NPCs</Link>.
+    </p>
+  );
   return (
     <Container width="data">
       <article>
@@ -81,13 +97,14 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
         </div>
 
         {groups === null ? null : groups.length === 0 ? (
-          <p className="py-4 text-cell text-fg-2">
-            Nothing matches that. An id always opens its page, or browse the{" "}
-            <Link href="/database/items" className={link}>items</Link>, <Link href="/database/quests" className={link}>quests</Link> and{" "}
-            <Link href="/database/npcs" className={link}>NPCs</Link>.
-          </p>
+          people ? <PeopleResults q={q} empty={nothing} /> : nothing
         ) : (
-          groups.map((group) => <ResultTable key={group.type} group={group} q={q} scoped={Boolean(scope)} icons={icons} />)
+          // Characters and guilds sit after the database groups, above the lore archive, tools and docs.
+          <>
+            {groups.slice(0, split).map((group) => <ResultTable key={group.type} group={group} q={q} scoped={Boolean(scope)} icons={icons} />)}
+            {people && <PeopleResults q={q} />}
+            {groups.slice(split).map((group) => <ResultTable key={group.type} group={group} q={q} scoped={Boolean(scope)} icons={icons} />)}
+          </>
         )}
       </article>
     </Container>
