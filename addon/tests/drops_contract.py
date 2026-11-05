@@ -54,9 +54,13 @@ tooltipCalls = {}
 Enum = { TooltipDataType = { Item = 0 } }
 TooltipDataProcessor = { AddTooltipPostCall = function(kind, f) table.insert(tooltipCalls, { kind = kind, f = f }) end }
 function tooltipFor(itemId)
-  local tip = { lines = {} }
-  tip.AddLine = function(self, text) table.insert(self.lines, text) end
+  local tip = { lines = {}, details = {} }
+  tip.AddLine = function(self, text, r, g, b, wrap)
+    table.insert(self.lines, text)
+    table.insert(self.details, { text = text, r = r, g = g, b = b, wrap = wrap })
+  end
   for _, c in ipairs(tooltipCalls) do c.f(tip, { id = itemId }) end
+  lastTooltip = tip
   return table.concat(tip.lines, '\\n'), #tip.lines
 end
 
@@ -96,6 +100,17 @@ Everloot:ResetPrices()
 
 -- A price and a drop source: the price is labelled market, each rate has its loot windows, installs and date.
 local linen = tooltipFor(2589)
+local wrapped = 0
+for _, line in ipairs(lastTooltip.details) do
+  if line.text:find('Everloot drop:', 1, true) or line.text:find('drop rates from uploads', 1, true) then
+    assert(line.wrap == true, 'drop details wrap within the compact price tooltip: ' .. line.text)
+    wrapped = wrapped + 1
+  end
+  if line.text:find('drop rates from uploads', 1, true) then
+    assert(line.r >= 0.75 and line.g >= 0.75, 'drop evidence is as readable as the price metadata')
+  end
+end
+assert(wrapped == 4, 'all three source rows and their evidence wrap')
 assert(linen:find('Everloot market 2s 5c'), 'the price is labelled a market price: ' .. linen)
 assert(linen:find('Everloot drop: NPC 116 · 12%.4%% %(42 of 340 loot windows%) · 5 installs'), linen)
 assert(linen:find('NPC 94 · 6%.0%% %(12 of 200 loot windows%) · 3 installs'), linen)
@@ -108,18 +123,18 @@ assert(a < b, 'prices first, then drops')
 
 -- A price, no drop source: the missing drop says so.
 local herb = tooltipFor(765)
-assert(herb:find('Everloot market unrecorded') and herb:find('Everloot: no drop source reported by 3 installs'), herb)
+assert(herb:find('Everloot market unrecorded') and herb:find('No drop source reported by 3 installs'), herb)
 assert(not herb:find('Everloot drop:'), herb)
 
 -- A drop source, no price: the missing price says so, and the object kind is named.
 local drop = tooltipFor(12345)
 assert(drop:find('Everloot drop: NPC 61 · 1%.2%% %(1 of 80 loot windows%) · 3 installs'), drop)
-assert(drop:find('Everloot: no price on Forever yet') and not drop:find('Everloot market'), drop)
+assert(drop:find('No price on Forever yet') and not drop:find('Everloot market'), drop)
 assert(tooltipFor(2770):find('Everloot drop: object 1731 · 96%.8%% %(300 of 310 loot windows%) · 6 installs'))
 
 -- Neither: one grey line under the header names both gaps; no number is shown that the file does not hold.
 local none, lines = tooltipFor(424242)
-assert(none:match('|t Everloot\\nEverloot: no price on Forever yet · no drop source reported by 3 installs$') and lines == 2, none)
+assert(none:match('|t Everloot\\nNo price on Forever yet · no drop source reported by 3 installs$') and lines == 2, none)
 assert(not tooltipFor(258):find('Everloot drop'), '258 does not match 2589: rows are matched whole')
 """)
 
@@ -138,13 +153,13 @@ Everloot:ResetPrices()
 printed = {}
 local tampered = tooltipFor(2589)
 assert(said('drop sources failed their checksum'), 'a bad checksum is reported')
-assert(tampered:find('Everloot market 2s 5c') and not tampered:find('Everloot drop:') and tampered:find('Everloot: drop sources failed their checksum'), tampered)
+assert(tampered:find('Everloot market 2s 5c') and not tampered:find('Everloot drop:') and tampered:find('Drop sources failed their checksum'), tampered)
 
 -- A file from an app that does not write drops yet: prices show, and the drop gap is named as the file's.
 EverlootPricesDB.drops = nil
 Everloot:ResetPrices()
 local old = tooltipFor(2589)
-assert(old:find('Everloot market') and old:find('Everloot: drop sources not in the price file yet'), old)
+assert(old:find('Everloot market') and old:find('Drop sources not in the price file yet'), old)
 """)
 
 # A large drops block is checked a slice per frame; until it passes, no drop line and no "missing" line.

@@ -186,4 +186,36 @@ event('LOOT_OPENED')
 assert(rows('item_seen') == before + 1, 'a real name is')
 """)
 
+# --- An item tooltip reads the item's vendor price: a secret price or link is unknown, and the prices still show ---
+lua = fresh(["modules/auctions.lua", "modules/prices.lua", "modules/drops.lua"])
+lua.execute((root / "tests" / "fixtures" / "EverlootPrices.lua").read_text(encoding="utf-8"))
+lua.execute("""
+GetRealmName = function() return 'Forever' end
+date = function() return '2026-10-20T10:00:00Z' end
+Enum = { TooltipDataType = { Item = 0 } }
+TooltipDataProcessor = { AddTooltipPostCall = function(_, f) hook = f end }
+Everloot:InitModules()
+function tooltip(id)
+ local rows = {}
+ hook({
+  AddLine = function(_, text) rows[#rows + 1] = text end,
+  AddDoubleLine = function(_, left, right) rows[#rows + 1] = left .. ' = ' .. right end,
+ }, { id = id })
+ return table.concat(rows, '\\n')
+end
+local sell, link = 13, 'item:2589'
+GetItemInfo = function() return 'Linen Cloth', link, 1, 5, 0, 'Trade Goods', 'Cloth', 20, '', 1, sell end
+assert(tooltip(2589):find('Vendor = 13', 1, true), 'a plain sell price shows')
+-- On the client a secret number is still of type number; only reading it raises. The test's stand-in is a table.
+local realType = type
+type = function(v) if rawequal(v, secretNumber) then return 'number' end return realType(v) end
+sell = secretNumber
+local shown = tooltip(2589)
+type = realType
+assert(shown:find('Market value', 1, true) and not shown:find('Vendor', 1, true), 'a secret sell price is unknown: ' .. shown)
+sell, link = 13, secretText
+shown = tooltip(2589)
+assert(shown:find('Market value', 1, true) and not shown:find('Vendor', 1, true), 'a secret link cannot show the item loaded: ' .. shown)
+""")
+
 print("secret values contract ok")

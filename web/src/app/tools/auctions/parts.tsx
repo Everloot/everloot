@@ -4,10 +4,13 @@ import ItemTip from "@/components/game/ItemTip";
 import { Card, Contribute as ContributeCard, DataTable, EmptyState, QUALITY_LABEL, QUALITY_TEXT, qualityOf as qualityToken, type Column, type Quality } from "@/components/ui";
 import { SPARK_BOX, itemHref, itemLabel, money, percent, sparkline, type ItemNames, type MarketRow, type RulesetSummary } from "@/lib/auction-house";
 import { RULESET_LABEL, isRulesetSlug, type RulesetSlug } from "@/lib/realms";
+import { RealmName } from "./RealmName";
 import { HISTORY_DAYS, formatCopper, type PublicDay } from "../../../../../kb/src/market";
 import type { ItemTip as Tip } from "./art";
 import { categoryRow } from "./browse";
 import TimeAgo from "./TimeAgo";
+
+export { RealmName };
 
 /** The quality token for a tooltip's quality name ("Uncommon"); null without a tooltip. */
 export function qualityOf(tip: Tip | undefined): Quality | null {
@@ -103,11 +106,11 @@ export function Contribute() {
   );
 }
 
-/** Facts beside each other under a page title: "Prices updated 4 min ago Â· 3 realms". */
+/** Facts beside each other under a page title: "Prices updated 4 min ago · 3 realms". */
 export function Facts({ items }: { items: ReactNode[] }) {
   return (
     <>
-      {items.flatMap((item, i) => (i === 0 ? [<span key={i}>{item}</span>] : [<span key={`s${i}`} aria-hidden="true">Â·</span>, <span key={i}>{item}</span>]))}
+      {items.flatMap((item, i) => (i === 0 ? [<span key={i}>{item}</span>] : [<span key={`s${i}`} aria-hidden="true">·</span>, <span key={i}>{item}</span>]))}
     </>
   );
 }
@@ -165,7 +168,7 @@ export function RealmPrices({ rows, caption, empty }: { rows: MarketRow[]; capti
   const columns: Column<MarketRow>[] = [
     {
       key: "realm", header: "Realm", nowrap: true,
-      cell: (r) => <Link href={itemHref(r.realm, r.value.itemId)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{r.realm.name}</Link>,
+      cell: (r) => <Link href={itemHref(r.realm, r.value.itemId)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg"><RealmName name={r.realm.name} /></Link>,
     },
     { key: "market", header: "Market value", numeric: true, cell: (r) => <span className={r.value.market === null ? "text-muted" : undefined}>{money(r.value.market)}</span> },
     { key: "min", header: "Min buyout", numeric: true, cell: (r) => formatCopper(r.value.min) },

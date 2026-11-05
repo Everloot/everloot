@@ -183,21 +183,61 @@ local function icon(parent, size, path)
   return t
 end
 
--- A panel inside the window: the surface colour and a one-pixel line around it.
-local function box(parent, x, y, w, h)
-  local b = CreateFrame("Frame", nil, parent)
-  b:SetPoint("TOPLEFT", x, y)
-  b:SetSize(w, h)
+-- The surface colour and a one-pixel line around a frame: the panels inside this window, the list of switches on
+-- the settings page and the price lookup at the auction house.
+local EDGES = { { "TOPLEFT", "TOPRIGHT", true }, { "BOTTOMLEFT", "BOTTOMRIGHT", true },
+  { "TOPLEFT", "BOTTOMLEFT" }, { "TOPRIGHT", "BOTTOMRIGHT" } }
+local function surface(b)
   fill(b, COLORS.surface)
-  for _, edge in ipairs({ { "TOPLEFT", "TOPRIGHT", w, 1 }, { "BOTTOMLEFT", "BOTTOMRIGHT", w, 1 },
-    { "TOPLEFT", "BOTTOMLEFT", 1, h }, { "TOPRIGHT", "BOTTOMRIGHT", 1, h } }) do
+  for _, edge in ipairs(EDGES) do
     local t = b:CreateTexture(nil, "BORDER")
     t:SetPoint(edge[1]); t:SetPoint(edge[2])
-    t:SetSize(edge[3], edge[4])
+    if edge[3] then t:SetHeight(1) else t:SetWidth(1) end
     t:SetColorTexture(unpack(COLORS.line))
   end
   return b
 end
+
+-- A panel inside the window.
+local function box(parent, x, y, w, h)
+  local b = CreateFrame("Frame", nil, parent)
+  b:SetPoint("TOPLEFT", x, y)
+  b:SetSize(w, h)
+  return surface(b)
+end
+
+-- Everloot's dark panel inside the stock tooltip edge, tinted bronze. A frame without the backdrop API gets the
+-- dark colour alone.
+local function backdrop(f)
+  if f.SetBackdrop then
+    f:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+      tile = false, edgeSize = 14, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
+    f:SetBackdropColor(unpack(COLORS.canvas))
+    f:SetBackdropBorderColor(unpack(COLORS.bronze))
+  else
+    fill(f, COLORS.canvas)
+  end
+end
+
+-- The heading of the settings page and the auction house tab: a small crest, Everloot in fel green as in the
+-- tooltip, and the page's name in muted text. The caller places the crest; the words follow it.
+local function heading(parent, subtitle)
+  local crest = parent:CreateTexture(nil, "ARTWORK")
+  crest:SetSize(28, 28)
+  crest:SetTexture(U.CREST)
+  local title = text(parent, 16, FRIZ, COLORS.accent)
+  title:SetPoint("LEFT", crest, "RIGHT", 6, 0)
+  title:SetText("Everloot")
+  local sub = text(parent, 12, FRIZ, COLORS.muted)
+  sub:SetPoint("LEFT", title, "RIGHT", 8, -1)
+  sub:SetText(subtitle or "")
+  return crest, title, sub
+end
+
+-- The look the settings page and the auction house tab borrow. This file loads after theirs, so they read it when
+-- they build; using it creates nothing here. Without this file they keep the game's own frames and fonts.
+U.COLORS, U.NARROW = COLORS, NARROW
+U.Text, U.Surface, U.Backdrop, U.Heading = text, surface, backdrop, heading
 
 local function stat(parent, x, path, caption)
   local i = icon(parent, 28, "Interface\\Icons\\" .. path)
@@ -316,15 +356,7 @@ local function build()
   f:RegisterForDrag("LeftButton")
   f:SetScript("OnDragStart", function(self) self:StartMoving() end)
   f:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
-  -- Everloot's dark panel inside the stock tooltip edge, tinted bronze.
-  if f.SetBackdrop then
-    f:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-      tile = false, edgeSize = 14, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
-    f:SetBackdropColor(unpack(COLORS.canvas))
-    f:SetBackdropBorderColor(unpack(COLORS.bronze))
-  else
-    fill(f, COLORS.canvas)
-  end
+  backdrop(f)
 
   -- The crest breaks out of the top-left corner.
   local crest = f:CreateTexture(nil, "OVERLAY")
@@ -333,9 +365,11 @@ local function build()
   crest:SetTexture(U.CREST)
   f.crest = crest
 
-  local title = text(f, 17)
+  -- Everloot in fel green, as the tooltip, the settings page and the auction house tab write it.
+  local title = text(f, 17, FRIZ, COLORS.accent)
   title:SetPoint("TOPLEFT", 54, -16)
   title:SetText("Everloot")
+  f.title = title
   f.subtitle = text(f, 12, FRIZ, COLORS.muted)
   f.subtitle:SetPoint("LEFT", title, "RIGHT", 10, -1)
   local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")

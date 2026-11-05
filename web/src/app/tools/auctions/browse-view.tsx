@@ -20,7 +20,7 @@ import {
   AH_PER_PAGE, DEFAULT_SORT, activeFilters, ahHref, ahQuery, browseRows, categoryRow, categoryTree, inCategory,
   type AhQuery, type AhSort, type BrowseRow, type TreeNode,
 } from "./browse";
-import { Contribute, Facts, ItemLink, RulesetSummaryTable, Sparkline, count } from "./parts";
+import { Contribute, Facts, ItemLink, RealmName, RulesetSummaryTable, Sparkline, count } from "./parts";
 import TimeAgo from "./TimeAgo";
 
 type Search = Record<string, string | string[] | undefined>;
@@ -131,7 +131,8 @@ export async function browseView({ slug, search }: { slug: string | null; search
   const rulesetTabs = summaries.flatMap(({ ruleset: r, items }) => (isRulesetSlug(r)
     ? [{ href: here({ ruleset: r }), label: RULESET_LABEL[r], count: items, current: ruleset === r }]
     : []));
-  const mapped = mappedRulesets();
+  // A ruleset is filed once the map names a realm on it or a realm with prices is named for it (`realmRuleset`).
+  const mapped = new Set<string>([...mappedRulesets(), ...summaries.filter((s) => s.mapped).map((s) => s.ruleset)]);
   const laterRulesets = [...AFTER_LAUNCH].filter((r) => !mapped.has(r));
 
   const inCat = rows.filter((r) => inCategory(r.value.itemId, q));
@@ -145,7 +146,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
       type: "menu", key: "realm", label: "Realm",
       options: [
         { label: "All realms", href: ahHref(AH_PATH, { ...q, page: 1 }), on: !slug, reset: true },
-        ...realmsHere.map((b) => ({ label: b.realm.name, href: ahHref(realmHref(b.realm), { ...q, ruleset: undefined, page: 1 }), on: b.realm.slug === slug, count: b.rows.length })),
+        ...realmsHere.map((b) => ({ label: <RealmName name={b.realm.name} />, href: ahHref(realmHref(b.realm), { ...q, ruleset: undefined, page: 1 }), on: b.realm.slug === slug, count: b.rows.length })),
       ],
     },
     {
@@ -176,7 +177,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
       key: "name", header: "Item", sortable: true,
       cell: ({ row }) => <ItemLink id={row.value.itemId} href={itemHref(row.realm, row.value.itemId)} tip={tips.get(row.value.itemId)} names={names} />,
     },
-    ...(showRealm ? [{ key: "realm", header: "Realm", nowrap: true, cell: ({ row }: BrowseRow) => <Link href={ahHref(realmHref(row.realm), { house: q.house })} className="text-fg-2 hover:text-fg hover:underline underline-offset-4">{row.realm.name}</Link> }] : []),
+    ...(showRealm ? [{ key: "realm", header: "Realm", nowrap: true, cell: ({ row }: BrowseRow) => <Link href={ahHref(realmHref(row.realm), { house: q.house })} className="text-fg-2 hover:text-fg hover:underline underline-offset-4"><RealmName name={row.realm.name} /></Link> }] : []),
     { key: "ilvl", header: "iLvl", numeric: true, sortable: true, cell: ({ row }) => tips.get(row.value.itemId)?.level || <span className="text-muted">—</span> },
     { key: "req", header: "Req.", numeric: true, sortable: true, cell: ({ row }) => tips.get(row.value.itemId)?.required || <span className="text-muted">—</span> },
     { key: "market", header: "Market value", numeric: true, sortable: true, cell: ({ row }) => <span className={row.value.market === null ? "text-muted" : undefined}>{money(row.value.market)}</span> },
@@ -212,8 +213,8 @@ export async function browseView({ slug, search }: { slug: string | null; search
   let body;
   if (!state) {
     body = <Card><p className="text-fg-2" role="status">Market values are unavailable right now. They are unrecorded, not zero.</p></Card>;
-  } else if (rows.length === 0 && ruleset && !mapped.has(ruleset)) {
-    body = <EmptyState message={`${AFTER_LAUNCH.has(ruleset) ? `${rulesetName} opens after launch, and n` : "N"}o realm is mapped to ${rulesetName} yet. Blizzard names Forever's realms at launch; until each is mapped to its ruleset, every realm's prices are under All.`} />;
+  } else if (rows.length === 0 && ruleset && AFTER_LAUNCH.has(ruleset) && !mapped.has(ruleset)) {
+    body = <EmptyState message={`${rulesetName} opens after launch, and no realm is on ${rulesetName} yet.`} />;
   } else if (rows.length === 0 && ruleset) {
     body = <EmptyState message={`No public prices on ${rulesetName} realms${q.house ? ` in the ${q.house} auction house` : ""} yet: a price shows once 3 players scan the same item on one of them.`} />;
   } else if (rows.length === 0) {
@@ -249,7 +250,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
     <Container width="data">
       <article>
         <DataTitle
-          title={title}
+          title={realmName ? <RealmName name={realmName} /> : title}
           trail={trail}
           meta={state && (
             <Facts items={[
