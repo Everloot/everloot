@@ -74,8 +74,12 @@ export function EntityTop({ box, facts }: { box: ReactNode; facts: ReactNode }) 
   );
 }
 
-/** A quick fact's value, or the empty agreement meter while no install has reported it. */
-export const known = (value: ReactNode) => (value === null || value === undefined || value === "" ? <AgreementMeter count={0} /> : value);
+/**
+ * A quick fact's value, or while it is not agreed the agreement meter: empty until an install reports it, then how
+ * many of the 3 have (`reported`, a count short of 3), never the value they reported.
+ */
+export const known = (value: ReactNode, reported = 0) =>
+  (value === null || value === undefined || value === "" ? <AgreementMeter count={reported} withText={reported > 0} /> : value);
 
 /**
  * An empty tab: one line. The agreement meter and "Get the addon" for what players report; a plain line

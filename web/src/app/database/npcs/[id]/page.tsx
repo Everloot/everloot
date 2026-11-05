@@ -4,7 +4,7 @@ import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { hasCard } from "@/lib/tooltip";
-import { npcPage, npcTraits, type NpcPin, type NpcRank } from "../../../../../../kb/src/world-pages";
+import { npcNameReporters, npcPage, npcTraits, type NpcPin, type NpcRank } from "../../../../../../kb/src/world-pages";
 import { pendingForNpc, pendingLine } from "../../../../../../kb/src/pending-loot";
 import { npcLootTable } from "../../../../../../kb/src/loot-tables";
 import { computeRollups, loadLootTables, loadWorldFacts } from "@/lib/rollup-compute";
@@ -146,12 +146,13 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
               layout="list"
               label={`${title}: quick facts`}
               items={[
-                { label: "Reported name", value: known(page.name) },
+                { label: "Reported name", value: known(page.name, npcNameReporters(npcId, facts)) },
                 { label: "Level", value: known(traits.level), numeric: true },
                 { label: "Rank", value: known(traits.rank && RANK_LABELS[traits.rank]) },
                 { label: "Zone", value: zone ? <Link href={zoneHref(zone.mapId, zone.name)} className={LINK}>{zone.name}</Link> : known(null) },
                 { label: "Map positions", value: known(page.pins.length || null), numeric: true },
-                { label: "Drops", value: known(zero ? `None in ${zero.kills} windows` : dropped.length ? `${dropped.length} items` : null) },
+                // Short of 3 installs the loot table has no rows, only its installs: that count fills the meter.
+                { label: "Drops", value: known(zero ? `None in ${zero.kills} windows` : dropped.length ? `${dropped.length} items` : null, lootTable.state === "short" ? lootTable.span.installs : 0) },
               ]}
             />
           )}

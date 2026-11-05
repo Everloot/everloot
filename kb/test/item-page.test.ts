@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { agreedItemNames, handleItemPage, itemPage, type DropRateRow, type ItemFacts, type NpcSighting } from "../src/item-page.js";
+import { agreedItemNames, handleItemPage, itemNameReporters, itemPage, type DropRateRow, type ItemFacts, type NpcSighting } from "../src/item-page.js";
 
 const rate = (extra: Partial<DropRateRow> = {}): DropRateRow => ({
   sourceNpcId: 456,
@@ -51,6 +51,16 @@ test("two installs, a second name, or a private rate stay off the page", () => {
   expect(page.pins).toHaveLength(0);
   expect(handleItemPage({ itemId: 1234 }, { rates: [], names: [], npcs: [] })).toContain("Drop rate unrecorded");
   expect(handleItemPage({ itemId: 0 })).toBe("Name an item id.");
+});
+
+test("an item with no agreed name counts the installs behind its leading name; an agreed or split name counts none", () => {
+  const seen = (installId: string, itemId: number, name: string) => ({ installId, itemId, name });
+  const count = (names: ItemFacts["names"]) => itemNameReporters(1234, facts({ names }));
+  expect(count([])).toBe(0);
+  expect(count([seen("a", 1234, "Peacebloom"), seen("a", 1234, "Peacebloom"), seen("b", 99, "Peacebloom")])).toBe(1);
+  expect(count([seen("a", 1234, "Peacebloom"), seen("b", 1234, "peacebloom "), seen("c", 1234, "Silverleaf")])).toBe(2);
+  expect(count(["a", "b", "c"].map((i) => seen(i, 1234, "Peacebloom")))).toBe(0);
+  expect(count([...["a", "b", "c"].map((i) => seen(i, 1234, "Peacebloom")), ...["d", "e", "f"].map((i) => seen(i, 1234, "Silverleaf"))])).toBe(0);
 });
 
 test("zero drops in a public sample names the kills", () => {

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { handleNpcPage, handleQuestPage, handleVendorPage, npcTraits, questTraits, worldFactsFromRecords } from "../src/world-pages.js";
+import { handleNpcPage, handleQuestPage, handleVendorPage, npcNameReporters, npcTraits, questTraits, worldFactsFromRecords } from "../src/world-pages.js";
 
 test("an NPC's level and reaction are kept from sightings and public once 3 installs agree", () => {
   const sight = (installId: string, level: unknown, reaction: unknown) =>
@@ -69,6 +69,16 @@ test("three agreeing sightings publish a name and a pin, and a split name stays 
   ]);
   expect(handleNpcPage({ npcId: 42 }, split)).toContain("No agreed name");
   expect(handleNpcPage({ npcId: 0 })).toBe("Name an npc id.");
+});
+
+test("an NPC with no agreed name counts the installs behind its leading name; an agreed or split name counts none", () => {
+  const sight = (installId: string, name: string) => ({ kind: "npc_sighting", positionKind: "npc", installId, npcId: 42, name, mapId: 12, x: 40, y: 20 });
+  const count = (records: object[]) => npcNameReporters(42, worldFactsFromRecords(records));
+  expect(count([])).toBe(0);
+  expect(count([sight("a", "Hogger"), sight("a", "Hogger")])).toBe(1);
+  expect(count([sight("a", "Hogger"), sight("b", "hogger "), sight("c", "Riverpaw")])).toBe(2);
+  expect(count(["a", "b", "c"].map((i) => sight(i, "Hogger")))).toBe(0);
+  expect(count([...["a", "b", "c"].map((i) => sight(i, "Hogger")), ...["d", "e", "f"].map((i) => sight(i, "Riverpaw"))])).toBe(0);
 });
 
 test("a quest publishes title, level, giver, and a reward only after 3 installs", () => {

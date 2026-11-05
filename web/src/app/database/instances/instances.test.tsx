@@ -4,10 +4,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test, vi } from "vitest";
 
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
-// Storage is down: the pages are built from the game files alone, which is where the level comes from.
+// Storage is down unless a test hands in sightings: the pages are then built from the game files alone, which is
+// where the level comes from.
+const state = vi.hoisted(() => ({ seen: { unreachable: true } as Record<string, unknown> }));
 vi.mock("@/lib/instances", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/instances")>()),
-  loadSightings: async () => ({ unreachable: true }),
+  loadSightings: async () => state.seen,
 }));
 
 import InstancesPage from "./page";
@@ -59,6 +61,29 @@ test("with storage down, an instance's page lists the bosses the game files give
   const list = renderToStaticMarkup(await InstancesPage());
   const col = [...list.matchAll(/<th[^>]*>(.*?)<\/th>/g)].map((m) => text(m[1]!).replace(/\|/g, "")).indexOf("Bosses");
   expect(cells(list, "/database/instances/409-molten-core")[col]).toMatch(/unconfirmed\|11$/);
+});
+
+test("on night one, each boss one install reported shows 1 of 3, and nothing it reported reads as confirmed", async () => {
+  // SYNTHETIC: one install killed each of Ragefire Chasm's four encounters once.
+  const encounters = [2732, 2733, 2734, 2735].map((encounterId) => ({ installId: "install-a", encounterId, name: "Reported name", instanceMapId: 389, success: true, npcIds: [1], capturedAt: "2026-11-04T20:00:00Z" }));
+  state.seen = { unreachable: false, asOf: new Date("2026-11-05T00:00:00Z"), instances: { entrances: [], encounters } };
+  try {
+    const html = renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: "389-ragefire-chasm" }) }));
+    const bosses = html.split('id="bosses"')[1] ?? "";
+    // The files' names stay, marked unconfirmed; the one install's name, kills and dates are not shown.
+    for (const r of bosses.split("<tr").slice(2)) expect(r).toContain('data-badge="files"');
+    expect(bosses).not.toContain("Reported name");
+    const headers = [...bosses.matchAll(/<th[^>]*>(.*?)<\/th>/g)].map((m) => text(m[1]!).replace(/\|/g, ""));
+    expect(headers).toEqual(["Boss", "Installs"]);
+    const row = bosses.split("<tr").find((r) => r.includes("Oggleflint")) ?? "";
+    expect(row).toContain('data-agreement="1"');
+    expect(text(row)).toContain("|1 of 3|");
+    expect(text(row)).toContain("1 of 3 installs reported");
+    expect(text(bosses)).toContain("No boss here has 3 installs reporting it yet. Kills and last seen show once one does.");
+    expect(text(html)).toMatch(/\|Bosses reported\|0\|/);
+  } finally {
+    state.seen = { unreachable: true };
+  }
 });
 
 test("an instance's page links its prep page only when a published wiki page binds it; a draft gets no link", async () => {
