@@ -9,11 +9,11 @@ import { guildPath, guildsOn } from "@/lib/guilds";
 import { Card, Container, Facts, PageHeader } from "@/components/ui";
 import { className, classText, describePlayer, PLAYER_STORAGE_UNAVAILABLE, playerRobots, raceName } from "../../../player-view";
 
-/** One hour. An opt-out clears the page at once (api/players/opt-out), so this only bounds how stale a level can be. */
-export const revalidate = 3600;
-
-/** No page is built ahead of time; the first visit to a character renders it and caches it for `revalidate`. */
-export function generateStaticParams() { return []; }
+/**
+ * Rendered on every visit. The store's lookup is an uncached (no-store) fetch, and a page Next.js may keep
+ * (revalidate, generateStaticParams) refuses one at run time: every address answered 500 in production.
+ */
+export const dynamic = "force-dynamic";
 
 type Params = { ruleset: string; realm: string; name: string };
 
