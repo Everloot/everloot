@@ -212,12 +212,12 @@ export interface RulesetSummary {
 export const MOVES_SHOWN = 3;
 
 /**
- * One line per ruleset for the hub: the launch rulesets always, Hardcore once a realm is mapped to it, and
- * "forever" when a realm with prices is not in the map yet. Counts come from public values only.
+ * One line per ruleset for the hub: the launch rulesets always, Hardcore once a realm is mapped to it or a realm
+ * with prices is named for it, and "forever" when a realm with prices has neither. Counts come from public values only.
  */
 export function rulesetSummaries(state: MarketState, now: Date, house: AuctionHouse | null = null): RulesetSummary[] {
   const groups = boardsByRuleset(realmBoards(state, now, house));
-  const mapped = mappedRulesets();
+  const mapped = new Set<string>([...mappedRulesets(), ...groups.keys()]);
   const shown: string[] = RULESET_SLUGS.filter((r) => !AFTER_LAUNCH.has(r) || mapped.has(r));
   if (groups.has(DEFAULT_RULESET)) shown.push(DEFAULT_RULESET);
   return shown.map((ruleset) => {

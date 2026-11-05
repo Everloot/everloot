@@ -53,7 +53,7 @@ beforeEach(() => {
 
 test("with the map empty: four launch tabs at 0, Hardcore after launch, and every realm's prices under All", async () => {
   const html = await hub({});
-  expect(tabs(html).map((t) => t.label)).toEqual(["All rulesets", "Normal (0)", "PvP (0)", "RP (0)", "RP-PvP (0)"]);
+  expect(tabs(html).map((t) => t.label)).toEqual(["All rulesets", "PvE (0)", "PvP (0)", "RP (0)", "RP-PvP (0)"]);
   expect(tabs(html)[0]!.current).toBe(true);
   expect(text(html)).toContain("Hardcore: after launch");
   expect(text(html)).toContain("Realms not mapped yet");
@@ -62,11 +62,24 @@ test("with the map empty: four launch tabs at 0, Hardcore after launch, and ever
   expect(text(html)).toContain("Forever");
 });
 
-test("with the map empty a ruleset tab says plainly that no realm is mapped to it, and shows no price", async () => {
+test("with the map empty a ruleset tab says plainly that it has no prices yet, and shows no price", async () => {
   const pvp = text(await hub({ ruleset: "pvp" }));
-  expect(pvp).toContain("No realm is mapped to PvP yet");
+  expect(pvp).toContain("No public prices on PvP realms yet");
   expect(pvp).not.toMatch(/\d+s \d+c/);
-  expect(text(await hub({ ruleset: "hardcore" }))).toContain("Hardcore opens after launch, and no realm is mapped to Hardcore yet");
+  expect(text(await hub({ ruleset: "hardcore" }))).toContain("Hardcore opens after launch, and no realm is on Hardcore yet");
+});
+
+test("with the map empty, a realm whose name ends in its ruleset is filed under that ruleset's tab", async () => {
+  const named = foldMarket(emptyMarket(), [...scans("CAMWOW US1 Realm 4 PvP", [[2589, 200, 205]]), ...scans("Forever", [[765, 30, 33]])], today);
+  store.loadMarket.mockResolvedValue({ state: named, dataAsOf: today.toISOString() });
+  const all = await hub({});
+  expect(tabs(all).map((t) => t.label)).toEqual(["All rulesets", "PvE (0)", "PvP (1)", "RP (0)", "RP-PvP (0)"]);
+  const pvp = text(await hub({ ruleset: "pvp" }));
+  expect(pvp).toContain("CAMWOW US1 Realm 4 PvP");
+  // The name and its ruleset are split, the ruleset in its own colour, as in the addon's tooltip.
+  expect(await hub({ ruleset: "pvp" })).toContain('CAMWOW US1 Realm 4 <span data-ruleset="pvp" class="font-medium text-realm-pvp">PvP</span>');
+  expect(pvp).not.toContain("Realms not mapped yet");
+  expect(text(await hub({ ruleset: "normal" }))).not.toContain("CAMWOW");
 });
 
 test("a ruleset that is not one is a 404, as a bad house is", async () => {
@@ -77,7 +90,7 @@ test("a ruleset that is not one is a 404, as a bad house is", async () => {
 test("with realms mapped, a tab shows its realms only, keeps the house, and its realm links drop the ruleset", async () => {
   map.realms = [{ name: "Mal'Ganis", ruleset: "pvp", region: "us" }, { name: "Argent Dawn", ruleset: "normal", region: "us" }, { name: "Doomhowl", ruleset: "hardcore", region: "us" }];
   const all = await hub({});
-  expect(tabs(all).map((t) => t.label)).toEqual(["All rulesets", "Normal (0)", "PvP (1)", "RP (0)", "RP-PvP (0)", "Hardcore (0)"]);
+  expect(tabs(all).map((t) => t.label)).toEqual(["All rulesets", "PvE (0)", "PvP (1)", "RP (0)", "RP-PvP (0)", "Hardcore (0)"]);
   expect(text(all)).not.toContain("after launch");
   expect(tabs(all).find((t) => t.label.startsWith("PvP"))!.href).toBe("/tools/auctions?ruleset=pvp");
 
@@ -92,7 +105,7 @@ test("with realms mapped, a tab shows its realms only, keeps the house, and its 
 
   // Mapped but no scans yet: the message says so, not that the ruleset is unmapped.
   const normal = text(await hub({ ruleset: "normal" }));
-  expect(normal).toContain("No public prices on Normal realms yet");
+  expect(normal).toContain("No public prices on PvE realms yet");
   expect(normal).toContain("No public prices yet");
 });
 
