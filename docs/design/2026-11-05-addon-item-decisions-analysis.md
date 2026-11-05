@@ -3,6 +3,8 @@
 Date: 2026-11-05. Status: analysis and proposed implementation sequence; no runtime changes.
 Code examined: `5071aec0` (also origin/main at capture). Native-client appearance has not been tested in this session.
 
+Later the same day, Carlos approved the tooltip-first implementation. That pass is now implemented locally; see [verification and remaining acceptance](2026-11-05-addon-price-verification.md). The analysis below remains the original research record, including the still-unimplemented disenchant outcome work.
+
 ## Source and evidence
 
 [Lorumerth: To DE Greens or Sell Them](https://www.facebook.com/reel/971876555802599/), published November 5, captured November 5. Duration 73.77 seconds. Full source downloaded through the existing video-ingest pipeline. English subtitles available; metadata reports `transcript_source: subtitles`, `subtitle_file: source.en_US.srt`, `transcript_errors: []`. Reviewed captions and frames at the opening, 25 seconds and 45 seconds. Automated summary wording is unreliable; captions and frames are the evidence.
