@@ -125,5 +125,7 @@ test("a hidden character is gone from the next search, and the server caches car
   await held.store!.suppress("Forever Pioneer", "Thrallina");
   expect((await peopleSearch("thrallina")).characters.total).toBe(0);
   // /players shares the first entry; a guild hide clears "guilds", a character hide "players" (members seen count).
-  expect(held.kept).toEqual([{ key: ["player-search"], tags: ["players"] }, { key: ["site-guild-search"], tags: ["guilds", "players"] }]);
+  // Other modules' caches (lib/guilds.ts keeps the realm list) are not this search's, so only its two are checked.
+  const ours = held.kept.filter((c) => ["player-search", "site-guild-search"].includes(c.key[0]));
+  expect(ours).toEqual([{ key: ["player-search"], tags: ["players"] }, { key: ["site-guild-search"], tags: ["guilds", "players"] }]);
 });
