@@ -119,6 +119,49 @@ assert(#EverlootDB.records.quest == 2, 'a header, a level of zero and a differen
 GetQuestLogTitle = nil
 accept(2, 176)
 assert(#EverlootDB.records.quest == 2, 'no quest log call, no quest row')
+-- Forever's client (build 1.60.1.70790, mainline UI): QUEST_ACCEPTED carries only the quest id, and the log is
+-- read through C_QuestLog.GetLogIndexForQuestID and C_QuestLog.GetInfo (QuestLogDocumentation.lua in the build).
+modernLog = {
+ {title = 'Durotar', questID = 0, level = 0, suggestedGroup = 0, isHeader = true},
+ {title = 'Lazy Peons', questID = 180, level = 4, suggestedGroup = 0, isHeader = false},
+ {title = 'Vile Familiars', questID = 181, level = 3, suggestedGroup = 3, isHeader = false},
+ {title = 'No Level', questID = 182, level = 0, suggestedGroup = 0, isHeader = false},
+}
+C_QuestLog.GetInfo = function(i) return modernLog[i] end
+C_QuestLog.GetLogIndexForQuestID = function(id)
+ for i, q in ipairs(modernLog) do if q.questID == id and not q.isHeader then return i end end
+end
+local function acceptId(id) for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'QUEST_ACCEPTED', id) end end
+acceptId(180)
+local modern = EverlootDB.records.quest[3]
+assert(modern and modern.questId == 180 and modern.title == 'Lazy Peons' and modern.level == 4, 'the quest id alone finds the log row')
+assert(modern.category == 'Durotar' and modern.suggestedGroup == nil and modern.faction == 'alliance' and modern.giverNpcId == 999)
+acceptId(181)
+assert(EverlootDB.records.quest[4].suggestedGroup == 3 and EverlootDB.records.quest[4].category == 'Durotar')
+acceptId(180)
+acceptId(182)
+acceptId(999)
+assert(#EverlootDB.records.quest == 4, 'a repeat, a level of zero and a quest not in the log record nothing')
+C_QuestLog.GetInfo, C_QuestLog.GetLogIndexForQuestID = nil, nil
+-- Vendors on Forever's client: its merchant window reads prices with C_MerchantFrame.GetItemInfo
+-- (Mainline/MerchantFrame.lua in the build); the old GetMerchantItemInfo is not there.
+GetMerchantNumItems = function() return 3 end
+GetMerchantItemLink = function(i) return ({ '|cffffffff|Hitem:159::::::::4:::::|h[Refreshing Spring Water]|h|r', '|Hitem:4540|h[Tough Hunk of Bread]|h' })[i] end
+GetMerchantItemInfo = nil
+C_MerchantFrame = { GetItemInfo = function(i)
+ return ({ { name = 'Water', price = 25, stackCount = 1, numAvailable = -1 }, { name = 'Bread', price = 25, stackCount = 1, numAvailable = 5 },
+  { name = 'No Link', price = 10, numAvailable = -1 } })[i]
+end }
+for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'MERCHANT_SHOW') end
+local vendor = EverlootDB.records.vendor and EverlootDB.records.vendor[1]
+assert(vendor and vendor.vendorNpcId == 999 and #vendor.items == 2, 'the modern merchant reader records the vendor')
+assert(vendor.items[1].itemId == 159 and vendor.items[1].priceCopper == 25 and vendor.items[1].limitedStock == nil)
+assert(vendor.items[2].itemId == 4540 and vendor.items[2].limitedStock == 5)
+C_MerchantFrame = nil
+local vendors = #EverlootDB.records.vendor
+for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'MERCHANT_SHOW') end
+assert(#EverlootDB.records.vendor == vendors, 'no price reader, no vendor row')
+n = #EverlootDB.records.npc_sighting  -- the merchant windows above recorded the vendor as a sighting
 C_Map.GetPlayerMapPosition = function() return nil end
 for _, hook in ipairs(Everloot.frame.hooks) do hook(nil,'PLAYER_TARGET_CHANGED') end
 assert(#EverlootDB.records.npc_sighting == n, 'missing coordinates must not become zero')

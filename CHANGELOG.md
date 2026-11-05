@@ -19,6 +19,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   its 2,000-row limit, and 98% of those rows were recipes the player had not learned, which the site does not use.
   The addon now writes learned recipes only, and per recipe and colour just the lowest and highest rank seen (the
   rows that narrow a skill range). On first load it drops the retained rows for recipes not learned and lifts the pause.
+- Addon: quests and vendors are recorded on the Forever client. On launch night no install sent a single `quest` or
+  `vendor` row: Forever's client uses the modern UI, where `QUEST_ACCEPTED` carries only the quest id and the old
+  `GetQuestLogTitle` and `GetMerchantItemInfo` calls are gone. The addon now reads the quest log with `C_QuestLog` and
+  vendor prices with `C_MerchantFrame.GetItemInfo`, the calls the build's own documentation and merchant window use.
 - Site: search finds dungeons and raids by name, with or without the leading "The", and an exact name puts the instance page
   first: "deadmines" now opens with `/database/instances/36-deadmines`. The group of wiki pages is headed Wiki, not Guides,
   so it no longer reads as the reviewed class guides at `/guides`.

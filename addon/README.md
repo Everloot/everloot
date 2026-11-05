@@ -108,9 +108,12 @@ trip out; it ends after 30 minutes outside, in another instance, at the game's r
 killed is pulled again; only time outside counts toward the 30 minutes. No names
 (`docs/design/specs/2026-11-02-pull-and-run-records-design.md`). The start, length and runs, like the boss pulls below,
 wait on `E.RUN_RECORDS` in `core.lua`: off until the release that ships them, so a nightly writes encounter rows as
-before. None of these has run in the Forever client yet. The quest-log calls (`GetQuestLogTitle`, `C_QuestLog.GetQuestTagInfo`)
-have not been tried in the Forever client; a call that is missing or returns something unexpected records
-nothing for that field. The site shows each value only after 3 installs agree.
+before. None of these has run in the Forever client yet. Forever's client uses the modern UI: on launch night 0.3.16
+recorded no quests and no vendors, because `QUEST_ACCEPTED` carries only the quest id there and the old
+`GetQuestLogTitle` and `GetMerchantItemInfo` are missing. Quests are now read with `C_QuestLog.GetLogIndexForQuestID`
+and `C_QuestLog.GetInfo`, and vendor prices with `C_MerchantFrame.GetItemInfo`, as the build's API documentation and
+its own merchant window do; clients with the old calls keep them. A call that is missing or returns something
+unexpected records nothing for that field. The site shows each value only after 3 installs agree.
 
 When the game shows you an item's tooltip, `modules/itemfacts.lua` records the numbers the game files do not
 hold: armor, block, damage per second, each stat and each resistance, one `item_fact` row per line with the item
