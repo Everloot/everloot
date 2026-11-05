@@ -23,7 +23,7 @@ test("file-only encounters remain useful before launch without claiming kills or
 
 test("a file-only encounter fewer than 3 installs reported says how many did, and stays unconfirmed", () => {
   const html = renderToStaticMarkup(<DungeonBosses facts={{ ...facts, row: { ...facts.row, reportedBosses: new Map([[100, 2]]) } }} />);
-  expect(html.replace(/<[^>]+>/g, "")).toContain("File-only boss · 2 of 3 installs reported");
+  expect(html).toMatch(/File-only boss(?:<[^>]*>)*\s*·\s*(?:<[^>]*>)*2 of 3 installs reported/);
   expect(html).toContain('data-badge="files"');
   expect(html).not.toMatch(/\d kills?\b|last seen/);
   // Storage down: no count, the files' list alone.
