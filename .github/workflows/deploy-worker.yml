@@ -73,6 +73,9 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          # The build reads the release list for /addon from GitHub. Signed in, it is not held to the 60 requests an
+          # hour GitHub allows an address the runner shares with other jobs.
+          GITHUB_TOKEN: ${{ github.token }}
           # Public values, read at build time; they are repository variables, not secrets.
           NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
           NEXT_PUBLIC_GAME_ASSETS_URL: ${{ vars.NEXT_PUBLIC_GAME_ASSETS_URL }}

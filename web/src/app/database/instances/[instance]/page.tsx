@@ -13,6 +13,7 @@ import { PLACEHOLDER } from "@/lib/item-names";
 import { mapHref } from "@/lib/map-view";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import { wikiHref } from "@/lib/wiki";
 import { prepPage } from "@/lib/wiki-dungeon";
 import { zoneHref } from "@/lib/zones";
@@ -103,6 +104,7 @@ export default async function InstancePage(props: Props) {
 
   return (
     <Container width="data">
+      <EdgeDegraded when={unreachable} />
       <JsonLd data={entityPageJsonLd({ name: title, path: canonical, identifier: `instance:${row.instanceMapId}` })} />
       <article>
         <DataTitle

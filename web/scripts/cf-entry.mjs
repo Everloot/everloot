@@ -4,7 +4,7 @@
 // (src/lib/cf-crons.ts), which call the cron routes. OpenNext's Durable Object classes are re-exported.
 import handler from "./worker.js";
 import { cronPaths, cronRequest } from "../src/lib/cf-crons.ts";
-import { edgeCacheKey, edgeCacheable, edgeTtl, forCache, fromCache } from "../src/lib/cf-edge-cache.ts";
+import { cacheCopy, edgeCacheKey, edgeCacheable, edgeTtl, fromCache } from "../src/lib/cf-edge-cache.ts";
 
 export { DOQueueHandler, DOShardedTagCache, BucketCachePurge } from "./worker.js";
 
@@ -16,7 +16,9 @@ export default {
     if (hit) return fromCache(hit);
     const res = await handler.fetch(request, env, ctx);
     const ttl = edgeTtl(res);
-    if (ttl) ctx.waitUntil(caches.default.put(key, forCache(res.clone(), ttl)));
+    // The copy is read to the end before it is stored, after the response has gone: a page that marks itself
+    // degraded is kept a minute, not its full lifetime.
+    if (ttl) ctx.waitUntil(cacheCopy(res.clone(), ttl).then((copy) => caches.default.put(key, copy)));
     return res;
   },
 

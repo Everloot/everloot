@@ -68,6 +68,26 @@ export function edgeTtl(res: Response): number | null {
   return ttl > 0 ? ttl : null;
 }
 
+/**
+ * A page that rendered without data it could not read (upload storage or the private game files out of reach)
+ * says so with this element (components/EdgeDegraded.tsx). The first render after a deploy is the one the cache
+ * keeps, so a read that failed then would otherwise show for the page's whole lifetime.
+ */
+export const DEGRADED_META = "everloot-degraded";
+/** Seconds the shared cache keeps a degraded page: long enough to spare storage during an outage, short enough to heal. */
+export const DEGRADED_TTL = 60;
+const DEGRADED_TAG = `<meta name="${DEGRADED_META}"`;
+
+/** Whether the HTML carries the marker element. Page text is escaped and the router payload is JSON, so only the element matches. */
+export const edgeDegraded = (html: string): boolean => html.includes(DEGRADED_TAG);
+
+/** The copy to store, read in full: a degraded page is kept DEGRADED_TTL seconds at most, any other `ttl`. */
+export async function cacheCopy(res: Response, ttl: number): Promise<Response> {
+  const html = await res.text();
+  const kept = new Response(html, { status: res.status, statusText: res.statusText, headers: res.headers });
+  return forCache(kept, edgeDegraded(html) ? Math.min(ttl, DEGRADED_TTL) : ttl);
+}
+
 /** The copy to store: the cache keeps it `ttl` seconds; the browser's own header rides along to be restored. */
 export function forCache(res: Response, ttl: number): Response {
   const headers = new Headers(res.headers);

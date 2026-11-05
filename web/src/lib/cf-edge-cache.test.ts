@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { classContextParams } from "./class-context";
-import { ITEM_LIST_PARAMS, edgeCacheKey, edgeCacheable, edgeTtl, forCache, fromCache } from "./cf-edge-cache";
+import { DEGRADED_TTL, ITEM_LIST_PARAMS, cacheCopy, edgeCacheKey, edgeCacheable, edgeDegraded, edgeTtl, forCache, fromCache } from "./cf-edge-cache";
 import { itemsHref } from "./items";
 
 const page = (headers: Record<string, string>, status = 200) => new Response("<html></html>", { status, headers });
@@ -36,6 +36,29 @@ test("the browser gets the page's own Cache-Control back from a cached copy", as
   expect(served.headers.get("x-everloot-edge-cache")).toBe("HIT");
   expect(served.headers.has("x-everloot-browser-cache-control")).toBe(false);
   expect(await served.text()).toBe("<html></html>");
+});
+
+test("a page that marks itself degraded is kept a minute, not its full lifetime; a whole page keeps its lifetime", async () => {
+  const headers = { "cdn-cache-control": "max-age=3600", "cache-control": "private, no-cache, no-store", "content-type": "text/html" };
+  const degraded = '<html><head><meta name="everloot-degraded" content="storage"/></head><body>Item 25</body></html>';
+  const short = await cacheCopy(new Response(degraded, { headers }), 3600);
+  expect(DEGRADED_TTL).toBe(60);
+  expect(short.headers.get("cache-control")).toBe(`public, max-age=${DEGRADED_TTL}`);
+  expect(short.headers.get("content-type")).toBe("text/html");
+  expect(await short.text()).toBe(degraded);
+  const whole = await cacheCopy(new Response("<html><body>Worn Shortsword</body></html>", { headers }), 3600);
+  expect(whole.headers.get("cache-control")).toBe("public, max-age=3600");
+  expect(await fromCache(whole).text()).toBe("<html><body>Worn Shortsword</body></html>");
+  // A lifetime already shorter than a minute is not lengthened.
+  expect((await cacheCopy(new Response(degraded, { headers }), 30)).headers.get("cache-control")).toBe("public, max-age=30");
+});
+
+test("only the marker element counts as degraded, not the same words in a page's text or in the router payload", () => {
+  expect(edgeDegraded('<meta name="everloot-degraded" content="storage"/>')).toBe(true);
+  // Text and attribute values are escaped, and the RSC payload is a JSON string, so neither can spell the element.
+  expect(edgeDegraded("<p>&lt;meta name=&quot;everloot-degraded&quot;&gt; everloot-degraded</p>")).toBe(false);
+  expect(edgeDegraded('<script>self.__next_f.push([1,"[\\"$\\",\\"meta\\",null,{\\"name\\":\\"everloot-degraded\\"}]"])</script>')).toBe(false);
+  expect(edgeDegraded("<html><body>Item 25</body></html>")).toBe(false);
 });
 
 test("on the item lists, parameters the page never reads do not split the cache, and order does not matter", () => {

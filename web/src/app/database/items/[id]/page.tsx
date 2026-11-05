@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import JsonLd from "@/components/JsonLd";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import { entityPageJsonLd } from "@/lib/jsonld";
 import AdSlot from "@/components/AdSlot";
 import { pageMetadata } from "@/lib/seo";
@@ -86,7 +87,7 @@ export default async function ItemPage(props: Props) {
   if (/^[a-z][a-z0-9-]*$/.test(params.id)) return CategoryPage({ classSlug: params.id, search: (await props.searchParams) ?? {} });
   if (!/^[1-9]\d*$/.test(params.id)) notFound();
   const itemId = Number(params.id);
-  const [{ facts, agreed, matched, showsTip }, edges, itemSeen, auctions] = await Promise.all([loadShownNames(), loadEdges(), loadItemSeen(), loadMarketBox(itemId)]);
+  const [{ facts, agreed, matched, showsTip, degraded }, edges, itemSeen, auctions] = await Promise.all([loadShownNames(), loadEdges(), loadItemSeen(), loadMarketBox(itemId)]);
   const page = itemPage(itemId, facts);
   if (unknownItem(itemId, facts, edgesFrom([...edges.observed, ...edges.client], "item", itemId), itemSeen)) notFound();
   // Named by players (3 installs agree); the badge and the facts card say so.
@@ -269,6 +270,7 @@ export default async function ItemPage(props: Props) {
 
   return (
     <Container width="data">
+      <EdgeDegraded when={degraded || itemSeen.unreachable || edges.unreachable || reported.unreachable} />
       <JsonLd data={entityPageJsonLd({ name: title, path: `/database/items/${itemId}`, identifier: `item:${itemId}` })} />
       <article>
         <EntityHeader

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
+import { edgeDegraded } from "@/lib/cf-edge-cache";
 
 const store = vi.hoisted(() => ({ loadCorpus: vi.fn() }));
 vi.mock("@/lib/upload-store", async (importOriginal) => ({
@@ -248,6 +249,7 @@ test("when the corpus reads but the world facts or the rollups do not, the secti
     for (const [profession, kind] of [["tailoring", "cloth"], ["first-aid", "cloth"], ["skinning", "leather"]]) {
       const part = section(await render(profession), kind)!;
       expect(part, `${which} ${profession}`).toContain("Storage unreachable");
+      expect(edgeDegraded(await render(profession)), `${which} ${profession}`).toBe(true);
       expect(part).not.toContain("zones yet");
       expect(part).not.toContain("<table");
     }

@@ -15,6 +15,7 @@ import { CLIENT_PROFESSIONS, professionBySlug, professionHref, RECIPES_BUILD, re
 import { pageMetadata } from "@/lib/seo";
 import { loadShownNames } from "@/lib/shown-item-names";
 import { STORAGE_UNREACHABLE, uploadStore } from "@/lib/upload-store";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import { formatCopper, handleProfessionPath } from "../../../../../../kb/src/profession-path";
 import { handleRecipeThresholds, pathFactsFromRecords, recipeThresholdsStructured, type Range } from "../../../../../../kb/src/recipe-thresholds";
 import { farmingAreas, gatherAreas, GATHERING, inLevels } from "@/lib/farming";
@@ -180,6 +181,7 @@ export default async function ProfessionPage(props: Props) {
 
   return (
     <Container width="data">
+      <EdgeDegraded when={corpus.unreachable === true || gathered.down} />
       <PageHeader
         trail={trail}
         title={`${p.name} recipes`}
