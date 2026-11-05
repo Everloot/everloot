@@ -289,23 +289,50 @@ local function questTag(questId)
   return nil
 end
 
+--- One quest log row: title, level, suggested group, isHeader, quest id. Older clients have GetQuestLogTitle;
+--- Forever's client (mainline UI) has only C_QuestLog.GetInfo, which returns the same fields as a table.
+local function questLogRow(index)
+  if GetQuestLogTitle then
+    local ok, title, level, group, isHeader, _, _, _, logId = pcall(GetQuestLogTitle, index)
+    if ok then return title, level, group, isHeader, logId end
+    return nil
+  end
+  if not (C_QuestLog and C_QuestLog.GetInfo) then return nil end
+  local ok, info = pcall(C_QuestLog.GetInfo, index)
+  info = ok and E.Readable(info)
+  if type(info) ~= "table" then return nil end
+  return E.Readable(info.title), E.Readable(info.level), E.Readable(info.suggestedGroup), E.Readable(info.isHeader), E.Readable(info.questID)
+end
+
+local function canReadQuestLog()
+  return GetQuestLogTitle ~= nil or (C_QuestLog ~= nil and C_QuestLog.GetInfo ~= nil and C_QuestLog.GetLogIndexForQuestID ~= nil)
+end
+
 -- A quest the character just accepted, read from its own quest log row. Level is the quest's level as the log
 -- shows it; a row that is not this quest, or has no real level, records nothing.
-local function questCapture(index, questId)
-  if not GetQuestLogTitle or type(index) ~= "number" or type(questId) ~= "number" then return end
+-- QUEST_ACCEPTED gives (log index, quest id) on older clients and only the quest id on Forever's.
+local function questCapture(arg1, arg2)
+  local index, questId = arg1, arg2
+  if questId == nil then index, questId = nil, E.Readable(arg1) end
+  if not canReadQuestLog() or type(questId) ~= "number" then return end
+  if index == nil and C_QuestLog and C_QuestLog.GetLogIndexForQuestID then
+    local ok, found = pcall(C_QuestLog.GetLogIndexForQuestID, questId)
+    index = ok and E.Readable(found) or nil
+  end
+  if type(index) ~= "number" then return end
   local faction = UnitFactionGroup and UnitFactionGroup("player")
   faction = faction == "Alliance" and "alliance" or faction == "Horde" and "horde" or nil
   EverlootDB.questSeen = EverlootDB.questSeen or {}
   local seenKey = tostring(questId) .. ":" .. tostring(faction)
   if EverlootDB.questSeen[seenKey] then return end
-  local ok, title, level, group, isHeader, _, _, _, logId = pcall(GetQuestLogTitle, index)
-  if not ok or isHeader or logId ~= questId or type(title) ~= "string" or title == "" then return end
+  local title, level, group, isHeader, logId = questLogRow(index)
+  if isHeader or logId ~= questId or type(title) ~= "string" or title == "" then return end
   if type(level) ~= "number" or level < 1 or level ~= math.floor(level) then return end
   -- The category is the nearest header above the quest in the log.
   local category
   for i = index - 1, 1, -1 do
-    local okRow, name, _, _, header = pcall(GetQuestLogTitle, i)
-    if okRow and header and type(name) == "string" and name ~= "" then category = name:sub(1, 60); break end
+    local name, _, _, header = questLogRow(i)
+    if header and type(name) == "string" and name ~= "" then category = name:sub(1, 60); break end
   end
   local row = {
     installId = EverlootDB.installId,
@@ -733,8 +760,23 @@ local function encounterEnd(encounterId, name, difficulty, size, success, units)
   })
 end
 
+--- A merchant slot's price and stock. Older clients have GetMerchantItemInfo; Forever's merchant window reads
+--- C_MerchantFrame.GetItemInfo, which returns them as fields.
+local function merchantPrice(index)
+  if GetMerchantItemInfo then
+    local ok, _, _, price, _, stock = pcall(GetMerchantItemInfo, index)
+    if ok then return price, stock end
+    return nil
+  end
+  local ok, info = pcall(C_MerchantFrame.GetItemInfo, index)
+  info = ok and E.Readable(info)
+  if type(info) ~= "table" then return nil end
+  return E.Readable(info.price), E.Readable(info.numAvailable)
+end
+
 local function vendorCapture()
-  if not GetMerchantNumItems or not GetMerchantItemLink or not GetMerchantItemInfo then return end
+  local canPrice = GetMerchantItemInfo or (C_MerchantFrame and C_MerchantFrame.GetItemInfo)
+  if not GetMerchantNumItems or not GetMerchantItemLink or not canPrice then return end
   local vendorNpcId = npcIdFromGuid(UnitGUID("npc")) or npcIdFromGuid(UnitGUID("target"))
   if not vendorNpcId then return end
   local okCount, count = pcall(GetMerchantNumItems)
@@ -744,8 +786,8 @@ local function vendorCapture()
     local okLink, link = pcall(GetMerchantItemLink, i)
     local itemId = okLink and type(link) == "string" and tonumber(link:match("item:(%d+)"))
     if itemId then
-      local okInfo, _, _, price, _, stock = pcall(GetMerchantItemInfo, i)
-      if okInfo and type(price) == "number" and price >= 0 and price == math.floor(price) then
+      local price, stock = merchantPrice(i)
+      if type(price) == "number" and price >= 0 and price == math.floor(price) then
         local row = { itemId = itemId, priceCopper = price }
         if type(stock) == "number" and stock > 0 and stock == math.floor(stock) then
           row.limitedStock = stock
@@ -814,8 +856,8 @@ E:RegisterModule("openworld", function()
     end
     if role ~= nil then pcall(interactionSighting, role or nil) end
   end)
-  if not GetQuestLogTitle then
-    return "ready (target/mouseover/loot/merchant/NPC windows; quests off, this client has no GetQuestLogTitle)"
+  if not canReadQuestLog() then
+    return "ready (target/mouseover/loot/merchant/NPC windows; quests off, this client has no quest log reader)"
   end
   return "ready (target/mouseover/loot/merchant/NPC windows/quest accept)"
 end)
