@@ -269,7 +269,8 @@ export async function loadGuildRealms(): Promise<GuildRealm[] | null> {
   if (realms === null) return null;
   const mapped = REALMS.length > 0;
   return realms
-    .filter((r) => !RESERVED_GUILD_SLUGS.has(realmSlugOf(r.realm)))
+    // A realm with no usable address (reserved, or a name of letters the slug drops, such as Hangul) is left off.
+    .filter((r) => realmSlugAllowed(realmSlugOf(r.realm)))
     .filter((r) => (mapped ? realmInfo(r.realm) !== null : r.guilds >= REALM_LIST_MIN.guilds && r.characters >= REALM_LIST_MIN.characters))
     .sort((a, b) => a.realm.localeCompare(b.realm));
 }

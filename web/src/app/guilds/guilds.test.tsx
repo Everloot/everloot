@@ -583,6 +583,18 @@ test("a realm whose name is spelled with an apostrophe is found at the slug its 
   expect(await realmPage("malganis")).toContain("Guilds on Mal’Ganis");
 });
 
+test("a realm whose name leaves no address, such as one written in Hangul, stays off the realm list", async () => {
+  on();
+  vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+  await seedRealm("Forever Pioneer", 2, 4);
+  // 3 guilds of 4: past the minimum, so only the missing address keeps it off.
+  await seedRealm("아즈샤라", 3, 4);
+  const html = await hub();
+  expect(html).toContain(">Forever Pioneer</a>");
+  expect(html).not.toContain("아즈샤라");
+  expect(html).not.toContain('href="/guilds/"');
+});
+
 test("a family slug still serves the family, with or without the guild switch, and reads no guild data", async () => {
   vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
   const realms = vi.spyOn(holder.store!, "guildRealms");
