@@ -59,7 +59,8 @@ Price tooltips use separate label/value rows with native coin icons. Community m
 values stay distinct from your own scan; the vendor sell price appears beside them when the client knows it.
 The amounts are per unit. The header names your realm with its ruleset (PvP, PvE, RP, RP-PvP, Hardcore) split off
 the name in its own colour, as the realm list shows it; drop rates sit in the value column too, their loot windows
-and installs beneath. Dates, units listed, reporters, all-house scope and stale-data warnings remain visible.
+and installs beneath. A source you have met is named as your client showed it ("Drops from Defias Bandit"), read
+from your own sightings and loot in the saved file; one you have not met keeps its id ("NPC 116"). Dates, units listed, reporters, all-house scope and stale-data warnings remain visible.
 `/everloot price` prints the same amounts as plain text. Disenchant outcomes and values are not yet available;
 the addon does not guess them from an item's color or type.
 

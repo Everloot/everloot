@@ -170,6 +170,32 @@ local member = EverlootDB.records.guild_snapshot[1].members[1]
 assert(member.rank == 'Officer' and member.level == 60 and member.class == 'MAGE')
 assert(member.lastOnlineDays == 0)
 """)
+# The names of drop sources this install met, for the tooltip's drop rows: read from its own sightings and loot, never
+# written; each lookup reads only rows stored since the last one, and a pipe in a name cannot start an escape.
+lua.execute("""
+local records = EverlootDB.records
+local function add(kind, row) records[kind] = records[kind] or {}; table.insert(records[kind], row) end
+local before = {}
+for kind, rows in pairs(records) do before[kind] = #rows end
+add('npc_sighting', { npcId = 990001, name = 'Defias Bandit' })
+add('object_sighting', { objectId = 990002, name = 'Copper Vein' })
+add('loot', { sourceObjectId = 990003, sourceObjectName = 'Battered Chest', items = {} })
+add('npc_sighting', { npcId = 990004, name = 4 })
+assert(Everloot:SourceName('npc', 990001) == 'Defias Bandit', 'an NPC this install saw')
+assert(Everloot:SourceName('object', 990002) == 'Copper Vein' and Everloot:SourceName('object', 990003) == 'Battered Chest', 'objects seen and looted')
+assert(Everloot:SourceName('npc', 990004) == nil and Everloot:SourceName('npc', 990002) == nil, 'no name, or the wrong kind, is nil')
+add('npc_sighting', { npcId = 990005, name = 'Mr. |cffff0000Red' })
+assert(Everloot:SourceName('npc', 990005) == 'Mr. ||cffff0000Red', 'a later row is read, its pipe shown as a pipe')
+for kind, rows in pairs(records) do
+  local n = (before[kind] or 0) + ((kind == 'npc_sighting' and 3) or ((kind == 'object_sighting' or kind == 'loot') and 1) or 0)
+  assert(#rows == n, 'looking up names stores nothing: ' .. kind)
+end
+-- Leave the rows as they were, for the schema check below.
+for kind, n in pairs({ npc_sighting = 3, object_sighting = 1, loot = 1 }) do
+  for _ = 1, n do table.remove(records[kind]) end
+  if #records[kind] == 0 and not before[kind] then records[kind] = nil end
+end
+""")
 # Every row the addon wrote is a record the site would accept (packages/protocol/schema).
 from protocol_schema import check_all  # noqa: E402
 check_all(lua)

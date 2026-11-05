@@ -199,6 +199,18 @@ printed = {}
 SlashCmdList.EVERLOOT('price 424242'); drain()
 assert(said('No price for this item on this realm yet') and said('No drop source reported by 3 installs'), table.concat(printed, '\\n'))
 
+-- A source this install met is named (the name comes from modules/openworld.lua's E:SourceName, tested in
+-- collection_contract.py): chat keeps the id beside the name, the tooltip row shows the name. One it never met keeps its id.
+Everloot.SourceName = function(_, kind, id) if kind == 'npc' and id == 116 then return 'Defias Bandit' end end
+printed = {}
+SlashCmdList.EVERLOOT('price 2589'); drain()
+assert(said('Everloot drop: Defias Bandit %(NPC 116%) · 12%.4%% %(42 of 340 loot windows%) · 5 installs'), table.concat(printed, '\\n'))
+assert(said('Everloot drop: NPC 94 · 6%.0%%'), 'an unmet source keeps its id: ' .. table.concat(printed, '\\n'))
+local named
+for _, line in ipairs(Everloot:DropLines(2589)) do if line.left == 'Drops from Defias Bandit' and line.right == '12.4%' then named = line end end
+assert(named, 'the tooltip row names the source')
+Everloot.SourceName = nil
+
 -- The SavedVariables cost of all of the above: none. Tooltips and the command read the slot file and write nothing.
 svAfter = serialize(EverlootDB)
 """)
