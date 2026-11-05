@@ -72,6 +72,54 @@ test("the tool answers per profession, filters by recipe, and says why it is emp
   expect(handleRecipeThresholds({ profession: " " }, rows)).toBe("Name a profession.");
 });
 
+// Spell 2152 is a Leatherworking recipe in the game files (client-recipes.json). A Spanish client names the
+// profession "Peletería" and the recipe and reagents in Spanish; the recipe id is the same.
+const kitEn = (installId: string, rank: number, difficulty: string) =>
+  ({ kind: "recipe_observed", installId, profession: "Leatherworking", recipe: "Light Armor Kit", recipeId: 2152, rank, difficulty, reagents: [{ item: "Light Leather", count: 1 }] });
+const kitEs = (installId: string, rank: number, difficulty: string) =>
+  ({ kind: "recipe_observed", installId, profession: "Peletería", recipe: "Kit de armadura ligero", recipeId: 2152, rank, difficulty, reagents: [{ item: "Cuero ligero", count: 1 }] });
+
+test("a Spanish install agrees with English ones on the same recipe id, published under the English names", () => {
+  const rows = recipeObservationsFromRecords([kitEn("en-a", 20, "optimal"), kitEn("en-b", 40, "medium"), kitEs("es-c", 35, "medium")]);
+  expect(inferThresholds(rows)).toEqual([{
+    profession: "Leatherworking", recipe: "Light Armor Kit", installs: 3, observations: 3,
+    yellow: { min: 21, max: 35 }, green: { min: 41, max: null }, grey: { min: 41, max: null }, reagents: null,
+  }]);
+  expect(handleRecipeThresholds({ profession: "Leatherworking" }, rows)).toContain("Light Armor Kit (Leatherworking), 3 installs: yellow from 21-35");
+  expect(handleRecipeThresholds({ profession: "Peletería" }, rows)).toMatch(/No recipe ranges/);
+});
+
+test("reagents for a game-file recipe come from English clients' lists only", () => {
+  const spanish = ["es-a", "es-b", "es-c"].map((id) => kitEs(id, 20, "optimal"));
+  const twoEnglish = [kitEn("en-d", 25, "optimal"), kitEn("en-e", 30, "optimal")];
+  const [withTwo] = inferThresholds(recipeObservationsFromRecords([...spanish, ...twoEnglish]));
+  expect(withTwo).toMatchObject({ recipe: "Light Armor Kit", installs: 5, reagents: null });
+  const [withThree] = inferThresholds(recipeObservationsFromRecords([...spanish, ...twoEnglish, kitEn("en-f", 22, "optimal")]));
+  expect(withThree.reagents).toEqual([{ item: "Light Leather", count: 1 }]);
+});
+
+test("a recipe only Spanish installs saw keeps its observed name under the English profession", () => {
+  const [only] = inferThresholds(recipeObservationsFromRecords(["es-a", "es-b", "es-c"].map((id) => kitEs(id, 20, "optimal"))));
+  expect(only).toMatchObject({ profession: "Leatherworking", recipe: "Kit de armadura ligero", reagents: null });
+});
+
+test("two recipe ids with the same name are not merged", () => {
+  // Merged, the trivial colour at 20 would contradict orange at 30 and withhold both.
+  const kit = [kitEn("en-a", 30, "optimal"), kitEn("en-b", 35, "optimal"), kitEn("en-c", 40, "optimal")];
+  const other = (installId: string) => ({ ...kitEn(installId, 20, "trivial"), recipeId: 2160 });
+  const [only, ...rest] = inferThresholds(recipeObservationsFromRecords([...kit, other("en-d")]));
+  expect(rest).toEqual([]);
+  expect(only).toMatchObject({ recipe: "Light Armor Kit", installs: 3, observations: 3, yellow: { min: 41, max: null } });
+  // Both agreed under one name: the name cannot tell them apart, so neither is published.
+  expect(inferThresholds(recipeObservationsFromRecords([...kit, other("en-d"), other("en-e"), other("en-f")]))).toEqual([]);
+});
+
+test("an older row without a recipe id joins the one id its name was seen with", () => {
+  const { recipeId: _, ...noId } = kitEn("en-c", 35, "medium");
+  const [only] = inferThresholds(recipeObservationsFromRecords([kitEn("en-a", 20, "optimal"), kitEs("es-b", 25, "optimal"), noId]));
+  expect(only).toMatchObject({ profession: "Leatherworking", recipe: "Light Armor Kit", installs: 3, yellow: { min: 26, max: 35 } });
+});
+
 const withMats = (installId: string, rank: number, difficulty: string, reagents: { item: string; count: number }[]) =>
   ({ ...obs(installId, rank, difficulty), reagents });
 const herbs = [{ item: "Peacebloom", count: 2 }, { item: "Empty Vial", count: 1 }];
