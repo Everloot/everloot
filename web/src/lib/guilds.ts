@@ -8,7 +8,12 @@ import {
 import { instanceFactsFromRecords } from "../../../kb/src/instances";
 import { loadGuildAlts, memberKey, type GuildAlt } from "./guild-alts";
 import { playerPagesOn, playerPath, rulesetOf, type Player } from "./player-pages";
-import { guildHideKey, playerHideKey, playerStore, type GuildHit } from "./player-store";
+import { unstable_cache } from "next/cache";
+import { cache } from "react";
+import { FAMILIES } from "../data/families";
+import { REALMS } from "../data/realms";
+import { guildHideKey, missingFunction, playerHideKey, playerStore, REALM_GUILD_LIMIT, realmSlugOf, type GuildHit, type GuildRealm } from "./player-store";
+import { realmInfo } from "./realms";
 import { uploadStore } from "./upload-store";
 
 /**
@@ -30,6 +35,11 @@ export const HIDE_GUILD_PATH = "/guilds/hide";
 
 export function guildPath(realm: string, guild: string): string {
   return `${GUILDS_PATH}/${encodeURIComponent(guildSlug(realm))}/${encodeURIComponent(guildSlug(guild))}`;
+}
+
+/** A realm's guild list, at the slug of the realm's key, so every spelling of the realm links to the one page. */
+export function realmPath(realm: string): string {
+  return `${GUILDS_PATH}/${encodeURIComponent(realmSlugOf(realm))}`;
 }
 
 export function hideGuildPath(realm: string, guild: string): string {
@@ -202,18 +212,109 @@ const seenFromHits = (hits: readonly GuildHit[]): Seen =>
 /**
  * Guilds whose name starts with `prefix`: the directory built from kills and officer boards, merged with the
  * players table's search (which knows guilds only members were seen in). Hidden guilds are already out of both.
+ * `partial` says the players table could not be read, so the answer lacks its guilds and members-seen counts.
  */
-export async function loadGuildSearch(prefix: string): Promise<{ results: GuildSummary[]; unreachable: boolean; dataAsOf: string | null }> {
+export async function loadGuildSearch(prefix: string): Promise<{ results: GuildSummary[]; unreachable: boolean; partial: boolean; dataAsOf: string | null }> {
   const data = await loadGuildData();
   // Without a readable hide list nothing is listed, not even the players table's guilds.
-  if (data.unreachable) return { results: [], unreachable: true, dataAsOf: null };
+  if (data.unreachable) return { results: [], unreachable: true, partial: false, dataAsOf: null };
   let hits: GuildHit[] = [];
+  let partial = false;
   if (playerPagesOn()) {
-    try { hits = await playerStore().searchGuilds(prefix); } catch { hits = []; }
+    try { hits = await playerStore().searchGuilds(prefix); } catch { hits = []; partial = true; }
   }
   const directory = guildDirectory({ kills: data.kills, seen: seenFromHits(hits), boards: boardSources(data.boards) });
-  return { results: searchGuilds(directory, prefix), unreachable: false, dataAsOf: data.dataAsOf };
+  return { results: searchGuilds(directory, prefix), unreachable: false, partial, dataAsOf: data.dataAsOf };
 }
+
+/**
+ * A players-table read that may come before its migration: null when the store cannot answer. PostgREST saying the
+ * function is not there yet is expected until the owner applies it, so only other failures are logged.
+ */
+async function storeRead<T>(what: string, read: () => Promise<T>): Promise<T | null> {
+  try {
+    return await read();
+  } catch (err) {
+    if (!missingFunction(err)) console.error(`${what} failed`, err);
+    return null;
+  }
+}
+
+/**
+ * Address segments under /guilds that are never a realm: the guild families (served first by the same route) and the
+ * hide form. A realm with one of these slugs gets no realm page and is left off the realm list.
+ */
+export const RESERVED_GUILD_SLUGS: ReadonlySet<string> = new Set([...FAMILIES.map((f) => f.slug), HIDE_GUILD_PATH.split("/").at(-1)!]);
+
+/** A realm address the store is asked about: the slug realmSlugOf writes, nothing longer than a realm can make. */
+const REALM_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const realmSlugAllowed = (slug: string) => slug.length <= 40 && REALM_SLUG.test(slug) && !RESERVED_GUILD_SLUGS.has(slug);
+
+/**
+ * The minimum for a realm on the /guilds realm list while the realm map (data/realms.ts) is empty: 3 guilds and 10
+ * characters seen in guilds. Any realm name the addon reports is stored, so without a minimum a few made-up names
+ * would fill the list; once the map lists the game's realms, only those are listed, whatever their counts.
+ */
+export const REALM_LIST_MIN = { guilds: 3, characters: 10 } as const;
+
+/** The realm list read for /guilds, kept five minutes; recording a guild hide clears it with the search tag. */
+const cachedGuildRealms = unstable_cache(() => playerStore().guildRealms(), ["guild-realms"], { revalidate: 300, tags: [GUILD_SEARCH_TAG] });
+
+/**
+ * The realms for the list on /guilds, by name: realms the map lists once it is filled, else realms past
+ * REALM_LIST_MIN, never one whose address is reserved. Null without the player pages or while the store cannot answer
+ * (a failed read is not kept: unstable_cache keeps only answers).
+ */
+export async function loadGuildRealms(): Promise<GuildRealm[] | null> {
+  if (!playerPagesOn()) return null;
+  const realms = await storeRead("guild realms", cachedGuildRealms);
+  if (realms === null) return null;
+  const mapped = REALMS.length > 0;
+  return realms
+    // A realm with no usable address (reserved, or a name of letters the slug drops, such as Hangul) is left off.
+    .filter((r) => realmSlugAllowed(realmSlugOf(r.realm)))
+    .filter((r) => (mapped ? realmInfo(r.realm) !== null : r.guilds >= REALM_LIST_MIN.guilds && r.characters >= REALM_LIST_MIN.characters))
+    .sort((a, b) => a.realm.localeCompare(b.realm));
+}
+
+/** Guilds per realm page. */
+export const REALM_PAGE = 50;
+
+export interface RealmPageData {
+  realm: string;
+  /** Every guild seen on the realm, most members seen first, then name. */
+  guilds: GuildSummary[];
+  /** True when the players table returned its most rows, so some guilds with the fewest members seen are not listed. */
+  capped: boolean;
+  dataAsOf: string | null;
+}
+
+/**
+ * A realm's guild list, by the realm slug in its address: every guild a kill, an officer board or a character seen in
+ * it puts on that realm, hidden guilds left out. Null when nothing is known on the realm (the page is then a 404),
+ * "unreachable" when the corpus, the hide list or the players table could not be read, including before the
+ * realm_guilds migration is applied. An address that is not a realm slug, or is reserved, is null without a read. One
+ * call per request: the page and its metadata share it.
+ */
+export const loadRealmPage = cache(async (slug: string): Promise<RealmPageData | null | "unreachable"> => {
+  const wanted = slug.toLowerCase();
+  if (!realmSlugAllowed(wanted)) return null;
+  const data = await loadGuildData();
+  if (data.unreachable) return "unreachable";
+  const onRealm = <T extends { realm: string }>(rows: Iterable<T>) => [...rows].filter((r) => realmSlugOf(r.realm) === wanted);
+  let hits: GuildHit[] = [];
+  if (playerPagesOn()) {
+    // One indexed read by slug: an address naming no realm finds no rows and reads nothing else.
+    const found = await storeRead("realm guilds", () => playerStore().realmGuilds(wanted));
+    if (found === null) return "unreachable";
+    hits = found;
+  }
+  const boards = new Map(onRealm(data.boards.values()).map((b) => [guildKey(b.realm, b.guildName), b] as const));
+  const guilds = guildDirectory({ kills: onRealm(data.kills), seen: seenFromHits(hits), boards: boardSources(boards) })
+    .sort((a, b) => (b.membersSeen ?? 0) - (a.membersSeen ?? 0) || a.guildName.localeCompare(b.guildName));
+  if (guilds.length === 0) return null;
+  return { realm: hits[0]?.realm ?? guilds[0]!.realm, guilds, capped: hits.length >= REALM_GUILD_LIMIT, dataAsOf: data.dataAsOf };
+});
 
 /** The day raids open on Forever (UTC). Before it, while no raid has an agreed kill, the hub says when raid ranking starts. */
 export const RAIDS_OPEN_DAY = "2026-12-09";

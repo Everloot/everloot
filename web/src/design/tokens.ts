@@ -159,11 +159,14 @@ export const GLINT = {
 
 export const QUALITIES = ["poor", "common", "uncommon", "rare", "epic", "legendary"] as const;
 export const CLASSES = ["warrior", "paladin", "hunter", "rogue", "priest", "shaman", "mage", "warlock", "druid"] as const;
+/** The realm rulesets' slugs, as ../data/realms.ts `RULESET_SLUGS`, for their name colours. */
+export const REALM_RULESETS = ["normal", "pvp", "rp", "rp-pvp", "hardcore"] as const;
 
 export type TokenName =
   | "canvas" | "panel" | "line" | "edge" | "fg" | "fg-2" | "muted" | "accent" | "danger" | "warning"
   | "tooltip" | "tooltip-border" | "tooltip-inner" | "accent-hover" | "blue-post"
-  | `q-${(typeof QUALITIES)[number]}` | `class-${(typeof CLASSES)[number]}` | "chat-whisper" | "chat-guild";
+  | `q-${(typeof QUALITIES)[number]}` | `class-${(typeof CLASSES)[number]}` | "chat-whisper" | "chat-guild"
+  | `realm-${(typeof REALM_RULESETS)[number]}`;
 
 // Tooltip frames stay dark in both modes, as in the game.
 const tooltip = { tooltip: "#080C18", "tooltip-border": "#5B6B8C", "tooltip-inner": "#26324F" } as const;
@@ -203,6 +206,12 @@ export const tokens: Record<Mode, Record<TokenName, string>> = {
     "class-druid": "#FF7C0A",
     "chat-whisper": "#FF80FF",
     "chat-guild": "#40FF40",
+    // A realm's ruleset beside its name (tools/auctions/RealmName.tsx): red PvP, green PvE, blue RP, orange RP-PvP, gold Hardcore.
+    "realm-normal": "#66D966",
+    "realm-pvp": "#FF4C4C",
+    "realm-rp": "#73B3FF",
+    "realm-rp-pvp": "#FF8040",
+    "realm-hardcore": "#FFD100",
   },
   light: {
     canvas: "#FBF8EC",
@@ -235,6 +244,11 @@ export const tokens: Record<Mode, Record<TokenName, string>> = {
     "class-druid": "#A84B00",
     "chat-whisper": "#A3218F",
     "chat-guild": "#1A7A12",
+    "realm-normal": "#1A7A12",
+    "realm-pvp": "#C62828",
+    "realm-rp": "#0057AD",
+    "realm-rp-pvp": "#A84B00",
+    "realm-hardcore": "#746500",
   },
 };
 
@@ -243,6 +257,7 @@ export const TEXT_TOKENS: TokenName[] = [
   ...QUALITIES.map((q) => `q-${q}` as const),
   ...CLASSES.map((c) => `class-${c}` as const),
   "chat-whisper", "chat-guild",
+  ...REALM_RULESETS.map((r) => `realm-${r}` as const),
 ];
 
 /** "#0E0F0D" -> "14 15 13", the form `rgb(var(--x) / <alpha-value>)` needs. */

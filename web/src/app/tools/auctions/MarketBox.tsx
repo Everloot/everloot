@@ -3,6 +3,7 @@ import { DataTable, type Column } from "@/components/ui";
 import { uploadStore } from "@/lib/upload-store";
 import { crossRealmHref, itemAcrossRealms, itemByHouse, itemHref, money, realmBoards, type MarketRow } from "@/lib/auction-house";
 import { formatCopper } from "../../../../../kb/src/market";
+import { RealmName } from "./RealmName";
 
 /**
  * An item's public auction prices for its database page: each realm's blend, then each of that realm's houses
@@ -23,7 +24,7 @@ export async function loadMarketBox(itemId: number, now: Date = new Date()): Pro
 export function MarketBox({ itemId, rows }: { itemId: number; rows: MarketRow[] }) {
   if (!rows.length) return null;
   const columns: Column<MarketRow>[] = [
-    { key: "realm", header: "Realm", nowrap: true, cell: (r) => <Link href={itemHref(r.realm, itemId)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{r.realm.name}</Link> },
+    { key: "realm", header: "Realm", nowrap: true, cell: (r) => <Link href={itemHref(r.realm, itemId)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg"><RealmName name={r.realm.name} /></Link> },
     { key: "house", header: "House", nowrap: true, cell: (r) => r.house ?? "All" },
     { key: "market", header: "Market value", numeric: true, cell: (r) => <span className={r.value.market === null ? "text-muted" : undefined}>{money(r.value.market)}</span> },
     { key: "min", header: "Min buyout", numeric: true, cell: (r) => formatCopper(r.value.min) },

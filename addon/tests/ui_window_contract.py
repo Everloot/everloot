@@ -3,7 +3,8 @@
 The Everloot window (modules/window.lua): built the first time it opens, from the minimap button or
 /everloot window, and drawn only from what the client and the saved file hold. A value it cannot read is a
 dash, never a number. It registers no events, so recording never runs through it: an error inside it closes
-the window and leaves capture as it was, and the off switch keeps it from being built at all. The item
+the window and leaves capture as it was, and the off switch keeps it from being built at all. Its title is
+Everloot in fel green, and the settings page borrows its look at load without building it. The item
 tooltip keeps its lines under one "Everloot" header, and the crest texture ships in the addon zip.
 """
 import shutil
@@ -58,6 +59,7 @@ function Frame.SetTexture(self, path) self.path = path end
 function Frame.SetBackdrop(self, b) self.backdrop = b end
 function Frame.SetBackdropBorderColor(self, r, g, b) self.border = { r, g, b } end
 function Frame.SetFont(self, path, size) self.font = path; return true end
+function Frame.SetTextColor(self, r, g, b, a) self.color = { r, g, b, a } end
 function Frame.SetMinMaxValues(self, lo, hi) self.lo, self.hi = lo, hi end
 function Frame.SetValue(self, v) self.value = v end
 function Frame.SetChecked(self, v) self.checked = v and true or false end
@@ -155,6 +157,9 @@ lua.execute("""
 local U = Everloot.Window
 assert(U.frame == nil and EverlootWindow == nil, 'nothing is built at load')
 assert(Everloot:Status():find('window: ready'), 'the module reports in /everloot status')
+local page = Everloot.Options.page
+assert(page.crest and page.crest.path == 'Interface\\\\AddOns\\\\Everloot\\\\media\\\\crest' and page.title.color[2] > 0.9,
+  'the settings page, built at load, already wears the crest and fel green title')
 
 -- Gold the gold module records: a vendor sale, a quest reward and a flight.
 fire('PLAYER_ENTERING_WORLD')
@@ -168,6 +173,8 @@ local f = EverlootWindow
 assert(f == U.frame and f.shown and f.template == 'BackdropTemplate', 'one named window, shown')
 assert(f.backdrop.edgeFile == 'Interface\\\\Tooltips\\\\UI-Tooltip-Border' and f.border[1] > f.border[3], 'bronze-tinted tooltip edge')
 assert(f.crest.path == 'Interface\\\\AddOns\\\\Everloot\\\\media\\\\crest', 'the crest')
+assert(f.title.text == 'Everloot' and f.title.color[2] > 0.9 and f.title.color[1] < 0.7 and f.title.color[3] < 0.3,
+  'Everloot in fel green, as in the tooltip, the settings page and the auction house tab')
 assert(f.subtitle.text == 'Home' and f.home.shown ~= false and f.nav.home.on.shown, 'Home is open, its nav item lit')
 assert(f.name.text == 'Samplechar' and f.realm.text == 'Forever', f.name.text)
 assert(f.class.text:find('^Level 24 Orc |cff0070dd') and f.class.text:find('Shaman'), f.class.text)

@@ -806,6 +806,39 @@ local function vendorCapture()
   })
 end
 
+-- Names of the sources this install has met, as this client showed them: NPCs from its sightings, objects from its
+-- sightings and from what it looted. Read from the rows already in the saved file, never written to it; each lookup
+-- reads only the rows stored since the last one. A source this install never met has no name here.
+local known = { npc = {}, object = {}, read = {} }
+local NAME_ROWS = {
+  { kind = "npc_sighting", id = "npcId", name = "name", into = "npc" },
+  { kind = "object_sighting", id = "objectId", name = "name", into = "object" },
+  { kind = "loot", id = "sourceObjectId", name = "sourceObjectName", into = "object" },
+}
+
+--- The name this install saw for a drop source (modules/drops.lua shows it) ("npc" or "object" and its id), or nil.
+function E:SourceName(kind, id)
+  local records = type(EverlootDB) == "table" and EverlootDB.records
+  if type(records) ~= "table" then return nil end
+  for _, source in ipairs(NAME_ROWS) do
+    local rows = records[source.kind]
+    if type(rows) == "table" then
+      local from = known.read[source.kind] or 0
+      if #rows < from then from = 0 end -- the rows were cleared: read them again
+      local into = known[source.into]
+      for i = from + 1, #rows do
+        local row = rows[i]
+        local rowId, name = type(row) == "table" and row[source.id], type(row) == "table" and row[source.name]
+        if type(rowId) == "number" and type(name) == "string" and name ~= "" then into[rowId] = name end
+      end
+      known.read[source.kind] = #rows
+    end
+  end
+  local name = known[kind] and known[kind][id]
+  -- A name is shown as written: a pipe would start a colour or texture escape.
+  return name and (name:gsub("|", "||")) or nil
+end
+
 E:RegisterModule("openworld", function()
   local f = E.frame
   f:RegisterEvent("PLAYER_TARGET_CHANGED")
