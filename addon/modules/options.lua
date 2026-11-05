@@ -83,22 +83,25 @@ local function build()
   title:SetPoint("TOPLEFT", 16, -16)
   title:SetText("Everloot")
   local intro = page:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-  intro:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
-  intro:SetWidth(560)
+  intro:SetPoint("TOPLEFT", page, "TOPLEFT", 16, -40)
+  intro:SetPoint("TOPRIGHT", page, "TOPRIGHT", -32, -40)
   intro:SetJustifyH("LEFT")
   intro:SetText("What the addon records. Everything stays in your saved file until the Everloot Desktop App or the upload page sends it, as each line says.")
   -- Ask Everloot: the question goes into the file, the companion answers it, and /reload prints it.
   local ask = CreateFrame("EditBox", nil, page, "InputBoxTemplate")
-  ask:SetSize(380, 22)
-  ask:SetPoint("TOPLEFT", intro, "BOTTOMLEFT", 0, -22)
+  ask:SetHeight(22)
   if ask.SetAutoFocus then ask:SetAutoFocus(false) end
   if ask.EnableMouse then ask:EnableMouse(true) end
   local askLabel = page:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-  askLabel:SetPoint("LEFT", ask, "RIGHT", 8, 0)
+  askLabel:SetPoint("TOPLEFT", intro, "BOTTOMLEFT", 0, -14)
+  askLabel:SetPoint("TOPRIGHT", intro, "BOTTOMRIGHT", 0, -14)
+  askLabel:SetJustifyH("LEFT")
   askLabel:SetText("Ask Everloot, then /reload for the answer")
   local send = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
   send:SetSize(64, 22)
-  send:SetPoint("LEFT", askLabel, "RIGHT", 8, 0)
+  send:SetPoint("TOPRIGHT", askLabel, "BOTTOMRIGHT", 0, -8)
+  ask:SetPoint("TOPLEFT", askLabel, "BOTTOMLEFT", 0, -8)
+  ask:SetPoint("TOPRIGHT", send, "TOPLEFT", -8, 0)
   send:SetText("Ask")
   local function askNow()
     local text = (ask:GetText() or ""):gsub("^%s+", ""):gsub("%s+$", "")
@@ -109,34 +112,61 @@ local function build()
   send:SetScript("OnClick", askNow)
   ask:SetScript("OnEnterPressed", askNow)
   page.ask = ask
+  local scroll = CreateFrame("ScrollFrame", nil, page, "UIPanelScrollFrameTemplate")
+  scroll:SetPoint("TOPLEFT", ask, "BOTTOMLEFT", 0, -18)
+  scroll:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -32, 54)
+  local content = CreateFrame("Frame", nil, scroll)
+  content:SetSize(1, 1)
+  scroll:SetScrollChild(content)
+  page.scroll = scroll
   page.boxes = {}
-  local anchor, gap = ask, -18
   for _, row in ipairs(O.ROWS) do
-    local box = CreateFrame("CheckButton", nil, page, "UICheckButtonTemplate")
-    box:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, gap)
+    local box = CreateFrame("CheckButton", nil, content, "UICheckButtonTemplate")
     box.row = row
     local label = box:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    label:SetPoint("LEFT", box, "RIGHT", 4, 1)
+    label:SetPoint("TOPLEFT", box, "TOPRIGHT", 4, -4)
+    label:SetJustifyH("LEFT")
     label:SetText(row.label)
     local text = box:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
     text:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -2)
-    text:SetWidth(520)
     text:SetJustifyH("LEFT")
     text:SetText(row.text)
+    box.label, box.description = label, text
     box:SetScript("OnClick", function(self) O.Set(row, self:GetChecked() and true or false) end)
     page.boxes[#page.boxes + 1] = box
-    anchor, gap = box, -18
   end
+  local function layout(_, width)
+    width = math.max(1, width or scroll:GetWidth())
+    content:SetWidth(width)
+    local y = 0
+    for _, box in ipairs(page.boxes) do
+      box:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
+      box.label:SetWidth(math.max(1, width - 38))
+      box.description:SetWidth(math.max(1, width - 38))
+      y = y + math.max(32, 4 + box.label:GetStringHeight() + 2 + box.description:GetStringHeight()) + 12
+    end
+    content:SetHeight(y)
+    scroll:SetVerticalScroll(math.min(scroll:GetVerticalScroll(), math.max(0, y - scroll:GetHeight())))
+  end
+  scroll:HookScript("OnSizeChanged", layout)
+  scroll:EnableMouseWheel(true)
+  scroll:SetScript("OnMouseWheel", function(self, delta)
+    local limit = math.max(0, content:GetHeight() - self:GetHeight())
+    self:SetVerticalScroll(math.max(0, math.min(limit, self:GetVerticalScroll() - delta * 40)))
+  end)
   local reload = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
   reload:SetSize(140, 24)
-  reload:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -20)
+  reload:SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", 16, 16)
   reload:SetText("Reload now")
   reload:SetScript("OnClick", function() if ReloadUI then ReloadUI() end end)
   page.reload = reload
   local note = page:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-  note:SetPoint("LEFT", reload, "RIGHT", 10, 0)
+  note:SetPoint("TOPLEFT", reload, "TOPRIGHT", 10, -2)
+  note:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -32, 16)
+  note:SetJustifyH("LEFT")
+  note:SetJustifyV("TOP")
   page.note = note
-  page:SetScript("OnShow", O.Refresh)
+  page:SetScript("OnShow", function() layout(); O.Refresh() end)
   return page
 end
 

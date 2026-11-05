@@ -29,10 +29,19 @@ end
 function Frame.SetScript(self, script, f) self.scripts[script] = f; if script == 'OnEvent' then self.onEvent = f end end
 function Frame.HookScript(self, _, f) table.insert(self.hooks, f) end
 function Frame.SetText(self, t) self.text = t end
+function Frame.SetSize(self, w, h) self.width = w; self.height = h end
+function Frame.SetWidth(self, w) self.width = w end
+function Frame.SetHeight(self, h) self.height = h end
+function Frame.GetStringHeight(self) return 12 * math.max(1, math.ceil(#self.text * 6 / self.width)) end
+function Frame.SetPoint(self, point, ...) self.points = rawget(self, 'points') or {}; self.points[point] = { ... } end
 function Frame.Show(self) self.shown = true end
 function Frame.Hide(self) self.shown = false end
 function Frame.IsShown(self) return self.shown end
-function Frame.CreateFontString(self) return setmetatable({ scripts = {}, hooks = {} }, Frame) end
+function Frame.CreateFontString(self)
+  local text = setmetatable({ scripts = {}, hooks = {} }, Frame)
+  self.fonts = rawget(self, 'fonts') or {}; table.insert(self.fonts, text)
+  return text
+end
 function Frame.RegisterEvent(self, e) self.events[e] = true end
 CreateFrame = function(kind, name, parent, template)
   local f = setmetatable({ kind = kind, name = name, parent = parent, template = template, scripts = {}, hooks = {}, events = {}, shown = true }, Frame)
@@ -102,6 +111,11 @@ fire('AUCTION_HOUSE_SHOW')
 local prompt = Everloot.scanPrompt
 assert(prompt and prompt.shown and prompt.parent == AuctionHouseFrame, 'the prompt shows beside the auction house')
 assert(prompt.button and prompt.button.text == 'Scan prices for Everloot', 'one button says what it does')
+local description = prompt.fonts[1]
+assert(prompt.height >= description:GetStringHeight() + prompt.button.height + 36,
+  'the prompt must fit its wrapped text, button and spacing without clipping or overlap')
+assert(Everloot.scanButton.points.TOPRIGHT[2] == 'BOTTOMRIGHT',
+  'the fallback scan action must stay below the house, away from Search and Filter')
 assert(replicateCalls == 0, 'the prompt never scans by itself')
 
 prompt.button.scripts.OnClick()

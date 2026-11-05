@@ -25,7 +25,17 @@ Frame.__index = function(self, key)
   return function() end
 end
 function Frame.SetScript(self, script, f) self.scripts[script] = f; if script == 'OnEvent' then self.onEvent = f end end
-function Frame.HookScript(self, _, f) table.insert(self.hooks, f) end
+function Frame.HookScript(self, script, f) table.insert(self.hooks, f); self.hooks[script] = f end
+function Frame.SetSize(self, w, h) self.width = w; self.height = h end
+function Frame.SetWidth(self, w) self.width = w end
+function Frame.SetHeight(self, h) self.height = h end
+function Frame.GetWidth(self) return rawget(self, 'width') or 560 end
+function Frame.GetHeight(self) return rawget(self, 'height') or 220 end
+function Frame.SetPoint(self, point, ...) self.points = rawget(self, 'points') or {}; self.points[point] = { ... } end
+function Frame.GetStringHeight(self) return 12 * math.max(1, math.ceil(#(rawget(self, 'text') or '') * 6 / (rawget(self, 'width') or 560))) end
+function Frame.SetScrollChild(self, child) self.child = child end
+function Frame.GetVerticalScroll(self) return rawget(self, 'offset') or 0 end
+function Frame.SetVerticalScroll(self, value) self.offset = value end
 function Frame.SetText(self, t) self.text = t end
 function Frame.SetChecked(self, v) self.checked = v and true or false end
 function Frame.GetChecked(self) return self.checked end
@@ -76,6 +86,27 @@ local byKey = {}
 for _, box in ipairs(O.page.boxes) do byKey[box.row.key] = box end
 assert(#O.page.boxes == #O.ROWS and byKey.auctions.checked and byKey.census.checked and byKey.scanPrompt.checked and not byKey.players.checked)
 assert(string.find(O.page.note.text, 'Everloot ' .. Everloot.VERSION, 1, true))
+
+-- Every switch stays reachable in a bounded viewport, including small panels and long descriptions.
+local scroll = rawget(O.page, 'scroll')
+assert(scroll and scroll.child, 'settings need a scrolling viewport, not controls spilling off the page')
+for _, width in ipairs({ 560, 320 }) do
+  scroll.width, scroll.height = width, 220
+  scroll.hooks.OnSizeChanged(scroll, width, 220)
+  local child = scroll.child
+  local previousBottom = 0
+  for _, box in ipairs(O.page.boxes) do
+    local top = -box.points.TOPLEFT[4]
+    assert(top >= previousBottom, 'wrapped row descriptions must not overlap the next control')
+    previousBottom = top + math.max(32, 4 + box.label:GetStringHeight() + 2 + box.description:GetStringHeight())
+  end
+  assert(child.height >= previousBottom, 'the last description must be inside scrollable content')
+  scroll.scripts.OnMouseWheel(scroll, -1000)
+  assert(scroll.offset == child.height - scroll.height, 'scrolling down reaches the last settings')
+  scroll.scripts.OnMouseWheel(scroll, 1000)
+  assert(scroll.offset == 0, 'scrolling back reaches the first settings')
+end
+assert(O.page.reload.parent == O.page and O.page.reload.points.BOTTOMLEFT, 'Reload remains at the fixed panel footer')
 
 -- A command row runs its command: census off deletes the census rows, as in chat.
 EverlootDB.records.census_seen = { { guid = 'Player-1-0000000A' } }

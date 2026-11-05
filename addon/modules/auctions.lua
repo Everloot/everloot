@@ -425,8 +425,8 @@ local function addButton()
   if E.AuctionTab and E.AuctionTab.Attach(AuctionHouseFrame) then return end
   local button = CreateFrame("Button", "EverlootScanButton", AuctionHouseFrame, "UIPanelButtonTemplate")
   button:SetSize(120, 22)
-  -- Placement still needs checking in the Forever client.
-  button:SetPoint("TOPRIGHT", AuctionHouseFrame, "TOPRIGHT", -30, -28)
+  -- Keep the fallback below the window, away from the house's Search and Filter controls.
+  button:SetPoint("TOPRIGHT", AuctionHouseFrame, "BOTTOMRIGHT", -12, -4)
   button:SetText("Everloot scan")
   button:SetScript("OnClick", function() E:StartScan() end)
   E.scanButton = button
@@ -446,23 +446,25 @@ local function showPrompt()
     local ok, frame = pcall(CreateFrame, "Frame", "EverlootScanPrompt", AuctionHouseFrame, "BackdropTemplate")
     if not ok or not frame then return end
     local built = pcall(function()
-      frame:SetSize(230, 74)
+      frame:SetWidth(280)
       frame:SetPoint("TOPLEFT", AuctionHouseFrame, "TOPRIGHT", 4, 0)
+      frame:SetClampedToScreen(true)
       if frame.SetBackdrop then
         frame:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
           tile = true, tileSize = 16, edgeSize = 16, insets = { left = 4, right = 4, top = 4, bottom = 4 } })
       end
       local text = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-      text:SetPoint("TOPLEFT", 12, -10)
-      text:SetWidth(190)
+      text:SetPoint("TOPLEFT", 12, -12)
+      text:SetWidth(232)
       text:SetJustifyH("LEFT")
       text:SetText("Share this house's prices with Everloot? One scan, every 15 min at most. /everloot scanprompt off hides this.")
       local button = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-      button:SetSize(180, 22)
-      button:SetPoint("BOTTOMLEFT", 10, 8)
+      button:SetSize(220, 22)
+      button:SetPoint("TOPLEFT", text, "BOTTOMLEFT", 0, -12)
       button:SetText("Scan prices for Everloot")
       button:SetScript("OnClick", function() frame:Hide(); E:StartScan() end)
       frame.button = button
+      frame:SetHeight(12 + text:GetStringHeight() + 12 + 22 + 12)
       local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
       close:SetPoint("TOPRIGHT", -2, -2)
       close:SetScript("OnClick", function() frame:Hide() end)
