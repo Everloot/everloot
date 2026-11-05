@@ -32,6 +32,8 @@ function Frame.GetChecked(self) return self.checked end
 function Frame.Show(self) self.shown = true end
 function Frame.Hide(self) self.shown = false end
 function Frame.SetParent(self, p) self.parentSet = p end
+function Frame.SetTexture(self, t) self.path = t end
+function Frame.SetHighlightTexture(self, t) self.highlightPath = t end
 function Frame.CreateFontString(self) return setmetatable({ scripts = {}, hooks = {} }, Frame) end
 function Frame.CreateTexture(self) return setmetatable({ scripts = {}, hooks = {} }, Frame) end
 function Frame.RegisterEvent(self, e) self.events[e] = true end
@@ -75,6 +77,13 @@ def test_the_button_sits_on_the_minimap_and_opens_the_panel():
     lua.globals().button = button
     assert lua.eval("Everloot.Minimap.Button() == button") is True  # built once
     assert lua.eval("button.parent == Minimap") is True
+    # Its face is Everloot's crest (the round badge in media/crest.tga), not a stock game icon, with a hover glow.
+    crest = "Interface\\AddOns\\Everloot\\media\\crest"
+    assert lua.eval("button.icon.path") == crest
+    assert lua.eval("button.highlightPath") is not None
+    toc = (root / "Everloot.toc").read_text(encoding="utf-8")
+    assert f"## IconTexture: {crest}" in toc, "the addon list shows the crest too"
+    assert (root / "media" / "crest.tga").exists()
     # Clicking it opens the panel.
     lua.execute("button.scripts.OnClick(button)")
     assert lua.eval("Everloot.Options.page ~= nil") is True

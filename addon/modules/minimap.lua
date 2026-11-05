@@ -15,13 +15,16 @@ function M.Button()
   button:SetSize(26, 26)
   button:SetPoint("TOPLEFT", Minimap, "TOPLEFT", 0, 0)
   if button.SetFrameStrata then button:SetFrameStrata("MEDIUM") end
+  -- The face is Everloot's crest: already a round badge (ring, dark face, the diamond), so it fills the button.
   local icon = button:CreateTexture(nil, "ARTWORK")
   if icon then
-    icon:SetSize(20, 20)
+    icon:SetSize(26, 26)
     icon:SetPoint("CENTER")
-    icon:SetTexture("Interface\\Icons\\INV_Misc_Book_09")
+    icon:SetTexture("Interface\\AddOns\\Everloot\\media\\crest")
     button.icon = icon
   end
+  -- The game's own round glow for minimap buttons on hover.
+  if button.SetHighlightTexture then button:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight", "ADD") end
   button:SetScript("OnClick", function(_, mouseButton)
     -- Left: the Everloot window, or the plan workspace when the window is off or has failed this session.
     if mouseButton ~= "RightButton" and E.Window and E:IsEnabled("window") and not E.Window.failed and E.Window.Toggle() then return end
