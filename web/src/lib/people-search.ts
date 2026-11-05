@@ -36,6 +36,8 @@ export interface PeopleSearch { characters: PersonGroup; guilds: PersonGroup }
 
 const EMPTY: PersonGroup = { results: [], total: 0, capped: false };
 export const PEOPLE_LIMIT = 8;
+/** The PEOPLE_SEARCH_LIMIT binding in web/wrangler.jsonc: lookups per address per minute on /search/people. */
+export const PEOPLE_PER_MINUTE = 60;
 /** The most rows either lookup returns: the players store's search limit, and kb's searchGuilds default. */
 const LOOKUP_CAP = 25;
 

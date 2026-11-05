@@ -15,9 +15,6 @@ export const dynamic = "force-dynamic";
 
 const HEADERS = { "Cache-Control": "private, no-store", "X-Robots-Tag": "noindex" };
 
-/** The PEOPLE_SEARCH_LIMIT binding in web/wrangler.jsonc: lookups per address per minute. */
-export const PEOPLE_PER_MINUTE = 60;
-
 interface Limiter { limit(options: { key: string }): Promise<{ success: boolean }> }
 
 /**

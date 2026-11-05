@@ -15,7 +15,8 @@ vi.mock("@/lib/shown-item-names", () => ({ loadShownNames: async () => ({}) }));
 vi.mock("@/lib/item-icons", () => ({ shownItemIcons: async () => new Map() }));
 vi.mock("@/lib/objects", () => ({ loadObjectFacts: async () => ({ rates: [], measuredZeros: [], names: [], unreachable: false }) }));
 
-import { GET, PEOPLE_PER_MINUTE } from "./route";
+import { PEOPLE_PER_MINUTE } from "@/lib/people-search";
+import { GET } from "./route";
 import { GET as suggestGET } from "../suggest/route";
 
 beforeEach(async () => {
