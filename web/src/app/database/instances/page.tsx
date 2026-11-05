@@ -8,6 +8,7 @@ import { loadingArt, loadSiteAssets } from "@/lib/game-assets";
 import { PLACEHOLDER } from "@/lib/item-names";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import { wikiHref } from "@/lib/wiki";
 import { prepPages } from "@/lib/wiki-dungeon";
 import { zoneHref } from "@/lib/zones";
@@ -61,6 +62,7 @@ export default async function InstancesPage() {
 
   return (
     <Container width="data">
+      <EdgeDegraded when={seen.unreachable} />
       <article>
         <DataTitle title="Dungeons and raids" meta={`${rows.length} instances`} trail={trailFor("/database/instances") ?? undefined} />
         {seen.unreachable && <p className="mb-3 text-meta text-warning">{STORAGE_UNREACHABLE} The entrances below are from the game files.</p>}

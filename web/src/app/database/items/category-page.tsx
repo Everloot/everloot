@@ -10,6 +10,7 @@ import {
 import { loadItemSeen } from "@/lib/item-seen";
 import { pageMetadata } from "@/lib/seo";
 import { loadShownNames } from "@/lib/shown-item-names";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
 import { classLabel, hasClassContext, parseClassContext, withClassContext, withoutClassContext } from "@/lib/class-context";
 import ClassContextChip from "@/components/classes/ClassContextChip";
@@ -119,7 +120,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   const usable = context ? classUse(CLIENT_CLASS_GEAR, context.classSlug, context.level) : null;
   const fits = (row: ItemRow) => !usable || usable(row) !== "no";
   const base = (cls ? filterItems(T, { classId: cls.id, subclassId: sub?.id }) : T.items).filter(fits);
-  const [{ agreed, matched, showsTip }, seen] = await Promise.all([loadShownNames(), loadItemSeen()]);
+  const [{ agreed, matched, showsTip, degraded }, seen] = await Promise.all([loadShownNames(), loadItemSeen()]);
   const nameOf = (id: number) => agreed.get(id) ?? matched?.names.get(id)?.name;
   // The game file name, icon and tooltip facts only for items players reported (3 installs) or the item name rule
   // names, as on the item page: a list of every id in the files must not become a list of unreleased items.
@@ -316,6 +317,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
 
   return (
     <Container width="data">
+      <EdgeDegraded when={degraded || seen.unreachable} />
       <article>
         <DataTitle title={title} trail={trail} aside={strip} />
         <FilterBar

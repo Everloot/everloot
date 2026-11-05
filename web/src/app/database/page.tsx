@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { objectList } from "../../../../kb/src/object-page";
@@ -83,6 +84,7 @@ export default async function DatabasePage() {
 
   return (
     <Container width="data">
+      <EdgeDegraded when={stats.unreachable || world.unreachable} />
       <article>
         <JsonLd data={datasetJsonLd({ uploads: stats.unreachable ? 0 : stats.uploads, name: DATASET_NAME, description, path: "/database", corpusPath: "/api/corpus/public", dataAsOf: stats.unreachable ? null : stats.dataAsOf })} />
         <DataTitle

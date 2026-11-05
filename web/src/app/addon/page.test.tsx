@@ -112,6 +112,19 @@ test("at build, when GitHub cannot be read the addon still downloads and the app
   expect(html).not.toContain("DesktopApp-");
 });
 
+test("at build, a failed read is asked again with a minute's lifetime, so a fallback page is rebuilt a minute after the deploy", async () => {
+  vi.stubEnv("NEXT_PHASE", "phase-production-build");
+  const answers = [() => Promise.reject(new Error("timed out")), () => Promise.resolve(Response.json(releases))];
+  const fetch = vi.fn(() => answers.shift()!());
+  vi.stubGlobal("fetch", fetch);
+  const html = renderToStaticMarkup(await AddonPage());
+  // The lowest lifetime among a page's fetches is the page's own (Next.js), so this sets the build's copy to a minute.
+  const lifetimes = fetch.mock.calls.map((call) => ((call as unknown[])[1] as { next?: { revalidate?: number } }).next?.revalidate);
+  expect(lifetimes).toEqual([3600, 60]);
+  expect(html).toContain("DesktopApp-0.1.0-win-x64-setup.exe");
+  expect(visible(html)).not.toContain("could not be loaded right now");
+});
+
 test("an hourly rebuild with GitHub down throws, so the cache keeps serving the last good page", async () => {
   await expect(render(() => Promise.resolve(new Response("limited", { status: 403 })))).rejects.toThrow("keep the last good page");
 });

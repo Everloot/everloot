@@ -5,6 +5,7 @@ const reads = vi.hoisted(() => ({ items: vi.fn(), world: vi.fn(), tips: vi.fn() 
 vi.mock("./rollup-compute", () => ({ loadItemFacts: reads.items, loadWorldFacts: reads.world }));
 vi.mock("./game-assets", () => ({
   loadItemNames: async () => null,
+  PRIVATE_UNREACHABLE: Symbol("private bucket unreachable"),
   loadQuestNames: async () => null,
   loadSiteAssets: async () => ({ base: "https://assets.everloot.app/b" }),
   loadItemTips: reads.tips,

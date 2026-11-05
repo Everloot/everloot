@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
+import { edgeDegraded } from "@/lib/cf-edge-cache";
 
 const store = vi.hoisted(() => ({ loadCorpus: vi.fn() }));
 const world = vi.hoisted(() => ({ empty: false }));
@@ -68,6 +69,7 @@ test("with no reports the whole map still shows, from the game files", async () 
   expect(html).toContain("Stormwind, Elwynn");
   expect(html).not.toContain("In-game cross-check");
   expect(html).not.toContain("Storage unreachable");
+  expect(edgeDegraded(html)).toBe(false);
   // Every category in its group, each with its count on the continent.
   for (const c of CATEGORY_GROUPS.flatMap((g) => g.categories)) expect(html).toContain(`>${c.label}</span>`);
   for (const g of CATEGORY_GROUPS) expect(html).toContain(`<legend class="mb-0.5 text-sm font-medium text-fg">${g.label}</legend>`);
@@ -189,6 +191,8 @@ test("unreadable storage says so, keeps the map, and shows no data age", async (
   store.loadCorpus.mockResolvedValue({ uploads: 0, records: [], unreachable: true });
   const html = await render("1");
   expect(html).toContain("Storage unreachable");
+  // Marked for the edge cache, so this render is kept a minute rather than the page's hour.
+  expect(edgeDegraded(html)).toBe(true);
   expect(html).toContain("Kalimdor");
   expect(html).toContain("Ragefire Chasm");
   expect(html).toContain("Durotar");

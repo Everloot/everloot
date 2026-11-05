@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
+import { edgeDegraded } from "@/lib/cf-edge-cache";
 
 const store = vi.hoisted(() => ({ loadCorpus: vi.fn() }));
 vi.mock("@/lib/upload-store", async (importOriginal) => ({
@@ -91,6 +92,7 @@ test("storage down reads unavailable, never an empty list, and stays out of the 
   store.loadCorpus.mockResolvedValue({ uploads: 0, records: [], unreachable: true });
   const page = await html(ZonePage(props("1436-westfall")));
   expect(page).not.toContain("No NPC has a confirmed position");
+  expect(edgeDegraded(page)).toBe(true);
   expect((await generateMetadata(props("1436-westfall"))).robots).toMatchObject({ index: false });
 });
 
@@ -133,4 +135,6 @@ test("the zone index says a dash is unrecorded, not none, and says so plainly wh
   store.loadCorpus.mockResolvedValue({ uploads: 0, records: [], unreachable: true });
   const down = await html(ZonesPage());
   expect(down).not.toContain("Players have not confirmed anything in any zone yet");
+  expect(edgeDegraded(down)).toBe(true);
+  expect(edgeDegraded(none)).toBe(false);
 });

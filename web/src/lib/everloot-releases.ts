@@ -44,14 +44,14 @@ interface GithubRelease {
   assets?: { name?: unknown; size?: unknown; digest?: unknown; browser_download_url?: unknown }[];
 }
 
-/** The release list, or null when GitHub could not be read. */
-export async function fetchReleases(): Promise<unknown[] | null> {
+/** The release list, or null when GitHub could not be read. `revalidate` is the fetch's lifetime in seconds. */
+export async function fetchReleases(revalidate = 3600): Promise<unknown[] | null> {
   const token = process.env.GITHUB_TOKEN;
   try {
     const response = await fetch(RELEASES_API, {
       headers: { Accept: "application/vnd.github+json", "User-Agent": "everloot.app", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       signal: AbortSignal.timeout(5000),
-      next: { revalidate: 3600 },
+      next: { revalidate },
     } as RequestInit);
     if (!response.ok) return null;
     const list = await response.json();

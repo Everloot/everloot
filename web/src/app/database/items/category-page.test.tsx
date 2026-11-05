@@ -23,6 +23,7 @@ import ItemPage, { generateMetadata } from "./[id]/page";
 import SubclassPage, { generateMetadata as subclassMetadata } from "./[id]/[subclass]/page";
 import ItemsPage from "./page";
 import { CLIENT_LAYER, CLIENT_TAXONOMY, ITEMS_PER_PAGE } from "@/lib/items";
+import { edgeDegraded } from "@/lib/cf-edge-cache";
 
 const props = (id: string, search: Record<string, string> = {}) => ({ params: Promise.resolve({ id }), searchParams: Promise.resolve(search) });
 const sub = (id: string, subclass: string, search: Record<string, string> = {}) => ({ params: Promise.resolve({ id, subclass }), searchParams: Promise.resolve(search) });
@@ -383,4 +384,18 @@ test("an address with a class context is noindex, with the plain category as its
   const all = await allMetadata({ searchParams: Promise.resolve({ class: "mage", level: "25" }) });
   expect(all.robots).toMatchObject({ index: false, follow: true });
   expect(all.alternates?.canonical).toBe("/database/items");
+});
+
+test("with upload storage out of reach, an item page and the item lists are marked degraded for the edge cache", async () => {
+  const id = String(CLIENT_TAXONOMY.items[0]![0]);
+  expect(edgeDegraded(await html(ItemPage(props(id))))).toBe(false);
+  expect(edgeDegraded(await html(items()))).toBe(false);
+  facts.unreachable = true;
+  try {
+    expect(edgeDegraded(await html(ItemPage(props(id))))).toBe(true);
+    expect(edgeDegraded(await html(items()))).toBe(true);
+    expect(edgeDegraded(await html(SubclassPage(sub("armor", "cloth"))))).toBe(true);
+  } finally {
+    facts.unreachable = false;
+  }
 });

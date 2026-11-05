@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test, vi } from "vitest";
+import { edgeDegraded } from "@/lib/cf-edge-cache";
 
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
 // Storage is down unless a test hands in sightings: the pages are then built from the game files alone, which is
@@ -61,6 +62,9 @@ test("with storage down, an instance's page lists the bosses the game files give
   const list = renderToStaticMarkup(await InstancesPage());
   const col = [...list.matchAll(/<th[^>]*>(.*?)<\/th>/g)].map((m) => text(m[1]!).replace(/\|/g, "")).indexOf("Bosses");
   expect(cells(list, "/database/instances/409-molten-core")[col]).toMatch(/unconfirmed\|11$/);
+  // Both renders are marked for the edge cache, which keeps them a minute rather than an hour.
+  expect(edgeDegraded(html)).toBe(true);
+  expect(edgeDegraded(list)).toBe(true);
 });
 
 test("on night one, each boss one install reported shows 1 of 3, and nothing it reported reads as confirmed", async () => {

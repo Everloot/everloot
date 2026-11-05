@@ -182,8 +182,13 @@ export async function loadSiteAssets(base: string | null = assetsBaseUrl(), fetc
 
 /* ---------- Items, from the private bucket ---------- */
 
-/** Reads one JSON file from the private bucket by its path, or null. */
+/**
+ * Reads one JSON file from the private bucket by its path: null when there is no such file, PRIVATE_UNREACHABLE
+ * when the bucket could not be read (an error, a timeout, an answer other than 200 or 404).
+ */
 export interface PrivateStore { read(path: string): Promise<unknown | null> }
+/** A private read that failed, as opposed to a file that is not there. Readers that only want the file see a non-object. */
+export const PRIVATE_UNREACHABLE: unique symbol = Symbol("private bucket unreachable");
 
 // Signed requests differ every time, so the fetch cache cannot keep them; this does, per server instance.
 const kept = new Map<string, { at: number; value: unknown | null }>();
@@ -204,15 +209,16 @@ export function privateStoreFromEnv(env: Record<string, string | undefined> = pr
     async read(path) {
       const url = `${root}/${path}`;
       const hit = kept.get(url);
-      // A miss is kept a minute, so a missing file is not asked for on every page view.
-      if (hit && Date.now() - hit.at < (hit.value === null ? 60_000 : REVALIDATE_SECONDS * 1000)) return hit.value;
+      // A miss or a failed read is kept a minute, so a missing file is not asked for on every page view.
+      const short = hit?.value === null || hit?.value === PRIVATE_UNREACHABLE;
+      if (hit && Date.now() - hit.at < (short ? 60_000 : REVALIDATE_SECONDS * 1000)) return hit.value;
       let value: unknown | null = null;
       try {
         const signed = await client.sign(url, { method: "GET", headers: { accept: "application/json" } });
         const res = await (fetcher ?? fetch)(signed, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), cache: "no-store" });
-        value = res.ok ? await res.json() : null;
+        value = res.ok ? await res.json() : res.status === 404 ? null : PRIVATE_UNREACHABLE;
       } catch {
-        value = null;
+        value = PRIVATE_UNREACHABLE;
       }
       kept.set(url, { at: Date.now(), value });
       return value;
@@ -332,12 +338,14 @@ const parsedNames = new WeakMap<object, ItemNames | null>();
  * The names the site may show for items players have not named yet (docs/DATA_POLICY.md, "Item names from the
  * game files and the Warcraft Wiki"): one file, `<build folder>/item-names.json` in the private bucket, read
  * by the server only. Null when it is missing, unreadable or for another build than the client layer the
- * pages list; the pages then show "Item N", as before. Never throws.
+ * pages list; the pages then show "Item N", as before. PRIVATE_UNREACHABLE when the bucket could not be read, so
+ * a page can mark that render degraded. Never throws.
  */
-export async function loadItemNames(version: string, base: string | null = assetsBaseUrl(), store: PrivateStore | null = privateStoreFromEnv()): Promise<ItemNames | null> {
+export async function loadItemNames(version: string, base: string | null = assetsBaseUrl(), store: PrivateStore | null = privateStoreFromEnv()): Promise<ItemNames | null | typeof PRIVATE_UNREACHABLE> {
   const folder = base ? buildFolder(base) : null;
   if (!folder || !store) return null;
   const raw = await store.read(`${folder}/item-names.json`);
+  if (raw === PRIVATE_UNREACHABLE) return raw;
   if (!raw || typeof raw !== "object") return null;
   if (!parsedNames.has(raw)) {
     const f = ItemNamesSchema.safeParse(raw);

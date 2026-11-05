@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { CURRENT_BUILD, TABLES } from "@/data/game-data/raid";
 import {
   assetUrl, BANNER_MAP, buildFolder, classAndProfessionIcons, continentArt, creditWhat, emblems, FETCH_TIMEOUT_MS, forgetPrivateReads, iconUrl,
-  instanceThumbs, itemIconUrl, itemShard, itemTip, gameNameFor, launchArt, loadingArt, loadItemNames, loadItemSetNames, loadItemTips, loadQuestNames, loadSpellNames, loadSiteAssets, parseSiteManifest, poiIcons, privateStoreFromEnv, raidArt,
+  instanceThumbs, itemIconUrl, itemShard, itemTip, gameNameFor, launchArt, loadingArt, loadItemNames, loadItemSetNames, loadItemTips, loadQuestNames, loadSpellNames, loadSiteAssets, parseSiteManifest, poiIcons, PRIVATE_UNREACHABLE, privateStoreFromEnv, raidArt, type ItemNames,
 } from "./game-assets";
 import { itemTipText, qualityColor, tipLines, WHY } from "./item-names";
 import { cameraBox, zoneArtShown, ZONE_ART_ZOOM, type Box, type Camera } from "./map-view";
@@ -129,7 +129,21 @@ test("the private bucket needs all four server-only variables, signs its reads, 
   expect(request.url).toBe(`https://r2.example.test/everloot-game-data/${FOLDER}/items.json`);
   expect(request.headers.get("authorization")).toMatch(/^AWS4-HMAC-SHA256 Credential=id\//);
   const failing = privateStoreFromEnv(env, vi.fn().mockRejectedValue(new Error("down")))!;
-  expect(await failing.read(`${FOLDER}/other.json`)).toBeNull();
+  expect(await failing.read(`${FOLDER}/other.json`)).toBe(PRIVATE_UNREACHABLE);
+});
+
+test("a file that is not there is null; a bucket that cannot be read (an error, a timeout, a 5xx) says so", async () => {
+  const env = { GAME_DATA_S3_ENDPOINT: "https://r2.example.test", GAME_DATA_BUCKET: "everloot-game-data", GAME_DATA_ACCESS_KEY_ID: "id", GAME_DATA_SECRET_ACCESS_KEY: "secret" };
+  const answer = (status: number) => privateStoreFromEnv(env, vi.fn(async () => new Response("<Error/>", { status })) as unknown as typeof fetch)!;
+  expect(await answer(404).read(`${FOLDER}/missing.json`)).toBeNull();
+  expect(await answer(503).read(`${FOLDER}/busy.json`)).toBe(PRIVATE_UNREACHABLE);
+  expect(await answer(403).read(`${FOLDER}/denied.json`)).toBe(PRIVATE_UNREACHABLE);
+  const slow = privateStoreFromEnv(env, vi.fn().mockRejectedValue(new DOMException("timed out", "TimeoutError")))!;
+  expect(await slow.read(`${FOLDER}/slow.json`)).toBe(PRIVATE_UNREACHABLE);
+  // The item names say which: no file is no names; an unread bucket is a render that is missing them.
+  const down = { read: async () => PRIVATE_UNREACHABLE };
+  expect(await loadItemNames("1.60.1.70450", BASE, down)).toBe(PRIVATE_UNREACHABLE);
+  expect(await loadItemNames("1.60.1.70450", BASE, memoryStore({}))).toBeNull();
 });
 
 test("an item tooltip reads like the game's and marks the stat amounts the tables do not give", () => {
@@ -310,7 +324,7 @@ const namesFile = {
 
 test("the shown item names come from one private file for the client layer's build, with colour and wiki link", async () => {
   const store = memoryStore({ [`${FOLDER}/item-names.json`]: namesFile });
-  const names = await loadItemNames("1.60.1.70450", BASE, store);
+  const names = await loadItemNames("1.60.1.70450", BASE, store) as ItemNames | null;
   expect(store.reads).toEqual([`${FOLDER}/item-names.json`]);
   expect(names?.wiki).toEqual({ name: namesFile.wiki.name, url: "https://warcraft.wiki.gg" });
   expect(names?.names.get(19019)).toEqual({ name: "Thunderfury, Blessed Blade of the Windseeker", color: qualityColor(5), wikiPage: "https://warcraft.wiki.gg/wiki/Thunderfury,_Blessed_Blade_of_the_Windseeker", source: "wiki" });
@@ -319,7 +333,7 @@ test("the shown item names come from one private file for the client layer's bui
 
 test("every id shows; a name without a wiki page is the game files' alone, and one without a quality is common", async () => {
   const file = { ...namesFile, count: 4, names: { ...namesFile.names, 191666: { n: "Skeletal Steed", q: 4 }, 883: { n: "Deprecated Fire Eyed Skull", w: "Deprecated_Fire_Eyed_Skull" } } };
-  const names = await loadItemNames("1.60.1.70450", BASE, memoryStore({ [`${FOLDER}/item-names.json`]: file }));
+  const names = await loadItemNames("1.60.1.70450", BASE, memoryStore({ [`${FOLDER}/item-names.json`]: file })) as ItemNames | null;
   expect([...names!.names.keys()].sort((a, b) => a - b)).toEqual([883, 2589, 19019, 191666]);
   expect(names!.names.get(191666)).toEqual({ name: "Skeletal Steed", color: qualityColor(4), wikiPage: null, source: "files" });
   expect(names!.names.get(883)).toEqual({ name: "Deprecated Fire Eyed Skull", color: qualityColor(1), wikiPage: "https://warcraft.wiki.gg/wiki/Deprecated_Fire_Eyed_Skull", source: "wiki" });
