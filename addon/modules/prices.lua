@@ -1,7 +1,7 @@
 -- Everloot prices in item tooltips: the player's own latest full scan, and community market values
--- the companion wrote into the EverlootPrices slot addon (checksummed; they show after /reload).
--- The drop sources in the same file (modules/drops.lua) follow the prices in the same tooltip.
--- Display only: nothing here talks to the network or acts on the auction house.
+-- the companion wrote into the EverlootPrices slot addon (checksummed; they show after /reload), with the
+-- game's own vendor price beside them. The drop sources in the same file (modules/drops.lua) follow the
+-- prices in the same tooltip. Display only: nothing here talks to the network or acts on the auction house.
 
 local E = Everloot
 
@@ -125,45 +125,96 @@ function E:CommunityPrice(realm, itemId)
   return communityRow(communityFor(realm), itemId)
 end
 
+local function hex(r, g, b) return string.format("|cff%02x%02x%02x", r * 255, g * 255, b * 255) end
+
+-- The tooltip's colours: fel green for the header only, Everloot's price gold for labels, the player's own scan in
+-- blue, amounts in white, the Home window's muted text for evidence (dates, units, reporters), red for warnings.
+local HEAD, LABEL, OWN = { 0.612, 0.941, 0.227 }, { 0.9, 0.8, 0.5 }, { 0.6, 0.8, 1 }
+local VALUE, META, WARN = { 1, 1, 1 }, { 0.788, 0.765, 0.69 }, { 1, 0.4, 0.4 }
+
+--- Copper as the game shows money in tooltips: each amount before the game's own coin icon, the same amounts as
+--- E.Coins. For the value column only; chat and every plain line keep E.Coins' letters.
+local function coinIcons(copper)
+  local function coin(n, kind) return n .. "|TInterface\\MoneyFrame\\UI-" .. kind .. "Icon:0:0:2:0|t" end
+  local gold, silver, coins = math.floor(copper / 10000), math.floor(copper % 10000 / 100), copper % 100
+  local text = (gold > 0) and (coin(gold, "Gold") .. " " .. coin(silver, "Silver") .. " ")
+    or ((silver > 0) and (coin(silver, "Silver") .. " ") or "")
+  return text .. coin(coins, "Copper")
+end
+
+--- A word in the value column (unrecorded, no sell price), in the evidence colour so it never reads as an amount.
+local function quiet(word) return hex(META[1], META[2], META[3]) .. word .. "|r" end
+
+--- The game's vendor price for one unit, in copper: 0 when vendors do not buy the item, nil when it is unknown (the
+--- item is not loaded yet, the client has no item reader, or the reader fails or answers with a secret). Unknown is
+--- never 0.
+local function vendorPrice(itemId)
+  local info = (type(C_Item) == "table" and C_Item.GetItemInfo) or GetItemInfo
+  if type(info) ~= "function" then return nil end
+  -- name, link, quality, item level, required level, type, subtype, stack, slot, icon, sell price
+  local ok, _, link, _, _, _, _, _, _, _, _, sell = pcall(info, itemId)
+  -- A stand-in for an item the client has not loaded has no link, and its sell price is not the item's.
+  if not ok or type(E.Readable(link)) ~= "string" then return nil end
+  sell = E.Readable(sell)
+  if type(sell) ~= "number" or sell < 0 or sell ~= math.floor(sell) then return nil end
+  return sell
+end
+
 --- The price lines for one item on the player's realm, as { text, r, g, b }: the community market value
---- from the companion's file (with its freshness) and the player's own last scan. The tooltip and the
---- chat command show the same lines, so they always agree.
+--- from the companion's file (with its freshness), the player's own last scan, and the vendor price beside them.
+--- The tooltip and the chat command show the same lines, so they always agree. `text` is plain, for chat; a line
+--- holding one amount also has `left` (its label) and `right` (the amount in coin icons, or a word when there is
+--- none) for the tooltip's two columns, and a long warning has `wrap`.
 local function priceLines(realm, itemId)
   local out = {}
-  local function add(text, r, g, b) out[#out + 1] = { text = text, r = r, g = g, b = b } end
+  local function add(text, color, left, right, wrap)
+    out[#out + 1] = { text = text, r = color[1], g = color[2], b = color[3], left = left, right = right, wrap = wrap }
+  end
   local entry = communityFor(realm)
   local row = communityRow(entry, itemId)
   if row then
-    local market = row.market and E.Coins(row.market)
-      or (row.quantity <= E.THIN_UNITS and "unrecorded (thin)" or "unrecorded")
+    local thin = row.quantity <= E.THIN_UNITS
+    local unrecorded = thin and "unrecorded (thin)" or "unrecorded"
     -- The website can show one auction house; this file blends every house on the realm, so say so beside the numbers.
-    add(string.format("Everloot market %s · min %s · historical %s · per unit · all houses",
-      market, E.Coins(row.min), E.Coins(row.historical)), 0.9, 0.8, 0.5)
-    add(string.format("  %d up · %d reporters · %s", row.quantity, row.reporters, row.day), 0.6, 0.6, 0.6)
+    add("Everloot market " .. (row.market and E.Coins(row.market) or unrecorded) .. " · per unit · all houses", LABEL,
+      "Market value · all houses", row.market and coinIcons(row.market) or quiet(unrecorded))
+    add("  min " .. E.Coins(row.min), LABEL, "  Min buyout", coinIcons(row.min))
+    add("  historical " .. E.Coins(row.historical), LABEL, "  Historical", coinIcons(row.historical))
+    add(string.format("  %d units listed%s, %d reporters on %s", row.quantity, thin and " (thin)" or "", row.reporters, row.day), META)
     -- Two separate facts. The item's newest public day says how old its prices are; the file's build time says
     -- how long since the companion last ran. A file built today can still hold an item nobody scanned for a week.
     local today = E.DayNumber(date("!%Y-%m-%d"))
     local seen = E.DayNumber(row.day)
     if not seen or not today then
-      add("  public day unknown (stale?)", 1, 0.4, 0.4)
+      add("  public day unknown (stale?)", WARN, nil, nil, true)
     elseif today - seen > E.STALE_DAYS then
-      add(string.format("  STALE: newest public day %s is %d days old", row.day, today - seen), 1, 0.4, 0.4)
+      add(string.format("  STALE: newest public day %s is %d days old", row.day, today - seen), WARN, nil, nil, true)
     end
     local built = E.DayNumber(entry.asOf or "")
     if not built or not today then
-      add("  price file age unknown (stale?)", 1, 0.4, 0.4)
+      add("  price file age unknown (stale?)", WARN, nil, nil, true)
     elseif today - built > E.STALE_DAYS then
-      add(string.format("  OLD FILE: built %s; the Desktop App or companion refreshes it, then /reload", entry.asOf:sub(1, 10)), 1, 0.4, 0.4)
+      add(string.format("  OLD FILE: built %s; the Desktop App or companion refreshes it, then /reload", entry.asOf:sub(1, 10)), WARN, nil, nil, true)
     else
-      add("  price file built " .. entry.asOf:sub(1, 10), 0.6, 0.6, 0.6)
+      add("  price file built " .. entry.asOf:sub(1, 10), META)
     end
   end
   local own = E:OwnScan(realm)
   local item = own and own.items[itemId]
   if item then
     local hours = math.floor((time() - own.at) / 3600)
-    add(string.format("Your scan: min %s · value %s · per unit · %d up · %s", E.Coins(item[4]), E.Coins(item[5]), item[3],
-      hours < 1 and "under 1 h ago" or (hours .. " h ago")), 0.6, 0.8, 1)
+    add("Your scan: min " .. E.Coins(item[4]) .. " · per unit", OWN, "Your scan · min buyout", coinIcons(item[4]))
+    add("  value " .. E.Coins(item[5]), OWN, "  Value", coinIcons(item[5]))
+    add(string.format("  %d units listed, scanned %s", item[3], hours < 1 and "under 1 h ago" or (hours .. " h ago")), META)
+  end
+  -- The game's own vendor price, for comparison beside an auction price; by itself it is no reason for these lines.
+  if #out > 0 then
+    local sell = vendorPrice(itemId)
+    if sell and sell > 0 then
+      add("Vendor " .. E.Coins(sell) .. " · per unit", LABEL, "Vendor", coinIcons(sell))
+    elseif sell == 0 then
+      add("Vendor: no sell price", LABEL, "Vendor", quiet("no sell price"))
+    end
   end
   return out, entry
 end
@@ -171,7 +222,7 @@ end
 E.PriceLines = priceLines
 
 --- The tooltip: price lines, then drop lines. Once the Desktop App's file is in the game and its prices have been
---- checked, what is missing is said in one grey line; without the file a tooltip carries no Everloot line it has no value for.
+--- checked, what is missing is said in one muted line; without the file a tooltip carries no Everloot line it has no value for.
 -- The crest's diamond, cut from media/crest.tga (128px), drawn inline before the name.
 local TOOLTIP_HEADER = "|TInterface\\AddOns\\Everloot\\media\\crest:14:14:0:0:128:128:36:92:36:92|t Everloot"
 
@@ -200,10 +251,29 @@ local function addLines(tooltip, itemId)
     missing[#missing + 1] = dropNote
   end
   for _, line in ipairs(dropLines or {}) do lines[#lines + 1] = line end
-  if #missing > 0 then lines[#lines + 1] = { text = "Everloot: " .. table.concat(missing, " · "), r = 0.6, g = 0.6, b = 0.6 } end
-  -- Plain lines under one header: the crest inline and "Everloot" in fel green, only when there is something to show.
-  if #lines > 0 then tooltip:AddLine(TOOLTIP_HEADER, 0.612, 0.941, 0.227) end
-  for _, line in ipairs(lines) do tooltip:AddLine(line.text, line.r, line.g, line.b) end
+  if #missing > 0 then
+    lines[#lines + 1] = { text = "Everloot: " .. table.concat(missing, " · "), r = META[1], g = META[2], b = META[3], wrap = true }
+  end
+  if #lines == 0 then return end
+  -- The game's two-column line puts each amount in a column beside its label; a tooltip without it gets every
+  -- line's plain text instead, so nothing is lost.
+  local columns = type(tooltip.AddDoubleLine) == "function"
+  local amounts = false
+  for _, line in ipairs(lines) do amounts = amounts or line.right ~= nil end
+  -- One header, only when there is something to show: the crest inline and "Everloot" in fel green, with the unit
+  -- of every amount below said once beside it.
+  if columns and amounts then
+    tooltip:AddDoubleLine(TOOLTIP_HEADER, "per unit", HEAD[1], HEAD[2], HEAD[3], META[1], META[2], META[3])
+  else
+    tooltip:AddLine(TOOLTIP_HEADER, HEAD[1], HEAD[2], HEAD[3])
+  end
+  for _, line in ipairs(lines) do
+    if columns and line.left and line.right then
+      tooltip:AddDoubleLine(line.left, line.right, line.r, line.g, line.b, VALUE[1], VALUE[2], VALUE[3])
+    else
+      tooltip:AddLine(line.text, line.r, line.g, line.b, line.wrap)
+    end
+  end
 end
 
 --- The item id in what the player typed after /everloot price: a shift-clicked link, a bare id, or the
@@ -216,8 +286,6 @@ function E.ItemIdFrom(text)
   local link = GetItemInfo and select(2, GetItemInfo(text))
   return link and tonumber(link:match("item:(%d+)")) or nil
 end
-
-local function hex(r, g, b) return string.format("|cff%02x%02x%02x", r * 255, g * 255, b * 255) end
 
 --- Why a price command found nothing, said exactly: no file, a file without this realm, a file that failed its
 --- checksum, a full file (the item may be public but cut), or a small file that simply has no price for it.
@@ -237,6 +305,8 @@ local function missingNote(realm, entry)
   end
   return "No price for this item on this realm yet: no public day (3 reporters) and no scan of your own."
 end
+
+E.PriceMissingNote = missingNote
 
 --- /everloot price <item>: the same lines as the tooltip, in chat, anywhere in the world. Read from the
 --- files already in the game (the companion's prices and the player's own scans); nothing is fetched.

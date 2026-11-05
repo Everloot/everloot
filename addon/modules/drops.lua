@@ -75,13 +75,13 @@ function E:DropLines(itemId)
   local out = {}
   for i = 1, math.min(#sources, E.DROP_SOURCES_SHOWN) do
     local s = sources[i]
-    out[#out + 1] = { r = 0.9, g = 0.8, b = 0.5, text = string.format("Everloot drop: %s %d · %.1f%% (%d of %d loot windows) · %d installs",
+    out[#out + 1] = { r = 0.9, g = 0.8, b = 0.5, wrap = true, text = string.format("Everloot drop: %s %d · %.1f%% (%d of %d loot windows) · %d installs",
       s.kind == "npc" and "NPC" or "object", s.id, 100 * s.drops / s.windows, s.drops, s.windows, s.installs) }
   end
   local day = type(entry.asOf) == "string" and entry.asOf:match("^%d%d%d%d%-%d%d%-%d%d")
   local more = #sources - E.DROP_SOURCES_SHOWN
   local tail = more > 1 and string.format(" · %d more sources", more) or more == 1 and " · 1 more source" or ""
-  out[#out + 1] = { r = 0.6, g = 0.6, b = 0.6,
+  out[#out + 1] = { r = 0.788, g = 0.765, b = 0.69, wrap = true,
     text = "  " .. (day and ("drop rates from uploads as of " .. day) or "drop rates: upload date unknown") .. tail }
   return out, nil
 end

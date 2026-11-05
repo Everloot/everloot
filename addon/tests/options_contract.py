@@ -3,7 +3,10 @@
 The settings page: registered with the Settings API when the client has it, else the older interface
 options, else shown as a window by /everloot options. One switch per module and the scan prompt; a switch
 with a /everloot command runs it (so off deletes rows exactly as in chat), the others set the toggle; the
-boxes show the saved state; Reload now reloads.
+boxes show the saved state; Reload now reloads. Every switch stays reachable in a scrolling list above the
+footer at any width. With the window's file loaded the page wears that window's look (a small crest heading,
+its fonts, the switches on a surface panel, its dark window when shown on its own) without building the
+window; without that file it keeps the game's own fonts and dialog.
 """
 from pathlib import Path
 from lupa.lua51 import LuaRuntime
@@ -37,25 +40,66 @@ function Frame.SetScrollChild(self, child) self.child = child end
 function Frame.GetVerticalScroll(self) return rawget(self, 'offset') or 0 end
 function Frame.SetVerticalScroll(self, value) self.offset = value end
 function Frame.SetText(self, t) self.text = t end
+function Frame.GetText(self) return rawget(self, 'text') end
 function Frame.SetChecked(self, v) self.checked = v and true or false end
 function Frame.GetChecked(self) return self.checked end
 function Frame.Show(self) self.shown = true end
 function Frame.Hide(self) self.shown = false end
 function Frame.SetParent(self, p) self.parentSet = p end
+function Frame.SetFont(self, path, size) self.font, self.size = path, size; return true end
+function Frame.SetTextColor(self, r, g, b, a) self.color = { r, g, b, a } end
+function Frame.SetTexture(self, path) self.path = path end
+function Frame.SetColorTexture(self, r, g, b, a) self.colorTexture = { r, g, b, a } end
+function Frame.SetBackdrop(self, b) self.backdrop = b end
+function Frame.SetBackdropColor(self, r, g, b, a) self.bg = { r, g, b, a } end
+function Frame.SetBackdropBorderColor(self, r, g, b, a) self.border = { r, g, b, a } end
 function Frame.CreateFontString(self) return setmetatable({ scripts = {}, hooks = {} }, Frame) end
+function Frame.CreateTexture(self)
+  local t = setmetatable({ scripts = {}, hooks = {} }, Frame)
+  self.textures = rawget(self, 'textures') or {}
+  table.insert(self.textures, t)
+  return t
+end
 function Frame.RegisterEvent(self, e) self.events[e] = true end
 CreateFrame = function(kind, name, parent, template)
   return setmetatable({ kind = kind, name = name, parent = parent, template = template, scripts = {}, hooks = {}, events = {} }, Frame)
 end
+
+-- Every switch stays reachable in a bounded viewport, including small panels and long descriptions.
+function checkRows(page)
+  local scroll = rawget(page, 'scroll')
+  assert(scroll and scroll.child, 'settings need a scrolling viewport, not controls spilling off the page')
+  for _, width in ipairs({ 560, 320 }) do
+    scroll.width, scroll.height = width, 220
+    scroll.hooks.OnSizeChanged(scroll, width, 220)
+    local child = scroll.child
+    local previousBottom = 0
+    for _, box in ipairs(page.boxes) do
+      local at = box.points.TOPLEFT
+      local top = -at[4]
+      assert(top >= previousBottom, 'wrapped row descriptions must not overlap the next control')
+      assert(at[3] >= 0 and at[3] + 38 + box.label.width <= width and at[3] + 38 + box.description.width <= width,
+        'labels and descriptions stay inside the list')
+      previousBottom = top + math.max(32, 4 + box.label:GetStringHeight() + 2 + box.description:GetStringHeight())
+    end
+    assert(child.height >= previousBottom, 'the last description must be inside scrollable content')
+    scroll.scripts.OnMouseWheel(scroll, -1000)
+    assert(scroll.offset == child.height - scroll.height, 'scrolling down reaches the last settings')
+    scroll.scripts.OnMouseWheel(scroll, 1000)
+    assert(scroll.offset == 0, 'scrolling back reaches the first settings')
+  end
+  assert(page.reload.parent == page and page.reload.points.BOTTOMLEFT, 'Reload remains at the fixed panel footer')
+end
 """
 
 
-def fresh(api: str, saved: str = "nil"):
+def fresh(api: str, saved: str = "nil", window: bool = False):
     lua = LuaRuntime()
     lua.execute(WORLD)
     lua.execute(api)
     lua.execute(f"EverlootDB = {saved}")
-    for file in ["core.lua", "modules/census.lua", "modules/options.lua"]:
+    # The TOC loads the window's file after this one; the page is built at ADDON_LOADED, once both are in.
+    for file in ["core.lua", "modules/census.lua", "modules/options.lua"] + (["modules/window.lua"] if window else []):
         lua.execute((root / file).read_text(encoding="utf-8"))
     lua.execute("Everloot.frame.onEvent(nil, 'ADDON_LOADED', 'Everloot')")
     return lua
@@ -88,25 +132,8 @@ assert(#O.page.boxes == #O.ROWS and byKey.auctions.checked and byKey.census.chec
 assert(string.find(O.page.note.text, 'Everloot ' .. Everloot.VERSION, 1, true))
 
 -- Every switch stays reachable in a bounded viewport, including small panels and long descriptions.
-local scroll = rawget(O.page, 'scroll')
-assert(scroll and scroll.child, 'settings need a scrolling viewport, not controls spilling off the page')
-for _, width in ipairs({ 560, 320 }) do
-  scroll.width, scroll.height = width, 220
-  scroll.hooks.OnSizeChanged(scroll, width, 220)
-  local child = scroll.child
-  local previousBottom = 0
-  for _, box in ipairs(O.page.boxes) do
-    local top = -box.points.TOPLEFT[4]
-    assert(top >= previousBottom, 'wrapped row descriptions must not overlap the next control')
-    previousBottom = top + math.max(32, 4 + box.label:GetStringHeight() + 2 + box.description:GetStringHeight())
-  end
-  assert(child.height >= previousBottom, 'the last description must be inside scrollable content')
-  scroll.scripts.OnMouseWheel(scroll, -1000)
-  assert(scroll.offset == child.height - scroll.height, 'scrolling down reaches the last settings')
-  scroll.scripts.OnMouseWheel(scroll, 1000)
-  assert(scroll.offset == 0, 'scrolling back reaches the first settings')
-end
-assert(O.page.reload.parent == O.page and O.page.reload.points.BOTTOMLEFT, 'Reload remains at the fixed panel footer')
+checkRows(O.page)
+assert(O.page.title.text == 'Everloot' and rawget(O.page, 'crest') == nil, "without the window file: the game's own heading")
 
 -- A command row runs its command: census off deletes the census rows, as in chat.
 EverlootDB.records.census_seen = { { guid = 'Player-1-0000000A' } }
@@ -153,8 +180,53 @@ local O = Everloot.Options
 assert(O.how == 'window')
 SlashCmdList.EVERLOOT('settings')
 assert(O.page.shown and O.windowed and O.page.parentSet == UIParent and O.close, 'a window with a close button')
+assert(O.page.backdrop.bgFile == 'Interface\\\\DialogFrame\\\\UI-DialogBox-Background', "without the window file: the game's dialog")
 SlashCmdList.EVERLOOT('options')
 assert(O.page.shown, 'opening again shows the same window')
 """)
 
-print("Lua 5.1 options: Settings API, interface options or a window; one switch per module; command rows run their command; Reload now")
+# --- With the window's file: the Everloot look, and the window itself still built only when opened ---
+lua = fresh(SETTINGS, window=True)
+lua.execute("""
+local O = Everloot.Options
+local page = O.page
+assert(O.how == 'settings' and registered[1].frame == page, 'still an AddOns category')
+assert(page.crest and page.crest.path == 'Interface\\\\AddOns\\\\Everloot\\\\media\\\\crest' and page.crest.width <= 32, 'a modest crest heads the page')
+assert(page.title.text == 'Everloot' and page.title.color[2] > 0.9 and page.title.color[1] < 0.7 and page.title.color[3] < 0.3, 'Everloot in fel green')
+assert(Everloot.Window.frame == nil and EverlootWindow == nil, 'the page borrows the look without building the window')
+assert(page.scroll.textures and page.scroll.textures[1].colorTexture[1] < 0.1, 'the switches sit on a surface panel')
+for _, box in ipairs(page.boxes) do
+  assert(box.label.font:find('FRIZQT', 1, true) and box.description.font:find('FRIZQT', 1, true), "the window's fonts")
+  assert(box.label.size > box.description.size and box.label.color[1] > box.description.color[1], 'a label reads above its description')
+end
+assert(page.intro.font:find('FRIZQT', 1, true) and page.note.font:find('FRIZQT', 1, true), 'the introduction and the footer note too')
+page.scripts.OnShow()
+checkRows(page)
+-- The controls behave as before: a switch, the ask box, Reload now.
+local census
+for _, box in ipairs(page.boxes) do if box.row.key == 'census' then census = box end end
+census.checked = false
+census.scripts.OnClick(census)
+assert(EverlootDB.toggles.census == false and not census.checked, 'a switch still sets its module')
+local asked
+Everloot.Ask = function(_, question) asked = question end
+page.ask:SetText('  where is the frost book?  ')
+page.ask.scripts.OnEnterPressed(page.ask)
+assert(asked == 'where is the frost book?' and page.ask.text == '', 'the ask box sends the question and clears')
+page.reload.scripts.OnClick()
+assert(reloads == 1, 'Reload now reloads')
+""")
+
+# The same page on its own: the window's flat dark panel and bronze edge.
+lua = fresh("", window=True)
+lua.execute("""
+local O = Everloot.Options
+assert(O.how == 'window')
+SlashCmdList.EVERLOOT('options')
+local page = O.page
+assert(page.shown and O.close, 'a window with a close button')
+assert(page.backdrop and page.backdrop.bgFile == 'Interface\\\\Buttons\\\\WHITE8X8' and page.backdrop.edgeFile == 'Interface\\\\Tooltips\\\\UI-Tooltip-Border', 'the window backdrop')
+assert(page.bg[1] < 0.1 and page.border[1] > page.border[3], 'dark inside a bronze edge')
+""")
+
+print("Lua 5.1 options: Settings API, interface options or a window; one switch per module; command rows run their command; every switch inside a scrolling list at any width; the window's crest heading, fonts, surface and dark window, or the game's own without its file; Reload now")

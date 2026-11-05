@@ -50,10 +50,16 @@ asking-price estimates, not live listings or guaranteed sale prices.
 Below the prices, the tooltip shows where the item drops when three installs looted the source: each rate as
 drops of loot windows, with its installs and the date of the uploads behind it, from the drop rates the Desktop
 App writes into the same `EverlootPrices` file. Once that file is in the game, a missing price or drop source is
-said in one grey line; nothing is written to your SavedVariables. Without the file, tooltips carry no community line,
+said in one muted line; nothing is written to your SavedVariables. Without the file, tooltips carry no community line,
 and the first item tooltip says once per install, in chat, that community prices come from the Everloot Desktop App
 (everloot.app/addon). `addon/tests/drops_contract.py` holds the rules.
 Nothing in the addon calls a buy, bid or post API; `addon/tests/market_contract.py` traps them.
+
+Price tooltips use separate label/value rows with native coin icons. Community market, minimum and historical
+values stay distinct from your own scan; the vendor sell price appears beside them when the client knows it.
+The amounts are per unit. Dates, units listed, reporters, all-house scope and stale-data warnings remain visible.
+`/everloot price` prints the same amounts as plain text. Disenchant outcomes and values are not yet available;
+the addon does not guess them from an item's color or type.
 
 ### Ask about an item's price
 

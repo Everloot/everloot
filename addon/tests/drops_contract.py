@@ -54,9 +54,13 @@ tooltipCalls = {}
 Enum = { TooltipDataType = { Item = 0 } }
 TooltipDataProcessor = { AddTooltipPostCall = function(kind, f) table.insert(tooltipCalls, { kind = kind, f = f }) end }
 function tooltipFor(itemId)
-  local tip = { lines = {} }
-  tip.AddLine = function(self, text) table.insert(self.lines, text) end
+  local tip = { lines = {}, details = {} }
+  tip.AddLine = function(self, text, r, g, b, wrap)
+    table.insert(self.lines, text)
+    table.insert(self.details, { text = text, r = r, g = g, b = b, wrap = wrap })
+  end
   for _, c in ipairs(tooltipCalls) do c.f(tip, { id = itemId }) end
+  lastTooltip = tip
   return table.concat(tip.lines, '\\n'), #tip.lines
 end
 
@@ -96,6 +100,17 @@ Everloot:ResetPrices()
 
 -- A price and a drop source: the price is labelled market, each rate has its loot windows, installs and date.
 local linen = tooltipFor(2589)
+local wrapped = 0
+for _, line in ipairs(lastTooltip.details) do
+  if line.text:find('Everloot drop:', 1, true) or line.text:find('drop rates from uploads', 1, true) then
+    assert(line.wrap == true, 'drop details wrap within the compact price tooltip: ' .. line.text)
+    wrapped = wrapped + 1
+  end
+  if line.text:find('drop rates from uploads', 1, true) then
+    assert(line.r >= 0.75 and line.g >= 0.75, 'drop evidence is as readable as the price metadata')
+  end
+end
+assert(wrapped == 4, 'all three source rows and their evidence wrap')
 assert(linen:find('Everloot market 2s 5c'), 'the price is labelled a market price: ' .. linen)
 assert(linen:find('Everloot drop: NPC 116 · 12%.4%% %(42 of 340 loot windows%) · 5 installs'), linen)
 assert(linen:find('NPC 94 · 6%.0%% %(12 of 200 loot windows%) · 3 installs'), linen)
