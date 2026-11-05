@@ -13,6 +13,8 @@ from launch_smoke import (  # noqa: E402
 assert request_headers({"EVERLOOT_EDGE_CHECK": "s3cret"}) == {"User-Agent": "everloot-launch-smoke", "x-everloot-check": "s3cret"}
 assert request_headers({}) == {"User-Agent": "everloot-launch-smoke"}
 assert request_headers({"EVERLOOT_EDGE_CHECK": ""}) == {"User-Agent": "everloot-launch-smoke"}
+assert request_headers({"EVERLOOT_EDGE_CHECK": "s3cret\r\n"})["x-everloot-check"] == "s3cret"
+assert request_headers({"EVERLOOT_EDGE_CHECK": " \n"}) == {"User-Agent": "everloot-launch-smoke"}
 
 # A version page with nothing running needs the notice and noindex; before the switch /beta is any 200 page.
 assert judge_notice(200, {}, '<meta name="robots" content="noindex, follow"/>None running.') is None

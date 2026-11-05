@@ -25,8 +25,9 @@ def request_headers(env=None) -> dict:
     EVERLOOT_EDGE_CHECK secret in the environment, x-everloot-check carries it and a security rule lets the check by."""
     env = os.environ if env is None else env
     headers = {"User-Agent": "everloot-launch-smoke"}
-    if env.get("EVERLOOT_EDGE_CHECK"):
-        headers["x-everloot-check"] = env["EVERLOOT_EDGE_CHECK"]
+    check = (env.get("EVERLOOT_EDGE_CHECK") or "").strip()  # a stored trailing newline is not part of the secret
+    if check:
+        headers["x-everloot-check"] = check
     return headers
 
 
