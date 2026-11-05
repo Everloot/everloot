@@ -9,7 +9,7 @@ const facts: DungeonFacts = {
   level: null, href: "/database/instances/36", unreachable: false,
   row: {
     instanceMapId: 36, name: "Test mine", raid: false, difficulty: null, level: null,
-    difficulties: [1], files: [], confirmed: [], reported: 0, bosses: [],
+    difficulties: [1], files: [], confirmed: [], reported: 0, bosses: [], reportedBosses: new Map(),
     encounters: [{ id: 100, name: "File-only boss" }] as DungeonFacts["row"]["encounters"],
   },
 };
@@ -18,7 +18,16 @@ test("file-only encounters remain useful before launch without claiming kills or
   const html = renderToStaticMarkup(<DungeonBosses facts={facts} />);
   expect(html).toContain("File-only boss");
   expect(html).toContain('data-badge="files"');
-  expect(html).not.toMatch(/0 kills|from 0 installs|last seen/);
+  expect(html).not.toMatch(/0 kills|from 0 installs|last seen|of 3 installs/);
+});
+
+test("a file-only encounter fewer than 3 installs reported says how many did, and stays unconfirmed", () => {
+  const html = renderToStaticMarkup(<DungeonBosses facts={{ ...facts, row: { ...facts.row, reportedBosses: new Map([[100, 2]]) } }} />);
+  expect(html.replace(/<[^>]+>/g, "")).toContain("File-only boss · 2 of 3 installs reported");
+  expect(html).toContain('data-badge="files"');
+  expect(html).not.toMatch(/\d kills?\b|last seen/);
+  // Storage down: no count, the files' list alone.
+  expect(renderToStaticMarkup(<DungeonBosses facts={{ ...facts, unreachable: true, row: { ...facts.row, reportedBosses: new Map([[100, 2]]) } }} />)).not.toContain("of 3 installs");
 });
 
 test("a file-only encounter still appears when player storage is unavailable", () => {

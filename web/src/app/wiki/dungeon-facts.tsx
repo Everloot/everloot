@@ -96,7 +96,8 @@ export function DungeonBosses({ facts }: { facts: DungeonFacts }) {
       <ul className="space-y-1 text-sm text-fg-2">
         {bosses.map((b) => (
           <li key={b.encounterId}>
-            {b.boss ? bossLine({ ...b.boss, name: b.name }) : b.name ?? `Encounter ${b.encounterId}`} {b.filesName && <Badge tone="files" />}
+            {b.boss ? bossLine({ ...b.boss, name: b.name }) : b.name ?? `Encounter ${b.encounterId}`}
+            {!b.boss && b.reported > 0 && ` · ${b.reported} of 3 installs reported`} {b.filesName && <Badge tone="files" />}
           </li>
         ))}
       </ul>

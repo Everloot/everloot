@@ -6,7 +6,7 @@ import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { hasCard } from "@/lib/tooltip";
-import { itemPage } from "../../../../../../kb/src/item-page";
+import { itemNameReporters, itemPage } from "../../../../../../kb/src/item-page";
 import { loadShownNames } from "@/lib/shown-item-names";
 import { loadEdges } from "@/lib/edges";
 import { loadItemSeen } from "@/lib/item-seen";
@@ -260,7 +260,7 @@ export default async function ItemPage(props: Props) {
       { label: "Quality", value: category.quality ? <span className={shownQuality ? QUALITY_TEXT[shownQuality] : undefined}>{category.quality.name}</span> : known(null) },
     ] : [{ label: "Game files", value: "Not found" }]),
     ...(facts.unreachable ? [] : [
-      { label: "Reported name", value: known(page.name) },
+      { label: "Reported name", value: known(page.name, itemNameReporters(itemId, facts)) },
       { label: "Drop sources", value: known(page.drops.length || null), numeric: true },
       { label: "Map positions", value: known(page.pins.length || null), numeric: true },
       ...(source ? [{ label: "Source", value: source }] : []),

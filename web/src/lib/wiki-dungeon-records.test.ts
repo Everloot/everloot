@@ -6,7 +6,7 @@ import { dungeonRecords } from "./wiki-dungeon-records";
 
 const row: InstanceRow = {
   instanceMapId: 36, name: "Synthetic Mine", raid: false, difficulty: null, level: null,
-  difficulties: [], files: [], confirmed: [], reported: 3, encounters: [],
+  difficulties: [], files: [], confirmed: [], reported: 3, encounters: [], reportedBosses: new Map(),
   bosses: [{ encounterId: 1, name: "Synthetic boss", npcIds: [100], kills: 3, reporters: 3, lastSeen: null }],
 };
 const items: ItemFacts = { names: [], npcs: [], rates: [
