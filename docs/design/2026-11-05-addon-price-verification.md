@@ -23,4 +23,6 @@ Candidate and install/rollback checklist are in the local scratch artifact direc
 
 ## Remaining acceptance
 
+A separate concurrent realm/ruleset styling lane also edits the tooltip and drop presentation. Its uncommitted work was preserved and its owner notified. This private candidate does not include that separate lane. Public integration must reconcile both implementations rather than overwrite either. The shared project status records the coordination handoff.
+
 Real Forever rendering is unverified: tooltip height, native coin sizing, 100/125/150% UI scales, Spanish, the AH scroll/footer and possible duplication of the game's native vendor-price row. Automated frame stubs do not prove those visuals. Existing data and stale/missing-state behavior are tested; visual improvement is not claimed as measured in the game.
