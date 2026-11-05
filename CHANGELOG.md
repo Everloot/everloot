@@ -15,18 +15,8 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
-- Addon: the minimap button shows the Everloot crest instead of a stock book icon, with the game's hover glow, and
-  the in-game addon list shows the crest too.
-- Addon: recipe collection no longer stops within hours. On launch night every install paused `recipe_observed` at
-  its 2,000-row limit, and 98% of those rows were recipes the player had not learned, which the site does not use.
-  The addon now writes learned recipes only, and per recipe and colour just the lowest and highest rank seen (the
-  rows that narrow a skill range). On first load it drops the retained rows for recipes not learned and lifts the pause.
-- Addon: quests and vendors are recorded on the Forever client. On launch night no install sent a single `quest` or
-  `vendor` row: Forever's client uses the modern UI, where `QUEST_ACCEPTED` carries only the quest id and the old
-  `GetQuestLogTitle` and `GetMerchantItemInfo` calls are gone. The addon now reads the quest log with `C_QuestLog` and
-  vendor prices with `C_MerchantFrame.GetItemInfo`, the calls the build's own documentation and merchant window use.
 - Site and MCP: recipe skill ranges agree on the recipe id the trade-skill window reports, not the recipe's name, so an
-  install on a Spanish client ("PeleterÃ­a") counts toward the same range as English ones. A recipe the game files list
+  install on a Spanish client ("Peletería") counts toward the same range as English ones. A recipe the game files list
   is published under the files' English profession name, with the recipe name and reagents English clients showed.
 - Site: search finds dungeons and raids by name, with or without the leading "The", and an exact name puts the instance page
   first: "deadmines" now opens with `/database/instances/36-deadmines`. The group of wiki pages is headed Wiki, not Guides,
@@ -90,7 +80,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: `/sign-in` and `/sign-up` are one centred card under Glint and the home art: the Battle.net button, a row of provider
   tiles (Google, GitHub, Discord, Twitch; Microsoft keeps its text button, as its guidelines ask), then email, then the links.
   GitHub joins the social providers behind `EVERLOOT_AUTH_V2` (`GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`).
-- MCP: answers no longer end with the licence line ("Licence: CC BY-SA 4.0. Credit: Everloot contributors, â€¦"). An
+- MCP: answers no longer end with the licence line ("Licence: CC BY-SA 4.0. Credit: Everloot contributors, …"). An
   answer built on player data ends with the data's age, after the `More:` line that links its everloot.app page, and the
   server's instructions ask the client to show that link: the link is the credit. `answer_sources` names each page once
   (the bosses of one instance share its page) and drops its closing credit sentence. The licence and credit line still
@@ -140,16 +130,16 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: every item, quest, item set and spell the game files or the Warcraft Wiki name is named on its page,
   with no id range and no placeholder filter. A name from the game files alone carries the unconfirmed marker;
   a name from the wiki says so in its tooltip. Items no source names still read "Item N" until players name them.
-- Site: the player pages are live. A player page shows what the addon last saw of a character â€” race, class,
-  level, guild and the day â€” found by the start of the name, and every page carries a hide link and a hide
+- Site: the player pages are live. A player page shows what the addon last saw of a character — race, class,
+  level, guild and the day — found by the start of the name, and every page carries a hide link and a hide
   form. The search index stays off for now, so the pages are reached by name and are not listed anywhere.
 
 ### Added
 - Site: the open data export, at `/database/download`. The published data as NDJSON files anyone can download
   and build on, under CC BY-SA 4.0: what three installs agree on, and the game files' own layer, with a
   manifest that says the build, the date the data was current, the method, the row count of every file and
-  what each one counts. The local Classic baseline is never in it â€” it is GPL-derived and stays on the
-  maintainer's machine â€” and a fact fewer than three installs agree on is not in it either. The page says so
+  what each one counts. The local Classic baseline is never in it — it is GPL-derived and stays on the
+  maintainer's machine — and a fact fewer than three installs agree on is not in it either. The page says so
   in the same words as the policy.
 - Site: `/database/coverage` says how much of the game three players have agreed on, per zone, per type and
   per field, with the confirmed share beside the settled one, and the zones that need players first. A type is
@@ -172,7 +162,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   marker on the map and a row on a page cannot disagree. The pages are in the sitemap and `/database` links
   the index.
 - Knowledge base: `npm run kb -- name-gaps` opens with the counts: how many items, quests, item sets and
-  spells carry a name today, and which source each name came from â€” the game files, the Warcraft Wiki, the
+  spells carry a name today, and which source each name came from — the game files, the Warcraft Wiki, the
   local baseline, or the players. A source that was not read says so instead of printing a zero.
 - Knowledge base: `npm run kb -- name-gaps`, a local report of the items, quests, item sets and spells that
   still print as an id, each with the reason and what would fill it (a rule decision, the addon's uploads, or no
@@ -193,6 +183,22 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   agree. Fishing (the bobber, or an object installs agree is fished) is never a pin. An upload of an event
   that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
   instead of withdrawing the event as a conflict. The map shows none of this yet.
+
+## [0.3.17] - 2026-11-05
+
+Release channel: Alpha
+
+Fixes from the first night of WoW: Forever. Quests, vendors and recipes now reach everloot.app from the live client,
+and the minimap button wears the Everloot crest. Quest and vendor capture follows the build's own API documentation and
+merchant window; it still needs to be seen working in game.
+
+### Fixed
+- Quests you accept and vendors you open are recorded again. On launch night no install sent a single quest or vendor:
+  Forever's client uses the modern quest log and merchant calls, and the addon now reads them.
+- Recipe collection no longer stops within hours. Every install paused it at its 2,000-row limit on night one, filled
+  almost entirely with recipes the player had not learned, which the site does not use. Only learned recipes are kept
+  now, and only the ranks that narrow a skill range. On first load the addon drops the unused rows and starts again.
+- The minimap button and the in-game addon list show the Everloot crest instead of stock game icons.
 
 ## [0.3.16] - 2026-11-05
 
@@ -276,7 +282,7 @@ Live-client verification is pending. This is a pre-release for WoW: Forever 1.60
 ### Added
 - `/ask` carries the realm you are on, so a price question such as `/ask price 2589` needs no realm in its words. The
   Desktop App or companion answers it from the recorded market, with no AI provider needed.
-- `/ask` also carries your character's class, level and zone, for that answer only: "here" (or "aquÃ­") is looked up as
+- `/ask` also carries your character's class, level and zone, for that answer only: "here" (or "aquí") is looked up as
   your zone and "my class" (or "mi clase") as your class. The question queue never leaves your computer, and your
   class and level are not kept.
 - Talent plans keep their spend order. A plan from the site or the Desktop App shows the next point only when its
@@ -538,7 +544,7 @@ Live-client verification is pending. This is a pre-release for WoW: Forever 1.60
   piece of evidence and its page.
 - `/ask` follows up on the question before it: "what does he drop" after "where is Edwin VanCleef" (within 30
   minutes) finds VanCleef.
-- `/ask` knows who is asking, for that answer only (with addon 0.3.13): "here" (or "aquÃ­") is your zone and "my class"
+- `/ask` knows who is asking, for that answer only (with addon 0.3.13): "here" (or "aquí") is your zone and "my class"
   (or "mi clase") your class, and a model you set up is told your class, level and zone. Neither class nor level is
   kept.
 - Price questions such as `/ask price 2589` are answered from the recorded market, with no AI provider needed; the
@@ -589,7 +595,7 @@ Live-client verification is pending. This is a pre-release for WoW: Forever 1.60
 ### Added
 - The player pages can go with the uploads, on a switch in Settings: "Send the player pages with the
   uploads". It is off by default, so nothing changes until it is turned on, and the rows stay in
-  `Everloot.lua` until then â€” the same rule the named data follows. The privacy policy and the data
+  `Everloot.lua` until then — the same rule the named data follows. The privacy policy and the data
   policy say so, in the words the switch uses.
 
 ## [desktop-v0.1.5] - 2026-10-20
@@ -713,7 +719,7 @@ version line, separate from the addon. Builds are not code-signed yet.
   shows only once three players report it the same way; until then each list says so.
 - Addon, protocol and database: NPC lists gain Type and Rank columns and filters (creature type and rank as the game shows them on target), and quest lists gain Category, Side and Group columns, with Category and Side filters. The addon now records a quest when you accept it: title, level, the quest log header, suggested group size and tag, the giver, and your faction (Alliance or Horde, no character name). Every value is public only after 3 installs agree; a side needs 3 installs on that faction and none on the other. Older addons keep working. Needs an addon release to start collecting; the quest-log calls have not been tried in the Forever client yet.
 - Player pages, off by default: search a WoW: Forever character by name and open a page with its race, class, level, guild and the day it was last seen, with a hide link on every page that needs no account. Nothing is collected or shown until `EVERLOOT_PLAYER_PAGES=1` is set on the site and a player turns on `/everloot players on` in an addon release that includes it; the design and the open legal questions are in `docs/design/specs/2026-10-20-player-pages-design.md`.
-- Site: a game version label in the header ("Beta Â· 1.60.1") with a menu of Live (at launch), PTR (none running) and Beta, read from one list in `web/src/lib/game-version.ts`; a test checks every game-data layer names the current build. The build is also named on `/methodology`.
+- Site: a game version label in the header ("Beta · 1.60.1") with a menu of Live (at launch), PTR (none running) and Beta, read from one list in `web/src/lib/game-version.ts`; a test checks every game-data layer names the current build. The build is also named on `/methodology`.
 - Site: `/docs`, one documentation area for players and developers: Overview, Guides, API Reference, MCP and
   Cookbook tabs, a grouped sidebar, "On this page", "Copy page" as Markdown, and a page per API endpoint and
   per MCP tool generated from the protocol, with cURL, JavaScript and Python examples. "Docs" replaces "Open data"
