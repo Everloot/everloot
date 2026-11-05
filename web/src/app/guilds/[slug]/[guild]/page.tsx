@@ -3,12 +3,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, Container, DataTable, PageHeader, SectionHeading, type Column } from "@/components/ui";
 import { dataAgeLabel } from "@/lib/data-age";
-import { factionLabel, guildPath, guildsOn, hideGuildPath, loadGuildPage, type GuildMember } from "@/lib/guilds";
+import { factionLabel, guildPath, guildsOn, hideGuildPath, loadGuildPage, realmPath, type GuildMember } from "@/lib/guilds";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import type { AgreedKill, GuildProgress } from "../../../../../../kb/src/guilds";
 import { className, classText } from "../../../players/player-view";
-import { day, guildRobots, link, number, Progress, sourceLabel } from "../../parts";
+import { day, decodeSlug, guildRobots, link, number, Progress, sourceLabel } from "../../parts";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,8 @@ type Params = { params: Promise<{ slug: string; guild: string }> };
 export async function generateMetadata(props: Params): Promise<Metadata> {
   if (!guildsOn()) return {};
   const { slug, guild } = await props.params;
-  const loaded = await loadGuildPage(decodeURIComponent(slug), decodeURIComponent(guild));
+  const [realm, name] = [decodeSlug(slug), decodeSlug(guild)];
+  const loaded = realm === null || name === null ? null : await loadGuildPage(realm, name);
   if (!loaded || loaded === "unreachable") return { robots: { index: false, follow: false } };
   const { summary } = loaded.page;
   return {
@@ -59,7 +60,9 @@ const memberMeta = (m: GuildMember) => [`${m.level} ${className(m.class)}`, m.ra
 export default async function GuildPage(props: Params) {
   if (!guildsOn()) notFound();
   const { slug, guild } = await props.params;
-  const loaded = await loadGuildPage(decodeURIComponent(slug), decodeURIComponent(guild));
+  const [realm, name] = [decodeSlug(slug), decodeSlug(guild)];
+  if (realm === null || name === null) notFound();
+  const loaded = await loadGuildPage(realm, name);
   if (loaded === null) notFound();
   if (loaded === "unreachable") {
     return (
@@ -87,7 +90,10 @@ export default async function GuildPage(props: Params) {
     <Container width="data">
       <article>
         <PageHeader
-          trail={[{ name: "Home", path: "/" }, { name: "Guilds", path: "/guilds" }, { name: summary.guildName, path: guildPath(summary.realm, summary.guildName) }]}
+          trail={[
+            { name: "Home", path: "/" }, { name: "Guilds", path: "/guilds" }, { name: summary.realm, path: realmPath(summary.realm) },
+            { name: summary.guildName, path: guildPath(summary.realm, summary.guildName) },
+          ]}
           title={summary.guildName}
           lede={`${faction ? `${faction} guild` : "Guild"} on ${summary.realm}`}
           meta={

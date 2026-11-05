@@ -9,7 +9,7 @@ import { mergeCensusRows } from "../../../../../kb/src/census-rows";
 
 const store = vi.hoisted(() => ({ putUpload: vi.fn(), lookup: vi.fn(), requestQuota: vi.fn(), installQuota: vi.fn(), reporter: vi.fn(), installCensus: vi.fn(), formQuota: vi.fn() }));
 vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { request: store.requestQuota, install: store.installQuota, reporter: store.reporter, form: store.formQuota } }));
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn(), unstable_cache: <T,>(fn: T) => fn }));
 
 vi.mock("@/lib/upload-store", () => ({
   sharingStore: { lookup: store.lookup },
