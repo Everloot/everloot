@@ -1,8 +1,9 @@
 /**
- * Which ruleset and region each WoW: Forever realm belongs to. Blizzard has not named the realms yet, so this list
- * is empty until launch (docs/LAUNCH_DAY.md, "Filling the realm map"). Add one line per realm exactly as the game
- * spells it; the pages read the rest from here. A realm not listed stays in the one "forever" view, as before, and
- * is never guessed into a ruleset.
+ * Which ruleset and region each WoW: Forever realm belongs to. Forever's realm names end in their ruleset
+ * ("CAMWOW US1 Realm 4 PvP"), and a realm named that way is filed by its name without a line here
+ * (../lib/realms.ts `rulesetFromName`). Add a line only for a realm whose name does not say its ruleset, or says it
+ * wrongly, exactly as the game spells it (docs/LAUNCH_DAY.md, "Filling the realm map"); a line here wins over the
+ * name. A realm neither names nor lists stays in the one "forever" view and is never guessed into a ruleset.
  */
 
 /** The rulesets' URL segments, in the order of `RULESETS` in ./wow-forever-launch.ts. */

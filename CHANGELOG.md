@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
+- Site: the separator between the facts under an Auction House title reads "·", not "Â·".
 - Site and MCP: recipe skill ranges agree on the recipe id the trade-skill window reports, not the recipe's name, so an
   install on a Spanish client ("Peletería") counts toward the same range as English ones. A recipe the game files list
   is published under the files' English profession name, with the recipe name and reagents English clients showed.
@@ -77,6 +78,11 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   objects keeps to that type.
 
 ### Changed
+- Site: the Auction House files a realm under the PvE, PvP, RP, RP-PvP or Hardcore tab when its name ends in that
+  ruleset, as Forever's realm list names them ("CAMWOW US1 Realm 4 PvP"); the realm map still overrides, and a realm
+  whose name names no ruleset stays under "Realms not mapped yet". Realm names show split the same way: the name, then
+  its ruleset in that ruleset's colour, in the realm column, the realm menu, a realm's page title and an item's
+  Auction House box. The Normal tab reads PvE.
 - Site: `/sign-in` and `/sign-up` are one centred card under Glint and the home art: the Battle.net button, a row of provider
   tiles (Google, GitHub, Discord, Twitch; Microsoft keeps its text button, as its guidelines ask), then email, then the links.
   GitHub joins the social providers behind `EVERLOOT_AUTH_V2` (`GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`).
@@ -183,6 +189,30 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   agree. Fishing (the bobber, or an object installs agree is fished) is never a pin. An upload of an event
   that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
   instead of withdrawing the event as a conflict. The map shows none of this yet.
+
+## [0.3.18] - 2026-11-05
+
+Release channel: Alpha
+
+Item tooltips read like the game's own: each price on its own row with gold, silver and copper icons, your realm and
+its ruleset in the header, and drop rates beside their sources. The minimap button gathers other addons' buttons.
+None of this has been seen in the Forever client yet.
+
+### Changed
+- Item tooltip prices are two-column rows, the label on the left and the amount on the right in the game's
+  gold, silver and copper icons (Market value, Min buyout, Historical, your scan's min buyout and value, and the
+  vendor sell price when the client knows it), with dates, units, reporters and warnings on muted lines beneath. The
+  Everloot header names the realm with its ruleset (PvP, PvE, RP, RP-PvP, Hardcore) split off in its own colour, and
+  says once that amounts are per unit. Drop rates sit in the value column too, their loot windows and installs beneath;
+  the note for what is missing drops its own "Everloot:". The Auction House tab's lookup shows the same rows in a
+  scrolling result, and Home, Options and the Auction House tab share one native style. `/everloot price` prints the
+  same amounts as plain text.
+
+### Added
+- The Everloot minimap button gathers other addons' minimap buttons. Hover the crest to see them in a small
+  panel; its clicks work as before, and Blizzard's own buttons stay where they are. It is on by default and covers
+  buttons made with LibDBIcon, which most addons use. `/everloot buttons off`, or the switch in the settings, puts
+  them back after a `/reload`.
 
 ## [0.3.17] - 2026-11-05
 

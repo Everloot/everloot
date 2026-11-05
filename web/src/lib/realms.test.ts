@@ -1,7 +1,8 @@
 import { expect, test } from "vitest";
 import { REALMS } from "../data/realms";
 import { RULESETS } from "../data/wow-forever-launch";
-import { DEFAULT_RULESET, RULESET_SLUGS, realmInfo, realmMap, realmMapKey, realmRuleset, rulesetParam } from "./realms";
+import { REALM_RULESETS } from "../design/tokens";
+import { DEFAULT_RULESET, RULESET_LABEL, RULESET_SLUGS, realmInfo, realmMap, realmMapKey, realmParts, realmRuleset, rulesetFromName, rulesetParam } from "./realms";
 
 // These tests read the realm map as committed, so they hold before and after it is filled. ./realms-empty.test.ts
 // pins the map empty and checks that everything behaves as before the map existed.
@@ -30,6 +31,28 @@ test("a realm the map does not list is forever, never a guess", () => {
     expect(realmRuleset(realm)).toBe(DEFAULT_RULESET);
     expect(realmInfo(realm)).toBeNull();
   }
+});
+
+test("a realm whose name ends in its ruleset is on that ruleset; the map still wins, and a name without one stays forever", () => {
+  expect(rulesetFromName("CAMWOW US1 Realm 4 PvP")).toBe("pvp");
+  expect(rulesetFromName("CAMWOW AU1 Realm 2 PvP")).toBe("pvp");
+  expect(rulesetFromName("Some Realm PvE")).toBe("normal");
+  expect(rulesetFromName("Some Realm Normal")).toBe("normal");
+  expect(rulesetFromName("Some Realm RP")).toBe("rp");
+  expect(rulesetFromName("Some Realm RP-PvP")).toBe("rp-pvp");
+  expect(rulesetFromName("Some Realm RP PvP ")).toBe("rp-pvp");
+  expect(rulesetFromName("Some Realm Hardcore")).toBe("hardcore");
+  for (const realm of ["PvP", "Mal'Ganis", "Stormrage", "Pvpland", "Forever"]) expect(rulesetFromName(realm)).toBeNull();
+  expect(realmRuleset("CAMWOW US1 Realm 4 PvP")).toBe("pvp");
+});
+
+test("a realm's name splits into the name and the ruleset it ends in, as the tooltip shows it", () => {
+  expect(realmParts("CAMWOW US1 Realm 4 PvP")).toEqual({ base: "CAMWOW US1 Realm 4", ruleset: "pvp" });
+  expect(realmParts("Some Realm RP-PvP")).toEqual({ base: "Some Realm", ruleset: "rp-pvp" });
+  expect(realmParts("Mal'Ganis")).toEqual({ base: "Mal'Ganis", ruleset: null });
+  expect(RULESET_LABEL.normal).toBe("PvE");
+  // Every ruleset has its name colour.
+  expect([...REALM_RULESETS]).toEqual([...RULESET_SLUGS]);
 });
 
 test("only a ruleset's slug is a ruleset parameter", () => {

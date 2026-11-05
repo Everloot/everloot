@@ -13,6 +13,8 @@ E.Options = O
 O.ROWS = {
   { key = "window", label = "Everloot window",
     text = "The window from the minimap button and /everloot window. It shows what this file holds and records nothing; off leaves recording as it is." },
+  { key = "buttons", command = "buttons", label = "Addon buttons in the Everloot button",
+    text = "Other addons' minimap buttons gather into the Everloot minimap button; hover it to use them. Records nothing; off puts them back after a reload." },
   { key = "auctions", command = "auctions", label = "Auction scans",
     text = "Scan this house from the Everloot tab at the auction house, one click at a time. Item prices and quantities, never sellers." },
   { key = "scanPrompt", command = "scanprompt", field = true, label = "Scan prompt at the auction house",
@@ -76,26 +78,45 @@ function O.Refresh()
   end
 end
 
+-- Text in the Everloot window's fonts and colours (modules/window.lua loads after this file, before the page is
+-- built), else in the game's own template.
+local function words(parent, template, size, tone)
+  local W = E.Window
+  if W and W.Text then return W.Text(parent, size, nil, W.COLORS[tone]) end
+  local s = parent:CreateFontString(nil, "ARTWORK", template)
+  s:SetJustifyH("LEFT")
+  return s
+end
+
+local PAD = 8 -- inside the list of switches
+
 local function build()
-  local page = CreateFrame("Frame", "EverlootOptionsPage")
+  -- A frame that can take a backdrop, for when the page is shown as a window of its own.
+  local made, page = pcall(CreateFrame, "Frame", "EverlootOptionsPage", nil, "BackdropTemplate")
+  if not made or not page then page = CreateFrame("Frame", "EverlootOptionsPage") end
   page.name = "Everloot"
-  local title = page:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-  title:SetPoint("TOPLEFT", 16, -16)
-  title:SetText("Everloot")
-  local intro = page:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-  intro:SetPoint("TOPLEFT", page, "TOPLEFT", 16, -40)
-  intro:SetPoint("TOPRIGHT", page, "TOPRIGHT", -32, -40)
-  intro:SetJustifyH("LEFT")
+  local W = E.Window
+  if W and W.Heading then
+    page.crest, page.title = W.Heading(page, "Settings")
+    page.crest:SetPoint("TOPLEFT", page, "TOPLEFT", 12, -10)
+  else
+    page.title = words(page, "GameFontNormalLarge")
+    page.title:SetPoint("TOPLEFT", 16, -16)
+    page.title:SetText("Everloot")
+  end
+  local intro = words(page, "GameFontHighlightSmall", 11, "muted")
+  intro:SetPoint("TOPLEFT", page, "TOPLEFT", 16, -46)
+  intro:SetPoint("TOPRIGHT", page, "TOPRIGHT", -32, -46)
   intro:SetText("What the addon records. Everything stays in your saved file until the Everloot Desktop App or the upload page sends it, as each line says.")
+  page.intro = intro
   -- Ask Everloot: the question goes into the file, the companion answers it, and /reload prints it.
   local ask = CreateFrame("EditBox", nil, page, "InputBoxTemplate")
   ask:SetHeight(22)
   if ask.SetAutoFocus then ask:SetAutoFocus(false) end
   if ask.EnableMouse then ask:EnableMouse(true) end
-  local askLabel = page:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+  local askLabel = words(page, "GameFontHighlightSmall", 12, "text")
   askLabel:SetPoint("TOPLEFT", intro, "BOTTOMLEFT", 0, -14)
   askLabel:SetPoint("TOPRIGHT", intro, "BOTTOMRIGHT", 0, -14)
-  askLabel:SetJustifyH("LEFT")
   askLabel:SetText("Ask Everloot, then /reload for the answer")
   local send = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
   send:SetSize(64, 22)
@@ -118,18 +139,17 @@ local function build()
   local content = CreateFrame("Frame", nil, scroll)
   content:SetSize(1, 1)
   scroll:SetScrollChild(content)
+  if W and W.Surface then W.Surface(scroll) end
   page.scroll = scroll
   page.boxes = {}
   for _, row in ipairs(O.ROWS) do
     local box = CreateFrame("CheckButton", nil, content, "UICheckButtonTemplate")
     box.row = row
-    local label = box:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    local label = words(box, "GameFontNormal", 13, "text")
     label:SetPoint("TOPLEFT", box, "TOPRIGHT", 4, -4)
-    label:SetJustifyH("LEFT")
     label:SetText(row.label)
-    local text = box:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    local text = words(box, "GameFontHighlightSmall", 11, "muted")
     text:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -2)
-    text:SetJustifyH("LEFT")
     text:SetText(row.text)
     box.label, box.description = label, text
     box:SetScript("OnClick", function(self) O.Set(row, self:GetChecked() and true or false) end)
@@ -138,11 +158,11 @@ local function build()
   local function layout(_, width)
     width = math.max(1, width or scroll:GetWidth())
     content:SetWidth(width)
-    local y = 0
+    local y = PAD
     for _, box in ipairs(page.boxes) do
-      box:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
-      box.label:SetWidth(math.max(1, width - 38))
-      box.description:SetWidth(math.max(1, width - 38))
+      box:SetPoint("TOPLEFT", content, "TOPLEFT", PAD, -y)
+      box.label:SetWidth(math.max(1, width - 2 * PAD - 38))
+      box.description:SetWidth(math.max(1, width - 2 * PAD - 38))
       y = y + math.max(32, 4 + box.label:GetStringHeight() + 2 + box.description:GetStringHeight()) + 12
     end
     content:SetHeight(y)
@@ -160,10 +180,9 @@ local function build()
   reload:SetText("Reload now")
   reload:SetScript("OnClick", function() if ReloadUI then ReloadUI() end end)
   page.reload = reload
-  local note = page:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+  local note = words(page, "GameFontDisableSmall", 11, "muted")
   note:SetPoint("TOPLEFT", reload, "TOPRIGHT", 10, -2)
   note:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -32, 16)
-  note:SetJustifyH("LEFT")
   note:SetJustifyV("TOP")
   page.note = note
   page:SetScript("OnShow", function() layout(); O.Refresh() end)
@@ -210,7 +229,11 @@ function O.Open()
     page:SetSize(620, 640)
     page:SetPoint("CENTER")
     page:SetFrameStrata("DIALOG")
-    if page.SetBackdrop then
+    -- The Everloot window's dark panel and bronze edge; the game's dialog without the window file.
+    local W = E.Window
+    if W and W.Backdrop then
+      W.Backdrop(page)
+    elseif page.SetBackdrop then
       page:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
         tile = true, tileSize = 16, edgeSize = 16, insets = { left = 4, right = 4, top = 4, bottom = 4 } })
     end

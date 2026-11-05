@@ -92,4 +92,7 @@ jobs:
       - name: Warm and check the pages
         if: steps.site.outputs.deploy == 'true'
         working-directory: web
+        env:
+          # Lets the warm pass past the zone's challenge and rate-limit rules on /database/* (scripts/cf-warm.mjs).
+          EVERLOOT_EDGE_CHECK: ${{ secrets.EVERLOOT_EDGE_CHECK }}
         run: node scripts/cf-warm.mjs https://everloot.app "$SHA"

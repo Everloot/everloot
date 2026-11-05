@@ -6,7 +6,15 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 from launch_smoke import (  # noqa: E402
     checks, judge_deadmines, judge_downloads, judge_health, judge_named_item, judge_notice, judge_png, judge_redirect, judge_tools, mcp_payload,
+    request_headers,
 )
+
+# With the secret set, the check carries it so the zone's rule lets it past the /database/* challenge; without, it does not.
+assert request_headers({"EVERLOOT_EDGE_CHECK": "s3cret"}) == {"User-Agent": "everloot-launch-smoke", "x-everloot-check": "s3cret"}
+assert request_headers({}) == {"User-Agent": "everloot-launch-smoke"}
+assert request_headers({"EVERLOOT_EDGE_CHECK": ""}) == {"User-Agent": "everloot-launch-smoke"}
+assert request_headers({"EVERLOOT_EDGE_CHECK": "s3cret\r\n"})["x-everloot-check"] == "s3cret"
+assert request_headers({"EVERLOOT_EDGE_CHECK": " \n"}) == {"User-Agent": "everloot-launch-smoke"}
 
 # A version page with nothing running needs the notice and noindex; before the switch /beta is any 200 page.
 assert judge_notice(200, {}, '<meta name="robots" content="noindex, follow"/>None running.') is None

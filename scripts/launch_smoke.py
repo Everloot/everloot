@@ -4,6 +4,7 @@ for presence and never printed.
 Run from the repository root: python scripts/launch_smoke.py [--after-switch] [--origin https://everloot.app]
 --after-switch: /beta must show the "None running" notice (after the launch switch, LAUNCH_DAY step 19)."""
 import json
+import os
 import re
 import sys
 import time
@@ -19,9 +20,20 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+def request_headers(env=None) -> dict:
+    """The smoke check's headers. The zone challenges clients that are not browsers on /database/*; with the
+    EVERLOOT_EDGE_CHECK secret in the environment, x-everloot-check carries it and a security rule lets the check by."""
+    env = os.environ if env is None else env
+    headers = {"User-Agent": "everloot-launch-smoke"}
+    check = (env.get("EVERLOOT_EDGE_CHECK") or "").strip()  # a stored trailing newline is not part of the secret
+    if check:
+        headers["x-everloot-check"] = check
+    return headers
+
+
 def fetch(url: str, body: dict | None = None) -> tuple[int, dict, str, float]:
     """Status, lower-cased headers, text and seconds. A redirect is returned as it is, not followed."""
-    headers = {"User-Agent": "everloot-launch-smoke"}
+    headers = request_headers()
     if body is not None:
         headers.update({"content-type": "application/json", "accept": "application/json, text/event-stream"})
     req = urllib.request.Request(url, data=json.dumps(body).encode() if body is not None else None, headers=headers)

@@ -50,10 +50,18 @@ asking-price estimates, not live listings or guaranteed sale prices.
 Below the prices, the tooltip shows where the item drops when three installs looted the source: each rate as
 drops of loot windows, with its installs and the date of the uploads behind it, from the drop rates the Desktop
 App writes into the same `EverlootPrices` file. Once that file is in the game, a missing price or drop source is
-said in one grey line; nothing is written to your SavedVariables. Without the file, tooltips carry no community line,
+said in one muted line; nothing is written to your SavedVariables. Without the file, tooltips carry no community line,
 and the first item tooltip says once per install, in chat, that community prices come from the Everloot Desktop App
 (everloot.app/addon). `addon/tests/drops_contract.py` holds the rules.
 Nothing in the addon calls a buy, bid or post API; `addon/tests/market_contract.py` traps them.
+
+Price tooltips use separate label/value rows with native coin icons. Community market, minimum and historical
+values stay distinct from your own scan; the vendor sell price appears beside them when the client knows it.
+The amounts are per unit. The header names your realm with its ruleset (PvP, PvE, RP, RP-PvP, Hardcore) split off
+the name in its own colour, as the realm list shows it; drop rates sit in the value column too, their loot windows
+and installs beneath. Dates, units listed, reporters, all-house scope and stale-data warnings remain visible.
+`/everloot price` prints the same amounts as plain text. Disenchant outcomes and values are not yet available;
+the addon does not guess them from an item's color or type.
 
 ### Ask about an item's price
 
@@ -199,6 +207,13 @@ The window is built the first time it opens and registers no events, so recordin
 inside it closes it until `/reload` and `/everloot status` names the error. The **Everloot window** switch on the
 settings page turns it off; the minimap button then opens the plan workspace as before. The crest it uses is
 `media/crest.tga`, which the release zip carries beside the code.
+
+The minimap button also holds other addons' minimap buttons. Buttons made with LibDBIcon (most addons' round
+minimap buttons) move into it at login; hover the crest and they show in a small panel beside it, which closes
+when the mouse leaves. Its clicks stay the same. Blizzard's own minimap buttons and any other button are left
+where they are. The first time it gathers a button, chat says how many. `/everloot buttons off`, or the **Addon
+buttons in the Everloot button** switch on the settings page, turns it off; the buttons go back around the
+minimap after a `/reload`.
 
 ## Census
 
