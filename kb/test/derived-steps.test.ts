@@ -74,6 +74,29 @@ test("a route names the training cost of its recipes: the median of three instal
   expect(text).toContain("Training, if not yet learned: 50c (Minor Healing Potion 50c). Training for Elixir unrecorded.");
 });
 
+// Spell 2152 is Leatherworking's Light Armor Kit in the game files; a Spanish client shows "Peletería".
+const kit = (installId: string, rank: number, difficulty: string, spanish = false) => ({
+  kind: "recipe_observed", installId, recipeId: 2152, rank, difficulty,
+  ...(spanish
+    ? { profession: "Peletería", recipe: "Kit de armadura ligero", reagents: [{ item: "Cuero ligero", count: 1 }] }
+    : { profession: "Leatherworking", recipe: "Light Armor Kit", reagents: [{ item: "Light Leather", count: 1 }] }),
+});
+const kitTrainer = (installId: string, spanish = false) => ({
+  kind: "trainer_seen", installId, requiredRank: 1, costCopper: 50,
+  ...(spanish ? { profession: "Peletería", recipe: "Kit de armadura ligero" } : { profession: "Leatherworking", recipe: "Light Armor Kit" }),
+});
+
+test("trainer rows match a recipe by its English name; Spanish trainer rows are left out", () => {
+  const observed = [kit("en-a", 10, "optimal"), kit("en-b", 15, "optimal"), kit("en-c", 30, "medium"), kit("es-d", 5, "optimal", true)];
+  const spanishTrainers = pathFactsFromRecords([...observed, ...["es-d", "es-e", "es-f"].map((id) => kitTrainer(id, true))]);
+  // The Spanish install's orange at 5 counts; its trainer rows do not.
+  expect(spanishTrainers.derived).toEqual([
+    { profession: "Leatherworking", recipe: "Light Armor Kit", skillMin: 5, skillMax: 16, points: 1, reagents: [{ item: "Light Leather", count: 1 }], reporters: 4, trainingCopper: null },
+  ]);
+  const englishTrainers = pathFactsFromRecords([...observed, ...["en-a", "en-b", "en-c"].map((id) => kitTrainer(id))]);
+  expect(englishTrainers.derived[0]).toMatchObject({ skillMin: 1, trainingCopper: 50 });
+});
+
 test("fewer than three trainer prices leave the training cost unrecorded", () => {
   const records = [
     seen("install-a", 1, "optimal"), seen("install-b", 10, "optimal"), seen("install-c", 12, "medium"),
