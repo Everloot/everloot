@@ -75,8 +75,12 @@ function E:DropLines(itemId)
   local out = {}
   for i = 1, math.min(#sources, E.DROP_SOURCES_SHOWN) do
     local s = sources[i]
-    out[#out + 1] = { r = 0.9, g = 0.8, b = 0.5, wrap = true, text = string.format("Everloot drop: %s %d · %.1f%% (%d of %d loot windows) · %d installs",
-      s.kind == "npc" and "NPC" or "object", s.id, 100 * s.drops / s.windows, s.drops, s.windows, s.installs) }
+    local source, rate = string.format("%s %d", s.kind == "npc" and "NPC" or "object", s.id), string.format("%.1f%%", 100 * s.drops / s.windows)
+    -- `text` is the plain sentence for chat and a tooltip without two columns. The game's tooltip shows `left` and
+    -- `right` as a row, the rate in the value column like a price, with `detail` (its denominator) muted beneath.
+    out[#out + 1] = { r = 0.9, g = 0.8, b = 0.5, wrap = true,
+      text = string.format("Everloot drop: %s · %s (%d of %d loot windows) · %d installs", source, rate, s.drops, s.windows, s.installs),
+      left = "Drops from " .. source, right = rate, detail = string.format("  %d of %d loot windows, %d installs", s.drops, s.windows, s.installs) }
   end
   local day = type(entry.asOf) == "string" and entry.asOf:match("^%d%d%d%d%-%d%d%-%d%d")
   local more = #sources - E.DROP_SOURCES_SHOWN

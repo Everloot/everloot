@@ -145,6 +145,36 @@ end
 --- A word in the value column (unrecorded, no sell price), in the evidence colour so it never reads as an amount.
 local function quiet(word) return hex(META[1], META[2], META[3]) .. word .. "|r" end
 
+-- Forever's realm names end in their ruleset, as the game's realm list splits them: "CAMWOW US1 Realm 4 PvP". The
+-- website files and colours realms by the same words (web/src/lib/realms.ts `rulesetFromName`, tokens `realm-*`).
+local RULESETS = {
+  { suffix = "rp%-pvp", label = "RP-PvP", r = 1, g = 0.5, b = 0.25 },
+  { suffix = "rp pvp", label = "RP-PvP", r = 1, g = 0.5, b = 0.25 },
+  { suffix = "pvp", label = "PvP", r = 1, g = 0.3, b = 0.3 },
+  { suffix = "pve", label = "PvE", r = 0.4, g = 0.85, b = 0.4 },
+  { suffix = "normal", label = "PvE", r = 0.4, g = 0.85, b = 0.4 },
+  { suffix = "rp", label = "RP", r = 0.45, g = 0.7, b = 1 },
+  { suffix = "hardcore", label = "Hardcore", r = 1, g = 0.82, b = 0 },
+}
+
+--- A realm's name without its ruleset, and the ruleset ({ label, r, g, b }), or the whole name and nil.
+function E.RealmRuleset(realm)
+  local lower = realm:lower()
+  for _, rule in ipairs(RULESETS) do
+    local cut = lower:find("[%s%-]" .. rule.suffix .. "$")
+    if cut and cut > 1 then return realm:sub(1, cut - 1), rule end
+  end
+  return realm, nil
+end
+
+--- The header's right column: the realm the prices are from, its ruleset split off in its own colour, and the unit
+--- of every amount below: "CAMWOW US1 Realm 4 PvP · per unit".
+local function headerRight(realm)
+  local name, rule = E.RealmRuleset(realm)
+  local ruleset = rule and (" " .. hex(rule.r, rule.g, rule.b) .. rule.label .. "|r") or ""
+  return quiet(name) .. ruleset .. quiet(" · per unit")
+end
+
 --- The game's vendor price for one unit, in copper: 0 when vendors do not buy the item, nil when it is unknown (the
 --- item is not loaded yet, the client has no item reader, or the reader fails or answers with a secret). Unknown is
 --- never 0.
@@ -236,6 +266,9 @@ local function addLines(tooltip, itemId)
     print("Everloot: community prices in item tooltips come from the Everloot Desktop App (everloot.app/addon), which writes them into the game; until then tooltips show only your own auction scans. /everloot price [item] says what Everloot has for an item.")
   end
   local lines, entry = priceLines(realm, itemId)
+  -- The unit and the realm belong to the price amounts; a drop rate is neither per unit nor per realm.
+  local amounts = false
+  for _, line in ipairs(lines) do amounts = amounts or line.right ~= nil end
   local dropLines, dropNote = E:DropLines(itemId)
   local missing = {}
   if type(EverlootPricesDB) == "table" and entry.status ~= "verifying" then
@@ -252,24 +285,25 @@ local function addLines(tooltip, itemId)
   end
   for _, line in ipairs(dropLines or {}) do lines[#lines + 1] = line end
   if #missing > 0 then
-    lines[#lines + 1] = { text = "Everloot: " .. table.concat(missing, " · "), r = META[1], g = META[2], b = META[3], wrap = true }
+    -- Under the Everloot header the note needs no "Everloot:" of its own: "No price on Forever yet · no drop source ...".
+    local note = table.concat(missing, " · "):gsub("^%l", string.upper)
+    lines[#lines + 1] = { text = note, r = META[1], g = META[2], b = META[3], wrap = true }
   end
   if #lines == 0 then return end
   -- The game's two-column line puts each amount in a column beside its label; a tooltip without it gets every
   -- line's plain text instead, so nothing is lost.
   local columns = type(tooltip.AddDoubleLine) == "function"
-  local amounts = false
-  for _, line in ipairs(lines) do amounts = amounts or line.right ~= nil end
-  -- One header, only when there is something to show: the crest inline and "Everloot" in fel green, with the unit
-  -- of every amount below said once beside it.
+  -- One header, only when there is something to show: the crest inline and "Everloot" in fel green, with the realm
+  -- the prices are from and the unit of every amount below said once beside it.
   if columns and amounts then
-    tooltip:AddDoubleLine(TOOLTIP_HEADER, "per unit", HEAD[1], HEAD[2], HEAD[3], META[1], META[2], META[3])
+    tooltip:AddDoubleLine(TOOLTIP_HEADER, headerRight(realm), HEAD[1], HEAD[2], HEAD[3], META[1], META[2], META[3])
   else
     tooltip:AddLine(TOOLTIP_HEADER, HEAD[1], HEAD[2], HEAD[3])
   end
   for _, line in ipairs(lines) do
     if columns and line.left and line.right then
       tooltip:AddDoubleLine(line.left, line.right, line.r, line.g, line.b, VALUE[1], VALUE[2], VALUE[3])
+      if line.detail then tooltip:AddLine(line.detail, META[1], META[2], META[3], true) end
     else
       tooltip:AddLine(line.text, line.r, line.g, line.b, line.wrap)
     end

@@ -259,8 +259,8 @@ assert(frames == math.ceil(#data / 20000) - 1, 'one slice per frame: ' .. frames
 local ready = tooltipFor(7)
 assert(ready:find('Everloot market 5s 0c') and ready:find('50 units listed'), ready)
 local absent = tooltipFor(3001)
-assert(not absent:find('Everloot market') and absent:find('not in the local price file'), 'an id that is not in a full file is not in the file, and 7 does not match 70 or 17: ' .. absent)
-assert(not absent:find('no price on'), 'a full file cannot say the item has no public price: ' .. absent)
+assert(not absent:find('Everloot market') and absent:find('Not in the local price file'), 'an id that is not in a full file is not in the file, and 7 does not match 70 or 17: ' .. absent)
+assert(not absent:find('No price on'), 'a full file cannot say the item has no public price: ' .. absent)
 local thin = tooltipFor(2)
 assert(thin:find('unrecorded %(thin%)'), thin)
 
@@ -270,11 +270,11 @@ Everloot:ResetPrices()
 printed = {}
 tooltipFor(7); drain()
 local refused = tooltipFor(7)
-assert(said('checksum') and not refused:find('Everloot market') and refused:find('community prices failed their checksum'), 'a large file with a bad checksum is refused, and says so: ' .. refused)
+assert(said('checksum') and not refused:find('Everloot market') and refused:find('Community prices failed their checksum'), 'a large file with a bad checksum is refused, and says so: ' .. refused)
 GetRealmName = function() return 'Forever' end
 Everloot:ResetPrices()
 -- A file below the cap that lacks the item has no public price for it: the usual short line.
-assert(tooltipFor(424242):find('no price on Forever yet'), 'a small file that lacks the item has no price for it')
+assert(tooltipFor(424242):find('No price on Forever yet'), 'a small file that lacks the item has no price for it')
 """)
 
 # The file's build time and the item's own newest day are different facts: a freshly built file can hold an
@@ -415,7 +415,8 @@ function lineAt(rows, text)
 end
 function valueRows(rows)
   local out = {}
-  for _, row in ipairs(rows) do if row.right and not row.left:find('crest', 1, true) then out[#out + 1] = row end end
+  -- Price amounts only: the header and the drop rates are rows too.
+  for _, row in ipairs(rows) do if row.right and not row.left:find('crest', 1, true) and not row.left:find('^Drops from') then out[#out + 1] = row end end
   return out
 end
 -- Contrast with the game's default tooltip background (0.09, 0.09, 0.19), as WCAG computes it. A tooltip can sit
@@ -436,7 +437,7 @@ local rows = nativeTooltipFor(2589)
 local headers = 0
 for _, row in ipairs(rows) do if (row.left or row.text):find('media\\\\crest', 1, true) then headers = headers + 1 end end
 assert(headers == 1 and rows[1].left and rows[1].left:find('|t Everloot$') and rows[1].r < 0.7 and rows[1].g > 0.9, 'one fel-green header first')
-assert(rows[1].right == 'per unit', 'the unit is said once, on the header: ' .. tostring(rows[1].right))
+assert(wordOf(rows[1].right) == 'Forever · per unit', 'the realm and the unit are said once, on the header: ' .. tostring(rows[1].right))
 
 -- Each value on its own row: the label left, the amount right in coins, in white. A section's first row names it;
 -- the rows under it are indented.
@@ -462,8 +463,11 @@ local scanned = lineAt(rows, '  100 units listed, scanned under 1 h ago')
 assert(day and built and scanned, 'dates, units and reporters stay in the tooltip')
 assert(select(2, labelled(rows, 'Historical')) < day and day < built and built < select(2, labelled(rows, 'Your scan · min buyout')), 'community evidence under the community values')
 assert(select(2, labelled(rows, 'Value')) < scanned and scanned < select(2, labelled(rows, 'Vendor')), 'the own scan evidence under its values')
-local drop = lineAt(rows, 'Everloot drop: NPC 116')
+local dropRow, drop = labelled(rows, 'Drops from NPC 116')
 assert(drop and drop > select(2, labelled(rows, 'Vendor')), 'the drop lines follow the prices, as before')
+-- A drop rate is a row like a price, its rate in the value column, its loot windows and installs muted beneath.
+assert(dropRow.right == '12.4%' and dropRow.rr == 1, 'the rate in the value column: ' .. dropRow.right)
+assert(rows[drop + 1].text == '  42 of 340 loot windows, 5 installs' and rows[drop + 1].wrap == true, 'its denominator beneath: ' .. tostring(rows[drop + 1].text))
 for _, row in ipairs(rows) do
   assert(contrast(row.r, row.g, row.b) >= 4.5, 'legible on the tooltip background: ' .. (row.left or row.text))
   if row.rr then assert(contrast(row.rr, row.rg, row.rb) >= 4.5, 'legible value: ' .. row.right) end
@@ -523,7 +527,7 @@ C_Item = nil
 GetItemInfo = function(id) return 'Thing', '|Hitem:' .. id .. '|h[Thing]|h', 1, 5, 0, 'Misc', 'Junk', 1, '', 1, 13 end
 rows = nativeTooltipFor(424242)
 assert(#Everloot.PriceLines('Forever', 424242) == 0 and not labelled(rows, 'Vendor'), 'no vendor-only section')
-assert(#rows == 2 and rows[1].text and rows[1].text:find('|t Everloot$') and rows[2].text:find('no price on Forever yet', 1, true), 'header and the missing note only')
+assert(#rows == 2 and rows[1].text and rows[1].text:find('|t Everloot$') and rows[2].text:find('No price on Forever yet', 1, true), 'header and the missing note only')
 assert(rows[2].wrap == true, 'the long missing note wraps instead of widening the tooltip')
 
 -- An unrecorded market value is a word in the value column, never an amount; a stale day is flagged right under the
@@ -573,7 +577,30 @@ Everloot:ResetPrices()
 rows = nativeTooltipFor(2589)
 assert(labelled(rows, 'Your scan · min buyout') and labelled(rows, 'Value') and lineAt(rows, '  100 units listed, scanned under 1 h ago'), 'the own scan alone')
 for _, row in ipairs(rows) do assert(not (row.left or row.text):find('all houses', 1, true), 'an own scan is not an all-house price') end
-assert(rows[1].right == 'per unit', 'its values are per unit too')
+assert(wordOf(rows[1].right) == 'Forever · per unit', 'its values are per unit too')
+
+-- A realm named for its ruleset shows the ruleset split off in its own colour, legible on the tooltip background.
+local function split(realm)
+  local name, rule = Everloot.RealmRuleset(realm)
+  return name .. '|' .. (rule and rule.label or '-')
+end
+assert(split('CAMWOW US1 Realm 4 PvP') == 'CAMWOW US1 Realm 4|PvP' and split('Some Realm PvE') == 'Some Realm|PvE')
+assert(split('Some Realm Normal') == 'Some Realm|PvE' and split('Some Realm RP') == 'Some Realm|RP')
+assert(split('Some Realm RP-PvP') == 'Some Realm|RP-PvP' and split('Some Realm RP PvP') == 'Some Realm|RP-PvP')
+assert(split('Some Realm Hardcore') == 'Some Realm|Hardcore')
+assert(split('Forever') == 'Forever|-' and split('PvP') == 'PvP|-' and split('Pvpland') == 'Pvpland|-', 'a name without a ruleset stays whole')
+for _, realm in ipairs({ 'A PvP', 'A PvE', 'A RP', 'A RP-PvP', 'A Hardcore' }) do
+  local _, rule = Everloot.RealmRuleset(realm)
+  assert(contrast(rule.r, rule.g, rule.b) >= 4.5, 'legible ruleset colour: ' .. realm)
+end
+local savedRealm = GetRealmName
+GetRealmName = function() return 'CAMWOW US1 Realm 4 PvP' end
+-- The player's own scan, taken on that realm.
+EverlootDB.lastScans['CAMWOW US1 Realm 4 PvP'] = EverlootDB.lastScans.Forever
+rows = nativeTooltipFor(2589)
+assert(rows[1].right:find('CAMWOW US1 Realm 4|r |cffff4c4cPvP|r', 1, true) and wordOf(rows[1].right) == 'CAMWOW US1 Realm 4 PvP · per unit', rows[1].right)
+GetRealmName = savedRealm
+EverlootDB.lastScans['CAMWOW US1 Realm 4 PvP'] = nil
 """)
 lua.execute((Path(__file__).parent / "fixtures" / "EverlootPrices.lua").read_text(encoding="utf-8"))
 lua.execute("Everloot:ResetPrices()")
