@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
+- Site: the separator between the facts under an Auction House title reads "·", not "Â·".
 - Site and MCP: recipe skill ranges agree on the recipe id the trade-skill window reports, not the recipe's name, so an
   install on a Spanish client ("Peletería") counts toward the same range as English ones. A recipe the game files list
   is published under the files' English profession name, with the recipe name and reagents English clients showed.
@@ -81,6 +82,11 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   objects keeps to that type.
 
 ### Changed
+- Site: the Auction House files a realm under the PvE, PvP, RP, RP-PvP or Hardcore tab when its name ends in that
+  ruleset, as Forever's realm list names them ("CAMWOW US1 Realm 4 PvP"); the realm map still overrides, and a realm
+  whose name names no ruleset stays under "Realms not mapped yet". Realm names show split the same way: the name, then
+  its ruleset in that ruleset's colour, in the realm column, the realm menu, a realm's page title and an item's
+  Auction House box. The Normal tab reads PvE.
 - Site: `/sign-in` and `/sign-up` are one centred card under Glint and the home art: the Battle.net button, a row of provider
   tiles (Google, GitHub, Discord, Twitch; Microsoft keeps its text button, as its guidelines ask), then email, then the links.
   GitHub joins the social providers behind `EVERLOOT_AUTH_V2` (`GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`).

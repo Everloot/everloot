@@ -115,9 +115,11 @@ No migration is part of the switch.
 
 ## Filling the realm map
 
-Blizzard has not named Forever's realms, so until launch every realm is in one "forever" view: the
-Auction House's ruleset tabs say "No realm is mapped to PvP yet". The map is one file,
-`web/src/data/realms.ts` (`REALMS`), and it groups Auction House prices only.
+Forever's realm names end in their ruleset, as the in-game realm list shows them ("CAMWOW US1 Realm 4 PvP",
+seen in the first uploads on 2026-11-05). Since then the Auction House files a realm by that last word (PvP, PvE or
+Normal, RP, RP-PvP, Hardcore; `rulesetFromName` in `web/src/lib/realms.ts`) and shows that word beside the name
+in its own colour. The map below is only for a realm whose name does not end in its ruleset; a line
+there wins over the name. It is one file, `web/src/data/realms.ts` (`REALMS`), and it groups Auction House prices only.
 
 | # | Owner | Step | Check and expected result | If it fails |
 |---|---|---|---|---|

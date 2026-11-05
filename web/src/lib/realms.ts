@@ -7,9 +7,12 @@ import { REALMS, RULESET_SLUGS, type RealmEntry, type Region, type RulesetSlug }
 
 export const DEFAULT_RULESET = "forever";
 
-/** The tab names; "Roleplaying" is "RP" so the five fit a phone. */
+/**
+ * The tab names, also the words beside a realm's name: "Roleplaying" is "RP" so the five fit a phone, and Normal
+ * is "PvE", as players call it.
+ */
 export const RULESET_LABEL: Record<RulesetSlug, string> = {
-  normal: "Normal", pvp: "PvP", rp: "RP", "rp-pvp": "RP-PvP", hardcore: "Hardcore",
+  normal: "PvE", pvp: "PvP", rp: "RP", "rp-pvp": "RP-PvP", hardcore: "Hardcore",
 };
 
 /** Rulesets that open after launch; their tab shows only once a realm is mapped to one. */
@@ -36,13 +39,39 @@ export function realmInfo(realm: string): RealmInfo | null {
   return MAP.get(realmMapKey(realm)) ?? null;
 }
 
+/** The last word of a realm's name, as Forever's realm list ends each name ("CAMWOW US1 Realm 4 PvP"). */
+const NAME_ENDINGS: readonly [RegExp, RulesetSlug][] = [
+  [/[\s-]rp[\s-]pvp$/i, "rp-pvp"], [/[\s-]pvp$/i, "pvp"], [/[\s-](pve|normal)$/i, "normal"],
+  [/[\s-]rp$/i, "rp"], [/[\s-]hardcore$/i, "hardcore"],
+];
+
 /**
- * The ruleset a realm's prices are grouped under: the map's, else "forever". Never a guess. Player, guild and
- * character-link addresses do not read this; they stay on "forever" (player-pages `rulesetOf`) until a migration
- * moves the stored rows, so mapping a realm never splits a player into two rows.
+ * The ruleset a realm's own name ends in, or null. Forever names its realms with their ruleset last, the way the
+ * game's realm list splits them.
+ */
+export function rulesetFromName(realm: string): RulesetSlug | null {
+  const name = realm.trim();
+  return NAME_ENDINGS.find(([ending]) => ending.test(name))?.[1] ?? null;
+}
+
+/**
+ * A realm's name split as the pages show it: the name without the ruleset it ends in, and the ruleset (the map's,
+ * else the name's), or the whole name and null. "CAMWOW US1 Realm 4 PvP" is "CAMWOW US1 Realm 4" and pvp.
+ */
+export function realmParts(realm: string): { base: string; ruleset: RulesetSlug | null } {
+  const name = realm.trim();
+  const ending = NAME_ENDINGS.find(([pattern]) => pattern.test(name))?.[0];
+  const base = ending ? name.replace(ending, "") : name;
+  return { base, ruleset: realmInfo(name)?.ruleset ?? rulesetFromName(name) };
+}
+
+/**
+ * The ruleset a realm's prices are grouped under: the map's, else the one its name ends in, else "forever". Never a
+ * guess. Player, guild and character-link addresses do not read this; they stay on "forever" (player-pages
+ * `rulesetOf`) until a migration moves the stored rows, so filing a realm never splits a player into two rows.
  */
 export function realmRuleset(realm: string): string {
-  return realmInfo(realm)?.ruleset ?? DEFAULT_RULESET;
+  return realmInfo(realm)?.ruleset ?? rulesetFromName(realm) ?? DEFAULT_RULESET;
 }
 
 /** Rulesets with at least one realm mapped to them. */

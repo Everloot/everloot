@@ -133,7 +133,7 @@ const RULES: Rule[] = [
   },
   {
     name: "text opacity",
-    pattern: token(String.raw`text-(?:fg|fg-2|muted|accent|danger|warning|q-[a-z]+|class-[a-z]+|chat-[a-z]+)\/(?:\d+|\[[^\]]*\])`),
+    pattern: token(String.raw`text-(?:fg|fg-2|muted|accent|danger|warning|q-[a-z]+|class-[a-z]+|chat-[a-z]+|realm-[a-z-]+)\/(?:\d+|\[[^\]]*\])`),
     bites: ["text-muted/60", "text-fg/[.85]", "hover:text-accent/[0.5]"],
     spares: ["text-muted", "bg-canvas/60"],
   },
