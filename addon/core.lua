@@ -255,6 +255,14 @@ SlashCmdList["EVERLOOT"] = function(msg)
     E.Options.Open()
   elseif msg == "window" and E.Window then
     E.Window.Toggle()
+  elseif msg == "buttons on" or msg == "buttons off" then
+    EverlootDB.toggles.buttons = (msg == "buttons on")
+    if EverlootDB.toggles.buttons then
+      print("Everloot: other addons' minimap buttons gather into the Everloot minimap button after /reload.")
+    else
+      -- Simplest correct restore: nothing is moved back in place; without the drawer, LibDBIcon places them again.
+      print("Everloot: other addons' minimap buttons stay on the minimap; any in the Everloot button return after /reload.")
+    end
   elseif msg == "version" then
     print("Everloot " .. E.VERSION)
   elseif msg == "selftest" and E.SelfTest then
@@ -335,6 +343,6 @@ SlashCmdList["EVERLOOT"] = function(msg)
       print("Everloot: installed addon list off; all recorded addon rows were deleted from this file. /reload to apply.")
     end
   else
-    print("Everloot commands: /everloot window, /everloot options, /everloot status, /everloot auctions on|off, /everloot scan, /everloot scanprompt on|off, /everloot vendor on|off, /everloot mail on|off, /everloot price [item], /everloot gph [start|pause|stop|reset|show|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], " .. (E.Pulls and "/everloot pulls [on|off], " or "") .. "/everloot link [code|clear], /everloot selftest, /everloot talents, /everloot plan [share code|number], /everloot raid [code], /ask <question>")
+    print("Everloot commands: /everloot window, /everloot options, /everloot buttons on|off, /everloot status, /everloot auctions on|off, /everloot scan, /everloot scanprompt on|off, /everloot vendor on|off, /everloot mail on|off, /everloot price [item], /everloot gph [start|pause|stop|reset|show|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], " .. (E.Pulls and "/everloot pulls [on|off], " or "") .. "/everloot link [code|clear], /everloot selftest, /everloot talents, /everloot plan [share code|number], /everloot raid [code], /ask <question>")
   end
 end

@@ -38,3 +38,4 @@ modules\options.lua
 modules\planner.lua
 modules\window.lua
 modules\minimap.lua
+modules\drawer.lua

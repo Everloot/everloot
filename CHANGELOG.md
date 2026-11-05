@@ -49,6 +49,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   `addon_download` to CurseForge like the other download links. The same tested zip is uploaded there on each release.
 
 ### Added
+- Addon: the Everloot minimap button gathers other addons' minimap buttons. Hover the crest to see them in a small
+  panel; its clicks work as before, and Blizzard's own buttons stay where they are. It is on by default and covers
+  buttons made with LibDBIcon, which most addons use. `/everloot buttons off`, or the switch in the settings, puts
+  them back after a `/reload`.
 - Desktop App and site, behind `EVERLOOT_CHARACTER_LINKS` (off): the addon's `/everloot link <code>` (0.3.15) writes one
   link row for the character you are playing, with a code made on the account page. The Desktop App, signed in, sends it only
   to the account's own link endpoint; uploads never carry link rows. The account page lists your linked characters,
