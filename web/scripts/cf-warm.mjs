@@ -46,7 +46,9 @@ export function summarize(results) {
  * @param {Record<string, string | undefined>} [env]
  */
 export function requestHeaders(env = process.env) {
-  return { "user-agent": "everloot-deploy-warm", ...(env.EVERLOOT_EDGE_CHECK ? { "x-everloot-check": env.EVERLOOT_EDGE_CHECK } : {}) };
+  // Trimmed: a secret stored with a trailing newline would make every fetch throw ("invalid header value").
+  const check = env.EVERLOOT_EDGE_CHECK?.trim();
+  return { "user-agent": "everloot-deploy-warm", ...(check ? { "x-everloot-check": check } : {}) };
 }
 
 async function get(url) {
