@@ -7,4 +7,4 @@ products:
   # `live` turns true when players can play it, at launch (docs/LAUNCH_DAY.md).
   - product: wowf
     label: WoW Forever
-    live: false
+    live: true
