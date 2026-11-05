@@ -37,15 +37,18 @@ describe("the old character address", () => {
     return route[method](new Request(`https://everloot.app${path}`, { method }));
   };
 
-  test("answers 308 with the character's one page, switch on or off, and reads nothing", async () => {
+  test("answers a temporary 307, kept an hour at most, with the character's one page, switch on or off, and reads nothing", async () => {
     const get = vi.spyOn(holder.store!, "get");
     for (const value of ["1", ""]) {
       vi.stubEnv("EVERLOOT_PLAYER_PAGES", value);
       const res = await go("/players/forever/forever-pioneer/thrallina");
-      expect(res.status).toBe(308);
+      expect(res.status).toBe(307);
+      expect(res.headers.get("cache-control")).toBe("public, max-age=3600");
       expect(res.headers.get("location")).toBe("https://everloot.app/characters/forever/forever-pioneer/thrallina");
     }
-    expect((await go("/players/forever/forever-pioneer/thrallina", "HEAD")).status).toBe(308);
+    const head = await go("/players/forever/forever-pioneer/thrallina", "HEAD");
+    expect(head.status).toBe(307);
+    expect(head.headers.get("cache-control")).toBe("public, max-age=3600");
     expect(get).not.toHaveBeenCalled();
   });
 
