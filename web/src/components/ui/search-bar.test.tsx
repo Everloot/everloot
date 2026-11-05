@@ -16,6 +16,8 @@ import SearchBar from "./SearchBar";
 let container: HTMLDivElement;
 let root: Root;
 let answers: Map<string, (rows: unknown[]) => void>;
+let people: { status: number; body: unknown; never?: boolean };
+let peopleAsked: { q: string; cache?: RequestCache; signal?: AbortSignal | null }[];
 
 const suggestion = (id: number, label: string) => ({ type: "item", id, label, href: `/database/items/${id}` });
 
@@ -23,11 +25,20 @@ beforeEach(async () => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   vi.useFakeTimers();
   answers = new Map();
-  // Every request waits until the test answers it, so a slow reply can be staged.
-  vi.stubGlobal("fetch", vi.fn((url: string) => new Promise((resolve) => {
-    const q = new URL(url, "http://localhost").searchParams.get("q") ?? "";
-    answers.set(q, (results) => resolve({ ok: true, json: async () => ({ results }) }));
-  })));
+  people = { status: 200, body: {} };
+  peopleAsked = [];
+  // Every database request waits until the test answers it, so a slow reply can be staged. Characters and guilds
+  // (/search/people) answer at once with what the test set, or never (until the request is aborted).
+  vi.stubGlobal("fetch", vi.fn((url: string, init?: RequestInit) => {
+    const u = new URL(url, "http://localhost");
+    const q = u.searchParams.get("q") ?? "";
+    if (u.pathname === "/search/people") {
+      peopleAsked.push({ q, cache: init?.cache, signal: init?.signal });
+      if (people.never) return new Promise((_, reject) => init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError"))));
+      return Promise.resolve({ ok: people.status === 200, json: async () => people.body });
+    }
+    return new Promise((resolve) => { answers.set(q, (results) => resolve({ ok: true, json: async () => ({ results }) })); });
+  }));
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -49,6 +60,11 @@ async function type(text: string) {
     field().dispatchEvent(new Event("input", { bubbles: true }));
   });
   await act(async () => { await vi.advanceTimersByTimeAsync(120); });
+}
+
+/** Lets `ms` more pass: the character and guild request starts 280 ms after the last key. */
+async function wait(ms: number) {
+  await act(async () => { await vi.advanceTimersByTimeAsync(ms); });
 }
 
 async function answer(q: string, rows: unknown[]) {
@@ -115,4 +131,112 @@ test("a dungeon row says which it is and its level, and is picked like any other
   const clicks = watchClicks();
   await press("Enter");
   expect(clicks).toEqual(["/database/instances/36-deadmines"]);
+});
+
+const person = (type: "character" | "guild", label: string, meta: string, exact = false) =>
+  ({ type, label, href: type === "character" ? `/players/forever/pioneer/${label.toLowerCase()}` : `/guilds/pioneer/${label.toLowerCase()}`, meta, exact });
+const texts = () => [...container.querySelectorAll("[role=option]")].map((o) => o.textContent);
+
+test("characters and guilds come after the database pages, at most 3, and the 8 rows still hold", async () => {
+  people.body = {
+    characters: { results: [person("character", "Thrallina", "Level 24 Shaman · Pioneer"), person("character", "Thrall", "Level 60 Shaman · Pioneer", true)], total: 2 },
+    guilds: { results: [person("guild", "Thrall Fans", "Pioneer · 4 members seen"), person("guild", "Thralls", "Pioneer")], total: 2 },
+  };
+  await type("thrall");
+  await answer("thrall", Array.from({ length: 8 }, (_, i) => suggestion(10 + i, `Thrall item ${i}`)));
+  // The database rows show at once; the people rows join them when they arrive.
+  expect(texts()).toHaveLength(8);
+  expect(peopleAsked).toEqual([]);
+  await wait(160);
+  const rows = texts();
+  expect(rows).toHaveLength(8);
+  expect(rows.slice(0, 5).every((t) => t!.startsWith("Thrall item"))).toBe(true);
+  // An exact name first, then characters before guilds; a guild row says it is one.
+  expect(rows.slice(5)).toEqual(["ThrallLevel 60 Shaman · Pioneer", "ThrallinaLevel 24 Shaman · Pioneer", "Thrall FansGuild · Pioneer · 4 members seen"]);
+});
+
+test("with no database match the character rows are the list, and they open their own pages", async () => {
+  people.body = { characters: { results: [person("character", "Zuljinna", "Level 12 Hunter · Pioneer")], total: 1 }, guilds: { results: [], total: 0 } };
+  await type("zulj");
+  await answer("zulj", []);
+  await wait(160);
+  expect(texts()).toEqual(["ZuljinnaLevel 12 Hunter · Pioneer"]);
+  await press("ArrowDown");
+  const clicks = watchClicks();
+  await press("Enter");
+  expect(clicks).toEqual(["/players/forever/pioneer/zuljinna"]);
+});
+
+test("characters and guilds are asked for every time, uncached, while the database pages are kept", async () => {
+  people.body = { characters: { results: [person("character", "Hidee", "Level 5 Mage · Pioneer")], total: 1 } };
+  await type("hide");
+  await answer("hide", []);
+  await wait(160);
+  expect(texts()).toEqual(["HideeLevel 5 Mage · Pioneer"]);
+  // The character is hidden; the same text typed again no longer shows it, though its database answer is kept.
+  people.body = {};
+  await type("");
+  await type("hide");
+  await wait(160);
+  expect(texts()).toEqual([]);
+  expect(peopleAsked.map(({ q, cache }) => ({ q, cache }))).toEqual([{ q: "hide", cache: "no-store" }, { q: "hide", cache: "no-store" }]);
+});
+
+test("a character lookup that never answers holds nothing back, and is dropped after 800 ms", async () => {
+  people.never = true;
+  await type("mageweave");
+  await answer("mageweave", [suggestion(5, "Mageweave Cloth")]);
+  expect(texts()).toEqual(["Mageweave ClothItem 5"]);
+  await wait(160);
+  expect(peopleAsked).toHaveLength(1);
+  expect(peopleAsked[0].signal!.aborted).toBe(false);
+  await wait(800);
+  expect(peopleAsked[0].signal!.aborted).toBe(true);
+  expect(texts()).toEqual(["Mageweave ClothItem 5"]);
+});
+
+test("rows added under the list leave the picked row picked", async () => {
+  people.body = { characters: { results: [person("character", "Silkie", "Level 9 Rogue · Pioneer")], total: 1 } };
+  await type("silk");
+  await answer("silk", [suggestion(6, "Silk Cloth"), suggestion(7, "Silk Thread")]);
+  await press("ArrowDown");
+  await press("ArrowDown");
+  const picked = () => container.querySelector("[aria-selected=true]")?.textContent;
+  expect(picked()).toBe("Silk ThreadItem 7");
+  await wait(160);
+  expect(texts()).toEqual(["Silk ClothItem 6", "Silk ThreadItem 7", "SilkieLevel 9 Rogue · Pioneer"]);
+  expect(picked()).toBe("Silk ThreadItem 7");
+});
+
+test("text that cannot start a character or guild name never asks for them", async () => {
+  for (const q of ["6948", "#12", "a", "it's-"]) {
+    await type(q);
+    await wait(400);
+  }
+  // An id is never a name here, even though a guild name may be digits; "it's-" could start a guild name.
+  expect(peopleAsked.map((a) => a.q)).toEqual(["it's-"]);
+});
+
+test("a quick typist asks for characters once, for the text they stopped on", async () => {
+  await type("th");
+  await type("thr");
+  await type("thra");
+  await wait(400);
+  expect(peopleAsked.map((a) => a.q)).toEqual(["thra"]);
+});
+
+test("a failed character lookup leaves the database rows; a scoped box never asks for characters", async () => {
+  people.status = 500;
+  await type("linen c");
+  await answer("linen c", [suggestion(2, "Linen Cloth")]);
+  expect(texts()).toEqual(["Linen ClothItem 2"]);
+  // A fresh bar scoped to items (the scope is the bar's own state, set when it mounts).
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  await act(async () => root.render(<SearchBar action="/search" label="Search Everloot" id="bar" scopes defaultScope="item" />));
+  peopleAsked = [];
+  await type("wool");
+  await answer("wool", [suggestion(3, "Wool Cloth")]);
+  expect(texts()).toEqual(["Wool ClothItem 3"]);
+  expect(peopleAsked).toEqual([]);
 });

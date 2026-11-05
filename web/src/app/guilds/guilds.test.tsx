@@ -224,6 +224,18 @@ test("the hub's search finds guilds by the start of the name", async () => {
   expect(await hub({ q: "x" })).toContain("Type 2 to 24 letters");
 });
 
+test("a players table that cannot be read leaves the hub's search as it was, and marks the answer partial", async () => {
+  on();
+  vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+  const { loadGuildSearch } = await import("@/lib/guilds");
+  expect((await loadGuildSearch("nig")).partial).toBe(false);
+  vi.spyOn(holder.store!, "searchGuilds").mockRejectedValue(new Error("search_guilds unavailable"));
+  const found = await loadGuildSearch("nig");
+  expect(found).toMatchObject({ unreachable: false, partial: true });
+  expect(found.results.map((g) => g.guildName)).toEqual(["Night Watch"]);
+  expect(await hub({ q: "nig" })).toContain('href="/guilds/forever-pioneer/night-watch"');
+});
+
 test("a guild page with members' kills only: progression with dates, activity, no officer roster", async () => {
   on();
   const html = await guildPage("forever-pioneer", "ember");

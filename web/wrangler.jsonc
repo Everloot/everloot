@@ -45,6 +45,11 @@
     // KNOWLEDGE_RELEASE_SHA256 below to the same release.
     { "binding": "KNOWLEDGE_D1", "database_name": "everloot-knowledge-2026-11-01", "database_id": "47ac29c7-c9f8-4574-bb31-c27774de1e7e" }
   ],
+  // Name lookups per address per minute on /search/people (src/app/search/people/route.ts), counted at each
+  // Cloudflare location. The zone's one rate-limiting rule (Free plan) is the /database/* scraper rule.
+  "ratelimits": [
+    { "name": "PEOPLE_SEARCH_LIMIT", "namespace_id": "1001", "simple": { "limit": 60, "period": 60 } }
+  ],
   // Repository files the pages read at run time (news, guides, wiki pages), copied into .open-next/repo by
   // scripts/cf-bundle-files.mjs and uploaded as text modules, so node:fs finds them under /bundle/repo.
   "find_additional_modules": true,

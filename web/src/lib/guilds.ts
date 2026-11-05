@@ -212,17 +212,19 @@ const seenFromHits = (hits: readonly GuildHit[]): Seen =>
 /**
  * Guilds whose name starts with `prefix`: the directory built from kills and officer boards, merged with the
  * players table's search (which knows guilds only members were seen in). Hidden guilds are already out of both.
+ * `partial` says the players table could not be read, so the answer lacks its guilds and members-seen counts.
  */
-export async function loadGuildSearch(prefix: string): Promise<{ results: GuildSummary[]; unreachable: boolean; dataAsOf: string | null }> {
+export async function loadGuildSearch(prefix: string): Promise<{ results: GuildSummary[]; unreachable: boolean; partial: boolean; dataAsOf: string | null }> {
   const data = await loadGuildData();
   // Without a readable hide list nothing is listed, not even the players table's guilds.
-  if (data.unreachable) return { results: [], unreachable: true, dataAsOf: null };
+  if (data.unreachable) return { results: [], unreachable: true, partial: false, dataAsOf: null };
   let hits: GuildHit[] = [];
+  let partial = false;
   if (playerPagesOn()) {
-    try { hits = await playerStore().searchGuilds(prefix); } catch { hits = []; }
+    try { hits = await playerStore().searchGuilds(prefix); } catch { hits = []; partial = true; }
   }
   const directory = guildDirectory({ kills: data.kills, seen: seenFromHits(hits), boards: boardSources(data.boards) });
-  return { results: searchGuilds(directory, prefix), unreachable: false, dataAsOf: data.dataAsOf };
+  return { results: searchGuilds(directory, prefix), unreachable: false, partial, dataAsOf: data.dataAsOf };
 }
 
 /**
