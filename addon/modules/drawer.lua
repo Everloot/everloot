@@ -49,6 +49,8 @@ local function drawer()
   f:SetFrameStrata("DIALOG")
   -- Opens to the left of the crest, which sits at the minimap's top-left corner.
   f:SetPoint("TOPRIGHT", D.crest, "TOPLEFT", -2, 0)
+  -- A minimap moved to the left edge would otherwise open the drawer off the screen.
+  if f.SetClampedToScreen then f:SetClampedToScreen(true) end
   if f.SetBackdrop then
     f:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
       tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
