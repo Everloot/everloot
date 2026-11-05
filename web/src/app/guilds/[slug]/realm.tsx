@@ -12,6 +12,9 @@ import { day, FactionMark, guildRobots, link, number } from "../parts";
 
 /** A realm's guild list (/guilds/<realm>): every guild seen on it, behind EVERLOOT_GUILDS like the other guild pages. */
 
+/** The title while the realm's guilds cannot be read: the realm's own spelling is not known then. */
+const UNREACHABLE_TITLE = "Guilds on this realm";
+
 const pageOf = (raw: string | string[] | undefined): number => {
   const n = Number(Array.isArray(raw) ? raw[0] : raw);
   return Number.isInteger(n) && n > 1 ? n : 1;
@@ -19,7 +22,8 @@ const pageOf = (raw: string | string[] | undefined): number => {
 
 export async function realmMetadata(slug: string, search: Record<string, string | string[] | undefined>): Promise<Metadata> {
   const loaded = await loadRealmPage(slug);
-  if (!loaded || loaded === "unreachable") return { robots: { index: false, follow: false } };
+  if (loaded === "unreachable") return { title: UNREACHABLE_TITLE, robots: { index: false, follow: false } };
+  if (!loaded) return { robots: { index: false, follow: false } };
   return {
     ...pageMetadata({
       title: `WoW Forever Guilds on ${loaded.realm}`,
@@ -49,7 +53,7 @@ export async function RealmGuilds({ slug, search }: { slug: string; search: Reco
     return (
       <Container width="data">
         <article className="space-y-6">
-          <PageHeader trail={[{ name: "Home", path: "/" }, { name: "Guilds", path: "/guilds" }]} title="Realm" />
+          <PageHeader trail={[{ name: "Home", path: "/" }, { name: "Guilds", path: "/guilds" }]} title={UNREACHABLE_TITLE} />
           <Card><p className="text-fg-2">{STORAGE_UNREACHABLE}</p></Card>
         </article>
       </Container>

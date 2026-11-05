@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { FAMILIES, figureLabel, getFamily, type FamilyFact } from "@/data/families";
+import { figureLabel, getFamily, type FamilyFact } from "@/data/families";
 import { Container, DataTable, Explainer, Facts, PageHeader, SectionHeading } from "@/components/ui";
 import { guildsOn } from "@/lib/guilds";
+import { decodeSlug } from "../parts";
 import { RealmGuilds, realmMetadata } from "./realm";
 
 const KIND_LABEL: Record<FamilyFact["kind"], string> = {
@@ -15,12 +16,11 @@ const KIND_LABEL: Record<FamilyFact["kind"], string> = {
 
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
-export function generateStaticParams() {
-  return FAMILIES.map((family) => ({ slug: family.slug }));
-}
+// Rendered per request: a realm's guild list reads the players table and the page number. The family pages are static
+// data and cost little to render each time.
+export const dynamic = "force-dynamic";
 
 type Search = Record<string, string | string[] | undefined>;
-/** The route's props; `searchParams` is read only for a realm, so the family pages stay prerendered. */
 type Props = { params: Promise<{ slug: string }>; searchParams?: Promise<Search> };
 
 export async function generateMetadata(props: Props): Promise<Metadata> {
@@ -29,7 +29,9 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   if (!family) {
     // Not a family: a realm's guild list, behind the guild switch like the other guild pages.
     if (!guildsOn()) return { title: "Guild family" };
-    return realmMetadata(decodeURIComponent(params.slug), (await props.searchParams) ?? {});
+    const slug = decodeSlug(params.slug);
+    if (slug === null) return { robots: { index: false, follow: false } };
+    return realmMetadata(slug, (await props.searchParams) ?? {});
   }
   return pageMetadata({ title: `${family.name} – WoW Forever Guild`, description: familyDescription(family.summary, family.facts), path: `/guilds/${family.slug}` });
 }
@@ -47,8 +49,9 @@ export default async function GuildFamilyPage(props: Props) {
   const params = await props.params;
   const family = getFamily(params.slug);
   if (!family) {
-    if (!guildsOn()) notFound();
-    return RealmGuilds({ slug: decodeURIComponent(params.slug), search: (await props.searchParams) ?? {} });
+    const slug = decodeSlug(params.slug);
+    if (!guildsOn() || slug === null) notFound();
+    return RealmGuilds({ slug, search: (await props.searchParams) ?? {} });
   }
 
   const halls = family.facts.filter((fact) => fact.kind === "guild-site");

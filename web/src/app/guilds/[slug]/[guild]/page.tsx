@@ -8,7 +8,7 @@ import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import type { AgreedKill, GuildProgress } from "../../../../../../kb/src/guilds";
 import { className, classText } from "../../../players/player-view";
-import { day, guildRobots, link, number, Progress, sourceLabel } from "../../parts";
+import { day, decodeSlug, guildRobots, link, number, Progress, sourceLabel } from "../../parts";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,8 @@ type Params = { params: Promise<{ slug: string; guild: string }> };
 export async function generateMetadata(props: Params): Promise<Metadata> {
   if (!guildsOn()) return {};
   const { slug, guild } = await props.params;
-  const loaded = await loadGuildPage(decodeURIComponent(slug), decodeURIComponent(guild));
+  const [realm, name] = [decodeSlug(slug), decodeSlug(guild)];
+  const loaded = realm === null || name === null ? null : await loadGuildPage(realm, name);
   if (!loaded || loaded === "unreachable") return { robots: { index: false, follow: false } };
   const { summary } = loaded.page;
   return {
@@ -59,7 +60,9 @@ const memberMeta = (m: GuildMember) => [`${m.level} ${className(m.class)}`, m.ra
 export default async function GuildPage(props: Params) {
   if (!guildsOn()) notFound();
   const { slug, guild } = await props.params;
-  const loaded = await loadGuildPage(decodeURIComponent(slug), decodeURIComponent(guild));
+  const [realm, name] = [decodeSlug(slug), decodeSlug(guild)];
+  if (realm === null || name === null) notFound();
+  const loaded = await loadGuildPage(realm, name);
   if (loaded === null) notFound();
   if (loaded === "unreachable") {
     return (

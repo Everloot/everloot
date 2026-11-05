@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { createCloudPlayerStore, createMemoryPlayerStore, missingFunction, playerHideKey, playerStoreFrom } from "./player-store";
+import { createCloudPlayerStore, createMemoryPlayerStore, missingFunction, playerHideKey, playerStoreFrom, realmSlugOf } from "./player-store";
 import { optOutPath, playerDateProblem, playerIndexingOn, playerPagesOn, playerPath, playerUpsert, realmSlug, searchPrefix, type PlayerRow } from "./player-pages";
 
 const row = (name: string, extra: object = {}) => ({ name, realm: "Forever Pioneer", race: "Orc", class: "SHAMAN", level: 24, seen: "2026-10-20", ...extra });
@@ -76,14 +76,25 @@ describe("the development store follows the same rules as the table", () => {
       row("Dd", { guild: "Quiet" }), row("Ee"), row("Ff", { realm: "Forever Nomad", guild: "Night Watch" }),
     ]);
     await store.suppress("Forever Pioneer", "Dd");
-    expect(await store.guildRealms()).toEqual([{ realm: "Forever Nomad", guilds: 1 }, { realm: "Forever Pioneer", guilds: 2 }]);
+    expect(await store.guildRealms()).toEqual([{ realm: "Forever Pioneer", guilds: 2, characters: 3 }, { realm: "Forever Nomad", guilds: 1, characters: 1 }]);
     const guilds = await store.realmGuilds("forever-pioneer");
     expect(guilds.map((g) => [g.guild, g.members])).toEqual([["Night Watch", 2], ["Ember", 1]]);
     expect(guilds[0]!.lastSeen).toBe("2026-10-23");
     await store.suppressGuild("Forever Pioneer", "Night Watch");
-    expect((await store.realmGuilds("Forever Pioneer")).map((g) => g.guild)).toEqual(["Ember"]);
-    expect(await store.guildRealms()).toEqual([{ realm: "Forever Nomad", guilds: 1 }, { realm: "Forever Pioneer", guilds: 1 }]);
-    expect(await store.realmGuilds("Nowhere")).toEqual([]);
+    expect((await store.realmGuilds("forever-pioneer")).map((g) => g.guild)).toEqual(["Ember"]);
+    expect(await store.guildRealms()).toEqual([{ realm: "Forever Nomad", guilds: 1, characters: 1 }, { realm: "Forever Pioneer", guilds: 1, characters: 1 }]);
+    // A realm is found by its slug only, apostrophes dropped as public.realm_slug drops them.
+    expect(await store.realmGuilds("Forever Pioneer")).toEqual([]);
+    expect(await store.realmGuilds("nowhere")).toEqual([]);
+    await store.upsert([row("Gg", { realm: "Mal’Ganis", guild: "Dawn" })]);
+    expect((await store.realmGuilds("malganis")).map((g) => g.guild)).toEqual(["Dawn"]);
+  });
+
+  test("a realm's slug is the slug of its key, whatever the spelling", () => {
+    expect(realmSlugOf("Forever Pioneer")).toBe("forever-pioneer");
+    expect(realmSlugOf("forever-pioneer")).toBe("forever-pioneer");
+    expect(realmSlugOf("Mal'Ganis")).toBe("malganis");
+    expect(realmSlugOf("Mal’Ganis")).toBe("malganis");
   });
 
   test("rows not seen for 90 days are pruned", async () => {
@@ -125,16 +136,16 @@ describe("the Supabase store", () => {
   });
 
   test("the realm reads call their functions with the realm key and a hard limit, and map the counts", async () => {
-    const { send, store } = call([{ realm: "Forever Pioneer", guilds: "3" }]);
-    expect(await store.guildRealms()).toEqual([{ realm: "Forever Pioneer", guilds: 3 }]);
+    const { send, store } = call([{ realm: "Forever Pioneer", guilds: "3", characters: "12" }]);
+    expect(await store.guildRealms()).toEqual([{ realm: "Forever Pioneer", guilds: 3, characters: 12 }]);
     const [url, init] = send.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("https://db.example/rest/v1/rpc/guild_realms");
     expect(JSON.parse(init.body as string)).toEqual({ p_ruleset: "forever" });
     const guilds = call([{ realm: "Forever Pioneer", guild: "Night Watch", members: "2", last_seen: "2026-10-23" }]);
-    expect(await guilds.store.realmGuilds("Forever-Pioneer")).toEqual([{ realm: "Forever Pioneer", guild: "Night Watch", members: 2, lastSeen: "2026-10-23" }]);
+    expect(await guilds.store.realmGuilds("forever-pioneer")).toEqual([{ realm: "Forever Pioneer", guild: "Night Watch", members: 2, lastSeen: "2026-10-23" }]);
     const [guildUrl, guildInit] = guilds.send.mock.calls[0] as unknown as [string, RequestInit];
     expect(guildUrl).toBe("https://db.example/rest/v1/rpc/realm_guilds");
-    expect(JSON.parse(guildInit.body as string)).toEqual({ p_ruleset: "forever", p_realm_key: "forever pioneer", p_limit: 1000 });
+    expect(JSON.parse(guildInit.body as string)).toEqual({ p_ruleset: "forever", p_realm_slug: "forever-pioneer", p_limit: 1000 });
   });
 
   test("a function the migration has not made yet is told apart from an outage", async () => {

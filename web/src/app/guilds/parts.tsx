@@ -7,6 +7,15 @@ export const number = (n: number) => n.toLocaleString("en-US");
 /** The day of an ISO time, the only part a guild page shows. */
 export const day = (iso: string | null) => (iso ? iso.slice(0, 10) : "");
 
+/** An address segment decoded, or null when it is not valid percent-encoding (the page is then a 404, not a 500). */
+export function decodeSlug(segment: string): string | null {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return null;
+  }
+}
+
 /** Guild pages stay out of search engines until EVERLOOT_GUILDS_INDEX=1; a search result page always does. */
 export function guildRobots(alwaysNoindex = false): Metadata["robots"] {
   return alwaysNoindex || !guildIndexingOn() ? { index: false, follow: false } : { index: true, follow: true };
