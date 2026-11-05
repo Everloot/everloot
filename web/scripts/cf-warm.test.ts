@@ -1,5 +1,11 @@
 import { expect, test } from "vitest";
-import { rateLimited, sitemapUrls, summarize } from "./cf-warm.mjs";
+import { rateLimited, requestHeaders, sitemapUrls, summarize } from "./cf-warm.mjs";
+
+test("with EVERLOOT_EDGE_CHECK set, every request carries it as x-everloot-check; without it, only the user agent", () => {
+  expect(requestHeaders({ EVERLOOT_EDGE_CHECK: "s3cret" })).toEqual({ "user-agent": "everloot-deploy-warm", "x-everloot-check": "s3cret" });
+  expect(requestHeaders({})).toEqual({ "user-agent": "everloot-deploy-warm" });
+  expect(requestHeaders({ EVERLOOT_EDGE_CHECK: "" })).toEqual({ "user-agent": "everloot-deploy-warm" });
+});
 
 test("the sitemap's pages, in order, once each, with escaped ampersands read back", () => {
   const xml = `<?xml version="1.0"?><urlset>
