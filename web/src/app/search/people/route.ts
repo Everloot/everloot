@@ -14,6 +14,6 @@ const HEADERS = { "Cache-Control": "private, no-store", "X-Robots-Tag": "noindex
 export async function GET(req: Request) {
   const q = (new URL(req.url).searchParams.get("q") ?? "").trim();
   if (q.length > MAX_QUERY) return Response.json({ ok: false, error: `q is at most ${MAX_QUERY} characters.` }, { status: 400, headers: HEADERS });
-  const found = q ? await peopleSearch(q) : { characters: { results: [], total: 0 }, guilds: { results: [], total: 0 } };
-  return Response.json({ q, ...found }, { headers: HEADERS });
+  // Empty text reads nothing: peopleSearch validates both prefixes before any lookup.
+  return Response.json({ q, ...(await peopleSearch(q)) }, { headers: HEADERS });
 }

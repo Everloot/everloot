@@ -158,6 +158,8 @@ test("text that cannot start a character or guild name asks for neither", async 
   expect(await render({ q: "6948" })).not.toContain("data-people");
   vi.stubEnv("EVERLOOT_GUILDS", "1");
   expect(await render({ q: "t" })).not.toContain("data-people");
+  // A guild name may be digits, but text with no letter is an id lookup.
+  expect(await render({ q: "6948" })).not.toContain("data-people");
 });
 
 test("with no database match the character lookup still runs, and the empty line is its fallback", async () => {

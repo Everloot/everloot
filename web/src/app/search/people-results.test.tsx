@@ -11,14 +11,18 @@ import PeopleResults from "./PeopleResults";
 
 let container: HTMLDivElement;
 let root: Root;
-let reply: { ok: boolean; body: unknown };
+let reply: { ok: boolean; body: unknown; never?: boolean };
 let asked: { url: string; cache?: RequestCache }[];
 
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   asked = [];
   reply = { ok: true, body: {} };
-  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => { asked.push({ url, cache: init?.cache }); return { ok: reply.ok, json: async () => reply.body }; }));
+  vi.stubGlobal("fetch", vi.fn((url: string, init?: RequestInit) => {
+    asked.push({ url, cache: init?.cache });
+    if (reply.never) return new Promise((_, reject) => init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError"))));
+    return Promise.resolve({ ok: reply.ok, json: async () => reply.body });
+  }));
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -46,9 +50,10 @@ test("the groups are asked for uncached and list each row with its link and meta
   expect(container.textContent).not.toContain("Nothing matches that.");
 });
 
-test("more than the group lists links to the full search on its own page", async () => {
-  reply.body = { characters: { results: Array.from({ length: 8 }, (_, i) => character(`Thrall${"abcdefgh"[i]}`)), total: 25 }, guilds: { results: [], total: 0 } };
+test("more than the group lists links to the full search on its own page, and a lookup that stopped at 25 says 25+", async () => {
+  reply.body = { characters: { results: Array.from({ length: 8 }, (_, i) => character(`Thrall${"abcdefgh"[i]}`)), total: 25, capped: true }, guilds: { results: [], total: 0, capped: false } };
   await show("thrall");
+  expect(container.querySelector("#results-character")!.textContent).toContain("Characters (25+)");
   expect(container.querySelector('a[href="/players?q=thrall"]')!.textContent).toBe("More on Find a player");
   expect(container.querySelector("#results-guild")).toBeNull();
 });
@@ -59,4 +64,20 @@ test("no rows, or a failed request, leaves the fallback", async () => {
   reply = { ok: false, body: null };
   await show("zzzz");
   expect(container.textContent).toBe("Nothing matches that.");
+});
+
+test("the slot stays empty until the answer settles, and a slow answer counts as none after 3 seconds", async () => {
+  vi.useFakeTimers();
+  try {
+    reply.never = true;
+    await show("slow");
+    // Never "Nothing matches" first and then replaced.
+    expect(container.textContent).toBe("");
+    await act(async () => { await vi.advanceTimersByTimeAsync(2999); });
+    expect(container.textContent).toBe("");
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(container.textContent).toBe("Nothing matches that.");
+  } finally {
+    vi.useRealTimers();
+  }
 });

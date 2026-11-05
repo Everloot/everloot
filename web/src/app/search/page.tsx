@@ -72,8 +72,9 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
     })),
   ];
   // The overview also lists characters and guilds when their pages are on and the text could start a name. The
-  // browser asks for them (see PeopleResults), so this page's cached HTML never holds a name a hide removed.
-  const people = Boolean(q && !scope && ((playerPagesOn() && searchPrefix(q)) || (guildsOn() && guildSearchPrefix(q))));
+  // browser asks for them (see PeopleResults), so this page's cached HTML never holds a name a hide removed. Text with
+  // no letter is an id, as in the type-ahead.
+  const people = Boolean(q && !scope && /\p{L}/u.test(q) && ((playerPagesOn() && searchPrefix(q)) || (guildsOn() && guildSearchPrefix(q))));
   const archive = (g: SearchGroup) => g.type === "lore" || g.type === "tool" || g.type === "doc";
   let split = groups?.length ?? 0;
   while (split > 0 && archive(groups![split - 1])) split--;

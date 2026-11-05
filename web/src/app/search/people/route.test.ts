@@ -45,7 +45,8 @@ test("the publicly cached type-ahead route never carries a character", async () 
 
 test("an empty or overlong text asks nothing", async () => {
   const search = vi.spyOn(held.store!, "search");
-  expect(await (await ask("")).json()).toEqual({ q: "", characters: { results: [], total: 0 }, guilds: { results: [], total: 0 } });
+  const none = { results: [], total: 0, capped: false };
+  expect(await (await ask("")).json()).toEqual({ q: "", characters: none, guilds: none });
   expect((await ask("z".repeat(500))).status).toBe(400);
   expect(search).not.toHaveBeenCalled();
 });

@@ -40,8 +40,25 @@ export function withPeople(database: Suggestion[], people: Suggestion[]): Sugges
 }
 
 /**
+ * Whether the text could start a character name (2 to 12 letters) or a guild name (2 to 24 letters, digits, spaces,
+ * apostrophes and hyphens, starting with a letter or digit): the same rules as validPlayerName and validGuildName in
+ * the protocol package, copied so the browser bundle does not load it. Text with no letter at all is an id ("6948"),
+ * the box's most common lookup, so it never asks either. Only otherwise is /search/people asked.
+ */
+export function couldBeName(text: string): boolean {
+  if (!/\p{L}/u.test(text)) return false;
+  return /^\p{L}{2,12}$/u.test(text) || (text.length >= 2 && text.length <= 24 && /^[\p{L}\p{N}][\p{L}\p{N} '’-]*$/u.test(text));
+}
+
+/** Database rows wait 120 ms after the last key; characters and guilds wait longer, as they reach storage. */
+const PEOPLE_PAUSE_MS = 280;
+/** A character and guild answer slower than this is dropped: the database rows never wait for it. */
+export const PEOPLE_TIMEOUT_MS = 800;
+
+/**
  * The suggestions for what is typed, 120 ms after the last key; the answer to an older text is dropped. An unscoped
- * box also asks /search/people, uncached, and shows both answers together.
+ * box also asks /search/people (uncached) when the text could start a name; its rows are added under the database
+ * rows when they arrive, and nothing waits for them.
  */
 function useSuggestions(text: string, scope: string): Suggestion[] {
   const [rows, setRows] = useState<Suggestion[]>([]);
@@ -50,21 +67,35 @@ function useSuggestions(text: string, scope: string): Suggestion[] {
     const key = `${scope}|${q.toLowerCase()}`;
     if (!q) { setRows([]); return; }
     const hit = cache.get(key);
-    if (hit) setRows(hit);
-    if (hit && scope) return;
     const ctrl = new AbortController();
-    const timer = setTimeout(() => {
-      // The site's own route, matched on the names the pages show (/api/suggest keeps the agreed names only).
-      const database = hit ? Promise.resolve(hit) : fetch(`/search/suggest?q=${encodeURIComponent(q)}${scope ? `&in=${scope}` : ""}`, { signal: ctrl.signal })
-        .then((r) => (r.ok ? r.json() : { results: [] }))
-        .then((body: { results?: Suggestion[] }) => { const list = body.results ?? []; cache.set(key, list); return list; });
-      // A failed or switched-off lookup adds no rows; the database pages still show.
-      const people: Promise<Suggestion[]> = scope ? Promise.resolve([]) : fetch(`/search/people?q=${encodeURIComponent(q)}`, { signal: ctrl.signal, cache: "no-store" })
-        .then((r) => (r.ok ? r.json() : null))
-        .then(peopleRows, () => []);
-      Promise.all([database, people]).then(([d, p]) => { if (!ctrl.signal.aborted) setRows(withPeople(d, p)); }).catch(() => {});
-    }, 120);
-    return () => { clearTimeout(timer); ctrl.abort(); };
+    // What this text has so far; the list shows the older text's rows until its database rows arrive.
+    let database: Suggestion[] | null = hit ?? null;
+    let people: Suggestion[] = [];
+    const show = () => { if (database && !ctrl.signal.aborted) setRows(withPeople(database, people)); };
+    show();
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    if (!hit) {
+      timers.push(setTimeout(() => {
+        // The site's own route, matched on the names the pages show (/api/suggest keeps the agreed names only).
+        fetch(`/search/suggest?q=${encodeURIComponent(q)}${scope ? `&in=${scope}` : ""}`, { signal: ctrl.signal })
+          .then((r) => (r.ok ? r.json() : { results: [] }))
+          .then((body: { results?: Suggestion[] }) => { database = body.results ?? []; cache.set(key, database); show(); })
+          .catch(() => {});
+      }, 120));
+    }
+    if (!scope && couldBeName(q)) {
+      timers.push(setTimeout(() => {
+        // A slow, failed or switched-off lookup adds no rows.
+        const slow = new AbortController();
+        ctrl.signal.addEventListener("abort", () => slow.abort());
+        timers.push(setTimeout(() => slow.abort(), PEOPLE_TIMEOUT_MS));
+        fetch(`/search/people?q=${encodeURIComponent(q)}`, { signal: slow.signal, cache: "no-store" })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((body) => { people = peopleRows(body); show(); })
+          .catch(() => {});
+      }, PEOPLE_PAUSE_MS));
+    }
+    return () => { timers.forEach(clearTimeout); ctrl.abort(); };
   }, [text, scope]);
   return rows;
 }
@@ -80,16 +111,18 @@ export function SuggestField({ id, name = "q", label, placeholder, defaultValue 
 }) {
   const [text, setText] = useState(defaultValue);
   const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(-1);
+  // The picked row is held by its link, so rows added under it (characters, guilds) leave the pick where it is.
+  const [picked, setPicked] = useState<string | null>(null);
   const rows = useSuggestions(text, scope);
+  const active = picked === null ? -1 : rows.findIndex((r) => r.href === picked);
   const list = useRef<HTMLUListElement>(null);
   const listId = `${id}-suggestions`;
   const shown = open && rows.length > 0;
-  useEffect(() => setActive(-1), [rows]);
+  useEffect(() => setPicked(null), [scope]);
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "ArrowDown" && rows.length) { event.preventDefault(); setOpen(true); setActive((a) => (a + 1) % rows.length); }
-    else if (event.key === "ArrowUp" && rows.length) { event.preventDefault(); setOpen(true); setActive((a) => (a <= 0 ? rows.length - 1 : a - 1)); }
+    if (event.key === "ArrowDown" && rows.length) { event.preventDefault(); setOpen(true); setPicked(rows[(active + 1) % rows.length].href); }
+    else if (event.key === "ArrowUp" && rows.length) { event.preventDefault(); setOpen(true); setPicked(rows[active <= 0 ? rows.length - 1 : active - 1].href); }
     // Each row is a link, so Enter follows the picked one the way a click does (client-side navigation).
     else if (event.key === "Enter" && shown && active >= 0) { event.preventDefault(); list.current?.querySelectorAll("a")[active]?.click(); setOpen(false); }
     else if (event.key === "Escape" && shown) { event.preventDefault(); event.stopPropagation(); setOpen(false); }
@@ -114,7 +147,7 @@ export function SuggestField({ id, name = "q", label, placeholder, defaultValue 
         aria-activedescendant={shown && active >= 0 ? `${listId}-${active}` : undefined}
         aria-describedby={describedBy}
         // The rows on screen answer the old text until the next ones arrive, so a pick made in them ends here.
-        onChange={(event) => { setText(event.target.value); setOpen(true); setActive(-1); }}
+        onChange={(event) => { setText(event.target.value); setOpen(true); setPicked(null); }}
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
         onKeyDown={onKeyDown}
@@ -130,7 +163,7 @@ export function SuggestField({ id, name = "q", label, placeholder, defaultValue 
               tabIndex={-1}
               // Pressing a row must not take focus from the field first, or the list closes before the click lands.
               onMouseDown={(event) => event.preventDefault()}
-              onMouseEnter={() => setActive(i)}
+              onMouseEnter={() => setPicked(row.href)}
               onClick={() => setOpen(false)}
               className={`flex h-9 items-center gap-3 px-3 text-cell ${i === active ? "bg-canvas" : ""}`}
             >
