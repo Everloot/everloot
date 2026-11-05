@@ -35,9 +35,9 @@ test("a valid request hides the character, clears the caches and sends the perso
   expect(where(response)).toBe("?done=1");
   expect(mocks.suppress).toHaveBeenCalledWith("Forever Pioneer", "Thrallina");
   expect(mocks.revalidateTag).toHaveBeenCalledWith("players");
-  expect(mocks.revalidatePath).toHaveBeenCalledWith("/players/forever/forever-pioneer/thrallina");
-  // Realm normalization and case-insensitive lookup let aliases have separate ISR entries.
-  expect(mocks.revalidatePath).toHaveBeenCalledWith("/players/[ruleset]/[realm]/[name]", "page");
+  expect(mocks.revalidatePath).toHaveBeenCalledWith("/characters/forever/forever-pioneer/thrallina");
+  // Realm normalization and case-insensitive lookup would let aliases have separate entries.
+  expect(mocks.revalidatePath).toHaveBeenCalledWith("/characters/[ruleset]/[realm]/[name]", "page");
 });
 
 test("a name or realm that is not one is refused before anything is recorded", async () => {

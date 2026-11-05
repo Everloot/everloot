@@ -37,8 +37,9 @@ export async function POST(req: Request) {
     return back(req, new URLSearchParams({ error: "storage", name, realm }).toString());
   }
   revalidateTag(PLAYER_SEARCH_TAG);
+  // The character's page is drawn on every request (never cached); clearing it is only a guard.
   revalidatePath(playerPath({ ruleset: rulesetOf(realm), realm, name }));
-  // Aliases normalize to the same character but have separate ISR entries.
-  revalidatePath("/players/[ruleset]/[realm]/[name]", "page");
+  // Aliases normalize to the same character but would have separate entries.
+  revalidatePath("/characters/[ruleset]/[realm]/[name]", "page");
   return back(req, "done=1");
 }

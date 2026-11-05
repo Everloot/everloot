@@ -8,8 +8,14 @@ vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a>,
 }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
+const players = vi.hoisted(() => ({ store: null as PlayerStore | null }));
+vi.mock("@/lib/player-store", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/player-store")>()), playerStore: () => players.store }));
 
-import Page, { generateMetadata } from "./[ruleset]/[realm]/[name]/page";
+import { createMemoryPlayerStore, type PlayerStore } from "@/lib/player-store";
+import { FOOTER_LINE } from "@/lib/character-showcase";
+import { PLAYER_SIGHTING_LINE } from "@/app/players/player-view";
+import * as pageModule from "./[ruleset]/[realm]/[name]/page";
+import Page, { dynamic, generateMetadata } from "./[ruleset]/[realm]/[name]/page";
 import { GET as wideCard } from "./[ruleset]/[realm]/[name]/card.png/route";
 import { GET as squareCard } from "./[ruleset]/[realm]/[name]/card-square.png/route";
 
@@ -34,6 +40,7 @@ async function pngSize(res: Response): Promise<{ width: number; height: number }
 }
 
 beforeEach(() => {
+  players.store = createMemoryPlayerStore();
   vi.stubEnv("EVERLOOT_SHOWCASE", "1");
   vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
   vi.stubEnv("SUPABASE_URL", "");
@@ -215,5 +222,133 @@ describe("planned builds (S4)", () => {
     expect((await card(wideCard)).status).toBe(200);
     expect((await card(squareCard)).status).toBe(200);
     expect(askedForBuilds()).toBe(false);
+  });
+});
+
+describe("one page for a character: the owner's showcase and what the addon saw", () => {
+  /** A sighting another player's addon sent: a different race and level than the link row, so the sources can be told apart. */
+  const SEEN = { name: "Thrallina", realm: "Forever Pioneer", race: "Scourge", class: "SHAMAN", level: 22, guild: "Night Watch", seen: "2026-10-20" };
+  const seen = () => players.store!.upsert([SEEN]);
+  const text = async (p = PARAMS) => (await render(p)).replace(/&#x27;/g, "'");
+
+  test("the page is drawn on every request: force-dynamic, with no revalidate window", () => {
+    expect(dynamic).toBe("force-dynamic");
+    expect("revalidate" in pageModule).toBe(false);
+  });
+
+  test("a sighting alone is a page: the row's facts, where they came from, the hide link and the policy", async () => {
+    vi.stubEnv("EVERLOOT_SHOWCASE", "");
+    await seen();
+    const out = await text();
+    expect(auth.authQuery).not.toHaveBeenCalled();
+    expect(out).toContain('data-part="sighting"');
+    expect(out).not.toContain('data-part="showcase"');
+    expect(out).toContain("Level 22 Undead Shaman · Forever Pioneer");
+    expect(out).toMatch(/text-class-shaman">Shaman</);
+    expect(out).toContain("Night Watch");
+    expect(out).toContain('Last seen <span class="font-mono">2026-10-20</span>');
+    expect(out).toContain(PLAYER_SIGHTING_LINE);
+    expect(out).not.toContain(FOOTER_LINE);
+    expect(out).toContain('href="/players/opt-out?realm=Forever%20Pioneer&amp;name=Thrallina"');
+    expect(out).toContain('href="/privacy#player-pages"');
+    expect(out).not.toMatch(/\b\d{2}:\d{2}\b/);
+    // Breadcrumb: Home, Characters (the search), the character.
+    expect(out).toMatch(/"name":"Characters","item":"[^"]*\/players"/);
+    expect(out).toMatch(/"name":"Thrallina","item":"[^"]*\/characters\/forever\/forever-pioneer\/thrallina"/);
+  });
+
+  test("a showcase alone is a page with its own source line and no sighting part", async () => {
+    const out = await text();
+    expect(out).toContain('data-part="showcase"');
+    expect(out).not.toContain('data-part="sighting"');
+    expect(out).toContain(FOOTER_LINE);
+    expect(out).toContain("From the player's own addon upload, 2026-10-30 (2 days ago)");
+    expect(out).not.toContain(PLAYER_SIGHTING_LINE);
+  });
+
+  test("with both, the owner's part comes first, each says where it came from, and neither borrows from the other", async () => {
+    await seen();
+    const out = await text();
+    const owner = out.indexOf('data-part="showcase"'), sighting = out.indexOf('data-part="sighting"');
+    expect(owner).toBeGreaterThan(-1);
+    expect(sighting).toBeGreaterThan(owner);
+    // The header and the owner's part are the link row's (Orc, level 24); the sighting's facts stay in its own part.
+    expect(out).toContain("Level 24 Orc Shaman · Forever Pioneer");
+    expect(out.slice(0, sighting)).not.toMatch(/Undead|Night Watch|2026-10-20/);
+    expect(out.slice(sighting)).toContain("Undead");
+    expect(out.slice(sighting)).not.toContain(">Orc<");
+    expect(out.indexOf(FOOTER_LINE)).toBeGreaterThan(owner);
+    expect(out.indexOf(FOOTER_LINE)).toBeLessThan(sighting);
+    expect(out.indexOf(PLAYER_SIGHTING_LINE)).toBeGreaterThan(sighting);
+    expect(out.match(/Hide this character/g)).toHaveLength(1);
+  });
+
+  test("neither is a 404 with noindex", async () => {
+    auth.authQuery.mockResolvedValue([]);
+    await expect(Page(props())).rejects.toThrow("NEXT_NOT_FOUND");
+    expect(await generateMetadata(props())).toEqual({ title: "Page not found", robots: { index: false, follow: false } });
+  });
+
+  test("with both switches off it is a 404 and neither store is asked, whatever rows exist", async () => {
+    await seen();
+    const get = vi.spyOn(players.store!, "get");
+    vi.stubEnv("EVERLOOT_SHOWCASE", "0");
+    vi.stubEnv("EVERLOOT_PLAYER_PAGES", "");
+    await expect(Page(props())).rejects.toThrow("NEXT_NOT_FOUND");
+    expect(await generateMetadata(props())).toEqual({ title: "Page not found", robots: { index: false, follow: false } });
+    expect(get).not.toHaveBeenCalled();
+    expect(auth.authQuery).not.toHaveBeenCalled();
+  });
+
+  test("with the player pages off, a sighting is never read or shown, and there is no hide link", async () => {
+    await seen();
+    const get = vi.spyOn(players.store!, "get");
+    vi.stubEnv("EVERLOOT_PLAYER_PAGES", "0");
+    const out = await render();
+    expect(out).toContain('data-part="showcase"');
+    expect(out).not.toContain('data-part="sighting"');
+    expect(out).not.toContain("Hide this character");
+    auth.authQuery.mockResolvedValue([]);
+    await expect(Page(props())).rejects.toThrow("NEXT_NOT_FOUND");
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  test("a hidden character's sighting is gone at once: a 404 alone, and left out beside a showcase", async () => {
+    await seen();
+    await players.store!.suppress("Forever Pioneer", "Thrallina");
+    expect(await render()).not.toContain('data-part="sighting"');
+    auth.authQuery.mockResolvedValue([]);
+    await expect(Page(props())).rejects.toThrow("NEXT_NOT_FOUND");
+  });
+
+  test("always noindex, nofollow: the player pages' index switch does not reach this page", async () => {
+    vi.stubEnv("EVERLOOT_PLAYER_PAGES_INDEX", "1");
+    vi.stubEnv("EVERLOOT_SHOWCASE", "");
+    await seen();
+    const meta = await generateMetadata(props({ ruleset: "forever", realm: "Forever-Pioneer", name: "THRALLINA" }));
+    expect(meta.robots).toEqual({ index: false, follow: false });
+    expect(meta.alternates?.canonical).toBe("/characters/forever/forever-pioneer/thrallina");
+    expect(String(meta.title)).toContain("Level 22 Undead Shaman");
+  });
+
+  test("player storage failing says so in its place and keeps the owner's part", async () => {
+    vi.spyOn(players.store!, "get").mockRejectedValue(new Error("Player storage unavailable (500)"));
+    const out = await render();
+    expect(out).toContain('data-part="showcase"');
+    expect(out).toContain("Player storage is unreachable right now");
+    vi.stubEnv("EVERLOOT_SHOWCASE", "");
+    const alone = await render();
+    expect(alone).toContain("Player storage is unreachable right now");
+    expect(alone).not.toContain("Thrallina");
+    expect((await generateMetadata(props())).robots).toEqual({ index: false, follow: false });
+  });
+
+  test("an address that cannot be a character never reaches the player store", async () => {
+    vi.stubEnv("EVERLOOT_SHOWCASE", "");
+    const get = vi.spyOn(players.store!, "get");
+    for (const p of [{ ...PARAMS, name: "y" }, { ...PARAMS, name: "thrall1" }, { ...PARAMS, realm: "x" }, { ...PARAMS, realm: "forever%20pioneer" }, { ...PARAMS, ruleset: "for.ever" }, { ...PARAMS, name: "%E0%A4%A" }]) {
+      await expect(Page(props(p))).rejects.toThrow("NEXT_NOT_FOUND");
+    }
+    expect(get).not.toHaveBeenCalled();
   });
 });

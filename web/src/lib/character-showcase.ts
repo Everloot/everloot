@@ -1,6 +1,6 @@
 import { describePlayer } from "@/app/players/player-view";
 import { CLASSES } from "@/design/tokens";
-import { realmSlug } from "@/lib/player-pages";
+import { characterPath } from "@/lib/player-pages";
 import { savedBuildsOn } from "@/lib/saved-builds";
 
 /**
@@ -25,12 +25,10 @@ export function showcaseBuildsOn(env: Record<string, string | undefined> = proce
 }
 
 /**
- * A linked character's public page: /characters/<ruleset>/<realm>/<name>, slugged as the player pages are. A
- * separate address from /players, because a link never adds data to a sighting page (identity ADR).
+ * A linked character's public page: the character's one page, the same address a sighting links to. The page
+ * keeps the two apart: the showcase draws only from the link row, never from a sighting.
  */
-export function characterPath(ruleset: string, realm: string, name: string): string {
-  return `/characters/${ruleset}/${encodeURIComponent(realmSlug(realm))}/${encodeURIComponent(name.toLowerCase())}`;
-}
+export { characterPath };
 
 /** A section older than this says it may be out of date. */
 export const STALE_DAYS = 14;

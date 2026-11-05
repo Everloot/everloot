@@ -80,7 +80,7 @@ test("mapping a realm leaves player, guild and link addresses on forever, so no 
   expect(calls.map((c) => c.p_ruleset)).toEqual(["forever", "forever"]);
   expect((calls[0]!.p_rows as { name: string }[]).map((r) => r.name)).toEqual(["Aa", "Bb", "Cc"]);
   expect(rulesetOf("Mal'Ganis")).toBe("forever");
-  expect(playerPath({ ruleset: rulesetOf("Mal'Ganis"), realm: "Mal'Ganis", name: "Thrallina" })).toBe("/players/forever/mal'ganis/thrallina");
+  expect(playerPath({ ruleset: rulesetOf("Mal'Ganis"), realm: "Mal'Ganis", name: "Thrallina" })).toBe("/characters/forever/mal'ganis/thrallina");
 
   const memory = createMemoryPlayerStore(() => now);
   await memory.upsert([row("Thrallina", "Mal'Ganis")]);
