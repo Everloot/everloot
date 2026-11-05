@@ -15,6 +15,8 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
+- Addon: the auction scan prompt fits its wrapped explanation and button; the backup scan action
+  sits below the auction window instead of overlapping Search.
 - Addon: settings scroll within the Options panel, keep Reload reachable, and fit the Ask controls
   inside the panel. Wrapped descriptions retain enough space at smaller panel sizes.
 - Site: search finds dungeons and raids by name, with or without the leading "The", and an exact name puts the instance page
