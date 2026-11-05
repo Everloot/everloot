@@ -15,6 +15,8 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
+- Addon: the minimap button shows the Everloot crest instead of a stock book icon, with the game's hover glow, and
+  the in-game addon list shows the crest too.
 - Addon: recipe collection no longer stops within hours. On launch night every install paused `recipe_observed` at
   its 2,000-row limit, and 98% of those rows were recipes the player had not learned, which the site does not use.
   The addon now writes learned recipes only, and per recipe and colour just the lowest and highest rank seen (the
