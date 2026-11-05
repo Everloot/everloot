@@ -33,9 +33,12 @@ function fixture() {
     if (req.method === "GET") return objects.has(key)
       ? new Response(objects.get(key), { headers: { etag: `"${revision}"` } })
       : new Response(null, { status: 404 });
+    // As R2 does, the precondition and the write are one step: the body is read first, so no await falls between
+    // them and two writers cannot both pass the check before either stores.
+    const body = await req.text();
     if (req.headers.get("if-match") !== (objects.has(key) ? `"${revision}"` : null) ||
         (!objects.has(key) && req.headers.get("if-none-match") !== "*")) return new Response(null, { status: 412 });
-    objects.set(key, await req.text()); revision++;
+    objects.set(key, body); revision++;
     return new Response(null, { status: 200 });
   }) as typeof fetch;
   const add = (id: string, records = [row()]) => {
