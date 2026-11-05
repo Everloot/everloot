@@ -82,6 +82,14 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   objects keeps to that type.
 
 ### Changed
+- Addon: item tooltip prices are two-column rows, the label on the left and the amount on the right in the game's
+  gold, silver and copper icons (Market value, Min buyout, Historical, your scan's min buyout and value, and the
+  vendor sell price when the client knows it), with dates, units, reporters and warnings on muted lines beneath. The
+  Everloot header names the realm with its ruleset (PvP, PvE, RP, RP-PvP, Hardcore) split off in its own colour, and
+  says once that amounts are per unit. Drop rates sit in the value column too, their loot windows and installs beneath;
+  the note for what is missing drops its own "Everloot:". The Auction House tab's lookup shows the same rows in a
+  scrolling result, and Home, Options and the Auction House tab share one native style. `/everloot price` prints the
+  same amounts as plain text.
 - Site: the Auction House files a realm under the PvE, PvP, RP, RP-PvP or Hardcore tab when its name ends in that
   ruleset, as Forever's realm list names them ("CAMWOW US1 Realm 4 PvP"); the realm map still overrides, and a realm
   whose name names no ruleset stays under "Realms not mapped yet". Realm names show split the same way: the name, then
