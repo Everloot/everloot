@@ -15,10 +15,6 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
-- Addon: the auction scan prompt fits its wrapped explanation and button; the backup scan action
-  sits below the auction window instead of overlapping Search.
-- Addon: settings scroll within the Options panel, keep Reload reachable, and fit the Ask controls
-  inside the panel. Wrapped descriptions retain enough space at smaller panel sizes.
 - Site: search finds dungeons and raids by name, with or without the leading "The", and an exact name puts the instance page
   first: "deadmines" now opens with `/database/instances/36-deadmines`. The group of wiki pages is headed Wiki, not Guides,
   so it no longer reads as the reviewed class guides at `/guides`.
@@ -184,6 +180,19 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   agree. Fishing (the bobber, or an object installs agree is fished) is never a pin. An upload of an event
   that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
   instead of withdrawing the event as a conflict. The map shows none of this yet.
+
+## [0.3.16] - 2026-11-05
+
+Release channel: Alpha
+
+Layout fixes for the Options and auction-house panels reported from the live Forever client.
+The corrected layout still needs in-game verification; automated UI contracts do not verify the game renderer.
+
+### Fixed
+- Settings scroll within the Options panel, keep Reload reachable, and fit the Ask controls inside the panel.
+  Wrapped descriptions retain enough space at smaller panel sizes.
+- The auction scan prompt fits its wrapped explanation and button; the backup scan action sits below the
+  auction window instead of overlapping Search. Scan cooldowns and click-only behavior are unchanged.
 
 ## [0.3.15] - 2026-11-01
 
