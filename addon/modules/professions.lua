@@ -1,8 +1,11 @@
 -- Everloot recipe observations for WoW: Forever (client 1.60.1, interface 16001). The profession
 -- window reports, per recipe, a difficulty colour at the player's current rank, not the skill
 -- thresholds themselves. Each row records what the window showed (profession, rank, recipe, colour,
--- product, reagents); the server infers threshold ranges from many installs. One row per recipe,
--- rank, colour and learned state; reopening adds nothing.
+-- product, reagents); the server infers threshold ranges from many installs.
+-- A colour only bounds a threshold through the lowest and the highest rank it was seen at, so those are
+-- the rows kept: the lowest is written at once; the highest waits until the colour changes or the player
+-- logs out, then it is written once. Ranks in between add nothing, and reopening adds nothing. Recipes the
+-- player has not learned are not written: the site does not use them, and the complete list holds hundreds.
 -- A trainer window lists each profession recipe's required rank and training cost: one row per
 -- recipe, rank and cost. Reads windows the player opened. Never crafts, clicks, trains or plays.
 --
@@ -112,8 +115,21 @@ local function windowProfession()
   return name, rank, (whole(maxRank) and maxRank <= MAX_RANK) and maxRank or nil
 end
 
---- One recipe into a row: "stored", "known" (already recorded), "pending" (reagent names not loaded),
---- "alternatives" (stored without reagents) or "skipped".
+--- Write the row a recipe's highest rank at its last colour is waiting in, if any.
+local function flush(recipe)
+  local waiting = EverlootDB.recipeWaiting and EverlootDB.recipeWaiting[recipe]
+  if not waiting then return end
+  EverlootDB.recipeWaiting[recipe] = nil
+  E:Store("recipe_observed", waiting)
+end
+
+--- Write every waiting row: at logout, so the file the player uploads holds each colour's highest rank.
+local function flushAll()
+  for recipe in pairs(EverlootDB and EverlootDB.recipeWaiting or {}) do flush(recipe) end
+end
+
+--- One recipe into a row: "stored", "known" (nothing new), "pending" (reagent names not loaded),
+--- "alternatives" (stored without reagents), "unlearned" (not written) or "skipped".
 local function readRecipe(id, profession, rank, maxRank)
   id = E.Readable(id)
   if not whole(id) then return "skipped" end
@@ -128,9 +144,12 @@ local function readRecipe(id, profession, rank, maxRank)
   if not whole(recipeId) then recipeId = id end
   local learned = E.Readable(info.learned)
   if type(learned) ~= "boolean" then learned = nil end
+  if learned == false then return "unlearned" end
   -- Do not reuse the legacy name key: it would lose identity and learned-state information.
-  local key = "id|" .. profession .. "|" .. recipeId .. "|" .. rank .. "|" .. colour .. "|" .. tostring(learned)
-  if EverlootDB.recipeSeen[key] then return "known" end
+  local recipe = profession .. "|" .. recipeId
+  local key = "id|" .. recipe .. "|" .. colour .. "|" .. tostring(learned)
+  local span = EverlootDB.recipeSpan[key]
+  if span and rank >= span.min and rank <= span.max then return "known" end
 
   local okSchematic, schematic = pcall(T.GetRecipeSchematic, id, false)
   if not okSchematic or type(schematic) ~= "table" then return "skipped" end
@@ -158,7 +177,7 @@ local function readRecipe(id, profession, rank, maxRank)
   if pending then return "pending" end
   if ambiguous then reagents = {} end
 
-  local stored = E:Store("recipe_observed", {
+  local row = {
     installId = EverlootDB.installId,
     capturedAt = date("!%Y-%m-%dT%H:%M:%SZ"),
     profession = profession,
@@ -170,9 +189,18 @@ local function readRecipe(id, profession, rank, maxRank)
     difficulty = colour,
     productItemId = whole(schematic.outputItemID) and schematic.outputItemID or nil,
     reagents = reagents,
-  })
-  if not stored then return "skipped" end
-  EverlootDB.recipeSeen[key] = true
+  }
+  -- The colour changed: the highest rank the last colour was seen at is now final.
+  local waiting = EverlootDB.recipeWaiting[recipe]
+  if waiting and (waiting.difficulty ~= colour or waiting.learned ~= learned) then flush(recipe) end
+  if span and rank > span.max then
+    -- A new highest rank for this colour replaces the one waiting; it is written when the colour changes.
+    EverlootDB.recipeWaiting[recipe] = row
+    span.max = rank
+    return "known"
+  end
+  if not E:Store("recipe_observed", row) then return "skipped" end
+  EverlootDB.recipeSpan[key] = { min = rank, max = span and span.max or rank }
   return ambiguous and "alternatives" or "stored"
 end
 
@@ -183,6 +211,7 @@ local function finish(stats, profession, rank, maxRank)
     profession, rank, maxRank and ("/" .. maxRank) or "", stats.listed, stats.stored + stats.alternatives, stats.skipped)
   if stats.alternatives > 0 then lastWindow = lastWindow .. string.format(", %d with alternative reagents stored without reagents", stats.alternatives) end
   if stats.pending > 0 then lastWindow = lastWindow .. string.format(", %d waiting for reagent names", stats.pending) end
+  if stats.unlearned > 0 then lastWindow = lastWindow .. string.format(", %d not learned (not recorded)", stats.unlearned) end
   lastWindow = lastWindow .. ", " .. stats.source
   if stats.capped then lastWindow = lastWindow .. " (capped at " .. MAX_RECIPES .. ")" end
   updateNote()
@@ -212,11 +241,12 @@ readWindow = function()
     end
   end
   if not okIds or type(ids) ~= "table" then lastWindow = "nothing recorded: no recipe list"; updateNote(); return end
-  EverlootDB.recipeSeen = EverlootDB.recipeSeen or {}
+  EverlootDB.recipeSpan = EverlootDB.recipeSpan or {}
+  EverlootDB.recipeWaiting = EverlootDB.recipeWaiting or {}
   pass = pass + 1
   local mine = pass
   local total = math.min(#ids, MAX_RECIPES)
-  local stats = { listed = total, stored = 0, alternatives = 0, pending = 0, skipped = 0, source = source, capped = #ids > MAX_RECIPES }
+  local stats = { listed = total, stored = 0, alternatives = 0, pending = 0, skipped = 0, unlearned = 0, source = source, capped = #ids > MAX_RECIPES }
   local nextIndex = 1
   local function step()
     if mine ~= pass or not windowOpen or not E:IsEnabled("professions") then return end
@@ -227,6 +257,7 @@ readWindow = function()
       if result == "stored" then stats.stored = stats.stored + 1
       elseif result == "alternatives" then stats.alternatives = stats.alternatives + 1
       elseif result == "pending" then stats.pending = stats.pending + 1
+      elseif result == "unlearned" then stats.unlearned = stats.unlearned + 1
       elseif result == "skipped" then stats.skipped = stats.skipped + 1 end
     end
     nextIndex = last + 1
@@ -287,10 +318,24 @@ local function trainer()
   end
 end
 
+--- 0.3.16 and earlier wrote every listed recipe at every rank, learned or not, and filled the kind within hours.
+--- The rows for recipes not learned are dropped (the site ignores them) and the pause lifts when there is room.
+local function upgradeOldRows()
+  if EverlootDB.recipeSeen == nil then return end
+  EverlootDB.recipeSeen = nil
+  local kept = {}
+  for _, row in ipairs(EverlootDB.records.recipe_observed or {}) do
+    if row.learned ~= false then kept[#kept + 1] = row end
+  end
+  EverlootDB.records.recipe_observed = kept
+  if EverlootDB.paused and #kept < E.MAX_ROWS_PER_KIND then EverlootDB.paused.recipe_observed = nil end
+end
+
 E:RegisterModule("professions", function()
+  upgradeOldRows()
   local f = E.frame
   for _, name in ipairs({ "TRADE_SKILL_SHOW", "TRADE_SKILL_LIST_UPDATE", "TRADE_SKILL_DATA_SOURCE_CHANGED", "TRADE_SKILL_CLOSE",
-    "NEW_RECIPE_LEARNED", "TRAINER_SHOW", "TRAINER_UPDATE" }) do
+    "NEW_RECIPE_LEARNED", "TRAINER_SHOW", "TRAINER_UPDATE", "PLAYER_LOGOUT" }) do
     pcall(function() f:RegisterEvent(name) end)
   end
   f:HookScript("OnEvent", function(_, event)
@@ -303,7 +348,8 @@ E:RegisterModule("professions", function()
     elseif event == "TRADE_SKILL_CLOSE" then
       windowOpen = false
       pass = pass + 1
-    elseif event == "TRAINER_SHOW" or event == "TRAINER_UPDATE" then pcall(trainer) end
+    elseif event == "TRAINER_SHOW" or event == "TRAINER_UPDATE" then pcall(trainer)
+    elseif event == "PLAYER_LOGOUT" then pcall(flushAll) end
   end)
   return note(describe(missingTradeSkillApi(), "ready, recipe colours from the open profession window"),
     describe(missingTrainerApi(), "ready, required ranks from trainers"))

@@ -158,11 +158,32 @@ assert(#rows() == 5)
 fire('TRADE_SKILL_SHOW'); fire('TRADE_SKILL_LIST_UPDATE'); fire('TRADE_SKILL_DATA_SOURCE_CHANGED')
 assert(#rows() == 5, 'same rank and colour is not observed twice')
 
--- A new rank is a new observation.
+-- A higher rank at the same colour waits: only a colour's lowest and highest rank bound a threshold.
+child.skillLevel = 65
+fire('TRADE_SKILL_LIST_UPDATE')
 child.skillLevel = 70
 fire('TRADE_SKILL_LIST_UPDATE')
-assert(#rows() == 10, 'a new rank records each recipe again; got ' .. #rows())
-assert(rows()[#rows()].rank == 70)
+assert(#rows() == 5, 'a higher rank at the same colour is not written at once; got ' .. #rows())
+-- The colour changes: the old colour's highest rank (70) is written, then the new colour at its first rank.
+recipes[1002].difficulty = 1
+child.skillLevel = 72
+fire('TRADE_SKILL_LIST_UPDATE')
+assert(#rows() == 7, 'a colour change writes the last rank of the old colour and the new one; got ' .. #rows())
+assert(rows()[6].recipe == 'Lesser Healing Potion' and rows()[6].rank == 70 and rows()[6].difficulty == 'optimal')
+assert(rows()[7].rank == 72 and rows()[7].difficulty == 'medium')
+-- Ranks inside what is already known add nothing; a lower rank than any seen at that colour is written at once
+-- (another character on the account can show the same recipe lower).
+child.skillLevel = 66
+fire('TRADE_SKILL_LIST_UPDATE')
+assert(#rows() == 8, 'only the new lowest rank for a colour is written; got ' .. #rows())
+assert(rows()[8].recipe == 'Lesser Healing Potion' and rows()[8].rank == 66 and rows()[8].difficulty == 'medium')
+-- Logging out (or /reload) writes each recipe's waiting highest rank once.
+event('PLAYER_LOGOUT')
+assert(#rows() == 12, 'logout writes the four waiting highest ranks; got ' .. #rows())
+for i = 9, 12 do assert(rows()[i].rank == 72 and rows()[i].recipe ~= 'Lesser Healing Potion', 'the waiting row is the highest rank seen') end
+event('PLAYER_LOGOUT')
+assert(#rows() == 12, 'a second logout writes nothing')
+child.skillLevel = 70
 
 -- A burst of list updates is one read.
 local before = getInfoCalls
@@ -206,6 +227,7 @@ count = #rows()
 fire('TRADE_SKILL_LIST_UPDATE')
 assert(#rows() == count, 'rank above 500 records nothing')
 child = { professionID = 171, professionName = 'Alchemy', skillLevel = 120, maxSkillLevel = 501 }
+recipes[1002].difficulty = 2  -- a colour not seen yet, so the row is written at once
 fire('TRADE_SKILL_LIST_UPDATE')
 assert(rows()[#rows()].rank == 120 and rows()[#rows()].maxRank == nil, 'maxRank above 500 is left out')
 
@@ -306,31 +328,35 @@ C_TradeSkillUI = {
 local function rows() return EverlootDB.records.recipe_observed end
 local count = #rows()
 fire('TRADE_SKILL_SHOW')
-assert(#rows() == count + 2, 'all IDs include filtered-out recipes and same-name IDs stay distinct')
+assert(#rows() == count, 'recipes not learned are not written')
+assert(Everloot:Status():find('2 not learned (not recorded)', 1, true), Everloot:Status())
 assert(allCalls == 1 and filteredCalls == 0, 'prefer the complete list without touching filters')
+learned = true
+fire('NEW_RECIPE_LEARNED')
+assert(#rows() == count + 2, 'all IDs include filtered-out recipes and same-name IDs stay distinct')
 assert(rows()[count + 1].recipeId == 7101 and rows()[count + 2].recipeId == 7102)
-assert(rows()[count + 1].learned == false, 'unlearned is a boolean, not missing')
+assert(rows()[count + 1].learned == true, 'learning a recipe writes it')
 recipeName = 'Localized Name'
 fire('TRADE_SKILL_LIST_UPDATE')
 assert(#rows() == count + 2, 'localization does not change recipe identity')
-learned = true
-fire('NEW_RECIPE_LEARNED')
-assert(#rows() == count + 4 and rows()[#rows()].learned == true, 'learning at the same rank and colour adds a row')
 colour = 1
 fire('TRADE_SKILL_LIST_UPDATE')
-assert(#rows() == count + 6, 'a new difficulty at the same rank adds a row')
+assert(#rows() == count + 4, 'a new difficulty at the same rank adds a row')
 child.skillLevel = 101
 fire('TRADE_SKILL_LIST_UPDATE')
-assert(#rows() == count + 8, 'a new rank still adds rows')
+assert(#rows() == count + 4, 'a new rank at the same colour waits')
+assert(EverlootDB.recipeWaiting['Alchemy|7101'].rank == 101)
 -- A bad optional learned value stays unknown; it must never become true or false by truthiness.
+-- Unknown is a new state: the waiting learned row is written first, then the unknown one.
 learned = 'false'
 fire('TRADE_SKILL_LIST_UPDATE')
-assert(#rows() == count + 10 and rows()[#rows()].learned == nil)
+assert(#rows() == count + 8 and rows()[#rows()].learned == nil, 'got ' .. #rows() - count)
+assert(rows()[#rows() - 1].learned == true and rows()[#rows() - 1].rank == 101)
 local secret = {}
 issecretvalue = function(value) return value == secret end
 learned = secret
 fire('TRADE_SKILL_LIST_UPDATE')
-assert(#rows() == count + 10, 'secret learned is the same unknown state')
+assert(#rows() == count + 8, 'secret learned is the same unknown state')
 all = { 0, -1, 1.5, math.huge, 9007199254740992, '7101', secret, 7101 }
 child.skillLevel = 102
 local getInfo = C_TradeSkillUI.GetRecipeInfo
@@ -338,7 +364,7 @@ local invalidCalls = 0
 C_TradeSkillUI.GetRecipeInfo = function(id) if id ~= 7101 then invalidCalls = invalidCalls + 1; return nil end; return getInfo(id) end
 fire('TRADE_SKILL_LIST_UPDATE')
 assert(invalidCalls == 0, 'invalid list ID reached API')
-assert(#rows() == count + 11 and rows()[#rows()].recipeId == 7101)
+assert(#rows() == count + 8 and EverlootDB.recipeWaiting['Alchemy|7101'].rank == 102)
 issecretvalue = nil
 -- Missing, throwing or invalid complete-list APIs fall back honestly to the filtered list.
 for _, mode in ipairs({ 'missing', 'throws', 'invalid' }) do
@@ -354,7 +380,8 @@ C_TradeSkillUI.GetFilteredRecipeIDs = nil
 C_TradeSkillUI.GetAllRecipeIDs = function() allCalls = allCalls + 1; return { 7101 } end
 child.skillLevel = 106
 fire('TRADE_SKILL_LIST_UPDATE')
-assert(rows()[#rows()].rank == 106)
+fire('PLAYER_LOGOUT')
+assert(rows()[#rows()].rank == 106 and rows()[#rows()].recipeId == 7101)
 fire('TRADE_SKILL_CLOSE')
 local closedCalls = allCalls
 fire('NEW_RECIPE_LEARNED')
@@ -387,6 +414,35 @@ fire('TRADE_SKILL_SHOW')
 while #pending > 0 do table.remove(pending, 1)() end
 assert(#rows() == before + 110, 'reenabling collects the remaining recipes')
 fire('TRADE_SKILL_CLOSE')
+""")
+
+# A file from 0.3.16 or earlier, paused at capacity by rows for recipes not learned: those rows go, the pause lifts.
+lua3 = LuaRuntime()
+lua3.execute("""
+date = function() return '2026-11-05T00:00:00Z' end
+time = function() return 1 end
+print = function() end
+SlashCmdList = {}
+CreateFrame = function() return {
+ RegisterEvent=function() end, SetScript=function(self, _, f) self.onEvent=f end,
+ HookScript=function(self, _, f) self.hooks=self.hooks or {}; table.insert(self.hooks,f) end } end
+local old = {}
+for i = 1, 1990 do old[i] = { kind = 'recipe_observed', recipe = 'Old ' .. i, learned = false } end
+old[1991] = { recipe = 'Learned', learned = true }
+old[1992] = { recipe = 'Before the flag' }
+for i = 1993, 2000 do old[i] = { recipe = 'Old ' .. i, learned = false } end
+EverlootDB = { installId = 'x', records = { recipe_observed = old, loot = { {}, {} } }, paused = { recipe_observed = true, loot = true },
+  recipeSeen = { ['id|Alchemy|1|60|optimal|false'] = true } }
+""")
+for file in ["core.lua", "modules/professions.lua"]:
+    lua3.execute((root / file).read_text(encoding="utf-8"))
+lua3.execute("""
+Everloot.frame.onEvent(nil,'ADDON_LOADED','Everloot')
+local kept = EverlootDB.records.recipe_observed
+assert(#kept == 2 and kept[1].recipe == 'Learned' and kept[2].recipe == 'Before the flag', 'got ' .. #kept)
+assert(EverlootDB.paused.recipe_observed == nil, 'the recipe pause lifts once there is room')
+assert(EverlootDB.paused.loot == true and #EverlootDB.records.loot == 2, 'other kinds are untouched')
+assert(EverlootDB.recipeSeen == nil, 'the old per-rank bookkeeping is dropped')
 """)
 
 # A client with none of the modern API loads the module and says so.

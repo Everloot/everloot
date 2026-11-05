@@ -15,6 +15,10 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
+- Addon: recipe collection no longer stops within hours. On launch night every install paused `recipe_observed` at
+  its 2,000-row limit, and 98% of those rows were recipes the player had not learned, which the site does not use.
+  The addon now writes learned recipes only, and per recipe and colour just the lowest and highest rank seen (the
+  rows that narrow a skill range). On first load it drops the retained rows for recipes not learned and lifts the pause.
 - Site: search finds dungeons and raids by name, with or without the leading "The", and an exact name puts the instance page
   first: "deadmines" now opens with `/database/instances/36-deadmines`. The group of wiki pages is headed Wiki, not Guides,
   so it no longer reads as the reviewed class guides at `/guides`.
