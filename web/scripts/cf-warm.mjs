@@ -39,10 +39,20 @@ export function summarize(results) {
   };
 }
 
+/**
+ * The zone's security rules challenge clients that are not browsers on /database/* and rate-limit it per address.
+ * A rule ahead of them skips both for requests whose x-everloot-check header equals the EVERLOOT_EDGE_CHECK secret,
+ * so the warm pass reaches every page. Without the secret the header is left out.
+ * @param {Record<string, string | undefined>} [env]
+ */
+export function requestHeaders(env = process.env) {
+  return { "user-agent": "everloot-deploy-warm", ...(env.EVERLOOT_EDGE_CHECK ? { "x-everloot-check": env.EVERLOOT_EDGE_CHECK } : {}) };
+}
+
 async function get(url) {
   const t = performance.now();
   try {
-    const res = await fetch(url, { headers: { "user-agent": "everloot-deploy-warm" }, signal: AbortSignal.timeout(30_000) });
+    const res = await fetch(url, { headers: requestHeaders(), signal: AbortSignal.timeout(30_000) });
     const body = await res.text();
     return { url, status: res.status, body, ms: performance.now() - t, retryAfter: res.headers.get("retry-after") };
   } catch (e) {
