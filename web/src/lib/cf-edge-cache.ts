@@ -81,8 +81,13 @@ const DEGRADED_TAG = `<meta name="${DEGRADED_META}"`;
 /** Whether the HTML carries the marker element. Page text is escaped and the router payload is JSON, so only the element matches. */
 export const edgeDegraded = (html: string): boolean => html.includes(DEGRADED_TAG);
 
-/** The copy to store, read in full: a degraded page is kept DEGRADED_TTL seconds at most, any other `ttl`. */
+/**
+ * The copy to store: an HTML page is read in full and kept DEGRADED_TTL seconds at most when degraded, else `ttl`.
+ * Anything else (the /map social card is a PNG under a cached path) is stored as it is: reading it as text would
+ * corrupt it.
+ */
 export async function cacheCopy(res: Response, ttl: number): Promise<Response> {
+  if (!/^text\/html\b/i.test(res.headers.get("content-type") ?? "")) return forCache(res, ttl);
   const html = await res.text();
   const kept = new Response(html, { status: res.status, statusText: res.statusText, headers: res.headers });
   return forCache(kept, edgeDegraded(html) ? Math.min(ttl, DEGRADED_TTL) : ttl);

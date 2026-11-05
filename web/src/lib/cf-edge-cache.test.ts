@@ -53,6 +53,13 @@ test("a page that marks itself degraded is kept a minute, not its full lifetime;
   expect((await cacheCopy(new Response(degraded, { headers }), 30)).headers.get("cache-control")).toBe("public, max-age=30");
 });
 
+test("a cached image (the /map social card) is stored byte for byte, never read as text", async () => {
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0xff, 0xfe, 0x00, 0x80]);
+  const kept = await cacheCopy(new Response(png, { headers: { "cdn-cache-control": "max-age=3600", "content-type": "image/png" } }), 3600);
+  expect(kept.headers.get("cache-control")).toBe("public, max-age=3600");
+  expect(new Uint8Array(await kept.arrayBuffer())).toEqual(png);
+});
+
 test("only the marker element counts as degraded, not the same words in a page's text or in the router payload", () => {
   expect(edgeDegraded('<meta name="everloot-degraded" content="storage"/>')).toBe(true);
   // Text and attribute values are escaped, and the RSC payload is a JSON string, so neither can spell the element.
