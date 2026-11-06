@@ -784,7 +784,7 @@ data, not game data and not an observation.
 
 ## Private sync and owner-published sections
 
-Draft for the owner to approve. Built behind `EVERLOOT_PRIVATE_SYNC`, which is off: until it is on and its
+Not in effect yet. Built behind `EVERLOOT_PRIVATE_SYNC`, which is off: until it is on and its
 migration (`20261106120000_private_sync.sql`) is applied, none of this happens.
 
 A signed-in player can sync their own linked characters' progress to their account and choose which parts of it
