@@ -286,14 +286,15 @@ function nearSpellings(word: string): string[] {
   return [...out].filter((w) => w.length >= 3);
 }
 
-/** How many pages (capped) carry each FTS query, one statement for all of them. */
+/**
+ * How many pages (capped) carry each FTS query, one statement for all of them: one row with a column per query. Not a
+ * UNION ALL, since D1 refuses a compound SELECT of more than five terms; MAX_TRIES keeps it under D1's 100 parameters.
+ */
 async function pageCounts(db: ReleaseDb, queries: readonly string[]): Promise<number[]> {
   if (!queries.length) return [];
-  const parts = queries.map((_, i) => `SELECT ${i} AS i, (SELECT count(*) FROM (SELECT 1 FROM entities_fts WHERE entities_fts MATCH ? LIMIT 20)) AS n`);
-  const rows = await db.all<{ i: number; n: number }>(parts.join(" UNION ALL "), ...queries);
-  const counts = queries.map(() => 0);
-  for (const r of rows) counts[r.i] = r.n;
-  return counts;
+  const columns = queries.map((_, i) => `(SELECT count(*) FROM (SELECT 1 FROM entities_fts WHERE entities_fts MATCH ? LIMIT 20)) AS n${i}`);
+  const [row] = await db.all<Record<string, number>>(`SELECT ${columns.join(", ")}`, ...queries);
+  return queries.map((_, i) => Number(row?.[`n${i}`] ?? 0));
 }
 
 /** The question's other topic words, quoted for FTS. */
