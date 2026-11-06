@@ -1,9 +1,9 @@
 # Public character pages: draft DATA_POLICY section
 
-Date: 2026-11-01. Status: **draft, not in effect.** Written for slice S3 of the
-[character showcase plan](2026-11-01-character-showcase-plan.md). Nothing here applies until the maintainer accepts
-it and moves the section below into [DATA_POLICY](../DATA_POLICY.md), after "Profiles". The code it describes is
-behind `EVERLOOT_SHOWCASE`, which is off in production.
+Date: 2026-11-01. Status: **accepted.** Written for slice S3 of the
+[character showcase plan](2026-11-01-character-showcase-plan.md). The section below is now in
+[DATA_POLICY](../DATA_POLICY.md), after "Profiles", with the D8 answer in place of the placeholder; that copy is the
+one in effect. The go-live PR turns on `EVERLOOT_SHOWCASE` with it.
 
 The [owned-character identity ADR](specs/2026-10-28-owned-character-identity.md) (section 5) says no route sets or
 reads `character_visibility` until a public-profile contract is accepted. The S3 code does both, behind the flag.

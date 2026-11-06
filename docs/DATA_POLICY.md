@@ -791,6 +791,40 @@ data, not game data and not an observation.
 - **Deletion.** The player changes or clears any of it, or turns the public profile off, on
   /settings at any time. Deleting the account (write to hello@everloot.app) deletes the profile.
 
+## Public character pages
+
+A signed-in player who has linked one of their characters (Linked characters, on /account) can give it a public
+page at `/characters/<ruleset>/<realm>/<name>`. The player's part of that page holds the player's own data from
+their own addon file and nothing about anyone else. The same address also shows, in their own parts, what the
+player pages and guild pages hold about the character (see "What players see in the game").
+
+- **What a page shows.** The character's name, level, race, class, faction and realm, as the addon file sent them
+  when the character was last linked, and the date of that upload, worded "From the player's own addon upload,
+  <date>". Nothing comes from the player pages, the census, other players' uploads or Blizzard. Gear, talents,
+  professions, reputations, raids and collections are not shown.
+- **What it never shows.** The BattleTag, the email address, the account, a profile handle, API keys, the
+  character's game id, or the hashes a link is stored under.
+- **Off until the player turns it on.** A new link is private. The player's part shows only while the player has
+  "Public page" on for that character. Turning it off, unlinking the character or deleting the account removes that
+  part and its share cards at once; the address then shows only what the player pages hold about the character, or
+  answers 404 like any unknown character when they hold nothing.
+- **A link is not proof.** A link shows that the account holder also had an addon file in which the character typed
+  a code. It is not checked with Blizzard, and the row can be written by hand. The page says the data is
+  self-reported and not checked against Blizzard, and it never calls the character verified or owned.
+- **Disputes.** When a second account links the same character, the character is frozen on every account that
+  holds it and has no public page until we settle it. To settle it, write to hello@everloot.app: we reply within 7
+  days, and the character stays frozen until it is settled.
+- **Hiding.** Anyone can hide a character through the player-page hide form, without an account. A hidden character
+  cannot be linked and has no public page, whoever linked it. Each character page links to the form.
+- **Share cards.** Each page has two images, 1200x630 for link previews and 1080x1080 to download, drawn from the
+  same fields as the page. Text and shapes only: no game art and no Blizzard marks.
+- **Search engines.** Every character page asks search engines not to index it. Players cannot change this yet.
+- **Caching.** Everloot draws the page and cards fresh on each request and keeps no copy. A copy that a link-preview
+  service (Discord, X and others) has already fetched is outside our control and may stay with that service.
+- **One page, separate parts.** A character's page shows the linked player's part first, then what other
+  players' addons saw of the character, then the guild it was seen in, each under its own source line and date.
+  Neither adds data to the other, and the share cards draw only on the player's part.
+
 ## Private sync and owner-published sections
 
 Not in effect yet. Built behind `EVERLOOT_PRIVATE_SYNC`, which is off: until it is on and its

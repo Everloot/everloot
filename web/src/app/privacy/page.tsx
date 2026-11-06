@@ -37,7 +37,7 @@ function Section({ id, children }: { id: string; children: React.ReactNode }) {
 export default function PrivacyPage() {
   // The boss pulls item shows only once the site collects them (EVERLOOT_PULL_SUMMARIES), and dates the page with it.
   const pulls = pullSummariesOn();
-  // The guild item gained the character page on 6 November, whether or not the boss pulls item shows.
+  // Linked characters, public character pages and the guild item's character page: change on the day this merges.
   const updated = "6 November 2026";
   return (
     <article>
@@ -156,6 +156,35 @@ export default function PrivacyPage() {
                 status. It never shows your BattleTag, your email or a build you did not share, and
                 search engines index it only while it is public. Turning it off hides it at once.
                 Deleting your account deletes your profile with it.
+              </li>
+              <li id="linked-characters">
+                <strong>Linked characters (optional):</strong> on your account page you can link a character
+                you play to your account. The site gives you a short code; you type it on the character with{" "}
+                <code>/everloot link &lt;code&gt;</code>, and the Everloot Desktop App, signed in to your account,
+                sends the row it writes. Link rows never go in an upload. We store the character&apos;s name,
+                realm, race, class, faction and level, when it was linked and last sent, and two keyed one-way
+                hashes: one of the game&apos;s id for the character, and one of your install id with the
+                addon&apos;s key for the character. Neither the game&apos;s id nor the install id is stored. We
+                store a code only as a hash; it works once, for 15 minutes. If our census rows for that character
+                disagree on its race, class or faction, the link is refused. A link shows that someone with this
+                account also had an addon file in which the character typed the code. We don&apos;t check it with
+                Blizzard. If a second account links the same character, it is frozen on both and shown nowhere
+                until we settle it: write to{" "}
+                <a href="mailto:hello@everloot.app">hello@everloot.app</a> and we reply within 7 days. A linked
+                character is private: only you see it, unless you give it a public page.
+              </li>
+              <li>
+                <strong>Public character page (optional):</strong> for each linked character you can turn on your
+                part of its page at <code>/characters/&lt;ruleset&gt;/&lt;realm&gt;/&lt;name&gt;</code>. Anyone can
+                open it and sees the character&apos;s name, level, race, class, faction and realm as you sent them,
+                the day they were last sent, and a share image drawn from the same fields. Your part sits above,
+                and apart from, what the player pages already show of the character. It never shows your BattleTag,
+                your email, your account, your handle or the hashes. It says the details are self-reported and not
+                checked against Blizzard. Search engines are asked not to index it. Turning the page off,
+                unlinking the character or deleting your account removes your part and its images at once. A copy
+                a link-preview service (Discord, X and others) has already fetched stays with that service. Anyone
+                can hide a character on the <Link href="/players/opt-out">hide form</Link>, without an account; a
+                hidden character cannot be linked and has no public page.
               </li>
               <li id="chat-projects">
                 <strong>Chat projects (optional):</strong> while signed in, Chat can keep your
@@ -379,6 +408,10 @@ export default function PrivacyPage() {
                 <strong>Your profile</strong> is changed, cleared or made private again on Settings.
               </li>
               <li>
+                <strong>Linked characters</strong> are unlinked, and their public pages turned on or off, on
+                your account page.
+              </li>
+              <li>
                 <strong>Chat projects and account chats</strong> are downloaded or deleted in
                 Chat&apos;s All chats view.
               </li>
@@ -399,6 +432,7 @@ export default function PrivacyPage() {
               <li><strong>Saved builds and characters:</strong> until you delete them or your account.</li>
               <li><strong>Chat projects, account chats, notes and saved entries:</strong> until you delete them, clear them in Chat or delete your account.</li>
               <li><strong>Handle, display name, status and profile choices:</strong> until you change them or delete your account. A status with a clear-after time stops showing at that time.</li>
+              <li><strong>Linked characters and their page settings:</strong> until you unlink the character or delete your account. Used and expired link codes are cleared when you make a new code a day or more later, and with your account.</li>
               <li><strong>Rate-limit hashes:</strong> a short time, long enough to enforce the limit (a day for Chat&apos;s free model), then discarded.</li>
               <li><strong>Uploads:</strong> until you ask us to remove them. They are the public database.</li>
               <li><strong>Census rows:</strong> as long as the upload they came in, and removed with it. They hold the character&apos;s hash, never its id, and a one-way hash of the address they came from, never the address. They are only ever published as counts.</li>

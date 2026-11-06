@@ -54,6 +54,7 @@ test("it lists the account's links with their status, and a frozen one says why 
   expect(text).toContain("Jainara · Level 24 Night Elf Priest");
   expect(text).toContain("Linked 2026-10-21, last sent 2026-10-30.");
   expect(text).toContain(FROZEN_TEXT);
+  expect(FROZEN_TEXT).toContain("write to hello@everloot.app; we reply within 7 days.");
   expect(text.match(/Frozen:/g)).toHaveLength(1);
   expect(text.toLowerCase()).not.toContain("verified");
   expect(text).toContain("not checked with Blizzard");
