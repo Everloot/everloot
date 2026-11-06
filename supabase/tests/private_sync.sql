@@ -1,4 +1,4 @@
--- Run after every migration up to 20261106120000_private_sync.sql on a disposable local PostgreSQL database
+-- Run after every migration up to 20261107120000_private_sync_stats_pvp.sql on a disposable local PostgreSQL database
 -- that has the roles anon, authenticated and service_role. Everything is rolled back at the end.
 begin;
 
@@ -195,10 +195,48 @@ declare
   b constant uuid := '00000000-0000-4000-8000-0000000000b2';
   thrall constant uuid := '30000000-0000-4000-8000-000000000001';
 begin
-  if (select count(*) from public.own_character_facts(a, thrall)) <> 6 then raise exception 'owner read is not one row per category'; end if;
+  if (select count(*) from public.own_character_facts(a, thrall)) <> 8 then raise exception 'owner read is not one row per category'; end if;
   if (select count(*) from public.own_character_facts(a, thrall) where data is not null) <> 2 then raise exception 'owner read misses facts'; end if;
   if (select consented from public.own_character_facts(a, thrall) where category = 'talents') then raise exception 'talents consented by default'; end if;
   if exists (select 1 from public.own_character_facts(b, thrall)) then raise exception 'another account reads the facts'; end if;
+  if (select consented from public.own_character_facts(a, thrall) where category = 'stats') then raise exception 'stats consented by default'; end if;
+  if (select consented from public.own_character_facts(a, thrall) where category = 'pvp') then raise exception 'pvp consented by default'; end if;
+end $$;
+
+-- Stats and pvp (20261107120000_private_sync_stats_pvp.sql): each has its own consent and its own switch, both off by
+-- default; a fact is public only with consent, the page on and that category's switch on.
+do $$
+declare
+  a constant text := '00000000-0000-4000-8000-0000000000a2';
+  b constant uuid := '00000000-0000-4000-8000-0000000000b2';
+  thrall constant uuid := '30000000-0000-4000-8000-000000000001';
+  stats constant jsonb := '{"groups": [{"group": "Attributes", "stats": [{"key": "strength", "value": 120}]}]}';
+begin
+  if (select show_stats or show_pvp from public.character_visibility where link_id = thrall) then raise exception 'stats or pvp switch on by default'; end if;
+  if (select outcome from pg_temp.sync(a, 'Thrallina', jsonb_build_array(pg_temp.fact('stats', '2026-10-06T10:00:00Z', stats)))) <> 'no_consent' then
+    raise exception 'stats stored without consent';
+  end if;
+  if public.set_sync_consent(b, thrall, 'stats', true) <> 'not_found' then raise exception 'another account granted stats consent'; end if;
+  if public.set_sync_consent(a::uuid, thrall, 'stats', true) is not null then raise exception 'stats consent refused'; end if;
+  if public.set_sync_consent(a::uuid, thrall, 'pvp', true) is not null then raise exception 'pvp consent refused'; end if;
+  if (select outcome from pg_temp.sync(a, 'Thrallina', jsonb_build_array(pg_temp.fact('stats', '2026-10-06T10:00:00Z', stats)))) <> 'stored' then
+    raise exception 'stats not stored';
+  end if;
+  if (select outcome from pg_temp.sync(a, 'Thrallina', jsonb_build_array(pg_temp.fact('pvp', '2026-10-06T10:00:00Z', '{"honorableKills": 12}')))) <> 'stored' then
+    raise exception 'pvp not stored';
+  end if;
+  if pg_temp.public_cats() like '%stats%' or pg_temp.public_cats() like '%pvp%' then raise exception 'stats or pvp public with their switches off'; end if;
+  perform public.set_visibility(a::uuid, thrall, '{"show_stats": true}');
+  if pg_temp.public_cats() not like '%stats%' or pg_temp.public_cats() like '%pvp%' then raise exception 'show_stats did not publish stats only: %', pg_temp.public_cats(); end if;
+  perform public.set_visibility(a::uuid, thrall, '{"show_pvp": true}');
+  if pg_temp.public_cats() not like '%pvp%' then raise exception 'show_pvp did not publish pvp'; end if;
+  if (select show_stats and show_pvp from public.character_visibility where link_id = thrall) is not true then raise exception 'switches not stored'; end if;
+  -- Revoking stats deletes its facts and leaves pvp.
+  if public.set_sync_consent(a::uuid, thrall, 'stats', false) is not null then raise exception 'stats revoke refused'; end if;
+  if exists (select 1 from public.character_facts where link_id = thrall and category = 'stats') then raise exception 'revoked stats kept'; end if;
+  if not exists (select 1 from public.character_facts where link_id = thrall and category = 'pvp') then raise exception 'stats revoke took pvp'; end if;
+  perform public.set_sync_consent(a::uuid, thrall, 'pvp', false);
+  perform public.set_visibility(a::uuid, thrall, '{"show_stats": false, "show_pvp": false}');
 end $$;
 
 -- Revoking a category deletes its facts, and a later sync of it is refused.

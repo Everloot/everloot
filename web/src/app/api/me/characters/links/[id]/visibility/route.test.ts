@@ -110,7 +110,7 @@ describe("the switch", () => {
 });
 
 describe("the section switches, with private sync on", () => {
-  const SECTIONS = ["show_gear", "show_talents", "show_professions", "show_reputations", "show_raids", "show_collections"];
+  const SECTIONS = ["show_gear", "show_stats", "show_talents", "show_pvp", "show_professions", "show_reputations", "show_raids", "show_collections"];
 
   test("each section switch goes to set_visibility as sent, and clears the page and both cards", async () => {
     vi.stubEnv("EVERLOOT_PRIVATE_SYNC", "1");

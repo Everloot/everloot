@@ -843,7 +843,10 @@ observation of anyone else, and none of it is published as a dataset.
 - **What is synced.** For each linked character the Desktop App sends the categories below, and the site keeps only the
   ones the player has turned on for that character: equipped gear (slot, item id, item level), the active talent build (talent node ids and ranks),
   professions (name and rank), reputations (faction id and standing), this week's raid lockouts (instance,
-  difficulty, bosses killed, reset), and achievements this character earned and titles held. Every category starts off. The
+  difficulty, bosses killed, reset), and achievements this character earned and titles held. Two more categories
+  are the player's own self-reported numbers: the character sheet's stats (attributes, attack power, crit, haste,
+  armor and the like, as the game window shows them) and PvP rank and honorable kills. Each has its own switch.
+  Every category starts off. The
   Desktop App sends these with a key made with "Sync my linked characters" (`sync:own`); that key can send and
   nothing else. It cannot turn a category on, change what the page shows, or list anything.
 - **The link decides, not the computer.** A synced row is kept only when the account that sent it holds a live
@@ -856,8 +859,8 @@ observation of anyone else, and none of it is published as a dataset.
   id, the addon's character key and the character's name are not stored with a synced row.
 - **Private by default.** Synced data is shown only to the player, on a signed-in preview of the character. It
   appears on the public page only when the page is on and the player has also switched that section on: gear,
-  talents, professions, reputations, raids, and achievements and titles (under Collections), each on its own
-  switch, all off by default. A frozen or hidden character shows none of it, to anyone. The page says the data is
+  stats, talents, PvP, professions, reputations, raids, and achievements and titles (under Collections), each on
+  its own switch, all off by default. A frozen or hidden character shows none of it, to anyone. The page says the data is
   self-reported through the Everloot addon and not checked against Blizzard; it never says verified.
 - **Names on the page.** An item is named only when three installs agree on its name; otherwise it reads
   "Item <id>". Factions, achievements and titles are named only when the catalog's three-install rule agrees on

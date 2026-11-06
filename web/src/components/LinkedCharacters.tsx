@@ -18,10 +18,11 @@ export interface ListedLink {
   sync?: { category: SyncCategory; on: boolean; capturedAt: string | null }[];
 }
 /** SYNC_CATEGORIES in web/src/lib/private-sync.ts, which is server code and cannot be imported here. */
-type SyncCategory = "gear" | "talents" | "professions" | "reputations" | "raids" | "achievements";
+type SyncCategory = "gear" | "stats" | "talents" | "pvp" | "professions" | "reputations" | "raids" | "achievements";
 /** Each category's name here, and the visibility switch that shows it (SHOW_SWITCH in private-sync.ts). */
 const CATEGORY: Record<SyncCategory, { name: string; show: string }> = {
-  gear: { name: "Gear", show: "show_gear" }, talents: { name: "Talents", show: "show_talents" },
+  gear: { name: "Gear", show: "show_gear" }, stats: { name: "Stats", show: "show_stats" },
+  talents: { name: "Talents", show: "show_talents" }, pvp: { name: "PvP", show: "show_pvp" },
   professions: { name: "Professions", show: "show_professions" }, reputations: { name: "Reputations", show: "show_reputations" },
   raids: { name: "Raids", show: "show_raids" }, achievements: { name: "Achievements and titles", show: "show_collections" },
 };

@@ -20,15 +20,15 @@ export function privateSyncOn(env: Record<string, string | undefined> = process.
   return characterLinksOn(env) && env.EVERLOOT_PRIVATE_SYNC === "1";
 }
 
-/** What a link can sync, in page order. `achievements` is published under the Collections section's switch. */
-export const SYNC_CATEGORIES = ["gear", "talents", "professions", "reputations", "raids", "achievements"] as const;
+/** What a link can sync, in page order. `stats` and `pvp` are the player's own self-reported numbers. `achievements` is published under the Collections section's switch. */
+export const SYNC_CATEGORIES = ["gear", "stats", "talents", "pvp", "professions", "reputations", "raids", "achievements"] as const;
 export type SyncCategory = (typeof SYNC_CATEGORIES)[number];
 export const isSyncCategory = (v: unknown): v is SyncCategory => (SYNC_CATEGORIES as readonly unknown[]).includes(v);
 
 /** The visibility switch that publishes each category. Gear and collections reuse the switches the links shipped with. */
 export const SHOW_SWITCH: Record<SyncCategory, string> = {
-  gear: "show_gear", talents: "show_talents", professions: "show_professions", reputations: "show_reputations",
-  raids: "show_raids", achievements: "show_collections",
+  gear: "show_gear", stats: "show_stats", talents: "show_talents", pvp: "show_pvp", professions: "show_professions",
+  reputations: "show_reputations", raids: "show_raids", achievements: "show_collections",
 };
 
 /** Characters one request may carry, and rows across them. A full completion file is a few thousand rows. */
@@ -193,6 +193,10 @@ function categoryData(category: SyncCategory, rows: readonly SyncRow[], now: Dat
       const g = newest(only(rows, "gear_snapshot"));
       return { equipped: g.equipped.map((e) => ({ slot: e.slot, itemId: e.itemId, itemLevel: e.itemLevel })) };
     }
+    case "stats":
+    case "pvp":
+      // No row kind feeds these yet (a later change adds them), so a request can never build one.
+      return null;
     case "talents": {
       const t = newest(only(rows, "talent_owned"));
       return {

@@ -265,12 +265,12 @@ describe("the owner's list", () => {
   test("with private sync on, each link lists its sync per category and, with the pages on, its section switches; never the facts", async () => {
     vi.stubEnv("EVERLOOT_SHOWCASE", "1");
     vi.stubEnv("EVERLOOT_PRIVATE_SYNC", "1");
-    const consent = (on: string[], captured: Record<string, string> = {}) => ["gear", "talents", "professions", "reputations", "raids", "achievements"]
+    const consent = (on: string[], captured: Record<string, string> = {}) => ["gear", "stats", "talents", "pvp", "professions", "reputations", "raids", "achievements"]
       .map((category) => ({ category, consented: on.includes(category), captured_at: captured[category] ?? null, data: captured[category] ? { secret: "fact-data" } : null }));
     auth.authQuery.mockImplementation(async (path: string, init?: { body: string }) => {
       if (path.startsWith("character_links?")) {
         return [
-          { ...own, ruleset: "forever", character_visibility: { page_public: true, show_gear: true, show_talents: false, show_professions: false, show_reputations: false, show_raids: false, show_collections: true } },
+          { ...own, ruleset: "forever", character_visibility: { page_public: true, show_gear: true, show_stats: false, show_talents: false, show_pvp: true, show_professions: false, show_reputations: false, show_raids: false, show_collections: true } },
           { ...own, id: OTHER_ID, name: "Jainara", status: "frozen", ruleset: "forever", character_visibility: null },
         ];
       }
@@ -284,18 +284,20 @@ describe("the owner's list", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     const [path] = auth.authQuery.mock.calls[0];
-    expect(path).toContain("character_visibility(page_public,show_gear,show_talents,show_professions,show_reputations,show_raids,show_collections)");
-    expect(body.links[0].page.sections).toEqual({ gear: true, talents: false, professions: false, reputations: false, raids: false, achievements: true });
+    expect(path).toContain("character_visibility(page_public,show_gear,show_stats,show_talents,show_pvp,show_professions,show_reputations,show_raids,show_collections)");
+    expect(body.links[0].page.sections).toEqual({ gear: true, stats: false, talents: false, pvp: true, professions: false, reputations: false, raids: false, achievements: true });
     expect(body.links[0].sync).toEqual([
       { category: "gear", on: true, capturedAt: "2026-11-05T10:00:00.000Z" },
+      { category: "stats", on: false, capturedAt: null },
       { category: "talents", on: false, capturedAt: null },
+      { category: "pvp", on: false, capturedAt: null },
       { category: "professions", on: false, capturedAt: null },
       { category: "reputations", on: false, capturedAt: null },
       { category: "raids", on: false, capturedAt: null },
       { category: "achievements", on: true, capturedAt: null },
     ]);
     // A link with no visibility row has every switch off.
-    expect(Object.values(body.links[1].page.sections)).toEqual([false, false, false, false, false, false]);
+    expect(Object.values(body.links[1].page.sections)).toEqual([false, false, false, false, false, false, false, false]);
     expect(body.links[1].sync.find((c: { category: string }) => c.category === "raids").on).toBe(true);
     // Each read is the session's own account.
     for (const [p, init] of auth.authQuery.mock.calls.slice(1)) {

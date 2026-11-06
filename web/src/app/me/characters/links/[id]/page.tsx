@@ -22,8 +22,8 @@ export const metadata: Metadata = { title: "Character preview", robots: { index:
 
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 /** The section each category fills on the page. */
-const SECTION: Record<SyncCategory, SectionKey> = {
-  gear: "gear", talents: "talents", professions: "professions", reputations: "reputations", raids: "raids", achievements: "collections",
+const SECTION: Record<Exclude<SyncCategory, "pvp">, SectionKey> = {
+  gear: "gear", stats: "stats", talents: "talents", professions: "professions", reputations: "reputations", raids: "raids", achievements: "collections",
 };
 
 type Params = { params: Promise<{ id: string }> };
@@ -42,7 +42,7 @@ function Settings({ link: l, categories }: { link: OwnSyncedLink; categories: Ow
             return (
               <li key={category} data-category={category} data-sync={sync ? "on" : "off"} data-public={shown ? "on" : "off"}
                 className="flex flex-wrap items-baseline justify-between gap-x-3 border-b border-line py-1">
-                <span className="text-fg">{SECTION_TITLES[SECTION[category]]}{category === "achievements" ? " (achievements and titles)" : ""}</span>
+                <span className="text-fg">{category === "pvp" ? "PvP" : SECTION_TITLES[SECTION[category]]}{category === "achievements" ? " (achievements and titles)" : ""}</span>
                 <span className="text-fg-2">
                   Sync {sync ? "on" : "off"} · Public {shown && l.pagePublic ? "on" : shown ? "on once the page is public" : "off"}
                   {c?.fact ? <> · Captured <span className="font-mono">{c.fact.capturedAt.slice(0, 10)}</span></> : null}
