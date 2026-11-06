@@ -17,8 +17,8 @@ const at = (category: StoredFact["category"], data: Record<string, unknown>, cap
 
 const base: ShowcaseInput = {
   sample: false, path: "/characters/forever/forever-pioneer/thrallina", name: "Thrallina", level: 60, race: "Orc", class: "SHAMAN",
-  faction: "Horde", realm: "Forever Pioneer", guild: null, lastUpload: "2026-11-01",
-  gear: { state: "empty" }, talents: { state: "empty" }, professions: { state: "empty" }, reputations: { state: "empty" },
+  faction: "Horde", realm: "Forever Pioneer", title: null, guild: null, lastUpload: "2026-11-01",
+  gear: { state: "empty" }, stats: { state: "unsupported" }, talents: { state: "empty" }, professions: { state: "empty" }, reputations: { state: "empty" },
   raids: { state: "empty" }, collections: { state: "empty" },
 };
 
@@ -27,7 +27,8 @@ describe("factSections", () => {
     const input = withFacts(base, factSections([], NAMES, NOW));
     expect(input).toEqual(base);
     const page = buildShowcase(input, NOW);
-    expect(page.sections.every((s) => s.section.state === "empty")).toBe(true);
+    // Stats stay unsupported (no collector records them); everything else is empty.
+    expect(page.sections.every((s) => s.section.state === (s.key === "stats" ? "unsupported" : "empty"))).toBe(true);
     expect(page.blocks).toEqual([]);
   });
 
@@ -38,9 +39,9 @@ describe("factSections", () => {
       { slot: "SecondaryHandSlot", itemId: 98, itemLevel: 62 },
     ] })], NAMES, NOW);
     expect(s.gear).toEqual({ state: "shown", asOf: "2026-11-05", data: [
-      { slot: "Head", itemId: 16_842, name: "Earthfury Helmet", itemLevel: 66 },
-      { slot: "Finger 1", itemId: 99, name: null, itemLevel: 60 },
-      { slot: "Off hand", itemId: 98, name: null, itemLevel: 62 },
+      { slot: "head", itemId: 16_842, name: "Earthfury Helmet", quality: null, itemLevel: 66 },
+      { slot: "finger1", itemId: 99, name: null, quality: null, itemLevel: 60 },
+      { slot: "offHand", itemId: 98, name: null, quality: null, itemLevel: 62 },
     ] });
   });
 
@@ -75,7 +76,7 @@ describe("factSections", () => {
       { instance: "Onyxia's Lair", instanceId: 249, difficulty: null, difficultyId: null, killed: 1, total: 1, resetAt: "2026-11-06T09:00:00.000Z" },
     ];
     expect(factSections([at("raids", { lockouts })], NAMES, NOW).raids).toEqual({ state: "shown", asOf: "2026-11-05", data: {
-      lockouts: [{ instance: "Molten Core", difficulty: "40 Player", killed: 6, total: 10, resets: "2026-11-10" }], guildKills: null,
+      lockouts: [{ instance: "Molten Core", difficulty: "40 Player", killed: 6, total: 10, resets: "2026-11-10", bosses: [] }], guildKills: null,
     } });
     expect(factSections([at("raids", { lockouts: [lockouts[1]] })], NAMES, NOW).raids)
       .toEqual({ state: "shown", asOf: "2026-11-05", data: { lockouts: [], guildKills: null } });
@@ -83,7 +84,7 @@ describe("factSections", () => {
 
   test("achievements: earned count, points and titles the catalog agrees on; without the catalog, nothing", () => {
     const facts = [at("achievements", { achievements: [{ id: 6, on: "2026-10-01" }, { id: 7, on: null }, { id: 8, on: null }], titleIds: [1, 2] })];
-    expect(factSections(facts, NAMES, NOW).collections).toEqual({ state: "shown", asOf: "2026-11-05", data: { achievements: 3, points: 35, titles: ["Private"] } });
+    expect(factSections(facts, NAMES, NOW).collections).toEqual({ state: "shown", asOf: "2026-11-05", data: { achievements: 3, points: 35, titles: ["Private"], recent: [], categories: [], quests: null } });
     expect(factSections(facts, { ...NAMES, catalog: null }, NOW).collections).toBeUndefined();
   });
 

@@ -75,6 +75,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   and achievements and titles. Each category is kept only when you hold that character's live link and turned its sync
   on, and only its newest capture is kept. You see it all on a signed-in preview, and each section shows on the
   character's public page only when you switch it on. Turning a category's sync off or unlinking deletes what was synced.
+- Addon and Desktop App: with the completion tracker on, the addon keeps each of your characters' professions (rank of
+  max rank) and this week's raid lockouts (bosses killed of total, reset time) under the completion key, latest state
+  only, and the Desktop App's Characters page shows them on the keyed rows. They stay on your computer: no upload, the
+  upload page included, sends them, and the Desktop App's Chat does not read them. Not yet checked in game.
 - Addon: player names stay off by default, and the addon now asks once, in game, whether to turn them on. The question
   comes a few seconds after the first loading screen, never in combat, and says what is recorded (name, realm, race,
   class, level and guild of your characters and of players you target, mouse over or group with), how to turn it off

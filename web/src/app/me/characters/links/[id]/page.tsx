@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import ShowcaseSections, { ShowcaseIdentity } from "@/components/showcase/ShowcaseSections";
+import ShowcaseSections, { ShowcaseHeader } from "@/components/showcase/ShowcaseSections";
 import { Card, Container, PageHeader, SectionHeading } from "@/components/ui";
 import { signInPath } from "@/lib/auth/return-to";
 import { factSections, withFacts } from "@/lib/character-facts";
@@ -81,19 +81,15 @@ export default async function LinkPreviewPage({ params }: Params) {
   const now = new Date();
   const path = characterPath(c.ruleset, c.realm, c.name);
   const showcase = buildShowcase(withFacts({
-    sample: false, path, name: c.name, level: c.level, race: c.race, class: c.class, faction: c.faction, realm: c.realm, guild: null,
+    sample: false, path, name: c.name, level: c.level, race: c.race, class: c.class, faction: c.faction, realm: c.realm, title: null, guild: null,
     lastUpload: new Date(c.lastUploadAt).toISOString().slice(0, 10),
-    gear: { state: "empty" }, talents: { state: "empty" }, professions: { state: "empty" }, reputations: { state: "empty" },
+    gear: { state: "empty" }, stats: { state: "unsupported" }, talents: { state: "empty" }, professions: { state: "empty" }, reputations: { state: "empty" },
     raids: { state: "empty" }, collections: { state: "empty" },
   }, facts.length ? factSections(facts, await loadFactNames(facts, c.class), now) : {}), now);
   return (
     <Container width="reading">
       <article className="space-y-8">
-        <PageHeader
-          trail={[{ name: "Home", path: "/" }, { name: "Account", path: "/account" }, { name: c.name, path: `/me/characters/links/${id}` }]}
-          title={<span className={showcase.classSlug ? `text-class-${showcase.classSlug}` : undefined}>{c.name}</span>}
-          lede={`${showcase.line} · ${c.realm}`}
-        />
+        <ShowcaseHeader showcase={showcase} trail={[{ name: "Home", path: "/" }, { name: "Account", path: "/account" }, { name: c.name, path: `/me/characters/links/${id}` }]} />
         <Card className="space-y-2 text-sm text-fg-2">
           <p>
             Only you see this preview. It shows everything synced for this character. The public page,{" "}
@@ -107,7 +103,6 @@ export default async function LinkPreviewPage({ params }: Params) {
         </Card>
         <Settings link={c} categories={categories} />
         <div className="space-y-8" data-part="preview">
-          <ShowcaseIdentity showcase={showcase} />
           {c.status === "linked" && <ShowcaseSections showcase={showcase} preview />}
           <p className="text-sm text-fg-2">{FOOTER_LINE}</p>
         </div>

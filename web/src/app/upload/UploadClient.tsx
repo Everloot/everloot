@@ -184,6 +184,7 @@ export default function UploadClient({ playerPages = false, pullSummaries = fals
         </p>}
         <p className="mt-3 text-sm text-fg-2">{prepared.value.held.legacy} legacy records without event IDs, {prepared.value.held.named} unchecked named records, and {prepared.value.held.invalid} invalid records stay out of this upload. Keep your original file.</p>
         {prepared.value.held.links > 0 && <p className="mt-1 text-sm text-fg-2">Character link codes never go in an upload. The Everloot Desktop App, signed in to your account, sends them to your account.</p>}
+        {prepared.value.held.local > 0 && <p className="mt-1 text-sm text-fg-2">Your professions and raid lockouts never go in an upload. They stay in your file for the Everloot Desktop App.</p>}
         <p className="mt-2 text-sm text-fg-2">{prepared.value.batches.length} batches. A storage receipt confirms saved records. A batch whose every record is rejected is processed without saving its records, so later batches can continue. Named choices are checked against the grant on the server.</p>
         <button disabled={busy || !prepared.value.batches.length || complete} onClick={() => void send()} className={outlineButton + " mt-4"}>
           {sending ? "Sending…" : complete ? rejected ? "Upload processed" : "Upload complete" : session?.next ? "Resume upload" : "Send upload"}

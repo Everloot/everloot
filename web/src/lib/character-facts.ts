@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { STANDING_NAMES } from "../../../kb/src/completion";
-import type { CollectionsData, GearRow, ProfessionRow, RaidsData, ReputationRow, Section, ShowcaseInput } from "./character-showcase";
+import type { CollectionsData, GearRow, GearSlot, ProfessionRow, RaidsData, ReputationRow, Section, ShowcaseInput } from "./character-showcase";
 import type { StoredFact } from "./private-sync-store";
 
 /**
@@ -35,11 +35,11 @@ export interface FactSections {
 }
 
 /** The addon's slot names, in the character window's order, with the page's words for them. */
-const SLOTS: Record<string, string> = {
-  HeadSlot: "Head", NeckSlot: "Neck", ShoulderSlot: "Shoulders", BackSlot: "Back", ChestSlot: "Chest", ShirtSlot: "Shirt",
-  TabardSlot: "Tabard", WristSlot: "Wrists", HandsSlot: "Hands", WaistSlot: "Waist", LegsSlot: "Legs", FeetSlot: "Feet",
-  Finger0Slot: "Finger 1", Finger1Slot: "Finger 2", Trinket0Slot: "Trinket 1", Trinket1Slot: "Trinket 2",
-  MainHandSlot: "Main hand", SecondaryHandSlot: "Off hand", RangedSlot: "Ranged or relic",
+const SLOTS: Record<string, GearSlot> = {
+  HeadSlot: "head", NeckSlot: "neck", ShoulderSlot: "shoulders", BackSlot: "back", ChestSlot: "chest", ShirtSlot: "shirt",
+  TabardSlot: "tabard", WristSlot: "wrists", HandsSlot: "hands", WaistSlot: "waist", LegsSlot: "legs", FeetSlot: "feet",
+  Finger0Slot: "finger1", Finger1Slot: "finger2", Trinket0Slot: "trinket1", Trinket1Slot: "trinket2",
+  MainHandSlot: "mainHand", SecondaryHandSlot: "offHand", RangedSlot: "ranged",
 };
 const SLOT_ORDER = Object.keys(SLOTS);
 
@@ -68,9 +68,11 @@ export function factSections(facts: readonly StoredFact[], names: FactNames, now
         const d = gearData.safeParse(fact.data);
         if (!d.success) break;
         const rank = (slot: string) => { const i = SLOT_ORDER.indexOf(slot); return i < 0 ? SLOT_ORDER.length : i; };
-        out.gear = shown(fact, [...d.data.equipped].sort((a, b) => rank(a.slot) - rank(b.slot)).map((e) => ({
-          slot: SLOTS[e.slot] ?? e.slot.replace(/Slot$/, ""), itemId: e.itemId, name: names.item(e.itemId), itemLevel: e.itemLevel,
-        })));
+        // A slot the page has no place for is left out; quality and icon are filled by the page's item rules.
+        out.gear = shown(fact, [...d.data.equipped].sort((a, b) => rank(a.slot) - rank(b.slot)).flatMap((e): GearRow[] => {
+          const slot = SLOTS[e.slot];
+          return slot ? [{ slot, itemId: e.itemId, name: names.item(e.itemId), quality: null, itemLevel: e.itemLevel }] : [];
+        }));
         break;
       }
       case "talents": {
@@ -113,7 +115,7 @@ export function factSections(facts: readonly StoredFact[], names: FactNames, now
         // A lockout that has reset since the capture is gone this week.
         const live = d.data.lockouts.filter((l) => Date.parse(l.resetAt) > now.getTime());
         out.raids = shown(fact, {
-          lockouts: live.map((l) => ({ instance: l.instance, difficulty: l.difficulty ?? "Raid", killed: l.killed, total: l.total, resets: day(l.resetAt) })),
+          lockouts: live.map((l) => ({ instance: l.instance, difficulty: l.difficulty ?? "Raid", killed: l.killed, total: l.total, resets: day(l.resetAt), bosses: [] })),
           guildKills: null,
         });
         break;
@@ -127,6 +129,8 @@ export function factSections(facts: readonly StoredFact[], names: FactNames, now
           // The points the catalog agrees on; an achievement it does not list yet adds none.
           points: d.data.achievements.reduce((sum, a) => sum + (catalog.achievements.get(a.id)?.points ?? 0), 0),
           titles: d.data.titleIds.flatMap((id) => { const t = catalog.titles.get(id); return t ? [t.name] : []; }).sort((a, b) => a.localeCompare(b)),
+          // Not synced yet: earned dates, per-category totals and the quest count. Empty lists and a null, never zeros.
+          recent: [], categories: [], quests: null,
         });
         break;
       }

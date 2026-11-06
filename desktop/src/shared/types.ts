@@ -235,6 +235,20 @@ export interface ProgressRow {
   titles: number;
   quests: number;
   talentPoints: number | null;
+  /** The addon's profession_owned rows for this key: the latest state, never uploaded and not given to Chat. */
+  professions: ProfessionRow[];
+  /** The addon's lockout_owned rows for this key that have not reset yet: never uploaded and not given to Chat. */
+  lockouts: LockoutRow[];
+}
+export interface ProfessionRow { name: string; rank: number; maxRank: number }
+export interface LockoutRow {
+  instance: string;
+  /** The game's difficulty name ("40 Player"), or "" when it gave none. */
+  difficulty: string;
+  killed: number;
+  total: number;
+  /** When the lockout resets, ISO 8601 UTC. */
+  resetAt: string;
 }
 export interface CharactersInfo {
   characters: CharacterRow[];

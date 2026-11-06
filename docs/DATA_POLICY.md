@@ -202,6 +202,13 @@ id. The link lasts until the rollup is rebuilt (`?rebuild=1`), which drops every
 were deleted; deleting a player's uploads therefore takes a rebuild to remove the link. Turning the
 module off deletes every one of these rows from the file.
 
+With the same switch the addon also keeps two kinds for the Desktop App's Characters page: `profession_owned` (each
+profession's name, rank and max rank) and `lockout_owned` (each raid the character is saved to this week: instance,
+difficulty, bosses killed of total, reset time), under the same opaque key and holding only the latest state. These two
+kinds stay on the player's computer and are never uploaded: every uploader holds them back, the site's intake has no
+schema for them and refuses them, and the Desktop App's Chat does not pass them to a model provider. Turning the module
+off deletes them with the rest.
+
 The census counts who plays what. It is on in a new install of the addon, which says so once in chat; an
 install from before the census keeps it off until `/everloot census on`. It leaves the player's computer
 only from the upload page or from the Desktop App, if the player allowed the census there. It

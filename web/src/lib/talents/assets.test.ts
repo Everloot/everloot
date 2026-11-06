@@ -133,6 +133,8 @@ const SHOWS_ART = new Set([
   // The hover card on the site's own database links, one entity per request, under the pages' rules; and the
   // icons beside the item hits of /search and the type-ahead, for the items whose pages show them.
   "web/src/lib/site-card.ts", "web/src/lib/item-icons.ts",
+  // A character page's equipped items: names and icons under the same rule, for the gear the page shows.
+  "web/src/lib/showcase-gear-art.ts",
   // The same names and quest titles for the entity tokens on a wiki page.
   "web/src/lib/wiki-names.ts",
   // Dungeon wiki pages show loading-screen art under the approved page-banner extension.

@@ -15,7 +15,7 @@ const factNames = vi.hoisted(() => ({ load: vi.fn() }));
 vi.mock("@/lib/character-facts-names", () => ({ loadFactNames: factNames.load }));
 
 import { createMemoryPlayerStore, type PlayerStore } from "@/lib/player-store";
-import { FOOTER_LINE } from "@/lib/character-showcase";
+import { FOOTER_LINE, NOT_RECORDED_LINE } from "@/lib/character-showcase";
 import { PLAYER_SIGHTING_LINE } from "@/app/players/player-view";
 import * as pageModule from "./[ruleset]/[realm]/[name]/page";
 import Page, { dynamic, generateMetadata } from "./[ruleset]/[realm]/[name]/page";
@@ -70,12 +70,21 @@ describe("a public character", () => {
     expect(auth.authQuery).toHaveBeenCalledWith("rpc/public_character", expect.objectContaining({ method: "POST" }));
     expect(JSON.parse(auth.authQuery.mock.calls[0][1].body)).toEqual({ p_ruleset: "forever", p_realm_slug: "forever-pioneer", p_name: "thrallina" });
     expect(html).toContain("Thrallina");
-    expect(html).toContain("Level 24 Orc Shaman · Forever Pioneer");
+    // The header band: the line, then the realm and side, from the link row.
+    expect(html).toContain(">Level 24 Orc Shaman<");
+    expect(html).toContain("<span>Forever Pioneer</span>");
+    expect(html).toContain('data-faction="true">Horde<');
     expect(html).toContain('data-section="identity"');
     expect(html).toContain("From the player&#x27;s own addon upload, 2026-10-30 (2 days ago)");
     expect(html).toContain("Not checked against Blizzard");
-    // Identity only: no other section, and no sample banner.
+    // Identity, and the stats as one line (no collector records them): no other section, no headline number, no
+    // title, no guild, and no sample banner.
     for (const key of ["gear", "talents", "professions", "reputations", "raids", "collections"]) expect(html).not.toContain(`data-section="${key}"`);
+    expect(html).toContain('data-section="stats" data-state="unsupported"');
+    expect(html).toContain(NOT_RECORDED_LINE);
+    expect(html).toContain('href="#showcase-stats"');
+    expect(html).not.toMatch(/>0</);
+    for (const absent of ["data-headlines", "data-title", "data-guild", "data-paper-doll"]) expect(html).not.toContain(absent);
     expect(html).not.toContain("data-sample");
     expect(html).not.toMatch(/verified|owner|proven|✓/i);
     // Someone whose character this really is can hide it without an account.
@@ -371,7 +380,9 @@ describe("one page for a character: the owner's showcase and what the addon saw"
     expect(owner).toBeGreaterThan(-1);
     expect(sighting).toBeGreaterThan(owner);
     // The header and the owner's part are the link row's (Orc, level 24); the sighting's facts stay in its own part.
-    expect(out).toContain("Level 24 Orc Shaman · Forever Pioneer");
+    expect(out).toContain("Level 24 Orc Shaman");
+    expect(out.slice(0, owner)).toContain("Forever Pioneer");
+    expect(out.slice(0, owner)).toContain("Horde");
     expect(out.slice(0, sighting)).not.toMatch(/Undead|Night Watch|2026-10-20/);
     expect(out.slice(sighting)).toContain("Undead");
     expect(out.slice(sighting)).not.toContain(">Orc<");
