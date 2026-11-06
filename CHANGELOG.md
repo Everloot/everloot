@@ -70,6 +70,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   `addon_download` to CurseForge like the other download links. The same tested zip is uploaded there on each release.
 
 ### Added
+- Addon, Desktop App and site: a linked character's active talent build syncs to its page. The addon keeps it as a
+  keyed `talent_owned` row (local only, deleted by `/everloot completion off`), the Desktop App sends it with the other
+  synced categories, and the site keeps it under the talents switch. The anonymous `talent_snapshot` is never synced.
 - Site and MCP: while few players upload, Everloot's own installs (Worker secret `EVERLOOT_TRUSTED_INSTALLS`) make an
   Auction House day or a census count public on their own. Everyone else still needs 3 reporters, and a census count
   still needs 10 characters, the hiding of small counts and rounding to 5. A value that rests on them says "includes

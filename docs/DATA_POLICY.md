@@ -834,7 +834,7 @@ In effect from 6 November 2026, accepted by the maintainer that day (`EVERLOOT_P
 its character by the same opaque key as the other synced rows, under the talents switch; there is no separate category.
 The public `talent_snapshot` row carries no character and is never synced.
 
-Amended 7 November 2026: the active talent build (`talent_owned`); to be accepted by the maintainer in PR review.
+Amended 6 November 2026, accepted by the maintainer that day: the active talent build (`talent_owned`).
 
 A signed-in player can sync their own linked characters' progress to their account and choose which parts of it
 their character's public page shows. Like saved builds and profiles, this is the player's own data, not an
