@@ -44,6 +44,16 @@ cannot ever fill are left out rather than shown empty.
   - **Progress**: the completionist explanation and a link to the tool; nothing else until a public opt-in exists.
 - The hide-this-character card and the privacy link stay at the foot. noindex rules unchanged.
 
+**As built (2026-11-05).** No tab row: one column of parts, each with its own source line, and a rail (contents and
+the date of each source). Order: the owner's showcase (when linked and public), the sighting (now with the faction its
+race plays on; none for Skyborne), the guild the sighting names (link, size, the guild's agreed progress with the
+guild page's own instance cards, up to eight other characters seen in it; read only with `EVERLOOT_GUILDS=1`), then
+"Plan a level N <class>": the class-context links (`contextLinks`), the same for every character of the class. The
+officers' rank, loot and attendance for the one character are built behind `EVERLOOT_CHARACTER_GUILD_FACTS` (off):
+each is public on the guild page, but the privacy guide lists the places a name appears, and gathering them on the
+character page needs the owner's word first (decision d below). Talents from a profile matched by name (b) are not
+built.
+
 ## 3. The showcase (`EVERLOOT_SHOWCASE=1`)
 
 A set of pages at `/showcase` that render the real components with sample rows, so the site can show, before
@@ -74,6 +84,9 @@ b. Whether the character page may show a build whose public profile names a char
    (a match by name, not a verified link; the page would say "shared by @handle").
 c. Whether the Progress tab should offer an owner opt-in to publish completion on the public page later (a new
    grant category); not built here.
+d. Whether a character's page may gather the officers' facts that name it (roster rank, loot received, present at
+   the last raid), which the guild page already shows. **Answered yes, 2026-11-06:** `EVERLOOT_CHARACTER_GUILD_FACTS=1`
+   in `web/wrangler.jsonc`, and the privacy policy, privacy guide and data policy name the character page.
 
 ## 5. Testing
 

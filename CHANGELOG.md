@@ -102,6 +102,13 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   objects keeps to that type.
 
 ### Changed
+- Site: a character's page reads as one page. Its parts come in a fixed order, each with its own source line: the
+  owner's showcase, what the addon last saw, the guild it was seen in (the guild's own page: its size, its agreed raid
+  progress, labelled as the guild's and not the character's attendance, and up to eight other characters seen in it),
+  then links to the class's pages at the character's level. A rail lists the parts and the date of each source. The
+  sighting names the faction its race plays on (none for Skyborne). When the guild's officers published a board, the
+  guild part also shows that character's rank, the loot they gave it and whether it was at their last raid
+  (`EVERLOOT_CHARACTER_GUILD_FACTS`); the privacy policy, the privacy guide and the data policy say so.
 - Site: the drop rates API (`/api/rollups/drops`) gives each rate `sourceName` once 3 installs agree on the NPC's or
   object's name, so the Desktop App's price file can name sources a player never met.
 - Site: the Auction House files a realm under the PvE, PvP, RP, RP-PvP or Hardcore tab when its name ends in that
