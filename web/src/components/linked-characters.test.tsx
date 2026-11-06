@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import LinkedCharacters, { FROZEN_TEXT, LABEL_TEXT, PAGE_TEXT, SYNC_TEXT, type ListedLink } from "./LinkedCharacters";
+import LinkedCharacters, { FROZEN_TEXT, LABEL_TEXT, PAGE_TEXT, RANK_TEXT, SYNC_TEXT, type ListedLink } from "./LinkedCharacters";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -313,6 +313,35 @@ describe("private sync", () => {
       { url: `/api/me/characters/links/${LINK.id}/visibility`, body: { show_gear: true } },
       { url: `/api/me/characters/links/${LINK.id}/visibility`, body: { show_collections: true } },
     ]);
+  });
+
+  test("Rank my gear shows only while the boards are on, ranks only with the page public and gear sync on, and sends ranked_gear", async () => {
+    const ranked = (opts: Parameters<typeof synced>[0] & { ranked?: boolean }) => {
+      const l = synced(opts);
+      return { ...l, page: { ...l.page!, ranked: opts.ranked ?? false } };
+    };
+    syncApi([{ links: [synced({ public: true, on: ["gear"] })] }]);
+    await show();
+    expect(container.textContent).not.toContain(RANK_TEXT);
+    await act(async () => root.unmount());
+    root = createRoot(container);
+
+    syncApi([{ links: [ranked({ public: true, on: [] })] }]);
+    await show();
+    const off = button("Rank Thrallina's gear")!;
+    expect(container.textContent).toContain(RANK_TEXT);
+    expect(off.disabled).toBe(true);
+    expect(reason(off)).toBe("Ranks only once gear sync is on.");
+    await act(async () => root.unmount());
+    root = createRoot(container);
+
+    const sent = syncApi([{ links: [ranked({ public: true, on: ["gear"] })] }, { links: [ranked({ public: true, on: ["gear"], ranked: true })] }]);
+    await show();
+    await click("Rank Thrallina's gear");
+    expect(sent).toEqual([{ url: `/api/me/characters/links/${LINK.id}/visibility`, body: { ranked_gear: true } }]);
+    expect(status()).toBe("Thrallina's gear is ranked.");
+    expect(container.textContent).toContain("Rank my gear: on");
+    expect(button("Take Thrallina off the gear rankings")!.disabled).toBe(false);
   });
 
   test("without the pages there is sync but no section switch", async () => {

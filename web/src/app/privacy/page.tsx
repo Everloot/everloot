@@ -4,6 +4,7 @@ import { pageMetadata } from "@/lib/seo";
 import { REVOKED_KEPT_DAYS, USAGE_KEPT_DAYS } from "@/lib/api-keys";
 import { OPERATOR } from "@/lib/jsonld";
 import { trailFor } from "@/lib/breadcrumbs";
+import { leaderboardsOn } from "@/lib/leaderboard-switch";
 import { pullSummariesOn } from "@/lib/pull-summaries";
 import { Container, PageHeader, Prose, SectionHeading, ReadingLayout, type TocItem } from "@/components/ui";
 
@@ -37,6 +38,8 @@ function Section({ id, children }: { id: string; children: React.ReactNode }) {
 export default function PrivacyPage() {
   // The boss pulls item shows only once the site collects them (EVERLOOT_PULL_SUMMARIES), and dates the page with it.
   const pulls = pullSummariesOn();
+  // The gear rankings item shows only once the boards are on (EVERLOOT_LEADERBOARDS); the switch-on change dates the page.
+  const ranked = leaderboardsOn();
   // Linked characters, public character pages, the guild item's character page and private sync: 6 November.
   const updated = "6 November 2026";
   return (
@@ -199,6 +202,14 @@ export default function PrivacyPage() {
                 it is self-reported and not checked against Blizzard. Turning a category&apos;s sync off deletes what
                 was synced for it at once; unlinking the character or deleting your account deletes all of it.
               </li>
+              {ranked && <li id="gear-rankings">
+                <strong>Gear rankings (optional):</strong> if you turn on <em>Rank my gear</em> for a linked
+                character whose page is public and whose gear sync is on, its name, realm, level, race and class, its
+                item level and Gear Score worked out from that synced gear, its rank and the gear&apos;s date show on the
+                public item level and Gear Score rankings. The items themselves show only if you show gear on the page.
+                Nothing is stored for the rankings: turning the switch, the page or gear sync off takes the character
+                off on the next request. It is off by default.
+              </li>}
               <li id="chat-projects">
                 <strong>Chat projects (optional):</strong> while signed in, Chat can keep your
                 conversations, projects, notes and saved entries in your account so they follow

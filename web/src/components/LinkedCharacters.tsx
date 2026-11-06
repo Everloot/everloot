@@ -10,9 +10,10 @@ export interface ListedLink {
   /**
    * Listed only while the character pages are on (EVERLOOT_SHOWCASE=1). `label` only while planned builds are on too
    * (EVERLOOT_SHOWCASE_BUILDS=1): the build label whose shared builds the page lists, or null. `sections` only while
-   * private sync is on too (EVERLOOT_PRIVATE_SYNC=1): each category's section switch.
+   * private sync is on too (EVERLOOT_PRIVATE_SYNC=1): each category's section switch. `ranked` only while the gear
+   * rankings are on (EVERLOOT_LEADERBOARDS=1): the "Rank my gear" switch.
    */
-  page?: { public: boolean; path: string; label?: { id: string; name: string } | null; sections?: Record<SyncCategory, boolean> };
+  page?: { public: boolean; path: string; label?: { id: string; name: string } | null; sections?: Record<SyncCategory, boolean>; ranked?: boolean };
   /** Listed only while private sync is on: each category's sync, in page order. */
   sync?: { category: SyncCategory; on: boolean; capturedAt: string | null }[];
 }
@@ -46,6 +47,17 @@ export const LABEL_TEXT = "Planned builds: the page can list the shared builds y
 
 /** What private sync does, said above a character's sync switches. */
 export const SYNC_TEXT = "Sync: the Everloot Desktop App sends what you turn on here, with a key made with \"Sync my linked characters\". Every part starts off, and only you see what is synced. Turning a part's sync off deletes what was synced for it.";
+
+/** What ranking a character's gear does, said next to its switch. */
+export const RANK_TEXT = "Rank my gear: the character's name, realm, level, race and class, with its item level and Gear Score from the synced gear, show on the item level and Gear Score rankings. Never the items themselves unless you show gear on the page. Off by default; turning it off takes the character off the rankings at once.";
+
+/** Why a character's gear is not ranked yet, or null when it can be. */
+function notRankedBecause(pagePublic: boolean, gearSync: boolean): string | null {
+  if (!pagePublic && !gearSync) return "Ranks only once the page is public and gear sync is on.";
+  if (!pagePublic) return "Ranks only once the page is public.";
+  if (!gearSync) return "Ranks only once gear sync is on.";
+  return null;
+}
 
 /** Why a section switch does nothing yet, or null when its section can show. */
 function notShownBecause(pagePublic: boolean, syncOn: boolean): string | null {
@@ -240,6 +252,33 @@ export default function LinkedCharacters() {
                       </>
                     )}
                   </div>
+                  {link.page.ranked !== undefined && (() => {
+                    const ranked = link.page!.ranked!;
+                    const gearSync = link.sync?.find((s) => s.category === "gear")?.on === true;
+                    const why = notRankedBecause(link.page!.public, gearSync);
+                    const whyId = `rank-why-${link.id}`;
+                    return (
+                      <div className="space-y-1">
+                        <p className="text-fg-2">{RANK_TEXT}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-fg">Rank my gear: {ranked && !why ? "on" : ranked ? "on, not ranked yet" : "off"}</span>
+                          <button
+                            type="button"
+                            className={button}
+                            aria-label={ranked ? `Take ${link.name} off the gear rankings` : `Rank ${link.name}'s gear`}
+                            aria-describedby={why ? whyId : undefined}
+                            onClick={() => void setSwitch(link, `${link.id}:rank`, "visibility", { ranked_gear: !ranked },
+                              ranked ? `${link.name} is off the gear rankings.` : `${link.name}'s gear is ranked.`)}
+                            // On can always be turned off; off turns on only when the character would rank.
+                            disabled={busy !== null || (!ranked && why !== null)}
+                          >
+                            {busy === `${link.id}:rank` ? "Saving…" : ranked ? "Stop ranking" : "Rank it"}
+                          </button>
+                          {why && <span id={whyId} className="text-fg-2">{why}</span>}
+                        </div>
+                      </div>
+                    );
+                  })()}
                   {link.page.label !== undefined && (
                     <div className="space-y-1">
                       <p className="text-fg-2">{LABEL_TEXT}</p>

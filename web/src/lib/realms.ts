@@ -77,6 +77,15 @@ export function realmRuleset(realm: string): string {
   return realmInfo(realm)?.ruleset ?? rulesetFromName(realm) ?? DEFAULT_RULESET;
 }
 
+/**
+ * The region a realm is in: the map's, else the region code its name carries ("CAMWOW US1 Realm 4 PvP" is us), else
+ * null. Never a guess from anything else.
+ */
+export function realmRegion(realm: string): Region | null {
+  const named = /(?:^|\s)(us|eu|kr|tw)\d*(?:\s|$)/i.exec(realm.trim())?.[1]?.toLowerCase();
+  return realmInfo(realm)?.region ?? (named as Region | undefined) ?? null;
+}
+
 /** Rulesets with at least one realm mapped to them. */
 export function mappedRulesets(): Set<RulesetSlug> {
   return new Set([...MAP.values()].map((r) => r.ruleset));

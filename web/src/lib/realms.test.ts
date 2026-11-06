@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import { REALMS } from "../data/realms";
 import { RULESETS } from "../data/wow-forever-launch";
 import { REALM_RULESETS } from "../design/tokens";
-import { DEFAULT_RULESET, RULESET_LABEL, RULESET_SLUGS, realmInfo, realmMap, realmMapKey, realmParts, realmRuleset, rulesetFromName, rulesetParam } from "./realms";
+import { DEFAULT_RULESET, RULESET_LABEL, RULESET_SLUGS, realmInfo, realmMap, realmMapKey, realmParts, realmRegion, realmRuleset, rulesetFromName, rulesetParam } from "./realms";
 
 // These tests read the realm map as committed, so they hold before and after it is filled. ./realms-empty.test.ts
 // pins the map empty and checks that everything behaves as before the map existed.
@@ -68,3 +68,11 @@ test("only a ruleset's slug is a ruleset parameter", () => {
   for (const bad of ["all", "forever", "PvP", "pve", "rp_pvp"]) expect(rulesetParam(bad)).toBeUndefined();
 });
 
+
+test("a realm's region comes from the region code in its name, never a guess", () => {
+  expect(realmRegion("CAMWOW US1 Realm 4 PvP")).toBe("us");
+  expect(realmRegion("CAMWOW EU5 Realm 4 PvP")).toBe("eu");
+  expect(realmRegion("camwow kr2 realm 1 rp")).toBe("kr");
+  expect(realmRegion("Mal'Ganis")).toBeNull();
+  expect(realmRegion("Eusebius")).toBeNull();
+});
