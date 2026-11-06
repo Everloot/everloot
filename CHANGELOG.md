@@ -70,8 +70,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   `addon_download` to CurseForge like the other download links. The same tested zip is uploaded there on each release.
 
 ### Added
-- Site: item level and Gear Score rankings for linked characters, built behind `EVERLOOT_LEADERBOARDS` (off; needs migration
-  `20261107120000_gear_board.sql` and the data policy's "Gear rankings" section, both waiting on the maintainer). A character
+- Site: item level and Gear Score rankings for linked characters at /rankings/item-level and /rankings/gear-score
+  (`EVERLOOT_LEADERBOARDS`, migration `20261107120000_gear_board.sql`, the data policy's "Gear rankings"). A character
   is on them only while its player made the page public, turned gear sync on and chose "Rank my gear" on the account page.
   Both numbers are averages over 17 slots with each item at the game files' item level; Gear Score v1 weighs each slot by
   its stat budget in the game's `RandPropPoints` table. Filters by ruleset and region, and the character page shows its

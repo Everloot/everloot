@@ -85,6 +85,8 @@
     "EVERLOOT_CHARACTER_LINKS": "1",
     "EVERLOOT_SHOWCASE": "1",
     "EVERLOOT_PRIVATE_SYNC": "1",
+    // Item level and Gear Score boards for linked characters whose owner chose "Rank my gear" (owner, 2026-11-06).
+    "EVERLOOT_LEADERBOARDS": "1",
     "NEWS_DIR": "/bundle/repo/kb/news",
     "GUIDES_DIR": "/bundle/repo/kb/guides",
     "WIKI_DIR": "/bundle/repo/kb/wiki",

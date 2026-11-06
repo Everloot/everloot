@@ -864,9 +864,9 @@ observation of anyone else, and none of it is published as a dataset.
 
 ## Gear rankings
 
-**Proposed, not yet in effect.** It takes effect once the maintainer accepts it, migration
-`20261107120000_gear_board.sql` is applied and `EVERLOOT_LEADERBOARDS=1` is set. Until then `/rankings/item-level`
-and `/rankings/gear-score` answer 404 and the switch below is refused.
+In effect from 6 November 2026, accepted by the maintainer that day (`EVERLOOT_LEADERBOARDS`, migration
+`20261107120000_gear_board.sql`). With the switch off, `/rankings/item-level` and `/rankings/gear-score` answer 404
+and the switch below is refused.
 
 Two public boards rank linked characters by the gear their owner synced: average item level and Everloot Gear
 Score. This is the ranking contract the owned-character identity ADR asks for, for gear only. Achievements, gold
