@@ -58,7 +58,7 @@ export const STAT_LABELS: Record<StatKey, { group: StatGroup; label: string; per
   meleeHit: { group: "Melee", label: "Hit", percent: true },
   meleeCrit: { group: "Melee", label: "Crit", percent: true },
   meleeHaste: { group: "Melee", label: "Haste", percent: true },
-  expertise: { group: "Melee", label: "Expertise", percent: false },
+  expertise: { group: "Melee", label: "Expertise", percent: true },
   rangedAttackPower: { group: "Ranged", label: "Attack power", percent: false },
   rangedHit: { group: "Ranged", label: "Hit", percent: true },
   rangedCrit: { group: "Ranged", label: "Crit", percent: true },
@@ -129,8 +129,11 @@ export function factSections(facts: readonly StoredFact[], names: FactNames, now
         const d = pvpFact.safeParse(fact.data);
         if (!d.success) break;
         const v = d.data;
-        // A fact with neither the rank nor the honorable kills says nothing to draw.
-        if (v.rank == null && v.honorableKills == null) break;
+        // Nothing to draw (no rank above 0, no points toward a next rank, no season, no kill count): no section, not
+        // an empty card. Rank 0 is unranked, as the PvP section reads it.
+        const ranked = v.rank != null && v.rank > 0;
+        const points = v.rankPoints != null && v.rankThreshold != null && v.rankThreshold > 0;
+        if (!ranked && !points && v.season == null && v.honorableKills == null) break;
         out.pvp = shown(fact, {
           rank: v.rank ?? null, rankPoints: v.rankPoints ?? null, rankThreshold: v.rankThreshold ?? null,
           rankMax: v.rankMax ?? null, season: v.season ?? null, honorableKills: v.honorableKills ?? null,

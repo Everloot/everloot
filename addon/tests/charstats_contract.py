@@ -108,7 +108,7 @@ def read(lua, name="PLAYER_ENTERING_WORLD", *args):
 
 FULL = {
     "strength": 10, "agility": 20, "stamina": 31, "intellect": 400, "spirit": 55,
-    "meleeAttackPower": 115, "meleeHit": 2.75, "meleeCrit": 5.46, "meleeHaste": 4.5, "expertise": 8,
+    "meleeAttackPower": 115, "meleeHit": 2.75, "meleeCrit": 5.46, "meleeHaste": 4.5, "expertise": 7.6,
     "rangedAttackPower": 60, "rangedHit": 2.5, "rangedCrit": 6.0, "rangedHaste": 4.0,
     "spellPower": 299, "healing": 450, "spellHit": 5.53, "spellCrit": 7.13, "spellHaste": 8.1,
     "armor": 1235, "defense": 312, "dodge": 4.5, "parry": 0, "block": 8.76,

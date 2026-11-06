@@ -9,7 +9,7 @@
 -- The row stays on this computer: no uploader sends it (web/src/lib/upload-batches.ts LOCAL_ONLY_KINDS) and the
 -- site's intake does not know it. It is for the private sync of a character the player linked.
 --
--- Numbers: the percent stats (every *Hit, *Crit, *Haste, dodge, parry, block) are rounded to 2 decimals. Every other
+-- Numbers: the percent stats (every *Hit, *Crit, *Haste, expertise, dodge, parry, block) are rounded to 2 decimals. Every other
 -- stat is a whole number, ROUNDED to the nearest (not floored).
 --
 -- Calls, each read from Forever's Camelot paper doll files (PaperDollFrame.lua, PaperDollFrameStats.lua):
@@ -19,7 +19,7 @@
 --   GetHitModifier / GetRangedHitModifier / GetSpellHitModifier, plus GetCombatRatingBonus(CR_HIT_MELEE|RANGED|SPELL)
 --                                      when that global and the function both exist
 --   GetMeleeHaste / UnitSpellHaste("player"); GetRangedHaste first + second return (ammo haste, 0 if absent)
---   GetExpertise                       first return (main hand)
+--   GetExpertise                       first return (main hand), a percent
 --   GetSpellBonusDamage(2..7)          the lowest school; GetSpellBonusHealing
 --   UnitArmor                          second return (effective); UnitDefenseSkill base + modifier, at least 0
 --   GetDodgeChance / GetParryChance / GetBlockChance
@@ -125,7 +125,8 @@ function S.Collect()
   put("meleeHit", percent(hit("GetHitModifier", "CR_HIT_MELEE")))
   put("meleeCrit", percent((call("GetCritChance"))))
   put("meleeHaste", percent((call("GetMeleeHaste"))))
-  put("expertise", whole((call("GetExpertise"))))
+  -- A percent in Forever: the paper doll formats it "%.1F%%" (Camelot PaperDollFrameStats.lua).
+  put("expertise", percent((call("GetExpertise"))))
 
   put("rangedAttackPower", whole(sum(3, call("UnitRangedAttackPower", "player"))))
   put("rangedHit", percent(hit("GetRangedHitModifier", "CR_HIT_RANGED")))

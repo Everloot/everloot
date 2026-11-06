@@ -113,6 +113,18 @@ describe("factSections", () => {
     expect(factSections([at("pvp", { rank: null, honorableKills: null }), at("pvp", { rank: "9" })], NAMES, NOW).pvp).toBeUndefined();
   });
 
+  test("pvp: unranked with nothing else to draw leaves the section out, not an empty card", () => {
+    expect(factSections([at("pvp", { rank: 0, rankPoints: 0, rankThreshold: 0 })], NAMES, NOW).pvp).toBeUndefined();
+    expect(factSections([at("pvp", { rank: 0, honorableKills: 0 })], NAMES, NOW).pvp).toMatchObject({ data: { honorableKills: 0 } });
+    expect(factSections([at("pvp", { rank: 0, season: 3 })], NAMES, NOW).pvp).toMatchObject({ data: { season: 3 } });
+    expect(factSections([at("pvp", { rank: 0, rankPoints: 40, rankThreshold: 500 })], NAMES, NOW).pvp).toMatchObject({ data: { rankPoints: 40 } });
+  });
+
+  test("expertise is a percent, as Forever's character window shows it", () => {
+    const s = factSections([at("stats", { stats: { strength: 1, agility: 1, stamina: 1, intellect: 1, spirit: 1, expertise: 7.6 } })], NAMES, NOW).stats;
+    expect(s).toMatchObject({ data: [{ group: "Attributes" }, { group: "Melee", stats: [{ label: "Expertise", value: "7.60%" }] }] });
+  });
+
   test("a stored shape it does not know is left out, never guessed", () => {
     const s = factSections([at("gear", { equipped: "nope" }), at("professions", { list: [] }), at("raids", { lockouts: [{ instance: 1 }] })], NAMES, NOW);
     expect(s).toEqual({});

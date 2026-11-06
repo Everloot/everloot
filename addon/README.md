@@ -189,7 +189,7 @@ expands, clicks or changes anything.
   read replaces this character's row, a build with no spent points writes none, and `/everloot completion off`
   deletes them with the rest. The anonymous `talent_snapshot` of the talents module is unchanged.
 - **Character sheet row** (`stats_owned`): the numbers the character sheet shows (attributes, attack power, hit, crit,
-  haste, spell power, healing, armor, defense, dodge, parry, block), one row per character under the same key, read out of combat. Percent stats are
+  haste, expertise, spell power, healing, armor, defense, dodge, parry, block), one row per character under the same key, read out of combat. Percent stats are
   rounded to 2 decimals and the rest to whole numbers; a stat the game will not give is left out, and with fewer than
   the five attributes there is no row. Never part of an upload file; the Desktop App's private sync sends it for a linked character and everloot.app keeps it
   only if you switched on that category; `/everloot completion off` deletes it.
