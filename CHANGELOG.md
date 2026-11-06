@@ -15,6 +15,9 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
+- Addon and site: a realm whose name ends in RP-PvP written as one word ("CAMWOW US1 Realm 9 RPPVP", as players copied
+  Forever's realm list) is an RP-PvP realm: the Auction House files it under RP-PvP instead of "Realms not mapped yet",
+  and the tooltip header splits it off in the RP-PvP colour.
 - Site: the separator between the facts under an Auction House title reads "·", not "Â·".
 - Site and MCP: recipe skill ranges agree on the recipe id the trade-skill window reports, not the recipe's name, so an
   install on a Spanish client ("Peletería") counts toward the same range as English ones. A recipe the game files list

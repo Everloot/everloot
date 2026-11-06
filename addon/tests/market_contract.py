@@ -587,6 +587,8 @@ end
 assert(split('CAMWOW US1 Realm 4 PvP') == 'CAMWOW US1 Realm 4|PvP' and split('Some Realm PvE') == 'Some Realm|PvE')
 assert(split('Some Realm Normal') == 'Some Realm|PvE' and split('Some Realm RP') == 'Some Realm|RP')
 assert(split('Some Realm RP-PvP') == 'Some Realm|RP-PvP' and split('Some Realm RP PvP') == 'Some Realm|RP-PvP')
+assert(split('CAMWOW US1 Realm 9 RPPVP') == 'CAMWOW US1 Realm 9|RP-PvP' and split('CAMWOW AU1 Realm 4 RPPvP') == 'CAMWOW AU1 Realm 4|RP-PvP', 'RP-PvP as one word')
+assert(split('CAMWOW US1 Realm 1 PVE') == 'CAMWOW US1 Realm 1|PvE' and split('CAMWOW US1 Realm 10 RP') == 'CAMWOW US1 Realm 10|RP')
 assert(split('Some Realm Hardcore') == 'Some Realm|Hardcore')
 assert(split('Forever') == 'Forever|-' and split('PvP') == 'PvP|-' and split('Pvpland') == 'Pvpland|-', 'a name without a ruleset stays whole')
 for _, realm in ipairs({ 'A PvP', 'A PvE', 'A RP', 'A RP-PvP', 'A Hardcore' }) do

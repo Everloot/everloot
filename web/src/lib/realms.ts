@@ -39,9 +39,12 @@ export function realmInfo(realm: string): RealmInfo | null {
   return MAP.get(realmMapKey(realm)) ?? null;
 }
 
-/** The last word of a realm's name, as Forever's realm list ends each name ("CAMWOW US1 Realm 4 PvP"). */
+/**
+ * The last word of a realm's name, as Forever's realm list ends each name ("CAMWOW US1 Realm 4 PvP"). RP-PvP may be
+ * one word ("CAMWOW US1 Realm 9 RPPVP" in the list players copied).
+ */
 const NAME_ENDINGS: readonly [RegExp, RulesetSlug][] = [
-  [/[\s-]rp[\s-]pvp$/i, "rp-pvp"], [/[\s-]pvp$/i, "pvp"], [/[\s-](pve|normal)$/i, "normal"],
+  [/[\s-]rp[\s-]?pvp$/i, "rp-pvp"], [/[\s-]pvp$/i, "pvp"], [/[\s-](pve|normal)$/i, "normal"],
   [/[\s-]rp$/i, "rp"], [/[\s-]hardcore$/i, "hardcore"],
 ];
 
