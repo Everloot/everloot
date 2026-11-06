@@ -15,7 +15,7 @@ SCHEMA_DIR = Path(os.environ.get("EVERLOOT_PROTOCOL_SCHEMA") or Path(__file__).p
 
 # Kinds the addon writes that never leave the computer: no uploader sends them (web/src/lib/upload-batches.ts
 # LOCAL_ONLY_KINDS) and the intake has no schema for them, by design. owned_contract.py checks their shape.
-LOCAL_ONLY_KINDS = {"profession_owned", "lockout_owned", "talent_owned"}
+LOCAL_ONLY_KINDS = {"profession_owned", "lockout_owned", "talent_owned", "stats_owned"}
 
 _validators = {}
 

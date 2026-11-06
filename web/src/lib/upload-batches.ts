@@ -26,7 +26,7 @@ const CENSUS_SEEN = "census_seen", CENSUS_SELF = "census_self";
  * professions, raid lockouts and active talent build (addon/modules/owned.lua). The protocol has no schema for them, so the intake would
  * refuse them anyway; they are held here by name so they never reach a batch and are not counted as invalid.
  */
-export const LOCAL_ONLY_KINDS: readonly string[] = ["profession_owned", "lockout_owned", "talent_owned"];
+export const LOCAL_ONLY_KINDS: readonly string[] = ["profession_owned", "lockout_owned", "talent_owned", "stats_owned"];
 
 /** Distinct characters per census kind. A row without a guid is not a character and is not counted. */
 export function censusCharacters(records: readonly { kind: string; guid?: unknown }[]): UploadSession["census"] {

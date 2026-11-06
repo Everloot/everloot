@@ -283,6 +283,7 @@ SlashCmdList["EVERLOOT"] = function(msg)
       -- Turning it off withdraws what it wrote: every completion row is deleted from this file.
       if E.Completion then E.Completion.Withdraw() end
       if E.Owned then E.Owned.Withdraw() end
+      if E.CharStats then E.CharStats.Withdraw() end
       print("Everloot: completion tracker off; all recorded completion rows were deleted from this file. /reload to apply.")
     end
   elseif msg == "completion" and E.Completion then

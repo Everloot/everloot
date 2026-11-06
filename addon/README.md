@@ -188,6 +188,10 @@ expands, clicks or changes anything.
   categories you switched on. Each
   read replaces this character's row, a build with no spent points writes none, and `/everloot completion off`
   deletes them with the rest. The anonymous `talent_snapshot` of the talents module is unchanged.
+- **Character sheet row** (`stats_owned`): the numbers the character sheet shows (attributes, attack power, hit, crit,
+  haste, spell power, defense), one row per character under the same key, read out of combat. Percent stats are
+  rounded to 2 decimals and the rest to whole numbers; a stat the game will not give is left out, and with fewer than
+  the five attributes there is no row. Never part of an upload file; `/everloot completion off` deletes it.
 - A changed achievement or standing replaces its earlier row. Titles and completed quests are additions.
 - The file stays bounded: at most 1500 achievements read, 600 progress rows per character, and about 3 MB
   of completion rows and remembered ids in all. A limit reached stops recording, says so once in chat that
