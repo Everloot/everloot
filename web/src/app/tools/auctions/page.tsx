@@ -10,7 +10,7 @@ import { browseView } from "./browse-view";
 export const dynamic = "force-dynamic";
 
 const TITLE = "WoW Forever Auction House Prices";
-const DESCRIPTION = "Live WoW: Forever auction house prices by realm: market value, minimum buyout and 60-day history from player scans. A price shows once 3 reporters agree.";
+const DESCRIPTION = "WoW: Forever auction house prices by realm: market value, minimum buyout and 60-day history, from player scans and Everloot's own.";
 
 type Search = Record<string, string | string[] | undefined>;
 type Props = { searchParams: Promise<Search> };

@@ -184,7 +184,7 @@ export const TOOL_LINES: Record<string, string> = {
   "/tools/farming-routes": "Gold and reputation farming areas, filled in from what players upload.",
   "/chat": "Ask a question in plain words. Your own AI model looks it up in Everloot's data and names the sources.",
   "/tools/legacy": "WoW: Forever's Legacy perk trees as the game files hold them: ids, ranks, prerequisites and spend gates, unconfirmed.",
-  "/tools/auctions": "Auction House prices by realm, from player scans. A price shows once 3 reporters agree.",
+  "/tools/auctions": "Auction House prices by realm, from player scans. A price shows once 3 reporters agree, or from Everloot's own scans.",
   "/census": "Races, classes and levels, counted from players who turned the census on.",
   "/rankings": "WoW: Forever week by week, from players who turned the census on.",
   "/addons": "Addons made for WoW: Forever, ranked by GitHub stars.",
