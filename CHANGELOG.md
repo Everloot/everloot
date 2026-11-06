@@ -18,6 +18,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Addon: a partial price sample (the search-based fallback when a full scan cannot run) keeps only the newest earlier
   sample of that realm before it stores, so two samples no longer fill the 2,000-row `auction_scan` cap and later samples no
   longer report "stored 0". Another realm's rows stay.
+- Addon: the Everloot price block shows once per hover. Comparing an item opens the game's comparison tooltips beside
+  the main one, and each of them carried the block too, so one hover read it up to three times.
 - CurseForge: an Alpha release uploads as a CurseForge Beta, named "Everloot <version> Beta". CurseForge's Files tab hides
   alpha files unless a visitor ticks "Show alpha files", so with every file an Alpha it read "No Results". GitHub still marks
   the release a pre-release, and the site still calls the addon an Alpha.
