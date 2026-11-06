@@ -29,6 +29,8 @@ export interface Settings {
   startInTray: boolean;
   /** The player closed the Overview's note that the data folder has grown past DATA_NOTICE_BYTES; it is not shown again. */
   dataNoticeDismissed: boolean;
+  /** Install a newer addon release on its own, into a game folder that already has the addon. On by default. */
+  autoUpdateAddon: boolean;
 }
 
 export type JobState = "off" | "idle" | "running" | "ok" | "error";
@@ -291,6 +293,8 @@ export interface AppState {
   builds: BuildsStatus;
   /** The site's last receipt for runs and boss pulls said it reads them; the settings page describes them only then. */
   runRecords?: boolean;
+  /** A newer addon release the app did not install itself (the switch is off, or the install failed); shown in the tray. */
+  addonUpdate?: string | null;
 }
 
 /** What `window.everloot` offers the page. Implemented in preload.ts over IPC. */

@@ -132,6 +132,7 @@ export async function fetchDropSources(endpoint: string, send: typeof fetch = fe
   const site = new URL(endpoint).origin;
   let url: string | null = `${site}/api/rollups/drops`;
   const rows: DropRow[] = [];
+  const names: Record<string, string> = {};
   let dataAsOf: string | null = null;
   for (let page = 0; url && page < MAX_DROP_PAGES; page++) {
     const res = await send(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(15_000) });
@@ -146,25 +147,38 @@ export async function fetchDropSources(endpoint: string, send: typeof fetch = fe
       if (!kind || !count(raw.itemId) || raw.itemId < 1 || !count(raw.drops) || !count(raw.kills) || !count(raw.reporters)) continue;
       if (raw.kills < 1 || raw.drops > raw.kills || raw.reporters < 3) continue;
       rows.push([raw.itemId, kind, source, raw.drops, raw.kills, raw.reporters]);
+      // The name the site knows for the source, so a tooltip can name one the player never met.
+      if (typeof raw.sourceName === "string" && raw.sourceName.trim()) names[`${kind}${source}`] = raw.sourceName;
     }
     const next: unknown = body.next;
     url = typeof next === "string" && next.startsWith(`${site}/api/rollups/drops?`) ? next : null;
   }
   rows.sort((a, b) => b[4] - a[4]);
-  return { dataAsOf, fetchedAt: now.toISOString(), rows: rows.slice(0, MAX_DROP_ROWS) };
+  const kept = rows.slice(0, MAX_DROP_ROWS);
+  return { dataAsOf, fetchedAt: now.toISOString(), rows: kept, ...(Object.keys(names).length ? { names } : {}) };
+}
+
+/** A Lua string literal's text as the companion writes it ("\\n", "\\\"", "\\\\" and "\\ddd" escapes). */
+function luaText(body: string): string {
+  return body.replace(/\\(\d{3}|.)/g, (_, e: string) => (e === "n" ? "\n" : /^\d{3}$/.test(e) ? String.fromCharCode(Number(e)) : e));
 }
 
 /** The drops block of the file this app last wrote, to carry over between daily fetches; null when absent. */
 export function readDropsBlock(addonsDir: string): DropSources | null {
   let text: string;
   try { text = readFileSync(join(addonsDir, "EverlootPrices", "EverlootPrices.lua"), "utf8"); } catch { return null; }
-  const m = /\["drops"\] = \{ \["data"\] = "([\w,;]*)", \["sum"\] = \d+, \["dataAsOf"\] = "([^"\\]*)", \["fetchedAt"\] = "([^"\\]*)" \}/.exec(text);
+  const m = /\["drops"\] = \{ \["data"\] = "([\w,;]*)", \["sum"\] = \d+, \["dataAsOf"\] = "([^"\\]*)", \["fetchedAt"\] = "([^"\\]*)"(?:, \["names"\] = "((?:[^"\\]|\\.)*)")? \}/.exec(text);
   if (!m) return null;
   const rows = m[1] ? m[1].split(";").map((r) => {
     const [item, kind, source, drops, kills, reporters] = r.split(",");
     return [Number(item), kind as "n" | "o", Number(source), Number(drops), Number(kills), Number(reporters)] as DropRow;
   }) : [];
-  return { dataAsOf: m[2] || null, fetchedAt: m[3], rows };
+  const names: Record<string, string> = {};
+  for (const line of m[4] ? luaText(m[4]).split("\n") : []) {
+    const at = /^([no]\d+)=(.+)$/.exec(line);
+    if (at) names[at[1]] = at[2];
+  }
+  return { dataAsOf: m[2] || null, fetchedAt: m[3], rows, ...(Object.keys(names).length ? { names } : {}) };
 }
 
 /**

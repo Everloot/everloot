@@ -63,6 +63,11 @@ export declare const marketRealmsResponse: z.ZodObject<{
         Horde: "Horde";
         Neutral: "Neutral";
     }>>>>;
+    pending: z.ZodOptional<z.ZodArray<z.ZodObject<{
+        realm: z.ZodString;
+        reporters: z.ZodNumber;
+        needed: z.ZodNumber;
+    }, z.core.$strip>>>;
     attribution: z.ZodObject<{
         licence: z.ZodString;
         licenceUrl: z.ZodString;
@@ -119,6 +124,7 @@ export declare const dropsResponse: z.ZodObject<{
         rate: z.ZodNumber;
         reporters: z.ZodNumber;
         public: z.ZodLiteral<true>;
+        sourceName: z.ZodOptional<z.ZodString>;
     }, z.core.$strip>>;
     measuredZeros: z.ZodArray<z.ZodObject<{
         sourceNpcId: z.ZodOptional<z.ZodNumber>;
@@ -1328,6 +1334,11 @@ export declare const API_SCHEMAS: {
             Horde: "Horde";
             Neutral: "Neutral";
         }>>>>;
+        pending: z.ZodOptional<z.ZodArray<z.ZodObject<{
+            realm: z.ZodString;
+            reporters: z.ZodNumber;
+            needed: z.ZodNumber;
+        }, z.core.$strip>>>;
         attribution: z.ZodObject<{
             licence: z.ZodString;
             licenceUrl: z.ZodString;
@@ -1380,6 +1391,7 @@ export declare const API_SCHEMAS: {
             rate: z.ZodNumber;
             reporters: z.ZodNumber;
             public: z.ZodLiteral<true>;
+            sourceName: z.ZodOptional<z.ZodString>;
         }, z.core.$strip>>;
         measuredZeros: z.ZodArray<z.ZodObject<{
             sourceNpcId: z.ZodOptional<z.ZodNumber>;

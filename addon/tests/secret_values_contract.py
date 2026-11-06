@@ -184,6 +184,9 @@ local before = rows('item_seen')
 guid = 'Creature-0-1-2-3-998-0000002'
 event('LOOT_OPENED')
 assert(rows('item_seen') == before + 1, 'a real name is')
+guid = 'Creature-0-1-2-3-997-0000003'
+event('LOOT_OPENED')
+assert(rows('item_seen') == before + 1, 'and once: the same item in another window adds no row')
 """)
 
 # --- An item tooltip reads the item's vendor price: a secret price or link is unknown, and the prices still show ---

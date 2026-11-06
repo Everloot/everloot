@@ -157,6 +157,43 @@ local vendor = EverlootDB.records.vendor and EverlootDB.records.vendor[1]
 assert(vendor and vendor.vendorNpcId == 999 and #vendor.items == 2, 'the modern merchant reader records the vendor')
 assert(vendor.items[1].itemId == 159 and vendor.items[1].priceCopper == 25 and vendor.items[1].limitedStock == nil)
 assert(vendor.items[2].itemId == 4540 and vendor.items[2].limitedStock == 5)
+-- The same window opened again on the same day is one vendor row; an item seen in three windows is one item row.
+GetItemInfo = function(id) return ({ [159] = 'Refreshing Spring Water', [4540] = 'Tough Hunk of Bread' })[id], nil, 1 end
+for _ = 1, 3 do for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'MERCHANT_SHOW') end end
+assert(#EverlootDB.records.vendor == 1, 'the same vendor on the same day is one row')
+assert(#EverlootDB.records.item_seen == 2, 'each item on the vendor is one item_seen row')
+-- A price or stock change is a new vendor row; a day change is one too; an unchanged item still adds no item row.
+local bread = { name = 'Bread', price = 30, stackCount = 1, numAvailable = 5 }
+C_MerchantFrame.GetItemInfo = function(i)
+ return ({ { name = 'Water', price = 25, stackCount = 1, numAvailable = -1 }, bread, { name = 'No Link', price = 10, numAvailable = -1 } })[i]
+end
+for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'MERCHANT_SHOW') end
+assert(#EverlootDB.records.vendor == 2 and EverlootDB.records.vendor[2].items[2].priceCopper == 30, 'a changed price is a new row')
+bread.numAvailable = 2
+for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'MERCHANT_SHOW') end
+assert(#EverlootDB.records.vendor == 3 and EverlootDB.records.vendor[3].items[2].limitedStock == 2, 'a changed stock is a new row')
+for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'MERCHANT_SHOW') end
+assert(#EverlootDB.records.vendor == 3, 'unchanged again, no row')
+date = function() return '2026-10-09T00:00:00Z' end
+for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'MERCHANT_SHOW') end
+assert(#EverlootDB.records.vendor == 4, 'the next day records the vendor once more')
+assert(#EverlootDB.records.item_seen == 2, 'no item row for an item already seen')
+-- A different name or quality for a known item is a new item row (once); the same item looted three times is not.
+GetItemInfo = function(id) return ({ [159] = 'Agua de manantial', [4540] = 'Tough Hunk of Bread' })[id], nil, 1 end
+for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'MERCHANT_SHOW') end
+assert(#EverlootDB.records.item_seen == 3 and EverlootDB.records.item_seen[3].name == 'Agua de manantial', 'a new name is a new row')
+GetItemInfo = function() return 'Linen Cloth', nil, 1 end
+GetNumLootItems = function() return 1 end
+GetLootSourceInfo = function() return 'Creature-0-1-2-3-44-0000004', 1 end
+local items = #EverlootDB.records.item_seen
+for _ = 1, 3 do for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'LOOT_OPENED') end end
+assert(#EverlootDB.records.item_seen == items + 1, 'one looted item seen three times is one row')
+GetItemInfo = function() return 'Linen Cloth', nil, 2 end
+for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'LOOT_OPENED') end
+assert(#EverlootDB.records.item_seen == items + 2 and EverlootDB.records.item_seen[items + 2].quality == 'uncommon', 'a new quality is a new row')
+GetItemInfo, GetLootSourceInfo = nil, nil
+GetNumLootItems = function() return 0 end
+date = function() return '2026-10-08T00:00:00Z' end
 C_MerchantFrame = nil
 local vendors = #EverlootDB.records.vendor
 for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'MERCHANT_SHOW') end

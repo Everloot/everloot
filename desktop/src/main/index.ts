@@ -10,7 +10,7 @@ import { presetFor, type ProviderKind } from "../shared/providers";
 import { accountInfo, signIn, signOut } from "./account";
 import { gameRunning, listBackups, restoreBackup } from "./backups";
 import { createBuildsSync } from "./builds";
-import { compareVersions, installAddon, installedAddonVersion, newestAddonRelease, slotAddons } from "./addon";
+import { addonUpdateAction, compareVersions, installAddon, installedAddonVersion, newestAddonRelease, slotAddons } from "./addon";
 import { fetchChanges } from "./changes";
 import { createChat } from "./chat";
 import { DATA_NOTICE_BYTES, dataUsage, deleteLocalData } from "./data-folder";
@@ -78,6 +78,8 @@ if (!app.requestSingleInstanceLock()) {
 
   const addonsDir = () => (settings.gameFolder ? join(settings.gameFolder, "Interface", "AddOns") : null);
   let update: AppState["update"] = null;
+  /** A newer addon release the app did not install itself, for the tray. */
+  let addonUpdate: string | null = null;
   let updateProgress: AppState["updateProgress"] = { stage: "idle", percent: 0, error: null };
   /** The verified installer, once downloaded, and the version it installs. */
   let downloaded: { path: string; version: string } | null = null;
@@ -112,7 +114,7 @@ if (!app.requestSingleInstanceLock()) {
     onChange: () => broadcast(),
     log: (level, text) => engine.log(level, text),
   });
-  const appState = (): AppState => ({ version: app.getVersion(), platform: process.platform, dataFolder: data, notice: loaded.error, settings, foreverFolder: foreverSuggestion(settings.gameFolder, settings.keptGameFolder, realFs), engine: engine.snapshot(), update, updateProgress, staleScans: staleScans(knownScans()), account: accountInfo(data), builds: builds.status(), runRecords: siteReadsRuns(join(data, "site-collects.json"), settings.endpoint) });
+  const appState = (): AppState => ({ version: app.getVersion(), platform: process.platform, dataFolder: data, notice: loaded.error, settings, foreverFolder: foreverSuggestion(settings.gameFolder, settings.keptGameFolder, realFs), engine: engine.snapshot(), update, updateProgress, staleScans: staleScans(knownScans()), account: accountInfo(data), builds: builds.status(), runRecords: siteReadsRuns(join(data, "site-collects.json"), settings.endpoint), addonUpdate });
   const broadcast = () => {
     const s = appState();
     win?.webContents.send("state", s);
@@ -156,16 +158,46 @@ if (!app.requestSingleInstanceLock()) {
       }
     } catch { /* offline: keep what the last check found */ }
   };
+  // A newer addon is installed by the app itself when Settings allows it (WoW reads the files only at login or /reload,
+  // so swapping them while the game runs is safe). Otherwise, or when the install failed, it shows in the tray and once
+  // per version as a notification. A failed version is not tried again until the app restarts.
   let addonNoticed: string | null = null;
+  let addonInstalling = false;
+  const addonAttempted = new Set<string>();
+  /** One install at a time, from the Addon page or the release check. */
+  const installAddonOnce = async (version: string, dir: string) => {
+    if (addonInstalling) throw new Error("The addon is already being updated. Try again in a moment.");
+    addonInstalling = true;
+    try { return await installAddon({ version, endpoint: settings.endpoint, addonsDir: dir }); } finally { addonInstalling = false; }
+  };
   const addonUpdateNotice = async () => {
     const dir = addonsDir();
     if (!dir) return;
     try {
       const installed = installedAddonVersion(dir);
-      const latest = newestAddonRelease(await releases());
-      if (installed && latest && latest.version !== addonNoticed && compareVersions(latest.version, installed) > 0) {
-        addonNoticed = latest.version;
-        notify("Everloot addon update", `${latest.version} is out (you run ${installed}). Open the Addon page to update.`, "addon");
+      const latest = newestAddonRelease(await releases())?.version ?? null;
+      const action = addonUpdateAction({ autoUpdate: settings.autoUpdateAddon, installed, latest, attempted: addonAttempted, installing: addonInstalling });
+      if (action === "none" || !latest) {
+        if (!addonInstalling && addonUpdate) { addonUpdate = null; broadcast(); }
+        return;
+      }
+      if (action === "install") {
+        addonAttempted.add(latest);
+        try {
+          await installAddonOnce(latest, dir);
+          engine.log("info", `addon updated from ${installed} to ${latest}`);
+          addonUpdate = null;
+          broadcast();
+          notify("Everloot addon updated", `Everloot addon updated to ${latest}. Type /reload in game.`, "addon");
+          return;
+        } catch (err) {
+          engine.log("error", `addon update to ${latest} failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+      if (addonUpdate !== latest) { addonUpdate = latest; broadcast(); }
+      if (latest !== addonNoticed) {
+        addonNoticed = latest;
+        notify("Everloot addon update", `${latest} is out (you run ${installed}). Open the Addon page to update.`, "addon");
       }
     } catch { /* offline; the Addon page will say so */ }
   };
@@ -512,7 +544,9 @@ if (!app.requestSingleInstanceLock()) {
     const dir = addonsDir();
     if (!dir) throw new Error("Pick the game folder first");
     if (typeof version !== "string" || !/^\d+\.\d+\.\d+$/.test(version)) throw new Error("Not a version");
-    return installAddon({ version, endpoint: settings.endpoint, addonsDir: dir });
+    const result = await installAddonOnce(version, dir);
+    if (addonUpdate && compareVersions(version, addonUpdate) >= 0) { addonUpdate = null; broadcast(); }
+    return result;
   });
   // The setup screen, before Start saves a folder: whether the picked folder has the addon (read from disk, nothing is
   // fetched until the player presses Install), and its Install button, the same checksum-checked install as the Addon page.

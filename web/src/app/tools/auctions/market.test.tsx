@@ -163,6 +163,23 @@ test("with no realm public yet, the hub says when it last checked, not that it w
   expect(words).not.toContain("Updated");
 });
 
+test("with no realm public yet, the hub lists each realm with scans and how many of the 3 players have scanned", async () => {
+  const pending = foldMarket(emptyMarket(), [
+    ...scans(dayAgo(0), [[2589, 900, 999]], "CAMWOW US1 Realm 4 PvP", ["install-x"]),
+    ...scans(dayAgo(0), [[2589, 900, 999]], "CAMWOW US1 Realm 9 RP", ["install-y", "install-z"]),
+  ], today);
+  store.loadMarket.mockResolvedValue({ state: pending, dataAsOf: new Date(today.getTime() - 4 * 60_000).toISOString() });
+  const html = await hub({});
+  const words = text(html);
+  expect(words).toContain("No realm has public prices yet");
+  expect(words).toContain("CAMWOW US1 Realm 9 RP2 of 3 players have scanned; prices go public at 3");
+  expect(words).toContain("CAMWOW US1 Realm 4 PvP1 of 3 players have scanned; prices go public at 3");
+  expect(words).toContain("A player is counted when they scanned the same item there on one day in the last 7 days; installs behind one upload address count once.");
+  expect(html).toContain('href="/tools/auctions/camwow-us1-realm-9-rp"');
+  expect(html).toContain('data-agreement="2"');
+  expect(words).not.toMatch(/9s 99c|9s 0c/);
+});
+
 test("an item page shows its value, a 60-day chart, each house, the other realms, its age and a Dataset", async () => {
   const html = renderToStaticMarkup(await RealmItemPage(item("forever", "2589")));
   const words = text(html);

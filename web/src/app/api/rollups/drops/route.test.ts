@@ -68,3 +68,27 @@ test("the body is the protocol's dropsResponse", async () => {
   const body = await (await GET(req())).json();
   expect(() => dropsResponse.parse(body)).not.toThrow();
 });
+
+test("each rate names its source when the site knows the name, so the price file can name sources a player never met", async () => {
+  vi.resetModules();
+  vi.doMock("@/lib/rollup-compute", () => ({
+    computeRollups: async () => ({
+      rates: [
+        { sourceNpcId: 3114, itemId: 2589, kills: 8, drops: 2, rate: 0.25, reporters: 3, public: true },
+        { sourceObjectId: 106318, itemId: 118, kills: 6, drops: 4, rate: 4 / 6, reporters: 3, public: true },
+        { sourceObjectId: 693674, itemId: 286012, kills: 3, drops: 3, rate: 1, reporters: 3, public: true },
+      ],
+      measuredZeros: [],
+      stats: { uploads: 3, lootWindows: 17, records: 40, unreachable: false, dataAsOf: null },
+    }),
+  }));
+  vi.doMock("@/lib/names", () => ({
+    loadNames: async () => ({ npcs: new Map([[3114, "Razormane Battleguard"]]), objects: new Map([[106318, "Battered Chest"]]), items: new Map(), quests: new Map() }),
+  }));
+  const { GET: named } = await import("./route");
+  const body = await (await named(req())).json();
+  expect(body.rates.map((r: { sourceName?: string }) => r.sourceName)).toEqual(["Razormane Battleguard", "Battered Chest", undefined]);
+  expect(() => dropsResponse.parse(body)).not.toThrow();
+  expect(dropsResponse.parse(body).rates[0]).toHaveProperty("sourceName", "Razormane Battleguard");
+  vi.doUnmock("@/lib/names");
+});

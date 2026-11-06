@@ -36,7 +36,8 @@ A replication scan that cannot start or times out now tries a **partial price sa
 search APIs are available. It reads actual item/commodity search rows for at most 20 browse keys and 40
 requests, paced at least one second apart and within 90 seconds of starting. It stops when the house closes
 or auctions are disabled. Empty attempts refund the cooldown; successful samples retain it. The sample is
-not a full-market snapshot and does not populate the full-scan cache.
+not a full-market snapshot and does not populate the full-scan cache. Before a sample stores, only the newest
+earlier sample of that realm stays in the file, so samples do not fill the per-kind row cap.
 
 Profession observations retain the API's recipe ID and learned flag when available. A client with a
 complete-list reader uses it; otherwise the status explicitly says **filtered recipe list**. The addon never

@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { emptyMarket, foldMarket } from "../../../kb/src/market";
 import {
-  SPARK_BOX, agreementSoFar, houseCounts, houseParam, itemAcrossRealms, itemByHouse, itemIdParam, itemLabel, percent, priceMove, realmBoards,
+  SPARK_BOX, agreementSoFar, houseCounts, pendingRealms, houseParam, itemAcrossRealms, itemByHouse, itemIdParam, itemLabel, percent, priceMove, realmBoards,
   realmSlug, sitemapPaths, slugParam, sparkline, timeAgo,
 } from "./auction-house";
 
@@ -120,4 +120,27 @@ test("ages read in minutes, hours and days", () => {
   expect(timeAgo(t - 3 * 3_600_000, t)).toBe("3 h ago");
   expect(timeAgo(t - 3 * 86_400_000, t)).toBe("3 days ago");
   expect(percent(-0.08)).toBe("−8%");
+});
+
+test("a realm with scans but no public price is pending, counted by upload address on its busiest item day", () => {
+  const realm4 = "CAMWOW US1 Realm 4 PvP";
+  const pending = foldMarket(emptyMarket(), [
+    // Three installs behind one upload address count once; a second address makes two.
+    ...scans(realm4, 0, [[2589, 100]], ["install-a1", "install-a2", "install-a3"]).map((r) => ({ ...r, reporter: "aaaaaaaaaaaaaaaa" })),
+    ...scans(realm4, 0, [[2589, 120]], ["install-b1"]).map((r) => ({ ...r, reporter: "bbbbbbbbbbbbbbbb" })),
+    // A third address on another item does not make 3 on one item day.
+    ...scans(realm4, 0, [[765, 30]], ["install-c1"]).map((r) => ({ ...r, reporter: "cccccccccccccccc" })),
+    ...scans("CAMWOW US1 Realm 9 RP", 1, [[2589, 100]], ["install-d1"]),
+    // A realm with public prices is not pending, nor is a name that is not a realm off the realm list.
+    ...scans("CAMWOW US1 Realm 2 PvE", 0, [[2589, 100]]),
+    ...scans("Buy gold cheap", 0, [[2589, 100]], ["install-e1"]),
+  ], now);
+  expect(pendingRealms(pending, now)).toEqual([
+    { realm: realm4, slug: "camwow-us1-realm-4-pvp", reporters: 2 },
+    { realm: "CAMWOW US1 Realm 9 RP", slug: "camwow-us1-realm-9-rp", reporters: 1 },
+  ]);
+  // Never more than the limit, the closest first.
+  expect(pendingRealms(pending, now, 1).map((p) => p.realm)).toEqual([realm4]);
+  expect(pendingRealms(emptyMarket(), now)).toEqual([]);
+  expect(JSON.stringify(pendingRealms(pending, now))).not.toMatch(/install-|aaaa/);
 });
