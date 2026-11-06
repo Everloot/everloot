@@ -124,11 +124,11 @@ lua.execute("event('UPDATE_INSTANCE_INFO')")
 locks = plain(lua, "lockout_owned")
 assert [l["instance"] for l in locks] == ["Molten Core", "Onyxia's Lair"], locks
 mc = locks[0]
-assert {k: mc[k] for k in ("characterKey", "class", "level", "instance", "instanceId", "difficultyId", "difficulty", "bossesKilled", "bossesTotal", "resetAt")} == {
+assert {k: mc[k] for k in ("characterKey", "class", "level", "instance", "instanceId", "difficultyId", "difficulty", "bossesKilledCount", "bossesTotal", "resetAt")} == {
     "characterKey": key, "class": "MAGE", "level": 60, "instance": "Molten Core", "instanceId": 409, "difficultyId": 9,
-    "difficulty": "40 Player", "bossesKilled": 6, "bossesTotal": 10, "resetAt": "2026-11-11T12:00:00Z"}, mc
+    "difficulty": "40 Player", "bossesKilledCount": 6, "bossesTotal": 10, "resetAt": "2026-11-11T12:00:00Z"}, mc
 assert set(mc) == {"characterKey", "class", "level", "capturedAt", "installId", "instance", "instanceId", "difficultyId", "difficulty",
-                   "bossesKilled", "bossesTotal", "resetAt", "eventId", "kindLoggedAt"}, sorted(mc)
+                   "bossesKilledCount", "bossesTotal", "resetAt", "eventId", "kindLoggedAt"}, sorted(mc)
 assert locks[1]["resetAt"] == "2026-11-13T12:00:00Z", locks[1]
 
 # No name, realm or GUID in either kind, and no name call was made.
@@ -155,7 +155,7 @@ event('PLAYER_ENTERING_WORLD'); event('UPDATE_INSTANCE_INFO')
 other = lua.eval("(Everloot.Completion.Identity())")
 assert other != key
 locks = plain(lua, "lockout_owned")
-assert sorted((l["characterKey"], l["bossesKilled"]) for l in locks) == sorted([(key, 6), (key, 1), (other, 2)]), locks
+assert sorted((l["characterKey"], l["bossesKilledCount"]) for l in locks) == sorted([(key, 6), (key, 1), (other, 2)]), locks
 assert {p["characterKey"] for p in plain(lua, "profession_owned")} == {key, other}
 
 # Three days on, the first character's Molten Core lockout has reset: the next read drops it for every character.

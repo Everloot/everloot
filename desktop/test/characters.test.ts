@@ -94,9 +94,9 @@ test("professions and this week's raid lockouts join their character's keyed row
     ["achievement_owned"] = { ${own("achievement_owned", `["achievementId"] = 10, ["completed"] = true`)} },
     ["profession_owned"] = { ${own("p", `["profession"] = "Blacksmithing", ["skillLine"] = 164, ["rank"] = 300, ["maxRank"] = 300`)}, ${own("p", `["profession"] = "Mining", ["rank"] = 280, ["maxRank"] = 300`)}, ${own("p", `["profession"] = "Fishing", ["rank"] = 50`)},
       { ["characterKey"] = "ffffffff", ["class"] = "MAGE", ["level"] = 12, ["profession"] = "Tailoring", ["rank"] = 40, ["maxRank"] = 75 } },
-    ["lockout_owned"] = { ${own("l", `["instance"] = "Molten Core", ["difficulty"] = "40 Player", ["bossesKilled"] = 6, ["bossesTotal"] = 10, ["resetAt"] = "2026-11-11T12:00:00Z"`)},
-      ${own("l", `["instance"] = "Onyxia's Lair", ["difficulty"] = "40 Player", ["bossesKilled"] = 1, ["bossesTotal"] = 1, ["resetAt"] = "2026-11-09T11:00:00Z"`)},
-      ${own("l", `["instance"] = "Zul'Gurub", ["bossesKilled"] = 3, ["resetAt"] = "2026-11-12T12:00:00Z"`)} },
+    ["lockout_owned"] = { ${own("l", `["instance"] = "Molten Core", ["difficulty"] = "40 Player", ["bossesKilledCount"] = 6, ["bossesTotal"] = 10, ["resetAt"] = "2026-11-11T12:00:00Z"`)},
+      ${own("l", `["instance"] = "Onyxia's Lair", ["difficulty"] = "40 Player", ["bossesKilledCount"] = 1, ["bossesTotal"] = 1, ["resetAt"] = "2026-11-09T11:00:00Z"`)},
+      ${own("l", `["instance"] = "Zul'Gurub", ["bossesKilledCount"] = 3, ["resetAt"] = "2026-11-12T12:00:00Z"`)} },
   } }`;
   const info = summarizeCharacters(sv, Date.parse("2026-11-09T12:00:00Z"));
   expect(info.characters).toEqual([]);

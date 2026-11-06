@@ -265,7 +265,7 @@ describe("uploading", () => {
 
   test("professions and raid lockouts never leave from here, from the command line or with every Desktop App choice on", async () => {
     const profession = { kind: "profession_owned", lua: `["eventId"] = "epoch:800", ["capturedAt"] = "2026-11-09T12:00:00Z", ["installId"] = "abcd-1234-ef56-7890", ["characterKey"] = "0a1b2c3d", ["class"] = "MAGE", ["level"] = 60, ["profession"] = "Tailoring", ["skillLine"] = 197, ["rank"] = 250, ["maxRank"] = 300` };
-    const lockout = { kind: "lockout_owned", lua: `["eventId"] = "epoch:801", ["capturedAt"] = "2026-11-09T12:00:00Z", ["installId"] = "abcd-1234-ef56-7890", ["characterKey"] = "0a1b2c3d", ["class"] = "MAGE", ["level"] = 60, ["instance"] = "Molten Core", ["instanceId"] = 409, ["difficultyId"] = 9, ["difficulty"] = "40 Player", ["bossesKilled"] = 6, ["bossesTotal"] = 10, ["resetAt"] = "2026-11-11T12:00:00Z"` };
+    const lockout = { kind: "lockout_owned", lua: `["eventId"] = "epoch:801", ["capturedAt"] = "2026-11-09T12:00:00Z", ["installId"] = "abcd-1234-ef56-7890", ["characterKey"] = "0a1b2c3d", ["class"] = "MAGE", ["level"] = 60, ["instance"] = "Molten Core", ["instanceId"] = 409, ["difficultyId"] = 9, ["difficulty"] = "40 Player", ["bossesKilledCount"] = 6, ["bossesTotal"] = 10, ["resetAt"] = "2026-11-11T12:00:00Z"` };
     const desktop = (endpoint: string) => {
       const collects = createSiteCollects(join(mkdtempSync(join(tmpdir(), "everloot-collects-")), "collects.json"));
       collects.set(new URL(endpoint).origin, { collects: true, at: Date.now() });

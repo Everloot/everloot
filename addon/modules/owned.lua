@@ -128,7 +128,7 @@ function O.ReadLockouts()
         instance = name, instanceId = whole(instanceId, 1, MAX_ID) and instanceId or nil,
         difficultyId = whole(difficultyId, 1, 1000) and difficultyId or nil,
         difficulty = text(difficultyName, 40) or (whole(difficultyId, 1, 1000) and tostring(difficultyId)) or nil,
-        bossesKilled = encounterProgress, bossesTotal = numEncounters,
+        bossesKilledCount = encounterProgress, bossesTotal = numEncounters,
         resetAt = date("!%Y-%m-%dT%H:%M:%SZ", t + reset),
       }
     end

@@ -112,7 +112,7 @@ export function collectCharacters(records: Array<Record<string, unknown>>): Char
         break;
       }
       case "lockout_owned": {
-        const instance = str(r.instance), killed = r.bossesKilled, total = r.bossesTotal, resetAt = str(r.resetAt);
+        const instance = str(r.instance), killed = r.bossesKilledCount, total = r.bossesTotal, resetAt = str(r.resetAt);
         if (!instance || typeof killed !== "number" || typeof total !== "number" || total <= 0 || !Number.isFinite(Date.parse(resetAt))) break;
         const p = prog(r); if (!p) break;
         const difficulty = str(r.difficulty);

@@ -158,7 +158,7 @@ unlink deletes the derived rows (D3).
 
 Done ahead of D1/D9 (groundwork, local only): the addon writes `profession_owned` (characterKey, class, level,
 profession, skillLine, rank, maxRank) and `lockout_owned` (characterKey, class, level, instance, instanceId,
-difficultyId, difficulty, bossesKilled, bossesTotal, resetAt) in `addon/modules/owned.lua`, under the completion key and
+difficultyId, difficulty, bossesKilledCount, bossesTotal, resetAt) in `addon/modules/owned.lua`, under the completion key and
 switch, latest state only. No uploader sends them (`LOCAL_ONLY_KINDS` in `web/src/lib/upload-batches.ts`), the protocol
 has no schema for them so intake refuses them, and the Desktop App's Characters page shows them on the keyed rows. Still
 waiting on D1 and D9: the sources and consent tables and their migration, the `sync:own` scope, the private sync

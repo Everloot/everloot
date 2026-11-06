@@ -128,7 +128,7 @@ test("character link rows never go in an upload, whatever is shared: their GUID 
 test("professions and raid lockouts stay on the computer: never in a batch, whatever is shared, and the intake refuses them", () => {
   const key = "0a1b2c3d";
   const profession = { kind: "profession_owned", installId: "install-batches", eventId: "epoch:prof", capturedAt: row(1).capturedAt, characterKey: key, class: "MAGE", level: 60, profession: "Tailoring", skillLine: 197, rank: 250, maxRank: 300 };
-  const lockout = { kind: "lockout_owned", installId: "install-batches", eventId: "epoch:lock", capturedAt: row(1).capturedAt, characterKey: key, class: "MAGE", level: 60, instance: "Molten Core", instanceId: 409, difficultyId: 9, difficulty: "40 Player", bossesKilled: 6, bossesTotal: 10, resetAt: "2026-11-11T12:00:00Z" };
+  const lockout = { kind: "lockout_owned", installId: "install-batches", eventId: "epoch:lock", capturedAt: row(1).capturedAt, characterKey: key, class: "MAGE", level: 60, instance: "Molten Core", instanceId: 409, difficultyId: 9, difficulty: "40 Player", bossesKilledCount: 6, bossesTotal: 10, resetAt: "2026-11-11T12:00:00Z" };
   for (const sharing of [{}, { gear: true, gold: true, guild: true, collection: true }]) {
     const session = prepareUpload({ addonVersion: "0.2.0", records: [profession, row(1), lockout, { ...lockout, eventId: undefined }] }, sharing, ["a".repeat(64)]);
     expect(session.held).toMatchObject({ local: 3, invalid: 0 });
