@@ -296,8 +296,6 @@ describe("answerMarketQuestion", () => {
     ["a day with month 99", ok({}, { day: "2026-99-99" })],
     ["a day in month 0", ok({}, { day: "2026-00-10" })],
     ["April 31", ok({}, { day: "2026-04-31" })],
-    ["one reporter, below the public minimum", ok({}, { reporters: 1 })],
-    ["two reporters, below the public minimum", ok({}, { reporters: 2 })],
     ["no reporters", ok({}, { reporters: 0 })],
     ["a missing page", { connected: true, dataAsOf: null }],
     ["not an object", "oops"],
@@ -305,6 +303,12 @@ describe("answerMarketQuestion", () => {
     const reply = await answerMarketQuestion("price 2589 on Forever", deps({ lookup: vi.fn(async () => raw) as never }));
     expect(reply).toMatchObject({ kind: "unavailable" });
     expect(reply!.text).toMatch(/unrecorded, not zero|not zero/i);
+  });
+
+  test.each([1, 2])("%s reporters, under three, is a day Everloot's own installs made public, and the answer says so", async (reporters) => {
+    const reply = await answerMarketQuestion("price 2589 on Forever", deps({ lookup: vi.fn(async () => ok({}, { reporters })) as never }));
+    expect(reply).toMatchObject({ kind: "connected" });
+    expect(reply!.text).toContain(`${reporters} reporter${reporters === 1 ? "" : "s"} (includes Everloot's own scans)`);
   });
 
   test("the three-reporter minimum and a real calendar day are accepted, as is a leap day and the server's tolerated day ahead", async () => {

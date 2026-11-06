@@ -5,7 +5,7 @@ import { AGREEMENT_NEEDED, AgreementMeter, Card, Contribute as ContributeCard, D
 import { SPARK_BOX, itemHref, itemLabel, money, percent, realmHref, sparkline, type ItemNames, type MarketRow, type PendingRealm, type RulesetSummary } from "@/lib/auction-house";
 import { RULESET_LABEL, isRulesetSlug, type RulesetSlug } from "@/lib/realms";
 import { RealmName } from "./RealmName";
-import { HISTORY_DAYS, formatCopper, type PublicDay } from "../../../../../kb/src/market";
+import { HISTORY_DAYS, formatCopper, reportersText, type PublicDay } from "../../../../../kb/src/market";
 import type { ItemTip as Tip } from "./art";
 import { categoryRow } from "./browse";
 import TimeAgo from "./TimeAgo";
@@ -185,6 +185,9 @@ export function PriceChart({ points }: { points: PublicDay[] }) {
   );
 }
 
+/** A reporter count; under 3 the day is public because Everloot's own installs scanned it, and the cell says so. */
+const reporterCell = (n: number) => (n < AGREEMENT_NEEDED ? reportersText(n) : n);
+
 /** One item's price on each realm, each row linking to that realm's page for it. */
 export function RealmPrices({ rows, caption, empty }: { rows: MarketRow[]; caption: string; empty: string }) {
   const columns: Column<MarketRow>[] = [
@@ -196,7 +199,7 @@ export function RealmPrices({ rows, caption, empty }: { rows: MarketRow[]; capti
     { key: "min", header: "Min buyout", numeric: true, cell: (r) => formatCopper(r.value.min) },
     { key: "historical", header: "Historical", numeric: true, cell: (r) => formatCopper(r.value.historical) },
     { key: "units", header: "Units", numeric: true, cell: (r) => r.value.quantity.toLocaleString("en-US") },
-    { key: "reporters", header: "Reporters", numeric: true, cell: (r) => r.value.reporters },
+    { key: "reporters", header: "Reporters", numeric: true, cell: (r) => reporterCell(r.value.reporters) },
     { key: "day", header: "Day", numeric: true, cell: (r) => r.value.day },
   ];
   return <DataTable caption={caption} columns={columns} rows={rows} rowKey={(r) => r.realm.key} empty={<EmptyState framed={false} message={empty} />} />;
@@ -209,7 +212,7 @@ export function DayTable({ points, caption }: { points: PublicDay[]; caption: st
     { key: "value", header: "Value", numeric: true, cell: (p) => formatCopper(p.market) },
     { key: "min", header: "Min buyout", numeric: true, cell: (p) => formatCopper(p.min) },
     { key: "units", header: "Units", numeric: true, cell: (p) => `${p.quantity.toLocaleString("en-US")}${p.thin ? " (thin)" : ""}` },
-    { key: "reporters", header: "Reporters", numeric: true, cell: (p) => p.reporters },
+    { key: "reporters", header: "Reporters", numeric: true, cell: (p) => reporterCell(p.reporters) },
   ];
   return <DataTable caption={caption} columns={columns} rows={[...points].reverse()} rowKey={(p) => p.day} />;
 }

@@ -48,7 +48,7 @@ function windowLine(view: CensusView, w: CensusWindow): string {
 
 function ruleLine(view: CensusView): string {
   const { minCharacters, minInstalls, minReporters, roundTo } = view.rule;
-  return `Each character counts once. A count shows when it covers at least ${minCharacters} characters reported by at least ${minInstalls} installs from at least ${minReporters} addresses, rounded to the nearest ${roundTo}. "${HIDDEN_LABEL}" means ${HIDDEN_MEANING}. Method: ${METHOD_URL}`;
+  return `Each character counts once. A count shows when it covers at least ${minCharacters} characters reported by at least ${minInstalls} installs from at least ${minReporters} addresses, rounded to the nearest ${roundTo}.${view.trusted ? " While few players upload, Everloot's own installs also count on their own, so counts can come from one player's game." : ""} "${HIDDEN_LABEL}" means ${HIDDEN_MEANING}. Method: ${METHOD_URL}`;
 }
 
 function cellOf(w: CensusWindow, base: Omit<PopulationCellOut, "count" | "share">, count: CensusCount): PopulationCellOut {
