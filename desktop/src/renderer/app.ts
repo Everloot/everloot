@@ -982,6 +982,8 @@ function settings(s: AppState): string {
         <div class="field"><label for="gameFolder">Game folder <span class="hint">the product folder that holds <code>WTF</code>: for WoW: Forever, <code>World of Warcraft\\_forever_</code></span></label>
           ${foreverCallout(s)}
           <div class="row"><input class="grow" type="text" id="gameFolder" name="gameFolder" value="${esc(st.gameFolder ?? "")}"><button type="button" class="btn" id="browse">Browse…</button></div></div>
+        <label class="switch"><input type="checkbox" name="autoUpdateAddon" ${st.autoUpdateAddon ? "checked" : ""}> Keep the addon up to date</label>
+        <p class="muted small">New versions of the Everloot addon install on their own and load at the next <code>/reload</code> or login.</p>
       </div></section>
       <section class="panel set-sec"><div class="set-lead"><h2>Startup</h2></div><div class="set-body">
         ${s.platform === "linux" ? "" : `<label class="switch"><input type="checkbox" name="launchAtLogin" ${st.launchAtLogin ? "checked" : ""}> Start when I sign in</label>`}
@@ -1818,7 +1820,7 @@ async function onSubmit(ev: SubmitEvent): Promise<void> {
   let note = "Saved.";
   if (form.id === "settings") {
     const endpoint = text("endpoint");
-    state = await api.saveSettings({ gameFolder: text("gameFolder") || null, endpoint, launchAtLogin: f.get("launchAtLogin") === "on", startInTray: f.get("startInTray") === "on", census: f.get("census") === "on", players: f.get("players") === "on" });
+    state = await api.saveSettings({ gameFolder: text("gameFolder") || null, endpoint, launchAtLogin: f.get("launchAtLogin") === "on", startInTray: f.get("startInTray") === "on", autoUpdateAddon: f.get("autoUpdateAddon") === "on", census: f.get("census") === "on", players: f.get("players") === "on" });
     note = savedNote({ endpoint }, state.settings);
   } else if (form.id === "askForm") {
     const mcpUrl = text("mcpUrl");

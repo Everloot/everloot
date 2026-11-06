@@ -83,6 +83,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   objects keeps to that type.
 
 ### Changed
+- Desktop App: the app installs a newer addon release on its own, into a game folder that already has the addon, and
+  says so once: "Everloot addon updated to X. Type /reload in game." The game loads it at the next `/reload` or login.
+  Settings → Game has the switch, "Keep the addon up to date", on by default. With it off, or when an install fails, the
+  tray's tooltip and menu show "Addon X available", which opens the Addon page.
 - Site: the Auction House files a realm under the PvE, PvP, RP, RP-PvP or Hardcore tab when its name ends in that
   ruleset, as Forever's realm list names them ("CAMWOW US1 Realm 4 PvP"); the realm map still overrides, and a realm
   whose name names no ruleset stays under "Realms not mapped yet". Realm names show split the same way: the name, then
