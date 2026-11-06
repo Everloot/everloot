@@ -4,14 +4,21 @@
 // (src/lib/cf-crons.ts), which call the cron routes. OpenNext's Durable Object classes are re-exported.
 import handler from "./worker.js";
 import { cronPaths, cronRequest } from "../src/lib/cf-crons.ts";
-import { cacheCopy, edgeCacheKey, edgeCacheable, edgeTtl, fromCache } from "../src/lib/cf-edge-cache.ts";
+import { cacheCopy, cacheVersionFor, edgeCacheKey, edgeCacheable, edgeTtl, fromCache } from "../src/lib/cf-edge-cache.ts";
 
 export { DOQueueHandler, DOShardedTagCache, BucketCachePurge } from "./worker.js";
 
 export default {
   async fetch(request, env, ctx) {
     if (!edgeCacheable(request) || typeof caches === "undefined") return handler.fetch(request, env, ctx);
-    const key = edgeCacheKey(request, env.EVERLOOT_COMMIT_SHA);
+    // The route's content versions, not the commit: another page's deploy keeps this cache.
+    const version = cacheVersionFor(new URL(request.url).pathname, {
+      template: env.EVERLOOT_CACHE_TEMPLATE,
+      data: env.EVERLOOT_CACHE_DATA,
+      knowledge: env.EVERLOOT_CACHE_KNOWLEDGE,
+      addon: env.EVERLOOT_CACHE_ADDON,
+    });
+    const key = edgeCacheKey(request, version);
     const hit = await caches.default.match(key);
     if (hit) return fromCache(hit);
     const res = await handler.fetch(request, env, ctx);

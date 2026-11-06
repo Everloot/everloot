@@ -4,10 +4,11 @@
  * the CDN-specific header carries the edge lifetime). A Worker's own responses skip
  * Cloudflare's cache, so the entry keeps them in the Cache API instead, for the same lifetime.
  *
- * Only a GET without credentials, answered 200 with `CDN-Cache-Control: max-age=N` and no `Set-Cookie`, is kept.
- * The key carries the deployed commit, so a deploy never serves an hour-old page that names script files the new
- * build no longer has. Browsers get the response's own
- * headers either way.
+ * Only a GET without credentials, answered 200 with `CDN-Cache-Control: max-age=N`, no `Set-Cookie` and no
+ * `Vary` on credentials, is kept. The key carries the content versions the entry is built with, not the
+ * deployed commit: a deploy that changes another page, a test or an API route keeps the public pages it did not
+ * change. A content change starts those pages on a new key, so an old page is never served after its data changed
+ * and never outlives its lifetime. Browsers get the response's own headers either way.
  */
 export const ORIGINAL_CACHE_CONTROL = "x-everloot-browser-cache-control";
 
@@ -20,7 +21,8 @@ const RSC_HEADERS = ["rsc", "next-router-state-tree", "next-router-prefetch", "n
 
 /**
  * Whether a request may be answered from, or stored in, the shared cache. Requests carrying a Cookie still may:
- * next.config.js marks only pages that read no cookies for the CDN, and a response that sets one is never kept.
+ * next.config.js marks only pages that read no cookies for the CDN, and a response that sets one, or varies on one,
+ * is never kept. A credential in the Authorization header bypasses the cache outright.
  */
 export function edgeCacheable(req: Request): boolean {
   if (req.method !== "GET" || req.headers.has("authorization") || req.headers.get("range")) return false;
@@ -43,27 +45,74 @@ export const ITEM_LIST_PARAMS: ReadonlySet<string> = new Set([
 ]);
 const ITEM_LIST_PATH = /^\/database\/items(?:\/[a-z][a-z0-9-]*(?:\/[^/]+)?)?\/?$/;
 
+/** Parameters a campaign or bot appends that no page reads. They are dropped from every key. */
+const TRACKING_PARAMS: ReadonlySet<string> = new Set([
+  "_", "_ga", "_gl", "cache", "cachebust", "cb", "dclid", "fbclid", "gbraid", "gclid", "igshid", "mc_cid", "mc_eid",
+  "msclkid", "nocache", "oly_anon_id", "oly_enc_id", "ref_src", "ref_url", "srsltid", "twclid", "vero_id", "wbraid",
+  "yclid",
+]);
+const isTracking = (k: string) => TRACKING_PARAMS.has(k) || k.startsWith("utm_");
+
 /**
- * The cache key: the URL plus the build, so each deploy starts with an empty cache. On the item lists, parameters
- * the page never reads (utm tags, cache busters bots add) are dropped and the rest sorted, so they cannot mint
- * an unbounded number of misses that each render the whole list (about 550 ms of CPU).
+ * The content versions the Worker has this deploy. `template` is bumped by hand (src/data/edge-cache-version.json)
+ * when the public pages' markup changes; the other three come from the files or release the pages read.
  */
-export function edgeCacheKey(req: Request, build: string): Request {
+export interface EdgeCacheVersions {
+  template: string;
+  data: string;
+  knowledge: string;
+  addon: string;
+}
+
+const DATA_PATH = /^\/(?:database(?:\/|$)|map(?:\/|$)|tools\/(?:talents|professions|legacy)(?:\/|$))/;
+const ADDON_PATH = /^\/(?:addon(?:\/|$)|addons(?:\/|$))/;
+const KNOWLEDGE_PATH = /^\/(?:changes(?:\/|$)|guides(?:\/|$)|lore(?:\/|$)|news(?:\/|$)|search(?:\/|$)|wiki(?:\/|$))/;
+
+/**
+ * The version a route's cached copy belongs to. Data pages follow the game files and the knowledge files they
+ * join; changes, guides, lore, news, search and wiki follow the knowledge release; addon pages follow the zips.
+ * Every page follows the hand-bumped template version, so a markup change refreshes all of them. A route outside
+ * these groups keeps only the template version: a change to an account, API or test file does not empty the
+ * public cache.
+ */
+export function cacheVersionFor(pathname: string, versions: EdgeCacheVersions): string {
+  const t = versions.template || "dev";
+  if (pathname === "/sitemap.xml") return `s.${versions.data || "dev"}.${versions.knowledge || "dev"}.${t}`;
+  if (ADDON_PATH.test(pathname)) return `a.${versions.addon || "dev"}.${t}`;
+  if (DATA_PATH.test(pathname)) return `d.${versions.data || "dev"}.${versions.knowledge || "dev"}.${t}`;
+  if (KNOWLEDGE_PATH.test(pathname)) return `k.${versions.knowledge || "dev"}.${t}`;
+  return `t.${t}`;
+}
+
+/**
+ * The cache key: the URL plus the route's content version, so a deploy only starts an empty cache for the pages
+ * whose content changed. Parameters the page never reads (tracking tags, cache busters bots add) are dropped and
+ * the rest sorted on every route, so they cannot mint an unbounded number of misses; the item lists keep only the
+ * parameters they read. Meaningful values stay, and different ones are different keys.
+ */
+export function edgeCacheKey(req: Request, version: string): Request {
   const url = new URL(req.url);
-  if (ITEM_LIST_PATH.test(url.pathname)) {
-    const kept = [...url.searchParams].filter(([k]) => ITEM_LIST_PARAMS.has(k));
-    kept.sort(([a, x], [b, y]) => (a === b ? (x < y ? -1 : x > y ? 1 : 0) : a < b ? -1 : 1));
-    url.search = new URLSearchParams(kept).toString();
-  }
-  url.searchParams.set("__edge_build", build || "unknown");
+  const kept = ITEM_LIST_PATH.test(url.pathname)
+    ? [...url.searchParams].filter(([k]) => ITEM_LIST_PARAMS.has(k))
+    : [...url.searchParams].filter(([k]) => !isTracking(k));
+  kept.sort(([a, x], [b, y]) => (a === b ? (x < y ? -1 : x > y ? 1 : 0) : a < b ? -1 : 1));
+  url.search = new URLSearchParams(kept).toString();
+  url.searchParams.set("__edge_version", version || "unknown");
   return new Request(url.toString(), { method: "GET" });
 }
 
-/** Seconds the shared cache may keep this response, from `CDN-Cache-Control: max-age`; null when it must not. */
+/**
+ * Seconds the shared cache may keep this response, from `CDN-Cache-Control: max-age`; null when it must not.
+ * The Cache API ignores `Vary`, so a response that varies on a credential (or on everything) is refused, as is a
+ * private or no-store CDN lifetime even if it also names a max-age.
+ */
 export function edgeTtl(res: Response): number | null {
   if (res.status !== 200 || res.headers.has("set-cookie")) return null;
-  const cdn = res.headers.get("cdn-cache-control");
-  const m = cdn?.match(/(?:^|,)\s*max-age=(\d+)/i);
+  const cdn = res.headers.get("cdn-cache-control") ?? "";
+  if (/(?:^|,)\s*(?:private|no-store|no-cache)\b/i.test(cdn)) return null;
+  const vary = res.headers.get("vary")?.toLowerCase() ?? "";
+  if (vary.split(",").some((v) => ["*", "cookie", "authorization"].includes(v.trim()))) return null;
+  const m = cdn.match(/(?:^|,)\s*max-age=(\d+)/i);
   const ttl = m ? Number(m[1]) : 0;
   return ttl > 0 ? ttl : null;
 }

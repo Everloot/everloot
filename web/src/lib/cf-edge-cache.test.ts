@@ -1,9 +1,11 @@
 import { expect, test } from "vitest";
 import { classContextParams } from "./class-context";
-import { DEGRADED_TTL, ITEM_LIST_PARAMS, cacheCopy, edgeCacheKey, edgeCacheable, edgeDegraded, edgeTtl, forCache, fromCache } from "./cf-edge-cache";
+import { DEGRADED_TTL, ITEM_LIST_PARAMS, cacheCopy, cacheVersionFor, edgeCacheKey, edgeCacheable, edgeDegraded, edgeTtl, forCache, fromCache } from "./cf-edge-cache";
 import { itemsHref } from "./items";
 
 const page = (headers: Record<string, string>, status = 200) => new Response("<html></html>", { status, headers });
+const VERSIONS = { template: "t1", data: "d1", knowledge: "k1", addon: "a1" };
+const version = (path: string, over: Partial<typeof VERSIONS> = {}) => cacheVersionFor(path, { ...VERSIONS, ...over });
 
 test("only a page next.config marks for the CDN is kept, for its CDN max-age", () => {
   expect(edgeTtl(page({ "cdn-cache-control": "max-age=3600, stale-while-revalidate=86400", "cache-control": "private, no-cache, no-store" }))).toBe(3600);
@@ -11,21 +13,48 @@ test("only a page next.config marks for the CDN is kept, for its CDN max-age", (
   expect(edgeTtl(page({ "cdn-cache-control": "max-age=0" }))).toBeNull();
 });
 
-test("an error, or a response that sets a cookie, is never kept", () => {
+test("an error, a response that sets a cookie, or one that varies on a credential is never kept", () => {
   expect(edgeTtl(page({ "cdn-cache-control": "max-age=300" }, 503))).toBeNull();
   expect(edgeTtl(page({ "cdn-cache-control": "max-age=300", "set-cookie": "a=b" }))).toBeNull();
+  expect(edgeTtl(page({ "cdn-cache-control": "private, max-age=3600" }))).toBeNull();
+  expect(edgeTtl(page({ "cdn-cache-control": "no-store, max-age=3600" }))).toBeNull();
+  expect(edgeTtl(page({ "cdn-cache-control": "max-age=3600", vary: "cookie" }))).toBeNull();
+  expect(edgeTtl(page({ "cdn-cache-control": "max-age=3600", vary: "Accept-Encoding, Authorization" }))).toBeNull();
+  expect(edgeTtl(page({ "cdn-cache-control": "max-age=3600", vary: "*" }))).toBeNull();
+  expect(edgeTtl(page({ "cdn-cache-control": "max-age=3600", vary: "accept-encoding" }))).toBe(3600);
 });
 
-test("only plain GETs without credentials use the shared cache", () => {
+test("only plain GETs without credentials use the shared cache; a cookie alone does not bypass it", () => {
   expect(edgeCacheable(new Request("https://everloot.app/database"))).toBe(true);
   expect(edgeCacheable(new Request("https://everloot.app/database", { method: "POST" }))).toBe(false);
   expect(edgeCacheable(new Request("https://everloot.app/database", { headers: { authorization: "Bearer evl_x" } }))).toBe(false);
+  // The page reads no cookies, and a response that sets one or varies on one is never kept (edgeTtl).
+  expect(edgeCacheable(new Request("https://everloot.app/database", { headers: { cookie: "evl_session=abc" } }))).toBe(true);
 });
 
-test("the key carries the build, so a deploy starts with an empty cache, and keeps the query", () => {
-  const a = edgeCacheKey(new Request("https://everloot.app/search?q=thrall"), "abc1234").url;
-  expect(a).toBe("https://everloot.app/search?q=thrall&__edge_build=abc1234");
-  expect(edgeCacheKey(new Request("https://everloot.app/search?q=thrall"), "def5678").url).not.toBe(a);
+test("the key carries the route's content version, not the deploy: the same content keeps the cache, a change starts a new key", () => {
+  const a = edgeCacheKey(new Request("https://everloot.app/search?q=thrall"), version("/search")).url;
+  expect(a).toBe(`https://everloot.app/search?q=thrall&__edge_version=${version("/search")}`);
+  // Another deploy with the same content versions keeps this key: an account, API or test change does not empty the cache.
+  expect(edgeCacheKey(new Request("https://everloot.app/search?q=thrall"), version("/search")).url).toBe(a);
+  // A template bump refreshes every route; a data or knowledge change only the pages that read it.
+  expect(edgeCacheKey(new Request("https://everloot.app/search?q=thrall"), version("/search", { template: "t2" })).url).not.toBe(a);
+});
+
+test("a data change refreshes data pages, a knowledge change knowledge pages, an addon change addon pages, and the template all", () => {
+  const changed = (path: string, over: Partial<typeof VERSIONS>) => cacheVersionFor(path, { ...VERSIONS, ...over });
+  expect(changed("/database/items", { data: "d2" })).not.toBe(version("/database/items"));
+  expect(changed("/map", { data: "d2" })).not.toBe(version("/map"));
+  expect(changed("/guides/frost-leveling", { data: "d2" })).toBe(version("/guides/frost-leveling"));
+  expect(changed("/guides/frost-leveling", { knowledge: "k2" })).not.toBe(version("/guides/frost-leveling"));
+  expect(changed("/addon", { addon: "a2" })).not.toBe(version("/addon"));
+  expect(changed("/addons", { addon: "a2" })).not.toBe(version("/addons"));
+  expect(changed("/addon-guide", { addon: "a2" })).toBe(version("/addon-guide"));
+  expect(changed("/about", { data: "d2", knowledge: "k2", addon: "a2" })).toBe(version("/about"));
+  expect(changed("/about", { template: "t2" })).not.toBe(version("/about"));
+  // The sitemap lists data and knowledge pages, so it follows both.
+  expect(changed("/sitemap.xml", { data: "d2" })).not.toBe(version("/sitemap.xml"));
+  expect(changed("/sitemap.xml", { knowledge: "k2" })).not.toBe(version("/sitemap.xml"));
 });
 
 test("the browser gets the page's own Cache-Control back from a cached copy", async () => {
@@ -69,15 +98,18 @@ test("only the marker element counts as degraded, not the same words in a page's
 });
 
 test("on the item lists, parameters the page never reads do not split the cache, and order does not matter", () => {
-  const key = (u: string) => edgeCacheKey(new Request(u), "abc1234").url;
+  const key = (u: string) => edgeCacheKey(new Request(u), "v1").url;
   const plain = key("https://everloot.app/database/items/weapons");
   expect(key("https://everloot.app/database/items/weapons?utm_source=x&cb=123")).toBe(plain);
   expect(key("https://everloot.app/database/items?quality=epic&slot=head")).toBe(key("https://everloot.app/database/items?slot=head&quality=epic&fbclid=z"));
-  expect(key("https://everloot.app/database/items/weapons/one-handed-swords?page=2&x=1")).toBe("https://everloot.app/database/items/weapons/one-handed-swords?page=2&__edge_build=abc1234");
+  expect(key("https://everloot.app/database/items/weapons/one-handed-swords?page=2&x=1")).toBe("https://everloot.app/database/items/weapons/one-handed-swords?page=2&__edge_version=v1");
   // Class context is part of the list: a mage list never shares a key with a warrior list.
   expect(key("https://everloot.app/database/items?class=mage&level=60")).not.toBe(key("https://everloot.app/database/items?class=warrior&level=60"));
-  // Item pages and other routes keep the query as it came.
-  expect(key("https://everloot.app/search?q=thrall&x=1")).toBe("https://everloot.app/search?q=thrall&x=1&__edge_build=abc1234");
+  // Item pages and other routes keep the query they read, sorted, without campaign tags.
+  expect(key("https://everloot.app/search?q=thrall&x=1")).toBe("https://everloot.app/search?q=thrall&x=1&__edge_version=v1");
+  expect(key("https://everloot.app/search?q=thrall&utm_source=x&cb=1")).toBe(key("https://everloot.app/search?q=thrall"));
+  expect(key("https://everloot.app/search?b=2&a=1")).toBe(key("https://everloot.app/search?a=1&b=2"));
+  expect(key("https://everloot.app/search?q=thrall")).not.toBe(key("https://everloot.app/search?q=jaina"));
 });
 
 test("every parameter the item lists' own links write survives the key", () => {
@@ -89,7 +121,7 @@ test("every parameter the item lists' own links write survives the key", () => {
   expect(written.length).toBeGreaterThan(15);
   for (const k of written) expect(ITEM_LIST_PARAMS.has(k), k).toBe(true);
   const kept = new URL(edgeCacheKey(new Request("https://everloot.app/database/items?class=mage&level=60&role=damage&sort=-ilvl"), "b").url).searchParams;
-  expect([...kept.keys()].sort()).toEqual(["__edge_build", "class", "level", "role", "sort"]);
+  expect([...kept.keys()].sort()).toEqual(["__edge_version", "class", "level", "role", "sort"]);
 });
 
 test("router (RSC) requests bypass the shared cache, so they never share a key with the HTML", () => {
