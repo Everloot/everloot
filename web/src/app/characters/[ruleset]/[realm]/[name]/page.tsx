@@ -8,6 +8,8 @@ import { buildShowcase, FOOTER_LINE, showcaseOn, type Showcase } from "@/lib/cha
 import { classLabel, contextLinks, MAX_LEVEL, type ClassSlug } from "@/lib/class-context";
 import { dataAgeLabel } from "@/lib/data-age";
 import { guildPath, guildsOn } from "@/lib/guilds";
+import { leaderboardsOn } from "@/lib/leaderboard-switch";
+import { GEAR_BOARDS, gearBoardPath, loadGearBoard, ranksOf, type GearMetric, type RankedEntry } from "@/lib/leaderboards";
 import { characterPath, optOutPath, playerPagesOn, type Player } from "@/lib/player-pages";
 import { pageMetadata } from "@/lib/seo";
 import { withGearArt } from "@/lib/showcase-gear-art";
@@ -183,6 +185,23 @@ function PlanPart({ classSlug, level }: { classSlug: ClassSlug; level: number })
 const Unavailable = ({ text }: { text: string }) => <Card><p className="text-fg-2" role="status">{text}</p></Card>;
 
 /**
+ * The character's places on the gear rankings, when its owner ranks its gear (EVERLOOT_LEADERBOARDS=1): the same
+ * numbers and ranks the boards print, read with them, so the page and the boards never disagree.
+ */
+function GearRanks({ ranks }: { ranks: Record<GearMetric, RankedEntry> }) {
+  return (
+    <Card as="section" aria-label="Rankings" className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+      {(["item-level", "gear-score"] as const).map((m) => (
+        <p key={m} className="text-fg-2">
+          {GEAR_BOARDS[m].column} <span className="font-mono tabular-nums text-fg">{ranks[m].entry[m === "item-level" ? "itemLevel" : "gearScore"]}</span>{" "}
+          <Link href={gearBoardPath(m)} className={link}>#{ranks[m].rank}</Link>
+        </p>
+      ))}
+    </Card>
+  );
+}
+
+/**
  * A character's one page. The owner's showcase first, when the owner linked the character and made its page
  * public; then what the addon last saw of it, when the player pages are on and a row exists; then the guild it was
  * seen in, as the guild's page shows it; then the site's pages for its class. Each part is drawn from its own source
@@ -213,6 +232,8 @@ export default async function CharacterPage(props: { params: Promise<Params> }) 
   const guildRead = sighted ? await characterGuild(sighted) : null;
   const guild = guildRead === "unreachable" ? null : guildRead;
   const c = showcase?.input;
+  const board = c && leaderboardsOn() ? await loadGearBoard(now) : null;
+  const ranks = c && board?.state === "ready" ? ranksOf(board.entries, c.realm, c.name) : null;
   const name = c?.name ?? sighted!.name;
   const realm = c?.realm ?? sighted!.realm;
   const path = c?.path ?? characterPath(sighted!.ruleset, sighted!.realm, sighted!.name);
@@ -244,6 +265,7 @@ export default async function CharacterPage(props: { params: Promise<Params> }) 
           {showcase
             ? <ShowcaseHeader showcase={showcase} trail={trail(name, path)} />
             : <PageHeader trail={trail(name, path)} title={<span className={classText(sighted!.class)}>{name}</span>} lede={`${describePlayer(sighted!)} · ${realm}`} />}
+          {ranks && <GearRanks ranks={ranks} />}
           {showcase ? <OwnerPart showcase={showcase} /> : owner === "unavailable" && <Unavailable text={UNAVAILABLE} />}
           {sighted ? <SightingPart seen={sighted} /> : seen === "unavailable" && <Unavailable text={PLAYER_STORAGE_UNAVAILABLE} />}
           {guild ? <GuildPart guild={guild} /> : guildRead === "unreachable" && <Unavailable text={GUILD_UNAVAILABLE} />}

@@ -133,6 +133,22 @@ describe("the section switches, with private sync on", () => {
   });
 });
 
+describe("the gear ranking switch, with the leaderboards on", () => {
+  test("ranked_gear goes to set_visibility only with EVERLOOT_LEADERBOARDS=1 and private sync on; the other rankings stay refused", async () => {
+    vi.stubEnv("EVERLOOT_PRIVATE_SYNC", "1");
+    expect((await send({ ranked_gear: true })).status).toBe(400);
+    vi.stubEnv("EVERLOOT_LEADERBOARDS", "1");
+    for (const bad of [{ ranked_achievements: true }, { ranked_gold: true }, { ranked_gear: "on" }]) {
+      expect((await send(bad)).status, JSON.stringify(bad)).toBe(400);
+    }
+    expect(auth.authQuery).not.toHaveBeenCalled();
+    owned();
+    const res = await send({ ranked_gear: true });
+    expect(res.status).toBe(200);
+    expect(JSON.parse(auth.authQuery.mock.calls[1][1].body).p_flags).toEqual({ ranked_gear: true });
+  });
+});
+
 describe("the owner's list with the showcase on", () => {
   test("each link carries its page switch and address; with it off the list is as before", async () => {
     auth.authQuery.mockResolvedValueOnce([

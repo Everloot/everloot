@@ -862,6 +862,40 @@ observation of anyone else, and none of it is published as a dataset.
   hello@everloot.app) deletes everything synced for it at once. A copy a link-preview service has already fetched
   stays with that service.
 
+## Gear rankings
+
+**Proposed, not yet in effect.** It takes effect once the maintainer accepts it, migration
+`20261107120000_gear_board.sql` is applied and `EVERLOOT_LEADERBOARDS=1` is set. Until then `/rankings/item-level`
+and `/rankings/gear-score` answer 404 and the switch below is refused.
+
+Two public boards rank linked characters by the gear their owner synced: average item level and Everloot Gear
+Score. This is the ranking contract the owned-character identity ADR asks for, for gear only. Achievements, gold
+and the Everloot Score are not ranked by it.
+
+- **Who is on them.** Only a linked character whose owner made its page public, turned gear sync on and turned
+  "Rank my gear" on (`ranked_gear`, off by default). Nobody else: no sighting, inspect, census row, other site or
+  Blizzard data puts a character on a board. A frozen or hidden character is never on them. Gear older than 30 days
+  is left off.
+- **What is shown.** The character's name, realm, level, race and class, its item level and Gear Score, its rank,
+  and the date of the gear. The items themselves appear only on the character page, and only when the owner shows
+  gear there. The character page shows its own rank on each board.
+- **How the numbers are made.** Both are averages over the same 17 equipment slots (shirt and tabard left out), an
+  empty slot counting 0, a two-handed weapon filling both hands. Item level is the plain average. Gear Score v1
+  weighs each slot by its stat budget at item level 60 from the game's `RandPropPoints` table (the Epic column), read
+  from the Forever client files and labelled found in game files, unconfirmed: 44 for head, chest and legs; 33 for
+  shoulders, hands, waist, feet and trinkets; 25 for neck, back, wrists, rings and off hand; 18 for the main hand; 14
+  for the ranged slot. Which slot falls in which budget group is the long-documented classic mapping, not something
+  the files state. These five numbers are the only thing taken from that table, and they are published in full on
+  `/methodology`. A change to a weight is a new version.
+- **Checked against the game files.** Every item level counted is the game files' level for that item. Gear holding
+  an item the files do not list, or one a page may not show yet (not reported by players and not named under the
+  item name rule, so possibly unreleased), an item level that differs from the files, or an item in a slot it cannot
+  go in, is not counted at all, and the board says how many characters were left out. The gear is still the
+  player's own upload: the board says it is not checked with Blizzard.
+- **Nothing is stored for the boards.** They are computed from the synced gear on each request. Turning "Rank my
+  gear", the page or gear sync off takes the character off on the next request; unlinking deletes the gear.
+- **Search engines.** The boards are `noindex` until indexing of character pages is accepted.
+
 ## Chat
 
 /chat answers questions about the game from Everloot's data. Everloot search needs no model and sends

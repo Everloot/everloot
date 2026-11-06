@@ -13,6 +13,9 @@ vi.mock("@/lib/player-store", async (importOriginal) => ({ ...(await importOrigi
 // The names synced facts are drawn with: fixed here, so a published-sections test reads no item or catalog store.
 const factNames = vi.hoisted(() => ({ load: vi.fn() }));
 vi.mock("@/lib/character-facts-names", () => ({ loadFactNames: factNames.load }));
+// The gear boards, fed in whole: their own reads are tested in app/rankings/gear-board.test.tsx.
+const gearBoard = vi.hoisted(() => ({ load: vi.fn() }));
+vi.mock("@/lib/leaderboards", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/leaderboards")>()), loadGearBoard: gearBoard.load }));
 
 import { createMemoryPlayerStore, type PlayerStore } from "@/lib/player-store";
 import { FOOTER_LINE, NOT_RECORDED_LINE } from "@/lib/character-showcase";
@@ -329,6 +332,36 @@ describe("published sections (private sync, S6)", () => {
     answer([GEAR]);
     expect((await card(wideCard)).status).toBe(200);
     expect(askedForFacts()).toBe(true);
+  });
+});
+
+describe("gear ranks (EVERLOOT_LEADERBOARDS)", () => {
+  const entry = (name: string, itemLevel: number, gearScore: number) => ({
+    name, realm: "Forever Pioneer", realmBase: "Forever Pioneer", ruleset: null, region: null, race: "Orc", class: "SHAMAN", faction: "Horde",
+    level: 24, path: `/characters/forever/forever-pioneer/${name.toLowerCase()}`, capturedAt: "2026-10-31T09:00:00Z", itemLevel, gearScore,
+  });
+  const on = () => { for (const k of ["EVERLOOT_LEADERBOARDS", "EVERLOOT_CHARACTER_LINKS", "EVERLOOT_PRIVATE_SYNC"]) vi.stubEnv(k, "1"); };
+  beforeEach(() => {
+    gearBoard.load.mockReset().mockResolvedValue({ state: "ready", asOf: "2026-11-01T12:00:00Z", notCounted: 0, entries: [entry("Thrallina", 40, 41), entry("Other", 45, 39)] });
+    auth.authQuery.mockImplementation(async (path: string) => (path === "rpc/public_character" ? [ROW] : []));
+  });
+
+  test("a ranked character's page shows its number and place on both boards, linked to them", async () => {
+    on();
+    const html = await render();
+    expect(html).toContain('aria-label="Rankings"');
+    expect(html).toMatch(/Item level <span[^>]*>40<\/span> <a href="\/rankings\/item-level"[^>]*>#2<\/a>/);
+    expect(html).toMatch(/Gear Score <span[^>]*>41<\/span> <a href="\/rankings\/gear-score"[^>]*>#1<\/a>/);
+  });
+
+  test("off the boards, or with them off, the page has no ranks and the boards are not read", async () => {
+    on();
+    gearBoard.load.mockResolvedValue({ state: "ready", asOf: "2026-11-01T12:00:00Z", notCounted: 0, entries: [entry("Other", 45, 39)] });
+    expect(await render()).not.toContain('aria-label="Rankings"');
+    gearBoard.load.mockClear();
+    vi.stubEnv("EVERLOOT_LEADERBOARDS", "");
+    expect(await render()).not.toContain('aria-label="Rankings"');
+    expect(gearBoard.load).not.toHaveBeenCalled();
   });
 });
 
