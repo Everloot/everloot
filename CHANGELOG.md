@@ -15,9 +15,8 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
-- Addon and site: a realm whose name ends in RP-PvP written as one word ("CAMWOW US1 Realm 9 RPPVP", as players copied
-  Forever's realm list) is an RP-PvP realm: the Auction House files it under RP-PvP instead of "Realms not mapped yet",
-  and the tooltip header splits it off in the RP-PvP colour.
+- Site: a realm whose name ends in RP-PvP written as one word ("CAMWOW US1 Realm 9 RPPVP", as players copied Forever's
+  realm list) is filed under RP-PvP on the Auction House instead of "Realms not mapped yet".
 - Site: the separator between the facts under an Auction House title reads "·", not "Â·".
 - Site and MCP: recipe skill ranges agree on the recipe id the trade-skill window reports, not the recipe's name, so an
   install on a Spanish client ("Peletería") counts toward the same range as English ones. A recipe the game files list
@@ -192,6 +191,17 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   agree. Fishing (the bobber, or an object installs agree is fished) is never a pin. An upload of an event
   that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
   instead of withdrawing the event as a conflict. The map shows none of this yet.
+
+## [0.3.20] - 2026-11-06
+
+Release channel: Alpha
+
+RP-PvP realms whose name ends in one word, "RPPVP", get their ruleset in the tooltip header. Not yet seen in the
+Forever client.
+
+### Fixed
+- On a realm whose name ends in RP-PvP written as one word ("CAMWOW US1 Realm 9 RPPVP", as players copied Forever's
+  realm list), the tooltip header splits RP-PvP off in its own colour, as it does for the other rulesets.
 
 ## [0.3.19] - 2026-11-05
 
