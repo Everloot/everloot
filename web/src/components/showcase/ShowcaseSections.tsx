@@ -170,7 +170,7 @@ function Reputations({ rows }: { rows: ReputationRow[] }) {
           <Sub>{g.standing}</Sub>
           <ul className="space-y-4">
             {g.rows.map((r) => ("renown" in r
-              ? <li key={r.faction} className="flex items-baseline justify-between gap-3 text-sm"><span className="text-fg">{r.faction}</span><span className="text-fg-2">{UNSUPPORTED_LINE}</span></li>
+              ? <li key={r.faction} className="flex items-baseline justify-between gap-3 text-sm"><span className="text-fg">{r.faction}</span><span className="text-fg-2">{NOT_RECORDED_LINE}</span></li>
               : <BarRow key={r.faction} name={r.faction} done={r.value} total={r.max} said={`${number(r.value)} / ${number(r.max)}`} />))}
           </ul>
         </div>
@@ -256,8 +256,8 @@ function Collections({ data }: { data: CollectionsData }) {
         items={[
           { label: "Titles", value: data.titles.length ? data.titles.join(", ") : "None" },
           // No collector writes these yet: a line, never a zero.
-          { label: "Mounts", value: UNSUPPORTED_LINE },
-          { label: "Pets", value: UNSUPPORTED_LINE },
+          { label: "Mounts", value: NOT_RECORDED_LINE },
+          { label: "Pets", value: NOT_RECORDED_LINE },
         ]}
       />
     </div>

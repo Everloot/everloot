@@ -60,7 +60,7 @@ test("the sample page carries the banner, the header band, every section and noi
   // The rail lists every section and the sample's upload date.
   expect(html).toContain('href="#showcase-stats"');
   expect(html).toContain("Sample upload");
-  expect(html).toContain(UNSUPPORTED_LINE);
+  expect(html).toContain(NOT_RECORDED_LINE);
   expect(html).toContain(STALE_LINE);
   expect(html).toContain("Not checked against Blizzard");
   expect(html).not.toMatch(/verified|owner|proven|✓/i);
@@ -217,7 +217,7 @@ describe("the other sections", () => {
     const html = section(render(base, true), "collections");
     expect(html).toContain(">Progress<");
     for (const text of ["Achievements", "Achievement points", "Quests completed", "500", "Sample Achievement One", "Achievements by category", "Exploration", "10 of 40", "Sample Second Title"]) expect(html).toContain(text);
-    expect(html.match(new RegExp(UNSUPPORTED_LINE.replace(".", "\\."), "g"))).toHaveLength(2);
+    expect(html.match(new RegExp(NOT_RECORDED_LINE.replace(".", "\\."), "g"))).toHaveLength(2);
   });
 
   test("progress with no quest count says so instead of a zero", () => {
