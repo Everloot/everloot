@@ -75,6 +75,11 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   and achievements and titles. Each category is kept only when you hold that character's live link and turned its sync
   on, and only its newest capture is kept. You see it all on a signed-in preview, and each section shows on the
   character's public page only when you switch it on. Turning a category's sync off or unlinking deletes what was synced.
+- Desktop App: signed in with a key made with "Sync my linked characters", the app sends the characters you linked from
+  this save file to that sync endpoint after each upload: the newest gear, professions, reputations, raid lockouts, and
+  achievements and titles. A capture the site has answered is not sent again; a changed one is. Talent builds are not
+  sent yet: the addon's talent rows do not say which character they belong to. With the site's switch off nothing is
+  said, and a key without that permission gets one line saying which key to make.
 - Addon and Desktop App: with the completion tracker on, the addon keeps each of your characters' professions (rank of
   max rank) and this week's raid lockouts (bosses killed of total, reset time) under the completion key, latest state
   only, and the Desktop App's Characters page shows them on the keyed rows. They stay on your computer: no upload, the
