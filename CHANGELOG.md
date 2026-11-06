@@ -91,6 +91,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   says so once: "Everloot addon updated to X. Type /reload in game." The game loads it at the next `/reload` or login.
   Settings → Game has the switch, "Keep the addon up to date", on by default. With it off, or when an install fails, the
   tray's tooltip and menu show "Addon X available", which opens the Addon page.
+- Addon, Desktop App and site: a tooltip's drop row names its source even when you never met it. The drop rates API
+  gives each rate `sourceName` once 3 installs agree on the NPC's or object's name, the Desktop App writes those names
+  into the price file beside the rates, and the addon shows them ("Drops from Battered Chest" instead of "Drops from
+  object 106318"). A name your own client showed still comes first. Older addons ignore the names.
 - Site: the Auction House files a realm under the PvE, PvP, RP, RP-PvP or Hardcore tab when its name ends in that
   ruleset, as Forever's realm list names them ("CAMWOW US1 Realm 4 PvP"); the realm map still overrides, and a realm
   whose name names no ruleset stays under "Realms not mapped yet". Realm names show split the same way: the name, then

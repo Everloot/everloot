@@ -463,7 +463,7 @@ local scanned = lineAt(rows, '  100 units listed, scanned under 1 h ago')
 assert(day and built and scanned, 'dates, units and reporters stay in the tooltip')
 assert(select(2, labelled(rows, 'Historical')) < day and day < built and built < select(2, labelled(rows, 'Your scan · min buyout')), 'community evidence under the community values')
 assert(select(2, labelled(rows, 'Value')) < scanned and scanned < select(2, labelled(rows, 'Vendor')), 'the own scan evidence under its values')
-local dropRow, drop = labelled(rows, 'Drops from NPC 116')
+local dropRow, drop = labelled(rows, 'Drops from Defias Bandit')
 assert(drop and drop > select(2, labelled(rows, 'Vendor')), 'the drop lines follow the prices, as before')
 -- A drop rate is a row like a price, its rate in the value column, its loot windows and installs muted beneath.
 assert(dropRow.right == '12.4%' and dropRow.rr == 1, 'the rate in the value column: ' .. dropRow.right)
