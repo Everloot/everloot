@@ -15,7 +15,7 @@ import {
   money, realmBoards, realmHref, slugParam, slugWords,
 } from "@/lib/auction-house";
 import { auctionNames, itemArt } from "../../art";
-import { Contribute, DayTable, Facts, HousePrices, PriceChart, PriceFacts, RealmPrices, count, itemQuality } from "../../parts";
+import { Contribute, DayTable, Facts, HousePrices, PriceChart, PriceFacts, RealmPrices, itemQuality } from "../../parts";
 import TimeAgo from "../../TimeAgo";
 
 type Props = { params: Promise<{ realm: string; itemId: string }> };
