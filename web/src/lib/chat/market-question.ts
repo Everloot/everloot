@@ -131,6 +131,28 @@ function subjectOf(raw: string, refs: ItemRef[]): MarketIntent["item"] | null {
 }
 
 /**
+ * A price question asked in Spanish, in the English wording below: "cuánto cuesta Linen Cloth en Forever" is "how much
+ * does Linen Cloth cost in Forever", "cuánto vale X" is "X worth", "precio de X" is "price of X". A question about the
+ * player's own goods ("mi", "tengo") is left as it is, so it never reads as one. Anything else passes through.
+ */
+function fromSpanish(text: string): string {
+  const s = text.replace(/^¿\s*/, "");
+  if (/(?:^|\s)(?:mi|mis|yo|tengo|nuestro|nuestra|nuestros|nuestras)(?=\s|$)/i.test(s)) return text;
+  // The realm comes after the last " en ": item names are English, so "en" inside one is not expected.
+  const realmed = (rest: string, english: (item: string) => string) => {
+    const at = rest.toLowerCase().lastIndexOf(" en ");
+    return at === -1 ? english(rest) : `${english(rest.slice(0, at))} in ${rest.slice(at + 4)}`;
+  };
+  const cost = /^cu[aá]nto\s+(?:cuesta|cuestan)\s+(.+)$/i.exec(s)?.[1];
+  if (cost) return realmed(cost, (item) => `how much does ${item} cost`);
+  const worth = /^cu[aá]nto\s+(?:vale|valen)\s+(.+)$/i.exec(s)?.[1];
+  if (worth) return realmed(worth, (item) => `${item} worth`);
+  const price = /^(?:cu[aá]l\s+es\s+el\s+)?precio\s+(?:de|del)\s+(.+)$/i.exec(s)?.[1];
+  if (price) return realmed(price, (item) => `price of ${item}`);
+  return text;
+}
+
+/**
  * The item and realm a price question names, or null when it is not one. Bounded wording only, with no
  * language model: "price 2589 on Forever", "what is the price of Linen Cloth on Forever", "how much does
  * Runecloth cost in Nightslayer", "Linen Cloth price", an item link, "item:2589". A question about the
@@ -138,7 +160,7 @@ function subjectOf(raw: string, refs: ItemRef[]): MarketIntent["item"] | null {
  */
 export function parseMarketQuestion(question: string): MarketIntent | null {
   if (typeof question !== "string" || question.length > 2000) return null;
-  const taken = takeItemRefs(question.replace(/\s+/g, " ").trim().replace(/[?.!\s]+$/, ""));
+  const taken = takeItemRefs(fromSpanish(question.replace(/\s+/g, " ").trim().replace(/[?.!\s]+$/, "")));
   // The polite lead goes first: the "me" in "tell me the price of X" is not the player's own goods.
   const spoken = taken.text.replace(LEAD, "");
   if (taken.refs.length > 1 || PERSONAL.test(spoken.replace(/\[[^\]]*\]/g, ""))) return null;

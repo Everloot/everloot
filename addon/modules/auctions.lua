@@ -13,6 +13,7 @@ E.SCAN_CHUNK = 1000       -- replicate rows read per frame, so a large house doe
 E.SCAN_COOLDOWN = 900     -- seconds between full scans: Retail's limit; Forever's is unverified
 E.SCAN_PART_ITEMS = 1000  -- items per auction_snapshot record, the intake maximum
 E.SCANS_KEPT = 3          -- full scans kept per realm in SavedVariables
+E.SAMPLES_KEPT = 2        -- partial price samples kept per realm: the newest earlier one beside the one being taken
 E.SCAN_WAIT_SECONDS = 30  -- how long a scan waits for REPLICATE_ITEM_LIST_UPDATE before giving up
 local RETRY_SECONDS = 2   -- one more read for rows whose item data had not loaded
 
@@ -139,6 +140,26 @@ local function nextFallbackItem(s)
   if s.index > #s.keys then finishFallback(s) end
 end
 
+--- Just before a partial sample stores its first row (a sample that finds nothing prunes nothing): keep the newest E.SAMPLES_KEPT - 1 earlier samples of this realm
+--- (a sample is the rows sharing one capturedAt), so up to 1,000 new rows fit under the per-kind cap. Without this,
+--- two samples filled the cap and every later one reported "stored 0". Another realm's rows are not touched.
+local function pruneSamples(realm)
+  local rows = EverlootDB.records.auction_scan or {}
+  local order, seen = {}, {}
+  for _, r in ipairs(rows) do
+    if r.realm == realm and not seen[r.capturedAt] then seen[r.capturedAt] = true; order[#order + 1] = r.capturedAt end
+  end
+  table.sort(order)
+  local keep = E.SAMPLES_KEPT - 1
+  if #order <= keep then return end
+  local drop = {}
+  for i = 1, #order - keep do drop[order[i]] = true end
+  local kept = {}
+  for _, r in ipairs(rows) do if r.realm ~= realm or not drop[r.capturedAt] then kept[#kept + 1] = r end end
+  EverlootDB.records.auction_scan = kept
+  if EverlootDB.paused then EverlootDB.paused.auction_scan = nil end
+end
+
 local function storeFallbackItem(s)
   local key = s.keys[s.index]
   local n = s.commodity and C_AuctionHouse.GetNumCommoditySearchResults(key.itemID) or C_AuctionHouse.GetNumItemSearchResults(key)
@@ -158,6 +179,7 @@ local function storeFallbackItem(s)
       price = math.floor(s.commodity and price or price / count)
       if price < 1 then return end
       seen[id] = true
+      if not s.pruned then s.pruned = true; pruneSamples(s.realm) end
       if E:Store("auction_scan", { installId = EverlootDB.installId, capturedAt = s.at,
         realm = s.realm, itemId = key.itemID, count = count, copper = price, priceBasis = "unit" }) then
         s.stored = s.stored + 1

@@ -14,9 +14,12 @@ spec.loader.exec_module(upload)
 
 class UploadTests(unittest.TestCase):
     def test_alpha_and_stable_use_the_release_notes_channel(self):
-        for notes, channel in [("Release channel: Alpha\nPending live checks.", "alpha"), ("Stable fixes.", "release")]:
+        # An Alpha uploads as a CurseForge Beta, since CurseForge's Files tab hides alpha files by default.
+        for notes, channel, name in [("Release channel: Alpha\nPending live checks.", "beta", "Everloot 0.3.14 Beta"),
+                                     ("Stable fixes.", "release", "Everloot 0.3.14")]:
             data = upload.metadata("0.3.14", notes)
             self.assertEqual(data["releaseType"], channel)
+            self.assertEqual(data["displayName"], name)
             self.assertEqual(data["gameVersions"], [17053])
             self.assertEqual(data["changelog"], notes)
             self.assertEqual(data["changelogType"], "markdown")

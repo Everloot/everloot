@@ -7,11 +7,21 @@ local E = Everloot
 E.DROP_INSTALLS = 3        -- as the site: a rate is public once three installs looted its source
 E.DROP_SOURCES_SHOWN = 3   -- tooltip lines per item; the rest are counted
 
--- The drops block: { status = "absent" | "verifying" | "ready" | "bad", data, asOf }.
+-- The drops block: { status = "absent" | "verifying" | "ready" | "bad", data, asOf, names }.
 local drops
 
 function E:ResetDrops()
   drops = nil
+end
+
+--- The block's `names`, one "n116=Defias Bandit" or "o1731=Copper Vein" line each, as { n116 = name }: the names
+--- the site knows for the sources, written by the Desktop App. Outside the checksum, so a name is display text only:
+--- its pipes are doubled, so the game prints them instead of reading a colour or a link.
+local function sourceNames(text)
+  local names = {}
+  if type(text) ~= "string" then return names end
+  for key, name in text:gmatch("([no]%d+)=([^\n]+)") do names[key] = name:sub(1, 100):gsub("|", "||") end
+  return names
 end
 
 --- The drops block of EverlootPricesDB: "itemId,kind,sourceId,drops,windows,installs;..." grouped by item, best
@@ -25,7 +35,7 @@ local function dropFile()
       drops = { status = "bad" }
       print("Everloot: drop sources failed their checksum and are not shown.")
     else
-      local entry = { status = "verifying", data = ";" .. db.data .. ";", asOf = db.dataAsOf }
+      local entry = { status = "verifying", data = ";" .. db.data .. ";", asOf = db.dataAsOf, names = sourceNames(db.names) }
       drops = entry
       E.VerifyChecksum(db.data, db.sum, function(ok)
         if drops ~= entry then return end -- reset while checking
@@ -76,9 +86,9 @@ function E:DropLines(itemId)
   for i = 1, math.min(#sources, E.DROP_SOURCES_SHOWN) do
     local s = sources[i]
     local source, rate = string.format("%s %d", s.kind == "npc" and "NPC" or "object", s.id), string.format("%.1f%%", 100 * s.drops / s.windows)
-    -- A source this install met is named; chat keeps the id beside the name, the tooltip shows the name alone.
-    -- The name comes from this install's own rows (modules/openworld.lua); this file reads only the slot file.
-    local name = E.SourceName and E:SourceName(s.kind, s.id)
+    -- A source is named as this install's client showed it (its own rows, modules/openworld.lua), else by the name
+    -- the site knows (the slot file's names). Chat keeps the id beside the name, the tooltip shows the name alone.
+    local name = (E.SourceName and E:SourceName(s.kind, s.id)) or entry.names[(s.kind == "npc" and "n" or "o") .. s.id]
     local said = name and (name .. " (" .. source .. ")") or source
     -- `text` is the plain sentence for chat and a tooltip without two columns. The game's tooltip shows `left` and
     -- `right` as a row, the rate in the value column like a price, with `detail` (its denominator) muted beneath.

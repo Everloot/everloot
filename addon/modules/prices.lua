@@ -371,13 +371,21 @@ function E.PriceCommand(text, tries)
   print("  Full history and other realms: everloot.app/tools/auctions?realm=" .. realm:gsub(" ", "+") .. "&item=" .. id)
 end
 
+--- The post-call runs for every item tooltip, and comparing an item opens ShoppingTooltip1 and 2 (ItemRefShoppingTooltip1
+--- and 2 from a chat link) beside the main one, each with its own item. The block belongs on the main tooltip only;
+--- on the comparison tooltips it repeated up to three times on one hover.
+local function isComparison(tooltip)
+  local name = type(tooltip.GetName) == "function" and tooltip:GetName()
+  return type(name) == "string" and name:find("ShoppingTooltip%d+$") ~= nil
+end
+
 E:RegisterModule("prices", function()
   if not (TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType) then
     error("tooltip API unavailable", 0)
   end
   if not E.pricesHooked then
     TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(tooltip, data)
-      if tooltip and tooltip.AddLine and type(data) == "table" and type(data.id) == "number" then
+      if tooltip and tooltip.AddLine and type(data) == "table" and type(data.id) == "number" and not isComparison(tooltip) then
         pcall(addLines, tooltip, data.id)
       end
     end)

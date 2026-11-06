@@ -1,10 +1,10 @@
 import { AUCTION_HOUSES, type AuctionHouse } from "@everloot/protocol";
 import { AUCTION_AGREEMENT } from "../../../kb/src/auction-history";
 import {
-  TRIM_FACTOR, TRIM_MIN_DAYS, formatCopper, houseKey, itemListings, itemMarket, parseHouse, validRealm,
+  MARKET_LIMITS, TRIM_FACTOR, TRIM_MIN_DAYS, formatCopper, houseKey, itemListings, itemMarket, parseHouse, validRealm,
   type ItemDays, type MarketState, type MarketValue, type PublicDay, type RealmDays,
 } from "../../../kb/src/market";
-import { AFTER_LAUNCH, DEFAULT_RULESET, RULESET_SLUGS, isRulesetSlug, mappedRulesets, realmRuleset, type RulesetSlug } from "./realms";
+import { AFTER_LAUNCH, DEFAULT_RULESET, RULESET_SLUGS, isRulesetSlug, mappedRulesets, realmInfo, realmRuleset, rulesetFromName, type RulesetSlug } from "./realms";
 
 /**
  * The Auction House pages' view of the market rollup (kb/src/market.ts): realms, the rows each one
@@ -246,9 +246,43 @@ export function agreementSoFar(state: MarketState, slug: string, itemId?: number
   for (const stored of buckets) {
     if (!validRealm(stored.name) || realmSlug(stored.name) !== slug) continue;
     const items = itemId === undefined ? Object.values(stored.items) : [stored.items[String(itemId)]].filter(Boolean) as ItemDays[];
-    for (const days of items) for (const installs of Object.values(days.open)) most = Math.max(most, groupsOf(installs).size);
+    most = Math.max(most, mostOnOneDay(items));
   }
   return Math.min(most, AUCTION_AGREEMENT - 1);
+}
+
+/** The most reporters on any one item's open day. */
+function mostOnOneDay(items: ItemDays[]): number {
+  let most = 0;
+  for (const days of items) for (const installs of Object.values(days.open)) most = Math.max(most, groupsOf(installs).size);
+  return most;
+}
+
+/**
+ * Forever's realm list names a realm like "CAMWOW US1 Realm 4 PvP": a word, a region and number, "Realm" and a
+ * number, then the ruleset. A realm with no public price is listed by name only when its name has that shape or
+ * the realm map lists it, so one upload cannot put any text it likes on the page.
+ */
+const FOREVER_REALM_NAME = /^[A-Za-z0-9]+ [A-Za-z]{2}\d+ Realm \d+[\s-]/;
+const listableName = (name: string) => validRealm(name) && (realmInfo(name) !== null || (FOREVER_REALM_NAME.test(name) && rulesetFromName(name) !== null));
+
+export interface PendingRealm { realm: string; slug: string; reporters: number }
+
+/**
+ * Realms with scans but no public price yet, and how close each is: the most reporters (upload addresses, so
+ * installs behind one address count once) that scanned one item there on one open day, the last 7. That is 1 or
+ * 2: at 3 the day is public and the realm has a board. A count only, never a value. The closest first, at most
+ * `limit` (the rollup keeps no more realms than that anyway).
+ */
+export function pendingRealms(state: MarketState, now: Date = new Date(), limit: number = MARKET_LIMITS.realms): PendingRealm[] {
+  const public_ = new Set(realmBoards(state, now).map((b) => b.realm.key));
+  const out: PendingRealm[] = [];
+  for (const [key, stored] of Object.entries(state.realms)) {
+    if (public_.has(key) || !listableName(stored.name)) continue;
+    const reporters = Math.min(mostOnOneDay(Object.values(stored.items)), AUCTION_AGREEMENT - 1);
+    if (reporters > 0) out.push({ realm: stored.name, slug: realmSlug(stored.name), reporters });
+  }
+  return out.sort((a, b) => b.reporters - a.reporters || a.realm.localeCompare(b.realm)).slice(0, Math.max(0, limit));
 }
 
 /** A slug read back as words, for a realm with nothing public: "argent-dawn" is "Argent Dawn". */

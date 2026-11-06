@@ -358,11 +358,17 @@ local function rememberItem(itemId)
   local label = QUALITY[quality]
   -- An item the client has not cached yet answers with a stand-in name, which is not the item's name.
   if not name or not label or name:find("^Item %d+$") then return end
-  E:Store("item_seen", {
+  -- One row per item: the same item in another loot window or on another vendor adds nothing. A new row is
+  -- stored only when the client shows a different name or quality for it.
+  EverlootDB.itemSeenIds = EverlootDB.itemSeenIds or {}
+  local seen = label .. " " .. name
+  if EverlootDB.itemSeenIds[itemId] == seen then return end
+  local stored = E:Store("item_seen", {
     installId = EverlootDB.installId,
     capturedAt = date("!%Y-%m-%dT%H:%M:%SZ"),
     itemId = itemId, name = name, quality = label,
   })
+  if stored then EverlootDB.itemSeenIds[itemId] = seen end
 end
 
 -- The game's own "N Gold", "N Silver" and "N Copper" strings, as patterns, so a coin slot's text reads in any
@@ -798,12 +804,21 @@ local function vendorCapture()
     end
   end
   if #items == 0 then return end
-  E:Store("vendor", {
+  -- One row per vendor and UTC day: opening the same window again adds nothing unless an item, a price or a
+  -- limited stock changed. The hash is of the items as read, in the vendor's order.
+  EverlootDB.vendorSeen = EverlootDB.vendorSeen or {}
+  local parts = {}
+  for i, item in ipairs(items) do parts[i] = item.itemId .. ":" .. item.priceCopper .. ":" .. (item.limitedStock or "") end
+  local day, hash = date("!%Y-%m-%d"), E.Adler32(table.concat(parts, ","))
+  local seen = EverlootDB.vendorSeen[vendorNpcId]
+  if type(seen) == "table" and seen.day == day and seen.hash == hash then return end
+  local stored = E:Store("vendor", {
     installId = EverlootDB.installId,
     capturedAt = date("!%Y-%m-%dT%H:%M:%SZ"),
     vendorNpcId = vendorNpcId,
     items = items,
   })
+  if stored then EverlootDB.vendorSeen[vendorNpcId] = { day = day, hash = hash } end
 end
 
 -- Names of the sources this install has met, as this client showed them: NPCs from its sightings, objects from its

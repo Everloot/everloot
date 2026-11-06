@@ -17,8 +17,10 @@ from urllib.request import Request, urlopen
 def metadata(version: str, notes: str) -> dict:
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         raise ValueError("Only tagged addon versions may be uploaded")
-    channel = "alpha" if "Release channel: Alpha" in notes.splitlines() else "release"
-    return {"displayName": f"Everloot {version}" + (" Alpha" if channel == "alpha" else ""),
+    # An Alpha goes up as a CurseForge Beta: the project's Files tab hides alpha files by default, so a page of Alpha
+    # uploads reads "No Results". Beta is still marked as not final; GitHub keeps the release a pre-release.
+    channel = "beta" if "Release channel: Alpha" in notes.splitlines() else "release"
+    return {"displayName": f"Everloot {version}" + (" Beta" if channel == "beta" else ""),
             "changelog": notes, "changelogType": "markdown", "gameVersions": [17053], "releaseType": channel}
 
 

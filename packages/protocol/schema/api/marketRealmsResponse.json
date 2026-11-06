@@ -43,6 +43,34 @@
         }
       }
     },
+    "pending": {
+      "description": "Realms with scans but no public values yet: the most reporters (upload addresses) that scanned one item there on one day in the last 7, out of the `needed` that make a day public. A count only, never a value.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "realm": {
+            "type": "string"
+          },
+          "reporters": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "needed": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "realm",
+          "reporters",
+          "needed"
+        ],
+        "additionalProperties": false
+      }
+    },
     "attribution": {
       "type": "object",
       "properties": {

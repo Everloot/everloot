@@ -112,6 +112,11 @@
           "public": {
             "type": "boolean",
             "const": true
+          },
+          "sourceName": {
+            "description": "The NPC's or object's name, once 3 installs agree on it; absent until then.",
+            "type": "string",
+            "minLength": 1
           }
         },
         "required": [
