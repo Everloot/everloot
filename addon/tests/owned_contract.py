@@ -178,9 +178,10 @@ assert plain(lua, "profession_owned") == [] and plain(lua, "lockout_owned") == [
 lua.execute("event('PLAYER_ENTERING_WORLD'); event('UPDATE_INSTANCE_INFO')")
 assert plain(lua, "profession_owned") == [] and plain(lua, "lockout_owned") == [], "off stops reading at once"
 
-# The on message tells the player these stay on the computer.
+# The on message tells the player these stay on the computer unless the Desktop App sends a linked character's.
 lua.execute("SlashCmdList.EVERLOOT('completion on')")
-assert "never uploaded" in lua.eval("printed[#printed]"), lua.eval("printed[#printed]")
+assert "only for characters you linked" in lua.eval("printed[#printed]"), lua.eval("printed[#printed]")
+assert "never uploaded" not in lua.eval("printed[#printed]"), lua.eval("printed[#printed]")
 
 # A missing call records nothing for its kind, never zeros; the other kind still works.
 lua = addon(setup="GetProfessionInfo = nil")

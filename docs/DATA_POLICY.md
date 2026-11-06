@@ -202,11 +202,13 @@ id. The link lasts until the rollup is rebuilt (`?rebuild=1`), which drops every
 were deleted; deleting a player's uploads therefore takes a rebuild to remove the link. Turning the
 module off deletes every one of these rows from the file.
 
-With the same switch the addon also keeps two kinds for the Desktop App's Characters page: `profession_owned` (each
-profession's name, rank and max rank) and `lockout_owned` (each raid the character is saved to this week: instance,
-difficulty, bosses killed of total, reset time), under the same opaque key and holding only the latest state. These two
-kinds stay on the player's computer and are never uploaded: every uploader holds them back, the site's intake has no
-schema for them and refuses them, and the Desktop App's Chat does not pass them to a model provider. Turning the module
+With the same switch the addon also keeps three kinds for the Desktop App: `profession_owned` (each
+profession's name, rank and max rank), `lockout_owned` (each raid the character is saved to this week: instance,
+difficulty, bosses killed of total, reset time) and `talent_owned` (the active talent build: tree, spec if known,
+points spent, talent node ids and ranks), under the same opaque key and holding only the latest state. These kinds stay on
+the player's computer except for private sync (see *Private sync and owner-published sections*): every uploader holds
+them back, the site's intake has no schema for them and refuses them, and the Desktop App's Chat does not pass them to a
+model provider. Only the Desktop App's sync sends them, and only for a character the player linked. Turning the module
 off deletes them with the rest.
 
 The census counts who plays what. It is on in a new install of the addon, which says so once in chat; an
@@ -828,8 +830,9 @@ player pages and guild pages hold about the character (see "What players see in 
 ## Private sync and owner-published sections
 
 In effect from 6 November 2026, accepted by the maintainer that day (`EVERLOOT_PRIVATE_SYNC`, migration
-`20261106120000_private_sync.sql`). The Desktop App does not send talent builds yet: the addon's talent rows do not
-say which character they belong to.
+`20261106120000_private_sync.sql`). The active talent build syncs as the addon's keyed `talent_owned` row, which names
+its character by the same opaque key as the other synced rows, under the talents switch; there is no separate category.
+The public `talent_snapshot` row carries no character and is never synced.
 
 A signed-in player can sync their own linked characters' progress to their account and choose which parts of it
 their character's public page shows. Like saved builds and profiles, this is the player's own data, not an
