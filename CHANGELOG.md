@@ -29,6 +29,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   whole snapshot (about 50 KB for a 500-member guild) and every loading screen stored the lockouts again.
 - Site: a realm whose name ends in RP-PvP written as one word ("CAMWOW US1 Realm 9 RPPVP", as players copied Forever's
   realm list) is filed under RP-PvP on the Auction House instead of "Realms not mapped yet".
+- Addon: a partial price sample (the search-based fallback when a full scan cannot run) keeps only the newest earlier
+  sample of that realm before it stores, so two samples no longer fill the 2,000-row `auction_scan` cap and later samples no
+  longer report "stored 0". Another realm's rows stay.
 - Site: the separator between the facts under an Auction House title reads "·", not "Â·".
 - Site and MCP: recipe skill ranges agree on the recipe id the trade-skill window reports, not the recipe's name, so an
   install on a Spanish client ("Peletería") counts toward the same range as English ones. A recipe the game files list
