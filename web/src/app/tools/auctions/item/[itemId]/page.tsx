@@ -65,7 +65,7 @@ export default async function CrossRealmItemPage(props: Props) {
       {rows.length > 0 && (
         <JsonLd data={marketDatasetJsonLd({
           name: `${label} auction prices across realms`,
-          description: `Public auction house prices for ${label} on every WoW: Forever realm where 3 reporters scanned it: market value, minimum buyout, historical value and units listed.`,
+          description: `Public auction house prices for ${label} on every WoW: Forever realm with a public day (3 reporters, or Everloot's own scans): market value, minimum buyout, historical value and units listed.`,
           path,
           apiPath: "/api/market/prices",
           from: days[0]!,

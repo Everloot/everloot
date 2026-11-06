@@ -248,6 +248,11 @@ They share one branch and one pull request, one commit per stage, because each s
     A unit price of 0 (buyout below the stack size) is dropped in the addon and again by the fold.
   - **Late arrivals.** The last 7 days stay open and take late uploads; a day under 3 reporters is not
     published. A scan for a day already closed is ignored.
+  - **Trusted installs (2026-11-06, while few players upload).** Install ids in the Worker secret
+    `EVERLOOT_TRUSTED_INSTALLS` are Everloot's own. Their scans fold with the reporter `everloot` in place of the
+    address hash, and a day with that reporter in it is public under 3; its reporters read "includes Everloot's own
+    scans". Open scans already stored from such an install are re-marked on each fold. Strangers still need 3.
+    Drop the secret once real uploaders reach 3 on the realms people play (`kb/src/trusted-source.ts`).
   - **Realm names** must be 2 to 40 letters, digits, spaces, apostrophes or hyphens, at most 3 realms
     per upload, and only such names are listed on the site.
   - **Price file.** `/api/market/prices` returns at most 2,000 items per realm (most units first), with

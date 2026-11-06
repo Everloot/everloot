@@ -491,7 +491,7 @@ export function formatCopper(value: number): string {
 }
 
 export const MARKET_RULE =
-  "A day is public when 3 reporters scanned this item on this realm with a full scan (installs behind one upload address count once); each value is the median of their last scans that day. " +
+  "A day is public when 3 reporters scanned this item on this realm with a full scan (installs behind one upload address count once); each value is the median of their last scans that day. While few players upload, a day Everloot's own installs scanned is public with fewer, and its reporters say so. " +
   "Market value is a weighted mean of the public days up to 14 calendar days old, newer days weighing more, skipping thin days (5 units listed or fewer) and days far from the historical value. Historical is the median of the public days in the last 60 calendar days, of those that are not thin when there are any.";
 
 /** "3 reporters", or "1 reporter (includes Everloot's own scans)" for a day public under 3 because a trusted install scanned it. */

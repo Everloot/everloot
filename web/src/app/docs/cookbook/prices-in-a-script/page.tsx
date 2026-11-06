@@ -152,7 +152,7 @@ export default function Page() {
       </List>
 
       <Callout kind="note">
-        <p>Prices come only from scans players make from WoW: Forever&apos;s launch on 4 November 2026, and a realm has no public prices until 3 reporters scan an item on it. Until then the scripts print the empty-answer message in step 3. The output in step 4 uses placeholder values, so you can see its shape.</p>
+        <p>Prices come only from scans players make from WoW: Forever&apos;s launch on 4 November 2026, and a realm has no public prices until 3 reporters scan an item on it (while few players upload, Everloot&apos;s own scans can make a day public alone; their <C>reporters</C> is then under 3). Until then the scripts print the empty-answer message in step 3. The output in step 4 uses placeholder values, so you can see its shape.</p>
       </Callout>
 
       <H2 id="steps">Steps</H2>

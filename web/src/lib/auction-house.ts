@@ -9,7 +9,7 @@ import { AFTER_LAUNCH, DEFAULT_RULESET, RULESET_SLUGS, isRulesetSlug, mappedRule
 /**
  * The Auction House pages' view of the market rollup (kb/src/market.ts): realms, the rows each one
  * shows, the price moves, and which pages are indexed. Only public values reach here: a realm/item day
- * is public when 3 reporters scanned it. Reporter hashes and install ids are counted, never returned.
+ * is public when 3 reporters scanned it, or one of Everloot's own installs did (kb/src/trusted-source.ts). Reporter hashes and install ids are counted, never returned.
  */
 
 const DAY_MS = 86_400_000;
@@ -290,7 +290,7 @@ export const slugWords = (slug: string) => slug.split("-").map((w) => w.charAt(0
 
 /**
  * Indexing rule: a price page is in the sitemap and indexable only when it has a market value, that is a
- * public day (3 reporters) with more than 5 units listed in the last 14 days. Every other price page says noindex.
+ * public day (3 reporters, or Everloot's own scans) with more than 5 units listed in the last 14 days. Every other price page says noindex.
  */
 export const indexable = (value: MarketValue | null | undefined) => Boolean(value && value.market !== null);
 

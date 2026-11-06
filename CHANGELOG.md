@@ -76,6 +76,12 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   Both numbers are averages over 17 slots with each item at the game files' item level; Gear Score v1 weighs each slot by
   its stat budget in the game's `RandPropPoints` table. Filters by ruleset and region, and the character page shows its
   place on each board.
+- Site and MCP: while few players upload, Everloot's own installs (Worker secret `EVERLOOT_TRUSTED_INSTALLS`) make an
+  Auction House day or a census count public on their own. Everyone else still needs 3 reporters, and a census count
+  still needs 10 characters, the hiding of small counts and rounding to 5. A value that rests on them says "includes
+  Everloot's own scans" on the Auction House pages, in chat price answers and `market_value`, and the census and
+  `population` say when their numbers include them. Scans already waiting for a third reporter count from the next
+  rollup run.
 - Site, behind `EVERLOOT_PRIVATE_SYNC` (off; its migration is not applied): private sync of your own linked characters.
   A key with the new `sync:own` scope sends a character's gear, active talents, professions, reputations, raid lockouts,
   and achievements and titles. Each category is kept only when you hold that character's live link and turned its sync

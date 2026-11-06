@@ -83,6 +83,9 @@ census_self | census_seen
    address don't clear the bar. Below that it
    reads "not enough reports", never a number that could point at one person. A cell with 40 characters
    from 2 installs is hidden too, so the label doesn't say "fewer than 10".
+   While few players upload (2026-11-06), rows from Everloot's own installs (`EVERLOOT_TRUSTED_INSTALLS`) meet the
+   install and address minimums on their own; the 10 characters, the suppression below and the rounding still
+   apply, and the page and `population` say when their numbers include them (`kb/src/trusted-source.ts`).
    Hiding a cell is not enough on its own: a hidden part could be worked out from its total and the
    shown parts. So in every published sum, a relation with anything hidden has at least two hidden
    parts whose true counts add up to at least 10; where it wouldn't, the smallest shown part is hidden

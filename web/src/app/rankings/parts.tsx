@@ -583,7 +583,8 @@ export function HowItCounts() {
       <p>
         A week runs from Monday to Sunday, UTC. Each character counts once a week, and a number shows only when it covers at
         least {CENSUS_MIN_CHARACTERS} characters reported by at least {CENSUS_MIN_INSTALLS} installs from at
-        least {CENSUS_MIN_REPORTERS} addresses, rounded to the nearest {CENSUS_ROUND_TO}.
+        least {CENSUS_MIN_REPORTERS} addresses, rounded to the nearest {CENSUS_ROUND_TO}. While few players upload,
+        Everloot&apos;s own installs also count on their own, so a week can come from one player&apos;s game.
       </p>
       <p>
         Ranks follow those rounded numbers, so equal numbers share a rank. Change compares a rank with the week before.

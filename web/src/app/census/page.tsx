@@ -209,10 +209,11 @@ function Filtered({ view: v, window: w }: { view: FilteredCensus; window: Census
 
 /** The census counting rule, word for word as the page has always stated it. */
 const ruleOf = (view: CensusView) =>
-  `Each character counts once, and a number shows only when it covers at least ${view.rule.minCharacters} characters reported by at least ${view.rule.minInstalls} installs from at least ${view.rule.minReporters} addresses, rounded to the nearest ${view.rule.roundTo}.${view.trusted ? TRUSTED_RULE : ""}`;
+  `Each character counts once, and a number shows only when it covers at least ${view.rule.minCharacters} characters reported by at least ${view.rule.minInstalls} installs from at least ${view.rule.minReporters} addresses, rounded to the nearest ${view.rule.roundTo}.${view.trusted ? trustedRule(view) : ""}`;
 
 /** Said beside the rule while Everloot's own installs count on their own (kb/src/trusted-source.ts). */
-const TRUSTED_RULE = " While few players upload, Everloot's own installs also count on their own, so these numbers can come from one player's game and lean towards the zones they play in. The 10-character minimum and the rounding still apply.";
+const trustedRule = (view: CensusView) =>
+  ` While few players upload, Everloot's own installs also count on their own, so these numbers can come from one player's game and lean towards the zones they play in. The ${view.rule.minCharacters}-character minimum and the rounding still apply.`;
 
 /** The top of the page's content: an EmptyState until the window has numbers, then one sentence. */
 function Headline({ view, window: w }: { view: CensusView; window: CensusWindow }) {

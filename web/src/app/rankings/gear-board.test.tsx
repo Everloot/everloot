@@ -80,7 +80,7 @@ test("without the game files nothing is ranked unchecked; storage down says so",
   files.assets = null;
   expect(await html(ItemLevelPage({ searchParams: search() }))).toContain(UNCHECKED_LINE);
   auth.authQuery.mockRejectedValueOnce(new Error("down"));
-  expect(await html(ItemLevelPage({ searchParams: search() }))).toContain(UNAVAILABLE_LINE.replace("'", "&#x27;"));
+  expect(await html(ItemLevelPage({ searchParams: search() }))).toContain(UNAVAILABLE_LINE.replaceAll("'", "&#x27;"));
 });
 
 test("an empty board says how to get on it, and the boards are never indexed", async () => {
