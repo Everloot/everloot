@@ -63,6 +63,11 @@ export declare const marketRealmsResponse: z.ZodObject<{
         Horde: "Horde";
         Neutral: "Neutral";
     }>>>>;
+    pending: z.ZodOptional<z.ZodArray<z.ZodObject<{
+        realm: z.ZodString;
+        reporters: z.ZodNumber;
+        needed: z.ZodNumber;
+    }, z.core.$strip>>>;
     attribution: z.ZodObject<{
         licence: z.ZodString;
         licenceUrl: z.ZodString;
@@ -1328,6 +1333,11 @@ export declare const API_SCHEMAS: {
             Horde: "Horde";
             Neutral: "Neutral";
         }>>>>;
+        pending: z.ZodOptional<z.ZodArray<z.ZodObject<{
+            realm: z.ZodString;
+            reporters: z.ZodNumber;
+            needed: z.ZodNumber;
+        }, z.core.$strip>>>;
         attribution: z.ZodObject<{
             licence: z.ZodString;
             licenceUrl: z.ZodString;

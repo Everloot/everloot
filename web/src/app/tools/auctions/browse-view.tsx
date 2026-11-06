@@ -11,16 +11,16 @@ import {
 import type { Crumb } from "@/lib/jsonld";
 import { trailFor } from "@/lib/breadcrumbs";
 import {
-  AH_PATH, HOUSES, agreementSoFar, crossRealmHref, findBoard, houseCounts, itemHref, itemIdParam, money, onRuleset, percent, realmBoards, realmHref,
-  rulesetSummaries, slugWords,
+  AH_PATH, HOUSES, agreementSoFar, crossRealmHref, findBoard, houseCounts, itemHref, itemIdParam, money, onRuleset, pendingRealms, percent, realmBoards,
+  realmHref, rulesetSummaries, slugWords,
 } from "@/lib/auction-house";
-import { AFTER_LAUNCH, RULESET_LABEL, isRulesetSlug, mappedRulesets } from "@/lib/realms";
+import { AFTER_LAUNCH, RULESET_LABEL, isRulesetSlug, mappedRulesets, realmRuleset } from "@/lib/realms";
 import { auctionNames, itemArt, type ItemTip } from "./art";
 import {
   AH_PER_PAGE, DEFAULT_SORT, activeFilters, ahHref, ahQuery, browseRows, categoryRow, categoryTree, inCategory,
   type AhQuery, type AhSort, type BrowseRow, type TreeNode,
 } from "./browse";
-import { Contribute, Facts, ItemLink, RealmName, RulesetSummaryTable, Sparkline, count } from "./parts";
+import { Contribute, Facts, ItemLink, PendingRealms, RealmName, RulesetSummaryTable, Sparkline, count } from "./parts";
 import TimeAgo from "./TimeAgo";
 
 type Search = Record<string, string | string[] | undefined>;
@@ -135,6 +135,11 @@ export async function browseView({ slug, search }: { slug: string | null; search
   const mapped = new Set<string>([...mappedRulesets(), ...summaries.filter((s) => s.mapped).map((s) => s.ruleset)]);
   const laterRulesets = [...AFTER_LAUNCH].filter((r) => !mapped.has(r));
 
+  // Realms with scans but no public price, on the all-realms page's plain first page: counted across every house.
+  const pending = state && !slug && !q.house && activeFilters(q) === 0 && q.page === 1
+    ? pendingRealms(state, now).filter((p) => !ruleset || realmRuleset(p.realm) === ruleset)
+    : [];
+
   const inCat = rows.filter((r) => inCategory(r.value.itemId, q));
   const qualityCount = new Map<number, number>();
   for (const r of inCat) {
@@ -223,7 +228,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
       ? <EmptyState count={agreementSoFar(state, slug, undefined, q.house)} message={`No public prices in ${where} yet: a price shows once 3 players scan the same item there.`} />
       : <EmptyState message={q.house
         ? `No public prices in ${where} yet: a price shows once 3 players scan the same item in that house.`
-        : "No realm has public prices yet: a realm shows here once 3 players scan the same item there."} />;
+        : "No realm has public prices yet: a realm shows here once 3 players scan the same item there."} count={pending[0]?.reporters ?? 0} />;
   } else {
     const empty = (
       <div className="flex flex-wrap items-center gap-2 py-4 text-cell text-fg-2">
@@ -301,6 +306,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
           <div className="min-w-0">
             <FilterBar label="Auction filters" controls={controls} active={activeFilters(q)} clearHref={clearHref} />
             <div className="mt-2">{body}</div>
+            {pending.length > 0 && <PendingRealms realms={pending} />}
             {pages > 1 && <div className="mt-2">{strip}</div>}
           </div>
         </div>

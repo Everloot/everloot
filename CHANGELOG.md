@@ -55,6 +55,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   `addon_download` to CurseForge like the other download links. The same tested zip is uploaded there on each release.
 
 ### Added
+- Site: the Auction House lists each realm that has scans but no public prices yet, with how many of the 3 players needed
+  have scanned there ("1 of 3 players have scanned; prices go public at 3"). A player is counted once per upload address,
+  on the item with the most players on one day in the last 7. `/api/market/prices` without a realm returns the same counts
+  in `pending`. Counts only: no price or quantity below 3 players is shown.
 - Desktop App and site, behind `EVERLOOT_CHARACTER_LINKS` (off): the addon's `/everloot link <code>` (0.3.15) writes one
   link row for the character you are playing, with a code made on the account page. The Desktop App, signed in, sends it only
   to the account's own link endpoint; uploads never carry link rows. The account page lists your linked characters,
