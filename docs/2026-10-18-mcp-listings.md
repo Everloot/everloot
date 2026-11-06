@@ -237,6 +237,7 @@ Execution on 2026-10-18, using the maintainer's existing accounts:
 
 - Official MCP Registry: published `app.everloot/knowledge` version `0.8.0`; the registry API reports active.
 - Official MCP Registry, 0.9.0: published 2026-11-04 after the Worker served that version; the registry API lists 0.8.0, 0.8.1 and 0.9.0, with 0.9.0 latest and active.
+- Official MCP Registry, 0.9.1: published 2026-11-06 after the Worker served that version (all four tool hints, the listing icons and the `kb` subfolder); the registry API lists 0.8.0 to 0.9.1, with 0.9.1 latest and active.
 - Claude, ChatGPT and Grok: custom connections created and real tool calls completed successfully.
 - Claude directory: listing draft prepared; all-tool verification and final submission still pending.
 - ChatGPT directory: business publisher verified, Everloot project and plugin draft created, portable package accepted. Domain verification and final submission still pending.
