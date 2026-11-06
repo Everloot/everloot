@@ -41,6 +41,11 @@ test("a realm whose name ends in its ruleset is on that ruleset; the map still w
   expect(rulesetFromName("Some Realm RP")).toBe("rp");
   expect(rulesetFromName("Some Realm RP-PvP")).toBe("rp-pvp");
   expect(rulesetFromName("Some Realm RP PvP ")).toBe("rp-pvp");
+  // The realm list as players copied it (Blizzard forums, 2026-11-03): one word for RP-PvP, capitals for PvE.
+  expect(rulesetFromName("CAMWOW US1 Realm 9 RPPVP")).toBe("rp-pvp");
+  expect(rulesetFromName("CAMWOW AU1 Realm 4 RPPvP")).toBe("rp-pvp");
+  expect(rulesetFromName("CAMWOW US1 Realm 1 PVE")).toBe("normal");
+  expect(rulesetFromName("CAMWOW US1 Realm 10 RP")).toBe("rp");
   expect(rulesetFromName("Some Realm Hardcore")).toBe("hardcore");
   for (const realm of ["PvP", "Mal'Ganis", "Stormrage", "Pvpland", "Forever"]) expect(rulesetFromName(realm)).toBeNull();
   expect(realmRuleset("CAMWOW US1 Realm 4 PvP")).toBe("pvp");
@@ -49,6 +54,7 @@ test("a realm whose name ends in its ruleset is on that ruleset; the map still w
 test("a realm's name splits into the name and the ruleset it ends in, as the tooltip shows it", () => {
   expect(realmParts("CAMWOW US1 Realm 4 PvP")).toEqual({ base: "CAMWOW US1 Realm 4", ruleset: "pvp" });
   expect(realmParts("Some Realm RP-PvP")).toEqual({ base: "Some Realm", ruleset: "rp-pvp" });
+  expect(realmParts("CAMWOW US2 Realm 10 RPPVP")).toEqual({ base: "CAMWOW US2 Realm 10", ruleset: "rp-pvp" });
   expect(realmParts("Mal'Ganis")).toEqual({ base: "Mal'Ganis", ruleset: null });
   expect(RULESET_LABEL.normal).toBe("PvE");
   // Every ruleset has its name colour.

@@ -147,9 +147,11 @@ local function quiet(word) return hex(META[1], META[2], META[3]) .. word .. "|r"
 
 -- Forever's realm names end in their ruleset, as the game's realm list splits them: "CAMWOW US1 Realm 4 PvP". The
 -- website files and colours realms by the same words (web/src/lib/realms.ts `rulesetFromName`, tokens `realm-*`).
+-- RP-PvP may be one word ("CAMWOW US1 Realm 9 RPPVP" in the list players copied).
 local RULESETS = {
   { suffix = "rp%-pvp", label = "RP-PvP", r = 1, g = 0.5, b = 0.25 },
   { suffix = "rp pvp", label = "RP-PvP", r = 1, g = 0.5, b = 0.25 },
+  { suffix = "rppvp", label = "RP-PvP", r = 1, g = 0.5, b = 0.25 },
   { suffix = "pvp", label = "PvP", r = 1, g = 0.3, b = 0.3 },
   { suffix = "pve", label = "PvE", r = 0.4, g = 0.85, b = 0.4 },
   { suffix = "normal", label = "PvE", r = 0.4, g = 0.85, b = 0.4 },
