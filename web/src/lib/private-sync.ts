@@ -130,11 +130,27 @@ export const statsOwned = ownedBase.extend({
   }),
 });
 
+const pvpInt = z.number().int().min(0).max(2_000_000_000);
+/**
+ * One linked character's PvP standing, as the addon records it: each number is optional (an unreadable one is absent,
+ * never a zero), but a row holds the rank or the honorable kills, or it says nothing.
+ */
+export const pvpOwned = ownedBase.extend({
+  kind: z.literal("pvp_owned"),
+  rank: pvpInt.optional(),
+  rankPoints: pvpInt.optional(),
+  rankThreshold: pvpInt.optional(),
+  rankMax: pvpInt.optional(),
+  season: pvpInt.optional(),
+  honorableKills: pvpInt.optional(),
+}).refine((r) => r.rank !== undefined || r.honorableKills !== undefined, { message: "pvp needs a rank or honorable kills", path: ["rank"] });
+
 /** The kinds this endpoint reads, each with the category it feeds. Any other kind is skipped. */
 const SCHEMAS = {
   gear_snapshot: recordSchemas.gear_snapshot,
   talent_owned: talentOwned,
   stats_owned: statsOwned,
+  pvp_owned: pvpOwned,
   profession_owned: professionOwned,
   reputation_owned: recordSchemas.reputation_owned,
   lockout_owned: lockoutOwned,
@@ -144,7 +160,7 @@ const SCHEMAS = {
 type Kind = keyof typeof SCHEMAS;
 export type SyncRow = z.infer<(typeof SCHEMAS)[Kind]>;
 const CATEGORY_OF: Record<Kind, SyncCategory> = {
-  gear_snapshot: "gear", talent_owned: "talents", stats_owned: "stats", profession_owned: "professions", reputation_owned: "reputations",
+  gear_snapshot: "gear", talent_owned: "talents", stats_owned: "stats", pvp_owned: "pvp", profession_owned: "professions", reputation_owned: "reputations",
   lockout_owned: "raids", achievement_owned: "achievements", title_owned: "achievements",
 };
 
@@ -240,9 +256,13 @@ function categoryData(category: SyncCategory, rows: readonly SyncRow[], now: Dat
       const stats = Object.fromEntries(STAT_KEYS.flatMap((k) => { const v = s.stats[k]; return v !== undefined && keepStat(k, v) ? [[k, v]] : []; }));
       return Object.keys(stats).length ? { stats } : null;
     }
-    case "pvp":
-      // No row kind feeds this yet (a later change adds it), so a request can never build one.
-      return null;
+    case "pvp": {
+      const p = newest(only(rows, "pvp_owned"));
+      return {
+        rank: p.rank ?? null, rankPoints: p.rankPoints ?? null, rankThreshold: p.rankThreshold ?? null,
+        rankMax: p.rankMax ?? null, season: p.season ?? null, honorableKills: p.honorableKills ?? null,
+      };
+    }
     case "talents": {
       const t = newest(only(rows, "talent_owned"));
       return {

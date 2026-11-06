@@ -253,6 +253,30 @@ describe("stats", () => {
   });
 });
 
+describe("pvp", () => {
+  const pvpOwned = { kind: "pvp_owned", ...owned, capturedAt: "2026-11-05T13:00:00Z", rank: 9, rankPoints: 12_500, rankThreshold: 15_000, rankMax: 14, season: 2, honorableKills: 1234, made_up: 1 };
+
+  test("a keyed pvp_owned row becomes the pvp fact with the six numbers, null where absent", async () => {
+    answers([{ category: "pvp", outcome: "stored" }]);
+    const later = { ...pvpOwned, capturedAt: "2026-11-05T14:00:00Z", rank: undefined, rankPoints: undefined, rankThreshold: undefined, rankMax: undefined, season: undefined, honorableKills: 5 };
+    const body = await (await send(thrallina([pvpOwned, later]))).json();
+    expect(body.characters[0].categories).toEqual({ pvp: "stored" });
+    const fact = syncCalls()[0].p_facts[0];
+    expect(fact.category).toBe("pvp");
+    expect(fact.data).toEqual({ rank: null, rankPoints: null, rankThreshold: null, rankMax: null, season: null, honorableKills: 5 });
+    expect(sentToDatabase()).not.toContain(CHARACTER_KEY);
+  });
+
+  test("a row with neither rank nor honorable kills, or a bad number, is skipped", async () => {
+    answers([{ category: null, outcome: "not_linked" }]);
+    const body = await (await send(thrallina([
+      { ...pvpOwned, rank: undefined, honorableKills: undefined }, { ...pvpOwned, rank: -1 }, { ...pvpOwned, honorableKills: 1.5 }, { ...pvpOwned, season: 3e9 },
+    ]))).json();
+    expect(body.skipped).toBe(4);
+    expect(syncCalls()[0].p_facts).toEqual([]);
+  });
+});
+
 describe("how often a key may sync", () => {
   test("each request counts against the key's own hourly bucket, after the key is checked; never the raw key", async () => {
     answers([{ category: "gear", outcome: "stored" }]);

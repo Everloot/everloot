@@ -313,6 +313,18 @@ describe("published sections (private sync, S6)", () => {
     expect(html).not.toContain("0.00%");
   });
 
+  test("a published pvp fact is drawn; without one the section is left out", async () => {
+    on();
+    answer([PROFESSIONS]);
+    expect(await render()).not.toContain('data-section="pvp"');
+    answer([{ category: "pvp", captured_at: "2026-10-31T09:00:00+00:00", data: { rank: 7, rankPoints: null, rankThreshold: null, rankMax: 14, season: null, honorableKills: 12_345 } }]);
+    const html = await render();
+    expect(html).toContain('data-section="pvp"');
+    expect(html).toContain("Rank 7 of 14");
+    expect(html).toContain("Honorable kills 12,345");
+    expect(html).not.toContain("Season");
+  });
+
   test("a section switched off is gone on the next request", async () => {
     on();
     answer([GEAR, PROFESSIONS]);

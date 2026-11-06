@@ -52,7 +52,7 @@ test("the sample page carries the banner, the header band, every section and noi
   expect(html).toContain("Examplechar");
   expect(html).toContain("Level 60 Orc Shaman");
   expect(html).toContain("&lt;Sampleguild&gt;");
-  for (const key of ["identity", "gear", "stats", "talents", "raids", "collections", "reputations", "professions"]) expect(html).toContain(`data-section="${key}"`);
+  for (const key of ["identity", "gear", "stats", "talents", "pvp", "raids", "collections", "reputations", "professions"]) expect(html).toContain(`data-section="${key}"`);
   expect(html).toMatch(/From the player&#x27;s own addon upload, \d{4}-\d{2}-\d{2} \(1 day ago\)/);
   expect(html).toContain('href="/database/items/1282"');
   expect(html).toContain("Item 1282");
@@ -126,7 +126,7 @@ describe("sections", () => {
 
   test("the sections come in page order: the sheet, then what the character did, then standing and trades", () => {
     const html = render(base, true);
-    const order = ["gear", "stats", "talents", "raids", "collections", "reputations", "professions"].map((k) => html.indexOf(`data-section="${k}"`));
+    const order = ["gear", "stats", "talents", "pvp", "raids", "collections", "reputations", "professions"].map((k) => html.indexOf(`data-section="${k}"`));
     expect(order).toEqual([...order].sort((a, b) => a - b));
   });
 
@@ -192,6 +192,26 @@ describe("the other sections", () => {
     const groups = [...html.matchAll(/data-stat-group="([^"]+)"/g)].map((m) => m[1]);
     expect(groups).toEqual(["Attributes", "Melee", "Ranged", "Spell", "Defense"]);
     expect(html).toContain("Attack power");
+  });
+
+  test("pvp: rank, points, season and honorable kills; a null line is not drawn", () => {
+    const html = section(render({ ...base, pvp: { state: "shown", asOf: "2026-10-31", data: { rank: 9, rankPoints: 12_500, rankThreshold: 15_000, rankMax: 14, season: 2, honorableKills: 1234 } } }, true), "pvp");
+    expect(html).toContain("Rank 9 of 14");
+    expect(html).toContain("12,500 / 15,000 rank points");
+    expect(html).toContain("Season 2");
+    expect(html).toContain("Honorable kills 1,234");
+    const part = section(render({ ...base, pvp: { state: "shown", asOf: "2026-10-31", data: { rank: null, rankPoints: null, rankThreshold: null, rankMax: null, season: null, honorableKills: 5 } } }, true), "pvp");
+    expect(part).toContain("Honorable kills 5");
+    expect(part).not.toMatch(/Rank|rank points|Season/);
+    const noMax = section(render({ ...base, pvp: { state: "shown", asOf: "2026-10-31", data: { rank: 4, rankPoints: 100, rankThreshold: null, rankMax: null, season: null, honorableKills: null } } }, true), "pvp");
+    expect(noMax).toContain("Rank 4");
+    expect(noMax).not.toMatch(/Rank 4 of|rank points|Honorable/);
+  });
+
+  test("pvp: empty says nothing synced, private is hidden on the public page", () => {
+    expect(section(render({ ...base, pvp: { state: "empty" } }, true), "pvp")).toContain(EMPTY_LINE);
+    expect(render({ ...base, pvp: { state: "private" } }, false)).not.toContain('data-section="pvp"');
+    expect(render({ ...base, pvp: { state: "private" } }, true)).toContain(PRIVATE_LINE);
   });
 
   test("talents: the main tree, points per tree with bars, and the calculator link", () => {

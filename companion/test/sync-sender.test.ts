@@ -139,6 +139,26 @@ describe("sending linked characters", () => {
     expect(r.synced).toHaveLength(2);
   });
 
+  test("each linked character sends its own newest pvp row; an unlinked one's is not sent", async () => {
+    const pvp = (key: string, honorableKills: number, capturedAt: string) => owned(key, { installId: INSTALL, capturedAt, honorableKills });
+    const { file, state } = workspace({
+      character_link: [link("Thrallina", THRALL), link("Jainara", JAINA)],
+      pvp_owned: [
+        pvp(THRALL, 100, "2026-11-05T09:00:00Z"), pvp(THRALL, 150, "2026-11-05T11:00:00Z"),
+        pvp(JAINA, 200, "2026-11-05T10:00:00Z"), pvp("ffffffff", 300, "2026-11-05T10:00:00Z"),
+      ],
+    });
+    const api = site((characters) => Response.json({
+      characters: characters.map((c, index) => ({ index, result: "synced", categories: { pvp: "stored" } })), skipped: 0,
+    }));
+    const r = await sendSync(file, { endpoint: SITE, key: KEY, state, fetch: api.send });
+    const sent = Object.fromEntries(api.calls[0]!.characters.map((c) => [c.name, c.records]));
+    expect(Object.keys(sent).sort()).toEqual(["Jainara", "Thrallina"]);
+    expect(sent.Thrallina).toMatchObject([{ kind: "pvp_owned", honorableKills: 150 }]);
+    expect(sent.Jainara).toMatchObject([{ kind: "pvp_owned", honorableKills: 200 }]);
+    expect(r.synced).toHaveLength(2);
+  });
+
   test("an answered capture is not sent again; a changed one is, alone", async () => {
     const { file, state, write } = workspace(full());
     const api = site(synced());

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { STANDING_NAMES } from "../../../kb/src/completion";
-import type { CollectionsData, GearRow, GearSlot, ProfessionRow, RaidsData, ReputationRow, Section, ShowcaseInput, StatsData } from "./character-showcase";
+import type { CollectionsData, GearRow, GearSlot, ProfessionRow, PvpData, RaidsData, ReputationRow, Section, ShowcaseInput, StatsData } from "./character-showcase";
 import type { StoredFact } from "./private-sync-store";
 import { keepStat, STAT_KEYS, type StatKey } from "./private-sync";
 
@@ -29,6 +29,7 @@ export interface FactNames {
 export interface FactSections {
   gear?: Section<GearRow[]>;
   stats?: Section<StatsData>;
+  pvp?: Section<PvpData>;
   talents?: { asOf: string; trees: { name: string; points: number }[] };
   professions?: Section<ProfessionRow[]>;
   reputations?: Section<ReputationRow[]>;
@@ -78,6 +79,8 @@ const statValue = (key: StatKey, n: number) => (STAT_LABELS[key].percent ? `${n.
 // The stored shapes, as private-sync.ts builds them. Read back defensively: a row of any other shape is left out.
 const gearData = z.object({ equipped: z.array(z.object({ slot: z.string(), itemId: z.number().int().positive(), itemLevel: z.number().int().positive() })) });
 const statsData = z.object({ stats: z.record(z.string(), z.number().finite()) });
+const pvpNumber = z.number().int().min(0).nullish();
+const pvpFact = z.object({ rank: pvpNumber, rankPoints: pvpNumber, rankThreshold: pvpNumber, rankMax: pvpNumber, season: pvpNumber, honorableKills: pvpNumber });
 const talentData = z.object({ nodes: z.array(z.object({ nodeId: z.number().int(), ranks: z.number().int().min(1) })) });
 const professionData = z.object({ professions: z.array(z.object({ name: z.string().min(1), rank: z.number().int().min(0), maxRank: z.number().int().min(1) })) });
 const reputationData = z.object({
@@ -120,6 +123,18 @@ export function factSections(facts: readonly StoredFact[], names: FactNames, now
           groups.set(group, [...(groups.get(group) ?? []), { label, value: statValue(key, n) }]);
         }
         if (groups.size) out.stats = shown(fact, [...groups].map(([group, stats]) => ({ group, stats })));
+        break;
+      }
+      case "pvp": {
+        const d = pvpFact.safeParse(fact.data);
+        if (!d.success) break;
+        const v = d.data;
+        // A fact with neither the rank nor the honorable kills says nothing to draw.
+        if (v.rank == null && v.honorableKills == null) break;
+        out.pvp = shown(fact, {
+          rank: v.rank ?? null, rankPoints: v.rankPoints ?? null, rankThreshold: v.rankThreshold ?? null,
+          rankMax: v.rankMax ?? null, season: v.season ?? null, honorableKills: v.honorableKills ?? null,
+        });
         break;
       }
       case "talents": {
@@ -194,7 +209,7 @@ export function factSections(facts: readonly StoredFact[], names: FactNames, now
 export function withFacts(input: ShowcaseInput, sections: FactSections): ShowcaseInput {
   const out: ShowcaseInput = { ...input };
   const dates = [input.lastUpload];
-  for (const key of ["gear", "stats", "professions", "reputations", "raids", "collections"] as const) {
+  for (const key of ["gear", "stats", "pvp", "professions", "reputations", "raids", "collections"] as const) {
     const s = sections[key];
     if (!s) continue;
     (out as unknown as Record<string, unknown>)[key] = s;

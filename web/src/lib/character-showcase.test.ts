@@ -43,7 +43,7 @@ describe("buildShowcase", () => {
   test("sections in page order, each dated when shown", () => {
     const s = buildShowcase(sampleShowcase(NOW), NOW);
     expect(s.sections.map((x) => x.key)).toEqual(Object.keys(SECTION_TITLES));
-    expect(s.sections.map((x) => x.key)).toEqual(["gear", "stats", "talents", "raids", "collections", "reputations", "professions"]);
+    expect(s.sections.map((x) => x.key)).toEqual(["gear", "stats", "talents", "pvp", "raids", "collections", "reputations", "professions"]);
     expect(s.sections.every((x) => x.asOf !== null)).toBe(true);
   });
 

@@ -19,7 +19,7 @@ const base: ShowcaseInput = {
   sample: false, path: "/characters/forever/forever-pioneer/thrallina", name: "Thrallina", level: 60, race: "Orc", class: "SHAMAN",
   faction: "Horde", realm: "Forever Pioneer", title: null, guild: null, lastUpload: "2026-11-01",
   gear: { state: "empty" }, stats: { state: "unsupported" }, talents: { state: "empty" }, professions: { state: "empty" }, reputations: { state: "empty" },
-  raids: { state: "empty" }, collections: { state: "empty" },
+  pvp: { state: "empty" }, raids: { state: "empty" }, collections: { state: "empty" },
 };
 
 describe("factSections", () => {
@@ -106,6 +106,13 @@ describe("factSections", () => {
     expect(factSections([at("stats", { stats: { bogus: 1 } }), at("stats", { stats: "nope" })], NAMES, NOW).stats).toBeUndefined();
   });
 
+  test("pvp: the stored numbers as the page's data, an absent one null; no known number leaves the section out", () => {
+    const s = factSections([at("pvp", { rank: 9, rankPoints: 12_500, rankThreshold: 15_000, rankMax: 14, season: 2, honorableKills: 1234 })], NAMES, NOW).pvp;
+    expect(s).toEqual({ state: "shown", asOf: "2026-11-05", data: { rank: 9, rankPoints: 12_500, rankThreshold: 15_000, rankMax: 14, season: 2, honorableKills: 1234 } });
+    expect(factSections([at("pvp", { honorableKills: 7 })], NAMES, NOW).pvp).toMatchObject({ data: { rank: null, honorableKills: 7 } });
+    expect(factSections([at("pvp", { rank: null, honorableKills: null }), at("pvp", { rank: "9" })], NAMES, NOW).pvp).toBeUndefined();
+  });
+
   test("a stored shape it does not know is left out, never guessed", () => {
     const s = factSections([at("gear", { equipped: "nope" }), at("professions", { list: [] }), at("raids", { lockouts: [{ instance: 1 }] })], NAMES, NOW);
     expect(s).toEqual({});
@@ -113,6 +120,13 @@ describe("factSections", () => {
 });
 
 describe("withFacts", () => {
+  test("synced pvp replaces the empty section and dates the header", () => {
+    expect(withFacts(base, {}).pvp).toEqual({ state: "empty" });
+    const input = withFacts(base, factSections([at("pvp", { rank: 3 }, "2026-11-05T23:00:00.000Z")], NAMES, NOW));
+    expect(input.pvp).toMatchObject({ state: "shown", asOf: "2026-11-05", data: { rank: 3 } });
+    expect(input.lastUpload).toBe("2026-11-05");
+  });
+
   test("synced stats replace the unsupported line and date the header; without a fact they stay unsupported", () => {
     expect(withFacts(base, {}).stats).toEqual({ state: "unsupported" });
     const input = withFacts(base, factSections([at("stats", { stats: { strength: 10 } }, "2026-11-05T23:00:00.000Z")], NAMES, NOW));

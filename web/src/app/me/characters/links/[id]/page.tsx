@@ -22,8 +22,8 @@ export const metadata: Metadata = { title: "Character preview", robots: { index:
 
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 /** The section each category fills on the page. */
-const SECTION: Record<Exclude<SyncCategory, "pvp">, SectionKey> = {
-  gear: "gear", stats: "stats", talents: "talents", professions: "professions", reputations: "reputations", raids: "raids", achievements: "collections",
+const SECTION: Record<SyncCategory, SectionKey> = {
+  gear: "gear", stats: "stats", talents: "talents", pvp: "pvp", professions: "professions", reputations: "reputations", raids: "raids", achievements: "collections",
 };
 
 type Params = { params: Promise<{ id: string }> };
@@ -42,7 +42,7 @@ function Settings({ link: l, categories }: { link: OwnSyncedLink; categories: Ow
             return (
               <li key={category} data-category={category} data-sync={sync ? "on" : "off"} data-public={shown ? "on" : "off"}
                 className="flex flex-wrap items-baseline justify-between gap-x-3 border-b border-line py-1">
-                <span className="text-fg">{category === "pvp" ? "PvP" : SECTION_TITLES[SECTION[category]]}{category === "achievements" ? " (achievements and titles)" : ""}</span>
+                <span className="text-fg">{SECTION_TITLES[SECTION[category]]}{category === "achievements" ? " (achievements and titles)" : ""}</span>
                 <span className="text-fg-2">
                   Sync {sync ? "on" : "off"} · Public {shown && l.pagePublic ? "on" : shown ? "on once the page is public" : "off"}
                   {c?.fact ? <> · Captured <span className="font-mono">{c.fact.capturedAt.slice(0, 10)}</span></> : null}
@@ -83,7 +83,7 @@ export default async function LinkPreviewPage({ params }: Params) {
   const showcase = buildShowcase(withFacts({
     sample: false, path, name: c.name, level: c.level, race: c.race, class: c.class, faction: c.faction, realm: c.realm, title: null, guild: null,
     lastUpload: new Date(c.lastUploadAt).toISOString().slice(0, 10),
-    gear: { state: "empty" }, stats: { state: "unsupported" }, talents: { state: "empty" }, professions: { state: "empty" }, reputations: { state: "empty" },
+    gear: { state: "empty" }, stats: { state: "unsupported" }, talents: { state: "empty" }, pvp: { state: "empty" }, professions: { state: "empty" }, reputations: { state: "empty" },
     raids: { state: "empty" }, collections: { state: "empty" },
   }, facts.length ? factSections(facts, await loadFactNames(facts, c.class), now) : {}), now);
   return (

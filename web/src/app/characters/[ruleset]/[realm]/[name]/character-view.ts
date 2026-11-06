@@ -129,6 +129,7 @@ export function characterShowcase({ ruleset, character: c }: Found, now: Date, p
         data: { trees: [], code: null, planned: planned.map((b) => ({ name: b.name, slug: b.slug })) },
       }
       : { state: "empty" },
+    pvp: { state: "empty" },
     professions: { state: "empty" },
     reputations: { state: "empty" },
     raids: { state: "empty" },
