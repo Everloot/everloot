@@ -412,3 +412,25 @@ test("uploadScans keeps the faction and house, and a house is named in any case"
   expect(parseHouse(" HORDE ")).toBe("Horde");
   expect(parseHouse("goblin")).toBeNull();
 });
+
+test("a trusted install makes a day public on its own, labelled; strangers still need 3", () => {
+  const day = "2026-10-20";
+  const own = [snapshot("install-own", day, [[2589, 4, 80, 100, 110]], { reporter: "0123456789abcdef" })];
+  // Untrusted, one reporter is not public.
+  expect(itemMarket(foldMarket(emptyMarket(), own, NOW), "Forever", 2589, NOW).value).toBeNull();
+  // Trusted, the same scan is public with one reporter.
+  const trusted = new Set(["install-own"]);
+  const state = foldMarket(emptyMarket(), own, NOW, {}, undefined, trusted);
+  expect(itemMarket(state, "Forever", 2589, NOW).value).toMatchObject({ min: 100, reporters: 1 });
+  expect(itemListings(state, "Forever", 2589, NOW)).toEqual({ [day]: 4 });
+  expect(handleMarketValue({ realm: "Forever", itemId: 2589 }, state, NOW)).toContain("1 reporter (includes Everloot's own scans)");
+  // A scan stored before the install was trusted is re-marked by the next trusted fold, so its day survives closing.
+  const closing = new Date("2026-10-30T12:00:00Z");
+  const untrusted = foldMarket(emptyMarket(), own, NOW);
+  expect(itemMarket(foldMarket(untrusted, [], closing), "Forever", 2589, closing).points).toEqual([]);
+  expect(itemMarket(foldMarket(untrusted, [], closing, {}, undefined, trusted), "Forever", 2589, closing).points)
+    .toEqual([{ day, min: 100, market: 110, quantity: 80, reporters: 1, thin: false }]);
+  // Two strangers without a trusted install are still not public.
+  const strangers = [snapshot("install-x", day, [[765, 1, 10, 5, 5]], { reporter: "1111111111111111" }), snapshot("install-y", day, [[765, 1, 10, 5, 5]], { reporter: "2222222222222222" })];
+  expect(itemMarket(foldMarket(emptyMarket(), strangers, NOW, {}, undefined, trusted), "Forever", 765, NOW).value).toBeNull();
+});

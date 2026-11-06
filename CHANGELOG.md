@@ -77,6 +77,12 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   character's public page only when you switch it on. Turning a category's sync off or unlinking deletes what was synced.
 - Site, behind `EVERLOOT_PRIVATE_SYNC` (off): /account turns each linked character's sync and page sections on and off,
   and links to the preview. A sync key may send 20 times an hour, and achievements count only those the character earned.
+- Desktop App: signed in with a key made with "Sync my linked characters", the app sends the characters you linked from
+  this save file to that sync endpoint after each upload: the newest gear, professions, reputations, raid lockouts, and
+  achievements and titles. A capture the site has kept is not sent again; a changed one is, and so is one for a
+  category whose sync is off or a character not linked yet, so turning sync on later still fills it in. Talent builds are not
+  sent yet: the addon's talent rows do not say which character they belong to. With the site's switch off nothing is
+  said, and a key without that permission gets one line saying which key to make.
 - Addon and Desktop App: with the completion tracker on, the addon keeps each of your characters' professions (rank of
   max rank) and this week's raid lockouts (bosses killed of total, reset time) under the completion key, latest state
   only, and the Desktop App's Characters page shows them on the keyed rows. They stay on your computer: no upload, the
@@ -194,6 +200,12 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the player pages are live. A player page shows what the addon last saw of a character — race, class,
   level, guild and the day — found by the start of the name, and every page carries a hide link and a hide
   form. The search index stays off for now, so the pages are reached by name and are not listed anywhere.
+- Site: character links and public character pages are on (`EVERLOOT_CHARACTER_LINKS`, `EVERLOOT_SHOWCASE`). On
+  /account a player links their own characters with a code typed in game, unlinks them, and can give each one a
+  public page at `/characters/<ruleset>/<realm>/<name>` with its name, level, race, class, faction and realm and two
+  share images. A new link is private, every page is noindex, and the hide form takes a page down without an
+  account. A character two accounts link stays frozen until it is settled: write to hello@everloot.app, we reply
+  within 7 days. The data policy, /privacy and the account page say so.
 
 ### Added
 - Site: the open data export, at `/database/download`. The published data as NDJSON files anyone can download

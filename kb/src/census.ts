@@ -9,7 +9,8 @@
  * - A count shows only when it covers at least 10 characters reported by at least 3 installs and from at
  *   least 3 distinct addresses (`reporter`, the keyed hash of the sender's address that intake stamps). A row
  *   without a reporter counts toward installs but not toward addresses, so many install ids from one address
- *   still don't clear it.
+ *   still don't clear it. While few players upload, rows from Everloot's own installs (trusted-source.ts) meet the
+ *   install and address minimums on their own; the 10 characters, the suppression and the rounding still apply.
  * - Complementary suppression: in every published sum (total = factions = classes = level bands =
  *   own + seen; faction = its races; race = its row of the race × class grid; class = its column), a
  *   relation with anything hidden has at least two hidden parts whose true counts add up to at least
@@ -24,6 +25,8 @@
  * One global view for now. Step 4 of the spec maps realms to ruleset and region; it will group the
  * rows first and call rollupCensus once per group with that group's scope.
  */
+
+import { TRUSTED_REPORTER } from "./trusted-source.js";
 
 export const CENSUS_MIN_CHARACTERS = 10;
 export const CENSUS_MIN_INSTALLS = 3;
@@ -137,6 +140,8 @@ export interface CensusView {
   /** False before launch: nothing is counted yet, which is not the same as collecting. */
   launched: boolean;
   rule: { minCharacters: number; minInstalls: number; minReporters: number; roundTo: number };
+  /** True when Everloot's own installs reported rows in view, so a count may show from them alone. */
+  trusted: boolean;
   windows: { week: CensusWindow; launch: CensusWindow };
   /**
    * Characters active each UTC day of the 7-day window, oldest first, under the same thresholds. Days
@@ -153,9 +158,13 @@ export function roundCount(n: number): number {
   return Math.round(n / CENSUS_ROUND_TO) * CENSUS_ROUND_TO;
 }
 
-/** Whether a count clears the thresholds on its own. */
-function clears(characters: number, installs: number, reporters: number): boolean {
-  return characters >= CENSUS_MIN_CHARACTERS && installs >= CENSUS_MIN_INSTALLS && reporters >= CENSUS_MIN_REPORTERS;
+/**
+ * Whether a count clears the thresholds on its own. Rows from Everloot's own installs carry TRUSTED_REPORTER
+ * (trusted-source.ts): with one among the reporters, the install and address minimums are met; 10 characters still are not waived.
+ */
+function clears(characters: number, installs: number, reporters: ReadonlySet<string>): boolean {
+  if (characters < CENSUS_MIN_CHARACTERS) return false;
+  return reporters.has(TRUSTED_REPORTER) || (installs >= CENSUS_MIN_INSTALLS && reporters.size >= CENSUS_MIN_REPORTERS);
 }
 
 const RACE_BY_FACTION = new Map<string, (typeof CENSUS_RACES)[number]>(CENSUS_RACES.map((r) => [`${r.faction}/${r.token}`, r]));
@@ -213,7 +222,7 @@ type Relation = { margin: Cell | null; parts: Cell[] };
  * parts are fewer than two or add up to fewer than 10 characters, until no relation needs it.
  */
 function suppress(all: Cell[], relations: Relation[]): void {
-  for (const c of all) c.hidden = !clears(c.characters, c.installs.size, c.reporters.size);
+  for (const c of all) c.hidden = !clears(c.characters, c.installs.size, c.reporters);
   for (let changed = true; changed;) {
     changed = false;
     for (const { margin, parts } of relations) {
@@ -267,7 +276,7 @@ function windowOf(id: CensusWindow["id"], rows: readonly Dated[], from: number, 
     levels.get(bandOf(r.level))!.add(c);
   }
 
-  const collecting = !clears(total.characters, total.installs.size, total.reporters.size);
+  const collecting = !clears(total.characters, total.installs.size, total.reporters);
   const relations: Relation[] = [
     { margin: null, parts: [...factions.values()] },
     { margin: null, parts: [own, seen] },
@@ -315,7 +324,7 @@ function trendOf(rows: readonly Dated[], firstDay: number, from: number, to: num
   }
   return days.map((d) => ({
     day: new Date(d.start).toISOString().slice(0, 10),
-    count: clears(d.characters.size, d.installs.size, d.reporters.size) ? roundCount(d.characters.size) : null,
+    count: clears(d.characters.size, d.installs.size, d.reporters) ? roundCount(d.characters.size) : null,
   }));
 }
 
@@ -347,6 +356,7 @@ export function rollupCensus(rows: readonly CensusRow[], options: CensusOptions)
     launch: new Date(launch).toISOString(),
     launched,
     rule: { minCharacters: CENSUS_MIN_CHARACTERS, minInstalls: CENSUS_MIN_INSTALLS, minReporters: CENSUS_MIN_REPORTERS, roundTo: CENSUS_ROUND_TO },
+    trusted: dated.some((d) => d.row.reporter === TRUSTED_REPORTER),
     windows: { week: windowOf("week", dated, weekFrom, to), launch: windowOf("launch", dated, launchFrom, to) },
     trend: launched ? trendOf(dated, firstDay, weekFrom, to, launch) : [],
   };
