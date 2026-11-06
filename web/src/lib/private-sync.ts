@@ -62,10 +62,10 @@ export const lockoutOwned = ownedBase.extend({
   instanceId: z.number().int().positive().max(2_000_000_000).optional(),
   difficultyId: z.number().int().nonnegative().max(1000).optional(),
   difficulty: z.string().min(1).max(60).optional(),
-  bossesKilled: z.number().int().min(0).max(100),
+  bossesKilledCount: z.number().int().min(0).max(100),
   bossesTotal: z.number().int().min(1).max(100),
   resetAt: z.string().datetime({ offset: true }),
-}).refine((r) => r.bossesKilled <= r.bossesTotal, { message: "bossesKilled cannot exceed bossesTotal", path: ["bossesKilled"] });
+}).refine((r) => r.bossesKilledCount <= r.bossesTotal, { message: "bossesKilledCount cannot exceed bossesTotal", path: ["bossesKilledCount"] });
 
 /** The kinds this endpoint reads, each with the category it feeds. Any other kind is skipped. */
 const SCHEMAS = {
@@ -203,7 +203,7 @@ function categoryData(category: SyncCategory, rows: readonly SyncRow[], now: Dat
           .sort((a, b) => a.instance.localeCompare(b.instance))
           .map((r) => ({
             instance: r.instance, instanceId: r.instanceId ?? null, difficulty: r.difficulty ?? null, difficultyId: r.difficultyId ?? null,
-            killed: r.bossesKilled, total: r.bossesTotal, resetAt: new Date(Date.parse(r.resetAt)).toISOString(),
+            killed: r.bossesKilledCount, total: r.bossesTotal, resetAt: new Date(Date.parse(r.resetAt)).toISOString(),
           })),
       };
     case "achievements": {
