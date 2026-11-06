@@ -181,8 +181,14 @@ export async function ownLinkPath(userId: string, id: string): Promise<string | 
   return rows[0] ? characterPath(rows[0].ruleset, rows[0].realm, rows[0].name) : null;
 }
 
-/** The switches the owner may set in this slice. The section and ranking switches wait for their own contracts. */
-export type VisibilityFlags = { page_public?: boolean; indexable?: boolean };
+/**
+ * The switches the owner may set. The section switches only with private sync on (the visibility route checks);
+ * gold, guild and the rankings wait for their own contracts.
+ */
+export type VisibilityFlags = {
+  page_public?: boolean; indexable?: boolean;
+  show_gear?: boolean; show_talents?: boolean; show_professions?: boolean; show_reputations?: boolean; show_raids?: boolean; show_collections?: boolean;
+};
 
 /** Sets the given switches through `set_visibility`. False when the link is not the account's. */
 export async function setVisibility(userId: string, id: string, flags: VisibilityFlags): Promise<boolean> {

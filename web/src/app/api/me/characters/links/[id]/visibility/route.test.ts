@@ -109,6 +109,30 @@ describe("the switch", () => {
   });
 });
 
+describe("the section switches, with private sync on", () => {
+  const SECTIONS = ["show_gear", "show_talents", "show_professions", "show_reputations", "show_raids", "show_collections"];
+
+  test("each section switch goes to set_visibility as sent, and clears the page and both cards", async () => {
+    vi.stubEnv("EVERLOOT_PRIVATE_SYNC", "1");
+    owned();
+    const flags = Object.fromEntries(SECTIONS.map((s, i) => [s, i % 2 === 0]));
+    const res = await send(flags);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ id: LINK_ID, ...flags });
+    expect(JSON.parse(auth.authQuery.mock.calls[1][1].body).p_flags).toEqual(flags);
+    expect(cache.revalidatePath.mock.calls.map((c) => c[0])).toEqual([PATH, `${PATH}/card.png`, `${PATH}/card-square.png`]);
+  });
+
+  test("with private sync off they are refused as before; gold, guild and the rankings stay refused either way", async () => {
+    for (const s of SECTIONS) expect((await send({ [s]: true })).status, s).toBe(400);
+    vi.stubEnv("EVERLOOT_PRIVATE_SYNC", "1");
+    for (const bad of [{ show_gold: true }, { show_guild: true }, { ranked_gear: false }, { show_talents: "on" }]) {
+      expect((await send(bad)).status, JSON.stringify(bad)).toBe(400);
+    }
+    expect(auth.authQuery).not.toHaveBeenCalled();
+  });
+});
+
 describe("the owner's list with the showcase on", () => {
   test("each link carries its page switch and address; with it off the list is as before", async () => {
     auth.authQuery.mockResolvedValueOnce([

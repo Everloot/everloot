@@ -118,8 +118,8 @@ on review. "Carlos" means it waits on a flag flip, an applied migration or a pol
 | S2 | Link Step 1 (HUB-P02/P03): `/everloot link`, Desktop sender, owner list and unlink | M | Code can merge; turning it on needs D0 wording, D8 dispute contact, migration readback, `EVERLOOT_CHARACTER_LINKS=1` | Code only |
 | S3 | Identity-only public page and real card | M | Carlos: public-character contract, a DATA_POLICY section, `EVERLOOT_SHOWCASE=1` | No (launch week at best) |
 | S4 | Planned builds on the page | S | Carlos: apply the `build_characters.link_id` migration | No |
-| S5 | Private own-character sync: gear, talents, reputations, professions, lockouts | L | Carlos: D1 and D9, sources/consent migration, `sync:own` scope | No |
-| S6 | Public sections and per-section switches | M | Carlos: publication rule for linked characters; migration for new `show_*` columns | No |
+| S5 | Private own-character sync: gear, talents, reputations, professions, lockouts | L | D1 accepted and D9 resolved (2026-11-06). Code built behind `EVERLOOT_PRIVATE_SYNC`; Carlos: apply `20261106120000_private_sync.sql`, approve the DATA_POLICY draft, set the switch | No |
+| S6 | Public sections and per-section switches | M | Rule accepted 2026-11-06; `show_*` columns in the same migration. Carlos: as S5, plus a /privacy line before the switch | No |
 | S7 | Raid section | M | After S5 and S6; target before 12/09 | No |
 
 **S0.** `web/src/lib/character-showcase.ts` builds a typed `Showcase` (sections, states, dates) from plain inputs.
@@ -160,15 +160,29 @@ Done ahead of D1/D9 (groundwork, local only): the addon writes `profession_owned
 profession, skillLine, rank, maxRank) and `lockout_owned` (characterKey, class, level, instance, instanceId,
 difficultyId, difficulty, bossesKilledCount, bossesTotal, resetAt) in `addon/modules/owned.lua`, under the completion key and
 switch, latest state only. No uploader sends them (`LOCAL_ONLY_KINDS` in `web/src/lib/upload-batches.ts`), the protocol
-has no schema for them so intake refuses them, and the Desktop App's Characters page shows them on the keyed rows. Still
-waiting on D1 and D9: the sources and consent tables and their migration, the `sync:own` scope, the private sync
-endpoint, protocol schemas for the two kinds, the `characterKey` on `talent_snapshot`, the owner preview and every public
-section. None of it is checked in game yet (PROBE-01).
+has no schema for them so intake refuses them, and the Desktop App's Characters page shows them on the keyed rows. None of it is checked in game yet (PROBE-01).
+
+Built (2026-11-06) behind `EVERLOOT_PRIVATE_SYNC` (off), which also needs `EVERLOOT_CHARACTER_LINKS`. The model follows
+D9 as resolved: the link decides, not the install, so there are no sources and no `contested` state. Per link and
+category (`gear`, `talents`, `professions`, `reputations`, `raids`, `achievements`) the database keeps the latest capture
+only, newest wins, a duplicate is a no-op, and the install is a keyed hash on the fact. `profession_owned` and
+`lockout_owned` are not in `@everloot/protocol` (the intake must keep refusing them); the sync endpoint defines their
+shapes from the addon's rows in `web/src/lib/private-sync.ts`. Talent rows carry no character key, so a request groups
+rows by character (`{ name, realm, records }`) and the link is found by name and realm among the account's own links.
+Routes: `POST /api/me/characters/sync` (sync:own key), `GET`/`POST /api/me/characters/links/<id>/sync` (consent,
+session and Origin), and the section switches on the existing visibility route. The owner's preview is
+`/me/characters/links/<id>`. Not built yet: the Desktop sender, account-page controls, `characterKey` on
+`talent_snapshot`, and the talent share code (the section shows points per tree from the class catalog, and no tree
+when a node is unknown). To turn it on: [private sync switch-on](../2026-11-06-private-sync-switch-on.md).
 
 **S6.** The switches turn on each public section. Today only an operator grant can publish owned rows; S6 needs a
 rule that the owner's own switch on a live link publishes their own synced rows. Migration: `show_talents`,
 `show_professions`, `show_reputations`, `show_raids` (or reuse `show_collections` for reputations). Tests: each
 section appears only with its switch on; switching off removes it from the page and the card on the next request.
+Built (2026-11-06) with S5: `public_character_facts` returns only switched-on, consented categories of a link that
+`public_character` would return, and the page and both cards read it on every request. Gear and collections reuse
+`show_gear` and `show_collections`; the migration adds `show_talents`, `show_professions`, `show_reputations` and
+`show_raids`.
 
 **S7.** Lockout and guild kills sections plus the card's raid block, ready for 2026-12-09. Tests: kills from
 another character on the same account never count; the guild block says it is the guild's; reset rolls over.

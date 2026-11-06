@@ -14,7 +14,7 @@ import { withGearArt } from "@/lib/showcase-gear-art";
 import { className, classText, describePlayer, PLAYER_SIGHTING_LINE, PLAYER_STORAGE_UNAVAILABLE, raceName } from "@/app/players/player-view";
 import { InstanceCard } from "@/app/guilds/parts";
 import { characterGuild, GUILD_LINE, PLAN_LINE, raceFaction, type CharacterGuild } from "./character-guild";
-import { characterParts, characterShowcase, plannedBuilds, type Params } from "./character-view";
+import { characterParts, characterShowcase, plannedBuilds, publishedFacts, type Params } from "./character-view";
 
 /**
  * Read on every request and never cached, so a page switched off, or a character hidden, is gone at once. The
@@ -206,7 +206,7 @@ export default async function CharacterPage(props: { params: Promise<Params> }) 
     );
   }
   const now = new Date();
-  const built = found(owner) ? characterShowcase(owner, now, await plannedBuilds(owner)) : null;
+  const built = found(owner) ? characterShowcase(owner, now, await plannedBuilds(owner), await publishedFacts(owner)) : null;
   // Item names and icons under the item lists' rule, read only when there is gear to show.
   const showcase = built && built.input.gear.state === "shown" ? buildShowcase(await withGearArt(built.input), now) : built;
   const sighted = found(seen) ? seen : null;
