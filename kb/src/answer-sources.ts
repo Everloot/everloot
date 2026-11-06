@@ -3,10 +3,10 @@ import { itemFactsFromRecords } from "./drop-rollup.js";
 import { itemPage, ITEM_AGREEMENT, type ItemFacts } from "./item-page.js";
 import { loreUrls, moreLine } from "./page-urls.js";
 import type { ReleaseSource } from "./release-db.js";
-import { search, searchSomeWords, SOME_WORDS, type SearchHit } from "./search.js";
+import { allTerms, contentTerms, respell, search, searchSomeWords, SOME_WORDS, type Respelling, type SearchHit } from "./search.js";
 import { agreedNpcNames, npcPage, WORLD_AGREEMENT, worldFactsFromRecords, type WorldFacts } from "./world-pages.js";
 import type { RecheckScope } from "./coverage.js";
-import { filesEvidence, type FilesIndex } from "./files-evidence.js";
+import { filesEvidence, filesNameWords, type FilesIndex } from "./files-evidence.js";
 
 /**
  * answer_sources: the evidence behind a question, every piece with its source, licence and date, so
@@ -42,6 +42,8 @@ export interface AnswerSources {
   dataAsOf: string | null;
   /** Set when no page held every asked word and the lore is the pages with some of them; said in the text only. */
   someWords?: true;
+  /** The words read another way before the pages were found ("thunderbluff" as "thunder bluff"); said in the text only. */
+  respelled?: Respelling[];
 }
 
 /** The two fact sets the tool reads from the corpus, built once per corpus version like the other tools. */
@@ -163,18 +165,48 @@ export function furtherReading(question: string): FurtherReading[] {
  * question that names two things ("Peacebloom and Thrall") still finds both pages. Deduplicated by id.
  * When neither finds a page, the pages with some of the question's words, marked `some`.
  */
-async function knowledgeHits(db: ReleaseSource, question: string, limit: number): Promise<{ hits: SearchHit[]; some: boolean }> {
+async function knowledgeHits(
+  db: ReleaseSource, question: string, limit: number, keep: ReadonlySet<string>,
+): Promise<{ hits: SearchHit[]; some: boolean; text: string; respelled: Respelling[]; trainers: Set<number> }> {
   const seen = new Set<number>();
+  const trainers = new Set<number>();
   const out: SearchHit[] = [];
-  const add = (hits: SearchHit[]) => { for (const hit of hits) if (!seen.has(hit.id) && out.length < limit) { seen.add(hit.id); out.push(hit); } };
-  add(await search(db, question, limit));
+  // The wiki's addon-API reference and its subpages (a guild's ship, a machinima's cast) answer no player's question
+  // by sharing its words; they stay only when the question names them.
+  const offTopic = (hit: SearchHit) => (/^API /.test(hit.name) || hit.name.includes("/")) && !mentions(question, hit.name);
+  const add = (hits: SearchHit[]) => { for (const hit of hits) if (!seen.has(hit.id) && !offTopic(hit) && out.length < limit) { seen.add(hit.id); out.push(hit); } };
+  // "where do I learn mining" asks for a trainer: the pages name them "an orc mining trainer", never "learn".
+  const trainer = question.replace(/\b(?:learn|train)\b/giu, "trainer");
+  // Fetched past the limit so the pages left out above do not shrink the answer.
+  if (trainer !== question) {
+    add(await search(db, trainer, limit + 5));
+    for (const hit of out) trainers.add(hit.id);
+  }
+  add(await search(db, question, limit + 5));
   const names = question.match(/\p{Lu}[\p{L}'-]+(?:\s+\p{Lu}[\p{L}'-]+)*/gu) ?? [];
   // A standalone asking word or game name is not another entity in the question. Searching "What"
   // alone falls back to that literal word and introduces unrelated book and quest pages.
   for (const name of names) if (name.length >= 3 && !/^(?:who|what|which|where|when|why|how|show|tell|please|qué|quién|dónde|cómo|wow|forever|world|warcraft)$/iu.test(name)) add(await search(db, name, 3));
-  if (out.length) return { hits: out, some: false };
-  add(await searchSomeWords(db, question, limit));
-  return { hits: out, some: out.length > 0 };
+  // A hit whose title holds every asked word is the page asked about. Without one, the hits may have matched a typo
+  // a page or two share ("scarlet monestary"), so the words are read again; a reading that changes nothing keeps them.
+  const asked = contentTerms(question);
+  const onTopic = out.some((hit) => { const words = new Set(allTerms(hit.name).split(" ")); return asked.every((t) => words.has(t)); });
+  if (onTopic) return { hits: out, some: false, text: question, respelled: [], trainers };
+  // First the words as the pages spell them ("thunderbluff zeppeling"), then some of the words.
+  const fixed = await respell(db, question, keep);
+  if (fixed) {
+    const again = await search(db, fixed.text, limit + 5);
+    if (again.length) {
+      out.length = 0;
+      seen.clear();
+      add(again);
+    }
+    if (out.length && again.length) return { hits: out, some: false, text: fixed.text, respelled: fixed.changes, trainers };
+  }
+  if (out.length) return { hits: out, some: false, text: question, respelled: [], trainers };
+  // The some-words line opens that answer alone (the in-game companion reads it there), so the reading is not said.
+  add(await searchSomeWords(db, fixed?.text ?? question, limit + 5));
+  return { hits: out, some: out.length > 0, text: fixed?.text ?? question, respelled: [], trainers };
 }
 
 /**
@@ -184,28 +216,60 @@ async function knowledgeHits(db: ReleaseSource, question: string, limit: number)
 export async function answerSources(
   db: ReleaseSource, args: { question: string; limit: number }, facts: AnswerSourcesFacts | null, dataAsOf: string | null, files: FilesIndex | null = null,
 ): Promise<AnswerSources> {
-  const question = args.question.trim();
-  const { found: observed, gaps } = facts ? observedEvidence(question, facts, dataAsOf, files?.zones) : { found: [], gaps: [] };
-  const { hits: found, some } = await knowledgeHits(db, question, args.limit);
+  const asked = args.question.trim();
+  const { hits: found, some, text: question, respelled, trainers } = await knowledgeHits(db, asked, args.limit, filesNameWords(files));
+  // Players' and the files' names are matched in the question as asked and, when it was read another way, as read:
+  // a name the 2023 pages lack is spelled right as typed.
+  const readings = question === asked ? [asked] : [asked, question];
+  const union = <T extends { claim: string }>(lists: T[][]): T[] => {
+    const out: T[] = [];
+    for (const e of lists.flat()) if (!out.some((o) => o.claim === e.claim)) out.push(e);
+    return out;
+  };
+  const players = facts ? readings.map((q) => observedEvidence(q, facts, dataAsOf, files?.zones)) : [];
+  const observed = union(players.map((p) => p.found));
+  const gaps = union(players.map((p) => p.gaps));
   const pages = await loreUrls(db, found);
   const hits = found.map((hit) => loreEvidence(hit, pages.get(hit.id)));
+  // The trainers a "where do I learn" question found answer it, whatever page its words name.
+  const trainerPages = new Set(hits.filter((_, i) => trainers.has(found[i]!.id)));
   const curated = hits.filter((e) => e.kind === "curated");
   const loreHits = hits.filter((e) => e.kind === "lore");
   // Once a question names an article we found, keep that context instead of unrelated pages that
   // happen to mention it (a dungeon's musical or pet-battle edition, for example). Broad questions
   // without an exact named article keep their explicitly marked search fallback.
-  const directLore = loreHits.filter((e) => mentions(question, e.source.title));
+  const directLore = loreHits.filter((e) => mentions(question, e.source.title) || trainerPages.has(e));
   const lore = directLore.length ? directLore : loreHits;
   // What the game-data files say about the things the question names: ids and facts, labelled unconfirmed.
   // Observed facts first, then Everloot's own, then the files (current build), then the 2023 wiki. Observed and files
   // facts about the question's names are all kept; curated and wiki pages fill what the limit leaves. Last, a note for
   // each name nothing agreed is known about yet, so an answer says unrecorded rather than leaving it out.
-  const fromFiles: Evidence[] = filesEvidence(question, files, args.limit);
-  const named = observed.length + fromFiles.length;
-  const fill = new Set([...curated, ...lore].slice(0, Math.max(0, args.limit - named)));
-  const evidence = [...observed, ...curated.filter((e) => fill.has(e)), ...fromFiles, ...lore.filter((e) => fill.has(e)), ...gaps];
+  // A piece that answers the whole question (the dungeons for a level) leaves no room for pages that share its words;
+  // a zone the question only mentions comes after the pages, in what room they leave.
+  const pieces = union(readings.map((q) => filesEvidence(q, files, args.limit))).slice(0, args.limit);
+  const plain = ({ role: _role, ...e }: (typeof pieces)[number]): Evidence => e;
+  const answers = pieces.filter((e) => e.role === "answer").map(plain);
+  const fromFiles = pieces.filter((e) => e.role === undefined).map(plain);
+  const places = pieces.filter((e) => e.role === "place").map(plain);
+  const named = observed.length + answers.length + fromFiles.length;
+  const fill = new Set(answers.length ? [] : [...curated, ...lore].slice(0, Math.max(0, args.limit - named)));
+  const room = Math.max(0, args.limit - named - fill.size);
+  const evidence = [
+    ...observed, ...curated.filter((e) => fill.has(e)), ...answers, ...fromFiles, ...lore.filter((e) => fill.has(e)), ...places.slice(0, room), ...gaps,
+  ];
   // Observed and files facts answer the question's own names, so only an answer of fallback pages alone is marked.
-  return { evidence, furtherReading: furtherReading(question), dataAsOf, ...(some && named === 0 ? { someWords: true as const } : {}) };
+  return {
+    evidence, furtherReading: furtherReading(asked), dataAsOf,
+    ...(some && named === 0 ? { someWords: true as const } : {}),
+    ...(respelled.length ? { respelled } : {}),
+  };
+}
+
+/** `Read "thunderbluff" as "thunder bluff" and "zeppeling" as "zeppelin".` */
+export function respelledLine(changes: readonly Respelling[]): string {
+  // A name split before a lone "s" is a possessive typed without its apostrophe: "mankriks" is "mankrik's".
+  const parts = changes.map((c) => `"${c.from}" as "${c.to.replace(/ s$/, "'s")}"`);
+  return `Read ${parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}` : parts[0]}.`;
 }
 
 const KIND_LABEL: Record<EvidenceKind, string> = { observed: "observed in play", curated: "curated", files: "game files, found in game files and unconfirmed", lore: "lore (Warcraft Wiki 2023, may differ in WoW: Forever)" };
@@ -214,6 +278,7 @@ const KIND_LABEL: Record<EvidenceKind, string> = { observed: "observed in play",
 export function formatAnswerSources(result: AnswerSources, corpus: boolean | "unreachable"): string {
   const lines: string[] = [];
   if (result.someWords) lines.push(SOME_WORDS);
+  else if (result.respelled?.length) lines.push(respelledLine(result.respelled));
   if (result.evidence.length === 0) lines.push("No evidence found for that question. Nothing here is invented: try other words or an exact name.");
   if (result.evidence.some((e) => e.kind === "lore")) lines.push("Archive lore is historical context, not confirmation of Forever gameplay. Do not infer recorded gameplay facts from it. Game-file facts remain unconfirmed; missing observations remain unrecorded.");
   const pages = new Set<string>();

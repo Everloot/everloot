@@ -172,8 +172,14 @@ export const RANKING_NOTE =
  * Source and More lines. The notes after them are for AI clients (the observed layer's state, links to read, the data's age).
  */
 export function evidenceLines(text: string): string {
-  return text.split("\n").filter((l, i) => /^(?:- |\s+\S)/.test(l) || (i === 0 && l.trim() !== "")).join("\n").trim();
+  return text.split("\n").filter((l, i) => /^(?:- |\s+\S)/.test(l) || (i === 0 && l.trim() !== "" && !l.startsWith(ARCHIVE_NOTE))).join("\n").trim();
 }
+
+/**
+ * How answer_sources' note to AI clients about archive lore begins (kb/src/answer-sources.ts). It tells a model what
+ * not to infer, so a visitor reading the pieces themselves is not shown it; each piece already carries its label.
+ */
+const ARCHIVE_NOTE = "Archive lore is historical context";
 
 /**
  * No key: answer_sources' evidence for the question, verbatim and labelled (observed, curated, the game files, then the
