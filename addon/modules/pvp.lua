@@ -172,5 +172,5 @@ E:RegisterModule("pvp", function()
     if not watched[event] or not E:IsEnabled("completion") then return end
     schedule()
   end)
-  return "ready: " .. describe() .. "; kept on this computer; the Everloot Desktop App sends it only for a character you linked, under the switches you set on everloot.app"
+  return "ready: " .. describe() .. "; kept on this computer; never in an upload; the Everloot Desktop App sends a linked character's row and everloot.app keeps only the categories you switched on"
 end, "completion")
