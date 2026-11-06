@@ -40,6 +40,9 @@ test("a visitor sees answer_sources' labelled pieces and their links, not the no
   expect(evidenceLines(EVIDENCE)).toBe(EVIDENCE.split("\n").slice(0, 3).join("\n"));
   // A notice on the first line (no page held every word) stays.
   expect(evidenceLines(`No page has every word.\n${EVIDENCE}`).split("\n")[0]).toBe("No page has every word.");
+  // The note to AI clients about archive lore is for a model, not for the visitor reading the pieces.
+  const note = "Archive lore is historical context, not confirmation of Forever gameplay. Do not infer recorded gameplay facts from it.";
+  expect(evidenceLines(`${note}\n${EVIDENCE}`)).toBe(evidenceLines(EVIDENCE));
 });
 
 test("sources are the distinct Source lines in order", () => {

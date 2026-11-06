@@ -78,6 +78,8 @@
     "EVERLOOT_PLAYER_PAGES": "1",
     "EVERLOOT_SAVED_BUILDS": "1",
     "EVERLOOT_GUILDS": "1",
+    // A character's page shows the officers' rank, loot and attendance for that character (owner, 2026-11-06).
+    "EVERLOOT_CHARACTER_GUILD_FACTS": "1",
     "EVERLOOT_PROFILES": "1",
     "EVERLOOT_CHAT_WORKSPACE": "1",
     "NEWS_DIR": "/bundle/repo/kb/news",

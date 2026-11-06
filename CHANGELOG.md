@@ -15,13 +15,29 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
+- Addon: an item's name and quality are recorded once, not again in every loot window and on every vendor that sells
+  it, and a vendor is recorded once per UTC day unless an item, a price or a limited stock changed. Before, about ten
+  vendor visits filled the 2,000-row cap for item names and every new name after that was lost.
+- Site and MCP: chat search reads a misspelled place or word as its common spelling and says so: "does thunderbluff have
+  a zeppeling?" is read as "thunder bluff" and "zeppelin" and finds The Zephyr instead of unrelated lore. Names from the
+  game files are never respelled. "learn mining in orgrimmar" finds the trainer, "what dungeon at level 30" lists the
+  dungeons near that level from the map entrances, a page named in the question opens with its first sentence, and
+  flight masters show only when the question is about flying or that place. Spanish price questions ("cuánto cuesta
+  linen cloth") go to the price lookup, and the chat no longer opens with the archive note meant for AI clients.
 - Addon: the Everloot price block shows once per hover. Comparing an item opens the game's comparison tooltips beside
   the main one, and each of them carried the block too, so one hover read it up to three times.
 - CurseForge: an Alpha release uploads as a CurseForge Beta, named "Everloot <version> Beta". CurseForge's Files tab hides
   alpha files unless a visitor ticks "Show alpha files", so with every file an Alpha it read "No Results". GitHub still marks
   the release a pre-release, and the site still calls the addon an Alpha.
+- Addon: a guild roster snapshot is stored at most once every six hours, and not when the roster reads the same as
+  the last one; a raid lockout is stored once until a boss goes down or the week resets, and an expired one not at
+  all; attendance is stored once per set of people in a raid run. Before, every guildmate's login or logout stored a
+  whole snapshot (about 50 KB for a 500-member guild) and every loading screen stored the lockouts again.
 - Site: a realm whose name ends in RP-PvP written as one word ("CAMWOW US1 Realm 9 RPPVP", as players copied Forever's
   realm list) is filed under RP-PvP on the Auction House instead of "Realms not mapped yet".
+- Addon: a partial price sample (the search-based fallback when a full scan cannot run) keeps only the newest earlier
+  sample of that realm before it stores, so two samples no longer fill the 2,000-row `auction_scan` cap and later samples no
+  longer report "stored 0". Another realm's rows stay.
 - Site: the separator between the facts under an Auction House title reads "·", not "Â·".
 - Site and MCP: recipe skill ranges agree on the recipe id the trade-skill window reports, not the recipe's name, so an
   install on a Spanish client ("Peletería") counts toward the same range as English ones. A recipe the game files list
@@ -59,6 +75,11 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   and achievements and titles. Each category is kept only when you hold that character's live link and turned its sync
   on, and only its newest capture is kept. You see it all on a signed-in preview, and each section shows on the
   character's public page only when you switch it on. Turning a category's sync off or unlinking deletes what was synced.
+- Addon: player names stay off by default, and the addon now asks once, in game, whether to turn them on. The question
+  comes a few seconds after the first loading screen, never in combat, and says what is recorded (name, realm, race,
+  class, level and guild of your characters and of players you target, mouse over or group with), how to turn it off
+  (`/everloot players off`) and where to hide a character (everloot.app/players/opt-out). After an answer, or a choice
+  made with `/everloot players on|off` or the settings page, it is never asked again.
 - Site: the Auction House lists each realm that has scans but no public prices yet, with how many of the 3 players needed
   have scanned there ("1 of 3 players have scanned; prices go public at 3"). A player is counted once per upload address,
   on the item with the most players on one day in the last 7. `/api/market/prices` without a realm returns the same counts
@@ -91,6 +112,13 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   objects keeps to that type.
 
 ### Changed
+- Site: a character's page reads as one page. Its parts come in a fixed order, each with its own source line: the
+  owner's showcase, what the addon last saw, the guild it was seen in (the guild's own page: its size, its agreed raid
+  progress, labelled as the guild's and not the character's attendance, and up to eight other characters seen in it),
+  then links to the class's pages at the character's level. A rail lists the parts and the date of each source. The
+  sighting names the faction its race plays on (none for Skyborne). When the guild's officers published a board, the
+  guild part also shows that character's rank, the loot they gave it and whether it was at their last raid
+  (`EVERLOOT_CHARACTER_GUILD_FACTS`); the privacy policy, the privacy guide and the data policy say so.
 - Site: the drop rates API (`/api/rollups/drops`) gives each rate `sourceName` once 3 installs agree on the NPC's or
   object's name, so the Desktop App's price file can name sources a player never met.
 - Site: the Auction House files a realm under the PvE, PvP, RP, RP-PvP or Hardcore tab when its name ends in that

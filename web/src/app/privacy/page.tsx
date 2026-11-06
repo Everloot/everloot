@@ -37,7 +37,8 @@ function Section({ id, children }: { id: string; children: React.ReactNode }) {
 export default function PrivacyPage() {
   // The boss pulls item shows only once the site collects them (EVERLOOT_PULL_SUMMARIES), and dates the page with it.
   const pulls = pullSummariesOn();
-  const updated = pulls ? "2 November 2026" : "27 October 2026";
+  // The guild item gained the character page on 6 November, whether or not the boss pulls item shows.
+  const updated = "6 November 2026";
   return (
     <article>
       <Container width="reading">
@@ -239,7 +240,9 @@ export default function PrivacyPage() {
                 {" "}The same module also records your own guild&apos;s boss kills: the guild, the realm, your
                 faction, the boss and the time, with no names. If the site has guild pages on, a kill is shown on
                 the guild&apos;s page once two players&apos; uploads report it, and a guild page lists the
-                characters seen in that guild, labelled as sightings, not the game&apos;s member list. Anyone can
+                characters seen in that guild, labelled as sightings, not the game&apos;s member list. A
+                character&apos;s page shows its guild the same way, with what the guild&apos;s officers published
+                about that character: its rank, the loot they gave it and whether it was at their last raid. Anyone can
                 hide a guild, without an account or an officer rank, on the{" "}
                 <Link href="/guilds/hide">guild hide form</Link>; its kills are then not kept. Its characters
                 keep their own pages, which the character hide form covers.

@@ -194,7 +194,9 @@ describe("planned builds (S4)", () => {
     // Dated by the newest build; no in-game tree table or calculator link, since nothing was synced from the game.
     expect(html).toContain("2026-10-31");
     expect(html).not.toContain("Points per tree");
-    expect(html).not.toContain("/tools/talents/");
+    // The talents section opens no build; the class links further down are the plain calculator, the same for anyone.
+    const talents = html.slice(html.indexOf('data-section="talents"'), html.indexOf("</section>", html.indexOf('data-section="talents"')));
+    expect(talents).not.toContain("/tools/talents/");
     for (const secret of ["my private note", "EL1-", USER_ID, "Thrall#1234"]) expect(html).not.toContain(secret);
     expect(html).not.toMatch(/verified|owner|proven|✓/i);
   });

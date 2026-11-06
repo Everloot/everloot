@@ -38,6 +38,12 @@ describe("parseMarketQuestion", () => {
     ["how much is The Review Blade worth on Forever", { item: { name: "The Review Blade" }, realm: "Forever" }],
     ["what is the price of the Linen Cloth on Forever", { item: { name: "the Linen Cloth" }, realm: "Forever" }],
     ["price of a Linen Cloth on Forever", { item: { name: "a Linen Cloth" }, realm: "Forever" }],
+    // The same questions in Spanish.
+    ["cuanto cuesta linen cloth", { item: { name: "linen cloth" }, realm: null }],
+    ["¿Cuánto cuesta Runecloth en Nightslayer?", { item: { name: "Runecloth" }, realm: "Nightslayer" }],
+    ["cuánto vale Linen Cloth en Forever", { item: { name: "Linen Cloth" }, realm: "Forever" }],
+    ["precio de 2589 en Forever", { item: { id: 2589 }, realm: "Forever" }],
+    ["cuál es el precio del Linen Cloth", { item: { name: "Linen Cloth" }, realm: null }],
   ])("%s", (question, expected) => {
     expect(parseMarketQuestion(question)).toEqual(expected);
   });
@@ -60,6 +66,10 @@ describe("parseMarketQuestion", () => {
     "please show me my Linen Cloth price on Forever",
     "tell me the price of Linen Cloth for me on Forever",
     "can you tell me what I paid, price of Linen Cloth on Forever",
+    // Spanish about the player's own goods, and Spanish that is not about a price.
+    "cuánto vale mi Linen Cloth",
+    "cuánto oro tengo",
+    "dónde dropea Linen Cloth",
   ])("passes %j through as not a price question", (question) => {
     expect(parseMarketQuestion(question)).toBeNull();
   });
