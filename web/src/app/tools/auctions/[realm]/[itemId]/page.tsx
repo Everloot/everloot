@@ -72,7 +72,7 @@ export default async function RealmItemPage(props: Props) {
       {row && v && (
         <JsonLd data={marketDatasetJsonLd({
           name: `${label} auction prices on ${realm}`,
-          description: `Public auction house prices for ${label} on ${realm} in WoW: Forever: one row per day that 3 reporters scanned, with market value, minimum buyout and units listed.`,
+          description: `Public auction house prices for ${label} on ${realm} in WoW: Forever: one row per public day (3 reporters, or Everloot's own scans), with market value, minimum buyout and units listed.`,
           path,
           apiPath: `/api/market/prices?realm=${encodeURIComponent(realm)}`,
           from: row.points[0]!.day,
