@@ -208,6 +208,16 @@ describe("the other sections", () => {
     expect(noMax).not.toMatch(/Rank 4 of|rank points|Honorable/);
   });
 
+  test("pvp: rank 0 is unranked and a zero threshold has no points line", () => {
+    const unranked = section(render({ ...base, pvp: { state: "shown", asOf: "2026-10-31", data: { rank: 0, rankPoints: 0, rankThreshold: 15_000, rankMax: 14, season: null, honorableKills: 0 } } }, true), "pvp");
+    expect(unranked).not.toMatch(/Rank|of 14/);
+    expect(unranked).toContain("0 / 15,000 rank points");
+    expect(unranked).toContain("Honorable kills 0");
+    const noThreshold = section(render({ ...base, pvp: { state: "shown", asOf: "2026-10-31", data: { rank: 3, rankPoints: 0, rankThreshold: 0, rankMax: 14, season: null, honorableKills: null } } }, true), "pvp");
+    expect(noThreshold).toContain("Rank 3 of 14");
+    expect(noThreshold).not.toMatch(/rank points/);
+  });
+
   test("pvp: empty says nothing synced, private is hidden on the public page", () => {
     expect(section(render({ ...base, pvp: { state: "empty" } }, true), "pvp")).toContain(EMPTY_LINE);
     expect(render({ ...base, pvp: { state: "private" } }, false)).not.toContain('data-section="pvp"');

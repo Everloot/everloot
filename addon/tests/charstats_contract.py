@@ -137,7 +137,7 @@ assert not ({"character", "name", "realm", "guid"} & set(row)), row
 assert lua.eval("#forbidden") == 0
 
 # Every listed event reads, once after a burst; UNIT_STATS for another unit does not.
-for name in ("PLAYER_ENTERING_WORLD", "PLAYER_EQUIPMENT_CHANGED", "PLAYER_LEVEL_UP"):
+for name in ("PLAYER_ENTERING_WORLD", "PLAYER_EQUIPMENT_CHANGED", "PLAYER_LEVEL_UP", "PLAYER_REGEN_ENABLED"):
     lua.execute("ATTR[1] = ATTR[1] + 1")
     read(lua, name)
     assert len(plain(lua)) == 1
@@ -200,6 +200,13 @@ assert plain(lua)[0]["stats"]["strength"] == 10
 lua.execute("combat = false")
 read(lua)
 assert plain(lua)[0]["stats"]["strength"] == 99
+# Combat ending is itself a read: a change skipped in combat is picked up without waiting for another event.
+lua.execute("combat = true; ATTR[1] = 123")
+read(lua, "UNIT_STATS", "'player'")
+assert plain(lua)[0]["stats"]["strength"] == 99
+lua.execute("combat = false")
+read(lua, "PLAYER_REGEN_ENABLED")
+assert plain(lua)[0]["stats"]["strength"] == 123
 
 # Attributes unreadable (secret or not there yet): no row at all, not a row of zeros; fewer than five is none.
 lua = addon(setup="issecretvalue = function(v) return v == 400 end")

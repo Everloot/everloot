@@ -237,6 +237,11 @@ begin
   if not exists (select 1 from public.character_facts where link_id = thrall and category = 'pvp') then raise exception 'stats revoke took pvp'; end if;
   perform public.set_sync_consent(a::uuid, thrall, 'pvp', false);
   perform public.set_visibility(a::uuid, thrall, '{"show_stats": false, "show_pvp": false}');
+  -- Exactly one check on each table mentions category, so an old check under another name cannot hide.
+  if (select count(*) from pg_constraint where conrelid = 'public.character_sync_consent'::regclass and contype = 'c'
+      and pg_get_constraintdef(oid) ilike '%category%') <> 1 then raise exception 'character_sync_consent needs exactly one category check'; end if;
+  if (select count(*) from pg_constraint where conrelid = 'public.character_facts'::regclass and contype = 'c'
+      and pg_get_constraintdef(oid) ilike '%category%') <> 1 then raise exception 'character_facts needs exactly one category check'; end if;
 end $$;
 
 -- Revoking a category deletes its facts, and a later sync of it is refused.

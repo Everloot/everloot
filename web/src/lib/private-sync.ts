@@ -38,8 +38,8 @@ export const SYNC_ROWS_PER_REQUEST = 10_000;
 const FUTURE_MS = 86_400_000;
 
 /**
- * profession_owned, lockout_owned and talent_owned stay on the computer except for this endpoint (the addon's owned
- * and talents modules), so the protocol has no schema for them and the public intake refuses them. Their shapes are
+ * profession_owned, lockout_owned, talent_owned, stats_owned and pvp_owned stay on the computer except for this
+ * endpoint (the addon's owned, charstats and pvp modules), so the protocol has no schema for them and the public intake refuses them. Their shapes are
  * defined here, for this endpoint only, from the addon's rows: adding them to `recordSchemas` would let the intake take them.
  */
 const ownedBase = z.object({

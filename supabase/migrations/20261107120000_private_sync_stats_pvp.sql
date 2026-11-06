@@ -229,6 +229,10 @@ notify pgrst, 'reload schema';
 --       and table_name = 'character_visibility' and column_name in ('show_stats', 'show_pvp')) as ok
 --   union all select 'consent check', pg_get_constraintdef((select oid from pg_constraint where conname = 'character_sync_consent_category_check')) like '%pvp%'
 --   union all select 'facts check', pg_get_constraintdef((select oid from pg_constraint where conname = 'character_facts_category_check')) like '%stats%'
+--   union all select 'one consent check', (select count(*) from pg_constraint where conrelid = 'public.character_sync_consent'::regclass and contype = 'c'
+--       and pg_get_constraintdef(oid) ilike '%category%') = 1
+--   union all select 'one facts check', (select count(*) from pg_constraint where conrelid = 'public.character_facts'::regclass and contype = 'c'
+--       and pg_get_constraintdef(oid) ilike '%category%') = 1
 --   union all select 'visibility', pg_get_functiondef('public.set_visibility(uuid, uuid, jsonb)'::regprocedure) like '%show_pvp%'
 --   union all select 'consent', pg_get_functiondef('public.set_sync_consent(uuid, uuid, text, boolean)'::regprocedure) like '%''pvp''%'
 --   union all select 'sync', pg_get_functiondef('public.sync_character_facts(uuid, text, text, text, text, text, jsonb)'::regprocedure) like '%> 8%'

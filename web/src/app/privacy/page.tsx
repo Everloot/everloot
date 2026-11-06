@@ -192,10 +192,9 @@ export default function PrivacyPage() {
               <li id="private-sync">
                 <strong>Private sync (optional):</strong> with an API key made with <em>Sync my linked
                 characters</em>, the Everloot Desktop App sends your linked characters&apos; own progress from your
-                addon file: equipped gear, the character sheet&apos;s stats, the active talent build, professions,
-                reputations, PvP rank and honorable kills, this week&apos;s raid lockouts, and the achievements that
-                character earned and the titles it holds. The stats and the PvP numbers are your own, self-reported.
-                You choose, per character, which of these
+                addon file: equipped gear, the character sheet&apos;s stats, the active talent build, PvP rank and
+                honorable kills, this week&apos;s raid lockouts, the achievements that character earned and the titles
+                it holds, reputations and professions. You choose, per character, which of these
                 are kept. Every category starts off. A synced row is kept only when your account holds a live link to
                 that character and that category is on, whichever computer sent it; anything else is dropped. We keep
                 only the newest capture of each category, with a keyed one-way hash of the install that sent it so it

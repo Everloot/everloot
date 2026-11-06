@@ -155,8 +155,9 @@ function Talents({ data, classSlug }: { data: TalentsData; classSlug: string | n
 /** Rank, its points, the season and the honorable kills; a number the game did not report is not drawn. */
 function Pvp({ data }: { data: PvpData }) {
   const lines: string[] = [];
-  if (data.rank !== null) lines.push(data.rankMax !== null ? `Rank ${number(data.rank)} of ${number(data.rankMax)}` : `Rank ${number(data.rank)}`);
-  if (data.rankPoints !== null && data.rankThreshold !== null) lines.push(`${number(data.rankPoints)} / ${number(data.rankThreshold)} rank points`);
+  // Rank 0 is unranked: no rank line, and no points line unless there is a next rank to count toward.
+  if (data.rank !== null && data.rank > 0) lines.push(data.rankMax !== null ? `Rank ${number(data.rank)} of ${number(data.rankMax)}` : `Rank ${number(data.rank)}`);
+  if (data.rankPoints !== null && data.rankThreshold !== null && data.rankThreshold > 0) lines.push(`${number(data.rankPoints)} / ${number(data.rankThreshold)} rank points`);
   if (data.season !== null) lines.push(`Season ${number(data.season)}`);
   if (data.honorableKills !== null) lines.push(`Honorable kills ${number(data.honorableKills)}`);
   return (

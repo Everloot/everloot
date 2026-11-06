@@ -36,7 +36,7 @@ local API = { "UnitStat", "UnitAttackPower", "UnitRangedAttackPower", "GetCritCh
   "GetRangedHaste", "UnitSpellHaste", "GetExpertise", "GetSpellBonusDamage", "GetSpellBonusHealing", "UnitArmor",
   "UnitDefenseSkill", "GetDodgeChance", "GetParryChance", "GetBlockChance" }
 
-local EVENTS = { "PLAYER_ENTERING_WORLD", "UNIT_STATS", "PLAYER_EQUIPMENT_CHANGED", "PLAYER_LEVEL_UP" }
+local EVENTS = { "PLAYER_ENTERING_WORLD", "UNIT_STATS", "PLAYER_EQUIPMENT_CHANGED", "PLAYER_LEVEL_UP", "PLAYER_REGEN_ENABLED" }
 local DEBOUNCE_SECONDS = 2
 local ATTRIBUTES = { "strength", "agility", "stamina", "intellect", "spirit" }
 local MAX_STAT = 1000000
@@ -198,7 +198,8 @@ E:RegisterModule("charstats", function()
   for _, event in ipairs(EVENTS) do
     if pcall(function() f:RegisterEvent(event) end) then watched[event] = true end
   end
-  -- Stat events come in bursts (every buff, every swap); read once after they settle.
+  -- Stat events come in bursts (every buff, every swap); read once after they settle. PLAYER_REGEN_ENABLED (combat
+  -- ended) reads too, so a read skipped in combat is not left stale.
   local pending = false
   local function schedule()
     if C_Timer and type(C_Timer.After) == "function" then

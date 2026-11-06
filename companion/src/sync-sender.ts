@@ -8,11 +8,11 @@ import { receiptKeyForSite, type SentState } from "./sent-state";
 /**
  * Private sync: sends the player's own linked characters' rows to the account's sync endpoint,
  * POST /api/me/characters/sync, with the account key, and nowhere else. The upload never carries profession_owned,
- * lockout_owned or talent_owned (web/src/lib/upload-batches.ts keeps them on the computer); this is the only sender of them.
+ * lockout_owned, talent_owned, stats_owned or pvp_owned (web/src/lib/upload-batches.ts keeps them on the computer); this is the only sender of them.
  *
  * Only characters this file linked are sent: the character_link rows `/everloot link` wrote name them, and their
  * completionKey ties the completion module's rows (characterKey) to that name and realm. Gear rows carry the name and
- * realm themselves; only the newest one per character goes, and likewise the newest talent_owned row. The public
+ * realm themselves; only the newest one per character goes, and likewise the newest talent_owned, stats_owned and pvp_owned row. The public
  * talent_snapshot rows carry no name, realm or key at all, so they can be tied to no character and are never sent.
  *
  * The site keeps a category only when the account holds that character's live link and turned the category's sync
