@@ -52,6 +52,11 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   `addon_download` to CurseForge like the other download links. The same tested zip is uploaded there on each release.
 
 ### Added
+- Addon: player names stay off by default, and the addon now asks once, in game, whether to turn them on. The question
+  comes a few seconds after the first loading screen, never in combat, and says what is recorded (name, realm, race,
+  class, level and guild of your characters and of players you target, mouse over or group with), how to turn it off
+  (`/everloot players off`) and where to hide a character (everloot.app/players/opt-out). After an answer, or a choice
+  made with `/everloot players on|off` or the settings page, it is never asked again.
 - Desktop App and site, behind `EVERLOOT_CHARACTER_LINKS` (off): the addon's `/everloot link <code>` (0.3.15) writes one
   link row for the character you are playing, with a code made on the account page. The Desktop App, signed in, sends it only
   to the account's own link endpoint; uploads never carry link rows. The account page lists your linked characters,

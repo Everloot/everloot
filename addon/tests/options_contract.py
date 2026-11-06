@@ -229,4 +229,100 @@ assert(page.backdrop and page.backdrop.bgFile == 'Interface\\\\Buttons\\\\WHITE8
 assert(page.bg[1] < 0.1 and page.border[1] > page.border[3], 'dark inside a bronze edge')
 """)
 
-print("Lua 5.1 options: Settings API, interface options or a window; one switch per module; command rows run their command; every switch inside a scrolling list at any width; the window's crest heading, fonts, surface and dark window, or the game's own without its file; Reload now")
+# --- Player names: asked once, a few seconds after the loading screen, never in combat ---
+TIMERS = """
+timers = {}
+C_Timer = { After = function(seconds, f) timers[#timers + 1] = { seconds = seconds, f = f } end }
+combat = false
+InCombatLockdown = function() return combat end
+function runTimers() local due = timers; timers = {}; for _, t in ipairs(due) do t.f() end; return due end
+function said(text) for _, line in ipairs(printed) do if string.find(line, text, 1, true) then return true end end return false end
+"""
+
+lua = fresh(SETTINGS + TIMERS, window=True)
+lua.execute("""
+local O = Everloot.Options
+assert(EverlootDB.toggles.players == false and EverlootDB.playersAsked == nil, 'player names start off and unasked')
+local listen = O.askFrame
+assert(listen and listen.events.PLAYER_ENTERING_WORLD, 'a new install waits for the loading screen to end')
+assert(#timers == 0 and O.prompt == nil, 'nothing is asked at load')
+listen.onEvent(listen, 'PLAYER_ENTERING_WORLD')
+assert(#timers == 1 and timers[1].seconds == O.ASK_DELAY and O.ASK_DELAY >= 5, 'asked a few seconds after the loading screen')
+-- In combat the question waits.
+combat = true
+runTimers()
+assert(O.prompt == nil and #timers == 1 and timers[1].seconds == O.COMBAT_RETRY, 'never during combat; tried again later')
+combat = false
+runTimers()
+local p = O.prompt
+assert(p and p.shown and p.parent == UIParent, 'the question is shown out of combat')
+local text = p.body.text
+for _, part in ipairs({ 'name, realm, race, class, level and guild of your own characters and of players you target, mouse over or group with',
+  'bosses your guild kills', '/everloot players off', 'everloot.app/players/opt-out', 'asks this once', 'off until you choose' }) do
+  assert(string.find(text, part, 1, true), 'the question says: ' .. part)
+end
+assert(p.crest and p.title.text == 'Everloot' and p.backdrop.bgFile == 'Interface\\\\Buttons\\\\WHITE8X8', "the Everloot window's look")
+assert(p.on.text == 'Turn on' and p.off.text == 'Leave off', 'two answers')
+assert(p.height > 100 and p.body.width <= p.width - 32, 'the text sits inside the question')
+O.AskPlayers()
+assert(#timers == 0, 'a question already on screen is not asked again')
+
+-- Leave off: still off, never asked again.
+p.off.scripts.OnClick(p.off)
+assert(not p.shown and EverlootDB.toggles.players == false and EverlootDB.playersAsked == true, 'leave off keeps it off and is remembered')
+assert(said('player names stay off') and said('/everloot players on'), 'the answer is said in chat')
+O.AskPlayers()
+assert(not p.shown and #timers == 0, 'never asked again after an answer')
+""")
+
+# Turn on: the same as /everloot players on, with its full chat line.
+lua = fresh(SETTINGS + TIMERS, window=True)
+lua.execute("""
+local O = Everloot.Options
+O.askFrame.onEvent(O.askFrame, 'PLAYER_ENTERING_WORLD')
+runTimers()
+O.prompt.on.scripts.OnClick(O.prompt.on)
+assert(EverlootDB.toggles.players == true and EverlootDB.playersAsked == true and not O.prompt.shown, 'turn on sets the module on')
+assert(said('players on. It records the name, realm') and said('/reload to apply'), 'the players-on line is said')
+""")
+
+# A choice made by hand, before the question, answers it: chat or the settings switch.
+lua = fresh(SETTINGS + TIMERS, window=True)
+lua.execute("""
+local O = Everloot.Options
+SlashCmdList.EVERLOOT('players off')
+assert(EverlootDB.playersAsked == true, '/everloot players off answers the question')
+O.askFrame.onEvent(O.askFrame, 'PLAYER_ENTERING_WORLD')
+runTimers()
+assert(O.prompt == nil, 'not asked after a choice made by hand')
+""")
+lua = fresh(SETTINGS + TIMERS, window=True)
+lua.execute("""
+local O = Everloot.Options
+local players
+for _, box in ipairs(O.page.boxes) do if box.row.key == 'players' then players = box end end
+players.checked = true
+players.scripts.OnClick(players)
+assert(EverlootDB.toggles.players == true and EverlootDB.playersAsked == true, 'the settings switch answers it too')
+""")
+
+# Saved answers, and an install that already has players on, are never asked: no listener at all.
+for saved in ("{ installId = 'abcd-1234', toggles = { players = false }, playersAsked = true, records = {} }",
+              "{ installId = 'abcd-1234', toggles = { players = true }, records = {} }"):
+    lua = fresh(SETTINGS + TIMERS, saved=saved, window=True)
+    lua.execute("assert(Everloot.Options.askFrame == nil, 'nothing waits to ask')")
+# An install from before the question, with players off, is asked once.
+lua = fresh(SETTINGS + TIMERS, saved="{ installId = 'abcd-1234', toggles = { players = false }, records = {} }", window=True)
+lua.execute("assert(Everloot.Options.askFrame, 'an upgraded install with players off is asked')")
+
+# Without the window's file: the game's dialog and a plain heading.
+lua = fresh(TIMERS)
+lua.execute("""
+local O = Everloot.Options
+O.askFrame.onEvent(O.askFrame, 'PLAYER_ENTERING_WORLD')
+runTimers()
+assert(O.prompt.shown and O.prompt.backdrop.bgFile == 'Interface\\\\DialogFrame\\\\UI-DialogBox-Background', "the game's dialog")
+assert(O.prompt.title.text == 'Everloot: player names')
+""")
+
+print("Lua 5.1 options: Settings API, interface options or a window; one switch per module; command rows run their command; every switch inside a scrolling list at any width; the window's crest heading, fonts, surface and dark window, or the game's own without its file; Reload now; player names asked once, after the loading screen and out of combat")
