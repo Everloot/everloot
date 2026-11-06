@@ -803,7 +803,7 @@ observation of anyone else, and none of it is published as a dataset.
 - **What is synced.** For each linked character, and only for the categories the player turns on for that
   character: equipped gear (slot, item id, item level), the active talent build (talent node ids and ranks),
   professions (name and rank), reputations (faction id and standing), this week's raid lockouts (instance,
-  difficulty, bosses killed, reset), and achievements earned and titles held. Every category starts off. The
+  difficulty, bosses killed, reset), and achievements this character earned and titles held. Every category starts off. The
   Desktop App sends these with a key made with "Sync my linked characters" (`sync:own`); that key can send and
   nothing else. It cannot turn a category on, change what the page shows, or list anything.
 - **The link decides, not the computer.** A synced row is kept only when the account that sent it holds a live

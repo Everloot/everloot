@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import LinkedCharacters, { FROZEN_TEXT, LABEL_TEXT, PAGE_TEXT, type ListedLink } from "./LinkedCharacters";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import LinkedCharacters, { FROZEN_TEXT, LABEL_TEXT, PAGE_TEXT, SYNC_TEXT, type ListedLink } from "./LinkedCharacters";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -199,4 +199,142 @@ test("planned builds: no picker and no label read unless the list offers it; the
   });
   expect(sent).toEqual([{ url: `/api/me/characters/links/${LINK.id}/label`, body: { label: LABELS[0].id } }]);
   expect(container.querySelector("select")!.value).toBe(LABELS[0].id);
+});
+
+describe("private sync", () => {
+  const PATH = "/characters/forever/forever-pioneer/thrallina";
+  const CATEGORIES = ["gear", "talents", "professions", "reputations", "raids", "achievements"] as const;
+  type Category = (typeof CATEGORIES)[number];
+  const sync = (on: Category[] = []) => CATEGORIES.map((category) => ({ category, on: on.includes(category), capturedAt: null }));
+  const sections = (shown: Category[] = []) => Object.fromEntries(CATEGORIES.map((c) => [c, shown.includes(c)])) as Record<Category, boolean>;
+  const synced = (opts: { public?: boolean; on?: Category[]; shown?: Category[]; page?: boolean } = {}): ListedLink => ({
+    ...LINK, sync: sync(opts.on),
+    ...(opts.page === false ? {} : { page: { public: opts.public ?? false, path: PATH, sections: sections(opts.shown) } }),
+  });
+  /** GET answers `lists` in turn (the last one again); every POST is recorded and answers `answer`. */
+  function syncApi(lists: object[], answer: { status: number; body: object } = { status: 200, body: {} }) {
+    const sent: Array<{ url: string; body: unknown }> = [];
+    let read = 0;
+    vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+      if (init?.method === "POST") {
+        sent.push({ url, body: JSON.parse(String(init.body)) });
+        return Response.json(answer.body, { status: answer.status });
+      }
+      return Response.json(lists[Math.min(read++, lists.length - 1)]);
+    });
+    return sent;
+  }
+  const button = (label: string) => buttonNamed(label) as HTMLButtonElement | undefined;
+  const status = () => container.querySelector('[role="status"]')?.textContent;
+  const reason = (b: HTMLButtonElement) => document.getElementById(b.getAttribute("aria-describedby") ?? "")?.textContent;
+
+  test("with the switch off there are no sync controls", async () => {
+    syncApi([{ links: [{ ...LINK, page: { public: true, path: PATH } }] }]);
+    await show();
+    expect(container.textContent).not.toContain(SYNC_TEXT);
+    expect(button("Turn on gear sync for Thrallina")).toBeUndefined();
+    expect(container.querySelector('a[href^="/me/characters/links/"]')).toBeNull();
+  });
+
+  test("each category has its sync, and the private preview is one link away", async () => {
+    syncApi([{ links: [synced({ on: ["gear"] })] }]);
+    await show();
+    expect(container.textContent).toContain(SYNC_TEXT);
+    for (const label of ["Gear", "Talents", "Professions", "Reputations", "Raids", "Achievements and titles"]) expect(container.textContent).toContain(label);
+    expect(button("Turn off gear sync for Thrallina")).toBeDefined();
+    expect(button("Turn on talents sync for Thrallina")).toBeDefined();
+    expect(container.querySelector(`a[href="/me/characters/links/${LINK.id}"]`)?.textContent).toBe("See what's synced");
+    expect(container.textContent!.toLowerCase()).not.toMatch(/verified|owner|proven/);
+  });
+
+  test("turning sync on sends that category alone and reads the list again", async () => {
+    const sent = syncApi([{ links: [synced()] }, { links: [synced({ on: ["professions"] })] }]);
+    await show();
+    await click("Turn on professions sync for Thrallina");
+    expect(sent).toEqual([{ url: `/api/me/characters/links/${LINK.id}/sync`, body: { professions: true } }]);
+    expect(status()).toBe("Professions sync is on for Thrallina.");
+    expect(button("Turn off professions sync for Thrallina")).toBeDefined();
+  });
+
+  test("turning sync off says first that what was synced is deleted, and only then sends it", async () => {
+    const sent = syncApi([{ links: [synced({ on: ["gear"] })] }, { links: [synced()] }]);
+    await show();
+    await click("Turn off gear sync for Thrallina");
+    expect(container.textContent).toContain("Turn off gear sync? What was synced for it is deleted now.");
+    expect(sent).toEqual([]);
+    await click("Keep it");
+    expect(sent).toEqual([]);
+    expect(container.textContent).not.toContain("is deleted now");
+    await click("Turn off gear sync for Thrallina");
+    await click("Turn off and delete");
+    expect(sent).toEqual([{ url: `/api/me/characters/links/${LINK.id}/sync`, body: { gear: false } }]);
+    expect(status()).toBe("Gear sync is off for Thrallina, and what was synced for it is deleted.");
+  });
+
+  test("a section can be shown only while the page is public and its sync is on, and says why not", async () => {
+    syncApi([{ links: [synced({ public: false, on: ["gear"] })] }]);
+    await show();
+    const gear = button("Show gear on Thrallina's page")!;
+    expect(gear.disabled).toBe(true);
+    expect(reason(gear)).toBe("Shows only once the page is public.");
+    const talents = button("Show talents on Thrallina's page")!;
+    expect(talents.disabled).toBe(true);
+    expect(reason(talents)).toBe("Shows only once the page is public and sync is on.");
+    await act(async () => root.unmount());
+    root = createRoot(container);
+
+    syncApi([{ links: [synced({ public: true, on: ["gear"] })] }]);
+    await show();
+    expect(button("Show gear on Thrallina's page")!.disabled).toBe(false);
+    expect(button("Show gear on Thrallina's page")!.hasAttribute("aria-describedby")).toBe(false);
+    const raids = button("Show raids on Thrallina's page")!;
+    expect(raids.disabled).toBe(true);
+    expect(reason(raids)).toBe("Shows only once sync is on.");
+  });
+
+  test("a switch left on while its sync is off can still be turned off, and says it is not shown", async () => {
+    const sent = syncApi([{ links: [synced({ public: true, on: [], shown: ["reputations"] })] }]);
+    await show();
+    const hide = button("Hide reputations from Thrallina's page")!;
+    expect(hide.disabled).toBe(false);
+    expect(reason(hide)).toBe("Shows only once sync is on.");
+    await click("Hide reputations from Thrallina's page");
+    expect(sent).toEqual([{ url: `/api/me/characters/links/${LINK.id}/visibility`, body: { show_reputations: false } }]);
+  });
+
+  test("showing a section sends its switch; achievements and titles are the Collections switch", async () => {
+    const sent = syncApi([{ links: [synced({ public: true, on: ["gear", "achievements"] })] }]);
+    await show();
+    await click("Show gear on Thrallina's page");
+    expect(status()).toBe("Gear shows on Thrallina's page.");
+    await click("Show achievements and titles on Thrallina's page");
+    expect(sent).toEqual([
+      { url: `/api/me/characters/links/${LINK.id}/visibility`, body: { show_gear: true } },
+      { url: `/api/me/characters/links/${LINK.id}/visibility`, body: { show_collections: true } },
+    ]);
+  });
+
+  test("without the pages there is sync but no section switch", async () => {
+    syncApi([{ links: [synced({ page: false, on: ["gear"] })] }]);
+    await show();
+    expect(button("Turn off gear sync for Thrallina")).toBeDefined();
+    expect(button("Show gear on Thrallina's page")).toBeUndefined();
+    expect(button("Hide gear from Thrallina's page")).toBeUndefined();
+  });
+
+  test("a frozen character's controls are all disabled, under the frozen wording", async () => {
+    syncApi([{ links: [{ ...synced({ public: true, on: ["gear"] }), status: "frozen" }] }]);
+    await show();
+    expect(container.textContent).toContain(FROZEN_TEXT);
+    expect(button("Turn off gear sync for Thrallina")!.disabled).toBe(true);
+    expect(button("Turn on talents sync for Thrallina")!.disabled).toBe(true);
+    expect(container.querySelector(`a[href="/me/characters/links/${LINK.id}"]`)).toBeNull();
+  });
+
+  test("a refusal is said, and nothing else changes", async () => {
+    syncApi([{ links: [synced()] }], { status: 409, body: { error: "This character is frozen because another account also linked it, so sync can't be turned on." } });
+    await show();
+    await click("Turn on gear sync for Thrallina");
+    expect(status()).toContain("frozen");
+  });
 });

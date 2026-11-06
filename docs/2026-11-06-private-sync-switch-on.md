@@ -21,7 +21,7 @@ request; the stored facts stay until their link is unlinked or their sync is tur
 |---|---|---|---|
 | 1 | Owner | Character links and public pages are live: the [go-live checklist](2026-11-02-showcase-go-live.md) is done. | `EVERLOOT_CHARACTER_LINKS=1` and `EVERLOOT_SHOWCASE=1` in `web/wrangler.jsonc`, and its readback passes. |
 | 2 | Owner | Approve the "Private sync and owner-published sections" section of [DATA_POLICY](DATA_POLICY.md) (a draft), and add a matching /privacy item in the same PR that sets the switch. | Text merged. |
-| 3 | Agent | The pieces that make it usable are merged: account-page controls for sync and the section switches, and the Desktop App's sync sender. Without them the switch works but nobody can use it. | PRs merged. |
+| 3 | Agent | The pieces that make it usable are merged: account-page controls for sync and the section switches, and the Desktop App's sync sender. Without them the switch works but nobody can use it. | PRs merged. Done: the /account controls, with the per-key hourly cap on `POST /api/me/characters/sync` (20 an hour, no migration) and achievements counted only when this character earned them. Not yet: the Desktop App's sender. |
 | 4 | Owner | `20261021190000_character_links.sql` and `20261022120000_api_key_expiry.sql` are applied (the migration checks and stops otherwise). Apply `supabase/migrations/20261106120000_private_sync.sql` in the Supabase SQL editor. It is safe to run twice. | No error. |
 | 5 | Owner | Run the readback below. It only reads. | Every row `t`. |
 

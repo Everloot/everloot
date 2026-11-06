@@ -3,6 +3,8 @@ import { recordSchemas } from "@everloot/protocol";
 import { censusAgrees, LINK_ROWS_PER_REQUEST, LINKS_PER_ACCOUNT, type LinkRow } from "@/lib/character-links";
 import { fail, linkAccount, linkSession, listLinks, NO_STORE, redeemLink, unavailable, type LinkRefusal } from "@/lib/character-links-store";
 import { characterSecret } from "@/lib/census-intake";
+import { privateSyncOn, SYNC_CATEGORIES } from "@/lib/private-sync";
+import { ownCharacterFacts } from "@/lib/private-sync-store";
 import { uploadStore } from "@/lib/upload-store";
 
 /**
@@ -19,12 +21,25 @@ export const dynamic = "force-dynamic";
  * GET /api/me/characters/links: the signed-in account's own links, for its owner's list. Session only, never an API
  * key. Each link's name, realm, race, class, faction, level, status (linked or frozen) and dates; never its keyed
  * hashes, and nothing about another account, not even which one also linked a frozen character.
+ *
+ * With EVERLOOT_PRIVATE_SYNC=1 each link also lists its sync per category (on or off, and the stored capture's date)
+ * and, with the pages on, its section switches, for the account page's controls. Never the synced facts: those are
+ * on the owner's preview.
  */
 export async function GET() {
   try {
     const account = await linkSession();
     if (account instanceof Response) return account;
-    return NextResponse.json({ links: await listLinks(account) }, { headers: NO_STORE });
+    const links = await listLinks(account);
+    if (privateSyncOn()) {
+      await Promise.all(links.map(async (link) => {
+        const by = new Map((await ownCharacterFacts(account, link.id)).map((c) => [c.category, c]));
+        link.sync = SYNC_CATEGORIES.map((category) => ({
+          category, on: by.get(category)?.consented === true, capturedAt: by.get(category)?.fact?.capturedAt ?? null,
+        }));
+      }));
+    }
+    return NextResponse.json({ links }, { headers: NO_STORE });
   } catch {
     return unavailable();
   }

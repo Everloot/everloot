@@ -221,3 +221,31 @@ test("the limits in code are the limits the newest quota function enforces, for 
   }
   expect(sql).toContain("p_scope not in ('request', 'install', 'mcp', 'api', 'form')");
 });
+
+test("a sync key is counted in its own bucket of the install scope, which every applied quota function has: no new SQL", async () => {
+  const fetch = vi.fn().mockImplementation(async () => new Response(JSON.stringify([{ allowed: false, retry_after: 600 }])));
+  const quota = createIntakeQuota({ env, fetch });
+  const keyHash = "c".repeat(64);
+  expect(await quota.syncKey(keyHash)).toEqual({ allowed: false, retryAfter: 600 });
+  await quota.install(keyHash);
+  const [first, second] = fetch.mock.calls.map((c) => JSON.parse(c[1].body));
+  expect(first.p_scope).toBe("install");
+  // Its own bucket: never the same counter as an install id, even one spelled like the hash.
+  expect(first.p_key).not.toBe(second.p_key);
+  expect(fetch.mock.calls[0][1].body).not.toContain(keyHash);
+  for (const file of ["20261007220000_intake_quotas.sql", "20261104120000_market_quota_scope.sql"]) {
+    const sql = readFileSync(new URL(`../../../supabase/migrations/${file}`, import.meta.url), "utf8");
+    expect(sql, file).toMatch(/keys := array\['install:' \|\| p_key\];\s+limits := array\[20\];/);
+  }
+});
+
+test("in development a sync key gets 20 an hour, apart from install allowances", async () => {
+  let now = 0;
+  const quota = createIntakeQuota({ env: { NODE_ENV: "test" }, now: () => now });
+  for (let i = 0; i < 20; i++) expect((await quota.syncKey("key-hash")).allowed).toBe(true);
+  expect(await quota.syncKey("key-hash")).toEqual({ allowed: false, retryAfter: 3600 });
+  expect((await quota.install("key-hash")).allowed).toBe(true);
+  expect((await quota.syncKey("another-key-hash")).allowed).toBe(true);
+  now = 3_600_000;
+  expect((await quota.syncKey("key-hash")).allowed).toBe(true);
+});
