@@ -496,6 +496,22 @@ local fallback = tooltipFor(2589)
 for _, line in ipairs(plainRows) do assert(fallback:find(line.text, 1, true), 'the fallback shows: ' .. line.text) end
 assert(not fallback:gsub('|T[^|]*crest[^|]*|t', ''):find('|T', 1, true), 'no texture in the fallback but the crest: ' .. fallback)
 
+-- Comparing an item opens ShoppingTooltip1 and 2 (ItemRefShoppingTooltip1 and 2 from a chat link) beside the main
+-- tooltip, and the post-call runs for each of them with its own item. The block belongs on the main tooltip only, so
+-- a hover while comparing shows it once, not up to three times.
+local function namedTooltipFor(name, itemId)
+  local tip = { rows = {}, GetName = function() return name end }
+  tip.AddLine = function(self, text) table.insert(self.rows, text) end
+  for _, c in ipairs(tooltipCalls) do c.f(tip, { id = itemId }) end
+  return tip.rows
+end
+for _, name in ipairs({ 'ShoppingTooltip1', 'ShoppingTooltip2', 'ItemRefShoppingTooltip1', 'ItemRefShoppingTooltip2' }) do
+  assert(#namedTooltipFor(name, 2589) == 0, name .. ' carries no Everloot block; got ' .. #namedTooltipFor(name, 2589))
+end
+for _, name in ipairs({ 'GameTooltip', 'ItemRefTooltip', 'SomeAddonTooltip' }) do
+  assert(#namedTooltipFor(name, 2589) > 0, name .. ' keeps the Everloot block')
+end
+
 -- Vendors: a loaded item vendors do not buy (sell price 0) says so in words, never as a 0c amount.
 sellPrice = 0
 local vendor = labelled(nativeTooltipFor(2589), 'Vendor')
