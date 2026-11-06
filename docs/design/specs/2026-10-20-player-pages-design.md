@@ -138,7 +138,7 @@ In `POST /api/intake`:
 All of these answer 404 until `EVERLOOT_PLAYER_PAGES=1`.
 
 - `/players`: a search box (`?q=`), name prefix, 2 to 12 letters, 25 results.
-- `/players/<ruleset>/<realm>/<name>`: name, level, race and class, guild, last seen date, realm, a short
+- `/players/<ruleset>/<realm>/<name>` (since 2026-11-05 a redirect to `/characters/...`, #773): name, level, race and class, guild, last seen date, realm, a short
   statement that it is unchecked game data from the addon, a link to hide the character, and a link to the privacy
   policy. The realm in the address is lower case with hyphens.
 - `/players/opt-out`: the hide form (§7). Every page and every search result links to it, filled in.

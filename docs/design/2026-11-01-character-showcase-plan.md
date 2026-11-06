@@ -23,7 +23,7 @@ Flags are read from `web/wrangler.jsonc` vars. Applied database migrations were 
 
 | Surface | Flag (production) | What it shows | Source |
 | --- | --- | --- | --- |
-| `/players/<ruleset>/<realm>/<name>` | `EVERLOOT_PLAYER_PAGES=1`; `EVERLOOT_PLAYER_PAGES_INDEX` unset, so noindex | Name, class, race, level, guild, realm, last-seen day; "Hide this character" | `player_seen` sightings, including other players the addon saw (`addon/modules/players.lua`, `web/src/lib/player-pages.ts`) |
+| `/players/<ruleset>/<realm>/<name>` (redirects to `/characters/...` since 2026-11-05, #773) | `EVERLOOT_PLAYER_PAGES=1`; `EVERLOOT_PLAYER_PAGES_INDEX` unset, so noindex | Name, class, race, level, guild, realm, last-seen day; "Hide this character" | `player_seen` sightings, including other players the addon saw (`addon/modules/players.lua`, `web/src/lib/player-pages.ts`) |
 | `/players/opt-out` | same | Hides and deletes a character, no account | `character_suppressions` |
 | `/u/<handle>` | `EVERLOOT_PROFILES=1` | Ticked character labels (name, class, realm), shared builds, status | Typed labels, not game data (`web/src/app/u/[handle]/page.tsx`) |
 | `/me/characters/<id>` | `EVERLOOT_SAVED_BUILDS=1` | One typed label's saved builds; owner only | `build_characters` |
@@ -52,8 +52,8 @@ Shown nowhere today: a linked character's own page, its gear, talents, professio
 
 ## 2. The showcase
 
-Address: `/characters/<ruleset>/<realm>/<name>`, using the same slug rules as `playerPath`. A separate page, because
-the ADR says a link never adds data to a sighting page. It renders only from `public_character()` and the linked
+Address: `/characters/<ruleset>/<realm>/<name>`, using the same slug rules as `playerPath`. Since 2026-11-05 (#773) the
+sighting is a second section on this address, never mixed into the showcase. It renders only from `public_character()` and the linked
 account's own synced rows. Nothing comes from `players`, the census or other installs. No row, a frozen link or a
 hidden character returns 404 with noindex.
 
@@ -187,7 +187,6 @@ Sweeping all characters on a realm is not part of it.
   Counting an owner-published equipped item as a report is a separate decision.
 - **Talent code conversion.** Mapping `talent_snapshot` node ids to the calculator's code is assumed, not tested;
   S5 starts with a fixture from a real snapshot.
-- **Two pages per character.** Sightings at `/players/...`, the owner's page at `/characters/...`. Whether one
-  links to the other is for Carlos; the ADR forbids mixing their data.
+- **Two pages per character.** Decided 2026-11-05 (#773): one address per character, `/characters/<ruleset>/<realm>/<name>`, with the owner's showcase and the sighting as separate sections; `/players/...` redirects there.
 - **Schedule.** S3 needs S2 turned on, which needs D8. If D8 slips past 11/04, the sample page (S0, S1) is what the
   site shows on launch day.

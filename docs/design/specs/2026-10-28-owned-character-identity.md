@@ -94,7 +94,7 @@ Aliases attach other identifiers to a root. Each records its kind, source and ti
 | `completion_ref` | Server, proposed `character_link_sources` (new) | Authenticated private sync presents the install id and completion key for an already consented link | Weaker than the link: install id and key are supplied in the row, not attested | Today one column holds one ref, so linking from a second machine **replaces** the first machine's ref. Proposed authenticated sources are separate; legacy refs do not create them |
 | Build label | Server, proposed nullable `build_characters.link_id` | Owner explicitly attaches a label to a link | Owner's own statement | Never inferred from matching names. Deleting the label never unlinks; unlinking sets `link_id` to null and keeps the label, its builds and profile references |
 | Local alt | Device only, optional `LocalAlt.linkId` | Owner confirms a suggested match | Owner's own statement | Never uploaded. A name/realm match is a suggestion, not an automatic join |
-| Public sighting | Not stored as an alias | — | None | Shown only through the existing public policy. A link never adds data to a sighting page, and a sighting never adds data to a private dashboard |
+| Public sighting | Not stored as an alias | — | None | Shown only through the existing public policy. A link never adds data to a sighting page, and a sighting never adds data to a private dashboard. Since 2026-11-05 (#773) both appear on one address, `/characters/...`, as separate sections that never mix rows |
 
 The local name/key map (COL-C03) stays in the addon file and on the device. It never enters a public upload.
 
