@@ -179,7 +179,15 @@ expands, clicks or changes anything.
   installs report it identically.
 - **Owned rows** (`achievement_owned`, `reputation_owned`, `title_owned`, `quest_owned`): your character's
   progress under an 8-digit key made from your install id and the character's GUID, never the name. They
-  leave this file only from the upload page, with the collection choice ticked and a verified grant.
+  leave this file from the upload page, with the collection choice ticked and a verified grant, or through the
+  Desktop App's private sync described below.
+- **Character rows** (`profession_owned`, `lockout_owned`, `talent_owned`): your professions, this week's raid
+  lockouts and the talent build of your active spec group, under the same key. They are never part of an upload
+  file. The Everloot Desktop App's private sync sends these own-character rows (professions, raid lockouts, the active
+  talent build) only for a character you linked: the app sends that character's rows and everloot.app keeps only the
+  categories you switched on. Each
+  read replaces this character's row, a build with no spent points writes none, and `/everloot completion off`
+  deletes them with the rest. The anonymous `talent_snapshot` of the talents module is unchanged.
 - A changed achievement or standing replaces its earlier row. Titles and completed quests are additions.
 - The file stays bounded: at most 1500 achievements read, 600 progress rows per character, and about 3 MB
   of completion rows and remembered ids in all. A limit reached stops recording, says so once in chat that

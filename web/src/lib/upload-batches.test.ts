@@ -125,6 +125,14 @@ test("character link rows never go in an upload, whatever is shared: their GUID 
   }
   expect(prepareUpload({ addonVersion: "0.2.0", records: [link] }, {}, []).batches).toEqual([]);
 });
+test("the talent a character runs stays on the computer too: talent_owned is held, with no protocol schema", () => {
+  const talent = { kind: "talent_owned", installId: "install-batches", eventId: "epoch:tal", capturedAt: row(1).capturedAt, characterKey: "0a1b2c3d", class: "MAGE", level: 60, treeId: 790, points: 1, nodes: [{ nodeId: 10, ranks: 1 }] };
+  expect(LOCAL_ONLY_KINDS).toContain("talent_owned");
+  expect(Object.hasOwn(recordSchemas, "talent_owned")).toBe(false);
+  const session = prepareUpload({ addonVersion: "0.2.0", records: [talent, row(1)] }, { gear: true, collection: true }, ["a".repeat(64)]);
+  expect(session.held).toMatchObject({ local: 1, invalid: 0 });
+  expect(session.batches.join("")).not.toContain("talent_owned");
+});
 test("professions and raid lockouts stay on the computer: never in a batch, whatever is shared, and the intake refuses them", () => {
   const key = "0a1b2c3d";
   const profession = { kind: "profession_owned", installId: "install-batches", eventId: "epoch:prof", capturedAt: row(1).capturedAt, characterKey: key, class: "MAGE", level: 60, profession: "Tailoring", skillLine: 197, rank: 250, maxRank: 300 };

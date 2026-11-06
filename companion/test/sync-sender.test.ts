@@ -36,6 +36,7 @@ const talent: Row = {
   capturedAt: "2026-11-05T10:00:00Z", class: "SHAMAN", level: 24, group: 1, active: true, configId: 7, treeId: 3,
   exportStatus: "unavailable", points: 2, nodes: [{ nodeId: 11, ranks: 2 }],
 };
+const talentOwned = (key: string, nodeId = 11) => owned(key, { installId: INSTALL, treeId: 3, points: 2, nodes: [{ nodeId, ranks: 2 }] });
 
 /** A save file holding `rows` under their kinds, the way the addon writes it. */
 function workspace(rows: Record<string, Row[]>) {
@@ -57,6 +58,7 @@ const full = (): Record<string, Row[]> => ({
   title_owned: [title(THRALL)],
   lockout_owned: [lockout(THRALL)],
   talent_snapshot: [talent],
+  talent_owned: [talentOwned(THRALL), talentOwned("ffffffff")],
   loot: [{ eventId: "epoch:1", capturedAt: "2026-11-01T00:00:00Z", sourceNpcId: 42, sourceEvidence: "loot-api", items: [{ itemId: 5, count: 1 }] }],
 });
 
@@ -75,7 +77,7 @@ function site(answer: (characters: Sent[]) => Response) {
 const synced = (outcome = "stored") => (characters: Sent[]) => Response.json({
   characters: characters.map((c, index) => ({
     index, result: "synced",
-    categories: Object.fromEntries(c.records.map((r) => [{ gear_snapshot: "gear", profession_owned: "professions", reputation_owned: "reputations", lockout_owned: "raids" }[String(r.kind)] ?? "achievements", outcome])),
+    categories: Object.fromEntries(c.records.map((r) => [{ gear_snapshot: "gear", profession_owned: "professions", reputation_owned: "reputations", lockout_owned: "raids", talent_owned: "talents" }[String(r.kind)] ?? "achievements", outcome])),
   })),
   skipped: 0,
 });
@@ -94,12 +96,27 @@ describe("sending linked characters", () => {
     expect(call.characters).toHaveLength(1);
     expect(call.characters[0]).toMatchObject({ name: "Thrallina", realm: "Forever Pioneer" });
     const kinds = call.characters[0]!.records.map((x) => x.kind).sort();
-    // No talent row (it names no character), no link, loot or unlinked character's rows.
-    expect(kinds).toEqual(["achievement_owned", "gear_snapshot", "lockout_owned", "profession_owned", "reputation_owned", "title_owned"]);
+    // The keyed talent row goes; the anonymous talent_snapshot, link, loot and unlinked character's rows do not.
+    expect(kinds).toEqual(["achievement_owned", "gear_snapshot", "lockout_owned", "profession_owned", "reputation_owned", "talent_owned", "title_owned"]);
     // The newest gear sample only.
     expect(call.characters[0]!.records.find((x) => x.kind === "gear_snapshot")).toMatchObject({ equipped: [{ itemLevel: 22 }] });
     expect(r).toMatchObject({ synced: ["Thrallina of Forever Pioneer"], waiting: 0, problem: null });
     expect(syncSummary(r)).toBe("synced 1 character");
+  });
+
+  test("each linked character sends its own talent build; an unlinked one's is not sent", async () => {
+    const { file, state } = workspace({
+      character_link: [link("Thrallina", THRALL), link("Jainara", JAINA)],
+      talent_owned: [talentOwned(THRALL, 11), talentOwned(JAINA, 22), talentOwned("ffffffff", 33)],
+    });
+    const api = site(synced());
+    const r = await sendSync(file, { endpoint: SITE, key: KEY, state, fetch: api.send });
+    expect(api.calls).toHaveLength(1);
+    const sent = Object.fromEntries(api.calls[0]!.characters.map((c) => [c.name, c.records]));
+    expect(Object.keys(sent).sort()).toEqual(["Jainara", "Thrallina"]);
+    expect(sent.Thrallina).toMatchObject([{ kind: "talent_owned", nodes: [{ nodeId: 11 }] }]);
+    expect(sent.Jainara).toMatchObject([{ kind: "talent_owned", nodes: [{ nodeId: 22 }] }]);
+    expect(r.synced).toHaveLength(2);
   });
 
   test("an answered capture is not sent again; a changed one is, alone", async () => {

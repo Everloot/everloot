@@ -1,26 +1,34 @@
--- Everloot own-character state for WoW: Forever: this character's professions and this week's raid lockouts.
+-- Everloot own-character state for WoW: Forever: this character's professions, this week's raid lockouts and
+-- its active talent build.
 -- Runs with the completion tracker (/everloot completion on|off) and under its key.
 --
 --   profession_owned  one row per profession: name, skill line id, rank, max rank.
 --   lockout_owned     one row per raid this character is saved to: instance, difficulty, bosses killed of total,
 --                     when the lockout resets.
--- Both carry the completion module's opaque characterKey (completion.lua, C.Identity), never a name, and hold the
+--   talent_owned      one row: the ACTIVE spec group's tree id, spec id, spent points and every spent node with its
+--                     ranks and choice. Copied from E.Talents.Snapshot (talents.lua), which also feeds the anonymous
+--                     talent_snapshot; that row is written by the talents module exactly as before.
+-- All carry the completion module's opaque characterKey (completion.lua, C.Identity), never a name, and hold the
 -- latest state only: each read replaces this character's rows, and a lockout past its reset is dropped.
+-- A build with no spent points is no row; a build the client cannot read this time leaves the last row alone.
 --
--- These rows stay on this computer. No uploader sends them (web/src/lib/upload-batches.ts LOCAL_ONLY_KINDS), the
--- site's intake does not know these kinds, and only the Everloot Desktop App's Characters page reads them.
+-- profession_owned and lockout_owned stay on this computer: no uploader sends them (web/src/lib/upload-batches.ts
+-- LOCAL_ONLY_KINDS), the site's intake does not know these kinds, and only the Everloot Desktop App's Characters
+-- page reads them. talent_owned is local only too: no upload carries it, it is for the private sync of a character
+-- the player linked (its shape is in web/src/lib/private-sync.ts).
 --
 -- Calls (mainline API; Forever loads the mainline UI). Not yet checked in game:
 --   GetProfessions, GetProfessionInfo                      professions
 --   GetNumSavedInstances, GetSavedInstanceInfo             lockouts, read on UPDATE_INSTANCE_INFO
 --   RequestRaidInfo                                        optional: asks the server for UPDATE_INSTANCE_INFO at login
+--   E.Talents.Groups, E.Talents.Snapshot                   talents, read two seconds after the trait events settle
 -- A missing call records nothing for its kind, never zeros, and /everloot status says which one.
 
 local E = Everloot
 local O = {}
 E.Owned = O
 
-O.KINDS = { "profession_owned", "lockout_owned" }
+O.KINDS = { "profession_owned", "lockout_owned", "talent_owned" }
 
 local API = {
   professions = { "GetProfessions", "GetProfessionInfo" },
@@ -28,14 +36,21 @@ local API = {
 }
 O.API = API
 
+-- The events talents.lua already listens to.
+local TALENT_EVENTS = { "PLAYER_ENTERING_WORLD", "TRAIT_CONFIG_UPDATED", "ACTIVE_PLAYER_SPECIALIZATION_CHANGED",
+  "PLAYER_TALENT_UPDATE", "PLAYER_LEVEL_UP" }
+local TALENT_DEBOUNCE_SECONDS = 2
+local MAX_TALENT_NODES = 600
+local MAX_TALENT_POINTS = 500
+
 local MAX_PROFESSIONS = 5       -- GetProfessions: two primary, archaeology, fishing, cooking
 local MAX_SAVED = 100
 local MAX_RANK = 1000
 local MAX_BOSSES = 40
 local MAX_ID = 2000000000
 
-local ready = { professions = false, lockouts = false }
-local missing = { professions = {}, lockouts = {} }
+local ready = { professions = false, lockouts = false, talents = false }
+local missing = { professions = {}, lockouts = {}, talents = {} }
 
 local function absent(paths)
   local out = {}
@@ -137,6 +152,38 @@ function O.ReadLockouts()
   return replace("lockout_owned", key, rows, function(row) return type(row.resetAt) == "string" and row.resetAt > at end)
 end
 
+--- The active spec group's build as the talents module reads it, or nil when the client has no talents to read.
+--- A build with no spent points removes this character's row; a build that cannot be read leaves it alone.
+function O.ReadTalents()
+  if not ready.talents then return nil end
+  -- The completion module can still be missing at load, so its key is read here, at event time.
+  local identity = E.Completion and E.Completion.Identity
+  local key, class, level
+  if identity then key, class, level = identity() end
+  if not key then return nil end
+  local active
+  for _, entry in ipairs(E.Talents.Groups()) do
+    if entry.active then active = entry end
+  end
+  if not active then return nil end
+  local snapshot = E.Talents.Snapshot(active)
+  if type(snapshot) ~= "table" or type(snapshot.nodes) ~= "table" then return nil end
+  local points = snapshot.points
+  if not (whole(points, 0, MAX_TALENT_POINTS) and whole(snapshot.treeId, 1, MAX_ID) and #snapshot.nodes <= MAX_TALENT_NODES) then
+    return nil
+  end
+  if points == 0 then return replace("talent_owned", key, {}) end
+  local nodes = {}
+  for i, node in ipairs(snapshot.nodes) do
+    nodes[i] = { nodeId = node.nodeId, ranks = node.ranks, choice = node.choice }
+  end
+  return replace("talent_owned", key, { {
+    kind = "talent_owned", characterKey = key, installId = EverlootDB.installId, capturedAt = now(), class = class, level = level,
+    treeId = snapshot.treeId, specId = whole(snapshot.specId, 1, MAX_ID) and snapshot.specId or nil,
+    points = points, nodes = nodes,
+  } })
+end
+
 --- /everloot completion off: delete every row this module wrote.
 function O.Withdraw()
   for _, kind in ipairs(O.KINDS) do
@@ -147,7 +194,7 @@ end
 
 local function describe()
   local parts = {}
-  for _, name in ipairs({ "professions", "lockouts" }) do
+  for _, name in ipairs({ "professions", "lockouts", "talents" }) do
     if ready[name] then parts[#parts + 1] = name .. " ready"
     else parts[#parts + 1] = name .. " unavailable, missing " .. table.concat(missing[name], ", ") .. " (records nothing)" end
   end
@@ -160,14 +207,41 @@ E:RegisterModule("owned", function()
     missing[name] = absent(paths)
     ready[name] = #missing[name] == 0
   end
-  if not (ready.professions or ready.lockouts) then error(describe(), 0) end
+  -- Talents come from the talents module (loaded before this one), which reads the trait API.
+  local talents = E.Talents
+  if type(talents) ~= "table" then missing.talents = { "Everloot.Talents" }
+  elseif type(talents.Groups) ~= "function" or type(talents.Snapshot) ~= "function" then missing.talents = { "Everloot.Talents.Snapshot" }
+  elseif not (type(talents.HasTraitApi) == "function" and talents.HasTraitApi()) then missing.talents = { "C_Traits" } end
+  ready.talents = #missing.talents == 0
+  if not (ready.professions or ready.lockouts or ready.talents) then error(describe(), 0) end
   local f = E.frame
   local watched = {}
-  for _, event in ipairs({ "PLAYER_ENTERING_WORLD", "SKILL_LINES_CHANGED", "UPDATE_INSTANCE_INFO" }) do
+  local events = { "SKILL_LINES_CHANGED", "UPDATE_INSTANCE_INFO" }
+  for _, event in ipairs(TALENT_EVENTS) do events[#events + 1] = event end
+  for _, event in ipairs(events) do
     if pcall(function() f:RegisterEvent(event) end) then watched[event] = true end
+  end
+  local talentEvent = {}
+  for _, event in ipairs(TALENT_EVENTS) do talentEvent[event] = true end
+  -- Trait events come in bursts; read once after they settle (the way talents.lua does).
+  local pending = false
+  local function scheduleTalents()
+    if not ready.talents then return end
+    if C_Timer and type(C_Timer.After) == "function" then
+      if pending then return end
+      pending = true
+      C_Timer.After(TALENT_DEBOUNCE_SECONDS, function()
+        pending = false
+        -- Switched off while waiting: write nothing.
+        if E:IsEnabled("completion") then pcall(O.ReadTalents) end
+      end)
+    else
+      pcall(O.ReadTalents)
+    end
   end
   f:HookScript("OnEvent", function(_, event)
     if not watched[event] or not E:IsEnabled("completion") then return end
+    if talentEvent[event] then scheduleTalents() end
     if event == "PLAYER_ENTERING_WORLD" then
       pcall(O.ReadProfessions)
       -- The lockout list is read when the server's answer arrives, not before: an empty list at login means nothing yet.
@@ -178,5 +252,5 @@ E:RegisterModule("owned", function()
       pcall(O.ReadLockouts)
     end
   end)
-  return "ready: " .. describe() .. "; kept on this computer, never uploaded"
+  return "ready: " .. describe() .. "; kept on this computer; never in an upload; the Everloot Desktop App sends a linked character's rows and everloot.app keeps only the categories you switched on"
 end, "completion")

@@ -76,6 +76,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   Both numbers are averages over 17 slots with each item at the game files' item level; Gear Score v1 weighs each slot by
   its stat budget in the game's `RandPropPoints` table. Filters by ruleset and region, and the character page shows its
   place on each board.
+- Addon, Desktop App and site: a linked character's active talent build syncs to its page. The addon keeps it as a
+  keyed `talent_owned` row (local only, deleted by `/everloot completion off`), the Desktop App sends it with the other
+  synced categories, and the site keeps it under the talents switch. The anonymous `talent_snapshot` is never synced.
 - Site and MCP: while few players upload, Everloot's own installs (Worker secret `EVERLOOT_TRUSTED_INSTALLS`) make an
   Auction House day or a census count public on their own. Everyone else still needs 3 reporters, and a census count
   still needs 10 characters, the hiding of small counts and rounding to 5. A value that rests on them says "includes
@@ -130,6 +133,11 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   objects keeps to that type.
 
 ### Changed
+- Site: the item lists, the census, the rankings and the MCP `population` tool read stored files the snapshot cron
+  writes, instead of rebuilding from every upload on each new server instance. The census is one snapshot the cron
+  extends with only the uploads received since its last run; the item lists' agreed names, public drops, and the items
+  players have seen with where they came from are one small file written after each snapshot that added uploads.
+  Both show the same values as before. With no file yet (the first minutes after a deploy) the pages read as before.
 - Site: private sync is on (`EVERLOOT_PRIVATE_SYNC`). A player can make a key with "Sync my linked characters", turn
   sync on per character and category on /account, see what arrived on a signed-in preview, and show each section on
   the character's public page. The data policy section is in effect and /privacy has the matching item.

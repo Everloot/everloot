@@ -138,6 +138,8 @@ const SHOWS_ART = new Set([
   // The gear rankings check each ranked item's level against the tooltip facts, only for items whose pages show them,
   // and print only the two averages: no item, icon or tooltip text reaches a board.
   "web/src/lib/leaderboards.ts",
+  // The item lists' stored view: the same shown names as shown-item-names.ts, read from the cron's file instead of the corpus.
+  "web/src/lib/item-view.ts",
   // The same names and quest titles for the entity tokens on a wiki page.
   "web/src/lib/wiki-names.ts",
   // Dungeon wiki pages show loading-screen art under the approved page-banner extension.

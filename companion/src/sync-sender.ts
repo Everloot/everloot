@@ -7,13 +7,13 @@ import { receiptKeyForSite, type SentState } from "./sent-state";
 
 /**
  * Private sync: sends the player's own linked characters' rows to the account's sync endpoint,
- * POST /api/me/characters/sync, with the account key, and nowhere else. The upload never carries profession_owned
- * or lockout_owned (web/src/lib/upload-batches.ts keeps them on the computer); this is the only sender of them.
+ * POST /api/me/characters/sync, with the account key, and nowhere else. The upload never carries profession_owned,
+ * lockout_owned or talent_owned (web/src/lib/upload-batches.ts keeps them on the computer); this is the only sender of them.
  *
  * Only characters this file linked are sent: the character_link rows `/everloot link` wrote name them, and their
  * completionKey ties the completion module's rows (characterKey) to that name and realm. Gear rows carry the name and
- * realm themselves; only the newest one per character goes. talent_snapshot rows carry no name, realm or key at all, so
- * no talent row can be tied to a character and none is sent.
+ * realm themselves; only the newest one per character goes, and likewise the newest talent_owned row. The public
+ * talent_snapshot rows carry no name, realm or key at all, so they can be tied to no character and are never sent.
  *
  * The site keeps a category only when the account holds that character's live link and turned the category's sync
  * on. Whatever it answers for a capture (kept, already had, older, sync off, not linked), the same capture is not sent
@@ -56,11 +56,11 @@ export interface SyncSendResult {
 export const syncReceiptKey = (installId: string, endpoint: string, character: string) => `sync|${receiptKeyForSite(installId, endpoint)}|${character}`;
 
 const CATEGORY_OF: Record<string, SyncCategory> = {
-  gear_snapshot: "gear", profession_owned: "professions", reputation_owned: "reputations",
+  gear_snapshot: "gear", talent_owned: "talents", profession_owned: "professions", reputation_owned: "reputations",
   lockout_owned: "raids", achievement_owned: "achievements", title_owned: "achievements",
 };
 /** Kinds keyed by the completion module's characterKey. */
-const KEYED = new Set(["profession_owned", "reputation_owned", "lockout_owned", "achievement_owned", "title_owned"]);
+const KEYED = new Set(["talent_owned", "profession_owned", "reputation_owned", "lockout_owned", "achievement_owned", "title_owned"]);
 
 /** A site that asked to wait, by origin: nothing goes to it before then. Kept while the app runs. */
 const waitUntil = new Map<string, number>();
@@ -105,10 +105,10 @@ function charactersOf(records: Array<Record<string, unknown>>): Character[] {
     const mine = rows.get(id);
     if (!mine) continue;
     const captures: Capture[] = [];
-    for (const category of ["gear", "professions", "reputations", "raids", "achievements"] as const) {
+    for (const category of ["gear", "talents", "professions", "reputations", "raids", "achievements"] as const) {
       let records = mine.filter((r) => CATEGORY_OF[r.kind] === category);
-      // The addon keeps a gear sample an hour; the site keeps the newest, so only that one goes.
-      if (category === "gear" && records.length) records = [records.reduce((a, b) => (time(b) > time(a) ? b : a))];
+      // The addon keeps a gear sample an hour, and the site keeps one talent build; the newest of each goes.
+      if ((category === "gear" || category === "talents") && records.length) records = [records.reduce((a, b) => (time(b) > time(a) ? b : a))];
       if (!records.length) continue;
       captures.push({ category, records, entry: `${category}|${hashOf(records)}` });
     }

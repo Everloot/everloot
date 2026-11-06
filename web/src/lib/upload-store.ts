@@ -97,6 +97,21 @@ const CENSUS_INSTALL_UPLOADS_MAX = 500;
 /** Rows are dated at most 30 days back, so older uploads cannot hold a day that still accepts rows. */
 const CENSUS_READ_DAYS = 32;
 
+/**
+ * The census rows the cron has folded, so a census, rankings or population read is one object instead of every
+ * upload. `mergeCensusRows` gives the same rows whether it folds once or in steps, so the snapshot equals a full fold.
+ */
+interface CensusSnapshot {
+  version: 1;
+  generatedAt: string;
+  rows: StoredCensusRecord[];
+  /** received_at of the newest upload folded in, and the ids sharing it, so ties are not read twice. */
+  lastReceivedAt: string | null;
+  lastIds: string[];
+}
+/** Uploads one census run folds at most; the next run continues from where it stopped. */
+const CENSUS_UPLOADS_PER_RUN = 2000;
+
 interface CompletionSnapshot {
   version: 2;
   generatedAt: string;
@@ -177,6 +192,7 @@ const PARALLEL_READS = 16;
 const SNAPSHOT_KEY = "snapshots/corpus.json";
 const MARKET_KEY = "snapshots/market.json";
 const COMPLETION_KEY = "snapshots/completion.json";
+const CENSUS_KEY = "snapshots/census.json";
 /** A rebuild is folded here over several runs and swapped into COMPLETION_KEY when done, so pages never read a partial one. */
 const COMPLETION_REBUILD_KEY = "snapshots/completion-rebuild.json";
 
@@ -527,23 +543,107 @@ export function createUploadStore(opts: {
   }
 
   /**
+   * Every upload's census rows folded from scratch: the census before the cron's first census snapshot, and its rebuild.
+   * Reads every upload object, so pages use the snapshot (`loadCensus`) and never this when one exists.
+   */
+  async function foldAllCensus(): Promise<{ rows: StoredCensusRecord[]; last: IndexRow[] }> {
+    const index = await listIndex();
+    let rows: StoredCensusRecord[] = [];
+    for (let i = 0; i < index.length; i += MARKET_FOLD_BATCH) {
+      const read = await readPayloads(index.slice(i, i + MARKET_FOLD_BATCH).map((r) => r.object_key));
+      if (read.missed) throw new Error("upload object unreadable");
+      rows = foldCensus(rows, read.payloads);
+    }
+    return { rows, last: index };
+  }
+
+  /** The stored census snapshot and its ETag; `snapshot` is null for one this code cannot read (a rebuild replaces it). */
+  async function readCensusSnapshot(): Promise<{ snapshot: CensusSnapshot | null; etag?: string } | null> {
+    const res = await r2Fetch(CENSUS_KEY, { method: "GET", headers: { "accept-encoding": "identity" } });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`census snapshot read failed (${res.status})`);
+    const etag = res.headers.get("etag") ?? undefined;
+    let parsed: Partial<CensusSnapshot>;
+    try { parsed = JSON.parse(await res.text()) as Partial<CensusSnapshot>; } catch { return { snapshot: null, etag }; }
+    if (parsed.version !== 1 || typeof parsed.generatedAt !== "string" || !Array.isArray(parsed.rows) || !Array.isArray(parsed.lastIds)
+        || !(typeof parsed.lastReceivedAt === "string" || parsed.lastReceivedAt === null)) {
+      return { snapshot: null, etag };
+    }
+    // Through the stored schemas again, as every read boundary does: a row of a shape the code no longer knows is dropped.
+    return { snapshot: { ...(parsed as CensusSnapshot), rows: mergeCensusRows([], parsed.rows) }, etag };
+  }
+
+  /**
+   * Fold the census rows of uploads received since the last run into the census snapshot (cron), like the market
+   * rollup: a watermark, at most CENSUS_UPLOADS_PER_RUN uploads a run, `remaining` for the next. An idle run with a
+   * snapshot reads nothing more. With no snapshot, or `rebuild`, it folds every upload from empty in one run. A missed
+   * object writes nothing, so the next run reads it again.
+   */
+  async function writeCensus(opts: { rebuild?: boolean; idle?: boolean } = {}): Promise<{ added: number; rows: number; remaining: number; skipped?: boolean }> {
+    if (!cloud) throw new Error("the census snapshot needs the cloud store");
+    const current = await readCensusSnapshot();
+    if (current && (!current.etag || current.etag.startsWith("W/"))) throw new Error("census snapshot has no strong ETag: cannot safely update it");
+    if (current && !current.snapshot && !opts.rebuild) throw new Error("census snapshot is invalid: rebuild it with ?rebuild=1");
+    const prev = opts.rebuild ? null : current?.snapshot ?? null;
+    if (opts.idle && prev) return { added: 0, rows: prev.rows.length, remaining: 0, skipped: true };
+    let rows: StoredCensusRecord[];
+    let fresh: IndexRow[];
+    let remaining = 0;
+    if (!prev) {
+      const all = await foldAllCensus();
+      rows = all.rows;
+      fresh = all.last;
+    } else {
+      const listed = await listIndex(prev.lastReceivedAt ?? undefined);
+      const unseen = listed.filter((r) => !(prev.lastReceivedAt && r.received_at === prev.lastReceivedAt && prev.lastIds.includes(r.id)));
+      fresh = unseen.slice(0, CENSUS_UPLOADS_PER_RUN);
+      remaining = unseen.length - fresh.length;
+      rows = prev.rows;
+      for (let i = 0; i < fresh.length; i += MARKET_FOLD_BATCH) {
+        const read = await readPayloads(fresh.slice(i, i + MARKET_FOLD_BATCH).map((r) => r.object_key));
+        if (read.missed) throw new Error("upload object unreadable");
+        rows = foldCensus(rows, read.payloads);
+      }
+    }
+    const last = fresh.length > 0 ? fresh[fresh.length - 1].received_at : null;
+    const atLast = fresh.filter((r) => r.received_at === last).map((r) => r.id);
+    const snapshot: CensusSnapshot = {
+      version: 1,
+      generatedAt: now().toISOString(),
+      rows,
+      lastReceivedAt: last ?? prev?.lastReceivedAt ?? null,
+      lastIds: last === null ? prev?.lastIds ?? [] : prev?.lastReceivedAt === last ? [...new Set([...prev.lastIds, ...atLast])] : atLast,
+    };
+    const put = await r2Fetch(CENSUS_KEY, {
+      method: "PUT",
+      body: JSON.stringify(snapshot),
+      headers: { "content-type": "application/json", ...(current ? { "if-match": current.etag! } : { "if-none-match": "*" }) },
+    });
+    if (!put.ok) throw new Error(`census snapshot write failed (${put.status})`);
+    censusCached = null;
+    return { added: fresh.length, rows: rows.length, remaining };
+  }
+
+  /**
    * Every stored census row, folded. This is the reader the census summary uses: census rows are never in the
    * public corpus, so they come from the private upload objects, through the stored schemas only. A row still
-   * carrying a GUID and no key is skipped, so no GUID can come out of here. Without a rollup snapshot this reads
-   * every upload object (cached for `cacheMs`); a census snapshot is the next step if that gets slow.
+   * carrying a GUID and no key is skipped, so no GUID can come out of here. In the cloud it reads the cron's census
+   * snapshot (one object, cached for `cacheMs`); only before the first snapshot exists does it fold every upload.
+   * Dated by the snapshot, so the census says when its rows were last folded.
    */
   async function loadCensus(): Promise<CensusRead> {
     try {
       if (unavailable) throw new Error("Production storage is not configured");
       if (censusCached && Date.now() - censusCached.at < cacheMs) return censusCached.read;
       let rows: StoredCensusRecord[] = [];
-      const dataAsOf = now().toISOString();
+      let dataAsOf = now().toISOString();
       if (cloud) {
-        const keys = (await listIndex()).map((r) => r.object_key);
-        for (let i = 0; i < keys.length; i += MARKET_FOLD_BATCH) {
-          const read = await readPayloads(keys.slice(i, i + MARKET_FOLD_BATCH));
-          if (read.missed) throw new Error("upload object unreadable");
-          rows = foldCensus(rows, read.payloads);
+        const stored = await readCensusSnapshot();
+        if (stored?.snapshot) {
+          rows = stored.snapshot.rows;
+          dataAsOf = stored.snapshot.generatedAt;
+        } else {
+          rows = (await foldAllCensus()).rows;
         }
       } else {
         const local = await readLocalPayloads();
@@ -936,7 +1036,7 @@ export function createUploadStore(opts: {
     } catch { return { status: "unavailable", ...unknown }; }
   }
 
-  return { putUpload, loadCorpus, putWaitlist, snapshotWork, writeCronRun, writeSnapshot, snapshotHealth, writeMarket, loadMarket, writeCompletion, loadCompletion, loadCensus, installCensus };
+  return { putUpload, loadCorpus, putWaitlist, snapshotWork, writeCronRun, writeSnapshot, snapshotHealth, writeMarket, loadMarket, writeCompletion, loadCompletion, writeCensus, loadCensus, installCensus };
 }
 
 /** The store the routes and pages use. */
