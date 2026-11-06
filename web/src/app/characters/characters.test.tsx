@@ -297,6 +297,22 @@ describe("published sections (private sync, S6)", () => {
     for (const secret of [USER_ID, "d".repeat(64), "install-1234", "Thrall#1234", "source_ref"]) expect(html).not.toContain(secret);
   });
 
+  test("a published stats fact is drawn; without one the stats keep the not-recorded line", async () => {
+    on();
+    answer([PROFESSIONS]);
+    const without = await render();
+    expect(without).toContain('data-section="stats" data-state="unsupported"');
+    expect(without).toContain(NOT_RECORDED_LINE);
+    answer([{ category: "stats", captured_at: "2026-10-31T09:00:00+00:00", data: { stats: { strength: 1234, meleeCrit: 12.34, agility: 0, meleeHit: 0 } } }]);
+    const html = await render();
+    expect(html).toContain('data-section="stats"');
+    expect(html).not.toContain('data-section="stats" data-state="unsupported"');
+    expect(html).not.toContain(NOT_RECORDED_LINE);
+    expect(html).toContain("1,234");
+    expect(html).toContain("12.34%");
+    expect(html).not.toContain("0.00%");
+  });
+
   test("a section switched off is gone on the next request", async () => {
     on();
     answer([GEAR, PROFESSIONS]);

@@ -21,7 +21,7 @@ export const KEY_SCOPES = [
   { id: "read:public", label: "Read public data", note: "The corpus, drop list, items, market prices and the MCP server, at a key's higher limits.", always: true },
   { id: "read:own", label: "Read my saved builds", note: "Your saved builds and character labels, for the Desktop App, MCP clients and scripts.", always: false },
   { id: "link:own", label: "Link my characters", note: "Send the in-game codes that link your characters to this account, as the Desktop App does.", always: false },
-  { id: "sync:own", label: "Sync my linked characters", note: "Send your linked characters' gear, talents, professions, reputations, lockouts and achievements, for the categories you turned on. Nothing is public until you switch a section on.", always: false },
+  { id: "sync:own", label: "Sync my linked characters", note: "Send your linked characters' gear, stats, talents, PvP, professions, reputations, lockouts and achievements, for the categories you turned on. Nothing is public until you switch a section on.", always: false },
 ] as const;
 export type KeyScope = (typeof KEY_SCOPES)[number]["id"];
 

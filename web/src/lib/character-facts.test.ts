@@ -88,6 +88,24 @@ describe("factSections", () => {
     expect(factSections(facts, { ...NAMES, catalog: null }, NOW).collections).toBeUndefined();
   });
 
+  test("stats, in the page's group order with percent and thousands formatting; unknown keys and empty groups are dropped", () => {
+    const s = factSections([at("stats", { stats: {
+      block: 4.5, strength: 1234, agility: 90, stamina: 1_234_567, intellect: 0, spirit: 12, armor: 3000, meleeCrit: 12.345, meleeHit: 0, bogus: 7,
+    } })], NAMES, NOW).stats;
+    expect(s).toEqual({ state: "shown", asOf: "2026-11-05", data: [
+      { group: "Attributes", stats: [
+        { label: "Strength", value: "1,234" }, { label: "Agility", value: "90" }, { label: "Stamina", value: "1,234,567" },
+        { label: "Intellect", value: "0" }, { label: "Spirit", value: "12" },
+      ] },
+      { group: "Melee", stats: [{ label: "Crit", value: "12.35%" }] },
+      { group: "Defense", stats: [{ label: "Armor", value: "3,000" }, { label: "Block", value: "4.50%" }] },
+    ] });
+  });
+
+  test("a stats fact with nothing known leaves the section out", () => {
+    expect(factSections([at("stats", { stats: { bogus: 1 } }), at("stats", { stats: "nope" })], NAMES, NOW).stats).toBeUndefined();
+  });
+
   test("a stored shape it does not know is left out, never guessed", () => {
     const s = factSections([at("gear", { equipped: "nope" }), at("professions", { list: [] }), at("raids", { lockouts: [{ instance: 1 }] })], NAMES, NOW);
     expect(s).toEqual({});
@@ -95,6 +113,17 @@ describe("factSections", () => {
 });
 
 describe("withFacts", () => {
+  test("synced stats replace the unsupported line and date the header; without a fact they stay unsupported", () => {
+    expect(withFacts(base, {}).stats).toEqual({ state: "unsupported" });
+    const input = withFacts(base, factSections([at("stats", { stats: { strength: 10 } }, "2026-11-05T23:00:00.000Z")], NAMES, NOW));
+    expect(input.stats).toEqual({ state: "shown", asOf: "2026-11-05", data: [{ group: "Attributes", stats: [{ label: "Strength", value: "10" }] }] });
+    expect(input.lastUpload).toBe("2026-11-05");
+    const page = buildShowcase({ ...input, lastUpload: "2026-11-05" }, NOW);
+    expect(page.sections.find((x) => x.key === "stats")).toMatchObject({ asOf: "2026-11-05", stale: false });
+    const old = buildShowcase(withFacts(base, factSections([at("stats", { stats: { strength: 10 } }, "2026-10-01T10:00:00.000Z")], NAMES, NOW)), NOW);
+    expect(old.sections.find((x) => x.key === "stats")).toMatchObject({ asOf: "2026-10-01", stale: true });
+  });
+
   test("synced talents sit beside the planned builds; the header's date is the newest shown capture", () => {
     const planned: ShowcaseInput = { ...base, talents: { state: "shown", asOf: "2026-10-20", data: { trees: [], code: null, planned: [{ name: "Raid", slug: "abc123" }] } } };
     const input = withFacts(planned, factSections([

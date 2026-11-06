@@ -90,10 +90,51 @@ export const talentOwned = ownedBase.extend({
   }
 });
 
+/**
+ * The character window's numbers, as the addon records them: exactly these keys, grouped as the page groups them.
+ * Percent keys are rounded to 2 decimals by the addon. An absent key was not readable; it is never a zero.
+ */
+export const STAT_KEYS = [
+  "strength", "agility", "stamina", "intellect", "spirit",
+  "meleeAttackPower", "meleeHit", "meleeCrit", "meleeHaste", "expertise",
+  "rangedAttackPower", "rangedHit", "rangedCrit", "rangedHaste",
+  "spellPower", "healing", "spellHit", "spellCrit", "spellHaste",
+  "armor", "defense", "dodge", "parry", "block",
+] as const;
+export type StatKey = (typeof STAT_KEYS)[number];
+export const ATTRIBUTE_KEYS: readonly StatKey[] = ["strength", "agility", "stamina", "intellect", "spirit"];
+const isStatKey = (k: string): k is StatKey => (STAT_KEYS as readonly string[]).includes(k);
+/** A stat of exactly 0 is not shown in game (except the five attributes), so it is not stored either. */
+export const keepStat = (key: StatKey, value: number) => value !== 0 || ATTRIBUTE_KEYS.includes(key);
+/**
+ * One linked character's sheet. Unknown keys are dropped, not refused, so an older site tolerates a newer addon; a row
+ * left with no known key is refused. Each value must be a finite number.
+ */
+export const statsOwned = ownedBase.extend({
+  kind: z.literal("stats_owned"),
+  stats: z.record(z.string(), z.unknown()).transform((raw, ctx) => {
+    const out: Partial<Record<StatKey, number>> = {};
+    for (const [key, value] of Object.entries(raw)) {
+      if (!isStatKey(key)) continue;
+      if (typeof value !== "number" || !Number.isFinite(value)) {
+        ctx.addIssue({ code: "custom", message: `${key} must be a finite number` });
+        return z.NEVER;
+      }
+      out[key] = value;
+    }
+    if (Object.keys(out).length === 0) {
+      ctx.addIssue({ code: "custom", message: "stats needs at least one known stat" });
+      return z.NEVER;
+    }
+    return out;
+  }),
+});
+
 /** The kinds this endpoint reads, each with the category it feeds. Any other kind is skipped. */
 const SCHEMAS = {
   gear_snapshot: recordSchemas.gear_snapshot,
   talent_owned: talentOwned,
+  stats_owned: statsOwned,
   profession_owned: professionOwned,
   reputation_owned: recordSchemas.reputation_owned,
   lockout_owned: lockoutOwned,
@@ -103,7 +144,7 @@ const SCHEMAS = {
 type Kind = keyof typeof SCHEMAS;
 export type SyncRow = z.infer<(typeof SCHEMAS)[Kind]>;
 const CATEGORY_OF: Record<Kind, SyncCategory> = {
-  gear_snapshot: "gear", talent_owned: "talents", profession_owned: "professions", reputation_owned: "reputations",
+  gear_snapshot: "gear", talent_owned: "talents", stats_owned: "stats", profession_owned: "professions", reputation_owned: "reputations",
   lockout_owned: "raids", achievement_owned: "achievements", title_owned: "achievements",
 };
 
@@ -193,9 +234,14 @@ function categoryData(category: SyncCategory, rows: readonly SyncRow[], now: Dat
       const g = newest(only(rows, "gear_snapshot"));
       return { equipped: g.equipped.map((e) => ({ slot: e.slot, itemId: e.itemId, itemLevel: e.itemLevel })) };
     }
-    case "stats":
+    case "stats": {
+      const s = newest(only(rows, "stats_owned"));
+      // Keys in the page's order; a zero outside the attributes is not a shown stat.
+      const stats = Object.fromEntries(STAT_KEYS.flatMap((k) => { const v = s.stats[k]; return v !== undefined && keepStat(k, v) ? [[k, v]] : []; }));
+      return Object.keys(stats).length ? { stats } : null;
+    }
     case "pvp":
-      // No row kind feeds these yet (a later change adds them), so a request can never build one.
+      // No row kind feeds this yet (a later change adds it), so a request can never build one.
       return null;
     case "talents": {
       const t = newest(only(rows, "talent_owned"));

@@ -102,8 +102,8 @@ export async function characterParts(p: Params): Promise<{ showcase: Found | nul
 
 /**
  * The showcase for a found character. The identity comes from the link row and its date is the link's last upload.
- * Talents show the planned builds when there are any, dated by the newest. Stats are `unsupported` (no collector
- * records them). The owner's published sections, when any, fill the rest (`withFacts`); a section with nothing
+ * Talents show the planned builds when there are any, dated by the newest. Stats are `unsupported` until a synced
+ * stats fact fills them. The owner's published sections, when any, fill the rest (`withFacts`); a section with nothing
  * published stays `empty`, so the public page and card leave it out.
  */
 export function characterShowcase({ ruleset, character: c }: Found, now: Date, planned: readonly PlannedBuild[] = [], facts: FactSections = {}): Showcase {
@@ -120,7 +120,7 @@ export function characterShowcase({ ruleset, character: c }: Found, now: Date, p
     guild: null,
     lastUpload: new Date(c.lastUploadAt).toISOString().slice(0, 10),
     gear: { state: "empty" },
-    // No collector records the character sheet's numbers: one line saying so, never a row of zeros.
+    // Until a stats fact is synced and switched on: one line saying so, never a row of zeros.
     stats: { state: "unsupported" },
     talents: planned.length
       ? {

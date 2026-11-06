@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { STANDING_NAMES } from "../../../kb/src/completion";
-import type { CollectionsData, GearRow, GearSlot, ProfessionRow, RaidsData, ReputationRow, Section, ShowcaseInput } from "./character-showcase";
+import type { CollectionsData, GearRow, GearSlot, ProfessionRow, RaidsData, ReputationRow, Section, ShowcaseInput, StatsData } from "./character-showcase";
 import type { StoredFact } from "./private-sync-store";
+import { keepStat, STAT_KEYS, type StatKey } from "./private-sync";
 
 /**
  * A linked character's synced facts (private sync, showcase plan S5 and S6) as the showcase's own sections. Pure:
@@ -27,6 +28,7 @@ export interface FactNames {
 /** The sections the facts fill. Talents carry only the in-game trees: the planned builds come from the page. */
 export interface FactSections {
   gear?: Section<GearRow[]>;
+  stats?: Section<StatsData>;
   talents?: { asOf: string; trees: { name: string; points: number }[] };
   professions?: Section<ProfessionRow[]>;
   reputations?: Section<ReputationRow[]>;
@@ -43,8 +45,39 @@ const SLOTS: Record<string, GearSlot> = {
 };
 const SLOT_ORDER = Object.keys(SLOTS);
 
+type StatGroup = StatsData[number]["group"];
+/** The character window's stats: the group and words the page uses, and whether the number is a percentage. */
+export const STAT_LABELS: Record<StatKey, { group: StatGroup; label: string; percent: boolean }> = {
+  strength: { group: "Attributes", label: "Strength", percent: false },
+  agility: { group: "Attributes", label: "Agility", percent: false },
+  stamina: { group: "Attributes", label: "Stamina", percent: false },
+  intellect: { group: "Attributes", label: "Intellect", percent: false },
+  spirit: { group: "Attributes", label: "Spirit", percent: false },
+  meleeAttackPower: { group: "Melee", label: "Attack power", percent: false },
+  meleeHit: { group: "Melee", label: "Hit", percent: true },
+  meleeCrit: { group: "Melee", label: "Crit", percent: true },
+  meleeHaste: { group: "Melee", label: "Haste", percent: true },
+  expertise: { group: "Melee", label: "Expertise", percent: false },
+  rangedAttackPower: { group: "Ranged", label: "Attack power", percent: false },
+  rangedHit: { group: "Ranged", label: "Hit", percent: true },
+  rangedCrit: { group: "Ranged", label: "Crit", percent: true },
+  rangedHaste: { group: "Ranged", label: "Haste", percent: true },
+  spellPower: { group: "Spell", label: "Spell power", percent: false },
+  healing: { group: "Spell", label: "Healing", percent: false },
+  spellHit: { group: "Spell", label: "Hit", percent: true },
+  spellCrit: { group: "Spell", label: "Crit", percent: true },
+  spellHaste: { group: "Spell", label: "Haste", percent: true },
+  armor: { group: "Defense", label: "Armor", percent: false },
+  defense: { group: "Defense", label: "Defense", percent: false },
+  dodge: { group: "Defense", label: "Dodge", percent: true },
+  parry: { group: "Defense", label: "Parry", percent: true },
+  block: { group: "Defense", label: "Block", percent: true },
+};
+const statValue = (key: StatKey, n: number) => (STAT_LABELS[key].percent ? `${n.toFixed(2)}%` : Math.round(n).toLocaleString("en-US"));
+
 // The stored shapes, as private-sync.ts builds them. Read back defensively: a row of any other shape is left out.
 const gearData = z.object({ equipped: z.array(z.object({ slot: z.string(), itemId: z.number().int().positive(), itemLevel: z.number().int().positive() })) });
+const statsData = z.object({ stats: z.record(z.string(), z.number().finite()) });
 const talentData = z.object({ nodes: z.array(z.object({ nodeId: z.number().int(), ranks: z.number().int().min(1) })) });
 const professionData = z.object({ professions: z.array(z.object({ name: z.string().min(1), rank: z.number().int().min(0), maxRank: z.number().int().min(1) })) });
 const reputationData = z.object({
@@ -73,6 +106,20 @@ export function factSections(facts: readonly StoredFact[], names: FactNames, now
           const slot = SLOTS[e.slot];
           return slot ? [{ slot, itemId: e.itemId, name: names.item(e.itemId), quality: null, itemLevel: e.itemLevel }] : [];
         }));
+        break;
+      }
+      case "stats": {
+        const d = statsData.safeParse(fact.data);
+        if (!d.success) break;
+        // Page order; an unknown key is dropped, and so is a zero outside the attributes (the game hides it too).
+        const groups = new Map<StatGroup, { label: string; value: string }[]>();
+        for (const key of STAT_KEYS) {
+          const n = d.data.stats[key];
+          if (n === undefined || !keepStat(key, n)) continue;
+          const { group, label } = STAT_LABELS[key];
+          groups.set(group, [...(groups.get(group) ?? []), { label, value: statValue(key, n) }]);
+        }
+        if (groups.size) out.stats = shown(fact, [...groups].map(([group, stats]) => ({ group, stats })));
         break;
       }
       case "talents": {
@@ -147,7 +194,7 @@ export function factSections(facts: readonly StoredFact[], names: FactNames, now
 export function withFacts(input: ShowcaseInput, sections: FactSections): ShowcaseInput {
   const out: ShowcaseInput = { ...input };
   const dates = [input.lastUpload];
-  for (const key of ["gear", "professions", "reputations", "raids", "collections"] as const) {
+  for (const key of ["gear", "stats", "professions", "reputations", "raids", "collections"] as const) {
     const s = sections[key];
     if (!s) continue;
     (out as unknown as Record<string, unknown>)[key] = s;

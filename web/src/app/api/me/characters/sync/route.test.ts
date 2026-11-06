@@ -223,6 +223,36 @@ describe("talents", () => {
   });
 });
 
+describe("stats", () => {
+  const statsOwned = {
+    kind: "stats_owned", ...owned, capturedAt: "2026-11-05T13:00:00Z",
+    stats: { block: 4.5, strength: 100, agility: 0, stamina: 200, intellect: 5, spirit: 6, meleeHit: 0, armor: 3000, made_up: 9 },
+  };
+
+  test("a keyed stats_owned row becomes the stats fact: known keys in page order, zeros outside the attributes left out", async () => {
+    answers([{ category: "stats", outcome: "stored" }]);
+    const body = await (await send(thrallina([statsOwned]))).json();
+    expect(body.characters[0].categories).toEqual({ stats: "stored" });
+    const data = syncCalls()[0].p_facts[0].data;
+    expect(syncCalls()[0].p_facts[0].category).toBe("stats");
+    expect(Object.keys(data.stats)).toEqual(["strength", "agility", "stamina", "intellect", "spirit", "armor", "block"]);
+    expect(data.stats).toMatchObject({ agility: 0, block: 4.5 });
+    expect(sentToDatabase()).not.toContain(CHARACTER_KEY);
+  });
+
+  test("a row with no known key, or a non-finite or non-numeric value, is skipped", async () => {
+    answers([{ category: null, outcome: "not_linked" }]);
+    const body = await (await send(thrallina([
+      { ...statsOwned, stats: { made_up: 1 } },
+      { ...statsOwned, stats: {} },
+      { ...statsOwned, stats: { strength: "12" } },
+      { ...statsOwned, stats: { strength: null } },
+    ]))).json();
+    expect(body.skipped).toBe(4);
+    expect(syncCalls()[0].p_facts).toEqual([]);
+  });
+});
+
 describe("how often a key may sync", () => {
   test("each request counts against the key's own hourly bucket, after the key is checked; never the raw key", async () => {
     answers([{ category: "gear", outcome: "stored" }]);
