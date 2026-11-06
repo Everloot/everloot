@@ -171,6 +171,58 @@ describe("what is stored", () => {
   });
 });
 
+describe("talents", () => {
+  const talentOwned = {
+    kind: "talent_owned", ...owned, capturedAt: "2026-11-05T13:00:00Z", treeId: 790, specId: 262, points: 4,
+    nodes: [{ nodeId: 30, ranks: 2 }, { nodeId: 10, ranks: 1, choice: 0 }, { nodeId: 20, ranks: 1, choice: 1 }],
+  };
+  const talentSnapshot = {
+    kind: "talent_snapshot", installId: INSTALL, capturedAt: "2026-11-05T14:00:00Z", class: "SHAMAN", level: 60, group: 1, active: true,
+    configId: 1, treeId: 790, specId: 262, exportStatus: "empty", points: 1, nodes: [{ nodeId: 5, ranks: 1 }],
+  };
+
+  test("a keyed talent_owned row becomes the talents fact, nodes sorted, in the shape the page reads", async () => {
+    answers([{ category: "talents", outcome: "stored" }]);
+    const body = await (await send(thrallina([talentOwned]))).json();
+    expect(body.characters[0].categories).toEqual({ talents: "stored" });
+    expect(syncCalls()[0].p_facts).toEqual([{
+      category: "talents", captured_at: "2026-11-05T13:00:00.000Z",
+      data: { class: "SHAMAN", treeId: 790, specId: 262, points: 4, nodes: [{ nodeId: 10, ranks: 1, choice: 0 }, { nodeId: 20, ranks: 1, choice: 1 }, { nodeId: 30, ranks: 2 }] },
+    }]);
+    expect(sentToDatabase()).not.toContain(CHARACTER_KEY);
+  });
+
+  test("an anonymous talent_snapshot row is skipped: it can never become a character's talents", async () => {
+    answers([{ category: "gear", outcome: "stored" }]);
+    const body = await (await send(thrallina([gear, talentSnapshot]))).json();
+    expect(body.skipped).toBe(1);
+    expect(syncCalls()[0].p_facts.map((f: { category: string }) => f.category)).toEqual(["gear"]);
+    answers([{ category: null, outcome: "not_linked" }]);
+    await send(thrallina([talentSnapshot]));
+    expect(syncCalls()[1].p_facts).toEqual([]);
+  });
+
+  test("limits match the protocol's talent row: ranks above 10 and a build above 100 points are accepted", async () => {
+    answers([{ category: "talents", outcome: "stored" }]);
+    await send(thrallina([{ ...talentOwned, points: 11, nodes: [{ nodeId: 1, ranks: 11 }] }]));
+    expect(syncCalls()[0].p_facts[0].data).toMatchObject({ points: 11, nodes: [{ nodeId: 1, ranks: 11 }] });
+    const nodes = Array.from({ length: 150 }, (_, i) => ({ nodeId: i + 1, ranks: 1 }));
+    answers([{ category: "talents", outcome: "stored" }]);
+    await send(thrallina([{ ...talentOwned, points: 150, nodes }]));
+    expect(syncCalls()[1].p_facts[0].data).toMatchObject({ points: 150 });
+  });
+
+  test("a talent_owned row whose points do not match its ranks, or repeats a node, is skipped", async () => {
+    answers([{ category: null, outcome: "not_linked" }]);
+    const body = await (await send(thrallina([
+      { ...talentOwned, points: 9 },
+      { ...talentOwned, nodes: [{ nodeId: 1, ranks: 1 }, { nodeId: 1, ranks: 1 }], points: 2 },
+    ]))).json();
+    expect(body.skipped).toBe(2);
+    expect(syncCalls()[0].p_facts).toEqual([]);
+  });
+});
+
 describe("how often a key may sync", () => {
   test("each request counts against the key's own hourly bucket, after the key is checked; never the raw key", async () => {
     answers([{ category: "gear", outcome: "stored" }]);

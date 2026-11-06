@@ -114,6 +114,7 @@ test("private sync: what the app sends, that the link decides, private by defaul
   expect(item.toLowerCase()).not.toContain("verified");
   for (const claim of [
     "Sync my linked characters",
+    "the active talent build",
     "Every category starts off.",
     "kept only when your account holds a live link to that character",
     "only the newest capture of each category",
