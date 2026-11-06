@@ -215,6 +215,7 @@ sample('Elsewhere','2026-10-30T00:00:00Z')
 sample('Forever','2026-10-31T00:00:00Z')
 sample('Forever','2026-10-31T01:00:00Z')
 assert(#EverlootDB.records.auction_scan==9,'two samples of a realm fit beside another realm')
+EverlootDB.paused={auction_scan=true}
 local said=sample('Forever','2026-10-31T02:00:00Z')
 assert(said:find('stored 3 search rows'),'a third sample still stores: '..said)
 local rows=EverlootDB.records.auction_scan

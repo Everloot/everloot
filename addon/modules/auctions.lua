@@ -140,7 +140,7 @@ local function nextFallbackItem(s)
   if s.index > #s.keys then finishFallback(s) end
 end
 
---- Before a partial sample stores its first row: keep the newest E.SAMPLES_KEPT - 1 earlier samples of this realm
+--- Just before a partial sample stores its first row (a sample that finds nothing prunes nothing): keep the newest E.SAMPLES_KEPT - 1 earlier samples of this realm
 --- (a sample is the rows sharing one capturedAt), so up to 1,000 new rows fit under the per-kind cap. Without this,
 --- two samples filled the cap and every later one reported "stored 0". Another realm's rows are not touched.
 local function pruneSamples(realm)
@@ -161,7 +161,6 @@ local function pruneSamples(realm)
 end
 
 local function storeFallbackItem(s)
-  if not s.pruned then s.pruned = true; pruneSamples(s.realm) end
   local key = s.keys[s.index]
   local n = s.commodity and C_AuctionHouse.GetNumCommoditySearchResults(key.itemID) or C_AuctionHouse.GetNumItemSearchResults(key)
   n = number(n) or 0
@@ -180,6 +179,7 @@ local function storeFallbackItem(s)
       price = math.floor(s.commodity and price or price / count)
       if price < 1 then return end
       seen[id] = true
+      if not s.pruned then s.pruned = true; pruneSamples(s.realm) end
       if E:Store("auction_scan", { installId = EverlootDB.installId, capturedAt = s.at,
         realm = s.realm, itemId = key.itemID, count = count, copper = price, priceBasis = "unit" }) then
         s.stored = s.stored + 1
