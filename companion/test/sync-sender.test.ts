@@ -126,24 +126,35 @@ describe("sending linked characters", () => {
     expect(api.calls.map((c) => c.characters[0]!.name)).toEqual(["Thrallina", "Jainara"]);
   });
 
-  test.each(["duplicate", "older", "no_consent"])("a %s answer counts as answered", async (outcome) => {
+  test.each(["duplicate", "older"])("a %s answer counts as answered", async (outcome) => {
     const { file, state } = workspace(full());
     const api = site(synced(outcome));
     const r = await sendSync(file, { endpoint: SITE, key: KEY, state, fetch: api.send });
     await sendSync(file, { endpoint: SITE, key: KEY, state, fetch: api.send });
     expect(api.calls).toHaveLength(1);
-    if (outcome === "no_consent") expect(syncSummary(r)).toContain("turn sync on for it on everloot.app");
-    else expect(r.synced).toHaveLength(1);
+    expect(r.synced).toHaveLength(1);
   });
 
-  test("not_linked is answered; a retry is not", async () => {
+  // The player can turn a category's sync on at any time; the same capture must reach the site then, not only once
+  // the game changes it.
+  test("a no_consent answer goes again next run", async () => {
+    const { file, state } = workspace(full());
+    const api = site(synced("no_consent"));
+    const r = await sendSync(file, { endpoint: SITE, key: KEY, state, fetch: api.send });
+    expect(syncSummary(r)).toContain("turn sync on for it on everloot.app");
+    await sendSync(file, { endpoint: SITE, key: KEY, state, fetch: api.send });
+    expect(api.calls).toHaveLength(2);
+  });
+
+  // Linking (or settling a frozen link) can happen after a send; the character goes again until it is linked.
+  test("not_linked and retry both go again next run", async () => {
     const { file, state } = workspace({ ...full(), character_link: [link("Thrallina", THRALL), link("Jainara", JAINA)], profession_owned: [profession(THRALL), profession(JAINA)] });
     const api = site(() => Response.json({ characters: [{ index: 0, result: "not_linked" }, { index: 1, result: "retry" }], skipped: 0 }));
     const r = await sendSync(file, { endpoint: SITE, key: KEY, state, fetch: api.send });
     expect(r).toMatchObject({ notLinked: ["Thrallina of Forever Pioneer"], waiting: 1 });
     expect(syncSummary(r)).toBe("Thrallina of Forever Pioneer not linked to your account; 1 character syncs next time");
     await sendSync(file, { endpoint: SITE, key: KEY, state, fetch: api.send });
-    expect(api.calls[1]!.characters.map((c) => c.name)).toEqual(["Jainara"]);
+    expect(api.calls[1]!.characters.map((c) => c.name)).toEqual(["Thrallina", "Jainara"]);
   });
 
   test("without a key nothing is read or sent", async () => {

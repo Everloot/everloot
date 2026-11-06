@@ -220,11 +220,15 @@ export async function sendSync(file: string, options: SyncSendOptions): Promise<
         for (const capture of group.captures) {
           const outcome = outcomes[capture.category];
           if (outcome === "stored" || outcome === "duplicate" || outcome === "older") kept.add(label);
-          else if (outcome === "no_consent") off.add(label);
+          // Sync off is not remembered: the player may turn it on later, and the same capture must go then.
+          else if (outcome === "no_consent") { off.add(label); continue; }
           answered.push(capture.entry);
         }
-      } else if (answer?.result === "not_linked" || answer?.result === "mismatch" || answer?.result === "invalid") {
-        (answer.result === "not_linked" ? notLinked : refused).add(label);
+      } else if (answer?.result === "not_linked") {
+        // Not remembered either: a link made or settled later must still get this capture.
+        notLinked.add(label);
+      } else if (answer?.result === "mismatch" || answer?.result === "invalid") {
+        refused.add(label);
         answered.push(...group.captures.map((x) => x.entry));
       } else waiting.add(label);
       if (answered.length) options.state.add(receiptKey(group.character), answered);

@@ -77,7 +77,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   character's public page only when you switch it on. Turning a category's sync off or unlinking deletes what was synced.
 - Desktop App: signed in with a key made with "Sync my linked characters", the app sends the characters you linked from
   this save file to that sync endpoint after each upload: the newest gear, professions, reputations, raid lockouts, and
-  achievements and titles. A capture the site has answered is not sent again; a changed one is. Talent builds are not
+  achievements and titles. A capture the site has kept is not sent again; a changed one is, and so is one for a
+  category whose sync is off or a character not linked yet, so turning sync on later still fills it in. Talent builds are not
   sent yet: the addon's talent rows do not say which character they belong to. With the site's switch off nothing is
   said, and a key without that permission gets one line saying which key to make.
 - Addon and Desktop App: with the completion tracker on, the addon keeps each of your characters' professions (rank of
