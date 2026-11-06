@@ -10,6 +10,9 @@ vi.mock("next/link", () => ({
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
 const players = vi.hoisted(() => ({ store: null as PlayerStore | null }));
 vi.mock("@/lib/player-store", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/player-store")>()), playerStore: () => players.store }));
+// The names synced facts are drawn with: fixed here, so a published-sections test reads no item or catalog store.
+const factNames = vi.hoisted(() => ({ load: vi.fn() }));
+vi.mock("@/lib/character-facts-names", () => ({ loadFactNames: factNames.load }));
 
 import { createMemoryPlayerStore, type PlayerStore } from "@/lib/player-store";
 import { FOOTER_LINE } from "@/lib/character-showcase";
@@ -222,6 +225,99 @@ describe("planned builds (S4)", () => {
     expect((await card(wideCard)).status).toBe(200);
     expect((await card(squareCard)).status).toBe(200);
     expect(askedForBuilds()).toBe(false);
+  });
+});
+
+describe("published sections (private sync, S6)", () => {
+  const FACTS_RPC = "rpc/public_character_facts";
+  /** What public_character_facts returns for the switched-on sections, plus fields it never sends. */
+  const GEAR = {
+    category: "gear", captured_at: "2026-10-31T09:00:00+00:00", data: { equipped: [{ slot: "HeadSlot", itemId: 16842, itemLevel: 66 }] },
+    source_ref: "d".repeat(64), install_id: "install-1234", user_id: USER_ID,
+  };
+  const PROFESSIONS = { category: "professions", captured_at: "2026-10-30T09:00:00+00:00", data: { professions: [{ name: "Mining", skillLine: 186, rank: 280, maxRank: 300 }] } };
+  const answer = (facts: unknown) => auth.authQuery.mockImplementation(async (path: string) => {
+    if (path === "rpc/public_character") return [ROW];
+    if (path === FACTS_RPC) {
+      if (facts instanceof Error) throw facts;
+      return facts;
+    }
+    throw new Error(`unexpected ${path}`);
+  });
+  const askedForFacts = () => auth.authQuery.mock.calls.some(([path]) => path === FACTS_RPC);
+  const on = () => { vi.stubEnv("EVERLOOT_CHARACTER_LINKS", "1"); vi.stubEnv("EVERLOOT_PRIVATE_SYNC", "1"); };
+
+  beforeEach(() => {
+    factNames.load.mockReset().mockResolvedValue({ item: (id: number) => (id === 16842 ? "Earthfury Helmet" : null), catalog: null, talentTrees: null });
+  });
+
+  test("with the switch off nothing asks for facts, and the page and cards are as before", async () => {
+    answer([GEAR]);
+    for (const [links, sync] of [["1", ""], ["1", "true"], ["", "1"]]) {
+      vi.stubEnv("EVERLOOT_CHARACTER_LINKS", links);
+      vi.stubEnv("EVERLOOT_PRIVATE_SYNC", sync);
+      const html = await render();
+      expect(html).toContain("Thrallina");
+      expect(html).not.toContain('data-section="gear"');
+      expect((await card(wideCard)).status).toBe(200);
+    }
+    expect(askedForFacts()).toBe(false);
+    expect(factNames.load).not.toHaveBeenCalled();
+  });
+
+  test("on, the page shows exactly the sections the owner switched on, dated, with names only where installs agree", async () => {
+    on();
+    answer([GEAR, PROFESSIONS]);
+    const html = await render();
+    expect(JSON.parse(auth.authQuery.mock.calls.find(([path]) => path === FACTS_RPC)![1].body))
+      .toEqual({ p_ruleset: "forever", p_realm_slug: "Forever Pioneer", p_name: "Thrallina" });
+    expect(html).toContain('data-section="gear"');
+    expect(html).toContain("Earthfury Helmet");
+    expect(html).toContain('href="/database/items/16842"');
+    expect(html).toContain('data-section="professions"');
+    expect(html).toContain("280 / 300");
+    for (const key of ["talents", "reputations", "raids", "collections"]) expect(html).not.toContain(`data-section="${key}"`);
+    // The header's date is the newest published capture.
+    expect(html).toContain("From the player&#x27;s own addon upload, 2026-10-31 (1 day ago)");
+    expect(html).not.toMatch(/verified|owner|proven|✓/i);
+    for (const secret of [USER_ID, "d".repeat(64), "install-1234", "Thrall#1234", "source_ref"]) expect(html).not.toContain(secret);
+  });
+
+  test("a section switched off is gone on the next request", async () => {
+    on();
+    answer([GEAR, PROFESSIONS]);
+    expect(await render()).toContain('data-section="gear"');
+    // The owner switched gear off: public_character_facts no longer returns it (supabase/tests/private_sync.sql).
+    answer([PROFESSIONS]);
+    const html = await render();
+    expect(html).not.toContain('data-section="gear"');
+    expect(html).not.toContain("Earthfury Helmet");
+    expect(html).toContain('data-section="professions"');
+  });
+
+  test("a hidden, frozen or private character is a 404 and its facts are never asked for", async () => {
+    on();
+    auth.authQuery.mockImplementation(async (path: string) => (path === FACTS_RPC ? [GEAR] : []));
+    await expect(Page(props())).rejects.toThrow("NEXT_NOT_FOUND");
+    expect((await card(wideCard)).status).toBe(404);
+    expect(askedForFacts()).toBe(false);
+  });
+
+  test("a failed or malformed read leaves the sections out and keeps the page", async () => {
+    on();
+    for (const facts of [new Error("down"), [{ category: "gear", captured_at: "not a date", data: {} }, { category: "gold", captured_at: "2026-10-31T09:00:00Z", data: {} }]]) {
+      answer(facts);
+      const html = await render();
+      expect(html).toContain("Thrallina");
+      expect(html).not.toContain('data-section="gear"');
+    }
+  });
+
+  test("the cards draw from the published sections too", async () => {
+    on();
+    answer([GEAR]);
+    expect((await card(wideCard)).status).toBe(200);
+    expect(askedForFacts()).toBe(true);
   });
 });
 

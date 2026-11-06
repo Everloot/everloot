@@ -54,6 +54,11 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   `addon_download` to CurseForge like the other download links. The same tested zip is uploaded there on each release.
 
 ### Added
+- Site, behind `EVERLOOT_PRIVATE_SYNC` (off; its migration is not applied): private sync of your own linked characters.
+  A key with the new `sync:own` scope sends a character's gear, active talents, professions, reputations, raid lockouts,
+  and achievements and titles. Each category is kept only when you hold that character's live link and turned its sync
+  on, and only its newest capture is kept. You see it all on a signed-in preview, and each section shows on the
+  character's public page only when you switch it on. Turning a category's sync off or unlinking deletes what was synced.
 - Site: the Auction House lists each realm that has scans but no public prices yet, with how many of the 3 players needed
   have scanned there ("1 of 3 players have scanned; prices go public at 3"). A player is counted once per upload address,
   on the item with the most players on one day in the last 7. `/api/market/prices` without a realm returns the same counts

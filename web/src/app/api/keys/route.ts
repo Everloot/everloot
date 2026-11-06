@@ -5,6 +5,7 @@ import {
 } from "@/lib/api-keys";
 import { characterLinksOn } from "@/lib/character-links";
 import { guardOn } from "@/lib/data-guard";
+import { privateSyncOn } from "@/lib/private-sync";
 import { DESKTOP_KEY_LABEL } from "@/lib/desktop-connect";
 import { savedBuildsOn } from "@/lib/saved-builds";
 import { getUser, siteUrl } from "@/lib/supabase/server";
@@ -36,10 +37,13 @@ async function account(req: Request, write: boolean) {
 
 /**
  * The scopes this site offers now: read:own while saved builds are on, link:own while character links are on and
- * the expiry migration is applied (the older call has no way to ask for it).
+ * the expiry migration is applied (the older call has no way to ask for it), sync:own the same way while private sync
+ * is on.
  */
 function offered(records = true): string[] {
-  const on: Record<string, boolean> = { "read:own": savedBuildsOn(), "link:own": characterLinksOn() && records };
+  const on: Record<string, boolean> = {
+    "read:own": savedBuildsOn(), "link:own": characterLinksOn() && records, "sync:own": privateSyncOn() && records,
+  };
   return KEY_SCOPES.filter((s) => on[s.id] ?? true).map((s) => s.id);
 }
 

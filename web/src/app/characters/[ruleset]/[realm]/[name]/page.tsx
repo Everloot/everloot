@@ -8,7 +8,7 @@ import { guildPath, guildsOn } from "@/lib/guilds";
 import { characterPath, optOutPath, playerPagesOn, type Player } from "@/lib/player-pages";
 import { pageMetadata } from "@/lib/seo";
 import { className, classText, describePlayer, PLAYER_SIGHTING_LINE, PLAYER_STORAGE_UNAVAILABLE, raceName } from "@/app/players/player-view";
-import { characterParts, characterShowcase, plannedBuilds, type Params } from "./character-view";
+import { characterParts, characterShowcase, plannedBuilds, publishedFacts, type Params } from "./character-view";
 
 /**
  * Read on every request and never cached, so a page switched off, or a character hidden, is gone at once. The
@@ -120,7 +120,7 @@ export default async function CharacterPage(props: { params: Promise<Params> }) 
       </Container>
     );
   }
-  const showcase = found(owner) ? characterShowcase(owner, new Date(), await plannedBuilds(owner)) : null;
+  const showcase = found(owner) ? characterShowcase(owner, new Date(), await plannedBuilds(owner), await publishedFacts(owner)) : null;
   const sighted = found(seen) ? seen : null;
   const c = showcase?.input;
   const name = c?.name ?? sighted!.name;

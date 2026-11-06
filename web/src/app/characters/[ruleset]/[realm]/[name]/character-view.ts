@@ -1,10 +1,14 @@
 import { cache } from "react";
 import { validPlayerName } from "@everloot/protocol";
+import { factSections, withFacts, type FactSections } from "@/lib/character-facts";
+import { loadFactNames } from "@/lib/character-facts-names";
 import { publicCharacter, publicCharacterBuilds, type PlannedBuild, type PublicCharacter } from "@/lib/character-links-store";
 import { buildShowcase, characterPath, showcaseBuildsOn, showcaseOn, type Showcase } from "@/lib/character-showcase";
 import { renderCharacterCard, type CharacterCardSize } from "@/lib/og-card";
 import { playerPagesOn, type Player } from "@/lib/player-pages";
 import { playerStore } from "@/lib/player-store";
+import { privateSyncOn } from "@/lib/private-sync";
+import { publicCharacterFacts } from "@/lib/private-sync-store";
 
 /**
  * A character's one page reads up to two rows, each from its own source: the owner's showcase from
@@ -40,6 +44,22 @@ export async function plannedBuilds({ ruleset, character: c }: Found): Promise<P
     return await publicCharacterBuilds(ruleset, c.realm, c.name);
   } catch {
     return [];
+  }
+}
+
+/**
+ * The sections the owner synced and switched on (showcase plan S6), read only with EVERLOOT_PRIVATE_SYNC=1 and only
+ * once the character itself was found. `public_character_facts` asks everything `public_character` asks, and of the
+ * facts returns only the categories whose switch is on and whose sync is still consented, so a section switched off is
+ * gone on the next request. A failed read leaves the sections out rather than taking the page down.
+ */
+export async function publishedFacts({ ruleset, character: c }: Found, now = new Date()): Promise<FactSections> {
+  if (!privateSyncOn()) return {};
+  try {
+    const facts = await publicCharacterFacts(ruleset, c.realm, c.name);
+    return facts.length ? factSections(facts, await loadFactNames(facts, c.class), now) : {};
+  } catch {
+    return {};
   }
 }
 
@@ -82,11 +102,11 @@ export async function characterParts(p: Params): Promise<{ showcase: Found | nul
 
 /**
  * The showcase for a found character. The identity comes from the link row and its date is the link's last upload.
- * Talents show the planned builds when there are any, dated by the newest; every other section is `empty` until the
- * sync slices land, so the public page and card leave them out.
+ * Talents show the planned builds when there are any, dated by the newest. The owner's published sections, when any,
+ * fill the rest (`withFacts`); a section with nothing published stays `empty`, so the public page and card leave it out.
  */
-export function characterShowcase({ ruleset, character: c }: Found, now: Date, planned: readonly PlannedBuild[] = []): Showcase {
-  return buildShowcase({
+export function characterShowcase({ ruleset, character: c }: Found, now: Date, planned: readonly PlannedBuild[] = [], facts: FactSections = {}): Showcase {
+  return buildShowcase(withFacts({
     sample: false,
     path: characterPath(ruleset, c.realm, c.name),
     name: c.name,
@@ -109,7 +129,7 @@ export function characterShowcase({ ruleset, character: c }: Found, now: Date, p
     reputations: { state: "empty" },
     raids: { state: "empty" },
     collections: { state: "empty" },
-  }, now);
+  }, facts), now);
 }
 
 const HEADERS = { "Cache-Control": "no-store", "X-Robots-Tag": "noindex" };
@@ -122,7 +142,7 @@ export async function characterCard(params: Promise<Params>, size: CharacterCard
   if (found === "unavailable") return new Response("Unavailable", { status: 503, headers: HEADERS });
   if (!found) return new Response("Not found", { status: 404, headers: HEADERS });
   const now = new Date();
-  const image = await renderCharacterCard(characterShowcase(found, now), size);
+  const image = await renderCharacterCard(characterShowcase(found, now, [], await publishedFacts(found, now)), size);
   for (const [name, value] of Object.entries(HEADERS)) image.headers.set(name, value);
   return image;
 }
