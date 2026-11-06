@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import { createCloudPlayerStore, createMemoryPlayerStore, missingFunction, playerHideKey, playerStoreFrom, realmSlugOf } from "./player-store";
 import { optOutPath, playerDateProblem, playerIndexingOn, playerPagesOn, playerPath, playerUpsert, realmSlug, searchPrefix, type PlayerRow } from "./player-pages";
+import { characterPath } from "./character-showcase";
 
 const row = (name: string, extra: object = {}) => ({ name, realm: "Forever Pioneer", race: "Orc", class: "SHAMAN", level: 24, seen: "2026-10-20", ...extra });
 
@@ -33,8 +34,13 @@ describe("what a row becomes", () => {
 
   test("addresses are lower case with hyphens, and a search is 2 to 12 letters", () => {
     expect(realmSlug("Forever Pioneer")).toBe("forever-pioneer");
-    expect(playerPath({ ruleset: "forever", realm: "Forever Pioneer", name: "Thrallina" })).toBe("/players/forever/forever-pioneer/thrallina");
+    expect(playerPath({ ruleset: "forever", realm: "Forever Pioneer", name: "Thrallina" })).toBe("/characters/forever/forever-pioneer/thrallina");
     expect(optOutPath({ realm: "Forever Pioneer", name: "Thrallina" })).toBe("/players/opt-out?realm=Forever%20Pioneer&name=Thrallina");
+    // A sighting and a linked character have one address, however the realm and name are spelled.
+    for (const [realm, name] of [["Forever Pioneer", "Thrallina"], ["  Forever   Pioneer ", "THRALLINA"], ["Mal'Ganis", "Zoë"], ["Ébène/Two", "Ørn"]]) {
+      expect(playerPath({ ruleset: "forever", realm, name })).toBe(characterPath("forever", realm, name));
+    }
+    expect(playerPath({ ruleset: "forever", realm: "Ébène/Two", name: "Ørn" })).toBe("/characters/forever/%C3%A9b%C3%A8ne%2Ftwo/%C3%B8rn");
     expect(searchPrefix(" Thr ")).toBe("Thr");
     for (const bad of ["T", "", "th%", "a_b", "x1", "abcdefghijklm", undefined, 5]) expect(searchPrefix(bad)).toBeNull();
   });

@@ -3,11 +3,15 @@ import { validPlayerName } from "@everloot/protocol";
 import { publicCharacter, publicCharacterBuilds, type PlannedBuild, type PublicCharacter } from "@/lib/character-links-store";
 import { buildShowcase, characterPath, showcaseBuildsOn, showcaseOn, type Showcase } from "@/lib/character-showcase";
 import { renderCharacterCard, type CharacterCardSize } from "@/lib/og-card";
+import { playerPagesOn, type Player } from "@/lib/player-pages";
+import { playerStore } from "@/lib/player-store";
 
 /**
- * A linked character's public page and card read one row, from `public_character`: identity only in this slice
- * (showcase plan, S3). No row (not linked, frozen, hidden, or the page switched off) is a 404 for the page and both
- * cards alike. Nothing is cached: an owner's switch off must not leave a warm copy anywhere.
+ * A character's one page reads up to two rows, each from its own source: the owner's showcase from
+ * `public_character` (identity only in this slice, showcase plan S3) and, with the player pages on, what the addon
+ * last saw from the players table. The cards read the showcase only. No showcase row (not linked, frozen, hidden,
+ * or the page switched off) is a 404 for both cards. Nothing is cached: an owner's switch off or a hide must not
+ * leave a warm copy anywhere.
  */
 
 export type Params = { ruleset: string; realm: string; name: string };
@@ -50,6 +54,31 @@ export const lookup = cache(async (ruleset: string, realm: string, name: string)
     return "unavailable";
   }
 });
+
+/**
+ * What the addon last saw of the character (the players table), null for none or with the player pages off, or
+ * "unavailable" when storage could not answer; never a throw. A hidden character has no row (`suppress_player`
+ * deletes it and `get_player` skips it). Read apart from the showcase, and never joined to it.
+ */
+export const sighting = cache(async (ruleset: string, realm: string, name: string): Promise<Player | null | "unavailable"> => {
+  if (!playerPagesOn()) return null;
+  const parts = parse({ ruleset, realm, name });
+  if (!parts) return null;
+  try {
+    return await playerStore().get(parts.ruleset, parts.realm, parts.name);
+  } catch {
+    return "unavailable";
+  }
+});
+
+/** Both parts of the page, each from its own source and behind its own switch; the showcase is not read with its switch off. */
+export async function characterParts(p: Params): Promise<{ showcase: Found | null | "unavailable"; seen: Player | null | "unavailable" }> {
+  const [showcase, seen] = await Promise.all([
+    showcaseOn() ? lookup(p.ruleset, p.realm, p.name) : null,
+    sighting(p.ruleset, p.realm, p.name),
+  ]);
+  return { showcase, seen };
+}
 
 /**
  * The showcase for a found character. The identity comes from the link row and its date is the link's last upload.

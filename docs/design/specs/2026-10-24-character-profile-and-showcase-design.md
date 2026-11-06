@@ -30,7 +30,7 @@ and each section says which it is:
 No section invents a number. A section with nothing to show says so once, as an `EmptyState`, and sections the data
 cannot ever fill are left out rather than shown empty.
 
-## 2. The page (`/players/<ruleset>/<realm>/<name>`)
+## 2. The page (`/players/<ruleset>/<realm>/<name>`; since 2026-11-05 `/characters/...`, #773)
 
 - `Container width="wide"`. `PageHeader`: trail Home > Players > realm; title = the name; lede = "Level 60 Orc
   Shaman"; meta = guild (a link when guilds are on), realm, "Last seen <day>".

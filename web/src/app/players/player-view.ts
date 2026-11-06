@@ -21,6 +21,9 @@ export function classText(token: string): string {
 /** What a player page tells about a character, said once wherever the pages are offered. */
 export const PLAYER_PAGE_SHOWS = "Race, class, level, guild and the day the addon last saw them. Nothing else.";
 
+/** Where a sighting comes from and how far to trust it, said under it on the character's page. */
+export const PLAYER_SIGHTING_LINE = "This is what a player running the Everloot addon last saw of this character, on the day above. It is not checked against the game, and it may be out of date: the level and guild are as of that day. The sighting holds no position, gear or history.";
+
 /** The sentence a player page shows when the store cannot answer. */
 export const PLAYER_STORAGE_UNAVAILABLE = "Player storage is unreachable right now. The character may still be there; try again in a moment.";
 

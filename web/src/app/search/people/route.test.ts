@@ -36,7 +36,7 @@ test("characters are never stored outside the server, and never indexed", async 
   expect(res.headers.get("x-robots-tag")).toBe("noindex");
   const body = await res.json();
   expect(body.characters.results).toEqual([
-    { type: "character", label: "Zuljinna", href: "/players/forever/forever-pioneer/zuljinna", meta: "Level 12 Hunter · Forever Pioneer", exact: false },
+    { type: "character", label: "Zuljinna", href: "/characters/forever/forever-pioneer/zuljinna", meta: "Level 12 Hunter · Forever Pioneer", exact: false },
   ]);
 });
 

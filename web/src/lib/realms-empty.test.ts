@@ -14,7 +14,7 @@ test("with the map empty every realm is forever, and nothing is guessed", () => 
     expect(realmRuleset(realm)).toBe(DEFAULT_RULESET);
     expect(realmInfo(realm)).toBeNull();
   }
-  expect(playerPath({ ruleset: realmRuleset("Forever Pioneer"), realm: "Forever Pioneer", name: "Thrallina" })).toBe("/players/forever/forever-pioneer/thrallina");
+  expect(playerPath({ ruleset: realmRuleset("Forever Pioneer"), realm: "Forever Pioneer", name: "Thrallina" })).toBe("/characters/forever/forever-pioneer/thrallina");
 });
 
 const now = new Date("2026-11-10T12:00:00.000Z");

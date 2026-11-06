@@ -291,7 +291,7 @@ test("a guild page with both, plus the seen roster labelled as sightings", async
   // The officers' roster first, in its order, then the sightings, newest first.
   expect(html.indexOf("Grimtusk")).toBeLessThan(html.indexOf("Throgar"));
   expect(html.indexOf("Throgar")).toBeLessThan(html.indexOf("Thrallina"));
-  expect(html).toContain('href="/players/forever/forever-pioneer/throgar"');
+  expect(html).toContain('href="/characters/forever/forever-pioneer/throgar"');
   expect(html).toContain('class="text-class-shaman">Shaman<');
   expect(html).toContain('href="/guilds/hide?realm=Forever%20Pioneer&amp;guild=Night%20Watch"');
   expect(html).not.toContain(">Alts<");
@@ -364,8 +364,8 @@ test("a member seen and on the officers' roster is one row, with the rank and th
   const loaded = await loadGuildPage("forever-pioneer", "night-watch");
   if (!loaded || loaded === "unreachable") throw new Error("no page");
   expect(loaded.members.map((m) => [m.name, m.rank, m.level, m.lastSeen, m.path])).toEqual([
-    ["Throgar", "Raider", 31, "2026-10-23", "/players/forever/forever-pioneer/throgar"],
-    ["Thrallina", null, 25, "2026-10-21", "/players/forever/forever-pioneer/thrallina"],
+    ["Throgar", "Raider", 31, "2026-10-23", "/characters/forever/forever-pioneer/throgar"],
+    ["Thrallina", null, 25, "2026-10-21", "/characters/forever/forever-pioneer/thrallina"],
   ]);
 });
 

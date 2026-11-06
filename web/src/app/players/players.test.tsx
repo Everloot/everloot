@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createMemoryPlayerStore, type PlayerStore } from "@/lib/player-store";
 
 vi.mock("next/link", () => ({
@@ -21,80 +21,57 @@ beforeEach(async () => {
 afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); });
 
 const on = () => vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
-const params = { ruleset: "forever", realm: "forever-pioneer", name: "thrallina" };
 
-test("with the switch off every page is a 404 and the store is never asked", async () => {
+test("with the switch off the search and the hide form are 404s and the store is never asked", async () => {
   const spy = vi.spyOn(holder.store!, "search");
-  const get = vi.spyOn(holder.store!, "get");
   const { default: Search } = await import("./page");
-  const { default: Player, generateMetadata } = await import("./[ruleset]/[realm]/[name]/page");
   const { default: OptOut } = await import("./opt-out/page");
   await expect(Search({ searchParams: Promise.resolve({ q: "thr" }) })).rejects.toThrow("NEXT_NOT_FOUND");
-  await expect(Player({ params: Promise.resolve(params) })).rejects.toThrow("NEXT_NOT_FOUND");
   await expect(OptOut({ searchParams: Promise.resolve({}) })).rejects.toThrow("NEXT_NOT_FOUND");
-  expect(await generateMetadata({ params: Promise.resolve(params) })).toMatchObject({ robots: { index: false } });
   expect(spy).not.toHaveBeenCalled();
-  expect(get).not.toHaveBeenCalled();
 });
 
-test("a character page shows what the row holds, a hide link and nothing else about the player", async () => {
-  on();
-  const { default: Player } = await import("./[ruleset]/[realm]/[name]/page");
-  const html = renderToStaticMarkup(await Player({ params: Promise.resolve(params) }));
-  expect(html).toContain("Thrallina");
-  expect(html).toContain("Level 24 Undead Shaman");
-  expect(html).toContain("Night Watch");
-  expect(html).toContain("2026-10-20");
-  expect(html).toContain('href="/players/opt-out?realm=Forever%20Pioneer&amp;name=Thrallina"');
-  expect(html).not.toMatch(/\b\d{2}:\d{2}\b/);
+describe("the old character address", () => {
+  const go = async (path: string, method: "GET" | "HEAD" = "GET") => {
+    const route = await import("./[ruleset]/[realm]/[name]/route");
+    return route[method](new Request(`https://everloot.app${path}`, { method }));
+  };
+
+  test("answers a temporary 307, kept an hour at most, with the character's one page, switch on or off, and reads nothing", async () => {
+    const get = vi.spyOn(holder.store!, "get");
+    for (const value of ["1", ""]) {
+      vi.stubEnv("EVERLOOT_PLAYER_PAGES", value);
+      const res = await go("/players/forever/forever-pioneer/thrallina");
+      expect(res.status).toBe(307);
+      expect(res.headers.get("cache-control")).toBe("public, max-age=3600");
+      expect(res.headers.get("location")).toBe("https://everloot.app/characters/forever/forever-pioneer/thrallina");
+    }
+    const head = await go("/players/forever/forever-pioneer/thrallina", "HEAD");
+    expect(head.status).toBe(307);
+    expect(head.headers.get("cache-control")).toBe("public, max-age=3600");
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  test("keeps the encoded segments exactly as they were sent, and the query", async () => {
+    for (const path of [
+      "/players/forever/mal'ganis/thrallina",
+      "/players/forever/%C3%A9b%C3%A8ne%2Ftwo/%C3%B8rn",
+      "/players/forever/Forever-Pioneer/THRALLINA",
+      "/players/forever/forever%20pioneer/thrallina",
+    ]) {
+      const location = (await go(path)).headers.get("location");
+      expect(location).toBe(`https://everloot.app${path.replace("/players/", "/characters/")}`);
+    }
+    expect((await go("/players/forever/forever-pioneer/thrallina?utm_source=x")).headers.get("location"))
+      .toBe("https://everloot.app/characters/forever/forever-pioneer/thrallina?utm_source=x");
+  });
 });
 
-test("a character that is not stored, or was hidden, is a 404", async () => {
+test("a search result page always stays out of search engines; the bare search page follows the index switch", async () => {
   on();
-  const { default: Player } = await import("./[ruleset]/[realm]/[name]/page");
-  await expect(Player({ params: Promise.resolve({ ...params, name: "nobody" }) })).rejects.toThrow("NEXT_NOT_FOUND");
-  await holder.store!.suppress("Forever Pioneer", "Thrallina");
-  await expect(Player({ params: Promise.resolve(params) })).rejects.toThrow("NEXT_NOT_FOUND");
-});
-
-test("a malformed name, realm or ruleset is a 404 and the store is never asked", async () => {
-  on();
-  const get = vi.spyOn(holder.store!, "get");
-  const { default: Player, generateMetadata } = await import("./[ruleset]/[realm]/[name]/page");
-  for (const bad of [{ ...params, name: "y" }, { ...params, name: "thrall1" }, { ...params, realm: "x" }, { ...params, realm: "forever%20pioneer" }, { ...params, ruleset: "for.ever" }, { ...params, name: "%E0%A4%A" }]) {
-    await expect(Player({ params: Promise.resolve(bad) })).rejects.toThrow("NEXT_NOT_FOUND");
-    expect(await generateMetadata({ params: Promise.resolve(bad) })).toMatchObject({ title: "Page not found", robots: { index: false } });
-  }
-  expect(get).not.toHaveBeenCalled();
-});
-
-test("a store that cannot answer renders the unavailable sentence, not a crash, and the page stays out of search engines", async () => {
-  on();
-  vi.spyOn(holder.store!, "get").mockRejectedValue(new Error("Player storage unavailable (500)"));
-  const { default: Player, generateMetadata } = await import("./[ruleset]/[realm]/[name]/page");
-  const html = renderToStaticMarkup(await Player({ params: Promise.resolve(params) }));
-  expect(html).toContain("Player storage is unreachable right now");
-  expect(html).not.toContain("Thrallina");
-  expect(await generateMetadata({ params: Promise.resolve(params) })).toMatchObject({ robots: { index: false } });
-});
-
-test("the character page is a profile card: class in its colour, each fact labelled, the realm in the trail", async () => {
-  on();
-  const { default: Player } = await import("./[ruleset]/[realm]/[name]/page");
-  const html = renderToStaticMarkup(await Player({ params: Promise.resolve(params) }));
-  expect(html).toContain('data-facts="grid"');
-  expect(html).toMatch(/text-class-shaman">Shaman</);
-  expect(html).toContain("Last seen 2026-10-20");
-  expect(html).toContain("Forever Pioneer");
-});
-
-test("pages stay out of search engines until the second switch is set, and a search result page always does", async () => {
-  on();
-  const { generateMetadata } = await import("./[ruleset]/[realm]/[name]/page");
   const { generateMetadata: searchMetadata } = await import("./page");
-  expect(await generateMetadata({ params: Promise.resolve(params) })).toMatchObject({ robots: { index: false, follow: false } });
+  expect(await searchMetadata({ searchParams: Promise.resolve({}) })).toMatchObject({ robots: { index: false } });
   vi.stubEnv("EVERLOOT_PLAYER_PAGES_INDEX", "1");
-  expect(await generateMetadata({ params: Promise.resolve(params) })).toMatchObject({ robots: { index: true } });
   expect(await searchMetadata({ searchParams: Promise.resolve({ q: "thr" }) })).toMatchObject({ robots: { index: false } });
   expect(await searchMetadata({ searchParams: Promise.resolve({}) })).toMatchObject({ robots: { index: true } });
 });
@@ -103,7 +80,7 @@ test("search finds a name prefix, links each result and offers to hide it", asyn
   on();
   const { default: Search } = await import("./page");
   const html = renderToStaticMarkup(await Search({ searchParams: Promise.resolve({ q: "thr" }) }));
-  expect(html).toContain('href="/players/forever/forever-pioneer/thrallina"');
+  expect(html).toContain('href="/characters/forever/forever-pioneer/thrallina"');
   expect(html).toContain("Level 24 Undead Shaman");
   expect(html).toContain("/players/opt-out?realm=Forever%20Pioneer");
   expect(html).toContain('action="/players"');
