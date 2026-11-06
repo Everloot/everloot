@@ -4,6 +4,8 @@
   "description": "Returns the newest official changes for WoW: Forever, newest first: Blizzard blue posts (title, author, time, a short excerpt and the link to the original), hotfix posts, and new game builds. Excerpts only: Blizzard's post text is Blizzard's; full posts are available at their source URLs. A build's time is when Everloot first saw it, not Blizzard's release time. Use it for what Blizzard changed or posted lately; use answer_sources for lore and game facts, and ecosystem_projects for community addons. filter picks one kind; limit caps the entries.",
   "annotations": {
     "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
     "openWorldHint": false
   },
   "inputSchema": {

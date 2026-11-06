@@ -4,6 +4,8 @@
   "description": "Returns one Forever item's page by item id: the agreed name, drop frequency from observed loot windows, agreed map pins, and player-reported armor, block, damage per second, stats and resistances. A number is public when one value has 3 agreeing installs in the newest build that 3 installs reported, and no competing value has 3; contested numbers are withheld. Each number states its agreeing installs, build and last seen, with the corpus date and method. Missing numbers are [?] with a reason. No baseline rows or player names. Use it when you have an item id; use market_value for its price, entity_relations for what drops or sells it, and item_categories for its class and slot. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
   "annotations": {
     "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
     "openWorldHint": false
   },
   "inputSchema": {
