@@ -66,11 +66,34 @@ export const lockoutOwned = ownedBase.extend({
   bossesTotal: z.number().int().min(1).max(100),
   resetAt: z.string().datetime({ offset: true }),
 }).refine((r) => r.bossesKilledCount <= r.bossesTotal, { message: "bossesKilledCount cannot exceed bossesTotal", path: ["bossesKilledCount"] });
+/**
+ * The active talent build of one linked character, keyed like the other owned rows. The public talent_snapshot carries
+ * no character key and is not read here, so an anonymous row can never become a character's fact. Same refinements as
+ * the protocol's talentSnapshot; `choice` is a zero-based entry index, so 0 is valid.
+ */
+export const talentOwned = ownedBase.extend({
+  kind: z.literal("talent_owned"),
+  treeId: z.number().int().positive(),
+  specId: z.number().int().positive().optional(),
+  points: z.number().int().min(0).max(100),
+  nodes: z.array(z.object({
+    nodeId: z.number().int().positive(),
+    ranks: z.number().int().min(1).max(10),
+    choice: z.number().int().min(0).max(3).optional(),
+  })).max(200),
+}).superRefine((row, ctx) => {
+  if (row.points !== row.nodes.reduce((sum, node) => sum + node.ranks, 0)) {
+    ctx.addIssue({ code: "custom", message: "talent points must equal the sum of node ranks", path: ["points"] });
+  }
+  if (new Set(row.nodes.map((node) => node.nodeId)).size !== row.nodes.length) {
+    ctx.addIssue({ code: "custom", message: "talent node ids must be unique", path: ["nodes"] });
+  }
+});
 
 /** The kinds this endpoint reads, each with the category it feeds. Any other kind is skipped. */
 const SCHEMAS = {
   gear_snapshot: recordSchemas.gear_snapshot,
-  talent_snapshot: recordSchemas.talent_snapshot,
+  talent_owned: talentOwned,
   profession_owned: professionOwned,
   reputation_owned: recordSchemas.reputation_owned,
   lockout_owned: lockoutOwned,
@@ -80,7 +103,7 @@ const SCHEMAS = {
 type Kind = keyof typeof SCHEMAS;
 export type SyncRow = z.infer<(typeof SCHEMAS)[Kind]>;
 const CATEGORY_OF: Record<Kind, SyncCategory> = {
-  gear_snapshot: "gear", talent_snapshot: "talents", profession_owned: "professions", reputation_owned: "reputations",
+  gear_snapshot: "gear", talent_owned: "talents", profession_owned: "professions", reputation_owned: "reputations",
   lockout_owned: "raids", achievement_owned: "achievements", title_owned: "achievements",
 };
 
@@ -150,12 +173,6 @@ export function buildCharacterFacts(name: string, realm: string, rows: readonly 
   const facts: Fact[] = [];
   for (const category of SYNC_CATEGORIES) {
     const all = usable.filter((r) => CATEGORY_OF[r.kind] === category);
-    if (category === "talents") {
-      // Only the active spec group is a record of what the character runs.
-      const active = all.filter((r) => r.kind === "talent_snapshot" && r.active);
-      skipped += all.length - active.length;
-      all.splice(0, all.length, ...active);
-    }
     if (all.length === 0) continue;
     const installId = newest(all).installId;
     const mine = all.filter((r) => r.installId === installId);
@@ -177,7 +194,7 @@ function categoryData(category: SyncCategory, rows: readonly SyncRow[], now: Dat
       return { equipped: g.equipped.map((e) => ({ slot: e.slot, itemId: e.itemId, itemLevel: e.itemLevel })) };
     }
     case "talents": {
-      const t = newest(only(rows, "talent_snapshot"));
+      const t = newest(only(rows, "talent_owned"));
       return {
         class: t.class.toUpperCase(), treeId: t.treeId, specId: t.specId ?? null, points: t.points,
         nodes: [...t.nodes].sort((a, b) => a.nodeId - b.nodeId).map((n) => ({ nodeId: n.nodeId, ranks: n.ranks, ...(n.choice === undefined ? {} : { choice: n.choice }) })),
