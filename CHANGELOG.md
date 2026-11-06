@@ -124,6 +124,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   objects keeps to that type.
 
 ### Changed
+- Site: private sync is on (`EVERLOOT_PRIVATE_SYNC`). A player can make a key with "Sync my linked characters", turn
+  sync on per character and category on /account, see what arrived on a signed-in preview, and show each section on
+  the character's public page. The data policy section is in effect and /privacy has the matching item.
 - MCP (0.9.1): every tool's annotations carry all four hints (`readOnlyHint: true`, `destructiveHint: false`,
   `idempotentHint: true`, `openWorldHint: false`), in the live tool list and in `/schema/mcp/<tool>.json`, so a directory
   that scores unannotated tools as destructive and open-world has nothing to assume. Lore hits open and guild boards close by

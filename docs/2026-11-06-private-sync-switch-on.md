@@ -4,6 +4,12 @@ Date: 2026-11-06. Turns on private sync of linked characters and the owner's sec
 S6) in production. "Owner" steps touch production and only the owner runs them; agents write the PRs and the smoke
 checks.
 
+**Status 2026-11-06:** the owner said go live today. Step 1: #718 merged (readback 9/9). Step 2: wording approved as
+written. Step 3: #852 (account controls, per-key cap) and #851 (Desktop App sender) merged. Step 4: both migrations
+applied in the SQL editor with the owner's go, after checking `set_visibility` and the scopes check matched the repo.
+Step 5: readback 18/18 `t`. Step 6: this switch PR. Talent builds are not sent yet (the addon's talent rows carry no
+character), and the Desktop App needs a release with #851 before players sync.
+
 What the switch does:
 
 | `EVERLOOT_PRIVATE_SYNC` | Players get |

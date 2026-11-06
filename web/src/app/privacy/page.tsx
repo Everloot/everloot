@@ -37,7 +37,7 @@ function Section({ id, children }: { id: string; children: React.ReactNode }) {
 export default function PrivacyPage() {
   // The boss pulls item shows only once the site collects them (EVERLOOT_PULL_SUMMARIES), and dates the page with it.
   const pulls = pullSummariesOn();
-  // Linked characters, public character pages and the guild item's character page: change on the day this merges.
+  // Linked characters, public character pages, the guild item's character page and private sync: 6 November.
   const updated = "6 November 2026";
   return (
     <article>
@@ -185,6 +185,19 @@ export default function PrivacyPage() {
                 a link-preview service (Discord, X and others) has already fetched stays with that service. Anyone
                 can hide a character on the <Link href="/players/opt-out">hide form</Link>, without an account; a
                 hidden character cannot be linked and has no public page.
+              </li>
+              <li id="private-sync">
+                <strong>Private sync (optional):</strong> with an API key made with <em>Sync my linked
+                characters</em>, the Everloot Desktop App sends your linked characters&apos; own progress from your
+                addon file: equipped gear, professions, reputations, this week&apos;s raid lockouts, and the
+                achievements that character earned and the titles it holds. You choose, per character, which of these
+                are kept. Every category starts off. A synced row is kept only when your account holds a live link to
+                that character and that category is on, whichever computer sent it; anything else is dropped. We keep
+                only the newest capture of each category, with a keyed one-way hash of the install that sent it so it
+                can be found and deleted, never the install id itself. You see it on a signed-in preview of the
+                character. Nothing synced is public until you turn your page on and that section on. The page says
+                it is self-reported and not checked against Blizzard. Turning a category&apos;s sync off deletes what
+                was synced for it at once; unlinking the character or deleting your account deletes all of it.
               </li>
               <li id="chat-projects">
                 <strong>Chat projects (optional):</strong> while signed in, Chat can keep your
@@ -412,6 +425,10 @@ export default function PrivacyPage() {
                 your account page.
               </li>
               <li>
+                <strong>Synced data</strong> is turned on and off, and each section shown or hidden, on your
+                account page.
+              </li>
+              <li>
                 <strong>Chat projects and account chats</strong> are downloaded or deleted in
                 Chat&apos;s All chats view.
               </li>
@@ -433,6 +450,7 @@ export default function PrivacyPage() {
               <li><strong>Chat projects, account chats, notes and saved entries:</strong> until you delete them, clear them in Chat or delete your account.</li>
               <li><strong>Handle, display name, status and profile choices:</strong> until you change them or delete your account. A status with a clear-after time stops showing at that time.</li>
               <li><strong>Linked characters and their page settings:</strong> until you unlink the character or delete your account. Used and expired link codes are cleared when you make a new code a day or more later, and with your account.</li>
+              <li><strong>Synced character data:</strong> the newest capture of each category, until you turn that category off, unlink the character or delete your account.</li>
               <li><strong>Rate-limit hashes:</strong> a short time, long enough to enforce the limit (a day for Chat&apos;s free model), then discarded.</li>
               <li><strong>Uploads:</strong> until you ask us to remove them. They are the public database.</li>
               <li><strong>Census rows:</strong> as long as the upload they came in, and removed with it. They hold the character&apos;s hash, never its id, and a one-way hash of the address they came from, never the address. They are only ever published as counts.</li>
