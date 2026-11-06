@@ -839,7 +839,7 @@ The public `talent_snapshot` row carries no character and is never synced.
 
 Amended 6 November 2026, accepted by the maintainer that day: the active talent build (`talent_owned`).
 Amended 7 November 2026: character-sheet stats and PvP standing (migration
-`20261107120000_private_sync_stats_pvp.sql`); to be accepted by the maintainer in PR review.
+`20261107140000_private_sync_stats_pvp.sql`); to be accepted by the maintainer in PR review.
 
 A signed-in player can sync their own linked characters' progress to their account and choose which parts of it
 their character's public page shows. Like saved builds and profiles, this is the player's own data, not an

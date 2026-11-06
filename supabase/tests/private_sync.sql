@@ -1,4 +1,4 @@
--- Run after every migration up to 20261107120000_private_sync_stats_pvp.sql on a disposable local PostgreSQL database
+-- Run after every migration up to 20261107140000_private_sync_stats_pvp.sql on a disposable local PostgreSQL database
 -- that has the roles anon, authenticated and service_role. Everything is rolled back at the end.
 begin;
 
@@ -203,7 +203,7 @@ begin
   if (select consented from public.own_character_facts(a, thrall) where category = 'pvp') then raise exception 'pvp consented by default'; end if;
 end $$;
 
--- Stats and pvp (20261107120000_private_sync_stats_pvp.sql): each has its own consent and its own switch, both off by
+-- Stats and pvp (20261107140000_private_sync_stats_pvp.sql): each has its own consent and its own switch, both off by
 -- default; a fact is public only with consent, the page on and that category's switch on.
 do $$
 declare
