@@ -15,6 +15,9 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
+- Addon: an item's name and quality are recorded once, not again in every loot window and on every vendor that sells
+  it, and a vendor is recorded once per UTC day unless an item, a price or a limited stock changed. Before, about ten
+  vendor visits filled the 2,000-row cap for item names and every new name after that was lost.
 - Addon: the Everloot price block shows once per hover. Comparing an item opens the game's comparison tooltips beside
   the main one, and each of them carried the block too, so one hover read it up to three times.
 - CurseForge: an Alpha release uploads as a CurseForge Beta, named "Everloot <version> Beta". CurseForge's Files tab hides
