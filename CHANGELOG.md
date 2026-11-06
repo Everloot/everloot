@@ -39,9 +39,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: `/ask` sends the visitor to the chat at `/chat` instead of a 404; the addon's command and the header both say Ask.
 - Site: the talent calculator no longer asks for the account's saved builds when no one is signed in, so a signed-out
   visit leaves no 401 in the browser console. Save still offers sign-in as before.
-- Desktop App: on macOS the app no longer logs "Unable to set login item" on every start. Start-up registers a login item
-  only when "Start when I sign in" is on; Settings still applies the switch either way.
-- Desktop App: the game-folder hint on the first-run screen shows a macOS or Linux path on those systems, not a Windows one.
 - Addon and companion: when `/ask` cannot be answered (the companion offline, no model set up), the reason is shown once and
   the question stays queued, so the retry's answer still reaches the game. Before, the question was dropped and a later answer never
   appeared. After each `/reload` the addon says how many questions are still waiting. Needs the next addon and Desktop App
@@ -87,10 +84,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   objects keeps to that type.
 
 ### Changed
-- Desktop App: the app installs a newer addon release on its own, into a game folder that already has the addon, and
-  says so once: "Everloot addon updated to X. Type /reload in game." The game loads it at the next `/reload` or login.
-  Settings → Game has the switch, "Keep the addon up to date", on by default. With it off, or when an install fails, the
-  tray's tooltip and menu show "Addon X available", which opens the Addon page.
 - Addon, Desktop App and site: a tooltip's drop row names its source even when you never met it. The drop rates API
   gives each rate `sourceName` once 3 installs agree on the NPC's or object's name, the Desktop App writes those names
   into the price file beside the rates, and the addon shows them ("Drops from Battered Chest" instead of "Drops from
@@ -206,6 +199,22 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   agree. Fishing (the bobber, or an object installs agree is fished) is never a pin. An upload of an event
   that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
   instead of withdrawing the event as a conflict. The map shows none of this yet.
+
+## [desktop-v0.1.18] - 2026-11-06
+
+### Changed
+- The app keeps the Everloot addon up to date on its own: a newer release installs into a game folder that already has
+  the addon, checked against the release's checksums, and the app says so once: "Everloot addon updated to X. Type
+  /reload in game." Settings → Game has the switch, "Keep the addon up to date", on by default. With it off, or when
+  an install fails, the tray's tooltip and menu show "Addon X available", which opens the Addon page. Before, the only
+  sign was one silent notification per version, easy to miss while the game is full screen.
+- The price file names the drop sources the site knows, beside the drop rates, so addon 0.3.21 and later can name a
+  source you never met ("Drops from Battered Chest" instead of "Drops from object 106318").
+
+### Fixed
+- On macOS the app no longer logs "Unable to set login item" on every start. Start-up registers a login item only when
+  "Start when I sign in" is on; Settings still applies the switch either way.
+- The game-folder hint on the first-run screen shows a macOS or Linux path on those systems, not a Windows one.
 
 ## [0.3.20] - 2026-11-06
 
