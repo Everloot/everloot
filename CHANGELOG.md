@@ -16,9 +16,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Fixed
 - Addon: a guild roster snapshot is stored at most once every six hours, and not when the roster reads the same as
-  the last one; a raid lockout is stored once until a boss goes down or the week resets; attendance is one row per
-  raid run. Before, every guildmate's login or logout stored a whole snapshot (about 50 KB for a 500-member guild)
-  and every loading screen stored the lockouts again.
+  the last one; a raid lockout is stored once until a boss goes down or the week resets, and an expired one not at
+  all; attendance is stored once per set of people in a raid run. Before, every guildmate's login or logout stored a
+  whole snapshot (about 50 KB for a 500-member guild) and every loading screen stored the lockouts again.
 - CurseForge: an Alpha release uploads as a CurseForge Beta, named "Everloot <version> Beta". CurseForge's Files tab hides
   alpha files unless a visitor ticks "Show alpha files", so with every file an Alpha it read "No Results". GitHub still marks
   the release a pre-release, and the site still calls the addon an Alpha.

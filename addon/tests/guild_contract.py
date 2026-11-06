@@ -99,6 +99,13 @@ now = now + 8 * DAY
 saved = {}
 event('PLAYER_ENTERING_WORLD')
 assert(count('raid_lockout') == 3 and next(EverlootDB.lockoutSeen) == nil, 'an expired lockout is forgotten, not stored')
+-- The client lists an expired lockout with no time left (RaidInfoFrame shows it as Expired): not a row each screen.
+saved = { { name = 'Blackwing Lair', reset = 0, difficulty = 9, bosses = { { 'Razorgore', true } } } }
+for _ = 1, 5 do now = now + 30; event('PLAYER_ENTERING_WORLD') end
+assert(count('raid_lockout') == 3, 'an expired lockout the client still lists is left out')
+saved = { { name = 'Blackwing Lair', reset = 3 * DAY, difficulty = 9, bosses = { { 'Razorgore', true } } } }
+event('PLAYER_ENTERING_WORLD')
+assert(count('raid_lockout') == 4, 'a live lockout is stored')
 
 -- Attendance: one row per raid run.
 inRaid = true
@@ -116,14 +123,20 @@ event('GUILD_ROSTER_UPDATE')
 assert(count('attendance') == 2 and #EverlootDB.records.attendance[2].present == 4, 'someone joining is a new row')
 event('GUILD_ROSTER_UPDATE')
 assert(count('attendance') == 2, 'and that row is stored once')
+raid = { 'Alpha-Realm', 'Bravo-Realm', 'Charlie-Realm' }
+event('GUILD_ROSTER_UPDATE')
+assert(count('attendance') == 2, 'someone dropping back to a set already stored this run adds nothing')
 now = now + 7 * HOUR
 event('PLAYER_ENTERING_WORLD')
 assert(count('attendance') == 3, 'the same people seven hours later are a new run')
+raid = { 'Alpha-Realm', 'Bravo-Realm', 'Charlie-Realm', 'Delta-Realm' }
+event('GUILD_ROSTER_UPDATE')
+assert(count('attendance') == 4, 'the new run stores its own sets')
 inRaid = false
 event('GUILD_ROSTER_UPDATE')
-assert(count('attendance') == 3, 'no raid, no row')
+assert(count('attendance') == 4, 'no raid, no row')
 """)
-# A reload reads the stored state back: the same roster and the same raid add nothing.
+# A reload reads the stored state back: the same roster, lockout and raid add nothing.
 lua.execute((root / "modules/guild.lua").read_text(encoding="utf-8"))
 lua.execute("""
 Everloot:InitModules()
@@ -134,6 +147,7 @@ local before = { count('guild_snapshot'), count('raid_lockout'), count('attendan
 event('GUILD_ROSTER_UPDATE')
 event('PLAYER_ENTERING_WORLD')
 assert(count('guild_snapshot') == before[1], 'a reload does not snapshot the roster again')
+assert(count('raid_lockout') == before[2], 'a reload does not store the lockout again')
 assert(count('attendance') == before[3], 'a reload does not record the raid again')
 """)
 # Every row the addon wrote is a record the site would accept (packages/protocol/schema).

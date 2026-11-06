@@ -88,7 +88,10 @@ local function raidLockouts()
   if type(n) ~= "number" or n < 1 then return end
   for i = 1, n do
     local name, _, reset, difficulty, _, _, _, _, _, _, numEncounters = GetSavedInstanceInfo(i)
-    if type(name) == "string" and name ~= "" then
+    -- An expired lockout is still listed, unlocked with no time left: it is left out, or every loading screen
+    -- would read it as a new one.
+    local resetSeconds = type(reset) == "number" and reset or 0
+    if type(name) == "string" and name ~= "" and resetSeconds > 0 then
       local bosses = {}
       local encounters = type(numEncounters) == "number" and numEncounters or 0
       if GetSavedInstanceEncounterInfo then
@@ -97,7 +100,6 @@ local function raidLockouts()
           if killed and type(boss) == "string" and boss ~= "" then bosses[#bosses + 1] = boss end
         end
       end
-      local resetSeconds = type(reset) == "number" and reset or 0
       local resetAt = now + resetSeconds
       difficulty = tostring(difficulty or "unknown")
       local key = ctx.realm .. "|" .. ctx.guildName .. "|" .. name .. "|" .. difficulty
@@ -130,23 +132,30 @@ local function raidAttendance()
     if name then present[#present + 1] = name:gsub("%-.+", "") end
   end
   if #present == 0 then return end
-  local instance = (GetInstanceInfo and select(1, GetInstanceInfo())) or "?"
-  -- One row per raid run: the same people in the same instance within the window add nothing. The hash is of
+  local instance = (GetInstanceInfo and E.Readable((select(1, GetInstanceInfo())))) or "?"
+  -- One row per set of people per raid run: a run is the window from the first row for this instance, and
+  -- every set of names seen in it is stored once, so people dropping and rejoining add nothing. The hash is of
   -- the names sorted, so the raid's order does not matter; the row keeps the roster's order.
   EverlootDB.attendanceSeen = EverlootDB.attendanceSeen or {}
   local sorted = {}
   for i, name in ipairs(present) do sorted[i] = name end
   table.sort(sorted)
   local key, hash = ctx.realm .. "|" .. ctx.guildName .. "|" .. instance, E.Adler32(table.concat(sorted, ","))
-  local seen = EverlootDB.attendanceSeen[key]
-  if type(seen) == "table" and seen.hash == hash and type(seen.at) == "number"
-    and time() - seen.at < ATTENDANCE_SECONDS then return end
+  local now = time()
+  local run = EverlootDB.attendanceSeen[key]
+  if type(run) ~= "table" or type(run.at) ~= "number" or type(run.hashes) ~= "table"
+    or now - run.at >= ATTENDANCE_SECONDS then run = nil end
+  if run and run.hashes[hash] then return end
   local stored = E:Store("attendance", {
     installId = EverlootDB.installId,
     capturedAt = date("!%Y-%m-%dT%H:%M:%SZ"),
     guildName = ctx.guildName, realm = ctx.realm, instance = instance, present = present,
   })
-  if stored then EverlootDB.attendanceSeen[key] = { at = time(), hash = hash } end
+  if stored then
+    run = run or { at = now, hashes = {} }
+    run.hashes[hash] = true
+    EverlootDB.attendanceSeen[key] = run
+  end
 end
 
 E:RegisterModule("guild", function()
