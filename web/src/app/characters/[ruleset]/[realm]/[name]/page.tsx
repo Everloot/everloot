@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import ShowcaseSections, { ShowcaseIdentity } from "@/components/showcase/ShowcaseSections";
+import ShowcaseSections, { showcaseContents, ShowcaseHeader } from "@/components/showcase/ShowcaseSections";
 import { Card, Container, Facts, PageHeader, ReadingLayout, RailFacts, SectionHeading, type TocItem } from "@/components/ui";
 import { CLASSES } from "@/design/tokens";
-import { FOOTER_LINE, isPublic, showcaseOn, type Showcase } from "@/lib/character-showcase";
+import { buildShowcase, FOOTER_LINE, showcaseOn, type Showcase } from "@/lib/character-showcase";
 import { classLabel, contextLinks, MAX_LEVEL, type ClassSlug } from "@/lib/class-context";
 import { dataAgeLabel } from "@/lib/data-age";
 import { guildPath, guildsOn } from "@/lib/guilds";
 import { characterPath, optOutPath, playerPagesOn, type Player } from "@/lib/player-pages";
 import { pageMetadata } from "@/lib/seo";
+import { withGearArt } from "@/lib/showcase-gear-art";
 import { className, classText, describePlayer, PLAYER_SIGHTING_LINE, PLAYER_STORAGE_UNAVAILABLE, raceName } from "@/app/players/player-view";
 import { InstanceCard } from "@/app/guilds/parts";
 import { characterGuild, GUILD_LINE, PLAN_LINE, raceFaction, type CharacterGuild } from "./character-guild";
@@ -67,12 +68,13 @@ function trail(name: string, path: string) {
   return [{ name: "Home", path: "/" }, ...(playerPagesOn() ? [{ name: "Characters", path: "/players" }] : []), { name, path }];
 }
 
-/** The owner's part: the link row and the owner's own uploads, dated, with the line that says who reported it. */
+/**
+ * The owner's part: the owner's own uploads, each section dated, with the line that says who reported it. The
+ * identity and the upload date are in the header band above it.
+ */
 function OwnerPart({ showcase }: { showcase: Showcase }) {
   return (
     <div className="space-y-8" data-part="showcase">
-      <p className="text-sm text-muted" data-freshness>{showcase.freshness}</p>
-      <ShowcaseIdentity showcase={showcase} />
       <ShowcaseSections showcase={showcase} preview={false} />
       <p className="text-sm text-fg-2">{FOOTER_LINE}</p>
     </div>
@@ -203,7 +205,10 @@ export default async function CharacterPage(props: { params: Promise<Params> }) 
       </Container>
     );
   }
-  const showcase = found(owner) ? characterShowcase(owner, new Date(), await plannedBuilds(owner)) : null;
+  const now = new Date();
+  const built = found(owner) ? characterShowcase(owner, now, await plannedBuilds(owner)) : null;
+  // Item names and icons under the item lists' rule, read only when there is gear to show.
+  const showcase = built && built.input.gear.state === "shown" ? buildShowcase(await withGearArt(built.input), now) : built;
   const sighted = found(seen) ? seen : null;
   const guildRead = sighted ? await characterGuild(sighted) : null;
   const guild = guildRead === "unreachable" ? null : guildRead;
@@ -211,14 +216,13 @@ export default async function CharacterPage(props: { params: Promise<Params> }) 
   const name = c?.name ?? sighted!.name;
   const realm = c?.realm ?? sighted!.realm;
   const path = c?.path ?? characterPath(sighted!.ruleset, sighted!.realm, sighted!.name);
-  const titleClass = showcase ? (showcase.classSlug ? `text-class-${showcase.classSlug}` : undefined) : classText(sighted!.class);
   // The header's class and level: the owner's when there is a showcase, else the sighting's, as the lede says.
   const classSlug = classSlugOf(c?.class ?? sighted!.class);
   const level = c?.level ?? sighted!.level;
 
   const contents: TocItem[] = [
     ...(showcase
-      ? [{ id: "showcase-identity", label: "Character" }, ...showcase.sections.filter((s) => isPublic(s.section)).map((s) => ({ id: `showcase-${s.key}`, label: s.title }))]
+      ? showcaseContents(showcase, false)
       : []),
     ...(sighted ? [{ id: "character-sighting", label: "Seen in game" }] : []),
     ...(guild ? [{ id: "character-guild", label: "Guild" }] : []),
@@ -237,11 +241,9 @@ export default async function CharacterPage(props: { params: Promise<Params> }) 
         meta={<div className="space-y-2" data-rail="sources"><p className="font-mono text-xs text-muted">Where this comes from</p><RailFacts items={sources} /></div>}
       >
         <article className="space-y-8">
-          <PageHeader
-            trail={trail(name, path)}
-            title={<span className={titleClass}>{name}</span>}
-            lede={`${showcase ? showcase.line : describePlayer(sighted!)} · ${realm}`}
-          />
+          {showcase
+            ? <ShowcaseHeader showcase={showcase} trail={trail(name, path)} />
+            : <PageHeader trail={trail(name, path)} title={<span className={classText(sighted!.class)}>{name}</span>} lede={`${describePlayer(sighted!)} · ${realm}`} />}
           {showcase ? <OwnerPart showcase={showcase} /> : owner === "unavailable" && <Unavailable text={UNAVAILABLE} />}
           {sighted ? <SightingPart seen={sighted} /> : seen === "unavailable" && <Unavailable text={PLAYER_STORAGE_UNAVAILABLE} />}
           {guild ? <GuildPart guild={guild} /> : guildRead === "unreachable" && <Unavailable text={GUILD_UNAVAILABLE} />}
