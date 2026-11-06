@@ -1,7 +1,7 @@
 """Run with: uv run --with lupa --with jsonschema python addon/tests/owned_contract.py
 
-addon/modules/owned.lua: this character's professions (profession_owned) and raid lockouts (lockout_owned), under the
-completion module's key, with the completion switch, latest state only, and never in an upload. The mock returns
+addon/modules/owned.lua: this character's professions (profession_owned), raid lockouts (lockout_owned) and active talent
+build (talent_owned, read through E.Talents), under the completion module's key, with the completion switch, latest state only, and never in an upload. The mock returns
 what the mainline API documentation gives for GetProfessions, GetProfessionInfo and GetSavedInstanceInfo; none of it
 is checked in game yet.
 """
@@ -73,13 +73,14 @@ function rows(kind) return EverlootDB.records[kind] or {} end
 """ % NOW
 
 
-def addon(completion=True, setup=""):
+def addon(completion=True, setup="", talents=False):
     lua = LuaRuntime()
     lua.execute(WORLD)
     lua.execute(setup)
     if completion is not None:
         lua.execute("EverlootDB = { installId = 'test-install-1234', toggles = { completion = %s }, records = {} }" % ("true" if completion else "false"))
-    for file in ("core.lua", "modules/completion.lua", "modules/owned.lua"):
+    # talents.lua loads before completion.lua and owned.lua in the TOC.
+    for file in ("core.lua",) + (("modules/talents.lua",) if talents else ()) + ("modules/completion.lua", "modules/owned.lua"):
         lua.execute((root / file).read_text(encoding="utf-8"))
     lua.execute("Everloot.frame.onEvent(nil, 'ADDON_LOADED', 'Everloot')")
     return lua
@@ -221,10 +222,135 @@ lua = addon(setup="UnitGUID = function() return nil end")
 lua.execute("event('PLAYER_ENTERING_WORLD'); event('UPDATE_INSTANCE_INFO')")
 assert plain(lua, "profession_owned") == [] and plain(lua, "lockout_owned") == []
 
+# --- talent_owned: the ACTIVE spec group's build, one row per character, read through E.Talents ---
+TALENTS = """
+GROUPS = 2
+ACTIVE = 1
+CONFIGS = { [1] = 10, [2] = 20 }
+SPEC = 1482
+PlayerUtil = { GetCurrentSpecID = function() return SPEC end }
+C_SpecializationInfo = {
+ GetNumSpecGroups = function() return GROUPS end,
+ GetActiveSpecGroup = function() return ACTIVE end,
+ GetCombatConfigIDForSpecGroup = function(group) return CONFIGS[group] end,
+}
+NODES = {
+ [10] = {
+  [90001] = { ranksPurchased = 2, activeRank = 2, maxRanks = 3 },
+  [90002] = { ranksPurchased = 1, activeRank = 1, maxRanks = 1, entryIDs = { 501, 502 }, activeEntry = { entryID = 502, rank = 1 } },
+  [90003] = { ranksPurchased = 0, activeRank = 1, maxRanks = 1 },
+  [90004] = { ranksPurchased = 0, activeRank = 0, maxRanks = 2 },
+ },
+ [20] = {
+  [90001] = { ranksPurchased = 0, activeRank = 0, maxRanks = 3 },
+  [90002] = { ranksPurchased = 0, activeRank = 0, maxRanks = 1 },
+  [90003] = { ranksPurchased = 0, activeRank = 1, maxRanks = 1 },
+  [90004] = { ranksPurchased = 1, activeRank = 1, maxRanks = 2 },
+ },
+}
+C_Traits = {
+ GetConfigInfo = function(id) if NODES[id] then return { ID = id, treeIDs = { 786 } } end end,
+ GetTreeNodes = function(tree) return { 90001, 90002, 90003, 90004 } end,
+ GetNodeInfo = function(config, node) local n = NODES[config][node]; if n then local copy = { ID = node }; for k, v in pairs(n) do copy[k] = v end; return copy end end,
+}
+C_ClassTalents = { GetActiveConfigID = function() return CONFIGS[ACTIVE] end }
+-- The trait events come in bursts: the module reads once after they settle, so a test runs the waiting timers.
+timers = {}
+C_Timer = { After = function(_, f) timers[#timers + 1] = f end }
+function settle() local run = timers; timers = {}; for _, f in ipairs(run) do f() end end
+"""
+TALENT_EVENTS = ("PLAYER_ENTERING_WORLD", "TRAIT_CONFIG_UPDATED", "ACTIVE_PLAYER_SPECIALIZATION_CHANGED", "PLAYER_TALENT_UPDATE", "PLAYER_LEVEL_UP")
+
+lua = addon(setup=TALENTS, talents=True)
+assert "talents ready" in status(lua), status(lua)
+lua.execute("event('PLAYER_ENTERING_WORLD'); settle()")
+key = lua.eval("(Everloot.Completion.Identity())")
+built = plain(lua, "talent_owned")
+assert len(built) == 1, built
+row = built[0]
+assert row["kind"] == "talent_owned" and row["characterKey"] == key and row["installId"] == "test-install-1234", row
+assert row["class"] == "MAGE" and row["level"] == 60 and row["capturedAt"] == "2026-11-09T12:00:00Z", row
+assert row["treeId"] == 786 and row["specId"] == 1482 and row["points"] == 3, row
+assert row["nodes"] == [{"nodeId": 90001, "ranks": 2}, {"nodeId": 90002, "ranks": 1, "choice": 1}], row["nodes"]
+assert set(row) == {"kind", "characterKey", "installId", "capturedAt", "class", "level", "treeId", "specId", "points", "nodes", "eventId", "kindLoggedAt"}, sorted(row)
+assert row["points"] == sum(n["ranks"] for n in row["nodes"]) and len({n["nodeId"] for n in row["nodes"]}) == len(row["nodes"])
+assert not ({"character", "name", "realm", "guid", "group", "configId", "loadoutString"} & set(row)), row
+# The anonymous talent_snapshot is still written for both groups, with no key.
+snaps = plain(lua, "talent_snapshot")
+assert len(snaps) == 2 and all("characterKey" not in s for s in snaps), snaps
+
+# Every talent event reads, a burst reads once, and a changed build replaces this character's row.
+for name in TALENT_EVENTS:
+    lua.execute("NODES[10][90004].ranksPurchased = NODES[10][90004].ranksPurchased + 1")
+    lua.execute(f"event('{name}'); event('{name}'); settle()")
+    built = plain(lua, "talent_owned")
+    assert len(built) == 1, (name, built)
+assert built[0]["points"] == 3 + len(TALENT_EVENTS) and built[0]["nodes"][-1]["nodeId"] == 90004, built
+
+# Only the ACTIVE group is written: switching to the second group replaces the first group's row.
+lua.execute("ACTIVE = 2; event('ACTIVE_PLAYER_SPECIALIZATION_CHANGED'); settle()")
+built = plain(lua, "talent_owned")
+assert len(built) == 1 and built[0]["points"] == 1 and built[0]["nodes"] == [{"nodeId": 90004, "ranks": 1}], built
+lua.execute("ACTIVE = 1; NODES[10][90004].ranksPurchased = 0; event('PLAYER_TALENT_UPDATE'); settle()")
+assert plain(lua, "talent_owned")[0]["points"] == 3
+
+# A second character keeps its own row beside the first one's, and a re-read of it replaces only its own.
+lua.execute("guid = 'Player-4242-0FEDCBA2'; event('PLAYER_ENTERING_WORLD'); settle()")
+other = lua.eval("(Everloot.Completion.Identity())")
+assert other != key
+assert sorted(r["characterKey"] for r in plain(lua, "talent_owned")) == sorted([key, other])
+lua.execute("NODES[10][90004].ranksPurchased = 2; event('PLAYER_TALENT_UPDATE'); settle()")
+byKey = {r["characterKey"]: r for r in plain(lua, "talent_owned")}
+assert len(byKey) == 2 and byKey[other]["points"] == 5 and byKey[key]["points"] == 3, byKey
+
+# No spent points: nothing is written, and an earlier build of this character is not kept as if it were current.
+lua.execute("for _, n in pairs(NODES[10]) do n.ranksPurchased = 0 end; event('PLAYER_TALENT_UPDATE'); settle()")
+assert [r["characterKey"] for r in plain(lua, "talent_owned")] == [key]
+lua = addon(setup=TALENTS + "for _, n in pairs(NODES[10]) do n.ranksPurchased = 0 end", talents=True)
+lua.execute("event('PLAYER_ENTERING_WORLD'); settle()")
+assert plain(lua, "talent_owned") == [], "points == 0 writes no row"
+
+# A build the client cannot read this time leaves the last row alone.
+lua = addon(setup=TALENTS, talents=True)
+lua.execute("event('PLAYER_ENTERING_WORLD'); settle(); C_Traits.GetConfigInfo = function() return nil end; event('PLAYER_TALENT_UPDATE'); settle()")
+assert len(plain(lua, "talent_owned")) == 1 and plain(lua, "talent_owned")[0]["points"] == 3
+
+# Local only: validation of the other kinds does not see it, and /everloot completion off withdraws it.
+counts = check_all(lua)
+assert "talent_owned" not in counts, counts
+lua.execute("SlashCmdList.EVERLOOT('completion off')")
+assert plain(lua, "talent_owned") == [], "completion off deletes the talent row"
+assert len(plain(lua, "talent_snapshot")) == 2, "the anonymous talent snapshot is a different switch"
+lua.execute("event('PLAYER_ENTERING_WORLD'); event('TRAIT_CONFIG_UPDATED'); settle()")
+assert plain(lua, "talent_owned") == [], "off stops writing at once"
+
+# Off by default like the rest: no completion switch, no row.
+lua = addon(completion=None, setup=TALENTS, talents=True)
+lua.execute("event('PLAYER_ENTERING_WORLD'); settle()")
+assert plain(lua, "talent_owned") == []
+
+# No talents module (E.Talents missing): no row, and the status names what is missing.
+lua = addon(setup=TALENTS)
+assert "talents unavailable, missing Everloot.Talents (records nothing)" in status(lua), status(lua)
+lua.execute("event('PLAYER_ENTERING_WORLD'); event('TRAIT_CONFIG_UPDATED'); settle()")
+assert plain(lua, "talent_owned") == []
+assert len(plain(lua, "profession_owned")) == 3, "the other kinds still work"
+
+# A client with no trait API: the talents module is there but cannot read.
+lua = addon(setup=TALENTS + "C_Traits = nil", talents=True)
+assert "talents unavailable, missing C_Traits (records nothing)" in status(lua), status(lua)
+lua.execute("event('PLAYER_ENTERING_WORLD'); settle()")
+assert plain(lua, "talent_owned") == []
+
+# No player id yet: no row under an empty key.
+lua = addon(setup=TALENTS + "UnitGUID = function() return nil end", talents=True)
+lua.execute("event('PLAYER_ENTERING_WORLD'); settle()")
+assert plain(lua, "talent_owned") == []
+
 # The module calls nothing that changes the game and reads no name.
 source = (root / "modules" / "owned.lua").read_text(encoding="utf-8")
 code = "\n".join(line.split("--")[0] for line in source.splitlines())
 for name in ("UnitName", "GetRealmName", "UnitGUID", "SendChatMessage", "SetSavedInstanceExtend", "ResetInstances"):
     assert name not in code, f"owned.lua must not call {name}"
 
-print("Own professions and lockouts: keyed like completion, follow its switch, latest state only, missing calls record nothing")
+print("Own professions, lockouts and active talent build: keyed like completion, follow its switch, latest state only, missing calls record nothing")
