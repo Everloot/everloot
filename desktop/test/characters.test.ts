@@ -87,3 +87,27 @@ test("the Characters page reads the shared parse and still dates the week, the 3
     expect(charactersFromFiles([sv, join(d, "missing.lua")], nows[0]).characters).toHaveLength(1);
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
+
+test("professions and this week's raid lockouts join their character's keyed row; a reset lockout and a row without numbers are left out", () => {
+  const own = (kind: string, fields: string) => `{ ["characterKey"] = "0a1b2c3d", ["class"] = "PALADIN", ["level"] = 60, ["capturedAt"] = "2026-11-09T12:00:00Z", ${fields} }`;
+  const sv = `EverlootDB = { ["version"] = "0.3.21", ["installId"] = "x", ["records"] = {
+    ["achievement_owned"] = { ${own("achievement_owned", `["achievementId"] = 10, ["completed"] = true`)} },
+    ["profession_owned"] = { ${own("p", `["profession"] = "Blacksmithing", ["skillLine"] = 164, ["rank"] = 300, ["maxRank"] = 300`)}, ${own("p", `["profession"] = "Mining", ["rank"] = 280, ["maxRank"] = 300`)}, ${own("p", `["profession"] = "Fishing", ["rank"] = 50`)},
+      { ["characterKey"] = "ffffffff", ["class"] = "MAGE", ["level"] = 12, ["profession"] = "Tailoring", ["rank"] = 40, ["maxRank"] = 75 } },
+    ["lockout_owned"] = { ${own("l", `["instance"] = "Molten Core", ["difficulty"] = "40 Player", ["bossesKilled"] = 6, ["bossesTotal"] = 10, ["resetAt"] = "2026-11-11T12:00:00Z"`)},
+      ${own("l", `["instance"] = "Onyxia's Lair", ["difficulty"] = "40 Player", ["bossesKilled"] = 1, ["bossesTotal"] = 1, ["resetAt"] = "2026-11-09T11:00:00Z"`)},
+      ${own("l", `["instance"] = "Zul'Gurub", ["bossesKilled"] = 3, ["resetAt"] = "2026-11-12T12:00:00Z"`)} },
+  } }`;
+  const info = summarizeCharacters(sv, Date.parse("2026-11-09T12:00:00Z"));
+  expect(info.characters).toEqual([]);
+  const [paladin, mage] = info.progress;
+  expect(paladin).toMatchObject({ key: "0a1b2c3d", achievements: 1 });
+  expect(paladin.professions).toEqual([{ name: "Blacksmithing", rank: 300, maxRank: 300 }, { name: "Mining", rank: 280, maxRank: 300 }]);
+  expect(paladin.lockouts).toEqual([{ instance: "Molten Core", difficulty: "40 Player", killed: 6, total: 10, resetAt: "2026-11-11T12:00:00Z" }]);
+  // A character known only from its professions still gets its own keyed row, with no lockouts and no zeros invented.
+  expect(mage).toMatchObject({ key: "ffffffff", class: "MAGE", level: 12, professions: [{ name: "Tailoring", rank: 40, maxRank: 75 }], lockouts: [] });
+  // The same file read after Molten Core resets: the lockout is gone, the professions stay.
+  const later = summarizeCharacters(sv, Date.parse("2026-11-11T12:00:01Z")).progress[0];
+  expect(later.lockouts).toEqual([]);
+  expect(later.professions).toHaveLength(2);
+});

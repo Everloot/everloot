@@ -13,6 +13,10 @@ from jsonschema import Draft202012Validator
 
 SCHEMA_DIR = Path(os.environ.get("EVERLOOT_PROTOCOL_SCHEMA") or Path(__file__).parents[2] / "packages" / "protocol" / "schema")
 
+# Kinds the addon writes that never leave the computer: no uploader sends them (web/src/lib/upload-batches.ts
+# LOCAL_ONLY_KINDS) and the intake has no schema for them, by design. owned_contract.py checks their shape.
+LOCAL_ONLY_KINDS = {"profession_owned", "lockout_owned"}
+
 _validators = {}
 
 
@@ -67,7 +71,7 @@ def check_all(lua):
         return counts
     for kind, rows in records.items():
         plain = to_plain(rows)
-        if plain == []:
+        if plain == [] or kind in LOCAL_ONLY_KINDS:
             continue
         assert isinstance(plain, list), f"EverlootDB.records.{kind} is not a list"
         check_rows(kind, plain, install_id)

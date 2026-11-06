@@ -52,6 +52,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   `addon_download` to CurseForge like the other download links. The same tested zip is uploaded there on each release.
 
 ### Added
+- Addon and Desktop App: with the completion tracker on, the addon keeps each of your characters' professions (rank of
+  max rank) and this week's raid lockouts (bosses killed of total, reset time) under the completion key, latest state
+  only, and the Desktop App's Characters page shows them on the keyed rows. They stay on your computer: no upload, the
+  upload page included, sends them, and the Desktop App's Chat does not read them. Not yet checked in game.
 - Desktop App and site, behind `EVERLOOT_CHARACTER_LINKS` (off): the addon's `/everloot link <code>` (0.3.15) writes one
   link row for the character you are playing, with a code made on the account page. The Desktop App, signed in, sends it only
   to the account's own link endpoint; uploads never carry link rows. The account page lists your linked characters,

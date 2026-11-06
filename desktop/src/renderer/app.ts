@@ -5,7 +5,7 @@ import { JOBS, NO_SOURCED_ANSWER, type AddonInfo, type AppState, type AskInfo, t
 import { PROVIDER_PRESETS, assistantSource, keptModelPick, manualModelShown, presetFor, removalNotice, type ModelChoice, type ProviderKind } from "../shared/providers";
 import { inkOn } from "../../../web/src/lib/chat/catalogue";
 import { WEBSITE_LINKS, websiteUrl } from "../shared/website";
-import { emptyCause, emptyState, ghostProfile, jobOfLine, statePill, threadLines, watchPill, workingStrip } from "./parts";
+import { emptyCause, emptyState, ghostProfile, jobOfLine, ownedLockouts, ownedProfessions, statePill, threadLines, watchPill, workingStrip } from "./parts";
 
 declare global { interface Window { everloot: EverlootApi } }
 const api = window.everloot;
@@ -532,7 +532,7 @@ function weekBars(days: MoneyDay[]): string {
 
 /** One keyed progress row set, listed apart from the named characters by design. */
 function keyedRows(c: CharactersInfo | undefined): string {
-  return (c?.progress ?? []).map((p) => `<tr><td><span class="mono">${esc(p.key)}</span></td><td>${esc(p.class.toLowerCase())} ${p.level}</td><td class="num">${p.achievements}${p.achievementsInProgress ? `<span class="muted"> +${p.achievementsInProgress} in progress</span>` : ""}</td><td class="num">${p.reputations}${p.exalted ? `<span class="muted"> · ${p.exalted} exalted</span>` : ""}</td><td class="num">${p.titles}</td><td class="num">${p.quests}</td></tr>`).join("");
+  return (c?.progress ?? []).map((p) => `<tr><td><span class="mono">${esc(p.key)}</span></td><td>${esc(p.class.toLowerCase())} ${p.level}</td><td class="num">${p.achievements}${p.achievementsInProgress ? `<span class="muted"> +${p.achievementsInProgress} in progress</span>` : ""}</td><td class="num">${p.reputations}${p.exalted ? `<span class="muted"> · ${p.exalted} exalted</span>` : ""}</td><td class="num">${p.titles}</td><td class="num">${p.quests}</td><td>${ownedProfessions(p.professions)}</td><td>${ownedLockouts(p.lockouts)}</td></tr>`).join("");
 }
 
 function characters(): string {
@@ -580,7 +580,8 @@ function characters(): string {
       <div class="tablewrap"><table class="roster"><thead><tr><th>Character</th><th class="num">Gold</th><th class="num">7 days</th><th class="num">Item level</th><th class="num">Last seen</th></tr></thead><tbody>${rows}</tbody></table></div>
     </section>` : c ? `${emptyState(emptyCause("characters", state!), icon("characters"))}${ghostProfile()}` : `<section class="panel"><p class="muted">Loading…</p></section>`}
     <section class="panel" id="keyed" tabindex="-1"><h2>Progress · keyed</h2>
-      ${prog ? `<div class="tablewrap"><table><thead><tr><th>Key</th><th>Class</th><th class="num">Achievements</th><th class="num">Reputations</th><th class="num">Titles</th><th class="num">Quests done</th></tr></thead><tbody>${prog}</tbody></table></div>` : `<p class="muted">${c ? "Nothing yet. The completion tracker is off until <code>/everloot completion on</code> in game." : "Loading…"}</p>`}
+      ${prog ? `<div class="tablewrap"><table><thead><tr><th>Key</th><th>Class</th><th class="num">Achievements</th><th class="num">Reputations</th><th class="num">Titles</th><th class="num">Quests done</th><th>Professions</th><th>Raid lockouts</th></tr></thead><tbody>${prog}</tbody></table></div>
+        <p class="muted small">Professions and raid lockouts stay on this computer: no upload sends them and Chat does not read them.</p>` : `<p class="muted">${c ? "Nothing yet. The completion tracker is off until <code>/everloot completion on</code> in game." : "Loading…"}</p>`}
       ${c?.talents.length ? `<p class="muted small">Active talent builds: ${c.talents.map((x) => `${esc(x.class.toLowerCase())} ${x.level} (${x.points} points)`).join(", ")}. Not linked to a name.</p>` : ""}
     </section>
   </div>
@@ -1038,6 +1039,7 @@ function dataPanel(s: AppState): string {
       <h3>What stays here</h3>
       <ul class="plain fg2 small">
         <li>Guild, gear, gold, collection and your installed addon list.</li>
+        <li>Your professions and raid lockouts. No upload sends them.</li>
         <li>Your settings, chat, upload history and backups, in the data folder.</li>
       </ul>
       <p class="small fg2">If you configure a model for Chat, it receives your questions and any local character details it uses to answer. Rules: ${ext("https://everloot.app/privacy", "everloot.app/privacy")}</p>

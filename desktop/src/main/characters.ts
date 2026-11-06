@@ -57,7 +57,7 @@ export function collectCharacters(records: Array<Record<string, unknown>>): Char
     const key = str(r.characterKey);
     if (!key) return null;
     let p = keyed.get(key);
-    if (!p) { p = { key, class: str(r.class) || "?", level: num(r.level), achievements: 0, achievementsInProgress: 0, reputations: 0, exalted: 0, titles: 0, quests: 0, talentPoints: null }; keyed.set(key, p); }
+    if (!p) { p = { key, class: str(r.class) || "?", level: num(r.level), achievements: 0, achievementsInProgress: 0, reputations: 0, exalted: 0, titles: 0, quests: 0, talentPoints: null, professions: [], lockouts: [] }; keyed.set(key, p); }
     if (num(r.level) > p.level) p.level = num(r.level);
     if (str(r.class)) p.class = str(r.class);
     return p;
@@ -102,6 +102,23 @@ export function collectCharacters(records: Array<Record<string, unknown>>): Char
       case "reputation_owned": { const p = prog(r); if (!p) break; const m = reps.get(p.key) ?? new Map<number, number>(); m.set(num(r.factionId), num(r.reaction)); reps.set(p.key, m); break; }
       case "title_owned": { const p = prog(r); if (!p) break; const s = titles.get(p.key) ?? new Set<number>(); for (const id of (Array.isArray(r.titleIds) ? r.titleIds : []) as unknown[]) s.add(num(id)); titles.set(p.key, s); break; }
       case "quest_owned": { const p = prog(r); if (!p) break; const s = quests.get(p.key) ?? new Set<number>(); for (const id of (Array.isArray(r.questIds) ? r.questIds : []) as unknown[]) s.add(num(id)); quests.set(p.key, s); break; }
+      // The addon keeps only the latest state of these two (addon/modules/owned.lua); a row the game gave no numbers
+      // for is not written there, and one that arrives without them here is left out, never shown as zero.
+      case "profession_owned": {
+        const name = str(r.profession), rank = r.rank, max = r.maxRank;
+        if (!name || typeof rank !== "number" || typeof max !== "number" || max <= 0) break;
+        const p = prog(r); if (!p) break;
+        p.professions = [...p.professions.filter((x) => x.name !== name), { name, rank, maxRank: max }];
+        break;
+      }
+      case "lockout_owned": {
+        const instance = str(r.instance), killed = r.bossesKilled, total = r.bossesTotal, resetAt = str(r.resetAt);
+        if (!instance || typeof killed !== "number" || typeof total !== "number" || total <= 0 || !Number.isFinite(Date.parse(resetAt))) break;
+        const p = prog(r); if (!p) break;
+        const difficulty = str(r.difficulty);
+        p.lockouts = [...p.lockouts.filter((x) => x.instance !== instance || x.difficulty !== difficulty), { instance, difficulty, killed, total, resetAt }];
+        break;
+      }
       default: break;
     }
   }
@@ -144,5 +161,7 @@ export function charactersAt(base: CharacterBase, now = Date.now()): CharactersI
     const receipts = events.slice(-RECEIPTS).reverse().map((e) => ({ at: e.at, category: e.category, copper: e.copper, direction: e.direction }));
     return { ...c, week, days, receipts };
   });
-  return { characters, progress: base.progress, talents: base.talents };
+  // A lockout past its reset is over in the game too, whenever the addon last read the list.
+  const progress = base.progress.map((p) => ({ ...p, lockouts: p.lockouts.filter((l) => Date.parse(l.resetAt) > now) }));
+  return { characters, progress, talents: base.talents };
 }

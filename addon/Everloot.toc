@@ -21,6 +21,7 @@ modules\addons.lua
 modules\mapbounds.lua
 modules\talents.lua
 modules\completion.lua
+modules\owned.lua
 modules\census.lua
 modules\players.lua
 modules\pulls.lua
