@@ -207,9 +207,11 @@ function categoryData(category: SyncCategory, rows: readonly SyncRow[], now: Dat
           })),
       };
     case "achievements": {
-      // Earned by this character: an achievement complete on the account but not by this character is left out.
+      // Earned by this character only: a link proves one character, not the account. An achievement complete on the
+      // account but not by this character, or a row that does not say who earned it, would publish what other,
+      // unlinked characters did, so it is left out.
       const earned = latestBy(only(rows, "achievement_owned"), (r) => r.achievementId)
-        .filter((r) => r.completed && r.earnedByMe !== false)
+        .filter((r) => r.completed && r.earnedByMe === true)
         .sort((a, b) => a.achievementId - b.achievementId)
         .map((r) => ({ id: r.achievementId, on: r.earnedOn ?? null }));
       const titles = [...new Set(only(rows, "title_owned").flatMap((r) => r.titleIds))].sort((a, b) => a - b);

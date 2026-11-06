@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { validPlayerName } from "@everloot/protocol";
+import { hashKey, presentedKey } from "@/lib/api-keys";
 import { fail, NO_STORE } from "@/lib/character-links-store";
 import { linkRealmKey } from "@/lib/character-links";
 import { characterSecret } from "@/lib/census-intake";
+import { intakeQuota } from "@/lib/intake-quota";
 import { rulesetOf } from "@/lib/player-pages";
 import { buildCharacterFacts, parseSyncRow, SYNC_CHARACTERS_PER_REQUEST, SYNC_ROWS_PER_REQUEST } from "@/lib/private-sync";
 import { syncAccount, syncCharacterFacts, unavailable, type CharacterOutcome } from "@/lib/private-sync-store";
@@ -16,8 +18,14 @@ import { syncAccount, syncCharacterFacts, unavailable, type CharacterOutcome } f
  * category, and only when it is newer than the stored one. A character the account has no live link for is
  * `not_linked` in the receipt, whoever else may hold it. The install id becomes a keyed hash here and goes no further.
  * 404 until EVERLOOT_PRIVATE_SYNC=1.
+ *
+ * Each key may send SYNC_PER_KEY_HOUR requests an hour (intakeQuota.syncKey); past that, 429 with Retry-After. Only
+ * the newest capture of each category is kept, so sending more often adds nothing that waiting would lose.
  */
 export const dynamic = "force-dynamic";
+
+/** The install scope's hourly limit (consume_intake_quota), which the sync bucket borrows. */
+const SYNC_PER_KEY_HOUR = 20;
 
 type Receipt = { index: number } & (CharacterOutcome | { result: "invalid" | "retry" });
 
@@ -42,6 +50,11 @@ export async function POST(req: Request) {
   try {
     const account = await syncAccount(req);
     if (account instanceof Response) return account;
+    // Counted only once the key is known to be live and sync:own, so a stranger's guesses never make a bucket.
+    const admitted = await intakeQuota.syncKey(hashKey(presentedKey(req)!));
+    if (!admitted.allowed) {
+      return fail(429, `This key has sent ${SYNC_PER_KEY_HOUR} syncs in the last hour. Try again later; the newest state is kept.`, { "Retry-After": String(admitted.retryAfter) });
+    }
     let body: unknown = null;
     try { body = await req.json(); } catch {}
     const list = groups(body);

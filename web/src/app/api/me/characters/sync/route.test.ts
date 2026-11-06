@@ -3,7 +3,10 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 const auth = vi.hoisted(() => ({ getUser: vi.fn(), authQuery: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ getUser: auth.getUser, authQuery: auth.authQuery, siteUrl: () => "https://everloot.app" }));
+const quota = vi.hoisted(() => ({ syncKey: vi.fn() }));
+vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { syncKey: quota.syncKey } }));
 
+import { hashKey } from "@/lib/api-keys";
 import { POST } from "./route";
 
 const SECRET = "k".repeat(40);
@@ -38,6 +41,7 @@ beforeEach(() => {
   vi.stubEnv("EVERLOOT_CHARACTER_KEY", SECRET);
   auth.getUser.mockReset().mockResolvedValue({ id: ACCOUNT, name: "Thrall#1" });
   auth.authQuery.mockReset();
+  quota.syncKey.mockReset().mockResolvedValue({ allowed: true, retryAfter: 0 });
 });
 afterEach(() => { vi.unstubAllEnvs(); });
 
@@ -149,6 +153,57 @@ describe("what is stored", () => {
       answers();
       expect((await send(bad)).status).toBe(400);
     }
+    expect(syncCalls()).toEqual([]);
+  });
+
+  test("achievements count only what this character earned: complete on the account alone, or unsaid, is left out", async () => {
+    const achievement = { kind: "achievement_owned", ...owned, capturedAt: "2026-11-05T12:00:00Z", criteriaMet: 1, criteriaTotal: 1 };
+    answers([{ category: "achievements", outcome: "stored" }]);
+    await send(thrallina([
+      { ...achievement, achievementId: 6, completed: true, earnedByMe: true, earnedOn: "2026-11-01" },
+      { ...achievement, achievementId: 7, completed: true, earnedByMe: false },
+      { ...achievement, achievementId: 8, completed: true },
+      { ...achievement, achievementId: 9, completed: false, criteriaMet: 0 },
+    ]));
+    expect(syncCalls()[0].p_facts).toEqual([
+      { category: "achievements", captured_at: "2026-11-05T12:00:00.000Z", data: { achievements: [{ id: 6, on: "2026-11-01" }], titleIds: [] } },
+    ]);
+  });
+});
+
+describe("how often a key may sync", () => {
+  test("each request counts against the key's own hourly bucket, after the key is checked; never the raw key", async () => {
+    answers([{ category: "gear", outcome: "stored" }]);
+    expect((await send(thrallina([gear]))).status).toBe(200);
+    expect(quota.syncKey.mock.calls).toEqual([[hashKey(KEY)]]);
+    expect(JSON.stringify(quota.syncKey.mock.calls)).not.toContain(KEY);
+  });
+
+  test("past the cap it is a 429 with Retry-After, never cached, and nothing is synced", async () => {
+    quota.syncKey.mockResolvedValue({ allowed: false, retryAfter: 1234 });
+    answers();
+    const res = await send(thrallina([gear]));
+    expect(res.status).toBe(429);
+    expect(res.headers.get("retry-after")).toBe("1234");
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
+    expect((await res.json()).error).toMatch(/try again/i);
+    expect(syncCalls()).toEqual([]);
+  });
+
+  test("a key that is not admitted is never counted: no key, a dead key or one without sync:own", async () => {
+    await send(thrallina([gear]), {});
+    auth.authQuery.mockResolvedValueOnce([{ account: null, refusal: "unknown_key" }]);
+    await send(thrallina([gear]));
+    auth.authQuery.mockResolvedValueOnce([{ account: null, refusal: "no_scope" }]);
+    await send(thrallina([gear]));
+    expect(quota.syncKey).not.toHaveBeenCalled();
+  });
+
+  test("the counter failing is a 503, never a pass", async () => {
+    quota.syncKey.mockRejectedValue(new Error("down"));
+    answers();
+    const res = await send(thrallina([gear]));
+    expect(res.status).toBe(503);
     expect(syncCalls()).toEqual([]);
   });
 });

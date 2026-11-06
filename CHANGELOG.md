@@ -75,6 +75,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   and achievements and titles. Each category is kept only when you hold that character's live link and turned its sync
   on, and only its newest capture is kept. You see it all on a signed-in preview, and each section shows on the
   character's public page only when you switch it on. Turning a category's sync off or unlinking deletes what was synced.
+- Site, behind `EVERLOOT_PRIVATE_SYNC` (off): /account turns each linked character's sync and page sections on and off,
+  and links to the preview. A sync key may send 20 times an hour, and achievements count only those the character earned.
 - Desktop App: signed in with a key made with "Sync my linked characters", the app sends the characters you linked from
   this save file to that sync endpoint after each upload: the newest gear, professions, reputations, raid lockouts, and
   achievements and titles. A capture the site has kept is not sent again; a changed one is, and so is one for a

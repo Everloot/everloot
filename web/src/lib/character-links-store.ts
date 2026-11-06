@@ -3,6 +3,7 @@ import { hashKey, KEY_PATTERN, presentedKey } from "./api-keys";
 import { signInPath } from "./auth/return-to";
 import { characterLinksOn, completionRef, linkCodeHash, linkKey, LINKS_PER_ACCOUNT, linkRealmKey, newLinkCode, type LinkRow } from "./character-links";
 import { characterPath, showcaseBuildsOn, showcaseOn } from "./character-showcase";
+import { privateSyncOn, SHOW_SWITCH, SYNC_CATEGORIES, type SyncCategory } from "./private-sync";
 import { DEFAULT_RULESET, rulesetOf } from "./player-pages";
 import { SLUG_PATTERN } from "./saved-builds";
 import { authQuery, getUser, siteUrl } from "./supabase/server";
@@ -64,12 +65,19 @@ export interface OwnLink {
   /**
    * Only with EVERLOOT_SHOWCASE=1: whether the character's public page is on, and its address. `label` only with
    * EVERLOOT_SHOWCASE_BUILDS=1 as well: the build label whose shared builds the page lists, or null for none.
+   * `sections` only with EVERLOOT_PRIVATE_SYNC=1 as well: each category's section switch (achievements is
+   * show_collections). A section shows only while the page is on and that category's sync is on too.
    */
-  page?: { public: boolean; path: string; label?: { id: string; name: string } | null };
+  page?: { public: boolean; path: string; label?: { id: string; name: string } | null; sections?: Record<SyncCategory, boolean> };
+  /**
+   * Only with EVERLOOT_PRIVATE_SYNC=1, added by the list route: each category's sync, in page order, and the date of
+   * the stored capture. Never the facts themselves.
+   */
+  sync?: { category: SyncCategory; on: boolean; capturedAt: string | null }[];
 }
 const OWN_LINK_COLUMNS = "id,name,realm,race,class,faction,level,status,linked_at,last_upload_at";
-/** With the showcase on, the list also reads each link's ruleset and page switch. */
-const SHOWCASE_COLUMNS = "ruleset,character_visibility(page_public)";
+/** With the showcase on, the list also reads each link's ruleset and page switch; with private sync too, its section switches. */
+const showcaseColumns = (sync: boolean) => `ruleset,character_visibility(${["page_public", ...(sync ? new Set(Object.values(SHOW_SWITCH)) : [])].join(",")})`;
 /** With planned builds on, also the label attached to each link (build_characters.link_id). */
 const LABEL_COLUMNS = "build_characters(id,name)";
 
@@ -79,7 +87,7 @@ const one = <T>(e: Embedded<T>): T | undefined => (Array.isArray(e) ? e[0] : e ?
 type ListedRow = Omit<OwnLink, "page"> & {
   ruleset?: string;
   // PostgREST embeds the one-to-one visibility row as an object; older versions send a one-row array.
-  character_visibility?: Embedded<{ page_public?: unknown }>;
+  character_visibility?: Embedded<Record<string, unknown>>;
   // A link has at most one label (a unique index), sent as an object or a one-row array.
   build_characters?: Embedded<{ id?: unknown; name?: unknown }>;
 };
@@ -88,7 +96,8 @@ type ListedRow = Omit<OwnLink, "page"> & {
 export async function listLinks(userId: string): Promise<OwnLink[]> {
   const showcase = showcaseOn();
   const labels = showcaseBuildsOn();
-  const columns = [OWN_LINK_COLUMNS, ...(showcase ? [SHOWCASE_COLUMNS] : []), ...(labels ? [LABEL_COLUMNS] : [])].join(",");
+  const sync = privateSyncOn();
+  const columns = [OWN_LINK_COLUMNS, ...(showcase ? [showcaseColumns(sync)] : []), ...(labels ? [LABEL_COLUMNS] : [])].join(",");
   const rows = await authQuery<ListedRow[]>(
     `character_links?select=${columns}&user_id=eq.${encodeURIComponent(userId)}&order=linked_at.asc,id.asc&limit=${LINKS_PER_ACCOUNT}`,
   );
@@ -99,9 +108,11 @@ export async function listLinks(userId: string): Promise<OwnLink[]> {
       status: r.status === "linked" ? "linked" : "frozen", linked_at: r.linked_at, last_upload_at: r.last_upload_at,
     };
     if (!showcase) return link;
+    const visibility = one(r.character_visibility);
     const page: NonNullable<OwnLink["page"]> = {
-      public: one(r.character_visibility)?.page_public === true, path: characterPath(r.ruleset ?? DEFAULT_RULESET, r.realm, r.name),
+      public: visibility?.page_public === true, path: characterPath(r.ruleset ?? DEFAULT_RULESET, r.realm, r.name),
     };
+    if (sync) page.sections = Object.fromEntries(SYNC_CATEGORIES.map((c) => [c, visibility?.[SHOW_SWITCH[c]] === true])) as Record<SyncCategory, boolean>;
     if (labels) {
       const label = one(r.build_characters);
       page.label = label && typeof label.id === "string" && typeof label.name === "string" ? { id: label.id, name: label.name } : null;
