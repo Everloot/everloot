@@ -70,6 +70,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   `addon_download` to CurseForge like the other download links. The same tested zip is uploaded there on each release.
 
 ### Added
+- Addon and Desktop App: with the completion tracker on, the addon keeps each of your characters' professions (rank of
+  max rank) and this week's raid lockouts (bosses killed of total, reset time) under the completion key, latest state
+  only, and the Desktop App's Characters page shows them on the keyed rows. They stay on your computer: no upload, the
+  upload page included, sends them, and the Desktop App's Chat does not read them. Not yet checked in game.
 - Addon: player names stay off by default, and the addon now asks once, in game, whether to turn them on. The question
   comes a few seconds after the first loading screen, never in combat, and says what is recorded (name, realm, race,
   class, level and guild of your characters and of players you target, mouse over or group with), how to turn it off

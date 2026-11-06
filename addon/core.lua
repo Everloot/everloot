@@ -134,8 +134,9 @@ end
 
 local modules = {}
 
-function E:RegisterModule(name, init)
-  modules[#modules + 1] = { name = name, init = init, ok = false, note = "pending" }
+--- `toggle`, when given, is another module's switch this one follows (its rows go with that module's).
+function E:RegisterModule(name, init, toggle)
+  modules[#modules + 1] = { name = name, init = init, ok = false, note = "pending", toggle = toggle }
 end
 
 --- A module reports what it found while running (an API this client lacks, what the last window held).
@@ -147,7 +148,7 @@ end
 
 function E:InitModules()
   for _, m in ipairs(modules) do
-    if self:IsEnabled(m.name) then
+    if self:IsEnabled(m.toggle or m.name) then
       local ok, note = pcall(m.init, self)
       m.ok = ok
       m.note = ok and (note or "ready") or ("disabled: " .. tostring(note))
@@ -185,7 +186,7 @@ function E:LoginLine()
   local on, off, failed = 0, 0, {}
   for _, m in ipairs(modules) do
     if m.ok then on = on + 1
-    elseif self:IsEnabled(m.name) then failed[#failed + 1] = m.name
+    elseif self:IsEnabled(m.toggle or m.name) then failed[#failed + 1] = m.name
     else off = off + 1 end
   end
   local text = string.format("Everloot %s: %d modules on, %d off", E.VERSION, on, off)
@@ -277,10 +278,11 @@ SlashCmdList["EVERLOOT"] = function(msg)
   elseif msg == "completion on" or msg == "completion off" then
     EverlootDB.toggles.completion = (msg == "completion on")
     if EverlootDB.toggles.completion then
-      print("Everloot: completion tracker on. It reads your achievements, reputation, titles and completed quests, and never changes them. Your own progress is sent only from the everloot.app upload page, with the collection choice ticked. /reload to apply.")
+      print("Everloot: completion tracker on. It reads your achievements, reputation, titles and completed quests, and never changes them. Your own progress is sent only from the everloot.app upload page, with the collection choice ticked. It also keeps your professions and this week's raid lockouts, which stay on this computer and are never uploaded. /reload to apply.")
     else
       -- Turning it off withdraws what it wrote: every completion row is deleted from this file.
       if E.Completion then E.Completion.Withdraw() end
+      if E.Owned then E.Owned.Withdraw() end
       print("Everloot: completion tracker off; all recorded completion rows were deleted from this file. /reload to apply.")
     end
   elseif msg == "completion" and E.Completion then

@@ -30,7 +30,7 @@ Flags are read from `web/wrangler.jsonc` vars. Applied database migrations were 
 | `POST /api/me/characters/link-codes`, `POST .../links` | `EVERLOOT_CHARACTER_LINKS` unset (404) | Code, then link rows | `web/src/lib/character-links.ts`; no account UI renders it |
 | `character_links`, `character_visibility`, `set_visibility`, `public_character()` | none; unwired | `page_public`, `show_gear/collections/gold/guild`, `ranked_*`, `indexable` default false | `supabase/migrations/20261021190000_character_links.sql` |
 | `/guilds/...` | `EVERLOOT_GUILDS=1` | Guild kills agreed by 2 installs, roster | `guild_kill` rows; no gear (`kb/src/guilds.ts`) |
-| Desktop "Characters" | local only | Gold, gear and item level per named character; keyed progress counts; talent points by class | `desktop/src/main/characters.ts` reads the save file; nothing uploaded |
+| Desktop "Characters" | local only | Gold, gear and item level per named character; keyed progress counts, professions and this week's raid lockouts; talent points by class | `desktop/src/main/characters.ts` reads the save file; nothing uploaded |
 | Social cards | n/a | Text-and-shapes cards (`renderCard`, `renderBuildCard`); no game art | `web/src/lib/og-card.tsx`, six `opengraph-image.tsx` routes; none per player |
 
 What the addon records about the player's own character, and whether it can be tied to a named, linked character:
@@ -40,10 +40,10 @@ What the addon records about the player's own character, and whether it can be t
 | Identity | `character_link` (schema only; no `/everloot link` command yet), `census_self`, `player_seen` | GUID in transit; name and realm | Link: link endpoint only. Census: hashed. Player: when the owner allows it |
 | Equipped gear | `gear_snapshot`, `gear.lua` (16 slots, item id, item level, hourly) | `character`, `realm` | Held by Desktop/CLI; web upload only with an operator-issued grant (`kb/src/publication.ts`) |
 | Talents | `talent_snapshot`, `talents.lua` (nodes, Blizzard loadout string) | None: class and level only | Anonymous intake; not shown per character anywhere |
-| Professions | None. The addon window reads `GetProfessions` locally (`window.lua`); `recipe_observed` is anonymous | None | n/a |
+| Professions | `profession_owned`, `owned.lua` (with completion on; S5 groundwork). The addon window also reads `GetProfessions` (`window.lua`); `recipe_observed` is anonymous | Opaque 8-hex `characterKey`, as completion | Never: no uploader sends it and intake has no schema for it; Desktop only |
 | Reputations, achievements, titles, quests | `*_owned`, `completion.lua` (off until `/everloot completion on`) | Opaque 8-hex `characterKey`; the link row carries `completionKey` to join it | `collection` grant only |
 | Collections (mounts, pets) | `collection_owned` is in the schema and allowlist; no addon module writes it | n/a | n/a |
-| Raid lockouts | `raid_lockout`, `guild.lua` (`GetSavedInstanceInfo`) | Guild name only, not the character | `guild` grant only |
+| Raid lockouts | `raid_lockout`, `guild.lua` (`GetSavedInstanceInfo`); `lockout_owned`, `owned.lua` (with completion on; S5 groundwork) | `raid_lockout`: guild name only. `lockout_owned`: opaque `characterKey` | `raid_lockout`: `guild` grant only. `lockout_owned`: never; Desktop only |
 | Boss kills | `encounter` (anonymous), `guild_kill` (guild's) | None | Anonymous; guild rollup |
 | Guild | `player_seen.guild`, `guild_snapshot` | Name on `player_seen` | As above |
 | Gold | `gold_snapshot`, `money_event` | `character`, `realm` | `gold` grant only |
@@ -155,6 +155,15 @@ talents are not shown), then set the switch. SQL checks: `supabase/tests/build_l
 guild-scoped `raid_lockout`. Gear already names the character. Owner sees the page in preview only. Tests: rows
 from another account, a revoked source or anonymous intake never show; a missing client call shows `unsupported`;
 unlink deletes the derived rows (D3).
+
+Done ahead of D1/D9 (groundwork, local only): the addon writes `profession_owned` (characterKey, class, level,
+profession, skillLine, rank, maxRank) and `lockout_owned` (characterKey, class, level, instance, instanceId,
+difficultyId, difficulty, bossesKilledCount, bossesTotal, resetAt) in `addon/modules/owned.lua`, under the completion key and
+switch, latest state only. No uploader sends them (`LOCAL_ONLY_KINDS` in `web/src/lib/upload-batches.ts`), the protocol
+has no schema for them so intake refuses them, and the Desktop App's Characters page shows them on the keyed rows. Still
+waiting on D1 and D9: the sources and consent tables and their migration, the `sync:own` scope, the private sync
+endpoint, protocol schemas for the two kinds, the `characterKey` on `talent_snapshot`, the owner preview and every public
+section. None of it is checked in game yet (PROBE-01).
 
 **S6.** The switches turn on each public section. Today only an operator grant can publish owned rows; S6 needs a
 rule that the owner's own switch on a live link publishes their own synced rows. Migration: `show_talents`,

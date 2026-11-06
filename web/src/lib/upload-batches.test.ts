@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
-import { recordSchemas } from "@everloot/protocol";
+import { parseRecords, recordSchemas } from "@everloot/protocol";
 import { expect, test, vi } from "vitest";
-import { censusCharacters, censusSummary, prepareUpload, sendBatches } from "./upload-batches";
+import { censusCharacters, censusSummary, LOCAL_ONLY_KINDS, prepareUpload, sendBatches } from "./upload-batches";
 const row = (i: number) => ({ kind: "loot", installId: "install-batches", eventId: `epoch:${i}`, capturedAt: "2026-10-07T00:00:00Z", sourceNpcId: 1, items: [] });
 
 const refused = (count: number) => ({ ok: false, accepted: [], rejected: Array.from({ length: count }, (_, index) => ({ index, reason: "Try again later" })) });
@@ -109,7 +109,7 @@ test("splits a full file by records and bytes, withholds legacy and unselected n
   const gold = { kind: "gold_snapshot", installId: "install-batches", eventId: "epoch:gold", capturedAt: row(1).capturedAt, character: "Thrall", realm: "Moon Guard", currentCopper: 1, peakCopper: 1 };
   const session = prepareUpload({ addonVersion: "0.2.0", records: [...Array.from({ length: 4500 }, (_, i) => row(i)), legacy, gold, { kind: "bogus" }] }, {}, []);
   expect(session.batches.map((b) => JSON.parse(b).records.length)).toEqual([2000, 2000, 500]);
-  expect(session.held).toEqual({ legacy: 1, named: 1, invalid: 1, links: 0 });
+  expect(session.held).toEqual({ legacy: 1, named: 1, invalid: 1, links: 0, local: 0 });
   expect(session.batches.every((b) => new TextEncoder().encode(b).length <= 600_000)).toBe(true);
 });
 test("character link rows never go in an upload, whatever is shared: their GUID and code stay out of every batch", () => {
@@ -124,6 +124,21 @@ test("character link rows never go in an upload, whatever is shared: their GUID 
     for (const secret of ["character_link", "Player-4395", "EL-7K3Q-9P", "0a1b2c3d"]) expect(session.batches.join("")).not.toContain(secret);
   }
   expect(prepareUpload({ addonVersion: "0.2.0", records: [link] }, {}, []).batches).toEqual([]);
+});
+test("professions and raid lockouts stay on the computer: never in a batch, whatever is shared, and the intake refuses them", () => {
+  const key = "0a1b2c3d";
+  const profession = { kind: "profession_owned", installId: "install-batches", eventId: "epoch:prof", capturedAt: row(1).capturedAt, characterKey: key, class: "MAGE", level: 60, profession: "Tailoring", skillLine: 197, rank: 250, maxRank: 300 };
+  const lockout = { kind: "lockout_owned", installId: "install-batches", eventId: "epoch:lock", capturedAt: row(1).capturedAt, characterKey: key, class: "MAGE", level: 60, instance: "Molten Core", instanceId: 409, difficultyId: 9, difficulty: "40 Player", bossesKilledCount: 6, bossesTotal: 10, resetAt: "2026-11-11T12:00:00Z" };
+  for (const sharing of [{}, { gear: true, gold: true, guild: true, collection: true }]) {
+    const session = prepareUpload({ addonVersion: "0.2.0", records: [profession, row(1), lockout, { ...lockout, eventId: undefined }] }, sharing, ["a".repeat(64)]);
+    expect(session.held).toMatchObject({ local: 3, invalid: 0 });
+    expect(session.counts).toEqual({ loot: 1 });
+    for (const text of ["profession_owned", "lockout_owned", "Tailoring", "Molten Core", key]) expect(session.batches.join("")).not.toContain(text);
+  }
+  expect(prepareUpload({ addonVersion: "0.2.0", records: [profession, lockout] }, {}, []).batches).toEqual([]);
+  // The site's own parser has no schema for them: a client that skipped this hold would still be refused.
+  for (const kind of LOCAL_ONLY_KINDS) expect(Object.hasOwn(recordSchemas, kind)).toBe(false);
+  expect(parseRecords([profession, lockout]).receipt.rejected.map((r) => r.reason)).toEqual(["unknown kind: profession_owned", "unknown kind: lockout_owned"]);
 });
 test("resumes at the first unconfirmed batch and rejects an unpersisted receipt", async () => {
   const session = prepareUpload({ addonVersion: "0.2.0", records: Array.from({ length: 2001 }, (_, i) => row(i)) }, {}, []);
@@ -205,7 +220,7 @@ test("with the pull switch off, the preview reads a file as main does: same rows
     prepareUpload({ addonVersion: "0.3.15", records: inputs }, {}, [], undefined, undefined, { runRecords: false })]) {
     expect(session.batches.flatMap((b) => JSON.parse(b).records)).toEqual(main.records.records);
     expect(session.counts).toEqual({ encounter: 4, loot: 1 });
-    expect(session.held).toEqual({ legacy: 0, named: 0, invalid: main.records.receipt.rejected.length, links: 0 });
+    expect(session.held).toEqual({ legacy: 0, named: 0, invalid: main.records.receipt.rejected.length, links: 0, local: 0 });
   }
   // On, the timing fields are read and checked, and the new kinds counted.
   const on = prepareUpload({ addonVersion: "0.3.15", records: inputs }, {}, [], undefined, undefined, { runRecords: true });
