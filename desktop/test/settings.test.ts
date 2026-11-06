@@ -109,3 +109,12 @@ test("a damaged settings file is kept under its own name, so the next Save does 
   expect(loadSettings(path).error).toMatch(/settings\.json\.corrupt-/);
   expect(readdirSync(d).filter((n) => n.startsWith("settings.json.corrupt-"))).toHaveLength(2);
 });
+
+test("the app keeps the addon up to date by default, also for a settings file saved before the switch existed", () => {
+  expect(defaultSettings().autoUpdateAddon).toBe(true);
+  const path = join(dir(), "settings.json");
+  writeFileSync(path, JSON.stringify({ gameFolder: "C:/WoW/_forever_", consentedAt: "2026-11-04T00:00:00Z" }));
+  expect(loadSettings(path).settings.autoUpdateAddon).toBe(true);
+  expect(mergeSettings(defaultSettings(), { autoUpdateAddon: false }).autoUpdateAddon).toBe(false);
+  expect(mergeSettings(defaultSettings(), { autoUpdateAddon: "no" }).autoUpdateAddon).toBe(true);
+});

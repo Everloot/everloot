@@ -15,7 +15,7 @@ const base: AppState = {
   version: "0.1.11", platform: "win32", dataFolder: "D:\\data", notice: null, foreverFolder: null,
   settings: {
     gameFolder: null, keptGameFolder: null, endpoint: "https://everloot.app", upload: true, census: true, players: false, prices: true,
-    ask: { enabled: false, mcpUrl: "https://everloot.app/mcp", tokenFile: "" }, market: { realms: [], dismissed: [] }, consentedAt: "2026-10-18T00:00:00Z", launchAtLogin: false, startInTray: true, dataNoticeDismissed: false,
+    ask: { enabled: false, mcpUrl: "https://everloot.app/mcp", tokenFile: "" }, market: { realms: [], dismissed: [] }, consentedAt: "2026-10-18T00:00:00Z", launchAtLogin: false, startInTray: true, dataNoticeDismissed: false, autoUpdateAddon: true,
   },
   engine: { files: [], jobs: { upload: job, prices: job, ask: job }, log: [], paused: false },
   update: null, updateProgress: { stage: "idle", percent: 0, error: null }, staleScans: [], account: { signedIn: false, hint: null },
@@ -76,4 +76,18 @@ test("an item from a menu that was kept acts on the newest state", () => {
   item(/^Update Everloot to 0\.1\.12$/)!.click!();
   expect(actions.show).toHaveBeenCalledWith("update");
   expect(actions.openExternal).not.toHaveBeenCalled();
+});
+
+test("a newer addon the app did not install shows in the tooltip and the menu, and opens the Addon page", () => {
+  createTray("tray.png", actions).update({ ...base, addonUpdate: "0.3.20" });
+  expect(h.tooltip).toBe("Everloot · addon 0.3.20 available");
+  item(/^Addon 0\.3\.20 available$/)!.click!();
+  expect(actions.show).toHaveBeenCalledWith("addon");
+});
+
+test("with both an app and an addon update the tooltip names both", () => {
+  createTray("tray.png", actions).update({ ...base, update: update(true), addonUpdate: "0.3.20" });
+  expect(h.tooltip).toBe("Everloot · update 0.1.12 available · addon 0.3.20 available");
+  expect(item(/^Update Everloot to 0\.1\.12$/)).toBeDefined();
+  expect(item(/^Addon 0\.3\.20 available$/)).toBeDefined();
 });

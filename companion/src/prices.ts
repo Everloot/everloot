@@ -75,8 +75,28 @@ export async function fetchRealmPrices(endpoint: string, realm: string, send: ty
 
 /** [itemId, "n" (NPC) | "o" (object), sourceId, drops, loot windows, installs]: one public drop rate. */
 export type DropRow = [number, "n" | "o", number, number, number, number];
-/** The public drop rates in the file: when the site's uploads were current, and when the app fetched them. */
-export interface DropSources { dataAsOf: string | null; fetchedAt: string; rows: DropRow[] }
+/**
+ * The public drop rates in the file: when the site's uploads were current, and when the app fetched them. `names`
+ * holds the sources' names the site knows, keyed "n<npcId>" or "o<objectId>".
+ */
+export interface DropSources { dataAsOf: string | null; fetchedAt: string; rows: DropRow[]; names?: Record<string, string> }
+
+/** A source's name as one line of the names block: control characters become spaces, at most 100 characters. */
+function nameLine(name: string): string {
+  return name.replace(/[\u0000-\u001f\u007f]+/g, " ").trim().slice(0, 100);
+}
+
+/** "n116=Defias Bandit\no1731=Copper Vein": a name for each source in the rows that has one, in key order. */
+export function dropNames(drops: DropSources): string {
+  const keys = new Set(drops.rows.map((r) => `${r[1]}${r[2]}`));
+  return Object.entries(drops.names ?? {})
+    .filter(([key]) => keys.has(key))
+    .map(([key, name]) => [key, nameLine(name)] as const)
+    .filter(([, name]) => name)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([key, name]) => `${key}=${name}`)
+    .join("\n");
+}
 
 /** Rows grouped by item (ascending), each item's sources best rate first, so the addon reads one run per item. */
 export function sortDropRows(rows: DropRow[]): DropRow[] {
@@ -104,9 +124,12 @@ export function renderPricesAddon(realms: RealmPrices[], drops?: DropSources): {
   });
   // `data` comes first in the drops table, so a reader looking for realm tables ({ ["dataAsOf"] = ...) never takes it for one.
   const dropData = drops ? sortDropRows(drops.rows).map((r) => r.join(",")).join(";") : "";
+  // Names come last, outside the checksummed data, so addons that predate them read the rates as before.
+  const names = drops ? dropNames(drops) : "";
   const close = drops
     ? `}, ["drops"] = { ["data"] = ${luaString(dropData)}, ["sum"] = ${adler32(dropData)}, ` +
-      `["dataAsOf"] = ${luaString(drops.dataAsOf ?? "")}, ["fetchedAt"] = ${luaString(drops.fetchedAt)} } }`
+      `["dataAsOf"] = ${luaString(drops.dataAsOf ?? "")}, ["fetchedAt"] = ${luaString(drops.fetchedAt)}` +
+      `${names ? `, ["names"] = ${luaString(names)}` : ""} } }`
     : "} }";
   const lua = [
     "-- Written by the Everloot companion. Do not edit: the next refresh replaces this file.",

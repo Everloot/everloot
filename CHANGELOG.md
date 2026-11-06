@@ -15,8 +15,29 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
+- Addon: an item's name and quality are recorded once, not again in every loot window and on every vendor that sells
+  it, and a vendor is recorded once per UTC day unless an item, a price or a limited stock changed. Before, about ten
+  vendor visits filled the 2,000-row cap for item names and every new name after that was lost.
+- Site and MCP: chat search reads a misspelled place or word as its common spelling and says so: "does thunderbluff have
+  a zeppeling?" is read as "thunder bluff" and "zeppelin" and finds The Zephyr instead of unrelated lore. Names from the
+  game files are never respelled. "learn mining in orgrimmar" finds the trainer, "what dungeon at level 30" lists the
+  dungeons near that level from the map entrances, a page named in the question opens with its first sentence, and
+  flight masters show only when the question is about flying or that place. Spanish price questions ("cuánto cuesta
+  linen cloth") go to the price lookup, and the chat no longer opens with the archive note meant for AI clients.
+- Addon: the Everloot price block shows once per hover. Comparing an item opens the game's comparison tooltips beside
+  the main one, and each of them carried the block too, so one hover read it up to three times.
+- CurseForge: an Alpha release uploads as a CurseForge Beta, named "Everloot <version> Beta". CurseForge's Files tab hides
+  alpha files unless a visitor ticks "Show alpha files", so with every file an Alpha it read "No Results". GitHub still marks
+  the release a pre-release, and the site still calls the addon an Alpha.
+- Addon: a guild roster snapshot is stored at most once every six hours, and not when the roster reads the same as
+  the last one; a raid lockout is stored once until a boss goes down or the week resets, and an expired one not at
+  all; attendance is stored once per set of people in a raid run. Before, every guildmate's login or logout stored a
+  whole snapshot (about 50 KB for a 500-member guild) and every loading screen stored the lockouts again.
 - Site: a realm whose name ends in RP-PvP written as one word ("CAMWOW US1 Realm 9 RPPVP", as players copied Forever's
   realm list) is filed under RP-PvP on the Auction House instead of "Realms not mapped yet".
+- Addon: a partial price sample (the search-based fallback when a full scan cannot run) keeps only the newest earlier
+  sample of that realm before it stores, so two samples no longer fill the 2,000-row `auction_scan` cap and later samples no
+  longer report "stored 0". Another realm's rows stay.
 - Site: the separator between the facts under an Auction House title reads "·", not "Â·".
 - Site and MCP: recipe skill ranges agree on the recipe id the trade-skill window reports, not the recipe's name, so an
   install on a Spanish client ("Peletería") counts toward the same range as English ones. A recipe the game files list
@@ -36,9 +57,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: `/ask` sends the visitor to the chat at `/chat` instead of a 404; the addon's command and the header both say Ask.
 - Site: the talent calculator no longer asks for the account's saved builds when no one is signed in, so a signed-out
   visit leaves no 401 in the browser console. Save still offers sign-in as before.
-- Desktop App: on macOS the app no longer logs "Unable to set login item" on every start. Start-up registers a login item
-  only when "Start when I sign in" is on; Settings still applies the switch either way.
-- Desktop App: the game-folder hint on the first-run screen shows a macOS or Linux path on those systems, not a Windows one.
 - Addon and companion: when `/ask` cannot be answered (the companion offline, no model set up), the reason is shown once and
   the question stays queued, so the retry's answer still reaches the game. Before, the question was dropped and a later answer never
   appeared. After each `/reload` the addon says how many questions are still waiting. Needs the next addon and Desktop App
@@ -52,6 +70,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   `addon_download` to CurseForge like the other download links. The same tested zip is uploaded there on each release.
 
 ### Added
+- Site: the Auction House lists each realm that has scans but no public prices yet, with how many of the 3 players needed
+  have scanned there ("1 of 3 players have scanned; prices go public at 3"). A player is counted once per upload address,
+  on the item with the most players on one day in the last 7. `/api/market/prices` without a realm returns the same counts
+  in `pending`. Counts only: no price or quantity below 3 players is shown.
 - Desktop App and site, behind `EVERLOOT_CHARACTER_LINKS` (off): the addon's `/everloot link <code>` (0.3.15) writes one
   link row for the character you are playing, with a code made on the account page. The Desktop App, signed in, sends it only
   to the account's own link endpoint; uploads never carry link rows. The account page lists your linked characters,
@@ -87,6 +109,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   sighting names the faction its race plays on (none for Skyborne). When the guild's officers published a board, the
   guild part also shows that character's rank, the loot they gave it and whether it was at their last raid
   (`EVERLOOT_CHARACTER_GUILD_FACTS`); the privacy policy, the privacy guide and the data policy say so.
+- Site: the drop rates API (`/api/rollups/drops`) gives each rate `sourceName` once 3 installs agree on the NPC's or
+  object's name, so the Desktop App's price file can name sources a player never met.
 - Site: the Auction House files a realm under the PvE, PvP, RP, RP-PvP or Hardcore tab when its name ends in that
   ruleset, as Forever's realm list names them ("CAMWOW US1 Realm 4 PvP"); the realm map still overrides, and a realm
   whose name names no ruleset stays under "Realms not mapped yet". Realm names show split the same way: the name, then
@@ -198,6 +222,34 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   agree. Fishing (the bobber, or an object installs agree is fished) is never a pin. An upload of an event
   that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
   instead of withdrawing the event as a conflict. The map shows none of this yet.
+
+## [0.3.21] - 2026-11-06
+
+Release channel: Alpha
+
+Drop rows name their source even when you never met it, with the names the site knows. Needs Desktop App 0.1.18 or
+later to write the names into the price file. Not yet seen in the Forever client.
+
+### Changed
+- A tooltip's drop row names its source from the price file when you never met it: "Drops from Battered Chest" instead
+  of "Drops from object 106318", and `/everloot price` says "Battered Chest (object 106318)". A name your own client
+  showed still comes first, and a source the site has no name for keeps its id.
+
+## [desktop-v0.1.18] - 2026-11-06
+
+### Changed
+- The app keeps the Everloot addon up to date on its own: a newer release installs into a game folder that already has
+  the addon, checked against the release's checksums, and the app says so once: "Everloot addon updated to X. Type
+  /reload in game." Settings → Game has the switch, "Keep the addon up to date", on by default. With it off, or when
+  an install fails, the tray's tooltip and menu show "Addon X available", which opens the Addon page. Before, the only
+  sign was one silent notification per version, easy to miss while the game is full screen.
+- The price file names the drop sources the site knows, beside the drop rates, so addon 0.3.21 and later can name a
+  source you never met ("Drops from Battered Chest" instead of "Drops from object 106318").
+
+### Fixed
+- On macOS the app no longer logs "Unable to set login item" on every start. Start-up registers a login item only when
+  "Start when I sign in" is on; Settings still applies the switch either way.
+- The game-folder hint on the first-run screen shows a macOS or Linux path on those systems, not a Windows one.
 
 ## [0.3.20] - 2026-11-06
 

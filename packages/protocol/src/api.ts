@@ -68,6 +68,12 @@ export const marketRealmsResponse = z.object({
   realms: z.array(z.string()),
   houses: z.record(z.string(), z.array(z.enum(AUCTION_HOUSES))).optional()
     .describe("Per realm, the auction houses that have public values of their own (scans that named their house)."),
+  pending: z.array(z.object({
+    realm: z.string(),
+    reporters: z.number().int().min(1),
+    needed: z.number().int().min(1),
+  })).optional()
+    .describe("Realms with scans but no public values yet: the most reporters (upload addresses) that scanned one item there on one day in the last 7, out of the `needed` that make a day public. A count only, never a value."),
   attribution: attributionSchema,
 });
 
@@ -98,6 +104,7 @@ const dropRate = z.object({
   rate: z.number().min(0).max(1),
   reporters: z.number().int().nonnegative().describe("Distinct installs that looted the source."),
   public: z.literal(true),
+  sourceName: z.string().min(1).optional().describe("The NPC's or object's name, once 3 installs agree on it; absent until then."),
 });
 
 const measuredZero = z.object({

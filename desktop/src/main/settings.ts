@@ -21,6 +21,7 @@ export function defaultSettings(): Settings {
     launchAtLogin: false,
     startInTray: true,
     dataNoticeDismissed: false,
+    autoUpdateAddon: true,
   };
 }
 
@@ -58,6 +59,7 @@ export function mergeSettings(base: Settings, patch: unknown): Settings {
     launchAtLogin: bool(p.launchAtLogin, base.launchAtLogin),
     startInTray: bool(p.startInTray, base.startInTray),
     dataNoticeDismissed: bool(p.dataNoticeDismissed, base.dataNoticeDismissed),
+    autoUpdateAddon: bool(p.autoUpdateAddon, base.autoUpdateAddon),
   };
 }
 

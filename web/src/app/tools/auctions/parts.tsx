@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import ItemTip from "@/components/game/ItemTip";
-import { Card, Contribute as ContributeCard, DataTable, EmptyState, QUALITY_LABEL, QUALITY_TEXT, qualityOf as qualityToken, type Column, type Quality } from "@/components/ui";
-import { SPARK_BOX, itemHref, itemLabel, money, percent, sparkline, type ItemNames, type MarketRow, type RulesetSummary } from "@/lib/auction-house";
+import { AGREEMENT_NEEDED, AgreementMeter, Card, Contribute as ContributeCard, DataTable, EmptyState, QUALITY_LABEL, QUALITY_TEXT, qualityOf as qualityToken, type Column, type Quality } from "@/components/ui";
+import { SPARK_BOX, itemHref, itemLabel, money, percent, realmHref, sparkline, type ItemNames, type MarketRow, type PendingRealm, type RulesetSummary } from "@/lib/auction-house";
 import { RULESET_LABEL, isRulesetSlug, type RulesetSlug } from "@/lib/realms";
 import { RealmName } from "./RealmName";
 import { HISTORY_DAYS, formatCopper, type PublicDay } from "../../../../../kb/src/market";
@@ -103,6 +103,28 @@ export function Contribute() {
       title={<>Add your realm&apos;s prices</>}
       note="Open the auction house in game and press Everloot scan. The Desktop App uploads the scan when you log out and puts these prices in your item tooltips."
     />
+  );
+}
+
+/** How the counts in PendingRealms are made, in one sentence. */
+export const PENDING_RULE = "A player is counted when they scanned the same item there on one day in the last 7 days; installs behind one upload address count once.";
+
+/** Realms with scans but no public price yet, each with how many of the 3 players have scanned there. Counts only. */
+export function PendingRealms({ realms }: { realms: PendingRealm[] }) {
+  return (
+    <section aria-labelledby="ah-pending" className="mt-4">
+      <h2 id="ah-pending" className="text-cell font-medium text-fg">Not public yet</h2>
+      <p className="mt-1 text-meta text-fg-2">{PENDING_RULE}</p>
+      <ul className="mt-2 divide-y divide-line border-y border-line">
+        {realms.map((r) => (
+          <li key={r.slug} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-cell">
+            <span aria-hidden="true"><AgreementMeter count={r.reporters} /></span>
+            <Link href={realmHref(r)} className="text-fg hover:underline underline-offset-4"><RealmName name={r.realm} /></Link>
+            <span className="text-fg-2">{r.reporters} of {AGREEMENT_NEEDED} players have scanned; prices go public at {AGREEMENT_NEEDED}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
