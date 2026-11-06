@@ -70,6 +70,11 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   `addon_download` to CurseForge like the other download links. The same tested zip is uploaded there on each release.
 
 ### Added
+- Addon: player names stay off by default, and the addon now asks once, in game, whether to turn them on. The question
+  comes a few seconds after the first loading screen, never in combat, and says what is recorded (name, realm, race,
+  class, level and guild of your characters and of players you target, mouse over or group with), how to turn it off
+  (`/everloot players off`) and where to hide a character (everloot.app/players/opt-out). After an answer, or a choice
+  made with `/everloot players on|off` or the settings page, it is never asked again.
 - Site: the Auction House lists each realm that has scans but no public prices yet, with how many of the 3 players needed
   have scanned there ("1 of 3 players have scanned; prices go public at 3"). A player is counted once per upload address,
   on the item with the most players on one day in the last 7. `/api/market/prices` without a realm returns the same counts
