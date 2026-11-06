@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import type { GuildFaction } from "../../../../kb/src/guilds";
+import type { GuildFaction, GuildProgress } from "../../../../kb/src/guilds";
+import { Card } from "@/components/ui";
 import { factionLabel, guildIndexingOn } from "@/lib/guilds";
 
 export const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
@@ -68,3 +69,36 @@ export function BossStrip({ list }: { list: readonly { encounterId: number; name
 
 /** Who reported a kill, in words. */
 export const sourceLabel = (source: "members" | "officers" | null) => (source === "members" ? "Members" : source === "officers" ? "Officers" : "");
+
+/**
+ * How many are in the guild, said as what it is: the officers' count when they published one, else the officers'
+ * roster, else the characters seen. Null with none of them.
+ */
+export function memberCountLine(board: { memberCount: number | null; roster: readonly unknown[] } | null, listed: number): string | null {
+  if (board?.memberCount) return `${number(board.memberCount)} ${board.memberCount === 1 ? "member" : "members"}`;
+  if (board?.roster.length) return `${number(board.roster.length)} on the officers' roster`;
+  return listed ? `${number(listed)} ${listed === 1 ? "character" : "characters"} seen` : null;
+}
+
+/** One instance: bosses killed out of its bosses, then each boss with the day it fell and who reported it; unkilled bosses muted. */
+export function InstanceCard({ progress, headingLevel = 3 }: { progress: GuildProgress; headingLevel?: 3 | 4 }) {
+  const id = `instance-${progress.instanceMapId}`;
+  const Heading = headingLevel === 3 ? "h3" : "h4";
+  return (
+    <Card as="section" padding="none" aria-labelledby={id}>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-4 pt-4 sm:px-6 sm:pt-5">
+        <Heading id={id} className="text-h2-sm text-fg">{progress.instanceName}</Heading>
+        <Progress killed={progress.killed} bosses={progress.bosses} />
+      </div>
+      <ol className="mt-3 border-t border-line">
+        {progress.list.map((b) => (
+          <li key={b.encounterId} className={`flex min-h-row items-center gap-3 border-b border-line px-4 text-cell last:border-b-0 sm:px-6 ${b.killed ? "text-fg" : "text-muted"}`}>
+            <span className="min-w-0 flex-1 truncate">{b.name}</span>
+            {b.killed && <span className="shrink-0 text-cell-2 text-fg-2">{b.killedAt ? day(b.killedAt) : ""}{b.killedAt && b.source ? " · " : ""}{sourceLabel(b.source)}</span>}
+            {!b.killed && <span className="shrink-0 text-cell-2">Not yet</span>}
+          </li>
+        ))}
+      </ol>
+    </Card>
+  );
+}
