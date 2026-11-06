@@ -77,12 +77,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   character's public page only when you switch it on. Turning a category's sync off or unlinking deletes what was synced.
 - Site, behind `EVERLOOT_PRIVATE_SYNC` (off): /account turns each linked character's sync and page sections on and off,
   and links to the preview. A sync key may send 20 times an hour, and achievements count only those the character earned.
-- Desktop App: signed in with a key made with "Sync my linked characters", the app sends the characters you linked from
-  this save file to that sync endpoint after each upload: the newest gear, professions, reputations, raid lockouts, and
-  achievements and titles. A capture the site has kept is not sent again; a changed one is, and so is one for a
-  category whose sync is off or a character not linked yet, so turning sync on later still fills it in. Talent builds are not
-  sent yet: the addon's talent rows do not say which character they belong to. With the site's switch off nothing is
-  said, and a key without that permission gets one line saying which key to make.
 - Addon and Desktop App: with the completion tracker on, the addon keeps each of your characters' professions (rank of
   max rank) and this week's raid lockouts (bosses killed of total, reset time) under the completion key, latest state
   only, and the Desktop App's Characters page shows them on the keyed rows. They stay on your computer: no upload, the
@@ -271,6 +265,19 @@ later to write the names into the price file. Not yet seen in the Forever client
 - A tooltip's drop row names its source from the price file when you never met it: "Drops from Battered Chest" instead
   of "Drops from object 106318", and `/everloot price` says "Battered Chest (object 106318)". A name your own client
   showed still comes first, and a source the site has no name for keeps its id.
+
+## [desktop-v0.1.19] - 2026-11-06
+
+### Added
+- Private sync of your linked characters. Signed in with a key made with "Sync my linked characters" on everloot.app,
+  the app sends the characters you linked from this save file after each upload: the newest gear, professions,
+  reputations, raid lockouts, and achievements and titles. The site keeps a category only when you turned its sync on
+  for that character on /account. A capture the site has kept is not sent again; a changed one is, and so is one for a
+  category whose sync is off or a character not linked yet, so turning sync on later still fills it in. Talent builds
+  are not sent yet: the addon's talent rows do not say which character they belong to. A key without that permission
+  gets one line saying which key to make.
+- The Characters page shows each character's professions and this week's raid lockouts once the addon records them
+  (the next addon release). They stay on your computer: no upload sends them.
 
 ## [desktop-v0.1.18] - 2026-11-06
 
