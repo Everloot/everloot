@@ -1,6 +1,6 @@
 import type { ShowcaseInput } from "@/lib/character-showcase";
 import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
-import { loadShownNames } from "@/lib/shown-item-names";
+import { loadListNames } from "@/lib/item-view";
 
 /**
  * The showcase's gear with each item's name and icon where the item lists would show them: only for items whose
@@ -13,7 +13,7 @@ export async function withGearArt(input: ShowcaseInput): Promise<ShowcaseInput> 
   try {
     const assets = await loadSiteAssets();
     if (!assets) return input;
-    const shown = await loadShownNames();
+    const shown = await loadListNames();
     const tips = await loadItemTips(assets, input.gear.data.map((r) => r.itemId).filter((id) => shown.showsTip(id)));
     const data = input.gear.data.map((r) => {
       const tip = tips.get(r.itemId);
