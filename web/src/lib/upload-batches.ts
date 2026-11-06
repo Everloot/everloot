@@ -23,7 +23,7 @@ const CENSUS_SEEN = "census_seen", CENSUS_SELF = "census_self";
 
 /**
  * Kinds the addon keeps for the Everloot Desktop App's own Characters page and that no uploader sends: the player's
- * professions and raid lockouts (addon/modules/owned.lua). The protocol has no schema for them, so the intake would
+ * professions, raid lockouts and active talent build (addon/modules/owned.lua). The protocol has no schema for them, so the intake would
  * refuse them anyway; they are held here by name so they never reach a batch and are not counted as invalid.
  */
 export const LOCAL_ONLY_KINDS: readonly string[] = ["profession_owned", "lockout_owned", "talent_owned"];

@@ -278,7 +278,7 @@ SlashCmdList["EVERLOOT"] = function(msg)
   elseif msg == "completion on" or msg == "completion off" then
     EverlootDB.toggles.completion = (msg == "completion on")
     if EverlootDB.toggles.completion then
-      print("Everloot: completion tracker on. It reads your achievements, reputation, titles and completed quests, and never changes them. Your own progress is sent only from the everloot.app upload page, with the collection choice ticked. It also keeps your professions, this week's raid lockouts and active talent build, kept on this computer; the Everloot Desktop App sends them only for characters you linked, under the switches you set on everloot.app. /reload to apply.")
+      print("Everloot: completion tracker on. It reads your achievements, reputation, titles and completed quests, and never changes them. It also records your professions, this week's raid lockouts and active talent build. All of it stays on this computer unless you send it: from the everloot.app upload page, or through the Everloot Desktop App's private sync, which sends only for characters you linked and only the categories you switched on at everloot.app. /reload to apply.")
     else
       -- Turning it off withdraws what it wrote: every completion row is deleted from this file.
       if E.Completion then E.Completion.Withdraw() end
