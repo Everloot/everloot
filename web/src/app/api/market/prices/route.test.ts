@@ -146,3 +146,16 @@ test("a house must be Alliance, Horde or Neutral, and needs a realm", async () =
   }
   expect(store.loadMarket).not.toHaveBeenCalled();
 });
+test("without a realm it also counts the players behind each realm that has scans but no public prices, never a value", async () => {
+  const pendingScans = ["install-p-1", "install-p-2"].map((installId, i) => ({
+    kind: "auction_snapshot", installId, eventId: `p:${i}`, capturedAt: NOW.toISOString(), realm: "CAMWOW US1 Realm 4 PvP",
+    scanId: `p-${i}`, part: 1, parts: 1, items: [[2589, 2, 40, 12345, 12345]],
+  }));
+  store.loadMarket.mockResolvedValue({ state: foldMarket(emptyMarket(), [...scans, ...pendingScans], NOW), dataAsOf: "2026-10-20T12:00:00.000Z" });
+  const body = await (await GET(req())).json();
+  expect(body).toMatchObject({ ok: true, realms: ["Forever"], pending: [{ realm: "CAMWOW US1 Realm 4 PvP", reporters: 2, needed: 3 }] });
+  expect(Object.keys(body.pending[0]).sort()).toEqual(["needed", "realm", "reporters"]);
+  expect(JSON.stringify(body)).not.toMatch(/12345|install-p/);
+  expect(() => marketRealmsResponse.parse(body)).not.toThrow();
+  expect(marketRealmsResponse.parse(body).pending).toEqual(body.pending);
+});
