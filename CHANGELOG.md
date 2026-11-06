@@ -78,10 +78,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   objects keeps to that type.
 
 ### Changed
-- Addon: a tooltip's drop rows name the sources you have met, as your client showed them: "Drops from Defias Bandit"
-  instead of "Drops from NPC 116", and `/everloot price` says "Defias Bandit (NPC 116)". The names come from your own
-  NPC and object sightings and what you looted, already in the saved file; nothing new is written. A source you never met
-  keeps its id.
 - Site: the Auction House files a realm under the PvE, PvP, RP, RP-PvP or Hardcore tab when its name ends in that
   ruleset, as Forever's realm list names them ("CAMWOW US1 Realm 4 PvP"); the realm map still overrides, and a realm
   whose name names no ruleset stays under "Realms not mapped yet". Realm names show split the same way: the name, then
@@ -193,6 +189,19 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   agree. Fishing (the bobber, or an object installs agree is fished) is never a pin. An upload of an event
   that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
   instead of withdrawing the event as a conflict. The map shows none of this yet.
+
+## [0.3.19] - 2026-11-05
+
+Release channel: Alpha
+
+Drop rows in item tooltips name the creature or object they come from, when you have met it. Not yet seen in the
+Forever client.
+
+### Changed
+- A tooltip's drop rows name the sources you have met, as your client showed them: "Drops from Defias Bandit"
+  instead of "Drops from NPC 116", and `/everloot price` says "Defias Bandit (NPC 116)". The names come from your own
+  NPC and object sightings and what you looted, already in the saved file; nothing new is written. A source you never met
+  keeps its id.
 
 ## [0.3.18] - 2026-11-05
 
