@@ -3,6 +3,7 @@ import { answerSources, formatAnswerSources } from "../src/answer-sources.js";
 import { openDb } from "../src/db.js";
 import { replaceSourceRows, type EntityInput } from "../src/entities.js";
 import { buildFilesIndex } from "../src/files-evidence.js";
+import { d1ReleaseDb, type D1Like } from "../src/release-db.js";
 import { respell, search, SOME_WORDS } from "../src/search.js";
 
 /**
@@ -172,6 +173,40 @@ test("a missing double letter is found, and a typo one page shares gives way to 
   const sm = await ask("what level is scarlet monestary");
   expect(sm.result.evidence.map((e) => e.source.title)).not.toContain("Exe");
   expect(sm.result.evidence.map((e) => e.claim)).toContain("Scarlet Monastery: a dungeon, level 30.");
+});
+
+/**
+ * better-sqlite3 behind D1's surface, refusing what production D1 refuses: a compound SELECT of more than five terms
+ * (measured on the live database 2026-11-06; the docs list no number) and more than 100 bound parameters.
+ */
+function d1Limits(db: Awaited<ReturnType<typeof seed>>): D1Like {
+  const check = (sql: string, values: unknown[]) => {
+    const terms = (sql.match(/\b(?:UNION|INTERSECT|EXCEPT)\b/giu) ?? []).length + 1;
+    if (terms > 5) throw new Error(`D1_ERROR: too many terms in compound SELECT (${terms})`);
+    if (values.length > 100) throw new Error(`D1_ERROR: too many SQL variables (${values.length})`);
+  };
+  return {
+    prepare: (sql) => ({
+      bind: (...values) => ({
+        all: async <T>() => (check(sql, values), { results: db.prepare(sql).all(...values) as T[] }),
+        first: async <T>() => (check(sql, values), (db.prepare(sql).get(...values) as T | undefined) ?? null),
+      }),
+    }),
+  };
+}
+
+test("the player questions read the same through D1's statement limits", async () => {
+  const db = await seed();
+  const d1 = d1ReleaseDb(d1Limits(db));
+  for (const question of [
+    "does thunderbluff have a zeppeling?", "where is orgrimar", "what level is scarlet monestary", "where do i learn mining in orgrimmar",
+    "where is mankriks wife", "where is hogger", "where does linen cloth drop", "what dungeon should i do at level 30", "where is sneedx",
+  ]) {
+    const viaD1 = await answerSources(d1, { question, limit: 3 }, null, null, files);
+    const viaFile = await answerSources(db, { question, limit: 3 }, null, null, files);
+    expect(viaD1, question).toEqual(viaFile);
+  }
+  expect(await respell(d1, "does thunderbluff have a zeppeling?")).toMatchObject({ text: "does thunder bluff have a zeppelin?" });
 });
 
 test("the city a player calls by its first word is the zone the files name in full", async () => {
