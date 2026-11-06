@@ -235,9 +235,9 @@ export interface ProgressRow {
   titles: number;
   quests: number;
   talentPoints: number | null;
-  /** The addon's profession_owned rows for this key: the latest state, never uploaded and not given to Chat. */
+  /** The addon's profession_owned rows for this key: the latest state; never in an upload, not given to Chat, sent only by private sync for a linked character. */
   professions: ProfessionRow[];
-  /** The addon's lockout_owned rows for this key that have not reset yet: never uploaded and not given to Chat. */
+  /** The addon's lockout_owned rows for this key that have not reset yet; never in an upload, not given to Chat, sent only by private sync for a linked character. */
   lockouts: LockoutRow[];
 }
 export interface ProfessionRow { name: string; rank: number; maxRank: number }
