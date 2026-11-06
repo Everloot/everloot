@@ -1,7 +1,7 @@
 import { AUCTION_HOUSES, type AuctionHouse } from "@everloot/protocol";
 import { AUCTION_AGREEMENT } from "../../../kb/src/auction-history";
 import {
-  MARKET_LIMITS, TRIM_FACTOR, TRIM_MIN_DAYS, formatCopper, houseKey, itemListings, itemMarket, parseHouse, validRealm,
+  MARKET_LIMITS, TRIM_FACTOR, TRIM_MIN_DAYS, agreed, formatCopper, houseKey, itemListings, itemMarket, parseHouse, validRealm,
   type ItemDays, type MarketState, type MarketValue, type PublicDay, type RealmDays,
 } from "../../../kb/src/market";
 import { AFTER_LAUNCH, DEFAULT_RULESET, RULESET_SLUGS, isRulesetSlug, mappedRulesets, realmInfo, realmRuleset, rulesetFromName, type RulesetSlug } from "./realms";
@@ -120,7 +120,7 @@ function realmBoard(state: MarketState, key: string, now: Date, house: AuctionHo
     let updatedAt: number | null = null;
     for (const installs of Object.values(days.open)) {
       const groups = groupsOf(installs);
-      if (groups.size < AUCTION_AGREEMENT) continue;
+      if (!agreed([...groups])) continue;
       for (const g of groups) reporters.add(g);
       for (const scan of Object.values(installs)) updatedAt = Math.max(updatedAt ?? 0, scan[4]);
     }

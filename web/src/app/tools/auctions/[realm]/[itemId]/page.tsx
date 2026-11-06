@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { pageMetadata } from "@/lib/seo";
-import { formatCopper, MARKET_RULE } from "../../../../../../../kb/src/market";
+import { formatCopper, MARKET_RULE, reportersText } from "../../../../../../../kb/src/market";
 import { auctionSightingsFromRecords, handleAuctionHistory } from "../../../../../../../kb/src/auction-history";
 import { STORAGE_UNREACHABLE, uploadStore } from "@/lib/upload-store";
 import { marketDatasetJsonLd } from "@/lib/jsonld";
@@ -89,7 +89,7 @@ export default async function RealmItemPage(props: Props) {
         meta={v && (
           <Facts items={[
             row.updatedAt !== null ? <>Updated <TimeAgo key="t" at={row.updatedAt} renderedAt={now.getTime()} /></> : `Newest public day ${v.day}`,
-            count(v.reporters, "reporter"),
+            reportersText(v.reporters),
           ]} />
         )}
         actions={<>

@@ -10,6 +10,8 @@
  * be missing, never shown as zero.
  */
 
+import { TRUSTED_SOURCE_LABEL } from "../../../../kb/src/trusted-source";
+
 export const MARKET_ANSWER_BUDGET = 600;
 /** The newest public day is called stale after this many days, as the game addon does. */
 export const STALE_DAYS = 2;
@@ -19,7 +21,10 @@ export const STALE_DAYS = 2;
  * then is not coming back soon, and a bridge that answers asks one after another must not wait on it forever.
  */
 export const MARKET_QUERY_BUDGET_MS = 30_000;
-/** A public day needs this many reporters (the server's AUCTION_AGREEMENT); a row claiming fewer is not a public price. */
+/**
+ * A public day has this many reporters (the server's AUCTION_AGREEMENT), or fewer when Everloot's own installs scanned
+ * it (kb/src/trusted-source.ts); the answer then says so.
+ */
 const MIN_REPORTERS = 3;
 
 /**
@@ -203,8 +208,8 @@ function read(raw: unknown, realm: string, itemId: number): Reading | null {
   if (!v || typeof v !== "object" || v.itemId !== itemId) return null;
   if (!(v.market === null || count(v.market)) || !count(v.min) || !count(v.historical) || !count(v.quantity) || !count(v.ageDays) || !count(v.reporters)
     || !calendarDay(v.day) || typeof v.thin !== "boolean") return null;
-  // A public day has at least three reporters; a row that says fewer contradicts itself and is not shown as a public price.
-  if (v.reporters < MIN_REPORTERS) return null;
+  // A public day has at least one reporter; under three it is a trusted install's, and describe says so.
+  if (v.reporters < 1) return null;
   return { kind: "value", realm: page.realm.trim(), url, value: { market: v.market, min: v.min, historical: v.historical, quantity: v.quantity, day: v.day, ageDays: v.ageDays, reporters: v.reporters, thin: v.thin } };
 }
 
@@ -230,7 +235,7 @@ function describe(name: string, realm: string, reading: Reading): { kind: Market
     for (const note of notes.filter(Boolean)) if (`${text} ${note}`.length <= MARKET_ANSWER_BUDGET) text = `${text} ${note}`;
     return text.slice(0, MARKET_ANSWER_BUDGET);
   };
-  const seen = `Newest public day ${v.day}, ${plural(v.reporters, "reporter")}`;
+  const seen = `Newest public day ${v.day}, ${plural(v.reporters, "reporter")}${v.reporters < MIN_REPORTERS ? ` (${TRUSTED_SOURCE_LABEL})` : ""}`;
   const days = `${seen}, ${v.quantity} listed.`;
   const prices = `minimum ${formatCopper(v.min)}, historical ${formatCopper(v.historical)} each`;
   if (v.market !== null) {

@@ -4,6 +4,7 @@ import {
   CENSUS_CLASSES, CENSUS_LAUNCH, CENSUS_MIN_CHARACTERS, CENSUS_MIN_INSTALLS, CENSUS_MIN_REPORTERS, CENSUS_RACES, CENSUS_ROUND_TO, FACTIONS, LEVEL_BANDS,
   censusFromRows, roundCount, rollupCensus, type CensusCount, type CensusRow, type CensusView, type CensusWindow, type Faction,
 } from "../src/census.js";
+import { TRUSTED_REPORTER } from "../src/trusted-source.js";
 
 /** When the corpus was current: a Monday, twelve days after launch. */
 const AS_OF = "2026-11-16T12:00:00Z";
@@ -424,4 +425,18 @@ test("the output carries no reporter", () => {
 
 test("rows from the store are rolled up as they are", () => {
   expect(censusFromRows(crowd(10, "w1"), AS_OF).windows.week.characters).toBe(10);
+});
+
+test("rows from Everloot's own installs (TRUSTED_REPORTER) clear the install and address minimums alone, not the 10 characters", () => {
+  const solo = (n: number, reporter?: string) => crowd(n, "tr", reporter ? { reporter } : {}, ["install-own"]);
+  // One install from one address: still collecting, and the view does not claim trusted rows.
+  expect(week(solo(40)).collecting).toBe(true);
+  expect(census(solo(40)).trusted).toBe(false);
+  // The same rows from a trusted install: the counts show, rounded.
+  const trusted = census(solo(40, TRUSTED_REPORTER));
+  expect(trusted.trusted).toBe(true);
+  expect(trusted.windows.week.collecting).toBe(false);
+  expect(trusted.windows.week.characters).toBe(40);
+  // Under 10 characters nothing shows, trusted or not.
+  expect(week(solo(9, TRUSTED_REPORTER)).collecting).toBe(true);
 });

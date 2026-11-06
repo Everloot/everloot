@@ -12,6 +12,7 @@ import { CREDIT } from "@/lib/talents/assets";
 import { MAP_SOURCE } from "@/lib/world-map";
 import { PageHeader, ReadingLayout, SectionHeading, type TocItem } from "@/components/ui";
 import { ScoreSection } from "./score";
+import { TRUSTED_SOURCE_LABEL } from "../../../../kb/src/trusted-source";
 
 const description =
   "How Everloot turns addon uploads into WoW Forever facts: three installs must agree, addresses are never published, and names only on the player pages.";
@@ -59,6 +60,11 @@ export default async function MethodologyPage() {
             <p className="text-fg-2">
               A fact that comes from a Polestar Recorder file needs three different characters uploading from three different
               addresses, and a player&apos;s alts or connections never confirm each other.
+            </p>
+            <p className="text-fg-2">
+              While few players upload, Everloot&apos;s own installs can make an auction price or a census count public on their own.
+              A price that rests on them says &ldquo;{TRUSTED_SOURCE_LABEL}&rdquo; beside its reporters, and the census says when its
+              numbers include them. Everyone else still needs three. A census count still needs 10 characters and is still rounded.
             </p>
             {playerPagesOn() && (
               <p className="text-fg-2">

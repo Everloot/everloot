@@ -5,6 +5,7 @@ import { CENSUS_KINDS, parseRecords, type IntakeRecord, type StoredCensusRecord,
 import { mergeCorpus, mergeCorpusBatches, publicRecords, type CorpusState } from "../../../kb/src/corpus";
 import { HISTORY_DAYS, MARKET_MAX_BYTES, emptyMarket, foldMarket, marketBytes, trimMarket, uploadScans, type FoldStats, type MarketState } from "../../../kb/src/market";
 import { mergeCensusRows } from "../../../kb/src/census-rows";
+import { TRUSTED_REPORTER, trustedInstalls } from "../../../kb/src/trusted-source";
 import { createSharingStore } from "./sharing-store";
 import {
   COMPLETION_MAX_BYTES, authorizedOwners, emptyCompletion, foldCompletion, isCompletionState, normalizeCompletion, trimCompletion, type CompletionState, type CompletionUpload,
@@ -208,6 +209,8 @@ export function createUploadStore(opts: {
   completionRowBudget?: number;
   /** Recheck current publication authority on EVERY read, including cache hits. */
   publication?: (state: CorpusState) => Promise<IntakeRecord[]>;
+  /** Everloot's own install ids, public on their own in the market and census (kb/src/trusted-source.ts). Defaults to EVERLOOT_TRUSTED_INSTALLS. */
+  trusted?: ReadonlySet<string>;
 }) {
   const doFetch = opts.fetch ?? fetch;
   const now = opts.now ?? (() => new Date());
@@ -222,6 +225,7 @@ export function createUploadStore(opts: {
   const completionBatch = opts.completionBatch ?? COMPLETION_UPLOADS_PER_RUN;
   const completionBudgetMs = opts.completionBudgetMs ?? 150_000;
   const completionRowBudget = opts.completionRowBudget ?? 500_000;
+  const trusted = opts.trusted ?? trustedInstalls(process.env.EVERLOOT_TRUSTED_INSTALLS);
 
   const cloud = opts.cloud;
   const unavailable = !cloud && process.env.NODE_ENV === "production";
@@ -460,7 +464,7 @@ export function createUploadStore(opts: {
       if (missed) throw new Error("upload object unreadable");
       const batch = marketScans(payloads);
       scans += batch.length;
-      state = foldMarket(state, batch, now(), {}, stats);
+      state = foldMarket(state, batch, now(), {}, stats, trusted);
     }
     const last = fresh.length > 0 ? fresh[fresh.length - 1].received_at : null;
     const sameTime = (ids: string[]) => (last !== null && prev?.lastReceivedAt === last ? [...new Set([...prev.lastIds, ...ids])] : ids);
@@ -468,7 +472,7 @@ export function createUploadStore(opts: {
       version: 3,
       generatedAt: now().toISOString(),
       // With no new scans the fold still closes and prunes days as time passes.
-      state: fresh.length ? state : foldMarket(state, [], now()),
+      state: fresh.length ? state : foldMarket(state, [], now(), {}, undefined, trusted),
       lastReceivedAt: last ?? prev?.lastReceivedAt ?? null,
       lastIds: last !== null ? sameTime(fresh.filter((r) => r.received_at === last).map((r) => r.id)) : prev?.lastIds ?? [],
     };
@@ -507,7 +511,7 @@ export function createUploadStore(opts: {
       } else {
         const local = await readLocalPayloads();
         if (!local) throw new Error("local uploads unreadable");
-        market = { state: foldMarket(emptyMarket(), marketScans(local.payloads), now()), dataAsOf: now().toISOString() };
+        market = { state: foldMarket(emptyMarket(), marketScans(local.payloads), now(), {}, undefined, trusted), dataAsOf: now().toISOString() };
       }
     } catch {
       return { state: null, dataAsOf: null, unreachable: true };
@@ -546,6 +550,8 @@ export function createUploadStore(opts: {
         if (!local) throw new Error("local uploads unreadable");
         rows = foldCensus([], local.payloads);
       }
+      // Everloot's own installs count as trusted reporters (kb/src/trusted-source.ts); their address hash is not needed here.
+      if (trusted.size) rows = rows.map((r) => (trusted.has(r.installId) ? { ...r, reporter: TRUSTED_REPORTER } : r));
       const read = { rows, dataAsOf };
       censusCached = { at: Date.now(), read };
       return read;
