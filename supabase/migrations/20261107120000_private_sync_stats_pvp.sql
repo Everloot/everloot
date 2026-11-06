@@ -3,8 +3,11 @@
 -- 20261106120000_private_sync.sql, which stays as applied: the two category checks are widened, two columns are added to
 -- character_visibility, and the five functions that name the categories are replaced with their full new bodies. Every
 -- other line of each function is the original's. Needs 20261106120000_private_sync.sql first. Safe to apply twice.
--- NOT applied to prod by the change that adds it; Carlos applies it (prod SQL via the preview SQL editor) before any
--- stats or pvp row is sent. Until then the site only lists the two categories; the database refuses to consent to them.
+-- APPLY THIS IN PROD BEFORE the site change that adds stats and pvp to SYNC_CATEGORIES deploys, that is, before that
+-- PR merges. Private sync is live in prod, and the new site code selects show_stats and show_pvp from character_visibility
+-- (character-links-store.ts showcaseColumns, private-sync-store.ts ownSyncedLink). Without these columns PostgREST rejects
+-- those queries: GET /api/me/characters/links answers 503 for every user, and the link sync read and the owner preview
+-- page fail too. Not applied by the change that adds it; Carlos applies it (prod SQL via the preview SQL editor).
 --
 -- Everything the first migration says holds here: nothing about stats or pvp is public until the owner turns the page
 -- on and the section's own switch on, only for a live, unhidden link, and revoking consent deletes the category's facts.
