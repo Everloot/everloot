@@ -18,10 +18,10 @@
 --   GetCritChance / GetRangedCritChance / GetSpellCritChance
 --   GetHitModifier / GetRangedHitModifier / GetSpellHitModifier, plus GetCombatRatingBonus(CR_HIT_MELEE|RANGED|SPELL)
 --                                      when that global and the function both exist
---   GetMeleeHaste / GetRangedHaste / UnitSpellHaste("player")
+--   GetMeleeHaste / UnitSpellHaste("player"); GetRangedHaste first + second return (ammo haste, 0 if absent)
 --   GetExpertise                       first return (main hand)
 --   GetSpellBonusDamage(2..7)          the lowest school; GetSpellBonusHealing
---   UnitArmor                          second return (effective); UnitDefenseSkill base + modifier
+--   UnitArmor                          second return (effective); UnitDefenseSkill base + modifier, at least 0
 --   GetDodgeChance / GetParryChance / GetBlockChance
 -- Not yet checked in game.
 
@@ -108,12 +108,17 @@ end
 --- The stats table, or nil when fewer than the five attributes are readable.
 function S.Collect()
   local stats = {}
-  local attributes = 0
+  local attributes, nonzero = 0, false
   for i, name in ipairs(ATTRIBUTES) do
     local value = whole(select(2, call("UnitStat", "player", i)))
-    if value then stats[name] = value; attributes = attributes + 1 end
+    if value then
+      stats[name] = value
+      attributes = attributes + 1
+      if value ~= 0 then nonzero = true end
+    end
   end
-  if attributes < #ATTRIBUTES then return nil end
+  -- Five zeros are a client with no data yet, not a character: no row.
+  if attributes < #ATTRIBUTES or not nonzero then return nil end
 
   local function put(key, value) if value ~= nil then stats[key] = value end end
   put("meleeAttackPower", whole(sum(3, call("UnitAttackPower", "player"))))
@@ -125,7 +130,10 @@ function S.Collect()
   put("rangedAttackPower", whole(sum(3, call("UnitRangedAttackPower", "player"))))
   put("rangedHit", percent(hit("GetRangedHitModifier", "CR_HIT_RANGED")))
   put("rangedCrit", percent((call("GetRangedCritChance"))))
-  put("rangedHaste", percent((call("GetRangedHaste"))))
+  -- The paper doll adds the ammo haste (second return) to the base; a missing second return is 0.
+  local baseHaste, ammoHaste = call("GetRangedHaste")
+  baseHaste = number(baseHaste)
+  put("rangedHaste", baseHaste and percent(baseHaste + (number(ammoHaste) or 0)) or nil)
 
   put("spellPower", whole(lowestSpellPower()))
   put("healing", whole((call("GetSpellBonusHealing"))))
@@ -134,7 +142,9 @@ function S.Collect()
   put("spellHaste", percent((call("UnitSpellHaste", "player"))))
 
   put("armor", whole(select(2, call("UnitArmor", "player"))))
-  put("defense", whole(sum(2, call("UnitDefenseSkill", "player"))))
+  -- Never below 0, as the paper doll's GetEffectiveDefenseSkill does.
+  local defense = sum(2, call("UnitDefenseSkill", "player"))
+  put("defense", defense and whole(math.max(0, defense)) or nil)
   put("dodge", percent((call("GetDodgeChance"))))
   put("parry", percent((call("GetParryChance"))))
   put("block", percent((call("GetBlockChance"))))

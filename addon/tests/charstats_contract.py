@@ -63,7 +63,7 @@ CR_HIT_MELEE = 6; CR_HIT_RANGED = 7; CR_HIT_SPELL = 8
 RATING = { [6] = 1.25, [7] = 0.5, [8] = 2.2 }
 GetCombatRatingBonus = function(cr) return RATING[cr] end
 GetMeleeHaste = function() return 4.5 end
-GetRangedHaste = function() return 3.999 end
+GetRangedHaste = function() return 3.25, 0.75 end
 UnitSpellHaste = function(unit) assert(unit == 'player'); return 8.1 end
 GetExpertise = function() return 7.6, 3, 2 end
 SPELLDMG = { [2] = 310, [3] = 300, [4] = 305, [5] = 320, [6] = 301, [7] = 299 }
@@ -153,6 +153,25 @@ read(lua)
 st = plain(lua)[0]["stats"]
 assert st["meleeHit"] == 1.5 and st["rangedHit"] == 2 and st["spellHit"] == 3.33, st
 
+# Ranged haste is base plus ammo haste; no second return counts as 0; an unreadable base leaves it out.
+lua = addon(setup="GetRangedHaste = function() return 3.25 end")
+read(lua)
+assert plain(lua)[0]["stats"]["rangedHaste"] == 3.25
+lua = addon(setup="GetRangedHaste = function() return 3.25, 0.75 end; issecretvalue = function(v) return v == 0.75 end")
+read(lua)
+assert plain(lua)[0]["stats"]["rangedHaste"] == 3.25, "an unreadable ammo haste counts as 0"
+lua = addon(setup="GetRangedHaste = function() return 3.25, 0.75 end; issecretvalue = function(v) return v == 3.25 end")
+read(lua)
+assert "rangedHaste" not in plain(lua)[0]["stats"]
+
+# Defense is never below 0.
+lua = addon(setup="UnitDefenseSkill = function() return 0, -5 end")
+read(lua)
+assert plain(lua)[0]["stats"]["defense"] == 0
+lua = addon(setup="UnitDefenseSkill = function() return 300, -12 end")
+read(lua)
+assert plain(lua)[0]["stats"]["defense"] == 288
+
 # A missing call omits its keys, never a zero; the others stay.
 lua = addon(setup="GetParryChance = nil; UnitSpellHaste = nil; GetExpertise = nil")
 read(lua)
@@ -192,6 +211,14 @@ assert plain(lua) == []
 lua = addon(setup="UnitStat = function(u, i) if i == 5 then return nil end; return 1, 2, 0, 0 end")
 read(lua)
 assert plain(lua) == [], "four attributes are not enough"
+# All five attributes 0 is a client with no data yet: no row of zeros.
+lua = addon(setup="UnitStat = function() return 0, 0, 0, 0 end")
+read(lua)
+assert plain(lua) == []
+# One zero attribute among real ones is a fact (a class with no spirit).
+lua = addon(setup="ATTR[5] = 0")
+read(lua)
+assert plain(lua)[0]["stats"]["spirit"] == 0
 # A row written earlier stays when a later read is empty.
 lua = addon()
 read(lua)
