@@ -284,6 +284,7 @@ SlashCmdList["EVERLOOT"] = function(msg)
       if E.Completion then E.Completion.Withdraw() end
       if E.Owned then E.Owned.Withdraw() end
       if E.CharStats then E.CharStats.Withdraw() end
+      if E.Pvp then E.Pvp.Withdraw() end
       print("Everloot: completion tracker off; all recorded completion rows were deleted from this file. /reload to apply.")
     end
   elseif msg == "completion" and E.Completion then
