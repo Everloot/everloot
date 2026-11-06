@@ -56,6 +56,16 @@ export function newestRelease(releases: unknown, prefix: string, includePrerelea
 }
 
 /**
+ * What the release check does about the addon: install the newer release itself, only show it, or nothing. Never
+ * into a folder without the addon, never while another install is writing it, and a version whose install already
+ * failed this run is only shown.
+ */
+export function addonUpdateAction(o: { autoUpdate: boolean; installed: string | null; latest: string | null; attempted: ReadonlySet<string>; installing: boolean }): "install" | "notice" | "none" {
+  if (!o.installed || !o.latest || compareVersions(o.latest, o.installed) <= 0 || o.installing) return "none";
+  return o.autoUpdate && !o.attempted.has(o.latest) ? "install" : "notice";
+}
+
+/**
  * The zip's files that may be written: regular files under `Everloot/`, with no `..`, no absolute
  * path and no backslash tricks. Anything else in the archive is ignored, never an error, so a
  * stray README at the top does not block an install.

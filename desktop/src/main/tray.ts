@@ -51,6 +51,7 @@ export function createTray(iconPath: string, actions: TrayActions): { update(sta
           label: state.updateProgress.stage === "ready" ? `Restart to update to ${state.update.latest}` : `Update Everloot to ${state.update.latest}`,
           click: () => { const u = current?.update; if (u?.installable) actions.show("update"); else if (u?.url) actions.openExternal(u.url); },
         }] : []),
+        ...(state.addonUpdate ? [{ label: `Addon ${state.addonUpdate} available`, click: () => actions.show("addon") }] : []),
         { type: "separator" },
         { label: "Open Everloot", click: () => actions.show() },
         { label: "Ask Everloot…", click: () => actions.show("chat") },
@@ -62,7 +63,7 @@ export function createTray(iconPath: string, actions: TrayActions): { update(sta
       ];
       const signature = JSON.stringify(items.map((i) => [i.type ?? "", i.label ?? "", i.enabled ?? true]));
       if (signature !== shown) { shown = signature; tray.setContextMenu(Menu.buildFromTemplate(items)); }
-      const tooltip = `Everloot${paused ? " (paused)" : ""}${state.update?.newer ? ` · update ${state.update.latest} available` : ""}`;
+      const tooltip = `Everloot${paused ? " (paused)" : ""}${state.update?.newer ? ` · update ${state.update.latest} available` : ""}${state.addonUpdate ? ` · addon ${state.addonUpdate} available` : ""}`;
       if (tooltip !== tip) { tip = tooltip; tray.setToolTip(tooltip); }
     },
     destroy: () => tray.destroy(),
