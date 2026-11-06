@@ -245,6 +245,106 @@ function O.Open()
   O.Refresh()
 end
 
+-- Player names (the players module) stay off until the player turns them on, and each install is asked once.
+-- The question comes a few seconds after the first loading screen of a session, never in combat. Either answer,
+-- or /everloot players on or off typed or clicked on this page, sets EverlootDB.playersAsked, and an install
+-- that already has the module on is never asked. The question has no close button: it goes away with an answer.
+O.PLAYERS_QUESTION = "Everloot can record player names for everloot.app. It is off until you choose.\n\n"
+  .. "If you turn it on, it records the name, realm, race, class, level and guild of your own characters and of players "
+  .. "you target, mouse over or group with, and the bosses your guild kills. Never where they are, their gear or what "
+  .. "they do. It stays in your saved file until you upload it; then these characters can appear on everloot.app.\n\n"
+  .. "/everloot players off turns it off and deletes the rows. Anyone can hide a character at everloot.app/players/opt-out. "
+  .. "Everloot asks this once."
+O.ASK_DELAY = 8      -- seconds after the loading screen, so the question does not land on top of it
+O.COMBAT_RETRY = 15  -- seconds before trying again when the player is in combat
+
+function O.PlayersAskDue()
+  return EverlootDB.playersAsked ~= true and EverlootDB.toggles.players ~= true
+end
+
+--- The answer: on runs /everloot players on, as the switch does; off keeps the module off and says so.
+function O.AnswerPlayers(on)
+  if O.prompt then O.prompt:Hide() end
+  if on and SlashCmdList and SlashCmdList.EVERLOOT then
+    SlashCmdList.EVERLOOT("players on")
+  else
+    EverlootDB.playersAsked = true
+    print("Everloot: player names stay off. /everloot players on turns them on.")
+  end
+  O.Refresh()
+end
+
+local function buildPrompt()
+  local made, f = pcall(CreateFrame, "Frame", "EverlootPlayersPrompt", UIParent, "BackdropTemplate")
+  if not made or not f then f = CreateFrame("Frame", "EverlootPlayersPrompt", UIParent) end
+  f:SetWidth(440)
+  f:SetPoint("CENTER", UIParent, "CENTER", 0, 120)
+  f:SetFrameStrata("DIALOG")
+  f:SetClampedToScreen(true)
+  f:EnableMouse(true)
+  local W = E.Window
+  local top
+  if W and W.Backdrop and W.Heading then
+    W.Backdrop(f)
+    f.crest, f.title = W.Heading(f, "Player names")
+    f.crest:SetPoint("TOPLEFT", f, "TOPLEFT", 12, -10)
+    top = f.crest
+  else
+    if f.SetBackdrop then
+      f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true, tileSize = 16, edgeSize = 16, insets = { left = 4, right = 4, top = 4, bottom = 4 } })
+    end
+    f.title = words(f, "GameFontNormalLarge")
+    f.title:SetPoint("TOPLEFT", 16, -16)
+    f.title:SetText("Everloot: player names")
+    top = f.title
+  end
+  local body = words(f, "GameFontHighlightSmall", 12, "text")
+  body:SetPoint("TOPLEFT", top, "BOTTOMLEFT", 4, -10)
+  body:SetWidth(400)
+  body:SetText(O.PLAYERS_QUESTION)
+  f.body = body
+  local on = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  on:SetSize(120, 24)
+  on:SetPoint("TOPLEFT", body, "BOTTOMLEFT", 0, -14)
+  on:SetText("Turn on")
+  on:SetScript("OnClick", function() O.AnswerPlayers(true) end)
+  local off = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  off:SetSize(120, 24)
+  off:SetPoint("LEFT", on, "RIGHT", 10, 0)
+  off:SetText("Leave off")
+  off:SetScript("OnClick", function() O.AnswerPlayers(false) end)
+  f.on, f.off = on, off
+  f:SetHeight(10 + 28 + 10 + body:GetStringHeight() + 14 + 24 + 16)
+  return f
+end
+
+--- Shows the question when it is still due; in combat it tries again a little later.
+function O.AskPlayers()
+  if not O.PlayersAskDue() or (O.prompt and O.prompt:IsShown()) then return end
+  if InCombatLockdown and InCombatLockdown() then
+    C_Timer.After(O.COMBAT_RETRY, function() pcall(O.AskPlayers) end)
+    return
+  end
+  if not O.prompt then
+    local ok, f = pcall(buildPrompt)
+    if not ok or not f then return end
+    O.prompt = f
+  end
+  O.prompt:Show()
+end
+
 E:RegisterModule("options", function()
-  return "ready (" .. O.Register() .. "; /everloot options opens it)"
+  local how = O.Register()
+  -- Only while the question is due, and only with timers: the game's loading screen ends at PLAYER_ENTERING_WORLD.
+  if O.PlayersAskDue() and C_Timer and C_Timer.After then
+    local listen = CreateFrame("Frame")
+    O.askFrame = listen
+    listen:RegisterEvent("PLAYER_ENTERING_WORLD")
+    listen:SetScript("OnEvent", function(self)
+      self:UnregisterEvent("PLAYER_ENTERING_WORLD")
+      C_Timer.After(O.ASK_DELAY, function() pcall(O.AskPlayers) end)
+    end)
+  end
+  return "ready (" .. how .. "; /everloot options opens it)"
 end)

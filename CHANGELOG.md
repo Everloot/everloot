@@ -74,6 +74,11 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   max rank) and this week's raid lockouts (bosses killed of total, reset time) under the completion key, latest state
   only, and the Desktop App's Characters page shows them on the keyed rows. They stay on your computer: no upload, the
   upload page included, sends them, and the Desktop App's Chat does not read them. Not yet checked in game.
+- Addon: player names stay off by default, and the addon now asks once, in game, whether to turn them on. The question
+  comes a few seconds after the first loading screen, never in combat, and says what is recorded (name, realm, race,
+  class, level and guild of your characters and of players you target, mouse over or group with), how to turn it off
+  (`/everloot players off`) and where to hide a character (everloot.app/players/opt-out). After an answer, or a choice
+  made with `/everloot players on|off` or the settings page, it is never asked again.
 - Site: the Auction House lists each realm that has scans but no public prices yet, with how many of the 3 players needed
   have scanned there ("1 of 3 players have scanned; prices go public at 3"). A player is counted once per upload address,
   on the item with the most players on one day in the last 7. `/api/market/prices` without a realm returns the same counts
@@ -106,6 +111,13 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   objects keeps to that type.
 
 ### Changed
+- Site: a character's page reads as one page. Its parts come in a fixed order, each with its own source line: the
+  owner's showcase, what the addon last saw, the guild it was seen in (the guild's own page: its size, its agreed raid
+  progress, labelled as the guild's and not the character's attendance, and up to eight other characters seen in it),
+  then links to the class's pages at the character's level. A rail lists the parts and the date of each source. The
+  sighting names the faction its race plays on (none for Skyborne). When the guild's officers published a board, the
+  guild part also shows that character's rank, the loot they gave it and whether it was at their last raid
+  (`EVERLOOT_CHARACTER_GUILD_FACTS`); the privacy policy, the privacy guide and the data policy say so.
 - Site: the drop rates API (`/api/rollups/drops`) gives each rate `sourceName` once 3 installs agree on the NPC's or
   object's name, so the Desktop App's price file can name sources a player never met.
 - Site: the Auction House files a realm under the PvE, PvP, RP, RP-PvP or Hardcore tab when its name ends in that

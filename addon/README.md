@@ -250,6 +250,11 @@ Off until `/everloot players on` (then `/reload`), and meant to stay off until t
 switched on (`docs/design/specs/2026-10-20-player-pages-design.md`). This is the one module that reads other
 players' names and guilds, so it is separate from the census, which never does. `/everloot players` says
 whether it is on and how many characters it holds; `/everloot players off` stops it at once and deletes every row.
+An install with it off is asked once, in an Everloot window a few seconds after the first loading screen and never in
+combat: **Turn on** runs `/everloot players on`, **Leave off** keeps it off. The window says what is recorded and
+points to `/everloot players off` and the hide form (everloot.app/players/opt-out). Either answer, or
+`/everloot players on|off` typed or set on the settings page, is saved as `playersAsked`, and the question never
+comes back. `addon/tests/options_contract.py` holds the rules.
 
 - **What a row holds** (`player_seen`): name (`UnitName`), realm (`GetRealmName`), race and class tokens
   (`UnitRace`, `UnitClass`), level (`UnitLevel`) and the guild name when the game shows one (`GetGuildInfo`).

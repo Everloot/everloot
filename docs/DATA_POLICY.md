@@ -87,7 +87,9 @@ installs report the same guild and boss, timed at the earliest of their reports;
 the open data export's `guild-kills.ndjson` and `guilds.ndjson` hold only those, and only while the guild pages are on. A guild's page lists its agreed kills, its officers'
 publication when they made one, and the characters the addon saw in that guild: these are player rows, each
 already public on its own page, grouped by the guild the game showed, and the page says they are sightings, not
-the game's member list. Anyone can hide a guild with the guild hide form, without an account or proof of office:
+the game's member list. A character's page shows the guild the addon last saw it in as that guild's page shows it, and
+what the guild's officers published about that one character: its rank on their roster, the loot they gave it and
+whether it was at their last raid. A hidden character is left out of all of it. Anyone can hide a guild with the guild hide form, without an account or proof of office:
 the guild leaves the pages, the ladder, the search and the export at once, and its kill rows are dropped at
 intake from then on. Its characters keep their own pages, which the character hide form governs.
 
