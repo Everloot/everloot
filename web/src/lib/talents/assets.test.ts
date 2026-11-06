@@ -135,6 +135,8 @@ const SHOWS_ART = new Set([
   "web/src/lib/site-card.ts", "web/src/lib/item-icons.ts",
   // A character page's equipped items: names and icons under the same rule, for the gear the page shows.
   "web/src/lib/showcase-gear-art.ts",
+  // The item lists' stored view: the same shown names as shown-item-names.ts, read from the cron's file instead of the corpus.
+  "web/src/lib/item-view.ts",
   // The same names and quest titles for the entity tokens on a wiki page.
   "web/src/lib/wiki-names.ts",
   // Dungeon wiki pages show loading-screen art under the approved page-banner extension.

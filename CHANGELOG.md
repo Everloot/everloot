@@ -124,6 +124,11 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   objects keeps to that type.
 
 ### Changed
+- Site: the item lists, the census, the rankings and the MCP `population` tool read stored files the snapshot cron
+  writes, instead of rebuilding from every upload on each new server instance. The census is one snapshot the cron
+  extends with only the uploads received since its last run; the item lists' agreed names, public drops, and the items
+  players have seen with where they came from are one small file written after each snapshot that added uploads.
+  Both show the same values as before. With no file yet (the first minutes after a deploy) the pages read as before.
 - Site: private sync is on (`EVERLOOT_PRIVATE_SYNC`). A player can make a key with "Sync my linked characters", turn
   sync on per character and category on /account, see what arrived on a signed-in preview, and show each section on
   the character's public page. The data policy section is in effect and /privacy has the matching item.

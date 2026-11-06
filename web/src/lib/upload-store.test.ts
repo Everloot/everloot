@@ -922,3 +922,84 @@ describe("completion rollup", () => {
       .toEqual({ state: null, dataAsOf: null, unreachable: true });
   });
 });
+
+describe("census snapshot", () => {
+  const CENSUS = `${R2}snapshots/census.json`;
+  const INDEX = "https://sb.example/rest/v1/uploads";
+  /** A stored census_self row for one character key (64 hex), as intake writes it. */
+  const self = (installId: string, key: string, level = 20) => ({
+    kind: "census_self", installId, capturedAt, eventId: `census_self:2026-10-04:${key.slice(0, 24)}`,
+    characterKey: key, serverId: 4395, race: "Orc", class: "SHAMAN", level, faction: "Horde", realm: "Forever",
+  });
+  const key = (c: string) => c.repeat(64);
+  const index = (ids: string[]) => ids.map((id, i) => ({ id, object_key: `uploads/${id}.json`, received_at: `2026-10-04T0${i}:00:00+00:00` }));
+  const uploads: Record<string, unknown[]> = {
+    a: [self("install-1", key("a")), lootRow()],
+    b: [self("install-2", key("b"))],
+    c: [self("install-1", key("a"), 22)],
+  };
+  const objectRoutes = Object.entries(uploads).map(([id, records]) => [`${R2}uploads/${id}.json`, "GET", () => Response.json({ records })] as [string, string, () => Response]);
+
+  test("the first run folds every upload, keeps only census rows, and creates the object; it equals a full read", async () => {
+    const { fn, calls } = fakeFetch([
+      [CENSUS, "GET", () => new Response("missing", { status: 404 })],
+      [INDEX, "GET", () => Response.json(index(["a", "b", "c"]))],
+      ...objectRoutes,
+      [CENSUS, "PUT", () => new Response(null, { status: 200 })],
+    ]);
+    const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now, trusted: new Set() });
+    expect(await store.writeCensus()).toEqual({ added: 3, rows: 2, remaining: 0 });
+    const put = calls.find((c) => c.method === "PUT")!;
+    expect(put.headers.get("if-none-match")).toBe("*");
+    const body = JSON.parse(put.body);
+    expect(body).toMatchObject({ version: 1, generatedAt: "2026-10-04T12:00:00.000Z", lastReceivedAt: "2026-10-04T02:00:00+00:00", lastIds: ["c"] });
+    // Last write wins for one install and event: the level 22 copy from upload c.
+    expect(body.rows.map((r: { characterKey: string; level: number }) => [r.characterKey.slice(0, 1), r.level])).toEqual([["a", 22], ["b", 20]]);
+    // The same rows the store folded on every read before the snapshot existed.
+    const full = fakeFetch([[CENSUS, "GET", () => new Response("missing", { status: 404 })], [INDEX, "GET", () => Response.json(index(["a", "b", "c"]))], ...objectRoutes]);
+    expect((await createUploadStore({ cloud, localDir: "unused", fetch: full.fn, now, trusted: new Set() }).loadCensus()).rows).toEqual(body.rows);
+  });
+
+  test("a later run lists only uploads since its watermark and replaces the object it read; an idle run reads nothing more", async () => {
+    const stored = { version: 1, generatedAt: "2026-10-04T01:00:00.000Z", rows: [self("install-1", key("a"))], lastReceivedAt: "2026-10-04T00:00:00+00:00", lastIds: ["a"] };
+    const { fn, calls } = fakeFetch([
+      [CENSUS, "GET", () => Response.json(stored)],
+      [INDEX, "GET", () => Response.json(index(["a", "b"]))],
+      ...objectRoutes,
+      [CENSUS, "PUT", () => new Response(null, { status: 200 })],
+    ]);
+    const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now, trusted: new Set() });
+    expect(await store.writeCensus()).toEqual({ added: 1, rows: 2, remaining: 0 });
+    expect(calls.find((c) => c.url.startsWith(INDEX))!.url).toContain("received_at=gte.2026-10-04T00%3A00%3A00%2B00%3A00");
+    expect(calls.some((c) => c.url.endsWith("uploads/a.json"))).toBe(false);
+    const put = calls.find((c) => c.method === "PUT")!;
+    expect(put.headers.get("if-match")).toBe('"fixture"');
+    expect(JSON.parse(put.body)).toMatchObject({ lastReceivedAt: "2026-10-04T01:00:00+00:00", lastIds: ["b"] });
+    calls.length = 0;
+    expect(await store.writeCensus({ idle: true })).toEqual({ added: 0, rows: 1, remaining: 0, skipped: true });
+    expect(calls.map((c) => c.method)).toEqual(["GET"]);
+  });
+
+  test("a page reads the one snapshot object, dated by it, never the uploads; without one it folds them as before", async () => {
+    const stored = { version: 1, generatedAt: "2026-10-04T11:50:00.000Z", rows: [self("install-1", key("a")), self("everloot-own", key("b"))], lastReceivedAt: null, lastIds: [] };
+    const { fn, calls } = fakeFetch([[CENSUS, "GET", () => Response.json(stored)]]);
+    const read = await createUploadStore({ cloud, localDir: "unused", fetch: fn, now, trusted: new Set(["everloot-own"]) }).loadCensus();
+    expect(read.dataAsOf).toBe("2026-10-04T11:50:00.000Z");
+    expect(read.rows).toHaveLength(2);
+    // Everloot's own installs are still re-marked at read time.
+    expect(read.rows.find((r) => r.installId === "everloot-own")?.reporter).toBe("everloot");
+    expect(calls.map((c) => c.url)).toEqual([CENSUS]);
+  });
+
+  test("an unreadable snapshot stops a normal run and is replaced by a rebuild", async () => {
+    const stuck = fakeFetch([[CENSUS, "GET", () => Response.json({ version: 9 })]]);
+    await expect(createUploadStore({ cloud, localDir: "unused", fetch: stuck.fn, now }).writeCensus()).rejects.toThrow(/rebuild/);
+    const rebuilt = fakeFetch([
+      [CENSUS, "GET", () => Response.json({ version: 9 })],
+      [INDEX, "GET", () => Response.json(index(["b"]))],
+      ...objectRoutes,
+      [CENSUS, "PUT", () => new Response(null, { status: 200 })],
+    ]);
+    expect(await createUploadStore({ cloud, localDir: "unused", fetch: rebuilt.fn, now, trusted: new Set() }).writeCensus({ rebuild: true })).toEqual({ added: 1, rows: 1, remaining: 0 });
+  });
+});

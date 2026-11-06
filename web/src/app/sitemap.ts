@@ -14,7 +14,7 @@ import { CLIENT_LAYER, CLIENT_TAXONOMY, categoryNamedEnough, itemsHref } from "@
 import { DATABASE_HUB_PATHS } from "@/lib/database-hubs";
 import { instancePaths } from "@/lib/database-sitemap";
 import { loadSightings } from "@/lib/instances";
-import { loadShownNames } from "@/lib/shown-item-names";
+import { loadListNames } from "@/lib/item-view";
 import { achievementHref, chainHref, factionHref, loadCatalog, titleHref } from "@/lib/completion-lists";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { RANKINGS, hubIndexable, loadRankingWeeks, rankingIndexable, rankingPath, rankingView } from "@/lib/rankings";
@@ -42,7 +42,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const talentRoutes = TALENT_CLASSES.map((slug) => `/tools/talents/${slug}`);
   // Item categories from the client layer: each class and subclass that holds items, first page only, and only
   // once half that page has a name (the page itself says noindex until then).
-  const { named } = await loadShownNames();
+  const { named } = await loadListNames();
   const itemRoutes = CLIENT_TAXONOMY.classes.filter((c) => c.items > 0).flatMap((c) => [
     ...(categoryNamedEnough(c.id, undefined, named) ? [itemsHref(c.slug)] : []),
     ...CLIENT_TAXONOMY.subclasses.filter((s) => s.classId === c.id && s.items > 0 && categoryNamedEnough(c.id, s.id, named)).map((s) => itemsHref(c.slug, s.slug)),
