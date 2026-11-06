@@ -85,8 +85,8 @@ b. Whether the character page may show a build whose public profile names a char
 c. Whether the Progress tab should offer an owner opt-in to publish completion on the public page later (a new
    grant category); not built here.
 d. Whether a character's page may gather the officers' facts that name it (roster rank, loot received, present at
-   the last raid), which the guild page already shows. Yes means: set `EVERLOOT_CHARACTER_GUILD_FACTS=1` and add the
-   character page to the places the privacy guide and policy say a name from an officers' board appears.
+   the last raid), which the guild page already shows. **Answered yes, 2026-11-06:** `EVERLOOT_CHARACTER_GUILD_FACTS=1`
+   in `web/wrangler.jsonc`, and the privacy policy, privacy guide and data policy name the character page.
 
 ## 5. Testing
 

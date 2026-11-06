@@ -84,8 +84,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   owner's showcase, what the addon last saw, the guild it was seen in (the guild's own page: its size, its agreed raid
   progress, labelled as the guild's and not the character's attendance, and up to eight other characters seen in it),
   then links to the class's pages at the character's level. A rail lists the parts and the date of each source. The
-  sighting names the faction its race plays on (none for Skyborne). The officers' rank, loot and attendance for the one
-  character are built but held behind `EVERLOOT_CHARACTER_GUILD_FACTS`, which is off.
+  sighting names the faction its race plays on (none for Skyborne). When the guild's officers published a board, the
+  guild part also shows that character's rank, the loot they gave it and whether it was at their last raid
+  (`EVERLOOT_CHARACTER_GUILD_FACTS`); the privacy policy, the privacy guide and the data policy say so.
 - Site: the Auction House files a realm under the PvE, PvP, RP, RP-PvP or Hardcore tab when its name ends in that
   ruleset, as Forever's realm list names them ("CAMWOW US1 Realm 4 PvP"); the realm map still overrides, and a realm
   whose name names no ruleset stays under "Realms not mapped yet". Realm names show split the same way: the name, then
