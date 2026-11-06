@@ -54,6 +54,15 @@ each is public on the guild page, but the privacy guide lists the places a name 
 character page needs the owner's word first (decision d below). Talents from a profile matched by name (b) are not
 built.
 
+The showcase's sections (2026-11-05, stacked on #794): a header band (name in class colour, title, line, guild,
+realm, faction, upload date, and item level and achievement points when those sections are shown); gear as a paper
+doll in the game's slot order, empty slots drawn, the same rows in a table under a disclosure, icons and names only
+under the item lists' rule; a `stats` section, `unsupported` on real pages ("The Everloot addon does not record this
+yet."); talents as points per tree with bars (the calculator has no read-only tree view that runs without its
+client state, so the trees themselves stay on the calculator); raids with a boss strip and reset day; Progress
+(counts, recent achievements, category bars, titles, quests); reputations grouped by standing; professions as rank
+bars. The sample page uses the same one-column layout and rail as the real page; no tab row, for the reasons above.
+
 ## 3. The showcase (`EVERLOOT_SHOWCASE=1`)
 
 A set of pages at `/showcase` that render the real components with sample rows, so the site can show, before
