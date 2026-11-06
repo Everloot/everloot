@@ -202,6 +202,16 @@ describe("talents", () => {
     expect(syncCalls()[1].p_facts).toEqual([]);
   });
 
+  test("limits match the protocol's talent row: ranks above 10 and a build above 100 points are accepted", async () => {
+    answers([{ category: "talents", outcome: "stored" }]);
+    await send(thrallina([{ ...talentOwned, points: 11, nodes: [{ nodeId: 1, ranks: 11 }] }]));
+    expect(syncCalls()[0].p_facts[0].data).toMatchObject({ points: 11, nodes: [{ nodeId: 1, ranks: 11 }] });
+    const nodes = Array.from({ length: 150 }, (_, i) => ({ nodeId: i + 1, ranks: 1 }));
+    answers([{ category: "talents", outcome: "stored" }]);
+    await send(thrallina([{ ...talentOwned, points: 150, nodes }]));
+    expect(syncCalls()[1].p_facts[0].data).toMatchObject({ points: 150 });
+  });
+
   test("a talent_owned row whose points do not match its ranks, or repeats a node, is skipped", async () => {
     answers([{ category: null, outcome: "not_linked" }]);
     const body = await (await send(thrallina([

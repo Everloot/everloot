@@ -75,12 +75,12 @@ export const talentOwned = ownedBase.extend({
   kind: z.literal("talent_owned"),
   treeId: z.number().int().positive(),
   specId: z.number().int().positive().optional(),
-  points: z.number().int().min(0).max(100),
+  points: z.number().int().nonnegative().max(500),
   nodes: z.array(z.object({
     nodeId: z.number().int().positive(),
-    ranks: z.number().int().min(1).max(10),
+    ranks: z.number().int().min(1).max(50),
     choice: z.number().int().min(0).max(3).optional(),
-  })).max(200),
+  })).max(600),
 }).superRefine((row, ctx) => {
   if (row.points !== row.nodes.reduce((sum, node) => sum + node.ranks, 0)) {
     ctx.addIssue({ code: "custom", message: "talent points must equal the sum of node ranks", path: ["points"] });
