@@ -155,6 +155,29 @@ test("drop rates come from the public rollup, every page on the same site, three
   await expect(fetchDropSources("https://everloot.app", down as unknown as typeof fetch)).rejects.toThrow(/unreachable/);
 });
 
+test("a rate's source name is kept for the file, keyed by kind and id; a rate left out leaves its name out", async () => {
+  const named = (r: ReturnType<typeof rate>, sourceName: unknown) => ({ ...r, sourceName });
+  const send = vi.fn(async () => dropsPage([
+    named(rate(2589, { sourceNpcId: 116 }, 42, 340, 5), "Defias Bandit"),
+    named(rate(2770, { sourceObjectId: 1731 }, 300, 310, 6), "Copper Vein"),
+    named(rate(1, { sourceNpcId: 2 }, 1, 9, 2), "Too Few Installs"),
+    named(rate(3, { sourceNpcId: 4 }, 1, 9, 3), 42),
+  ]));
+  const drops = await fetchDropSources("https://everloot.app", send as unknown as typeof fetch, new Date("2026-10-21T10:00:00Z"));
+  expect(drops.names).toEqual({ n116: "Defias Bandit", o1731: "Copper Vein" });
+});
+
+test("names written beside the rates are read back with them, so the daily carry-over keeps them", async () => {
+  const d = dir();
+  const addons = join(d, "AddOns");
+  const send = vi.fn(async (url: string) => (url.includes("/api/rollups/drops")
+    ? dropsPage([{ ...rate(2589, { sourceNpcId: 116 }, 42, 340, 5), sourceName: 'Defias "Bandit"\nTwo' }])
+    : new Response(JSON.stringify({ ok: true, dataAsOf: "2026-10-18", realm: "Doomhowl", fields: [], items: [] }))));
+  await refreshMarket({ svFiles: [], followed: ["Doomhowl"], addonsDir: addons, endpoint: "https://everloot.app", send: send as unknown as typeof fetch, now: new Date("2026-10-21T10:00:00Z") });
+  expect(readDropsBlock(addons)).toEqual({ dataAsOf: "2026-10-20T06:00:00.000Z", fetchedAt: "2026-10-21T10:00:00.000Z",
+    rows: [[2589, "n", 116, 42, 340, 5]], names: { n116: 'Defias "Bandit" Two' } });
+});
+
 test("drop rates are fetched once a day; between fetches and after a failure the last good block is kept", async () => {
   const d = dir();
   const addons = join(d, "AddOns");

@@ -124,6 +124,7 @@ export declare const dropsResponse: z.ZodObject<{
         rate: z.ZodNumber;
         reporters: z.ZodNumber;
         public: z.ZodLiteral<true>;
+        sourceName: z.ZodOptional<z.ZodString>;
     }, z.core.$strip>>;
     measuredZeros: z.ZodArray<z.ZodObject<{
         sourceNpcId: z.ZodOptional<z.ZodNumber>;
@@ -1390,6 +1391,7 @@ export declare const API_SCHEMAS: {
             rate: z.ZodNumber;
             reporters: z.ZodNumber;
             public: z.ZodLiteral<true>;
+            sourceName: z.ZodOptional<z.ZodString>;
         }, z.core.$strip>>;
         measuredZeros: z.ZodArray<z.ZodObject<{
             sourceNpcId: z.ZodOptional<z.ZodNumber>;

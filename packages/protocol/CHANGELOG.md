@@ -6,6 +6,10 @@ required, or tightening a limit is a major release.
 
 ## [Unreleased]
 
+### Added
+- `dropsResponse.rates[].sourceName`: the NPC's or object's name, once 3 installs agree on it; absent until then.
+  Optional, so earlier readers are unaffected.
+
 ### Changed
 - Description text only, no shape change: every MCP tool description opens with what it returns, says when to use it and
   which sibling tool to use instead, and where its id comes from; the `limit` parameters of `guild_search`,

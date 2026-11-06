@@ -63,12 +63,21 @@ test("the slot addon holds one checksummed string per realm and matches the gold
 });
 
 test("drop rates sit beside the realms in one checksummed string, grouped by item and best rate first", () => {
-  const { lua } = renderPricesAddon(FIXTURE_REALMS, FIXTURE_DROPS);
+  const { lua } = renderPricesAddon(FIXTURE_REALMS, { ...FIXTURE_DROPS, names: undefined });
   const data = "2589,n,116,42,340,5;2589,n,94,12,200,3;2589,n,474,5,120,4;2589,n,6,1,90,3;2770,o,1731,300,310,6;12345,n,61,1,80,3";
   expect(lua).toContain(`}, ["drops"] = { ["data"] = "${data}", ["sum"] = ${adler32(data)}, ["dataAsOf"] = "2026-10-20T06:00:00.000Z", ["fetchedAt"] = "2026-10-20T06:30:00.000Z" } }`);
   // Without drops the file ends as it did before drops existed.
   expect(renderPricesAddon(FIXTURE_REALMS).lua).toMatch(/\n\} \}\n$/);
   expect(renderPricesAddon(FIXTURE_REALMS).lua).not.toContain("drops");
+});
+
+test("the drops table names the sources the site knows, one line each, only for sources in the rows", () => {
+  const { lua } = renderPricesAddon(FIXTURE_REALMS, FIXTURE_DROPS);
+  // After fetchedAt, outside the checksummed data, so addons that predate it read the rates as before.
+  expect(lua).toContain(`["fetchedAt"] = "2026-10-20T06:30:00.000Z", ["names"] = "n116=Defias Bandit\\nn6=Kobold Vermin\\nn94=Bad \\"|cffff0000Name|r\\" n6=Forged\\no1731=Copper Vein" } }`);
+  expect(lua).not.toContain("Not In Any Row");
+  const unnamed = renderPricesAddon(FIXTURE_REALMS, { ...FIXTURE_DROPS, names: undefined }).lua;
+  expect(unnamed).not.toContain('["names"]');
 });
 
 test("realm keys lower-case ASCII only, as Lua's string.lower does", () => {
