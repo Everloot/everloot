@@ -192,6 +192,12 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the player pages are live. A player page shows what the addon last saw of a character — race, class,
   level, guild and the day — found by the start of the name, and every page carries a hide link and a hide
   form. The search index stays off for now, so the pages are reached by name and are not listed anywhere.
+- Site: character links and public character pages are on (`EVERLOOT_CHARACTER_LINKS`, `EVERLOOT_SHOWCASE`). On
+  /account a player links their own characters with a code typed in game, unlinks them, and can give each one a
+  public page at `/characters/<ruleset>/<realm>/<name>` with its name, level, race, class, faction and realm and two
+  share images. A new link is private, every page is noindex, and the hide form takes a page down without an
+  account. A character two accounts link stays frozen until it is settled: write to hello@everloot.app, we reply
+  within 7 days. The data policy, /privacy and the account page say so.
 
 ### Added
 - Site: the open data export, at `/database/download`. The published data as NDJSON files anyone can download

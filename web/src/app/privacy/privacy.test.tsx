@@ -85,6 +85,30 @@ test("profiles: private by default, what a public profile shows and never shows,
   ]) expect(policy).toContain(claim);
 });
 
+test("linked characters: private until a page is turned on, how a dispute is settled, the hide form, and never verified", () => {
+  const items = html.slice(html.indexOf('<li id="linked-characters">'), html.indexOf('<li id="chat-projects">'));
+  expect(items).toContain('href="/players/opt-out"');
+  expect(items).toContain('href="mailto:hello@everloot.app"');
+  expect(items.toLowerCase()).not.toContain("verified");
+  for (const claim of [
+    "Link rows never go in an upload.",
+    "Neither the game's id nor the install id is stored.",
+    "We don't check it with Blizzard.",
+    "until we settle it: write to hello@everloot.app and we reply within 7 days",
+    "A linked character is private: only you see it, unless you give it a public page.",
+    "It never shows your BattleTag, your email, your account, your handle or the hashes.",
+    "Search engines are asked not to index it.",
+    "Anyone can hide a character on the hide form, without an account",
+    "Linked characters are unlinked, and their public pages turned on or off, on your account page.",
+    "Linked characters and their page settings: until you unlink the character or delete your account.",
+  ]) expect(text).toContain(claim);
+  for (const claim of [
+    "## Public character pages",
+    "it never calls the character verified or owned",
+    "write to hello@everloot.app: we reply within 7 days",
+  ]) expect(policy).toContain(claim);
+});
+
 test("chat's free model: what goes to the provider, what never does, and what we keep", () => {
   for (const claim of [
     "Chat's free model (optional):",

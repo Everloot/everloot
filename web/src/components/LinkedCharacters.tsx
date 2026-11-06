@@ -35,10 +35,9 @@ export const LABEL_TEXT = "Planned builds: the page can list the shared builds y
 
 /**
  * What a frozen link says to its owner. It tells them another account linked the character too, and nothing about
- * that account. How to reach us about it is the owner's decision (D8 in the identity ADR), so no contact or promise
- * of review is made here yet.
+ * that account. The contact and reply time are D8 in the identity ADR; /privacy and the data policy say the same.
  */
-export const FROZEN_TEXT = "Frozen: another account has linked this character too, so it is frozen on both accounts and shows nowhere until that is settled. Unlinking it here does not unfreeze the other account's link.";
+export const FROZEN_TEXT = "Frozen: another account has linked this character too, so it is frozen on both accounts and shows nowhere until that is settled. To settle it, write to hello@everloot.app; we reply within 7 days. Unlinking it here does not unfreeze the other account's link.";
 
 /**
  * The account page's linked characters: make a code to type in game, the account's own links with their status, and
