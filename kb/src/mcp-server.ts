@@ -813,7 +813,7 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
       const files = options.gameData ? await options.gameData() : null;
       const result = await answerSources(db, args, read?.facts ?? null, read?.dataAsOf ?? null, files);
       // The fallback is said in the text; the structured answer keeps its published shape.
-      const { someWords: _someWords, ...structured } = result;
+      const { someWords: _someWords, respelled: _respelled, ...structured } = result;
       const observations = read !== null ? true : observationsConfigured(options.corpus) ? "unreachable" : false;
       return { text: `${formatAnswerSources(result, observations)}${read ? `\n${answerFooter(read.dataAsOf)}` : ""}`, structured };
     },

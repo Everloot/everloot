@@ -18,6 +18,12 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Addon: an item's name and quality are recorded once, not again in every loot window and on every vendor that sells
   it, and a vendor is recorded once per UTC day unless an item, a price or a limited stock changed. Before, about ten
   vendor visits filled the 2,000-row cap for item names and every new name after that was lost.
+- Site and MCP: chat search reads a misspelled place or word as its common spelling and says so: "does thunderbluff have
+  a zeppeling?" is read as "thunder bluff" and "zeppelin" and finds The Zephyr instead of unrelated lore. Names from the
+  game files are never respelled. "learn mining in orgrimmar" finds the trainer, "what dungeon at level 30" lists the
+  dungeons near that level from the map entrances, a page named in the question opens with its first sentence, and
+  flight masters show only when the question is about flying or that place. Spanish price questions ("cuánto cuesta
+  linen cloth") go to the price lookup, and the chat no longer opens with the archive note meant for AI clients.
 - Addon: the Everloot price block shows once per hover. Comparing an item opens the game's comparison tooltips beside
   the main one, and each of them carried the block too, so one hover read it up to three times.
 - CurseForge: an Alpha release uploads as a CurseForge Beta, named "Everloot <version> Beta". CurseForge's Files tab hides
