@@ -196,4 +196,34 @@ Everloot:StartScan(); fire('REPLICATE_ITEM_LIST_UPDATE'); tick(1)
 assert(countCalls('browse')==1,'replicate result API error falls back safely')
 """)
 
+lua=runtime()
+lua.execute("""
+-- Partial samples are pruned like full scans: before a sample stores its first row, only the newest earlier
+-- sample of that realm stays, so two 1,000-row samples cannot fill the 2,000-row cap and make the next report "stored 0".
+Everloot.MAX_ROWS_PER_KIND=9
+local function sample(realm,at)
+ GetRealmName=function() return realm end
+ date=function() return at end
+ EverlootDB.lastScanAt=nil
+ Everloot:StartScan(); tick(1); fire('AUCTION_HOUSE_BROWSE_RESULTS_UPDATED'); tick(1)
+ fire('ITEM_SEARCH_RESULTS_UPDATED',key); tick(1)
+ fire('COMMODITY_SEARCH_RESULTS_UPDATED',765); tick(1)
+ assert(not Everloot:Scanning())
+ return printed[#printed]
+end
+sample('Elsewhere','2026-10-30T00:00:00Z')
+sample('Forever','2026-10-31T00:00:00Z')
+sample('Forever','2026-10-31T01:00:00Z')
+assert(#EverlootDB.records.auction_scan==9,'two samples of a realm fit beside another realm')
+local said=sample('Forever','2026-10-31T02:00:00Z')
+assert(said:find('stored 3 search rows'),'a third sample still stores: '..said)
+local rows=EverlootDB.records.auction_scan
+assert(#rows==9,'the oldest sample of the realm left the file: '..#rows)
+for i=1,3 do assert(rows[i].realm=='Elsewhere','another realm is untouched') end
+for i=4,6 do assert(rows[i].capturedAt=='2026-10-31T01:00:00Z','the newest earlier sample stays') end
+for i=7,9 do assert(rows[i].capturedAt=='2026-10-31T02:00:00Z','the new sample follows it') end
+assert(not (EverlootDB.paused and EverlootDB.paused.auction_scan),'a pruned kind is not paused')
+""")
+check_all(lua)
+
 print('Lua 5.1 auction fallback: explicit click, actual partial rows, bounded pages/throttle, timeout, cancellation, no trading')

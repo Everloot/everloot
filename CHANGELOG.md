@@ -15,6 +15,9 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
+- Addon: a partial price sample (the search-based fallback when a full scan cannot run) keeps only the newest earlier
+  sample of that realm before it stores, so two samples no longer fill the 2,000-row `auction_scan` cap and later samples no
+  longer report "stored 0". Another realm's rows stay.
 - CurseForge: an Alpha release uploads as a CurseForge Beta, named "Everloot <version> Beta". CurseForge's Files tab hides
   alpha files unless a visitor ticks "Show alpha files", so with every file an Alpha it read "No Results". GitHub still marks
   the release a pre-release, and the site still calls the addon an Alpha.
