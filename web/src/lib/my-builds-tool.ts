@@ -24,7 +24,7 @@ export const MY_BUILDS_TOOL: McpToolDef = {
   title: "My saved builds",
   description: `${MY_BUILDS_LINE} Needs a key made with "Read my saved builds". Each build links its short link while sharing is on, otherwise the calculator, and says whether it was made on an older or a newer game build than the calculator's tree (olderBuild, newerBuild).`,
   inputSchema: { slug: z.string().regex(SLUG_PATTERN).optional().describe("A build's slug from the list, for that build's talents.") },
-  annotations: { readOnlyHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 };
 
 const UNAVAILABLE = "Saved builds are unavailable right now. Try again in a minute.";

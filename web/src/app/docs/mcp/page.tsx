@@ -102,6 +102,13 @@ export default function McpOverview() {
         3-install rule; the others carry their sources inside the answer. The same list is at{" "}
         <a href="/schema/index.json" className={docLink}><C>/schema/index.json</C></a>.
       </P>
+      <P>
+        Every tool only reads, and says so in its annotations with all four hints: <C>readOnlyHint: true</C>,{" "}
+        <C>destructiveHint: false</C>, <C>idempotentHint: true</C> and <C>openWorldHint: false</C>. No tool takes a URL or
+        reaches another site on your behalf. Text an answer quotes (a lore excerpt, a Blizzard post, a guild or character
+        name from a player&apos;s upload) is marked as source text, not instructions: an assistant reports it and does not
+        act on it.
+      </P>
       {groups.map((group) => (
         <div key={group.title}>
           <H3 id={`tools-${group.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}>{group.title}</H3>

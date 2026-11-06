@@ -11,6 +11,9 @@ required, or tightening a limit is a major release.
   Optional, so earlier readers are unaffected.
 
 ### Changed
+- Annotations only, no shape change: every MCP tool's `annotations` carry `destructiveHint: false` and
+  `idempotentHint: true` beside `readOnlyHint: true` and `openWorldHint: false`, and `schema/mcp/<tool>.json` shows all
+  four. The server used to add `destructiveHint` at registration; now the table and the schema files say it too.
 - Description text only, no shape change: every MCP tool description opens with what it returns, says when to use it and
   which sibling tool to use instead, and where its id comes from; the `limit` parameters of `guild_search`,
   `guild_rankings`, `recent_changes` and `ecosystem_projects` state what they cap. Written against the tool definition

@@ -38,7 +38,7 @@ Use the same words everywhere, so the listings match the site and each other.
 | Website | `https://everloot.app` |
 | Source | `https://github.com/Everloot/everloot` (AGPL-3.0-only) |
 | Icon | `web/public/icon-512.png` and `icon-64.png`, rendered from the site icon (`https://everloot.app/icon-512.png`) |
-| Reads or writes | Reads only. Every tool carries `readOnlyHint: true` and a `title` (checked against the live endpoint on 2026-10-20: 28 tools, all annotated; 32 tools live on 2026-11-02). |
+| Reads or writes | Reads only. Every tool carries all four hints (`readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false`) and a `title`, in the live `tools/list` and in `/schema/mcp/<tool>.json` (checked against the live endpoint on 2026-10-20: 28 tools, all annotated; 32 tools live on 2026-11-02; four hints from 0.9.1). |
 | Data handling | Our own API. No personal health data, no sponsored content, no conversation data collected. |
 
 ### Long description
@@ -90,8 +90,9 @@ ingest from, so it comes first. Docs: [quickstart](https://modelcontextprotocol.
 may reset.
 
 - **`server.json`** at the repository root describes the remote server: name `app.everloot/knowledge`,
-  one `streamable-http` remote, version `0.9.0` (the MCP server's `SERVER_VERSION`; bump both together).
-  `mcp-publisher validate` passes.
+  one `streamable-http` remote, version `0.9.1` (the MCP server's `SERVER_VERSION`; bump both together), the two
+  listing icons (`icons`, 64 and 512 px, served from the site) and `repository.subfolder: kb`, where the server's
+  code lives. `mcp-publisher validate` passes.
 - **Namespace proof** is the HTTP method: `web/public/.well-known/mcp-registry-auth` holds the public
   key record (`v=MCPv1; k=ed25519; p=…`). The matching private key is on the maintainer machine only,
   outside the repository, never committed.
