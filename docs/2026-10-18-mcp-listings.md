@@ -90,8 +90,9 @@ ingest from, so it comes first. Docs: [quickstart](https://modelcontextprotocol.
 may reset.
 
 - **`server.json`** at the repository root describes the remote server: name `app.everloot/knowledge`,
-  one `streamable-http` remote, version `0.9.1` (the MCP server's `SERVER_VERSION`; bump both together).
-  `mcp-publisher validate` passes.
+  one `streamable-http` remote, version `0.9.1` (the MCP server's `SERVER_VERSION`; bump both together), the two
+  listing icons (`icons`, 64 and 512 px, served from the site) and `repository.subfolder: kb`, where the server's
+  code lives. `mcp-publisher validate` passes.
 - **Namespace proof** is the HTTP method: `web/public/.well-known/mcp-registry-auth` holds the public
   key record (`v=MCPv1; k=ed25519; p=…`). The matching private key is on the maintainer machine only,
   outside the repository, never committed.

@@ -4,9 +4,26 @@
   "title": "Everloot: WoW Forever data",
   "description": "World of Warcraft: Forever lore and player-observed drops, vendors, quests, professions and talents.",
   "websiteUrl": "https://everloot.app/connect",
+  "icons": [
+    {
+      "src": "https://everloot.app/icon-64.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "64x64"
+      ]
+    },
+    {
+      "src": "https://everloot.app/icon-512.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "512x512"
+      ]
+    }
+  ],
   "repository": {
     "url": "https://github.com/Everloot/everloot",
-    "source": "github"
+    "source": "github",
+    "subfolder": "kb"
   },
   "version": "0.9.1",
   "remotes": [

@@ -120,7 +120,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   `idempotentHint: true`, `openWorldHint: false`), in the live tool list and in `/schema/mcp/<tool>.json`, so a directory
   that scores unannotated tools as destructive and open-world has nothing to assume. Lore hits open and guild boards close by
   saying their names and excerpts are quoted source text, not instructions, as Blizzard's posts already did, and the
-  server's instructions tell every client the same and that no tool writes.
+  server's instructions tell every client the same and that no tool writes. `server.json` (and its copy at
+  `/.well-known/mcp/server-card.json`) now carries the listing icons and the `kb` subfolder for the registry.
 - Site: a character's page reads as one page. Its parts come in a fixed order, each with its own source line: the
   owner's showcase, what the addon last saw, the guild it was seen in (the guild's own page: its size, its agreed raid
   progress, labelled as the guild's and not the character's attendance, and up to eight other characters seen in it),
