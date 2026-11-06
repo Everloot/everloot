@@ -36,7 +36,7 @@ O.ROWS = {
   { key = "guild", label = "Guild",
     text = "Your guild's roster, lockouts and loot. Published only through an officer's upload." },
   { key = "completion", command = "completion", label = "Completion tracker",
-    text = "Your achievements, reputation, titles and completed quests, read only; also your professions, raid lockouts and active talent build. Stays on this computer unless you upload it or switch on private sync at everloot.app. Off deletes its rows." },
+    text = "Your achievements, reputation, titles and completed quests, read only; also your professions, raid lockouts and active talent build. Collection rows leave only from the upload page; the other three only through the Desktop App's private sync, for a character you linked. Off deletes its rows." },
   { key = "addons", command = "addons", label = "Installed addon list",
     text = "Each installed addon's name and version. Sent only from the upload page. Off deletes its rows." },
   { key = "players", command = "players", label = "Player pages",

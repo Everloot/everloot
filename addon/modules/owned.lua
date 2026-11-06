@@ -252,5 +252,5 @@ E:RegisterModule("owned", function()
       pcall(O.ReadLockouts)
     end
   end)
-  return "ready: " .. describe() .. "; kept on this computer; the Everloot Desktop App sends them only for characters you linked, under the switches you set on everloot.app"
+  return "ready: " .. describe() .. "; kept on this computer; never in an upload; the Everloot Desktop App sends a linked character's rows and everloot.app keeps only the categories you switched on"
 end, "completion")

@@ -840,8 +840,8 @@ A signed-in player can sync their own linked characters' progress to their accou
 their character's public page shows. Like saved builds and profiles, this is the player's own data, not an
 observation of anyone else, and none of it is published as a dataset.
 
-- **What is synced.** For each linked character, and only for the categories the player turns on for that
-  character: equipped gear (slot, item id, item level), the active talent build (talent node ids and ranks),
+- **What is synced.** For each linked character the Desktop App sends the categories below, and the site keeps only the
+  ones the player has turned on for that character: equipped gear (slot, item id, item level), the active talent build (talent node ids and ranks),
   professions (name and rank), reputations (faction id and standing), this week's raid lockouts (instance,
   difficulty, bosses killed, reset), and achievements this character earned and titles held. Every category starts off. The
   Desktop App sends these with a key made with "Sync my linked characters" (`sync:own`); that key can send and
