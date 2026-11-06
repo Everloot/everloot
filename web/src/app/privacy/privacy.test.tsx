@@ -109,6 +109,28 @@ test("linked characters: private until a page is turned on, how a dispute is set
   ]) expect(policy).toContain(claim);
 });
 
+test("private sync: what the app sends, that the link decides, private by default, deletion, and never verified", () => {
+  const item = html.slice(html.indexOf('<li id="private-sync">'), html.indexOf('<li id="chat-projects">'));
+  expect(item.toLowerCase()).not.toContain("verified");
+  for (const claim of [
+    "Sync my linked characters",
+    "Every category starts off.",
+    "kept only when your account holds a live link to that character",
+    "only the newest capture of each category",
+    "Nothing synced is public until you turn your page on and that section on.",
+    "Turning a category's sync off deletes what was synced for it at once; unlinking the character or deleting your account deletes all of it.",
+    "Synced data is turned on and off, and each section shown or hidden, on your account page.",
+    "Synced character data: the newest capture of each category, until you turn that category off, unlink the character or delete your account.",
+  ]) expect(text).toContain(claim);
+  for (const claim of [
+    "## Private sync and owner-published sections",
+    "In effect from 6 November 2026",
+    "The link decides, not the computer.",
+    "achievements this character earned",
+  ]) expect(policy).toContain(claim);
+  expect(policy).not.toContain("Not in effect yet.");
+});
+
 test("chat's free model: what goes to the provider, what never does, and what we keep", () => {
   for (const claim of [
     "Chat's free model (optional):",

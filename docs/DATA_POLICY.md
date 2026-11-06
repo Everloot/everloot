@@ -827,8 +827,9 @@ player pages and guild pages hold about the character (see "What players see in 
 
 ## Private sync and owner-published sections
 
-Not in effect yet. Built behind `EVERLOOT_PRIVATE_SYNC`, which is off: until it is on and its
-migration (`20261106120000_private_sync.sql`) is applied, none of this happens.
+In effect from 6 November 2026, accepted by the maintainer that day (`EVERLOOT_PRIVATE_SYNC`, migration
+`20261106120000_private_sync.sql`). The Desktop App does not send talent builds yet: the addon's talent rows do not
+say which character they belong to.
 
 A signed-in player can sync their own linked characters' progress to their account and choose which parts of it
 their character's public page shows. Like saved builds and profiles, this is the player's own data, not an
