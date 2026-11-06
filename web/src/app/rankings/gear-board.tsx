@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, Container, DataTable, EmptyState, FilterBar, PageHeader, type Column, type FilterControl } from "@/components/ui";
 import {
-  BOARD_ROWS, boardHref, boardQuery, GEAR_BOARDS, gearBoardPath, leaderboardsOn, loadGearBoard, rankEntries,
+  BOARD_ROWS, boardHref, boardQuery, GEAR_BOARDS, gearBoardPath, leaderboardsOn, loadGearBoard, rankEntries, updatedLine,
   type BoardQuery, type GearMetric, type RankedEntry,
 } from "@/lib/leaderboards";
 import { RULESET_LABEL, RULESET_SLUGS } from "@/lib/realms";
@@ -20,7 +20,6 @@ import { link, RankingRail, Swatch } from "./parts";
 
 type Search = Record<string, string | string[] | undefined>;
 
-export const UNCHECKED_LINE = "The game files could not be read just now, so no gear can be checked and nothing is ranked. Try again in a few minutes.";
 export const UNAVAILABLE_LINE = "The rankings are unavailable right now. Try again in a minute.";
 const EMPTY_LINE = "No ranked characters here yet. Link a character, make its page public, turn on gear sync and choose Rank my gear on your account page.";
 const RANK_ACTION = { href: "/account#characters", label: "Rank your character" };
@@ -107,15 +106,15 @@ export async function GearBoardPage({ metric, searchParams }: { metric: GearMetr
           trail={[{ name: "Home", path: "/" }, { name: "Rankings", path: "/rankings" }, { name: def.title, path }]}
           title={def.title}
           lede={def.lede}
-          meta={board.state === "ready" && <span>As of {board.asOf.slice(0, 16).replace("T", " ")} UTC</span>}
+          meta={board.state === "ready" && (
+            <time dateTime={board.generatedAt} title={`${board.generatedAt.slice(0, 16).replace("T", " ")} UTC`}>{updatedLine(board.generatedAt)}</time>
+          )}
         />
         <div className="grid gap-4 lg:grid-cols-[11rem_minmax(0,1fr)] lg:gap-6">
           <RankingRail current={path} />
           <div className="min-w-0 space-y-4">
             {board.state === "unavailable" ? (
               <Card><p className="text-fg-2">{UNAVAILABLE_LINE}</p></Card>
-            ) : board.state === "unchecked" ? (
-              <Card><p className="text-fg-2">{UNCHECKED_LINE}</p></Card>
             ) : (
               <>
                 <FilterBar label="Ranking filters" controls={controls(metric, q)} active={active} clearHref={path} />
@@ -137,7 +136,8 @@ export async function GearBoardPage({ metric, searchParams }: { metric: GearMetr
               <p>
                 Only characters their player linked to an Everloot account, with the page public, gear sync on and Rank my gear
                 turned on. The gear is what the player&apos;s own addon last sent, in the last 30 days, and it is checked against the
-                game files: each item&apos;s level is the files&apos; level. It is not checked with Blizzard.
+                game files: each item&apos;s level is the files&apos; level. It is not checked with Blizzard. The boards are scored
+                every 30 minutes; turning any of those off takes a character off at once.
               </p>
               <p>
                 Item level and Gear Score ({GEAR_SCORE_VERSION}) are both averages over 17 slots, shirt and tabard left out, an empty

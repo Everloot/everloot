@@ -11,12 +11,14 @@ import { guildPath, guildsOn } from "@/lib/guilds";
 import { leaderboardsOn } from "@/lib/leaderboard-switch";
 import { GEAR_BOARDS, gearBoardPath, loadGearBoard, ranksOf, type GearMetric, type RankedEntry } from "@/lib/leaderboards";
 import { characterPath, optOutPath, playerPagesOn, type Player } from "@/lib/player-pages";
+import { loadTrack } from "@/lib/profile-pipeline";
 import { pageMetadata } from "@/lib/seo";
 import { withGearArt } from "@/lib/showcase-gear-art";
 import { className, classText, describePlayer, PLAYER_SIGHTING_LINE, PLAYER_STORAGE_UNAVAILABLE, raceName } from "@/app/players/player-view";
 import { InstanceCard } from "@/app/guilds/parts";
 import { characterGuild, GUILD_LINE, PLAN_LINE, raceFaction, type CharacterGuild } from "./character-guild";
 import { characterParts, characterShowcase, plannedBuilds, publishedFacts, type Params } from "./character-view";
+import { TrackChart } from "@/app/characters/track-chart";
 
 /**
  * Read on every request and never cached, so a page switched off, or a character hidden, is gone at once. The
@@ -232,8 +234,10 @@ export default async function CharacterPage(props: { params: Promise<Params> }) 
   const guildRead = sighted ? await characterGuild(sighted) : null;
   const guild = guildRead === "unreachable" ? null : guildRead;
   const c = showcase?.input;
-  const board = c && leaderboardsOn() ? await loadGearBoard(now) : null;
+  const board = c && leaderboardsOn() ? await loadGearBoard() : null;
   const ranks = c && board?.state === "ready" ? ranksOf(board.entries, c.realm, c.name) : null;
+  // Only a ranked character's history, read from what the profile cron stored: nothing is scored here.
+  const track = ranks ? await loadTrack(ranks["item-level"].entry.linkId) : null;
   const name = c?.name ?? sighted!.name;
   const realm = c?.realm ?? sighted!.realm;
   const path = c?.path ?? characterPath(sighted!.ruleset, sighted!.realm, sighted!.name);
@@ -266,6 +270,7 @@ export default async function CharacterPage(props: { params: Promise<Params> }) 
             ? <ShowcaseHeader showcase={showcase} trail={trail(name, path)} />
             : <PageHeader trail={trail(name, path)} title={<span className={classText(sighted!.class)}>{name}</span>} lede={`${describePlayer(sighted!)} · ${realm}`} />}
           {ranks && <GearRanks ranks={ranks} />}
+          {track && track.length >= 2 && <TrackChart days={track} name={name} />}
           {showcase ? <OwnerPart showcase={showcase} /> : owner === "unavailable" && <Unavailable text={UNAVAILABLE} />}
           {sighted ? <SightingPart seen={sighted} /> : seen === "unavailable" && <Unavailable text={PLAYER_STORAGE_UNAVAILABLE} />}
           {guild ? <GuildPart guild={guild} /> : guildRead === "unreachable" && <Unavailable text={GUILD_UNAVAILABLE} />}

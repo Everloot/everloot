@@ -11,6 +11,7 @@ test("the Worker's triggers are exactly the schedules this file runs", () => {
 test("a trigger calls its routes with the cron secret, and an unknown schedule runs nothing", () => {
   expect(cronPaths("*/10 * * * *")).toEqual(["/api/cron/snapshot", "/api/cron/blue"]);
   expect(cronPaths("23 * * * *")).toEqual(["/api/cron/indexnow"]);
+  expect(cronPaths("7,37 * * * *")).toEqual(["/api/cron/profiles"]);
   expect(cronPaths("0 0 * * *")).toEqual([]);
   const req = cronRequest("/api/cron/snapshot", "s3cret");
   expect(req.url).toBe("https://everloot.app/api/cron/snapshot");

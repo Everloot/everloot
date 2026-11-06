@@ -367,10 +367,11 @@ describe("gear ranks (EVERLOOT_LEADERBOARDS)", () => {
   const entry = (name: string, itemLevel: number, gearScore: number) => ({
     name, realm: "Forever Pioneer", realmBase: "Forever Pioneer", ruleset: null, region: null, race: "Orc", class: "SHAMAN", faction: "Horde",
     level: 24, path: `/characters/forever/forever-pioneer/${name.toLowerCase()}`, capturedAt: "2026-10-31T09:00:00Z", itemLevel, gearScore,
+    linkId: `link-${name}`,
   });
   const on = () => { for (const k of ["EVERLOOT_LEADERBOARDS", "EVERLOOT_CHARACTER_LINKS", "EVERLOOT_PRIVATE_SYNC"]) vi.stubEnv(k, "1"); };
   beforeEach(() => {
-    gearBoard.load.mockReset().mockResolvedValue({ state: "ready", asOf: "2026-11-01T12:00:00Z", notCounted: 0, entries: [entry("Thrallina", 40, 41), entry("Other", 45, 39)] });
+    gearBoard.load.mockReset().mockResolvedValue({ state: "ready", generatedAt: "2026-11-01T12:00:00Z", notCounted: 0, entries: [entry("Thrallina", 40, 41), entry("Other", 45, 39)] });
     auth.authQuery.mockImplementation(async (path: string) => (path === "rpc/public_character" ? [ROW] : []));
   });
 
@@ -384,12 +385,36 @@ describe("gear ranks (EVERLOOT_LEADERBOARDS)", () => {
 
   test("off the boards, or with them off, the page has no ranks and the boards are not read", async () => {
     on();
-    gearBoard.load.mockResolvedValue({ state: "ready", asOf: "2026-11-01T12:00:00Z", notCounted: 0, entries: [entry("Other", 45, 39)] });
+    gearBoard.load.mockResolvedValue({ state: "ready", generatedAt: "2026-11-01T12:00:00Z", notCounted: 0, entries: [entry("Other", 45, 39)] });
     expect(await render()).not.toContain('aria-label="Rankings"');
     gearBoard.load.mockClear();
     vi.stubEnv("EVERLOOT_LEADERBOARDS", "");
     expect(await render()).not.toContain('aria-label="Rankings"');
     expect(gearBoard.load).not.toHaveBeenCalled();
+  });
+
+  test("a ranked character with two tracked days or more gets its chart, read for its own link only", async () => {
+    on();
+    const points = [
+      { day: "2026-11-04", metric: "item_level", value: 38 }, { day: "2026-11-04", metric: "gear_score", value: 39 },
+      { day: "2026-11-06", metric: "item_level", value: 40 }, { day: "2026-11-06", metric: "gear_score", value: 41 },
+    ];
+    const track = vi.fn((_body: unknown) => points);
+    auth.authQuery.mockImplementation(async (path: string, init?: RequestInit) =>
+      path === "rpc/public_character" ? [ROW] : path === "rpc/character_track_points" ? track(JSON.parse(String(init?.body))) : []);
+    const html = await render();
+    expect(track).toHaveBeenCalledWith({ p_link_id: "link-Thrallina" });
+    expect(html).toContain("data-track-chart");
+    expect(html).toContain('aria-label="Thrallina: item level and Gear Score by day"');
+    expect(html).toContain("<th scope=\"row\">2026-11-06</th><td>40</td><td>41</td>");
+    // One day is not a line yet.
+    track.mockReturnValue(points.slice(0, 2));
+    expect(await render()).not.toContain("data-track-chart");
+    // Off the boards: no chart, and its points are not read.
+    track.mockClear();
+    gearBoard.load.mockResolvedValue({ state: "ready", generatedAt: "2026-11-01T12:00:00Z", notCounted: 0, entries: [entry("Other", 45, 39)] });
+    expect(await render()).not.toContain("data-track-chart");
+    expect(track).not.toHaveBeenCalled();
   });
 });
 

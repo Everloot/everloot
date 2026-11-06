@@ -70,6 +70,11 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   `addon_download` to CurseForge like the other download links. The same tested zip is uploaded there on each release.
 
 ### Added
+- Site: the gear rankings are scored every 30 minutes by a new cron (`/api/cron/profiles`) and stored, instead of on
+  every page view; the boards say how long ago. Each view still filters the stored boards against who is ranked right
+  now, so a switch turned off takes a character off on the next request. Ranked characters get a daily history of
+  level, item level and Gear Score, drawn as a chart on their page from the second day. Behind `EVERLOOT_LEADERBOARDS`
+  (off; needs migration `20261107130000_profile_pipeline.sql`). Design: `docs/design/2026-11-07-profile-pipeline.md`.
 - Site: item level and Gear Score rankings for linked characters at /rankings/item-level and /rankings/gear-score
   (`EVERLOOT_LEADERBOARDS`, migration `20261107120000_gear_board.sql`, the data policy's "Gear rankings"). A character
   is on them only while its player made the page public, turned gear sync on and chose "Rank my gear" on the account page.

@@ -2,8 +2,11 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
-// The boards read ranked_gear_board, then the game files for every item; both are fed in here.
+// The cron reads ranked_gear_board and the game files for every item and stores the boards; a page reads what it
+// stored and the links on the boards right now. The database, the game files and the stored object are fed in here.
 const auth = vi.hoisted(() => ({ authQuery: vi.fn() }));
+const stored = vi.hoisted(() => ({ snapshot: null as unknown, read: vi.fn() }));
+vi.mock("@/lib/gear-board-store", () => ({ gearBoardStore: () => ({ read: stored.read, write: async (s: unknown) => { stored.snapshot = s; } }) }));
 vi.mock("@/lib/supabase/server", () => ({ authQuery: auth.authQuery, getUser: vi.fn(), siteUrl: () => "https://everloot.app" }));
 const files = vi.hoisted(() => ({ assets: { base: "https://assets.example/1", version: "1", label: "x" } as unknown, shows: (_id: number): boolean => true }));
 // Item 1 a head (inventory type 1) at 60, item 2 a ring (11) at 50.
@@ -18,10 +21,11 @@ vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_
 
 import ItemLevelPage, { generateMetadata } from "./item-level/page";
 import GearScorePage from "./gear-score/page";
-import { UNCHECKED_LINE, UNAVAILABLE_LINE } from "./gear-board";
+import { UNAVAILABLE_LINE } from "./gear-board";
+import { writeGearBoard } from "@/lib/profile-pipeline";
 
 const row = (name: string, realm: string, equipped: object[], at = "2026-11-06T10:00:00Z") =>
-  ({ ruleset: "forever", realm, name, race: "Orc", class: "SHAMAN", faction: "Horde", level: 60, captured_at: at, data: { equipped } });
+  ({ link_id: `link-${name}`, ruleset: "forever", realm, name, race: "Orc", class: "SHAMAN", faction: "Horde", level: 60, captured_at: at, received_at: at, data: { equipped } });
 const HEAD = { slot: "HeadSlot", itemId: 1, itemLevel: 60 };
 const RING = { slot: "Finger0Slot", itemId: 2, itemLevel: 50 };
 const ROWS = [
@@ -32,11 +36,26 @@ const ROWS = [
 const html = async (page: Promise<ReactNode> | ReactNode) => renderToStaticMarkup(await page);
 const search = (s: Record<string, string> = {}) => Promise.resolve(s);
 
-beforeEach(() => {
+/** The links on the boards right now. */
+let live: string[] = [];
+/** One cron run over `rows`, stored where the pages read it. */
+async function cron(rows: object[] = ROWS) {
+  live = rows.map((r) => (r as { link_id: string }).link_id);
+  auth.authQuery.mockImplementation(async (path: string) =>
+    path === "rpc/ranked_gear_links" ? live.map((link_id) => ({ link_id })) : path === "rpc/ranked_gear_board" ? rows : 0);
+  await writeGearBoard({ rebuild: true }, { now: new Date() });
+  auth.authQuery.mockClear();
+  stored.read.mockClear();
+}
+
+beforeEach(async () => {
   for (const k of ["EVERLOOT_LEADERBOARDS", "EVERLOOT_CHARACTER_LINKS", "EVERLOOT_SHOWCASE", "EVERLOOT_PRIVATE_SYNC"]) vi.stubEnv(k, "1");
-  auth.authQuery.mockReset().mockResolvedValue(ROWS);
+  auth.authQuery.mockReset();
+  stored.snapshot = null;
+  stored.read.mockReset().mockImplementation(async () => stored.snapshot);
   files.assets = { base: "https://assets.example/1", version: "1", label: "x" };
   files.shows = () => true;
+  await cron();
 });
 afterEach(() => { vi.unstubAllEnvs(); });
 
@@ -47,11 +66,14 @@ test("off, both boards are a 404 and nothing is read", async () => {
   vi.stubEnv("EVERLOOT_PRIVATE_SYNC", "");
   await expect(html(GearScorePage({ searchParams: search() }))).rejects.toThrow("NEXT_NOT_FOUND");
   expect(auth.authQuery).not.toHaveBeenCalled();
+  expect(stored.read).not.toHaveBeenCalled();
 });
 
-test("ranks by the board's number, links each character, and counts the gear it left out", async () => {
+test("ranks the stored board by its number, links each character, and counts the gear it left out", async () => {
   const page = await html(GearScorePage({ searchParams: search() }));
-  expect(auth.authQuery).toHaveBeenCalledWith("rpc/ranked_gear_board", expect.objectContaining({ method: "POST" }));
+  // A page view scores nothing: one read of the links on the boards, never the board rows.
+  expect(auth.authQuery.mock.calls.map((c) => c[0])).toEqual(["rpc/ranked_gear_links"]);
+  expect(page).toContain("Updated just now");
   expect(page.indexOf("Helmy")).toBeLessThan(page.indexOf("Ringo"));
   expect(page).toContain('href="/characters/forever/camwow-us1-realm-4-pvp/helmy"');
   expect(page).not.toContain("Faker");
@@ -71,20 +93,39 @@ test("filters by ruleset and region from the realm name; an unknown value is a 4
 
 test("an item a page may not show yet keeps that gear off the board", async () => {
   files.shows = (id) => id !== 1;
+  await cron();
   const page = await html(ItemLevelPage({ searchParams: search() }));
   expect(page).not.toContain("Helmy");
   expect(page).toContain("Ringo");
 });
 
-test("without the game files nothing is ranked unchecked; storage down says so", async () => {
+test("a character whose owner switched ranking off since the run is gone on the next view, not the next run", async () => {
+  expect(await html(ItemLevelPage({ searchParams: search() }))).toContain("Helmy");
+  live = live.filter((id) => id !== "link-Helmy");
+  const page = await html(ItemLevelPage({ searchParams: search() }));
+  expect(page).not.toContain("Helmy");
+  expect(page).toContain("Ringo");
+  // Faker (not counted) switched off too: the not-counted line goes with it.
+  live = live.filter((id) => id !== "link-Faker");
+  expect(await html(GearScorePage({ searchParams: search() }))).not.toContain("Not counted");
+});
+
+test("without the game files the cron keeps the boards it had; with either read down the boards are unavailable, never unfiltered", async () => {
+  const before = stored.snapshot;
   files.assets = null;
-  expect(await html(ItemLevelPage({ searchParams: search() }))).toContain(UNCHECKED_LINE);
-  auth.authQuery.mockRejectedValueOnce(new Error("down"));
+  await expect(cron([row("Newbie", "CAMWOW US1 Realm 4 PvP", [HEAD])])).rejects.toThrow(/game files/);
+  expect(stored.snapshot).toBe(before);
+  auth.authQuery.mockImplementation(async () => { throw new Error("down"); });
+  expect(await html(ItemLevelPage({ searchParams: search() }))).toContain(UNAVAILABLE_LINE.replaceAll("'", "&#x27;"));
+  auth.authQuery.mockImplementation(async () => live.map((link_id) => ({ link_id })));
+  stored.read.mockRejectedValueOnce(new Error("down"));
+  expect(await html(ItemLevelPage({ searchParams: search() }))).toContain(UNAVAILABLE_LINE.replaceAll("'", "&#x27;"));
+  stored.read.mockResolvedValueOnce(null);
   expect(await html(ItemLevelPage({ searchParams: search() }))).toContain(UNAVAILABLE_LINE.replaceAll("'", "&#x27;"));
 });
 
 test("an empty board says how to get on it, and the boards are never indexed", async () => {
-  auth.authQuery.mockResolvedValue([]);
+  await cron([]);
   expect(await html(ItemLevelPage({ searchParams: search() }))).toContain("No ranked characters here yet");
   expect(generateMetadata().robots).toEqual({ index: false, follow: true });
 });
