@@ -243,12 +243,12 @@ ${row(3, 43)}
 });
 
 describe("character link codes in the upload job", () => {
-  const linkFile = (d: string) => {
+  const linkFile = (d: string, extra = "") => {
     const file = join(d, "Everloot.lua");
     writeFileSync(file, `EverlootDB = {
 ["version"] = "0.3.14",
 ["installId"] = "abcd-1234-ef56-7890",
-["records"] = {
+["records"] = {${extra}
 ["character_link"] = {
 {["eventId"] = "character_link:1", ["capturedAt"] = "2026-11-01T18:00:00Z", ["code"] = "EL-7K3Q-9P", ["name"] = "Thrallina", ["realm"] = "Forever Pioneer", ["race"] = "Orc", ["class"] = "SHAMAN", ["level"] = 24, ["faction"] = "Horde", ["guid"] = "Player-4395-0A1B2C3D", ["completionKey"] = "0a1b2c3d"},
 },
@@ -266,6 +266,9 @@ describe("character link codes in the upload job", () => {
       const url = String(input);
       if (url.includes("/api/coverage/settled")) return new Response(null, { status: 404 });
       calls.push({ url, auth: new Headers(init?.headers).get("authorization"), body: String(init?.body) });
+      if (url.endsWith("/api/me/characters/sync")) {
+        return Response.json({ characters: [{ index: 0, result: "synced", categories: { professions: "stored" } }], skipped: 0 });
+      }
       const records = JSON.parse(String(init?.body)).records as { kind: string }[];
       if (url.endsWith("/api/me/characters/links")) {
         return Response.json({ results: [{ index: 0, status: "linked", name: "Thrallina", realm: "Forever Pioneer", message: "Linked." }] });
@@ -290,6 +293,30 @@ describe("character link codes in the upload job", () => {
       expect(calls[0].auth).toBeNull();
       for (const secret of ["character_link", "Player-4395", "EL-7K3Q-9P", key]) expect(calls[0].body).not.toContain(secret);
       expect(calls[1].auth).toBe(`Bearer ${key}`);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  test("signed in, a linked character's professions go to the sync endpoint after the link, never with the upload", async () => {
+    const d = dir();
+    const data = join(d, "data");
+    const key = `evl_${"ab".repeat(32)}`;
+    mkdirSync(data, { recursive: true });
+    writeFileSync(join(data, ACCOUNT_KEY_FILE), key);
+    writeKeyOrigin(data, "https://everloot.app");
+    const calls = site();
+    const professions = `
+["profession_owned"] = {
+{["capturedAt"] = "2026-11-05T10:00:00Z", ["characterKey"] = "0a1b2c3d", ["class"] = "SHAMAN", ["level"] = 24, ["profession"] = "Mining", ["rank"] = 75, ["maxRank"] = 150},
+},`;
+    try {
+      const said = await companionJobs(data, () => ({ ...defaultSettings(), endpoint: "https://everloot.app" })).deps.upload(linkFile(d, professions));
+      expect(said).toContain("linked Thrallina of Forever Pioneer; synced 1 character");
+      expect(calls.map((c) => new URL(c.url).pathname)).toEqual(["/api/intake", "/api/me/characters/links", "/api/me/characters/sync"]);
+      expect(calls[0].body).not.toContain("profession_owned");
+      expect(calls[2].auth).toBe(`Bearer ${key}`);
+      expect(JSON.parse(calls[2].body)).toEqual({ characters: [{ name: "Thrallina", realm: "Forever Pioneer", records: [expect.objectContaining({ kind: "profession_owned", profession: "Mining" })] }] });
     } finally {
       vi.unstubAllGlobals();
     }
