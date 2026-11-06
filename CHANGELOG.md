@@ -84,10 +84,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   objects keeps to that type.
 
 ### Changed
-- Addon, Desktop App and site: a tooltip's drop row names its source even when you never met it. The drop rates API
-  gives each rate `sourceName` once 3 installs agree on the NPC's or object's name, the Desktop App writes those names
-  into the price file beside the rates, and the addon shows them ("Drops from Battered Chest" instead of "Drops from
-  object 106318"). A name your own client showed still comes first. Older addons ignore the names.
+- Site: the drop rates API (`/api/rollups/drops`) gives each rate `sourceName` once 3 installs agree on the NPC's or
+  object's name, so the Desktop App's price file can name sources a player never met.
 - Site: the Auction House files a realm under the PvE, PvP, RP, RP-PvP or Hardcore tab when its name ends in that
   ruleset, as Forever's realm list names them ("CAMWOW US1 Realm 4 PvP"); the realm map still overrides, and a realm
   whose name names no ruleset stays under "Realms not mapped yet". Realm names show split the same way: the name, then
@@ -199,6 +197,18 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   agree. Fishing (the bobber, or an object installs agree is fished) is never a pin. An upload of an event
   that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
   instead of withdrawing the event as a conflict. The map shows none of this yet.
+
+## [0.3.21] - 2026-11-06
+
+Release channel: Alpha
+
+Drop rows name their source even when you never met it, with the names the site knows. Needs Desktop App 0.1.18 or
+later to write the names into the price file. Not yet seen in the Forever client.
+
+### Changed
+- A tooltip's drop row names its source from the price file when you never met it: "Drops from Battered Chest" instead
+  of "Drops from object 106318", and `/everloot price` says "Battered Chest (object 106318)". A name your own client
+  showed still comes first, and a source the site has no name for keeps its id.
 
 ## [desktop-v0.1.18] - 2026-11-06
 
