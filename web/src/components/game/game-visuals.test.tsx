@@ -217,9 +217,10 @@ test("home: the hero keeps the game name and credited loading art without the ga
   expect(banner).toContain(">World of Warcraft: Forever</p>");
   expect(banner).not.toMatch(/class="[^"]*hidden[^"]*">World of Warcraft: Forever/);
   expect(banner).not.toContain("endorsed by Blizzard");
-  // The countdown sits on the banner, in Glint's speech bubble, and only there.
-  expect(banner).toMatch(/data-glint-hero[\s\S]*Forever launches <a href="\/wow-forever"[^>]*><time/);
-  expect(html.match(/Forever launches/g)).toHaveLength(1);
+  // Forever is out, so the server render says so in Glint's speech bubble on the banner, and only there.
+  expect(banner).toMatch(/data-glint-hero[\s\S]*Forever is live\. Show me what you looted!/);
+  expect(html.match(/Forever is live\./g)).toHaveLength(1);
+  expect(html).not.toContain("Forever launches");
   expect(html).not.toMatch(/data-game-credit|data-source-line/);
   expect(html.indexOf("data-launch-banner")).toBeLessThan(html.indexOf("<h1"));
 });
@@ -230,8 +231,8 @@ test("home: without the game's logo in the upload there is no launch banner, and
   const html = await render(() => Home());
   expect(html).not.toMatch(/data-launch-banner|logo-wow|World of Warcraft: Forever<\/p>/);
   expect(html).not.toContain("loading/9249");
-  // The countdown stays in the hero.
-  expect(html).toContain("Forever launches");
+  // Glint's live line stays in the hero.
+  expect(html).toContain("Forever is live. Show me what you looted!");
 });
 
 test("wow-forever: race and faction emblems beside the names in the race and class table, and no credit line", async () => {
