@@ -19,20 +19,27 @@ local FALLBACK_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 
 local refresh
 
--- What was recorded for one profession: how many recipes, each colour's count, and the newest read day.
+-- What was recorded for one profession: how many recipes, each colour's count, and the newest read day. A recipe
+-- whose colour changed has a row per colour (professions.lua), so only its newest row counts.
 local function recorded(name)
-  local out = { n = 0, orange = 0, yellow = 0, green = 0, grey = 0 }
-  local newest
+  local latest = {}
   for _, r in ipairs(E:Rows("recipe_observed")) do
     if type(r) == "table" and r.profession == name then
-      out.n = out.n + 1
-      local bucket = BUCKETS[r.difficulty]
-      if bucket then out[bucket] = out[bucket] + 1 end
-      local at = type(r.kindLoggedAt) == "string" and r.kindLoggedAt:match("^%d%d%d%d%-%d%d%-%d%d")
-      if at and (not newest or at > newest) then newest = at end
+      local id = r.recipeId ~= nil and r.recipeId or r.recipe
+      local at = type(r.kindLoggedAt) == "string" and r.kindLoggedAt:match("^%d%d%d%d%-%d%d%-%d%d") or ""
+      if id ~= nil then
+        local seen = latest[id]
+        if not seen or at >= seen.at then latest[id] = { at = at, difficulty = r.difficulty } end
+      end
     end
   end
-  out.newest = newest
+  local out = { n = 0, orange = 0, yellow = 0, green = 0, grey = 0 }
+  for _, r in pairs(latest) do
+    out.n = out.n + 1
+    local bucket = BUCKETS[r.difficulty]
+    if bucket then out[bucket] = out[bucket] + 1 end
+    if r.at ~= "" and (not out.newest or r.at > out.newest) then out.newest = r.at end
+  end
   return out
 end
 
@@ -42,7 +49,7 @@ local function draw(block, p)
   block.icon:SetTexture(p.icon or FALLBACK_ICON)
   block.bar:SetMinMaxValues(0, p.maxRank or math.max(p.rank, 1))
   block.bar:SetValue(p.rank)
-  block.rank:SetText(p.rank .. " / " .. (p.maxRank or "-"))
+  block.rank:SetText(p.maxRank and (p.rank .. " / " .. p.maxRank) or "-")
   if got.n == 0 then
     block.recipes:SetText(READ_IT)
   else

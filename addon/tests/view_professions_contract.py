@@ -22,6 +22,7 @@ RECORDS = """{
   recipe_observed = {
     { profession = 'Cooking', recipeId = 1, difficulty = 'optimal', kindLoggedAt = '2026-11-06T09:00:00Z' },
     { profession = 'Cooking', recipeId = 2, difficulty = 'medium', kindLoggedAt = '2026-11-07T10:30:00Z' },
+    { profession = 'Cooking', recipeId = 2, difficulty = 'optimal', kindLoggedAt = '2026-11-03T10:30:00Z' },
     { profession = 'Alchemy', recipeId = 3, difficulty = 'optimal', kindLoggedAt = '2026-11-08T10:30:00Z' },
   },
 }"""
@@ -66,6 +67,20 @@ assert(U.Open('professions') == true)
 local p = EverlootWindow.professions
 assert(p.empty.shown and p.empty.text == 'No professions learned yet.', p.empty.text)
 assert(not p.blocks[1].shown and not U.failed)
+""")
+# A recipe whose colour changed has a row per colour: only the newest counts. A missing max rank reads as a dash.
+lua = fresh("{ installId = 'abcd-1234', toggles = {}, records = { recipe_observed = { "
+            "{ profession = 'Cooking', recipeId = 9, difficulty = 'optimal', kindLoggedAt = '2026-11-01T10:00:00Z' }, "
+            "{ profession = 'Cooking', recipeId = 9, difficulty = 'medium', kindLoggedAt = '2026-11-05T10:00:00Z' } } } }",
+            "GetProfessionInfo = function(i) if i == 1 then return 'Cooking', 'x', 5, nil end end; "
+            "GetProfessions = function() return 1 end")
+lua.execute("""
+local U = Everloot.Window
+assert(U.Open('professions') == true)
+local b = EverlootWindow.professions.blocks[1]
+assert(b.recipes.text == '1 recipe recorded: 0 orange · 1 yellow · 0 green · 0 grey', b.recipes.text)
+assert(b.last.text == 'Last read: 2026-11-05', b.last.text)
+assert(b.rank.text == '-' and not U.failed)
 """)
 print("Lua 5.1 Professions view: book ranks with bars, recipe counts by colour and the newest read date, "
       "the open-the-window line, no book, no professions")
