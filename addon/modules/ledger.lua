@@ -19,6 +19,7 @@ local DAY = 86400
 local MAX_EVENTS = 5000
 local MAX_AGE = 90 * DAY
 local MAX_SALES = 2000
+local PENDING_SECONDS = 48 * 3600
 local MAX_CLOSES = 400
 local MAX_ITEM_NAME = 80
 local SERIES_DAYS = 30
@@ -112,17 +113,47 @@ function L.Record(key, category, copper, extra)
   return true
 end
 
---- Appends one auction sale: item, count, total after the house cut, the deposit returned and the cut.
+--- Appends a sale the sold notice announced: the item is known, the gold is not until the letter is taken.
+function L.RecordPending(key, itemName)
+  if not validKey(key) or not validName(itemName) then return false end
+  local s = store()
+  s.sales[#s.sales + 1] = { at = time(), key = key, itemName = itemName, status = "pending" }
+  evict(s)
+  return true
+end
+
+--- The oldest pending sale of this item for this character, or nil.
+function L.MatchPending(key, itemName)
+  for _, row in ipairs(store().sales) do
+    if row.status == "pending" and row.key == key and row.itemName == itemName then return row end
+  end
+  return nil
+end
+
+--- Marks pending sales older than 48 hours as unmatched: the letter never came, or its item name did not match.
+function L.ExpirePending(now)
+  now = tonumber(now) or time()
+  for _, row in ipairs(store().sales) do
+    if row.status == "pending" and type(row.at) == "number" and row.at < now - PENDING_SECONDS then row.status = "unmatched" end
+  end
+end
+
+--- Records one auction sale: item, count, total after the house cut, the deposit returned and the cut. A pending
+--- sale of the same item is filled in and marked paid; otherwise the sale is appended.
 function L.RecordSale(key, sale)
   if not validKey(key) or type(sale) ~= "table" then return false end
   if not validName(sale.itemName) or not whole(sale.count, 1) or not whole(sale.total, 1) then return false end
   if sale.deposit ~= nil and not whole(sale.deposit, 0) then return false end
   if sale.cut ~= nil and not whole(sale.cut, 0) then return false end
   local s = store()
-  s.sales[#s.sales + 1] = {
-    at = time(), key = key, itemName = sale.itemName, count = sale.count, unit = math.floor(sale.total / sale.count),
-    total = sale.total, deposit = sale.deposit, cut = sale.cut, status = "paid",
-  }
+  L.ExpirePending(time())
+  local row = L.MatchPending(key, sale.itemName)
+  if not row then
+    row = {}
+    s.sales[#s.sales + 1] = row
+  end
+  row.at, row.key, row.itemName, row.count = time(), key, sale.itemName, sale.count
+  row.unit, row.total, row.deposit, row.cut, row.status = math.floor(sale.total / sale.count), sale.total, sale.deposit, sale.cut, "paid"
   evict(s)
   return true
 end
@@ -268,6 +299,7 @@ end
 
 --- The keys' auction sales between two times (both included; nil means all), newest first.
 function L.Sales(keys, fromTs, toTs)
+  L.ExpirePending(time())
   fromTs = math.max(tonumber(fromTs) or 0, oldest())
   toTs = tonumber(toTs) or time()
   local wanted, list = keySet(keys), {}
@@ -282,15 +314,17 @@ function L.Sales(keys, fromTs, toTs)
   return list
 end
 
---- The same sales grouped by item name: count sold, total, average unit price and number of sales, largest total first.
+--- The same paid sales grouped by item name: count sold, total, average unit price and number of sales, largest total first.
 function L.SalesByItem(keys, fromTs, toTs)
   local groups, list = {}, {}
   for _, s in ipairs(L.Sales(keys, fromTs, toTs)) do
-    local g = groups[s.itemName]
-    if not g then g = { itemName = s.itemName, count = 0, total = 0, sales = 0 }; groups[s.itemName] = g; list[#list + 1] = g end
-    g.count = g.count + s.count
-    g.total = g.total + s.total
-    g.sales = g.sales + 1
+    if s.status == "paid" then
+      local g = groups[s.itemName]
+      if not g then g = { itemName = s.itemName, count = 0, total = 0, sales = 0 }; groups[s.itemName] = g; list[#list + 1] = g end
+      g.count = g.count + s.count
+      g.total = g.total + s.total
+      g.sales = g.sales + 1
+    end
   end
   for _, g in ipairs(list) do g.unit = math.floor(g.total / g.count) end
   table.sort(list, function(a, b)
@@ -332,5 +366,6 @@ end
 E:RegisterModule("ledger", function()
   local s = store()
   evict(s)
+  L.ExpirePending(time())
   return string.format("ready (%d events, %d sales, local only)", #s.events, #s.sales)
 end, "gold")

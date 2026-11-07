@@ -37,6 +37,8 @@ SAVED = f"""{{ installId = 'abcd-1234', toggles = {{}}, records = {{}},
     sales = {{
       {{ at = {TODAY + 8 * 3600}, key = 'aaaa0002', itemName = 'Linen Cloth', count = 10, unit = 190, total = 1900, status = 'paid' }},
       {{ at = {TODAY + 11 * 3600}, key = '{ME}', itemName = 'Linen Cloth', count = 20, unit = 190, total = 3800, deposit = 60, cut = 200, status = 'paid' }},
+      {{ at = {TODAY + 11 * 3600 + 1800}, key = '{ME}', itemName = 'Linen Cloth', status = 'pending' }},
+      {{ at = {TODAY + 6 * 3600}, key = '{ME}', itemName = 'Copper Ore', status = 'unmatched' }},
     }},
     daily = {{
       ['{ME}'] = {{ ['2026-11-05'] = 1000000, ['2026-11-06'] = 1200000, ['2026-11-07'] = 1312745 }},
@@ -95,14 +97,19 @@ assert(g.period == 'today' and g.unrecorded.text:find('^Unrecorded: 5|T.-Silver.
 
 -- Sales: one by one for this character, every character's grouped by item.
 click(g.tabs.sales)
-assert(shown(g.sales) == 1 and g.sales[1].item.text .. ' ' .. g.sales[1].count.text == 'Linen Cloth × 20')
-assert(money(g.sales[1].unit.text, {{1, 'Silver'}}, {{90, 'Copper'}}) and money(g.sales[1].total.text, {{38, 'Silver'}}, {{0, 'Copper'}}), g.sales[1].unit.text)
-assert(g.sales[1].when.text == '2026-11-07 11:00' and g.sales[1].status.text == 'Paid')
+assert(shown(g.sales) == 3, 'paid, pending and unmatched rows are listed')
+-- Newest first: the pending notice, the paid sale, the unmatched notice.
+assert(g.sales[1].item.text == 'Linen Cloth' and g.sales[1].status.text == 'sold, gold pending', g.sales[1].status.text)
+assert(g.sales[1].count.text == '-' and g.sales[1].unit.text == '-' and g.sales[1].total.text == '-', 'a pending row has no price yet')
+assert(g.sales[2].item.text .. ' ' .. g.sales[2].count.text == 'Linen Cloth × 20')
+assert(money(g.sales[2].unit.text, {{1, 'Silver'}}, {{90, 'Copper'}}) and money(g.sales[2].total.text, {{38, 'Silver'}}, {{0, 'Copper'}}), g.sales[2].unit.text)
+assert(g.sales[2].when.text == '2026-11-07 11:00' and g.sales[2].status.text == 'paid')
+assert(g.sales[3].item.text == 'Copper Ore' and g.sales[3].status.text == 'unmatched' and g.sales[3].total.text == '-')
 click(g.scopes.account)
-assert(shown(g.sales) == 2 and g.sales[1].count.text == '× 20' and g.sales[2].count.text == '× 10', 'newest first')
+assert(shown(g.sales) == 4 and g.sales[2].count.text == '× 20' and g.sales[3].count.text == '× 10', 'newest first')
 assert(g.groupButton.text == 'By item')
 click(g.groupButton)
-assert(g.grouped and shown(g.sales) == 1 and g.sales[1].count.text == '× 30' and g.sales[1].when.text == '2 sales', g.sales[1].when.text)
+assert(g.grouped and shown(g.sales) == 1 and g.sales[1].count.text == '× 30' and g.sales[1].when.text == '2 sales', 'grouped view counts paid sales only')
 assert(money(g.sales[1].total.text, {{57, 'Silver'}}, {{0, 'Copper'}}) and g.groupButton.text == 'Each sale')
 
 -- Session: the gph lines and the commands' own buttons.

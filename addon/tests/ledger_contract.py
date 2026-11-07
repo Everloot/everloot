@@ -318,4 +318,37 @@ assert "ledger: off by toggle" in g.status(), g.status()
 assert len(py(L.Sales(keys(A), 0, NOW))) == 2000, "queries work with the module off"
 g.EverlootDB.ledger = None
 assert py(L.Summary(keys(A), 0, NOW).categories) == [] and py(L.Sales(keys(A), 0, NOW)) == [], "no store, empty results"
+# Pending sales: the sold notice's row is filled by the matching sale, oldest first; 48 hours without a letter is unmatched.
+g.EverlootDB.ledger = None
+g.clock = NOW - 5000
+assert L.RecordPending(A, "Linen Cloth") is True
+g.clock = NOW - 4000
+L.RecordPending(A, "Linen Cloth")
+L.RecordPending(B, "Linen Cloth")
+assert L.RecordPending(A, "") is False, "no item name"
+first = L.MatchPending(A, "Linen Cloth")
+assert first.at == NOW - 5000 and first.status == "pending" and L.MatchPending(A, "Copper Ore") is None, "oldest of this key and item"
+assert L.MatchPending(B, "Linen Cloth").at == NOW - 4000
+g.clock = NOW
+assert L.RecordSale(A, extra(itemName="Linen Cloth", count=20, total=1990, deposit=60, cut=105)) is True
+sales_rows = py(g.EverlootDB.ledger.sales)
+assert len(sales_rows) == 3, "the sale filled a pending row, it did not add one"
+assert sales_rows[0] == {"at": NOW, "key": A, "itemName": "Linen Cloth", "count": 20, "unit": 99, "total": 1990,
+                         "deposit": 60, "cut": 105, "status": "paid"}, sales_rows[0]
+assert sales_rows[1]["status"] == "pending" and sales_rows[1]["at"] == NOW - 4000, "the newer pending row stays"
+by_item = py(L.SalesByItem(keys(A, B), 0, NOW))
+assert by_item == [{"itemName": "Linen Cloth", "count": 20, "total": 1990, "unit": 99, "sales": 1}], by_item
+L.RecordSale(A, extra(itemName="Copper Ore", count=1, total=10))
+assert len(py(g.EverlootDB.ledger.sales)) == 4, "no pending row: the sale appends"
+# 47 hours: still pending. 49 hours: unmatched, listed with that status, left out of the grouped view.
+g.EverlootDB.ledger = None
+g.clock = NOW
+L.RecordPending(A, "Ore")
+L.ExpirePending(NOW + 47 * 3600)
+assert g.EverlootDB.ledger.sales[1].status == "pending", "47 hours is still pending"
+L.ExpirePending(NOW + 49 * 3600)
+assert g.EverlootDB.ledger.sales[1].status == "unmatched" and L.MatchPending(A, "Ore") is None
+assert [r["status"] for r in py(L.Sales(keys(A), 0, NOW))] == ["unmatched"]
+assert py(L.SalesByItem(keys(A), 0, NOW)) == []
+
 print("ledger contract: PASS")

@@ -8,7 +8,8 @@
 -- and listings name other players; those fields are never read into a record.
 -- Each event also goes to the local ledger (ledger.lua) under the character key, with
 -- an auction sale kept by item (name, count, deposit, cut) there only; the uploaded
--- money_event keeps its shape. The day's closing gold is written there as it changes.
+-- money_event keeps its shape. The sold notice (a system line naming only the item) adds a pending sale there; the
+-- letter's sale fills it in. The day's closing gold is written there as it changes.
 
 local E = Everloot
 
@@ -97,6 +98,27 @@ local function storeSale(mail)
   if key then
     E.Ledger.RecordSale(key, { itemName = item.itemName, count = item.count, total = mail.sale, deposit = item.deposit, cut = item.cut })
   end
+end
+
+--- The sold notice's Lua pattern, from the client's own format string ("A buyer has been found for your auction of %s."),
+--- built once at init; nil when the client has no such string.
+local soldPattern = nil
+local function soldNoticePattern()
+  local format = E.Readable(_G.ERR_AUCTION_SOLD_S)
+  if type(format) ~= "string" or not format:find("%s", 1, true) then return nil end
+  return "^" .. format:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0"):gsub("%%%%s", "(.+)") .. "$"
+end
+
+--- A sold notice names the item and nothing else; the gold comes with the letter. The line may carry an item link,
+--- of which only the bracketed name is kept. A secret or non-string line records nothing.
+local function soldNotice(text)
+  text = E.Readable(text)
+  if not soldPattern or type(text) ~= "string" then return end
+  local ok, item = pcall(string.match, text, soldPattern)
+  if not ok or not item then return end
+  item = item:match("%[(.-)%]") or item
+  local key = ledgerKey()
+  if key then E.Ledger.RecordPending(key, item) end
 end
 
 local function whole(copper)
@@ -207,6 +229,8 @@ E:RegisterModule("gold", function()
   local f = E.frame
   f:RegisterEvent("PLAYER_ENTERING_WORLD")
   f:RegisterEvent("LOOT_OPENED")
+  soldPattern = soldNoticePattern()
+  if soldPattern then pcall(function() f:RegisterEvent("CHAT_MSG_SYSTEM") end) end
   for _, name in ipairs({ "PLAYER_MONEY", "MERCHANT_SHOW", "MERCHANT_CLOSED", "TAXIMAP_OPENED", "TAXIMAP_CLOSED", "QUEST_TURNED_IN", "MAIL_CLOSED",
     "MAIL_SEND_SUCCESS", "MAIL_FAILED", "AUCTION_HOUSE_CLOSED", "COMMODITY_PRICE_UPDATED", "COMMODITY_PRICE_UNAVAILABLE", "COMMODITY_PURCHASE_FAILED", "AUCTION_HOUSE_SHOW_ERROR" }) do
     pcall(function() f:RegisterEvent(name) end)
@@ -252,7 +276,9 @@ E:RegisterModule("gold", function()
       -- questID, xpReward, moneyReward. The reward names itself; the PLAYER_MONEY that follows is not attributed.
       local _, _, reward = ...
       storeMoney("quest", reward)
+    elseif event == "CHAT_MSG_SYSTEM" then soldNotice((...))
     elseif event == "LOOT_OPENED" then lootMoney() end
   end)
   return "ready (peak, current, loot copper, quest rewards, vendor sales, flights, mailed auction sales by item, postage, buyouts; local ledger and daily close)"
+    .. (soldPattern and "" or "; sold notice: no ERR_AUCTION_SOLD_S")
 end)

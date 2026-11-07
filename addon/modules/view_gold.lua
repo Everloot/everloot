@@ -181,20 +181,23 @@ local function drawLedger(g, keys)
   g.unrecorded:SetText("Unrecorded: " .. U.Money(sum.unrecorded))
 end
 
+local STATUS_TEXT = { paid = "paid", pending = "sold, gold pending", unmatched = "unmatched" }
+
 local function drawSales(g, keys)
   local from, to = E.Ledger.Period(g.period)
   local sales = g.grouped and E.Ledger.SalesByItem(keys, from, to) or E.Ledger.Sales(keys, from, to)
   show(g.sales, sales, function(row, s)
+    local priced = type(s.count) == "number" and type(s.total) == "number"
     row.item:SetText(s.itemName)
-    row.count:SetText("× " .. s.count)
-    row.unit:SetText(U.Money(s.unit))
-    row.total:SetText(U.Money(s.total))
+    row.count:SetText(priced and ("× " .. s.count) or "-")
+    row.unit:SetText(priced and U.Money(s.unit) or "-")
+    row.total:SetText(priced and U.Money(s.total) or "-")
     if g.grouped then
       row.when:SetText(s.sales .. (s.sales == 1 and " sale" or " sales"))
       row.status:SetText("")
     else
       row.when:SetText(date("!%Y-%m-%d %H:%M", s.at))
-      row.status:SetText(s.status == "paid" and "Paid" or "-")
+      row.status:SetText(STATUS_TEXT[s.status] or "-")
     end
   end, NO_SALES)
   g.groupButton:SetText(g.grouped and "Each sale" or "By item")

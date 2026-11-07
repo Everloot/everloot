@@ -307,6 +307,45 @@ walk(EverlootDB, 'EverlootDB')
 """)
 check_all(ledger)
 
+# The sold notice: a system line with the client's own text and only the item. It adds a pending sale; the invoice
+# flow fills the same row. A secret line, another system line, and a client without the global record nothing.
+SOLD = "ERR_AUCTION_SOLD_S = 'A buyer has been found for your auction of %s.'"
+pending = runtime(SOLD + "\n" + "issecretvalue = function(v) return v == 'SECRET LINE' end")
+pending.execute("""
+event('PLAYER_ENTERING_WORLD')
+local key = Everloot.CharacterKey()
+local sales = EverlootDB.ledger.sales
+event('CHAT_MSG_SYSTEM', 'SECRET LINE')
+event('CHAT_MSG_SYSTEM', 'Your auction of Linen Cloth has expired.')
+event('CHAT_MSG_SYSTEM', 42)
+assert(#sales == 0, 'a secret, unrelated or non-string line records nothing')
+event('CHAT_MSG_SYSTEM', string.format(ERR_AUCTION_SOLD_S, 'Linen Cloth'))
+assert(#sales == 1 and sales[1].key == key and sales[1].itemName == 'Linen Cloth' and sales[1].status == 'pending', 'one pending sale')
+assert(sales[1].total == nil and sales[1].count == nil and sales[1].unit == nil, 'no gold is known yet')
+assert(#(EverlootDB.records.money_event or {}) == 0 and #EverlootDB.ledger.events == 0, 'the notice moves no money and uploads nothing')
+GetInboxInvoiceInfo = function() return 'seller', 'Linen Cloth', 'Buyerperson', 4000, 4000, 100, 200, 0, 0, 0, 20, true end
+GetInboxHeaderInfo = function() return 'icon', 'paper', 'Auction House', 'Auction successful', 3900 end
+TakeInboxMoney(1)
+money = money + 3900; event('PLAYER_MONEY')
+assert(#sales == 1, 'the invoice fills the pending row, it does not add one')
+local sale = sales[1]
+assert(sale.status == 'paid' and sale.count == 20 and sale.unit == 190 and sale.total == 3800 and sale.deposit == 100 and sale.cut == 200, 'the same row, paid')
+-- With nothing pending, a sale still appends as before.
+TakeInboxMoney(1)
+money = money + 3900; event('PLAYER_MONEY')
+assert(#sales == 2 and sales[2].status == 'paid', 'a sale without a notice appends')
+""")
+check_all(pending)
+
+missing = runtime("ERR_AUCTION_SOLD_S = nil")
+missing.execute("""
+event('PLAYER_ENTERING_WORLD')
+event('CHAT_MSG_SYSTEM', 'A buyer has been found for your auction of Linen Cloth.')
+assert(#EverlootDB.ledger.sales == 0, 'no global, no pending sale')
+assert(Everloot:Status():find('sold notice: no ERR_AUCTION_SOLD_S', 1, true), Everloot:Status())
+""")
+check_all(missing)
+
 # Without the ledger file, gold records its money_event as before.
 plain = runtime("Everloot.Ledger = nil")
 plain.execute("""
