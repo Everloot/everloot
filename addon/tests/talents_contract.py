@@ -133,6 +133,70 @@ assert(string.find(Everloot:Status(), 'rows talent_snapshot: 3', 1, true))
 assert(calls.import == 0 and calls.view == 0 and calls.purchase == 0, 'reading never imports, views or spends')
 """)
 
+# --- Two characters on one account: each snapshot is stored once, however often they swap ---
+lua = fresh("GUID = 'Player-1-AAAA'; UnitGUID = function() return GUID end", "{ installId = 'abcd-1234' }")
+lua.execute("""
+event('PLAYER_ENTERING_WORLD')
+assert(Everloot:Count('talent_snapshot') == 2, 'first character: both groups')
+GUID = 'Player-1-BBBB'; reload()
+assert(Everloot:Count('talent_snapshot') == 4, 'second character: its own two rows')
+GUID = 'Player-1-AAAA'; reload()
+GUID = 'Player-1-BBBB'; reload()
+GUID = 'Player-1-AAAA'; reload()
+assert(Everloot:Count('talent_snapshot') == 4, 'swapping back stores nothing again: ' .. Everloot:Count('talent_snapshot'))
+""")
+
+# --- The gear sample keeps its hour per character in SavedVariables: a /reload does not start it again ---
+def gear(guid="Player-1-AAAA", name="Aria"):
+    lua = LuaRuntime()
+    lua.execute(STUBS.replace("__LOADOUT__", GOOD))
+    lua.execute(f"""
+NOW = 1000000
+time = function() return NOW end
+GUID = '{guid}'; NAME = '{name}'
+UnitGUID = function() return GUID end
+UnitName = function() return NAME end
+GetRealmName = function() return 'Realm' end
+GetInventorySlotInfo = function(slot) return slot == 'HeadSlot' and 1 or nil end
+GetInventoryItemLink = function() return 'item:1234' end
+GetDetailedItemLevelInfo = function() return 60 end
+""")
+    for file in ["core.lua", "modules/gear.lua"]:
+        lua.execute((root / file).read_text(encoding="utf-8"))
+    lua.execute("EverlootDB = { installId = 'abcd-1234' }")
+    lua.execute("""
+Everloot.frame.onEvent(nil,'ADDON_LOADED','Everloot')
+function enter() for _, hook in ipairs(Everloot.frame.hooks or {}) do hook(nil, 'PLAYER_ENTERING_WORLD') end end
+function reload() Everloot.frame.hooks = nil; Everloot.frame.onEvent(nil,'ADDON_LOADED','Everloot'); enter() end
+""")
+    return lua
+
+
+lua = gear()
+lua.execute("""
+enter()
+assert(Everloot:Count('gear_snapshot') == 1, 'sampled at login')
+NOW = NOW + 600; reload()
+assert(Everloot:Count('gear_snapshot') == 1, 'a /reload inside the hour does not sample again')
+NOW = NOW + 3000; reload()
+assert(Everloot:Count('gear_snapshot') == 2, 'a reload after the hour does')
+NAME = 'Bram'; GUID = 'Player-1-BBBB'; reload()
+assert(Everloot:Count('gear_snapshot') == 3, 'another character has its own hour')
+NAME = 'Aria'; GUID = 'Player-1-AAAA'; NOW = NOW + 60; reload()
+assert(Everloot:Count('gear_snapshot') == 3, 'and the first one keeps hers')
+local n = 0
+for _ in pairs(EverlootDB.gearSampledAt) do n = n + 1 end
+assert(n == 2, 'one entry per character')
+for key in pairs(EverlootDB.gearSampledAt) do assert(not key:find('Aria') and not key:find('Bram'), 'the key is opaque') end
+""")
+lua = gear()
+lua.execute("""
+UnitGUID = nil
+enter()
+NOW = NOW + 600; reload()
+assert(Everloot:Count('gear_snapshot') == 1 and EverlootDB.gearSampledAt['Aria-Realm'], 'without a character key the name and realm key the hour')
+""")
+
 # --- Before level 40 there is one group; no points, no row ---
 lua = fresh("GROUPS = 1; LEVEL = 30")
 lua.execute("""
