@@ -11,6 +11,6 @@ export interface EventMap {
   addon_download: { addon: string; to: "curseforge" | "github" | "site" };
   connect_copy: { target: "mcp_url" | "claude_command" | "other" };
   /** Whether the search found anything is not known at submit time, so only the surface is sent. */
-  search: { surface: "lore" };
+  search: { surface: "lore" | "header" | "header-phone" | "menu" };
 }
 export type EventName = keyof EventMap;
