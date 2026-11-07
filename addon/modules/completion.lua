@@ -111,20 +111,9 @@ local function plain(text, limit)
   return text
 end
 
-local function hex8(n)
-  return string.format("%04x%04x", math.floor(n / 65536) % 65536, n % 65536)
-end
-
---- This character's opaque key, class token and level, or nil, reason.
+--- This character's opaque key, class token and level, or nil, reason (core.lua: the formula every module shares).
 function C.Identity()
-  local guid = E.Readable(call("UnitGUID", "player"))
-  if type(guid) ~= "string" or guid == "" then return nil, "no player id" end
-  local _, token = call("UnitClass", "player")
-  token = E.Readable(token)
-  if type(token) ~= "string" or not token:find("^%a+$") or #token < 2 or #token > 20 then return nil, "no class" end
-  local level = tonumber(E.Readable(call("UnitLevel", "player")))
-  if not level or level < 1 then return nil, "no level" end
-  return hex8(E.Adler32((EverlootDB.installId or "") .. ":" .. guid)), token, math.min(100, math.floor(level))
+  return E.CharacterKey()
 end
 
 local function daysIn(month, year)

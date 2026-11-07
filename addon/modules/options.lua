@@ -29,6 +29,8 @@ O.ROWS = {
     text = "NPCs, loot, quests, vendors and items you see, and where you stood at NPC windows and herbs, ore and chests. Anonymous: no character or guild names." },
   { key = "gold", label = "Your gold",
     text = "Your own gold in and out, for gold per hour. Sent only if you share it on the upload page." },
+  { key = "roster", label = "Your characters",
+    text = "Name, realm, class, level, faction, gold and professions of each character you log in with, for the window's Home. Stays in this file; never uploaded." },
   { key = "gear", label = "Your gear",
     text = "Your equipped items and item levels, at most once an hour. Sent only if you share it on the upload page." },
   { key = "talents", label = "Your talents",

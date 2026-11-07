@@ -31,6 +31,32 @@ function E.Readable(value)
   return value
 end
 
+local function hex8(n)
+  return string.format("%04x%04x", math.floor(n / 65536) % 65536, n % 65536)
+end
+
+--- One guarded call to a global game function: its first two values, or nil on a missing function or an error.
+local function playerCall(name)
+  local fn = _G[name]
+  if type(fn) ~= "function" then return nil end
+  local ok, a, b = pcall(fn, "player")
+  if not ok then return nil end
+  return a, b
+end
+
+--- This character's opaque key (8 hex digits, never the name), class token and level, or nil, reason.
+--- The one formula every module shares: completion rows, the roster and the gold ledger join on it.
+function E.CharacterKey()
+  local guid = E.Readable(playerCall("UnitGUID"))
+  if type(guid) ~= "string" or guid == "" then return nil, "no player id" end
+  local _, token = playerCall("UnitClass")
+  token = E.Readable(token)
+  if type(token) ~= "string" or not token:find("^%a+$") or #token < 2 or #token > 20 then return nil, "no class" end
+  local level = tonumber(E.Readable((playerCall("UnitLevel"))))
+  if not level or level < 1 then return nil, "no level" end
+  return hex8(E.Adler32((EverlootDB.installId or "") .. ":" .. guid)), token, math.min(100, math.floor(level))
+end
+
 --- The NPC id in a creature GUID (Creature-0-server-instance-zone-NPCID-spawn); nil for anything else.
 function E.NpcIdFromGuid(guid)
   guid = E.Readable(guid)
@@ -53,7 +79,7 @@ end
 local defaults = {
   version = E.VERSION,
   installId = nil,
-  toggles = { openworld = true, guild = true, gear = true, auctions = true, gold = true, addons = false, talents = true, completion = false, census = true, players = false },
+  toggles = { openworld = true, guild = true, gear = true, auctions = true, gold = true, roster = true, addons = false, talents = true, completion = false, census = true, players = false },
   records = {},
 }
 
