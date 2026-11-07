@@ -330,8 +330,14 @@ local function lootMoney()
     local okType, slotType = pcall(GetLootSlotType, i)
     -- 2 is the money slot. An item slot is not income.
     if okType and slotType == 2 then
-      local okInfo, _, _, copper = pcall(GetLootSlotInfo, i)
-      if okInfo and type(copper) == "number" and copper >= 1 and copper == math.floor(copper) then
+      -- The money slot names its amount in its text ("1 Gold, 20 Silver"); the numeric field is the fallback.
+      local okInfo, _, text, quantity = pcall(GetLootSlotInfo, i)
+      local copper = okInfo and E.CoinText(text)
+      if not copper and okInfo then
+        quantity = E.Readable(quantity)
+        copper = type(quantity) == "number" and quantity or nil
+      end
+      if copper and copper >= 1 and copper == math.floor(copper) then
         storeMoney("loot", copper)
         writeSnapshot(true)
       end

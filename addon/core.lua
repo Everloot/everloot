@@ -76,6 +76,30 @@ function E.Coins(copper)
   return text .. coins .. "c"
 end
 
+-- The game's own "N Gold", "N Silver" and "N Copper" strings, as patterns, so coin text reads in any language;
+-- English where the client does not define them.
+local COIN_UNITS = {
+  { "GOLD_AMOUNT", "%d Gold", 10000 },
+  { "SILVER_AMOUNT", "%d Silver", 100 },
+  { "COPPER_AMOUNT", "%d Copper", 1 },
+}
+
+--- The copper a coin text names ("1 Gold, 20 Silver", "1,234 Gold", a money chat line), or nil when it holds no
+--- amount. A count may carry any thousands separator. Read each call: the client's globals can arrive late.
+function E.CoinText(text)
+  text = E.Readable(text)
+  if type(text) ~= "string" then return nil end
+  local total = 0
+  for _, unit in ipairs(COIN_UNITS) do
+    local format = type(_G[unit[1]]) == "string" and _G[unit[1]] or unit[2]
+    local p = format:gsub("[%^%$%(%)%.%[%]%*%+%-%?]", "%%%0"):gsub("%%d", "([%%d,%%.]+)")
+    local digits = text:match(p)
+    local amount = digits and tonumber((digits:gsub("%D", "")))
+    if amount then total = total + amount * unit[3] end
+  end
+  return total >= 1 and total or nil
+end
+
 local defaults = {
   version = E.VERSION,
   installId = nil,
