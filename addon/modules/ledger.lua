@@ -5,7 +5,10 @@
 --
 -- Rows are keyed by the opaque character key (core.lua, E.CharacterKey), never a name. Times are time() seconds;
 -- days are UTC. The window is bounded: 5,000 events and 90 days, 2,000 sales, 400 daily closes per character.
+-- Queries skip rows older than 90 days even before eviction has run.
 -- Categories and directions are the web's (kb/src/gold-ledger.ts), in the same order, plus the slice-two names.
+-- For days before the store existed, Summary also reads the uploaded money_event records (read only, never copied
+-- into the store), matched to a character key through the roster's name and realm.
 -- This file registers no events: gold.lua calls Record, RecordSale and Close, and the views call the queries.
 
 local E = Everloot
@@ -18,6 +21,7 @@ local MAX_AGE = 90 * DAY
 local MAX_SALES = 2000
 local MAX_CLOSES = 400
 local MAX_ITEM_NAME = 80
+local SERIES_DAYS = 30
 
 L.INCOME = { "loot", "quest", "vendor", "auction", "trade_in", "mail_in" }
 L.SPENDING = { "flight", "postage", "barber", "respec", "auction_spend", "repair", "vendor_spend", "trade_out", "mail_out" }
@@ -65,6 +69,11 @@ local function day(ts)
   return date("!%Y-%m-%d", ts)
 end
 
+--- The oldest time a query still counts.
+local function oldest()
+  return time() - MAX_AGE
+end
+
 local function keySet(keys)
   local set = {}
   for _, k in ipairs(type(keys) == "table" and keys or {}) do set[k] = true end
@@ -79,20 +88,27 @@ local function dropOldest(list, n)
   for i = total - n + 1, total do list[i] = nil end
 end
 
---- Appends a money event for this character. Refuses an unknown category, copper that is not a whole number of
---- at least 1, or an item name or count that does not fit; other fields in `extra` are not kept.
+--- Keeps the newest 5,000 events from the last 90 days and the newest 2,000 sales.
+local function evict(s)
+  local events, limit = s.events, oldest()
+  local drop = math.max(0, #events - MAX_EVENTS)
+  while events[drop + 1] and (type(events[drop + 1].at) ~= "number" or events[drop + 1].at < limit) do drop = drop + 1 end
+  dropOldest(events, drop)
+  dropOldest(s.sales, #s.sales - MAX_SALES)
+end
+
+--- Appends a money event for this character. Refuses an unknown category or copper that is not a whole number of
+--- at least 1. An item name or count that does not fit is left off the row; other fields in `extra` are not kept.
 function L.Record(key, category, copper, extra)
   if not validKey(key) or not direction[category] or not whole(copper, 1) then return false end
-  if extra ~= nil and type(extra) ~= "table" then return false end
-  extra = extra or {}
-  if extra.itemName ~= nil and not validName(extra.itemName) then return false end
-  if extra.count ~= nil and not whole(extra.count, 1) then return false end
-  local events = store().events
-  local now = time()
-  events[#events + 1] = { at = now, key = key, category = category, copper = copper, itemName = extra.itemName, count = extra.count }
-  local drop = math.max(0, #events - MAX_EVENTS)
-  while events[drop + 1] and events[drop + 1].at < now - MAX_AGE do drop = drop + 1 end
-  dropOldest(events, drop)
+  extra = type(extra) == "table" and extra or {}
+  local s = store()
+  s.events[#s.events + 1] = {
+    at = time(), key = key, category = category, copper = copper,
+    itemName = validName(extra.itemName) and extra.itemName or nil,
+    count = whole(extra.count, 1) and extra.count or nil,
+  }
+  evict(s)
   return true
 end
 
@@ -102,12 +118,12 @@ function L.RecordSale(key, sale)
   if not validName(sale.itemName) or not whole(sale.count, 1) or not whole(sale.total, 1) then return false end
   if sale.deposit ~= nil and not whole(sale.deposit, 0) then return false end
   if sale.cut ~= nil and not whole(sale.cut, 0) then return false end
-  local sales = store().sales
-  sales[#sales + 1] = {
+  local s = store()
+  s.sales[#s.sales + 1] = {
     at = time(), key = key, itemName = sale.itemName, count = sale.count, unit = math.floor(sale.total / sale.count),
     total = sale.total, deposit = sale.deposit, cut = sale.cut, status = "paid",
   }
-  dropOldest(sales, #sales - MAX_SALES)
+  evict(s)
   return true
 end
 
@@ -127,51 +143,88 @@ function L.Close(key, copper)
   return true
 end
 
---- One character's latest close on or before a UTC date, or nil.
-local function closeOn(closes, ymd)
+--- One character's latest close on or before a UTC date (and, when given, not before `since`), or nil.
+local function closeOn(closes, ymd, since)
   local best
   for d in pairs(type(closes) == "table" and closes or {}) do
-    if d <= ymd and (not best or d > best) then best = d end
+    if d <= ymd and (not since or d >= since) and (not best or d > best) then best = d end
   end
   return best and closes[best]
 end
 
---- The keys' gold summed at a UTC date, or nil when no key has a close by then.
-local function balanceOn(keys, ymd)
-  local daily, total = store().daily, nil
-  for _, k in ipairs(keys) do
-    local copper = closeOn(daily[k], ymd)
-    if copper then total = (total or 0) + copper end
-  end
-  return total
+--- "YYYY-MM-DDTHH:MM:SS..." (UTC) as time() seconds, or nil. Lua 5.1 has no UTC parser, so the day count is
+--- worked out from the civil date.
+local function isoTime(text)
+  if type(text) ~= "string" then return nil end
+  local y, m, d, hh, mm, ss = text:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)T(%d%d):(%d%d):(%d%d)")
+  if not y then return nil end
+  y, m, d = tonumber(y), tonumber(m), tonumber(d)
+  if m < 1 or m > 12 or d < 1 or d > 31 then return nil end
+  if m <= 2 then y = y - 1 end
+  local era = math.floor(y / 400)
+  local yoe = y - era * 400
+  local doy = math.floor((153 * (m > 2 and m - 3 or m + 9) + 2) / 5) + d - 1
+  local days = era * 146097 + yoe * 365 + math.floor(yoe / 4) - math.floor(yoe / 100) + doy - 719468
+  return days * DAY + tonumber(hh) * 3600 + tonumber(mm) * 60 + tonumber(ss)
 end
 
---- In and out for the keys between two times (both included): category totals, days with events, receipts for a
---- day, and the gold change the events do not explain (unrecorded), when there are closes at both ends.
+--- The uploaded money_event records for the wanted keys from before the store's oldest event, as ledger rows.
+--- Read only: a row whose character and realm are not in the roster, or that does not read cleanly, is skipped.
+local function recordRows(wanted, events)
+  local uploaded = type(EverlootDB) == "table" and type(EverlootDB.records) == "table" and EverlootDB.records.money_event
+  if type(uploaded) ~= "table" or not (E.Roster and E.Roster.Rows) then return {} end
+  local before
+  for _, e in ipairs(events) do
+    if type(e.at) == "number" and (not before or e.at < before) then before = e.at end
+  end
+  local keyOf = {}
+  for _, r in ipairs(E.Roster.Rows()) do
+    if wanted[r.key] and type(r.name) == "string" and type(r.realm) == "string" then keyOf[r.name .. "\0" .. r.realm] = r.key end
+  end
+  local rows = {}
+  for _, r in ipairs(uploaded) do
+    local key = type(r) == "table" and type(r.character) == "string" and type(r.realm) == "string" and keyOf[r.character .. "\0" .. r.realm]
+    local at = key and isoTime(r.capturedAt)
+    if at and (not before or at < before) and direction[r.category] and whole(r.copper, 1) then
+      rows[#rows + 1] = { at = at, key = key, category = r.category, copper = r.copper }
+    end
+  end
+  return rows
+end
+
+--- In and out for the keys between two times (both included; nil means all): category totals, days with events,
+--- receipts for a day, and the gold change the events do not explain (unrecorded). Unrecorded is the change from the
+--- close before the first day to the close on the last, and only when every key has both; otherwise nil.
 function L.Summary(keys, fromTs, toTs)
   keys = type(keys) == "table" and keys or {}
   local wanted = keySet(keys)
+  fromTs = math.max(tonumber(fromTs) or 0, oldest())
+  toTs = tonumber(toTs) or time()
   local totals, byDay, rows = {}, {}, {}
   local totalIn, totalOut = 0, 0
-  for i, e in ipairs(store().events) do
-    if wanted[e.key] and e.at >= fromTs and e.at <= toTs then
-      local dir = L.Direction(e.category)
-      local t = totals[e.category]
-      if not t then t = { category = e.category, direction = dir, copper = 0, events = 0 }; totals[e.category] = t end
-      t.copper = t.copper + e.copper
-      t.events = t.events + 1
-      local ymd = day(e.at)
-      local d = byDay[ymd]
-      if not d then d = { date = ymd, inCopper = 0, outCopper = 0, net = 0 }; byDay[ymd] = d end
-      if dir == "in" then
-        d.inCopper = d.inCopper + e.copper; totalIn = totalIn + e.copper
-      else
-        d.outCopper = d.outCopper + e.copper; totalOut = totalOut + e.copper
-      end
-      d.net = d.inCopper - d.outCopper
-      rows[#rows + 1] = { i = i, e = e, ymd = ymd, direction = dir }
+  local events = store().events
+
+  local function count(i, e)
+    if not (wanted[e.key] and type(e.at) == "number" and e.at >= fromTs and e.at <= toTs) then return end
+    local dir = L.Direction(e.category)
+    local t = totals[e.category]
+    if not t then t = { category = e.category, direction = dir, copper = 0, events = 0 }; totals[e.category] = t end
+    t.copper = t.copper + e.copper
+    t.events = t.events + 1
+    local ymd = day(e.at)
+    local d = byDay[ymd]
+    if not d then d = { date = ymd, inCopper = 0, outCopper = 0, net = 0 }; byDay[ymd] = d end
+    if dir == "in" then
+      d.inCopper = d.inCopper + e.copper; totalIn = totalIn + e.copper
+    else
+      d.outCopper = d.outCopper + e.copper; totalOut = totalOut + e.copper
     end
+    d.net = d.inCopper - d.outCopper
+    rows[#rows + 1] = { i = i, e = e, ymd = ymd, direction = dir }
   end
+  -- Older uploaded rows sort before every store row with the same time.
+  for _, e in ipairs(recordRows(wanted, events)) do count(0, e) end
+  for i, e in ipairs(events) do count(i, e) end
 
   local categories, days = {}, {}
   for _, t in pairs(totals) do categories[#categories + 1] = t end
@@ -183,8 +236,16 @@ function L.Summary(keys, fromTs, toTs)
   table.sort(days, function(a, b) return a.date < b.date end)
 
   local unrecorded
-  local opening, closing = balanceOn(keys, day(fromTs)), balanceOn(keys, day(toTs))
-  if opening and closing then unrecorded = (closing - opening) - (totalIn - totalOut) end
+  if #keys > 0 then
+    local daily, opening, closing = store().daily, 0, 0
+    local openDay, closeDay = day(fromTs - fromTs % DAY - DAY), day(toTs)
+    for _, k in ipairs(keys) do
+      local a, b = closeOn(daily[k], openDay), closeOn(daily[k], closeDay)
+      if not (a and b) then opening = nil; break end
+      opening, closing = opening + a, closing + b
+    end
+    if opening then unrecorded = (closing - opening) - (totalIn - totalOut) end
+  end
 
   local function receipts(ymd)
     local list = {}
@@ -205,11 +266,13 @@ function L.Summary(keys, fromTs, toTs)
   return { categories = categories, days = days, receipts = receipts, totalIn = totalIn, totalOut = totalOut, unrecorded = unrecorded }
 end
 
---- The keys' auction sales between two times (both included), newest first.
+--- The keys' auction sales between two times (both included; nil means all), newest first.
 function L.Sales(keys, fromTs, toTs)
+  fromTs = math.max(tonumber(fromTs) or 0, oldest())
+  toTs = tonumber(toTs) or time()
   local wanted, list = keySet(keys), {}
   for i, s in ipairs(store().sales) do
-    if wanted[s.key] and s.at >= fromTs and s.at <= toTs then list[#list + 1] = { i = i, s = s } end
+    if wanted[s.key] and type(s.at) == "number" and s.at >= fromTs and s.at <= toTs then list[#list + 1] = { i = i, s = s } end
   end
   table.sort(list, function(a, b)
     if a.s.at ~= b.s.at then return a.s.at > b.s.at end
@@ -237,30 +300,37 @@ function L.SalesByItem(keys, fromTs, toTs)
   return list
 end
 
---- The keys' gold over the last `days` UTC days, oldest first, today last. A day before any close has no copper.
+--- The keys' gold over the last `days` UTC days (30 when not given), oldest first, today last: each key's latest
+--- close from the last 90 days on or before the day, summed. A day before any close has no copper.
 function L.Series(keys, days)
   keys = type(keys) == "table" and keys or {}
+  days = whole(days, 1) and days or SERIES_DAYS
+  local daily, since = store().daily, day(oldest())
   local today = time()
   today = today - today % DAY
   local list = {}
   for i = days - 1, 0, -1 do
-    local ymd = day(today - i * DAY)
-    list[#list + 1] = { date = ymd, copper = balanceOn(keys, ymd) }
+    local ymd, total = day(today - i * DAY), nil
+    for _, k in ipairs(keys) do
+      local copper = closeOn(daily[k], ymd, since)
+      if copper then total = (total or 0) + copper end
+    end
+    list[#list + 1] = { date = ymd, copper = total }
   end
   return list
 end
 
---- The from and to times of a period: "today" (since UTC midnight), "7d", "30d" or "all".
+--- The from and to times of a period: "today" (since UTC midnight), "7d", "30d" or "all"; anything else is "30d".
 function L.Period(name)
   local now = time()
   if name == "today" then return now - now % DAY, now end
   if name == "7d" then return now - 7 * DAY, now end
-  if name == "30d" then return now - 30 * DAY, now end
   if name == "all" then return 0, now end
-  return nil
+  return now - 30 * DAY, now
 end
 
 E:RegisterModule("ledger", function()
   local s = store()
+  evict(s)
   return string.format("ready (%d events, %d sales, local only)", #s.events, #s.sales)
 end, "gold")

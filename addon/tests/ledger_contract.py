@@ -11,7 +11,9 @@ assert "modules\\roster.lua\nmodules\\ledger.lua\n" in toc, "ledger loads right 
 source = (root / "modules/ledger.lua").read_text(encoding="utf-8")
 assert "RegisterEvent" not in source, "the ledger registers no events"
 assert "E:Store(" not in source, "the ledger is not a record"
-assert not re.search(r"records\s*[\[\.]", source), "the ledger never touches EverlootDB.records"
+# Reading the uploaded money_event rows is allowed; any assignment into records, or an insert, is not.
+assert not re.search(r"\brecords\b[\w.\[\]\"' ]*=(?!=)", source), "the ledger never writes EverlootDB.records"
+assert not re.search(r"(table\.insert|table\.remove|dropOldest)\s*\([^)]*records", source), "the ledger never changes EverlootDB.records"
 
 # The web's category lists, read from the TypeScript file: the Lua lists start with them, in order.
 ts = (root.parent / "kb/src/gold-ledger.ts").read_text(encoding="utf-8")
@@ -22,8 +24,15 @@ def ts_list(name):
     return re.findall(r'"([a-z_]+)"', body)
 
 
+def ts_labels(name):
+    body = re.search(name + r"[^=]*=\s*\{([^}]*)\}", ts).group(1)
+    return dict(re.findall(r'(\w+):\s*"([^"]+)"', body))
+
+
 TS_INCOME, TS_SPENDING = ts_list("INCOME_CATEGORIES"), ts_list("SPENDING_CATEGORIES")
 assert len(TS_INCOME) == 4 and len(TS_SPENDING) == 5, (TS_INCOME, TS_SPENDING)
+TS_LABELS = {**ts_labels("INCOME_LABEL"), **ts_labels("SPENDING_LABEL")}
+assert sorted(TS_LABELS) == sorted(TS_INCOME + TS_SPENDING), TS_LABELS
 
 fixture = json.loads((root / "tests/fixtures/ledger-parity.json").read_text(encoding="utf-8"))
 
@@ -96,9 +105,7 @@ assert income[:4] == TS_INCOME and spending[:5] == TS_SPENDING, (income, spendin
 assert income[4:] == ["trade_in", "mail_in"], income
 assert spending[5:] == ["repair", "vendor_spend", "trade_out", "mail_out"], spending
 assert py(L.LABELS) == {
-    "loot": "Loot", "quest": "Quest rewards", "vendor": "Vendor sales", "auction": "Auction sales",
-    "flight": "Flight paths", "postage": "Postage", "barber": "Barber", "respec": "Respecs",
-    "auction_spend": "Auction purchases", "repair": "Repairs", "vendor_spend": "Vendor purchases",
+    **TS_LABELS, "repair": "Repairs", "vendor_spend": "Vendor purchases",
     "trade_in": "Trades in", "trade_out": "Trades out", "mail_in": "Mail in", "mail_out": "Mail out",
 }, py(L.LABELS)
 for c in income:
@@ -110,9 +117,15 @@ for c in spending:
 records_before = py(g.EverlootDB.records)
 for args in [(A, "gameplay", 10), (A, "loot", 0), (A, "loot", 1.5), (A, "loot", "5"), (None, "loot", 5), ("", "loot", 5)]:
     assert L.Record(*args) is False, args
-assert L.Record(A, "loot", 5, extra(itemName="x" * 81)) is False, "item name over 80"
-assert L.Record(A, "loot", 5, extra(count=0)) is False, "count under 1"
 assert py(g.EverlootDB.ledger.events) == [], "nothing refused is written"
+
+# A bad item name or count is left off the row; the money is still recorded.
+assert L.Record(A, "loot", 5, extra(itemName="x" * 81, count=2)) is True, "item name over 80"
+assert L.Record(A, "loot", 6, extra(itemName="Ore", count=0)) is True, "count under 1"
+assert L.Record(A, "loot", 7, extra(itemName=12, count=1.5)) is True, "wrong types"
+rows = py(g.EverlootDB.ledger.events)
+assert [(r["copper"], r.get("itemName"), r.get("count")) for r in rows] == [(5, None, 2), (6, "Ore", None), (7, None, None)], rows
+g.EverlootDB.ledger = None
 
 # Parity: the fixture through Record gives the web's category totals and week (money-ledger.parity.test.ts).
 CHARACTER_KEYS = {"Thrall": A, "Jaina": B}
@@ -173,10 +186,26 @@ assert series == [{"date": "2026-11-05", "copper": 12000}, {"date": "2026-11-06"
                   {"date": "2026-11-07", "copper": 30700}], series
 series = py(L.Series(keys(B), 3))
 assert series == [{"date": "2026-11-05"}, {"date": "2026-11-06"}, {"date": "2026-11-07", "copper": 700}], series
-s = L.Summary(keys(A), epoch("2026-11-05T23:00:00Z"), g.clock)
-# Gold went 12000 to 30000 while the events explain +8500: 9500 is unrecorded.
+s = L.Summary(keys(A), epoch("2026-11-06T00:00:00Z"), g.clock)
+# The opening is the close before the first day (11-05, 12000), the closing today's (30000); the events explain
+# +8500, so 9500 is unrecorded.
 assert (s.totalIn, s.totalOut, s.unrecorded) == (9000, 500, 9500), (s.totalIn, s.totalOut, s.unrecorded)
-assert L.Summary(keys(A), epoch("2026-11-04T12:00:00Z"), g.clock).unrecorded is None, "no close at the start"
+assert L.Summary(keys(A), epoch("2026-11-05T00:00:00Z"), g.clock).unrecorded is None, "no close before the first day"
+# B's first close is inside the window: its whole balance must not read as unrecorded.
+assert L.Summary(keys(A, B), epoch("2026-11-06T00:00:00Z"), g.clock).unrecorded is None, "a key without an opening close"
+
+# Today: yesterday's close is the opening, today's the closing.
+g.EverlootDB.ledger = None
+g.clock = epoch("2026-11-06T21:00:00Z")
+L.Close(A, 10000)
+g.clock = epoch("2026-11-07T09:00:00Z")
+L.Record(A, "quest", 9000)
+L.Record(A, "flight", 500)
+g.clock = epoch("2026-11-07T12:00:00Z")
+L.Close(A, 25000)
+f, t = L.Period("today")
+s = L.Summary(keys(A), f, t)
+assert (s.totalIn, s.totalOut, s.unrecorded) == (9000, 500, (25000 - 10000) - 8500), (s.totalIn, s.totalOut, s.unrecorded)
 
 # Each key keeps its newest 400 daily closes.
 g.EverlootDB.ledger = None
@@ -199,6 +228,64 @@ for ago, copper in [(91, 1), (89, 2), (0, 3)]:
     g.clock = NOW - ago * DAY
     L.Record(A, "loot", copper)
 assert [r["copper"] for r in py(g.EverlootDB.ledger.events)] == [2, 3], "an event older than 90 days is dropped"
+
+# Queries skip rows past 90 days before eviction runs; the module's start runs one sweep.
+g.EverlootDB.ledger = None
+g.clock = NOW
+L.Record(A, "loot", 3)
+L.RecordSale(A, extra(itemName="Ore", count=1, total=10))
+L.Close(A, 500)
+lua.execute("table.insert(EverlootDB.ledger.events, 1, { at = clock - 91 * 86400, key = 'aaaaaaaa', category = 'loot', copper = 1 })")
+lua.execute("table.insert(EverlootDB.ledger.sales, 1, { at = clock - 91 * 86400, key = 'aaaaaaaa', itemName = 'Old', count = 1, total = 7, unit = 7, status = 'paid' })")
+lua.execute("EverlootDB.ledger.daily.aaaaaaaa[os.date('!%Y-%m-%d', clock - 120 * 86400)] = 900")
+s = L.Summary(keys(A), 0, NOW)
+assert (s.totalIn, py(s.categories)[0]["events"]) == (3, 1), (s.totalIn, py(s.categories))
+assert py(s.receipts("2026-08-08")) == [], "no receipt for the old event"
+assert [r["itemName"] for r in py(L.Sales(keys(A), 0, NOW))] == ["Ore"], "the old sale is skipped"
+series = py(L.Series(keys(A), 120))
+assert series[0] == {"date": "2026-07-11"} and series[-1] == {"date": "2026-11-07", "copper": 500}, (series[0], series[-1])
+g.boot(lua.table_from({"toggles": lua.table_from({"gold": True}), "ledger": g.EverlootDB.ledger}))
+assert len(g.EverlootDB.ledger.events) == 1 and g.EverlootDB.ledger.events[1].copper == 3, "init evicts the old event"
+assert "ledger: ready (1 events, 2 sales, local only)" in g.status(), g.status()
+
+# Bad inputs from a view read as sensible defaults, never an error.
+assert L.Period("bogus") == L.Period("30d") and L.Period(None) == L.Period("30d"), "unknown period is 30 days"
+assert L.Summary(keys(A), None, None).totalIn == L.Summary(keys(A), 0, NOW).totalIn == 3, "nil bounds mean all"
+assert len(py(L.Sales(keys(A), None, None))) == 1, "nil bounds mean all sales in the window"
+assert len(py(L.Series(keys(A), None))) == 30, "Series defaults to 30 days"
+assert py(L.Summary(None, None, None).categories) == [], "nil keys, nothing counted"
+
+# Days before the store existed: the uploaded money_event rows count, matched through the roster.
+records_before = py(g.EverlootDB.records)
+lua.execute("""
+Everloot.Roster = { Rows = function() return {
+  { key = 'aaaaaaaa', name = 'Thrall', realm = 'Moon Guard' },
+  { key = 'bbbbbbbb', name = 'Jaina', realm = 'Moon Guard' },
+} end }
+EverlootDB.records.money_event = {
+  { kind = 'money_event', installId = 'i', capturedAt = os.date('!%Y-%m-%dT%H:%M:%SZ', clock - 10 * 86400), character = 'Thrall', realm = 'Moon Guard', category = 'quest', copper = 400 },
+  { kind = 'money_event', installId = 'i', capturedAt = os.date('!%Y-%m-%dT%H:%M:%SZ', clock - 10 * 86400), character = 'Garrosh', realm = 'Moon Guard', category = 'quest', copper = 800 },
+  { kind = 'money_event', installId = 'i', capturedAt = os.date('!%Y-%m-%dT%H:%M:%SZ', clock - 100 * 86400), character = 'Thrall', realm = 'Moon Guard', category = 'loot', copper = 50 },
+  { kind = 'money_event', installId = 'i', capturedAt = os.date('!%Y-%m-%dT%H:%M:%SZ', clock - 5 * 86400), character = 'Jaina', realm = 'Moon Guard', category = 'flight', copper = 60 },
+}
+""")
+records_before = py(g.EverlootDB.records)
+g.EverlootDB.ledger = None
+s = L.Summary(keys(A), 0, NOW)
+assert (s.totalIn, s.totalOut) == (400, 0), "Thrall's uploaded quest reward counts; Garrosh is not in the roster; past 90 days is skipped"
+receipt = py(s.receipts("2026-10-28"))
+assert receipt == [{"at": NOW - 10 * DAY, "key": A, "category": "quest", "direction": "in", "copper": 400}], receipt
+assert L.Summary(keys(A, B), 0, NOW).totalOut == 60, "Jaina's row counts for her key"
+g.clock = NOW - 11 * DAY
+L.Record(A, "loot", 9)
+g.clock = NOW
+s = L.Summary(keys(A), 0, NOW)
+assert (s.totalIn, s.totalOut) == (9, 0), "a ledger event older than the uploaded rows replaces them"
+assert py(g.EverlootDB.ledger.events) == [{"at": NOW - 11 * DAY, "key": A, "category": "loot", "copper": 9}], "uploaded rows never enter the store"
+assert py(g.EverlootDB.records) == records_before, "reading the uploaded rows changes nothing"
+g.EverlootDB.records.money_event = None
+g.Everloot.Roster = None
+records_before = py(g.EverlootDB.records)
 
 # Sales: the row, refusals, newest first, grouped by item, the 2,000 cap.
 g.EverlootDB.ledger = None
