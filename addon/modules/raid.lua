@@ -215,23 +215,29 @@ end
 
 --- The names and spell ids of the helpful auras on a unit. Prefers C_UnitAuras, falls back to UnitAura.
 local function readAuras(unit)
-  local set = {}
+  local set, seen, readable = {}, false, false
   local byIndex = C_UnitAuras and C_UnitAuras.GetAuraDataByIndex
   for i = 1, 40 do
     if byIndex then
       local aura = call(byIndex, unit, i, "HELPFUL")
       if type(aura) ~= "table" then break end
-      if aura.name then set[aura.name] = true end
-      if aura.spellId then set[aura.spellId] = true end
+      seen = true
+      local name, spellId = E.Readable(aura.name), E.Readable(aura.spellId)
+      if name then set[name] = true; readable = true end
+      if spellId then set[spellId] = true; readable = true end
     elseif UnitAura then
       local name, _, _, _, _, _, _, _, _, spellId = call(UnitAura, unit, i, "HELPFUL")
       if not name then break end
-      set[name] = true
-      if type(spellId) == "number" then set[spellId] = true end
+      seen = true
+      name, spellId = E.Readable(name), E.Readable(spellId)
+      if name then set[name] = true; readable = true end
+      if type(spellId) == "number" then set[spellId] = true; readable = true end
     else
       return nil
     end
   end
+  -- Auras were present but every one was secret: nothing could be read.
+  if seen and not readable then return nil end
   return set
 end
 
