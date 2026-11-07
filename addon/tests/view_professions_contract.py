@@ -47,6 +47,10 @@ assert(c.last.shown and c.last.text == 'Last read: 2026-11-07', c.last.text)
 assert(not p.blocks[4].shown, 'only the learned professions show')
 assert(p.empty.shown == false)
 assert(p.footer.text == 'Full planner: everloot.app/tools/profession-planner')
+assert(p.footer.point[1] == 'BOTTOMLEFT' and p.footer.point[2] == 8 and p.footer.point[3] == 8, 'the footer sits at the bottom of the view')
+assert(#p.blocks == 5, 'one block per profession book slot')
+local last = p.blocks[5].point
+assert(last[1] == 'TOPLEFT' and -last[3] + p.blocks[5].height <= 390 - 24, 'the last block ends above the footer')
 assert(f.shown and not U.failed)
 """)
 
@@ -68,7 +72,7 @@ local p = EverlootWindow.professions
 assert(p.empty.shown and p.empty.text == 'No professions learned yet.', p.empty.text)
 assert(not p.blocks[1].shown and not U.failed)
 """)
-# A recipe whose colour changed has a row per colour: only the newest counts. A missing max rank reads as a dash.
+# A recipe whose colour changed has a row per colour: only the newest counts. A missing max rank shows the rank alone.
 lua = fresh("{ installId = 'abcd-1234', toggles = {}, records = { recipe_observed = { "
             "{ profession = 'Cooking', recipeId = 9, difficulty = 'optimal', kindLoggedAt = '2026-11-01T10:00:00Z' }, "
             "{ profession = 'Cooking', recipeId = 9, difficulty = 'medium', kindLoggedAt = '2026-11-05T10:00:00Z' } } } }",
@@ -80,7 +84,7 @@ assert(U.Open('professions') == true)
 local b = EverlootWindow.professions.blocks[1]
 assert(b.recipes.text == '1 recipe recorded: 0 orange · 1 yellow · 0 green · 0 grey', b.recipes.text)
 assert(b.last.text == 'Last read: 2026-11-05', b.last.text)
-assert(b.rank.text == '-' and not U.failed)
+assert(b.rank.text == '5' and not U.failed, b.rank.text)
 """)
 print("Lua 5.1 Professions view: book ranks with bars, recipe counts by colour and the newest read date, "
       "the open-the-window line, no book, no professions")

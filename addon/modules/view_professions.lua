@@ -9,7 +9,7 @@ local U = E.Window
 local COLORS, NARROW, text, surface = U.COLORS, U.NARROW, U.Text, U.Surface
 
 local W = 604          -- the view frame window.lua gives every view (W - MAIN - 12 wide)
-local BLOCKS, BLOCK_H, GAP = 6, 64, 4
+local BLOCKS, BLOCK_H, GAP = 5, 64, 4   -- the profession book has five slots
 local BUCKETS = { optimal = "orange", medium = "yellow", easy = "green", trivial = "grey" }
 local READ_IT = "Open the profession window to read its recipes."
 local NO_BOOK = "No profession book in this client."
@@ -49,7 +49,7 @@ local function draw(block, p)
   block.icon:SetTexture(p.icon or FALLBACK_ICON)
   block.bar:SetMinMaxValues(0, p.maxRank or math.max(p.rank, 1))
   block.bar:SetValue(p.rank)
-  block.rank:SetText(p.maxRank and (p.rank .. " / " .. p.maxRank) or "-")
+  block.rank:SetText(p.maxRank and (p.rank .. " / " .. p.maxRank) or tostring(p.rank))
   if got.n == 0 then
     block.recipes:SetText(READ_IT)
   else
@@ -113,7 +113,8 @@ local function build(f, parent)
   p.empty:SetPoint("TOPLEFT", 8, -12)
   p.empty:SetWidth(W - 16)
   p.footer = text(parent, 11, NARROW, COLORS.muted)
-  p.footer:SetPoint("TOPLEFT", 4, -BLOCKS * (BLOCK_H + GAP) + 2)
+  -- At the bottom of the view, under the five blocks (5 x 68 = 340 of the view's 390).
+  p.footer:SetPoint("BOTTOMLEFT", 8, 8)
   p.footer:SetWidth(W - 8)
   p.footer:SetText(FOOTER)
 end
