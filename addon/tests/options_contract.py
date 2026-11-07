@@ -160,6 +160,40 @@ O.page.reload.scripts.OnClick()
 assert(reloads == 1, 'Reload now reloads')
 """)
 
+# --- Every switch a module checks has a row on the page ---
+# The scan reads the sources: each IsEnabled("x") and each module registered under its own name is a switch
+# the player can need to turn off, so it needs an O.ROWS key (the rows come from this runtime, so a typo in
+# options.lua shows up here). The names below are the exceptions, each with its reason.
+import re
+rows = set(lua.eval("(function() local t = {} for _, r in ipairs(Everloot.Options.ROWS) do t[#t + 1] = r.key end return t end)()").values())
+OWN_SWITCH_OK = {
+    # Only in builds that carry the pulls module (E.RUN_RECORDS); options.lua appends its row under that gate.
+    "pulls",
+    # Registered under their own name but record nothing: displays, planners and tools. No row to stop.
+    "ask", "conveniences", "gph", "minimap", "plan", "planner", "prices", "raid", "options",
+    # Stores item facts, but its init returns "off" when the openworld switch is off, so that row is its switch.
+    "itemfacts",
+}
+sources = sorted((root / "modules").glob("*.lua")) + [root / "core.lua"]
+wanted = {}
+follows = {}  # module -> the switch it follows (the third RegisterModule argument, as `end, "completion")`)
+for path in sources:
+    text = path.read_text(encoding="utf-8")
+    for name in re.findall(r'IsEnabled\("(\w+)"\)', text):
+        wanted.setdefault(name, path.name)
+    own = re.findall(r'RegisterModule\("(\w+)"', text)
+    toggle = re.findall(r'^end, "(\w+)"\)', text, re.M)
+    for name in own:
+        if toggle:
+            follows[name] = toggle[0]
+        else:
+            wanted.setdefault(name, path.name)
+assert follows, "the scan found no module that follows another's switch; the pattern is stale"
+missing = sorted(name for name in wanted if name not in rows and name not in OWN_SWITCH_OK)
+assert not missing, "modules without a switch on the settings page (add an O.ROWS row, or allowlist with a reason): " + ", ".join(f"{n} ({wanted[n]})" for n in missing)
+assert all(t in rows for t in follows.values()), "a module follows a switch that has no row: " + ", ".join(f"{m} -> {t}" for m, t in follows.items())
+assert 'key = "pulls"' in (root / "modules" / "options.lua").read_text(encoding="utf-8"), "the pulls allowlist entry needs its gated row"
+
 # --- Older client: interface options ---
 lua = fresh("""
 added = nil; openCalls = 0

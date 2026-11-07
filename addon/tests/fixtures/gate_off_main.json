@@ -9,6 +9,8 @@
    "mailCollect",
    "census",
    "openworld",
+   "professions",
+   "mapbounds",
    "gold",
    "roster",
    "gear",
@@ -105,6 +107,7 @@
     "guild": true,
     "openworld": true,
     "players": false,
+    "professions": true,
     "roster": true,
     "talents": true
    },
@@ -122,6 +125,8 @@
    "mailCollect",
    "census",
    "openworld",
+   "professions",
+   "mapbounds",
    "gold",
    "roster",
    "gear",
@@ -216,6 +221,7 @@
     "guild": true,
     "openworld": true,
     "players": false,
+    "professions": true,
     "roster": true,
     "talents": true
    },
