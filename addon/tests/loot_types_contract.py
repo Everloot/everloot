@@ -16,11 +16,12 @@ date = function() return '2026-10-23T00:00:00Z' end
 time = function() return 123456 end
 print = function() end
 SlashCmdList = {}
-CreateFrame = function() return {
+frames = {}
+CreateFrame = function() local f = {
  RegisterEvent=function(self, name) self.events=self.events or {}; self.events[name]=true end,
  SetScript=function(self, _, f) self.onEvent=f end,
  HookScript=function(self, _, f) self.hooks=self.hooks or {}; table.insert(self.hooks,f) end
-} end
+}; frames[#frames + 1] = f; return f end
 UnitGUID = function() end
 clock = 100
 GetTime = function() return clock end
@@ -40,7 +41,13 @@ for file in ["core.lua", "modules/openworld.lua"]:
     lua.execute((root / file).read_text(encoding="utf-8"))
 lua.execute("""
 Everloot.frame.onEvent(nil, 'ADDON_LOADED', 'Everloot')
-function event(name, ...) for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, name, ...) end end
+function event(name, ...)
+  for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, name, ...) end
+  -- A frame of its own (the spell casts) gets the events it registered, as the game sends them.
+  for _, f in ipairs(frames) do
+    if f ~= Everloot.frame and f.events and f.events[name] and f.onEvent then f.onEvent(f, name, ...) end
+  end
+end
 function rows() return EverlootDB.records.loot or {} end
 function last() local r = rows(); return r[#r] end
 function window(guid, items, coin)

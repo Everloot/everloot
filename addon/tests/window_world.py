@@ -31,7 +31,7 @@ Frame.__index = function(self, key)
   return function() end
 end
 local function new(kind, name, parent, template)
-  local f = setmetatable({ kind = kind, frameName = name, parent = parent, template = template, scripts = {}, hooks = {}, events = {}, shown = true }, Frame)
+  local f = setmetatable({ kind = kind, frameName = name, parent = parent, template = template, scripts = {}, hooks = {}, events = {}, unitEvents = {}, shown = true }, Frame)
   created[#created + 1] = f
   if name then _G[name] = f end
   return f
@@ -56,6 +56,7 @@ function Frame.SetValue(self, v) self.value = v end
 function Frame.SetChecked(self, v) self.checked = v and true or false end
 function Frame.GetChecked(self) return self.checked end
 function Frame.RegisterEvent(self, e) self.events[e] = true end
+function Frame.RegisterUnitEvent(self, e, unit) self.events[e] = true; self.unitEvents[e] = unit end
 function Frame.CreateFontString(self) return new('FontString') end
 function Frame.CreateTexture(self) return new('Texture') end
 CreateFrame = function(kind, name, parent, template)
@@ -63,11 +64,22 @@ CreateFrame = function(kind, name, parent, template)
   return new(kind, name, parent, template)
 end
 
--- The core frame dispatches to its OnEvent script, then to every module's hook, as the game does.
+-- The core frame dispatches to its OnEvent script, then to every module's hook, as the game does: one chain, so an
+-- error in one handler ends the dispatch and the hooks after it miss the event. The error is raised again so a
+-- crashing handler fails the test, unless the test set expectErrors; then it is kept in fireErrors.
+fireErrors = {}
+expectErrors = false
 function fire(event, ...)
   local f = Everloot.frame
-  f.onEvent(f, event, ...)
-  for _, hook in ipairs(f.hooks) do hook(f, event, ...) end
+  local args, n = { ... }, select('#', ...)
+  local ok, err = pcall(function()
+    f.onEvent(f, event, unpack(args, 1, n))
+    for _, hook in ipairs(f.hooks) do hook(f, event, unpack(args, 1, n)) end
+  end)
+  if not ok then
+    if not expectErrors then error(err, 0) end
+    fireErrors[#fireErrors + 1] = tostring(err)
+  end
 end
 
 money = 381240
