@@ -7,7 +7,7 @@ companion, and adds auction prices to item tooltips. It uses only the game's add
 plays the character. Records match the upload contract (`packages/protocol`, see its `schema/records/`) field for
 field.
 
-**Status:** 0.3.15 Alpha. The automated contract tests pass; live-client rendering of the Home window (0.3.14),
+**Status:** 0.3.15 Alpha. The automated contract tests pass; live-client rendering of the Everloot window's tabs,
 crest, fonts and interactions remains unverified. The in-client checks in
 `docs/2026-10-08-beta-client-checklist.md`, `docs/2026-10-18-addon-0.3.2-beta-checklist.md`,
 `docs/2026-10-19-addon-0.3.3-beta-checklist.md` and `docs/2026-10-21-addon-0.3.10-launch-checklist.md` are still open, and the full scan
@@ -216,12 +216,32 @@ game's options API shows the page as a window instead.
 
 ## The Everloot window
 
-Left-click the minimap button, or `/everloot window`, for the Everloot window. **Home** shows your character, gold on
-hand, the peak this install has seen and the money the gold module recorded for this character (loot, quests,
-vendors, auctions, flights), the gold per hour session with a Pause button, your professions with their skill and
-the recipe colours the file holds, and how many rows of each kind are in your saved file. A value the game does not
-give is a dash. **Gold** opens the gold per hour window, **Build plan** the plan workspace and **Settings** this page;
-the other items say what to use for now.
+Left-click the minimap button, or `/everloot window`, for the Everloot window. Its sidebar has five items.
+
+- **Home** lists every character this install has seen: gold, level, professions, raid lockouts and when it was last
+  seen, with totals for each realm and for the account and a "This week" line (gold in and out for this character over
+  seven days). Below it, the gold per hour session with a Pause button.
+- **Gold** has four tabs. **Overview** shows every character's gold by realm and the last 30 days as bars. **Ledger**
+  lists the money events by category, by day or by receipt. **Sales** lists auction sales one by one or by item.
+  **Session** is the gold per hour session. Each can be set to today, 7 days, 30 days or all, for this character or the account.
+- **Collection** shows this character's achievements, reputation, titles and raid lockouts from the rows the
+  completion tracker wrote, so it needs `/everloot completion on`; with it off the tab says so and has a button that runs that command.
+- **Professions** shows each profession in the profession book with its rank and the recipes recorded for it by
+  difficulty colour.
+- **Settings** opens this page. "What you've added", the row counts in your saved file, is on that page now.
+
+Ask, Build plan and Auctions are no longer in the sidebar. `/ask`, `/everloot plan` (the planner workspace) and the
+auction house tab work as before.
+
+The Gold tab and the character list on Home read two tables that exist only in your SavedVariables file.
+`EverlootDB.roster` holds one row per character you log in with (name, realm, class, level, faction, gold while the
+gold module is on, professions); the **Your characters** row in the options turns it off. `EverlootDB.ledger` holds
+your money events, your auction sales and each character's closing gold for each day, kept per character: up to 5,000
+events and 90 days, 2,000 sales and 400 daily closes, the oldest dropped first. For days before the ledger existed, the
+Gold tab also reads the older `money_event` rows from the file, without copying them. Neither table is a record, neither is
+read by an upload, and nothing in the window uploads anything. An auction sale is recorded when you collect its
+letter at the mailbox, from the invoice: item name, count, the price after the auction house's cut and the deposit.
+The buyer's name is never read.
 
 The window is built the first time it opens and registers no events, so recording never depends on it. An error
 inside it closes it until `/reload` and `/everloot status` names the error. The **Everloot window** switch on the

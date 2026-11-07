@@ -180,6 +180,12 @@ complete market snapshot or listing distribution. The fallback records no seller
 The addon's gold-per-hour sessions (`/everloot gph`) are personal: they stay in your SavedVariables
 file, outside the records an upload reads, and are never sent to the site.
 
+The addon's window keeps two more tables that are local in the same way. `EverlootDB.ledger` holds your money events,
+your auction sales (item name, count, price after the cut, deposit) and each character's closing gold per day, and
+`EverlootDB.roster` holds one row per character you log in with. Neither is a record, neither is read by an
+upload, and neither is sent to the site. An auction sale is read from the mailbox invoice, and the buyer's name is
+never read into the file. The completion tracker's rows are unchanged.
+
 Completion tracking (addon 0.3.3, off until `/everloot completion on`) follows the same split.
 Four catalog kinds (`achievement_catalog`, `reputation_catalog`, `title_catalog`,
 `quest_chain_catalog`) hold only game facts the addon read from the game's own calls: ids, names,
