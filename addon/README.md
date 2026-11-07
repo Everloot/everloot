@@ -188,6 +188,16 @@ expands, clicks or changes anything.
   categories you switched on. Each
   read replaces this character's row, a build with no spent points writes none, and `/everloot completion off`
   deletes them with the rest. The anonymous `talent_snapshot` of the talents module is unchanged.
+- **Character sheet row** (`stats_owned`): the numbers the character sheet shows (attributes, attack power, hit, crit,
+  haste, expertise, spell power, healing, armor, defense, dodge, parry, block), one row per character under the same key, read out of combat. Percent stats are
+  rounded to 2 decimals and the rest to whole numbers; a stat the game will not give is left out, and with fewer than
+  the five attributes there is no row. Never part of an upload file; the Desktop App's private sync sends it for a linked character and everloot.app keeps it
+  only if you switched on that category; `/everloot completion off` deletes it.
+- **PvP row** (`pvp_owned`): the PvP rank (renown on Forever's PvP rank faction: rank, points, next-rank threshold,
+  top rank), the season and lifetime honorable kills from the Statistics tab, one row per character under the same key.
+  Whole numbers only, no rank title; a field the game will not give is left out, and with neither a rank nor honorable
+  kills there is no row. Never part of an upload file; sent and kept the same way as the stats row;
+  `/everloot completion off` deletes it.
 - A changed achievement or standing replaces its earlier row. Titles and completed quests are additions.
 - The file stays bounded: at most 1500 achievements read, 600 progress rows per character, and about 3 MB
   of completion rows and remembered ids in all. A limit reached stops recording, says so once in chat that

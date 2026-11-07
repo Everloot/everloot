@@ -278,11 +278,13 @@ SlashCmdList["EVERLOOT"] = function(msg)
   elseif msg == "completion on" or msg == "completion off" then
     EverlootDB.toggles.completion = (msg == "completion on")
     if EverlootDB.toggles.completion then
-      print("Everloot: completion tracker on. It reads your achievements, reputation, titles and completed quests, and never changes them. It also records your professions, this week's raid lockouts and active talent build. Achievements, reputation, titles and quests leave this computer from the everloot.app upload page; achievements, reputation and titles also go through the Everloot Desktop App's private sync for a character you linked. Professions, raid lockouts and the talent build never go in an upload; they leave only through private sync. everloot.app keeps only the categories you switched on there. /reload to apply.")
+      print("Everloot: completion tracker on. It reads your achievements, reputation, titles and completed quests, and never changes them. It also records your professions, this week's raid lockouts, active talent build, character sheet stats and PvP standing. Achievements, reputation, titles and quests leave this computer from the everloot.app upload page; achievements, reputation and titles also go through the Everloot Desktop App's private sync for a character you linked. Professions, raid lockouts, the talent build, stats and PvP never go in an upload; they leave only through private sync. everloot.app keeps only the categories you switched on there. /reload to apply.")
     else
       -- Turning it off withdraws what it wrote: every completion row is deleted from this file.
       if E.Completion then E.Completion.Withdraw() end
       if E.Owned then E.Owned.Withdraw() end
+      if E.CharStats then E.CharStats.Withdraw() end
+      if E.Pvp then E.Pvp.Withdraw() end
       print("Everloot: completion tracker off; all recorded completion rows were deleted from this file. /reload to apply.")
     end
   elseif msg == "completion" and E.Completion then

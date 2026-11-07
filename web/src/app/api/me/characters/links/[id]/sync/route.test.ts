@@ -77,13 +77,15 @@ describe("who may change it", () => {
 
 describe("consent", () => {
   test("grants and revokes per category through set_sync_consent, for the session's account, and clears the page", async () => {
-    owned(null, null);
-    const res = await send({ gear: true, raids: false });
+    owned(null, null, null, null);
+    const res = await send({ gear: true, stats: true, pvp: false, raids: false });
     expect(res.status).toBe(200);
     expect(res.headers.get("cache-control")).toBe("private, no-store");
-    expect(await res.json()).toEqual({ id: LINK_ID, gear: true, raids: false });
+    expect(await res.json()).toEqual({ id: LINK_ID, gear: true, stats: true, pvp: false, raids: false });
     expect(consentCalls()).toEqual([
       { p_user_id: USER.id, p_link_id: LINK_ID, p_category: "gear", p_granted: true },
+      { p_user_id: USER.id, p_link_id: LINK_ID, p_category: "stats", p_granted: true },
+      { p_user_id: USER.id, p_link_id: LINK_ID, p_category: "pvp", p_granted: false },
       { p_user_id: USER.id, p_link_id: LINK_ID, p_category: "raids", p_granted: false },
     ]);
     expect(cache.revalidatePath.mock.calls.map((c) => c[0])).toEqual([PATH, `${PATH}/card.png`, `${PATH}/card-square.png`]);
@@ -102,10 +104,12 @@ describe("consent", () => {
   test("the owner's read lists every category with sync, its public switch and the capture date; no data, source or key", async () => {
     auth.authQuery
       .mockResolvedValueOnce([{ id: LINK_ID, ruleset: "forever", name: "Thrallina", realm: "Forever Pioneer", race: "Orc", class: "SHAMAN", faction: "Horde", level: 60,
-        last_upload_at: "2026-11-01T10:00:00+00:00", status: "linked", character_visibility: { page_public: true, show_gear: true, show_talents: false, show_professions: false, show_reputations: false, show_raids: false, show_collections: true } }])
+        last_upload_at: "2026-11-01T10:00:00+00:00", status: "linked", character_visibility: { page_public: true, show_gear: true, show_stats: true, show_talents: false, show_pvp: false, show_professions: false, show_reputations: false, show_raids: false, show_collections: true } }])
       .mockResolvedValueOnce([
         { category: "gear", consented: true, captured_at: "2026-11-05T10:00:00+00:00", data: { equipped: [] } },
+        { category: "stats", consented: true, captured_at: null, data: null },
         { category: "talents", consented: false, captured_at: null, data: null },
+        { category: "pvp", consented: false, captured_at: null, data: null },
         { category: "professions", consented: false, captured_at: null, data: null },
         { category: "reputations", consented: false, captured_at: null, data: null },
         { category: "raids", consented: false, captured_at: null, data: null },
@@ -118,7 +122,9 @@ describe("consent", () => {
       id: LINK_ID, status: "linked", pagePublic: true,
       categories: [
         { category: "gear", sync: true, shown: true, capturedAt: "2026-11-05T10:00:00.000Z" },
+        { category: "stats", sync: true, shown: true, capturedAt: null },
         { category: "talents", sync: false, shown: false, capturedAt: null },
+        { category: "pvp", sync: false, shown: false, capturedAt: null },
         { category: "professions", sync: false, shown: false, capturedAt: null },
         { category: "reputations", sync: false, shown: false, capturedAt: null },
         { category: "raids", sync: false, shown: false, capturedAt: null },

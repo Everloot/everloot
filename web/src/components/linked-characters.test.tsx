@@ -204,7 +204,7 @@ test("planned builds: no picker and no label read unless the list offers it; the
 
 describe("private sync", () => {
   const PATH = "/characters/forever/forever-pioneer/thrallina";
-  const CATEGORIES = ["gear", "talents", "professions", "reputations", "raids", "achievements"] as const;
+  const CATEGORIES = ["gear", "stats", "talents", "pvp", "professions", "reputations", "raids", "achievements"] as const;
   type Category = (typeof CATEGORIES)[number];
   const sync = (on: Category[] = []) => CATEGORIES.map((category) => ({ category, on: on.includes(category), capturedAt: null }));
   const sections = (shown: Category[] = []) => Object.fromEntries(CATEGORIES.map((c) => [c, shown.includes(c)])) as Record<Category, boolean>;
@@ -241,7 +241,7 @@ describe("private sync", () => {
     syncApi([{ links: [synced({ on: ["gear"] })] }]);
     await show();
     expect(container.textContent).toContain(SYNC_TEXT);
-    for (const label of ["Gear", "Talents", "Professions", "Reputations", "Raids", "Achievements and titles"]) expect(container.textContent).toContain(label);
+    for (const label of ["Gear", "Stats", "Talents", "PvP", "Professions", "Reputations", "Raids", "Achievements and titles"]) expect(container.textContent).toContain(label);
     expect(button("Turn off gear sync for Thrallina")).toBeDefined();
     expect(button("Turn on talents sync for Thrallina")).toBeDefined();
     expect(container.querySelector(`a[href="/me/characters/links/${LINK.id}"]`)?.textContent).toBe("See what's synced");
@@ -342,6 +342,17 @@ describe("private sync", () => {
     expect(status()).toBe("Thrallina's gear is ranked.");
     expect(container.textContent).toContain("Rank my gear: on");
     expect(button("Take Thrallina off the gear rankings")!.disabled).toBe(false);
+  });
+
+  test("stats and PvP each have their own sync and their own switch", async () => {
+    const sent = syncApi([{ links: [synced({ public: true, on: ["stats", "pvp"] })] }]);
+    await show();
+    await click("Show stats on Thrallina's page");
+    await click("Show pvp on Thrallina's page");
+    expect(sent).toEqual([
+      { url: `/api/me/characters/links/${LINK.id}/visibility`, body: { show_stats: true } },
+      { url: `/api/me/characters/links/${LINK.id}/visibility`, body: { show_pvp: true } },
+    ]);
   });
 
   test("without the pages there is sync but no section switch", async () => {

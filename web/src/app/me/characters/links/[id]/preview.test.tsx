@@ -25,11 +25,13 @@ const LINK = {
   id: LINK_ID, ruleset: "forever", name: "Thrallina", realm: "Forever Pioneer", race: "Orc", class: "SHAMAN", faction: "Horde", level: 60,
   status: "linked", last_upload_at: "2026-10-30T18:00:00+00:00", link_key: "a".repeat(64), completion_ref: "b".repeat(64),
   // Only gear is switched on for the public page.
-  character_visibility: { page_public: true, show_gear: true, show_talents: false, show_professions: false, show_reputations: false, show_raids: false, show_collections: false },
+  character_visibility: { page_public: true, show_gear: true, show_stats: false, show_talents: false, show_pvp: false, show_professions: false, show_reputations: false, show_raids: false, show_collections: false },
 };
 const OWN = [
   { category: "gear", consented: true, captured_at: "2026-10-31T09:00:00+00:00", data: { equipped: [{ slot: "HeadSlot", itemId: 16842, itemLevel: 66 }] } },
+  { category: "stats", consented: true, captured_at: null, data: null },
   { category: "talents", consented: false, captured_at: null, data: null },
+  { category: "pvp", consented: false, captured_at: null, data: null },
   { category: "professions", consented: true, captured_at: "2026-10-30T09:00:00+00:00", data: { professions: [{ name: "Mining", skillLine: null, rank: 280, maxRank: 300 }] } },
   { category: "reputations", consented: false, captured_at: null, data: null },
   { category: "raids", consented: true, captured_at: null, data: null },
@@ -92,6 +94,8 @@ test("the owner sees every synced section, switched on or not, each category's s
   expect(html).toContain('data-category="gear" data-sync="on" data-public="on"');
   expect(html).toContain('data-category="professions" data-sync="on" data-public="off"');
   expect(html).toContain('data-category="talents" data-sync="off" data-public="off"');
+  expect(html).toContain('data-category="stats" data-sync="on" data-public="off"');
+  expect(html).toContain('data-category="pvp" data-sync="off" data-public="off"');
   expect(html).toContain('href="/characters/forever/forever-pioneer/thrallina"');
   expect(html).not.toMatch(/verified|owner|proven|✓/i);
   for (const secret of [USER.id, "a".repeat(64), "b".repeat(64), "Thrall#1"]) expect(html).not.toContain(secret);

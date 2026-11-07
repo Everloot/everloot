@@ -203,7 +203,7 @@ export async function ownLinkPath(userId: string, id: string): Promise<string | 
  */
 export type VisibilityFlags = {
   page_public?: boolean; indexable?: boolean;
-  show_gear?: boolean; show_talents?: boolean; show_professions?: boolean; show_reputations?: boolean; show_raids?: boolean; show_collections?: boolean;
+  show_gear?: boolean; show_stats?: boolean; show_talents?: boolean; show_pvp?: boolean; show_professions?: boolean; show_reputations?: boolean; show_raids?: boolean; show_collections?: boolean;
   ranked_gear?: boolean;
 };
 

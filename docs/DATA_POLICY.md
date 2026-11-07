@@ -202,10 +202,13 @@ id. The link lasts until the rollup is rebuilt (`?rebuild=1`), which drops every
 were deleted; deleting a player's uploads therefore takes a rebuild to remove the link. Turning the
 module off deletes every one of these rows from the file.
 
-With the same switch the addon also keeps three kinds for the Desktop App: `profession_owned` (each
+With the same switch the addon also keeps five kinds for the Desktop App: `profession_owned` (each
 profession's name, rank and max rank), `lockout_owned` (each raid the character is saved to this week: instance,
 difficulty, bosses killed of total, reset time) and `talent_owned` (the active talent build: tree, spec if known,
-points spent, talent node ids and ranks), under the same opaque key and holding only the latest state. These kinds stay on
+points spent, talent node ids and ranks), `stats_owned` (the character sheet's attributes, attack power, hit, crit,
+haste, expertise, spell power, healing, armor, defense, dodge, parry and block, as the game's character window shows them) and
+`pvp_owned` (PvP rank, rank points toward the next rank, top rank, season, lifetime honorable kills), under the same
+opaque key and holding only the latest state. These kinds stay on
 the player's computer except for private sync (see *Private sync and owner-published sections*): every uploader holds
 them back, the site's intake has no schema for them and refuses them, and the Desktop App's Chat does not pass them to a
 model provider. Only the Desktop App's sync sends them, and only for a character the player linked. Turning the module
@@ -835,6 +838,8 @@ its character by the same opaque key as the other synced rows, under the talents
 The public `talent_snapshot` row carries no character and is never synced.
 
 Amended 6 November 2026, accepted by the maintainer that day: the active talent build (`talent_owned`).
+Amended 7 November 2026: character-sheet stats and PvP standing (migration
+`20261107140000_private_sync_stats_pvp.sql`); to be accepted by the maintainer in PR review.
 
 A signed-in player can sync their own linked characters' progress to their account and choose which parts of it
 their character's public page shows. Like saved builds and profiles, this is the player's own data, not an
@@ -843,7 +848,10 @@ observation of anyone else, and none of it is published as a dataset.
 - **What is synced.** For each linked character the Desktop App sends the categories below, and the site keeps only the
   ones the player has turned on for that character: equipped gear (slot, item id, item level), the active talent build (talent node ids and ranks),
   professions (name and rank), reputations (faction id and standing), this week's raid lockouts (instance,
-  difficulty, bosses killed, reset), and achievements this character earned and titles held. Every category starts off. The
+  difficulty, bosses killed, reset), achievements this character earned and titles held, the character sheet's stats
+  (attributes, attack power, hit, crit, haste, expertise, spell power, healing, armor, defense, dodge, parry, block, as the
+  game's character window shows them) and PvP standing (rank, rank points toward the next rank, top rank, season,
+  lifetime honorable kills). Each category has its own switch and every category starts off. The
   Desktop App sends these with a key made with "Sync my linked characters" (`sync:own`); that key can send and
   nothing else. It cannot turn a category on, change what the page shows, or list anything.
 - **The link decides, not the computer.** A synced row is kept only when the account that sent it holds a live
@@ -856,8 +864,8 @@ observation of anyone else, and none of it is published as a dataset.
   id, the addon's character key and the character's name are not stored with a synced row.
 - **Private by default.** Synced data is shown only to the player, on a signed-in preview of the character. It
   appears on the public page only when the page is on and the player has also switched that section on: gear,
-  talents, professions, reputations, raids, and achievements and titles (under Collections), each on its own
-  switch, all off by default. A frozen or hidden character shows none of it, to anyone. The page says the data is
+  stats, talents, PvP, professions, reputations, raids, and achievements and titles (under Collections), each on
+  its own switch, all off by default. A frozen or hidden character shows none of it, to anyone. The page says the data is
   self-reported through the Everloot addon and not checked against Blizzard; it never says verified.
 - **Names on the page.** An item is named only when three installs agree on its name; otherwise it reads
   "Item <id>". Factions, achievements and titles are named only when the catalog's three-install rule agrees on

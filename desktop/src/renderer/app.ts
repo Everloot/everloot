@@ -581,7 +581,7 @@ function characters(): string {
     </section>` : c ? `${emptyState(emptyCause("characters", state!), icon("characters"))}${ghostProfile()}` : `<section class="panel"><p class="muted">Loading…</p></section>`}
     <section class="panel" id="keyed" tabindex="-1"><h2>Progress · keyed</h2>
       ${prog ? `<div class="tablewrap"><table><thead><tr><th>Key</th><th>Class</th><th class="num">Achievements</th><th class="num">Reputations</th><th class="num">Titles</th><th class="num">Quests done</th><th>Professions</th><th>Raid lockouts</th></tr></thead><tbody>${prog}</tbody></table></div>
-        <p class="muted small">Professions and raid lockouts stay on this computer: no upload sends them and Chat does not read them.</p>` : `<p class="muted">${c ? "Nothing yet. The completion tracker is off until <code>/everloot completion on</code> in game." : "Loading…"}</p>`}
+        <p class="muted small">Professions and raid lockouts never go in an upload, and Chat does not read them. Private sync sends them only for a character you linked, and everloot.app keeps only the categories you switched on.</p>` : `<p class="muted">${c ? "Nothing yet. The completion tracker is off until <code>/everloot completion on</code> in game." : "Loading…"}</p>`}
       ${c?.talents.length ? `<p class="muted small">Active talent builds: ${c.talents.map((x) => `${esc(x.class.toLowerCase())} ${x.level} (${x.points} points)`).join(", ")}. Not linked to a name.</p>` : ""}
     </section>
   </div>

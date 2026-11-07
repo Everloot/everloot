@@ -90,6 +90,15 @@ export interface TalentsData {
   /** Saved builds the owner attached to the character (/b/<slug>). */
   planned: { name: string; slug: string }[];
 }
+/** One linked character's PvP standing. A number the game did not report is null, and its line is not drawn. */
+export interface PvpData {
+  rank: number | null;
+  rankPoints: number | null;
+  rankThreshold: number | null;
+  rankMax: number | null;
+  season: number | null;
+  honorableKills: number | null;
+}
 export interface ProfessionRow { name: string; rank: number; maxRank: number }
 /** A faction the catalog agrees on. A renown faction has ranks, not standings, and is not supported yet. */
 export type ReputationRow = { faction: string; standing: string; value: number; max: number } | { faction: string; renown: true };
@@ -161,18 +170,20 @@ export interface ShowcaseInput {
   gear: Section<GearRow[]>;
   stats: Section<StatsData>;
   talents: Section<TalentsData>;
+  pvp: Section<PvpData>;
   professions: Section<ProfessionRow[]>;
   reputations: Section<ReputationRow[]>;
   raids: Section<RaidsData>;
   collections: Section<CollectionsData>;
 }
 
-export type SectionKey = "gear" | "stats" | "talents" | "raids" | "collections" | "reputations" | "professions";
+export type SectionKey = "gear" | "stats" | "talents" | "pvp" | "raids" | "collections" | "reputations" | "professions";
 /** Page order: the character sheet first, then what the character has done, then its standing and trades. */
 export const SECTION_TITLES: Record<SectionKey, string> = {
   gear: "Gear",
   stats: "Stats",
   talents: "Talents",
+  pvp: "PvP",
   raids: "Raids",
   collections: "Progress",
   reputations: "Reputations",

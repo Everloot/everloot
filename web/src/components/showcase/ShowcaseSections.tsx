@@ -7,7 +7,7 @@ import { Card, DataTable, Disclosure, Facts, PageHeader, QUALITY_TEXT, qualityOf
 import type { Crumb } from "@/lib/jsonld";
 import {
   averageItemLevel, EMPTY_LINE, GEAR_SLOTS, isPublic, NOT_RECORDED_LINE, PAPER_DOLL, paperDoll, PLANNED_LINE, PRIVATE_LINE, reputationGroups, STALE_LINE, UNSUPPORTED_LINE,
-  type CollectionsData, type GearRow, type GearSlot, type ProfessionRow, type RaidsData, type ReputationRow, type Section, type Showcase, type ShownSection, type StatsData, type TalentsData,
+  type CollectionsData, type GearRow, type GearSlot, type ProfessionRow, type PvpData, type RaidsData, type ReputationRow, type Section, type Showcase, type ShownSection, type StatsData, type TalentsData,
 } from "@/lib/character-showcase";
 
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
@@ -152,6 +152,23 @@ function Talents({ data, classSlug }: { data: TalentsData; classSlug: string | n
   );
 }
 
+/** Rank, its points, the season and the honorable kills; a number the game did not report is not drawn. */
+function Pvp({ data }: { data: PvpData }) {
+  const lines: string[] = [];
+  // Rank 0 is unranked: no rank line, and no points line unless there is a next rank to count toward.
+  if (data.rank !== null && data.rank > 0) lines.push(data.rankMax !== null ? `Rank ${number(data.rank)} of ${number(data.rankMax)}` : `Rank ${number(data.rank)}`);
+  if (data.rankPoints !== null && data.rankThreshold !== null && data.rankThreshold > 0) lines.push(`${number(data.rankPoints)} / ${number(data.rankThreshold)} rank points`);
+  if (data.season !== null) lines.push(`Season ${number(data.season)}`);
+  if (data.honorableKills !== null) lines.push(`Honorable kills ${number(data.honorableKills)}`);
+  return (
+    <Card>
+      <ul className="space-y-1 text-sm text-fg" aria-label="PvP">
+        {lines.map((l) => <li key={l} className="font-mono tabular-nums">{l}</li>)}
+      </ul>
+    </Card>
+  );
+}
+
 function Professions({ rows }: { rows: ProfessionRow[] }) {
   return (
     <Card>
@@ -275,6 +292,7 @@ function Body({ s, classSlug }: { s: ShownSection; classSlug: string | null }) {
     case "gear": return <Gear rows={data as GearRow[]} />;
     case "stats": return <Stats data={data as StatsData} />;
     case "talents": return <Talents data={data as TalentsData} classSlug={classSlug} />;
+    case "pvp": return <Pvp data={data as PvpData} />;
     case "professions": return <Professions rows={data as ProfessionRow[]} />;
     case "reputations": return <Reputations rows={data as ReputationRow[]} />;
     case "raids": return <Raids data={data as RaidsData} />;

@@ -19,7 +19,7 @@ const base: ShowcaseInput = {
   sample: false, path: "/characters/forever/forever-pioneer/thrallina", name: "Thrallina", level: 60, race: "Orc", class: "SHAMAN",
   faction: "Horde", realm: "Forever Pioneer", title: null, guild: null, lastUpload: "2026-11-01",
   gear: { state: "empty" }, stats: { state: "unsupported" }, talents: { state: "empty" }, professions: { state: "empty" }, reputations: { state: "empty" },
-  raids: { state: "empty" }, collections: { state: "empty" },
+  pvp: { state: "empty" }, raids: { state: "empty" }, collections: { state: "empty" },
 };
 
 describe("factSections", () => {
@@ -88,6 +88,43 @@ describe("factSections", () => {
     expect(factSections(facts, { ...NAMES, catalog: null }, NOW).collections).toBeUndefined();
   });
 
+  test("stats, in the page's group order with percent and thousands formatting; unknown keys and empty groups are dropped", () => {
+    const s = factSections([at("stats", { stats: {
+      block: 4.5, strength: 1234, agility: 90, stamina: 1_234_567, intellect: 0, spirit: 12, armor: 3000, meleeCrit: 12.345, meleeHit: 0, bogus: 7,
+    } })], NAMES, NOW).stats;
+    expect(s).toEqual({ state: "shown", asOf: "2026-11-05", data: [
+      { group: "Attributes", stats: [
+        { label: "Strength", value: "1,234" }, { label: "Agility", value: "90" }, { label: "Stamina", value: "1,234,567" },
+        { label: "Intellect", value: "0" }, { label: "Spirit", value: "12" },
+      ] },
+      { group: "Melee", stats: [{ label: "Crit", value: "12.35%" }] },
+      { group: "Defense", stats: [{ label: "Armor", value: "3,000" }, { label: "Block", value: "4.50%" }] },
+    ] });
+  });
+
+  test("a stats fact with nothing known leaves the section out", () => {
+    expect(factSections([at("stats", { stats: { bogus: 1 } }), at("stats", { stats: "nope" })], NAMES, NOW).stats).toBeUndefined();
+  });
+
+  test("pvp: the stored numbers as the page's data, an absent one null; no known number leaves the section out", () => {
+    const s = factSections([at("pvp", { rank: 9, rankPoints: 12_500, rankThreshold: 15_000, rankMax: 14, season: 2, honorableKills: 1234 })], NAMES, NOW).pvp;
+    expect(s).toEqual({ state: "shown", asOf: "2026-11-05", data: { rank: 9, rankPoints: 12_500, rankThreshold: 15_000, rankMax: 14, season: 2, honorableKills: 1234 } });
+    expect(factSections([at("pvp", { honorableKills: 7 })], NAMES, NOW).pvp).toMatchObject({ data: { rank: null, honorableKills: 7 } });
+    expect(factSections([at("pvp", { rank: null, honorableKills: null }), at("pvp", { rank: "9" })], NAMES, NOW).pvp).toBeUndefined();
+  });
+
+  test("pvp: unranked with nothing else to draw leaves the section out, not an empty card", () => {
+    expect(factSections([at("pvp", { rank: 0, rankPoints: 0, rankThreshold: 0 })], NAMES, NOW).pvp).toBeUndefined();
+    expect(factSections([at("pvp", { rank: 0, honorableKills: 0 })], NAMES, NOW).pvp).toMatchObject({ data: { honorableKills: 0 } });
+    expect(factSections([at("pvp", { rank: 0, season: 3 })], NAMES, NOW).pvp).toMatchObject({ data: { season: 3 } });
+    expect(factSections([at("pvp", { rank: 0, rankPoints: 40, rankThreshold: 500 })], NAMES, NOW).pvp).toMatchObject({ data: { rankPoints: 40 } });
+  });
+
+  test("expertise is a percent, as Forever's character window shows it", () => {
+    const s = factSections([at("stats", { stats: { strength: 1, agility: 1, stamina: 1, intellect: 1, spirit: 1, expertise: 7.6 } })], NAMES, NOW).stats;
+    expect(s).toMatchObject({ data: [{ group: "Attributes" }, { group: "Melee", stats: [{ label: "Expertise", value: "7.60%" }] }] });
+  });
+
   test("a stored shape it does not know is left out, never guessed", () => {
     const s = factSections([at("gear", { equipped: "nope" }), at("professions", { list: [] }), at("raids", { lockouts: [{ instance: 1 }] })], NAMES, NOW);
     expect(s).toEqual({});
@@ -95,6 +132,24 @@ describe("factSections", () => {
 });
 
 describe("withFacts", () => {
+  test("synced pvp replaces the empty section and dates the header", () => {
+    expect(withFacts(base, {}).pvp).toEqual({ state: "empty" });
+    const input = withFacts(base, factSections([at("pvp", { rank: 3 }, "2026-11-05T23:00:00.000Z")], NAMES, NOW));
+    expect(input.pvp).toMatchObject({ state: "shown", asOf: "2026-11-05", data: { rank: 3 } });
+    expect(input.lastUpload).toBe("2026-11-05");
+  });
+
+  test("synced stats replace the unsupported line and date the header; without a fact they stay unsupported", () => {
+    expect(withFacts(base, {}).stats).toEqual({ state: "unsupported" });
+    const input = withFacts(base, factSections([at("stats", { stats: { strength: 10 } }, "2026-11-05T23:00:00.000Z")], NAMES, NOW));
+    expect(input.stats).toEqual({ state: "shown", asOf: "2026-11-05", data: [{ group: "Attributes", stats: [{ label: "Strength", value: "10" }] }] });
+    expect(input.lastUpload).toBe("2026-11-05");
+    const page = buildShowcase({ ...input, lastUpload: "2026-11-05" }, NOW);
+    expect(page.sections.find((x) => x.key === "stats")).toMatchObject({ asOf: "2026-11-05", stale: false });
+    const old = buildShowcase(withFacts(base, factSections([at("stats", { stats: { strength: 10 } }, "2026-10-01T10:00:00.000Z")], NAMES, NOW)), NOW);
+    expect(old.sections.find((x) => x.key === "stats")).toMatchObject({ asOf: "2026-10-01", stale: true });
+  });
+
   test("synced talents sit beside the planned builds; the header's date is the newest shown capture", () => {
     const planned: ShowcaseInput = { ...base, talents: { state: "shown", asOf: "2026-10-20", data: { trees: [], code: null, planned: [{ name: "Raid", slug: "abc123" }] } } };
     const input = withFacts(planned, factSections([

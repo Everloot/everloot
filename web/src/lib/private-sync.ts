@@ -20,15 +20,15 @@ export function privateSyncOn(env: Record<string, string | undefined> = process.
   return characterLinksOn(env) && env.EVERLOOT_PRIVATE_SYNC === "1";
 }
 
-/** What a link can sync, in page order. `achievements` is published under the Collections section's switch. */
-export const SYNC_CATEGORIES = ["gear", "talents", "professions", "reputations", "raids", "achievements"] as const;
+/** What a link can sync, in page order. `stats` and `pvp` are the player's own self-reported numbers. `achievements` is published under the Collections section's switch. */
+export const SYNC_CATEGORIES = ["gear", "stats", "talents", "pvp", "professions", "reputations", "raids", "achievements"] as const;
 export type SyncCategory = (typeof SYNC_CATEGORIES)[number];
 export const isSyncCategory = (v: unknown): v is SyncCategory => (SYNC_CATEGORIES as readonly unknown[]).includes(v);
 
 /** The visibility switch that publishes each category. Gear and collections reuse the switches the links shipped with. */
 export const SHOW_SWITCH: Record<SyncCategory, string> = {
-  gear: "show_gear", talents: "show_talents", professions: "show_professions", reputations: "show_reputations",
-  raids: "show_raids", achievements: "show_collections",
+  gear: "show_gear", stats: "show_stats", talents: "show_talents", pvp: "show_pvp", professions: "show_professions",
+  reputations: "show_reputations", raids: "show_raids", achievements: "show_collections",
 };
 
 /** Characters one request may carry, and rows across them. A full completion file is a few thousand rows. */
@@ -38,8 +38,8 @@ export const SYNC_ROWS_PER_REQUEST = 10_000;
 const FUTURE_MS = 86_400_000;
 
 /**
- * profession_owned, lockout_owned and talent_owned stay on the computer except for this endpoint (the addon's owned
- * and talents modules), so the protocol has no schema for them and the public intake refuses them. Their shapes are
+ * profession_owned, lockout_owned, talent_owned, stats_owned and pvp_owned stay on the computer except for this
+ * endpoint (the addon's owned, charstats and pvp modules), so the protocol has no schema for them and the public intake refuses them. Their shapes are
  * defined here, for this endpoint only, from the addon's rows: adding them to `recordSchemas` would let the intake take them.
  */
 const ownedBase = z.object({
@@ -90,10 +90,67 @@ export const talentOwned = ownedBase.extend({
   }
 });
 
+/**
+ * The character window's numbers, as the addon records them: exactly these keys, grouped as the page groups them.
+ * Percent keys are rounded to 2 decimals by the addon. An absent key was not readable; it is never a zero.
+ */
+export const STAT_KEYS = [
+  "strength", "agility", "stamina", "intellect", "spirit",
+  "meleeAttackPower", "meleeHit", "meleeCrit", "meleeHaste", "expertise",
+  "rangedAttackPower", "rangedHit", "rangedCrit", "rangedHaste",
+  "spellPower", "healing", "spellHit", "spellCrit", "spellHaste",
+  "armor", "defense", "dodge", "parry", "block",
+] as const;
+export type StatKey = (typeof STAT_KEYS)[number];
+export const ATTRIBUTE_KEYS: readonly StatKey[] = ["strength", "agility", "stamina", "intellect", "spirit"];
+const isStatKey = (k: string): k is StatKey => (STAT_KEYS as readonly string[]).includes(k);
+/** A stat of exactly 0 is not shown in game (except the five attributes), so it is not stored either. */
+export const keepStat = (key: StatKey, value: number) => value !== 0 || ATTRIBUTE_KEYS.includes(key);
+/**
+ * One linked character's sheet. Unknown keys are dropped, not refused, so an older site tolerates a newer addon; a row
+ * left with no known key is refused. Each value must be a finite number.
+ */
+export const statsOwned = ownedBase.extend({
+  kind: z.literal("stats_owned"),
+  stats: z.record(z.string(), z.unknown()).transform((raw, ctx) => {
+    const out: Partial<Record<StatKey, number>> = {};
+    for (const [key, value] of Object.entries(raw)) {
+      if (!isStatKey(key)) continue;
+      if (typeof value !== "number" || !Number.isFinite(value)) {
+        ctx.addIssue({ code: "custom", message: `${key} must be a finite number` });
+        return z.NEVER;
+      }
+      out[key] = value;
+    }
+    if (Object.keys(out).length === 0) {
+      ctx.addIssue({ code: "custom", message: "stats needs at least one known stat" });
+      return z.NEVER;
+    }
+    return out;
+  }),
+});
+
+const pvpInt = z.number().int().min(0).max(2_000_000_000);
+/**
+ * One linked character's PvP standing, as the addon records it: each number is optional (an unreadable one is absent,
+ * never a zero), but a row holds the rank or the honorable kills, or it says nothing.
+ */
+export const pvpOwned = ownedBase.extend({
+  kind: z.literal("pvp_owned"),
+  rank: pvpInt.optional(),
+  rankPoints: pvpInt.optional(),
+  rankThreshold: pvpInt.optional(),
+  rankMax: pvpInt.optional(),
+  season: pvpInt.optional(),
+  honorableKills: pvpInt.optional(),
+}).refine((r) => r.rank !== undefined || r.honorableKills !== undefined, { message: "pvp needs a rank or honorable kills", path: ["rank"] });
+
 /** The kinds this endpoint reads, each with the category it feeds. Any other kind is skipped. */
 const SCHEMAS = {
   gear_snapshot: recordSchemas.gear_snapshot,
   talent_owned: talentOwned,
+  stats_owned: statsOwned,
+  pvp_owned: pvpOwned,
   profession_owned: professionOwned,
   reputation_owned: recordSchemas.reputation_owned,
   lockout_owned: lockoutOwned,
@@ -103,7 +160,7 @@ const SCHEMAS = {
 type Kind = keyof typeof SCHEMAS;
 export type SyncRow = z.infer<(typeof SCHEMAS)[Kind]>;
 const CATEGORY_OF: Record<Kind, SyncCategory> = {
-  gear_snapshot: "gear", talent_owned: "talents", profession_owned: "professions", reputation_owned: "reputations",
+  gear_snapshot: "gear", talent_owned: "talents", stats_owned: "stats", pvp_owned: "pvp", profession_owned: "professions", reputation_owned: "reputations",
   lockout_owned: "raids", achievement_owned: "achievements", title_owned: "achievements",
 };
 
@@ -192,6 +249,19 @@ function categoryData(category: SyncCategory, rows: readonly SyncRow[], now: Dat
     case "gear": {
       const g = newest(only(rows, "gear_snapshot"));
       return { equipped: g.equipped.map((e) => ({ slot: e.slot, itemId: e.itemId, itemLevel: e.itemLevel })) };
+    }
+    case "stats": {
+      const s = newest(only(rows, "stats_owned"));
+      // Keys in the page's order; a zero outside the attributes is not a shown stat.
+      const stats = Object.fromEntries(STAT_KEYS.flatMap((k) => { const v = s.stats[k]; return v !== undefined && keepStat(k, v) ? [[k, v]] : []; }));
+      return Object.keys(stats).length ? { stats } : null;
+    }
+    case "pvp": {
+      const p = newest(only(rows, "pvp_owned"));
+      return {
+        rank: p.rank ?? null, rankPoints: p.rankPoints ?? null, rankThreshold: p.rankThreshold ?? null,
+        rankMax: p.rankMax ?? null, season: p.season ?? null, honorableKills: p.honorableKills ?? null,
+      };
     }
     case "talents": {
       const t = newest(only(rows, "talent_owned"));

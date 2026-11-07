@@ -14,8 +14,8 @@ import { validId } from "@/lib/saved-builds";
  * exactly as an unknown one, 404. Any change clears the page and both cards from the Next cache. 404 unless both
  * EVERLOOT_CHARACTER_LINKS=1 and EVERLOOT_SHOWCASE=1.
  *
- * With EVERLOOT_PRIVATE_SYNC=1 the owner's section switches are taken too (showcase plan S6): show_gear, show_talents,
- * show_professions, show_reputations, show_raids and show_collections. Each publishes only that section's synced facts,
+ * With EVERLOOT_PRIVATE_SYNC=1 the owner's section switches are taken too (showcase plan S6): show_gear, show_stats, show_talents,
+ * show_pvp, show_professions, show_reputations, show_raids and show_collections. Each publishes only that section's synced facts,
  * and only while sync for it stays on. Gold, guild and the achievement and gold rankings stay refused.
  *
  * With EVERLOOT_LEADERBOARDS=1, `ranked_gear` ("Rank my gear") is taken too: the character is on the gear boards while
