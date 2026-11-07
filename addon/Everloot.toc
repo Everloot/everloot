@@ -16,6 +16,7 @@ modules\gear.lua
 modules\auctions.lua
 modules\gold.lua
 modules\roster.lua
+modules\ledger.lua
 modules\professions.lua
 modules\ask.lua
 modules\addons.lua

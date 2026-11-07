@@ -1,0 +1,35 @@
+{
+  "now": "2026-11-07T12:00:00Z",
+  "events": [
+    { "at": "2026-09-28T10:00:00Z", "character": "Thrall", "realm": "Moon Guard", "category": "vendor", "copper": 2200 },
+    { "at": "2026-10-30T11:00:00Z", "character": "Jaina", "realm": "Moon Guard", "category": "loot", "copper": 800 },
+    { "at": "2026-10-31T12:00:00Z", "character": "Jaina", "realm": "Moon Guard", "category": "respec", "copper": 7500 },
+    { "at": "2026-11-01T12:00:00Z", "character": "Jaina", "realm": "Moon Guard", "category": "barber", "copper": 5000 },
+    { "at": "2026-11-02T20:00:00Z", "character": "Jaina", "realm": "Moon Guard", "category": "auction_spend", "copper": 40000 },
+    { "at": "2026-11-03T14:00:00Z", "character": "Jaina", "realm": "Moon Guard", "category": "auction", "copper": 25000 },
+    { "at": "2026-11-04T08:00:00Z", "character": "Thrall", "realm": "Moon Guard", "category": "flight", "copper": 120 },
+    { "at": "2026-11-05T10:00:00Z", "character": "Thrall", "realm": "Moon Guard", "category": "quest", "copper": 10000 },
+    { "at": "2026-11-06T07:00:00Z", "character": "Thrall", "realm": "Moon Guard", "category": "quest", "copper": 650 },
+    { "at": "2026-11-06T18:00:00Z", "character": "Thrall", "realm": "Moon Guard", "category": "postage", "copper": 30 },
+    { "at": "2026-11-07T09:00:00Z", "character": "Thrall", "realm": "Moon Guard", "category": "loot", "copper": 1500 },
+    { "at": "2026-11-07T09:30:00Z", "character": "Thrall", "realm": "Moon Guard", "category": "vendor", "copper": 300 }
+  ],
+  "expected": {
+    "categories": [
+      { "category": "auction_spend", "direction": "out", "copper": 40000, "events": 1 },
+      { "category": "auction", "direction": "in", "copper": 25000, "events": 1 },
+      { "category": "quest", "direction": "in", "copper": 10650, "events": 2 },
+      { "category": "respec", "direction": "out", "copper": 7500, "events": 1 },
+      { "category": "barber", "direction": "out", "copper": 5000, "events": 1 },
+      { "category": "vendor", "direction": "in", "copper": 2500, "events": 2 },
+      { "category": "loot", "direction": "in", "copper": 2300, "events": 2 },
+      { "category": "flight", "direction": "out", "copper": 120, "events": 1 },
+      { "category": "postage", "direction": "out", "copper": 30, "events": 1 }
+    ],
+    "week": {
+      "in": 37450,
+      "out": 52650,
+      "net": -15200
+    }
+  }
+}
