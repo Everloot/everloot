@@ -6,15 +6,18 @@ const reads = vi.hoisted(() => ({
   seen: { seen: new Set([10, 20, 40]), from: new Map([[20, ["drop"]], [40, ["vendor"]]]), unreachable: false } as Record<string, unknown>,
   names: { names: new Map([[50, { name: "Wiki Item" }]]) } as unknown,
   cloud: null as unknown,
+  /** The corpus each reader was handed, if any. */
+  passed: [] as unknown[],
 }));
-vi.mock("./rollup-compute", () => ({ loadItemFacts: async () => reads.facts }));
-vi.mock("./item-seen", () => ({ loadItemSeen: async () => reads.seen }));
+vi.mock("./rollup-compute", () => ({ loadItemFacts: async (read?: unknown) => { reads.passed.push(read); return reads.facts; } }));
+vi.mock("./item-seen", () => ({ loadItemSeen: async (read?: unknown) => { reads.passed.push(read); return reads.seen; } }));
 vi.mock("../../../kb/src/item-page", () => ({ agreedItemNames: (f: { names: { itemId: number; name: string }[] }) => new Map(f.names.map((n) => [n.itemId, n.name])) }));
 vi.mock("./game-assets", () => ({ PRIVATE_UNREACHABLE: Symbol.for("unreachable"), loadItemNames: async () => reads.names }));
 
 import { loadListNames, loadListSeen } from "./item-view";
 import { buildItemView, forgetItemView, ITEM_VIEW_KEY, loadItemView, parseItemView, writeItemView } from "./item-view-store";
 import { loadShownNames } from "./shown-item-names";
+import { uploadStore } from "./upload-store";
 
 const CLOUD = { r2AccountId: "acct", r2AccessKeyId: "id", r2SecretAccessKey: "secret", r2Bucket: "everloot-uploads", supabaseUrl: "https://db.test", supabaseServiceKey: "service" };
 const AT = new Date("2026-11-06T12:00:00Z");
@@ -47,6 +50,17 @@ test("the cron writes it after a change or when it is missing, and an idle run w
   expect(calls[0]!.url).toBe(`https://acct.r2.cloudflarestorage.com/everloot-uploads/${ITEM_VIEW_KEY}`);
   expect(JSON.parse(await calls[0]!.text())).toEqual(view);
   await expect(writeItemView({ added: 1, dataAsOf: null }, { cloud: null })).rejects.toThrow(/cloud/);
+});
+
+test("the cron's view is worked out from the corpus it reads, never from stored aggregates the same run has not written yet", async () => {
+  const corpus = { uploads: 3, records: [], dataAsOf: "2026-11-06T11:50:00Z" };
+  const load = vi.spyOn(uploadStore, "loadCorpus").mockResolvedValue(corpus);
+  reads.passed = [];
+  const put = vi.fn(async () => new Response(null, { status: 200 }));
+  expect(await writeItemView({ added: 1, dataAsOf: corpus.dataAsOf }, { cloud: CLOUD, fetch: put as unknown as typeof fetch })).toEqual({ written: true, items: 3 });
+  expect(load).toHaveBeenCalledOnce();
+  expect(reads.passed).toEqual([corpus, corpus]);
+  load.mockRestore();
 });
 
 test("a file of an unknown shape is no view", async () => {
