@@ -243,6 +243,18 @@ read by an upload, and nothing in the window uploads anything. An auction sale i
 letter at the mailbox, from the invoice: item name, count, the price after the auction house's cut and the deposit.
 The buyer's name is never read.
 
+When the game says a buyer was found, Sales lists the item at once as "sold, gold pending". Collecting the letter
+turns that row "paid" with the price; a row with no letter after 48 hours reads "unmatched", and a letter collected
+later still fills it. The ledger also records repairs and vendor purchases at an open merchant (a repair paid from the
+guild bank costs you nothing and is left out), gold traded with another player (Trades in, Trades out), gold sent with
+a letter (Mail out) and gold in a letter from one of your own characters (Mail in). A letter from anyone else, or the
+auction house's own letter, adds no Mail in row. Gold that goes from one of your characters to another is marked as
+such: with the account selected it leaves the totals and shows on its own line, "Moved between your characters";
+with one character selected it counts as that character's gold in or out. The trade partner's and the letter's names
+are compared with your own characters' names and then dropped. These categories are local only and never uploaded.
+Today, 7 days and 30 days start at UTC midnight (today, today and the 6 days before it, today and the 29 days before
+it).
+
 The window is built the first time it opens and registers no events, so recording never depends on it. An error
 inside it closes it until `/reload` and `/everloot status` names the error. The **Everloot window** switch on the
 settings page turns it off; the minimap button then opens the plan workspace as before. The crest it uses is

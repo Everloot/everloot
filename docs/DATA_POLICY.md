@@ -183,9 +183,15 @@ file, outside the records an upload reads, and are never sent to the site.
 The addon's window keeps two more tables that are local in the same way. `EverlootDB.ledger` holds your money events,
 your auction sales and each character's closing gold per day, and
 `EverlootDB.roster` holds one row per character you log in with. Neither is a record, neither is read by an
-upload, and neither is sent to the site. A money event keeps its time, the opaque character key, a category, the amount and, when there is one, an item name and
-count. An auction sale is read from the mailbox invoice and keeps its time, the character key, the item name, count, unit
-price, total after the cut, the cut, the deposit and a status; the buyer's name is never read into the file. The completion tracker's rows are unchanged.
+upload, and neither is sent to the site. A money event keeps `at` (its time), `key` (the opaque character key),
+`category`, `copper` and, when there is one, `itemName` and `count`, plus `ownAlt` when the gold went to or came from
+one of the player's own characters. An auction sale is read from the mailbox invoice and keeps `itemName`, `count`,
+`unit`, `total` (after the cut), `deposit` and `cut` when the letter carries them, and `status` (`pending` from the
+game's sold notice until the letter is collected, then `paid`; `unmatched` when no letter came within 48 hours), with
+its time and the character key; the buyer's name is never read into the file. To mark a trade or a letter as gold moved
+between the player's own characters, the addon reads the trade partner's name, the name a letter is sent to and the
+sender of a letter with money, compares each with the player's own characters on the same realm, and drops it: none of
+these names is ever kept. The completion tracker's rows are unchanged.
 
 Completion tracking (addon 0.3.3, off until `/everloot completion on`) follows the same split.
 Four catalog kinds (`achievement_catalog`, `reputation_catalog`, `title_catalog`,
