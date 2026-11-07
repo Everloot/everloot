@@ -85,6 +85,7 @@ fire('QUEST_TURNED_IN', 1, 0, 67500); money = money + 67500; fire('PLAYER_MONEY'
 fire('TAXIMAP_OPENED'); money = money - 55; fire('PLAYER_MONEY'); fire('TAXIMAP_CLOSED')
 assert(Everloot:Count('money_event') == 3, 'three money events recorded')
 
+table.insert(Everloot.Window.NAV, { key = 'ghost', label = 'Ghost', icon = 'INV_Misc_QuestionMark' })
 assert(U.Open() == true, 'the window opens')
 local f = EverlootWindow
 assert(f == U.frame and f.shown and f.template == 'BackdropTemplate', 'one named window, shown')
@@ -161,7 +162,7 @@ Everloot.Window.Views.collection = { build = function(f, parent) parent.built = 
 f.nav.collection.scripts.OnClick(f.nav.collection)
 assert(f.home.shown == false and f.views.collection.shown and rawget(f.views.collection, 'built') and f.views.collection.refreshed == 1 and f.subtitle.text == 'Collection')
 assert(f.nav.collection.on.shown and not f.nav.home.on.shown, 'fel green marks only the open item')
-f.nav.professions.scripts.OnClick(f.nav.professions)
+f.nav.ghost.scripts.OnClick(f.nav.ghost)
 assert(f.views.collection.shown == false and f.note.shown and f.note.text:find('did not load'), 'an unregistered view says so')
 assert(not f.note.text:find('oon'), 'no coming soon')
 f.nav.settings.scripts.OnClick(f.nav.settings)

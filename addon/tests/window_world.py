@@ -97,7 +97,8 @@ end
 
 BEFORE = ["core.lua", "modules/auctions.lua", "modules/gold.lua", "modules/roster.lua", "modules/ledger.lua",
           "modules/prices.lua", "modules/drops.lua", "modules/gph.lua", "modules/options.lua"]
-AFTER = ["modules/view_gold.lua", "modules/view_collection.lua", "modules/minimap.lua"]
+AFTER = ["modules/view_gold.lua", "modules/view_collection.lua",
+         "modules/view_professions.lua", "modules/minimap.lua"]
 
 
 def fresh(saved: str = "nil", api: str = "", window: bool = True, extra: tuple = ()):
