@@ -9,6 +9,7 @@ import { pullStore } from "@/lib/pull-store";
 import { writeCoverage } from "@/lib/coverage-store";
 import { currentSettledWeek, writeSettled } from "@/lib/settled-store";
 import { writeItemView } from "@/lib/item-view-store";
+import { writeAggregates } from "@/lib/aggregate-store";
 
 /**
  * GET /api/cron/snapshot — the Worker's Cron Trigger (src/lib/cf-crons.ts, every 10 minutes) extends the corpus snapshot with new uploads,
@@ -116,13 +117,22 @@ export async function GET(req: Request) {
     } catch (err) {
       console.error("item view failed", err);
     }
+    // The tables the item, NPC, zone, instance, object, loot, edge and addon pages read (lib/aggregate-store.ts), stored so
+    // a new server instance reads one file instead of replaying the corpus. Same rule as the item view: written only when
+    // this run added uploads, rebuilt, or finds no file; a failure is logged and the pages work the tables out themselves.
+    let aggregates: { written: boolean; bytes?: number } | null = null;
+    try {
+      aggregates = await writeAggregates({ added: result.added, rebuild, dataAsOf: result.dataAsOf });
+    } catch (err) {
+      console.error("aggregates failed", err);
+    }
     // A rollup with uploads left over is pending: the next run folds them even when no new upload arrived.
     await uploadStore.writeCronRun(
       completion.remaining > 0 || completion.rebuilding || (market.remaining ?? 0) > 0 || (census?.remaining ?? 0) > 0,
       result.dataAsOf,
       settled?.written ? week : work.settledWeek ?? null,
     );
-    return NextResponse.json({ ok: true, rebuild, ...result, market, completion, coverage, settled, census, itemView });
+    return NextResponse.json({ ok: true, rebuild, ...result, market, completion, coverage, settled, census, itemView, aggregates });
   } catch (err) {
     console.error("snapshot failed", err);
     return NextResponse.json({ ok: false, error: "snapshot failed" }, { status: 500 });

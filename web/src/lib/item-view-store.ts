@@ -3,7 +3,7 @@ import { agreedItemNames } from "../../../kb/src/item-page";
 import { loadItemSeen, type ItemSeen } from "./item-seen";
 import { SOURCES, type SourceSlug } from "./items";
 import { loadItemFacts } from "./rollup-compute";
-import type { R2Config } from "./upload-store";
+import { uploadStore, type Corpus, type R2Config } from "./upload-store";
 
 /**
  * What the item lists read from players' uploads, stored by the cron instead of worked out on each view: the names 3
@@ -46,9 +46,13 @@ function r2FromEnv(env: Record<string, string | undefined> = process.env): R2Con
 const r2Url = (cloud: R2Config) => `https://${cloud.r2AccountId}.r2.cloudflarestorage.com/${cloud.r2Bucket}/${ITEM_VIEW_KEY}`;
 const r2 = (cloud: R2Config) => new AwsClient({ accessKeyId: cloud.r2AccessKeyId, secretAccessKey: cloud.r2SecretAccessKey, service: "s3", region: "auto" });
 
-/** The view from the corpus as it stands, through the same functions the pages used before. Throws when the corpus is out of reach. */
-export async function buildItemView(dataAsOf: string | null, now = new Date()): Promise<ItemView> {
-  const [facts, seen] = await Promise.all([loadItemFacts(), loadItemSeen()]);
+/**
+ * The view from the corpus as it stands, through the same functions the pages used before. Throws when the corpus is out
+ * of reach. The cron passes the corpus it read (`read`), so the view is worked out from it and never from the stored
+ * aggregates, which the same run writes only afterwards (aggregate-store.ts).
+ */
+export async function buildItemView(dataAsOf: string | null, now = new Date(), read?: Corpus): Promise<ItemView> {
+  const [facts, seen] = await Promise.all([loadItemFacts(read), loadItemSeen(read)]);
   if (facts.unreachable || seen.unreachable) throw new Error("corpus unreachable");
   return {
     version: 1,
@@ -82,7 +86,7 @@ export async function writeItemView(opts: { added: number; rebuild?: boolean; da
   if (!cloud) throw new Error("the item view needs the cloud store");
   const doFetch = deps.fetch ?? fetch;
   if (opts.added <= 0 && !opts.rebuild && await viewExists(cloud, doFetch)) return { written: false };
-  const view = await (deps.build ?? (() => buildItemView(opts.dataAsOf)))();
+  const view = await (deps.build ?? (async () => buildItemView(opts.dataAsOf, new Date(), await uploadStore.loadCorpus())))();
   const put = await doFetch(await r2(cloud).sign(r2Url(cloud), { method: "PUT", body: JSON.stringify(view), headers: { "content-type": "application/json" } }));
   if (!put.ok) throw new Error(`item view write failed (${put.status})`);
   return { written: true, items: view.seen.length };

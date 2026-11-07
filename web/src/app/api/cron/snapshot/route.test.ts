@@ -16,6 +16,8 @@ const settled = vi.hoisted(() => ({ writeSettled: vi.fn(), week: vi.fn(() => "20
 vi.mock("@/lib/settled-store", () => ({ writeSettled: settled.writeSettled, currentSettledWeek: settled.week }));
 const view = vi.hoisted(() => ({ writeItemView: vi.fn() }));
 vi.mock("@/lib/item-view-store", () => ({ writeItemView: view.writeItemView }));
+const aggregates = vi.hoisted(() => ({ writeAggregates: vi.fn() }));
+vi.mock("@/lib/aggregate-store", () => ({ writeAggregates: aggregates.writeAggregates }));
 import { GET } from "./route";
 beforeEach(() => {
   vi.stubEnv("CRON_SECRET", "synthetic-cron-key");
@@ -26,6 +28,7 @@ beforeEach(() => {
   store.writeCompletion.mockReset().mockResolvedValue({ added: 0, remaining: 0, trimmed: 0, rebuilding: false });
   store.writeCensus.mockReset().mockResolvedValue({ added: 0, rows: 0, remaining: 0 });
   view.writeItemView.mockReset().mockResolvedValue({ written: false });
+  aggregates.writeAggregates.mockReset().mockResolvedValue({ written: false });
   store.prune.mockReset().mockResolvedValue(undefined);
   keys.pruneKeys.mockReset().mockResolvedValue(undefined);
   players.prune.mockReset().mockResolvedValue(undefined);
@@ -252,4 +255,28 @@ test("the item view is written after the snapshot with what that run added; a ce
   const res = await GET(req());
   expect(res.status).toBe(200);
   expect(await res.json()).toMatchObject({ ok: true, census: null, itemView: null });
+});
+
+test("the stored aggregates are written after the item view with what that run added; a failure is logged and the run succeeds", async () => {
+  const order: string[] = [];
+  store.writeSnapshot.mockResolvedValue({ uploads: 9, added: 2, dataAsOf: "2026-10-02T00:00:00.000Z" });
+  view.writeItemView.mockImplementation(async () => { order.push("itemView"); return { written: true, items: 12 }; });
+  aggregates.writeAggregates.mockImplementation(async () => { order.push("aggregates"); return { written: true, bytes: 4096 }; });
+  expect(await (await GET(req())).json()).toMatchObject({ ok: true, itemView: { written: true }, aggregates: { written: true, bytes: 4096 } });
+  expect(order).toEqual(["itemView", "aggregates"]);
+  expect(aggregates.writeAggregates).toHaveBeenCalledWith({ added: 2, rebuild: false, dataAsOf: "2026-10-02T00:00:00.000Z" });
+  await GET(req("Bearer synthetic-cron-key", "?rebuild=1"));
+  expect(aggregates.writeAggregates).toHaveBeenLastCalledWith(expect.objectContaining({ rebuild: true }));
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  aggregates.writeAggregates.mockRejectedValue(new Error("r2 down"));
+  const res = await GET(req());
+  expect(res.status).toBe(200);
+  expect(await res.json()).toMatchObject({ ok: true, aggregates: null });
+  expect(store.writeCronRun).toHaveBeenCalled();
+});
+
+test("an idle run still asks for the stored aggregates, so a missing file is written", async () => {
+  store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: false, dataAsOf: "2026-10-01", settledWeek: "2026-W43" });
+  await GET(req());
+  expect(aggregates.writeAggregates).toHaveBeenCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-10-01" });
 });
