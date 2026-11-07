@@ -235,7 +235,7 @@ export default async function CharacterPage(props: { params: Promise<Params> }) 
   const guild = guildRead === "unreachable" ? null : guildRead;
   const c = showcase?.input;
   const board = c && leaderboardsOn() ? await loadGearBoard() : null;
-  const ranks = c && board?.state === "ready" ? ranksOf(board.entries, c.realm, c.name) : null;
+  const ranks = c && board?.state === "ready" ? ranksOf(board.entries, c.path) : null;
   // Only a ranked character's history, read from what the profile cron stored: nothing is scored here.
   const track = ranks ? await loadTrack(ranks["item-level"].entry.linkId) : null;
   const name = c?.name ?? sighted!.name;
@@ -270,7 +270,7 @@ export default async function CharacterPage(props: { params: Promise<Params> }) 
             ? <ShowcaseHeader showcase={showcase} trail={trail(name, path)} />
             : <PageHeader trail={trail(name, path)} title={<span className={classText(sighted!.class)}>{name}</span>} lede={`${describePlayer(sighted!)} · ${realm}`} />}
           {ranks && <GearRanks ranks={ranks} />}
-          {track && track.length >= 2 && <TrackChart days={track} name={name} />}
+          {track && <TrackChart days={track} name={name} />}
           {showcase ? <OwnerPart showcase={showcase} /> : owner === "unavailable" && <Unavailable text={UNAVAILABLE} />}
           {sighted ? <SightingPart seen={sighted} /> : seen === "unavailable" && <Unavailable text={PLAYER_STORAGE_UNAVAILABLE} />}
           {guild ? <GuildPart guild={guild} /> : guildRead === "unreachable" && <Unavailable text={GUILD_UNAVAILABLE} />}

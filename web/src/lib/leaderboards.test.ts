@@ -48,8 +48,10 @@ describe("leaderboards", () => {
     expect(eu.map((r) => [r.rank, r.entry.name])).toEqual([[1, "Late"]]);
     const pvp = rankEntries(entries, "item-level", { ruleset: "pvp", region: "us" });
     expect(pvp.map((r) => r.entry.name)).toEqual(["Early", "Ring"]);
-    expect(ranksOf(entries, "camwow us1 realm 4 pvp", "ring")?.["gear-score"].rank).toBe(3);
-    expect(ranksOf(entries, "CAMWOW US1 Realm 4 PvP", "Nobody")).toBeNull();
+    expect(ranksOf(entries, "/characters/forever/camwow-us1-realm-4-pvp/ring")?.["gear-score"].rank).toBe(3);
+    expect(ranksOf(entries, "/characters/forever/camwow-us1-realm-4-pvp/nobody")).toBeNull();
+    // Another ruleset's address with the same realm and name is not this character.
+    expect(ranksOf(entries, "/characters/hardcore/camwow-us1-realm-4-pvp/ring")).toBeNull();
   });
 
   it("reads only known filter values and writes one address per view", () => {

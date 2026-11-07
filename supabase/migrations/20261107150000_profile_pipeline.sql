@@ -2,7 +2,7 @@
 -- of 2026-11-06): the gear boards are scored by a cron every 30 minutes and stored, and each ranked character keeps a
 -- history of its numbers, one point per day. Additive: one new table, three new functions, and ranked_gear_board
 -- replaced by a version that reads incrementally and names each row's link. Needs 20261107120000_gear_board.sql
--- first. Apply before setting EVERLOOT_LEADERBOARDS=1; until then the site never calls anything here. Safe to apply twice.
+-- first. Named after 20261107140000_private_sync_stats_pvp.sql, which production already has, so it sorts after it. Apply before setting EVERLOOT_LEADERBOARDS=1; until then the site never calls anything here. Safe to apply twice.
 --
 -- The rule for who is on a board lives in one place, ranked_gear_links(): a live link (linked, not frozen, and no
 -- frozen link claims it), page public and "Rank my gear" on, gear sync on, not hidden, gear captured in the last 30
@@ -17,8 +17,9 @@ begin
   end if;
 end $$;
 
--- 1. Who may be on the gear boards right now: link ids only. Each board request reads this once.
-create or replace function public.ranked_gear_links()
+-- 1. Who may be on the gear boards right now: link ids only. Each board request reads this once. With p_link_id, the
+-- same rule for that one link (a character page's history read), so the rule still lives in one place.
+create or replace function public.ranked_gear_links(p_link_id uuid default null)
 returns table (link_id uuid)
 language sql stable security definer set search_path = '' set lock_timeout = '3s'
 as $$
@@ -28,17 +29,19 @@ as $$
   join public.character_facts f on f.link_id = l.id and f.category = 'gear'
   join public.character_sync_consent c on c.link_id = l.id and c.category = 'gear' and c.revoked_at is null
   where l.status = 'linked' and v.page_public and v.ranked_gear
+    and (p_link_id is null or l.id = p_link_id)
     and f.captured_at >= now() - interval '30 days'
     and not exists (select 1 from public.character_suppressions s where public.link_realm_key(s.realm) = l.realm_key and s.character = l.name_key)
     and not exists (select 1 from public.character_links o where o.id <> l.id and o.status = 'frozen'
       and (o.link_key = l.link_key or (o.ruleset = l.ruleset and o.realm_key = l.realm_key and o.name_key = l.name_key)));
 $$;
-revoke all on function public.ranked_gear_links() from public, anon, authenticated;
-grant execute on function public.ranked_gear_links() to service_role;
+revoke all on function public.ranked_gear_links(uuid) from public, anon, authenticated;
+grant execute on function public.ranked_gear_links(uuid) to service_role;
 
 -- 2. The board rows the cron scores. With no arguments, every eligible character (the daily full pass); with
 -- p_since, only gear received since then, plus any link in p_link_ids (one that came back onto the board without new
--- gear). The zero-argument version from 20261107120000 is replaced; calling it with no arguments still works.
+-- gear). The zero-argument version from 20261107120000 is replaced; calling it with no arguments still works. No row
+-- cap: a capped read could drop changed rows while the cron's watermark moved past them. Oldest arrival first.
 drop function if exists public.ranked_gear_board();
 create or replace function public.ranked_gear_board(p_since timestamptz default null, p_link_ids uuid[] default null)
 returns table (link_id uuid, ruleset text, realm text, name text, race text, class text, faction text, level smallint,
@@ -50,8 +53,7 @@ as $$
   join public.character_links l on l.id = r.link_id
   join public.character_facts f on f.link_id = l.id and f.category = 'gear'
   where p_since is null or f.received_at >= p_since or l.id = any(coalesce(p_link_ids, '{}'::uuid[]))
-  order by l.ruleset, l.realm_key, l.name_key
-  limit 5000;
+  order by f.received_at, l.id;
 $$;
 revoke all on function public.ranked_gear_board(timestamptz, uuid[]) from public, anon, authenticated;
 grant execute on function public.ranked_gear_board(timestamptz, uuid[]) to service_role;
@@ -113,7 +115,7 @@ as $$
   select t.day, t.metric, t.value, t.source, t.version
   from public.character_track t
   where t.link_id = p_link_id and t.day >= current_date - 400
-    and exists (select 1 from public.ranked_gear_links() r where r.link_id = p_link_id)
+    and exists (select 1 from public.ranked_gear_links(p_link_id))
   order by t.day, t.metric;
 $$;
 revoke all on function public.character_track_points(uuid) from public, anon, authenticated;
@@ -121,7 +123,7 @@ grant execute on function public.character_track_points(uuid) to service_role;
 notify pgrst, 'reload schema';
 
 -- Readback (every row t):
---   select 'links' as check, has_function_privilege('service_role', 'public.ranked_gear_links()', 'EXECUTE') as ok
+--   select 'links' as check, has_function_privilege('service_role', 'public.ranked_gear_links(uuid)', 'EXECUTE') as ok
 --   union all select 'board', has_function_privilege('service_role', 'public.ranked_gear_board(timestamptz, uuid[])', 'EXECUTE')
 --   union all select 'old board gone', to_regprocedure('public.ranked_gear_board()') is null
 --   union all select 'track closed', not has_table_privilege('service_role', 'public.character_track', 'SELECT')
@@ -136,5 +138,5 @@ notify pgrst, 'reload schema';
 --   drop function if exists public.record_character_track(jsonb);
 --   drop table if exists public.character_track;
 --   drop function if exists public.ranked_gear_board(timestamptz, uuid[]);
---   drop function if exists public.ranked_gear_links();
+--   drop function if exists public.ranked_gear_links(uuid);
 --   then run 20261107120000_gear_board.sql again; notify pgrst, 'reload schema';

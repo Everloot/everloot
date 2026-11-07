@@ -83,7 +83,7 @@ gear, and N = everyone ranked:
 | Step | Incremental run | Full pass (once a day) |
 | --- | --- | --- |
 | `ranked_gear_links()` | 1 query, N ids | same |
-| `ranked_gear_board()` | 1 query, C + R rows | 1 query, N rows (capped at 5,000) |
+| `ranked_gear_board()` | 1 query, C + R rows (plus a 5-minute overlap) | 1 query, N rows |
 | Game files | items of C + R characters | items of N characters |
 | Scoring | C + R characters | N characters |
 | `record_character_track()` | 1 call, 3 points each for C + R | 3 points each for N (same values, rewritten) |
@@ -113,6 +113,6 @@ function before it writes, never a wider gate for everyone.
 
 - Should turning gear sync off (which deletes the stored gear at once) also delete gear-derived tracking points? Today
   they are kept and hidden while the character is off the boards, and deleted on unlinking.
-- The board read is capped at 5,000 rows, as before. Above that, the full pass needs paging.
+- The board read has no row cap (a cap could drop changed rows while the watermark moved past them). Each row is about 1-2 KB of gear, so past a few thousand ranked characters the daily full pass should page by received_at. Incremental runs re-read a 5-minute overlap behind the watermark, and a row holding the capture already stored is not scored again, so the overlap costs no game-file read and no point write.
 - Two overlapping runs could write the snapshot out of order; the 30-minute schedule makes this unlikely, and the
   market rollup's ETag check can be added if it ever matters.

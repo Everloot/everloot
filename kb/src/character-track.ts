@@ -1,6 +1,6 @@
 /**
  * Tracking (leaderboards decision 2026-11-06): each ranked character's numbers over time, at most one point per day
- * and metric, stored in `character_track` (supabase/migrations/20261107130000_profile_pipeline.sql). Pure.
+ * and metric, stored in `character_track` (supabase/migrations/20261107150000_profile_pipeline.sql). Pure.
  *
  * A point is dated by the day its gear was captured (UTC), not the day the cron ran: a point dated today from gear
  * sent three weeks ago would claim a number nobody saw today. When the owner sends gear twice in a day, the later

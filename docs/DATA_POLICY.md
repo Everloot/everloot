@@ -880,7 +880,7 @@ observation of anyone else, and none of it is published as a dataset.
 In effect from 6 November 2026, accepted by the maintainer that day (`EVERLOOT_LEADERBOARDS`, migration
 `20261107120000_gear_board.sql`). With the switch off, `/rankings/item-level` and `/rankings/gear-score` answer 404
 and the switch below is refused. The stored boards and the daily history below (migration
-`20261107130000_profile_pipeline.sql`) are proposed: they take effect once the maintainer accepts them and applies
+`20261107150000_profile_pipeline.sql`) are proposed: they take effect once the maintainer accepts them and applies
 that migration.
 
 Two public boards rank linked characters by the gear their owner synced: average item level and Everloot Gear

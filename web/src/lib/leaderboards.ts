@@ -127,6 +127,19 @@ export type GearBoard =
   | { state: "unavailable" }
   | { state: "ready"; entries: StoredEntry[]; notCounted: number; generatedAt: string };
 
+/** The link ids in a `ranked_gear_links` answer; the cron and the pages read it the same way. */
+export function liveLinkIds(rows: readonly unknown[]): Set<string> {
+  return new Set(rows.flatMap((r) => {
+    const id = (r as { link_id?: unknown } | null)?.link_id;
+    return typeof id === "string" ? [id] : [];
+  }));
+}
+
+/** Every equipped item id in board rows of the known shape, for the game-file read. */
+export function equippedItemIds(rows: readonly unknown[]): number[] {
+  return rows.flatMap((r) => BoardRow.safeParse(r).data?.data.equipped.map((e) => e.itemId) ?? []);
+}
+
 /** The stored boards as they may be shown now: only links in `live` (the links on the boards right now). */
 export function liveBoard(snapshot: GearBoardSnapshot, live: ReadonlySet<string>): GearBoard {
   return {
@@ -173,19 +186,19 @@ export async function loadGearBoard(): Promise<GearBoard> {
       authQuery<unknown>("rpc/ranked_gear_links", { method: "POST", body: "{}" }),
     ]);
     if (!snapshot || !Array.isArray(live)) return { state: "unavailable" };
-    const ids = new Set(live.flatMap((r) => {
-      const id = (r as { link_id?: unknown } | null)?.link_id;
-      return typeof id === "string" ? [id] : [];
-    }));
-    return liveBoard(snapshot, ids);
+    return liveBoard(snapshot, liveLinkIds(live));
   } catch {
     return { state: "unavailable" };
   }
 }
 
-/** One character's rank on both boards (no filter), or null when it is not on them. */
-export function ranksOf<E extends GearEntry>(entries: readonly E[], realm: string, name: string): Record<GearMetric, RankedEntry<E>> | null {
-  const hit = (r: RankedEntry<E>) => r.entry.realm.toLowerCase() === realm.toLowerCase() && r.entry.name.toLowerCase() === name.toLowerCase();
+/**
+ * One character's rank on both boards (no filter), or null when it is not on them. Matched by the page's own address,
+ * which carries the link's ruleset, realm and name, so two characters of one name on one realm in different
+ * rulesets are never taken for each other.
+ */
+export function ranksOf<E extends GearEntry>(entries: readonly E[], path: string): Record<GearMetric, RankedEntry<E>> | null {
+  const hit = (r: RankedEntry<E>) => r.entry.path.toLowerCase() === path.toLowerCase();
   const all: BoardQuery = { ruleset: null, region: null };
   const il = rankEntries(entries, "item-level", all).find(hit), gs = rankEntries(entries, "gear-score", all).find(hit);
   return il && gs ? { "item-level": il, "gear-score": gs } : null;

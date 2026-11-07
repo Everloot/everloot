@@ -4,7 +4,7 @@ begin;
 
 do $$
 declare role_name text;
--- 20261107130000_profile_pipeline.sql replaces the board with one that takes optional arguments; check whichever is there.
+-- 20261107150000_profile_pipeline.sql replaces the board with one that takes optional arguments; check whichever is there.
 declare fn text := coalesce(to_regprocedure('public.ranked_gear_board(timestamptz, uuid[])'), to_regprocedure('public.ranked_gear_board()'))::oid::regprocedure::text;
 begin
   foreach role_name in array array['anon', 'authenticated'] loop

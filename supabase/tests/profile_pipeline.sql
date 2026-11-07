@@ -1,4 +1,4 @@
--- Run after every migration up to 20261107130000_profile_pipeline.sql on a disposable local PostgreSQL database that
+-- Run after every migration up to 20261107150000_profile_pipeline.sql on a disposable local PostgreSQL database that
 -- has the roles anon, authenticated and service_role. Everything is rolled back at the end.
 begin;
 
@@ -12,7 +12,7 @@ begin
       raise exception '% can touch character_track directly', role_name;
     end if;
   end loop;
-  foreach fn in array array['public.ranked_gear_links()', 'public.ranked_gear_board(timestamptz, uuid[])',
+  foreach fn in array array['public.ranked_gear_links(uuid)', 'public.ranked_gear_board(timestamptz, uuid[])',
       'public.record_character_track(jsonb)', 'public.character_track_points(uuid)'] loop
     foreach role_name in array array['anon', 'authenticated'] loop
       if has_function_privilege(role_name, fn, 'EXECUTE') then raise exception '% can run %', role_name, fn; end if;

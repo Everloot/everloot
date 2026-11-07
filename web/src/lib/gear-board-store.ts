@@ -1,5 +1,6 @@
+import { AwsClient } from "aws4fetch";
 import type { GearBoardSnapshot } from "./leaderboards";
-import { r2Client, r2Config, type R2Config } from "./upload-store";
+import type { R2Config } from "./upload-store";
 
 /**
  * Where the profile cron keeps the scored gear boards (profile-pipeline.ts), beside the market rollup in the private
@@ -17,6 +18,13 @@ export interface GearBoardStore {
   read(): Promise<GearBoardSnapshot | null>;
   write(snapshot: GearBoardSnapshot): Promise<void>;
 }
+
+/** The uploads bucket's settings, read here rather than through upload-store, as item-view-store.ts does. */
+function r2FromEnv(env: Record<string, string | undefined> = process.env): R2Config | null {
+  const c = { r2AccountId: env.R2_ACCOUNT_ID?.trim(), r2AccessKeyId: env.R2_ACCESS_KEY_ID?.trim(), r2SecretAccessKey: env.R2_SECRET_ACCESS_KEY?.trim(), r2Bucket: env.R2_BUCKET?.trim() };
+  return Object.values(c).every(Boolean) ? (c as R2Config) : null;
+}
+const r2Client = (r2: R2Config) => new AwsClient({ accessKeyId: r2.r2AccessKeyId, secretAccessKey: r2.r2SecretAccessKey, service: "s3", region: "auto" });
 
 function usable(raw: unknown): raw is GearBoardSnapshot {
   const s = raw as Partial<GearBoardSnapshot> | null;
@@ -60,5 +68,5 @@ export function createGearBoardStore(opts: { r2: R2Config | null; fetch?: typeof
 let shared: GearBoardStore | null = null;
 /** The store over the Worker's R2 settings, made on first use. */
 export function gearBoardStore(): GearBoardStore {
-  return (shared ??= createGearBoardStore({ r2: r2Config() }));
+  return (shared ??= createGearBoardStore({ r2: r2FromEnv() }));
 }

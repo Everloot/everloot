@@ -124,12 +124,50 @@ describe("the cron run", () => {
     // b turns ranking back on without new gear; a sends nothing new; c is new.
     const db = database([...rows, row("c", "Newbie", [HEAD], "2026-11-06T12:20:00+00:00")]);
     const run = await writeGearBoard({}, { query: db.query, store, files: loadFiles, now: new Date("2026-11-06T12:30:00Z") });
-    expect(db.calls[1]!.body).toEqual({ p_since: "2026-11-06T10:00:00+00:00", p_link_ids: ["b", "c"] });
-    // a's row is read again because its received_at equals the watermark (the read is ">="); it changes nothing.
-    expect(run).toMatchObject({ full: false, scored: 3, entries: 3 });
+    // The read starts five minutes before the watermark (a late-committing sync is caught).
+    expect(db.calls[1]!.body).toEqual({ p_since: "2026-11-06T09:55:00.000Z", p_link_ids: ["b", "c"] });
+    // a's row is read again inside the overlap; it holds the stored capture, so it is not scored again.
+    expect(run).toMatchObject({ full: false, read: 3, scored: 2, entries: 3, points: 6 });
     const third = database([...rows, row("c", "Newbie", [HEAD], "2026-11-06T12:20:00+00:00")]);
-    expect(await writeGearBoard({}, { query: third.query, store, files: loadFiles, now: new Date("2026-11-06T13:00:00Z") })).toMatchObject({ read: 1, scored: 1 });
-    expect(third.calls[1]!.body).toEqual({ p_since: "2026-11-06T12:20:00+00:00", p_link_ids: [] });
+    const loads = vi.fn(loadFiles);
+    expect(await writeGearBoard({}, { query: third.query, store, files: loads, now: new Date("2026-11-06T13:00:00Z") })).toMatchObject({ read: 1, scored: 0, points: 0 });
+    expect(third.calls[1]!.body).toEqual({ p_since: "2026-11-06T12:15:00.000Z", p_link_ids: [] });
+    // Nothing needed scoring, so the game files were not read and no points were written.
+    expect(loads).not.toHaveBeenCalled();
+    expect(third.calls.map((c) => c.path)).not.toContain("rpc/record_character_track");
+  });
+
+  it("a sync that commits after a run read, with an older received_at, is caught by the next run's overlap", async () => {
+    const store = memoryStore();
+    await writeGearBoard({}, { ...database([row("a", "Helmy", [HEAD], "2026-11-06T12:37:00+00:00")]), store, files: loadFiles, now: NOW });
+    // b's transaction started at 12:36:59.9 but committed after that read.
+    const late = row("b", "Late", [RING], "2026-11-06T12:36:59.900+00:00", "2026-11-06T12:36:00Z");
+    const db = database([row("a", "Helmy", [HEAD], "2026-11-06T12:37:00+00:00"), late], ["a", "b"]);
+    // b is unknown to the snapshot, so it is asked for by id too; drop that path to prove the overlap alone catches it.
+    const onlySince = vi.fn(async (path: string, init?: RequestInit) => {
+      if (path !== "rpc/ranked_gear_board") return db.query(path, init);
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return db.query(path, { ...init, body: JSON.stringify({ ...body, p_link_ids: [] }) });
+    });
+    await writeGearBoard({}, { query: onlySince, store, files: loadFiles, now: new Date("2026-11-06T12:40:00Z") });
+    expect(store.saved?.entries.map((e) => e.linkId).sort()).toEqual(["a", "b"]);
+  });
+
+  it("the daily full pass re-scores everyone but never rewrites a past day's points from an old capture", async () => {
+    const store = memoryStore();
+    const old = row("a", "Helmy", [HEAD], "2026-11-01T10:00:00+00:00", "2026-11-01T09:00:00Z");
+    await writeGearBoard({}, { ...database([old]), store, files: loadFiles, now: new Date("2026-11-01T12:00:00Z") });
+    // Two days later the link's level moved to 61 with no new gear: the full pass keeps the board current…
+    const raised = { ...old, level: 61 };
+    const db = database([raised]);
+    const run = await writeGearBoard({}, { query: db.query, store, files: loadFiles, now: new Date("2026-11-03T00:07:00Z") });
+    expect(run).toMatchObject({ full: true, scored: 1, points: 0 });
+    expect(store.saved?.entries[0]?.level).toBe(61);
+    // …but writes no point dated 11/01, which would replace what was true that day.
+    expect(db.calls.map((c) => c.path)).not.toContain("rpc/record_character_track");
+    // A new capture the same day does get its points.
+    const fresh = database([{ ...raised, captured_at: "2026-11-03T08:00:00Z", received_at: "2026-11-03T08:01:00+00:00" }]);
+    expect(await writeGearBoard({}, { query: fresh.query, store, files: loadFiles, now: new Date("2026-11-03T08:07:00Z") })).toMatchObject({ points: 3 });
   });
 
   it("with nothing changed it writes no points; without the game files it keeps the boards it had", async () => {
