@@ -332,4 +332,102 @@ assert(O.prompt.shown and O.prompt.backdrop.bgFile == 'Interface\\\\DialogFrame\
 assert(O.prompt.title.text == 'Everloot: player names')
 """)
 
+# --- Turning off a row that deletes rows asks first when the click comes from the page ---
+POPUP = """
+StaticPopupDialogs = {}
+shown = nil
+StaticPopup_Show = function(which, ...) shown = { which, ... }; return {} end
+"""
+lua = fresh(POPUP + SETTINGS)
+lua.execute("""
+local O = Everloot.Options
+local byKey = {}
+for _, box in ipairs(O.page.boxes) do byKey[box.row.key] = box end
+local function census5()
+  EverlootDB.records.census_seen = { {}, {}, {}, {}, {} }
+  EverlootDB.toggles.census = true
+  shown = nil
+end
+local dialog = StaticPopupDialogs.EVERLOOT_TURN_OFF
+assert(dialog and dialog.timeout == 0 and dialog.whileDead == 1 and dialog.hideOnEscape == 1, 'the dialog is registered')
+assert(string.find(dialog.text, 'Turn off %s and delete %d recorded rows?', 1, true))
+
+-- Unticking asks, and deletes nothing yet.
+census5()
+byKey.census.checked = false
+byKey.census.scripts.OnClick(byKey.census)
+assert(shown and shown[1] == 'EVERLOOT_TURN_OFF' and shown[2] == 'Census' and shown[3] == 5, 'asks with the label and the row count')
+assert(#EverlootDB.records.census_seen == 5 and EverlootDB.toggles.census == true, 'nothing is deleted before the answer')
+assert(byKey.census.checked, 'the switch stays ticked while the question is open')
+-- Cancel leaves the rows and the tick.
+byKey.census.checked = false
+dialog.OnCancel()
+assert(#EverlootDB.records.census_seen == 5 and EverlootDB.toggles.census == true and byKey.census.checked, 'cancel keeps rows and re-ticks')
+-- Accept deletes and sets the toggle.
+byKey.census.checked = false
+byKey.census.scripts.OnClick(byKey.census)
+dialog.OnAccept()
+assert(EverlootDB.toggles.census == false and EverlootDB.records.census_seen == nil, 'accept turns it off and deletes the rows')
+assert(not byKey.census.checked)
+
+-- No rows: no question, the command runs.
+EverlootDB.records.census_seen = nil
+EverlootDB.toggles.census = true
+shown = nil
+byKey.census.checked = false
+byKey.census.scripts.OnClick(byKey.census)
+assert(shown == nil and EverlootDB.toggles.census == false, 'with no rows it turns off without asking')
+
+-- Turning on never asks.
+shown = nil
+byKey.census.checked = true
+byKey.census.scripts.OnClick(byKey.census)
+assert(shown == nil and EverlootDB.toggles.census == true)
+
+-- The slash command stays direct.
+census5()
+SlashCmdList.EVERLOOT('census off')
+assert(shown == nil and EverlootDB.records.census_seen == nil and EverlootDB.toggles.census == false, 'the slash command deletes without a question')
+
+-- Rows without a deleting command are unchanged.
+byKey.gold.checked = false
+byKey.gold.scripts.OnClick(byKey.gold)
+byKey.scanPrompt.checked = false
+byKey.scanPrompt.scripts.OnClick(byKey.scanPrompt)
+assert(shown == nil and EverlootDB.toggles.gold == false and EverlootDB.scanPrompt == false)
+
+-- The other deleting rows count their own kinds.
+EverlootDB.records.addon_seen = { {}, {} }
+EverlootDB.toggles.addons = true
+byKey.addons.checked = false
+byKey.addons.scripts.OnClick(byKey.addons)
+assert(shown and shown[2] == 'Installed addon list' and shown[3] == 2 and #EverlootDB.records.addon_seen == 2)
+dialog.OnCancel()
+shown = nil
+EverlootDB.records.player_seen, EverlootDB.records.guild_kill = { {} }, { {}, {} }
+EverlootDB.toggles.players = true
+byKey.players.checked = false
+byKey.players.scripts.OnClick(byKey.players)
+assert(shown and shown[3] == 3, 'players counts player rows and guild kills')
+dialog.OnCancel()
+shown = nil
+EverlootDB.records.achievement_owned, EverlootDB.records.pvp_owned = { {} }, { {} }
+EverlootDB.toggles.completion = true
+byKey.completion.checked = false
+byKey.completion.scripts.OnClick(byKey.completion)
+assert(shown and shown[3] == 2, 'completion counts every kind it deletes')
+""")
+
+# A client without the popup function runs the command directly, as before.
+lua = fresh(SETTINGS)
+lua.execute("""
+local O = Everloot.Options
+local census
+for _, box in ipairs(O.page.boxes) do if box.row.key == 'census' then census = box end end
+EverlootDB.records.census_seen = { {}, {} }
+census.checked = false
+census.scripts.OnClick(census)
+assert(EverlootDB.toggles.census == false and EverlootDB.records.census_seen == nil, 'no StaticPopup: the command runs')
+""")
+
 print("Lua 5.1 options: Settings API, interface options or a window; one switch per module; command rows run their command; every switch inside a scrolling list at any width; the window's crest heading, fonts, surface and dark window, or the game's own without its file; Reload now; player names asked once, after the loading screen and out of combat")
