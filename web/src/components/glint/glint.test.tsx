@@ -86,8 +86,27 @@ describe("the lines", () => {
     expect(heroLines(at - H).map((l) => l.id)).toEqual(["countdown", "drops", "addon"]);
   });
 
-  test("without a clock (the server) the first line names the date", () => {
-    expect(lineText(heroLines(null)[0])).toBe("Forever launches November 4, 2026, 3:00 p.m. PST. My satchel's ready!");
+  test("without a clock (the server) before launch the first line names the date", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(at - H);
+    try {
+      expect(lineText(heroLines(null)[0])).toBe("Forever launches November 4, 2026, 3:00 p.m. PST. My satchel's ready!");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("without a clock (the server) after launch the lines are the live ones, never the countdown", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(at + 3 * 24 * H);
+    try {
+      const lines = heroLines(null);
+      expect(lines.map((l) => l.id)).not.toContain("countdown");
+      expect(lineText(lines[0])).toBe("Forever is live. Show me what you looted!");
+      expect(lines.map(lineText).join(" ")).not.toMatch(/launches|until Forever/);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("from launch on, the lines are about looting Forever", () => {
