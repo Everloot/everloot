@@ -155,4 +155,37 @@ assert(g.session.text:find('No session running') and g.sessionButton.text == 'St
 assert(EverlootWindow.shown and not U.failed, 'the window stays open')
 """)
 
+# Gold moved between own characters: one line under Unrecorded, for the account only.
+MOVED = SAVED.replace(
+    f"{{ at = {TODAY + 9 * 3600}, key = '{ME}', category = 'vendor', copper = 41000 }},",
+    f"{{ at = {TODAY + 9 * 3600}, key = '{ME}', category = 'vendor', copper = 41000 }},\n"
+    f"      {{ at = {TODAY + 9 * 3600 + 60}, key = '{ME}', category = 'trade_out', copper = 4000, ownAlt = true }},\n"
+    f"      {{ at = {TODAY + 9 * 3600 + 120}, key = 'aaaa0002', category = 'trade_in', copper = 4000, ownAlt = true }},")
+assert MOVED != SAVED
+lua = fresh(MOVED, API)
+lua.execute("""
+local U = Everloot.Window
+assert(U.Open('gold') == true)
+local g = EverlootWindow.gold
+local function click(b) b.scripts.OnClick(b) end
+click(g.tabs.ledger)
+assert(not g.moved.shown, 'no moved line for one character')
+local found = false
+for _, row in ipairs(g.categories) do if row.shown and row.label.text == 'Trades out' then found = true end end
+assert(found, 'one character keeps its trade in the categories')
+click(g.scopes.account)
+assert(g.moved.shown and g.moved.text:find('^Moved between your characters: 80|T.-Silver.- 0|T.-Copper'), g.moved.text)
+for _, row in ipairs(g.categories) do assert(not (row.shown and row.label.text:find('^Trades')), 'the account leaves transfers out') end
+local listed = 0
+for _, row in ipairs(g.receipts) do if row.shown and row.label.text:find('^Trades') then listed = listed + 1 end end
+assert(listed == 2, 'both sides are still receipts')
+""")
+lua = fresh(SAVED, API)
+lua.execute("""
+local g = (Everloot.Window.Open('gold') and EverlootWindow.gold)
+g.tabs.ledger.scripts.OnClick(g.tabs.ledger)
+g.scopes.account.scripts.OnClick(g.scopes.account)
+assert(g.moved.shown and g.moved.text == 'Moved between your characters: -', g.moved.text)
+""")
+
 print("Lua 5.1 Gold view: characters by realm with a 30-day chart, ledger by category, day and receipt, sales each or by item, the gph session; empty lines for a fresh file")

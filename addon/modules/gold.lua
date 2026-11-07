@@ -2,10 +2,15 @@
 -- copper taken from a loot window, quest money rewards, sales at an open merchant,
 -- flight costs paid at an open taxi map, auction sales taken from the mailbox (the
 -- sale minus the house cut; the returned deposit is the player's own money), postage
--- for letters the server confirmed sent, and auction buyouts. Other purchases, bids,
--- deposits, repairs, other mail and gameplay stay unrecorded: their source cannot be
--- told apart, or the money can come back. No other player's name: invoices, letters
--- and listings name other players; those fields are never read into a record.
+-- for letters the server confirmed sent, and auction buyouts. Bids, deposits, COD
+-- payments and gameplay stay unrecorded: their source cannot be told apart, or the money
+-- can come back. No other player's name: invoices, letters and listings name other
+-- players; those fields are never read into a record.
+-- Ledger only (the uploaded money_event keeps the schema's nine categories): repairs and
+-- purchases at an open merchant, trades both sides accepted, money sent with a letter
+-- and a plain letter's money. Each is marked ownAlt when the other side is one of the
+-- player's own characters: the trade partner, recipient or sender is compared with the
+-- roster's names on the player's realm and then dropped, never kept.
 -- Each event also goes to the local ledger (ledger.lua) under the character key, with
 -- an auction sale kept by item (name, count, deposit, cut) there only; the uploaded
 -- money_event keeps its shape. The sold notice (a system line naming only the item) adds a pending sale there; the
@@ -23,6 +28,15 @@ local postage = nil -- price quoted for a letter the server has not confirmed ye
 local buyout = nil -- copper a buyout is about to take
 local buyoutGen = 0 -- which pending buyout an expiry timer belongs to
 local quote = nil -- total the auction house last quoted for a commodity purchase
+local repairPending = false -- a repair was asked for at the merchant; the next drop there is a repair
+local repairGen = 0 -- which repair an expiry timer belongs to
+local sendMoney = nil -- { copper, ownAlt }: money a letter carries, until the server confirms it sent
+local plainMail = nil -- { letter = copper, ownAlt }: a plain letter's money, until the purse matches it
+local trade = nil -- { out, inn, ownAlt, closed }: a trade both sides accepted
+
+-- The money_event schema's categories (packages/protocol/schema/records/money_event.json). Others are local.
+local UPLOADED = { loot = true, quest = true, vendor = true, auction = true, flight = true, postage = true,
+  barber = true, respec = true, auction_spend = true }
 
 local function playerMoney()
   if not GetMoney then return nil end
@@ -72,14 +86,16 @@ end
 local function storeMoney(category, copper, extra)
   local name, realm = identity()
   if not name or type(copper) ~= "number" or copper < 1 or copper ~= math.floor(copper) then return end
-  E:Store("money_event", {
-    installId = EverlootDB.installId,
-    capturedAt = date("!%Y-%m-%dT%H:%M:%SZ"),
-    character = name,
-    realm = realm,
-    category = category,
-    copper = copper,
-  })
+  if UPLOADED[category] then
+    E:Store("money_event", {
+      installId = EverlootDB.installId,
+      capturedAt = date("!%Y-%m-%dT%H:%M:%SZ"),
+      character = name,
+      realm = realm,
+      category = category,
+      copper = copper,
+    })
+  end
   local key = ledgerKey()
   if key then E.Ledger.Record(key, category, copper, extra) end
 end
@@ -125,17 +141,47 @@ local function whole(copper)
   return type(copper) == "number" and copper >= 1 and copper == math.floor(copper)
 end
 
---- Only a source that names itself attributes a change: an auction-sale letter or a buyout
---- whose money moves in full, a merchant sale or a paid flight.
+--- True when a name read from the client is one of the player's own characters on the player's realm. The name is
+--- only compared, case-insensitively, and never kept.
+local function ownAlt(other)
+  other = E.Readable(other)
+  local _, realm = identity()
+  if type(other) ~= "string" or other == "" or not realm or not (E.Roster and E.Roster.Rows) then return false end
+  local ok, rows = pcall(E.Roster.Rows)
+  if not ok or type(rows) ~= "table" then return false end
+  other = other:lower()
+  for _, r in ipairs(rows) do
+    if r.realm == realm and type(r.name) == "string" and r.name:lower() == other then return true end
+  end
+  return false
+end
+
+--- A trade the purse matched: what came in and what went out, each only when there was some.
+local function storeTrade(t)
+  if t.inn > 0 then storeMoney("trade_in", t.inn, { ownAlt = t.ownAlt }) end
+  if t.out > 0 then storeMoney("trade_out", t.out, { ownAlt = t.ownAlt }) end
+end
+
+--- Only a source that names itself attributes a change: an auction-sale or plain letter, a buyout or
+--- an accepted trade whose money moves in full, a merchant sale, repair or purchase, or a paid flight.
 local function moneyChanged(copper)
+  local settled = false
   if lastMoney then
     local delta = copper - lastMoney
     if auctionMail and delta == auctionMail.letter then storeSale(auctionMail)
+    elseif plainMail and delta == plainMail.letter then storeMoney("mail_in", delta, { ownAlt = plainMail.ownAlt })
     elseif buyout and delta == -buyout then storeMoney("auction_spend", buyout)
+    elseif trade and delta == trade.inn - trade.out then storeTrade(trade); settled = true
     elseif merchantOpen and delta > 0 then storeMoney("vendor", delta)
+    elseif merchantOpen and delta < 0 then
+      storeMoney(repairPending and "repair" or "vendor_spend", -delta)
+      repairPending = false
     elseif taxiOpen and delta < 0 then storeMoney("flight", -delta) end
   end
+  -- A trade waits for its money while the window is open; after it closes, the next change settles it either way.
+  if settled or (trade and trade.closed) then trade = nil end
   auctionMail = nil
+  plainMail = nil
   buyout = nil
   lastMoney = copper
 end
@@ -143,12 +189,21 @@ end
 --- Called after the player takes a letter's money. The invoice type, not the localized subject, marks a sale.
 local function mailTaken(index)
   auctionMail = nil
+  plainMail = nil
   if not GetInboxInvoiceInfo or not GetInboxHeaderInfo then return end
   -- invoiceType, itemName, playerName (bound to _, never read), bid, buyout, deposit, consignmentFee, moneyDelay,
   -- etaDay, etaHour, count, commerceAuction
   local okInvoice, invoiceType, itemName, _, bid, buyoutPrice, deposit, cut, _, _, _, count, commerce = pcall(GetInboxInvoiceInfo, index)
   if not okInvoice then return end
   invoiceType, bid, cut = E.Readable(invoiceType), E.Readable(bid), E.Readable(cut)
+  if invoiceType ~= "seller" and invoiceType ~= "buyer" then
+    -- A plain letter: its money, and whether the sender is one of the player's characters (compared, never kept).
+    -- packageIcon, stationeryIcon, sender, subject, money
+    local okHeader, _, _, sender, _, money = pcall(GetInboxHeaderInfo, index)
+    money = okHeader and E.Readable(money)
+    if whole(money) then plainMail = { letter = money, ownAlt = ownAlt(sender) } end
+    return
+  end
   if invoiceType ~= "seller" or not whole(bid) or type(cut) ~= "number" then return end
   count = E.Readable(count)
   local item = {
@@ -198,12 +253,55 @@ local function commodityConfirmed()
   quote = nil
 end
 
---- Called after SendMail: the send window's quoted price, before the fields clear. Recipient and text are not read.
+--- Called after SendMail: the send window's quoted price and the money the letter carries, before the fields clear.
+--- The recipient field is only compared with the roster's names; it and the text are never kept.
 local function mailSent()
   postage = nil
-  if not GetSendMailPrice then return end
-  local ok, copper = pcall(GetSendMailPrice)
-  if ok and type(copper) == "number" then postage = copper end
+  sendMoney = nil
+  if GetSendMailPrice then
+    local ok, copper = pcall(GetSendMailPrice)
+    copper = ok and E.Readable(copper)
+    if type(copper) == "number" then postage = copper end
+  end
+  if GetSendMailMoney then
+    local ok, copper = pcall(GetSendMailMoney)
+    copper = ok and E.Readable(copper)
+    if whole(copper) then
+      local box = _G.SendMailNameEditBox
+      local okName, recipient = false, nil
+      if type(box) == "table" and box.GetText then okName, recipient = pcall(box.GetText, box) end
+      sendMoney = { copper = copper, ownAlt = okName and ownAlt(recipient) }
+    end
+  end
+end
+
+--- A repair asked for at the merchant lasts a few seconds, like a buyout: the next drop there is its cost.
+local function repairAsked()
+  repairPending = true
+  repairGen = repairGen + 1
+  if C_Timer and C_Timer.After then
+    local mine = repairGen
+    pcall(C_Timer.After, BUYOUT_SECONDS, function() if repairGen == mine then repairPending = false end end)
+  end
+end
+
+--- Both sides accepted: the money each puts up, and whether the partner is one of the player's characters.
+--- The partner's name is compared, not kept. Anything else (an acceptance taken back) drops the trade.
+local function tradeAccepted(player, target)
+  trade = nil
+  if player ~= 1 or target ~= 1 or not (GetPlayerTradeMoney and GetTargetTradeMoney) then return end
+  local okOut, out = pcall(GetPlayerTradeMoney)
+  local okIn, inn = pcall(GetTargetTradeMoney)
+  out, inn = okOut and E.Readable(out), okIn and E.Readable(inn)
+  out = type(out) == "number" and out >= 0 and out == math.floor(out) and out or nil
+  inn = type(inn) == "number" and inn >= 0 and inn == math.floor(inn) and inn or nil
+  if not out or not inn or (out == 0 and inn == 0) then return end
+  -- name, realm: a realm means the partner is from another realm
+  local okName, partner, partnerRealm = false, nil, nil
+  if UnitName then okName, partner, partnerRealm = pcall(UnitName, "NPC") end
+  partnerRealm = okName and E.Readable(partnerRealm)
+  local alt = okName and (partnerRealm == nil or partnerRealm == "") and ownAlt(partner) or false
+  trade = { out = out, inn = inn, ownAlt = alt }
 end
 
 local function lootMoney()
@@ -232,7 +330,8 @@ E:RegisterModule("gold", function()
   soldPattern = soldNoticePattern()
   if soldPattern then pcall(function() f:RegisterEvent("CHAT_MSG_SYSTEM") end) end
   for _, name in ipairs({ "PLAYER_MONEY", "MERCHANT_SHOW", "MERCHANT_CLOSED", "TAXIMAP_OPENED", "TAXIMAP_CLOSED", "QUEST_TURNED_IN", "MAIL_CLOSED",
-    "MAIL_SEND_SUCCESS", "MAIL_FAILED", "AUCTION_HOUSE_CLOSED", "COMMODITY_PRICE_UPDATED", "COMMODITY_PRICE_UNAVAILABLE", "COMMODITY_PURCHASE_FAILED", "AUCTION_HOUSE_SHOW_ERROR" }) do
+    "MAIL_SEND_SUCCESS", "MAIL_FAILED", "AUCTION_HOUSE_CLOSED", "COMMODITY_PRICE_UPDATED", "COMMODITY_PRICE_UNAVAILABLE", "COMMODITY_PURCHASE_FAILED", "AUCTION_HOUSE_SHOW_ERROR",
+    "TRADE_SHOW", "TRADE_CLOSED", "TRADE_ACCEPT_UPDATE" }) do
     pcall(function() f:RegisterEvent(name) end)
   end
   if hooksecurefunc then
@@ -240,6 +339,10 @@ E:RegisterModule("gold", function()
       if _G[name] then pcall(hooksecurefunc, name, mailTaken) end
     end
     if SendMail then pcall(hooksecurefunc, "SendMail", mailSent) end
+    -- The player's own repair click, or the conveniences auto-repair: watched, never called here.
+    for _, name in ipairs({ "RepairAllItems", "RepairItem" }) do
+      if _G[name] then pcall(hooksecurefunc, name, repairAsked) end
+    end
     if PlaceAuctionBid then pcall(hooksecurefunc, "PlaceAuctionBid", bidPlaced) end
     -- Watched after the player's own click, never called: a hook runs once the game's function has run.
     if type(C_AuctionHouse) == "table" then
@@ -258,12 +361,18 @@ E:RegisterModule("gold", function()
       if copper then rememberPeak(copper); closeDay(copper); moneyChanged(copper) end
       writeSnapshot(false)
     elseif event == "MERCHANT_SHOW" then merchantOpen = true
-    elseif event == "MERCHANT_CLOSED" then merchantOpen = false
+    elseif event == "MERCHANT_CLOSED" then merchantOpen = false; repairPending = false
     elseif event == "TAXIMAP_OPENED" then taxiOpen = true
     elseif event == "TAXIMAP_CLOSED" then taxiOpen = false
-    elseif event == "MAIL_CLOSED" then auctionMail = nil
-    elseif event == "MAIL_SEND_SUCCESS" then storeMoney("postage", postage); postage = nil
-    elseif event == "MAIL_FAILED" then postage = nil
+    elseif event == "MAIL_CLOSED" then auctionMail = nil; plainMail = nil
+    elseif event == "MAIL_SEND_SUCCESS" then
+      storeMoney("postage", postage)
+      if sendMoney then storeMoney("mail_out", sendMoney.copper, { ownAlt = sendMoney.ownAlt }) end
+      postage = nil; sendMoney = nil
+    elseif event == "MAIL_FAILED" then postage = nil; sendMoney = nil
+    elseif event == "TRADE_SHOW" then trade = nil
+    elseif event == "TRADE_ACCEPT_UPDATE" then tradeAccepted(...)
+    elseif event == "TRADE_CLOSED" then if trade then trade.closed = true end
     elseif event == "AUCTION_HOUSE_CLOSED" then buyout = nil; quote = nil
     elseif event == "COMMODITY_PRICE_UPDATED" then
       -- updatedUnitPrice, updatedTotalPrice
@@ -279,6 +388,6 @@ E:RegisterModule("gold", function()
     elseif event == "CHAT_MSG_SYSTEM" then soldNotice((...))
     elseif event == "LOOT_OPENED" then lootMoney() end
   end)
-  return "ready (peak, current, loot copper, quest rewards, vendor sales, flights, mailed auction sales by item, postage, buyouts; local ledger and daily close)"
+  return "ready (peak, current, loot copper, quest rewards, vendor sales, flights, mailed auction sales by item, postage, buyouts; local ledger and daily close, repairs, vendor purchases, trades, mail money)"
     .. (soldPattern and "" or "; sold notice: no ERR_AUCTION_SOLD_S")
 end)

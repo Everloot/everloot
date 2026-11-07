@@ -179,6 +179,13 @@ local function drawLedger(g, keys)
     row.amount:SetText(signed(r.copper, r.direction))
   end, NO_EVENTS)
   g.unrecorded:SetText("Unrecorded: " .. U.Money(sum.unrecorded))
+  -- The account's totals leave out gold moved between its own characters; this line says how much that was.
+  if g.scope == "account" then
+    g.moved:SetText("Moved between your characters: " .. U.Money((sum.moved or 0) > 0 and sum.moved or nil))
+    g.moved:Show()
+  else
+    g.moved:Hide()
+  end
 end
 
 local STATUS_TEXT = { paid = "paid", pending = "sold, gold pending", unmatched = "unmatched" }
@@ -305,6 +312,8 @@ local function build(f, parent)
     { { "when", 4, 30 }, { "label", 36, 76 }, { "amount", 112, 52, true } })
   g.unrecorded = text(l, 12, nil, COLORS.muted)
   g.unrecorded:SetPoint("TOPLEFT", 4, -300)
+  g.moved = text(l, 12, nil, COLORS.muted)
+  g.moved:SetPoint("TOPLEFT", 4, -314)
 
   -- Sales, newest first, or one row per item.
   local salesBox

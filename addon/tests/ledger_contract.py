@@ -158,6 +158,28 @@ assert L.Record(A, "vendor", 90, extra(itemName="Linen Cloth", count=3, bidder="
 row = py(g.EverlootDB.ledger.events)[-1]
 assert row == {"at": NOW, "key": A, "category": "vendor", "copper": 90, "itemName": "Linen Cloth", "count": 3}, row
 
+# Transfers between own characters: ownAlt is kept only when true. Account totals leave them out and count them as
+# moved; one character's totals keep them, since that character really paid or received the gold.
+g.EverlootDB.ledger = None
+g.clock = NOW
+assert L.Record(A, "trade_out", 2000, extra(ownAlt=True)) is True
+assert L.Record(B, "trade_in", 2000, extra(ownAlt=True)) is True
+assert L.Record(A, "mail_out", 500, extra(ownAlt=False)) is True
+assert L.Record(A, "repair", 300, extra(ownAlt="yes")) is True
+rows = py(g.EverlootDB.ledger.events)
+assert [r.get("ownAlt") for r in rows] == [True, True, None, None], rows
+both = L.Summary(keys(A, B), 0, NOW)
+assert (both.totalIn, both.totalOut, both.moved) == (0, 800, 4000), (both.totalIn, both.totalOut, both.moved)
+assert sorted(c["category"] for c in py(both.categories)) == ["mail_out", "repair"], py(both.categories)
+assert [d["inCopper"] for d in py(both.days)] == [0] and [d["outCopper"] for d in py(both.days)] == [800], py(both.days)
+listed = py(both.receipts("2026-11-07"))
+assert sorted(r["category"] for r in listed) == ["mail_out", "repair", "trade_in", "trade_out"], listed
+one = L.Summary(keys(A), 0, NOW)
+assert (one.totalIn, one.totalOut, one.moved) == (0, 2800, 2000), (one.totalIn, one.totalOut, one.moved)
+assert sorted(c["category"] for c in py(one.categories)) == ["mail_out", "repair", "trade_out"], py(one.categories)
+assert L.Summary(keys(), 0, NOW).moved == 0, "no keys, nothing moved"
+g.EverlootDB.ledger = None
+
 # Period: today starts at UTC midnight; 7d and 30d count back from now; all starts at 0.
 g.clock = epoch("2026-11-07T23:59:30Z")
 assert L.Period("today") == (epoch("2026-11-07T00:00:00Z"), g.clock), L.Period("today")

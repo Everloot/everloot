@@ -84,7 +84,7 @@ local function events(category)
 end
 event('PLAYER_ENTERING_WORLD')
 
--- A sale at an open merchant is vendor income; a purchase there is not recorded.
+-- A sale at an open merchant is vendor income; a purchase there is a vendor purchase, kept in the local ledger only.
 event('MERCHANT_SHOW')
 money = 1500; event('PLAYER_MONEY')
 money = 1200; event('PLAYER_MONEY')
@@ -361,6 +361,158 @@ assert(#(store.events or {}) == 0 and #(store.sales or {}) == 0 and next(store.d
 """)
 check_all(plain)
 
+# Slice two: repairs, vendor purchases, trades and mail. These categories go to the local ledger only; the uploaded
+# money_event keeps the schema's nine. An own alt is a roster name on the player's realm; no other name is kept.
+# The repair hooks are installed at init, so the repair functions exist before the module starts.
+two = runtime("RepairAllItems = function() end\nRepairItem = function() end\n"
+              "GetPlayerTradeMoney = function() return tradeOut end\nGetTargetTradeMoney = function() return tradeIn end\n"
+              "sendMoney = 0\nGetSendMailMoney = function() return sendMoney end\n"
+              "SendMailNameEditBox = { GetText = function() return recipient end }\n"
+              "UnitName = function(unit) if unit == 'NPC' then return partner, partnerRealm end return 'Thrall' end\n")
+two.execute("""
+local function uploaded() return #(EverlootDB.records.money_event or {}) end
+local function last() local rows = EverlootDB.ledger.events; return rows[#rows] end
+money = 100000
+event('PLAYER_ENTERING_WORLD')
+EverlootDB.roster.alt00001 = { name = 'Altperson', realm = 'Test Realm' }
+EverlootDB.roster.alt00002 = { name = 'Farperson', realm = 'Other Realm' }
+local key = Everloot.CharacterKey()
+local events = EverlootDB.ledger.events
+
+-- A repair at an open merchant, one item repaired, a purchase, an expired repair. A sale there stays vendor income.
+event('MERCHANT_SHOW')
+RepairAllItems(false)
+money = money - 1200; event('PLAYER_MONEY')
+assert(#events == 1 and last().category == 'repair' and last().copper == 1200 and last().key == key, 'repair 1200')
+assert(uploaded() == 0, 'a repair adds no money_event row')
+money = money - 500; event('PLAYER_MONEY')
+assert(#events == 2 and last().category == 'vendor_spend' and last().copper == 500, 'purchase 500 is a vendor purchase')
+RepairItem()
+money = money - 80; event('PLAYER_MONEY')
+assert(#events == 3 and last().category == 'repair' and last().copper == 80, 'one item repaired')
+RepairAllItems(false)
+runTimers()
+money = money - 90; event('PLAYER_MONEY')
+assert(#events == 4 and last().category == 'vendor_spend', 'an expired repair is a purchase')
+money = money + 300; event('PLAYER_MONEY')
+assert(#events == 5 and last().category == 'vendor' and uploaded() == 1, 'a sale at a merchant stays vendor income')
+event('MERCHANT_CLOSED')
+money = money - 40; event('PLAYER_MONEY')
+assert(#events == 5, 'no merchant, nothing recorded')
+
+-- A trade with an own alt: both sides accepted, then the money matches.
+money = money + 100000; event('PLAYER_MONEY')
+partner, partnerRealm, tradeOut, tradeIn = 'Altperson', nil, 0, 2500
+event('TRADE_SHOW')
+event('TRADE_ACCEPT_UPDATE', 1, 0)
+event('TRADE_ACCEPT_UPDATE', 1, 1)
+event('TRADE_CLOSED')
+money = money + 2500; event('PLAYER_MONEY')
+assert(#events == 6 and last().category == 'trade_in' and last().copper == 2500 and last().ownAlt == true, 'trade in from an alt')
+-- A trade with another player, money both ways.
+partner, tradeOut, tradeIn = 'Partnerperson', 1000, 300
+event('TRADE_SHOW')
+event('TRADE_ACCEPT_UPDATE', 1, 1)
+event('TRADE_CLOSED')
+money = money - 700; event('PLAYER_MONEY')
+assert(#events == 8 and events[7].category == 'trade_in' and events[7].copper == 300 and events[8].category == 'trade_out'
+ and events[8].copper == 1000 and events[7].ownAlt == nil and events[8].ownAlt == nil, 'trade both ways, not an alt')
+-- The money change can come before the window closes.
+partner, tradeOut, tradeIn = 'Partnerperson', 0, 120
+event('TRADE_SHOW')
+event('TRADE_ACCEPT_UPDATE', 1, 1)
+money = money + 120; event('PLAYER_MONEY')
+event('TRADE_CLOSED')
+assert(#events == 9 and last().category == 'trade_in' and last().copper == 120, 'money before TRADE_CLOSED')
+-- A roster name on another realm is not the alt.
+partner, partnerRealm, tradeOut, tradeIn = 'Farperson', 'Other Realm', 50, 0
+event('TRADE_SHOW')
+event('TRADE_ACCEPT_UPDATE', 1, 1)
+event('TRADE_CLOSED')
+money = money - 50; event('PLAYER_MONEY')
+assert(#events == 10 and last().category == 'trade_out' and last().ownAlt == nil, 'a cross-realm partner is not an own alt')
+-- A money change that does not match records nothing, and the trade is gone after it.
+partner, partnerRealm, tradeOut, tradeIn = 'Altperson', nil, 400, 0
+event('TRADE_SHOW')
+event('TRADE_ACCEPT_UPDATE', 1, 1)
+event('TRADE_CLOSED')
+money = money - 399; event('PLAYER_MONEY')
+money = money - 400; event('PLAYER_MONEY')
+assert(#events == 10, 'a mismatched delta records nothing')
+-- A trade one side never accepted, or an acceptance taken back, moves nothing.
+event('TRADE_SHOW')
+event('TRADE_ACCEPT_UPDATE', 1, 0)
+event('TRADE_CLOSED')
+money = money - 400; event('PLAYER_MONEY')
+event('TRADE_SHOW')
+event('TRADE_ACCEPT_UPDATE', 1, 1)
+event('TRADE_ACCEPT_UPDATE', 0, 0)
+money = money - 400; event('PLAYER_MONEY')
+event('TRADE_CLOSED')
+assert(#events == 10, 'an unaccepted trade records nothing')
+
+-- Mail out: to a non-alt, and to an alt whatever the case.
+sendPrice, sendMoney, recipient = 30, 5000, 'Strangerperson'
+SendMail('Strangerperson', 'Hi', '')
+event('MAIL_SEND_SUCCESS')
+assert(#events == 12 and events[11].category == 'postage' and events[12].category == 'mail_out' and events[12].copper == 5000
+ and events[12].ownAlt == nil, 'mail out to a non-alt')
+recipient = 'altperson'
+SendMail('altperson', 'Hi', '')
+event('MAIL_SEND_SUCCESS')
+assert(#events == 14 and last().category == 'mail_out' and last().ownAlt == true, 'mail out to an alt')
+sendMoney = 0
+SendMail('Strangerperson', 'Hi', '')
+event('MAIL_SEND_SUCCESS')
+assert(#events == 15 and last().category == 'postage', 'a letter without money is postage only')
+sendMoney = 700
+SendMail('Strangerperson', 'Hi', '')
+event('MAIL_FAILED')
+event('MAIL_SEND_SUCCESS')
+assert(#events == 15, 'a failed send moves nothing')
+
+-- Mail in: a plain letter's money, from an alt and from another player; an auction sale is still a sale.
+mailFrom, mailMoney = 'Altperson', 900
+GetInboxInvoiceInfo = function() return nil end
+GetInboxHeaderInfo = function() return 'icon', 'paper', mailFrom, 'Hi', mailMoney end
+TakeInboxMoney(1)
+money = money + 900; event('PLAYER_MONEY')
+assert(#events == 16 and last().category == 'mail_in' and last().copper == 900 and last().ownAlt == true, 'mail in from an alt')
+mailFrom, mailMoney = 'Partnerperson', 600
+TakeInboxMoney(1)
+money = money + 600; event('PLAYER_MONEY')
+assert(#events == 17 and last().category == 'mail_in' and last().ownAlt == nil, 'mail in from another player')
+TakeInboxMoney(1)
+money = money + 599; event('PLAYER_MONEY')
+assert(#events == 17, 'a mismatched letter records nothing')
+GetInboxInvoiceInfo = function() return 'seller', 'Linen Cloth', 'Partnerperson', 4000, 4000, 100, 200, 0, 0, 0, 20, true end
+mailFrom, mailMoney = 'Auction House', 3900
+TakeInboxMoney(1)
+money = money + 3900; event('PLAYER_MONEY')
+assert(#events == 18 and last().category == 'auction', 'a sale letter is not plain mail')
+-- A COD payment at the open mailbox stays unrecorded.
+money = money - 1000; event('PLAYER_MONEY')
+assert(#events == 18, 'a COD payment is unrecorded')
+
+-- money_event never carries a new category.
+local known = { loot = true, quest = true, vendor = true, auction = true, flight = true, postage = true, barber = true, respec = true, auction_spend = true }
+for _, row in ipairs(EverlootDB.records.money_event) do assert(known[row.category], 'money_event carries ' .. tostring(row.category)) end
+assert(uploaded() == 5, 'vendor, postage three times and the auction sale uploaded; got ' .. uploaded())
+
+-- No partner, recipient or sender name is saved; the alts' names live only in the roster.
+local function walk(value, path, name)
+ if type(value) == 'string' then
+  assert(not value:lower():find(name:lower(), 1, true), name .. ' was saved at ' .. path)
+ elseif type(value) == 'table' then
+  for k, v in pairs(value) do
+   if not (path == 'EverlootDB' and k == 'roster') then walk(k, path .. '[key]', name); walk(v, path .. '.' .. tostring(k), name) end
+  end
+ end
+end
+for _, name in ipairs({ 'Partnerperson', 'Strangerperson', 'Altperson', 'Farperson' }) do walk(EverlootDB, 'EverlootDB', name) end
+""")
+check_all(two)
+
 # No addon source may call, index by string, or alias a buy, bid, post or craft function.
 import re
 names = (r"PostItem|PostCommodity|PlaceBid|PlaceAuctionBid|StartAuction|PostAuction|StartCommoditiesPurchase|"
@@ -383,4 +535,4 @@ for source in sorted(root.rglob("*.lua")):
         assert not found, f"{source.name} has {what} of a buy, bid, post or craft API: {found.group(0)}"
 # Every row the addon wrote is a record the site would accept (packages/protocol/schema).
 check_all(lua)
-print("Lua 5.1 gold: vendor sales, flights, quest rewards, net auction sales, postage and buyouts (legacy and C_AuctionHouse, items and commodities) attributed; auction sales by item and daily closes in the local ledger; other purchases and unknown income unrecorded")
+print("Lua 5.1 gold: vendor sales, flights, quest rewards, net auction sales, postage and buyouts (legacy and C_AuctionHouse, items and commodities) attributed; auction sales by item and daily closes in the local ledger; repairs, vendor purchases, trades and mail money in the ledger only, own-alt transfers marked; unknown income unrecorded")

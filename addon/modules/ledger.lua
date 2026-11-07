@@ -99,7 +99,8 @@ local function evict(s)
 end
 
 --- Appends a money event for this character. Refuses an unknown category or copper that is not a whole number of
---- at least 1. An item name or count that does not fit is left off the row; other fields in `extra` are not kept.
+--- at least 1. An item name or count that does not fit is left off the row; `ownAlt` (gold moved to or from one of
+--- the player's own characters) is kept only when true; other fields in `extra` are not kept.
 function L.Record(key, category, copper, extra)
   if not validKey(key) or not direction[category] or not whole(copper, 1) then return false end
   extra = type(extra) == "table" and extra or {}
@@ -108,6 +109,7 @@ function L.Record(key, category, copper, extra)
     at = time(), key = key, category = category, copper = copper,
     itemName = validName(extra.itemName) and extra.itemName or nil,
     count = whole(extra.count, 1) and extra.count or nil,
+    ownAlt = extra.ownAlt == true or nil,
   }
   evict(s)
   return true
@@ -226,32 +228,40 @@ end
 --- In and out for the keys between two times (both included; nil means all): category totals, days with events,
 --- receipts for a day, and the gold change the events do not explain (unrecorded). Unrecorded is the change from the
 --- close before the first day to the close on the last, and only when every key has both; otherwise nil.
+--- Moved is the copper of the rows marked ownAlt, in and out. With more than one key those rows leave the totals,
+--- categories and days (the gold stayed in the account) and are still receipts; one key keeps them in its totals.
 function L.Summary(keys, fromTs, toTs)
   keys = type(keys) == "table" and keys or {}
   local wanted = keySet(keys)
   fromTs = math.max(tonumber(fromTs) or 0, oldest())
   toTs = tonumber(toTs) or time()
   local totals, byDay, rows = {}, {}, {}
-  local totalIn, totalOut = 0, 0
+  local totalIn, totalOut, moved = 0, 0, 0
+  local netted = #keys > 1
   local events = store().events
 
   local function count(i, e)
     if not (wanted[e.key] and type(e.at) == "number" and e.at >= fromTs and e.at <= toTs) then return end
     local dir = L.Direction(e.category)
+    local ymd = day(e.at)
+    rows[#rows + 1] = { i = i, e = e, ymd = ymd, direction = dir }
+    -- The day is listed even when only transfers fall on it, so its receipts can be picked.
+    local d = byDay[ymd]
+    if not d then d = { date = ymd, inCopper = 0, outCopper = 0, net = 0 }; byDay[ymd] = d end
+    if e.ownAlt == true then
+      moved = moved + e.copper
+      if netted then return end
+    end
     local t = totals[e.category]
     if not t then t = { category = e.category, direction = dir, copper = 0, events = 0 }; totals[e.category] = t end
     t.copper = t.copper + e.copper
     t.events = t.events + 1
-    local ymd = day(e.at)
-    local d = byDay[ymd]
-    if not d then d = { date = ymd, inCopper = 0, outCopper = 0, net = 0 }; byDay[ymd] = d end
     if dir == "in" then
       d.inCopper = d.inCopper + e.copper; totalIn = totalIn + e.copper
     else
       d.outCopper = d.outCopper + e.copper; totalOut = totalOut + e.copper
     end
     d.net = d.inCopper - d.outCopper
-    rows[#rows + 1] = { i = i, e = e, ymd = ymd, direction = dir }
   end
   -- Older uploaded rows sort before every store row with the same time.
   for _, e in ipairs(recordRows(wanted, events)) do count(0, e) end
@@ -294,7 +304,7 @@ function L.Summary(keys, fromTs, toTs)
     return list
   end
 
-  return { categories = categories, days = days, receipts = receipts, totalIn = totalIn, totalOut = totalOut, unrecorded = unrecorded }
+  return { categories = categories, days = days, receipts = receipts, totalIn = totalIn, totalOut = totalOut, unrecorded = unrecorded, moved = moved }
 end
 
 --- The keys' auction sales between two times (both included; nil means all), newest first.
