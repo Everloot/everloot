@@ -11,9 +11,14 @@ export interface BlizzardConfig {
   now?: () => number;
 }
 
+/** Blizzard Developer API Terms 2(s): data is refreshed at least every 30 days and kept no longer. */
+const MAX_AGE_MS = 30 * 86_400_000;
+
 /**
  * Battle.net API client. Responses are cached in `api_cache` on this machine only — Blizzard's terms
- * forbid redistributing the data, so the snapshot command always drops this table.
+ * forbid redistributing the data, so the snapshot command always drops this table. Every request first
+ * deletes rows fetched more than 30 days ago, no cached copy is served past 30 days, and a 404 deletes the
+ * cached copy (terms 2(s): a character the API no longer has is not kept or shown).
  */
 export class BlizzardClient {
   private token: { value: string; expiresAt: number } | null = null;
@@ -38,6 +43,7 @@ export class BlizzardClient {
     url.searchParams.set("locale", this.cfg.locale ?? "en_US");
     const key = url.toString();
 
+    this.db.prepare("DELETE FROM api_cache WHERE fetched_at < ?").run(new Date(this.clock() - MAX_AGE_MS).toISOString());
     const cached = this.db.prepare("SELECT body, expires_at FROM api_cache WHERE key = ?").get(key) as
       | { body: string; expires_at: string }
       | undefined;
@@ -46,6 +52,7 @@ export class BlizzardClient {
     const res = await this.http()(key, {
       headers: { Authorization: `Bearer ${await this.accessToken()}`, "User-Agent": USER_AGENT },
     });
+    if (res.status === 404) this.db.prepare("DELETE FROM api_cache WHERE key = ?").run(key);
     if (!res.ok) throw new Error(`Blizzard API HTTP ${res.status}: ${path} (${ns})`);
     const body = await res.text();
     let parsed: unknown;
@@ -60,7 +67,7 @@ export class BlizzardClient {
         `INSERT INTO api_cache (key, body, fetched_at, expires_at) VALUES (?, ?, ?, ?)
          ON CONFLICT(key) DO UPDATE SET body = excluded.body, fetched_at = excluded.fetched_at, expires_at = excluded.expires_at`,
       )
-      .run(key, body, new Date(now).toISOString(), new Date(now + ttlSeconds * 1000).toISOString());
+      .run(key, body, new Date(now).toISOString(), new Date(now + Math.min(ttlSeconds * 1000, MAX_AGE_MS)).toISOString());
     return parsed;
   }
 
