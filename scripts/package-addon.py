@@ -8,6 +8,11 @@ root = Path(__file__).resolve().parents[1]
 addon = root / "addon"
 toc = (addon / "Everloot.toc").read_text(encoding="utf-8")
 version = re.search(r"^## Version: ([0-9][0-9A-Za-z.+-]*)\s*$", toc, re.M).group(1)
+# The listing fields: the addon compartment (players who hide minimap buttons), the category, the website and
+# CurseForge project (the same zip goes to CurseForge), and the Spanish notes.
+for field in ["Category", "X-Website", "X-Curse-Project-ID", "Notes-esES", "AddonCompartmentFunc", "IconTexture"]:
+    assert re.search(rf"^## {field}: \S", toc, re.M), f"Everloot.toc needs ## {field}"
+assert re.search(r"^## AddonCompartmentFunc: Everloot_OnAddonCompartmentClick\s*$", toc, re.M), "the compartment click is Everloot_OnAddonCompartmentClick"
 core_version = re.search(r'^E\.VERSION = "([^"]+)"', (addon / "core.lua").read_text(encoding="utf-8"), re.M).group(1)
 # A nightly build stamps "0.3.1-nightly.<date>.<run>" into the TOC and "0.3.1-nightly" into core.lua
 # (the upload intake allows 20 characters), in the CI copy only. A release has the same text in both.
