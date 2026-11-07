@@ -301,6 +301,25 @@ Forever can mark a value secret: an addon may hold it but not read it. The addon
 4. If `completion` was turned on only for this probe, leave it on until the file is kept or restored; turning it
    off deletes its rows.
 
+## 11. Window and ledger
+
+Code: [`addon/modules/window.lua`](../addon/modules/window.lua), `view_gold.lua`, `view_collection.lua`,
+`view_professions.lua`, `ledger.lua`, `roster.lua`, and the invoice read in `gold.lua`. The contract tests pass in the
+Lua harness; none of this has run in the Forever client.
+
+| Probe | Steps | Expected | If not |
+|---|---|---|---|
+| W-1 | Open the window (minimap button or `/everloot window`) and click Home, Gold (all four tabs), Collection, Professions and Settings | Each opens without a Lua error and shows its own content; the sidebar has those five items | A Lua error or a blank tab is `ERROR`: record the item and the error text |
+| W-2 | With the gold module on, sell one auction, wait for the letter and collect it at the mailbox. Open Gold, then Sales | One row for that item with its count, the price after the cut and the deposit, and no buyer name anywhere | No row: check the letter was an auction sale, `/reload`, and record what `GetInboxInvoiceInfo` returns for it |
+| W-3 | Play on two different days with the gold module on, then open Gold, Overview | Bars for both days and a daily closing gold for the character | One bar or none: record the dates and the table sizes only |
+| W-4 | With the completion tracker off, open Collection and click **Turn on**, then `/reload` and open Collection again | The tab explains the tracker, the button runs `/everloot completion on`, and after the reload achievements, reputation, titles and raids list rows | Still empty after opening the achievements, reputation and titles windows: record which section |
+| W-5 | Log in a second character and open Home | Both characters are listed with gold, level, professions and last seen, and the realm and account totals add up | A character missing: check the **Your characters** option is on |
+| W-6 | Sell an auction. Before opening the mail, open Gold, then Sales; then collect the letter and look again | Before the letter: one row for the item reading "sold, gold pending". After: the same row reads "paid" with count, price and deposit, still one row | No pending row: record the sold notice's exact chat text. Two rows: record both statuses |
+| W-7 | Repair at a merchant; buy one item from the merchant; repair from the guild bank where you can | Gold, Ledger: a Repairs row for the repair and a Vendor purchases row for the item; nothing for the guild-bank repair | A repair listed as a vendor purchase, or a guild-bank repair listed: record which button was used |
+| W-8 | Trade gold with another player; then trade gold with one of your own characters | A Trades in or Trades out row for each. With the account selected, the trade with your own character leaves the totals and shows as "Moved between your characters" | No row: record whether the trade completed and whether gold changed before or after the trade window closed |
+| W-9 | Mail gold to one of your own characters, then log in that character and collect it; collect an auction house letter with money on any character | A Mail out row on the sender and a Mail in row on the receiver; with the account selected, "Moved between your characters" shows the amount. The auction house letter adds no Mail in row | A Mail in row missing: record the sender text the inbox shows. A Mail in row for the auction letter is `ERROR` |
+| W-10 | Client facts to confirm while running W-6 to W-9 | `GetInboxInvoiceInfo` returns the count at position 11 and `commerceAuction` at 12; the `ERR_AUCTION_SOLD_S` text, and whether the item in it is a link; `RepairAllItems` is hooked with its `guildBank` argument, and whether a global `RepairItem` exists; whether `PLAYER_MONEY` comes before or after `TRADE_CLOSED`, and the `TRADE_ACCEPT_UPDATE` values; `SendMailNameEditBox` and `GetSendMailMoney` still hold their values in the post-hook on `SendMail`; the sender format `GetInboxHeaderInfo` gives for your own characters; vertical `StatusBar` orientation on the Overview bars; the Professions footer sits at the bottom of the view | Record each fact that differs, with the value the client gave |
+
 ## Results
 
 Fill one record per probe; keep raw evidence private.
@@ -317,6 +336,8 @@ Fill one record per probe; keep raw evidence private.
 | P-ENC-1..4 | PVE-E01, LOG-L02 | live | UNVERIFIED | | |
 | P-PVP-1..6 | PVP-V01 | live | UNVERIFIED | | |
 | P-LOG-1..6 | LOG-L02, LOG-L03, COMBAT-D01 | live | UNVERIFIED | | |
+| W-1..5 | | live | UNVERIFIED | | |
+| W-6..10 | | live | UNVERIFIED | | |
 
 ## Open unknowns this checklist cannot settle
 

@@ -81,6 +81,24 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   `addon_download` to CurseForge like the other download links. The same tested zip is uploaded there on each release.
 
 ### Added
+- Addon: the Everloot window's sidebar is now Home, Gold, Collection, Professions and Settings. Ask, Build plan and
+  Auctions left the sidebar; `/ask` and `/everloot plan` still work.
+- Addon: Home lists every character this install has seen (gold, level, professions, raid lockouts, last seen) with
+  realm and account totals and a "This week" line. "What you've added" moved to the Settings page.
+- Addon: the Gold tab has Overview (gold by character and realm, the last 30 days as bars), Ledger (by category, day or
+  receipt), Sales and Session. It reads a new local ledger, `EverlootDB.ledger` (5,000 events or 90 days, 2,000 sales,
+  400 daily closes per character), and a local roster, `EverlootDB.roster` (options row "Your characters"). Neither is uploaded.
+- Addon: each auction sale is recorded by item from the mailbox invoice (item name, count, price after the cut,
+  deposit) when you collect the letter. The buyer's name is not read.
+- Addon: Sales lists a sale as "sold, gold pending" from the moment the game says a buyer was found, and the same row
+  turns "paid" when you collect the letter. A letter collected after 48 hours still fills its row.
+- Addon: the ledger records repairs and vendor purchases at an open merchant (a guild-bank repair costs you nothing and
+  is left out), gold traded with another player, gold sent with a letter, and gold in a letter from one of your own
+  characters. With the account selected, gold moved between your own characters leaves the totals and shows on its own
+  line, "Moved between your characters". These categories stay in the local ledger and are not uploaded.
+- Addon: the Gold tab's Today, 7 days and 30 days start at UTC midnight, so the first day is a whole day.
+- Addon: Collection tab for achievements, reputation, titles and raid lockouts (needs the completion tracker on) and a
+  Professions tab with each profession's rank and recorded recipe colours.
 - Site: the gear rankings are scored every 30 minutes by a new cron (`/api/cron/profiles`) and stored, instead of on
   every page view; the boards say how long ago. Each view still filters the stored boards against who is ranked right
   now, so a switch turned off takes a character off on the next request. Ranked characters get a daily history of

@@ -8,126 +8,17 @@ Everloot in fel green, and the settings page borrows its look at load without bu
 tooltip keeps its lines under one "Everloot" header, and the crest texture ships in the addon zip.
 """
 import shutil
+import zlib
 import struct
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 from zipfile import ZipFile
-from lupa.lua51 import LuaRuntime
+from window_world import AFTER, BEFORE, WORLD, fresh  # noqa: F401
 
 root = Path(__file__).parents[1]
 repo = root.parent
-
-WORLD = """
-now = 1000000
-time = function() return now end
-date = function() return '2026-10-30T10:00:00Z' end
-printed = {}
-print = function(msg) printed[#printed + 1] = tostring(msg) end
-function said(pattern) for _, p in ipairs(printed) do if string.find(p, pattern) then return true end end return false end
-SlashCmdList = {}
-UIParent = { GetWidth = function() return 1920 end, GetHeight = function() return 1080 end }
-UISpecialFrames = {}
-SECRET = {}
-issecretvalue = function(v) return SECRET[v] == true end
-
--- A frame API that accepts every call and keeps what the window sets, so a test can read it back. As in the game,
--- a named frame becomes a global and a new frame is shown until something hides it.
-created = {}
-failOn = nil
-local Frame = {}
-Frame.__index = function(self, key)
-  local own = rawget(Frame, key)
-  if own then return own end
-  return function() end
-end
-local function new(kind, name, parent, template)
-  local f = setmetatable({ kind = kind, frameName = name, parent = parent, template = template, scripts = {}, hooks = {}, events = {}, shown = true }, Frame)
-  created[#created + 1] = f
-  if name then _G[name] = f end
-  return f
-end
-function Frame.SetScript(self, script, f) self.scripts[script] = f; if script == 'OnEvent' then self.onEvent = f end end
-function Frame.HookScript(self, _, f) table.insert(self.hooks, f) end
-function Frame.SetText(self, t) self.text = t end
-function Frame.GetText(self) return self.text end
-function Frame.Show(self) self.shown = true end
-function Frame.Hide(self) self.shown = false end
-function Frame.IsShown(self) return self.shown == true end
-function Frame.SetTexture(self, path) self.path = path end
-function Frame.SetBackdrop(self, b) self.backdrop = b end
-function Frame.SetBackdropBorderColor(self, r, g, b) self.border = { r, g, b } end
-function Frame.SetFont(self, path, size) self.font = path; return true end
-function Frame.SetTextColor(self, r, g, b, a) self.color = { r, g, b, a } end
-function Frame.SetMinMaxValues(self, lo, hi) self.lo, self.hi = lo, hi end
-function Frame.SetValue(self, v) self.value = v end
-function Frame.SetChecked(self, v) self.checked = v and true or false end
-function Frame.GetChecked(self) return self.checked end
-function Frame.RegisterEvent(self, e) self.events[e] = true end
-function Frame.CreateFontString(self) return new('FontString') end
-function Frame.CreateTexture(self) return new('Texture') end
-CreateFrame = function(kind, name, parent, template)
-  if failOn == kind then error('forced failure creating a ' .. kind) end
-  return new(kind, name, parent, template)
-end
-
--- The core frame dispatches to its OnEvent script, then to every module's hook, as the game does.
-function fire(event, ...)
-  local f = Everloot.frame
-  f.onEvent(f, event, ...)
-  for _, hook in ipairs(f.hooks) do hook(f, event, ...) end
-end
-
-money = 381240
-GetMoney = function() return money end
-UnitName = function() return 'Samplechar' end
-UnitClass = function() return 'Shaman', 'SHAMAN' end
-UnitRace = function() return 'Orc' end
-UnitLevel = function() return 24 end
-GetRealmName = function() return 'Forever' end
-RAID_CLASS_COLORS = { SHAMAN = { r = 0, g = 0.44, b = 0.87 } }
-GetProfessions = function() return 1, nil, nil, 4, 5 end
-GetProfessionInfo = function(i)
-  if i == 1 then return 'Mining', 'Interface\\\\Icons\\\\Trade_Mining', 112, 150 end
-  if i == 4 then return 'Fishing', 'Interface\\\\Icons\\\\Trade_Fishing', 20, 75 end
-  if i == 5 then return 'Cooking', 'Interface\\\\Icons\\\\INV_Misc_Food_15', 1, 75 end
-end
-timers = {}
-C_Timer = { After = function(seconds, f) table.insert(timers, f) end }
-function drain() while #timers > 0 do table.remove(timers, 1)() end end
-tooltipCalls = {}
-Enum = { TooltipDataType = { Item = 0 } }
-TooltipDataProcessor = { AddTooltipPostCall = function(kind, f) table.insert(tooltipCalls, f) end }
-function tooltipFor(itemId)
-  local tip = { lines = {} }
-  tip.AddLine = function(self, text, r, g, b) table.insert(self.lines, { text = text, r = r, g = g, b = b }) end
-  for _, f in ipairs(tooltipCalls) do f(tip, { id = itemId }) end
-  return tip.lines
-end
-"""
-
-BEFORE = ["core.lua", "modules/auctions.lua", "modules/gold.lua", "modules/prices.lua", "modules/drops.lua",
-          "modules/gph.lua", "modules/options.lua"]
-AFTER = ["modules/minimap.lua"]
-
-
-def fresh(saved: str = "nil", api: str = "", window: bool = True):
-    lua = LuaRuntime()
-    lua.execute(WORLD)
-    lua.execute(api)
-    lua.execute(f"EverlootDB = {saved}")
-    for file in BEFORE:
-        lua.execute((root / file).read_text(encoding="utf-8"))
-    # Every global that exists before the window's file runs; the window may add its own frame name only.
-    lua.execute("globalsBefore = {}; for k in pairs(_G) do globalsBefore[k] = true end")
-    if window:
-        lua.execute((root / "modules" / "window.lua").read_text(encoding="utf-8"))
-    for file in AFTER:
-        lua.execute((root / file).read_text(encoding="utf-8"))
-    lua.execute("Everloot.frame.onEvent(nil, 'ADDON_LOADED', 'Everloot')")
-    return lua
-
 
 # --- The file itself: no events, no hooks on the recording frame, the game's own fonts and the bronze edge ---
 toc = (root / "Everloot.toc").read_text(encoding="utf-8")
@@ -135,10 +26,16 @@ assert "modules\\window.lua" in toc, "the window is in the TOC"
 assert toc.index("modules\\window.lua") < toc.index("modules\\minimap.lua"), "the window loads before the minimap button"
 source = (root / "modules" / "window.lua").read_text(encoding="utf-8")
 code = "\n".join(line.split("--")[0] for line in source.splitlines())
-for word in ["RegisterEvent", "HookScript", "hooksecurefunc", "E:Store", "EverlootDB.records[", "SendAddonMessage"]:
-    assert word not in code, f"the window reads and displays only: {word} found"
+# The window and every view file read and display only.
+for path in [root / "modules" / "window.lua", *sorted((root / "modules").glob("view_*.lua"))]:
+    text = path.read_text(encoding="utf-8")
+    lines = "\n".join(line.split("--")[0] for line in text.splitlines())
+    for word in ["RegisterEvent", "HookScript", "hooksecurefunc", "E:Store", "EverlootDB.records[", "SendAddonMessage"]:
+        assert word not in lines, f"{path.name} reads and displays only: {word} found"
+    assert "Coming soon" not in text, f"no stubs in {path.name}"
 assert "Fonts\\\\FRIZQT__.TTF" in code and "Fonts\\\\ARIALN.TTF" in code, "Friz Quadrata headings, Arial Narrow numbers"
 assert "UI-Tooltip-Border" in code and "SetBackdropBorderColor" in code, "the stock tooltip edge, tinted"
+assert "Coming soon" not in source, "no stubs in the window"
 prices = (root / "modules" / "prices.lua").read_text(encoding="utf-8")
 for word in ["CreateTexture", "CreateFontString", "SetFont"]:
     assert word not in prices, f"the tooltip uses AddLine and |T..|t only: {word} found in prices.lua"
@@ -151,8 +48,28 @@ assert width == height and width in (64, 128) and len(crest) == 18 + id_len + wi
 assert 'Interface\\\\AddOns\\\\Everloot\\\\media\\\\crest' in code and 'Interface\\\\AddOns\\\\Everloot\\\\media\\\\crest:14:14' in prices
 
 # --- It builds under the stub frame API and shows only real values ---
-SAVED = "{ installId = 'abcd-1234', toggles = {}, records = { recipe_observed = { { profession = 'Cooking' }, { profession = 'Cooking' } } } }"
-lua = fresh(SAVED)
+# The key core.lua's E.CharacterKey gives this install and player GUID.
+ME = "%08x" % zlib.adler32(b"abcd-1234:Player-1-0001")
+API = ("UnitGUID = function() return 'Player-1-0001' end\n"
+       "date = os.date\n"
+       "RAID_CLASS_COLORS.MAGE = { r = 0.25, g = 0.78, b = 0.92 }\n"
+       "RAID_CLASS_COLORS.ROGUE = { r = 1, g = 0.96, b = 0.41 }\n")
+SAVED = f"""{{ installId = 'abcd-1234', toggles = {{}}, records = {{
+    recipe_observed = {{ {{ profession = 'Cooking' }}, {{ profession = 'Cooking' }} }},
+    lockout_owned = {{ {{ characterKey = 'bbbb0002', instance = 'Karazhan', resetAt = '2030-01-01T00:00:00Z' }}, {{ characterKey = 'bbbb0002', instance = 'Gruul', resetAt = '2030-01-02T00:00:00Z' }}, {{ characterKey = 'bbbb0002', instance = 'Magtheridon', resetAt = '1970-01-02T00:00:00Z' }}, {{ characterKey = 'zzzz', instance = 'Other' }} }} }},
+  ledger = {{ events = {{
+    {{ at = 1000000 - 3600, key = '{ME}', category = 'quest', copper = 12345 }},
+    {{ at = 1000000 - 7200, key = '{ME}', category = 'flight', copper = 77 }},
+    {{ at = 1000000 - 8 * 86400, key = '{ME}', category = 'vendor', copper = 5000000 }},
+    {{ at = 1000000 - 3600, key = 'aaaa0001', category = 'quest', copper = 999 }},
+  }} }},
+  roster = {{
+    ['{ME}'] = {{ name = 'Samplechar', realm = 'Forever', class = 'SHAMAN', level = 24, copper = 1312745, lastSeen = 1794052800,
+      professions = {{ {{ name = 'Mining', rank = 112, maxRank = 150 }}, {{ name = 'Cooking', rank = 1, maxRank = 75 }} }} }},
+    aaaa0001 = {{ name = 'Alt', realm = 'Forever', class = 'ROGUE', level = 12, copper = 500 }},
+    bbbb0002 = {{ name = 'Mage', realm = 'Nightfall', class = 'MAGE', level = 30 }},
+  }} }}"""
+lua = fresh(SAVED, API)
 lua.execute("""
 local U = Everloot.Window
 assert(U.frame == nil and EverlootWindow == nil, 'nothing is built at load')
@@ -168,6 +85,7 @@ fire('QUEST_TURNED_IN', 1, 0, 67500); money = money + 67500; fire('PLAYER_MONEY'
 fire('TAXIMAP_OPENED'); money = money - 55; fire('PLAYER_MONEY'); fire('TAXIMAP_CLOSED')
 assert(Everloot:Count('money_event') == 3, 'three money events recorded')
 
+table.insert(Everloot.Window.NAV, { key = 'ghost', label = 'Ghost', icon = 'INV_Misc_QuestionMark' })
 assert(U.Open() == true, 'the window opens')
 local f = EverlootWindow
 assert(f == U.frame and f.shown and f.template == 'BackdropTemplate', 'one named window, shown')
@@ -180,19 +98,58 @@ assert(f.name.text == 'Samplechar' and f.realm.text == 'Forever', f.name.text)
 assert(f.class.text:find('^Level 24 Orc |cff0070dd') and f.class.text:find('Shaman'), f.class.text)
 assert(f.onHand.text:find('^48|TInterface\\\\MoneyFrame\\\\UI%-GoldIcon') and f.onHand.text:find('96|T.-Silver') and f.onHand.text:find('85|T.-Copper'), f.onHand.text)
 assert(f.peak.text:find('^48|T'), 'the peak the gold module saved: ' .. f.peak.text)
-assert(f.ledger.text:find('Quests |cffffffff6g 75s|r') and f.ledger.text:find('Vendors |cffffffff4g 10s|r')
-  and f.ledger.text:find('Flights |cffffffff%-55c|r'), f.ledger.text)
-assert(not f.ledger.text:find('Loot'), 'a source with no rows is left out: ' .. f.ledger.text)
+local U0 = Everloot.Window
+-- The seeded events (12345 in, 77 out) plus the vendor sale, quest reward and flight the gold module just recorded live.
+assert(f.week.text == 'This week: +' .. U0.Money(12345 + 41000 + 67500) .. ' / -' .. U0.Money(77 + 55), 'this character, last 7 days only: ' .. f.week.text)
+assert(rawget(f, 'ledger') == nil, 'the Recorded line is the week line now')
 assert(f.perHour.text == '-' and f.session.text:find('not running') and f.gphButton.text == 'Start', 'no session, no number')
 
 local rows = f.profRows
 assert(rows[1].name.text == 'Mining' and rows[1].rank.text == '112 / 150' and rows[1].bar.hi == 150 and rows[1].bar.value == 112)
-assert(rows[2].name.text == 'Fishing' and rows[3].name.text:find('^Cooking  .-2 recipe colours recorded'), rows[3].name.text)
+assert(rows[2].name.text == 'Fishing' and rows[3].name.text == 'Cooking', rows[3].name.text)
 assert(rows[4].name.shown == false and rows[4].bar.shown == false, 'unused rows are hidden')
-for i, a in ipairs(Everloot.Window.ADDED) do
-  assert(f.added[i].text == tostring(Everloot:Count(a[1])), a[2])
-end
-assert(f.added[4].text == '2', 'recipe colours counted from the file')
+
+-- Home across alts: realm lines and characters sorted realm then name, class colours, totals, lockouts, last seen.
+assert(rawget(f, 'added') == nil and Everloot.Window.ADDED == nil, 'the row counts left the window for Settings')
+local r = f.roster
+local function shownRows() local n = 0; for _, row in ipairs(r.rows) do if row.shown then n = n + 1 end end; return n end
+assert(#r.rows == 10 and shownRows() == 5, 'two realm lines and three characters')
+assert(r.rows[1].name.text:find('^Forever') and r.rows[2].name.text == 'Alt' and r.rows[3].name.text == 'Samplechar'
+  and r.rows[4].name.text:find('^Nightfall') and r.rows[5].name.text == 'Mage', 'realm, then name')
+assert(r.rows[2].name.color[1] == 1 and r.rows[2].name.color[3] == 0.41, 'Alt is rogue yellow')
+assert(r.rows[5].name.color[1] == 0.25 and r.rows[5].name.color[3] == 0.92, 'Mage is mage blue')
+assert(r.rows[3].name.color[1] < 0.7 and r.rows[3].name.color[2] > 0.9 and r.rows[3].name.color[3] < 0.3, 'this character is marked in the accent colour')
+local mine = EverlootDB.roster[Everloot.CharacterKey()].copper
+assert(mine == money, 'this character reads gold from the client when the window opens')
+assert(r.realmTotals.Forever.text == 'Forever · ' .. Everloot.Window.Money(mine + 500) and r.realmTotals.Forever.copper == mine + 500, r.realmTotals.Forever.text)
+assert(r.realmTotals.Nightfall.text == 'Nightfall · -' and r.realmTotals.Nightfall.copper == nil, 'no gold read, a dash')
+assert(r.accountTotal.text == 'Account: ' .. Everloot.Window.Money(mine + 500), r.accountTotal.text)
+assert(r.rows[3].level.text == '24' and r.rows[3].gold.text == Everloot.Window.MoneyShort(mine) and r.rows[2].gold.text == Everloot.Window.MoneyShort(500), r.rows[2].gold.text)
+assert(r.rows[3].profs.text == 'Mining 112, Fishing 20, Cooking 1' and r.rows[2].profs.text == '-', r.rows[3].profs.text)
+assert(r.rows[3].lockouts.text == '-' and r.rows[5].lockouts.text == '-', 'lockouts are read only while the completion tracker is on')
+assert(r.rows[3].seen.text == '1970-01-12' and r.rows[2].seen.text == '-', r.rows[3].seen.text)
+EverlootDB.toggles.completion = true
+Everloot.Window.Refresh()
+-- Magtheridon's reset time has passed: two live lockouts, as the Collection view counts them.
+assert(r.rows[5].lockouts.text == '2 raids' and r.rows[3].lockouts.text == '-' and r.rows[2].lockouts.text == '-', r.rows[5].lockouts.text)
+EverlootDB.records.lockout_owned[2].resetAt = '1970-01-03T00:00:00Z'
+Everloot.Window.Refresh()
+assert(r.rows[5].lockouts.text == '1 raid', 'one live, two past their reset: ' .. r.rows[5].lockouts.text)
+EverlootDB.toggles.completion = false
+Everloot.Window.Refresh()
+
+-- Paging: more than 10 lines show Down only; Down moves a page and clamps at the end; Up goes back.
+assert(r.up.shown == false and r.down.shown == false, 'a short list pages nowhere')
+for i = 1, 12 do EverlootDB.roster['zz' .. string.format('%02d', i)] = { name = 'Zed' .. string.format('%02d', i), realm = 'Zeta', class = 'MAGE', level = 5 } end
+Everloot.Window.Refresh()
+assert(shownRows() == 10 and r.rows[1].name.text:find('^Forever') and r.down.shown and not r.up.shown, 'first page, Down only')
+r.down.scripts.OnClick(r.down)
+assert(r.offset == 10 and r.rows[1].name.text == 'Zed05' and shownRows() == 8, 'second page starts at the 11th line: ' .. r.rows[1].name.text)
+assert(r.up.shown and not r.down.shown, 'at the end, Up only')
+r.down.scripts.OnClick(r.down)
+assert(r.offset == 10, 'the offset is clamped at the end')
+r.up.scripts.OnClick(r.up)
+assert(r.offset == 0 and r.rows[1].name.text:find('^Forever') and r.down.shown and not r.up.shown, 'Up returns to the first page')
 
 -- Gold per hour from the gph session, and Pause runs the gph command.
 EverlootDB.gph.current = { v = 1, elapsed = 0, runningSince = now - 600, counts = {}, distinct = 0,
@@ -202,10 +159,16 @@ assert(f.perHour.text:find('^3|T.-Gold') and f.session.text:find('Running') and 
 f.gphButton.scripts.OnClick(f.gphButton)
 assert(EverlootDB.gph.current.runningSince == nil and f.gphButton.text == 'Resume' and f.session.text:find('^Paused'), 'Pause pauses the session')
 
--- Other sidebar items: a line, or the part of the addon they open.
+-- Sidebar: Home, Gold, Collection, Professions, Settings. A view registers by key; one that did not load says so.
+assert(f.nav.ask == nil and f.nav.plan == nil and f.nav.auctions == nil, 'Ask, Build plan and Auctions left the sidebar')
+assert(f.nav.gold and f.nav.collection and f.nav.professions and f.nav.settings, 'Home, Gold, Collection, Professions, Settings')
+Everloot.Window.Views.collection = { build = function(f, parent) parent.built = true end, refresh = function(f) local v = f.views.collection; v.refreshed = (rawget(v, 'refreshed') or 0) + 1 end }
 f.nav.collection.scripts.OnClick(f.nav.collection)
-assert(f.home.shown == false and f.note.shown and f.note.text:find('Coming soon') and f.subtitle.text == 'Collection')
+assert(f.home.shown == false and f.views.collection.shown and rawget(f.views.collection, 'built') and f.views.collection.refreshed == 1 and f.subtitle.text == 'Collection')
 assert(f.nav.collection.on.shown and not f.nav.home.on.shown, 'fel green marks only the open item')
+f.nav.ghost.scripts.OnClick(f.nav.ghost)
+assert(f.views.collection.shown == false and f.note.shown and f.note.text:find('did not load'), 'an unregistered view says so')
+assert(not f.note.text:find('oon'), 'no coming soon')
 f.nav.settings.scripts.OnClick(f.nav.settings)
 assert(Everloot.Options.page and Everloot.Options.page.shown, 'Settings opens the options page')
 f.nav.home.scripts.OnClick(f.nav.home)
@@ -241,7 +204,8 @@ assert(Everloot.Window.Open())
 local f = EverlootWindow
 assert(f.name.text == '-' and f.onHand.text == '-' and f.peak.text == '-' and f.perHour.text == '-', 'dashes, not numbers')
 assert(f.profRows[1].name.text == '-' and f.profRows[1].bar.shown == false, 'no profession book, no bars')
-assert(f.ledger.text:find('No gold sources'), f.ledger.text)
+assert(f.week.text == 'This week: -', f.week.text)
+assert(f.roster.accountTotal.text == 'Account: -' and not f.roster.rows[1].shown, 'no characters, no rows')
 """)
 
 # --- A forced error inside the window never stops an event from being recorded ---

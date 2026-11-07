@@ -15,6 +15,8 @@ modules\guild.lua
 modules\gear.lua
 modules\auctions.lua
 modules\gold.lua
+modules\roster.lua
+modules\ledger.lua
 modules\professions.lua
 modules\ask.lua
 modules\addons.lua
@@ -40,5 +42,8 @@ modules\conveniences.lua
 modules\options.lua
 modules\planner.lua
 modules\window.lua
+modules\view_gold.lua
+modules\view_collection.lua
+modules\view_professions.lua
 modules\minimap.lua
 modules\drawer.lua

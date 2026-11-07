@@ -202,6 +202,13 @@ end
 assert(page.intro.font:find('FRIZQT', 1, true) and page.note.font:find('FRIZQT', 1, true), 'the introduction and the footer note too')
 page.scripts.OnShow()
 checkRows(page)
+
+-- What you've added: one line per kind of row in the saved file, filled when the page shows.
+assert(#page.added == #O.ADDED and #O.ADDED == 8, 'one line per kind')
+for i, a in ipairs(O.ADDED) do
+  assert(page.added[i].text == a[2] .. ': ' .. tostring(Everloot:Count(a[1])), page.added[i].text)
+end
+assert(page.addedHeading.text == "What you've added", 'the block has its title')
 -- The controls behave as before: a switch, the ask box, Reload now.
 local census
 for _, box in ipairs(page.boxes) do if box.row.key == 'census' then census = box end end

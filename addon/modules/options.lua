@@ -29,6 +29,8 @@ O.ROWS = {
     text = "NPCs, loot, quests, vendors and items you see, and where you stood at NPC windows and herbs, ore and chests. Anonymous: no character or guild names." },
   { key = "gold", label = "Your gold",
     text = "Your own gold in and out, for gold per hour. Sent only if you share it on the upload page." },
+  { key = "roster", label = "Your characters",
+    text = "Name, realm, class, level, faction, gold and professions of each character you log in with, for the window's Home. Stays in this file; never uploaded." },
   { key = "gear", label = "Your gear",
     text = "Your equipped items and item levels, at most once an hour. Sent only if you share it on the upload page." },
   { key = "talents", label = "Your talents",
@@ -47,6 +49,12 @@ if E.Pulls then
   O.ROWS[#O.ROWS + 1] = { key = "pulls", command = "pulls", label = "Boss pulls",
     text = "After each boss pull: your group's names, classes, roles and the game's damage meter totals. Sent from the upload page or the Desktop App. Off deletes its rows." }
 end
+
+-- "What you've added": rows of each kind in the saved file now, shown under the switches.
+O.ADDED = {
+  { "loot", "Loot windows" }, { "npc_sighting", "NPC sightings" }, { "quest", "Quests" }, { "recipe_observed", "Recipe colours" },
+  { "item_fact", "Item facts" }, { "auction_scan", "Auction scans" }, { "census_seen", "Players seen" }, { "map_bounds", "Zones mapped" },
+}
 
 function O.IsOn(row)
   if row.field then
@@ -73,6 +81,9 @@ function O.Refresh()
   local page = O.page
   if not page then return end
   for _, box in ipairs(page.boxes or {}) do box:SetChecked(O.IsOn(box.row)) end
+  for i, a in ipairs(O.ADDED) do
+    if page.added and page.added[i] then page.added[i]:SetText(a[2] .. ": " .. tostring(E:Count(a[1]))) end
+  end
   if page.note then
     page.note:SetText(O.changed and "Changes apply after a reload." or ("Everloot " .. E.VERSION .. ". Changes apply after a reload."))
   end
@@ -155,6 +166,10 @@ local function build()
     box:SetScript("OnClick", function(self) O.Set(row, self:GetChecked() and true or false) end)
     page.boxes[#page.boxes + 1] = box
   end
+  page.addedHeading = words(content, "GameFontNormal", 13, "text")
+  page.addedHeading:SetText("What you've added")
+  page.added = {}
+  for i = 1, #O.ADDED do page.added[i] = words(content, "GameFontHighlightSmall", 11, "muted") end
   local function layout(_, width)
     width = math.max(1, width or scroll:GetWidth())
     content:SetWidth(width)
@@ -165,7 +180,13 @@ local function build()
       box.description:SetWidth(math.max(1, width - 2 * PAD - 38))
       y = y + math.max(32, 4 + box.label:GetStringHeight() + 2 + box.description:GetStringHeight()) + 12
     end
-    content:SetHeight(y)
+    page.addedHeading:SetPoint("TOPLEFT", content, "TOPLEFT", PAD, -y)
+    y = y + 22
+    for _, line in ipairs(page.added) do
+      line:SetPoint("TOPLEFT", content, "TOPLEFT", PAD, -y)
+      y = y + 16
+    end
+    content:SetHeight(y + PAD)
     scroll:SetVerticalScroll(math.min(scroll:GetVerticalScroll(), math.max(0, y - scroll:GetHeight())))
   end
   scroll:HookScript("OnSizeChanged", layout)
