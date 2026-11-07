@@ -181,13 +181,13 @@ assert L.Summary(keys(B), 0, NOW).moved == 0, "the receiving side alone moved no
 assert L.Summary(keys(), 0, NOW).moved == 0, "no keys, nothing moved"
 g.EverlootDB.ledger = None
 
-# Period: today starts at UTC midnight; 7d and 30d count back from now; all starts at 0.
+# Period: today starts at UTC midnight; 7d and 30d are today and the 6 or 29 whole UTC days before it; all starts at 0.
 g.clock = epoch("2026-11-07T23:59:30Z")
 assert L.Period("today") == (epoch("2026-11-07T00:00:00Z"), g.clock), L.Period("today")
 g.clock = epoch("2026-11-08T00:00:30Z")
 assert L.Period("today") == (epoch("2026-11-08T00:00:00Z"), g.clock), L.Period("today")
-assert L.Period("7d") == (g.clock - 7 * DAY, g.clock)
-assert L.Period("30d") == (g.clock - 30 * DAY, g.clock)
+assert L.Period("7d") == (epoch("2026-11-02T00:00:00Z"), g.clock), L.Period("7d")
+assert L.Period("30d") == (epoch("2026-10-10T00:00:00Z"), g.clock), L.Period("30d")
 assert L.Period("all") == (0, g.clock)
 
 # Daily closes, the gold series and the unrecorded line.
@@ -229,6 +229,32 @@ L.Close(A, 25000)
 f, t = L.Period("today")
 s = L.Summary(keys(A), f, t)
 assert (s.totalIn, s.totalOut, s.unrecorded) == (9000, 500, (25000 - 10000) - 8500), (s.totalIn, s.totalOut, s.unrecorded)
+
+# 7d and 30d at 15:00: events on the first day before 15:00 are inside the period, so the closes explain them all.
+for period, first in [("7d", "2026-11-01"), ("30d", "2026-10-09")]:
+    g.EverlootDB.ledger = None
+    g.clock = epoch(first + "T00:00:00Z") - DAY + 20 * 3600
+    L.Close(A, 10000)  # the close of the day before the period
+    g.clock = epoch(first + "T09:00:00Z")
+    L.Record(A, "quest", 3000)
+    L.Record(A, "flight", 200)
+    g.clock = epoch(first + "T22:00:00Z")
+    L.Close(A, 12800)
+    g.clock = epoch("2026-11-07T15:00:00Z")
+    L.Record(A, "loot", 500)
+    L.Close(A, 13300)
+    s = L.Summary(keys(A), *L.Period(period))
+    assert py(s.days)[0]["date"] == first, (period, py(s.days))
+    assert (s.totalIn, s.totalOut, s.unrecorded) == (3500, 200, 0), (period, s.totalIn, s.totalOut, s.unrecorded)
+# A query reaching past 90 days starts at the UTC midnight 89 days before today's.
+g.EverlootDB.ledger = None
+g.clock = epoch("2026-08-09T23:00:00Z")
+L.Record(A, "loot", 1)  # the day before the oldest whole day
+g.clock = epoch("2026-08-10T08:00:00Z")
+L.Record(A, "loot", 2)
+g.clock = epoch("2026-11-07T15:00:00Z")
+assert L.Summary(keys(A), 0, g.clock).totalIn == 2, "the oldest day counted is whole"
+g.EverlootDB.ledger = None
 
 # Each key keeps its newest 400 daily closes.
 g.EverlootDB.ledger = None
@@ -373,5 +399,10 @@ L.ExpirePending(NOW + 49 * 3600)
 assert g.EverlootDB.ledger.sales[1].status == "unmatched" and L.MatchPending(A, "Ore") is None
 assert [r["status"] for r in py(L.Sales(keys(A), 0, NOW))] == ["unmatched"]
 assert py(L.SalesByItem(keys(A), 0, NOW)) == []
+# A letter taken after 48 hours still pays the sale: the unmatched row becomes paid, one row.
+g.clock = NOW + 49 * 3600
+assert L.RecordSale(A, extra(itemName="Ore", count=2, total=300)) is True
+sales_rows = py(g.EverlootDB.ledger.sales)
+assert len(sales_rows) == 1 and sales_rows[0]["status"] == "paid" and sales_rows[0]["total"] == 300, sales_rows
 
 print("ledger contract: PASS")

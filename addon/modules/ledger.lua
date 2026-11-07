@@ -5,7 +5,8 @@
 --
 -- Rows are keyed by the opaque character key (core.lua, E.CharacterKey), never a name. Times are time() seconds;
 -- days are UTC. The window is bounded: 5,000 events and 90 days, 2,000 sales, 400 daily closes per character.
--- Queries skip rows older than 90 days even before eviction has run.
+-- Queries skip rows older than 90 days even before eviction has run; their period starts at a UTC midnight at most
+-- 89 days before today's.
 -- Categories and directions are the web's (kb/src/gold-ledger.ts), in the same order, plus the slice-two names.
 -- For days before the store existed, Summary also reads the uploaded money_event records (read only, never copied
 -- into the store), matched to a character key through the roster's name and realm.
@@ -75,6 +76,18 @@ local function oldest()
   return time() - MAX_AGE
 end
 
+--- Today's UTC midnight.
+local function midnight()
+  local now = time()
+  return now - now % DAY
+end
+
+--- The oldest time a query's period may start: a UTC midnight, so the first day is a whole day and its opening
+--- close (the day before) matches the events counted.
+local function oldestDay()
+  return midnight() - (MAX_AGE - DAY)
+end
+
 local function keySet(keys)
   local set = {}
   for _, k in ipairs(type(keys) == "table" and keys or {}) do set[k] = true end
@@ -124,10 +137,12 @@ function L.RecordPending(key, itemName)
   return true
 end
 
---- The oldest pending sale of this item for this character, or nil.
-function L.MatchPending(key, itemName)
+--- The oldest pending sale of this item for this character, or nil. With `orUnmatched`, a row already marked
+--- unmatched counts too: a letter taken after 48 hours still belongs to the sale it pays.
+function L.MatchPending(key, itemName, orUnmatched)
   for _, row in ipairs(store().sales) do
-    if row.status == "pending" and row.key == key and row.itemName == itemName then return row end
+    local open = row.status == "pending" or (orUnmatched and row.status == "unmatched")
+    if open and row.key == key and row.itemName == itemName then return row end
   end
   return nil
 end
@@ -141,7 +156,7 @@ function L.ExpirePending(now)
 end
 
 --- Records one auction sale: item, count, total after the house cut, the deposit returned and the cut. A pending
---- sale of the same item is filled in and marked paid; otherwise the sale is appended.
+--- or unmatched sale of the same item (the oldest) is filled in and marked paid; otherwise the sale is appended.
 function L.RecordSale(key, sale)
   if not validKey(key) or type(sale) ~= "table" then return false end
   if not validName(sale.itemName) or not whole(sale.count, 1) or not whole(sale.total, 1) then return false end
@@ -149,7 +164,7 @@ function L.RecordSale(key, sale)
   if sale.cut ~= nil and not whole(sale.cut, 0) then return false end
   local s = store()
   L.ExpirePending(time())
-  local row = L.MatchPending(key, sale.itemName)
+  local row = L.MatchPending(key, sale.itemName, true)
   if not row then
     row = {}
     s.sales[#s.sales + 1] = row
@@ -233,7 +248,7 @@ end
 function L.Summary(keys, fromTs, toTs)
   keys = type(keys) == "table" and keys or {}
   local wanted = keySet(keys)
-  fromTs = math.max(tonumber(fromTs) or 0, oldest())
+  fromTs = math.max(tonumber(fromTs) or 0, oldestDay())
   toTs = tonumber(toTs) or time()
   local totals, byDay, rows = {}, {}, {}
   local totalIn, totalOut, moved = 0, 0, 0
@@ -311,7 +326,7 @@ end
 --- The keys' auction sales between two times (both included; nil means all), newest first.
 function L.Sales(keys, fromTs, toTs)
   L.ExpirePending(time())
-  fromTs = math.max(tonumber(fromTs) or 0, oldest())
+  fromTs = math.max(tonumber(fromTs) or 0, oldestDay())
   toTs = tonumber(toTs) or time()
   local wanted, list = keySet(keys), {}
   for i, s in ipairs(store().sales) do
@@ -365,13 +380,14 @@ function L.Series(keys, days)
   return list
 end
 
---- The from and to times of a period: "today" (since UTC midnight), "7d", "30d" or "all"; anything else is "30d".
+--- The from and to times of a period: "today" (since UTC midnight), "7d" and "30d" (today and the 6 or 29 whole UTC
+--- days before it), or "all"; anything else is "30d". Every period but "all" starts at a UTC midnight.
 function L.Period(name)
-  local now = time()
-  if name == "today" then return now - now % DAY, now end
-  if name == "7d" then return now - 7 * DAY, now end
+  local now, today = time(), midnight()
+  if name == "today" then return today, now end
+  if name == "7d" then return today - 6 * DAY, now end
   if name == "all" then return 0, now end
-  return now - 30 * DAY, now
+  return today - 29 * DAY, now
 end
 
 E:RegisterModule("ledger", function()
