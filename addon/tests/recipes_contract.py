@@ -380,6 +380,8 @@ C_TradeSkillUI.GetFilteredRecipeIDs = nil
 C_TradeSkillUI.GetAllRecipeIDs = function() allCalls = allCalls + 1; return { 7101 } end
 child.skillLevel = 106
 fire('TRADE_SKILL_LIST_UPDATE')
+-- 7101 wrote a highest-rank row earlier on this fixture's day; the next UTC day lets the logout write 106.
+date = function() return '2026-10-11T00:00:00Z' end
 fire('PLAYER_LOGOUT')
 assert(rows()[#rows()].rank == 106 and rows()[#rows()].recipeId == 7101)
 fire('TRADE_SKILL_CLOSE')
@@ -443,6 +445,63 @@ assert(#kept == 2 and kept[1].recipe == 'Learned' and kept[2].recipe == 'Before 
 assert(EverlootDB.paused.recipe_observed == nil, 'the recipe pause lifts once there is room')
 assert(EverlootDB.paused.loot == true and #EverlootDB.records.loot == 2, 'other kinds are untouched')
 assert(EverlootDB.recipeSeen == nil, 'the old per-rank bookkeeping is dropped')
+""")
+
+# Reloads while levelling: a waiting highest rank persists in EverlootDB, so a logout or /reload writes it only
+# when the colour has changed or once per UTC day, not once per reload.
+lua4 = LuaRuntime()
+lua4.execute("""
+today = '2026-10-10'
+date = function(fmt) if fmt == '!%Y-%m-%d' then return today end return today .. 'T00:00:00Z' end
+time = function() return 1 end
+print = function() end
+SlashCmdList = {}
+CreateFrame = function() return {
+ RegisterEvent=function() end, SetScript=function(self, _, f) self.onEvent=f end,
+ HookScript=function(self, _, f) self.hooks=self.hooks or {}; table.insert(self.hooks,f) end } end
+C_Item = { GetItemNameByID = function() return 'Herb' end }
+child = { professionID = 171, professionName = 'Alchemy', skillLevel = 10, maxSkillLevel = 75 }
+colour = 0
+C_TradeSkillUI = {
+ GetChildProfessionInfo = function() return child end,
+ GetBaseProfessionInfo = function() return child end,
+ GetFilteredRecipeIDs = function() return { 1001 } end,
+ GetRecipeInfo = function(id) return { recipeID = id, name = 'Minor Healing Potion', relativeDifficulty = colour, learned = true } end,
+ GetRecipeSchematic = function() return { outputItemID = 118, reagentSlotSchematics = {} } end,
+}
+""")
+for file in ["core.lua", "modules/professions.lua"]:
+    lua4.execute((root / file).read_text(encoding="utf-8"))
+lua4.execute("""
+Everloot.frame.onEvent(nil,'ADDON_LOADED','Everloot')
+local function event(name) for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, name) end end
+local function rows() return EverlootDB.records.recipe_observed or {} end
+local function reload(rank) child.skillLevel = rank; event('TRADE_SKILL_SHOW'); event('TRADE_SKILL_CLOSE'); event('PLAYER_LOGOUT') end
+
+reload(10)
+assert(#rows() == 1 and rows()[1].rank == 10, 'the lowest rank is written at once; got ' .. #rows())
+for rank = 11, 13 do reload(rank) end
+assert(#rows() == 2, 'three reloads at one colour write one highest-rank row; got ' .. #rows())
+assert(rows()[2].rank == 11 and rows()[2].difficulty == 'optimal')
+
+-- The colour changes: the previous colour's highest rank (13) is written, then the new colour's first rank.
+colour = 1
+reload(14)
+assert(#rows() == 4, 'a colour change flushes the old colour and writes the new one; got ' .. #rows())
+assert(rows()[3].rank == 13 and rows()[3].difficulty == 'optimal' and rows()[4].rank == 14 and rows()[4].difficulty == 'medium')
+
+-- Later reloads on the same UTC day add nothing, with or without a new rank.
+reload(14)
+reload(15)
+reload(15)
+assert(#rows() == 4, 'a reload on the same UTC day writes nothing; got ' .. #rows())
+
+-- The next UTC day: the waiting highest rank is written once.
+today = '2026-10-11'
+reload(15)
+assert(#rows() == 5 and rows()[5].rank == 15 and rows()[5].difficulty == 'medium', 'the next day writes one row; got ' .. #rows())
+reload(15)
+assert(#rows() == 5, 'nothing waits, nothing is written; got ' .. #rows())
 """)
 
 # A client with none of the modern API loads the module and says so.

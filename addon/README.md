@@ -43,8 +43,8 @@ Profession observations retain the API's recipe ID and learned flag when availab
 complete-list reader uses it; otherwise the status explicitly says **filtered recipe list**. The addon never
 changes the player's filters. Up to 500 recipes are read in chunks; reaching that cap is reported. Only learned
 recipes are written (the status counts the others). For each recipe and colour the file keeps the lowest and the
-highest rank it was seen at: the highest is written when the colour changes or at logout, so levelling a profession
-adds a few rows per recipe, not one per skill point. Disabling professions stops queued chunks.
+highest rank it was seen at: the highest is written when the colour changes, or at the first logout or reload on a
+new UTC day, so levelling a profession adds a few rows per recipe, not one per skill point or per reload. Disabling professions stops queued chunks.
 Tooltip prices show the item's newest public observation day separately from when the price file was built,
 and warn when either is old. Community values combine all auction houses on the realm; they are recorded
 asking-price estimates, not live listings or guaranteed sale prices.
