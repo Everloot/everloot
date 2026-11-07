@@ -8,7 +8,7 @@
 -- players; those fields are never read into a record.
 -- Ledger only (the uploaded money_event keeps the schema's nine categories): repairs and
 -- purchases at an open merchant, trades both sides accepted, money sent with a letter
--- and a plain letter's money. Each is marked ownAlt when the other side is one of the
+-- and money in a letter from one of the player's own characters. Each is marked ownAlt when the other side is one of the
 -- player's own characters: the trade partner, recipient or sender is compared with the
 -- roster's names on the player's realm and then dropped, never kept.
 -- Each event also goes to the local ledger (ledger.lua) under the character key, with
@@ -197,11 +197,15 @@ local function mailTaken(index)
   if not okInvoice then return end
   invoiceType, bid, cut = E.Readable(invoiceType), E.Readable(bid), E.Readable(cut)
   if invoiceType ~= "seller" and invoiceType ~= "buyer" then
-    -- A plain letter: its money, and whether the sender is one of the player's characters (compared, never kept).
+    -- A plain letter counts only when one of the player's own characters on this realm sent it (the sender is
+    -- compared, never kept). Any other money letter (an outbid refund, a system letter, another player's gold)
+    -- stays unrecorded: it is not income the player earned, and its source cannot be told apart.
+    -- A letter in transit between two alts has left the account's purse but not arrived, so the account's
+    -- unrecorded line reads negative until it is taken.
     -- packageIcon, stationeryIcon, sender, subject, money
     local okHeader, _, _, sender, _, money = pcall(GetInboxHeaderInfo, index)
     money = okHeader and E.Readable(money)
-    if whole(money) then plainMail = { letter = money, ownAlt = ownAlt(sender) } end
+    if whole(money) and ownAlt(sender) then plainMail = { letter = money, ownAlt = true } end
     return
   end
   if invoiceType ~= "seller" or not whole(bid) or type(cut) ~= "number" then return end
@@ -276,7 +280,9 @@ local function mailSent()
 end
 
 --- A repair asked for at the merchant lasts a few seconds, like a buyout: the next drop there is its cost.
-local function repairAsked()
+--- A guild-bank repair (RepairAllItems(true)) takes none of the player's own gold, so it is not pending.
+local function repairAsked(guildBank)
+  if guildBank == true then return end
   repairPending = true
   repairGen = repairGen + 1
   if C_Timer and C_Timer.After then
@@ -285,11 +291,13 @@ local function repairAsked()
   end
 end
 
---- Both sides accepted: the money each puts up, and whether the partner is one of the player's characters.
---- The partner's name is compared, not kept. Anything else (an acceptance taken back) drops the trade.
-local function tradeAccepted(player, target)
+--- The trade's money as it stands: what each side puts up, and whether the partner is one of the player's
+--- characters (the name is compared, not kept). Taken whenever the money or items change and whenever the
+--- partner has accepted, since the update with both sides accepted may never come when the player accepts
+--- second. The purse moving by exactly in minus out is what confirms the trade happened.
+local function tradeSnapshot()
   trade = nil
-  if player ~= 1 or target ~= 1 or not (GetPlayerTradeMoney and GetTargetTradeMoney) then return end
+  if not (GetPlayerTradeMoney and GetTargetTradeMoney) then return end
   local okOut, out = pcall(GetPlayerTradeMoney)
   local okIn, inn = pcall(GetTargetTradeMoney)
   out, inn = okOut and E.Readable(out), okIn and E.Readable(inn)
@@ -302,6 +310,11 @@ local function tradeAccepted(player, target)
   partnerRealm = okName and E.Readable(partnerRealm)
   local alt = okName and (partnerRealm == nil or partnerRealm == "") and ownAlt(partner) or false
   trade = { out = out, inn = inn, ownAlt = alt }
+end
+
+--- TRADE_ACCEPT_UPDATE(player, target): a snapshot once the partner has accepted.
+local function tradeAccepted(_, target)
+  if target == 1 then tradeSnapshot() end
 end
 
 local function lootMoney()
@@ -331,7 +344,7 @@ E:RegisterModule("gold", function()
   if soldPattern then pcall(function() f:RegisterEvent("CHAT_MSG_SYSTEM") end) end
   for _, name in ipairs({ "PLAYER_MONEY", "MERCHANT_SHOW", "MERCHANT_CLOSED", "TAXIMAP_OPENED", "TAXIMAP_CLOSED", "QUEST_TURNED_IN", "MAIL_CLOSED",
     "MAIL_SEND_SUCCESS", "MAIL_FAILED", "AUCTION_HOUSE_CLOSED", "COMMODITY_PRICE_UPDATED", "COMMODITY_PRICE_UNAVAILABLE", "COMMODITY_PURCHASE_FAILED", "AUCTION_HOUSE_SHOW_ERROR",
-    "TRADE_SHOW", "TRADE_CLOSED", "TRADE_ACCEPT_UPDATE" }) do
+    "TRADE_SHOW", "TRADE_CLOSED", "TRADE_ACCEPT_UPDATE", "TRADE_MONEY_CHANGED", "TRADE_PLAYER_ITEM_CHANGED" }) do
     pcall(function() f:RegisterEvent(name) end)
   end
   if hooksecurefunc then
@@ -372,6 +385,7 @@ E:RegisterModule("gold", function()
     elseif event == "MAIL_FAILED" then postage = nil; sendMoney = nil
     elseif event == "TRADE_SHOW" then trade = nil
     elseif event == "TRADE_ACCEPT_UPDATE" then tradeAccepted(...)
+    elseif event == "TRADE_MONEY_CHANGED" or event == "TRADE_PLAYER_ITEM_CHANGED" then tradeSnapshot()
     elseif event == "TRADE_CLOSED" then if trade then trade.closed = true end
     elseif event == "AUCTION_HOUSE_CLOSED" then buyout = nil; quote = nil
     elseif event == "COMMODITY_PRICE_UPDATED" then

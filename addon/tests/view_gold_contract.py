@@ -174,7 +174,7 @@ local found = false
 for _, row in ipairs(g.categories) do if row.shown and row.label.text == 'Trades out' then found = true end end
 assert(found, 'one character keeps its trade in the categories')
 click(g.scopes.account)
-assert(g.moved.shown and g.moved.text:find('^Moved between your characters: 80|T.-Silver.- 0|T.-Copper'), g.moved.text)
+assert(g.moved.shown and g.moved.text:find('^Moved between your characters: 40|T.-Silver.- 0|T.-Copper'), g.moved.text)
 for _, row in ipairs(g.categories) do assert(not (row.shown and row.label.text:find('^Trades')), 'the account leaves transfers out') end
 local listed = 0
 for _, row in ipairs(g.receipts) do if row.shown and row.label.text:find('^Trades') then listed = listed + 1 end end

@@ -439,60 +439,81 @@ event('TRADE_CLOSED')
 money = money - 399; event('PLAYER_MONEY')
 money = money - 400; event('PLAYER_MONEY')
 assert(#events == 10, 'a mismatched delta records nothing')
--- A trade one side never accepted, or an acceptance taken back, moves nothing.
+-- A trade the partner never accepted, with no money change seen, moves nothing.
 event('TRADE_SHOW')
 event('TRADE_ACCEPT_UPDATE', 1, 0)
 event('TRADE_CLOSED')
 money = money - 400; event('PLAYER_MONEY')
-event('TRADE_SHOW')
-event('TRADE_ACCEPT_UPDATE', 1, 1)
-event('TRADE_ACCEPT_UPDATE', 0, 0)
-money = money - 400; event('PLAYER_MONEY')
-event('TRADE_CLOSED')
 assert(#events == 10, 'an unaccepted trade records nothing')
+-- The player accepts second: only (0, 1) is seen, and the matching money still records the trade.
+event('TRADE_SHOW')
+event('TRADE_ACCEPT_UPDATE', 0, 1)
+event('TRADE_CLOSED')
+money = money - 400; event('PLAYER_MONEY')
+assert(#events == 11 and last().category == 'trade_out' and last().copper == 400 and last().ownAlt == true, 'partner accepted first')
+-- A money change in the trade window is snapshotted too.
+partner, tradeOut, tradeIn = 'Partnerperson', 0, 250
+event('TRADE_SHOW')
+event('TRADE_MONEY_CHANGED')
+event('TRADE_CLOSED')
+money = money + 250; event('PLAYER_MONEY')
+assert(#events == 12 and last().category == 'trade_in' and last().copper == 250 and last().ownAlt == nil, 'TRADE_MONEY_CHANGED snapshot')
 
 -- Mail out: to a non-alt, and to an alt whatever the case.
 sendPrice, sendMoney, recipient = 30, 5000, 'Strangerperson'
 SendMail('Strangerperson', 'Hi', '')
 event('MAIL_SEND_SUCCESS')
-assert(#events == 12 and events[11].category == 'postage' and events[12].category == 'mail_out' and events[12].copper == 5000
- and events[12].ownAlt == nil, 'mail out to a non-alt')
+assert(#events == 14 and events[13].category == 'postage' and events[14].category == 'mail_out' and events[14].copper == 5000
+ and events[14].ownAlt == nil, 'mail out to a non-alt')
 recipient = 'altperson'
 SendMail('altperson', 'Hi', '')
 event('MAIL_SEND_SUCCESS')
-assert(#events == 14 and last().category == 'mail_out' and last().ownAlt == true, 'mail out to an alt')
+assert(#events == 16 and last().category == 'mail_out' and last().ownAlt == true, 'mail out to an alt')
 sendMoney = 0
 SendMail('Strangerperson', 'Hi', '')
 event('MAIL_SEND_SUCCESS')
-assert(#events == 15 and last().category == 'postage', 'a letter without money is postage only')
+assert(#events == 17 and last().category == 'postage', 'a letter without money is postage only')
 sendMoney = 700
 SendMail('Strangerperson', 'Hi', '')
 event('MAIL_FAILED')
 event('MAIL_SEND_SUCCESS')
-assert(#events == 15, 'a failed send moves nothing')
+assert(#events == 17, 'a failed send moves nothing')
 
--- Mail in: a plain letter's money, from an alt and from another player; an auction sale is still a sale.
+-- Mail in: only a letter from one of the player's own characters is recorded. Another player's gold, an outbid
+-- refund or a system letter stays unrecorded; an auction sale is still a sale.
 mailFrom, mailMoney = 'Altperson', 900
 GetInboxInvoiceInfo = function() return nil end
 GetInboxHeaderInfo = function() return 'icon', 'paper', mailFrom, 'Hi', mailMoney end
 TakeInboxMoney(1)
 money = money + 900; event('PLAYER_MONEY')
-assert(#events == 16 and last().category == 'mail_in' and last().copper == 900 and last().ownAlt == true, 'mail in from an alt')
+assert(#events == 18 and last().category == 'mail_in' and last().copper == 900 and last().ownAlt == true, 'mail in from an alt')
 mailFrom, mailMoney = 'Partnerperson', 600
 TakeInboxMoney(1)
 money = money + 600; event('PLAYER_MONEY')
-assert(#events == 17 and last().category == 'mail_in' and last().ownAlt == nil, 'mail in from another player')
+assert(#events == 18, 'mail from another player stays unrecorded')
+mailFrom, mailMoney = 'Auction House', 5000
+TakeInboxMoney(1)
+money = money + 5000; event('PLAYER_MONEY')
+assert(#events == 18, 'an outbid refund stays unrecorded')
+mailFrom, mailMoney = 'Altperson', 600
 TakeInboxMoney(1)
 money = money + 599; event('PLAYER_MONEY')
-assert(#events == 17, 'a mismatched letter records nothing')
+assert(#events == 18, 'a mismatched letter records nothing')
 GetInboxInvoiceInfo = function() return 'seller', 'Linen Cloth', 'Partnerperson', 4000, 4000, 100, 200, 0, 0, 0, 20, true end
 mailFrom, mailMoney = 'Auction House', 3900
 TakeInboxMoney(1)
 money = money + 3900; event('PLAYER_MONEY')
-assert(#events == 18 and last().category == 'auction', 'a sale letter is not plain mail')
+assert(#events == 19 and last().category == 'auction', 'a sale letter is not plain mail')
 -- A COD payment at the open mailbox stays unrecorded.
 money = money - 1000; event('PLAYER_MONEY')
-assert(#events == 18, 'a COD payment is unrecorded')
+assert(#events == 19, 'a COD payment is unrecorded')
+
+-- A guild-bank repair takes none of the player's gold: the next drop at the merchant is a purchase.
+event('MERCHANT_SHOW')
+RepairAllItems(true)
+money = money - 600; event('PLAYER_MONEY')
+assert(#events == 20 and last().category == 'vendor_spend' and last().copper == 600, 'a guild repair is not pending')
+event('MERCHANT_CLOSED')
 
 -- money_event never carries a new category.
 local known = { loot = true, quest = true, vendor = true, auction = true, flight = true, postage = true, barber = true, respec = true, auction_spend = true }

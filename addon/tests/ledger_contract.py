@@ -169,7 +169,7 @@ assert L.Record(A, "repair", 300, extra(ownAlt="yes")) is True
 rows = py(g.EverlootDB.ledger.events)
 assert [r.get("ownAlt") for r in rows] == [True, True, None, None], rows
 both = L.Summary(keys(A, B), 0, NOW)
-assert (both.totalIn, both.totalOut, both.moved) == (0, 800, 4000), (both.totalIn, both.totalOut, both.moved)
+assert (both.totalIn, both.totalOut, both.moved) == (0, 800, 2000), (both.totalIn, both.totalOut, both.moved)
 assert sorted(c["category"] for c in py(both.categories)) == ["mail_out", "repair"], py(both.categories)
 assert [d["inCopper"] for d in py(both.days)] == [0] and [d["outCopper"] for d in py(both.days)] == [800], py(both.days)
 listed = py(both.receipts("2026-11-07"))
@@ -177,6 +177,7 @@ assert sorted(r["category"] for r in listed) == ["mail_out", "repair", "trade_in
 one = L.Summary(keys(A), 0, NOW)
 assert (one.totalIn, one.totalOut, one.moved) == (0, 2800, 2000), (one.totalIn, one.totalOut, one.moved)
 assert sorted(c["category"] for c in py(one.categories)) == ["mail_out", "repair", "trade_out"], py(one.categories)
+assert L.Summary(keys(B), 0, NOW).moved == 0, "the receiving side alone moved nothing out"
 assert L.Summary(keys(), 0, NOW).moved == 0, "no keys, nothing moved"
 g.EverlootDB.ledger = None
 

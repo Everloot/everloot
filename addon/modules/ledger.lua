@@ -228,7 +228,7 @@ end
 --- In and out for the keys between two times (both included; nil means all): category totals, days with events,
 --- receipts for a day, and the gold change the events do not explain (unrecorded). Unrecorded is the change from the
 --- close before the first day to the close on the last, and only when every key has both; otherwise nil.
---- Moved is the copper of the rows marked ownAlt, in and out. With more than one key those rows leave the totals,
+--- Moved is the copper of the outgoing rows marked ownAlt (each transfer once). With more than one key those rows leave the totals,
 --- categories and days (the gold stayed in the account) and are still receipts; one key keeps them in its totals.
 function L.Summary(keys, fromTs, toTs)
   keys = type(keys) == "table" and keys or {}
@@ -249,7 +249,8 @@ function L.Summary(keys, fromTs, toTs)
     local d = byDay[ymd]
     if not d then d = { date = ymd, inCopper = 0, outCopper = 0, net = 0 }; byDay[ymd] = d end
     if e.ownAlt == true then
-      moved = moved + e.copper
+      -- One transfer has an out row and an in row; only the out side counts, so it is not counted twice.
+      if dir == "out" then moved = moved + e.copper end
       if netted then return end
     end
     local t = totals[e.category]
