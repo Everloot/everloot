@@ -84,7 +84,7 @@ function scripted() {
   const calls: string[] = [];
   const impl = (async (url: string | URL | Request) => {
     const u = String(url);
-    if (u.startsWith("https://oauth.battle.net")) return new Response(JSON.stringify({ access_token: "t", expires_in: 1e9 }), { status: 200 });
+    if (new URL(u).host === "oauth.battle.net") return new Response(JSON.stringify({ access_token: "t", expires_in: 1e9 }), { status: 200 });
     calls.push(u);
     return status === 200 ? new Response(JSON.stringify({ at: calls.length }), { status }) : new Response("{}", { status });
   }) as typeof fetch;
