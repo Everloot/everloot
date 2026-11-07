@@ -73,7 +73,7 @@ lua = fresh()
 lua.execute("""
 assert(#postCalls == 1 and postCalls[1].kind == Enum.TooltipDataType.Item, 'one post-call on item tooltips')
 assert(Everloot:Status():find('itemfacts: ready', 1, true), Everloot:Status())
-assert(Everloot:Status():find('rows item_fact: 0', 1, true), 'status lists the kind')
+assert(not Everloot:Status():find('rows item_fact', 1, true), 'status leaves out a kind with no rows')
 hover({ id = 2075, guid = 'Item-0-0-0000000000000001' })
 local got = factsOf(2075)
 assert(got.stamina == 5 and got.spirit == -2 and got.armor == 103, 'armor and stats, a negative stat kept')

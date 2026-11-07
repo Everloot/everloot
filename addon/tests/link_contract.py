@@ -165,7 +165,7 @@ assert(string.find(printed[#printed], 'deleted', 1, true), printed[#printed])
 SlashCmdList.EVERLOOT('linkx')
 assert(string.find(printed[#printed], 'Everloot commands', 1, true), 'a word that only starts with link is not the command')
 assert(string.find(printed[#printed], '/everloot link', 1, true), 'the help lists the command')
-assert(string.find(Everloot:Status(), 'rows character_link: 0', 1, true), 'status counts link rows')
+assert(not string.find(Everloot:Status(), 'rows character_link', 1, true), 'status leaves out a kind with no rows')
 """)
 
 # --- Without the completion module loaded the key is the same ---

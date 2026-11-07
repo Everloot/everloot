@@ -1,5 +1,6 @@
 """Execute the real release command against a local gh stub; never contact GitHub."""
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -45,4 +46,10 @@ for name in ['checks.yml', 'nightly.yml', 'release.yml']:
     workflow = (root / '.github/workflows' / name).read_text(encoding='utf-8')
     assert 'python addon/tests/run_all.py' in workflow, (name, 'run_all.py')
     assert '_contract.py && python addon/tests/' not in workflow.replace('raid_plan_contract.py && python addon/tests/planner_contract.py', ''), (name, 'a hand-kept list')
+# The README status line and the newest addon heading in CHANGELOG.md name the TOC version (a nightly stamp adds a suffix).
+toc_version = re.search(r'^## Version: ([0-9][0-9A-Za-z.+-]*)\s*$', (root / 'addon/Everloot.toc').read_text(encoding='utf-8'), re.M).group(1).split('-')[0]
+readme_status = re.search(r'^\*\*Status:\*\* ([0-9]+\.[0-9]+\.[0-9]+)', (root / 'addon/README.md').read_text(encoding='utf-8'), re.M)
+assert readme_status and readme_status.group(1) == toc_version, ('addon/README.md Status', readme_status and readme_status.group(1), toc_version)
+newest = re.search(r'^## \[([0-9]+\.[0-9]+\.[0-9]+)\]', (root / 'CHANGELOG.md').read_text(encoding='utf-8'), re.M)
+assert newest and newest.group(1) == toc_version, ('newest addon heading in CHANGELOG.md', newest and newest.group(1), toc_version)
 print('Alpha release classification and planner publication contracts: PASS')
