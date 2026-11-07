@@ -4,11 +4,13 @@ begin;
 
 do $$
 declare role_name text;
+-- 20261107150000_profile_pipeline.sql replaces the board with one that takes optional arguments; check whichever is there.
+declare fn text := coalesce(to_regprocedure('public.ranked_gear_board(timestamptz, uuid[])'), to_regprocedure('public.ranked_gear_board()'))::oid::regprocedure::text;
 begin
   foreach role_name in array array['anon', 'authenticated'] loop
-    if has_function_privilege(role_name, 'public.ranked_gear_board()', 'EXECUTE') then raise exception '% can read the board', role_name; end if;
+    if has_function_privilege(role_name, fn, 'EXECUTE') then raise exception '% can read the board', role_name; end if;
   end loop;
-  if not has_function_privilege('service_role', 'public.ranked_gear_board()', 'EXECUTE') then raise exception 'server cannot read the board'; end if;
+  if not has_function_privilege('service_role', fn, 'EXECUTE') then raise exception 'server cannot read the board'; end if;
 end $$;
 
 insert into public.users (id, bnet_id, battletag) values

@@ -208,8 +208,10 @@ export default function PrivacyPage() {
                 character whose page is public and whose gear sync is on, its name, realm, level, race and class, its
                 item level and Gear Score worked out from that synced gear, its rank and the gear&apos;s date show on the
                 public item level and Gear Score rankings. The items themselves show only if you show gear on the page.
-                Nothing is stored for the rankings: turning the switch, the page or gear sync off takes the character
-                off on the next request. It is off by default.
+                The rankings are scored every 30 minutes, and while the character is ranked its level, item level and
+                Gear Score are kept as a daily history that its page shows as a chart. Turning the switch, the page or
+                gear sync off takes the character off the rankings and hides the chart on the next request; unlinking
+                deletes the history. It is off by default.
               </li>}
               <li id="chat-projects">
                 <strong>Chat projects (optional):</strong> while signed in, Chat can keep your

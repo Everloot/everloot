@@ -894,7 +894,9 @@ observation of anyone else, and none of it is published as a dataset.
 
 In effect from 6 November 2026, accepted by the maintainer that day (`EVERLOOT_LEADERBOARDS`, migration
 `20261107120000_gear_board.sql`). With the switch off, `/rankings/item-level` and `/rankings/gear-score` answer 404
-and the switch below is refused.
+and the switch below is refused. The stored boards and the daily history below (migration
+`20261107150000_profile_pipeline.sql`) are proposed: they take effect once the maintainer accepts them and applies
+that migration.
 
 Two public boards rank linked characters by the gear their owner synced: average item level and Everloot Gear
 Score. This is the ranking contract the owned-character identity ADR asks for, for gear only. Achievements, gold
@@ -920,8 +922,14 @@ and the Everloot Score are not ranked by it.
   item name rule, so possibly unreleased), an item level that differs from the files, or an item in a slot it cannot
   go in, is not counted at all, and the board says how many characters were left out. The gear is still the
   player's own upload: the board says it is not checked with Blizzard.
-- **Nothing is stored for the boards.** They are computed from the synced gear on each request. Turning "Rank my
-  gear", the page or gear sync off takes the character off on the next request; unlinking deletes the gear.
+- **What is stored, and for how long.** Every 30 minutes the site scores the boards and keeps the result in one
+  private file (the rows above, with each character's link id). Each page view filters that file against who is on
+  the boards right now, so turning "Rank my gear", the page or gear sync off, a hide request or unlinking takes the
+  character off on the next request, not at the next scoring. While a character is ranked, its level, item level and
+  Gear Score are also kept as a history, at most one value of each per day (the day the gear was captured), and its
+  character page draws that history as a chart once there are two days. The history is shown only while the
+  character is ranked, kept while it is not, and deleted with the link: unlinking or deleting the account removes it,
+  as it removes the gear.
 - **Search engines.** The boards are `noindex` until indexing of character pages is accepted.
 
 ## Chat
