@@ -208,7 +208,7 @@ assert(f.nav.ask == nil and f.nav.plan == nil and f.nav.auctions == nil, 'Ask, B
 assert(f.nav.gold and f.nav.collection and f.nav.professions and f.nav.settings, 'Home, Gold, Collection, Professions, Settings')
 Everloot.Window.Views.collection = { build = function(f, parent) parent.built = true end, refresh = function(f) local v = f.views.collection; v.refreshed = (rawget(v, 'refreshed') or 0) + 1 end }
 f.nav.collection.scripts.OnClick(f.nav.collection)
-assert(f.home.shown == false and f.views.collection.shown and f.views.collection.built and f.views.collection.refreshed == 1 and f.subtitle.text == 'Collection')
+assert(f.home.shown == false and f.views.collection.shown and rawget(f.views.collection, 'built') and f.views.collection.refreshed == 1 and f.subtitle.text == 'Collection')
 assert(f.nav.collection.on.shown and not f.nav.home.on.shown, 'fel green marks only the open item')
 f.nav.gold.scripts.OnClick(f.nav.gold)
 assert(f.views.collection.shown == false and f.note.shown and f.note.text:find('did not load'), 'an unregistered view says so')
