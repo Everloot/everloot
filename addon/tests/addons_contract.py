@@ -64,8 +64,9 @@ assert(mentions == 1, 'status shows the addon list state once; got ' .. mentions
 
 SlashCmdList.EVERLOOT('addons on')
 assert(EverlootDB.toggles.addons == true, '/everloot addons on turns it on')
-assert(string.find(printed[#printed], 'upload page', 1, true) and string.find(printed[#printed], 'companion', 1, true),
- 'turning it on says the list goes only through the upload page, never the companion')
+assert(string.find(printed[#printed], 'upload page', 1, true) and string.find(printed[#printed], 'Desktop App', 1, true)
+ and not string.find(printed[#printed], 'companion', 1, true),
+ 'turning it on says the list goes only through the upload page, never the Desktop App')
 reload()
 local rows = EverlootDB.records.addon_seen
 assert(rows and #rows == 4, 'one row per installed addon; got ' .. tostring(rows and #rows))

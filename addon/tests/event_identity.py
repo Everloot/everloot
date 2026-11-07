@@ -65,6 +65,32 @@ printed = {}
 SlashCmdList.EVERLOOT('status')
 local full = table.concat(printed, '\\n')
 assert(string.find(full, 'plan: disabled: no trait API', 1, true) and string.find(full, 'addons: off by toggle', 1, true)
-  and string.find(full, 'rows loot: 0', 1, true) and string.find(full, 'loot: collection paused', 1, true), '/everloot status keeps the full list: ' .. full)
+  and string.find(full, 'loot: collection paused', 1, true), '/everloot status keeps the full list: ' .. full)
+""")
+# /everloot status lists a kind only when it has rows: the fixed kinds first, then any other kind a module wrote.
+login.execute("""
+EverlootDB.records = { loot = { {}, {} }, quest = {}, guild_kill = { {} }, zz_custom = { {}, {}, {} } }
+local full = Everloot:Status()
+assert(not string.find(full, 'rows quest', 1, true) and not string.find(full, ': 0', 1, true), 'no zero rows: ' .. full)
+local a, b, c = string.find(full, 'rows loot: 2', 1, true), string.find(full, 'rows guild_kill: 1', 1, true), string.find(full, 'rows zz_custom: 3', 1, true)
+assert(a and b and c and a < b and b < c, 'fixed order first, then the others by name: ' .. full)
+""")
+
+# The game hands the addon its folder name: a folder extracted as Everloot-0.3.20 still initializes, and one that is
+# not this addon's name does not. A chunk loaded without arguments (the other contracts) answers to "Everloot".
+named = LuaRuntime()
+named.execute("""
+date = function() return '2026-10-07T00:00:00Z' end
+time = function() return 123456 end
+print = function() end
+SlashCmdList = {}
+CreateFrame = function() return {RegisterEvent=function() end, SetScript=function(self, _, f) self.onEvent=f end} end
+""")
+named.eval("function(...) " + (Path(__file__).parents[1] / "core.lua").read_text(encoding="utf-8") + " end")("Everloot-0.3.20")
+named.execute("""
+Everloot.frame.onEvent(nil, 'ADDON_LOADED', 'Everloot')
+assert(EverlootDB == nil, 'the plain name is not this folder')
+Everloot.frame.onEvent(nil, 'ADDON_LOADED', 'Everloot-0.3.20')
+assert(EverlootDB and EverlootDB.version == Everloot.VERSION, 'the extracted folder name initializes')
 """)
 print("Lua 5.1 event identity: same-second events, reload, reset and retained IDs passed; login says one status line")
