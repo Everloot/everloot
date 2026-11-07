@@ -57,6 +57,12 @@ API = ("UnitGUID = function() return 'Player-1-0001' end\n"
 SAVED = f"""{{ installId = 'abcd-1234', toggles = {{}}, records = {{
     recipe_observed = {{ {{ profession = 'Cooking' }}, {{ profession = 'Cooking' }} }},
     lockout_owned = {{ {{ characterKey = 'bbbb0002', instance = 'Karazhan' }}, {{ characterKey = 'bbbb0002', instance = 'Gruul' }}, {{ characterKey = 'zzzz', instance = 'Other' }} }} }},
+  ledger = {{ events = {{
+    {{ at = 1000000 - 3600, key = '{ME}', category = 'quest', copper = 12345 }},
+    {{ at = 1000000 - 7200, key = '{ME}', category = 'flight', copper = 77 }},
+    {{ at = 1000000 - 8 * 86400, key = '{ME}', category = 'vendor', copper = 5000000 }},
+    {{ at = 1000000 - 3600, key = 'aaaa0001', category = 'quest', copper = 999 }},
+  }} }},
   roster = {{
     ['{ME}'] = {{ name = 'Samplechar', realm = 'Forever', class = 'SHAMAN', level = 24, copper = 1312745, lastSeen = 1794052800,
       professions = {{ {{ name = 'Mining', rank = 112, maxRank = 150 }}, {{ name = 'Cooking', rank = 1, maxRank = 75 }} }} }},
@@ -91,7 +97,9 @@ assert(f.name.text == 'Samplechar' and f.realm.text == 'Forever', f.name.text)
 assert(f.class.text:find('^Level 24 Orc |cff0070dd') and f.class.text:find('Shaman'), f.class.text)
 assert(f.onHand.text:find('^48|TInterface\\\\MoneyFrame\\\\UI%-GoldIcon') and f.onHand.text:find('96|T.-Silver') and f.onHand.text:find('85|T.-Copper'), f.onHand.text)
 assert(f.peak.text:find('^48|T'), 'the peak the gold module saved: ' .. f.peak.text)
-assert(f.week.text:find('^This week: %+') and f.week.text:find('Gold') and f.week.text:find(' / %-'), f.week.text)
+local U0 = Everloot.Window
+-- The seeded events (12345 in, 77 out) plus the vendor sale, quest reward and flight the gold module just recorded live.
+assert(f.week.text == 'This week: +' .. U0.Money(12345 + 41000 + 67500) .. ' / -' .. U0.Money(77 + 55), 'this character, last 7 days only: ' .. f.week.text)
 assert(rawget(f, 'ledger') == nil, 'the Recorded line is the week line now')
 assert(f.perHour.text == '-' and f.session.text:find('not running') and f.gphButton.text == 'Start', 'no session, no number')
 
@@ -122,8 +130,21 @@ assert(r.rows[3].seen.text == '1970-01-12' and r.rows[2].seen.text == '-', r.row
 EverlootDB.toggles.completion = true
 Everloot.Window.Refresh()
 assert(r.rows[5].lockouts.text == '2 raids' and r.rows[3].lockouts.text == '-' and r.rows[2].lockouts.text == '-', r.rows[5].lockouts.text)
-EverlootDB.toggles.completion = nil
+EverlootDB.toggles.completion = false
 Everloot.Window.Refresh()
+
+-- Paging: more than 10 lines show Down only; Down moves a page and clamps at the end; Up goes back.
+assert(r.up.shown == false and r.down.shown == false, 'a short list pages nowhere')
+for i = 1, 12 do EverlootDB.roster['zz' .. string.format('%02d', i)] = { name = 'Zed' .. string.format('%02d', i), realm = 'Zeta', class = 'MAGE', level = 5 } end
+Everloot.Window.Refresh()
+assert(shownRows() == 10 and r.rows[1].name.text:find('^Forever') and r.down.shown and not r.up.shown, 'first page, Down only')
+r.down.scripts.OnClick(r.down)
+assert(r.offset == 10 and r.rows[1].name.text == 'Zed05' and shownRows() == 8, 'second page starts at the 11th line: ' .. r.rows[1].name.text)
+assert(r.up.shown and not r.down.shown, 'at the end, Up only')
+r.down.scripts.OnClick(r.down)
+assert(r.offset == 10, 'the offset is clamped at the end')
+r.up.scripts.OnClick(r.up)
+assert(r.offset == 0 and r.rows[1].name.text:find('^Forever') and r.down.shown and not r.up.shown, 'Up returns to the first page')
 
 -- Gold per hour from the gph session, and Pause runs the gph command.
 EverlootDB.gph.current = { v = 1, elapsed = 0, runningSince = now - 600, counts = {}, distinct = 0,
