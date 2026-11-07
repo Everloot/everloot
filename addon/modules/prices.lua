@@ -344,6 +344,12 @@ end
 
 E.PriceMissingNote = missingNote
 
+--- Percent-encodes every byte outside [A-Za-z0-9-_.~] so a realm with an apostrophe or non-ASCII letters is a valid URL
+--- value. The ranges are spelled out: %w follows the C locale and can count a Latin-1 lead byte as a letter.
+local function encode(s)
+  return (s:gsub("[^A-Za-z0-9%-_%.~]",function(c) return string.format("%%%02X", c:byte()) end))
+end
+
 --- /everloot price <item>: the same lines as the tooltip, in chat, anywhere in the world. Read from the
 --- files already in the game (the companion's prices and the player's own scans); nothing is fetched.
 --- The full history, every realm and the chart are on the site.
@@ -368,7 +374,7 @@ function E.PriceCommand(text, tries)
   local dropLines, dropNote = E:DropLines(id)
   for _, line in ipairs(dropLines or {}) do print(hex(line.r, line.g, line.b) .. line.text .. "|r") end
   if dropNote and type(EverlootPricesDB) == "table" then print("  " .. dropNote:gsub("^%l", string.upper)) end
-  print("  Full history and other realms: everloot.app/tools/auctions?realm=" .. realm:gsub(" ", "+") .. "&item=" .. id)
+  print("  Full history and other realms: everloot.app/tools/auctions?realm=" .. encode(realm) .. "&item=" .. encode(tostring(id)))
 end
 
 --- The post-call runs for every item tooltip, and comparing an item opens ShoppingTooltip1 and 2 (ItemRefShoppingTooltip1
