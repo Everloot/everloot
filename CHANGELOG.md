@@ -15,6 +15,14 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
+- Site: an addon page, title and download links exist only for an addon the owner approved (the curated source map or the
+  ecosystem registry). Before, any addon three installs reported got a page, and its title came from the uploads. The
+  usage board at /addons/popular still counts what players run, and links only the approved ones.
+- Site: the public-page cache keeps its pages across a deploy that changes nothing they show. Its versions are computed
+  from the build itself (the rendering source, the dependencies, the files a page names under `_next/static`, the
+  Worker's switches) and ship inside the Worker bundle; an API-only or test-only change keeps the cache, and a changed
+  script, style or page starts a new one. A name repeated in the query keeps its order in the cache key, and the
+  sign-in, sign-up, password-reset, `/me` and auth routes are never read from or stored in it.
 - Addon: an item's name and quality are recorded once, not again in every loot window and on every vendor that sells
   it, and a vendor is recorded once per UTC day unless an item, a price or a limited stock changed. Before, about ten
   vendor visits filled the 2,000-row cap for item names and every new name after that was lost.

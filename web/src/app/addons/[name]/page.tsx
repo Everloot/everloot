@@ -2,11 +2,10 @@ import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { curatedAddon } from "@/data/addon-repos";
+import { approvedAddon, type ApprovedAddon } from "@/data/addon-repos";
 import { addonGithub, type AddonGithubResult } from "@/lib/addon-github";
 import { dataAgeLabel } from "@/lib/data-age";
 import { loadPopularAddons } from "@/lib/rollup-compute";
-import { REPO_URL } from "@/lib/source";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import { trailFor } from "@/lib/breadcrumbs";
 import { Card, Container, EmptyState, Explainer, Facts, PageHeader, SectionHeading } from "@/components/ui";
@@ -25,17 +24,19 @@ const day = (iso: string) => new Date(iso).toISOString().slice(0, 10);
 type Props = { params: Promise<{ name: string }> };
 
 type Found = {
-  /** The name as the site spells it, or as typed when storage is down and nothing can be checked. */
-  name: string;
+  /** The owner-approved entry: its folder name, title and source are what the page shows. */
+  approved: ApprovedAddon;
+  /** The install counts for it, joined by folder name. They are usage only: they never name, title or source the page. */
   stats: Awaited<ReturnType<typeof loadPopularAddons>>["addons"][number] | null;
-  source: NonNullable<ReturnType<typeof curatedAddon>>["source"] | null;
   usage: Awaited<ReturnType<typeof loadPopularAddons>>;
 } | null;
 
 /**
- * A page exists for an addon three installs report, or one on the curated list. Anything else is
- * not found, so a made-up name and a one- or two-install addon answer alike. When storage is down
- * nothing can be ruled out, so the page renders its outage sentence instead of a 404.
+ * A page exists only for an owner-approved addon (src/data/addon-repos.ts: the curated source map and the ecosystem
+ * registry). Anything else is not found, however many installs report it: a made-up name and a widely run addon the
+ * owner has not approved answer alike, with no read of the upload store. The counts on /addons/popular stay public
+ * aggregate usage; they never publish a page, a title or a source link. When storage is down an approved page still
+ * renders, with its outage sentence in place of the counts.
  * Names match without regard to case; `null` also covers a name that is not valid percent-encoding.
  */
 async function find(params: Props["params"]): Promise<Found> {
@@ -45,23 +46,25 @@ async function find(params: Props["params"]): Promise<Found> {
   } catch {
     return null;
   }
+  const approved = approvedAddon(typed);
+  if (!approved) return null;
   const usage = await loadPopularAddons();
-  const lower = typed.toLowerCase();
-  const stats = usage.unreachable ? null : usage.addons.find((a) => a.name === typed) ?? usage.addons.find((a) => a.name.toLowerCase() === lower) ?? null;
-  const curated = curatedAddon(typed);
-  if (!stats && !curated && !usage.unreachable) return null;
-  return { name: stats?.name ?? curated?.name ?? typed, stats, source: curated?.source ?? null, usage };
+  const lower = approved.name.toLowerCase();
+  const stats = usage.unreachable ? null : usage.addons.find((a) => a.name === approved.name) ?? usage.addons.find((a) => a.name.toLowerCase() === lower) ?? null;
+  return { approved, stats, usage };
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const found = await find(params);
   if (!found) return { title: "Addon not found" };
-  const title = found.stats?.title ?? found.name;
+  const { approved } = found;
+  // The owner's title, never the one uploads report.
+  const title = approved.title;
   return pageMetadata({
     title: `${title}: addon for WoW: Forever`,
     description: `How many Everloot installs run ${title}, where its author publishes it and what its repository shows. Counts appear once three installs report the addon.`,
     // Polestar has a dedicated guide page at the lowercase address.
-    path: found.name.toLowerCase() === "polestar" ? "/addons/polestar" : `/addons/${encodeURIComponent(found.name)}`,
+    path: approved.name.toLowerCase() === "polestar" ? "/addons/polestar" : `/addons/${encodeURIComponent(approved.name)}`,
   });
 }
 
@@ -135,12 +138,12 @@ function GithubFacts({ result, repo }: { result: AddonGithubResult; repo: string
 export default async function AddonProfilePage({ params }: Props) {
   const found = await find(params);
   if (!found) notFound();
-  const { name, stats, source, usage } = found;
+  const { approved, stats, usage } = found;
+  const { name, source, title } = approved;
   const { reportingInstalls, unreachable, dataAsOf } = usage;
   if (name !== decodeURIComponent((await params).name)) redirect(`/addons/${encodeURIComponent(name)}`);
-  const github = source ? await addonGithub(source.repo) : null;
-  const title = stats?.title ?? name;
-  const repoUrl = source ? `https://github.com/${source.repo}` : null;
+  const github = await addonGithub(source.repo);
+  const repoUrl = `https://github.com/${source.repo}`;
   const path = `/addons/${encodeURIComponent(name)}`;
 
   return (
@@ -200,37 +203,19 @@ export default async function AddonProfilePage({ params }: Props) {
 
           <section aria-labelledby="repo">
             <SectionHeading id="repo">The repository</SectionHeading>
-            {source && github ? (
-              <GithubFacts result={github} repo={source.repo} />
-            ) : (
-              <p className="text-sm text-fg-2">
-                Everloot does not know where this addon&apos;s code is published, so there are no repository facts. If you
-                know, <Link href="/contact" className={link}>tell us</Link> or open an issue on{" "}
-                <a className={link} href={`${REPO_URL}/issues`} rel={EXT}>GitHub</a>.
-              </p>
-            )}
+            <GithubFacts result={github} repo={source.repo} />
           </section>
 
           <section aria-labelledby="download">
-            <SectionHeading id="download" note={source ? "These links leave Everloot. Everloot hosts no addon files." : undefined}>
+            <SectionHeading id="download" note="These links leave Everloot. Everloot hosts no addon files.">
               Download from the author
             </SectionHeading>
-            {source ? (
-              <div className="flex flex-wrap gap-3">
-                {repoUrl && <a className={button} href={`${repoUrl}/releases`} rel={EXT}>GitHub releases</a>}
-                {source.curseforge && <a className={button} href={source.curseforge} rel={EXT}>CurseForge</a>}
-                {source.wago && <a className={button} href={source.wago} rel={EXT}>Wago</a>}
-                {source.wowinterface && <a className={button} href={source.wowinterface} rel={EXT}>WoWInterface</a>}
-              </div>
-            ) : (
-              <p className="text-sm text-fg-2">
-                Everloot does not know where the author publishes this one.{" "}
-                <a className={link} rel={EXT} href={`https://www.curseforge.com/wow/search?search=${encodeURIComponent(title)}`}>
-                  Search CurseForge for {title}
-                </a>{" "}
-                opens a search there; Everloot does not use CurseForge&apos;s data and hosts no addon files.
-              </p>
-            )}
+            <div className="flex flex-wrap gap-3">
+              <a className={button} href={`${repoUrl}/releases`} rel={EXT}>GitHub releases</a>
+              {source.curseforge && <a className={button} href={source.curseforge} rel={EXT}>CurseForge</a>}
+              {source.wago && <a className={button} href={source.wago} rel={EXT}>Wago</a>}
+              {source.wowinterface && <a className={button} href={source.wowinterface} rel={EXT}>WoWInterface</a>}
+            </div>
           </section>
 
           <section aria-labelledby="use-data">

@@ -634,6 +634,21 @@ maintainer has checked and added to `kb/curated/ecosystem.json`.
   for listings and WoWInterface's terms forbid automated access, so we read none of them.
 - *Opt-out.* An author can ask to be removed with the ecosystem issue form or at hello@everloot.app.
 
+**Addon pages and the usage board.** Two surfaces use addon names, and only one of them publishes a catalog entry.
+
+- *The usage board counts.* `/addons/popular` lists an addon once three installs report it, with its share, as an
+  anonymous aggregate. For an addon nobody approved, the title is the plain title installs agree on and labels the
+  count only: the row has no page, no download links and no repository facts.
+- *The catalog is approved by the owner.* An addon gets a page at `/addons/<name>`, a title, repository facts and
+  download links only when it is named in the curated source map (`web/src/data/addon-repos.ts`) or by a project in
+  `kb/curated/ecosystem.json`. Both change through a reviewed commit, never through an upload. An unapproved addon
+  answers 404 however many installs report it, the page reads nothing from the upload store to decide that, and no
+  upload field (title, name spelling, version) reaches an approved page's title, link or source. Install counts are
+  joined to an approved page as usage only.
+- *Approving one.* Add it to the registry (or the curated map) with its repository and the page that shows it is
+  for Forever. The deploy that ships the change starts a new edge cache version for the addon pages, so a page
+  built from the old list is not served after it.
+
 **Open sources.** The lore archive is built from the Warcraft Wiki dump of 2023-11-13
 (CC BY-SA 4.0). We may add other openly licensed datasets later. Each one goes in the
 [source ledger](sources/LEDGER.md) with its licence and exact version before any of it ships.

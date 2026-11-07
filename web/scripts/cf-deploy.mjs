@@ -4,6 +4,10 @@
  * NEXT_PUBLIC_* values must be in the environment: they are read at build time. The Worker's `vars`
  * (wrangler.jsonc: platform, environment, feature switches) are passed to the build as well, because pages
  * built ahead of time read them then; the *_DIR paths are left out, as they exist only inside the Worker.
+ *
+ * The edge cache's content versions (src/lib/cf-edge-cache.ts) are not stamped here: `npm run cf:build` writes them
+ * into the bundle (scripts/cf-bundle-files.mjs, scripts/cache-versions.mjs), so another page's deploy keeps the
+ * public pages it did not change and the deploy passes no cache variable. A build that cannot compute one fails.
  * Run from web/: node scripts/cf-deploy.mjs
  */
 import { execFileSync, execSync } from "node:child_process";

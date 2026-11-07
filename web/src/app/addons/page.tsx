@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { pageMetadata } from "@/lib/seo";
 import { trailFor } from "@/lib/breadcrumbs";
-import { curatedAddon } from "@/data/addon-repos";
+import { approvedAddon } from "@/data/addon-repos";
 import { loadEcosystem, starHistory } from "@/lib/ecosystem";
 import {
   boardHref, boardQuery, boardRows, changeSince, initials, sortBoard, TAG_LABEL,
@@ -29,7 +29,10 @@ function sitePage(row: BoardRow): string | null {
   const own = OWN_PAGE[row.project.id];
   if (own) return own;
   const name = row.project.addonNames[0];
-  return name && (row.installs !== null || curatedAddon(name)) ? `/addons/${encodeURIComponent(name)}` : null;
+  if (!name) return null;
+  // Only an owner-approved folder has a page; the link uses the owner's spelling.
+  const approved = approvedAddon(name);
+  return approved ? `/addons/${encodeURIComponent(approved.name)}` : null;
 }
 
 /** The ranking views, as OpenRouter lists its rankings: each one a sort of the same board. */
@@ -86,7 +89,7 @@ function columns(q: BoardQuery, showChange: boolean, showInstalls: boolean): Col
 
 function AddonCard({ row, showChange, showInstalls }: { row: BoardRow; showChange: boolean; showInstalls: boolean }) {
   const p = row.project;
-  const source = p.addonNames[0] ? curatedAddon(p.addonNames[0])?.source : undefined;
+  const source = p.addonNames[0] ? approvedAddon(p.addonNames[0])?.source : undefined;
   const page = sitePage(row);
   const tags = [p.kind === "addon" ? "Addon" : "Tool", ...p.badges.map((b) => TAG_LABEL[b]).filter((t): t is string => Boolean(t))];
   const facts: [string, React.ReactNode][] = [

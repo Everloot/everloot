@@ -4,12 +4,38 @@
  * the CDN-specific header carries the edge lifetime). A Worker's own responses skip
  * Cloudflare's cache, so the entry keeps them in the Cache API instead, for the same lifetime.
  *
- * Only a GET without credentials, answered 200 with `CDN-Cache-Control: max-age=N` and no `Set-Cookie`, is kept.
- * The key carries the deployed commit, so a deploy never serves an hour-old page that names script files the new
- * build no longer has. Browsers get the response's own
- * headers either way.
+ * Only a GET without credentials (a Cookie or an Authorization header), answered 200 with
+ * `CDN-Cache-Control: max-age=N`, no `Set-Cookie` and no `Vary` on credentials, is kept. The pages that hold a
+ * session or the account (data/protected-paths.json) never reach the cache at all. The key carries the content
+ * versions the entry is built with, not the deployed commit: a deploy that changes another page, a test or an
+ * API route keeps the public pages it did not change. A content change starts those pages on a new key, so an
+ * old page is never served after its data changed and never outlives its lifetime. Browsers get the response's
+ * own headers either way.
  */
+import PROTECTED_PATHS from "../data/protected-paths.json";
+
 export const ORIGINAL_CACHE_CONTROL = "x-everloot-browser-cache-control";
+
+/**
+ * The routes that sign a visitor in, read or change the session, or sit behind a purchase: auth, the signed-in
+ * visitor's own data, sign-in, sign-up and password reset, and a cart. Matched by route, before any lookup, so no
+ * header a handler sets can put one of them in the shared cache. `/cart` and `/api/cart` have no route today; they
+ * are listed so a later one is private from its first deploy.
+ */
+const SESSION_PATHS: readonly string[] = ["/api/auth", "/api/me", "/me", "/sign-in", "/sign-up", "/reset-password", "/cart", "/api/cart"];
+
+/** The pages that hold a session or the account. They are never looked up in, or stored in, the shared cache. */
+const PRIVATE_PATHS: readonly string[] = [...PROTECTED_PATHS, ...SESSION_PATHS];
+export function isPrivatePath(pathname: string): boolean {
+  // The router reads the decoded path, so `/%6De` is `/me`: match what it will serve. An undecodable path is refused.
+  let route: string;
+  try {
+    route = decodeURIComponent(pathname).replace(/\/{2,}/g, "/").toLowerCase();
+  } catch {
+    return true;
+  }
+  return PRIVATE_PATHS.some((p) => route === p || route.startsWith(`${p}/`));
+}
 
 /**
  * Headers Next's router sends for a React Server Components payload instead of HTML. The Cache API ignores
@@ -19,13 +45,16 @@ export const ORIGINAL_CACHE_CONTROL = "x-everloot-browser-cache-control";
 const RSC_HEADERS = ["rsc", "next-router-state-tree", "next-router-prefetch", "next-router-segment-prefetch", "next-url"];
 
 /**
- * Whether a request may be answered from, or stored in, the shared cache. Requests carrying a Cookie still may:
- * next.config.js marks only pages that read no cookies for the CDN, and a response that sets one is never kept.
+ * Whether a request may be answered from, or stored in, the shared cache. A Cookie or an Authorization header
+ * bypasses it outright: the Cache API ignores `Vary`, so a request that could carry a session must never read a
+ * copy rendered for someone else, even when the page nominally reads no cookie. The protected pages (the chat
+ * keys, the account, the saved builds) bypass it too, before any lookup.
  */
 export function edgeCacheable(req: Request): boolean {
-  if (req.method !== "GET" || req.headers.has("authorization") || req.headers.get("range")) return false;
+  if (req.method !== "GET" || req.headers.has("authorization") || req.headers.has("cookie") || req.headers.get("range")) return false;
   if (RSC_HEADERS.some((h) => req.headers.has(h))) return false;
   const url = new URL(req.url);
+  if (isPrivatePath(url.pathname)) return false;
   if (url.searchParams.has("_rsc")) return false;
   // A name search on an item list is one-off text: caching it only fills the cache with keys nobody repeats.
   if (ITEM_LIST_PATH.test(url.pathname) && url.searchParams.getAll("q").some((v) => v.trim() !== "")) return false;
@@ -44,26 +73,89 @@ export const ITEM_LIST_PARAMS: ReadonlySet<string> = new Set([
 const ITEM_LIST_PATH = /^\/database\/items(?:\/[a-z][a-z0-9-]*(?:\/[^/]+)?)?\/?$/;
 
 /**
- * The cache key: the URL plus the build, so each deploy starts with an empty cache. On the item lists, parameters
- * the page never reads (utm tags, cache busters bots add) are dropped and the rest sorted, so they cannot mint
- * an unbounded number of misses that each render the whole list (about 550 ms of CPU).
+ * Parameters a campaign or bot appends that no page reads, and this cache's own markers (`__edge_*`): a request
+ * that carries one, once or repeated, gets the key it would have without it, and cannot choose its own version.
+ * They are dropped from every key.
  */
-export function edgeCacheKey(req: Request, build: string): Request {
+const TRACKING_PARAMS: ReadonlySet<string> = new Set([
+  "_", "_ga", "_gl", "cache", "cachebust", "cb", "dclid", "fbclid", "gbraid", "gclid", "igshid", "mc_cid", "mc_eid",
+  "msclkid", "nocache", "oly_anon_id", "oly_enc_id", "ref_src", "ref_url", "srsltid", "twclid", "vero_id", "wbraid",
+  "yclid", "__edge_build", "__edge_version",
+]);
+const isTracking = (k: string) => TRACKING_PARAMS.has(k) || k.startsWith("utm_");
+
+/**
+ * The content versions the Worker has this deploy, from scripts/cache-versions.mjs. `template` is the committed
+ * rendering source, so a markup change is its own version instead of a number raised by hand; `data` is the game
+ * files, `knowledge` the kb tree plus the D1 release, `addon` the public zips plus the owner-approved source list.
+ */
+export interface EdgeCacheVersions {
+  template: string;
+  data: string;
+  knowledge: string;
+  addon: string;
+}
+
+/** Every version must be present: a missing one would make unrelated deploys share a key ("dev"). */
+export function versionsComplete(versions: EdgeCacheVersions): boolean {
+  return [versions.template, versions.data, versions.knowledge, versions.addon].every((v) => typeof v === "string" && v.length > 0);
+}
+
+const HOME_PATH = /^\/(?:home\/?)?$/;
+const DATA_PATH = /^\/(?:database(?:\/|$)|map(?:\/|$)|tools\/(?:talents|professions|legacy)(?:\/|$))/;
+const ADDON_PATH = /^\/(?:addon(?:\/|$)|addons(?:\/|$))/;
+const KNOWLEDGE_PATH = /^\/(?:changes(?:\/|$)|guides(?:\/|$)|lore(?:\/|$)|news(?:\/|$)|search(?:\/|$)|wiki(?:\/|$))/;
+
+/**
+ * The version a route's cached copy belongs to. The home page reads the game files, the knowledge timeline and
+ * the addon release, and the sitemap lists data, knowledge and addon pages, so both follow all three. Data pages
+ * follow the game files and the knowledge files they join; changes, guides, lore, news, search and wiki follow
+ * the knowledge release; addon pages follow the zips and the ecosystem snapshot they join. Every page follows the
+ * template version, so a markup change refreshes all of them. A route outside these groups keeps only the template
+ * version: a change to an account, API or test file does not empty the public cache.
+ */
+export function cacheVersionFor(pathname: string, versions: EdgeCacheVersions): string {
+  const t = versions.template;
+  if (HOME_PATH.test(pathname)) return `h.${versions.data}.${versions.knowledge}.${versions.addon}.${t}`;
+  if (pathname === "/sitemap.xml") return `s.${versions.data}.${versions.knowledge}.${versions.addon}.${t}`;
+  if (ADDON_PATH.test(pathname)) return `a.${versions.addon}.${versions.knowledge}.${t}`;
+  if (DATA_PATH.test(pathname)) return `d.${versions.data}.${versions.knowledge}.${t}`;
+  if (KNOWLEDGE_PATH.test(pathname)) return `k.${versions.knowledge}.${t}`;
+  return `t.${t}`;
+}
+
+/**
+ * The cache key: the URL plus the route's content version, so a deploy only starts an empty cache for the pages
+ * whose content changed. Parameters the page never reads (tracking tags, cache busters bots add, this cache's own
+ * markers) are dropped and the rest ordered by name on every route, so they cannot mint an unbounded number of
+ * misses; the item lists keep only the parameters they read. Meaningful values stay, and different ones are
+ * different keys. The values of one repeated name keep the order they came in: a page reads the first of them, so
+ * `?realm=a&realm=b` and `?realm=b&realm=a` are different pages and must not share a key.
+ */
+export function edgeCacheKey(req: Request, version: string): Request {
   const url = new URL(req.url);
-  if (ITEM_LIST_PATH.test(url.pathname)) {
-    const kept = [...url.searchParams].filter(([k]) => ITEM_LIST_PARAMS.has(k));
-    kept.sort(([a, x], [b, y]) => (a === b ? (x < y ? -1 : x > y ? 1 : 0) : a < b ? -1 : 1));
-    url.search = new URLSearchParams(kept).toString();
-  }
-  url.searchParams.set("__edge_build", build || "unknown");
+  const kept = ITEM_LIST_PATH.test(url.pathname)
+    ? [...url.searchParams].filter(([k]) => ITEM_LIST_PARAMS.has(k))
+    : [...url.searchParams].filter(([k]) => !isTracking(k));
+  // Array.prototype.sort is stable: equal names stay in request order.
+  kept.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  url.search = new URLSearchParams(kept).toString();
+  url.searchParams.set("__edge_version", version || "unknown");
   return new Request(url.toString(), { method: "GET" });
 }
 
-/** Seconds the shared cache may keep this response, from `CDN-Cache-Control: max-age`; null when it must not. */
+/**
+ * Seconds the shared cache may keep this response, from `CDN-Cache-Control: max-age`; null when it must not.
+ * The Cache API ignores `Vary`, so a response that varies on a credential (or on everything) is refused, as is a
+ * private or no-store CDN lifetime even if it also names a max-age.
+ */
 export function edgeTtl(res: Response): number | null {
   if (res.status !== 200 || res.headers.has("set-cookie")) return null;
-  const cdn = res.headers.get("cdn-cache-control");
-  const m = cdn?.match(/(?:^|,)\s*max-age=(\d+)/i);
+  const cdn = res.headers.get("cdn-cache-control") ?? "";
+  if (/(?:^|,)\s*(?:private|no-store|no-cache)\b/i.test(cdn)) return null;
+  const vary = res.headers.get("vary")?.toLowerCase() ?? "";
+  if (vary.split(",").some((v) => ["*", "cookie", "authorization"].includes(v.trim()))) return null;
+  const m = cdn.match(/(?:^|,)\s*max-age=(\d+)/i);
   const ttl = m ? Number(m[1]) : 0;
   return ttl > 0 ? ttl : null;
 }
@@ -109,4 +201,38 @@ export function fromCache(res: Response): Response {
   if (original) headers.set("cache-control", original); else headers.delete("cache-control");
   headers.set("x-everloot-edge-cache", "HIT");
   return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+}
+
+/** The slice of the Workers Cache API the entry uses; a fake fills it in tests without a network. */
+export interface EdgeCacheStore {
+  match(key: Request): Promise<Response | undefined>;
+  put(key: Request, value: Response): Promise<void>;
+}
+/** The slice of the Workers ExecutionContext the entry uses. */
+export interface EdgeCacheContext {
+  waitUntil(promise: Promise<unknown>): void;
+}
+
+/**
+ * Answer a request from the shared cache, or render and store it. This is the whole lookup path, kept here so a
+ * test runs the same entry logic against a deterministic store: the request is refused before any lookup when it
+ * carries a credential, a version is missing, or the route is not the kind next.config marks for the CDN; a hit is
+ * served without calling the handler; a miss renders once and stores a copy after the response. Routes that change
+ * their content version start a new key, so a build that changes canonical data never reads the old copy.
+ */
+export async function cachedResponse(
+  request: Request,
+  versions: EdgeCacheVersions,
+  handler: (request: Request) => Promise<Response>,
+  store: EdgeCacheStore,
+  ctx: EdgeCacheContext,
+): Promise<Response> {
+  if (!edgeCacheable(request) || !versionsComplete(versions)) return handler(request);
+  const key = edgeCacheKey(request, cacheVersionFor(new URL(request.url).pathname, versions));
+  const hit = await store.match(key);
+  if (hit) return fromCache(hit);
+  const res = await handler(request);
+  const ttl = edgeTtl(res);
+  if (ttl) ctx.waitUntil(cacheCopy(res.clone(), ttl).then((copy) => store.put(key, copy)));
+  return res;
 }

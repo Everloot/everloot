@@ -6,6 +6,7 @@ import nextConfig from "../next.config.js";
 import { PREFIXES, SERVED } from "./lib/build-versions";
 import { CHAT_PROVIDERS } from "./lib/chat/providers";
 import { isProtectedPath } from "./lib/document-boundary";
+import { isPrivatePath } from "./lib/cf-edge-cache";
 
 // The served version's prefix (/beta before launch, none once Live is served) shows the same pages; another
 // version's prefix shows its notice. Read from the routing table, so the switch at launch changes no test here.
@@ -100,6 +101,37 @@ test("the public pages rendered on every request are kept at the CDN; the change
   }
   for (const path of ["/chat", "/account", "/settings", "/sign-in", "/api/tools/search_knowledge", "/changes/feed.xml", "/tools/profession-planner"]) {
     expect(await headersFor(path), path).not.toHaveProperty("CDN-Cache-Control");
+  }
+});
+
+test("only the public pages rendered per request are marked for the shared CDN cache", async () => {
+  const marked = (await nextConfig.headers!())
+    .filter((entry) => entry.headers.some((header) => header.key === "CDN-Cache-Control"))
+    .map((entry) => entry.source)
+    .sort();
+  // A fixed allowlist: a new CDN-marked source is a deliberate decision, and this test makes it one. Everyone
+  // shares these copies, so the list may only hold pages whose HTML is the same for every visitor. The named
+  // records a visitor can see are re-authorized on every read (kb/src/corpus.ts publicRecords) and the people
+  // results on /search are drawn in the browser, so no visitor's names are in a cached page.
+  expect(marked).toEqual([
+    "/changes",
+    "/database",
+    "/database/instances/:path*",
+    "/database/items",
+    "/database/items/:path*",
+    "/database/zones/:path*",
+    "/map",
+    "/map/:path*",
+    "/search",
+    "/sitemap.xml",
+    "/tools/professions/:path*",
+  ].sort());
+  // The pages that hold a session, the account or a collection never join that list, whatever a future edit adds.
+  for (const source of marked) {
+    expect(isProtectedPath(source.replace(/:path\*$/, "")), source).toBe(false);
+    // Nor a session route the edge cache refuses by route: the two lists must never overlap.
+    expect(isPrivatePath(source.replace(/\/:path\*$/, "") || "/"), source).toBe(false);
+    expect(source, source).not.toMatch(/^\/(?:guilds?|players?|u|account|settings|chat|tools\/collections)(?:\/|$)/);
   }
 });
 

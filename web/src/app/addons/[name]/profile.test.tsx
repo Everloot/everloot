@@ -23,8 +23,8 @@ import AddonProfilePage, { generateMetadata } from "./page";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 
 let n = 0;
-const seen = (installId: string, name: string, version?: string, loaded = true) => ({
-  kind: "addon_seen", eventId: `${installId}:addon:${++n}`, installId, capturedAt: "2026-10-16T08:00:00.000Z", name, title: name, loaded,
+const seen = (installId: string, name: string, version?: string, loaded = true, title = name) => ({
+  kind: "addon_seen", eventId: `${installId}:addon:${++n}`, installId, capturedAt: "2026-10-16T08:00:00.000Z", name, title, loaded,
   ...(version ? { version } : {}),
 });
 let version = 0;
@@ -33,7 +33,7 @@ const corpus = (records: unknown[]) => ({
 });
 const props = (name: string) => ({ params: Promise.resolve({ name }) });
 const html = async (name: string) => renderToStaticMarkup(await AddonProfilePage(props(name)));
-const three = (name: string, v?: string) => ["a", "b", "c"].map((id) => seen(id, name, v));
+const three = (name: string, v?: string, title = name) => ["a", "b", "c"].map((id) => seen(id, name, v, true, title));
 
 const okGithub = {
   status: "ok",
@@ -46,23 +46,34 @@ const okGithub = {
 
 beforeEach(() => {
   store.loadCorpus.mockReset();
-  github.addonGithub.mockReset();
+  github.addonGithub.mockReset().mockResolvedValue(okGithub);
 });
 
-test("three installs show the counts, share and versions three agree on, newest version first", async () => {
+test("three installs show the counts, share and versions three agree on, newest version first, for an approved addon", async () => {
   store.loadCorpus.mockResolvedValue(corpus([
-    ...three("Questie", "9.9.0"),
-    ...three("Questie", "9.10.0"),
-    seen("a", "Questie", "9.99-mine"),
+    ...three("Polestar", "9.9.0"),
+    ...three("Polestar", "9.10.0"),
+    seen("a", "Polestar", "9.99-mine"),
     seen("d", "Bagnon"),
   ]));
-  const page = await html("Questie");
+  const page = await html("Polestar");
   expect(page).toContain("Installs reporting");
   expect(page).toContain("75%");
   expect(page).toContain("3 of 4 loaded it");
   expect(page).toContain("2026-10-16");
   expect(page.indexOf("9.10.0")).toBeLessThan(page.indexOf("9.9.0"));
   expect(page).not.toContain("9.99-mine");
+});
+
+test("an addon three installs report but nobody approved has no page, no title and no source", async () => {
+  store.loadCorpus.mockResolvedValue(corpus([...three("Questie", "9.9.0", "Questie Deluxe"), ...three("Bagnon")]));
+  await expect(html("Questie")).rejects.toThrow("NOT_FOUND");
+  await expect(html("questie")).rejects.toThrow("NOT_FOUND");
+  await expect(html("Bagnon")).rejects.toThrow("NOT_FOUND");
+  const meta = await generateMetadata(props("Questie"));
+  expect(meta.title).toBe("Addon not found");
+  expect(meta.alternates).toBeUndefined();
+  expect(github.addonGithub).not.toHaveBeenCalled();
 });
 
 test("a one- or two-install addon and a made-up name both 404, and nothing names the addon", async () => {
@@ -75,41 +86,73 @@ test("a one- or two-install addon and a made-up name both 404, and nothing names
   expect((await generateMetadata(props("MyGuildTools"))).title).toBe("Addon not found");
 });
 
-test("a name matches without regard to case and redirects to the canonical spelling", async () => {
-  store.loadCorpus.mockResolvedValue(corpus(three("Questie")));
-  await expect(html("questie")).rejects.toThrow("REDIRECT /addons/Questie");
-  expect(await html("Questie")).toContain("Installs reporting");
+test("an unapproved name never reads the upload store, so a crawler guessing names costs nothing", async () => {
+  await expect(html("Questie")).rejects.toThrow("NOT_FOUND");
+  await generateMetadata(props("Questie"));
+  expect(store.loadCorpus).not.toHaveBeenCalled();
+});
+
+test("uploads that forge an approved addon's title, spelling or version cannot change its page, title or source", async () => {
+  store.loadCorpus.mockResolvedValue(corpus([
+    ...three("Polestar", "6.6.6", "Polestar Gold: free gems at evil.example"),
+    ...three("polestar", "6.6.6", "polestar (official)"),
+    ...three("Polestar.Alternate", "6.6.6", "Polestar"),
+  ]));
+  const page = await html("Polestar");
+  const meta = await generateMetadata(props("Polestar"));
+  expect(meta.title).toBe("Polestar: addon for WoW: Forever");
+  expect(meta.alternates?.canonical).toBe("/addons/polestar");
+  expect(String(meta.description)).not.toMatch(/evil|gems|official/);
+  expect(page).not.toMatch(/evil\.example|free gems|\(official\)/);
+  // The source is the owner's, and only the owner's.
+  expect(github.addonGithub).toHaveBeenCalledTimes(1);
+  expect(github.addonGithub).toHaveBeenCalledWith("fitzforge/polestar");
+  expect(page).toContain('href="https://github.com/fitzforge/polestar/releases"');
+  expect(page).toContain('href="https://www.curseforge.com/wow/addons/polestar-guides"');
+  expect(page).not.toMatch(/href="https?:\/\/(?!(?:github\.com\/fitzforge\/polestar|www\.curseforge\.com\/wow\/addons\/polestar-guides|everloot\.app)\b)[^"]*"/);
+  // A near-name is a different, unapproved addon.
+  await expect(html("Polestar.Alternate")).rejects.toThrow("NOT_FOUND");
+});
+
+test("a registry-approved addon the curated map lacks is published with the registry's source and the owner's title", async () => {
+  store.loadCorpus.mockResolvedValue(corpus(three("Olympus", "1.2.0", "Olympus (hacked title)")));
+  const page = await html("Olympus");
+  const meta = await generateMetadata(props("olympus"));
+  expect(github.addonGithub).toHaveBeenCalledWith("dnl-gentile/olympus-addon");
+  expect(page).toContain('href="https://github.com/dnl-gentile/olympus-addon/releases"');
+  expect(page).toContain("Installs reporting");
+  expect(page).not.toContain("hacked title");
+  expect(meta.title).toBe("Olympus: addon for WoW: Forever");
+  expect(meta.alternates?.canonical).toBe("/addons/Olympus");
+  expect(meta.robots).toBeUndefined();
+});
+
+test("a name matches without regard to case and redirects to the owner's spelling", async () => {
+  store.loadCorpus.mockResolvedValue(corpus(three("Olympus")));
+  await expect(html("olympus")).rejects.toThrow("REDIRECT /addons/Olympus");
+  expect(await html("Olympus")).toContain("Installs reporting");
   await expect(html("POLESTAR")).rejects.toThrow("REDIRECT /addons/Polestar");
 });
 
 test("a malformed percent-encoded name is a 404, not an error", async () => {
-  store.loadCorpus.mockResolvedValue(corpus(three("Questie")));
+  store.loadCorpus.mockResolvedValue(corpus(three("Polestar")));
   await expect(html("%E0%A4%A")).rejects.toThrow("NOT_FOUND");
   expect((await generateMetadata(props("%E0%A4%A"))).title).toBe("Addon not found");
 });
 
-test("when storage is down, no page 404s or is marked noindex: curated ones keep their repository, others show the outage", async () => {
+test("when storage is down, an approved page keeps its repository and no page is marked noindex; an unapproved one stays a 404", async () => {
   store.loadCorpus.mockResolvedValue({ uploads: 0, records: [], unreachable: true });
-  github.addonGithub.mockResolvedValue(okGithub);
   const curated = await html("Polestar");
   expect(curated).toContain(STORAGE_UNREACHABLE);
   expect(curated).toContain("GPL-3.0");
-  const other = await html("Questie");
-  expect(other).toContain(STORAGE_UNREACHABLE);
   expect(github.addonGithub).toHaveBeenCalledTimes(1);
-  for (const name of ["Polestar", "Questie"]) expect((await generateMetadata(props(name))).robots).toBeUndefined();
-});
-
-test("a reported name that is not in the curated map says the repository is unknown and makes no GitHub call", async () => {
-  store.loadCorpus.mockResolvedValue(corpus(three("Questie")));
-  const page = await html("Questie");
-  expect(page).toContain("does not know where this addon&#x27;s code is published");
-  expect(github.addonGithub).not.toHaveBeenCalled();
+  expect((await generateMetadata(props("Polestar"))).robots).toBeUndefined();
+  await expect(html("Questie")).rejects.toThrow("NOT_FOUND");
+  expect((await generateMetadata(props("Questie"))).title).toBe("Addon not found");
 });
 
 test("a curated addon shows GitHub facts, author download links and plain links only", async () => {
   store.loadCorpus.mockResolvedValue(corpus(three("Polestar", "0.2.4")));
-  github.addonGithub.mockResolvedValue(okGithub);
   const page = await html("Polestar");
   expect(github.addonGithub).toHaveBeenCalledWith("fitzforge/polestar");
   expect(page).toContain("GPL-3.0");
@@ -130,19 +173,18 @@ test("when GitHub cannot be reached the page still renders, says why, and keeps 
   expect(await html("Polestar")).toContain("was not found on GitHub");
 });
 
-test("a curated addon below three installs still shows its repository, with the opt-in instead of numbers", async () => {
+test("an approved addon below three installs still shows its repository, with the opt-in instead of numbers", async () => {
   store.loadCorpus.mockResolvedValue(corpus([seen("a", "Polestar")]));
-  github.addonGithub.mockResolvedValue(okGithub);
   const page = await html("Polestar");
   expect(page).not.toContain("Installs reporting");
   expect(page).toContain("/everloot addons on");
   expect(page).toContain("GPL-3.0");
 });
 
-test("the canonical link uses the site's spelling of the name and the page is indexable", async () => {
-  store.loadCorpus.mockResolvedValue(corpus(three("Questie")));
-  const meta = await generateMetadata(props("questie"));
-  expect(meta.alternates?.canonical).toBe("/addons/Questie");
+test("the canonical link uses the owner's spelling of the name and the page is indexable", async () => {
+  store.loadCorpus.mockResolvedValue(corpus(three("Olympus")));
+  const meta = await generateMetadata(props("olympus"));
+  expect(meta.alternates?.canonical).toBe("/addons/Olympus");
   expect(meta.robots).toBeUndefined();
 });
 
@@ -155,7 +197,6 @@ test("Polestar's usage profile names the dedicated guide page as its canonical",
 
 test("every external link carries noopener noreferrer nofollow", async () => {
   store.loadCorpus.mockResolvedValue(corpus(three("Polestar")));
-  github.addonGithub.mockResolvedValue(okGithub);
   const page = await html("Polestar");
   const external = [...page.matchAll(/<a [^>]*>/g)].map((m) => m[0]).filter((tag) => /href="https?:/.test(tag));
   expect(external.length).toBeGreaterThan(3);
@@ -163,6 +204,6 @@ test("every external link carries noopener noreferrer nofollow", async () => {
 });
 
 test("copy has no paid-plan or ad wording", async () => {
-  store.loadCorpus.mockResolvedValue(corpus(three("Questie")));
-  expect(await html("Questie")).not.toMatch(/premium|subscription|\bpaid\b|sponsor|\bads?\b|pricing/i);
+  store.loadCorpus.mockResolvedValue(corpus(three("Olympus")));
+  expect(await html("Olympus")).not.toMatch(/premium|subscription|\bpaid\b|sponsor|\bads?\b|pricing/i);
 });

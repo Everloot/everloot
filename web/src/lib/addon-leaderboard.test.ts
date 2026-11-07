@@ -8,9 +8,9 @@ vi.mock("@/data/addon-repos", () => {
     Curated: { repo: "someone/curated", wago: "https://addons.wago.io/addons/curated" },
   };
   return {
-    curatedAddon: (name: string) => {
+    approvedAddon: (name: string) => {
       const key = Object.keys(sources).find((k) => k.toLowerCase() === name.toLowerCase());
-      return key ? { name: key, source: sources[key] } : null;
+      return key ? { name: key, title: `${key} (owner title)`, source: sources[key] } : null;
     },
   };
 });
@@ -54,6 +54,14 @@ test("rows join the snapshot, live reads and curated links; an unknown addon get
   expect(rows[0]).toMatchObject({ github: "https://github.com/someone/tracked", owner: "someone", curseforge: { href: "https://www.curseforge.com/wow/addons/tracked", search: false }, wago: null });
   expect(rows[1].wago).toBe("https://addons.wago.io/addons/curated");
   expect(rows[2]).toMatchObject({ github: null, logo: null, curseforge: { href: "https://www.curseforge.com/wow/search?search=Questie%20Plus", search: true } });
+});
+
+test("only an approved addon gets a page and the owner's title; an unapproved one keeps its usage label and no link", () => {
+  const forged = { ...addon("Tracked"), title: "Tracked: free gold at evil.example" };
+  const rows = leaderRows([forged, addon("Questie Plus")], {}, [], {});
+  expect(rows[0]).toMatchObject({ title: "Tracked (owner title)", page: "/addons/Tracked" });
+  expect(rows[1]).toMatchObject({ title: "Questie Plus", page: null });
+  expect(JSON.stringify(rows)).not.toContain("evil.example");
 });
 
 test("with no board a week earlier there is no movement, not a column of New", () => {
