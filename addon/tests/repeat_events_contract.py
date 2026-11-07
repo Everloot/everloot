@@ -8,7 +8,14 @@ over the same EverlootDB, which is what /reload does, fires the events three mor
 
 A kind that legitimately writes one row per source is bounded by its sources, said in a comment where it is
 asserted. Every scenario needs its first run to write the row (a collector that never fires proves nothing).
-gear_snapshot has its own test, gear_contract.py.
+
+Kinds covered: vendor, item_seen, npc_sighting, loot, guild_snapshot, raid_lockout, attendance, map_bounds,
+census_self, census_seen, recipe_observed, trainer_seen, gold_snapshot. gear_snapshot is in gear_contract.py.
+Kinds left out: quest, object_sighting, instance_entrance, auction_scan, auction_snapshot, addon_seen,
+talent_snapshot, stats_owned, pvp_owned, item_fact, money_event, pull_summary, encounter, instance_run, guild_kill.
+They fire only on gameplay events (a quest accepted, a boss pull, an auction scan) that this fixture does not model.
+
+NOW is frozen on purpose: every repeat lands in the same second, so throttles that expire with time are out of scope.
 """
 from pathlib import Path
 from lupa.lua51 import LuaRuntime
@@ -229,11 +236,16 @@ scenario("gold, money events", GOLD, ["modules/gold.lua"], "times(3, 'PLAYER_MON
 
 # gold_snapshot is also written at every PLAYER_ENTERING_WORLD (writeSnapshot(true) skips the minute limit), so each
 # loading screen adds a row until the kind is capped at 2000 and pauses. Observed on main: 3 rows for 3 events.
-# Skipped, not fixed here: assert count(lua, "gold_snapshot") <= 1 once the module limits it. No issue is filed yet.
+# Skipped, not fixed here: tracked in issue #882. Once its fix lands this turns into the assertion below.
+# Same shape as the gear bug: lastSnapshot is in memory only, so a reload followed by PLAYER_MONEY writes another
+# gold_snapshot today. #882's fix covers that too.
 lua = world(GOLD, ["modules/gold.lua"])
 lua.execute("times(3, 'PLAYER_ENTERING_WORLD')")
-if count(lua, "gold_snapshot") > 1:
-    SKIPPED.append(f"gold_snapshot: {count(lua, 'gold_snapshot')} rows for 3 PLAYER_ENTERING_WORLD events (one per loading screen)")
+gold_rows = count(lua, "gold_snapshot")
+if gold_rows > 1:
+    SKIPPED.append(f"gold_snapshot (issue #882): {gold_rows} rows for 3 PLAYER_ENTERING_WORLD events (one per loading screen)")
+else:
+    assert gold_rows == 1, f"gold_snapshot: {gold_rows} rows for 3 PLAYER_ENTERING_WORLD events, expected 1"
 
 for line in SKIPPED:
     print("SKIPPED known growth:", line)
