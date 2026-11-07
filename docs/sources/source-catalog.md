@@ -11,9 +11,12 @@ type decided from its terms, a last-verified date, and confirmed version coverag
 
 - **WoW: Forever is in beta** (since 2026-09-17). Full launch is **2026-11-04**. All "Forever: yes"
   below is beta-stage coverage; expect churn at launch. Re-verify every Forever row after 11/04.
-- **No machine-readable Forever feed exists yet.** Blizzard's Game Data API has no Forever namespace
-  (open forum request 2026-09-18, no staff reply; open issue `Pewtro/blizzard-api#110`). Raider.IO
-  and Warcraft Logs depend on the same data, or on logs not yet supported.
+- **Blizzard's API has Forever namespaces since launch** (checked 2026-11-06 with the Everloot client, US
+  and EU): `static-forever-{region}`, `dynamic-forever-{region}`, `profile-forever-{region}`. Rulesets
+  replace realms (`/data/wow/ruleset/index`: 1 PvP, 2 Normal, 3 Roleplay, 15 Roleplay PvP; the realm
+  index is 404). Characters by `name-surname`, guilds with rosters, and 15 auction houses per region
+  under `/data/wow/ruleset/{id}/auctions/` (the same houses under every ruleset). The terms below still
+  apply: local cache only, no redistribution, nothing on ad pages.
 - **Blizzard runs no PTR for Forever and hides item stats until drop**, specifically to frustrate
   datamining. Datamined tables will have gaps for balance-sensitive data.
 - **Access-type rule:** where the terms check read the source, its verdict wins. Where it didn't,
@@ -104,7 +107,7 @@ name the exact domain in the map.
 | wago.tools | wago.tools | DB2 tables, build monitor | yes | **blocked** — robots.txt disallows everything but the home page (see v1 table) |
 | Gethe/wow-ui-source | github.com/Gethe/wow-ui-source (branch `forever`, updated 2026-09-24) | Blizzard UI/Lua source mirror — ground truth for **building the addon** | yes | `fetch` (git) |
 | Warcraft Wiki — WoW API | warcraft.wiki.gg/wiki/World_of_Warcraft_API | Addon API reference | unconfirmed for Forever | 2023 dump (import); live pages: link only — /api.php disallowed |
-| Blizzard Game Data / Profile API | community.developer.battle.net | Official data — **all free groups adopted**, see spec §4.5 | **no Forever namespace yet** | `api` — one adapter, all namespaces (retail, `classic`, `classic1x`), Forever gated. Each user brings their own free client. Terms: attribution required, no redistribution/resale, no monetising the data, 36,000 calls/hr → local cache only |
+| Blizzard Game Data / Profile API | community.developer.battle.net | Official data — **all free groups adopted**, see spec §4.5 | **Forever namespaces answer (2026-11-06)** | `api` — one adapter, all namespaces (retail, `classic`, `classic1x`, `forever`). Each user brings their own free client. Terms: attribution required, no redistribution/resale, no monetising the data, 36,000 calls/hr → local cache only |
 | WoWDev wiki | wowdev.wiki | File formats | no | skip |
 | wow.tools | wow.tools (site retired May 2025) | Public site dead. Local app [Marlamin/wow.tools.local](https://github.com/Marlamin/wow.tools.local) is MIT and still updated. It downloads older builds from wago.tools. | dev machine only | Do not publish extracted tables. Do not import via its wago.tools path. |
 | Community Forever datasets | github.com/alcaras/forever-ref | Example consumer of wago.tools Forever exports | yes | reference only |
@@ -182,7 +185,7 @@ given us, and how we fill that gap ourselves. Never filled by copying the blocke
 | Class and leveling guides | Icy Veins, Method, Wowhead guides | No API; bot blocking | Curated guides we write, drawing on player-collected data | 1 (curated) |
 | Hunter pet families and taming | Petopia | "may not be copied or reprinted" | Collector records tameable beasts | 3 |
 | Balance-sensitive item stats | datamined tables | Blizzard hides stats until drop | Collector records item tooltips players see | 3 |
-| Character / guild profiles | Blizzard API, Raider.IO | No Forever namespace yet | Addon character context now; re-check after 11/04 launch | 3 |
+| Character / guild profiles | Blizzard API, Raider.IO | Forever profiles answer (2026-11-06): from level 10, after logout | Addon character context now; a Blizzard mirror is the showcase plan's section 5 | 3 |
 | Combat rankings | Warcraft Logs | No Forever support; redistribution terms silent | Ask `support@rpglogs.com`; revisit after launch | later |
 | Lore from the old wiki | Wowpedia (Fandom) | ToS bars AI use without consent | Covered by the warcraft.wiki.gg dump (same history pre-2023) | 1 |
 | Community discussion | Reddit | Paid API | Link-out only | — |

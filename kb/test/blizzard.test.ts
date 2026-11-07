@@ -1,13 +1,15 @@
 import { expect, test } from "vitest";
 import { openDb } from "../src/db.js";
 import { BlizzardClient } from "../src/blizzard/client.js";
-import { namespace, NotAvailableYetError } from "../src/blizzard/namespaces.js";
+import { namespace } from "../src/blizzard/namespaces.js";
 
 test("namespace names per game version", () => {
   expect(namespace("retail", "static", "us")).toBe("static-us");
   expect(namespace("classic", "dynamic", "eu")).toBe("dynamic-classic-eu");
   expect(namespace("classic1x", "profile", "us")).toBe("profile-classic1x-us");
-  expect(() => namespace("forever", "static", "us")).toThrow(NotAvailableYetError);
+  expect(namespace("forever", "static", "us")).toBe("static-forever-us");
+  expect(namespace("forever", "dynamic", "eu")).toBe("dynamic-forever-eu");
+  expect(namespace("forever", "profile", "eu")).toBe("profile-forever-eu");
   expect(() => namespace("retale" as never, "static", "us")).toThrow();
 });
 
@@ -43,12 +45,12 @@ test("fetches a token once and serves repeats from the cache until the TTL passe
   expect(calls).toHaveLength(3);
 });
 
-test("forever requests fail fast without any network call", async () => {
+test("forever requests use the forever namespace", async () => {
   const db = openDb(":memory:");
   const { calls, impl } = fakeBlizzard();
   const client = new BlizzardClient(db, { clientId: "id", clientSecret: "secret", region: "us", fetchImpl: impl });
-  await expect(client.get("/data/wow/item/19019", "forever", "static")).rejects.toThrow(NotAvailableYetError);
-  expect(calls).toHaveLength(0);
+  await client.get("/data/wow/item/19019", "forever", "static");
+  expect(calls[1]).toBe("https://us.api.blizzard.com/data/wow/item/19019?namespace=static-forever-us&locale=en_US");
 });
 
 test("API errors name the path and namespace", async () => {
