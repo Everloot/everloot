@@ -371,18 +371,6 @@ local function rememberItem(itemId)
   if stored then EverlootDB.itemSeenIds[itemId] = seen end
 end
 
--- The game's own "N Gold", "N Silver" and "N Copper" strings, as patterns, so a coin slot's text reads in any
--- language; English where the client does not define them. A count may carry a thousands separator.
-local COIN_UNITS = { { "GOLD_AMOUNT", "%d Gold", 10000 }, { "SILVER_AMOUNT", "%d Silver", 100 }, { "COPPER_AMOUNT", "%d Copper", 1 } }
-local function coinPatterns()
-  local out = {}
-  for _, unit in ipairs(COIN_UNITS) do
-    local fmt = type(_G[unit[1]]) == "string" and _G[unit[1]] or unit[2]
-    out[#out + 1] = { fmt:gsub("[%^%$%(%)%.%[%]%*%+%-%?]", "%%%0"):gsub("%%d", "([%%d,%%.]+)"), unit[3] }
-  end
-  return out
-end
-
 -- The copper in loot slot i when it is the coin slot, read from the slot's text; nil for an item slot or a text
 -- that holds no amount.
 local function slotCopper(i, text)
@@ -391,13 +379,8 @@ local function slotCopper(i, text)
   if slotType ~= (Enum and Enum.LootSlotType and Enum.LootSlotType.Money or LOOT_SLOT_MONEY or 2) or type(text) ~= "string" then
     return nil
   end
-  local total = 0
-  for _, unit in ipairs(coinPatterns()) do
-    local digits = text:match(unit[1])
-    local amount = digits and tonumber((digits:gsub("%D", "")))
-    if amount then total = total + amount * unit[2] end
-  end
-  return total >= 1 and total <= 10000000000 and total or nil
+  local total = E.CoinText(text)
+  return total and total <= 10000000000 and total or nil
 end
 
 -- The id of the item an item GUID names. The GUID itself does not hold it: the disenchant or lock cast read it

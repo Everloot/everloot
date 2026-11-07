@@ -84,21 +84,8 @@ local function ownLoot(text)
 end
 
 -- Copper in a money line ("You loot 1 Gold, 2 Silver, 3 Copper"), from the game's own coin words.
-local coinPatterns
 local function copperIn(text)
-  if not coinPatterns then
-    coinPatterns = {}
-    for _, coin in ipairs({ { GOLD_AMOUNT, 10000 }, { SILVER_AMOUNT, 100 }, { COPPER_AMOUNT, 1 } }) do
-      local p = pattern(coin[1])
-      if p then coinPatterns[#coinPatterns + 1] = { p:sub(2, -2), coin[2] } end
-    end
-  end
-  local copper = 0
-  for _, coin in ipairs(coinPatterns) do
-    local n = tonumber(text:match(coin[1]))
-    if n then copper = copper + n * coin[2] end
-  end
-  return copper
+  return E.CoinText(text) or 0
 end
 
 --- Money lines can be read when the client has its coin words; otherwise money looted while a loot

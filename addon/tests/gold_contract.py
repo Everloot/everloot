@@ -563,6 +563,44 @@ for _, name in ipairs({ 'Partnerperson', 'Strangerperson', 'Altperson', 'Farpers
 """)
 check_all(two)
 
+# Looted gold: Forever's money slot carries its amount in the slot text, not in the quantity field.
+loot = runtime("GOLD_AMOUNT = '%d Gold'; SILVER_AMOUNT = '%d Silver'; COPPER_AMOUNT = '%d Copper'\n"
+               "slot = { type = 2, name = '1 Gold\\n20 Silver', quantity = 0 }\n"
+               "GetNumLootItems = function() return 1 end\n"
+               "GetLootSlotType = function() return slot.type end\n"
+               "GetLootSlotInfo = function() return 'icon', slot.name, slot.quantity end\n")
+loot.execute("""
+event('PLAYER_ENTERING_WORLD')
+local rows = EverlootDB.records.money_event
+local before = #(rows or {})
+event('LOOT_OPENED')
+rows = EverlootDB.records.money_event
+assert(#rows == before + 1 and rows[#rows].category == 'loot' and rows[#rows].copper == 12000, 'text-only money slot is 12000')
+local ledger = EverlootDB.ledger.events
+assert(ledger[#ledger].category == 'loot' and ledger[#ledger].copper == 12000, 'the ledger has the loot event')
+-- A thousands separator belongs to the number.
+slot.name = '1,234 Gold'
+event('LOOT_OPENED')
+rows = EverlootDB.records.money_event
+assert(rows[#rows].copper == 12340000, '1,234 Gold is 12340000, got ' .. tostring(rows[#rows].copper))
+-- A Spanish client's own coin words.
+GOLD_AMOUNT = '%d de oro'; SILVER_AMOUNT = '%d de plata'; COPPER_AMOUNT = '%d de cobre'
+slot.name = '1.234 de oro\\n5 de plata'
+event('LOOT_OPENED')
+rows = EverlootDB.records.money_event
+assert(rows[#rows].copper == 12340500, 'Spanish words and separator, got ' .. tostring(rows[#rows].copper))
+-- A name with no amount falls back to the numeric field; an item slot is not income.
+slot.name, slot.quantity = nil, 77
+event('LOOT_OPENED')
+rows = EverlootDB.records.money_event
+assert(rows[#rows].copper == 77, 'the numeric field is the fallback')
+local n = #rows
+slot.type, slot.name = 1, '5 Gold'
+event('LOOT_OPENED')
+assert(#EverlootDB.records.money_event == n, 'an item slot is not income')
+""")
+check_all(loot)
+
 # No addon source may call, index by string, or alias a buy, bid, post or craft function.
 import re
 names = (r"PostItem|PostCommodity|PlaceBid|PlaceAuctionBid|StartAuction|PostAuction|StartCommoditiesPurchase|"
