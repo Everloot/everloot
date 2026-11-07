@@ -7,14 +7,16 @@
 -- can come back. No other player's name: invoices, letters and listings name other
 -- players; those fields are never read into a record.
 -- Ledger only (the uploaded money_event keeps the schema's nine categories): repairs and
--- purchases at an open merchant, trades both sides accepted, money sent with a letter
--- and money in a letter from one of the player's own characters. Each is marked ownAlt when the other side is one of the
--- player's own characters: the trade partner, recipient or sender is compared with the
--- roster's names on the player's realm and then dropped, never kept.
+-- purchases at an open merchant, trades the purse confirms, money sent with a letter
+-- and money in a letter from one of the player's own characters. Each is marked ownAlt
+-- when the other side is one of the player's own characters: the trade partner,
+-- recipient or sender is compared with the roster's names on the player's realm and
+-- then dropped, never kept.
 -- Each event also goes to the local ledger (ledger.lua) under the character key, with
 -- an auction sale kept by item (name, count, deposit, cut) there only; the uploaded
--- money_event keeps its shape. The sold notice (a system line naming only the item) adds a pending sale there; the
--- letter's sale fills it in. The day's closing gold is written there as it changes.
+-- money_event keeps its shape. The sold notice (a system line naming only the item)
+-- adds a pending sale there; the letter's sale fills it in. The day's closing gold is
+-- written there as it changes.
 
 local E = Everloot
 
@@ -32,7 +34,9 @@ local repairPending = false -- a repair was asked for at the merchant; the next 
 local repairGen = 0 -- which repair an expiry timer belongs to
 local sendMoney = nil -- { copper, ownAlt }: money a letter carries, until the server confirms it sent
 local plainMail = nil -- { letter = copper, ownAlt }: a plain letter's money, until the purse matches it
-local trade = nil -- { out, inn, ownAlt, closed }: a trade both sides accepted
+local trade = nil -- { out, inn, ownAlt, closed }: the trade window's money, until the purse confirms it
+local tradeGen = 0 -- which closed trade an expiry timer belongs to
+local TRADE_SECONDS = 3 -- a closed trade's money arrives within this, or the trade was cancelled
 
 -- The money_event schema's categories (packages/protocol/schema/records/money_event.json). Others are local.
 local UPLOADED = { loot = true, quest = true, vendor = true, auction = true, flight = true, postage = true,
@@ -386,7 +390,17 @@ E:RegisterModule("gold", function()
     elseif event == "TRADE_SHOW" then trade = nil
     elseif event == "TRADE_ACCEPT_UPDATE" then tradeAccepted(...)
     elseif event == "TRADE_MONEY_CHANGED" or event == "TRADE_PLAYER_ITEM_CHANGED" then tradeSnapshot()
-    elseif event == "TRADE_CLOSED" then if trade then trade.closed = true end
+    elseif event == "TRADE_CLOSED" then
+      -- The money can arrive after the window closes; a cancelled trade's snapshot expires after a few seconds,
+      -- so later loot of the same amount is not called a trade.
+      if trade then
+        trade.closed = true
+        tradeGen = tradeGen + 1
+        local mine, armed = tradeGen, trade
+        if C_Timer and C_Timer.After then
+          pcall(C_Timer.After, TRADE_SECONDS, function() if tradeGen == mine and trade == armed then trade = nil end end)
+        end
+      end
     elseif event == "AUCTION_HOUSE_CLOSED" then buyout = nil; quote = nil
     elseif event == "COMMODITY_PRICE_UPDATED" then
       -- updatedUnitPrice, updatedTotalPrice
