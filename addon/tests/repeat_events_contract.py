@@ -11,9 +11,15 @@ asserted. Every scenario needs its first run to write the row (a collector that 
 
 Kinds covered: vendor, item_seen, npc_sighting, loot, guild_snapshot, raid_lockout, attendance, map_bounds,
 census_self, census_seen, recipe_observed, trainer_seen, gold_snapshot. gear_snapshot is in gear_contract.py.
-Kinds left out: quest, object_sighting, instance_entrance, auction_scan, auction_snapshot, addon_seen,
-talent_snapshot, stats_owned, pvp_owned, item_fact, money_event, pull_summary, encounter, instance_run, guild_kill.
-They fire only on gameplay events (a quest accepted, a boss pull, an auction scan) that this fixture does not model.
+Kinds left out, gameplay events only (a quest accepted, a boss pull, an auction scan) that this fixture does not
+model: auction_scan, auction_snapshot, addon_seen, item_fact, money_event, pull_summary, encounter, instance_run,
+guild_kill, quest, object_sighting, instance_entrance.
+Kinds left out, untested gaps: player_seen (players.lua) fires on the census scenario's events, but the fixture does
+not load players.lua. character_link (link.lua) is user-triggered, with no event. talent_owned (owned.lua) and the
+completion kinds (achievement_owned, achievement_catalog, reputation_owned, reputation_catalog, title_owned,
+title_catalog, quest_owned, quest_chain_catalog) fire on loading screens and level-ups, but the fixture does not
+load owned.lua or completion.lua. talent_snapshot (talents.lua) also fires on loading screens, and stats_owned
+(charstats.lua) and pvp_owned (pvp.lua) are the same kind of module: none of the three is loaded here.
 
 NOW is frozen on purpose: every repeat lands in the same second, so throttles that expire with time are out of scope.
 """
