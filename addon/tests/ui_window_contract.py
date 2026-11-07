@@ -199,6 +199,28 @@ end
 assert(#extra == 0, 'stray globals: ' .. table.concat(extra, ', '))
 """)
 
+# --- Fonts follow the client: a CJK or Cyrillic client's own fonts, the Latin paths only as a fallback ---
+lua = fresh("{ installId = 'abcd-1234', toggles = {}, records = {} }", """
+STANDARD_TEXT_FONT = 'Fonts\\\\2002.TTF'
+NumberFontNormal = { GetFont = function() return 'Fonts\\\\2002B.TTF', 12, '' end }
+""")
+lua.execute("""
+assert(Everloot.Window.Open())
+local f = EverlootWindow
+assert(f.title.font == 'Fonts\\\\2002.TTF', 'the title uses the client font: ' .. tostring(f.title.font))
+assert(f.realm.font == 'Fonts\\\\2002.TTF', 'the realm line too: ' .. tostring(f.realm.font))
+assert(f.onHand.font == 'Fonts\\\\2002B.TTF', 'numbers use the client number font: ' .. tostring(f.onHand.font))
+assert(Everloot.Window.NARROW == 'Fonts\\\\2002B.TTF')
+""")
+lua = fresh("{ installId = 'abcd-1234', toggles = {}, records = {} }", """
+STANDARD_TEXT_FONT = 5
+NumberFontNormal = { GetFont = function() error('no font') end }
+""")
+lua.execute("""
+assert(Everloot.Window.Open())
+assert(EverlootWindow.title.font == 'Fonts\\\\FRIZQT__.TTF' and Everloot.Window.NARROW == 'Fonts\\\\ARIALN.TTF', 'a bad value falls back to the Latin fonts')
+""")
+
 # --- A value the client cannot give, or will not let the addon read, is a dash ---
 lua = fresh("{ installId = 'abcd-1234', toggles = {}, records = {} }", """
 GetMoney = nil

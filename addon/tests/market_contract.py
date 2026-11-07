@@ -378,6 +378,17 @@ local capped = table.concat(printed, '\\n')
 assert(capped:find('keeps only the 2,000 items') and capped:find('website'), 'a full file says it is capped: ' .. capped)
 assert(not capped:find('no public day') and not capped:find('No price for this item'), 'a full file cannot say nothing is public: ' .. capped)
 assert(capped:find('everloot.app/tools/auctions%?realm=Bigrealm&item=3001'), 'and links the page that can tell: ' .. capped)
+
+-- The link percent-encodes the realm byte by byte: spaces, apostrophes and non-ASCII letters never break the URL.
+GetRealmName = function() return "Old Blanchy's Realm" end
+Everloot:ResetPrices()
+assert(ask('2589'):find('realm=Old%20Blanchy%27s%20Realm&item=2589', 1, true), 'apostrophe and spaces are encoded')
+GetRealmName = function() return 'Caf\\195\\169 Ru\\208\\177' end
+Everloot:ResetPrices()
+assert(ask('2589'):find('realm=Caf%C3%A9%20Ru%D0%B1&item=2589', 1, true), 'non-ASCII bytes are encoded upper-case')
+GetRealmName = function() return 'Az-er_o.th~1' end
+Everloot:ResetPrices()
+assert(ask('2589'):find('realm=Az-er_o.th~1&item=2589', 1, true), 'unreserved characters stay as they are')
 GetRealmName = function() return 'Forever' end
 Everloot:ResetPrices()
 """)
