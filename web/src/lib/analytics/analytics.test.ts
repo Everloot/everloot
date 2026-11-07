@@ -384,3 +384,13 @@ describe("a plan in the address never reaches an analytics tool", () => {
     expect(script.outerHTML).not.toContain(CODE);
   });
 });
+
+describe("search surfaces", () => {
+  it("accepts the four surfaces and rejects any other at type level", () => {
+    for (const surface of ["lore", "header", "header-phone", "menu"] as const) {
+      expect(() => track("search", { surface })).not.toThrow();
+    }
+    // @ts-expect-error not a search surface
+    expect(() => track("search", { surface: "footer" })).not.toThrow();
+  });
+});
