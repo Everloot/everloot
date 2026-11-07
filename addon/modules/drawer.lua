@@ -153,6 +153,7 @@ end
 
 E:RegisterModule("buttons", function()
   if not (C_Timer and C_Timer.After) then error("C_Timer.After unavailable (the drawer could not close), buttons left in place", 0) end
+  if E.Minimap and not E.Minimap.Enabled() then return "off (the Everloot minimap button is off, so addon buttons stay on the minimap)" end
   D.crest = E.Minimap and E.Minimap.Button()
   if not D.crest or type(D.crest.HookScript) ~= "function" then error("no minimap button to gather into", 0) end
   D.crest:HookScript("OnEnter", open)

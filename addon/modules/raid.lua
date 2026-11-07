@@ -299,22 +299,50 @@ end
 R.Report = report
 
 local function showCode(url)
-  -- A window with the link selected for copying. Any missing frame function falls back to chat.
+  -- A small window with a title, the link selected for copying, a Ctrl+C hint and a Close button. It wears the
+  -- Everloot window's look when that file is loaded. Any missing frame function falls back to chat.
   local ok = pcall(function()
     local frame = R.frame
     if not frame then
-      frame = CreateFrame("Frame", "EverlootRaidCode", UIParent)
-      frame:SetSize(520, 60)
+      local U = E.Window
+      frame = CreateFrame("Frame", "EverlootRaidCode", UIParent, "BackdropTemplate")
+      frame:SetSize(520, 130)
       frame:SetPoint("CENTER")
       frame:SetFrameStrata("DIALOG")
+      if U and U.Backdrop then U.Backdrop(frame)
+      elseif frame.SetBackdrop then
+        frame:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+          edgeSize = 14, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
+        frame:SetBackdropColor(0.055, 0.059, 0.051, 0.97)
+      end
       R.frame = frame
-      local box = CreateFrame("EditBox", nil, frame)
-      box:SetAllPoints(frame)
+      local function label(string, point, x, y, color)
+        local fs
+        if U and U.Text then fs = U.Text(frame, 12, nil, color)
+        else
+          fs = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+          if color then fs:SetTextColor(unpack(color)) end
+        end
+        fs:SetPoint(point, x, y)
+        fs:SetText(string)
+        return fs
+      end
+      local colors = U and U.COLORS or {}
+      label("Everloot raid link", "TOPLEFT", 16, -14, colors.accent)
+      label("Press Ctrl+C to copy the link, then paste it into your browser.", "TOPLEFT", 16, -40, colors.muted)
+      local box = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
+      box:SetPoint("TOPLEFT", 22, -64)
+      box:SetSize(476, 30)
       box:SetAutoFocus(true)
       box:SetFontObject(ChatFontNormal)
       box:SetScript("OnEscapePressed", function() frame:Hide() end)
       box:SetScript("OnEnterPressed", function() frame:Hide() end)
       frame.box = box
+      local close = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+      close:SetSize(80, 24)
+      close:SetPoint("BOTTOMRIGHT", -16, 12)
+      close:SetText("Close")
+      close:SetScript("OnClick", function() frame:Hide() end)
     end
     frame:Show()
     frame.box:SetText(url)
