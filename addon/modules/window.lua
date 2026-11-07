@@ -18,21 +18,19 @@ local COLORS = {
   accent = { 0.612, 0.941, 0.227, 1 },
 }
 
--- In sidebar order. `view` shows a line in the window; `open` hands over to another part of the addon.
+-- In sidebar order. A view is looked up in U.Views by key when it is selected; `open` hands over to another part
+-- of the addon. Files loaded after this one fill U.Views.
 U.NAV = {
   { key = "home", label = "Home", icon = "INV_Misc_Book_09" },
-  { key = "gold", label = "Gold", icon = "INV_Misc_Coin_02", open = function() E.GphCommand("show") end },
-  { key = "professions", label = "Professions", icon = "Trade_BlackSmithing",
-    view = "Coming soon. Open a profession window and Everloot reads its recipe colours; Home shows your skill." },
-  { key = "collection", label = "Collection", icon = "INV_Misc_Bag_10",
-    view = "Coming soon. /everloot completion on reads your achievements, reputation, titles and quests." },
-  { key = "auctions", label = "Auctions", icon = "INV_Misc_Note_01",
-    view = "Coming soon here. At the auction house the Everloot tab scans prices, and /everloot price [item] shows one." },
-  { key = "ask", label = "Ask", icon = "INV_Misc_QuestionMark",
-    view = "Coming soon here. Type /ask and a question; the Desktop App answers it and /reload shows the answer." },
-  { key = "plan", label = "Build plan", icon = "INV_Misc_Book_11", open = function() E.Planner.Open() end },
+  { key = "gold", label = "Gold", icon = "INV_Misc_Coin_02" },
+  { key = "collection", label = "Collection", icon = "INV_Misc_Bag_10" },
+  { key = "professions", label = "Professions", icon = "Trade_BlackSmithing" },
   { key = "settings", label = "Settings", icon = "Trade_Engineering", bottom = true, open = function() E.Options.Open() end },
 }
+
+-- A view is { build = function(f, parent) end, refresh = function(f) end }, keyed like U.NAV. It is built once, the
+-- first time it is selected, into a frame stored at f.views[key].
+U.Views = {}
 
 -- What the gold module records, in the order the ledger line names them. Spending is shown as a minus.
 U.SOURCES = {
@@ -405,6 +403,7 @@ local function build()
   end
 
   buildHome(f)
+  f.views = {}
   f.note = text(f, 13, FRIZ, COLORS.muted)
   f.note:SetPoint("TOPLEFT", MAIN + 4, -56)
   f.note:SetWidth(W - MAIN - 32)
@@ -514,13 +513,32 @@ function U.Select(key)
     else b.on:Hide(); b.label:SetTextColor(unpack(COLORS.muted)) end
   end
   f.subtitle:SetText(item.label)
+  for _, v in pairs(f.views) do v:Hide() end
   if key == "home" then
     f.note:Hide(); f.home:Show()
     local ok, err = pcall(U.Refresh)
     if not ok then U.Fail(err) end
-  else
-    f.home:Hide(); f.note:SetText(item.view); f.note:Show()
+    return
   end
+  f.home:Hide()
+  local view = U.Views[key]
+  if not view then
+    f.note:SetText("This part of Everloot did not load. /everloot status says why."); f.note:Show()
+    return
+  end
+  if not f.views[key] then
+    local parent = CreateFrame("Frame", nil, f)
+    parent:SetPoint("TOPLEFT", MAIN, -48)
+    parent:SetSize(W - MAIN - 12, H - 60)
+    parent:Hide()
+    local ok, err = pcall(view.build, f, parent)
+    if not ok then U.Fail(err); return end
+    f.views[key] = parent
+  end
+  f.note:Hide()
+  f.views[key]:Show()
+  local ok, err = pcall(view.refresh, f)
+  if not ok then U.Fail(err) end
 end
 
 --- An error inside the window: it closes and stays closed this session, and /everloot status says why.

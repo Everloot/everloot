@@ -139,6 +139,7 @@ for word in ["RegisterEvent", "HookScript", "hooksecurefunc", "E:Store", "Everlo
     assert word not in code, f"the window reads and displays only: {word} found"
 assert "Fonts\\\\FRIZQT__.TTF" in code and "Fonts\\\\ARIALN.TTF" in code, "Friz Quadrata headings, Arial Narrow numbers"
 assert "UI-Tooltip-Border" in code and "SetBackdropBorderColor" in code, "the stock tooltip edge, tinted"
+assert "Coming soon" not in source, "no stubs in the window"
 prices = (root / "modules" / "prices.lua").read_text(encoding="utf-8")
 for word in ["CreateTexture", "CreateFontString", "SetFont"]:
     assert word not in prices, f"the tooltip uses AddLine and |T..|t only: {word} found in prices.lua"
@@ -202,10 +203,16 @@ assert(f.perHour.text:find('^3|T.-Gold') and f.session.text:find('Running') and 
 f.gphButton.scripts.OnClick(f.gphButton)
 assert(EverlootDB.gph.current.runningSince == nil and f.gphButton.text == 'Resume' and f.session.text:find('^Paused'), 'Pause pauses the session')
 
--- Other sidebar items: a line, or the part of the addon they open.
+-- Sidebar: Home, Gold, Collection, Professions, Settings. A view registers by key; one that did not load says so.
+assert(f.nav.ask == nil and f.nav.plan == nil and f.nav.auctions == nil, 'Ask, Build plan and Auctions left the sidebar')
+assert(f.nav.gold and f.nav.collection and f.nav.professions and f.nav.settings, 'Home, Gold, Collection, Professions, Settings')
+Everloot.Window.Views.collection = { build = function(f, parent) parent.built = true end, refresh = function(f) local v = f.views.collection; v.refreshed = (rawget(v, 'refreshed') or 0) + 1 end }
 f.nav.collection.scripts.OnClick(f.nav.collection)
-assert(f.home.shown == false and f.note.shown and f.note.text:find('Coming soon') and f.subtitle.text == 'Collection')
+assert(f.home.shown == false and f.views.collection.shown and f.views.collection.built and f.views.collection.refreshed == 1 and f.subtitle.text == 'Collection')
 assert(f.nav.collection.on.shown and not f.nav.home.on.shown, 'fel green marks only the open item')
+f.nav.gold.scripts.OnClick(f.nav.gold)
+assert(f.views.collection.shown == false and f.note.shown and f.note.text:find('did not load'), 'an unregistered view says so')
+assert(not f.note.text:find('oon'), 'no coming soon')
 f.nav.settings.scripts.OnClick(f.nav.settings)
 assert(Everloot.Options.page and Everloot.Options.page.shown, 'Settings opens the options page')
 f.nav.home.scripts.OnClick(f.nav.home)
