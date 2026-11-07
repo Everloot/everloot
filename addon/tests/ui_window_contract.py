@@ -183,10 +183,18 @@ local escapes = false
 for _, name in ipairs(UISpecialFrames) do if name == 'EverlootWindow' then escapes = true end end
 assert(escapes, 'Escape closes it')
 
--- No stray globals: only named frames (the window's, and the pages its buttons open) are new.
+-- The addon compartment entry (the TOC's AddonCompartmentFunc) toggles the window like the minimap button.
+assert(type(Everloot_OnAddonCompartmentClick) == 'function', 'the compartment click is a global function')
+assert(f.shown, 'the window is open before the compartment click')
+Everloot_OnAddonCompartmentClick('Everloot', 'LeftButton')
+assert(f.shown == false, 'the compartment click closes an open window')
+Everloot_OnAddonCompartmentClick('Everloot', 'LeftButton')
+assert(f.shown, 'and opens it again')
+
+-- No stray globals: only named frames (the window's, and the pages its buttons open) and the one compartment function are new.
 local extra = {}
 for k, v in pairs(_G) do
-  if not globalsBefore[k] and not (type(v) == 'table' and v.frameName == k and k:find('^Everloot')) then extra[#extra + 1] = tostring(k) end
+  if not globalsBefore[k] and k ~= 'Everloot_OnAddonCompartmentClick' and not (type(v) == 'table' and v.frameName == k and k:find('^Everloot')) then extra[#extra + 1] = tostring(k) end
 end
 assert(#extra == 0, 'stray globals: ' .. table.concat(extra, ', '))
 """)
@@ -279,6 +287,9 @@ Minimap = {}
 local button = Everloot.Minimap.Button()
 button.scripts.OnClick(button, 'LeftButton')
 assert(Everloot.Options.page.shown)
+Everloot.Options.page.shown = false
+Everloot_OnAddonCompartmentClick('Everloot', 'LeftButton')
+assert(Everloot.Options.page.shown, 'the compartment click falls back the same way')
 """)
 
 # --- The tooltip: the same lines under one fel-green header with the crest inline ---

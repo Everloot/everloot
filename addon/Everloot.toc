@@ -1,12 +1,17 @@
 ## Interface: 16001
 ## Title: Everloot
 ## Notes: WoW: Forever data collector — drops, spawns, vendors, guilds, auctions, recipes. Answers never play.
+## Notes-esES: Recolector de datos de WoW: Forever: botín, apariciones, vendedores, hermandades, subastas y recetas. Las respuestas nunca juegan por ti.
 ## Author: Everloot
+## Category: Auction & Economy
+## X-Website: https://everloot.app
+## X-Curse-Project-ID: 1762765
 ## Version: 0.3.21
 ## X-License: AGPL-3.0
 ## SavedVariables: EverlootDB
 ## OptionalDeps: EverlootAnswers, EverlootPrices, EverlootBuilds
 ## IconTexture: Interface\AddOns\Everloot\media\crest
+## AddonCompartmentFunc: Everloot_OnAddonCompartmentClick
 
 core.lua
 modules\openworld.lua

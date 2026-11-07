@@ -5,6 +5,18 @@ local E = Everloot
 local M = {}
 E.Minimap = M
 
+--- A click: the Everloot window, or the plan workspace when the window is off or has failed this session.
+--- A right click opens the options page.
+function M.Click(mouseButton)
+  if mouseButton ~= "RightButton" and E.Window and E:IsEnabled("window") and not E.Window.failed and E.Window.Toggle() then return end
+  if mouseButton ~= "RightButton" and E.Planner then E.Planner.Open()
+  elseif E.Options and E.Options.Open then E.Options.Open() end
+end
+
+-- The game's addon compartment (the TOC's AddonCompartmentFunc) reaches players who hide minimap buttons.
+-- The one global this file adds; the compartment calls it by name.
+function Everloot_OnAddonCompartmentClick(_, buttonName) M.Click(buttonName) end
+
 --- The button, once. Returns the frame or nil when the client has no minimap to sit on.
 function M.Button()
   if M.button then return M.button end
@@ -25,12 +37,7 @@ function M.Button()
   end
   -- The game's own round glow for minimap buttons on hover.
   if button.SetHighlightTexture then button:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight", "ADD") end
-  button:SetScript("OnClick", function(_, mouseButton)
-    -- Left: the Everloot window, or the plan workspace when the window is off or has failed this session.
-    if mouseButton ~= "RightButton" and E.Window and E:IsEnabled("window") and not E.Window.failed and E.Window.Toggle() then return end
-    if mouseButton ~= "RightButton" and E.Planner then E.Planner.Open()
-    elseif E.Options and E.Options.Open then E.Options.Open() end
-  end)
+  button:SetScript("OnClick", function(_, mouseButton) M.Click(mouseButton) end)
   if button.RegisterForClicks then button:RegisterForClicks("LeftButtonUp", "RightButtonUp") end
   M.button = button
   return button
