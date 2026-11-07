@@ -1,7 +1,6 @@
 # The Everloot window: cut the stubs, build the Gold ledger, Collection and an account Home (2026-11-07)
 
-Status: design, awaiting the owner's approval. Addon at `5cf8b845` (0.3.21). Companion note in the Brain:
-`wiki/projects/everloot/ops/2026-11-07-addon-window-focus.md`.
+Status: approved by the owner on 2026-11-07. Addon at `5cf8b845` (0.3.21).
 
 ## Intent
 
@@ -43,9 +42,8 @@ bar is the full TSM-style ledger, not a category tally.
 
 ## Constraints
 
-- WoW: Forever client 1.60.1, interface 16001, mainline UI and API (Brain note
-  `wiki/projects/everloot/2026-11-05-forever-ui-api-from-cdn.md`; repo checklist
-  `docs/2026-10-28-live-client-capability-checklist.md`).
+- WoW: Forever client 1.60.1, interface 16001, mainline UI and API (the API docs and Blizzard UI files from
+  the CDN build; repo checklist `docs/2026-10-28-live-client-capability-checklist.md`).
   Every new client call is listed in the module header, checked against the CDN API docs by file name, and
   carries a live-client probe for the owner. Nothing in this design was run in a game client.
 - Secret values: every unit, name and tooltip read goes through `E.Readable` (`addon/core.lua`).
