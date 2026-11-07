@@ -66,7 +66,7 @@ export function sampleShowcase(now: Date): ShowcaseInput {
       asOf: daysBefore(now, 20),
       data: { trees: [{ name: "Elemental Combat", points: 0 }, { name: "Enhancement", points: 30 }, { name: "Restoration", points: 21 }], code: null, planned: [] },
     },
-    pvp: { state: "shown", asOf: recent, data: { rank: 6, rankPoints: 9000, rankThreshold: 12000, rankMax: 14, season: null, honorableKills: 1500 } },
+    pvp: { state: "shown", asOf: recent, data: { rank: 6, rankPoints: 9000, rankThreshold: 12000, rankMax: 14, season: 1, honorableKills: 1500 } },
     raids: {
       state: "shown",
       asOf: recent,

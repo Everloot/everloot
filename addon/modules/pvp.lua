@@ -92,8 +92,9 @@ local function readHonorableKills()
     for i = 1, math.min(total, MAX_PER_CATEGORY) do
       walked = walked + 1
       if walked > MAX_WALK then return nil end
-      local value, _, statId = invoke(_G.GetStatistic, category, i)
-      if statId == HONORABLE_KILLS_STAT_ID then return quantity(value) end
+      local value, skip, statId = invoke(_G.GetStatistic, category, i)
+      -- Blizzard's Statistics tab leaves out an entry flagged skip; so does this read.
+      if statId == HONORABLE_KILLS_STAT_ID and not skip then return quantity(value) end
     end
   end
   return nil
@@ -118,9 +119,15 @@ function P.Read()
   if not key then return false end
   local fields = P.Collect()
   if not fields then return false end
-  local kept = {}
+  local kept, previous = {}, nil
   for _, row in ipairs(EverlootDB.records.pvp_owned or {}) do
-    if type(row) == "table" and row.characterKey ~= key then kept[#kept + 1] = row end
+    if type(row) == "table" and row.characterKey ~= key then kept[#kept + 1] = row
+    elseif type(row) == "table" then previous = row end
+  end
+  -- The statistics can load after the PvP tab: a read that finds no kill count keeps the one this character last had,
+  -- so the count does not drop out between reads. Lifetime kills never go down.
+  if fields.honorableKills == nil and previous and count(previous.honorableKills) then
+    fields.honorableKills = previous.honorableKills
   end
   EverlootDB.records.pvp_owned = kept
   local row = { kind = "pvp_owned", characterKey = key, installId = EverlootDB.installId, capturedAt = now(),

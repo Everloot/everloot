@@ -175,7 +175,10 @@ function O.ReadTalents()
   if points == 0 then return replace("talent_owned", key, {}) end
   local nodes = {}
   for i, node in ipairs(snapshot.nodes) do
-    nodes[i] = { nodeId = node.nodeId, ranks = node.ranks, choice = node.choice }
+    -- The site takes a choice of 0 to 3 (the protocol's talent node); one outside that is left off, not the whole row.
+    local choice = node.choice
+    if type(choice) ~= "number" or choice < 0 or choice > 3 or choice ~= math.floor(choice) then choice = nil end
+    nodes[i] = { nodeId = node.nodeId, ranks = node.ranks, choice = choice }
   end
   return replace("talent_owned", key, { {
     kind = "talent_owned", characterKey = key, installId = EverlootDB.installId, capturedAt = now(), class = class, level = level,

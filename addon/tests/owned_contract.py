@@ -273,6 +273,10 @@ assert row["kind"] == "talent_owned" and row["characterKey"] == key and row["ins
 assert row["class"] == "MAGE" and row["level"] == 60 and row["capturedAt"] == "2026-11-09T12:00:00Z", row
 assert row["treeId"] == 786 and row["specId"] == 1482 and row["points"] == 3, row
 assert row["nodes"] == [{"nodeId": 90001, "ranks": 2}, {"nodeId": 90002, "ranks": 1, "choice": 1}], row["nodes"]
+# A choice past 3 (the site's limit) is left off that node; the row is still written.
+wide = addon(setup=TALENTS + "NODES[10][90002].entryIDs = { 501, 502, 503, 504, 505, 506 }; NODES[10][90002].activeEntry = { entryID = 506, rank = 1 }", talents=True)
+wide.execute("event('PLAYER_ENTERING_WORLD'); settle()")
+assert plain(wide, "talent_owned")[0]["nodes"] == [{"nodeId": 90001, "ranks": 2}, {"nodeId": 90002, "ranks": 1}], plain(wide, "talent_owned")
 assert set(row) == {"kind", "characterKey", "installId", "capturedAt", "class", "level", "treeId", "specId", "points", "nodes", "eventId", "kindLoggedAt"}, sorted(row)
 assert row["points"] == sum(n["ranks"] for n in row["nodes"]) and len({n["nodeId"] for n in row["nodes"]}) == len(row["nodes"])
 assert not ({"character", "name", "realm", "guid", "group", "configId", "loadoutString"} & set(row)), row
