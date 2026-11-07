@@ -39,6 +39,9 @@ end
 function Frame.SetScript(self, script, f) self.scripts[script] = f; if script == 'OnEvent' then self.onEvent = f end end
 function Frame.HookScript(self, _, f) table.insert(self.hooks, f) end
 function Frame.SetText(self, t) self.text = t end
+function Frame.SetPoint(self, ...) self.point = { ... } end
+function Frame.SetWidth(self, w) self.width = w end
+function Frame.SetSize(self, w, h) self.width, self.height = w, h end
 function Frame.GetText(self) return self.text end
 function Frame.Show(self) self.shown = true end
 function Frame.Hide(self) self.shown = false end

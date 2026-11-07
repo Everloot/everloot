@@ -56,7 +56,7 @@ API = ("UnitGUID = function() return 'Player-1-0001' end\n"
        "RAID_CLASS_COLORS.ROGUE = { r = 1, g = 0.96, b = 0.41 }\n")
 SAVED = f"""{{ installId = 'abcd-1234', toggles = {{}}, records = {{
     recipe_observed = {{ {{ profession = 'Cooking' }}, {{ profession = 'Cooking' }} }},
-    lockout_owned = {{ {{ characterKey = 'bbbb0002', instance = 'Karazhan' }}, {{ characterKey = 'bbbb0002', instance = 'Gruul' }}, {{ characterKey = 'zzzz', instance = 'Other' }} }} }},
+    lockout_owned = {{ {{ characterKey = 'bbbb0002', instance = 'Karazhan', resetAt = '2030-01-01T00:00:00Z' }}, {{ characterKey = 'bbbb0002', instance = 'Gruul', resetAt = '2030-01-02T00:00:00Z' }}, {{ characterKey = 'bbbb0002', instance = 'Magtheridon', resetAt = '1970-01-02T00:00:00Z' }}, {{ characterKey = 'zzzz', instance = 'Other' }} }} }},
   ledger = {{ events = {{
     {{ at = 1000000 - 3600, key = '{ME}', category = 'quest', copper = 12345 }},
     {{ at = 1000000 - 7200, key = '{ME}', category = 'flight', copper = 77 }},
@@ -124,13 +124,17 @@ assert(mine == money, 'this character reads gold from the client when the window
 assert(r.realmTotals.Forever.text == 'Forever · ' .. Everloot.Window.Money(mine + 500) and r.realmTotals.Forever.copper == mine + 500, r.realmTotals.Forever.text)
 assert(r.realmTotals.Nightfall.text == 'Nightfall · -' and r.realmTotals.Nightfall.copper == nil, 'no gold read, a dash')
 assert(r.accountTotal.text == 'Account: ' .. Everloot.Window.Money(mine + 500), r.accountTotal.text)
-assert(r.rows[3].level.text == '24' and r.rows[3].gold.text == Everloot.Window.Money(mine) and r.rows[2].gold.text == Everloot.Window.Money(500), r.rows[2].gold.text)
+assert(r.rows[3].level.text == '24' and r.rows[3].gold.text == Everloot.Window.MoneyShort(mine) and r.rows[2].gold.text == Everloot.Window.MoneyShort(500), r.rows[2].gold.text)
 assert(r.rows[3].profs.text == 'Mining 112, Fishing 20, Cooking 1' and r.rows[2].profs.text == '-', r.rows[3].profs.text)
 assert(r.rows[3].lockouts.text == '-' and r.rows[5].lockouts.text == '-', 'lockouts are read only while the completion tracker is on')
 assert(r.rows[3].seen.text == '1970-01-12' and r.rows[2].seen.text == '-', r.rows[3].seen.text)
 EverlootDB.toggles.completion = true
 Everloot.Window.Refresh()
+-- Magtheridon's reset time has passed: two live lockouts, as the Collection view counts them.
 assert(r.rows[5].lockouts.text == '2 raids' and r.rows[3].lockouts.text == '-' and r.rows[2].lockouts.text == '-', r.rows[5].lockouts.text)
+EverlootDB.records.lockout_owned[2].resetAt = '1970-01-03T00:00:00Z'
+Everloot.Window.Refresh()
+assert(r.rows[5].lockouts.text == '1 raid', 'one live, two past their reset: ' .. r.rows[5].lockouts.text)
 EverlootDB.toggles.completion = false
 Everloot.Window.Refresh()
 

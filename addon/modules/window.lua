@@ -57,6 +57,19 @@ function U.Money(copper)
   return sign .. table.concat(parts, " ")
 end
 
+local function coinIcon(n, name) return n .. "|TInterface\\MoneyFrame\\UI-" .. name .. "Icon:0:0:2:0|t" end
+
+--- Copper for a list cell: at most the two largest coins, "12g 34s", "34s 56c" or "56c", drawn as coins.
+function U.MoneyShort(copper)
+  if type(copper) ~= "number" then return "-" end
+  local sign = copper < 0 and "-" or ""
+  copper = math.abs(math.floor(copper))
+  local gold, silver, rest = math.floor(copper / 10000), math.floor(copper % 10000 / 100), copper % 100
+  if gold > 0 then return sign .. coinIcon(gold, "Gold") .. " " .. coinIcon(silver, "Silver") end
+  if silver > 0 then return sign .. coinIcon(silver, "Silver") .. " " .. coinIcon(rest, "Copper") end
+  return sign .. coinIcon(rest, "Copper")
+end
+
 local function minutes(seconds)
   if seconds < 3600 then return math.floor(seconds / 60) .. " min" end
   return string.format("%d h %d min", math.floor(seconds / 3600), math.floor(seconds % 3600 / 60))
@@ -450,12 +463,14 @@ function U.WeekLine()
   return "This week: +" .. U.Money(sum.totalIn) .. " / -" .. U.Money(sum.totalOut)
 end
 
--- Raid lockouts exist only while the completion tracker is on; "-" when it is off or the character has none.
+-- Raid lockouts exist only while the completion tracker is on; "-" when it is off or the character has none. A
+-- lockout whose reset time has passed is gone in the game too, as in the Collection view.
 local function lockoutText(key)
   if not E:IsEnabled("completion") then return "-" end
+  local now = date("!%Y-%m-%dT%H:%M:%SZ", time())
   local n = 0
   for _, row in ipairs(E:Rows("lockout_owned")) do
-    if type(row) == "table" and row.characterKey == key then n = n + 1 end
+    if type(row) == "table" and row.characterKey == key and type(row.resetAt) == "string" and row.resetAt > now then n = n + 1 end
   end
   return n > 0 and (n .. (n == 1 and " raid" or " raids")) or "-"
 end
@@ -521,7 +536,7 @@ function U.RefreshRoster()
         if item.key == current then row.name:SetTextColor(unpack(COLORS.accent))
         else row.name:SetTextColor(classColor(item.class)) end
         row.level:SetText(type(item.level) == "number" and tostring(item.level) or "-")
-        row.gold:SetText(U.Money(item.copper))
+        row.gold:SetText(U.MoneyShort(item.copper))
         row.profs:SetText(professionText(item.professions))
         row.lockouts:SetText(lockoutText(item.key))
         row.seen:SetText(type(item.lastSeen) == "number" and date("!%Y-%m-%d", item.lastSeen) or "-")

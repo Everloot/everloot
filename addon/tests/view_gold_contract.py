@@ -66,11 +66,36 @@ local function money(text, ...)
 end
 local function click(b) b.scripts.OnClick(b) end
 
+-- List cells: two coins at most. 123456 copper is 12g 34s; the copper is left off.
+assert(money(U.MoneyShort(123456), {{12, 'Gold'}}, {{34, 'Silver'}}) and not U.MoneyShort(123456):find('Copper'), U.MoneyShort(123456))
+assert(money(U.MoneyShort(3456), {{34, 'Silver'}}, {{56, 'Copper'}}) and money(U.MoneyShort(56), {{56, 'Copper'}}) and U.MoneyShort(nil) == '-')
+assert(money(U.MoneyShort(-123456), {{'%-12', 'Gold'}}, {{34, 'Silver'}}), 'a minus in front')
+
+-- Every list's columns fill its row exactly, and the status column fits "sold, gold pending" (100 px).
+local function filled(rows)
+  local row, w = rows[1], rows[1].width
+  local fields = {{}}
+  for k, v in pairs(row) do if type(v) == 'table' and v.kind == 'FontString' then fields[#fields + 1] = v end end
+  table.sort(fields, function(a, b) return a.point[2] < b.point[2] end)
+  local x = 0
+  for _, s in ipairs(fields) do
+    assert(s.point[2] >= x, 'columns do not overlap')
+    x = s.point[2] + s.width
+  end
+  return x == w, x .. ' of ' .. w
+end
+assert(filled(g.rows))
+for _, tab in ipairs({{ 'ledger', 'sales' }}) do click(g.tabs[tab]) end
+for _, rows in ipairs({{ g.categories, g.days, g.receipts, g.sales }}) do assert(filled(rows)) end
+assert(g.sales[1].status.width == 100 and g.sales[1].deposit.width == 56 and g.sales[1].when.width == 76, 'the sales columns')
+assert(g.days[1].date.width == 70 and g.days[1]['in'].width == 76 and g.days[1].out.width == 76 and g.days[1].net.width == 76, 'the day columns')
+click(g.tabs.overview)
+
 -- Overview: every character grouped by realm, the realm and account totals, and the last 30 days.
 local rows = g.rows
 assert(shown(rows) == 4, 'two realm lines, two characters')
-assert(rows[1].name.text == 'Forever' and rows[2].name.text == 'Samplechar' and money(rows[2].gold.text, {{131, 'Gold'}}, {{27, 'Silver'}}, {{45, 'Copper'}}), rows[2].gold.text)
-assert(rows[3].name.text == 'Nightfall' and rows[4].name.text == 'Samplechar' and money(rows[4].gold.text, {{25, 'Gold'}}, {{0, 'Silver'}}, {{0, 'Copper'}}), rows[4].gold.text)
+assert(rows[1].name.text == 'Forever' and rows[2].name.text == 'Samplechar' and money(rows[2].gold.text, {{131, 'Gold'}}, {{27, 'Silver'}}), rows[2].gold.text)
+assert(rows[3].name.text == 'Nightfall' and rows[4].name.text == 'Samplechar' and money(rows[4].gold.text, {{25, 'Gold'}}, {{0, 'Silver'}}), rows[4].gold.text)
 assert(g.realmTotals.Forever == 1312745 and g.realmTotals.Nightfall == 250000)
 assert(g.accountTotal == 1312745 + 250000, 'the account total is every character summed')
 assert(#g.bars == 30 and g.bars[30].value == 1312745 and g.bars[30].hi == 1312745 and g.bars[29].value == 1200000, 'today is the last bar')
@@ -83,11 +108,11 @@ click(g.scopes.character)
 -- Ledger: categories largest first, one day, its receipts newest first, the gold the events do not explain.
 click(g.tabs.ledger)
 assert(g.tab == 'ledger' and g.pages.ledger.shown and not g.pages.overview.shown)
-assert(g.categories[1].label.text == 'Quest rewards' and money(g.categories[1].amount.text, {{6, 'Gold'}}, {{75, 'Silver'}}, {{0, 'Copper'}}), g.categories[1].amount.text)
+assert(g.categories[1].label.text == 'Quest rewards' and money(g.categories[1].amount.text, {{6, 'Gold'}}, {{75, 'Silver'}}), g.categories[1].amount.text)
 assert(g.categories[1].count.text == '1 event' and shown(g.categories) == 4)
 assert(g.categories[4].label.text == 'Flight paths' and money(g.categories[4].amount.text, {{'%-55', 'Copper'}}), 'spending is a minus')
 assert(shown(g.days) == 1 and g.days[1].date.text == '2026-11-07' and g.day == '2026-11-07')
-assert(money(g.days[1]['out'].text, {{55, 'Copper'}}) and money(g.days[1].net.text, {{11, 'Gold'}}, {{22, 'Silver'}}, {{45, 'Copper'}}), g.days[1].net.text)
+assert(money(g.days[1]['out'].text, {{55, 'Copper'}}) and money(g.days[1].net.text, {{11, 'Gold'}}, {{22, 'Silver'}}), g.days[1].net.text)
 assert(shown(g.receipts) == 4, 'four receipts that day')
 assert(g.receipts[1].when.text == '11:00' and g.receipts[1].label.text == 'Auction sales · Linen Cloth × 20', g.receipts[1].label.text)
 assert(g.receipts[2].when.text == '10:15' and g.receipts[3].when.text == '10:00' and g.receipts[4].when.text == '09:00', 'newest first')
@@ -100,10 +125,11 @@ click(g.tabs.sales)
 assert(shown(g.sales) == 3, 'paid, pending and unmatched rows are listed')
 -- Newest first: the pending notice, the paid sale, the unmatched notice.
 assert(g.sales[1].item.text == 'Linen Cloth' and g.sales[1].status.text == 'sold, gold pending', g.sales[1].status.text)
-assert(g.sales[1].count.text == '-' and g.sales[1].unit.text == '-' and g.sales[1].total.text == '-', 'a pending row has no price yet')
+assert(g.sales[1].count.text == '-' and g.sales[1].unit.text == '-' and g.sales[1].total.text == '-' and g.sales[1].deposit.text == '-', 'a pending row has no price yet')
 assert(g.sales[2].item.text .. ' ' .. g.sales[2].count.text == 'Linen Cloth × 20')
 assert(money(g.sales[2].unit.text, {{1, 'Silver'}}, {{90, 'Copper'}}) and money(g.sales[2].total.text, {{38, 'Silver'}}, {{0, 'Copper'}}), g.sales[2].unit.text)
-assert(g.sales[2].when.text == '2026-11-07 11:00' and g.sales[2].status.text == 'paid')
+assert(money(g.sales[2].deposit.text, {{60, 'Copper'}}), 'the deposit the letter returned: ' .. g.sales[2].deposit.text)
+assert(g.sales[2].when.text == '11-07 11:00' and g.sales[2].status.text == 'paid')
 assert(g.sales[3].item.text == 'Copper Ore' and g.sales[3].status.text == 'unmatched' and g.sales[3].total.text == '-')
 click(g.scopes.account)
 assert(shown(g.sales) == 4 and g.sales[2].count.text == '× 20' and g.sales[3].count.text == '× 10', 'newest first')

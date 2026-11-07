@@ -44,15 +44,16 @@ local function lit(b, on)
   if on then b:LockHighlight() else b:UnlockHighlight() end
 end
 
--- A panel of ROWS rows under a heading. Columns are { field, x, width, right aligned }; each row keeps one font
--- string per field. Up and Down page through a longer list.
-local function list(parent, x, y, w, h, title, columns)
+-- A panel of `count` rows (ROWS when not given) under a heading. Columns are { field, x, width, right aligned }
+-- and together fill the row, which is w - 8 wide; each row keeps one font string per field. Up and Down page
+-- through a longer list.
+local function list(parent, x, y, w, h, title, columns, count)
   local b = box(parent, x, y, w, h)
-  local rows = { offset = 0 }
+  local rows = { offset = 0, size = count or ROWS }
   rows.head = text(b, 12)
   rows.head:SetPoint("TOPLEFT", 8, -6)
   rows.head:SetText(title)
-  for i = 1, ROWS do
+  for i = 1, rows.size do
     local row = CreateFrame("Button", nil, b)
     row:SetPoint("TOPLEFT", 4, -24 - (i - 1) * ROW_H)
     row:SetSize(w - 8, ROW_H)
@@ -69,9 +70,9 @@ local function list(parent, x, y, w, h, title, columns)
   rows.empty = text(b, 11, nil, COLORS.muted)
   rows.empty:SetPoint("TOPLEFT", 8, -28)
   rows.empty:SetWidth(w - 16)
-  rows.up = button(b, "Up", 48, function() rows.offset = math.max(0, rows.offset - ROWS) end)
+  rows.up = button(b, "Up", 48, function() rows.offset = math.max(0, rows.offset - rows.size) end)
   rows.up:SetPoint("BOTTOMRIGHT", -58, 6)
-  rows.down = button(b, "Down", 48, function() rows.offset = rows.offset + ROWS end)
+  rows.down = button(b, "Down", 48, function() rows.offset = rows.offset + rows.size end)
   rows.down:SetPoint("BOTTOMRIGHT", -6, 6)
   return rows, b
 end
@@ -79,7 +80,7 @@ end
 -- Fills a list from `items` at its offset; `draw(row, item)` sets one row. With no items, the empty line.
 local function show(rows, items, draw, empty)
   local n = #items
-  rows.offset = math.min(rows.offset, math.floor(math.max(n - 1, 0) / ROWS) * ROWS)
+  rows.offset = math.min(rows.offset, math.floor(math.max(n - 1, 0) / rows.size) * rows.size)
   for i, row in ipairs(rows) do
     local item = items[rows.offset + i]
     if item then draw(row, item); row:Show() else row:Hide() end
@@ -87,11 +88,12 @@ local function show(rows, items, draw, empty)
   rows.empty:SetText(empty)
   if n == 0 then rows.empty:Show() else rows.empty:Hide() end
   if rows.offset > 0 then rows.up:Show() else rows.up:Hide() end
-  if rows.offset + ROWS < n then rows.down:Show() else rows.down:Hide() end
+  if rows.offset + rows.size < n then rows.down:Show() else rows.down:Hide() end
 end
 
+-- List cells use the short money text (two coins at most); the totals under the lists keep the full one.
 local function signed(copper, direction)
-  return U.Money(direction == "out" and -copper or copper)
+  return U.MoneyShort(direction == "out" and -copper or copper)
 end
 
 local function label(category)
@@ -126,7 +128,7 @@ local function drawOverview(g, keys)
   show(g.rows, items, function(row, item)
     row.name:SetText(item.name)
     row.name:SetTextColor(unpack(item.header and COLORS.muted or COLORS.text))
-    row.gold:SetText(U.Money(item.copper))
+    row.gold:SetText(U.MoneyShort(item.copper))
   end, "No characters recorded yet.")
   g.total:SetText(#items > 0 and ("All characters  " .. U.Money(account)) or "")
 
@@ -165,9 +167,9 @@ local function drawLedger(g, keys)
     row.day = d.date
     row.date:SetText(d.date)
     row.date:SetTextColor(unpack(d.date == g.day and COLORS.accent or COLORS.text))
-    row["in"]:SetText(U.Money(d.inCopper))
-    row.out:SetText(U.Money(d.outCopper))
-    row.net:SetText(U.Money(d.net))
+    row["in"]:SetText(U.MoneyShort(d.inCopper))
+    row.out:SetText(U.MoneyShort(d.outCopper))
+    row.net:SetText(U.MoneyShort(d.net))
   end, NO_EVENTS)
 
   g.receipts.head:SetText(g.day and ("Receipts  " .. g.day) or "Receipts")
@@ -197,13 +199,15 @@ local function drawSales(g, keys)
     local priced = type(s.count) == "number" and type(s.total) == "number"
     row.item:SetText(s.itemName)
     row.count:SetText(priced and ("× " .. s.count) or "-")
-    row.unit:SetText(priced and U.Money(s.unit) or "-")
-    row.total:SetText(priced and U.Money(s.total) or "-")
+    row.unit:SetText(priced and U.MoneyShort(s.unit) or "-")
+    row.total:SetText(priced and U.MoneyShort(s.total) or "-")
     if g.grouped then
+      row.deposit:SetText("")
       row.when:SetText(s.sales .. (s.sales == 1 and " sale" or " sales"))
       row.status:SetText("")
     else
-      row.when:SetText(date("!%Y-%m-%d %H:%M", s.at))
+      row.deposit:SetText(type(s.deposit) == "number" and U.MoneyShort(s.deposit) or "-")
+      row.when:SetText(date("!%m-%d %H:%M", s.at))
       row.status:SetText(STATUS_TEXT[s.status] or "-")
     end
   end, NO_SALES)
@@ -279,7 +283,7 @@ local function build(f, parent)
   -- Overview: characters by realm, and the scope's closing gold for the last 30 days.
   local o = g.pages.overview
   local roster
-  g.rows, roster = list(o, 0, 0, 290, 300, "Characters", { { "name", 6, 150 }, { "gold", 150, 126, true } })
+  g.rows, roster = list(o, 0, 0, 290, 300, "Characters", { { "name", 0, 150 }, { "gold", 150, 132, true } })
   g.total = text(roster, 12)
   g.total:SetPoint("BOTTOMLEFT", 8, 10)
   local chart = box(o, 296, 0, 308, 300)
@@ -299,17 +303,18 @@ local function build(f, parent)
   g.chartCaption = text(chart, 12)
   g.chartCaption:SetPoint("BOTTOMLEFT", 10, 14)
 
-  -- Ledger: by category, by day, and the receipts of the day picked.
+  -- Ledger: by day on the left; by category and the receipts of the day picked stacked on the right, five rows
+  -- each, so every money column has room for its coins.
   local l = g.pages.ledger
-  g.categories = list(l, 0, 0, 196, 290, "By category",
-    { { "label", 4, 80 }, { "amount", 84, 62, true }, { "count", 148, 40, true } })
-  g.days = list(l, 202, 0, 228, 290, "By day  |cffc9c3b0in, out, net|r",
-    { { "date", 4, 58 }, { "in", 64, 52, true }, { "out", 118, 50, true }, { "net", 170, 52, true } })
+  g.days = list(l, 0, 0, 306, 290, "By day  |cffc9c3b0in, out, net|r",
+    { { "date", 0, 70 }, { "in", 70, 76, true }, { "out", 146, 76, true }, { "net", 222, 76, true } })
   for _, row in ipairs(g.days) do
     row:SetScript("OnClick", function(self) g.day = self.day; g.receipts.offset = 0; redraw() end)
   end
-  g.receipts = list(l, 436, 0, 168, 290, "Receipts",
-    { { "when", 4, 30 }, { "label", 36, 76 }, { "amount", 112, 52, true } })
+  g.categories = list(l, 312, 0, 292, 142, "By category",
+    { { "label", 0, 148 }, { "amount", 148, 76, true }, { "count", 224, 60, true } }, 5)
+  g.receipts = list(l, 312, -148, 292, 142, "Receipts",
+    { { "when", 0, 34 }, { "label", 34, 174 }, { "amount", 208, 76, true } }, 5)
   g.unrecorded = text(l, 12, nil, COLORS.muted)
   g.unrecorded:SetPoint("TOPLEFT", 4, -300)
   g.moved = text(l, 12, nil, COLORS.muted)
@@ -318,8 +323,8 @@ local function build(f, parent)
   -- Sales, newest first, or one row per item.
   local salesBox
   g.sales, salesBox = list(g.pages.sales, 0, 0, W, 300, "Auction sales",
-    { { "item", 4, 190 }, { "count", 198, 50 }, { "unit", 252, 90, true }, { "total", 346, 90, true },
-      { "when", 446, 100 }, { "status", 550, 44 } })
+    { { "item", 0, 184 }, { "count", 184, 34 }, { "unit", 218, 70, true }, { "total", 288, 70, true },
+      { "deposit", 358, 56, true }, { "when", 420, 76 }, { "status", 496, 100 } })
   g.groupButton = button(salesBox, "By item", 90, function() g.grouped = not g.grouped; g.sales.offset = 0 end)
   g.groupButton:SetPoint("BOTTOMLEFT", 6, 6)
 
