@@ -97,15 +97,16 @@ end
 
 BEFORE = ["core.lua", "modules/auctions.lua", "modules/gold.lua", "modules/roster.lua", "modules/ledger.lua",
           "modules/prices.lua", "modules/drops.lua", "modules/gph.lua", "modules/options.lua"]
-AFTER = ["modules/view_gold.lua", "modules/minimap.lua"]
+AFTER = ["modules/view_gold.lua", "modules/view_collection.lua", "modules/minimap.lua"]
 
 
-def fresh(saved: str = "nil", api: str = "", window: bool = True):
+def fresh(saved: str = "nil", api: str = "", window: bool = True, extra: tuple = ()):
+    """`extra` are more files loaded after BEFORE, such as the recording modules a view reads."""
     lua = LuaRuntime()
     lua.execute(WORLD)
     lua.execute(api)
     lua.execute(f"EverlootDB = {saved}")
-    for file in BEFORE:
+    for file in [*BEFORE, *extra]:
         lua.execute((root / file).read_text(encoding="utf-8"))
     # Every global that exists before the window's file runs; the window may add its own frame name only.
     lua.execute("globalsBefore = {}; for k in pairs(_G) do globalsBefore[k] = true end")

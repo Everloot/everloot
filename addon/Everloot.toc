@@ -43,5 +43,6 @@ modules\options.lua
 modules\planner.lua
 modules\window.lua
 modules\view_gold.lua
+modules\view_collection.lua
 modules\minimap.lua
 modules\drawer.lua
