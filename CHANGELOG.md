@@ -82,7 +82,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Added
 - Addon: the Everloot window's sidebar is now Home, Gold, Collection, Professions and Settings. Ask, Build plan and
-  Auctions left the sidebar; `/ask`, `/everloot plan` and the auction house tab are unchanged.
+  Auctions left the sidebar; `/ask` and `/everloot plan` still work.
 - Addon: Home lists every character this install has seen (gold, level, professions, raid lockouts, last seen) with
   realm and account totals and a "This week" line. "What you've added" moved to the Settings page.
 - Addon: the Gold tab has Overview (gold by character and realm, the last 30 days as bars), Ledger (by category, day or

@@ -218,20 +218,20 @@ game's options API shows the page as a window instead.
 
 Left-click the minimap button, or `/everloot window`, for the Everloot window. Its sidebar has five items.
 
-- **Home** lists every character this install has seen: gold, level, professions, raid lockouts and when it was last
+- **Home** lists every character this install has seen: gold, level, professions, raid lockouts (shown only while the completion tracker is on) and when it was last
   seen, with totals for each realm and for the account and a "This week" line (gold in and out for this character over
   seven days). Below it, the gold per hour session with a Pause button.
 - **Gold** has four tabs. **Overview** shows every character's gold by realm and the last 30 days as bars. **Ledger**
   lists the money events by category, by day or by receipt. **Sales** lists auction sales one by one or by item.
-  **Session** is the gold per hour session. Each can be set to today, 7 days, 30 days or all, for this character or the account.
+  **Session** is the gold per hour session. Ledger and Sales can be set to today, 7 days, 30 days or all; Overview always
+  shows the last 30 days. Overview, Ledger and Sales can be set to this character or the account; Session has neither.
 - **Collection** shows this character's achievements, reputation, titles and raid lockouts from the rows the
   completion tracker wrote, so it needs `/everloot completion on`; with it off the tab says so and has a button that runs that command.
 - **Professions** shows each profession in the profession book with its rank and the recipes recorded for it by
   difficulty colour.
 - **Settings** opens this page. "What you've added", the row counts in your saved file, is on that page now.
 
-Ask, Build plan and Auctions are no longer in the sidebar. `/ask`, `/everloot plan` (the planner workspace) and the
-auction house tab work as before.
+Ask, Build plan and Auctions are no longer in the sidebar. `/ask` and `/everloot plan` (the planner workspace) still work.
 
 The Gold tab and the character list on Home read two tables that exist only in your SavedVariables file.
 `EverlootDB.roster` holds one row per character you log in with (name, realm, class, level, faction, gold while the
@@ -360,8 +360,8 @@ code (`EL-7K3Q-9P`) to a signed-in player; it works once, for 15 minutes. Nothin
 
 ### Bring a website plan into the game
 
-Open `/everloot`, or **Build plan** in the Everloot window, for the **Talents / Raid** workspace. With the window
-off, a left-click on the minimap button opens the workspace instead.
+Open `/everloot` for the **Talents / Raid** workspace, or load a plan straight into the plan panel with
+`/everloot plan <share code>`.
 Right-click the minimap button, or use `/everloot options`, for collection settings.
 `/everloot status` still prints the collector status.
 
