@@ -3,8 +3,9 @@
 -- thresholds themselves. Each row records what the window showed (profession, rank, recipe, colour,
 -- product, reagents); the server infers threshold ranges from many installs.
 -- A colour only bounds a threshold through the lowest and the highest rank it was seen at, so those are
--- the rows kept: the lowest is written at once; the highest waits until the colour changes or the player
--- logs out, then it is written once. Ranks in between add nothing, and reopening adds nothing. Recipes the
+-- the rows kept: the lowest is written at once; the highest waits (saved with the file, so a reload keeps it)
+-- until the colour changes, or until a logout on a later UTC day than that recipe's last highest-rank row.
+-- Ranks in between add nothing, and reopening or reloading adds nothing. Recipes the
 -- player has not learned are not written: the site does not use them, and the complete list holds hundreds.
 -- A trainer window lists each profession recipe's required rank and training cost: one row per
 -- recipe, rank and cost. Reads windows the player opened. Never crafts, clicks, trains or plays.
@@ -120,12 +121,19 @@ local function flush(recipe)
   local waiting = EverlootDB.recipeWaiting and EverlootDB.recipeWaiting[recipe]
   if not waiting then return end
   EverlootDB.recipeWaiting[recipe] = nil
+  EverlootDB.recipeFlushed = EverlootDB.recipeFlushed or {}
+  EverlootDB.recipeFlushed[recipe] = date("!%Y-%m-%d")
   E:Store("recipe_observed", waiting)
 end
 
---- Write every waiting row: at logout, so the file the player uploads holds each colour's highest rank.
+--- Write the waiting rows at logout, at most one per recipe per UTC day: a waiting row is saved with the
+--- file, so a reload loses nothing by leaving it, and writing it each time would add a row per reload.
 local function flushAll()
-  for recipe in pairs(EverlootDB and EverlootDB.recipeWaiting or {}) do flush(recipe) end
+  local today = date("!%Y-%m-%d")
+  local flushed = EverlootDB and EverlootDB.recipeFlushed or {}
+  for recipe in pairs(EverlootDB and EverlootDB.recipeWaiting or {}) do
+    if flushed[recipe] ~= today then flush(recipe) end
+  end
 end
 
 --- One recipe into a row: "stored", "known" (nothing new), "pending" (reagent names not loaded),
