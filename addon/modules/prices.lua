@@ -226,7 +226,7 @@ local function priceLines(realm, itemId)
     if not built or not today then
       add("  price file age unknown (stale?)", WARN, nil, nil, true)
     elseif today - built > E.STALE_DAYS then
-      add(string.format("  OLD FILE: built %s; the Desktop App or companion refreshes it, then /reload", entry.asOf:sub(1, 10)), WARN, nil, nil, true)
+      add(string.format("  OLD FILE: built %s; the Everloot Desktop App refreshes it, then /reload", entry.asOf:sub(1, 10)), WARN, nil, nil, true)
     else
       add("  price file built " .. entry.asOf:sub(1, 10), META)
     end
@@ -328,11 +328,11 @@ end
 local function missingNote(realm, entry)
   if entry.status == "verifying" then return "The price file is still being checked; try again in a moment." end
   if entry.status == "bad" and not entry.silent then
-    return "The community prices for " .. realm .. " failed their checksum and were not used: refresh them with the Desktop App or companion, then /reload."
+    return "The community prices for " .. realm .. " failed their checksum and were not used: refresh them with the Everloot Desktop App, then /reload."
   end
   if entry.status == "bad" then
     if type(EverlootPricesDB) ~= "table" then
-      return "No Everloot price file in the game yet: the Everloot Desktop App or companion writes it, then /reload."
+      return "No Everloot price file in the game yet: the Everloot Desktop App writes it, then /reload."
     end
     return "The Everloot price file has no data for " .. realm .. " yet: scan its auction house or follow it in the Desktop App, then /reload."
   end

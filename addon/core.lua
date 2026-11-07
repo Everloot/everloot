@@ -4,6 +4,8 @@
 
 Everloot = Everloot or {}
 local E = Everloot
+-- The game passes the folder name as the first argument of each file; a folder extracted as Everloot-0.3.20 is still this addon.
+local addonName = ... or "Everloot"
 
 E.VERSION = "0.3.21"
 E.MAX_ROWS_PER_KIND = 2000
@@ -206,8 +208,21 @@ function E:Status()
     "gold_snapshot", "money_event", "addon_seen", "map_bounds", "talent_snapshot",
     "achievement_catalog", "reputation_catalog", "title_catalog", "quest_chain_catalog",
     "achievement_owned", "reputation_owned", "title_owned", "quest_owned", "census_self", "census_seen", "player_seen", "character_link", "pull_summary" }) do
-    if E.RUN_RECORDS or not RUN_KINDS[kind] then lines[#lines + 1] = string.format("  rows %s: %d", kind, self:Count(kind)) end
+    local count = self:Count(kind)
+    if count > 0 and (E.RUN_RECORDS or not RUN_KINDS[kind]) then lines[#lines + 1] = string.format("  rows %s: %d", kind, count) end
   end
+  -- Any other kind a module wrote (guild_kill, for one) follows, by name.
+  local listed = {}
+  for _, line in ipairs(lines) do
+    local shown = line:match("^  rows (%S+):")
+    if shown then listed[shown] = true end
+  end
+  local extra = {}
+  for kind, store in pairs(EverlootDB and EverlootDB.records or {}) do
+    if not listed[kind] and (E.RUN_RECORDS or not RUN_KINDS[kind]) and type(store) == "table" and #store > 0 then extra[#extra + 1] = kind end
+  end
+  table.sort(extra)
+  for _, kind in ipairs(extra) do lines[#lines + 1] = string.format("  rows %s: %d", kind, self:Count(kind)) end
   return table.concat(lines, "\n")
 end
 
@@ -233,7 +248,7 @@ local PULLS_TEXT = "After each boss pull in a dungeon or raid it records your gr
 
 frame:RegisterEvent("ADDON_LOADED")
 frame:SetScript("OnEvent", function(_, event, arg1)
-  if event == "ADDON_LOADED" and arg1 == "Everloot" then
+  if event == "ADDON_LOADED" and arg1 == addonName then
     local upgraded = EverlootDB ~= nil
     EverlootDB = EverlootDB or {}
     for k, v in pairs(defaults) do if EverlootDB[k] == nil then EverlootDB[k] = v end end

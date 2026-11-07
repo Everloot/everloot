@@ -131,7 +131,7 @@ local function finishFallback(s)
   scan = nil
   if s.stored == 0 then EverlootDB.lastScanAt = s.previousScanAt end
   say(string.format("partial price sample: stored %d search rows; this is not a full market scan. %s",
-    s.stored, s.stored > 0 and "Upload with the companion." or "The auction house sent no data with usable buyouts. Try again."))
+    s.stored, s.stored > 0 and "Upload with the Everloot Desktop App." or "The auction house sent no data with usable buyouts. Try again."))
 end
 
 local function nextFallbackItem(s)
@@ -351,14 +351,14 @@ local function finish()
       faction = s.faction, house = s.house,
       scanId = scanId, part = p, parts = parts, items = items,
     }) then
-      return say("the scan could not be stored. Upload your file with the companion, then scan again.")
+      return say("the scan could not be stored. Upload your file with the Everloot Desktop App, then scan again.")
     end
   end
   pruneScans(s.realm)
   EverlootDB.lastScans = EverlootDB.lastScans or {}
   EverlootDB.lastScans[s.realm] = { scanId = scanId, at = s.startedAt }
   E.ownScanCache = nil
-  return say(string.format("scanned %d items on %s (%d rows skipped, %d not loaded). Upload with the companion.",
+  return say(string.format("scanned %d items on %s (%d rows skipped, %d not loaded). Upload with the Everloot Desktop App.",
     #ids, s.realm, s.skipped, s.incomplete))
 end
 
