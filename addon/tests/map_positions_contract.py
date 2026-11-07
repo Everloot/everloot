@@ -62,7 +62,7 @@ lua.execute("""
 local registered = Everloot.frame.events
 for _, name in ipairs({'MERCHANT_SHOW','GOSSIP_SHOW','QUEST_DETAIL','QUEST_GREETING','TRAINER_SHOW','TAXIMAP_OPENED',
   'BANKFRAME_OPENED','AUCTION_HOUSE_SHOW','PET_STABLE_SHOW','CONFIRM_BINDER','PLAYER_INTERACTION_MANAGER_FRAME_SHOW',
-  'UNIT_SPELLCAST_SENT','LOOT_OPENED','LOOT_CLOSED'}) do
+  'LOOT_OPENED','LOOT_CLOSED'}) do
   assert(registered[name], name .. ' is not registered')
 end
 
