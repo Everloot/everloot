@@ -221,4 +221,36 @@ shown = tooltip(2589)
 assert(shown:find('Market value', 1, true) and not shown:find('Vendor', 1, true), 'a secret link cannot show the item loaded: ' .. shown)
 """)
 
+# --- /everloot raid: an aura name or spell id the client hides is never a table key, and a unit with only those is unreadable ---
+lua = fresh(["modules/raid_data.lua", "modules/raid.lua"])
+lua.execute("""
+IsInGroup = function() return true end
+IsInRaid = function() return true end
+GetNumGroupMembers = function() return 2 end
+GetRaidRosterInfo = function(i) return 'Member' .. i, 0, 1, 60, 'Warrior', 'WARRIOR' end
+UnitExists = function() return true end
+UnitIsConnected = function() return true end
+UnitIsVisible = function() return true end
+UnitClass = function() return 'Warrior', 'WARRIOR' end
+local shown = {}
+print = function(line) shown[#shown + 1] = line end
+local secretAura = true
+C_UnitAuras = { GetAuraDataByIndex = function(unit, i)
+ if unit == 'raid1' then
+  if i == 1 then return { name = secretAura and secretText or 'Battle Shout', spellId = secretAura and secretNumber or 6673 } end
+  return nil
+ end
+ if i == 1 then return { name = 'Battle Shout', spellId = 6673 } end
+ return nil
+end }
+local members = Everloot.Raid.ReadGroup()
+assert(members[1].readable == false, 'a unit with only secret auras is unreadable')
+assert(not holds(members[1].auras, secretText) and not holds(members[1].auras, secretNumber), 'a secret aura is not stored as a key')
+assert(members[2].readable == true and members[2].auras['Battle Shout'], 'a plain unit reads as before')
+Everloot:InitModules()
+SlashCmdList.EVERLOOT('raid')
+local text = table.concat(shown, '\\n')
+assert(text:find('1 member(s) could not be read', 1, true), 'the secret unit is counted as unreadable: ' .. text)
+""")
+
 print("secret values contract ok")
