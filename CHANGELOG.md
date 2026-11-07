@@ -274,6 +274,19 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
   instead of withdrawing the event as a conflict. The map shows none of this yet.
 
+## [desktop-v0.1.20] - 2026-11-06
+
+### Added
+- Private sync now sends three more parts of a linked character: the active talent build, the character sheet's stats
+  (attributes, attack power, hit, crit, haste, expertise, spell power, healing, armor, defense, dodge, parry, block) and
+  PvP standing (rank, rank points, top rank, season, lifetime honorable kills). They come from the addon's next
+  release, which records them with the completion tracker on. As before, only characters you linked are sent, and
+  everloot.app keeps only the categories you switched on for that character on /account.
+
+### Changed
+- The Characters page no longer says professions and raid lockouts stay on your computer. They never go in an upload,
+  and private sync sends them only for a character you linked.
+
 ## [0.3.21] - 2026-11-06
 
 Release channel: Alpha
