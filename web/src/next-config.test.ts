@@ -6,6 +6,7 @@ import nextConfig from "../next.config.js";
 import { PREFIXES, SERVED } from "./lib/build-versions";
 import { CHAT_PROVIDERS } from "./lib/chat/providers";
 import { isProtectedPath } from "./lib/document-boundary";
+import { isPrivatePath } from "./lib/cf-edge-cache";
 
 // The served version's prefix (/beta before launch, none once Live is served) shows the same pages; another
 // version's prefix shows its notice. Read from the routing table, so the switch at launch changes no test here.
@@ -128,6 +129,8 @@ test("only the public pages rendered per request are marked for the shared CDN c
   // The pages that hold a session, the account or a collection never join that list, whatever a future edit adds.
   for (const source of marked) {
     expect(isProtectedPath(source.replace(/:path\*$/, "")), source).toBe(false);
+    // Nor a session route the edge cache refuses by route: the two lists must never overlap.
+    expect(isPrivatePath(source.replace(/\/:path\*$/, "") || "/"), source).toBe(false);
     expect(source, source).not.toMatch(/^\/(?:guilds?|players?|u|account|settings|chat|tools\/collections)(?:\/|$)/);
   }
 });

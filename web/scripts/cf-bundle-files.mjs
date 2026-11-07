@@ -1,11 +1,14 @@
 /**
  * After `opennextjs-cloudflare build`: copy the repository files the pages read at run time into
  * .open-next/repo, so wrangler uploads them with the Worker (the `rules` in wrangler.jsonc) and node:fs finds
- * them under /bundle/repo. The directories match the NEWS_DIR, GUIDES_DIR and WIKI_DIR vars there.
+ * them under /bundle/repo. The directories match the NEWS_DIR, GUIDES_DIR and WIKI_DIR vars there. It also writes
+ * .open-next/cache-versions.json, the edge cache's content versions for this build.
  * Run from web/: node scripts/cf-bundle-files.mjs
  */
 import { cpSync, existsSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { unstable_readConfig } from "wrangler";
+import { writeCacheVersions } from "./cache-versions.mjs";
 
 const OUT = join(".open-next", "repo");
 const DIRS = ["kb/news", "kb/guides", "kb/wiki"];
@@ -39,4 +42,8 @@ writeFileSync(join(".open-next", "assets", "_headers"), [
 ].join("\n"));
 // The Worker entry (wrangler.jsonc `main`): OpenNext's worker plus the scheduled jobs.
 cpSync(join("scripts", "cf-entry.mjs"), join(".open-next", "cf-entry.mjs"));
+// The edge cache's content versions, from this build's inputs and output (scripts/cache-versions.mjs). The entry
+// imports the file, so the versions ship inside the bundle they describe; a missing input stops the build here.
+const versions = writeCacheVersions({ vars: unstable_readConfig({ config: "wrangler.jsonc" }, {}).vars ?? {} });
 console.log(`Copied ${DIRS.join(", ")} and the protocol schemas into ${OUT}, and the Worker entry`);
+console.log(`Edge cache versions: ${Object.entries(versions).map(([name, value]) => `${name} ${value.slice(0, 12)}`).join(", ")}`);

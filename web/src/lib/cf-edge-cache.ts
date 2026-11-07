@@ -16,10 +16,25 @@ import PROTECTED_PATHS from "../data/protected-paths.json";
 
 export const ORIGINAL_CACHE_CONTROL = "x-everloot-browser-cache-control";
 
+/**
+ * The routes that sign a visitor in, read or change the session, or sit behind a purchase: auth, the signed-in
+ * visitor's own data, sign-in, sign-up and password reset, and a cart. Matched by route, before any lookup, so no
+ * header a handler sets can put one of them in the shared cache. `/cart` and `/api/cart` have no route today; they
+ * are listed so a later one is private from its first deploy.
+ */
+const SESSION_PATHS: readonly string[] = ["/api/auth", "/api/me", "/me", "/sign-in", "/sign-up", "/reset-password", "/cart", "/api/cart"];
+
 /** The pages that hold a session or the account. They are never looked up in, or stored in, the shared cache. */
-const PRIVATE_PATHS: readonly string[] = PROTECTED_PATHS;
+const PRIVATE_PATHS: readonly string[] = [...PROTECTED_PATHS, ...SESSION_PATHS];
 export function isPrivatePath(pathname: string): boolean {
-  return PRIVATE_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  // The router reads the decoded path, so `/%6De` is `/me`: match what it will serve. An undecodable path is refused.
+  let route: string;
+  try {
+    route = decodeURIComponent(pathname).replace(/\/{2,}/g, "/").toLowerCase();
+  } catch {
+    return true;
+  }
+  return PRIVATE_PATHS.some((p) => route === p || route.startsWith(`${p}/`));
 }
 
 /**
@@ -57,11 +72,15 @@ export const ITEM_LIST_PARAMS: ReadonlySet<string> = new Set([
 ]);
 const ITEM_LIST_PATH = /^\/database\/items(?:\/[a-z][a-z0-9-]*(?:\/[^/]+)?)?\/?$/;
 
-/** Parameters a campaign or bot appends that no page reads. They are dropped from every key. */
+/**
+ * Parameters a campaign or bot appends that no page reads, and this cache's own markers (`__edge_*`): a request
+ * that carries one, once or repeated, gets the key it would have without it, and cannot choose its own version.
+ * They are dropped from every key.
+ */
 const TRACKING_PARAMS: ReadonlySet<string> = new Set([
   "_", "_ga", "_gl", "cache", "cachebust", "cb", "dclid", "fbclid", "gbraid", "gclid", "igshid", "mc_cid", "mc_eid",
   "msclkid", "nocache", "oly_anon_id", "oly_enc_id", "ref_src", "ref_url", "srsltid", "twclid", "vero_id", "wbraid",
-  "yclid",
+  "yclid", "__edge_build", "__edge_version",
 ]);
 const isTracking = (k: string) => TRACKING_PARAMS.has(k) || k.startsWith("utm_");
 
@@ -107,16 +126,19 @@ export function cacheVersionFor(pathname: string, versions: EdgeCacheVersions): 
 
 /**
  * The cache key: the URL plus the route's content version, so a deploy only starts an empty cache for the pages
- * whose content changed. Parameters the page never reads (tracking tags, cache busters bots add) are dropped and
- * the rest sorted on every route, so they cannot mint an unbounded number of misses; the item lists keep only the
- * parameters they read. Meaningful values stay, and different ones are different keys.
+ * whose content changed. Parameters the page never reads (tracking tags, cache busters bots add, this cache's own
+ * markers) are dropped and the rest ordered by name on every route, so they cannot mint an unbounded number of
+ * misses; the item lists keep only the parameters they read. Meaningful values stay, and different ones are
+ * different keys. The values of one repeated name keep the order they came in: a page reads the first of them, so
+ * `?realm=a&realm=b` and `?realm=b&realm=a` are different pages and must not share a key.
  */
 export function edgeCacheKey(req: Request, version: string): Request {
   const url = new URL(req.url);
   const kept = ITEM_LIST_PATH.test(url.pathname)
     ? [...url.searchParams].filter(([k]) => ITEM_LIST_PARAMS.has(k))
     : [...url.searchParams].filter(([k]) => !isTracking(k));
-  kept.sort(([a, x], [b, y]) => (a === b ? (x < y ? -1 : x > y ? 1 : 0) : a < b ? -1 : 1));
+  // Array.prototype.sort is stable: equal names stay in request order.
+  kept.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   url.search = new URLSearchParams(kept).toString();
   url.searchParams.set("__edge_version", version || "unknown");
   return new Request(url.toString(), { method: "GET" });

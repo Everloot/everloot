@@ -4,6 +4,8 @@
 // API for `repo` and nothing from the other hosts, which are plain links.
 // Reading `## X-Website` from the .toc through the addon-list opt-in would replace this map, but it
 // needs an addon release first.
+import registryFile from "../../../kb/curated/ecosystem.json";
+import { parseRegistry } from "../../../kb/src/ecosystem";
 
 export interface AddonSource {
   /** GitHub "owner/name". */
@@ -24,11 +26,31 @@ export function curatedAddon(name: string): { name: string; source: AddonSource 
   return key ? { name: key, source: ADDON_SOURCES[key] } : null;
 }
 
+/** The ecosystem registry (kb/curated/ecosystem.json): projects a maintainer checked by hand, with their folder names. */
+const REGISTRY = parseRegistry(registryFile).projects;
+
+/** An addon the owner approved: the only kind that gets a public catalog page, title and source on this site. */
+export interface ApprovedAddon {
+  /** The folder name as the owner spelled it. */
+  name: string;
+  /** The title the site shows, never one an upload reports. */
+  title: string;
+  /** Where the author publishes it. */
+  source: AddonSource;
+}
+
 /**
- * The name the site shows for an addon: the owner-approved spelling when the folder is curated, else the name
- * the installs report. A live report can never replace the curated one, so an unapproved upload cannot stand in
- * for a verified addon's page or take its source link. Null when neither names it.
+ * The owner-approved entry for a folder name, ignoring case, or null. Approved means named in the curated source map
+ * (addon-repos.ts) or by a project in the ecosystem registry; both are edited by hand in this repository, so a
+ * release changes the set and an upload never does. The curated map's links win, since they carry the author's
+ * download pages; a registry project supplies its repository. Install counts (a live, anonymous aggregate) are
+ * joined to an approved entry by the page and never decide what is approved, how it is titled or where it is published.
  */
-export function canonicalAddonName(typed: string, live: string | null): string | null {
-  return curatedAddon(typed)?.name ?? live;
+export function approvedAddon(name: string): ApprovedAddon | null {
+  const wanted = name.toLowerCase();
+  const project = REGISTRY.find((p) => p.addonNames.some((n) => n.toLowerCase() === wanted));
+  const curated = curatedAddon(name);
+  if (curated) return { name: curated.name, title: project?.name ?? curated.name, source: curated.source };
+  const folder = project?.addonNames.find((n) => n.toLowerCase() === wanted);
+  return project && folder ? { name: folder, title: project.name, source: { repo: project.repo } } : null;
 }

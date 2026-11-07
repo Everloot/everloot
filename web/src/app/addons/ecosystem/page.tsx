@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { curatedAddon } from "@/data/addon-repos";
+import { approvedAddon } from "@/data/addon-repos";
 import { BADGES, buildBoards, loadEcosystem, type BadgeId, type ProjectView } from "@/lib/ecosystem";
 import { pageMetadata } from "@/lib/seo";
 import { REPO_URL } from "@/lib/source";
@@ -33,7 +33,9 @@ const BADGE_LABEL: Record<BadgeId, string> = {
 function profileHref(project: ProjectView): string | null {
   const name = project.addonNames[0];
   if (!name) return null;
-  return project.installs !== null || curatedAddon(name) ? `/addons/${encodeURIComponent(name)}` : null;
+  // Only an owner-approved folder has a page; the link uses the owner's spelling.
+  const approved = approvedAddon(name);
+  return approved ? `/addons/${encodeURIComponent(approved.name)}` : null;
 }
 
 /** One project's repository facts, label beside value, as a line that wraps. */
