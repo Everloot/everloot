@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { classContextParams } from "./class-context";
-import { DEGRADED_TTL, ITEM_LIST_PARAMS, cacheCopy, cacheVersionFor, edgeCacheKey, edgeCacheable, edgeDegraded, edgeTtl, forCache, fromCache } from "./cf-edge-cache";
+import { DEGRADED_TTL, ITEM_LIST_PARAMS, cacheCopy, cacheVersionFor, cachedResponse, edgeCacheKey, edgeCacheable, edgeDegraded, edgeTtl, forCache, fromCache, isPrivatePath, versionsComplete } from "./cf-edge-cache";
 import { itemsHref } from "./items";
 
 const page = (headers: Record<string, string>, status = 200) => new Response("<html></html>", { status, headers });
@@ -24,12 +24,23 @@ test("an error, a response that sets a cookie, or one that varies on a credentia
   expect(edgeTtl(page({ "cdn-cache-control": "max-age=3600", vary: "accept-encoding" }))).toBe(3600);
 });
 
-test("only plain GETs without credentials use the shared cache; a cookie alone does not bypass it", () => {
+test("only plain GETs without credentials use the shared cache; a cookie or authorization bypasses it", () => {
   expect(edgeCacheable(new Request("https://everloot.app/database"))).toBe(true);
   expect(edgeCacheable(new Request("https://everloot.app/database", { method: "POST" }))).toBe(false);
   expect(edgeCacheable(new Request("https://everloot.app/database", { headers: { authorization: "Bearer evl_x" } }))).toBe(false);
-  // The page reads no cookies, and a response that sets one or varies on one is never kept (edgeTtl).
-  expect(edgeCacheable(new Request("https://everloot.app/database", { headers: { cookie: "evl_session=abc" } }))).toBe(true);
+  // The Cache API ignores Vary, so a request carrying a session must never read a copy rendered for someone else.
+  expect(edgeCacheable(new Request("https://everloot.app/database", { headers: { cookie: "evl_session=abc" } }))).toBe(false);
+});
+
+test("the pages that hold a session or the account never reach the shared cache", () => {
+  for (const path of ["/chat", "/chat/abc", "/account", "/settings", "/tools/builds", "/tools/builds/12", "/tools/alts", "/guides/write"]) {
+    expect(edgeCacheable(new Request(`https://everloot.app${path}`)), path).toBe(false);
+    expect(isPrivatePath(path), path).toBe(true);
+  }
+  // A prefix only matches a whole segment: /chatty and /accounting are public pages.
+  expect(edgeCacheable(new Request("https://everloot.app/chatty"))).toBe(true);
+  expect(edgeCacheable(new Request("https://everloot.app/accounting"))).toBe(true);
+  expect(edgeCacheable(new Request("https://everloot.app/guides/frost-leveling"))).toBe(true);
 });
 
 test("the key carries the route's content version, not the deploy: the same content keeps the cache, a change starts a new key", () => {
@@ -49,12 +60,24 @@ test("a data change refreshes data pages, a knowledge change knowledge pages, an
   expect(changed("/guides/frost-leveling", { knowledge: "k2" })).not.toBe(version("/guides/frost-leveling"));
   expect(changed("/addon", { addon: "a2" })).not.toBe(version("/addon"));
   expect(changed("/addons", { addon: "a2" })).not.toBe(version("/addons"));
+  // Addon pages join the ecosystem snapshot from kb.
+  expect(changed("/addon", { knowledge: "k2" })).not.toBe(version("/addon"));
   expect(changed("/addon-guide", { addon: "a2" })).toBe(version("/addon-guide"));
   expect(changed("/about", { data: "d2", knowledge: "k2", addon: "a2" })).toBe(version("/about"));
   expect(changed("/about", { template: "t2" })).not.toBe(version("/about"));
-  // The sitemap lists data and knowledge pages, so it follows both.
+  // The sitemap lists data, knowledge and addon pages, so it follows all three.
   expect(changed("/sitemap.xml", { data: "d2" })).not.toBe(version("/sitemap.xml"));
   expect(changed("/sitemap.xml", { knowledge: "k2" })).not.toBe(version("/sitemap.xml"));
+  expect(changed("/sitemap.xml", { addon: "a2" })).not.toBe(version("/sitemap.xml"));
+});
+
+test("the home page reads the game files, the knowledge timeline and the addon release, so it follows all three", () => {
+  for (const over of [{ data: "d2" }, { knowledge: "k2" }, { addon: "a2" }, { template: "t2" }] as Partial<typeof VERSIONS>[]) {
+    expect(cacheVersionFor("/", { ...VERSIONS, ...over }), JSON.stringify(over)).not.toBe(version("/"));
+  }
+  expect(cacheVersionFor("/home", { ...VERSIONS })).toBe(version("/"));
+  // /homepage is a different route, not the home page.
+  expect(cacheVersionFor("/homepage", { ...VERSIONS, data: "d2" })).toBe(version("/homepage"));
 });
 
 test("the browser gets the page's own Cache-Control back from a cached copy", async () => {
@@ -138,5 +161,102 @@ test("a name search on an item list is not cached; an empty one is", () => {
   expect(edgeCacheable(new Request("https://everloot.app/database/items/weapons?q=%20sword%20"))).toBe(false);
   expect(edgeCacheable(new Request("https://everloot.app/database/items?q="))).toBe(true);
   expect(edgeCacheable(new Request("https://everloot.app/database/items?q=%20"))).toBe(true);
-  expect(edgeCacheable(new Request("https://everloot.app/database/items", { headers: { cookie: "a=b" } }))).toBe(true);
+  expect(edgeCacheable(new Request("https://everloot.app/database/items", { headers: { cookie: "a=b" } }))).toBe(false);
+});
+
+/** A Cache API stand-in: keys are URLs, and a stored copy is cloned on the way out like the real one. */
+function fakeStore() {
+  const entries = new Map<string, Response>();
+  return {
+    entries,
+    match: async (key: Request) => entries.get(key.url)?.clone(),
+    put: async (key: Request, value: Response) => { entries.set(key.url, value); },
+  };
+}
+
+/** Collects waitUntil work so a test waits for the store write the way the runtime would after the response. */
+function fakeContext() {
+  const waits: Promise<unknown>[] = [];
+  return { waits, waitUntil: (p: Promise<unknown>) => { waits.push(p); } };
+}
+
+function cachedPage(body: string, extra: Record<string, string> = {}) {
+  return new Response(body, { headers: { "cdn-cache-control": "max-age=60", "cache-control": "private, no-cache", "content-type": "text/html", ...extra } });
+}
+
+test("a second request is a HIT without rendering; an unrelated deploy keeps it and a content change starts a new key", async () => {
+  const store = fakeStore();
+  const ctx = fakeContext();
+  let rendered = 0;
+  const handler = async () => { rendered++; return cachedPage(`<html>Worn Shortsword ${rendered}</html>`); };
+  const request = () => new Request("https://everloot.app/database/items?slot=head");
+  const first = await cachedResponse(request(), VERSIONS, handler, store, ctx);
+  await Promise.all(ctx.waits);
+  expect(rendered).toBe(1);
+  expect(await first.text()).toBe("<html>Worn Shortsword 1</html>");
+
+  const second = await cachedResponse(request(), VERSIONS, handler, store, ctx);
+  expect(rendered).toBe(1);
+  expect(second.headers.get("x-everloot-edge-cache")).toBe("HIT");
+  expect(second.headers.get("cache-control")).toBe("private, no-cache");
+  expect(await second.text()).toBe("<html>Worn Shortsword 1</html>");
+
+  // The same canonical content from another deploy hits; a changed data version renders and replaces the copy.
+  expect((await cachedResponse(request(), { ...VERSIONS, data: "d1" }, handler, store, ctx)).headers.get("x-everloot-edge-cache")).toBe("HIT");
+  const changed = await cachedResponse(request(), { ...VERSIONS, data: "d2" }, handler, store, ctx);
+  expect(await changed.text()).toBe("<html>Worn Shortsword 2</html>");
+  await Promise.all(ctx.waits);
+  expect(store.entries.size).toBe(2);
+});
+
+test("a request with a session bypasses the cache even on a public route, and stores nothing", async () => {
+  const store = fakeStore();
+  const ctx = fakeContext();
+  let rendered = 0;
+  const handler = async () => { rendered++; return cachedPage("<html>public</html>"); };
+  const withCookie = () => new Request("https://everloot.app/database", { headers: { cookie: "evl_session=abc" } });
+  await cachedResponse(withCookie(), VERSIONS, handler, store, ctx);
+  await Promise.all(ctx.waits);
+  await cachedResponse(withCookie(), VERSIONS, handler, store, ctx);
+  expect(rendered).toBe(2);
+  expect(store.entries.size).toBe(0);
+});
+
+test("a protected page is rendered every time and never stored, even without a cookie", async () => {
+  const store = fakeStore();
+  const ctx = fakeContext();
+  let rendered = 0;
+  const handler = async () => { rendered++; return cachedPage("<html>account</html>"); };
+  await cachedResponse(new Request("https://everloot.app/account"), VERSIONS, handler, store, ctx);
+  await Promise.all(ctx.waits);
+  await cachedResponse(new Request("https://everloot.app/account"), VERSIONS, handler, store, ctx);
+  expect(rendered).toBe(2);
+  expect(store.entries.size).toBe(0);
+});
+
+test("a page that sets a cookie is served but never stored", async () => {
+  const store = fakeStore();
+  const ctx = fakeContext();
+  let rendered = 0;
+  const handler = async () => { rendered++; return cachedPage("<html>x</html>", { "set-cookie": "a=b" }); };
+  await cachedResponse(new Request("https://everloot.app/database"), VERSIONS, handler, store, ctx);
+  await Promise.all(ctx.waits);
+  await cachedResponse(new Request("https://everloot.app/database"), VERSIONS, handler, store, ctx);
+  expect(rendered).toBe(2);
+  expect(store.entries.size).toBe(0);
+});
+
+test("a missing content version disables the cache instead of sharing a made-up key", async () => {
+  expect(versionsComplete(VERSIONS)).toBe(true);
+  expect(versionsComplete({ ...VERSIONS, template: "" })).toBe(false);
+  expect(versionsComplete({ ...VERSIONS, addon: undefined as unknown as string })).toBe(false);
+  const store = fakeStore();
+  const ctx = fakeContext();
+  let rendered = 0;
+  const handler = async () => { rendered++; return cachedPage("<html>x</html>"); };
+  const incomplete = { ...VERSIONS, knowledge: "" };
+  await cachedResponse(new Request("https://everloot.app/database"), incomplete, handler, store, ctx);
+  await cachedResponse(new Request("https://everloot.app/database"), incomplete, handler, store, ctx);
+  expect(rendered).toBe(2);
+  expect(store.entries.size).toBe(0);
 });

@@ -2,7 +2,8 @@
  * After a deploy: waits until the site serves the commit just deployed, then asks for a bounded sample of the
  * pages in its sitemap, a few at a time. Each page's cache key carries its content versions
  * (src/lib/cf-edge-cache.ts), so this fills the cache of the data centre the runner reaches; it is a smoke check,
- * not a crawl: at most MAX_PAGES pages and MAX_MS milliseconds, however large the sitemap is. A 429 is the edge
+ * not a crawl: at most MAX_PAGES unique pages and MAX_MS milliseconds in total (the commit wait, the sitemap and
+ * retries share the budget), however large the sitemap is. A 429 is the edge
  * asking the runner to slow down, not a broken page, and a network error on one request is the runner's connection,
  * not the page: those pages are asked for again, fewer at a time, after the wait the answer names (a minute when it
  * names none), twice before they count as failures. Other data centres still fill on their first visit.
@@ -95,36 +96,62 @@ export async function warm(urls, { get: fetchOne = get, now = () => performance.
   return { results, skipped: urls.filter((u, i) => i >= picked.length || !asked.has(u)) };
 }
 
-/** Polls the home page until its footer names the commit; a deploy takes a few seconds to reach every data centre. */
-async function waitForCommit(origin, sha, tries = 24) {
-  for (let i = 0; i < tries; i++) {
-    const res = await get(`${origin}/?deploy-check=${Date.now()}`);
-    if (res.body?.includes(sha)) return true;
-    await new Promise((r) => setTimeout(r, 5_000));
-  }
-  return false;
-}
-
-async function main([origin, sha]) {
+/**
+ * The whole post-deploy pass: wait for the commit, read the sitemap, warm a sample and retry what was rate
+ * limited. It spends at most `maxMs` in total (the commit wait, the sitemap and the retries share one deadline)
+ * and asks at most `maxPages` unique pages, however many retries a page takes. `get`, `now` and `sleep` are
+ * injected so the limits are tested without a network or a clock. A page may be requested up to three times
+ * (the pass and two retries), which is not a new page.
+ * @param {{ origin?: string, sha?: string, get?: (url: string, timeoutMs?: number) => Promise<{ url: string, status: number, body?: string, ms?: number, retryAfter?: string | null, error?: string }>, now?: () => number, sleep?: (ms: number) => Promise<unknown>, log?: (line: string) => void, maxMs?: number, maxPages?: number, concurrency?: number }} [options]
+ */
+export async function warmDeploy({
+  origin, sha,
+  get: fetchOne = get,
+  now = () => performance.now(),
+  sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
+  log = console.log,
+  maxMs = MAX_MS,
+  maxPages = MAX_PAGES,
+  concurrency = CONCURRENCY,
+} = {}) {
   if (!origin || !sha) throw new Error("usage: node scripts/cf-warm.mjs <origin> <commit sha>");
-  if (!(await waitForCommit(origin, sha))) throw new Error(`${origin} does not serve ${sha} after two minutes`);
-  const sitemap = await get(`${origin}/sitemap.xml`);
+  const started = now();
+  const remaining = () => Math.max(0, maxMs - (now() - started));
+  const ask = (url, cap = 30_000) => fetchOne(url, Math.min(cap, remaining()));
+
+  // Polls the home page until its footer names the commit; a deploy takes a few seconds to reach every data centre.
+  let served = false;
+  for (let i = 0; i < 24 && remaining() > 0; i++) {
+    const res = await ask(`${origin}/?deploy-check=${Math.round(now())}`);
+    if (res.body?.includes(sha)) { served = true; break; }
+    const wait = Math.min(5_000, remaining());
+    if (wait <= 0) break;
+    await sleep(wait);
+  }
+  if (!served) throw new Error(`${origin} does not serve ${sha} within ${Math.round(maxMs / 1000)} s`);
+
+  const sitemap = await ask(`${origin}/sitemap.xml`);
   if (sitemap.status !== 200) throw new Error(`the sitemap answered ${sitemap.status || sitemap.error}`);
   const urls = sitemapUrls(sitemap.body);
-  const started = performance.now();
-  const budget = () => Math.max(0, MAX_MS - (performance.now() - started));
-  let { results, skipped } = await warm(urls, { maxMs: budget() });
+  if (remaining() <= 0) return { ...summarize([], urls), results: [], skipped: urls, pagesAsked: 0 };
+
+  let { results, skipped } = await warm(urls, { get: fetchOne, now, maxMs: remaining(), maxPages, concurrency });
   // Twice, not five times: a rate-limited page that survives two waits is not made better by a longer crawl.
   for (let round = 0; round < 2; round++) {
     const { urls: again, waitMs } = rateLimited(results);
-    if (again.length === 0 || waitMs >= budget()) break;
-    console.log(`${again.length} pages answered 429 or not at all; asking again in ${Math.round(waitMs / 1000)} s`);
-    await new Promise((r) => setTimeout(r, waitMs));
-    const retried = await warm(again, { maxMs: budget(), maxPages: again.length });
+    if (again.length === 0 || waitMs >= remaining()) break;
+    log(`${again.length} pages answered 429 or not at all; asking again in ${Math.round(waitMs / 1000)} s`);
+    await sleep(waitMs);
+    if (remaining() <= 0) break;
+    const retried = await warm(again, { get: fetchOne, now, maxMs: remaining(), maxPages: again.length, concurrency });
     const byUrl = new Map(retried.results.map((r) => [r.url, r]));
     results = results.map((r) => byUrl.get(r.url) ?? r);
   }
-  const { ok, lines } = summarize(results, skipped);
+  return { ...summarize(results, skipped), results, skipped, pagesAsked: new Set(results.map((r) => r.url)).size };
+}
+
+async function main([origin, sha]) {
+  const { ok, lines } = await warmDeploy({ origin, sha });
   console.log(lines.join("\n"));
   if (!ok) process.exitCode = 1;
 }

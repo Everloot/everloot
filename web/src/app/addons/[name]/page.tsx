@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { curatedAddon } from "@/data/addon-repos";
+import { canonicalAddonName, curatedAddon } from "@/data/addon-repos";
 import { addonGithub, type AddonGithubResult } from "@/lib/addon-github";
 import { dataAgeLabel } from "@/lib/data-age";
 import { loadPopularAddons } from "@/lib/rollup-compute";
@@ -50,7 +50,8 @@ async function find(params: Props["params"]): Promise<Found> {
   const stats = usage.unreachable ? null : usage.addons.find((a) => a.name === typed) ?? usage.addons.find((a) => a.name.toLowerCase() === lower) ?? null;
   const curated = curatedAddon(typed);
   if (!stats && !curated && !usage.unreachable) return null;
-  return { name: stats?.name ?? curated?.name ?? typed, stats, source: curated?.source ?? null, usage };
+  // The owner-approved spelling wins over what an upload reports, so a live name cannot replace a curated page.
+  return { name: canonicalAddonName(typed, stats?.name ?? null) ?? typed, stats, source: curated?.source ?? null, usage };
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

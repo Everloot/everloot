@@ -23,3 +23,12 @@ export function curatedAddon(name: string): { name: string; source: AddonSource 
   const key = Object.keys(ADDON_SOURCES).find((k) => k.toLowerCase() === wanted);
   return key ? { name: key, source: ADDON_SOURCES[key] } : null;
 }
+
+/**
+ * The name the site shows for an addon: the owner-approved spelling when the folder is curated, else the name
+ * the installs report. A live report can never replace the curated one, so an unapproved upload cannot stand in
+ * for a verified addon's page or take its source link. Null when neither names it.
+ */
+export function canonicalAddonName(typed: string, live: string | null): string | null {
+  return curatedAddon(typed)?.name ?? live;
+}

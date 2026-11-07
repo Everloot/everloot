@@ -4,29 +4,24 @@
 // (src/lib/cf-crons.ts), which call the cron routes. OpenNext's Durable Object classes are re-exported.
 import handler from "./worker.js";
 import { cronPaths, cronRequest } from "../src/lib/cf-crons.ts";
-import { cacheCopy, cacheVersionFor, edgeCacheKey, edgeCacheable, edgeTtl, fromCache } from "../src/lib/cf-edge-cache.ts";
+import { cachedResponse } from "../src/lib/cf-edge-cache.ts";
 
 export { DOQueueHandler, DOShardedTagCache, BucketCachePurge } from "./worker.js";
 
 export default {
   async fetch(request, env, ctx) {
-    if (!edgeCacheable(request) || typeof caches === "undefined") return handler.fetch(request, env, ctx);
-    // The route's content versions, not the commit: another page's deploy keeps this cache.
-    const version = cacheVersionFor(new URL(request.url).pathname, {
+    if (typeof caches === "undefined") return handler.fetch(request, env, ctx);
+    // The route's content versions, not the commit: another page's deploy keeps this cache. src/lib/cf-edge-cache.ts
+    // also refuses a request that carries a cookie, the account's protected paths, and a missing version.
+    const versions = {
       template: env.EVERLOOT_CACHE_TEMPLATE,
       data: env.EVERLOOT_CACHE_DATA,
       knowledge: env.EVERLOOT_CACHE_KNOWLEDGE,
       addon: env.EVERLOOT_CACHE_ADDON,
-    });
-    const key = edgeCacheKey(request, version);
-    const hit = await caches.default.match(key);
-    if (hit) return fromCache(hit);
-    const res = await handler.fetch(request, env, ctx);
-    const ttl = edgeTtl(res);
+    };
     // The copy is read to the end before it is stored, after the response has gone: a page that marks itself
     // degraded is kept a minute, not its full lifetime.
-    if (ttl) ctx.waitUntil(cacheCopy(res.clone(), ttl).then((copy) => caches.default.put(key, copy)));
-    return res;
+    return cachedResponse(request, versions, (r) => handler.fetch(r, env, ctx), caches.default, ctx);
   },
 
   // Each job runs as its own request through the Worker's self-binding, so each gets its own CPU budget, memory and

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { MAX_MS, MAX_PAGES, rateLimited, requestHeaders, sitemapUrls, summarize, warm } from "./cf-warm.mjs";
+import { MAX_MS, MAX_PAGES, rateLimited, requestHeaders, sitemapUrls, summarize, warm, warmDeploy } from "./cf-warm.mjs";
 
 test("with EVERLOOT_EDGE_CHECK set, every request carries it as x-everloot-check; without it, only the user agent", () => {
   expect(requestHeaders({ EVERLOOT_EDGE_CHECK: "s3cret" })).toEqual({ "user-agent": "everloot-deploy-warm", "x-everloot-check": "s3cret" });
@@ -81,4 +81,60 @@ test("the pages a pass left at 429 are asked again after the longest Retry-After
   // A network error (status 0, e.g. a TypeError from fetch) is asked again too; a 503 stays a failure.
   const lost = { url: "https://everloot.app/database/achievements/1", status: 0, error: "TypeError", ms: 9 };
   expect(rateLimited([ok, lost, a])).toEqual({ urls: [lost.url, a.url], waitMs: 30_000 });
+});
+
+const ORIGIN = "https://everloot.app";
+const SHA = "f8f41f401be50d2e705dc1e9356da082057fe9b9";
+const sitemap = (...paths: string[]) => `<?xml version="1.0"?><urlset>${paths.map((p) => `<url><loc>${ORIGIN}${p}</loc></url>`).join("")}</urlset>`;
+
+/** A deploy that answers the commit check and the sitemap, and 200s every page except the ones a test names. */
+function fakeDeploy(options: { served?: boolean; sitemapBody?: string; page?: (url: string) => { status: number; retryAfter?: string | null } } = {}) {
+  const asked: string[] = [];
+  const get = async (url: string) => {
+    asked.push(url);
+    if (url.includes("deploy-check")) return { url, status: 200, body: options.served === false ? "old" : SHA, ms: 1 };
+    if (url === `${ORIGIN}/sitemap.xml`) return { url, status: 200, body: options.sitemapBody ?? sitemap("/", "/map"), ms: 1 };
+    const answer = options.page?.(url) ?? { status: 200 };
+    return { url, status: answer.status, retryAfter: answer.retryAfter ?? null, body: "", ms: 1 };
+  };
+  return { asked, get };
+}
+
+test("a deploy pass waits for the commit, warms the sitemap and asks a 429 page again after its Retry-After", async () => {
+  let first = true;
+  const { asked, get } = fakeDeploy({
+    page: (url) => {
+      if (url.endsWith("/map") && first) { first = false; return { status: 429, retryAfter: "1" }; }
+      return { status: 200 };
+    },
+  });
+  const slept: number[] = [];
+  const out = await warmDeploy({ origin: ORIGIN, sha: SHA, get, now: () => 0, sleep: async (ms: number) => { slept.push(ms); }, log: () => {} });
+  expect(out.ok).toBe(true);
+  expect(out.pagesAsked).toBe(2);
+  expect(asked.filter((u) => u === `${ORIGIN}/map`)).toHaveLength(2);
+  expect(slept).toContain(1_000);
+});
+
+test("the commit wait shares the pass's deadline: a deploy that never serves the commit fails instead of crawling", async () => {
+  const { get } = fakeDeploy({ served: false });
+  let clock = 0;
+  const slept: number[] = [];
+  await expect(warmDeploy({
+    origin: ORIGIN, sha: SHA, get, maxMs: 10, now: () => clock,
+    sleep: async (ms: number) => { slept.push(ms); clock += ms; }, log: () => {},
+  })).rejects.toThrow(/does not serve/);
+  expect(slept).toHaveLength(1);
+  expect(slept[0]).toBe(10);
+});
+
+test("retries ask no new pages: the unique page count stays within maxPages however many waits a page takes", async () => {
+  const { asked, get } = fakeDeploy({ sitemapBody: sitemap("/a", "/b", "/c"), page: () => ({ status: 429, retryAfter: "0" }) });
+  const out = await warmDeploy({ origin: ORIGIN, sha: SHA, get, maxPages: 1, now: () => 0, sleep: async () => {}, log: () => {} });
+  expect(out.ok).toBe(false);
+  expect(out.pagesAsked).toBe(1);
+  expect(asked).not.toContain(`${ORIGIN}/b`);
+  expect(asked).not.toContain(`${ORIGIN}/c`);
+  // The pass and its two retries: bounded, so a rate-limited site cannot keep the deploy running.
+  expect(asked.filter((u) => u === `${ORIGIN}/a`)).toHaveLength(3);
 });

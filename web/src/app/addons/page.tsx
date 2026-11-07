@@ -29,7 +29,10 @@ function sitePage(row: BoardRow): string | null {
   const own = OWN_PAGE[row.project.id];
   if (own) return own;
   const name = row.project.addonNames[0];
-  return name && (row.installs !== null || curatedAddon(name)) ? `/addons/${encodeURIComponent(name)}` : null;
+  if (!name) return null;
+  const curated = curatedAddon(name);
+  // The link opens the canonical page, which is the curated spelling when the folder is owner-approved.
+  return row.installs !== null || curated ? `/addons/${encodeURIComponent(curated?.name ?? name)}` : null;
 }
 
 /** The ranking views, as OpenRouter lists its rankings: each one a sort of the same board. */
