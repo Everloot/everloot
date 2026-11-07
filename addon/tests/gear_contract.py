@@ -116,5 +116,5 @@ if persists:
     reloaded.execute(f"NOW = 1000000 + {HOUR}; event('PLAYER_ENTERING_WORLD')")
     assert reloaded.eval("#rows()") == 2, "an hour after the sample, a reload samples again"
 else:
-    print(f"SKIPPED across /reload: gear.lua keeps the sample time in memory; a reload wrote {reloaded.eval('#rows()')} rows")
+    print(f"SKIPPED across /reload (PR #875 persists gearSampledAt): gear.lua keeps the sample time in memory; a reload wrote {reloaded.eval('#rows()')} rows")
 print("Gear contract: PASS")
