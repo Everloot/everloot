@@ -14,120 +14,10 @@ import sys
 import tempfile
 from pathlib import Path
 from zipfile import ZipFile
-from lupa.lua51 import LuaRuntime
+from window_world import AFTER, BEFORE, WORLD, fresh  # noqa: F401
 
 root = Path(__file__).parents[1]
 repo = root.parent
-
-WORLD = """
-now = 1000000
-time = function() return now end
-date = function() return '2026-10-30T10:00:00Z' end
-printed = {}
-print = function(msg) printed[#printed + 1] = tostring(msg) end
-function said(pattern) for _, p in ipairs(printed) do if string.find(p, pattern) then return true end end return false end
-SlashCmdList = {}
-UIParent = { GetWidth = function() return 1920 end, GetHeight = function() return 1080 end }
-UISpecialFrames = {}
-SECRET = {}
-issecretvalue = function(v) return SECRET[v] == true end
-
--- A frame API that accepts every call and keeps what the window sets, so a test can read it back. As in the game,
--- a named frame becomes a global and a new frame is shown until something hides it.
-created = {}
-failOn = nil
-local Frame = {}
-Frame.__index = function(self, key)
-  local own = rawget(Frame, key)
-  if own then return own end
-  return function() end
-end
-local function new(kind, name, parent, template)
-  local f = setmetatable({ kind = kind, frameName = name, parent = parent, template = template, scripts = {}, hooks = {}, events = {}, shown = true }, Frame)
-  created[#created + 1] = f
-  if name then _G[name] = f end
-  return f
-end
-function Frame.SetScript(self, script, f) self.scripts[script] = f; if script == 'OnEvent' then self.onEvent = f end end
-function Frame.HookScript(self, _, f) table.insert(self.hooks, f) end
-function Frame.SetText(self, t) self.text = t end
-function Frame.GetText(self) return self.text end
-function Frame.Show(self) self.shown = true end
-function Frame.Hide(self) self.shown = false end
-function Frame.IsShown(self) return self.shown == true end
-function Frame.SetTexture(self, path) self.path = path end
-function Frame.SetBackdrop(self, b) self.backdrop = b end
-function Frame.SetBackdropBorderColor(self, r, g, b) self.border = { r, g, b } end
-function Frame.SetFont(self, path, size) self.font = path; return true end
-function Frame.SetTextColor(self, r, g, b, a) self.color = { r, g, b, a } end
-function Frame.SetMinMaxValues(self, lo, hi) self.lo, self.hi = lo, hi end
-function Frame.SetValue(self, v) self.value = v end
-function Frame.SetChecked(self, v) self.checked = v and true or false end
-function Frame.GetChecked(self) return self.checked end
-function Frame.RegisterEvent(self, e) self.events[e] = true end
-function Frame.CreateFontString(self) return new('FontString') end
-function Frame.CreateTexture(self) return new('Texture') end
-CreateFrame = function(kind, name, parent, template)
-  if failOn == kind then error('forced failure creating a ' .. kind) end
-  return new(kind, name, parent, template)
-end
-
--- The core frame dispatches to its OnEvent script, then to every module's hook, as the game does.
-function fire(event, ...)
-  local f = Everloot.frame
-  f.onEvent(f, event, ...)
-  for _, hook in ipairs(f.hooks) do hook(f, event, ...) end
-end
-
-money = 381240
-GetMoney = function() return money end
-UnitName = function() return 'Samplechar' end
-UnitClass = function() return 'Shaman', 'SHAMAN' end
-UnitRace = function() return 'Orc' end
-UnitLevel = function() return 24 end
-GetRealmName = function() return 'Forever' end
-RAID_CLASS_COLORS = { SHAMAN = { r = 0, g = 0.44, b = 0.87 } }
-GetProfessions = function() return 1, nil, nil, 4, 5 end
-GetProfessionInfo = function(i)
-  if i == 1 then return 'Mining', 'Interface\\\\Icons\\\\Trade_Mining', 112, 150 end
-  if i == 4 then return 'Fishing', 'Interface\\\\Icons\\\\Trade_Fishing', 20, 75 end
-  if i == 5 then return 'Cooking', 'Interface\\\\Icons\\\\INV_Misc_Food_15', 1, 75 end
-end
-timers = {}
-C_Timer = { After = function(seconds, f) table.insert(timers, f) end }
-function drain() while #timers > 0 do table.remove(timers, 1)() end end
-tooltipCalls = {}
-Enum = { TooltipDataType = { Item = 0 } }
-TooltipDataProcessor = { AddTooltipPostCall = function(kind, f) table.insert(tooltipCalls, f) end }
-function tooltipFor(itemId)
-  local tip = { lines = {} }
-  tip.AddLine = function(self, text, r, g, b) table.insert(self.lines, { text = text, r = r, g = g, b = b }) end
-  for _, f in ipairs(tooltipCalls) do f(tip, { id = itemId }) end
-  return tip.lines
-end
-"""
-
-BEFORE = ["core.lua", "modules/auctions.lua", "modules/gold.lua", "modules/prices.lua", "modules/drops.lua",
-          "modules/gph.lua", "modules/options.lua"]
-AFTER = ["modules/minimap.lua"]
-
-
-def fresh(saved: str = "nil", api: str = "", window: bool = True):
-    lua = LuaRuntime()
-    lua.execute(WORLD)
-    lua.execute(api)
-    lua.execute(f"EverlootDB = {saved}")
-    for file in BEFORE:
-        lua.execute((root / file).read_text(encoding="utf-8"))
-    # Every global that exists before the window's file runs; the window may add its own frame name only.
-    lua.execute("globalsBefore = {}; for k in pairs(_G) do globalsBefore[k] = true end")
-    if window:
-        lua.execute((root / "modules" / "window.lua").read_text(encoding="utf-8"))
-    for file in AFTER:
-        lua.execute((root / file).read_text(encoding="utf-8"))
-    lua.execute("Everloot.frame.onEvent(nil, 'ADDON_LOADED', 'Everloot')")
-    return lua
-
 
 # --- The file itself: no events, no hooks on the recording frame, the game's own fonts and the bronze edge ---
 toc = (root / "Everloot.toc").read_text(encoding="utf-8")
@@ -135,8 +25,13 @@ assert "modules\\window.lua" in toc, "the window is in the TOC"
 assert toc.index("modules\\window.lua") < toc.index("modules\\minimap.lua"), "the window loads before the minimap button"
 source = (root / "modules" / "window.lua").read_text(encoding="utf-8")
 code = "\n".join(line.split("--")[0] for line in source.splitlines())
-for word in ["RegisterEvent", "HookScript", "hooksecurefunc", "E:Store", "EverlootDB.records[", "SendAddonMessage"]:
-    assert word not in code, f"the window reads and displays only: {word} found"
+# The window and every view file read and display only.
+for path in [root / "modules" / "window.lua", *sorted((root / "modules").glob("view_*.lua"))]:
+    text = path.read_text(encoding="utf-8")
+    lines = "\n".join(line.split("--")[0] for line in text.splitlines())
+    for word in ["RegisterEvent", "HookScript", "hooksecurefunc", "E:Store", "EverlootDB.records[", "SendAddonMessage"]:
+        assert word not in lines, f"{path.name} reads and displays only: {word} found"
+    assert "Coming soon" not in text, f"no stubs in {path.name}"
 assert "Fonts\\\\FRIZQT__.TTF" in code and "Fonts\\\\ARIALN.TTF" in code, "Friz Quadrata headings, Arial Narrow numbers"
 assert "UI-Tooltip-Border" in code and "SetBackdropBorderColor" in code, "the stock tooltip edge, tinted"
 assert "Coming soon" not in source, "no stubs in the window"
@@ -210,7 +105,7 @@ Everloot.Window.Views.collection = { build = function(f, parent) parent.built = 
 f.nav.collection.scripts.OnClick(f.nav.collection)
 assert(f.home.shown == false and f.views.collection.shown and rawget(f.views.collection, 'built') and f.views.collection.refreshed == 1 and f.subtitle.text == 'Collection')
 assert(f.nav.collection.on.shown and not f.nav.home.on.shown, 'fel green marks only the open item')
-f.nav.gold.scripts.OnClick(f.nav.gold)
+f.nav.professions.scripts.OnClick(f.nav.professions)
 assert(f.views.collection.shown == false and f.note.shown and f.note.text:find('did not load'), 'an unregistered view says so')
 assert(not f.note.text:find('oon'), 'no coming soon')
 f.nav.settings.scripts.OnClick(f.nav.settings)
