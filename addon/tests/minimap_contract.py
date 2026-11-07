@@ -104,9 +104,27 @@ def test_hovering_the_button_explains_its_three_actions():
     local button = Everloot.Minimap.Button()
     assert(button.scripts.OnEnter == nil and button.scripts.OnLeave == nil, 'hooked, so the drawer hover keeps working')
     hover(button)
-    assert(GameTooltip.owner == button and GameTooltip.anchor == 'ANCHOR_LEFT' and GameTooltip.shown)
-    assert(#GameTooltip.lines == 4 and GameTooltip.lines[1] == 'Everloot', table.concat(GameTooltip.lines, '|'))
-    assert(GameTooltip.lines[2]:find('Left%-click', 1) and GameTooltip.lines[3]:find('Right%-click', 1) and GameTooltip.lines[4]:find('Hover', 1))
+    assert(GameTooltip.owner == button and GameTooltip.anchor == 'ANCHOR_BOTTOMRIGHT' and GameTooltip.shown)
+    assert(#GameTooltip.lines == 3 and GameTooltip.lines[1] == 'Everloot', table.concat(GameTooltip.lines, '|'))
+    assert(GameTooltip.lines[2] == 'Left-click: open the plan workspace', 'no window module in this world')
+    assert(GameTooltip.lines[3]:find('Right%-click', 1), 'no gathered buttons, no hover line')
+    Everloot.Window = { failed = false }
+    hover(button)
+    assert(GameTooltip.lines[2] == 'Left-click: open the Everloot window')
+    Everloot.Window.failed = true
+    hover(button)
+    assert(GameTooltip.lines[2] == 'Left-click: open the plan workspace', 'a failed window falls back')
+    Everloot.Window.failed = false
+    EverlootDB.toggles.window = false
+    hover(button)
+    assert(GameTooltip.lines[2] == 'Left-click: open the plan workspace', 'window off')
+    EverlootDB.toggles.window = nil
+    Everloot.Drawer = { collected = { {} } }
+    hover(button)
+    assert(#GameTooltip.lines == 4 and GameTooltip.lines[4] == "Hover: show other addons' buttons")
+    EverlootDB.toggles.buttons = false
+    hover(button)
+    assert(#GameTooltip.lines == 3, 'buttons off, no hover line')
     assert(GameTooltip.lines[3]:lower():find('settings', 1, true))
     leave(button)
     assert(not GameTooltip.shown)

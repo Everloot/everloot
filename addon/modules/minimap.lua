@@ -40,11 +40,15 @@ function M.Button()
   -- What the three actions do. Hooked, not set: the drawer hooks the same hover to open, and both must run.
   button:HookScript("OnEnter", function(self)
     if type(GameTooltip) ~= "table" then return end
-    GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+    GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT") -- the drawer opens to the left
     GameTooltip:AddLine("Everloot")
-    GameTooltip:AddLine("Left-click: open the Everloot window")
+    -- Each line says what the click does now: the window, or the plan workspace when the window is off or failed.
+    local window = E.Window and E:IsEnabled("window") and not E.Window.failed
+    GameTooltip:AddLine(window and "Left-click: open the Everloot window" or "Left-click: open the plan workspace")
     GameTooltip:AddLine("Right-click: open the settings")
-    GameTooltip:AddLine("Hover: use other addons' buttons gathered here")
+    if E:IsEnabled("buttons") and E.Drawer and E.Drawer.collected and #E.Drawer.collected > 0 then
+      GameTooltip:AddLine("Hover: show other addons' buttons")
+    end
     GameTooltip:Show()
   end)
   button:HookScript("OnLeave", function()
