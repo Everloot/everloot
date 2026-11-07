@@ -11,7 +11,13 @@ E.Window = U
 
 U.CREST = "Interface\\AddOns\\Everloot\\media\\crest"
 
-local FRIZ, NARROW = "Fonts\\FRIZQT__.TTF", "Fonts\\ARIALN.TTF"
+-- The client's own fonts, so ruRU and CJK clients draw their letters; the Latin files are the fallback.
+local FRIZ = (type(STANDARD_TEXT_FONT) == "string" and STANDARD_TEXT_FONT) or "Fonts\\FRIZQT__.TTF"
+local NARROW = "Fonts\\ARIALN.TTF"
+do
+  local ok, path = pcall(function() return NumberFontNormal:GetFont() end)
+  if ok and type(path) == "string" and path ~= "" then NARROW = path end
+end
 local COLORS = {
   canvas = { 0.055, 0.059, 0.051, 0.97 }, surface = { 0.082, 0.09, 0.102, 1 }, line = { 0.17, 0.176, 0.157, 1 },
   bronze = { 0.478, 0.416, 0.298, 1 }, text = { 0.957, 0.937, 0.867, 1 }, muted = { 0.788, 0.765, 0.69, 1 },
