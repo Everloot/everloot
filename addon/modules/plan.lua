@@ -610,10 +610,35 @@ end
 
 --- Keep the plan in SavedVariables: its code, its order token when the order fits, and set 2 when the
 --- code is a link's second set. Nil forgets all three.
+--- EverlootDB.plan/planOrder/planSet are the playing character's plan; EverlootDB.plans[CLASS] keeps each
+--- class's plan so a character of another class neither shows nor loses it.
 local function save(plan)
   EverlootDB.plan = plan and P.Encode(plan) or nil
   EverlootDB.planOrder = plan and plan.order and plan.order.token or nil
   EverlootDB.planSet = plan and plan.set or nil
+  local class = plan and plan.class or T.Player()
+  if class then
+    if type(EverlootDB.plans) ~= "table" then EverlootDB.plans = {} end
+    EverlootDB.plans[class] = plan and { plan = EverlootDB.plan, order = EverlootDB.planOrder, set = EverlootDB.planSet } or nil
+  end
+end
+
+--- At login: file a plan left by another class under its class, then bring this class's plan forward.
+local function selectClassPlan()
+  local class = T.Player()
+  if not class then return end
+  local old = EverlootDB.plan and P.Decode(EverlootDB.plan)
+  if old and old.class ~= class then
+    if type(EverlootDB.plans) ~= "table" then EverlootDB.plans = {} end
+    if EverlootDB.plans[old.class] == nil then
+      EverlootDB.plans[old.class] = { plan = EverlootDB.plan, order = EverlootDB.planOrder, set = EverlootDB.planSet }
+    end
+    EverlootDB.plan, EverlootDB.planOrder, EverlootDB.planSet = nil, nil, nil
+  end
+  local mine = type(EverlootDB.plans) == "table" and EverlootDB.plans[class]
+  if type(mine) == "table" and type(mine.plan) == "string" then
+    EverlootDB.plan, EverlootDB.planOrder, EverlootDB.planSet = mine.plan, mine.order, mine.set
+  end
 end
 
 --- Load a share code with the spend order token that came with it, if any; set 2 marks the code as a
@@ -727,6 +752,7 @@ E:RegisterModule("plan", function()
   userHidden = EverlootDB.planView == "workspace"
   -- A saved order is read again: one that no longer fits is dropped and its reason shown; a damaged
   -- code takes its order and set with it.
+  selectClassPlan()
   local plan = EverlootDB.plan and P.Decode(EverlootDB.plan)
   if plan then
     if EverlootDB.planOrder ~= nil then plan.order, plan.orderProblem = P.DecodeOrder(EverlootDB.planOrder, plan) end
