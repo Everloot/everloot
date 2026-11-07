@@ -3,7 +3,7 @@
 The in-game addon for WoW: Forever. It records what you see while you play (sightings, loot
 windows, vendors, full auction-house scans you start, recipes, trainers, your own gold, the world
 position of each zone you enter) into its SavedVariables file, shows `/ask` answers from the
-companion, and adds auction prices to item tooltips. It uses only the game's addon API and never
+Everloot Desktop App, and adds auction prices to item tooltips. It uses only the game's addon API and never
 plays the character. Records match the upload contract (`packages/protocol`, see its `schema/records/`) field for
 field.
 
@@ -142,7 +142,7 @@ open and close the window, `gph history` prints the last five, `gph cut on|off` 
   quest rewards, purchases and crafts are left out), money you loot or get as your share of group loot,
   quest money (`QUEST_TURNED_IN`), and what you sell at a vendor. A reload or logout pauses the clock and
   the session resumes when you are back; after a crash it waits, paused.
-- Each item is valued from the Everloot market value on your realm (the file the Desktop App or companion
+- Each item is valued from the Everloot market value on your realm (the file the Everloot Desktop App
   writes), else your own last full scan, else the vendor price, and the window says which. With the cut on
   (the default) 5% is taken from market and scan values, as the faction houses take it.
 - Total = item values + looted money + quest money. Vendor sales are shown apart and not added: the items
@@ -498,7 +498,7 @@ addon/
 │   ├── auctions.lua    full auction-house scans you start (Forever); listed buyouts on older clients; on in a new install
 │   ├── gold.lua        your own gold: loot, quests, vendors, flights, mailed auction sales, postage, buyouts
 │   ├── professions.lua recipe colours at your rank (C_TradeSkillUI); required rank and cost from trainer windows
-│   ├── ask.lua         /ask stores a question; the companion's answers show after /reload
+│   ├── ask.lua         /ask stores a question; the Everloot Desktop App's answers show after /reload
 │   ├── addons.lua      your installed addons' names, titles and versions; off until enabled
 │   ├── mapbounds.lua   each zone's corners in world coordinates, once per zone per build
 │   ├── talents.lua     your talent build per spec group, plus the game's own loadout string
@@ -510,7 +510,7 @@ addon/
 │   ├── plan.lua        share code reader and the display-only plan panel
 │   ├── raid_data.lua   raid buff list generated from web/src/data/game-data/raid-*.json
 │   ├── raid.lua        /everloot raid: buffs missing per group, and a raid share code; display only
-│   ├── prices.lua      item tooltips: your latest scan and the companion's community prices
+│   ├── prices.lua      item tooltips: your latest scan and the Everloot Desktop App's community prices
 │   ├── drops.lua       item tooltips: where an item drops, from the public rates in the same file
 │   ├── gph.lua         gold per hour sessions, kept in your file only
 │   ├── conveniences.lua  sell greys and repair at a merchant, Collect all at the mailbox; each off until enabled, no records

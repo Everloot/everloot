@@ -386,7 +386,7 @@ SlashCmdList["EVERLOOT"] = function(msg)
   elseif msg == "addons on" or msg == "addons off" then
     EverlootDB.toggles.addons = (msg == "addons on")
     if EverlootDB.toggles.addons then
-      print("Everloot: installed addon list on. It is sent only from the everloot.app upload page, which lists the addons first; the companion never sends it. /reload to apply.")
+      print("Everloot: installed addon list on. It is sent only from the everloot.app upload page, which lists the addons first; the Everloot Desktop App never sends it. /reload to apply.")
     else
       -- Turning it off withdraws the list: every recorded addon row is deleted from this file.
       EverlootDB.records.addon_seen = nil
