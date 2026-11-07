@@ -192,6 +192,9 @@ assert follows, "the scan found no module that follows another's switch; the pat
 missing = sorted(name for name in wanted if name not in rows and name not in OWN_SWITCH_OK)
 assert not missing, "modules without a switch on the settings page (add an O.ROWS row, or allowlist with a reason): " + ", ".join(f"{n} ({wanted[n]})" for n in missing)
 assert all(t in rows for t in follows.values()), "a module follows a switch that has no row: " + ", ".join(f"{m} -> {t}" for m, t in follows.items())
+# The minimap button is a field row (EverlootDB.minimapButton), not a toggle, so no IsEnabled call names it.
+assert "minimapButton" in rows and "EverlootDB.minimapButton" in (root / "modules" / "minimap.lua").read_text(encoding="utf-8")
+assert 'key = "minimapButton", field = true' in (root / "modules" / "options.lua").read_text(encoding="utf-8")
 assert 'key = "pulls"' in (root / "modules" / "options.lua").read_text(encoding="utf-8"), "the pulls allowlist entry needs its gated row"
 
 # --- Older client: interface options ---

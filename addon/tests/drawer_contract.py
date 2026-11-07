@@ -84,6 +84,12 @@ function hover(frame) for _, hook in ipairs(frame.hooks.OnEnter or {}) do hook(f
 
 MINIMAP = """
 Minimap = CreateFrame('Frame', 'Minimap', UIParent)
+GameTooltip = { lines = {}, shown = false }
+function GameTooltip:SetOwner(owner) self.owner, self.lines = owner, {} end
+function GameTooltip:AddLine(text) self.lines[#self.lines + 1] = text end
+function GameTooltip:Show() self.shown = true end
+function GameTooltip:Hide() self.shown = false end
+function leave(frame) for _, hook in ipairs(frame.hooks.OnLeave or {}) do hook(frame) end end
 """
 TIMER = """
 C_Timer = { After = function(seconds, f) timers[#timers + 1] = { seconds = seconds, f = f } end }
@@ -216,6 +222,9 @@ def test_hover_shows_the_drawer_until_the_mouse_leaves_and_clicks_are_unchanged(
     crest.mouse = true
     hover(crest)
     assert(D.frame.shown)
+    assert(GameTooltip.shown and GameTooltip.owner == crest and #GameTooltip.lines == 4, 'the tooltip, with the hover line, shows beside the drawer')
+    leave(crest)
+    assert(not GameTooltip.shown and D.frame.shown, 'leaving hides the tooltip; the drawer closes on its own poll')
     tick()
     assert(D.frame.shown, 'stays open while the mouse is on the crest')
     crest.mouse = false; D.frame.mouse = true
@@ -238,6 +247,15 @@ def test_hover_shows_the_drawer_until_the_mouse_leaves_and_clicks_are_unchanged(
     crest.scripts.OnClick(crest, 'RightButton')
     assert(planned == 1 and options == 1, 'right-click opens the options')
     """)
+
+
+def test_with_the_minimap_button_off_the_addon_buttons_stay_on_the_minimap():
+    lua = fresh(saved="{ installId = 'abcd-1234', toggles = {}, records = {}, minimapButton = false }")
+    lua.execute("""
+    assert(Everloot.Minimap.button == nil and Everloot.Drawer.crest == nil)
+    assert(alpha.parent == Minimap and beta.parent == Minimap, 'nothing gathered into a button that is not there')
+    """)
+    assert "buttons: off" in lua.eval("Everloot:Status()")
 
 
 def test_no_buttons_no_drawer():
@@ -359,6 +377,7 @@ if __name__ == "__main__":
     test_libdbicon_buttons_are_collected_and_laid_out_and_nothing_else_is()
     test_a_late_libdbicon_button_is_collected()
     test_hover_shows_the_drawer_until_the_mouse_leaves_and_clicks_are_unchanged()
+    test_with_the_minimap_button_off_the_addon_buttons_stay_on_the_minimap()
     test_no_buttons_no_drawer()
     test_off_collects_nothing_and_the_switch_and_command_work()
     test_a_client_without_libstub_minimap_or_timers_gets_no_error()

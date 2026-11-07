@@ -2,6 +2,7 @@
  "new": {
   "options": [
    "window",
+   "minimapButton",
    "buttons",
    "auctions",
    "scanPrompt",
@@ -118,6 +119,7 @@
  "upgrade": {
   "options": [
    "window",
+   "minimapButton",
    "buttons",
    "auctions",
    "scanPrompt",
