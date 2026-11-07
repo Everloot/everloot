@@ -222,7 +222,7 @@ def test_hover_shows_the_drawer_until_the_mouse_leaves_and_clicks_are_unchanged(
     crest.mouse = true
     hover(crest)
     assert(D.frame.shown)
-    assert(GameTooltip.shown and GameTooltip.owner == crest and #GameTooltip.lines == 4, 'the tooltip shows beside the drawer')
+    assert(GameTooltip.shown and GameTooltip.owner == crest and #GameTooltip.lines == 4, 'the tooltip, with the hover line, shows beside the drawer')
     leave(crest)
     assert(not GameTooltip.shown and D.frame.shown, 'leaving hides the tooltip; the drawer closes on its own poll')
     tick()

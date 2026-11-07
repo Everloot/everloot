@@ -260,6 +260,8 @@ inside it closes it until `/reload` and `/everloot status` names the error. The 
 settings page turns it off; the minimap button then opens the plan workspace as before. The crest it uses is
 `media/crest.tga`, which the release zip carries beside the code.
 
+Hovering the minimap button shows what its clicks do. The Minimap button switch on the settings page hides it after a `/reload`; `/everloot window` still opens the window.
+
 The minimap button also holds other addons' minimap buttons. Buttons made with LibDBIcon (most addons' round
 minimap buttons) move into it at login; hover the crest and they show in a small panel beside it, which closes
 when the mouse leaves. Its clicks stay the same. Blizzard's own minimap buttons and any other button are left
