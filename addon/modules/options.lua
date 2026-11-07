@@ -77,6 +77,60 @@ function O.Set(row, on)
   O.Refresh()
 end
 
+-- Kinds of rows each command deletes when it turns off (core.lua: the Withdraw of each module), for the
+-- confirmation the page asks first. The slash command stays direct.
+O.DELETES = {
+  census = { "census_self", "census_seen" },
+  players = { "player_seen", "guild_kill" },
+  addons = { "addon_seen" },
+  completion = { "achievement_catalog", "reputation_catalog", "title_catalog", "quest_chain_catalog",
+    "achievement_owned", "reputation_owned", "title_owned", "quest_owned",
+    "profession_owned", "lockout_owned", "talent_owned", "stats_owned", "pvp_owned" },
+}
+
+--- How many rows turning this row off would delete.
+function O.RowsToDelete(row)
+  local n = 0
+  for _, kind in ipairs(O.DELETES[row.key] or {}) do n = n + E:Count(kind) end
+  return n
+end
+
+if StaticPopupDialogs then
+  StaticPopupDialogs["EVERLOOT_TURN_OFF"] = {
+    text = "Turn off %s and delete %d recorded rows? They have not necessarily been uploaded.",
+    button1 = "Turn off and delete",
+    button2 = "Cancel",
+    OnAccept = function()
+      local row = O.pending
+      O.pending = nil
+      if row then O.Set(row, false) end
+    end,
+    OnCancel = function()
+      O.pending = nil
+      O.Refresh()
+    end,
+    timeout = 0, whileDead = 1, hideOnEscape = 1,
+  }
+end
+
+--- A click on a switch on the page. Turning off a row whose command deletes recorded rows asks first;
+--- everything else is O.Set as before.
+function O.Click(row, on)
+  if not on and O.DELETES[row.key] and StaticPopup_Show and StaticPopupDialogs and StaticPopupDialogs["EVERLOOT_TURN_OFF"] then
+    local n = O.RowsToDelete(row)
+    if n > 0 then
+      O.pending = row
+      local ok, shown = pcall(StaticPopup_Show, "EVERLOOT_TURN_OFF", row.label, n)
+      if ok and shown then
+        O.Refresh() -- the switch stays on until the answer
+        return
+      end
+      O.pending = nil
+    end
+  end
+  O.Set(row, on)
+end
+
 function O.Refresh()
   local page = O.page
   if not page then return end
@@ -163,7 +217,7 @@ local function build()
     text:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -2)
     text:SetText(row.text)
     box.label, box.description = label, text
-    box:SetScript("OnClick", function(self) O.Set(row, self:GetChecked() and true or false) end)
+    box:SetScript("OnClick", function(self) O.Click(row, self:GetChecked() and true or false) end)
     page.boxes[#page.boxes + 1] = box
   end
   page.addedHeading = words(content, "GameFontNormal", 13, "text")
