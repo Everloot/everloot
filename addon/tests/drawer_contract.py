@@ -46,6 +46,9 @@ function Frame.IsMouseOver(self) return rawget(self, 'mouse') == true end
 function Frame.SetPoint(self, point, rel, relPoint, x, y) table.insert(self.points, { point, rel, relPoint, x, y }) end
 function Frame.ClearAllPoints(self) self.points = {} end
 function Frame.SetAlpha(self, a) self.alpha = a end
+function Frame.SetFrameLevel(self, l) self.level = l end
+function Frame.GetFrameLevel(self) return rawget(self, 'level') or 1 end
+function Frame.SetBackdrop(self, b) self.backdrop = b end
 function Frame.SetSize(self, w, h) self.width, self.height = w, h end
 function Frame.IsObjectType() return true end
 function Frame.SetText(self, t) self.text = t end
@@ -137,13 +140,15 @@ elsewhere = CreateFrame('Button', 'LibDBIcon10_Elsewhere', UIParent)
 """
 
 
-def fresh(api: str = MINIMAP + TIMER + LIBDBICON + CHILDREN, saved: str = "nil", login: bool = True):
+def fresh(api: str = MINIMAP + TIMER + LIBDBICON + CHILDREN, saved: str = "nil", login: bool = True, window: str = ""):
     lua = LuaRuntime()
     lua.execute(WORLD)
     lua.execute(api)
     lua.execute(f"EverlootDB = {saved}")
     for file in ["core.lua", "modules/options.lua", "modules/minimap.lua", "modules/drawer.lua"]:
         lua.execute((root / file).read_text(encoding="utf-8"))
+        if file == "core.lua" and window:
+            lua.execute(window)
     lua.execute("planned = 0; Everloot.Planner = { Open = function() planned = planned + 1 end }")
     lua.execute("Everloot.frame.onEvent(nil, 'ADDON_LOADED', 'Everloot')")
     if login:
@@ -179,12 +184,29 @@ def test_libdbicon_buttons_are_collected_and_laid_out_and_nothing_else_is():
     assert(D.frame.shown, 'hover opens the drawer')
     assert(#alpha.points == 1 and alpha.points[1][2] == D.frame and alpha.alpha == 1)
     assert(#beta.points == 1 and beta.points[1][2] == D.frame and beta.points[1][4] > alpha.points[1][4], 'side by side')
+    -- A LibDBIcon ring is drawn wider than its 31-pixel button, from the top-left: cells leave room for it, and
+    -- each button draws above the one before it so no ring shadow dims the icon beside or below it.
+    assert(beta.points[1][4] - alpha.points[1][4] >= 36, 'cells wider than a ring')
+    assert(alpha.level > D.frame:GetFrameLevel() and beta.level == alpha.level + 1, 'later buttons draw above earlier ones')
+    assert(rawget(D.frame, 'backdrop') and D.frame.backdrop.edgeFile, 'the drawer has a panel without the window loaded')
     -- LibDBIcon putting a button back around the minimap no longer moves it, and it cannot be dragged off.
     libdbicon.Refresh('Alpha')
     assert(#alpha.points == 1 and alpha.points[1][2] == D.frame, 'LibDBIcon repositioning is ignored')
     assert(alpha.scripts.OnDragStart == nil and alpha.scripts.OnDragStop == nil, 'no drag-to-move')
     """)
     assert "buttons: ready (2 addon buttons" in lua.eval("Everloot:Status()")
+
+
+def test_the_drawer_borrows_the_window_panel_when_the_window_is_loaded():
+    # window.lua loads before drawer.lua and exposes its backdrop; the drawer then looks like the rest of Everloot.
+    lua = fresh(window="styled = {}; Everloot.Window = { Backdrop = function(f) styled[#styled + 1] = f end }")
+    lua.execute("""
+    local D = Everloot.Drawer
+    assert(#styled == 1 and styled[1] == D.frame, 'the window styles the drawer panel')
+    assert(rawget(D.frame, 'backdrop') == nil, 'and the drawer sets no panel of its own')
+    """)
+    toc = (root / "Everloot.toc").read_text(encoding="utf-8")
+    assert toc.index("modules\\window.lua") < toc.index("modules\\drawer.lua")
 
 
 def test_a_late_libdbicon_button_is_collected():

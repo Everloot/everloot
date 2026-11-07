@@ -10,8 +10,10 @@ E.Drawer = D
 
 local PREFIX = "LibDBIcon10_"
 local COLUMNS = 6
-local CELL = 32 -- a LibDBIcon button is 31 pixels square
-local PAD = 6
+-- A LibDBIcon button is 31 pixels square, but its ring and shadow are drawn larger from its top-left corner, so a
+-- 32-pixel cell put every ring over the icon beside it and every shadow over the icon below.
+local CELL = 38
+local PAD = 8
 local POLL_SECONDS = 0.25 -- how often an open drawer checks whether the mouse has left
 local NOTICE_SECONDS = 5 -- the notice waits for the other addons' buttons to settle, so the count is right
 local RESCANS = { 3, 10 } -- seconds after entering the world: buttons some addons make late
@@ -51,7 +53,10 @@ local function drawer()
   f:SetPoint("TOPRIGHT", D.crest, "TOPLEFT", -2, 0)
   -- A minimap moved to the left edge would otherwise open the drawer off the screen.
   if f.SetClampedToScreen then f:SetClampedToScreen(true) end
-  if f.SetBackdrop then
+  -- The window's own panel (its canvas inside the bronze edge), so the drawer looks like the rest of Everloot.
+  if E.Window and E.Window.Backdrop then
+    E.Window.Backdrop(f)
+  elseif f.SetBackdrop then
     f:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
       tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
     if f.SetBackdropColor then f:SetBackdropColor(0.05, 0.05, 0.07, 0.95) end
@@ -62,14 +67,18 @@ local function drawer()
 end
 
 --- Places the shown buttons in rows of COLUMNS and sizes the drawer to fit. Returns how many are shown.
+--- Each button sits one frame level above the one before it: a ring's shadow falls to the right and below, so the
+--- button it would fall on draws over it and no icon is dimmed by its neighbour.
 local function layout()
   local f, shown = drawer(), 0
+  local base = (tonumber(f.GetFrameLevel and f:GetFrameLevel()) or 1) + 5
   for _, b in ipairs(D.collected) do
     local own = original[b]
     own.ClearAllPoints(b)
     if b:IsShown() then
       local column, row = shown % COLUMNS, math.floor(shown / COLUMNS)
       own.SetPoint(b, "TOPLEFT", f, "TOPLEFT", PAD + column * CELL, -(PAD + row * CELL))
+      if b.SetFrameLevel then b:SetFrameLevel(base + shown) end
       b:SetAlpha(1)
       shown = shown + 1
     end
@@ -98,9 +107,8 @@ local function collect(b)
   b.SetPoint, b.ClearAllPoints = noop, noop
   b:SetScript("OnDragStart", nil)
   b:SetScript("OnDragStop", nil)
-  -- LibDBIcon sets its own strata and level; above the drawer's background, or the panel would cover them.
+  -- LibDBIcon sets its own strata; the drawer's, or the panel would cover the button. Layout sets the level.
   if b.SetFrameStrata then b:SetFrameStrata("DIALOG") end
-  if b.SetFrameLevel then b:SetFrameLevel((tonumber(f.GetFrameLevel and f:GetFrameLevel()) or 1) + 5) end
   collectedSet[b] = true
   D.collected[#D.collected + 1] = b
   table.sort(D.collected, function(x, y) return x:GetName() < y:GetName() end)

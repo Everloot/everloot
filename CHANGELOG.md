@@ -17,6 +17,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 ### Fixed
 - Addon: a loading screen inside the minute after the last gold snapshot writes no new row unless the balance changed;
   the last snapshot's time is kept in the saved file, so a /reload no longer adds a row each.
+- Addon: the buttons gathered under the minimap crest no longer dim each other. A LibDBIcon ring is drawn wider than
+  its button, so the drawer's cells leave room for it and each button draws above the one before it; the panel is the
+  window's own canvas and bronze edge.
 - Addon: the PvP row keeps a character's last honorable kill count when a read comes before the Statistics tab has
   loaded, and skips a statistic the game flags to skip. A talent choice past the site's range is left off that node
   instead of failing the whole talent row on sync.
