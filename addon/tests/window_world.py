@@ -65,16 +65,21 @@ CreateFrame = function(kind, name, parent, template)
 end
 
 -- The core frame dispatches to its OnEvent script, then to every module's hook, as the game does: one chain, so an
--- error in one handler ends the dispatch and the hooks after it miss the event. The error is kept in fireErrors.
+-- error in one handler ends the dispatch and the hooks after it miss the event. The error is raised again so a
+-- crashing handler fails the test, unless the test set expectErrors; then it is kept in fireErrors.
 fireErrors = {}
+expectErrors = false
 function fire(event, ...)
   local f = Everloot.frame
-  local args = { ... }
+  local args, n = { ... }, select('#', ...)
   local ok, err = pcall(function()
-    f.onEvent(f, event, unpack(args))
-    for _, hook in ipairs(f.hooks) do hook(f, event, unpack(args)) end
+    f.onEvent(f, event, unpack(args, 1, n))
+    for _, hook in ipairs(f.hooks) do hook(f, event, unpack(args, 1, n)) end
   end)
-  if not ok then fireErrors[#fireErrors + 1] = tostring(err) end
+  if not ok then
+    if not expectErrors then error(err, 0) end
+    fireErrors[#fireErrors + 1] = tostring(err)
+  end
 end
 
 money = 381240

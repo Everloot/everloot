@@ -25,6 +25,7 @@ for file in ["core.lua", "modules/openworld.lua", "modules/auctions.lua", "modul
     lua.execute((root / file).read_text(encoding="utf-8"))
 lua.execute("""
 Everloot.frame.onEvent(nil, 'ADDON_LOADED', 'Everloot')
+expectErrors = true
 SlashCmdList.EVERLOOT('gph start')
 assert(#Everloot.frame.hooks >= 3, 'openworld, gold and gph hook the one frame')
 local before = EverlootDB.gph.current.money.loot or 0
@@ -42,7 +43,15 @@ fire('LOOT_OPENED')
 n = 0
 for _, p in ipairs(printed) do if p:find('openworld hit an error', 1, true) then n = n + 1 end end
 assert(n == 1, 'a second error says nothing more, got ' .. n)
-assert(Everloot:Status():find('openworld: error', 1, true), 'status says which module failed')
+assert(Everloot:Status():find('openworld: error in lootCapture', 1, true), 'status names the function that failed')
+-- A different function failing later updates the note and says nothing more in chat.
+local printsBefore = #printed
+UnitGUID = function() error('bang') end
+fire('PLAYER_TARGET_CHANGED')
+assert(Everloot:Status():find('openworld: error in targetSighting', 1, true), 'the note shows the latest failing function')
+assert(#printed == printsBefore, 'a second function failing prints nothing more')
+fire('PLAYER_TARGET_CHANGED')
+assert(#printed == printsBefore and #fireErrors == 0)
 
 -- Spell casts: the player's own, on a frame that is not the shared one.
 local spell

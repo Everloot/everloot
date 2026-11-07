@@ -856,12 +856,14 @@ end
 
 -- A Lua error in one handler on the shared frame ends the dispatch, so the modules after it miss the event.
 -- The captures that read the game's own windows run inside this, and the first error of a session is said once.
-local failedOnce = false
-local function guarded(fn, ...)
+local failedOnce, failedFns = false, {}
+local function guarded(label, fn, ...)
   local ok, err = pcall(fn, ...)
-  if ok or failedOnce then return end
+  if ok or failedFns[label] then return end
+  failedFns[label] = true
+  E:SetNote("openworld", "error in " .. label .. ": " .. tostring(err))
+  if failedOnce then return end
   failedOnce = true
-  E:SetNote("openworld", "error: " .. tostring(err))
   print("Everloot: openworld hit an error and keeps running. Other modules are not affected. /everloot status says more.")
 end
 
@@ -884,10 +886,10 @@ E:RegisterModule("openworld", function()
     for _, event in ipairs({ "ENCOUNTER_START", "CHAT_MSG_SYSTEM" }) do pcall(function() f:RegisterEvent(event) end) end
   end
   local function onEvent(_, event, arg1, arg2, arg3, arg4, arg5, arg6)
-    if event == "PLAYER_TARGET_CHANGED" then guarded(targetSighting, "target")
-    elseif event == "UPDATE_MOUSEOVER_UNIT" then guarded(targetSighting, "mouseover")
-    elseif event == "LOOT_OPENED" then guarded(lootCapture)
-    elseif event == "QUEST_ACCEPTED" then guarded(questCapture, arg1, arg2)
+    if event == "PLAYER_TARGET_CHANGED" then guarded("targetSighting", targetSighting, "target")
+    elseif event == "UPDATE_MOUSEOVER_UNIT" then guarded("targetSighting", targetSighting, "mouseover")
+    elseif event == "LOOT_OPENED" then guarded("lootCapture", lootCapture)
+    elseif event == "QUEST_ACCEPTED" then guarded("questCapture", questCapture, arg1, arg2)
     elseif event == "UNIT_SPELLCAST_SENT" then pcall(castSent, arg1, arg2, arg3, arg4)
     elseif (event == "UNIT_SPELLCAST_FAILED" or event == "UNIT_SPELLCAST_FAILED_QUIET" or event == "UNIT_SPELLCAST_INTERRUPTED")
       and arg1 == "player" then
@@ -906,7 +908,7 @@ E:RegisterModule("openworld", function()
       local role = interactionRole(arg1)
       if role ~= nil then pcall(interactionSighting, role or nil) end
     end
-    if event == "MERCHANT_SHOW" then guarded(vendorCapture) end
+    if event == "MERCHANT_SHOW" then guarded("vendorCapture", vendorCapture) end
     local role = WINDOW_ROLES[event]
     if role == false then
       local ok, found = pcall(gossipRole)
