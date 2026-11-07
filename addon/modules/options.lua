@@ -13,6 +13,8 @@ E.Options = O
 O.ROWS = {
   { key = "window", label = "Everloot window",
     text = "The window from the minimap button and /everloot window. It shows what this file holds and records nothing; off leaves recording as it is." },
+  { key = "minimapButton", field = true, label = "Minimap button",
+    text = "The Everloot button on the minimap: click it for the window, right-click for these settings, hover it for other addons' buttons. Off hides it after a reload; /everloot window still opens the window." },
   { key = "buttons", command = "buttons", label = "Addon buttons in the Everloot button",
     text = "Other addons' minimap buttons gather into the Everloot minimap button; hover it to use them. Records nothing; off puts them back after a reload." },
   { key = "auctions", command = "auctions", label = "Auction scans",

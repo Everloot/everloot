@@ -5,9 +5,15 @@ local E = Everloot
 local M = {}
 E.Minimap = M
 
---- The button, once. Returns the frame or nil when the client has no minimap to sit on.
+--- False when the player turned the button off on the settings page (applies at load).
+function M.Enabled()
+  return not (EverlootDB and EverlootDB.minimapButton == false)
+end
+
+--- The button, once. Returns the frame or nil when the client has no minimap to sit on or the button is off.
 function M.Button()
   if M.button then return M.button end
+  if not M.Enabled() then return nil end
   if type(Minimap) ~= "table" or type(Minimap) == "userdata" then return nil end
   if type(Minimap) == "table" and type(Minimap.IsObjectType) == "function" and not Minimap:IsObjectType("Frame") then return nil end
   local button = CreateFrame("Button", "EverlootMinimapButton", Minimap)
@@ -31,12 +37,26 @@ function M.Button()
     if mouseButton ~= "RightButton" and E.Planner then E.Planner.Open()
     elseif E.Options and E.Options.Open then E.Options.Open() end
   end)
+  -- What the three actions do. Hooked, not set: the drawer hooks the same hover to open, and both must run.
+  button:HookScript("OnEnter", function(self)
+    if type(GameTooltip) ~= "table" then return end
+    GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+    GameTooltip:AddLine("Everloot")
+    GameTooltip:AddLine("Left-click: open the Everloot window")
+    GameTooltip:AddLine("Right-click: open the settings")
+    GameTooltip:AddLine("Hover: use other addons' buttons gathered here")
+    GameTooltip:Show()
+  end)
+  button:HookScript("OnLeave", function()
+    if type(GameTooltip) == "table" then GameTooltip:Hide() end
+  end)
   if button.RegisterForClicks then button:RegisterForClicks("LeftButtonUp", "RightButtonUp") end
   M.button = button
   return button
 end
 
 E:RegisterModule("minimap", function()
+  if not M.Enabled() then return "off (the minimap button is switched off; /everloot window opens the window)" end
   if M.Button() then return "ready (a button at the top-left of the minimap)" end
   return "no minimap on this client; /everloot options still opens the panel"
 end)
