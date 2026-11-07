@@ -6,6 +6,9 @@
 -- deposits, repairs, other mail and gameplay stay unrecorded: their source cannot be
 -- told apart, or the money can come back. No other player's name: invoices, letters
 -- and listings name other players; those fields are never read into a record.
+-- Each event also goes to the local ledger (ledger.lua) under the character key, with
+-- an auction sale kept by item (name, count, deposit, cut) there only; the uploaded
+-- money_event keeps its shape. The day's closing gold is written there as it changes.
 
 local E = Everloot
 
@@ -14,7 +17,7 @@ local lastSnapshot = 0
 local lastMoney = nil
 local merchantOpen = false
 local taxiOpen = false
-local auctionMail = nil -- { letter = copper the letter pays, sale = the sale minus the cut }
+local auctionMail = nil -- { letter = copper the letter pays, sale = the sale minus the cut, item = the invoice's item facts }
 local postage = nil -- price quoted for a letter the server has not confirmed yet
 local buyout = nil -- copper a buyout is about to take
 local buyoutGen = 0 -- which pending buyout an expiry timer belongs to
@@ -58,7 +61,14 @@ local function writeSnapshot(force)
   })
 end
 
-local function storeMoney(category, copper)
+--- This character's ledger key, or nil when the ledger is not loaded or the key cannot be read.
+local function ledgerKey()
+  if not (E.Ledger and E.CharacterKey) then return nil end
+  local ok, key = pcall(E.CharacterKey)
+  return ok and key or nil
+end
+
+local function storeMoney(category, copper, extra)
   local name, realm = identity()
   if not name or type(copper) ~= "number" or copper < 1 or copper ~= math.floor(copper) then return end
   E:Store("money_event", {
@@ -69,6 +79,24 @@ local function storeMoney(category, copper)
     category = category,
     copper = copper,
   })
+  local key = ledgerKey()
+  if key then E.Ledger.Record(key, category, copper, extra) end
+end
+
+--- The day's closing gold in the ledger; the day's last change wins.
+local function closeDay(copper)
+  local key = ledgerKey()
+  if key and copper then E.Ledger.Close(key, copper) end
+end
+
+--- A confirmed auction sale: the money_event, then the sale by item in the ledger.
+local function storeSale(mail)
+  local item = mail.item
+  storeMoney("auction", mail.sale, { itemName = item.itemName, count = item.count })
+  local key = ledgerKey()
+  if key then
+    E.Ledger.RecordSale(key, { itemName = item.itemName, count = item.count, total = mail.sale, deposit = item.deposit, cut = item.cut })
+  end
 end
 
 local function whole(copper)
@@ -80,7 +108,7 @@ end
 local function moneyChanged(copper)
   if lastMoney then
     local delta = copper - lastMoney
-    if auctionMail and delta == auctionMail.letter then storeMoney("auction", auctionMail.sale)
+    if auctionMail and delta == auctionMail.letter then storeSale(auctionMail)
     elseif buyout and delta == -buyout then storeMoney("auction_spend", buyout)
     elseif merchantOpen and delta > 0 then storeMoney("vendor", delta)
     elseif taxiOpen and delta < 0 then storeMoney("flight", -delta) end
@@ -94,12 +122,21 @@ end
 local function mailTaken(index)
   auctionMail = nil
   if not GetInboxInvoiceInfo or not GetInboxHeaderInfo then return end
-  -- invoiceType, itemName, playerName (not read), bid, buyout, deposit, consignment
-  local okInvoice, invoiceType, _, _, bid, _, _, cut = pcall(GetInboxInvoiceInfo, index)
-  if not okInvoice or invoiceType ~= "seller" or not whole(bid) or type(cut) ~= "number" then return end
+  -- invoiceType, itemName, playerName (bound to _, never read), bid, buyout, deposit, consignmentFee, moneyDelay,
+  -- etaDay, etaHour, count, commerceAuction
+  local okInvoice, invoiceType, itemName, _, bid, buyoutPrice, deposit, cut, _, _, _, count, commerce = pcall(GetInboxInvoiceInfo, index)
+  if not okInvoice then return end
+  invoiceType, bid, cut = E.Readable(invoiceType), E.Readable(bid), E.Readable(cut)
+  if invoiceType ~= "seller" or not whole(bid) or type(cut) ~= "number" then return end
+  count = E.Readable(count)
+  local item = {
+    itemName = E.Readable(itemName), count = whole(count) and count or 1, bid = bid, buyout = E.Readable(buyoutPrice),
+    deposit = E.Readable(deposit), cut = cut, commerce = E.Readable(commerce),
+  }
   -- packageIcon, stationeryIcon, sender, subject, money
   local okHeader, _, _, _, _, copper = pcall(GetInboxHeaderInfo, index)
-  if okHeader and whole(copper) and whole(bid - cut) then auctionMail = { letter = copper, sale = bid - cut } end
+  copper = okHeader and E.Readable(copper)
+  if whole(copper) and whole(bid - cut) then auctionMail = { letter = copper, sale = bid - cut, item = item } end
 end
 
 --- A pending buyout lasts a few seconds: a bid the house rejects never moves money, and a later change
@@ -191,9 +228,10 @@ E:RegisterModule("gold", function()
     if event == "PLAYER_ENTERING_WORLD" then
       lastMoney = playerMoney()
       writeSnapshot(true)
+      closeDay(lastMoney)
     elseif event == "PLAYER_MONEY" then
       local copper = playerMoney()
-      if copper then rememberPeak(copper); moneyChanged(copper) end
+      if copper then rememberPeak(copper); closeDay(copper); moneyChanged(copper) end
       writeSnapshot(false)
     elseif event == "MERCHANT_SHOW" then merchantOpen = true
     elseif event == "MERCHANT_CLOSED" then merchantOpen = false
@@ -216,5 +254,5 @@ E:RegisterModule("gold", function()
       storeMoney("quest", reward)
     elseif event == "LOOT_OPENED" then lootMoney() end
   end)
-  return "ready (peak, current, loot copper, quest rewards, vendor sales, flights, mailed auction sales, postage, buyouts)"
+  return "ready (peak, current, loot copper, quest rewards, vendor sales, flights, mailed auction sales by item, postage, buyouts; local ledger and daily close)"
 end)

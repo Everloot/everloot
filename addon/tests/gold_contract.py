@@ -1,10 +1,10 @@
 """Run with: uv run --with lupa --with jsonschema python addon/tests/gold_contract.py"""
 from pathlib import Path
 from lupa.lua51 import LuaRuntime
+from protocol_schema import check_all
 
-lua = LuaRuntime()
-lua.execute("""
-date = function() return '2026-10-09T00:00:00Z' end
+STUBS = """
+date = function(fmt) if fmt == '!%Y-%m-%d' then return '2026-10-09' end return '2026-10-09T00:00:00Z' end
 local clock = 1000
 time = function() clock = clock + 1; return clock end
 print = function() end
@@ -15,6 +15,9 @@ CreateFrame = function() return {
  HookScript=function(self, _, f) self.hooks=self.hooks or {}; table.insert(self.hooks,f) end
 } end
 UnitName = function() return 'Thrall' end
+UnitGUID = function() return 'Player-4242-0ABCDEF1' end
+UnitClass = function() return 'Shaman', 'SHAMAN', 7 end
+UnitLevel = function() return 60 end
 GetRealmName = function() return 'Test Realm' end
 money = 1000
 GetMoney = function() return money end
@@ -52,15 +55,26 @@ C_AuctionHouse = {
 timers = {}
 C_Timer = { After = function(seconds, f) table.insert(timers, { seconds = seconds, f = f }) end }
 function runTimers() local list = timers; timers = {}; for _, t in ipairs(list) do t.f() end end
-""")
-root = Path(__file__).parents[1]
-for file in ["core.lua", "modules/gold.lua"]:
-    lua.execute((root / file).read_text(encoding="utf-8"))
-lua.execute("""
-Everloot.frame.onEvent(nil,'ADDON_LOADED','Everloot')
-local function event(name, ...)
+function event(name, ...)
  for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, name, ...) end
 end
+"""
+root = Path(__file__).parents[1]
+
+
+def runtime(before_load=""):
+    """A fresh client: core, roster, ledger and gold loaded, then ADDON_LOADED. Gold finds the ledger at call time."""
+    lua = LuaRuntime()
+    lua.execute(STUBS)
+    for file in ["core.lua", "modules/roster.lua", "modules/ledger.lua", "modules/gold.lua"]:
+        lua.execute((root / file).read_text(encoding="utf-8"))
+    lua.execute(before_load)
+    lua.execute("Everloot.frame.onEvent(nil,'ADDON_LOADED','Everloot')")
+    return lua
+
+
+lua = runtime()
+lua.execute("""
 local function events(category)
  local list = {}
  for _, row in ipairs(EverlootDB.records.money_event or {}) do
@@ -229,6 +243,85 @@ for _, row in ipairs(events()) do
  for _, value in pairs(row) do assert(value ~= 'Jaina' and value ~= 'Player-1-AAAA', 'buyers, sellers and recipients are other players and are never stored') end
 end
 """)
+
+# The local ledger: an auction sale is kept by item once the money change confirms the letter. Forever's invoice
+# returns invoiceType, itemName, playerName, bid, buyout, deposit, consignmentFee, moneyDelay, etaDay, etaHour,
+# count, commerceAuction. The buyer's name is never kept anywhere in the saved file.
+ledger = runtime()
+ledger.execute("""
+local function events(category)
+ local list = {}
+ for _, row in ipairs(EverlootDB.records.money_event or {}) do
+  if category == nil or row.category == category then list[#list + 1] = row end
+ end
+ return list
+end
+event('PLAYER_ENTERING_WORLD')
+local key = Everloot.CharacterKey()
+assert(key, 'the test character has a key')
+assert(EverlootDB.ledger.daily[key]['2026-10-09'] == 1000, 'entering the world writes the daily close')
+invoiceCount = 20
+GetInboxInvoiceInfo = function()
+ return 'seller', 'Linen Cloth', 'Buyerperson', 4000, 4000, 100, 200, 0, 0, 0, invoiceCount, true
+end
+GetInboxHeaderInfo = function() return 'icon', 'paper', 'Auction House', 'Auction successful', 3900 end
+TakeInboxMoney(1)
+money = money + 3900; event('PLAYER_MONEY')
+assert(#events() == 1 and events('auction')[1].copper == 3800, 'one money_event, auction 3800')
+assert(events()[1].itemName == nil and events()[1].count == nil, 'the uploaded money_event keeps its shape')
+local sale = EverlootDB.ledger.sales[1]
+assert(#EverlootDB.ledger.sales == 1 and sale.key == key, 'one sale under the character key')
+assert(sale.itemName == 'Linen Cloth' and sale.count == 20 and sale.total == 3800 and sale.unit == 190
+ and sale.deposit == 100 and sale.cut == 200 and sale.status == 'paid', 'the sale by item')
+local row = EverlootDB.ledger.events[1]
+assert(#EverlootDB.ledger.events == 1 and row.key == key and row.category == 'auction' and row.copper == 3800
+ and row.itemName == 'Linen Cloth' and row.count == 20, 'the ledger event names the item')
+assert(EverlootDB.ledger.daily[key]['2026-10-09'] == 4900, 'PLAYER_MONEY writes the daily close')
+
+-- A money change that does not match the letter: no sale, no event; the close still follows the purse.
+TakeInboxMoney(1)
+money = money + 3901; event('PLAYER_MONEY')
+assert(#EverlootDB.ledger.sales == 1 and #EverlootDB.ledger.events == 1 and #events() == 1, 'a mismatched delta records nothing')
+assert(EverlootDB.ledger.daily[key]['2026-10-09'] == 8801, 'the close follows the purse')
+
+-- An invoice without a count is one item.
+invoiceCount = nil
+TakeInboxMoney(1)
+money = money + 3900; event('PLAYER_MONEY')
+local single = EverlootDB.ledger.sales[2]
+assert(single and single.count == 1 and single.unit == 3800 and EverlootDB.ledger.events[2].count == 1, 'no count is count 1')
+
+-- Every stored money event reaches the ledger, not only sales.
+event('QUEST_TURNED_IN', 123, 450, 250)
+local quest = EverlootDB.ledger.events[3]
+assert(quest and quest.key == key and quest.category == 'quest' and quest.copper == 250, 'a quest reward in the ledger')
+
+local function walk(value, path)
+ if type(value) == 'string' then
+  assert(not value:find('Buyerperson', 1, true), 'a buyer name was saved at ' .. path)
+ elseif type(value) == 'table' then
+  for k, v in pairs(value) do walk(k, path .. '[key]'); walk(v, path .. '.' .. tostring(k)) end
+ end
+end
+walk(EverlootDB, 'EverlootDB')
+""")
+check_all(ledger)
+
+# Without the ledger file, gold records its money_event as before.
+plain = runtime("Everloot.Ledger = nil")
+plain.execute("""
+event('PLAYER_ENTERING_WORLD')
+GetInboxInvoiceInfo = function() return 'seller', 'Linen Cloth', 'Buyerperson', 4000, 4000, 100, 200, 0, 0, 0, 20, true end
+GetInboxHeaderInfo = function() return 'icon', 'paper', 'Auction House', 'Auction successful', 3900 end
+TakeInboxMoney(1)
+money = money + 3900; event('PLAYER_MONEY')
+local rows = EverlootDB.records.money_event
+assert(#rows == 1 and rows[1].category == 'auction' and rows[1].copper == 3800, 'money_event without the ledger')
+local store = EverlootDB.ledger or {}
+assert(#(store.events or {}) == 0 and #(store.sales or {}) == 0 and next(store.daily or {}) == nil, 'gold writes no ledger rows without E.Ledger')
+""")
+check_all(plain)
+
 # No addon source may call, index by string, or alias a buy, bid, post or craft function.
 import re
 names = (r"PostItem|PostCommodity|PlaceBid|PlaceAuctionBid|StartAuction|PostAuction|StartCommoditiesPurchase|"
@@ -250,6 +343,5 @@ for source in sorted(root.rglob("*.lua")):
         found = re.search(pattern, code)
         assert not found, f"{source.name} has {what} of a buy, bid, post or craft API: {found.group(0)}"
 # Every row the addon wrote is a record the site would accept (packages/protocol/schema).
-from protocol_schema import check_all  # noqa: E402
 check_all(lua)
-print("Lua 5.1 gold: vendor sales, flights, quest rewards, net auction sales, postage and buyouts (legacy and C_AuctionHouse, items and commodities) attributed; other purchases and unknown income unrecorded")
+print("Lua 5.1 gold: vendor sales, flights, quest rewards, net auction sales, postage and buyouts (legacy and C_AuctionHouse, items and commodities) attributed; auction sales by item and daily closes in the local ledger; other purchases and unknown income unrecorded")
