@@ -158,6 +158,11 @@ function E:Count(kind)
   return store and #store or 0
 end
 
+--- The rows of one kind as the saved file holds them; an empty list when there are none.
+function E:Rows(kind)
+  return (EverlootDB and EverlootDB.records and EverlootDB.records[kind]) or {}
+end
+
 local modules = {}
 
 --- `toggle`, when given, is another module's switch this one follows (its rows go with that module's).

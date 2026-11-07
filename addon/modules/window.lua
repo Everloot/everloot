@@ -1,6 +1,6 @@
 -- Everloot window: a home for what this file already holds. The character, gold on hand and where the gold
--- module saw it come from, gold per hour from the gph session, professions with their skill bars and how many
--- rows each kind of record has. Built the first time it opens (minimap button or /everloot window), never at
+-- module saw it come from, gold per hour from the gph session, professions with their skill bars and every
+-- character the roster holds. Built the first time it opens (minimap button or /everloot window), never at
 -- load, and it registers no events: recording runs whether this window exists, works or is turned off.
 -- Every build and refresh runs inside pcall; an error closes this window for the session, not the addon.
 -- Display only: it reads, the buttons call the commands the player could type, and nothing here records.
@@ -32,18 +32,6 @@ U.NAV = {
 -- first time it is selected, into a frame stored at f.views[key].
 U.Views = {}
 
--- What the gold module records, in the order the ledger line names them. Spending is shown as a minus.
-U.SOURCES = {
-  { "loot", "Loot" }, { "quest", "Quests" }, { "vendor", "Vendors" }, { "auction", "Auctions" },
-  { "flight", "Flights", true }, { "auction_spend", "Buyouts", true }, { "postage", "Postage", true },
-}
-
--- "What you've added": rows of each kind in the saved file now.
-U.ADDED = {
-  { "loot", "Loot windows" }, { "npc_sighting", "NPC sightings" }, { "quest", "Quests" }, { "recipe_observed", "Recipe colours" },
-  { "item_fact", "Item facts" }, { "auction_scan", "Auction scans" }, { "census_seen", "Players seen" }, { "map_bounds", "Zones mapped" },
-}
-
 -- A game call's values, each one a secret value would be read as missing; nothing when the call errors.
 local function readable(fn, ...)
   if type(fn) ~= "function" then return nil end
@@ -53,15 +41,6 @@ local function readable(fn, ...)
   if not result[1] then return nil end
   for i = 2, result.n do result[i] = E.Readable(result[i]) end
   return unpack(result, 2, result.n)
-end
-
-local function count(n)
-  local text = tostring(n)
-  while true do
-    local done
-    text, done = text:gsub("^(%d+)(%d%d%d)", "%1,%2")
-    if done == 0 then return text end
-  end
 end
 
 --- Copper with the game's coin icons: "38g 12s 40c" drawn as coins, gold and silver left out below them.
@@ -102,24 +81,8 @@ function U.HomeData()
   local copper = readable(GetMoney)
   d.onHand = type(copper) == "number" and copper >= 0 and copper or nil
   d.peak = type(EverlootDB.goldPeak) == "number" and EverlootDB.goldPeak or nil
-  -- Money events are the player's own, one character at a time: only this character's are summed.
-  local totals = {}
-  for _, row in ipairs(EverlootDB.records.money_event or {}) do
-    if type(row) == "table" and row.character == d.name and row.realm == d.realm and type(row.copper) == "number" then
-      totals[row.category] = (totals[row.category] or 0) + row.copper
-    end
-  end
-  d.sources = {}
-  if d.name and d.realm then
-    for _, s in ipairs(U.SOURCES) do
-      if totals[s[1]] then d.sources[#d.sources + 1] = { label = s[2], copper = s[3] and -totals[s[1]] or totals[s[1]] } end
-    end
-  end
-
   d.gph = U.GphData()
   d.professions = U.Professions()
-  d.added = {}
-  for _, a in ipairs(U.ADDED) do d.added[#d.added + 1] = { label = a[2], n = E:Count(a[1]) } end
   return d
 end
 
@@ -137,18 +100,13 @@ end
 function U.Professions()
   if type(GetProfessions) ~= "function" or type(GetProfessionInfo) ~= "function" then return nil end
   local indices = { readable(GetProfessions) }
-  local recipes = {}
-  for _, row in ipairs(EverlootDB.records.recipe_observed or {}) do
-    if type(row) == "table" and type(row.profession) == "string" then recipes[row.profession] = (recipes[row.profession] or 0) + 1 end
-  end
   local out = {}
   for i = 1, 6 do
     local index = indices[i]
     if index then
       local name, icon, rank, maxRank = readable(GetProfessionInfo, index)
       if type(name) == "string" and name ~= "" and type(rank) == "number" then
-        out[#out + 1] = { name = name, icon = icon, rank = rank, maxRank = type(maxRank) == "number" and maxRank > 0 and maxRank or nil,
-          recipes = recipes[name] }
+        out[#out + 1] = { name = name, icon = icon, rank = rank, maxRank = type(maxRank) == "number" and maxRank > 0 and maxRank or nil }
       end
     end
   end
@@ -250,6 +208,13 @@ end
 
 local W, H, SIDE, MAIN = 800, 450, 160, 184
 
+-- The roster list on Home: { field, x, width, right aligned, heading }.
+U.ROSTER_ROWS = 10
+U.ROSTER_COLUMNS = {
+  { "name", 4, 88, false, "Name" }, { "level", 94, 22, true, "Lv" }, { "gold", 120, 100, true, "Gold" },
+  { "profs", 224, 104, false, "Professions" }, { "lockouts", 332, 46, false, "Raids" }, { "seen", 382, 54, false, "Seen" },
+}
+
 local function buildHome(f)
   local home = CreateFrame("Frame", nil, f)
   home:SetPoint("TOPLEFT", MAIN, -48)
@@ -278,9 +243,9 @@ local function buildHome(f)
   f.onHand = stat(gold, 10, "INV_Misc_Coin_02", "On hand")
   f.perHour = stat(gold, 158, "INV_Misc_PocketWatch_01", "Gold per hour")
   f.peak = stat(gold, 306, "INV_Misc_Coin_04", "Peak on install")
-  f.ledger = text(gold, 11, FRIZ, COLORS.muted)
-  f.ledger:SetPoint("TOPLEFT", 10, -50)
-  f.ledger:SetWidth(424)
+  f.week = text(gold, 12, FRIZ, COLORS.muted)
+  f.week:SetPoint("TOPLEFT", 10, -50)
+  f.week:SetWidth(424)
   f.session = text(gold, 12, FRIZ, COLORS.muted)
   f.session:SetPoint("BOTTOMLEFT", 10, 10)
   local toggle = CreateFrame("Button", nil, gold, "UIPanelButtonTemplate")
@@ -293,50 +258,78 @@ local function buildHome(f)
   end)
   f.gphButton = toggle
 
-  -- Professions, one bar each.
-  local prof = box(home, 160, -110, 444, 146)
-  local heading = text(prof, 13)
-  heading:SetPoint("TOPLEFT", 10, -8)
-  heading:SetText("Professions")
+  -- Professions, one bar each, five across.
+  local prof = box(home, 160, -110, 444, 55)
   f.profRows = {}
   for i = 1, 5 do
-    local y = -28 - (i - 1) * 23
-    local row = { icon = icon(prof, 18, "Interface\\Icons\\INV_Misc_QuestionMark") }
-    row.icon:SetPoint("TOPLEFT", 10, y)
-    row.name = text(prof, 12)
-    row.name:SetPoint("TOPLEFT", 36, y + 1)
-    row.name:SetWidth(320)
+    local x = 6 + (i - 1) * 87
+    local row = { icon = icon(prof, 14, "Interface\\Icons\\INV_Misc_QuestionMark") }
+    row.icon:SetPoint("TOPLEFT", x, -7)
+    row.name = text(prof, 11)
+    row.name:SetPoint("TOPLEFT", x + 18, -7)
+    row.name:SetWidth(64)
+    if row.name.SetWordWrap then row.name:SetWordWrap(false) end
     local bar = CreateFrame("StatusBar", nil, prof)
-    bar:SetPoint("TOPLEFT", 36, y - 13)
-    bar:SetSize(320, 5)
+    bar:SetPoint("TOPLEFT", x, -25)
+    bar:SetSize(80, 5)
     bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
     bar:SetStatusBarColor(unpack(COLORS.accent))
     fill(bar, { 0.133, 0.137, 0.114, 1 })
     row.bar = bar
-    row.rank = text(prof, 13, NARROW, { 1, 1, 1, 1 })
-    row.rank:SetPoint("TOPRIGHT", -10, y - 2)
-    row.rank:SetJustifyH("RIGHT")
+    row.rank = text(prof, 11, NARROW, { 1, 1, 1, 1 })
+    row.rank:SetPoint("TOPLEFT", x, -33)
+    row.rank:SetWidth(80)
     f.profRows[i] = row
   end
 
-  -- What this file holds, kind by kind.
-  local added = box(home, 160, -266, 444, 124)
-  local addedHeading = text(added, 13)
-  addedHeading:SetPoint("TOPLEFT", 10, -8)
-  addedHeading:SetText("What you've added  |cffc9c3b0rows in your saved file|r")
-  f.added = {}
-  for i = 1, #U.ADDED do
-    local col, line = (i - 1) % 4, math.floor((i - 1) / 4)
-    local l = text(added, 11, FRIZ, COLORS.muted)
-    l:SetPoint("TOPLEFT", 10 + col * 108, -32 - line * 22)
-    l:SetText(U.ADDED[i][2])
-    local n = text(added, 13, NARROW, COLORS.accent)
-    n:SetPoint("TOPLEFT", 10 + col * 108, -44 - line * 22)
-    f.added[i] = n
+  -- Every character the roster holds, by realm: 10 rows at a time, Up and Down for more.
+  local roster = box(home, 160, -175, 444, 215)
+  local r = { rows = {}, realmTotals = {}, offset = 0 }
+  f.roster = r
+  local title = text(roster, 12)
+  title:SetPoint("TOPLEFT", 8, -6)
+  title:SetText("Characters")
+  for _, c in ipairs(U.ROSTER_COLUMNS) do
+    local head = text(roster, 10, FRIZ, COLORS.muted)
+    head:SetPoint("TOPLEFT", 4 + c[2], -22)
+    head:SetWidth(c[3])
+    if c[4] then head:SetJustifyH("RIGHT") end
+    head:SetText(c[5])
   end
-  local footer = text(added, 10, FRIZ, COLORS.muted)
-  footer:SetPoint("BOTTOMLEFT", 10, 8)
-  footer:SetText("Nothing leaves this computer until the Desktop App or everloot.app/upload sends it.")
+  for i = 1, U.ROSTER_ROWS do
+    local row = CreateFrame("Frame", nil, roster)
+    row:SetPoint("TOPLEFT", 4, -36 - (i - 1) * 16)
+    row:SetSize(436, 16)
+    for _, c in ipairs(U.ROSTER_COLUMNS) do
+      local s = text(row, 11, NARROW)
+      s:SetPoint("LEFT", c[2], 0)
+      s:SetWidth(c[3])
+      if c[4] then s:SetJustifyH("RIGHT") end
+      if s.SetWordWrap then s:SetWordWrap(false) end
+      row[c[1]] = s
+    end
+    r.rows[i] = row
+  end
+  r.empty = text(roster, 11, nil, COLORS.muted)
+  r.empty:SetPoint("TOPLEFT", 8, -40)
+  r.empty:SetText("No characters recorded yet.")
+  r.accountTotal = text(roster, 12)
+  r.accountTotal:SetPoint("BOTTOMLEFT", 8, 5)
+  local function page(delta)
+    r.offset = math.max(0, r.offset + delta * U.ROSTER_ROWS)
+    local ok, err = pcall(U.Refresh)
+    if not ok then U.Fail(err) end
+  end
+  r.up = CreateFrame("Button", nil, roster, "UIPanelButtonTemplate")
+  r.up:SetSize(48, 18)
+  r.up:SetPoint("TOPRIGHT", -58, -3)
+  r.up:SetText("Up")
+  r.up:SetScript("OnClick", function() page(-1) end)
+  r.down = CreateFrame("Button", nil, roster, "UIPanelButtonTemplate")
+  r.down:SetSize(48, 18)
+  r.down:SetPoint("TOPRIGHT", -6, -3)
+  r.down:SetText("Down")
+  r.down:SetScript("OnClick", function() page(1) end)
 end
 
 local function build()
@@ -446,6 +439,101 @@ function U.RefreshLive()
   end
 end
 
+--- "This week: +<in> / -<out>" for this character over the last seven days, or "This week: -" when the key or
+--- the ledger is missing.
+function U.WeekLine()
+  local L = E.Ledger
+  local key = E.Roster and E.Roster.Current()
+  if not (key and L and L.Summary and L.Period) then return "This week: -" end
+  local ok, sum = pcall(function() return L.Summary({ key }, L.Period("7d")) end)
+  if not ok or type(sum) ~= "table" or type(sum.totalIn) ~= "number" or type(sum.totalOut) ~= "number" then return "This week: -" end
+  return "This week: +" .. U.Money(sum.totalIn) .. " / -" .. U.Money(sum.totalOut)
+end
+
+-- Raid lockouts exist only while the completion tracker is on; "-" when it is off or the character has none.
+local function lockoutText(key)
+  if not E:IsEnabled("completion") then return "-" end
+  local n = 0
+  for _, row in ipairs(E:Rows("lockout_owned")) do
+    if type(row) == "table" and row.characterKey == key then n = n + 1 end
+  end
+  return n > 0 and (n .. (n == 1 and " raid" or " raids")) or "-"
+end
+
+local function professionText(list)
+  local parts = {}
+  for _, p in ipairs(type(list) == "table" and list or {}) do
+    if type(p) == "table" and type(p.name) == "string" then
+      parts[#parts + 1] = p.name .. (type(p.rank) == "number" and (" " .. p.rank) or "")
+    end
+  end
+  return #parts > 0 and table.concat(parts, ", ") or "-"
+end
+
+-- The class colour, else the plain text colour.
+local function classColor(token)
+  local c = type(token) == "string" and type(RAID_CLASS_COLORS) == "table" and RAID_CLASS_COLORS[token]
+  if type(c) == "table" and type(c.r) == "number" and type(c.g) == "number" and type(c.b) == "number" then return c.r, c.g, c.b, 1 end
+  return unpack(COLORS.text)
+end
+
+--- Home's list of characters: a line per realm with its gold, then its characters; the account total under it.
+function U.RefreshRoster()
+  local f = U.frame
+  local r = f.roster
+  local ok, rows = false, nil
+  if E.Roster and E.Roster.Rows then ok, rows = pcall(E.Roster.Rows) end
+  if not (ok and type(rows) == "table") then rows = {} end
+  local current = E.Roster and E.Roster.Current()
+  local items, realm, header, account = {}, nil, nil, nil
+  r.realmTotals = {}
+  for _, c in ipairs(rows) do
+    if not header or c.realm ~= realm then
+      realm = c.realm
+      header = { header = true, realm = realm or "-" }
+      items[#items + 1] = header
+      r.realmTotals[header.realm] = header
+    end
+    items[#items + 1] = c
+    if type(c.copper) == "number" then
+      header.copper = (header.copper or 0) + c.copper
+      account = (account or 0) + c.copper
+    end
+  end
+  for _, h in pairs(r.realmTotals) do h.text = h.realm .. " · " .. U.Money(h.copper) end
+  r.accountTotal:SetText("Account: " .. U.Money(account))
+
+  local n = #items
+  r.offset = math.min(r.offset, math.floor(math.max(n - 1, 0) / U.ROSTER_ROWS) * U.ROSTER_ROWS)
+  for i, row in ipairs(r.rows) do
+    local item = items[r.offset + i]
+    if not item then
+      row:Hide()
+    else
+      for _, c in ipairs(U.ROSTER_COLUMNS) do row[c[1]]:SetText("") end
+      if item.header then
+        row.name:SetText(item.text)
+        row.name:SetWidth(430)
+        row.name:SetTextColor(unpack(COLORS.muted))
+      else
+        row.name:SetWidth(88)
+        row.name:SetText(item.name or "-")
+        if item.key == current then row.name:SetTextColor(unpack(COLORS.accent))
+        else row.name:SetTextColor(classColor(item.class)) end
+        row.level:SetText(type(item.level) == "number" and tostring(item.level) or "-")
+        row.gold:SetText(U.Money(item.copper))
+        row.profs:SetText(professionText(item.professions))
+        row.lockouts:SetText(lockoutText(item.key))
+        row.seen:SetText(type(item.lastSeen) == "number" and date("!%Y-%m-%d", item.lastSeen) or "-")
+      end
+      row:Show()
+    end
+  end
+  if n == 0 then r.empty:Show() else r.empty:Hide() end
+  if r.offset > 0 then r.up:Show() else r.up:Hide() end
+  if r.offset + U.ROSTER_ROWS < n then r.down:Show() else r.down:Hide() end
+end
+
 function U.Refresh()
   local f = U.frame
   if not (f and f:IsShown()) then return end
@@ -465,19 +553,15 @@ function U.Refresh()
   if SetPortraitTexture then pcall(SetPortraitTexture, f.portrait, "player") end
 
   f.peak:SetText(d.peak and U.Money(d.peak) or "-")
-  local ledger = {}
-  for _, s in ipairs(d.sources) do
-    local amount = E.Coins(math.abs(s.copper)):gsub(" 0c$", "")
-    ledger[#ledger + 1] = s.label .. " |cffffffff" .. (s.copper < 0 and "-" or "") .. amount .. "|r"
-  end
-  f.ledger:SetText(#ledger > 0 and ("Recorded: " .. table.concat(ledger, "   ")) or "No gold sources recorded for this character yet.")
+  f.week:SetText(U.WeekLine())
 
   local profs = d.professions
   for i, row in ipairs(f.profRows) do
     local p = profs and profs[i]
     if p then
       row.icon:SetTexture(p.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
-      row.name:SetText(p.name .. (p.recipes and ("  |cffc9c3b0" .. count(p.recipes) .. " recipe colours recorded|r") or ""))
+      row.name:SetText(p.name)
+      row.name:SetWidth(64)
       row.bar:SetMinMaxValues(0, p.maxRank or math.max(p.rank, 1))
       row.bar:SetValue(p.rank)
       row.rank:SetText(p.rank .. (p.maxRank and (" / " .. p.maxRank) or ""))
@@ -486,6 +570,7 @@ function U.Refresh()
       row.icon:Hide(); row.bar:Hide(); row.rank:Hide()
       if i == 1 then
         row.name:SetText(profs and "No professions learned." or "-")
+        row.name:SetWidth(400)
         row.name:Show()
       else
         row.name:Hide()
@@ -493,7 +578,7 @@ function U.Refresh()
     end
   end
 
-  for i, a in ipairs(d.added) do f.added[i]:SetText(count(a.n)) end
+  U.RefreshRoster()
   U.RefreshLive()
 end
 

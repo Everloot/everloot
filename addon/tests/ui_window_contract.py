@@ -8,6 +8,7 @@ Everloot in fel green, and the settings page borrows its look at load without bu
 tooltip keeps its lines under one "Everloot" header, and the crest texture ships in the addon zip.
 """
 import shutil
+import zlib
 import struct
 import subprocess
 import sys
@@ -47,8 +48,22 @@ assert width == height and width in (64, 128) and len(crest) == 18 + id_len + wi
 assert 'Interface\\\\AddOns\\\\Everloot\\\\media\\\\crest' in code and 'Interface\\\\AddOns\\\\Everloot\\\\media\\\\crest:14:14' in prices
 
 # --- It builds under the stub frame API and shows only real values ---
-SAVED = "{ installId = 'abcd-1234', toggles = {}, records = { recipe_observed = { { profession = 'Cooking' }, { profession = 'Cooking' } } } }"
-lua = fresh(SAVED)
+# The key core.lua's E.CharacterKey gives this install and player GUID.
+ME = "%08x" % zlib.adler32(b"abcd-1234:Player-1-0001")
+API = ("UnitGUID = function() return 'Player-1-0001' end\n"
+       "date = os.date\n"
+       "RAID_CLASS_COLORS.MAGE = { r = 0.25, g = 0.78, b = 0.92 }\n"
+       "RAID_CLASS_COLORS.ROGUE = { r = 1, g = 0.96, b = 0.41 }\n")
+SAVED = f"""{{ installId = 'abcd-1234', toggles = {{}}, records = {{
+    recipe_observed = {{ {{ profession = 'Cooking' }}, {{ profession = 'Cooking' }} }},
+    lockout_owned = {{ {{ characterKey = 'bbbb0002', instance = 'Karazhan' }}, {{ characterKey = 'bbbb0002', instance = 'Gruul' }}, {{ characterKey = 'zzzz', instance = 'Other' }} }} }},
+  roster = {{
+    ['{ME}'] = {{ name = 'Samplechar', realm = 'Forever', class = 'SHAMAN', level = 24, copper = 1312745, lastSeen = 1794052800,
+      professions = {{ {{ name = 'Mining', rank = 112, maxRank = 150 }}, {{ name = 'Cooking', rank = 1, maxRank = 75 }} }} }},
+    aaaa0001 = {{ name = 'Alt', realm = 'Forever', class = 'ROGUE', level = 12, copper = 500 }},
+    bbbb0002 = {{ name = 'Mage', realm = 'Nightfall', class = 'MAGE', level = 30 }},
+  }} }}"""
+lua = fresh(SAVED, API)
 lua.execute("""
 local U = Everloot.Window
 assert(U.frame == nil and EverlootWindow == nil, 'nothing is built at load')
@@ -76,19 +91,39 @@ assert(f.name.text == 'Samplechar' and f.realm.text == 'Forever', f.name.text)
 assert(f.class.text:find('^Level 24 Orc |cff0070dd') and f.class.text:find('Shaman'), f.class.text)
 assert(f.onHand.text:find('^48|TInterface\\\\MoneyFrame\\\\UI%-GoldIcon') and f.onHand.text:find('96|T.-Silver') and f.onHand.text:find('85|T.-Copper'), f.onHand.text)
 assert(f.peak.text:find('^48|T'), 'the peak the gold module saved: ' .. f.peak.text)
-assert(f.ledger.text:find('Quests |cffffffff6g 75s|r') and f.ledger.text:find('Vendors |cffffffff4g 10s|r')
-  and f.ledger.text:find('Flights |cffffffff%-55c|r'), f.ledger.text)
-assert(not f.ledger.text:find('Loot'), 'a source with no rows is left out: ' .. f.ledger.text)
+assert(f.week.text:find('^This week: %+') and f.week.text:find('Gold') and f.week.text:find(' / %-'), f.week.text)
+assert(rawget(f, 'ledger') == nil, 'the Recorded line is the week line now')
 assert(f.perHour.text == '-' and f.session.text:find('not running') and f.gphButton.text == 'Start', 'no session, no number')
 
 local rows = f.profRows
 assert(rows[1].name.text == 'Mining' and rows[1].rank.text == '112 / 150' and rows[1].bar.hi == 150 and rows[1].bar.value == 112)
-assert(rows[2].name.text == 'Fishing' and rows[3].name.text:find('^Cooking  .-2 recipe colours recorded'), rows[3].name.text)
+assert(rows[2].name.text == 'Fishing' and rows[3].name.text == 'Cooking', rows[3].name.text)
 assert(rows[4].name.shown == false and rows[4].bar.shown == false, 'unused rows are hidden')
-for i, a in ipairs(Everloot.Window.ADDED) do
-  assert(f.added[i].text == tostring(Everloot:Count(a[1])), a[2])
-end
-assert(f.added[4].text == '2', 'recipe colours counted from the file')
+
+-- Home across alts: realm lines and characters sorted realm then name, class colours, totals, lockouts, last seen.
+assert(rawget(f, 'added') == nil and Everloot.Window.ADDED == nil, 'the row counts left the window for Settings')
+local r = f.roster
+local function shownRows() local n = 0; for _, row in ipairs(r.rows) do if row.shown then n = n + 1 end end; return n end
+assert(#r.rows == 10 and shownRows() == 5, 'two realm lines and three characters')
+assert(r.rows[1].name.text:find('^Forever') and r.rows[2].name.text == 'Alt' and r.rows[3].name.text == 'Samplechar'
+  and r.rows[4].name.text:find('^Nightfall') and r.rows[5].name.text == 'Mage', 'realm, then name')
+assert(r.rows[2].name.color[1] == 1 and r.rows[2].name.color[3] == 0.41, 'Alt is rogue yellow')
+assert(r.rows[5].name.color[1] == 0.25 and r.rows[5].name.color[3] == 0.92, 'Mage is mage blue')
+assert(r.rows[3].name.color[1] < 0.7 and r.rows[3].name.color[2] > 0.9 and r.rows[3].name.color[3] < 0.3, 'this character is marked in the accent colour')
+local mine = EverlootDB.roster[Everloot.CharacterKey()].copper
+assert(mine == money, 'this character reads gold from the client when the window opens')
+assert(r.realmTotals.Forever.text == 'Forever · ' .. Everloot.Window.Money(mine + 500) and r.realmTotals.Forever.copper == mine + 500, r.realmTotals.Forever.text)
+assert(r.realmTotals.Nightfall.text == 'Nightfall · -' and r.realmTotals.Nightfall.copper == nil, 'no gold read, a dash')
+assert(r.accountTotal.text == 'Account: ' .. Everloot.Window.Money(mine + 500), r.accountTotal.text)
+assert(r.rows[3].level.text == '24' and r.rows[3].gold.text == Everloot.Window.Money(mine) and r.rows[2].gold.text == Everloot.Window.Money(500), r.rows[2].gold.text)
+assert(r.rows[3].profs.text == 'Mining 112, Fishing 20, Cooking 1' and r.rows[2].profs.text == '-', r.rows[3].profs.text)
+assert(r.rows[3].lockouts.text == '-' and r.rows[5].lockouts.text == '-', 'lockouts are read only while the completion tracker is on')
+assert(r.rows[3].seen.text == '1970-01-12' and r.rows[2].seen.text == '-', r.rows[3].seen.text)
+EverlootDB.toggles.completion = true
+Everloot.Window.Refresh()
+assert(r.rows[5].lockouts.text == '2 raids' and r.rows[3].lockouts.text == '-' and r.rows[2].lockouts.text == '-', r.rows[5].lockouts.text)
+EverlootDB.toggles.completion = nil
+Everloot.Window.Refresh()
 
 -- Gold per hour from the gph session, and Pause runs the gph command.
 EverlootDB.gph.current = { v = 1, elapsed = 0, runningSince = now - 600, counts = {}, distinct = 0,
@@ -143,7 +178,8 @@ assert(Everloot.Window.Open())
 local f = EverlootWindow
 assert(f.name.text == '-' and f.onHand.text == '-' and f.peak.text == '-' and f.perHour.text == '-', 'dashes, not numbers')
 assert(f.profRows[1].name.text == '-' and f.profRows[1].bar.shown == false, 'no profession book, no bars')
-assert(f.ledger.text:find('No gold sources'), f.ledger.text)
+assert(f.week.text == 'This week: -', f.week.text)
+assert(f.roster.accountTotal.text == 'Account: -' and not f.roster.rows[1].shown, 'no characters, no rows')
 """)
 
 # --- A forced error inside the window never stops an event from being recorded ---
