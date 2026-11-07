@@ -765,5 +765,32 @@ assert(string.find(panel().body.text, 'Spend order: unknown', 1, true))
 assert(P.Link() == 'https://everloot.app/tools/talents/mage#plan2={CODE2}')
 """)
 
+# --- A plan belongs to its class: another class's character neither shows nor loses it ---
+lua = fresh("""
+CLASS = 'WARRIOR'
+PlayerSpellsFrame = {
+ IsShown = function() return true end,
+ HookScript = function(self, kind, f) self[kind] = f end,
+ TalentsFrame = { IsShown = function() return true end, GetTalentButtonByNodeID = function() return nil end },
+}
+""", saved=f"{{ plan = '{CODE}', planOrder = 'O1g-ABACC', planSet = 2 }}")
+lua.execute(f"""
+PlayerSpellsFrame.OnShow()
+assert(panel() == nil, 'a warrior is not shown the saved mage plan')
+assert(EverlootDB.plan == nil and EverlootDB.planOrder == nil and EverlootDB.planSet == nil, 'nothing is loaded for the warrior')
+assert(EverlootDB.plans.MAGE.plan == '{CODE}' and EverlootDB.plans.MAGE.order == 'O1g-ABACC' and EverlootDB.plans.MAGE.set == 2, 'the mage plan is kept for the mage')
+SlashCmdList.EVERLOOT('plan')
+assert(string.find(panel().body.text, 'No plan loaded', 1, true), 'the plan command shows no plan for the warrior')
+-- The mage logs in again: the plan is back with its order and set.
+CLASS = 'MAGE'
+Everloot.frame.hooks = nil
+Everloot.frame.onEvent(nil, 'ADDON_LOADED', 'Everloot')
+assert(EverlootDB.plan == '{CODE}' and EverlootDB.planOrder == 'O1g-ABACC' and EverlootDB.planSet == 2, 'the mage gets the plan back')
+assert(Everloot.Plan.Link() == 'https://everloot.app/tools/talents/mage#plan2={CODE}&order2=O1g-ABACC')
+-- Clearing it as the mage forgets only the mage plan.
+SlashCmdList.EVERLOOT('plan clear')
+assert(EverlootDB.plan == nil and EverlootDB.plans.MAGE == nil)
+""")
+
 print("Lua 5.1 plan: EL1 share code (independent base64url check), spend order token (shared vectors, exact whitespace), "
       "next point only from an order, mismatches, panel, display only, saved builds list")
