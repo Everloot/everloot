@@ -15,6 +15,9 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
+- Addon: the PvP row keeps a character's last honorable kill count when a read comes before the Statistics tab has
+  loaded, and skips a statistic the game flags to skip. A talent choice past the site's range is left off that node
+  instead of failing the whole talent row on sync.
 - Site: an addon page, title and download links exist only for an addon the owner approved (the curated source map or the
   ecosystem registry). Before, any addon three installs reported got a page, and its title came from the uploads. The
   usage board at /addons/popular still counts what players run, and links only the approved ones.

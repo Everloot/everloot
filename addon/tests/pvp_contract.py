@@ -140,6 +140,22 @@ assert "honorableKills" not in plain(lua)[0]
 lua = addon(setup="STATS[20][2][3] = 589")
 read(lua)
 assert "honorableKills" not in plain(lua)[0]
+# An entry Blizzard's Statistics tab skips is skipped here too, even with statistic id 588.
+lua = addon(setup="STATS[20][2][2] = true")
+read(lua)
+assert "honorableKills" not in plain(lua)[0], plain(lua)
+# Statistics not loaded on a later read: the character keeps its last kill count instead of losing it.
+lua = addon()
+read(lua)
+assert plain(lua)[0]["honorableKills"] == 1234
+lua.execute("STATS[20][2][1] = '--'; INFO.renownLevel = 8")
+read(lua)
+row = plain(lua)[0]
+assert row["honorableKills"] == 1234 and row["rank"] == 8 and len(plain(lua)) == 1, plain(lua)
+# A new count replaces the old one.
+lua.execute("STATS[20][2][1] = '1,300'")
+read(lua)
+assert plain(lua)[0]["honorableKills"] == 1300, plain(lua)
 # The statistics calls missing or erroring: rank only.
 for setup in ("GetStatisticsCategoryList = nil", "GetStatistic = function() error('boom') end"):
     lua = addon(setup=setup)

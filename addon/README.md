@@ -196,7 +196,7 @@ expands, clicks or changes anything.
 - **PvP row** (`pvp_owned`): the PvP rank (renown on Forever's PvP rank faction: rank, points, next-rank threshold,
   top rank), the season and lifetime honorable kills from the Statistics tab, one row per character under the same key.
   Whole numbers only, no rank title; a field the game will not give is left out, and with neither a rank nor honorable
-  kills there is no row. Never part of an upload file; sent and kept the same way as the stats row;
+  kills there is no row. A read made before the statistics load keeps the character's last kill count. Never part of an upload file; sent and kept the same way as the stats row;
   `/everloot completion off` deletes it.
 - A changed achievement or standing replaces its earlier row. Titles and completed quests are additions.
 - The file stays bounded: at most 1500 achievements read, 600 progress rows per character, and about 3 MB
