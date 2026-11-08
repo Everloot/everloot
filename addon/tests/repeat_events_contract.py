@@ -237,21 +237,10 @@ scenario("profession window", PROFESSIONS, ["modules/professions.lua"],
          "for _ = 1, 3 do event('TRADE_SKILL_SHOW'); drain(); event('TRADE_SKILL_LIST_UPDATE'); drain() end; times(3, 'TRAINER_SHOW')",
          {"recipe_observed": 1, "trainer_seen": 1})
 
-# --- gold: PLAYER_MONEY inside one second is one row (the module's one-a-minute limit).
-scenario("gold, money events", GOLD, ["modules/gold.lua"], "times(3, 'PLAYER_MONEY')", {"gold_snapshot": 1}, reload=False)
-
-# gold_snapshot is also written at every PLAYER_ENTERING_WORLD (writeSnapshot(true) skips the minute limit), so each
-# loading screen adds a row until the kind is capped at 2000 and pauses. Observed on main: 3 rows for 3 events.
-# Skipped, not fixed here: tracked in issue #882. Once its fix lands this turns into the assertion below.
-# Same shape as the gear bug: lastSnapshot is in memory only, so a reload followed by PLAYER_MONEY writes another
-# gold_snapshot today. #882's fix covers that too.
-lua = world(GOLD, ["modules/gold.lua"])
-lua.execute("times(3, 'PLAYER_ENTERING_WORLD')")
-gold_rows = count(lua, "gold_snapshot")
-if gold_rows > 1:
-    SKIPPED.append(f"gold_snapshot (issue #882): {gold_rows} rows for 3 PLAYER_ENTERING_WORLD events (one per loading screen)")
-else:
-    assert gold_rows == 1, f"gold_snapshot: {gold_rows} rows for 3 PLAYER_ENTERING_WORLD events, expected 1"
+# --- gold: loading screens and PLAYER_MONEY inside one minute are one row (the module's one-a-minute limit, kept in
+# SavedVariables so a /reload inside the minute writes nothing).
+scenario("gold, loading screens and money events", GOLD, ["modules/gold.lua"],
+         "times(3, 'PLAYER_ENTERING_WORLD'); times(3, 'PLAYER_MONEY')", {"gold_snapshot": 1})
 
 for line in SKIPPED:
     print("SKIPPED known growth:", line)
