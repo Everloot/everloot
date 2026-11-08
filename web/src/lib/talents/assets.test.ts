@@ -118,7 +118,7 @@ const SHOWS_ART = new Set([
   "web/src/app/database/spells/page.tsx",
   // The database index reads the spell names for the count beside the link, the way the sitemap reads
   // the item names only to know whether a category has enough to list. No art, no tooltip.
-  "web/src/app/database/page.tsx",
+  "web/src/app/database/(hub)/page.tsx",
   // The quest list's reward icons, under the item lists' rule (reported or wiki-named items only).
   "web/src/app/database/quests/page.tsx",
   // The site-wide credit (footer → /methodology#credits): reads only the manifest's build and label, no art.

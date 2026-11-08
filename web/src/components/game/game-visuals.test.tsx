@@ -25,10 +25,10 @@ vi.mock("@/components/WorldMapView", async (importOriginal) => {
 import Home from "@/app/page";
 import DropsPage from "@/app/database/drops/page";
 import AuctionsRealmPage from "@/app/tools/auctions/[realm]/page";
-import ProfessionsPage from "@/app/tools/professions/(hub)/page";
+import ProfessionsPage from "@/app/tools/professions/page";
 import ProfessionPage from "@/app/tools/professions/[profession]/page";
 import RaidPage from "@/app/tools/raid/page";
-import MapPage from "@/app/map/(hub)/page";
+import MapPage from "@/app/map/page";
 import ContinentMapPage from "@/app/map/[continent]/page";
 import ItemPage from "@/app/database/items/[id]/page";
 import VendorPage from "@/app/database/vendors/[id]/page";
@@ -322,7 +322,7 @@ test("map: the continent picture and zone pictures; held-back zones only with sp
   const on = await render(() => ContinentMapPage({ params: Promise.resolve({ continent: "eastern-kingdoms" }), searchParams: Promise.resolve({ spoilers: "1" }) }));
   expect(art(on)!.zones.some((z) => z.url === `${BASE}/maps/2548.webp`)).toBe(true);
   // The page's description no longer says "No game art" once the pictures are on.
-  const { generateMetadata } = await import("@/app/map/(hub)/page");
+  const { generateMetadata } = await import("@/app/map/page");
   expect((await generateMetadata({ searchParams: Promise.resolve({}) })).description).toContain("The map pictures are the game's own.");
   // Kalimdor has no map pictures in this upload: none drawn, and no credit for them.
   const kalimdor = await render(() => ContinentMapPage({ params: Promise.resolve({ continent: "kalimdor" }), searchParams: Promise.resolve({}) }));

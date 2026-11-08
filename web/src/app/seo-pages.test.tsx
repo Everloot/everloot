@@ -101,7 +101,7 @@ test("the raid page lists the talent-gated buffs from the raid data and its JSON
 });
 
 test.each([
-  ["/tools/professions", () => import("./tools/professions/(hub)/page")],
+  ["/tools/professions", () => import("./tools/professions/page")],
   ["/tools/guild-board", () => import("./tools/guild-board/page")],
   ["/tools/collections", () => import("./tools/collections/page")],
   ["/tools/gold-ledger", () => import("./tools/gold-ledger/page")],
@@ -128,7 +128,7 @@ test("/tools/auctions carries WebApplication named by its H1; with no lead line,
 });
 
 test("the profession hub's H1 names WoW Forever and is its title", async () => {
-  const { default: Page, metadata } = await import("./tools/professions/(hub)/page");
+  const { default: Page, metadata } = await import("./tools/professions/page");
   const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({}) }));
   expect(h1(html)).toBe("WoW Forever Profession Hubs");
   expect(metadata.title).toBe(h1(html));

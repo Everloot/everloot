@@ -12,7 +12,7 @@ vi.mock("next/link", () => ({
 vi.mock("next/navigation", () => ({ redirect: (to: string) => { throw new Error(`NEXT_REDIRECT ${to}`); } }));
 vi.mock("@/components/EmailCapture", () => ({ default: () => null }));
 
-import ProfessionsPage from "./(hub)/page";
+import ProfessionsPage from "./page";
 
 const render = async (search: Record<string, string> = {}) =>
   renderToStaticMarkup(await ProfessionsPage({ searchParams: Promise.resolve(search) }));
