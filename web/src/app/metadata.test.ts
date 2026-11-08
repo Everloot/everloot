@@ -104,6 +104,10 @@ test("a search names its query in the title and stays out of the index", async (
   expect(m.robots).toEqual({ index: false, follow: true });
   expect((await generateMetadata({ searchParams: Promise.resolve({ q: ["Elwynn", "x"] }) })).title).toBe("Search: Elwynn");
   expect((await generateMetadata({ searchParams: Promise.resolve({ q: "   " }) })).title).toBe("Search");
+  // The title names the query the page ran, which is cut at the same length as the search itself.
+  const { MAX_QUERY } = await import("@/lib/lore");
+  const long = (await generateMetadata({ searchParams: Promise.resolve({ q: "a".repeat(MAX_QUERY + 50) }) })).title;
+  expect(long).toBe(`Search: ${"a".repeat(MAX_QUERY)}`);
 });
 
 test("the map descriptions still fit when the game's map pictures are on", async () => {

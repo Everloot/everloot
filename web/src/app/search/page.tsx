@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
 
 /** The tab and history name what was searched; a results page is never indexed. */
 export async function generateMetadata(props: { searchParams: Promise<Params> }): Promise<Metadata> {
-  const q = (first((await props.searchParams).q) ?? "").trim();
+  const q = (first((await props.searchParams).q) ?? "").trim().slice(0, MAX_QUERY);
   return {
     ...pageMetadata({ title: q ? `Search: ${q}` : "Search", description: "Search WoW: Forever items, NPCs, quests, zones, lore archive pages and Everloot tools by name or id. An exact match comes first.", path: "/search" }),
     robots: { index: false, follow: true },
