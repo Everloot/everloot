@@ -53,7 +53,7 @@ const FAQ: { q: string; a: ReactNode }[] = [
   },
   {
     q: "Is RP-PvP there at launch?",
-    a: <>Yes. RP-PvP realms opened with the launch on November 4.<Link href={RULESETS_POST.path} className={link}>Rulesets explained</Link>.</>,
+    a: <>Yes. The RP-PvP ruleset opened with the launch on November 4. <Link href={RULESETS_POST.path} className={link}>Rulesets explained</Link>.</>,
   },
   {
     q: "When does Hardcore start?",
@@ -218,7 +218,7 @@ export default async function WowForeverPage() {
               <DataTable caption="WoW: Forever rulesets" columns={rulesetColumns} rows={[...RULESETS]} rowKey={(r) => r.name} />
             </Card>
             <p className="text-sm text-muted">
-              Detail, and what to decide before name reservations: <Link href={RULESETS_POST.path} className={link}>Rulesets explained</Link>,
+              Detail on each ruleset: <Link href={RULESETS_POST.path} className={link}>Rulesets explained</Link>,
               which follows Blizzard&apos;s <a href={RULESETS_POST.blizzardUrl} rel="noopener" className={link}>{RULESETS_POST.blizzardTitle}</a>.
               Battlegrounds can mix rulesets, except Hardcore.
             </p>
