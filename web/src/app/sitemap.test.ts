@@ -10,7 +10,9 @@ import { filterItems } from "../../../kb/src/item-taxonomy";
 import { instanceHref, instanceRows } from "@/lib/instances";
 import { loadCatalog, TALENT_CLASSES } from "@/lib/talents/catalogs";
 import { encodeBuild, encodeOrder } from "@/lib/talents/share";
-import sitemap from "./sitemap";
+import { GET } from "./sitemap.xml/route";
+import sitemap from "@/lib/site-sitemap";
+import { approvedAddonNames } from "@/data/addon-repos";
 
 const facts = vi.hoisted(() => ({ rates: [] as unknown[], names: [] as { installId: string; itemId: number; name: string }[], npcs: [] as unknown[], unreachable: false }));
 const world = vi.hoisted(() => ({ npcs: [] as unknown[], quests: [] as unknown[], vendors: [] as unknown[], unreachable: false }));
@@ -25,13 +27,16 @@ vi.mock("@/lib/database-hubs", async (importOriginal) => {
 const blue = vi.hoisted(() => ({ writeups: new Map<string, { postId: string; reviewed: { by: string; on: string }; body: string }>() }));
 vi.mock("@/lib/changes", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/changes")>()), loadWriteups: () => blue.writeups }));
 
+const rankings = vi.hoisted(() => ({ weeks: [] as unknown[], unreachable: false, dataAsOf: null as string | null }));
+vi.mock("@/lib/rankings", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/rankings")>()), loadRankingWeeks: async () => rankings }));
+
 const news = vi.hoisted(() => ({ posts: new Map<string, unknown>() }));
 vi.mock("@/lib/news", async (importOriginal) => {
   const real = await importOriginal<typeof import("@/lib/news")>();
   return { ...real, loadNews: () => news.posts };
 });
 
-const entries = await sitemap();
+const entries = (await sitemap())!;
 const byPath = new Map(entries.map((e) => [new URL(e.url).pathname, e]));
 
 test("/changes is dated by its newest entry", async () => {
@@ -47,7 +52,7 @@ test("a blue post's page is listed only once it has a reviewed write-up, dated b
   const [first, second] = posts;
   try {
     blue.writeups = new Map([[first.id, { postId: first.id, reviewed: { by: "Maintainer", on: "2026-10-21" }, body: "Our words." }]]);
-    const withOne = await sitemap();
+    const withOne = (await sitemap())!;
     expect(listed(withOne)).toEqual([postPath(first)]);
     expect(withOne.find((e) => e.url.endsWith(postPath(first)!))?.lastModified).toEqual(new Date("2026-10-21"));
     expect(listed(withOne)).not.toContain(postPath(second));
@@ -61,7 +66,7 @@ test("the news hub and its posts are listed only once a post is published, dated
   expect(listed(entries)).toEqual([]);
   try {
     news.posts = new Map([["launch", { slug: "launch", title: "Launch", summary: "s", author: "a", published: "2026-10-24", updated: "2026-10-25", tags: [], sources: [], status: "published", blocks: [] }]]);
-    const withOne = await sitemap();
+    const withOne = (await sitemap())!;
     expect(listed(withOne)).toEqual(["/news", "/news/launch"]);
     expect(withOne.find((e) => e.url.endsWith("/news/launch"))?.lastModified).toEqual(new Date("2026-10-25"));
   } finally {
@@ -97,7 +102,7 @@ test("a guide is listed only while its page asks to be indexed, dated by its rev
   writeFileSync(join(dir, "thin-guide.md"), file(3, "thin-guide", { words: 2 }));
   vi.stubEnv("GUIDES_DIR", dir);
   try {
-    const withGuides = await sitemap();
+    const withGuides = (await sitemap())!;
     expect(listed(withGuides).sort()).toEqual([...hubs, "/guides", "/guides/frost-leveling"].sort());
     expect(withGuides.find((e) => e.url.endsWith("/guides/frost-leveling"))?.lastModified).toEqual(new Date("2026-10-20"));
     expect(withGuides.find((e) => e.url.endsWith("/guides"))?.lastModified).toBeUndefined();
@@ -133,7 +138,7 @@ test("changefreq and priority are gone", () => {
 });
 
 test("the zone index is listed; a zone page only once something is on it, and never a held-back one", async () => {
-  const paths = async () => (await sitemap()).map((e) => new URL(e.url).pathname);
+  const paths = async () => (await sitemap())!.map((e) => new URL(e.url).pathname);
   expect(byPath.has("/database/zones")).toBe(true);
   expect(byPath.has("/database/zones/1436-westfall")).toBe(true);
   expect(byPath.has("/database/zones/1450-moonglade")).toBe(false);
@@ -141,12 +146,44 @@ test("the zone index is listed; a zone page only once something is on it, and ne
   try {
     world.npcs = ["a", "b", "c"].map((installId) => ({ installId, npcId: 5, name: "Keeper", mapId: 1450, x: 50, y: 50, positionKind: "npc" }));
     expect(await paths()).toContain("/database/zones/1450-moonglade");
-    world.unreachable = true;
-    expect(await paths()).not.toContain("/database/zones/1450-moonglade");
   } finally {
     world.npcs = [];
-    world.unreachable = false;
   }
+});
+
+test("the sitemap answers 503, uncached, while the world facts or the census cannot be read, instead of one without the zone and ranking pages", async () => {
+  const text = await (await GET()).text();
+  expect(text).toContain("<loc>https://everloot.app/database/zones/1436-westfall</loc>");
+  expect(text).toContain(`<lastmod>${new Date(LAUNCH.checkedOn).toISOString()}</lastmod>`);
+  for (const down of [world, rankings]) {
+    try {
+      down.unreachable = true;
+      expect(await sitemap()).toBeNull();
+      const res = await GET();
+      expect(res.status).toBe(503);
+      for (const key of ["Cache-Control", "CDN-Cache-Control"]) expect(res.headers.get(key), key).toBe("no-store");
+    } finally {
+      down.unreachable = false;
+    }
+  }
+  const ok = await GET();
+  expect(ok.status).toBe(200);
+  expect(ok.headers.get("CDN-Cache-Control")).toBe("max-age=3600, stale-while-revalidate=86400");
+});
+
+test("/chat is listed; the guild, player and ranking searches are not", () => {
+  expect(byPath.has("/chat")).toBe(true);
+  for (const path of ["/guilds", "/players", "/characters", "/rankings"]) expect(byPath.has(path), path).toBe(false);
+});
+
+test("each owner-approved addon has its profile listed at its spelled name; Polestar's is its guide page", () => {
+  const listed = [...byPath.keys()].filter((p) => /^\/addons\/[^/]+$/.test(p) && !["/addons/popular", "/addons/ecosystem", "/addons/polestar"].includes(p));
+  const approved = approvedAddonNames();
+  expect(approved).toContain("Polestar");
+  expect(approved).toContain("Olympus");
+  expect(listed.sort()).toEqual(approved.filter((n) => n.toLowerCase() !== "polestar").map((n) => `/addons/${encodeURIComponent(n)}`).sort());
+  expect(byPath.has("/addons/polestar")).toBe(true);
+  expect(byPath.has("/addons/Polestar")).toBe(false);
 });
 
 test("an item category is listed only once half its first page has an agreed name", async () => {
@@ -157,9 +194,9 @@ test("an item category is listed only once half its first page has an agreed nam
   const name = (n: number) => ids.slice(0, n).flatMap((itemId) => ["a", "b", "c"].map((installId) => ({ installId, itemId, name: `Item name ${itemId}` })));
   try {
     facts.names = name(Math.ceil(ITEMS_PER_PAGE / 2) - 1);
-    expect((await sitemap()).map((e) => new URL(e.url).pathname)).not.toContain(itemsHref("weapons"));
+    expect((await sitemap())!.map((e) => new URL(e.url).pathname)).not.toContain(itemsHref("weapons"));
     facts.names = name(Math.ceil(ITEMS_PER_PAGE / 2));
-    expect((await sitemap()).map((e) => new URL(e.url).pathname)).toContain(itemsHref("weapons"));
+    expect((await sitemap())!.map((e) => new URL(e.url).pathname)).toContain(itemsHref("weapons"));
   } finally {
     facts.names = [];
   }
@@ -185,7 +222,7 @@ test("each dungeon and raid page is listed, once, as many as the instance index 
 });
 
 test("an instance page is listed only while storage is readable, and one entered only from a held-back zone has none", async () => {
-  const paths = async () => (await sitemap()).map((e) => new URL(e.url).pathname);
+  const paths = async () => (await sitemap())!.map((e) => new URL(e.url).pathname);
   const zoned = (mapId: number) => ["a", "b", "c"].map((installId) => ({ installId, instanceMapId: 9999, name: "Secret Vault", instanceType: "party", mapId, x: 40, y: 40, capturedAt: "2026-10-10T00:00:00.000Z" }));
   try {
     instances.entrances = zoned(2482);
@@ -205,7 +242,7 @@ test("an instance page is listed only while storage is readable, and one entered
 
 test("a zone with only a treasure on it is listed, as its page counts the treasures players pinned", async () => {
   const chest = (installId: string) => ({ installId, objectId: 500, mapId: 1450, x: 50, y: 50, capturedAt: "2026-10-10T00:00:00.000Z" });
-  const paths = async () => (await sitemap()).map((e) => new URL(e.url).pathname);
+  const paths = async () => (await sitemap())!.map((e) => new URL(e.url).pathname);
   try {
     expect(await paths()).not.toContain("/database/zones/1450-moonglade");
     instances.sightings = ["a", "b"].map(chest);

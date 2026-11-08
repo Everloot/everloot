@@ -24,7 +24,9 @@ test("the old gold-per-hour page answers 301 with the addon page's section about
   expect(redirects).toContainEqual({ source: "/connect", destination: "/docs", permanent: true });
   expect(redirects).toContainEqual({ source: "/ask", destination: "/chat", permanent: true });
   expect(redirects).toContainEqual({ source: "/lore/forever-launch-date", destination: "/wow-forever", permanent: true });
-  expect(redirects).toHaveLength(7);
+  // /characters/<ruleset>/... are the character pages; the bare path is the player search, not a 404.
+  expect(redirects).toContainEqual({ source: "/characters", destination: "/players", permanent: true });
+  expect(redirects).toHaveLength(8);
 });
 
 test("www.everloot.app answers 301 with the same path on the apex, and only that host does", async () => {
@@ -123,7 +125,6 @@ test("only the public pages rendered per request are marked for the shared CDN c
     "/map",
     "/map/:path*",
     "/search",
-    "/sitemap.xml",
     "/tools/professions/:path*",
   ].sort());
   // The pages that hold a session, the account or a collection never join that list, whatever a future edit adds.
@@ -198,10 +199,8 @@ test("Chat may ask for the microphone (dictation); every other page, the account
   }
 });
 
-test("only the root sitemap gets static CDN caching; fallible sitemaps and private routes set their own policy", async () => {
-  const got = await headersFor("/sitemap.xml");
-  expect(got["CDN-Cache-Control"]).toBe("max-age=3600, stale-while-revalidate=86400");
-  for (const path of ["/", "/database-sitemap.xml", "/database-sitemap/3.xml", "/auctions-sitemap.xml", "/auctions-sitemap/0.xml", ...PROTECTED, "/sign-in", "/api/auth/session", "/api/me"]) {
+test("the sitemaps and private routes set their own CDN policy; none gets a static one that would keep a 503", async () => {
+  for (const path of ["/", "/sitemap.xml", "/database-sitemap.xml", "/database-sitemap/3.xml", "/auctions-sitemap.xml", "/auctions-sitemap/0.xml", ...PROTECTED, "/sign-in", "/api/auth/session", "/api/me"]) {
     const h = await headersFor(path);
     expect(h["CDN-Cache-Control"], path).toBeUndefined();
   }

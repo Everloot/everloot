@@ -22,7 +22,7 @@ import { API_ROUTES, MCP_PROMPT_NAMES, MCP_RESOURCE_TEMPLATE_URIS, MCP_RESOURCE_
 import { liveToolNames } from "@/lib/guild-switch";
 import { createIntakeQuota } from "@/lib/intake-quota";
 import { ANON_PAGE, ANON_PER_HOUR, attribution, KEY_PAGE, KEY_PER_HOUR } from "@/lib/data-guard";
-import sitemap from "@/app/sitemap";
+import sitemap from "@/lib/site-sitemap";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import { allDocsPages, endpointSlug } from "./nav";
@@ -152,7 +152,7 @@ test("links the repository's policy files", () => {
 });
 
 test("every docs page is in the sitemap, the docs are in the header and the footer, and /connect redirects to them", async () => {
-  const paths = (await sitemap()).map((entry) => new URL(entry.url).pathname);
+  const paths = (await sitemap())!.map((entry) => new URL(entry.url).pathname);
   for (const { href } of allDocsPages()) expect(paths, href).toContain(href);
   expect(paths).not.toContain("/connect");
   expect(renderToStaticMarkup(<Header />)).toContain('href="/docs"');

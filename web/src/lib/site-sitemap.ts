@@ -23,11 +23,7 @@ import { loadNews, newsSitemapPaths } from "@/lib/news";
 import { wikiSitemapPaths } from "@/lib/wiki";
 import { LEGACY_PERKS } from "@/data/game-data/legacy-perks";
 import { CLIENT_PROFESSIONS, professionHref, RECIPES_EXTRACTED_AT } from "@/lib/professions";
-
-// Rendered per request, as the database and auctions sitemaps are: built ahead of time it reflects only what the
-// build could read (the Cloudflare build has no storage keys, so item names, zones and dungeons were missing).
-// next.config.js gives it an hour at the CDN, which the Worker's edge cache keeps too.
-export const dynamic = "force-dynamic";
+import { approvedAddonNames } from "@/data/addon-repos";
 
 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://everloot.app";
 
@@ -35,9 +31,15 @@ const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://everloot.app";
  * A page gets a lastModified only when the site knows one: the newest change entry for /changes, the build's
  * extraction date for the pages drawn from the game files, the day the launch sentence was read for
  * /wow-forever. Every other page has none, because a made-up date teaches crawlers to ignore the field.
+ *
+ * Null when the world facts or the census cannot be read: the zone and ranking pages would be missing, and the
+ * route answers 503 (uncached) rather than a shorter sitemap the CDN keeps for an hour, as the database sitemap does.
  */
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const staticRoutes = ["/", "/wow-forever", "/methodology", "/about", "/privacy", "/terms", "/security", "/accessibility", "/contact", "/upload", "/addon", "/lore", "/lore/coverage", "/changes", "/map", "/map/eastern-kingdoms", "/map/kalimdor", ...DATABASE_HUB_PATHS, "/tools", "/tools/collections", "/tools/guild-board", "/tools/auctions", "/tools/gold-ledger", "/tools/legacy", "/addons", "/addons/popular", "/census", "/addons/ecosystem", "/addons/polestar", "/addons/polestar/packs", "/addons/polestar/wanted"];
+export default async function sitemap(): Promise<MetadataRoute.Sitemap | null> {
+  const staticRoutes = ["/", "/wow-forever", "/methodology", "/about", "/privacy", "/terms", "/security", "/accessibility", "/contact", "/upload", "/addon", "/lore", "/lore/coverage", "/changes", "/map", "/map/eastern-kingdoms", "/map/kalimdor", ...DATABASE_HUB_PATHS, "/tools", "/tools/collections", "/tools/guild-board", "/tools/auctions", "/tools/gold-ledger", "/tools/legacy", "/addons", "/addons/popular", "/census", "/addons/ecosystem", "/addons/polestar", "/addons/polestar/packs", "/addons/polestar/wanted", "/chat"];
+  // Each addon profile that exists: the owner-approved names (src/data/addon-repos.ts). An addon the installs report
+  // but the owner has not approved has no page, so it is not listed. Polestar's profile is its guide page above.
+  const addonRoutes = approvedAddonNames().filter((name) => name.toLowerCase() !== "polestar").map((name) => `/addons/${encodeURIComponent(name)}`);
 
   const talentRoutes = TALENT_CLASSES.map((slug) => `/tools/talents/${slug}`);
   // Item categories from the client layer: each class and subclass that holds items, first page only, and only
@@ -50,10 +52,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Zone pages with something on them, like the item categories: one with nothing yet says noindex itself. The page
   // counts the players' treasures and entrances too, so it is asked with the same sightings.
   const [world, seen] = await Promise.all([loadWorldFacts(), loadSightings()]);
-  const zoneRoutes = world.unreachable ? [] : (() => {
-    const contents = zoneContents(world, undefined, seen);
-    return publicZones().filter((z) => hasContent(contents.get(z.mapId))).map((z) => zoneHref(z.mapId, z.name));
-  })();
+  if (world.unreachable) return null;
+  const contents = zoneContents(world, undefined, seen);
+  const zoneRoutes = publicZones().filter((z) => hasContent(contents.get(z.mapId))).map((z) => zoneHref(z.mapId, z.name));
   // Each dungeon and raid page, under the rule its page states (lib/database-sitemap.ts).
   const instanceRoutes = instancePaths(seen);
   // Achievement, faction, title and quest chain pages exist only for entries three players reported, so each listed one has content.
@@ -61,7 +62,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const catalogRoutes = catalog ? [...catalog.achievements.map((a) => achievementHref(a.achievementId, a.name)), ...catalog.factions.map((f) => factionHref(f.factionId, f.name)), ...catalog.titles.map((t) => titleHref(t.titleId, t.name)), ...catalog.chains.map((c) => chainHref(c.questLineId, c.name))] : [];
   // The rankings hub and each unfiltered ranking, once it asks to be indexed (10 ranked rows).
   const rankings = await loadRankingWeeks();
-  const rankingRoutes = rankings.unreachable ? [] : [
+  if (rankings.unreachable) return null;
+  const rankingRoutes = [
     ...(hubIndexable(rankings.weeks) ? ["/rankings"] : []),
     ...RANKINGS.filter((def) => rankingIndexable(rankingView(def, rankings.weeks))).map((def) => rankingPath(def.slug)),
   ];
@@ -77,7 +79,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const classRoutes = classesIndexable(guides) ? ["/classes", ...TALENT_CLASSES.filter((slug) => classHubIndexable(slug, guides)).map((slug) => `/classes/${slug}`)] : [];
   // Each profession the game files list, with its recipes.
   const professionRoutes = CLIENT_PROFESSIONS.map((p) => professionHref(p.slug));
-  const paths = [...new Set([...staticRoutes, ...rankingRoutes, ...talentRoutes, ...professionRoutes, ...classRoutes, ...itemRoutes, ...zoneRoutes, ...instanceRoutes, ...catalogRoutes, ...tools.filter((tool) => tool.status !== "coming-soon").map(toolHref), ...allDocsPages().map((page) => page.href)])];
+  const paths = [...new Set([...staticRoutes, ...addonRoutes, ...rankingRoutes, ...talentRoutes, ...professionRoutes, ...classRoutes, ...itemRoutes, ...zoneRoutes, ...instanceRoutes, ...catalogRoutes, ...tools.filter((tool) => tool.status !== "coming-soon").map(toolHref), ...allDocsPages().map((page) => page.href)])];
 
   const timeline = await loadTimeline();
   const newestChange = timeline[0]?.at;

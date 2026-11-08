@@ -29,6 +29,15 @@ export function curatedAddon(name: string): { name: string; source: AddonSource 
 /** The ecosystem registry (kb/curated/ecosystem.json): projects a maintainer checked by hand, with their folder names. */
 const REGISTRY = parseRegistry(registryFile).projects;
 
+/** Every approved folder name, each spelled once: the curated map's spelling first, then the registry's. */
+export function approvedAddonNames(): string[] {
+  const names = Object.keys(ADDON_SOURCES);
+  for (const name of REGISTRY.flatMap((p) => p.addonNames)) {
+    if (!names.some((n) => n.toLowerCase() === name.toLowerCase())) names.push(name);
+  }
+  return names;
+}
+
 /** An addon the owner approved: the only kind that gets a public catalog page, title and source on this site. */
 export interface ApprovedAddon {
   /** The folder name as the owner spelled it. */

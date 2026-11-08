@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, expect, test, vi } from "vitest";
 import { TOOL_GROUPS, TOOL_LINES } from "@/data/tools";
-import sitemap from "../sitemap";
+import sitemap from "@/lib/site-sitemap";
 
 vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a>,
@@ -46,7 +46,7 @@ test("/about names the tools as the menu does and no longer uses the old names",
 });
 
 test("the sitemap lists /tools", async () => {
-  expect((await sitemap()).map((e) => new URL(e.url).pathname)).toContain("/tools");
+  expect((await sitemap())!.map((e) => new URL(e.url).pathname)).toContain("/tools");
 });
 
 test("Alts on this device is listed on /tools with its line, and the sitemap leaves it out too", async () => {
@@ -54,7 +54,7 @@ test("Alts on this device is listed on /tools with its line, and the sitemap lea
   const html = renderToStaticMarkup(await ToolsPage());
   expect(html).toContain('href="/tools/alts"');
   expect(html).toContain(TOOL_LINES["/tools/alts"]);
-  expect((await sitemap()).map((e) => new URL(e.url).pathname)).not.toContain("/tools/alts");
+  expect((await sitemap())!.map((e) => new URL(e.url).pathname)).not.toContain("/tools/alts");
 });
 
 test("Plans on this device is listed on /tools, and the sitemap leaves the private list out", async () => {
@@ -62,7 +62,7 @@ test("Plans on this device is listed on /tools, and the sitemap leaves the priva
   const html = renderToStaticMarkup(await ToolsPage());
   expect(html).toContain('href="/tools/builds"');
   expect(html).toContain(TOOL_LINES["/tools/builds"]);
-  expect((await sitemap()).map((e) => new URL(e.url).pathname)).not.toContain("/tools/builds");
+  expect((await sitemap())!.map((e) => new URL(e.url).pathname)).not.toContain("/tools/builds");
 });
 
 test("/tools gives each tool the game icon the asset upload has, and its initial when the upload has none", async () => {

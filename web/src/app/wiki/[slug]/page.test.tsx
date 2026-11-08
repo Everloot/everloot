@@ -64,8 +64,8 @@ test("a published page that meets the bar is indexed, with a self canonical and 
 });
 
 test("a published page is in sitemap.xml, dated by its review; adapted pages and drafts are not", async () => {
-  const { default: sitemap } = await import("../../sitemap");
-  const entries = new Map((await sitemap()).map((e) => [new URL(e.url).pathname, e]));
+  const { default: sitemap } = await import("@/lib/site-sitemap");
+  const entries = new Map((await sitemap())!.map((e) => [new URL(e.url).pathname, e]));
   expect(entries.get("/wiki/test-dungeon")?.lastModified).toEqual(new Date("2026-10-27"));
   expect(entries.has("/wiki")).toBe(true);
   expect(entries.has("/wiki/test-zone")).toBe(false);
@@ -159,8 +159,8 @@ test("a dungeon known only from a Blizzard post, with no entrance bound, renders
   expect(html).toContain('"@type":"Article"');
   const { generateMetadata } = await import("./page");
   expect((await generateMetadata(params("test-new-dungeon"))).robots).toEqual({ index: false, follow: true });
-  const { default: sitemap } = await import("../../sitemap");
-  expect((await sitemap()).map((e) => new URL(e.url).pathname)).not.toContain("/wiki/test-new-dungeon");
+  const { default: sitemap } = await import("@/lib/site-sitemap");
+  expect((await sitemap())!.map((e) => new URL(e.url).pathname)).not.toContain("/wiki/test-new-dungeon");
 });
 
 test("a published dungeon page shows the game files' level and entrance marked unconfirmed, prints one level as one number and links the instance in the database", async () => {

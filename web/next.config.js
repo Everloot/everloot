@@ -143,6 +143,8 @@ const nextConfig = {
       { source: "/connect", destination: "/docs", permanent: true },
       // The addon's command is /ask and the header says Ask, so the typed URL lands on the chat.
       { source: "/ask", destination: "/chat", permanent: true },
+      // The character pages live under /characters/<ruleset>/...; the bare path is the player search.
+      { source: "/characters", destination: "/players", permanent: true },
       // The notice for a version without a snapshot lives at its prefix, not at its internal route.
       { source: `/game-version/:id(${Object.keys(versions.prefixes).join("|")})`, destination: "/:id", permanent: true },
     ];
@@ -181,9 +183,7 @@ const nextConfig = {
       // The profession hub and pages read no cookies; a page renders every recipe with the corpus's gathering areas on each request
       // (2 to 5 s). Five minutes, so a page drawn while storage was unreachable does not stay long.
       { source: "/tools/professions/:path*", headers: briefCdnHeaders },
-      // The sitemap reads no cookies and rebuilds from kb on every request (about 4s cold), so the CDN keeps it an hour.
-      // The database and auctions sitemaps set these on their own successful responses, so their 503s stay uncached.
-      { source: "/sitemap.xml", headers: databaseItemsCdnHeaders },
+      // The sitemaps set these on their own successful responses (lib/database-sitemap.ts), so their 503s stay uncached.
       // Two public API routes are prerendered, so no handler of theirs runs to set it.
       { source: "/api/items/categories", headers: [{ key: "Access-Control-Allow-Origin", value: "*" }] },
       { source: "/api/edges/client-layer", headers: [{ key: "Access-Control-Allow-Origin", value: "*" }] },

@@ -25,7 +25,7 @@ vi.mock("@/lib/rollup-compute", () => ({
   loadLootTables: async () => ({ tables: { sources: new Map(), leftOut: 0 }, unreachable: false, dataAsOf: null }),
   loadReportedItemFacts: async () => ({ shown: [], contested: [], progress: state.progress, unreachable: false }),
 }));
-vi.mock("@/lib/upload-store", () => ({ STORAGE_UNREACHABLE: "Storage unavailable", uploadStore: { loadCompletion: async () => ({ state: null, dataAsOf: null, unreachable: true }) } }));
+vi.mock("@/lib/upload-store", () => ({ STORAGE_UNREACHABLE: "Storage unavailable", uploadStore: { loadCompletion: async () => ({ state: null, dataAsOf: null, unreachable: true }), loadCensus: async () => ({ rows: [], dataAsOf: null, unreachable: false }) } }));
 vi.mock("next/link", () => ({ default: ({ href, children, style, title }: { href: string; children: ReactNode; style?: object; title?: string }) => <a href={href} title={title} style={style}>{children}</a> }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); }, useRouter: () => ({ push: () => {} }) }));
 
@@ -35,7 +35,7 @@ import { NAME_TITLE } from "./category-page";
 import { CREDIT } from "@/lib/talents/assets";
 import { CLIENT_EDGES } from "@/lib/edges";
 import { CLIENT_TAXONOMY, ITEMS_PER_PAGE, NAME_SOURCE } from "@/lib/items";
-import sitemap from "@/app/sitemap";
+import sitemap from "@/lib/site-sitemap";
 
 const BASE = "https://assets.example.test/b";
 const made = CLIENT_EDGES.find((e) => e.rel === "created_by")!;
@@ -145,11 +145,11 @@ test("wiki-matched names count toward the half a category needs to be indexed an
   const half = Math.ceil(Math.min(ids.length, ITEMS_PER_PAGE) / 2);
   state.matched = matchedNames(ids.slice(0, half - 1));
   expect((await subclassMetadata({ params: Promise.resolve({ id: "armor", subclass: "cloth" }), searchParams: Promise.resolve({}) })).robots).toMatchObject({ index: false });
-  expect((await sitemap()).map((e) => new URL(e.url).pathname)).not.toContain("/database/items/armor/cloth");
+  expect((await sitemap())!.map((e) => new URL(e.url).pathname)).not.toContain("/database/items/armor/cloth");
   // One player-agreed name makes up the half with the matched ones.
   state.names = agreed(ids[half - 1]);
   expect((await subclassMetadata({ params: Promise.resolve({ id: "armor", subclass: "cloth" }), searchParams: Promise.resolve({}) })).robots).toMatchObject({ index: true });
-  expect((await sitemap()).map((e) => new URL(e.url).pathname)).toContain("/database/items/armor/cloth");
+  expect((await sitemap())!.map((e) => new URL(e.url).pathname)).toContain("/database/items/armor/cloth");
 });
 
 test("an item page with a matched name shows it with its icon and tooltip facts, marked unconfirmed, and is indexed; credits are the footer's", async () => {

@@ -5,7 +5,8 @@ import { beforeEach, expect, test, vi } from "vitest";
 const store = vi.hoisted(() => ({ loadCompletion: vi.fn() }));
 vi.mock("@/lib/upload-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/upload-store")>()),
-  uploadStore: { loadCompletion: store.loadCompletion },
+  // The sitemap reads the census for the ranking pages and answers nothing while it is unreachable: readable and empty here.
+  uploadStore: { loadCompletion: store.loadCompletion, loadCensus: async () => ({ rows: [], dataAsOf: null, unreachable: false }) },
 }));
 // The game-file base the lists start from: unreadable (null, the wrapper throws) unless a test sets it, so the cases below
 // keep testing the rollup alone. An empty list is a file that was read and holds nothing.
@@ -44,7 +45,7 @@ import TitleList, { generateMetadata as titleListMetadata } from "./titles/page"
 import TitlePage, { generateMetadata as titleMetadata } from "./titles/[id]/page";
 import ChainList, { generateMetadata as chainListMetadata } from "./quest-chains/page";
 import ChainPage, { generateMetadata as chainMetadata } from "./quest-chains/[id]/page";
-import sitemap from "../sitemap";
+import sitemap from "@/lib/site-sitemap";
 import { loadCatalog } from "@/lib/completion-lists";
 import { siteSearch } from "@/lib/site-search";
 import { emptyCompletion, foldCompletion } from "../../../../kb/src/completion-rollup";
@@ -256,14 +257,14 @@ test("a faction page shows its header, and one with none says not reported", asy
 });
 
 test("the sitemap lists both lists and only the entries that passed the gate", async () => {
-  const paths = (await sitemap()).map((e) => new URL(e.url).pathname);
+  const paths = (await sitemap())!.map((e) => new URL(e.url).pathname);
   expect(paths).toContain("/database/achievements");
   expect(paths).toContain("/database/factions");
   expect(paths).toContain("/database/achievements/4-ten-quests");
   expect(paths).toContain("/database/factions/69-darnassus");
   expect(paths.filter((p) => /^\/database\/(achievements|factions)\//.test(p)).sort()).toEqual(["/database/achievements/2-level-10", "/database/achievements/4-ten-quests", "/database/achievements/9-explore-elwynn-forest", "/database/factions/529-argent-dawn", "/database/factions/69-darnassus", "/database/factions/76-orgrimmar"]);
   store.loadCompletion.mockResolvedValue({ state: null, dataAsOf: null, unreachable: true });
-  const down = (await sitemap()).map((e) => new URL(e.url).pathname);
+  const down = (await sitemap())!.map((e) => new URL(e.url).pathname);
   expect(down).toContain("/database/achievements");
   expect(down.filter((p) => p.startsWith("/database/achievements/"))).toEqual([]);
 });
@@ -315,7 +316,7 @@ test("empty and unreadable states for titles and quest chains", async () => {
 });
 
 test("sitemap and search include agreed titles and quest chains only", async () => {
-  const paths = (await sitemap()).map((e) => new URL(e.url).pathname);
+  const paths = (await sitemap())!.map((e) => new URL(e.url).pathname);
   for (const p of ["/database/titles", "/database/quest-chains", "/database/titles/5-corporal", "/database/quest-chains/900-the-defias"]) expect(paths).toContain(p);
   expect(paths.filter((p) => /two-titles|two-chain|split/.test(p))).toEqual([]);
   expect((await siteSearch("corporal")).find((g) => g.type === "title")!.results[0].href).toBe("/database/titles/5-corporal");
