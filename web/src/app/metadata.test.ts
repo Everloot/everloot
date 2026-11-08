@@ -29,7 +29,7 @@ const routes: [string, () => Promise<{ metadata: Metadata }>, boolean][] = [
   ["/changes", () => import("./changes/page"), true],
   ["/accessibility", () => import("./accessibility/page"), false],
   ["/contact", () => import("./contact/page"), false],
-  ["/database", () => import("./database/page"), true],
+  ["/database", () => import("./database/(hub)/page"), true],
   // The lists are generated: a filtered or sorted view is noindex. Their plain URL is checked here.
   ["/database/drops", async () => ({ metadata: await (await import("./database/drops/page")).generateMetadata({}) }), true],
   ["/database/factions", async () => ({ metadata: await (await import("./database/factions/page")).generateMetadata({}) }), true],
@@ -45,7 +45,7 @@ const routes: [string, () => Promise<{ metadata: Metadata }>, boolean][] = [
   ["/lore", () => import("./lore/page"), false],
   ["/lore/coverage", async () => ({ metadata: await (await import("./lore/coverage/page")).generateMetadata() }), false],
   // The map's description depends on whether the game's map pictures are on, so it is generated.
-  ["/map", async () => ({ metadata: await (await import("./map/page")).generateMetadata({ searchParams: Promise.resolve({}) }) }), true],
+  ["/map", async () => ({ metadata: await (await import("./map/(hub)/page")).generateMetadata({ searchParams: Promise.resolve({}) }) }), true],
   ...(["eastern-kingdoms", "kalimdor"] as const).map((slug): [string, () => Promise<{ metadata: Metadata }>, boolean] => [
     `/map/${slug}`,
     async () => ({ metadata: await (await import("./map/[continent]/page")).generateMetadata({ params: Promise.resolve({ continent: slug }), searchParams: Promise.resolve({}) }) }),
@@ -62,7 +62,7 @@ const routes: [string, () => Promise<{ metadata: Metadata }>, boolean][] = [
   ["/tools/farming-routes", async () => ({ metadata: await (await import("./tools/farming-routes/page")).generateMetadata({}) }), true],
   ["/tools/gold-ledger", () => import("./tools/gold-ledger/page"), true],
   ["/tools/guild-board", () => import("./tools/guild-board/page"), true],
-  ["/tools/professions", () => import("./tools/professions/page"), true],
+  ["/tools/professions", () => import("./tools/professions/(hub)/page"), true],
   ["/tools/raid", () => import("./tools/raid/page"), true],
   ["/tools/talents", () => import("./tools/talents/page"), true],
   ["/upload", () => import("./upload/page"), true],

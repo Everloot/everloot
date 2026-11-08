@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { permanentRedirect } from "next/navigation";
 import { continentPath } from "@/lib/map-view";
-import { renderMapScreen, mapMetadata, queryString, resolveMap, type MapQuery } from "./map-screen";
+import { renderMapScreen, mapMetadata, queryString, resolveMap, type MapQuery } from "../map-screen";
 
 export const dynamic = "force-dynamic";
 

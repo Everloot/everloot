@@ -101,7 +101,7 @@ test("the raid page lists the talent-gated buffs from the raid data and its JSON
 });
 
 test.each([
-  ["/tools/professions", () => import("./tools/professions/page")],
+  ["/tools/professions", () => import("./tools/professions/(hub)/page")],
   ["/tools/guild-board", () => import("./tools/guild-board/page")],
   ["/tools/collections", () => import("./tools/collections/page")],
   ["/tools/gold-ledger", () => import("./tools/gold-ledger/page")],
@@ -128,7 +128,7 @@ test("/tools/auctions carries WebApplication named by its H1; with no lead line,
 });
 
 test("the profession hub's H1 names WoW Forever and is its title", async () => {
-  const { default: Page, metadata } = await import("./tools/professions/page");
+  const { default: Page, metadata } = await import("./tools/professions/(hub)/page");
   const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({}) }));
   expect(h1(html)).toBe("WoW Forever Profession Hubs");
   expect(metadata.title).toBe(h1(html));
@@ -170,7 +170,7 @@ test("/wow-forever: the page is about the VideoGame it names, published by Blizz
 });
 
 test("/database: no Dataset while nothing is uploaded, a Dataset with its licence once something is, and no licence text on the page", async () => {
-  const { default: Page } = await import("./database/page");
+  const { default: Page } = await import("./database/(hub)/page");
   const empty = renderToStaticMarkup(await Page());
   expect(blocks(empty)).toEqual([]);
   mocks.stats = { uploads: 2, lootWindows: 5, unreachable: false, dataAsOf: "2026-10-17T18:20:27.999Z" };

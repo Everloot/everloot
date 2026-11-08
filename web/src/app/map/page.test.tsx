@@ -35,7 +35,7 @@ vi.mock("@/components/WorldMapView", async (importOriginal) => {
   return { default: (props: Parameters<typeof real.default>[0]) => { handed.props = props as never; return real.default(props); } };
 });
 
-import MapPage, { generateMetadata as mapMeta } from "./page";
+import MapPage, { generateMetadata as mapMeta } from "./(hub)/page";
 import ContinentMapPage, { generateMetadata as continentMeta } from "./[continent]/page";
 import { WORLD_MAP } from "@/lib/world-map";
 import { CATEGORY_GROUPS, type MapItems } from "@/lib/map-view";

@@ -54,7 +54,7 @@ import RaidPage from "@/app/tools/raid/page";
 import RaidLinkPage from "@/app/tools/raid/r/[code]/page";
 import { CURRENT_BUILD } from "@/data/game-data/raid";
 import { emptySlots, encodeRaid } from "@/lib/raid";
-import ProfessionsPage from "@/app/tools/professions/page";
+import ProfessionsPage from "@/app/tools/professions/(hub)/page";
 import ProfessionPage from "@/app/tools/professions/[profession]/page";
 import { CLASS_CONTEXT_SLOT, type ClassContext, type ContextRead } from "@/lib/class-context";
 import { loadCatalog } from "@/lib/talents/catalogs";
