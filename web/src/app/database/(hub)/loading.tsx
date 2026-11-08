@@ -17,8 +17,8 @@ export default function Loading() {
           </div>
           <div className="h-12 w-full rounded-control bg-panel" />
           <div className="mt-2 flex flex-wrap gap-2">
-            {[10, 14, 14, 16, 16].map((w, i) => (
-              <div key={i} className={`h-10 w-${w} rounded-[6px] bg-panel sm:h-8`} />
+            {["w-10", "w-14", "w-14", "w-16", "w-16"].map((w, i) => (
+              <div key={i} className={`h-10 ${w} rounded-[6px] bg-panel sm:h-8`} />
             ))}
           </div>
         </div>

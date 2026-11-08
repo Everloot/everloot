@@ -53,6 +53,8 @@ test("every loading.tsx under app sits alone in a route group with one page that
     expect(existsSync(join(dir, "page.tsx")), `${dir} has no page.tsx`).toBe(true);
     const children = readdirSync(dir).filter((n) => statSync(join(dir, n)).isDirectory());
     expect(children, `${dir} has routes below it`).toEqual([]);
+    // The scan reads the page file alone: a redirect or notFound reached through a helper in another module would
+    // pass it. Nothing under src/lib or kb imports next/navigation today, so the gap is known, not covered.
     const page = readFileSync(join(dir, "page.tsx"), "utf8");
     expect(page, `${dir}/page.tsx imports next/navigation: a redirect or notFound there would answer 200`).not.toContain("next/navigation");
     expect(page, `${dir}/page.tsx redirects or 404s`).not.toMatch(/\b(redirect|permanentRedirect|notFound)\s*\(/);
