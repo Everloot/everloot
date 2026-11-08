@@ -21,7 +21,6 @@
 local E = Everloot
 
 local peak = 0
-local lastSnapshot = 0
 local lastMoney = nil
 local merchantOpen = false
 local taxiOpen = false
@@ -62,14 +61,20 @@ local function rememberPeak(copper)
   EverlootDB.goldPeak = peak
 end
 
+-- One row a minute. The last row's time and balance are kept per character in SavedVariables, so a /reload inside
+-- the minute writes nothing. A forced write (login, loot) still waits out the minute unless the balance changed.
 local function writeSnapshot(force)
   local now = time()
-  if not force and now - lastSnapshot < 60 then return end
   local copper = playerMoney()
   local name, realm = identity()
   if not copper or not name then return end
+  local key = name .. "-" .. realm
+  if type(EverlootDB.goldSnapshotAt) ~= "table" then EverlootDB.goldSnapshotAt = {} end
+  local last = EverlootDB.goldSnapshotAt[key]
+  if type(last) ~= "table" then last = { at = 0 } end
+  if now - (tonumber(last.at) or 0) < 60 and (not force or copper == last.copper) then return end
   rememberPeak(copper)
-  lastSnapshot = now
+  EverlootDB.goldSnapshotAt[key] = { at = now, copper = copper }
   E:Store("gold_snapshot", {
     installId = EverlootDB.installId,
     capturedAt = date("!%Y-%m-%dT%H:%M:%SZ"),

@@ -601,6 +601,38 @@ assert(#EverlootDB.records.money_event == n, 'an item slot is not income')
 """)
 check_all(loot)
 
+# One gold_snapshot a minute, kept in the saved file: a loading screen inside the minute with the same balance writes
+# nothing, on a /reload too; a changed balance still writes at once.
+snap = runtime()
+snap.execute("""
+event('PLAYER_ENTERING_WORLD')
+assert(Everloot:Count('gold_snapshot') == 1, 'login writes a snapshot')
+event('PLAYER_ENTERING_WORLD')
+assert(Everloot:Count('gold_snapshot') == 1, 'a loading screen inside the minute with the same balance writes nothing')
+money = 1600; event('PLAYER_ENTERING_WORLD')
+assert(Everloot:Count('gold_snapshot') == 2, 'a changed balance inside the minute still writes')
+function dump(v)
+ local t = type(v)
+ if t == 'number' then return string.format('%.17g', v) end
+ if t == 'string' then return string.format('%q', v) end
+ if t == 'boolean' then return tostring(v) end
+ if t == 'table' then
+  local parts = {}
+  for k, x in pairs(v) do parts[#parts + 1] = '[' .. dump(k) .. ']=' .. dump(x) end
+  return '{' .. table.concat(parts, ',') .. '}'
+ end
+ return 'nil'
+end
+""")
+reloaded = runtime("money = 1600\nEverlootDB = " + snap.eval("dump(EverlootDB)"))
+reloaded.execute("""
+event('PLAYER_ENTERING_WORLD')
+assert(Everloot:Count('gold_snapshot') == 2, 'a /reload inside the minute with the same balance writes nothing')
+money = 1700; event('PLAYER_MONEY')
+assert(Everloot:Count('gold_snapshot') == 2, 'a money change inside the minute waits for the minute')
+""")
+check_all(reloaded)
+
 # No addon source may call, index by string, or alias a buy, bid, post or craft function.
 import re
 names = (r"PostItem|PostCommodity|PlaceBid|PlaceAuctionBid|StartAuction|PostAuction|StartCommoditiesPurchase|"
