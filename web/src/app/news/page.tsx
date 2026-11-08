@@ -23,7 +23,7 @@ const fromBlizzard = (e: ChangeEntry) => e.type === "build" || e.source === "for
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    ...pageMetadata({ title: "Everloot News", description: DESCRIPTION, path: "/news" }),
+    ...pageMetadata({ title: "News", description: DESCRIPTION, path: "/news" }),
     // Indexed once it lists a post; an empty hub stays out of search.
     robots: { index: hubIndexable(loadNews()), follow: true },
   };

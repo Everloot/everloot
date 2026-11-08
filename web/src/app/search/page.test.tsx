@@ -217,7 +217,8 @@ test("no hits offers the wiki's own search for the encoded query", async () => {
 
 test("the page is never indexed and canonicalises to /search", async () => {
   vi.stubEnv("KB_SNAPSHOT_PATH", release);
-  const { metadata } = await import("./page");
+  const { generateMetadata } = await import("./page");
+  const metadata = await generateMetadata({ searchParams: Promise.resolve({ q: "Thrall" }) });
   expect(metadata.robots).toMatchObject({ index: false, follow: true });
   expect(metadata.alternates).toMatchObject({ canonical: "/search" });
 });

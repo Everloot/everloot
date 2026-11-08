@@ -8,7 +8,7 @@ import { CONNECT_EXAMPLES as ex } from "@/lib/docs/connect-data";
 import { pageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = pageMetadata({
-  title: "Everloot Quickstart",
+  title: "Quickstart",
   description: "Three ways into Everloot: browse the site, install the addon, or use the open data through the API, the MCP server and embeddable tooltips.",
   path: "/docs/quickstart",
 });

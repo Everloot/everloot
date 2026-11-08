@@ -56,12 +56,12 @@ async function find(params: Props["params"]): Promise<Found> {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const found = await find(params);
-  if (!found) return { title: "Addon not found" };
+  if (!found) return { title: "Page not found" };
   const { approved } = found;
   // The owner's title, never the one uploads report.
   const title = approved.title;
   return pageMetadata({
-    title: `${title}: addon for WoW: Forever`,
+    title: `${title} – WoW Forever Addon`,
     description: `How many Everloot installs run ${title}, where its author publishes it and what its repository shows. Counts appear once three installs report the addon.`,
     // Polestar has a dedicated guide page at the lowercase address.
     path: approved.name.toLowerCase() === "polestar" ? "/addons/polestar" : `/addons/${encodeURIComponent(approved.name)}`,
