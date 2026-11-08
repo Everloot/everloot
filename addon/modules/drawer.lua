@@ -2,7 +2,8 @@
 -- crest shows them in a small grid beside it. Only LibDBIcon buttons (frames named LibDBIcon10_<name> on the
 -- minimap) are taken; Blizzard frames and any other button are never touched. The crest's clicks stay as
 -- they are. Off (/everloot buttons off or the settings page) collects nothing, and the buttons already taken
--- go back to the minimap with the next /reload. Records nothing.
+-- go back to the minimap with the next /reload. Another addon that gathers minimap buttons keeps them. Records
+-- nothing.
 
 local E = Everloot
 local D = { collected = {} }
@@ -17,6 +18,10 @@ local PAD = 8
 local POLL_SECONDS = 0.25 -- how often an open drawer checks whether the mouse has left
 local NOTICE_SECONDS = 5 -- the notice waits for the other addons' buttons to settle, so the count is right
 local RESCANS = { 3, 10 } -- seconds after entering the world: buttons some addons make late
+-- Addons that gather minimap buttons themselves. Two collectors take the same buttons from each other (each one
+-- reparents them and stubs their SetPoint), and the loser's panel opens empty over the winner's, dimming every icon
+-- under it. Seen with MinimapButtonButton; when one of these is loaded the drawer leaves the buttons to it.
+local COLLECTORS = { "MinimapButtonButton" }
 
 local collectedSet = {}
 local original = {} -- per button: the frame type's own SetPoint and ClearAllPoints, for our layout
@@ -25,6 +30,18 @@ local function noop() end
 
 local function after(seconds, f)
   if C_Timer and C_Timer.After then pcall(C_Timer.After, seconds, f) end
+end
+
+--- The name of a loaded addon that gathers minimap buttons itself, or nil. Asked at login, once every addon has
+--- loaded; the module's own init runs before the addons after it in load order exist.
+local function otherCollector()
+  local loaded = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
+  if type(loaded) ~= "function" then return nil end
+  for _, name in ipairs(COLLECTORS) do
+    local ok, yes = pcall(loaded, name)
+    if ok and yes then return name end
+  end
+  return nil
 end
 
 local function count()
@@ -72,6 +89,12 @@ end
 local function layout()
   local f, shown = drawer(), 0
   local base = (tonumber(f.GetFrameLevel and f:GetFrameLevel()) or 1) + 5
+  -- A button whose parent is no longer the drawer was taken by another addon after us: it is left to that addon
+  -- and never moved again (its stubbed SetPoint is that addon's now, so nothing is restored either).
+  for i = #D.collected, 1, -1 do
+    local b = D.collected[i]
+    if b:GetParent() ~= f then table.remove(D.collected, i) end
+  end
   for _, b in ipairs(D.collected) do
     local own = original[b]
     own.ClearAllPoints(b)
@@ -171,6 +194,11 @@ E:RegisterModule("buttons", function()
   f:RegisterEvent("PLAYER_ENTERING_WORLD")
   f:HookScript("OnEvent", function(_, event)
     if event ~= "PLAYER_LOGIN" and event ~= "PLAYER_ENTERING_WORLD" then return end
+    if D.leftTo == nil then D.leftTo = otherCollector() or false end
+    if D.leftTo then
+      E:SetNote("buttons", string.format("off (%s gathers the addon buttons already; Everloot leaves them to it)", D.leftTo))
+      return
+    end
     hook()
     scan()
     if event == "PLAYER_LOGIN" then return end
