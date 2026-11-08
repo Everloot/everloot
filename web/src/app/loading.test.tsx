@@ -19,7 +19,8 @@ describe.each([
   test("is one Loading status with no readable text", () => {
     expect(html).toContain('role="status"');
     expect(html).toContain('aria-label="Loading"');
-    expect(html.replace(/<[^>]+>/g, "").trim()).toBe("");
+    // No text node: nothing but whitespace sits between a closing ">" and the next "<".
+    expect(html).not.toMatch(/>[^<]*\S[^<]*</);
     expect(html).not.toMatch(/animate-|opacity-|gradient/);
   });
 });
