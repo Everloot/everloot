@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { MCP_TOOLS, SITE, type McpToolName } from "@everloot/protocol";
 import { z } from "zod";
-import { createToolHandlers, registeredToolNames, type ToolHandlers } from "../../../../../../kb/src/mcp-server";
+import { createToolHandlers, registeredToolNames, ToolArgumentError, type ToolHandlers } from "../../../../../../kb/src/mcp-server";
 import { admit, attributionHeaders } from "@/lib/data-guard";
 import { toolLoaders } from "@/lib/mcp-mount";
 import { myBuildsRoute } from "@/lib/my-builds-tool";
@@ -21,6 +21,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const NO_STORE = { "Cache-Control": "no-store" };
+const UNAVAILABLE = "Everloot's data store is unavailable; try again in a minute.";
 
 function refuse(status: number, error: string): Response {
   return Response.json({ ok: false, error }, { status, headers: NO_STORE });
@@ -59,7 +60,10 @@ export async function GET(req: Request, context: { params: Promise<{ tool: strin
   try {
     answer = await (handlers[name] as (a: unknown) => ReturnType<ToolHandlers[McpToolName]>)(parsed.data);
   } catch (err) {
-    return refuse(400, err instanceof Error ? err.message : "The tool refused the arguments.");
+    if (err instanceof ToolArgumentError) return refuse(400, err.message);
+    // A storage or release failure is the server's, not the caller's: log it here, tell the caller only that it is unavailable.
+    console.error(`[api/tools] ${name} failed`, err);
+    return Response.json({ ok: false, error: UNAVAILABLE }, { status: 503, headers: { ...NO_STORE, "Retry-After": "60" } });
   }
   const text = typeof answer === "string" ? answer : answer.text;
   const structured = typeof answer === "string" ? { text } : answer.structured;
