@@ -53,7 +53,7 @@ const FAQ: { q: string; a: ReactNode }[] = [
   },
   {
     q: "Is RP-PvP there at launch?",
-    a: <>Yes. RP-PvP arrives at launch on November 4, and Blizzard plans to offer it during name reservations. <Link href={RULESETS_POST.path} className={link}>Rulesets explained</Link>.</>,
+    a: <>Yes. RP-PvP realms opened with the launch on November 4.<Link href={RULESETS_POST.path} className={link}>Rulesets explained</Link>.</>,
   },
   {
     q: "When does Hardcore start?",
@@ -185,7 +185,7 @@ export default async function WowForeverPage() {
               </li>
               <li>
                 <span className={step}>Plan a talent build.</span> Try one in the <Link href="/tools/talents" className={link}>Talent calculator</Link>.
-                Its trees and rules are unconfirmed beta data.
+                Its trees and rules are unconfirmed, read from build 1.60.1.
               </li>
               <li>
                 <span className={step}>Install the Everloot addon.</span> It is on <Link href="/addons" className={link}>Addons</Link> and

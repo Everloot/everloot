@@ -41,7 +41,7 @@ export const RULESETS: readonly { name: string; what: string; when: string }[] =
   { name: "Normal", what: "The baseline game. PvP happens when you opt in.", when: "At launch" },
   { name: "PvP", what: "Contested zones are dangerous. Characters here can be one faction only.", when: "At launch" },
   { name: "Roleplaying", what: "For players who want to stay in character.", when: "At launch" },
-  { name: "RP-PvP", what: "Roleplaying and PvP together. Added in Blizzard's October 22 update.", when: "At launch, November 4. Blizzard plans to offer it during name reservations." },
+  { name: "RP-PvP", what: "Roleplaying and PvP together. Added in Blizzard's October 22 update.", when: "At launch, November 4." },
   { name: "Hardcore", what: "Death is permanent, but a dead character can move to another ruleset. Battlegrounds never mix Hardcore with other rulesets.", when: "Sometime after launch" },
 ];
 
