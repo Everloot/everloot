@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { tools } from "@/data/tools";
-import sitemap from "@/app/sitemap";
+import sitemap from "@/lib/site-sitemap";
 
 describe("working feature discovery", () => {
   it("links directly to the working database and upload", () => {
@@ -12,7 +12,7 @@ describe("working feature discovery", () => {
     expect(tools.find((tool) => tool.slug === "farming-routes")?.status).toBe("collecting");
   });
   it("lists canonical routes once without redirect or waitlist duplicates", async () => {
-    const urls = (await sitemap()).map((entry) => new URL(entry.url).pathname);
+    const urls = (await sitemap())!.map((entry) => new URL(entry.url).pathname);
     expect(new Set(urls).size).toBe(urls.length);
     expect(urls).toContain("/database");
     expect(urls).toContain("/upload");
@@ -22,7 +22,7 @@ describe("working feature discovery", () => {
     expect(urls).not.toContain("/tools/profession-planner");
   });
   it("exposes a contact page linked from the footer and sitemap", async () => {
-    const urls = (await sitemap()).map((entry) => new URL(entry.url).pathname);
+    const urls = (await sitemap())!.map((entry) => new URL(entry.url).pathname);
     expect(urls).toContain("/about");
     expect(urls).toContain("/privacy");
     expect(urls).toContain("/contact");

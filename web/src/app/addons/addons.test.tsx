@@ -4,7 +4,7 @@ import { beforeEach, expect, test, vi } from "vitest";
 
 const github = vi.hoisted(() => ({ polestarLive: vi.fn() }));
 vi.mock("@/lib/polestar-github", () => github);
-const rollup = vi.hoisted(() => ({ loadPopularAddons: vi.fn(), loadItemFacts: async () => ({ rates: [], names: [], npcs: [], unreachable: true }), loadWorldFacts: async () => ({ npcs: [], quests: [], vendors: [], unreachable: true }), loadInstanceFacts: async () => ({ entrances: [], encounters: [], sightings: [], unreachable: true, dataAsOf: null }) }));
+const rollup = vi.hoisted(() => ({ loadPopularAddons: vi.fn(), loadItemFacts: async () => ({ rates: [], names: [], npcs: [], unreachable: false }), loadWorldFacts: async () => ({ npcs: [], quests: [], vendors: [], unreachable: false }), loadInstanceFacts: async () => ({ entrances: [], encounters: [], sightings: [], unreachable: false, dataAsOf: null }) }));
 vi.mock("@/lib/rollup-compute", () => rollup);
 vi.mock("../../lib/rollup-compute", () => rollup);
 // The committed star history, or none when a test sets `history.none`.
@@ -24,7 +24,7 @@ import AddonsPage, { metadata as addonsMeta } from "./page";
 import PolestarPage, { metadata as polestarMeta } from "./polestar/page";
 import PacksPage, { metadata as packsMeta } from "./polestar/packs/page";
 import WantedPage, { metadata as wantedMeta } from "./polestar/wanted/page";
-import sitemap from "../sitemap";
+import sitemap from "@/lib/site-sitemap";
 import { loadEcosystem, starHistory } from "@/lib/ecosystem";
 import { boardRows } from "@/lib/addon-board";
 import Footer from "@/components/Footer";
@@ -174,7 +174,7 @@ test("the wanted page cites a reason for each idea and links the pack handbook",
 });
 
 test("the sitemap, header and footer reach the addons pages", async () => {
-  const urls = (await sitemap()).map((entry) => new URL(entry.url).pathname);
+  const urls = (await sitemap())!.map((entry) => new URL(entry.url).pathname);
   for (const path of ["/addons", "/addons/popular", "/addons/polestar", "/addons/polestar/packs", "/addons/polestar/wanted"]) expect(urls).toContain(path);
   expect(renderToStaticMarkup(<Header />)).toContain('href="/addons"');
   expect(renderToStaticMarkup(<Footer />)).toContain('href="/addons"');

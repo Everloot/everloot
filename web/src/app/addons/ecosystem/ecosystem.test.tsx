@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
 
-const rollup = vi.hoisted(() => ({ loadPopularAddons: vi.fn(), loadItemFacts: async () => ({ rates: [], names: [], npcs: [], unreachable: true }), loadWorldFacts: async () => ({ npcs: [], quests: [], vendors: [], unreachable: true }), loadInstanceFacts: async () => ({ entrances: [], encounters: [], sightings: [], unreachable: true, dataAsOf: null }) }));
+const rollup = vi.hoisted(() => ({ loadPopularAddons: vi.fn(), loadItemFacts: async () => ({ rates: [], names: [], npcs: [], unreachable: false }), loadWorldFacts: async () => ({ npcs: [], quests: [], vendors: [], unreachable: false }), loadInstanceFacts: async () => ({ entrances: [], encounters: [], sightings: [], unreachable: false, dataAsOf: null }) }));
 vi.mock("@/lib/rollup-compute", () => rollup);
 vi.mock("../../../lib/rollup-compute", () => rollup);
 vi.mock("next/link", () => ({
@@ -13,7 +13,7 @@ vi.mock("next/link", () => ({
 
 import EcosystemPage, { metadata } from "./page";
 import { loadEcosystem } from "@/lib/ecosystem";
-import sitemap from "../../sitemap";
+import sitemap from "@/lib/site-sitemap";
 
 const popular = (addons: { name: string; installs: number }[]) =>
   rollup.loadPopularAddons.mockResolvedValue({ addons, reportingInstalls: 9, unreachable: false, dataAsOf: "2026-10-17T12:00:00.000Z" });
@@ -66,5 +66,5 @@ test("the page names no person: no usernames or contributor lists", async () => 
 });
 
 test("the sitemap lists the page", async () => {
-  expect((await sitemap()).map((e) => e.url)).toContain("https://everloot.app/addons/ecosystem");
+  expect((await sitemap())!.map((e) => e.url)).toContain("https://everloot.app/addons/ecosystem");
 });
