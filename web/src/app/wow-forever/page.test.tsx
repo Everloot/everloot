@@ -10,7 +10,7 @@ vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a>,
 }));
 
-import Page from "./page";
+import Page, { revalidate } from "./page";
 
 const visible = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ");
 const at = async (iso: string) => {
@@ -71,6 +71,18 @@ test("the FAQ has eight questions, every answer carries a link, and each date ma
   expect(text).toContain("closed it on October 23");
   expect(faq).toContain(`href="${LAUNCH.sourceUrl}"`);
   for (const ref of Object.values(POSTS)) expect(html).toContain(`href="${postPath(ref)}"`);
+});
+
+test("after launch the page reads as launched: RP-PvP in the past tense, no name-reservation plan, no beta data, rebuilt hourly", async () => {
+  const html = await at("2026-11-07T12:00:00Z");
+  const text = visible(html);
+  expect(text).toContain("The RP-PvP ruleset opened with the launch on November 4.");
+  // The sentence and the link that follows it keep their space in the markup, not only after tags are stripped.
+  expect(html).toContain("November 4. <a");
+  expect(text).not.toContain("name reservations");
+  expect(text).not.toContain("beta data");
+  expect(text).toContain("unconfirmed, read from build 1.60.1");
+  expect(revalidate).toBe(3600);
 });
 
 test("each faction's racial traits sit under its race table, by name with active or passive, labelled once with the build", async () => {
