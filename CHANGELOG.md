@@ -21,7 +21,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   addon that takes a button after Everloot did. Before, both gathered the same buttons and hovering the crest opened
   an empty Everloot panel over the other addon's, which dimmed every icon under it. The drawer's cells also leave
   room for a LibDBIcon ring, each button draws above the one before it, and the panel is the window's own canvas and
-  bronze edge.
+  bronze edge with a thin bar in the window's green down the side that faces the crest.
 - Addon: the PvP row keeps a character's last honorable kill count when a read comes before the Statistics tab has
   loaded, and skips a statistic the game flags to skip. A talent choice past the site's range is left off that node
   instead of failing the whole talent row on sync.

@@ -15,6 +15,7 @@ local COLUMNS = 6
 -- 32-pixel cell put every ring over the icon beside it and every shadow over the icon below.
 local CELL = 38
 local PAD = 8
+local ACCENT = { 0.612, 0.941, 0.227, 1 } -- the window's accent green, when the window is not there to lend it
 local POLL_SECONDS = 0.25 -- how often an open drawer checks whether the mouse has left
 local NOTICE_SECONDS = 5 -- the notice waits for the other addons' buttons to settle, so the count is right
 local RESCANS = { 3, 10 } -- seconds after entering the world: buttons some addons make late
@@ -77,6 +78,17 @@ local function drawer()
     f:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
       tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
     if f.SetBackdropColor then f:SetBackdropColor(0.05, 0.05, 0.07, 0.95) end
+  end
+  -- A two-pixel bar in the window's accent green on the edge facing the crest: the drawer is the crest's tab, and
+  -- the green is the window title's, not a frame of its own around the other addons' rings.
+  local bar = f.CreateTexture and f:CreateTexture(nil, "OVERLAY")
+  if bar then
+    local accent = E.Window and E.Window.COLORS and E.Window.COLORS.accent or ACCENT
+    bar:SetPoint("TOPRIGHT", f, "TOPRIGHT", -4, -4)
+    bar:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -4, 4)
+    bar:SetWidth(2)
+    if bar.SetColorTexture then bar:SetColorTexture(unpack(accent)) end
+    f.accent = bar
   end
   f:Hide()
   D.frame = f

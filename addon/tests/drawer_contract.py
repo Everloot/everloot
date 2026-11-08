@@ -200,11 +200,12 @@ def test_libdbicon_buttons_are_collected_and_laid_out_and_nothing_else_is():
 
 def test_the_drawer_borrows_the_window_panel_when_the_window_is_loaded():
     # window.lua loads before drawer.lua and exposes its backdrop; the drawer then looks like the rest of Everloot.
-    lua = fresh(window="styled = {}; Everloot.Window = { Backdrop = function(f) styled[#styled + 1] = f end }")
+    lua = fresh(window="styled = {}; Everloot.Window = { Backdrop = function(f) styled[#styled + 1] = f end, COLORS = { accent = { 0.1, 0.95, 0.2, 1 } } }")
     lua.execute("""
     local D = Everloot.Drawer
     assert(#styled == 1 and styled[1] == D.frame, 'the window styles the drawer panel')
     assert(rawget(D.frame, 'backdrop') == nil, 'and the drawer sets no panel of its own')
+    assert(D.frame.accent.color[1] == 0.1 and D.frame.accent.color[2] == 0.95, 'the bar takes the window accent')
     """)
     toc = (root / "Everloot.toc").read_text(encoding="utf-8")
     assert toc.index("modules\\window.lua") < toc.index("modules\\drawer.lua")
