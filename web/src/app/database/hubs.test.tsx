@@ -16,7 +16,7 @@ vi.mock("@/lib/database-hubs", async (importOriginal) => {
 
 import { DATABASE_HUBS } from "@/lib/database-hubs";
 import { instanceRows } from "@/lib/instances";
-import DatabasePage from "./page";
+import DatabasePage from "./(hub)/page";
 
 beforeEach(() => store.loadCorpus.mockReset());
 

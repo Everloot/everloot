@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
-import { objectList } from "../../../../kb/src/object-page";
+import { objectList } from "../../../../../kb/src/object-page";
 import { computeRollups, loadWorldFacts } from "@/lib/rollup-compute";
 import { CLIENT_TAXONOMY as T, itemsHref, subclassLabel } from "@/lib/items";
 import { npcRows, publicQuests, publicVendors } from "@/lib/world-lists";

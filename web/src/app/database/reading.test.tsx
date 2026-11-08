@@ -10,7 +10,7 @@ vi.mock("@/lib/upload-store", async (importOriginal) => ({
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
 
-import DatabasePage from "./page";
+import DatabasePage from "./(hub)/page";
 
 beforeEach(() => store.loadCorpus.mockReset());
 

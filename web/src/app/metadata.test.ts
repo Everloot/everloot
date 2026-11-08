@@ -29,7 +29,7 @@ const routes: [string, () => Promise<{ metadata: Metadata }>, boolean][] = [
   ["/changes", () => import("./changes/page"), true],
   ["/accessibility", () => import("./accessibility/page"), false],
   ["/contact", () => import("./contact/page"), false],
-  ["/database", () => import("./database/page"), true],
+  ["/database", () => import("./database/(hub)/page"), true],
   // The lists are generated: a filtered or sorted view is noindex. Their plain URL is checked here.
   ["/database/drops", async () => ({ metadata: await (await import("./database/drops/page")).generateMetadata({}) }), true],
   ["/database/factions", async () => ({ metadata: await (await import("./database/factions/page")).generateMetadata({}) }), true],

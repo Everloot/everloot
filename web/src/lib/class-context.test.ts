@@ -74,13 +74,17 @@ test("the classes, the top level and the roles are the ones the calculators and 
   expect([...ROLES]).toEqual([...GUIDE_ROLES]);
 });
 
-/** The page file a site path is served by: the exact folder, or a dynamic [segment] folder for its last part. */
+/**
+ * The page file a site path is served by: the exact folder, a (group) folder inside it (a hub whose loading.tsx
+ * must not cover the routes below it stands in one), or a dynamic [segment] folder for its last part.
+ */
 const APP = fileURLToPath(new URL("../app", import.meta.url));
 function routeFile(pathname: string): string | null {
   const parts = pathname.split("/").filter(Boolean);
+  const dir = join(APP, ...parts);
   const parent = join(APP, ...parts.slice(0, -1));
-  const dynamic = existsSync(parent) ? readdirSync(parent).filter((d) => /^\[[a-z]+\]$/.test(d)).map((d) => join(parent, d, "page.tsx")) : [];
-  return [join(APP, ...parts, "page.tsx"), ...dynamic].find((f) => existsSync(f)) ?? null;
+  const pagesIn = (d: string, folder: RegExp) => (existsSync(d) ? readdirSync(d).filter((n) => folder.test(n)).map((n) => join(d, n, "page.tsx")) : []);
+  return [join(dir, "page.tsx"), ...pagesIn(dir, /^\(.+\)$/), ...pagesIn(parent, /^\[[a-z]+\]$/)].find((f) => existsSync(f)) ?? null;
 }
 
 describe("contextLinks", () => {

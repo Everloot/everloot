@@ -1,4 +1,6 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { tools } from "@/data/tools";
 import sitemap from "@/lib/site-sitemap";
@@ -32,7 +34,13 @@ describe("working feature discovery", () => {
     expect(contact).toContain("mailto:hello@everloot.app");
   });
   it("claims no feature the addon or server does not have", () => {
-    const page = (path: string) => readFileSync(new URL(`../app/${path}`, import.meta.url), "utf8");
+    // A page may stand in a (group) folder of its route, as a hub with a loading.tsx of its own does.
+    const page = (path: string) => {
+      const file = fileURLToPath(new URL(`../app/${path}`, import.meta.url));
+      const dir = dirname(file);
+      const inGroup = existsSync(dir) ? readdirSync(dir).filter((n) => /^\(.+\)$/.test(n)).map((n) => join(dir, n, basename(file))) : [];
+      return readFileSync([file, ...inGroup].find((f) => existsSync(f)) ?? file, "utf8");
+    };
     const professions = page("tools/professions/page.tsx");
     // No recipe emitter or perk record kind exists.
     expect(professions).not.toMatch(/perk tracking|We track which perks|recipe sightings and material drops flow|plug straight into/);

@@ -14,7 +14,7 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-import DatabasePage from "./page";
+import DatabasePage from "./(hub)/page";
 import DropsPage from "./drops/page";
 
 const loot = (install: string, npc: number, items: { itemId: number; count: number }[], n: number) => ({
