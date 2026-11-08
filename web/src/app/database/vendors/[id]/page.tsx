@@ -14,7 +14,7 @@ import EntityLink from "@/components/EntityLink";
 import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
 import ItemTip from "@/components/game/ItemTip";
 import { Container, DataTable, Facts, InShort, Tabs, TooltipFrame } from "@/components/ui";
-import { EmptyTab, EntityHeader, EntityTop, known, LINK, Unreachable } from "../../entity";
+import { EmptyTab, EntityHeader, EntityTop, known, LINK, MAP_LINK_HEADER, MapName, ShowOnMap, Unreachable, zoneName } from "../../entity";
 import { vendorIndexable } from "@/lib/indexable";
 import { entityTitle, vendorDescription } from "@/lib/entity-meta";
 
@@ -48,7 +48,7 @@ function formatCopper(copper: number): string {
   return parts.join(" ");
 }
 
-interface Place { href: string; label: string }
+interface Place { href: string; mapId: number; x: number; y: number }
 
 export default async function VendorPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -59,7 +59,7 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
   // Where players saw this vendor stand: the NPC pins that 3 installs agree on, as links to the map.
   const places: Place[] = facts.unreachable ? [] : npcPage(page.vendorNpcId, facts).pins.flatMap((pin) => {
     const href = pinLink(pin.mapId, pin.x, pin.y);
-    return href ? [{ href, label: `Map ${pin.mapId} at ${pin.x}, ${pin.y}` }] : [];
+    return href ? [{ href, mapId: pin.mapId, x: pin.x, y: pin.y }] : [];
   });
   const assets = await loadSiteAssets();
   const tips = await loadItemTips(assets, facts.unreachable ? [] : page.offers.map((o) => o.itemId));
@@ -86,7 +86,7 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
         <EntityTop
           box={
             <TooltipFrame name={title} label={`${title}, as players saw it`}>
-              {places[0] && <p>{places[0].label}</p>}
+              {places[0] && <p>{`${zoneName(places[0].mapId)} at ${places[0].x}, ${places[0].y}`}</p>}
             </TooltipFrame>
           }
           facts={!facts.unreachable && (
@@ -131,8 +131,9 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
                     dense
                     caption={`Where ${title} stands`}
                     columns={[
-                      { key: "where", header: "Position", cell: (p: Place) => p.label },
-                      { key: "show", header: "", cell: (p: Place) => <Link href={p.href} className={LINK}>Show on the map</Link> },
+                      { key: "map", header: "Map", cell: (p: Place) => <MapName mapId={p.mapId} /> },
+                      { key: "where", header: "Position", numeric: true, cell: (p: Place) => `${p.x}, ${p.y}` },
+                      { key: "show", header: MAP_LINK_HEADER, cell: (p: Place) => <ShowOnMap href={p.href} mapId={p.mapId} x={p.x} y={p.y} /> },
                     ]}
                     rows={places}
                     rowKey={(p) => p.href}
