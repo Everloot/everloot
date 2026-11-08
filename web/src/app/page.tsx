@@ -31,7 +31,7 @@ const link = "text-fg underline decoration-edge underline-offset-4 hover:decorat
 const TOOL_NOTES: Record<string, string> = {
   "/tools/raid": "Which buffs a raid covers",
   "/tools/professions": "Leveling paths from uploads",
-  "/tools/farming-routes": "Routes from uploaded sightings",
+  "/tools/farming-routes": "Gold and reputation areas from uploads",
   "/tools/auctions": "Prices by realm, from scans",
   "/census": "Who plays what",
   "/rankings": "Classes and races by week",

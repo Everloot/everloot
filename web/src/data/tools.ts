@@ -100,7 +100,7 @@ export const tools: Tool[] = [
     tagline: "Gold and reputation areas from uploads.",
     description:
       "Gold and reputation farming areas from what players upload. Gathering is on the profession pages, and dungeons have their own list.",
-    status: "coming-soon",
+    status: "collecting",
     keywords: [
       "wow forever farming",
       "wow forever gold farm",
