@@ -8,8 +8,8 @@ describe("working feature discovery", () => {
     expect(tools.find((tool) => tool.slug === "database")).toMatchObject({ href: "/database", status: "collecting" });
     expect(tools.find((tool) => tool.slug === "upload")).toMatchObject({ href: "/upload", status: "live" });
   });
-  it("describes routes that are still planned honestly", () => {
-    expect(tools.find((tool) => tool.slug === "farming-routes")?.status).toBe("coming-soon");
+  it("describes the farming tool as live now that its page is", () => {
+    expect(tools.find((tool) => tool.slug === "farming-routes")?.status).toBe("collecting");
   });
   it("lists canonical routes once without redirect or waitlist duplicates", async () => {
     const urls = (await sitemap()).map((entry) => new URL(entry.url).pathname);
