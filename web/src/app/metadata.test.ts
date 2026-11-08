@@ -54,7 +54,7 @@ const routes: [string, () => Promise<{ metadata: Metadata }>, boolean][] = [
   ["/methodology", () => import("./methodology/page"), true],
   ["/players", async () => ({ metadata: await (await import("./players/page")).generateMetadata({ searchParams: Promise.resolve({}) }) }), false],
   ["/privacy", () => import("./privacy/page"), false],
-  ["/search", () => import("./search/page"), false],
+  ["/search", async () => ({ metadata: await (await import("./search/page")).generateMetadata({ searchParams: Promise.resolve({}) }) }), false],
   ["/security", () => import("./security/page"), false],
   ["/terms", () => import("./terms/page"), false],
   ["/tools/auctions", () => import("./tools/auctions/page"), true],
@@ -75,6 +75,8 @@ function checkComplete(path: string, m: Metadata, mustLead: boolean) {
   const title = text(m.title);
   expect(title, path).not.toBe("");
   if (mustLead) expect(title, path).toContain("WoW Forever");
+  // The layout template adds the brand, so a title that leads or ends with it would read "Everloot FAQ · Everloot".
+  expect(title, path).not.toMatch(/^Everloot|Everloot$/);
   expect(text(m.description).length, `${path} description: ${m.description}`).toBeGreaterThanOrEqual(DESCRIPTION_MIN);
   expect(text(m.description).length, `${path} description: ${m.description}`).toBeLessThanOrEqual(DESCRIPTION_MAX);
   expect(m.alternates?.canonical, path).toBe(path);
@@ -93,6 +95,19 @@ function checkComplete(path: string, m: Metadata, mustLead: boolean) {
 
 test.each(routes)("%s has a complete title, description, Open Graph and Twitter set", async (path, load, mustLead) => {
   checkComplete(path, (await load()).metadata, mustLead);
+});
+
+test("a search names its query in the title and stays out of the index", async () => {
+  const { generateMetadata } = await import("./search/page");
+  const m = await generateMetadata({ searchParams: Promise.resolve({ q: "  Thrall " }) });
+  expect(m.title).toBe("Search: Thrall");
+  expect(m.robots).toEqual({ index: false, follow: true });
+  expect((await generateMetadata({ searchParams: Promise.resolve({ q: ["Elwynn", "x"] }) })).title).toBe("Search: Elwynn");
+  expect((await generateMetadata({ searchParams: Promise.resolve({ q: "   " }) })).title).toBe("Search");
+  // The title names the query the page ran, which is cut at the same length as the search itself.
+  const { MAX_QUERY } = await import("@/lib/lore");
+  const long = (await generateMetadata({ searchParams: Promise.resolve({ q: "a".repeat(MAX_QUERY + 50) }) })).title;
+  expect(long).toBe(`Search: ${"a".repeat(MAX_QUERY)}`);
 });
 
 test("the map descriptions still fit when the game's map pictures are on", async () => {

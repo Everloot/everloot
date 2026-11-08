@@ -5,7 +5,7 @@ import { DOCS_TABS } from "@/lib/docs/nav";
 import { pageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = pageMetadata({
-  title: "Everloot Cookbook",
+  title: "Cookbook",
   description: "Short, tested walkthroughs for common jobs with Everloot: tooltips on your site, questions to Claude, prices and drop rates in a script or spreadsheet.",
   path: "/docs/cookbook",
 });

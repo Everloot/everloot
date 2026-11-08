@@ -71,7 +71,7 @@ test("a private handle is the same uncached 404 as one nobody has", async () => 
   row = null;
   for (const handle of ["thrall", "nobody"]) {
     await expect(PublicProfilePage(params(handle))).rejects.toThrow("NEXT_NOT_FOUND");
-    expect(await generateMetadata(params(handle))).toEqual({ title: "Not found", robots: { index: false, follow: false } });
+    expect(await generateMetadata(params(handle))).toEqual({ title: "Page not found", robots: { index: false, follow: false } });
   }
 });
 

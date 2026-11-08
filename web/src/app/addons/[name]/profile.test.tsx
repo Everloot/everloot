@@ -71,7 +71,7 @@ test("an addon three installs report but nobody approved has no page, no title a
   await expect(html("questie")).rejects.toThrow("NOT_FOUND");
   await expect(html("Bagnon")).rejects.toThrow("NOT_FOUND");
   const meta = await generateMetadata(props("Questie"));
-  expect(meta.title).toBe("Addon not found");
+  expect(meta.title).toBe("Page not found");
   expect(meta.alternates).toBeUndefined();
   expect(github.addonGithub).not.toHaveBeenCalled();
 });
@@ -83,7 +83,7 @@ test("a one- or two-install addon and a made-up name both 404, and nothing names
   ]));
   await expect(html("MyGuildTools")).rejects.toThrow("NOT_FOUND");
   await expect(html("NeverReported")).rejects.toThrow("NOT_FOUND");
-  expect((await generateMetadata(props("MyGuildTools"))).title).toBe("Addon not found");
+  expect((await generateMetadata(props("MyGuildTools"))).title).toBe("Page not found");
 });
 
 test("an unapproved name never reads the upload store, so a crawler guessing names costs nothing", async () => {
@@ -100,7 +100,7 @@ test("uploads that forge an approved addon's title, spelling or version cannot c
   ]));
   const page = await html("Polestar");
   const meta = await generateMetadata(props("Polestar"));
-  expect(meta.title).toBe("Polestar: addon for WoW: Forever");
+  expect(meta.title).toBe("Polestar – WoW Forever Addon");
   expect(meta.alternates?.canonical).toBe("/addons/polestar");
   expect(String(meta.description)).not.toMatch(/evil|gems|official/);
   expect(page).not.toMatch(/evil\.example|free gems|\(official\)/);
@@ -122,7 +122,7 @@ test("a registry-approved addon the curated map lacks is published with the regi
   expect(page).toContain('href="https://github.com/dnl-gentile/olympus-addon/releases"');
   expect(page).toContain("Installs reporting");
   expect(page).not.toContain("hacked title");
-  expect(meta.title).toBe("Olympus: addon for WoW: Forever");
+  expect(meta.title).toBe("Olympus – WoW Forever Addon");
   expect(meta.alternates?.canonical).toBe("/addons/Olympus");
   expect(meta.robots).toBeUndefined();
 });
@@ -137,7 +137,7 @@ test("a name matches without regard to case and redirects to the owner's spellin
 test("a malformed percent-encoded name is a 404, not an error", async () => {
   store.loadCorpus.mockResolvedValue(corpus(three("Polestar")));
   await expect(html("%E0%A4%A")).rejects.toThrow("NOT_FOUND");
-  expect((await generateMetadata(props("%E0%A4%A"))).title).toBe("Addon not found");
+  expect((await generateMetadata(props("%E0%A4%A"))).title).toBe("Page not found");
 });
 
 test("when storage is down, an approved page keeps its repository and no page is marked noindex; an unapproved one stays a 404", async () => {
@@ -148,7 +148,7 @@ test("when storage is down, an approved page keeps its repository and no page is
   expect(github.addonGithub).toHaveBeenCalledTimes(1);
   expect((await generateMetadata(props("Polestar"))).robots).toBeUndefined();
   await expect(html("Questie")).rejects.toThrow("NOT_FOUND");
-  expect((await generateMetadata(props("Questie"))).title).toBe("Addon not found");
+  expect((await generateMetadata(props("Questie"))).title).toBe("Page not found");
 });
 
 test("a curated addon shows GitHub facts, author download links and plain links only", async () => {

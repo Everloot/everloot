@@ -7,7 +7,7 @@ import { pageMetadata } from "@/lib/seo";
 import { REPO_URL } from "@/lib/source";
 
 export const metadata: Metadata = pageMetadata({
-  title: "How Everloot Works",
+  title: "How It Works",
   description: "How a loot window in WoW: Forever becomes a fact on Everloot: the addon, uploads, the 3-install rule, measured zeros, game-file data, spoilers and data age.",
   path: "/docs/how-it-works",
 });
