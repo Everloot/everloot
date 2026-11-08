@@ -20,7 +20,7 @@ describe.each([
     expect(html).toContain('role="status"');
     expect(html).toContain('aria-label="Loading"');
     // No text node: nothing but whitespace sits between a closing ">" and the next "<".
-    expect(html).not.toMatch(/>[^<]*\S[^<]*</);
+    expect(html).not.toMatch(/>[^<]*[^\s<][^<]*</);
     expect(html).not.toMatch(/animate-|opacity-|gradient/);
   });
 });
