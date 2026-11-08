@@ -18,6 +18,7 @@ import ZoneCoveragePage from "./[zone]/page";
 import { COVERAGE_BUILD, loadCoverageExpected } from "@/lib/coverage-compute";
 import { writeCoverage } from "@/lib/coverage-store";
 import { plateauDetail, plateauMeasured, plateauShare, plateauVerdict } from "./plateau";
+import { cellDetail, shareText } from "@/lib/coverage-view";
 
 const sighting = (i: number, npcId: number, name: string, mapId: number) => ({
   kind: "npc_sighting", installId: `install-${i}`, eventId: `e:${i}:${npcId}`, capturedAt: "2026-10-01T00:00:00.000Z",
@@ -46,6 +47,23 @@ test("the index is a search box, then one row per zone with settled / confirmed 
   expect(page).not.toContain("Unagreed Name");
   expect(page).not.toContain('aria-label="Breadcrumb"');
   expect(page).not.toContain("CC BY-SA");
+});
+
+test("a zone expecting none of a type reads as a dash, not a share of nothing", async () => {
+  const none = { expected: 0, observed: 0, denominator: 0, reported: 0, recheck: 0, confirmed: 0, settled: 0 };
+  expect(shareText(none)).toBe("–");
+  expect(cellDetail(none)).toBe("none expected in this zone");
+  // An open-world zone's entrances without the expected file: the game files list none, so the same dash.
+  expect(shareText({ ...none, expected: null })).toBe("–");
+  // A count the files do not give is still [?]; a zone with reports but no expected count still shows them.
+  expect(shareText({ ...none, expected: null, denominator: null })).toBe("[?] / [?]");
+  expect(cellDetail({ ...none, expected: null, denominator: null, observed: 2, reported: 2 })).toBe("0 settled, 0 confirmed, 2 reported, no expected count (2 reported)");
+  // Westfall has no dungeon entrance in the game files: the index cell is the dash with its reason, never "0 settled ... of 0".
+  store.loadCorpus.mockResolvedValue(corpus(westfall));
+  const page = await html(CoveragePage(search({})));
+  expect(page).toContain('<span title="none expected in this zone" class="tabular-nums">–<span class="sr-only">: none expected in this zone</span></span>');
+  expect(page).not.toContain(", of 0<");
+  expect(page).not.toContain(', of 0"');
 });
 
 test("sorting by a column keeps the lowest first and the header links flip it", async () => {
