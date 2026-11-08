@@ -2,6 +2,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test, vi } from "vitest";
+import { toolHref, tools } from "@/data/tools";
 import { LAUNCH } from "@/data/wow-forever";
 import { MAP_DATA_EXTRACTED_AT, TALENT_DATA_EXTRACTED_AT } from "@/lib/build-stamp";
 import { loadTimeline, postPath } from "@/lib/changes";
@@ -33,6 +34,11 @@ vi.mock("@/lib/news", async (importOriginal) => {
 
 const entries = await sitemap();
 const byPath = new Map(entries.map((e) => [new URL(e.url).pathname, e]));
+
+test("every catalogue tool that is not coming-soon is in the sitemap, farming included (#826)", () => {
+  expect(byPath.has("/tools/farming-routes")).toBe(true);
+  for (const tool of tools) expect(byPath.has(toolHref(tool)), tool.slug).toBe(tool.status !== "coming-soon");
+});
 
 test("/changes is dated by its newest entry", async () => {
   const newest = (await loadTimeline())[0];

@@ -52,7 +52,7 @@ const LIMITATIONS = [
   "Public database facts appear only when enough install reports agree. Distinct addon install IDs are not proof of independent people.",
   "Loot-window observations are not verified kills and are not kill-based drop probabilities.",
   "No actual beta-client collection trial has been verified yet. Empty storage and unavailable storage are different states.",
-  "No number, name or position is invented for an unknown entity. Farming routes and respawn optimization are planned, not built.",
+  "No number, name or position is invented for an unknown entity. Respawn optimization is planned, not built.",
   "The lore archive is a 2023 Warcraft Wiki snapshot and predates WoW: Forever.",
 ];
 

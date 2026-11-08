@@ -8,8 +8,8 @@ describe("working feature discovery", () => {
     expect(tools.find((tool) => tool.slug === "database")).toMatchObject({ href: "/database", status: "collecting" });
     expect(tools.find((tool) => tool.slug === "upload")).toMatchObject({ href: "/upload", status: "live" });
   });
-  it("describes routes that are still planned honestly", () => {
-    expect(tools.find((tool) => tool.slug === "farming-routes")?.status).toBe("coming-soon");
+  it("describes the farming tool as live now that its page is", () => {
+    expect(tools.find((tool) => tool.slug === "farming-routes")?.status).toBe("collecting");
   });
   it("lists canonical routes once without redirect or waitlist duplicates", async () => {
     const urls = (await sitemap()).map((entry) => new URL(entry.url).pathname);
@@ -34,7 +34,7 @@ describe("working feature discovery", () => {
   it("claims no feature the addon or server does not have", () => {
     const page = (path: string) => readFileSync(new URL(`../app/${path}`, import.meta.url), "utf8");
     const professions = page("tools/professions/page.tsx");
-    // No recipe emitter or perk record kind exists, and farming routes are planned.
+    // No recipe emitter or perk record kind exists.
     expect(professions).not.toMatch(/perk tracking|We track which perks|recipe sightings and material drops flow|plug straight into/);
     expect(tools.find((tool) => tool.slug === "professions")?.description).not.toMatch(/perk/i);
     // Opt-out needs a verified character grant; not any character.
