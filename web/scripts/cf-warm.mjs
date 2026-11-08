@@ -7,6 +7,9 @@
  * asking the runner to slow down, not a broken page, and a network error on one request is the runner's connection,
  * not the page: those pages are asked for again, fewer at a time, after the wait the answer names (a minute when it
  * names none), twice before they count as failures. Other data centres still fill on their first visit.
+ * The lore pages open the knowledge release on the request path, which a cold isolate hashes whole, so they are
+ * asked for first, one at a time, before the sample; a 500 there is the cold render outrunning the Worker's CPU
+ * budget under load and is asked once more after a short wait before it counts.
  * Run: node scripts/cf-warm.mjs <origin> <commit sha>
  */
 import { pathToFileURL } from "node:url";
@@ -16,10 +19,20 @@ export const MAX_PAGES = 80;
 /** The most time one deploy spends warming, in milliseconds. */
 export const MAX_MS = 120_000;
 const CONCURRENCY = 4;
+/** How long to wait before asking a release page that answered 500 once more. */
+const RELEASE_RETRY_MS = 5_000;
 
 /** The page addresses a sitemap lists, in order, without repeats. */
 export function sitemapUrls(xml) {
   return [...new Set([...xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/g)].map((m) => m[1].replaceAll("&amp;", "&")))];
+}
+
+/**
+ * The pages that open the knowledge release on the request path (src/lib/release.ts): /lore and every page under
+ * it. They are warmed first and alone, so the release opens once, on an idle isolate.
+ */
+export function releasePages(urls) {
+  return urls.filter((u) => /^\/lore(\/|$)/.test(new URL(u).pathname));
 }
 
 /**
@@ -101,7 +114,8 @@ export async function warm(urls, { get: fetchOne = get, now = () => performance.
  * limited. It spends at most `maxMs` in total (the commit wait, the sitemap and the retries share one deadline)
  * and asks at most `maxPages` unique pages, however many retries a page takes. `get`, `now` and `sleep` are
  * injected so the limits are tested without a network or a clock. A page may be requested up to three times
- * (the pass and two retries), which is not a new page.
+ * (the pass and two retries), which is not a new page. The release pages go first, serially, and a 500 on that
+ * pass is asked once more after RELEASE_RETRY_MS before it counts; the sample follows with the rest of the page budget.
  * @param {{ origin?: string, sha?: string, get?: (url: string, timeoutMs?: number) => Promise<{ url: string, status: number, body?: string, ms?: number, retryAfter?: string | null, error?: string }>, now?: () => number, sleep?: (ms: number) => Promise<unknown>, log?: (line: string) => void, maxMs?: number, maxPages?: number, concurrency?: number }} [options]
  */
 export async function warmDeploy({
@@ -135,7 +149,20 @@ export async function warmDeploy({
   const urls = sitemapUrls(sitemap.body);
   if (remaining() <= 0) return { ...summarize([], urls), results: [], skipped: urls, pagesAsked: 0 };
 
-  let { results, skipped } = await warm(urls, { get: fetchOne, now, maxMs: remaining(), maxPages, concurrency });
+  const lore = releasePages(urls);
+  const first = await warm(lore, { get: fetchOne, now, maxMs: remaining(), maxPages, concurrency: 1 });
+  const killed = first.results.filter((r) => r.status === 500).map((r) => r.url);
+  if (killed.length > 0 && RELEASE_RETRY_MS < remaining()) {
+    log(`${killed.length} release pages answered 500 on the cold pass; asking again in ${Math.round(RELEASE_RETRY_MS / 1000)} s`);
+    await sleep(RELEASE_RETRY_MS);
+    const retried = await warm(killed, { get: fetchOne, now, maxMs: remaining(), maxPages: killed.length, concurrency: 1 });
+    const byUrl = new Map(retried.results.map((r) => [r.url, r]));
+    first.results = first.results.map((r) => byUrl.get(r.url) ?? r);
+  }
+  const rest = urls.filter((u) => !lore.includes(u));
+  const sample = await warm(rest, { get: fetchOne, now, maxMs: remaining(), maxPages: Math.max(0, maxPages - first.results.length), concurrency });
+  let results = [...first.results, ...sample.results];
+  const skipped = [...first.skipped, ...sample.skipped];
   // Twice, not five times: a rate-limited page that survives two waits is not made better by a longer crawl.
   for (let round = 0; round < 2; round++) {
     const { urls: again, waitMs } = rateLimited(results);

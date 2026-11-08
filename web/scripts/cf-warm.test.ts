@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { MAX_MS, MAX_PAGES, rateLimited, requestHeaders, sitemapUrls, summarize, warm, warmDeploy } from "./cf-warm.mjs";
+import { MAX_MS, MAX_PAGES, rateLimited, releasePages, requestHeaders, sitemapUrls, summarize, warm, warmDeploy } from "./cf-warm.mjs";
 
 test("with EVERLOOT_EDGE_CHECK set, every request carries it as x-everloot-check; without it, only the user agent", () => {
   expect(requestHeaders({ EVERLOOT_EDGE_CHECK: "s3cret" })).toEqual({ "user-agent": "everloot-deploy-warm", "x-everloot-check": "s3cret" });
@@ -137,4 +137,79 @@ test("retries ask no new pages: the unique page count stays within maxPages howe
   expect(asked).not.toContain(`${ORIGIN}/c`);
   // The pass and its two retries: bounded, so a rate-limited site cannot keep the deploy running.
   expect(asked.filter((u) => u === `${ORIGIN}/a`)).toHaveLength(3);
+});
+
+test("the release pages are /lore and everything under it, not /lorem or a page that mentions lore", () => {
+  const urls = [`${ORIGIN}/`, `${ORIGIN}/lore`, `${ORIGIN}/lorem`, `${ORIGIN}/lore/zones/elwynn`, `${ORIGIN}/map?from=lore`];
+  expect(releasePages(urls)).toEqual([`${ORIGIN}/lore`, `${ORIGIN}/lore/zones/elwynn`]);
+});
+
+test("the lore pages are asked first, one at a time, before the concurrent sample", async () => {
+  const { asked, get } = fakeDeploy({ sitemapBody: sitemap("/", "/lore", "/map", "/lore/zones/elwynn", "/database") });
+  let inFlight = 0;
+  const loreOverlap: number[] = [];
+  let sampleOverlap = 0;
+  const slowGet = async (url: string) => {
+    inFlight++;
+    // Lets the other workers of a concurrent pass start before this request answers.
+    await new Promise((r) => setTimeout(r, 2));
+    if (url.includes("/lore")) loreOverlap.push(inFlight);
+    else if (!url.includes("deploy-check") && !url.endsWith("sitemap.xml")) sampleOverlap = Math.max(sampleOverlap, inFlight);
+    inFlight--;
+    return get(url);
+  };
+  const out = await warmDeploy({ origin: ORIGIN, sha: SHA, get: slowGet, now: () => 0, sleep: async () => {}, log: () => {} });
+  expect(out.ok).toBe(true);
+  expect(out.pagesAsked).toBe(5);
+  const pages = asked.filter((u) => !u.includes("deploy-check") && !u.endsWith("sitemap.xml"));
+  expect(pages.slice(0, 2)).toEqual([`${ORIGIN}/lore`, `${ORIGIN}/lore/zones/elwynn`]);
+  expect(loreOverlap).toEqual([1, 1]);
+  expect(sampleOverlap).toBeGreaterThan(1);
+});
+
+test("a lore page that answers 500 on the cold pass is asked once more after a short wait, and passes when it answers 200", async () => {
+  let cold = true;
+  const { asked, get } = fakeDeploy({
+    sitemapBody: sitemap("/", "/lore", "/map"),
+    page: (url) => {
+      if (url.endsWith("/lore") && cold) { cold = false; return { status: 500 }; }
+      return { status: 200 };
+    },
+  });
+  const slept: number[] = [];
+  const out = await warmDeploy({ origin: ORIGIN, sha: SHA, get, now: () => 0, sleep: async (ms: number) => { slept.push(ms); }, log: () => {} });
+  expect(out.ok).toBe(true);
+  expect(out.pagesAsked).toBe(3);
+  expect(asked.filter((u) => u === `${ORIGIN}/lore`)).toHaveLength(2);
+  expect(slept).toEqual([5_000]);
+  // The retry is done before the sample starts, so the sample never lands on the cold open.
+  const pages = asked.filter((u) => !u.includes("deploy-check") && !u.endsWith("sitemap.xml"));
+  expect(pages).toEqual([`${ORIGIN}/lore`, `${ORIGIN}/lore`, `${ORIGIN}/`, `${ORIGIN}/map`]);
+});
+
+test("a lore page that answers 500 twice fails the run, named as before", async () => {
+  const { asked, get } = fakeDeploy({ sitemapBody: sitemap("/", "/lore", "/map"), page: (url) => ({ status: url.endsWith("/lore") ? 500 : 200 }) });
+  const out = await warmDeploy({ origin: ORIGIN, sha: SHA, get, now: () => 0, sleep: async () => {}, log: () => {} });
+  expect(out.ok).toBe(false);
+  expect(out.lines).toEqual(["3 pages, 2 answered 200, p95 1 ms", `  500 ${ORIGIN}/lore`]);
+  expect(asked.filter((u) => u === `${ORIGIN}/lore`)).toHaveLength(2);
+});
+
+test("a 500 on a sampled page that is not a lore page is still a failure on the first answer", async () => {
+  const { asked, get } = fakeDeploy({ sitemapBody: sitemap("/", "/lore", "/map"), page: (url) => ({ status: url.endsWith("/map") ? 500 : 200 }) });
+  const slept: number[] = [];
+  const out = await warmDeploy({ origin: ORIGIN, sha: SHA, get, now: () => 0, sleep: async (ms: number) => { slept.push(ms); }, log: () => {} });
+  expect(out.ok).toBe(false);
+  expect(slept).toEqual([]);
+  expect(asked.filter((u) => u === `${ORIGIN}/map`)).toHaveLength(1);
+});
+
+test("the lore pages count against the page limit: the sample gets what is left", async () => {
+  const { asked, get } = fakeDeploy({ sitemapBody: sitemap("/", "/lore", "/map", "/lore/zones/elwynn", "/database") });
+  const out = await warmDeploy({ origin: ORIGIN, sha: SHA, get, maxPages: 3, now: () => 0, sleep: async () => {}, log: () => {} });
+  expect(out.ok).toBe(true);
+  expect(out.pagesAsked).toBe(3);
+  expect(asked).toContain(`${ORIGIN}/lore`);
+  expect(asked).toContain(`${ORIGIN}/lore/zones/elwynn`);
+  expect(out.skipped).toEqual([`${ORIGIN}/map`, `${ORIGIN}/database`]);
 });
