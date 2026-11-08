@@ -34,7 +34,7 @@ describe("working feature discovery", () => {
   it("claims no feature the addon or server does not have", () => {
     const page = (path: string) => readFileSync(new URL(`../app/${path}`, import.meta.url), "utf8");
     const professions = page("tools/professions/page.tsx");
-    // No recipe emitter or perk record kind exists, and farming routes are planned.
+    // No recipe emitter or perk record kind exists.
     expect(professions).not.toMatch(/perk tracking|We track which perks|recipe sightings and material drops flow|plug straight into/);
     expect(tools.find((tool) => tool.slug === "professions")?.description).not.toMatch(/perk/i);
     // Opt-out needs a verified character grant; not any character.
